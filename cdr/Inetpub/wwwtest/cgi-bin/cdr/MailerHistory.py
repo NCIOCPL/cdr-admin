@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: MailerHistory.py,v 1.1 2002-05-03 20:28:54 bkline Exp $
+# $Id: MailerHistory.py,v 1.2 2002-10-09 13:00:11 bkline Exp $
 #
 # Reports on the history of mailers for a particular document.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2002/05/03 20:28:54  bkline
+# New Mailer reports.
+#
 #----------------------------------------------------------------------
 import cdrdb, cdrcgi, cgi, re, string
 
@@ -137,7 +140,7 @@ try:
                AND sent.path = '/Mailer/Sent'
                AND doc.path = '/Mailer/Document/@cdr:ref'
                AND doc.int_val = ?
-          ORDER BY sent.value""", id)
+          ORDER BY sent.value""", id, 300)
     row = cursor.fetchone()
     if not row:
         cdrcgi.sendPage(html + """\
