@@ -1,9 +1,12 @@
 #----------------------------------------------------------------------
-# $Id: tsoap.py,v 1.3 2002-04-16 22:43:25 bkline Exp $
+# $Id: tsoap.py,v 1.4 2002-05-16 14:33:34 bkline Exp $
 #
 # Stub for SOAP interface to CDR from Cancer.gov.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2002/04/16 22:43:25  bkline
+# Fixed function name.
+#
 # Revision 1.2  2002/04/16 22:42:08  bkline
 # Eliminated some unneeded imports.
 #
@@ -12,7 +15,7 @@
 # a client message and sending back a response.
 #
 #----------------------------------------------------------------------
-import os, sys
+import os, sys, time
 
 #----------------------------------------------------------------------
 # Send an XML SOAP message back to the client.
@@ -89,8 +92,8 @@ def readRequest():
 request = readRequest()
 sendMessage("""\
   <PubEventResp         system = "CDR"
-                          when = "2002-11-01T19:48:06.780"
+                          when = "%s"
                        pubType = "Export"
                        docType = "Term"
                        lastJob = "287398"/>
-""")
+""" % time.strftime("%Y-%m-%dT%H:%M:%S"))
