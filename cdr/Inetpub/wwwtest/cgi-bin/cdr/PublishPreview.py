@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: PublishPreview.py,v 1.14 2002-10-24 15:38:08 bkline Exp $
+# $Id: PublishPreview.py,v 1.15 2002-10-28 13:59:11 bkline Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.14  2002/10/24 15:38:08  bkline
+# Implemented change request from issue #478 to use last publishable
+# version instead of current working version.
+#
 # Revision 1.13  2002/10/22 17:47:05  bkline
 # Added, then commented out, the debugging flag for cdr2cg.
 #
@@ -56,6 +60,7 @@ fields  = cgi.FieldStorage() or cdrcgi.bail("No Request Found", title)
 session = cdrcgi.getSession(fields) or cdrcgi.bail("Not logged in")
 docId   = fields.getvalue(cdrcgi.DOCID) or cdrcgi.bail("No Document", title)
 flavor  = fields.getvalue("Flavor") or None
+dbgLog  = fields.getvalue("DebugLog") or None
 
 #----------------------------------------------------------------------
 # Map for finding the filters for a given document type.
@@ -139,7 +144,8 @@ doc = pattern1.sub("", doc)
 doc = pattern2.sub("", doc)
 #cdrcgi.bail("flavor=%s doc=%s" % (flavor, doc))
 try:
-    #cdr2cg.debuglevel = 1
+    if dbgLog:
+        cdr2cg.debuglevel = 1
     resp = cdr2cg.pubPreview(doc, flavor)
 except:
     cdrcgi.bail("Preview formatting failure")
@@ -154,6 +160,7 @@ cdrcgi.sendPage("""\
 <html>
  <head>
   <title>Publish Preview for CDR%010d</title>
+  <link rel="stylesheet" href="http://www.cancer.gov/stylesheets/nci.css">
  </head>
  <body>
   %s
