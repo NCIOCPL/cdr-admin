@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: TermUsage.py,v 1.2 2002-02-21 22:34:01 bkline Exp $
+# $Id: TermUsage.py,v 1.3 2004-01-09 16:03:20 bkline Exp $
 #
 # Reports on documents which link to specified terms.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/02/21 22:34:01  bkline
+# Added navigation buttons.
+#
 # Revision 1.1  2001/12/01 18:11:44  bkline
 # Initial revision
 #
@@ -128,13 +131,13 @@ html    = """\
  </TR>
 """
 for row in rows:
-    title = row[2].encode('latin-1')
-    termName = row[4].encode('latin-1')
+    title = row[2]
+    termName = row[4]
     #shortTitle = title[:50] 
     #shortTermName = termName[:30]
     #if len(title) > 50: shortTitle += " ..."
     #if len(termName) > 30: shortTermName += " ..."
-    html += """\
+    html += u"""\
  <TR>
   <TD BGCOLOR='white' VALIGN='top' ALIGN='left'><FONT SIZE='-1'>%s</FONT></TD>
   <TD BGCOLOR='white' VALIGN='top' ALIGN='center'><FONT SIZE='-1'>CDR%010d</FONT></TD>
