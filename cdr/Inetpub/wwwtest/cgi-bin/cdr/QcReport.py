@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.15 2002-12-30 15:15:47 bkline Exp $
+# $Id: QcReport.py,v 1.16 2003-04-02 21:21:15 pzhang Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.15  2002/12/30 15:15:47  bkline
+# Fixed a typo.
+#
 # Revision 1.14  2002/12/26 21:54:40  bkline
 # Added doc id to new screen for multiple matching titles.
 #
@@ -240,9 +243,11 @@ filters = {
         ["name:Citation QC Report"],
     'Organization':     
         ["name:Denormalization Filter (1/1): Organization",
+         "name:Denormalization: sort OrganizationName for Postal Address",
          "name:Organization QC Report Filter"],
     'Person':           
         ["name:Denormalization Filter (1/1): Person",
+         "name:Denormalization: sort OrganizationName for Postal Address",
          "name:Person QC Report Filter"],
     'InScopeProtocol':  
         ["name:Denormalization Filter (1/1): InScope Protocol",
