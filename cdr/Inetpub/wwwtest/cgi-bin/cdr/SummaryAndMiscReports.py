@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryAndMiscReports.py,v 1.11 2004-03-11 20:53:28 venglisc Exp $
+# $Id: SummaryAndMiscReports.py,v 1.12 2004-04-08 20:31:10 bkline Exp $
 #
 # Submenu for summary and miscellanous document reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.11  2004/03/11 20:53:28  venglisc
+# Minor change to one menu entry.
+#
 # Revision 1.10  2004/03/05 21:47:44  venglisc
 # Modified the menu selection and added new SummariesLists menu item.
 #
@@ -87,22 +90,7 @@ reports = [
            #  'No Markup QC Report')
           ]
 for r in reports:
-    form += "<LI><A HREF='%s/%s%s=%s'>%s</LI>\n" % (
-            cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
-
-form += """\
-    </OL>
-    <H4>Miscellaneous Document QC Report</H4>
-    <OL>
-"""
-reports = [
-           ('MiscSearch.py?', 
-            'Miscellaneous Documents')
-          ]
-for r in reports:
-    # Careful!  The pattern in the HREF='...' below is intentionally
-    # different from the patterns above; there's a '?' included here.
-    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI>\n" % (
+    form += "<LI><A HREF='%s/%s%s=%s'>%s</A></LI>\n" % (
             cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
 
 form += """\
@@ -126,8 +114,29 @@ reports = [
             'Summary Metadata'),
           ]
 for r in reports:
-    form += "<LI><A HREF='%s/%s%s=%s'>%s</LI>\n" % (
+    form += "<LI><A HREF='%s/%s%s=%s'>%s</A></LI>\n" % (
             cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
 
+
+form += """\
+   </OL>
+   <H4>Board Member Information Reports</H4>
+   <OL>
+"""
+
+for choice in (
+    ('Stub.py',          'Board Member Information QC Report' ),
+    ('Stub.py',               'Board Roster Reports'               )
+    ):
+    form += """\
+    <LI><A href='%s/%s?%s'>%s</A></LI>
+""" % (cdrcgi.BASE, choice[0], session, choice[1])
+    
+form += """\
+   </OL>
+   <H4>Miscellaneous Document QC Report</H4>
+   <OL>
+    <LI><A HREF='%s/MiscSearch.py?%s'>Miscellaneous Documents</A></LI>
+""" % (cdrcgi.BASE, session)
 
 cdrcgi.sendPage(header + form + "</OL></FORM></BODY></HTML>")

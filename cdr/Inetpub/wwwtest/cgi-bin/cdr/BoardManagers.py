@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: BoardManagers.py,v 1.3 2003-12-19 18:29:08 bkline Exp $
+# $Id: BoardManagers.py,v 1.4 2004-04-08 20:31:10 bkline Exp $
 #
 # Main menu for board managers.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2003/12/19 18:29:08  bkline
+# Plugged in new Summaries LIsts report.
+#
 # Revision 1.2  2003/12/18 22:16:41  bkline
 # Alphabetized first section at Volker's request (with Lakshmi's
 # concurrence).
@@ -67,13 +70,9 @@ for choice in (
 
 form += """\
    </ol>
-   <h2>Miscellaneous Document QC Report</h2>
-   <ol>
-    <li><a href='%s/MiscSearch.py?%s'>Miscellaneous Documents</a></li>
-   </ol>
    <h2>Management Reports</h2>
    <ol>
-""" % (cdrcgi.BASE, session)
+"""
 
 for choice in (
     ('SummaryChanges.py',          'History of Changes'          ),
@@ -87,8 +86,26 @@ for choice in (
     <li><a href='%s/%s?%s'>%s</a></li>
 """ % (cdrcgi.BASE, choice[0], session, choice[1])
     
+form += """\
+   </ol>
+   <h2>Board Member Information Reports</h2>
+   <ol>
+"""
+
+for choice in (
+    ('Stub.py',          'Board Member Information QC Report' ),
+    ('Stub.py',               'Board Roster Reports'               )
+    ):
+    form += """\
+    <li><a href='%s/%s?%s'>%s</a></li>
+""" % (cdrcgi.BASE, choice[0], session, choice[1])
+    
 cdrcgi.sendPage(header + form + """\
+   </ol>
+   <h2>Miscellaneous Document QC Report</h2>
+   <ol>
+    <li><a href='%s/MiscSearch.py?%s'>Miscellaneous Documents</a></li>
    </ol>
   </form>
  </body>
-</html>""")
+</html>""" % (cdrcgi.BASE, session))
