@@ -1,7 +1,9 @@
 #----------------------------------------------------------------------
-# $Id: Glossary.py,v 1.1 2001-03-27 21:11:14 bkline Exp $
+# $Id: Glossary.py,v 1.2 2001-03-27 21:12:36 bkline Exp $
 #
-# Displays CDR glossary term (stub version).
+# Displays CDR glossary term.
+# 
+# $Log: not supported by cvs2svn $
 #----------------------------------------------------------------------
 import cgi, cdrcgi, cdr
 
