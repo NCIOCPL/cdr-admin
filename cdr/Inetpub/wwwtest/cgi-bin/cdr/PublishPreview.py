@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: PublishPreview.py,v 1.23 2004-05-27 20:50:23 bkline Exp $
+# $Id: PublishPreview.py,v 1.24 2004-12-28 16:20:55 bkline Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.23  2004/05/27 20:50:23  bkline
+# Replaced stylesheets as requested by Jay (email message).
+#
 # Revision 1.22  2003/12/16 15:47:14  bkline
 # Added debugging support and CTGovProtocol support.
 #
@@ -87,6 +90,7 @@ if not fields:
     docId   = sys.argv[1]
     dbgLog  = len(sys.argv) > 2 and sys.argv[2] or None
     flavor  = len(sys.argv) > 3 and sys.argv[3] or None
+    cgHost  = len(sys.argv) > 4 and sys.argv[4] or None
     monitor = 1
 else:
     session = cdrcgi.getSession(fields) or cdrcgi.bail("Not logged in")
@@ -94,7 +98,14 @@ else:
                                                            title)
     flavor  = fields.getvalue("Flavor") or None
     dbgLog  = fields.getvalue("DebugLog") or None
+    cgHost  = fields.getvalue("cgHost") or None
     monitor = 0
+
+#----------------------------------------------------------------------
+# Point to a different host if requested.
+#----------------------------------------------------------------------
+if cgHost:
+    cdr2cg.host = cgHost
 
 #----------------------------------------------------------------------
 # Debugging output.
