@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: DocVersionHistory.py,v 1.8 2002-10-10 19:15:26 bkline Exp $
+# $Id: DocVersionHistory.py,v 1.9 2002-12-19 17:12:50 pzhang Exp $
 #
 # Show version history of document.
 #----------------------------------------------------------------------
@@ -96,6 +96,7 @@ if docTitle and not docId:
 try:
     cursor.execute("""SELECT doc_title,
                              doc_type,
+                             doc_status,
                              created_by,
                              created_date,
                              mod_by,
@@ -105,7 +106,7 @@ try:
     row = cursor.fetchone()
     if not row:
         cdrcgi.bail("Unable to find document information for %s" % docId)
-    docTitle, docType, createdBy, createdDate, modBy, modDate = row
+    docTitle, docType, docStatus, createdBy, createdDate, modBy, modDate = row
 except cdrdb.Error, info:    
         cdrcgi.bail('Unable to find document information for %s: %s' % (docId, 
                                                                  info[1][0]))
@@ -114,6 +115,11 @@ except cdrdb.Error, info:
 #----------------------------------------------------------------------
 # Build the report header.
 #----------------------------------------------------------------------
+if docStatus == 'I':
+    docStatus = "<B>I [Blocked]</B>"
+elif docStatus == 'A':
+    docStatus = "A [Active]"
+
 html = """\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>
@@ -158,6 +164,18 @@ html = """\
     <b>
      <td valign = 'top' align='right' nowrap='1'>
       <font size='3'>Document Title:&nbsp;</font>
+     </td>
+    <b>
+    <b>
+     <td colspan='3'>
+      <font size='3'>%s</font>
+     </td>
+    </b>
+   </tr>
+   <tr>
+    <b>
+     <td valign = 'top' align='right' nowrap='1'>
+      <font size='3'>Document Status:&nbsp;</font>
      </td>
     <b>
     <b>
@@ -256,6 +274,7 @@ html = """\
        intId,
        docType,
        docTitle,
+       docStatus,
        createdBy or "[Conversion]",
        createdDate and createdDate[:10] or "2002-06-22",
        modBy or "N/A",
