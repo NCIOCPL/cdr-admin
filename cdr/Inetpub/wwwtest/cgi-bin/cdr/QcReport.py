@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.25 2003-08-25 20:27:30 bkline Exp $
+# $Id: QcReport.py,v 1.26 2003-08-27 16:39:28 venglisc Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.25  2003/08/25 20:27:30  bkline
+# Plugged in support for displaying StandardWording markup in patient
+# summary QC report.
+#
 # Revision 1.24  2003/08/11 21:57:19  venglisc
 # Modified code to pass an additional parameter named delRefLevels to the
 # summary QC reports to handle insertion/deletion markup properly.
@@ -466,7 +470,7 @@ if not filters.has_key(docType):
 filterParm = []
 if insRevLvls:
     filterParm = [['insRevLevels', insRevLvls]]
-if repType == "bu":
+if repType == "bu" or repType == "but":
     filterParm.append(['delRevLevels', 'Y'])
 if repType == "pat":
     filterParm.append(['DisplayGlossaryTermList',
