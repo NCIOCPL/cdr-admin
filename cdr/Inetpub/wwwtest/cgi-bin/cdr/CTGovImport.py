@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: CTGovImport.py,v 1.1 2003-11-10 17:57:34 bkline Exp $
+# $Id: CTGovImport.py,v 1.2 2003-11-25 12:45:47 bkline Exp $
 #
 # User interface for selecting Protocols to be imported from
 # ClinicalTrials.gov.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2003/11/10 17:57:34  bkline
+# User interface for reviewing protocol documents downloaded from
+# ClinicalTrials.gov to determine their disposition.
+#
 #----------------------------------------------------------------------
 import cdr, cdrbatch, cgi, cdrcgi, cdrdb
 
@@ -41,8 +45,14 @@ def showList(skipPast, cursor):
     html = cdrcgi.header ("CDR Import from ClinicalTrials.gov",
                           "Import CTGov Documents",
                           subtitle,
-                          "CTGovImport.py")
-
+                          "CTGovImport.py",
+                          stylesheet = """\
+  <script>
+	function openWindow(pageURL) {
+		windowName=window.open(pageURL,'ctgov')
+	}
+  </script>
+""")
     # Add saved session
     html += """
     <input type='hidden' name='%s' value='%s' />
@@ -88,8 +98,9 @@ def showList(skipPast, cursor):
     html += "<span style='font-family: arial'>\n"
     base = "http://clinicaltrials.gov/ct/show/"
     for row in rows:
-        html += "<b><a href='%s%s'>%s</a></b> <i>%s</i><br>\n" % (base,
-                                                                  row[0],
+        href = 'javascript:openWindow("%s%s")' % (base, row[0])
+        html += "<b><a href='%s'>%s</a></b> <i>%s</i><br>\n" % (href, #base,
+                                                                  #row[0],
                                                                   row[0],
                                                        cgi.escape(row[1]))
         html += "<input type='hidden' name='id-%d' value='%s'>\n" % (n, row[0])
