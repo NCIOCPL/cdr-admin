@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: UnchangedDocs.py,v 1.3 2002-04-24 20:37:10 bkline Exp $
+# $Id: UnchangedDocs.py,v 1.4 2004-02-17 19:55:02 venglisc Exp $
 #
 # Reports on documents unchanged for a specified number of days.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2002/04/24 20:37:10  bkline
+# Changed "Title" label to "DocTitle" at Eileen's request (issue #161).
+#
 # Revision 1.2  2002/02/21 15:22:03  bkline
 # Added navigation buttons.
 #
@@ -134,8 +137,8 @@ SELECT DISTINCT name
         docTypes = cursor.fetchall()
     except cdrdb.Error, info:
         cdrcgi.bail('Database query failure: %s' % info[1][0])
-    title   = "Unchanged Documents"
-    instr   = "Select Options and Submit Request"
+    title   = "CDR Administration"
+    instr   = "Unchanged Documents"
     buttons = ("Submit Request", SUBMENU, cdrcgi.MAINMENU)
     header  = cdrcgi.header(title, title, instr, "UnchangedDocs.py", buttons)
     form    = """\
