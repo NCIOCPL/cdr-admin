@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: PublishPreview.py,v 1.15 2002-10-28 13:59:11 bkline Exp $
+# $Id: PublishPreview.py,v 1.16 2002-10-31 02:06:06 bkline Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.15  2002/10/28 13:59:11  bkline
+# Added hook to debuglevel.  Added link to Cancer.gov stylesheet.
+#
 # Revision 1.14  2002/10/24 15:38:08  bkline
 # Implemented change request from issue #478 to use last publishable
 # version instead of current working version.
@@ -160,7 +163,7 @@ cdrcgi.sendPage("""\
 <html>
  <head>
   <title>Publish Preview for CDR%010d</title>
-  <link rel="stylesheet" href="http://www.cancer.gov/stylesheets/nci.css">
+  <link rel="stylesheet" href="http://stage.cancer.gov/stylesheets/nci.css">
  </head>
  <body>
   %s
