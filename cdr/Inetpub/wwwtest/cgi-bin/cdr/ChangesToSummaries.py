@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ChangesToSummaries.py,v 1.1 2003-12-16 15:55:50 bkline Exp $
+# $Id: ChangesToSummaries.py,v 1.2 2005-03-24 21:11:26 bkline Exp $
 #
-# Report of history of changes to a single summary.
+# Report of history of changes for a board's summaries
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2003/12/16 15:55:50  bkline
+# Report of history of changes for a board's summaries.
+#
 #----------------------------------------------------------------------
 import cdr, cdrdb, time, cgi, cdrcgi, re
 
@@ -21,40 +24,152 @@ SUBMENU   = "Reports Menu"
 buttons   = ["Submit", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 header    = cdrcgi.header(title, title, section, "ChangesToSummaries.py",
                           buttons, method = 'GET')
-boardId   = fields.getvalue("BoardId")    or None
+board     = fields.getvalue("Board")      or None
 audience  = fields.getvalue("Audience")   or None
 startDate = fields.getvalue("StartDate")  or None
 endDate   = fields.getvalue("EndDate")    or None
+pattern   = re.compile("<DateLastModified[^>]*>([^<]+)</DateLastModified>")
+
+#----------------------------------------------------------------------
+# Load common style information from repository.
+#----------------------------------------------------------------------
+def getCommonCssStyle():
+    xslScript = """\
+<?xml version="1.0"?>
+<xsl:transform           xmlns:xsl = "http://www.w3.org/1999/XSL/Transform"
+                           version = "1.0"
+                         xmlns:cdr = "cips.nci.nih.gov/cdr"
+           exclude-result-prefixes = "cdr">
+ <xsl:output                method = "html"/>
+ <xsl:include                 href = "cdr:name:Module: STYLE Default"/>
+ <xsl:template               match = "/">
+  <style type='text/css'>
+   <xsl:call-template         name = "defaultStyle"/>
+   h1       { font-family: Arial, sans-serif; font-size: 16pt;
+              text-align: center; font-weight: bold; }
+   h2       { font-family: Arial, sans-serif; font-size: 14pt;
+              text-align: center; font-weight: bold; }
+   h1.left  { font-family: Arial, sans-serif; font-size: 16pt;
+              text-align: left; font-weight: bold; }
+   h2.left  { font-family: Arial, sans-serif; font-size: 14pt;
+              text-align: left; font-weight: bold; }
+   td.hdg   { font-family: Arial, sans-serif; font-size: 16pt;
+              font-weight: bold; }
+   p        { font-family: Arial, sans-serif; font-size: 12pt; }
+   body     { font-family: Arial; font-size: 12pt; }
+   span.SectionRef { text-decoration: underline; font-weight: bold; }
+  </style>
+ </xsl:template>
+</xsl:transform>
+"""
+    response = cdr.filterDoc('guest', xslScript, doc = "<dummy/>", inline = 1)
+    if type(response) in (type(""), type(u"")):
+        cdrcgi.bail("Failure loading common CSS style information: %s" %
+                    response)
+    return response[0]
 
 #----------------------------------------------------------------------
 # Build a picklist for editorial boards, including an option for All.
 #----------------------------------------------------------------------
-def getBoardList():
-    try:
-        cursor.execute("""\
-            SELECT DISTINCT d.id, d.title
-                       FROM document d
-                       JOIN query_term q
-                         ON q.doc_id = d.id
-                      WHERE q.path = '/Organization/OrganizationType'
-                        AND q.value = 'PDQ Editorial Board'
-                   ORDER BY d.title""")
-        rows = cursor.fetchall()
-        if not rows:
-            cdrcgi.bail("Can't find any editorial boards.")
-    except Exception, info:
-        cdrcgi.bail("Database failure fetching editorial boards: %s" %
-                    str(info))
-    html = """\
-     <SELECT NAME='BoardId'>
-      <OPTION VALUE='' SELECTED='1'>All</OPTION>
+def getBoardList(cursor):
+    picklist = """\
+    <SELECT NAME='Board'>
+     <OPTION VALUE='All' SELECTED='1'>All</OPTION>
 """
+    cursor.execute("""\
+        SELECT org_name.doc_id, org_name.value
+          FROM query_term org_name
+          JOIN query_term org_type
+            ON org_type.doc_id = org_name.doc_id
+         WHERE org_type.value  = 'PDQ Editorial Board'
+           AND org_type.path   = '/Organization/OrganizationType'
+           AND org_name.path   = '/Organization/OrganizationNameInformation'
+                               + '/OfficialName/Name'
+      ORDER BY org_name.value""", timeout = 300)
+    for docId, orgName in cursor.fetchall():
+        picklist += """\
+     <OPTION VALUE='%d'>%s</OPTION>
+""" % (docId, orgName)
+    return picklist + """\
+    </SELECT>"""
+
+#----------------------------------------------------------------------
+# Assemble the HTML for one summary's changes.
+#----------------------------------------------------------------------
+def getSummaryChanges(cursor, docId, startDate, endDate):
+    cursor.execute("SELECT title FROM document WHERE id = ?", docId)
+    docTitle = cursor.fetchall()[0][0]
+    semicolon = docTitle.find(";")
+    if semicolon != -1:
+        docTitle = docTitle[:semicolon]
+    html = u"""\
+  <table border='0' width = '100%%'>
+   <tr>
+    <td class='hdg'>%s</td>
+    <td align='right' valign='top' class='hdg'>CDR%010d</td>
+   </tr>
+  </table>
+""" % (docTitle, docId)
+    cursor.execute("""\
+        SELECT num
+          FROM doc_version
+         WHERE id = ?
+           AND publishable = 'Y'
+      ORDER BY num DESC""", docId)
+    pubVersions = [row[0] for row in cursor.fetchall()]
+    for pubVersion in pubVersions:
+        cursor.execute("""\
+            SELECT xml, dt
+              FROM doc_version
+             WHERE id = ?
+               AND num = ?""", (docId, pubVersion))
+        docXml, verDate = cursor.fetchall()[0]
+        match = pattern.search(docXml)
+        if match:
+            dateLastModified = match.group(1)
+            if dateLastModified >= startDate and dateLastModified <= endDate:
+                verDate = "%s/%s/%s" % (verDate[5:7], verDate[8:10],
+                                        verDate[:4])
+                resp = cdr.filterDoc('guest', ['name:Summary Changes Report'],
+                                     doc = docXml)
+                section = resp[0].replace("@@PubVerDate@@", verDate)
+                return (docTitle,
+                        html + unicode(section, "utf-8") + u"<br><br>\n")
+    return [u"", u""]
+
+#----------------------------------------------------------------------
+# Generate HTML for changes to one board's summaries.
+#----------------------------------------------------------------------
+def reportOnBoard(cursor, docId, boardName, startDate, endDate, audience):
+    html = """\
+  <br>
+  <br>
+  <h2 class='left'>%s<br>%s</h2>
+  <br>
+""" % (boardName, audience)
+    cursor.execute("""\
+SELECT DISTINCT b.doc_id
+           FROM query_term b
+           JOIN query_term a
+             ON a.doc_id = b.doc_id
+          WHERE b.path = '/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref'
+            AND a.path = '/Summary/SummaryMetaData/SummaryAudience'
+            AND b.int_val = ?
+            AND a.value = ?""", (docId, audience))
+    rows = cursor.fetchall()
+    summaries = []
+    #if not rows:
+    #    cdrcgi.bail("no summaries for %s/%s" % (docId, audience))
     for row in rows:
-        html += """\
-      <OPTION VALUE='%d'>%s</OPTION>
-""" % (row[0], cgi.escape(row[1]))
-    return html + """\
-     </SELECT>"""
+        summary = getSummaryChanges(cursor, row[0], startDate, endDate)
+        if summary[1]:
+            summaries.append(summary)
+    if not summaries:
+        return u""
+    summaries.sort(lambda a,b: cmp(a[0], b[0]))
+    for summary in summaries:
+        html += summary[1]
+    return html
 
 #----------------------------------------------------------------------
 # Handle navigation requests.
@@ -83,11 +198,11 @@ except Exception, info:
 # If we don't have any information yet, put up the basic form.
 #----------------------------------------------------------------------
 if not startDate or not endDate or not audience:
-    boardList = getBoardList()
+    boardList = getBoardList(cursor)
     hpSel = patSel = ""
-    if audience == "Health Professional":
+    if audience == "Health Professionals":
         hpSel = " SELECTED='1'"
-    elif audience == "Patient":
+    elif audience == "Patients":
         patSel = " SELECTED='1'"
     if not endDate or not startDate:
         endDate = time.strftime("%Y-%m-%d")
@@ -114,9 +229,9 @@ if not startDate or not endDate or not audience:
      <B>Audience:&nbsp;</B>
     </TD>
     <TD>
-     <INPUT TYPE='radio' NAME='Audience' VALUE='Health Professional'%s>
+     <INPUT TYPE='radio' NAME='Audience' VALUE='Health Professionals'%s>
       Health Professional<BR>
-     <INPUT TYPE='radio' NAME='Audience' VALUE='Patient'%s>Patient
+     <INPUT TYPE='radio' NAME='Audience' VALUE='Patients'%s> Patient
     </TD>
    </TR>
    <TR>
@@ -147,101 +262,46 @@ if not startDate or not endDate or not audience:
 </HTML>
 """)
 
-cdrcgi.bail("Sorry, that's as far as I've gotten!")
-
 #----------------------------------------------------------------------
-# If we have a title, use it to get a document ID.
+# We have what we need; put up the report.
 #----------------------------------------------------------------------
-if docTitle:
-    param = "%s%%" % docTitle
-    try:
-        cursor.execute("""\
-            SELECT d.id, d.title
-              FROM document d
-              JOIN doc_type t
-                ON t.id = d.doc_type
-             WHERE d.title LIKE ?
-               AND t.name = 'Summary'""", param)
-        rows = cursor.fetchall()
-    except Exception, info:
-        cdrcgi.bail("Failure looking up document title: %s" % str(info))
-    if not rows:
-        cdrcgi.bail("No summary documents match %s" % docTitle)
-    if len(rows) > 1:
-        showTitleChoices(rows)
-
-#----------------------------------------------------------------------
-# From this point on we have what we need for the report.
-#----------------------------------------------------------------------
-#numYears = 2
-#docId = 62978 #62906 #62978
-startDate = list(time.localtime())
-startDate[0] -= numYears
-startDate = time.strftime("%Y-%m-%d", time.localtime(time.mktime(startDate)))
-conn = cdrdb.connect('CdrGuest')
-cursor = conn.cursor()
-cursor.execute("SELECT title FROM document WHERE id = ?", docId)
-docTitle = cursor.fetchall()[0][0]
-semicolon = docTitle.find(";")
-if semicolon != -1:
-    docTitle = docTitle[:semicolon]
-cursor.execute("""\
-    SELECT num, dt
-      FROM doc_version
-     WHERE id = ?
-       AND dt >= ?
-       AND publishable = 'Y'
-  ORDER BY num""", (docId, startDate))
-sections = []
-lastSection = None
-for row in cursor.fetchall():
-    verDate = "%s/%s/%s" % (row[1][5:7], row[1][8:10], row[1][:4])
-    resp = cdr.filterDoc('guest', [#'set:Denormalization Summary Set',
-                                   'name:Summary Changes Report'], docId,
-                         docVer = "%d" % row[0])
-    if resp[0].strip():
-        if not lastSection or resp[0] != lastSection:
-            lastSection = resp[0]
-            section = resp[0].replace("@@PubVerDate@@", verDate)
-            sections.append(section)
-sections.reverse()
 html = """\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>
  <head>
-  <title>Summary Changes Report for CDR%010d - %s</title>
-  <style type='text/css'>
-   h1       { font-family: Arial, sans-serif; font-size: 16pt;
-              text-align: center; font-weight: bold; }
-   h2       { font-family: Arial, sans-serif; font-size: 14pt;
-              text-align: center; font-weight: bold; }
-   td.hdg   { font-family: Arial, sans-serif; font-size: 16pt;
-              font-weight: bold; }
-   p        { font-family: Arial, sans-serif; font-size: 12pt; }
-   span.SectionRef { text-decoration: underline; font-weight: bold; }
-  </style>
+  <title>Changes to Summaries Report - %s</title>
+  %s
  </head>
  <body>
-  <h1>History of Changes to Summary Report<br>
-      Changes Made in the Last %d Year%s</h1>
-  <table border='0' width = '100%%'>
-   <tr>
-    <td class='hdg'>%s</td>
-    <td align='right' valign='top' class='hdg'>CDR%010d</td>
-   </tr>
-  </table>
-""" % (docId,
-       time.strftime("%B %d, %Y"),
-       numYears,
-       numYears and "s" or "",
-       docTitle,
-       docId)
-for section in sections:
-    html += section + "<br><hr><br>\n"
-html += """
+  <h1>Changes to Summaries Report<br>from %s to %s</h1>
+""" % (time.strftime("%B %d, %Y"),
+       getCommonCssStyle(),
+       startDate,
+       endDate)
+
+if board == 'All':
+    cursor.execute("""\
+        SELECT org_name.doc_id, org_name.value
+          FROM query_term org_name
+          JOIN query_term org_type
+            ON org_type.doc_id = org_name.doc_id
+         WHERE org_type.value  = 'PDQ Editorial Board'
+           AND org_type.path   = '/Organization/OrganizationType'
+           AND org_name.path   = '/Organization/OrganizationNameInformation'
+                               + '/OfficialName/Name'
+      ORDER BY org_name.value""", timeout = 300)
+else:
+    cursor.execute("""\
+        SELECT doc_id, value
+          FROM query_term
+         WHERE doc_id = ?
+           AND path = '/Organization/OrganizationNameInformation'
+                    + '/OfficialName/Name'""", board)
+for docId, boardName in cursor.fetchall():
+    html += reportOnBoard(cursor, docId, boardName, startDate, endDate,
+                          audience)
+
+cdrcgi.sendPage(html + """\
  </body>
 </html>
-"""
-
-#print html
-cdrcgi.sendPage(html)
+""")    
