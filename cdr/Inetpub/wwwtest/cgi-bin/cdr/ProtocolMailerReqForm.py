@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolMailerReqForm.py,v 1.20 2005-03-03 13:44:07 bkline Exp $
+# $Id: ProtocolMailerReqForm.py,v 1.21 2005-03-24 21:20:16 bkline Exp $
 #
 # Request form for all protocol mailers.
 #
@@ -17,6 +17,10 @@
 # publication job for the publishing daemon to find and initiate.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.20  2005/03/03 13:44:07  bkline
+# Modified the selection criteria for protocol abstract remailers at
+# Sheri's request (#1570).
+#
 # Revision 1.19  2004/10/20 21:21:08  bkline
 # Removed temporary block or Brussels protocols.
 #
@@ -553,7 +557,7 @@ elif mailType == 'Protocol-Annual abstract':
                                               ctrlDocId,
                                               orgMailType,
                                               brussels,
-                                              sourcePath))
+                                              sourcePath), timeout = 300)
         docList = cursor.fetchall()
     except cdrdb.Error, info:
         cdrcgi.bail("Failure selecting protocols: %s" % info[1][0])
@@ -609,7 +613,7 @@ elif mailType == 'Protocol-Annual abstract remail':
                                  FROM query_term
                                 WHERE path = '/Mailer/RemailerFor/@cdr:ref'
                                   AND int_val = mailer_sent.doc_id)
-          GROUP BY protocol.id""" % (maxDocs, annualMailers))
+          GROUP BY protocol.id""" % (maxDocs, annualMailers), timeout = 300)
 
         docList = cursor.fetchall()
     except cdrdb.Error, info:
