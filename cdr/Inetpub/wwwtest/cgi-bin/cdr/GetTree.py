@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GetTree.py,v 1.2 2001-04-08 22:56:59 bkline Exp $
+# $Id: GetTree.py,v 1.3 2001-04-09 15:45:11 bkline Exp $
 #
 # Prototype for CDR Terminology tree viewer.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2001/04/08 22:56:59  bkline
+# New version to handle optimized processing using stored procedure.
+#
 # Revision 1.1  2001/04/08 17:21:28  bkline
 # Initial revision
 #
@@ -20,7 +23,7 @@ SCRIPT  = '/cgi-bin/cdr/GetTree.py'
 # Get the form variables.
 #----------------------------------------------------------------------
 fields  = cgi.FieldStorage()
-docId   = fields and fields.getvalue("id") or None #'CDR0000182201'
+docId   = fields and normalize(fields.getvalue("id")) or None #'CDR0000182201'
 submit  = fields and fields.getvalue("submit") or None
 
 #----------------------------------------------------------------------
