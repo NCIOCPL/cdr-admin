@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: Mailers.py,v 1.4 2002-03-19 23:46:36 ameyer Exp $
+# $Id: Mailers.py,v 1.5 2002-06-04 19:15:01 ameyer Exp $
 #
 # Main menu for mailer jobs.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2002/03/19 23:46:36  ameyer
+# Added line for directory mailers.  Will eventually remove physician mailer.
+#
 # Revision 1.3  2002/02/21 22:34:00  bkline
 # Added navigation buttons.
 #
@@ -47,8 +50,6 @@ reports = [('PDQMailerRequestForm.py', 'PDQ Editorial Board Members Mailing'),
             'Protocol Status and Participant Initial Verification Mailer'),
            ('StatAndParticUpdateMailer.py',
             'Protocol Status and Participant Update Verification Mailer'),
-           ('NewPhysicianInitMailerReqForm.py',
-            'New Physician Initial Mailer'),
            ('DirectoryMailerReqForm.py',
             'Directory Mailers')]
 
