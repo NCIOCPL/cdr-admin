@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: OrgSearch2.py,v 1.2 2002-02-14 19:37:23 bkline Exp $
+# $Id: OrgSearch2.py,v 1.3 2002-02-20 03:59:34 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Organization documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/02/14 19:37:23  bkline
+# Modified search elements to match schema changes; fixed display filter.
+#
 # Revision 1.1  2001/12/01 18:11:44  bkline
 # Initial revision
 #
@@ -21,6 +24,7 @@ fields  = cgi.FieldStorage()
 session = cdrcgi.getSession(fields)
 boolOp  = fields and fields.getvalue("Boolean")         or "AND"
 orgName = fields and fields.getvalue("OrgName")         or None
+street  = fields and fields.getvalue("Street")          or None
 city    = fields and fields.getvalue("City")            or None
 state   = fields and fields.getvalue("State")           or None
 country = fields and fields.getvalue("Country")         or None
@@ -44,6 +48,7 @@ except cdrdb.Error, info:
 #----------------------------------------------------------------------
 if not submit:
     fields = (('Organization Name',       'OrgName'),
+              ('Street',                  'Street'),
               ('City',                    'City'),
               ('State',                   'State', cdrcgi.stateList),
               ('Country',                 'Country', cdrcgi.countryList),
@@ -74,7 +79,11 @@ searchFields = (cdrcgi.SearchField(orgName,
                              "/Organization/OrganizationNameInformation/"
                              "ShortName/Name",
                              "/Organization/OrganizationNameInformation/"
-                             "AlternateName")),
+                             "AlternateName/Name")),
+                cdrcgi.SearchField(street,
+                            ("/Organization/OrganizationLocations/"
+                             "OrganizationLocation/Location/PostalAddress/"
+                             "Street",)),
                 cdrcgi.SearchField(city,
                             ("/Organization/OrganizationLocations/"
                              "OrganizationLocation/Location/PostalAddress/"
