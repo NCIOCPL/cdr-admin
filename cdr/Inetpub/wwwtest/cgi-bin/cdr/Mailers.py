@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: Mailers.py,v 1.10 2004-07-17 11:52:54 bkline Exp $
+# $Id: Mailers.py,v 1.11 2004-08-03 19:58:54 bkline Exp $
 #
 # Main menu for mailer jobs.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.10  2004/07/17 11:52:54  bkline
+# Plugged in user interface for generating PDQ Board Member Correspondence
+# Mailers.
+#
 # Revision 1.9  2004/07/13 17:47:06  bkline
 # Added electronic mailer review.
 #
@@ -64,12 +68,16 @@ reports = (('DirectoryMailerReqForm.py?', 'Directory Mailers'),
             'Summary Mailers (Advisory Board)'),
            ('BoardMemberMailerReqForm.py?',
             'PDQ&reg; Board Member Correspondence Mailers'),
-           ('EmailerReview.py?', 'Electronic Mailer Review'))
+           ('EmailerReview.py?',
+            'Electronic Mailer Review (on CDR Server)'))
 
 for r in reports:
     form += "<LI><A HREF='%s/%s%s=%s'>%s</A></LI>\n" % (
             cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
-
+form += """\
+<LI><A HREF='http://%s/PDQUpdate/cgi-bin/ShowBatchInfo.py'
+>Electronic Mailer Review (on E-Mailer Server)</A></LI>
+""" % (cdr.isDevHost() and "verdi.nci.nih.gov" or "pdqupdate.cancer.gov")
 form += """\
 <LI><A HREF="%s/Logout.py?%s=%s">%s</LI>
 </OL>
