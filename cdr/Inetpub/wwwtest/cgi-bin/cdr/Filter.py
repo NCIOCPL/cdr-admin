@@ -1,11 +1,17 @@
 #----------------------------------------------------------------------
 #
-# $Id: Filter.py,v 1.9 2002-09-16 16:58:36 pzhang Exp $
+# $Id: Filter.py,v 1.10 2002-09-19 21:00:15 pzhang Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.9  2002/09/16 16:58:36  pzhang
+# Stripped off whitespaces in filters
+#
+# Revision 1.8  2002/09/16 16:35:31  pzhang
+# Added "QC Filter Sets" feature.
+#
 # Revision 1.7  2002/08/15 19:20:56  bkline
 # Eliminated hard-wired CDR login credentials.
 #
@@ -38,7 +44,9 @@ title   = "CDR Formatting"
 fields  = cgi.FieldStorage() or cdrcgi.bail("No Request Found", title)
 session = 'guest'
 docId   = fields.getvalue(cdrcgi.DOCID) or cdrcgi.bail("No Document", title)
-filtId0 = fields.getvalue(cdrcgi.FILTER) or cdrcgi.bail("No Filter", title)
+filtId0 = fields.getvalue(cdrcgi.FILTER)
+if not fields.getvalue('qcFilterSets'):
+    filtId0 or cdrcgi.bail("No Filter", title)
 valFlag = fields.getvalue('validate') or 0
 filtId  = [filtId0,
            fields.getvalue(cdrcgi.FILTER + "1", ""),
@@ -63,9 +71,11 @@ def dispList(list):
 # Show only the filterSet that matches the input filter(s).
 def dispFilterSet(key, filterSets, filterId):
     filtExpr = re.compile("^(CDR)*(0*)(\d+)$", re.IGNORECASE)
+    nFilters = 0
     for filt in filterId:  
         if not filt:
-            continue    
+            continue   
+        nFilters += 1 
         filt = filt.strip()  
         match = filtExpr.search(filt)
         if match:            
@@ -79,7 +89,11 @@ def dispFilterSet(key, filterSets, filterId):
                 if -1 != filter.find(filt): 
                     # cdrcgi.bail("name: %s in %s" % (filt,filter),  title)      
                     return 1       
-    return 0
+    if nFilters:
+        return 0
+    else:
+        # Display all filter sets when no "filter" filter is given.
+        return 1
 
 # Do all real work here.
 def qcFilterSets(docId, filterId = None):
@@ -116,7 +130,7 @@ def qcFilterSets(docId, filterId = None):
    
     html = "<TABLE BORDER=1>\n"
     html += """<TR><TD><FONT COLOR=BLACK><B>Set Name</B></FONT></TD>
-            <TD><B>Action</B></TD><TD><B>Action</B></TD><TD><B><FONT 
+            <TD><CENTER><B>Action</B></CENTER></TD><TD><B><FONT 
             COLOR=BLACK>Set Detail</B></FONT></TD></TR>\n"""
     for key in filterSets.keys():
         if not dispFilterSet(key, filterSets, filterId):
@@ -137,10 +151,10 @@ def qcFilterSets(docId, filterId = None):
                     url += "&Filter%d=" % i +  id
                 i += 1             
     
-        filter = "<A TARGET='_new' HREF='%s'>Filtering</A>" % url
-        validate = "<A TARGET='_new' HREF='%s&validate=Y'>Validating</A>" % url
-        html += """<TR><TD><FONT COLOR=BLACK>%s</FONT></TD><TD>%s</TD>
-                       <TD>%s</TD><TD><FONT COLOR=BLACK>%s</FONT></TD>
+        filter = "<A TARGET='_new' HREF='%s'>Filter</A>" % url
+        validate = "<A TARGET='_new' HREF='%s&validate=Y'>Validate</A>" % url
+        html += """<TR><TD><FONT COLOR=BLACK>%s</FONT></TD><TD>%s&nbsp;%s</TD>
+                       <TD><FONT COLOR=BLACK>%s</FONT></TD>
                        </TR>\n""" % (key, filter, validate, 
                        dispList(filterSets[key]))
     html += "</TABLE>"
