@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.40 2004-10-22 20:20:49 venglisc Exp $
+# $Id: QcReport.py,v 1.41 2004-12-01 23:56:12 venglisc Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.40  2004/10/22 20:20:49  venglisc
+# The BoardMember QC report failed if a person was not linked to a summary.
+# This has been fixed by setting a bogus batch job ID to query the database.
+#
 # Revision 1.39  2004/07/13 19:43:40  venglisc
 # Modified label from "Date Received" to "Date Response Received" (Bug 1054).
 #
@@ -350,11 +354,15 @@ if docType == 'Summary' and repType and not version:
   <INPUT TYPE='checkbox' NAME='DisplayCommentElements' CHECKED='1'>&nbsp;&nbsp;
   Display Comments?
 """
-    if repType == "pat":
-        form += """\
+#if repType == "pat":
+    form += """\
   <BR><BR>
   <INPUT TYPE='checkbox' NAME='Glossary'>&nbsp;&nbsp;
   Include glossary terms at end of report?<BR>
+"""
+
+    if repType == "pat":
+        form += """\
   <BR>
   <INPUT TYPE='checkbox' NAME='ShowStandardWording'>&nbsp;&nbsp;
   Show standard wording with mark-up?<BR>
@@ -825,9 +833,11 @@ if docType.startswith('Summary'):
                        displayComments and 'Y' or 'N'])
 if repType == "bu" or repType == "but":
     filterParm.append(['delRevLevels', 'Y'])
-if repType == "pat":
-    filterParm.append(['DisplayGlossaryTermList',
+
+# Added GlossaryTermList to HP documents, not just patient.
+filterParm.append(['DisplayGlossaryTermList',
                        glossary and "Y" or "N"])
+if repType == "pat":
     filterParm.append(['ShowStandardWording',
                        standardWording and "Y" or "N"])
 doc = cdr.filterDoc(session, filters[docType], docId = docId,
