@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GeneralReports.py,v 1.6 2002-07-02 13:47:55 bkline Exp $
+# $Id: GeneralReports.py,v 1.7 2002-07-10 19:33:33 bkline Exp $
 #
 # Submenu for general reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2002/07/02 13:47:55  bkline
+# New report on new documents with publication status.
+#
 # Revision 1.5  2002/06/28 13:38:07  bkline
 # New report for document version history added.
 #
@@ -55,7 +58,7 @@ if action == "Log Out":
 form = "<INPUT TYPE='hidden' NAME='%s' VALUE='%s'><OL>\n" % (cdrcgi.SESSION,
                                                              session)
 reports = [
-           ('Stub.py', 'Ad-Hoc Reports'),
+           ('AdHocQuery.py', 'Ad-Hoc Reports'),
            ('CheckedOutDocs.py', 'Checked Out Documents'),
            ('DateLastModified.py', 'Date Last Modified'),
            ('DatedActions.py', 'Dated Actions'),
