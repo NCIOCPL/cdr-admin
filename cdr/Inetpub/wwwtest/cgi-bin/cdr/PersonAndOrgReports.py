@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PersonAndOrgReports.py,v 1.3 2002-06-04 20:16:45 bkline Exp $
+# $Id: PersonAndOrgReports.py,v 1.4 2002-07-16 15:39:37 bkline Exp $
 #
 # Submenu for person and organization reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2002/06/04 20:16:45  bkline
+# New report for member orgs and PIs of cooperative groups.
+#
 # Revision 1.2  2002/05/25 02:39:13  bkline
 # Removed extra blank lines from HTML output.
 #
@@ -64,7 +67,9 @@ form += """\
 reports = [
            ('CoopGroupMembers.py', 'Cooperative Group Investigators'),
            ('PersonProtocolReview.py', 'Person Protocol Review'),
-           ('PersonsAtOrg.py', 'Persons Practicing at Organizations')
+           ('PersonsAtOrg.py', 'Persons Practicing at Organizations'),
+           ('InactivePersonsOrgs.py', 
+            'Inactive Persons/Organizations Linked to Protocols')
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI>\n" % (
