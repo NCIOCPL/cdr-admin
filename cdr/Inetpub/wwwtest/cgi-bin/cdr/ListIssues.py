@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ListIssues.py,v 1.2 2002-05-10 19:27:16 bkline Exp $
+# $Id: ListIssues.py,v 1.3 2002-05-10 21:15:25 bkline Exp $
 #
 # Lists CDR development issues.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/05/10 19:27:16  bkline
+# Added option to filter out future enhancements.
+#
 # Revision 1.1  2001/12/01 18:11:44  bkline
 # Initial revision
 #
@@ -54,8 +57,6 @@ except cdrdb.Error, info:
 #----------------------------------------------------------------------
 flag = nextVer and "CHECKED" or ""
 body = """\
-<RIGHT><B>Show enhancements for future releases</B>
-<INPUT TYPE='checkbox' NAME='NextVer' %s></RIGHT>
 <TABLE BORDER='0' WIDTH='100%%' CELLSPACING='1' CELLPADDING='1'>
  <TR BGCOLOR='silver' VALIGN='top'>
   <TD ALIGN='center'><FONT SIZE='-1'><B>&nbsp;#&nbsp;</B></FONT></TD>
@@ -76,8 +77,7 @@ body = """\
   <TD ALIGN='center'><FONT SIZE='-1'><B>Resolved</B></FONT></TD>
   <TD ALIGN='center'><FONT SIZE='-1'><B>By</B></FONT></TD>
  </TR>
-""" % (flag,
-       cdrcgi.REQUEST, request,
+""" % (cdrcgi.REQUEST, request,
        cdrcgi.REQUEST, request,
        cdrcgi.REQUEST, request,
        cdrcgi.REQUEST, request)
@@ -115,7 +115,11 @@ try:
 except cdrdb.Error, info:
     cdrcgi.bail('Failure fetching query results: %s' % info[1][0])
 
-body += "</TABLE>\n"
+body += """\
+</TABLE>
+<INPUT TYPE='checkbox' NAME='NextVer' %s>
+Show enhancements for future releases
+""" % flag
 
 #----------------------------------------------------------------------
 # Add the session key and send back the form.
