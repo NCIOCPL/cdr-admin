@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
 #
-# $Id: BoardManagers.py,v 1.7 2004-06-02 15:19:58 venglisc Exp $
+# $Id: BoardManagers.py,v 1.8 2004-07-13 19:11:14 venglisc Exp $
 #
 # Main menu for board managers.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.7  2004/06/02 15:19:58  venglisc
+# Testing CVS server:  Adding extra comment line.
+#
 # Revision 1.6  2004/05/11 17:29:53  bkline
 # Plugged in Board Roster report.
 #
@@ -40,8 +43,8 @@ buttons = []
 header  = cdrcgi.header(title, title, section, "BoardManagers.py", buttons,
                         numBreaks = 1, stylesheet = """\
   <style type='text/css'>
-   h2 { font-family: Arial; font-size: 14pt; font-weight: bold }
-   li { font-family: Arial; font-size: 12pt; font-weight: bold }
+   H2 { font-family: Arial; font-size: 14pt; font-weight: bold }
+   LI { font-family: Arial; font-size: 12pt; font-weight: bold }
   </style>
 """)
 
@@ -50,8 +53,8 @@ header  = cdrcgi.header(title, title, section, "BoardManagers.py", buttons,
 #----------------------------------------------------------------------
 session = "%s=%s" % (cdrcgi.SESSION, session)
 form = """\
-   <h2>General Use Reports</h2>
-   <ol>
+   <H2>General Use Reports</H2>
+   <OL>
 """
 for choice in (
     ('GeneralReports.py', 'All General Reports'         ),
@@ -61,13 +64,13 @@ for choice in (
     ('UnchangedDocs.py',  'Unchanged Documents Report'  )
     ):
     form += """\
-    <li><a href='%s/%s?%s'>%s</a></li>
+    <LI><a href='%s/%s?%s'>%s</a></LI>
 """ % (cdrcgi.BASE, choice[0], session, choice[1])
 
 form += """\
-   </ol>
-   <h2>Summary QC Reports</h2>
-   <ol>
+   </OL>
+   <H2>Summary QC Reports</H2>
+   <OL>
 """
 for choice in (
     ('bu',  'Bold/Underline (HP/Old Patient)'   ),
@@ -75,13 +78,13 @@ for choice in (
     ('pat', 'New Patient'                       )
     ):
     form += """\
-    <li><a href='%s/QcReport.py?DocType=Summary&ReportType=%s&%s'>%s</a></li>
+    <LI><a href='%s/QcReport.py?DocType=Summary&ReportType=%s&%s'>%s</a></LI>
 """ % (cdrcgi.BASE, choice[0], session, choice[1])
 
 form += """\
-   </ol>
-   <h2>Management Reports</h2>
-   <ol>
+   </OL>
+   <H2>Management Reports</H2>
+   <OL>
 """
 
 for choice in (
@@ -90,16 +93,17 @@ for choice in (
     ('SummaryCitations.py',        'Summaries Citations'         ),
     ('SummaryDateLastModified.py', 'Summaries Date Last Modified'),
     ('SummariesLists.py',          'Summaries Lists'             ),
-    ('SummaryMetaData.py',         'Summaries Metadata'         )
+    ('SummaryMetaData.py',         'Summaries Metadata'          ),
+    ('SummariesTocReport.py',      'Summaries TOC Lists'         )
     ):
     form += """\
-    <li><a href='%s/%s?%s'>%s</a></li>
+    <LI><a href='%s/%s?%s'>%s</a></LI>
 """ % (cdrcgi.BASE, choice[0], session, choice[1])
     
 form += """\
-   </ol>
-   <h2>Board Member Information Reports</h2>
-   <ol>
+   </OL>
+   <H2>Board Member Information Reports</H2>
+   <OL>
 """
 
 for choice in (
@@ -107,15 +111,15 @@ for choice in (
     ('BoardRoster.py',          'Board Roster Reports'               )
     ):
     form += """\
-    <li><a href='%s/%s?DocType=PDQBoardMemberInfo&%s'>%s</a></li>
+    <LI><a href='%s/%s?DocType=PDQBoardMemberInfo&%s'>%s</a></LI>
 """ % (cdrcgi.BASE, choice[0], session, choice[1])
     
 cdrcgi.sendPage(header + form + """\
-   </ol>
-   <h2>Miscellaneous Document QC Report</h2>
-   <ol>
-    <li><a href='%s/MiscSearch.py?%s'>Miscellaneous Documents</a></li>
-   </ol>
-  </form>
- </body>
-</html>""" % (cdrcgi.BASE, session))
+   </OL>
+   <H2>Miscellaneous Document QC Report</H2>
+   <OL>
+    <LI><a href='%s/MiscSearch.py?%s'>Miscellaneous Documents</a></LI>
+   </OL>
+  </FORM>
+ </BODY>
+</HTML>""" % (cdrcgi.BASE, session))
