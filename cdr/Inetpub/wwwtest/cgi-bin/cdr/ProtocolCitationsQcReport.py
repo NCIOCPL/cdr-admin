@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolCitationsQcReport.py,v 1.1 2002-04-22 13:54:06 bkline Exp $
+# $Id: ProtocolCitationsQcReport.py,v 1.2 2002-05-03 20:27:33 bkline Exp $
 #
 # Protocol Citations QC Report.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2002/04/22 13:54:06  bkline
+# New QC reports.
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, cdrdb, re
 
@@ -21,7 +24,7 @@ docId   = fields.getvalue(cdrcgi.DOCID) or cdrcgi.bail("No Document", title)
 # XXX Get the real filters!
 #----------------------------------------------------------------------
 filters = [
-    "name:Protocol Denormalization Filter (InScope)",
+    "name:Denormalization Filter: InScope Protocol",
     "name:Protocol Citations QC Report Filter"
 ]
 
