@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: DocVersionHistory.py,v 1.3 2002-07-05 18:02:15 bkline Exp $
+# $Id: DocVersionHistory.py,v 1.4 2002-08-29 12:31:24 bkline Exp $
 #
 # Show version history of document.
 #----------------------------------------------------------------------
@@ -94,39 +94,6 @@ if docTitle and not docId:
 # Get the document information we need.
 #----------------------------------------------------------------------
 try:
-    """
-    cursor.execute(" " "\
-            SELECT d.title,
-                   t.name,
-                   u1.fullname,
-                   a1.dt,
-                   u2.fullname,
-                   a2.dt
-              FROM document d
-              JOIN doc_type t
-                ON t.id = d.doc_type
-              JOIN audit_trail a1
-                ON a1.document = d.id
-              JOIN usr u1
-                ON u1.id = a1.usr
-              JOIN audit_trail a2
-                ON a2.document = d.id
-              JOIN usr u2
-                ON u2.id = a2.usr
-             WHERE d.id = 50000
-               AND a1.dt = (SELECT MIN(audit_trail.dt)
-                              FROM audit_trail
-                              JOIN action
-                                ON action.id = audit_trail.action
-                             WHERE audit_trail.document = d.id
-                               AND action.name = 'ADD DOCUMENT')
-               AND a2.dt = (SELECT MAX(audit_trail.dt)
-                              FROM audit_trail
-                              JOIN action
-                                ON action.id = audit_trail.action
-                             WHERE audit_trail.document = d.id
-                               AND action.name = 'MODIFY DOCUMENT')" " ", intId)
-    """
     cursor.execute("""SELECT doc_title,
                              doc_type,
                              created_by,
@@ -284,10 +251,10 @@ html = """\
        intId,
        docType,
        docTitle,
-       createdBy,
-       createdDate[:10],
-       modBy,
-       modDate[:10])
+       createdBy or "[Conversion]",
+       createdDate and createdDate[:10] or "2002-06-24",
+       modBy or "N/A",
+       modDate and modDate[:10] or "N/A")
 
 #----------------------------------------------------------------------
 # Build the report body.
