@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PubStatus.py,v 1.8 2002-11-05 16:04:34 pzhang Exp $
+# $Id: PubStatus.py,v 1.9 2003-01-08 22:26:31 pzhang Exp $
 #
 # Status of a publishing job.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.8  2002/11/05 16:04:34  pzhang
+# Enhanced interface per Eileen's input
+#
 # Revision 1.7  2002/09/11 21:11:18  pzhang
 # Displayed the top 500 document infor for each type.
 #
@@ -116,7 +119,7 @@ def dispJobStatus(jobId):
      </BODY>
     </HTML>
     """ % (pubSystem, subset, setting, name, 
-           (no_output == 'Y' and "None") or dir,
+           (no_output == 'Y' and "None") or dir or "None",
            started, completed and completed or "No", status, messages)
     cdrcgi.sendPage(header + html)
 
@@ -626,6 +629,209 @@ def dispCgWork(jobId):
     
     cdrcgi.sendPage(header + html)
 
+#----------------------------------------------------------------------
+# Report what has been added, removed, and updated in this job.
+#----------------------------------------------------------------------
+def dispJobDiff(jobId):
+    
+    title   = "CDR Document Pushing Information"
+    instr   = "Job Number %d" % jobId
+    buttons = []
+    header  = cdrcgi.header(title, title, instr, None, buttons)
+
+    conn = cdrdb.connect('CdrGuest')
+    cursor = conn.cursor()
+
+    #----------------------------------------------------------------------
+    # Find vendor jobs
+    #----------------------------------------------------------------------  
+    try:      
+        cursor.execute("""\
+            SELECT pub_subset               
+              FROM pub_proc 
+             WHERE id = %d  
+                       """ % jobId)
+        subset = cursor.fetchone()
+    except cdrdb.Error, info:
+        cdrcgi.bail("Failure getting vendor job info for %d." % jobId)
+
+    # Is there any documents removed?
+    try:      
+        cursor.execute("""\
+            SELECT ppd.doc_id, t.name, d.title              
+              FROM pub_proc_doc ppd
+              JOIN document d
+                ON d.id = ppd.doc_id
+              JOIN doc_type t
+                ON d.doc_type = t.id
+             WHERE ppd.removed = 'Y'
+               AND ppd.pub_proc = %d
+          ORDER BY t.name, ppd.doc_id                            
+                       """ % jobId)
+        rowsRemoved = cursor.fetchall()
+    except cdrdb.Error, info:
+        cdrcgi.bail("Failure getting removed documents for job %s." % jobId)  
+   
+    # Get the latest Full Load.
+    try:      
+        cursor.execute("""\
+            SELECT MAX(id)          
+              FROM primary_pub_job            
+             WHERE pub_subset = 'Full-Load'
+               AND id < %d                                   
+                       """ % jobId)
+        fullLoad = cursor.fetchone()
+        if fullLoad and fullLoad[0]:
+            fullLoadJob = fullLoad[0]
+        else:
+            cdrcgi.bail("No latest full load for job %s." % jobId)            
+    except cdrdb.Error, info:
+        cdrcgi.bail("Failure getting latest full load for job %s." % jobId)        
+         
+    # Is there any documents added?
+    # A new document is one that is either removed in its immediate
+    # previous job if there is any previous job after the latest Full 
+    # Load, or not in previous jobs at all. Full Load cannot contain 
+    # removed documents.
+    try:      
+        cursor.execute("""\
+            SELECT ppd.doc_id, t.name, d.title              
+              FROM primary_pub_doc ppd
+              JOIN document d
+                ON d.id = ppd.doc_id
+              JOIN doc_type t
+                ON d.doc_type = t.id
+             WHERE ppd.removed = 'N'
+               AND ppd.pub_proc = %d
+               AND (NOT EXISTS (SELECT ppd2.pub_proc                           
+                                  FROM primary_pub_doc ppd2
+                                 WHERE ppd2.pub_proc < %d
+                                   AND ppd2.pub_proc > %d
+                                   AND ppd2.doc_id = ppd.doc_id
+                                )
+                    OR                 
+                    ('Y' IN (SELECT TOP 1 ppd2.removed
+                               FROM primary_pub_doc ppd2
+                              WHERE ppd2.pub_proc < %d
+                                AND ppd2.pub_proc > %d
+                                AND ppd2.doc_id = ppd.doc_id
+                           ORDER BY ppd2.pub_proc DESC
+                            )
+                    )
+                   )
+          ORDER BY t.name, ppd.doc_id                            
+                       """ % (jobId, jobId, fullLoadJob-1, jobId, fullLoadJob),
+                       timeout = 360
+                      )
+        rowsAdded = cursor.fetchall()                 
+    except cdrdb.Error, info:
+        cdrcgi.bail("Failure getting added documents for job %d." % jobId) 
+    
+    # Is there any documents updated?
+    # A new document is one that is either removed in its immediate
+    # previous job if there is any previous job after the latest Full 
+    # Load, or not in previous jobs at all. Full Load cannot contain 
+    # removed documents.
+    try:      
+        cursor.execute("""\
+            SELECT ppd.doc_id, t.name, d.title              
+              FROM primary_pub_doc ppd
+              JOIN document d
+                ON d.id = ppd.doc_id
+              JOIN doc_type t
+                ON d.doc_type = t.id
+             WHERE ppd.removed = 'N'
+               AND ppd.pub_proc = %d
+               AND (NOT EXISTS (SELECT ppd2.pub_proc                           
+                                  FROM primary_pub_doc ppd2
+                                 WHERE ppd2.pub_proc < %d
+                                   AND ppd2.pub_proc > %d
+                                   AND ppd2.doc_id = ppd.doc_id
+                                )
+                    OR                 
+                    ('Y' IN (SELECT TOP 1 ppd2.removed
+                               FROM primary_pub_doc ppd2
+                              WHERE ppd2.pub_proc < %d
+                                AND ppd2.pub_proc > %d
+                                AND ppd2.doc_id = ppd.doc_id
+                           ORDER BY ppd2.pub_proc DESC
+                            )
+                    )
+                   )
+          ORDER BY t.name, ppd.doc_id                            
+                       """ % (jobId, jobId, fullLoadJob-1, jobId, fullLoadJob),
+                       timeout = 360
+                      )
+        rowsAdded = cursor.fetchall()                 
+    except cdrdb.Error, info:
+        cdrcgi.bail("Failure getting added documents for job %d." % jobId)    
+   
+    HTML    = """\
+        <TABLE>   
+           <TR>
+             <TD ALIGN='right' NOWRAP><B>Vendor Job Name: &nbsp;</B></TD>
+             <TD>%s</TD>
+            </TR>            
+            <TR>
+             <TD ALIGN='right' NOWRAP><B>Removed Documents: &nbsp;</B></TD>
+             <TD>%d</TD>
+            </TR>
+            <TR>
+             <TD ALIGN='right' NOWRAP><B>Updated Documents: &nbsp;</B></TD>
+             <TD>%d</TD>
+            </TR> 
+            <TR>
+             <TD ALIGN='right' NOWRAP><B>Added Documents: &nbsp;</B></TD>
+             <TD>%d</TD>
+            </TR>        
+           </TABLE>    
+              """     
+  
+    HEADER  = """\
+               <BR><FONT SIZE=5>Documents %s (%d) [Top 500]:</FONT><BR><BR>
+               <TABLE BORDER=1>
+                <tr>    
+                <td valign='top'><B>DocId</B></td>   
+                <td valign='top'><B>DocType</B></td>  
+                <td valign='top'><B>DocTitle</B></td>  
+                </tr>
+              """ 
+    ROW     = """<tr><td><FONT COLOR='black'>%s</FONT></td>
+                     <td><FONT COLOR='black'>%s</FONT></td>
+                     <td><FONT COLOR='black'>%s</FONT></td></tr>"""  
+
+    nAdded   = len(rowsAdded)
+    nRemoved = len(rowsRemoved)
+    nUpdated = len(rowsAdded)
+    html     = HTML % (subset, nRemoved, nUpdated, nAdded)
+    if nRemoved:       
+        html  += HEADER % ('Removed', nRemoved)  
+   
+        numRows = 0
+        for row in rowsRemoved:
+            html += ROW % (row[0], row[1], row[2])
+            numRows += 1
+            if numRows > 500:
+                break
+      
+        html  += "</TABLE>"   
+
+    if rowsAdded:       
+        html  += HEADER % ('Added', nAdded)  
+   
+        numRows = 0
+        for row in rowsAdded:
+            html += ROW % (row[0], row[1], row[2])
+            numRows += 1
+            if numRows > 500:
+                break
+      
+        html  += "</TABLE>"   
+    
+    html  += "</BODY></HTML>"  
+    
+    cdrcgi.sendPage(header + html)
+
 if not jobId:
     cdrcgi.bail("Job ID not supplied")
 
@@ -642,6 +848,8 @@ elif dispType == "Manage":
     if not session:
         cdrcgi.bail("A session ID must be provided for this page.")    
     dispJobControl(jobId, session)
+elif dispType == "DiffReport":    
+    dispJobDiff(jobId)
 else:
     cdrcgi.bail("Display type: %s not supported." % dispType)
     
