@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolMailerReqForm.py,v 1.8 2003-01-08 23:46:15 bkline Exp $
+# $Id: ProtocolMailerReqForm.py,v 1.9 2003-01-22 01:43:17 ameyer Exp $
 #
 # Request form for all protocol mailers.
 #
@@ -17,8 +17,11 @@
 # publication job for the publishing daemon to find and initiate.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.8  2003/01/08 23:46:15  bkline
+# Fixed cosmetic typo in SQL query.
+#
 # Revision 1.7  2002/12/06 16:01:59  bkline
-# Fixed typo in WHERE clause (doc_verision.publishable = 'P' should have
+# Fixed typo in WHERE clause (doc_version.publishable = 'P' should have
 # been doc_version.publishable = 'Y').
 #
 # Revision 1.6  2002/11/18 14:39:09  bkline
@@ -57,18 +60,18 @@ section     = "Protocol Mailer Request Form"
 SUBMENU     = "Mailer Menu"
 buttons     = ["Submit", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 script      = 'ProtocolMailerReqForm.py'
-header      = cdrcgi.header(title, title, section, script, buttons, 
+header      = cdrcgi.header(title, title, section, script, buttons,
                             stylesheet = """\
  <style type='text/css'>
    ul { margin-left: 40pt }
    h2 { font-size: 14pt; font-family:Arial; color:navy }
    h3 { font-size: 13pt; font-family:Arial; color:black; font-weight:bold }
-   li, span.r { 
+   li, span.r {
         font-size: 12pt; font-family:"Times New Roman"; color:black;
-        margin-bottom: 10pt; font-weight:normal 
+        margin-bottom: 10pt; font-weight:normal
    }
    b {  font-size: 12pt; font-family:"Times New Roman"; color:black;
-        margin-bottom: 10pt; font-weight:bold 
+        margin-bottom: 10pt; font-weight:bold
    }
   </style>
  """)
@@ -115,19 +118,19 @@ if not request:
    <h2>%s</h2>
    <ul>
     <li>
-     To generate mailers for a batch, select type of mailer. 
+     To generate mailers for a batch, select type of mailer.
      It may take a minute to select documents to be included in the mailing.
      Please be patient.
      If you want to, you can limit the number of protocol documents for
-     which mailers will be generated in a given job, by entering a 
+     which mailers will be generated in a given job, by entering a
      maximum number.
     </li>
     <li>
-     To generate mailers for a single Protocol, select type of mailer 
+     To generate mailers for a single Protocol, select type of mailer
      and enter the document ID of the Protocol.
     </li>
     <li>
-     To receive email notification when the job is completed, enter your 
+     To receive email notification when the job is completed, enter your
      email address.
     </li>
     <li>
@@ -147,7 +150,7 @@ if not request:
     <span class='r'>Quarterly Status/Participant Check</span>
    <br><br><br>
    <b>
-    Limit maximum number of documents for which mailers will be 
+    Limit maximum number of documents for which mailers will be
     generated:&nbsp;
    </b>
    <input type='text' name='maxMails' size='12' value='No limit' />
@@ -244,20 +247,22 @@ if docId:
     digits = re.sub('[^\d]+', '', docId)
     intId  = int(digits)
 
-    # Make sure the corresponding document exists in version control
+    # Make sure the corresponding document exists in version control,
+    #   getting the last version number of the last valid version.
     try:
         cursor.execute("""\
             SELECT MAX(num)
               FROM doc_version
-             WHERE id = ?""", (intId,))
+             WHERE id = ?
+               AND val_status = 'V'""", (intId,))
         row = cursor.fetchone()
-        if not row:
-            cdrcgi.bail("No version found for document %d" % intId)
+        if not row or not row[0]:
+            cdrcgi.bail("No valid version found for document %d" % intId)
 
         # Document list contains one tuple of doc id + version number
         docList = ((intId, row[0]),)
     except cdrdb.Error, info:
-        cdrcgi.bail("Database failure finding version for document %d: %s" % 
+        cdrcgi.bail("Database failure finding version for document %d: %s" %
                     (intId, info[1][0]))
 
     # Validate that document matches type implied by mailer type selection
@@ -289,7 +294,7 @@ elif mailType == 'Protocol-Initial abstract':
                          ON protocol.id = ready_for_review.doc_id
                        JOIN query_term prot_status
                          ON prot_status.doc_id = protocol.id
-                      WHERE prot_status.value IN ('Active', 
+                      WHERE prot_status.value IN ('Active',
                                                   'Approved-not yet active')
                         AND prot_status.path       = '%s'
                         AND doc_version.val_status = 'V'
@@ -338,7 +343,7 @@ elif mailType == 'Protocol-Annual abstract':
                                              'Protocol-Annual abstract',
                                              'Protocol-Annual abstract remail')
                         AND p.pub_system = %d""" % ctrlDocId)
-                                             
+
         cursor.execute("""\
             SELECT DISTINCT TOP %d protocol.id, MAX(doc_version.num)
                        FROM document protocol
@@ -346,7 +351,7 @@ elif mailType == 'Protocol-Annual abstract':
                          ON doc_version.id = protocol.id
                        JOIN query_term prot_status
                          ON prot_status.doc_id = protocol.id
-                      WHERE prot_status.value IN ('Active', 
+                      WHERE prot_status.value IN ('Active',
                                                   'Approved-Not Yet Active')
                         AND prot_status.path = '%s'
                         AND doc_version.val_status = 'V'
@@ -425,7 +430,7 @@ elif mailType == 'Protocol-Annual abstract remail':
                                 WHERE path = '/Mailer/RemailerFor/@cdr:ref'
                                   AND int_val = mailer_sent.doc_id)
           GROUP BY protocol.id""" % (maxDocs, annualMailers))
-    
+
         docList = cursor.fetchall()
     except cdrdb.Error, info:
         cdrcgi.bail("Failure selecting protocols: %s" % info[1][0])
@@ -446,7 +451,7 @@ elif mailType == 'Protocol-Initial status/participant check':
                          ON prot_status.doc_id = protocol.id
                        JOIN query_term lead_org
                          ON lead_org.doc_id = protocol.id
-                      WHERE prot_status.value IN ('Active', 
+                      WHERE prot_status.value IN ('Active',
                                                   'Approved-Not Yet Active')
                         AND prot_status.path       = '%s'
                         AND lead_org.path          = '%s'
@@ -476,10 +481,10 @@ elif mailType == 'Protocol-Initial status/participant check':
                                            AND (p.status = 'Success'
                                             OR p.completed IS NULL))
                    GROUP BY protocol.id""" % (maxDocs,
-                                              statusPath, 
+                                              statusPath,
                                               leadOrgPath,
                                               modePath,
-                                              brussels, 
+                                              brussels,
                                               sourcePath,
                                               mailType))
         docList = cursor.fetchall()
@@ -491,8 +496,8 @@ elif mailType == 'Protocol-Initial status/participant check':
 #----------------------------------------------------------------------
 elif mailType == 'Protocol-Quarterly status/participant check':
     try:
-        # From the mailer requirements, section 2.81:  "Regular 
-        # Status/Participant Update mailers will be generated for 
+        # From the mailer requirements, section 2.81:  "Regular
+        # Status/Participant Update mailers will be generated for
         # protocols with Status = Active, and [i.e. or] Approved,
         # Temporarily Closed [i.e. Approved-not yet active], and
         # with Source not = NCI Liaison Office, and has flag of
@@ -521,7 +526,7 @@ elif mailType == 'Protocol-Quarterly status/participant check':
                          ON lead_org.doc_id = protocol.id
 
                       -- Only send mailers for active or approved protocols
-                      WHERE prot_status.value IN ('Active', 
+                      WHERE prot_status.value IN ('Active',
                                                   'Approved-Not Yet Active')
                         AND prot_status.path         = '%s'
                         AND lead_org.path            = '%s'
