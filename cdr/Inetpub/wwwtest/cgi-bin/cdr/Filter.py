@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: Filter.py,v 1.7 2002-08-15 19:20:56 bkline Exp $
+# $Id: Filter.py,v 1.8 2002-09-16 16:35:31 pzhang Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.7  2002/08/15 19:20:56  bkline
+# Eliminated hard-wired CDR login credentials.
+#
 # Revision 1.6  2002/07/25 20:38:00  bkline
 # Removed debugging code.
 #
@@ -26,7 +29,7 @@
 #
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, cdrpub, re, string
+import cgi, cdr, cdrcgi, cdrpub, re, string, xml.dom.minidom
 
 #----------------------------------------------------------------------
 # Get the parameters from the request.
@@ -47,11 +50,110 @@ filtId  = [filtId0,
            fields.getvalue(cdrcgi.FILTER + "7", "")]
 
 #----------------------------------------------------------------------
+# QC Filter Sets.
+#----------------------------------------------------------------------
+
+# Display a list of filters.
+def dispList(list):
+    strRet = ""
+    for element in list:
+        strRet += element + "<BR>"
+    return strRet
+        
+# Show only the filterSet that matches the input filter(s).
+def dispFilterSet(key, filterSets, filterId):
+    filtExpr = re.compile("^(CDR)*(0*)(\d+)$", re.IGNORECASE)
+    for filt in filterId:  
+        if not filt:
+            continue      
+        match = filtExpr.search(filt)
+        if match:            
+            id = match.group(3) + ":"          
+            for filter in filterSets[key]:                              
+                if -1 != filter.find(id):  
+                    # cdrcgi.bail("id: %s in %s" % (id,filter),  title)             
+                    return 1
+        else:            
+            for filter in filterSets[key]:                
+                if -1 != filter.find(filt): 
+                    # cdrcgi.bail("name: %s in %s" % (filt,filter),  title)      
+                    return 1       
+    return 0
+
+# Do all real work here.
+def qcFilterSets(docId, filterId = None):
+    
+    # Where the filtersets file is.
+    # Don't want this page to be working on FRANCK or BACH.
+    fileName = "d:/cdr/filters/FilterSets.xml"
+
+    # Hash for filter set: name->[filters]
+    filterSets = {}
+    
+    # Open the xml master file and build the hash.
+    string = open(fileName, "r").read()
+    docElem = xml.dom.minidom.parseString(string).documentElement     
+    for node in docElem.childNodes:        
+        if node.nodeType == xml.dom.minidom.Node.ELEMENT_NODE:
+            name = ""
+            for m in node.childNodes:
+                if m.nodeType == xml.dom.minidom.Node.ELEMENT_NODE:
+                    if m.nodeName == 'Name':
+                        name = cdr.getTextContent(m) 
+                        if not filterSets.has_key(name):
+                            filterSets[name] = []
+                    else:
+                        filter = cdr.getTextContent(m) 
+                        filterSets[name].append(filter)
+   
+    #----------------------------------------------------------------------
+    # Format HTML page.
+    #---------------------------------------------------------------------- 
+    title   = "CDR XSLT Filtering"
+    section = "QC Filter Sets"
+    header  = cdrcgi.header(title, title, section, "Filter.py", "")
+   
+    html = "<TABLE BORDER=1>\n"
+    html += """<TR><TD><FONT COLOR=BLACK><B>Set Name</B></FONT></TD>
+            <TD><B>Action</B></TD><TD><B>Action</B></TD><TD><B><FONT 
+            COLOR=BLACK>Set Detail</B></FONT></TD></TR>\n"""
+    for key in filterSets.keys():
+        if not dispFilterSet(key, filterSets, filterId):
+            continue
+
+        # Form new set of filters.
+        base    = "/cgi-bin/cdr/Filter.py"; 
+        url     = base + "?DocId=" + docId    
+        docIdExpr = re.compile("^(\d+):")
+        i = 0        
+        for filt in filterSets[key]:
+            match = docIdExpr.search(filt)
+            if match:            
+                id = match.group(1)     
+                if i == 0:
+                    url += "&Filter=" + id   
+                else:
+                    url += "&Filter%d=" % i +  id
+                i += 1             
+    
+        filter = "<A TARGET='_new' HREF='%s'>Filtering</A>" % url
+        validate = "<A TARGET='_new' HREF='%s&validate=Y'>Validating</A>" % url
+        html += """<TR><TD><FONT COLOR=BLACK>%s</FONT></TD><TD>%s</TD>
+                       <TD>%s</TD><TD><FONT COLOR=BLACK>%s</FONT></TD>
+                       </TR>\n""" % (key, filter, validate, 
+                       dispList(filterSets[key]))
+    html += "</TABLE>"
+    cdrcgi.sendPage(header + html + "<BODY></HTML>")
+
+if fields.getvalue('qcFilterSets'):
+    qcFilterSets(docId, filtId)
+    
+#----------------------------------------------------------------------
 # Filter the document.
 #----------------------------------------------------------------------
 doc = cdr.filterDoc(session, filtId, docId = docId)
 if type(doc) == type(()):
-  doc = doc[0]
+    doc = doc[0]
 
 #----------------------------------------------------------------------
 # Add a table row for an error or warning.
