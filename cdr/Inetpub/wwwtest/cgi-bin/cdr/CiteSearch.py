@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CiteSearch.py,v 1.8 2002-07-25 01:51:03 bkline Exp $
+# $Id: CiteSearch.py,v 1.9 2003-01-29 20:59:11 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Citation documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.8  2002/07/25 01:51:03  bkline
+# Added code to catch network exception.
+#
 # Revision 1.7  2002/07/15 21:50:37  bkline
 # Enhancements for issues #323 and #325.
 #
@@ -50,6 +53,7 @@ help      = fields and fields.getvalue("HelpButton")       or None
 impReq    = fields and fields.getvalue("ImportButton")     or None
 srchPmed  = fields and fields.getvalue("SearchPubMed")     or None
 subtitle  = "Citation"
+valErrors = ""
 
 #----------------------------------------------------------------------
 # Redirect to PubMed searching if requested (in a different window).
@@ -72,6 +76,15 @@ try:
 except cdrdb.Error, info:
     cdrcgi.bail('Failure connecting to CDR: %s' % info[1][0])
 
+#----------------------------------------------------------------------
+# Parse out the errors for display.
+#----------------------------------------------------------------------
+def formatErrors(str):
+    result = ""
+    for error in re.findall("<Err>(.*?)</Err>", str):
+        result += (cgi.escape("%s") % error) + "<br>\n"
+    return result
+    
 #----------------------------------------------------------------------
 # See if citation already exists.
 #----------------------------------------------------------------------
@@ -158,6 +171,7 @@ if impReq:
         pubVerNote = "(with publishable version)"
     else:
         pubVerNote = "(with validation errors)"
+        valErrors = formatErrors(resp[1])
     if not replaceID:
         subtitle = "Citation added as %s %s" % (resp[0], pubVerNote)
     else:
@@ -178,13 +192,26 @@ if not submit:
                ('submit', 'HelpButton',   'Help'),
                ('reset',  'CancelButton', 'Clear'),
                ('submit', 'SearchPubMed', 'Search Pub Med'))
+    errors = ""
+    if valErrors:
+        errors = """\
+    <SPAN STYLE="color: red; font-size: 14pt; font-family:
+                Arial; font-weight: Bold">
+     *** IMPORTED WITH ERRORS ***  PUBLISHABLE VERSION NOT CREATED<BR>
+    </SPAN>
+    <SPAN STYLE="color: red; font-size: 12pt; font-family:
+                Arial; font-weight: Normal">
+     %s
+    </SPAN>
+""" % valErrors
     page = cdrcgi.startAdvancedSearchPage(session,
                                           "Citation Search Form",
                                           "CiteSearch.py",
                                           fields,
                                           buttons,
                                           subtitle, # 'Citation',
-                                          conn)
+                                          conn,
+                                          errors)
     page += """\
    <CENTER>
     <TABLE>
