@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.34 2004-01-14 18:45:22 venglisc Exp $
+# $Id: QcReport.py,v 1.35 2004-03-06 23:23:37 bkline Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.34  2004/01/14 18:45:22  venglisc
+# Modified user input form to allow Reformatted Patient Summaries to use the
+# Comment element as well as Redline/Strikeout and Bold/Under reports.
+#
 # Revision 1.33  2003/12/16 15:49:13  bkline
 # Modifed report to drop PDQ indexing section if first attempt to filter
 # a CTGovProtocol document fails.
@@ -393,7 +397,7 @@ if not docType:
 #  * Count of linking patient summaries
 #----------------------------------------------------------------------
 def getDocsLinkingToPerson(docId):
-    counts = [0, 0, 0, 0]
+    counts = [0, 0, 0, 0, 0]
     statusValues = [ ('Active',
                       'Approved-not yet active', 
                       'Temporarily Closed'),
@@ -410,6 +414,12 @@ def getDocsLinkingToPerson(docId):
         for row in cursor.fetchall():
             if row[1] == 'Health professionals': counts[2] += row[0]
             if row[1] == 'Patients':             counts[3] += row[0]
+        cursor.execute("""\
+            SELECT COUNT(DISTINCT doc_id)
+              FROM query_term
+             WHERE int_val = ?
+               AND path LIKE '/CTGovProtocol/%/@cdr:ref'""", docId)
+        counts[4] = cursor.fetchall()[0][0]
     except cdrdb.Error, info:    
         cdrcgi.bail('Failure retrieving link counts: %s' % info[1][0])
     return counts
@@ -483,6 +493,8 @@ def fixPersonReport(doc):
                     counts[3] and "Yes" or "No", doc)
     doc    = re.sub("@@IN_EXTERNAL_MAP_TABLE@@",
                     (row[0] > 0) and "Yes" or "No", doc)
+    doc    = re.sub("@@CTGOV_PROTOCOLS@@",
+                    (counts[4]) and "Yes" or "No", doc)
     return doc
 
 #----------------------------------------------------------------------
