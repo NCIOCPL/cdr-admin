@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermSearch.py,v 1.3 2004-01-08 17:47:56 venglisc Exp $
+# $Id: GlossaryTermSearch.py,v 1.4 2004-09-17 17:42:06 venglisc Exp $
 #
 # Prototype for duplicate-checking interface for GlossaryTerm documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2004/01/08 17:47:56  venglisc
+# Modified GlossaryTerm Advanced Search Screen to allow searching on the
+# Audience field.
+#
 # Revision 1.2  2002/02/28 15:51:32  bkline
 # Changed title of display filter.
 #
@@ -48,7 +52,8 @@ if not submit:
               ('Term Definition',              'Definition'),
               ('Audience',                     'Audience', 
                                                  cdrcgi.glossaryAudienceList),
-              ('Term Status',                  'Status'))
+              ('Term Status',                  'Status', 
+	                                         cdrcgi.glossaryTermStatusList))
     buttons = (('submit', 'SubmitButton', 'Search'),
                ('submit', 'HelpButton',   'Help'),
                ('reset',  'CancelButton', 'Clear'))
