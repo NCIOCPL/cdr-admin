@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: DirectoryMailerReqForm.py,v 1.10 2002-11-01 02:44:44 ameyer Exp $
+# $Id: DirectoryMailerReqForm.py,v 1.11 2002-11-01 05:25:45 ameyer Exp $
 #
 # Request form for all directory mailers.
 #
@@ -31,6 +31,9 @@
 # Bob Kline.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.10  2002/11/01 02:44:44  ameyer
+# Fix top document/distinct selection commands.
+#
 # Revision 1.9  2002/10/22 21:54:26  ameyer
 # Added user control to limit the number of docs selected for mailing.
 #
@@ -473,7 +476,7 @@ else:
         # Execute a query that builds a temporary table
         try:
             rms = cdrmailcommon.RemailSelector (conn)
-            rms.select (orgMailType, maxMailers=maxMailers)
+            rms.select ("'%s'" % orgMailType, maxMailers=maxMailers)
 
             # And create one to fetch the doc ids from it
             qry = rms.getDocIdVerQuery()
