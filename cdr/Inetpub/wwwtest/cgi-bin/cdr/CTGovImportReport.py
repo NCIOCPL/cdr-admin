@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CTGovImportReport.py,v 1.3 2004-01-22 00:26:31 bkline Exp $
+# $Id: CTGovImportReport.py,v 1.4 2004-01-23 15:52:23 bkline Exp $
 #
 # Stats on documents imported from ClinicalTrials.gov into CDR.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2004/01/22 00:26:31  bkline
+# Added call to cdrcgi.getSession().
+#
 # Revision 1.2  2003/12/16 15:42:30  bkline
 # Added section for failures creating new publishable versions.  Fixed
 # typo in style section.
@@ -70,9 +73,10 @@ if not job:
 """ % (row[0], row[1][:19])
     cdrcgi.sendPage(header + form + """\
    </select>
+   <input type='hidden' name='%s' value='%s'>
   </form>
  </body>
-</html>""")
+</html>""" % (cdrcgi.SESSION, session))
 
 #----------------------------------------------------------------------
 # Gather the report data.
