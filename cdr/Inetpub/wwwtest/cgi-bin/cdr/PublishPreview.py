@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: PublishPreview.py,v 1.24 2004-12-28 16:20:55 bkline Exp $
+# $Id: PublishPreview.py,v 1.25 2005-02-15 13:07:13 bkline Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.24  2004/12/28 16:20:55  bkline
+# Added cgHost parameter.
+#
 # Revision 1.23  2004/05/27 20:50:23  bkline
 # Replaced stylesheets as requested by Jay (email message).
 #
@@ -91,6 +94,7 @@ if not fields:
     dbgLog  = len(sys.argv) > 2 and sys.argv[2] or None
     flavor  = len(sys.argv) > 3 and sys.argv[3] or None
     cgHost  = len(sys.argv) > 4 and sys.argv[4] or None
+    ssHost  = len(sys.argv) > 5 and sys.argv[5] or 'www.cancer.gov'
     monitor = 1
 else:
     session = cdrcgi.getSession(fields) or cdrcgi.bail("Not logged in")
@@ -99,6 +103,7 @@ else:
     flavor  = fields.getvalue("Flavor") or None
     dbgLog  = fields.getvalue("DebugLog") or None
     cgHost  = fields.getvalue("cgHost") or None
+    ssHost  = fields.getvalue("ssHost") or 'www.cancer.gov'
     monitor = 0
 
 #----------------------------------------------------------------------
@@ -207,13 +212,13 @@ cdrcgi.sendPage("""\
  <head>
   <title>Publish Preview for CDR%010d</title>
   <link rel='stylesheet'
-        href='http://www.cancer.gov/stylesheets/nci.css'
+        href='http://%s/stylesheets/nci.css'
         type='text/css'>
   <link rel='stylesheet'
-        href='http://www.cancer.gov/stylesheets/nci_general_browsers.css'
+        href='http://%s/stylesheets/nci_general_browsers.css'
         type='text/css'>
  </head>
  <body>
   %s
  </body>
-</html>""" % (intId, resp.xmlResult))
+</html>""" % (intId, ssHost, ssHost, resp.xmlResult))
