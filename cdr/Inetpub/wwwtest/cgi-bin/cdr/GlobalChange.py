@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------
-# $Id: GlobalChange.py,v 1.4 2002-08-27 22:45:40 ameyer Exp $
+# $Id: GlobalChange.py,v 1.5 2002-09-24 23:40:00 ameyer Exp $
 #
 # Perform global changes on XML records in the database.
 #
@@ -14,6 +14,10 @@
 # present the next one - to the end.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2002/08/27 22:45:40  ameyer
+# Now allowing user to enter organization ids with or without address
+# fragments.
+#
 # Revision 1.3  2002/08/09 03:49:15  ameyer
 # Changes for organization status protocol global change.
 # Some small cosmetic changes.
@@ -65,9 +69,11 @@ def sendGlblChgPage (parms):
                           header, "GlobalChange.py")
 
     # Save state in the form
+    # Values are encoded to prevent quotes or other chars from
+    #   causing problems in the output html
     for key in sessionVars.keys():
-        html += "<input type='hidden' name='%s' value='%s' />\n" %\
-                (key, sessionVars[key])
+        html += '<input type="hidden" name="%s" value="%s" />\n' %\
+                (key, cgi.escape (sessionVars[key], 1))
 
     # Add form contents
     html += formContent
