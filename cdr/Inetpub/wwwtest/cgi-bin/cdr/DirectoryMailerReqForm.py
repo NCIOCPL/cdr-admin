@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: DirectoryMailerReqForm.py,v 1.14 2003-01-22 01:49:08 ameyer Exp $
+# $Id: DirectoryMailerReqForm.py,v 1.15 2003-02-04 22:00:24 ameyer Exp $
 #
 # Request form for all directory mailers.
 #
@@ -31,6 +31,10 @@
 # Bob Kline.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.14  2003/01/22 01:49:08  ameyer
+# Added check for returned row with nothing in it to validation of
+# single doc id entered by user.
+#
 # Revision 1.13  2002/11/08 03:07:50  ameyer
 # Removed a debugging line inadvertently left in, restoring the correct one.
 #
@@ -520,14 +524,14 @@ else:
 
         # Fill it
         try:
-            cursor.execute(tmpQry)
+            cursor.execute(tmpQry, timeout=120)
         except cdrdb.Error, info:
             cdrcgi.bail("Failure filling temp table for mailers: %s" \
                         % info[1][0])
 
     # Execute the main query to find all matching documents
     try:
-        cursor.execute(qry)
+        cursor.execute(qry, timeout=120)
         docList = cursor.fetchall()
     except cdrdb.Error, info:
         cdrcgi.bail("Failure retrieving document IDs: %s" % info[1][0])
