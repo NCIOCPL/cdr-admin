@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: pptest.py,v 1.1 2001-12-01 18:11:44 bkline Exp $
+# $Id: pptest.py,v 1.2 2002-08-15 19:22:46 bkline Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2001/12/01 18:11:44  bkline
+# Initial revision
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, cdrdb, re
 
@@ -13,7 +16,7 @@ import cgi, cdr, cdrcgi, cdrdb, re
 # Get the parameters from the request.
 #----------------------------------------------------------------------
 title   = "CDR Publish Preview"
-session = cdr.login('rmk','***REDACTED***')
+session = 'guest'
 docId   = 'cdr190853'
 
 #----------------------------------------------------------------------

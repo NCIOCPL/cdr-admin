@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: Filter.py,v 1.6 2002-07-25 20:38:00 bkline Exp $
+# $Id: Filter.py,v 1.7 2002-08-15 19:20:56 bkline Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2002/07/25 20:38:00  bkline
+# Removed debugging code.
+#
 # Revision 1.5  2002/07/25 01:51:27  bkline
 # Added option for DTD validation.
 #
@@ -30,7 +33,7 @@ import cgi, cdr, cdrcgi, cdrpub, re, string
 #----------------------------------------------------------------------
 title   = "CDR Formatting"
 fields  = cgi.FieldStorage() or cdrcgi.bail("No Request Found", title)
-session = cdr.login('rmk', '***REDACTED***') or cdrcgi.bail("Not Authorized", title)
+session = 'guest'
 docId   = fields.getvalue(cdrcgi.DOCID) or cdrcgi.bail("No Document", title)
 filtId0 = fields.getvalue(cdrcgi.FILTER) or cdrcgi.bail("No Filter", title)
 valFlag = fields.getvalue('validate') or 0
