@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: MenuHierarchy.py,v 1.1 2003-05-08 20:27:27 bkline Exp $
+# $Id: MenuHierarchy.py,v 1.2 2004-11-05 19:48:05 venglisc Exp $
 #
 # Enables users to review the entire menu hierarchy for a given menu type.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2003/05/08 20:27:27  bkline
+# New terminology report for menu information.
+#
 #----------------------------------------------------------------------
 import xml.dom.minidom, cgi, socket, struct, re, cdr, cdrcgi, cdrdb, time
 
@@ -42,11 +45,12 @@ if request == "Log Out":
     cdrcgi.logout(session)
 
 class MenuItem:
-    def __init__(self, id, menuTypeName, name, status):
+    def __init__(self, id, sortString, menuTypeName, name, status):
         self.id           = id
         self.menuTypeName = menuTypeName
         self.name         = name
         self.status       = status
+	self.sortString   = sortString
         self.parents      = []
         self.children     = []
     def __cmp__(self, other):
@@ -81,6 +85,7 @@ def loadMenuItems(menuType):
             menuStatus   = None
             displayName  = None
             parentId     = None
+	    sortString   = None
             for child in elem.childNodes:
                 if child.nodeName == "TermId":
                     termId = int(cdr.getTextContent(child))
@@ -94,15 +99,18 @@ def loadMenuItems(menuType):
                     displayName = cdr.getTextContent(child)
                 elif child.nodeName == "ParentId":
                     parentId = int(cdr.getTextContent(child))
+		elif child.nodeName == "SortString":
+		    sortString = cdr.getTextContent(child)
+
             if termId and termName and menuTypeName:
                 if menuTypeName not in menuTypes:
                     menuTypes[menuTypeName] = MenuType(menuTypeName)
                 name = displayName or termName
-                key = (termId, name, menuTypeName)
+                key = (termId, sortString, name, menuTypeName)
                 if key in menuItems:
                     menuItem = menuItems[key]
                 else:
-                    menuItem = MenuItem(termId, menuTypeName, name, menuStatus)
+                    menuItem = MenuItem(termId, sortString, menuTypeName, name, menuStatus)
                     menuItems[key] = menuItem
                 if parentId:
                     menuItem.parents.append(parentId)
@@ -166,12 +174,20 @@ if not menuType:
 
 #----------------------------------------------------------------------
 # Display a term and its children.
+# This is the second level display.
 #----------------------------------------------------------------------
 def displayMenuItem(item, level):
     b1 = level == 1 and "<b>" or ""
     b2 = level == 1 and "</b>" or ""
     html = "&nbsp;" * level * 5 + b1 + cgi.escape(item.name) + b2 + "<br>\n"
-    item.children.sort(lambda a,b: cmp(menuItems[a].name, menuItems[b].name))
+
+    # We want only sort the children of the terms by the sortString not the terms itself
+    # ----------------------------------------------------------------------------------
+    if level == 1:
+        item.children.sort(lambda a,b: cmp(menuItems[a].sortString, menuItems[b].sortString))
+    else:
+        item.children.sort(lambda a,b: cmp(menuItems[a].name, menuItems[b].name))
+
     if level < 2:
         for child in item.children:
             html += displayMenuItem(menuItems[child], level + 1)
@@ -189,6 +205,8 @@ html = """\
 <html>
  <head>
   <title>Menu Hierarchy Report -- %s</title>
+  <basefont face="Arial, Helvetica, sans-serif">
+  <link rel="STYLESHEET" href="/stylesheets/dataform.css">
   <style type='text/css'>
    h2 { text-align: center; font-size: 16pt; font-weight: bold; }
    body { font-size: 12pt; }
