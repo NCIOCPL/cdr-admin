@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: UnverifiedCitations.py,v 1.1 2002-03-09 03:27:40 bkline Exp $
+# $Id: UnverifiedCitations.py,v 1.2 2002-03-13 16:58:42 bkline Exp $
 #
 # Reports on citations which have not been verified.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2002/03/09 03:27:40  bkline
+# Added report for unverified citations.
+#
 #----------------------------------------------------------------------
 import cdr, cgi, cdrdb, cdrcgi, time, re
 
@@ -47,7 +50,7 @@ html = """\
  <head>
   <title>Unverified Citations Report %s %s</title>
  </head>
- <!-- <basefont face='Arial, Helvetica, sans-serif'> -->
+ <basefont face='Arial, Helvetica, sans-serif'>
  <body>
   <center>
    <b>
@@ -70,7 +73,7 @@ html = """\
      <font size='4'>Comment</font>
     </td>
    </tr>
-""" % (time.strftime("%d/%m/%Y", now), usr, time.strftime("%B %d, %Y", now))
+""" % (time.strftime("%m/%d/%Y", now), usr, time.strftime("%B %d, %Y", now))
    
 #----------------------------------------------------------------------
 # Find out which citations are unverified.
