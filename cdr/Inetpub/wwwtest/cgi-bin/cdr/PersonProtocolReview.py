@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: PersonProtocolReview.py,v 1.3 2002-06-26 20:26:19 bkline Exp $
+# $Id: PersonProtocolReview.py,v 1.4 2003-06-13 20:30:21 bkline Exp $
 #
 # Report to assist editors in checking links to a specified person from
 # protocols.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2002/06/26 20:26:19  bkline
+# Changed query to match new Person DocTitle format rules.
+#
 # Revision 1.2  2002/05/23 15:01:22  bkline
 # Changed the sort logic to match the latest criteria.
 #
@@ -379,15 +382,18 @@ for pp in ppList:
     if loc is None:
         cdrcgi.bail("Missing Location information for private practice %d" %
                     num)
+    prevLoc = pp.getAttribute("PreviousLocation")
+    if prevLoc:
+        prevLoc = " (Previous Location = %s)" % prevLoc
     html += """\
   <b>
    <i>
-    <font size='3'>%d.</font>
+    <font size='3'>%d.%s</font>
    </i>
   </b>
   <br />
   <font size='3'>
-""" % num
+""" % (num, prevLoc)
     for child in loc.childNodes:
         if child.nodeName == 'Line':
             html += """\
@@ -434,15 +440,18 @@ for opl in oplList:
         cdrcgi.bail("Missing Location information")
     if not orgName:
         cdrcgi.bail("Missing org name for other practice location %d" % num)
+    prevLoc = opl.getAttribute("PreviousLocation")
+    if prevLoc:
+        prevLoc = " (Previous Location = %s)" % prevLoc
     html += """\
   <b>
    <i>
-    <font size='3'>%d. %s</font>
+    <font size='3'>%d. %s%s</font>
    </i>
   </b>
   <br />
   <font size='3'>
-""" % (num, orgName)
+""" % (num, orgName, prevLoc)
     if pTitle:
         html += """\
   %s<br />
