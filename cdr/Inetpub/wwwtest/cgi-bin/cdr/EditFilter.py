@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditFilter.py,v 1.5 2001-12-01 17:58:54 bkline Exp $
+# $Id: EditFilter.py,v 1.6 2002-06-26 11:46:45 bkline Exp $
 #
 # Prototype for editing CDR filter documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2001/12/01 17:58:54  bkline
+# Added support for checking the filter back in to the CDR.
+#
 # Revision 1.4  2001/07/06 16:02:40  bkline
 # Added missing / for closing CdrDoc tag in BLANKDOC.
 #
@@ -51,6 +54,7 @@ fields  = cgi.FieldStorage()
 if not fields: cdrcgi.bail("Unable to read form fields", banner)
 session = cdrcgi.getSession(fields)
 request = cdrcgi.getRequest(fields)
+version = fields.getvalue('version')
 if not session: cdrcgi.bail("Unable to log into CDR Server", banner)
 if not request: cdrcgi.bail("No request submitted", banner)
 
@@ -59,10 +63,13 @@ if not request: cdrcgi.bail("No request submitted", banner)
 #----------------------------------------------------------------------
 def showForm(doc, subBanner, buttons):
     hdr = cdrcgi.header(title, banner, subBanner, "EditFilter.py", buttons)
-    html = hdr + ("<CENTER><TEXTAREA NAME='Doc' ROWS='20' COLS='80'>%s"
+    verField = "<INPUT NAME='version' TYPE='checkbox'%s>&nbsp;" \
+               "Create new version for Save, Checkin, or Clone<BR><BR>" % (
+               version and " CHECKED" or "")
+    html = hdr + ("<CENTER>%s<TEXTAREA NAME='Doc' ROWS='20' COLS='80'>%s"
                   "</TEXTAREA><INPUT TYPE='hidden' NAME='%s' VALUE='%s'>"
                   "</FORM></CENTER></BODY></HTML>"
-                  % (doc.replace('\r', ''), cdrcgi.SESSION, session))
+                  % (verField, doc.replace('\r', ''), cdrcgi.SESSION, session))
     cdrcgi.sendPage(html)
 
 #----------------------------------------------------------------------
@@ -97,7 +104,8 @@ elif request == 'Clone':
     if not fields.has_key("Doc"):
         cdrcgi.bail("No document to save")
     doc = stripId(fields["Doc"].value)
-    docId = cdr.addDoc(session, doc=cdrcgi.encode(doc))
+    docId = cdr.addDoc(session, doc=cdrcgi.encode(doc), 
+                                ver=version and 'Y' or 'N')
     if docId.find("<Errors>") >= 0:
         cdrcgi.bail(doc, banner)
     else:
@@ -117,10 +125,13 @@ elif request in ('Save', 'Checkin'):
     doc = fields["Doc"].value
     open('d:/cdr/log/filtersave.doc', 'w').write(doc)
     checkIn = request == 'Checkin' and 'Y' or 'N'
+    ver = version and 'Y' or 'N'
     if re.search("<CdrDoc[^>]*\sId='[^']*'", doc, re.DOTALL):
-        docId = cdr.repDoc(session, doc=cdrcgi.encode(doc), checkIn = checkIn)
+        docId = cdr.repDoc(session, doc=cdrcgi.encode(doc), checkIn = checkIn,
+                           ver = ver)
     else:
-        docId = cdr.addDoc(session, doc=cdrcgi.encode(doc), checkIn = checkIn)
+        docId = cdr.addDoc(session, doc=cdrcgi.encode(doc), checkIn = checkIn,
+                           ver = ver)
     if docId.find("<Errors>") >= 0:
         cdrcgi.bail(doc, banner)
     else:
