@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: CCOPOrgReport.py,v 1.2 2004-03-29 21:34:17 bkline Exp $
+# $Id: CCOPOrgReport.py,v 1.3 2004-03-30 21:13:47 bkline Exp $
 #
 # The NCI Funded CCOP/MBCCOP Organization Report will serve as an
 # additional QC report to check the accuracy of Principal Investigator's
@@ -8,6 +8,9 @@
 # co-investigators that need to be removed from documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2004/03/29 21:34:17  bkline
+# Modified logic to only pick up active persons.
+#
 # Revision 1.1  2004/03/23 21:44:39  bkline
 # New report for Sheri (see Bugzilla entry #1117).
 #
@@ -232,7 +235,7 @@ keys.sort()
 for state in keys:
     orgsInState = orgs[state]
     orgsInState.sort(lambda a,b: cmp(a.name, b.name))
-    col1 = u"<b>%s</b>" % cgi.escape(state).upper()
+    col1 = u"<b>%s</b>" % (state and cgi.escape(state).upper() or u"[NONE]")
     for org in orgsInState:
         col2 = u"%s (%d)" % (cgi.escape(org.name), org.id)
         if not org.persons:
