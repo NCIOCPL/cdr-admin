@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.23 2003-08-01 21:01:43 bkline Exp $
+# $Id: QcReport.py,v 1.24 2003-08-11 21:57:19 venglisc Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.23  2003/08/01 21:01:43  bkline
+# Added code to create subtitle dynamically based on report subtype;
+# added separate CGI variables for deletion markup settings.
+#
 # Revision 1.22  2003/07/29 12:45:35  bkline
 # Checked in modifications made by Peter before he left the project.
 #
@@ -124,12 +128,6 @@ if not insRevLvls:
     insRevLvls = fields.getvalue('publish') and 'publish|' or '' 
     insRevLvls += fields.getvalue('approved') and 'approved|' or ''
     insRevLvls += fields.getvalue('proposed') and 'proposed' or '' 
-if not delRevLvls:
-    delRevLvls = fields.getvalue('dpublish') and 'publish|' or '' 
-    delRevLvls += fields.getvalue('dapproved') and 'approved|' or ''
-    delRevLvls += fields.getvalue('dproposed') and 'proposed' or ''
-if not delRevLvls:
-    delRevLvls = insRevLvls
  
 if not docId and not docType:
     cdrcgi.bail("No document specified", repTitle)
@@ -275,10 +273,6 @@ if docType == 'Summary' and repType and not version:
                          CHECKED='1'>&nbsp;&nbsp; With approved attribute<BR>
   <INPUT TYPE="checkbox" NAME="proposed">&nbsp;&nbsp; With proposed attribute
   <BR><BR>
-  <INPUT TYPE="checkbox" NAME="dpublish">&nbsp;&nbsp; delete With publish attribute<BR>
-  <INPUT TYPE="checkbox" NAME="dapproved"
-                         CHECKED='1'>&nbsp;&nbsp; delete With approved attribute<BR>
-  <INPUT TYPE="checkbox" NAME="dproposed">&nbsp;&nbsp; delete With proposed attribute
 """
     if repType == "pat":
         form += """\
@@ -464,8 +458,8 @@ if not filters.has_key(docType):
 filterParm = []
 if insRevLvls:
     filterParm = [['insRevLevels', insRevLvls]]
-if delRevLvls:
-    filterParm.append(['delRevLevels', delRevLvls])
+if repType == "bu":
+    filterParm.append(['delRevLevels', 'Y'])
 if repType == "pat":
     filterParm.append(['DisplayGlossaryTermList',
                        glossary and "Y" or "N"])
