@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.22 2003-07-29 12:45:35 bkline Exp $
+# $Id: QcReport.py,v 1.23 2003-08-01 21:01:43 bkline Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.22  2003/07/29 12:45:35  bkline
+# Checked in modifications made by Peter before he left the project.
+#
 # Revision 1.21  2003/06/13 20:27:26  bkline
 # Added interface for choosing whether to include glossary terms list
 # at the bottom of the patient summary report.
@@ -75,6 +78,27 @@
 import cgi, cdr, cdrcgi, cdrdb, re, sys
 
 #----------------------------------------------------------------------
+# Dynamically create the title of the menu section (request #809).
+#----------------------------------------------------------------------
+def getSectionTitle(repType):
+    if not repType:
+        return "QC Report"
+    elif repType == "bu":
+        return "Bold/Underline QC Report"
+    elif repType == "but":
+        return "Bold/Underline QC Report (Test)"
+    elif repType == "rs":
+        return "Redline/Strikeout QC Report"
+    elif repType == "rst":
+        return "Redline/Strikeout QC Report (Test)"
+    elif repType == "nm":
+        return "QC Report (No Markup)"
+    elif repType == "pat":
+        return "Patient QC Report"
+    else:
+        return "QC Report (Unrecognized Type)"
+
+#----------------------------------------------------------------------
 # Get the parameters from the request.
 #----------------------------------------------------------------------
 repTitle = "CDR QC Report"
@@ -82,23 +106,30 @@ fields   = cgi.FieldStorage() or cdrcgi.bail("No Request Found", repTitle)
 session  = cdrcgi.getSession(fields) or cdrcgi.bail("Not logged in")
 action   = cdrcgi.getRequest(fields)
 title    = "CDR Administration"
+repType  = fields.getvalue("ReportType") or None
 section  = "QC Report"
 SUBMENU  = "Reports Menu"
 buttons  = ["Submit", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-header   = cdrcgi.header(title, title, section, "QcReport.py", buttons, method
-         = 'GET')
+header   = cdrcgi.header(title, title, getSectionTitle(repType),
+                         "QcReport.py", buttons, method = 'GET')
 docId    = fields.getvalue(cdrcgi.DOCID) or None
 docType  = fields.getvalue("DocType")    or None
-repType  = fields.getvalue("ReportType") or None
 docTitle = fields.getvalue("DocTitle")   or None
 version  = fields.getvalue("DocVersion") or None
 glossary = fields.getvalue("Glossary")   or None
 
 insRevLvls  = fields.getvalue("revLevels")  or None
+delRevLvls  = fields.getvalue("delRevLevels")  or None
 if not insRevLvls:
     insRevLvls = fields.getvalue('publish') and 'publish|' or '' 
     insRevLvls += fields.getvalue('approved') and 'approved|' or ''
     insRevLvls += fields.getvalue('proposed') and 'proposed' or '' 
+if not delRevLvls:
+    delRevLvls = fields.getvalue('dpublish') and 'publish|' or '' 
+    delRevLvls += fields.getvalue('dapproved') and 'approved|' or ''
+    delRevLvls += fields.getvalue('dproposed') and 'proposed' or ''
+if not delRevLvls:
+    delRevLvls = insRevLvls
  
 if not docId and not docType:
     cdrcgi.bail("No document specified", repTitle)
@@ -433,6 +464,8 @@ if not filters.has_key(docType):
 filterParm = []
 if insRevLvls:
     filterParm = [['insRevLevels', insRevLvls]]
+if delRevLvls:
+    filterParm.append(['delRevLevels', delRevLvls])
 if repType == "pat":
     filterParm.append(['DisplayGlossaryTermList',
                        glossary and "Y" or "N"])
