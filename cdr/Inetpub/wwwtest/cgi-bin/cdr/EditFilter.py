@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditFilter.py,v 1.11 2003-02-25 20:03:59 pzhang Exp $
+# $Id: EditFilter.py,v 1.12 2003-03-19 15:33:51 bkline Exp $
 #
 # Prototype for editing CDR filter documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.11  2003/02/25 20:03:59  pzhang
+# Show edit feature only on Dev machine (MAHLER now).
+#
 # Revision 1.10  2002/09/13 17:08:10  bkline
 # Added View command.
 #
@@ -38,14 +41,14 @@
 #----------------------------------------------------------------------
 # Import required modules.
 #----------------------------------------------------------------------
-import cgi, cdr, cdrdb, os, re, cdrcgi, sys, tempfile, string, socket
+import cgi, cdr, cdrdb, os, re, cdrcgi, sys, tempfile, string, socket, time
 
 #----------------------------------------------------------------------
 # Edit only on Dev machine.
 #----------------------------------------------------------------------
 localhost = socket.gethostname()
 if string.upper(localhost) == "MAHLER":
-    localhost= "Dev"
+    localhost = "Dev"
 
 #----------------------------------------------------------------------
 # Set some initial values.
@@ -80,14 +83,29 @@ version    = fields.getvalue('version')
 cvsid      = fields.getvalue('cvsid')
 cvspw      = fields.getvalue('cvspw')
 cvscomment = fields.getvalue('cvscomment')
+logName    = "%s/cvs-filter.log" % cdr.DEFAULT_LOGDIR
+debugging  = 1
 if not session: cdrcgi.bail("Unable to log into CDR Server", banner)
 if not request: cdrcgi.bail("No request submitted", banner)
 
 #----------------------------------------------------------------------
+# Logging to keep an eye on problems (mostly with CVS).
+#----------------------------------------------------------------------
+def debugLog(what):
+    #cdrcgi.bail("debugging=%s" % str(debugging))
+    if debugging:
+        try:
+            f = open(logName, "a")
+            f.write("%s: %s\n" % (time.strftime("%Y-%m-%d %H:%M:%S"), what))
+            f.close()
+        except Exception, info:
+            cdrcgi.bail("Failure writing to %s: %s" % (logName, str(info)))
+    
+#----------------------------------------------------------------------
 # Display the CDR document form.
 #----------------------------------------------------------------------
 def showForm(doc, subBanner, buttons):
-    hdr = cdrcgi.header(title, banner, subBanner, "EditFilter.py", buttons,
+    hdr = cdrcgi.header(title, banner, subBanner, "xEditFilter.py", buttons,
             numBreaks = 1)
     html = hdr + """\
    <input name='version' type='checkbox'%s>
@@ -133,6 +151,7 @@ def showForm(doc, subBanner, buttons):
 # Don't leave dross around if we can help it.
 #----------------------------------------------------------------------
 def cleanup(abspath):
+    debugLog("cleaning up %s" % abspath)
     try:
         os.chdir("..")
         runCommand("rm -rf %s" % abspath)
@@ -171,10 +190,9 @@ def getFilterXml(title, server = 'localhost'):
                     (cgi.escape(title), doc[1]))
         return unicode(doc[0], 'utf-8').replace('\r', '')
         """
-    except:
-        raise
-        cdrcgi.bail("Failure retrieving '%s' from %s" %
-                    (cgi.escape(title), server))
+    except Exception, info:
+        cdrcgi.bail("Failure retrieving '%s' from %s: %s" %
+                    (cgi.escape(title), server, str(info)))
                               
 #----------------------------------------------------------------------
 # Remove the document ID attribute so we can save the doc under a new ID.
@@ -195,10 +213,14 @@ class CommandResult:
 # Run an external command.
 #----------------------------------------------------------------------
 def runCommand(command):
-    commandStream = os.popen('%s 2>&1' % command)
-    output = commandStream.read()
-    code = commandStream.close()
-    return CommandResult(code, output)
+    debugLog("runCommand(%s)" % command)
+    try:
+        commandStream = os.popen('%s 2>&1' % command)
+        output = commandStream.read()
+        code = commandStream.close()
+        return CommandResult(code, output)
+    except Exception, info:
+        debugLog("failure running command: %s" % str(info))
 
 #----------------------------------------------------------------------
 # Don't leave dross around if we can help it.
@@ -207,11 +229,17 @@ def cvsCleanup(abspath, cvsroot = None):
     try:
         os.chdir(abspath)
         if cvsroot:
-            runCommand("cvs -Q %s release -d filt" % cvsroot)
+            result = runCommand("cvs -Q %s release -d filt" % cvsroot)
+            if result.code:
+                debugLog("failure releasing workspace: code=%d output=%s" %
+                         (result.code, result.output))
         os.chdir("..")
-        runCommand("rm -rf %s" % abspath)
-    except:
-        pass
+        result = runCommand("rm -rf %s" % abspath)
+        if result.code:
+            debugLog("failure removing %s: code=%d output=%s" %
+                     (abspath, result.code, result.output))
+    except Exception, info:
+        debugLog("cvsCleanup exception: %s" % str(info))
 
 #----------------------------------------------------------------------
 # Find id of document on production server; create doc if necessary.
@@ -311,89 +339,123 @@ def doCvs(docId, doc, cvsid, cvspw, cvscomment, session):
 
     # Set up cvs strings and directories
     cvsroot = "-d:pserver:%s:%s@%s" % (cvsid, cvspw, cdr.CVSROOT)
+    debugLog("initializing CVS workspace: CVSROOT=%s" % cvsroot)
     if os.environ.has_key("TMP"):
         tempfile.tempdir = os.environ["TMP"]
+        debugLog("tempfile.tempdir=%s" % tempfile.tempdir)
     where = tempfile.mktemp("cvswork")
     abspath = os.path.abspath(where)
-    try: os.mkdir(abspath)
-    except: cdrcgi.bail("Cannot create directory %s" % abspath)
-    try: os.chdir(abspath)
-    except: 
+    debugLog("creating directory %s" % abspath)
+    try:
+        os.mkdir(abspath)
+    except Exception, info:
+        debugLog("mkdir %s failure: %s" % (abspath, str(info)))
+        cdrcgi.bail("Cannot create directory %s" % abspath)
+    try:
+        os.chdir(abspath)
+    except Exception, info:
+        debugLog("chdir %s failure: %s" % (abspath, str(info)))
         cvsCleanup(abspath)
         cdrcgi.bail("Cannot cd to %s" % abspath)
 
+    errorMessage = ""
     try:
         # Check the document out from CVS.
+        debugLog("checking out %s.xml" % prodId)
         cmd = "cvs %s checkout -d filt cdr/Filters/%s.xml" % (cvsroot, prodId)
         res = runCommand(cmd)
         if res.code is not None:
-
+            debugLog("checkout failure: code=%d output=%s" % (res.code,
+                                                              res.output))
+            
             # Is failure because document is new to CVS?
             # XXX Fragile, but the best we can do, I think.
             if res.output.find("cannot find module") == -1:
-                cvsCleanup(abspath, cvsroot)
-                cdrcgi.bail("cvs checkout failure: %d: %s" %
-                        (res.code, res.output))
+                errorMessage = "cvs checkout failure: %d: %s" % \
+                        (res.code, res.output)
 
             # Then use a known document to create a minimal working directory.
-            cmd = "cvs %s co -d filt cdr/Filters/CDR0000000100.xml" % cvsroot
-            res = runCommand(cmd)
-            if res.code is not None:
-                cvsCleanup(abspath, cvsroot)
-                cdrcgi.bail("cvs checkout failure: %d: %s" % 
-                        (res.code, res.output))
+            if not errorMessage:
+                debugLog("adding new document to CVS for %s.xml" % prodId)
+                cmd = "cvs %s co -d filt cdr/Filters/CDR0000000100.xml" % \
+                      cvsroot
+                res = runCommand(cmd)
+                if res.code is not None:
+                    errorMessage = "cvs checkout failure: %d: %s" % \
+                                   (res.code, res.output)
 
             # Move into the working directory.
-            try: os.chdir('filt')
-            except:
-                cvsCleanup(abspath, cvsroot)
-                cdrcgi.bail("Cannot cd to %s/filt" % abspath)
+            if not errorMessage:
+                debugLog("moving to filt subdirectory")
+                try:
+                    os.chdir('filt')
+                except Exception, info:
+                    errorMessage = "failure of chdir to %s/filt: %s" % \
+                                   (abspath, str(info))
 
             # Create the file.
-            try: open("%s.xml" % prodId, "wb").write(doc)
-            except:
-                cvsCleanup(abspath, cvsroot)
-                cdrcgi.bail("Cannot write %s/filt/%s.xml" % (abspath, prodId))
+            if not errorMessage:
+                debugLog("creating file %s.xml" % prodId)
+                try:
+                    open("%s.xml" % prodId, "wb").write(doc)
+                except Exception, info:
+                    path = "%s/filt/%s.xml" % (abspath, prodId)
+                    errorMessage = "failure creating %s: %s" % (path,
+                                                                str(info))
 
             # Add it to the CVS archives.
-            cmd = "cvs %s add %s.xml" % (cvsroot, prodId)
-            res = runCommand(cmd)
-            if res.code is not None:
-                cvsCleanup(abspath, cvsroot)
-                cdrcgi.bail("cvs add failure: %d: %s" % (res.code, res.output))
+            if not errorMessage:
+                debugLog("adding %s.xml to CVS archives" % prodId)
+                cmd = "cvs %s add %s.xml" % (cvsroot, prodId)
+                res = runCommand(cmd)
+                if res.code is not None:
+                    errorMessage = "cvs add failure: %d: %s" % (res.code,
+                                                                res.output)
 
         else:
             
             # Move into the working directory.
-            try: os.chdir('filt')
-            except:
-                cvsCleanup(abspath, cvsroot)
-                cdrcgi.bail("Cannot cd to %s/filt" % abspath)
+            debugLog("moving to filt subdirectory")
+            try:
+                os.chdir('filt')
+            except Exception, info:
+                errorMessage = "failure of chdir to %s/filt: %s" % \
+                               (abspath, str(info))
 
             # Create the file.
-            try: open("%s.xml" % prodId, "wb").write(doc)
-            except:
-                cvsCleanup(abspath, cvsroot)
-                cdrcgi.bail("Cannot write %s/filt/%s.xml" % (abspath, prodId))
+            if not errorMessage:
+                debugLog("writing file %s.xml" % prodId)
+                try:
+                    open("%s.xml" % prodId, "wb").write(doc)
+                except:
+                    path = "%s/filt/%s.xml" % (abspath, prodId)
+                    errorMessage = "failure creating %s: %s" % (path,
+                                                                str(info))
 
         # Commit the version of the document.
-        cmd = runCommand('cvs %s commit -m"%s" %s.xml' %
-                (cvsroot, 
-                 cvscomment.replace('\r', '')
-                           .replace('\n', ' ')
-                           .replace('"', "'"),
-                 prodId))
-        if cmd.code is not None:
-            cvsCleanup(abspath, cvsroot)
-            cdrcgi.bail("cvs commit failure: %d: %s" % (cmd.code, cmd.output))
+        if not errorMessage:
+            debugLog("checking the revision into CVS")
+            cmd = runCommand('cvs %s commit -m"%s" %s.xml' %
+                             (cvsroot, 
+                              cvscomment.replace('\r', '')
+                              .replace('\n', ' ')
+                              .replace('"', "'"),
+                              prodId))
+            if cmd.code is not None:
+                errorMessage = "cvs commit failure: %d: %s" % (cmd.code,
+                                                               cmd.output)
 
+    except Exception, info:
+        errorMessage = "Unknown failure running CVS command: %s" % str(info)
     except:
-        cvsCleanup(abspath, cvsroot)
-        raise
-        cdrcgi.bail("Unknown failure running CVS command")
+        errorMessage = "REALLY unknown failure running CVS command!!!"
 
     # Remove the working directory.
+    debugLog("CVS work done: cleaning up")
     cvsCleanup(abspath, cvsroot)
+    if errorMessage:
+        debugLog(errorMessage)
+        cdrcgi.bail(errorMessage)
     
 #----------------------------------------------------------------------
 # Load an existing document.
