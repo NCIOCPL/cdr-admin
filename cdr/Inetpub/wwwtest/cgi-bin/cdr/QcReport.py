@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.27 2003-09-04 21:31:01 bkline Exp $
+# $Id: QcReport.py,v 1.28 2003-09-05 21:05:43 bkline Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.27  2003/09/04 21:31:01  bkline
+# Added checkbox for DisplayComments (summary reports).
+#
 # Revision 1.26  2003/08/27 16:39:28  venglisc
 # Modified code to include the report type but (bold/underline test)
 # to pass the additional parameter just as report type bu (bold/underline)
@@ -289,6 +292,11 @@ if docType == 'Summary' and repType and not version:
   <INPUT TYPE="checkbox" NAME="proposed">&nbsp;&nbsp; With proposed attribute
   <BR><BR>
 """
+    if repType in ('bu', 'rs'):
+        form += """\
+  <INPUT TYPE='checkbox' NAME='DisplayCommentElements' CHECKED='1'>&nbsp;&nbsp;
+  Display Comments?
+"""
     if repType == "pat":
         form += """\
   <BR><BR>
@@ -297,9 +305,6 @@ if docType == 'Summary' and repType and not version:
   <BR>
   <INPUT TYPE='checkbox' NAME='ShowStandardWording'>&nbsp;&nbsp;
   Show standard wording with mark-up?<BR>
-  <BR>
-  <INPUT TYPE='checkbox' NAME='DisplayCommentElements' CHECKED='1'>&nbsp;&nbsp;
-  Display comment elements?<BR>
 """
     cdrcgi.sendPage(header + form + """  
  </BODY>
