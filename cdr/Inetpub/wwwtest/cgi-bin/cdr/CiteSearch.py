@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: CiteSearch.py,v 1.13 2003-11-26 20:53:21 venglisc Exp $
+# $Id: CiteSearch.py,v 1.14 2004-05-11 21:31:15 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Citation documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.13  2003/11/26 20:53:21  venglisc
+# Replaced the Citation QC Report filter to run the QC Citation filter set
+# instead.
+#
 # Revision 1.12  2003/10/22 13:44:06  bkline
 # Removed dependency on Python regular expression package, which was
 # choking on complex documents.
@@ -312,8 +316,10 @@ searchFields = (cdrcgi.SearchField(title,
                 cdrcgi.SearchField(year,
                             ("/Citation/PDQCitation/PublicationDetails"
                              "/PublicationYear",
-                             "/Citation/PubmedArticle/PubmedData/History"
-                             "/PubMedPubDate/Year")),
+                             #"/Citation/PubmedArticle/PubmedData/History"
+                             #"/PubMedPubDate/Year")),
+                             "/Citation/PubmedArticle/MedlineCitation"
+                             "/Article/Journal/JournalIssue/PubDate/Year")),
                 cdrcgi.SearchField(volume,
                             ("/Citation/PubmedArticle/MedlineCitation"
                              "/Article/Journal/JournalIssue/Volume",)),
