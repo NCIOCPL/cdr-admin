@@ -1,8 +1,11 @@
 #----------------------------------------------------------------------
 #
-# $Id: EmailerReview.py,v 1.2 2005-02-19 23:49:22 bkline Exp $
+# $Id: EmailerReview.py,v 1.3 2005-03-02 21:36:58 bkline Exp $
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2005/02/19 23:49:22  bkline
+# Added code to insert mailer_type into job table.
+#
 # Revision 1.1  2004/07/13 18:02:48  bkline
 # Administrative support for electronic mailers.
 #
@@ -145,7 +148,7 @@ if not jobId:
 # Dig the pub_subset value out of the manifest file.
 #----------------------------------------------------------------------
 def lookupMailerType():
-    dom = xml.minidom.parse('manifest.xml')
+    dom = xml.dom.minidom.parse('manifest.xml')
     mailerType = dom.documentElement.getAttribute('PubSubset')
     return mailerType or "Unknown"
 
