@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtSearch.py,v 1.14 2004-04-06 18:52:37 bkline Exp $
+# $Id: ProtSearch.py,v 1.15 2004-04-09 12:17:32 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Protocol documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.14  2004/04/06 18:52:37  bkline
+# Implemented enhancements for request #1165.
+#
 # Revision 1.13  2003/12/17 01:21:33  bkline
 # Added code to pass session to results page function (to support
 # CTGovProtocol report).
@@ -170,6 +173,7 @@ searchFields = (cdrcgi.SearchField(title, selectPaths(docType,
                              "/ScientificProtocolInfo"
                              "/ProtocolIDs/OtherID/IDString",
                              "/CTGovProtocol/IDInfo/OrgStudyID",
+                             "/CTGovProtocol/IDInfo/SecondaryID",
                              "/CTGovProtocol/IDInfo/NCTID"))))
 
 #----------------------------------------------------------------------
