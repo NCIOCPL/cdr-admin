@@ -1,12 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryDateLastModified.py,v 1.3 2003-12-03 20:42:14 bkline Exp $
+# $Id: SummaryDateLastModified.py,v 1.4 2003-12-16 15:50:23 bkline Exp $
 #
 # Report listing specified set of Cancer Information Summaries, the date
 # they were last modified as entered by a user, and the date the last
 # Modify action was taken.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2003/12/03 20:42:14  bkline
+# Added designation of which date range was specified (user or system).
+#
 # Revision 1.2  2003/11/03 00:24:51  bkline
 # Changes requested by issue #913.
 #
@@ -200,11 +203,13 @@ if uStartDate and uEndDate:
     sEndDate   = '9999-12-30'  # Yow!  Y10K bug! :->}
     startDate  = uStartDate
     endDate    = uEndDate
+    bodyTitle  = "Summary Date Last Modified (User) Report"
 else:
     uStartDate = '1853-01-01'
     uEndDate   = '9999-12-30'  # Don't do 9999-12-31 (avoid overflow below)
     startDate  = sStartDate
     endDate    = sEndDate
+    bodyTitle  = "Summary Last Modified Date (System) Report"
 try:
     cursor.execute("""\
         SELECT DISTINCT st.doc_id,
@@ -271,10 +276,6 @@ if not summaryType:
     title = "All Boards/%s" % audience
 else:
     title = "%s/%s" % (row[2], audience)
-if uStartDate and uEndDate:
-    bodyTitle = "Summary Date Last Modified (User) Report"
-else:
-    bodyTitle = "Summary Last Modified Date (System) Report"
 html = """\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>
