@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolMailerReqForm.py,v 1.4 2002-11-13 20:34:52 bkline Exp $
+# $Id: ProtocolMailerReqForm.py,v 1.5 2002-11-14 14:27:15 bkline Exp $
 #
 # Request form for all protocol mailers.
 #
@@ -17,6 +17,9 @@
 # publication job for the publishing daemon to find and initiate.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2002/11/13 20:34:52  bkline
+# Fixed wording on limit documentation.
+#
 # Revision 1.3  2002/11/07 18:54:47  bkline
 # Incorporated interface changes requested by Lakshmi.
 #
@@ -278,7 +281,8 @@ elif mailType == 'Protocol-Initial abstract':
                          ON prot_status.doc_id = protocol.id
                       WHERE prot_status.value IN ('Active', 
                                                   'Approved-not yet active')
-                        AND prot_status.path = '%s'
+                        AND prot_status.path       = '%s'
+                        AND doc_version.val_status = 'V'
 
                         -- Don't send mailers to Brussels.
                         AND NOT EXISTS (SELECT *
@@ -335,6 +339,8 @@ elif mailType == 'Protocol-Annual abstract':
                       WHERE prot_status.value IN ('Active', 
                                                   'Approved-Not Yet Active')
                         AND prot_status.path = '%s'
+                        AND doc_version.val_status = 'V'
+                        AND doc_version.publishable = 'P'
 
                         -- Make sure the initial mailer has gone out.
                         AND EXISTS (SELECT *
@@ -392,6 +398,8 @@ elif mailType == 'Protocol-Annual abstract remail':
                AND mailer_sent.path = '/Mailer/Sent'
                AND mailer_sent.value BETWEEN DATEADD(day, -120, GETDATE())
                                          AND DATEADD(day,  -60, GETDATE())
+               AND doc_version.publishable = 'Y'
+               AND doc_version.val_status  = 'V'
 
                -- Don't bug the folks who have already answered.
                AND NOT EXISTS (SELECT *
@@ -430,8 +438,9 @@ elif mailType == 'Protocol-Initial status/participant check':
                          ON lead_org.doc_id = protocol.id
                       WHERE prot_status.value IN ('Active', 
                                                   'Approved-Not Yet Active')
-                        AND prot_status.path   = '%s'
-                        AND lead_org.path      = '%s'
+                        AND prot_status.path       = '%s'
+                        AND lead_org.path          = '%s'
+                        AND doc_version.val_status = 'V'
 
                         -- Don't send paper when they want electronic mailers.
                         AND NOT EXISTS (SELECT *
@@ -514,8 +523,10 @@ elif mailType == 'Protocol-Quarterly status/participant check':
                       -- Only send mailers for active or approved protocols
                       WHERE prot_status.value IN ('Active', 
                                                   'Approved-Not Yet Active')
-                        AND prot_status.path   = '%s'
-                        AND lead_org.path      = '%s'
+                        AND prot_status.path       = '%s'
+                        AND lead_org.path          = '%s'AND
+                        doc_version.publishable    = 'Y'
+                        AND doc_version.val_status = 'V'
 
                         -- Make sure they've gotten their original mailer.
                         AND EXISTS (SELECT *
