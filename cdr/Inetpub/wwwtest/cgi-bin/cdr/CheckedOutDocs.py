@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CheckedOutDocs.py,v 1.3 2002-03-02 13:51:32 bkline Exp $
+# $Id: CheckedOutDocs.py,v 1.4 2002-04-24 20:36:03 bkline Exp $
 #
 # Report on documents checked out to a user.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2002/03/02 13:51:32  bkline
+# Rearranged columns.  Added call to unicodeToLatin1().
+#
 # Revision 1.2  2002/03/02 13:04:42  bkline
 # Fixed header comment.
 #
@@ -64,7 +67,7 @@ table  = """\
   <TD NOWRAP='1'><B>Checked Out</B></TD>
   <TD><B>Type</B></TD>
   <TD><B>ID</B></TD>
-  <TD><B>Title</B></TD>
+  <TD><B>DocTitle</B></TD>
  </TR>
 """
 

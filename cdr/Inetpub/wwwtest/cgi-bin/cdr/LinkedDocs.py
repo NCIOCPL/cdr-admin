@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: LinkedDocs.py,v 1.2 2002-02-21 15:22:03 bkline Exp $
+# $Id: LinkedDocs.py,v 1.3 2002-04-24 20:36:03 bkline Exp $
 #
 # Reports on documents which link to a specified document.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/02/21 15:22:03  bkline
+# Added navigation buttons.
+#
 # Revision 1.1  2002/01/22 21:36:08  bkline
 # Initial revision
 #
@@ -144,7 +147,7 @@ SELECT DISTINCT d.id, d.title, t.name, n.source_elem, n.target_frag
     report = """\
 <H4>Document Type</H4>
 %s
-<H4>Document Title</H4>
+<H4>DocTitle</H4>
 %s
 <BR>&nbsp;<BR>&nbsp;<BR>
 

@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ModifiedPubMedDocs.py,v 1.2 2002-02-21 22:34:00 bkline Exp $
+# $Id: ModifiedPubMedDocs.py,v 1.3 2002-04-24 20:36:03 bkline Exp $
 #
 # Reports on documents unchanged for a specified number of days.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/02/21 22:34:00  bkline
+# Added navigation buttons.
+#
 # Revision 1.1  2001/12/01 18:11:44  bkline
 # Initial revision
 #
@@ -73,7 +76,7 @@ html    = """\
 <TABLE BORDER='0' WIDTH='100%%' CELLSPACING='1' CELLPADDING='1'>
  <TR BGCOLOR='silver' VALIGN='top'>
   <TD ALIGN='center'><FONT SIZE='-1'><B>Doc ID</B></FONT></TD>
-  <TD ALIGN='center'><FONT SIZE='-1'><B>Title</B></FONT></TD>
+  <TD ALIGN='center'><FONT SIZE='-1'><B>DocTitle</B></FONT></TD>
  </TR>
 """
 for row in rows:
