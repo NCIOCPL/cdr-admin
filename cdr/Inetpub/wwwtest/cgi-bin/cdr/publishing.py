@@ -2,8 +2,11 @@
 #
 # Publishing CGI script.
 #
-# $Id: publishing.py,v 1.2 2001-12-03 23:10:05 Pzhang Exp $
+# $Id: publishing.py,v 1.3 2002-02-07 14:45:52 mruben Exp $
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2001/12/03 23:10:05  Pzhang
+# Added email notification feature. Used PubStatus.py for status check.
+#
 # Revision 1.1  2001/12/01 18:11:44  bkline
 # Initial revision
 #
@@ -175,19 +178,23 @@ class Display:
         <input type="checkbox" checked name="Email" value="y">&nbsp;&nbsp;
         <BR> Use comma to separate receivers: &nbsp
         <input type="text" size="50" name="EmailAddr" value="***REMOVED***"><br><br>
+        Messages only?
+        <input type="checkbox" name="NoOutput" value="Y"><br><br>
         <input type="submit" name="Publish" value="Yes">&nbsp;&nbsp;
         <input type="submit" name="Publish" value="No">"""
            
         cdrcgi.sendPage(header + form + "</FORM></BODY></HTML>")
     
     # Publish and return a link for checking status.
-    def initPublish(self, ctrlDocId, subsetName, credential, docIds, params, email):
+    def initPublish(self, ctrlDocId, subsetName, credential, docIds, params,
+                    email, no_output):
 
         form = "<H4>Publishing SubSet %s</H4>\n" % subsetName
         form += "<OL>\n"
     
         # Get publishing job ID.       
-        p = publish.Publish(ctrlDocId, subsetName, credential, docIds, params, email)
+        p = publish.Publish(ctrlDocId, subsetName, credential, docIds, params,
+                            email, no_output)
         jobId = p.getJobId()
         if type(jobId) == type(""):            
             form += "<LI>Failed: <H5>%s</H5></LI>\n" % jobId
@@ -272,7 +279,7 @@ if fields.has_key('Session') and fields.has_key('SubSet') and \
     subsetName = fields.getvalue('SubSet')
     credential = fields.getvalue('Session')
     answer = fields.getvalue('Publish')
-    
+
     if answer == 'No':
         d.displayDocParam(ctrlDocId, subsetName, "Redirect")
     else:        
@@ -288,7 +295,12 @@ if fields.has_key('Session') and fields.has_key('SubSet') and \
             email = fields.getvalue('EmailAddr')
         else:
             email = "Do not notify"
-        d.initPublish(ctrlDocId, subsetName, credential, docIds, params, email)
+        if fields.getvalue('NoOutput') == 'Y':        
+            no_output = "Y"
+        else:
+            no_output = "N"
+        d.initPublish(ctrlDocId, subsetName, credential, docIds, params,
+                      email, no_output)
 
 elif fields.has_key('Session') and fields.has_key('SubSet') and \
     fields.has_key('ctrlId') and fields.has_key('DocParam'):
