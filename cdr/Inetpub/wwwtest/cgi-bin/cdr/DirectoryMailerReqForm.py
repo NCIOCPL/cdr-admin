@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: DirectoryMailerReqForm.py,v 1.12 2002-11-08 02:35:07 ameyer Exp $
+# $Id: DirectoryMailerReqForm.py,v 1.13 2002-11-08 03:07:50 ameyer Exp $
 #
 # Request form for all directory mailers.
 #
@@ -31,6 +31,9 @@
 # Bob Kline.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.12  2002/11/08 02:35:07  ameyer
+# Revised user interface to match Lakshmi's change request.
+#
 # Revision 1.11  2002/11/01 05:25:45  ameyer
 # Changed form of parameter passed to remail selector.
 # Added publishable='Y' to version selection (forgot to comment this
@@ -384,8 +387,7 @@ else:
                          OR
                             p2.pub_subset = 'Physician-Annual remail'
                        )
-                       -- AND p2.completed > DATEADD(year,-1,GETDATE())
-                       AND p2.completed > DATEADD(day,-360,GETDATE())
+                       AND p2.completed > DATEADD(year,-1,GETDATE())
                        AND p2.status <> 'Failure'
         """
 
