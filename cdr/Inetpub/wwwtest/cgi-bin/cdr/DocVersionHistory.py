@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: DocVersionHistory.py,v 1.5 2002-08-29 13:12:26 bkline Exp $
+# $Id: DocVersionHistory.py,v 1.6 2002-09-25 15:28:32 pzhang Exp $
 #
 # Show version history of document.
 #----------------------------------------------------------------------
@@ -236,6 +236,11 @@ html = """\
     </td>
     <td align='center' valign='top'>
      <b>
+      <font size='3'>VALIDITY</font>
+     </b>
+    </td>
+    <td align='center' valign='top'>
+     <b>
       <font size='3'>PUBLISHABLE?</font>
      </b>
     </td>
@@ -265,6 +270,7 @@ try:
                 v.comment,
                 u.fullname,
                 v.dt,
+                v.val_status,
                 v.publishable,
                 d.completed
            FROM doc_version v
@@ -280,7 +286,8 @@ LEFT OUTER JOIN primary_pub_doc d
     lastVer = None
     row = cursor.fetchone()
     while row:
-        verNum, verComment, verUser, verDate, verPublishable, pubDate = row
+        verNum, verComment, verUser, verDate, verValStatus, \
+            verPublishable, pubDate = row
         if verNum != lastVer:
             lastVer = verNum
             html += """\
@@ -300,14 +307,19 @@ LEFT OUTER JOIN primary_pub_doc d
     <td align = 'center' valign = 'top'>
      <font size = '3'>%s</font>
     </td>
+    <td align = 'center' valign = 'top'>
+     <font size = '3'>%s</font>
+    </td>
 """ % (verNum,
        verComment or "&nbsp;",
        verDate[:10],
        verUser,
+       verValStatus,
        verPublishable == 'Y' and 'Y' or 'N')
         else:
             html += """\
    <tr>
+    <td>&nbsp;</td>
     <td>&nbsp;</td>
     <td>&nbsp;</td>
     <td>&nbsp;</td>
