@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: PublishPreview.py,v 1.21 2003-11-25 12:47:41 bkline Exp $
+# $Id: PublishPreview.py,v 1.22 2003-12-16 15:47:14 bkline Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.21  2003/11/25 12:47:41  bkline
+# Added support for testing from command line.
+#
 # Revision 1.20  2003/08/25 20:31:44  bkline
 # Eliminated obsolete lists of filters (replaced by named filter sets).
 #
@@ -68,7 +71,7 @@
 # Initial revision
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, cdrdb, re, cdr2cg, sys
+import cgi, cdr, cdrcgi, cdrdb, re, cdr2cg, sys, time
 
 #----------------------------------------------------------------------
 # Get the parameters from the request.
@@ -81,19 +84,31 @@ if not fields:
     docId   = sys.argv[1]
     dbgLog  = len(sys.argv) > 2 and sys.argv[2] or None
     flavor  = len(sys.argv) > 3 and sys.argv[3] or None
+    monitor = 1
 else:
     session = cdrcgi.getSession(fields) or cdrcgi.bail("Not logged in")
     docId   = fields.getvalue(cdrcgi.DOCID) or cdrcgi.bail("No Document",
                                                            title)
     flavor  = fields.getvalue("Flavor") or None
     dbgLog  = fields.getvalue("DebugLog") or None
+    monitor = 0
+
+#----------------------------------------------------------------------
+# Debugging output.
+#----------------------------------------------------------------------
+def showProgress(progress):
+    if monitor:
+        sys.stderr.write("[%s] %s\n" % (time.strftime("%Y-%m-%d %H:%M:%S"),
+                                        progress))
+showProgress("Started...")
 
 #----------------------------------------------------------------------
 # Map for finding the filters for a given document type.
 #----------------------------------------------------------------------
 filterSets = {
     'Summary'        : ['set:Vendor Summary Set'],
-    'InScopeProtocol': ['set:Vendor InScopeProtocol Set']
+    'InScopeProtocol': ['set:Vendor InScopeProtocol Set'],
+    'CTGovProtocol'  : ['set:Vendor CTGovProtocol Set']
 }
 
 #----------------------------------------------------------------------
@@ -102,6 +117,7 @@ filterSets = {
 try:
     conn = cdrdb.connect('CdrGuest')
     cursor = conn.cursor()
+    showProgress("Connected to CDR database...")
 except cdrdb.Error, info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
 
@@ -124,16 +140,20 @@ try:
 
     row = cursor.fetchone()
     if not row:
-        cdrcgi.bail("Unable to find document type for %s" % docId)
+        cdrcgi.bail("Unable to find publishable version for %s" % docId)
     docType, docVer = row
 except cdrdb.Error, info:    
-        cdrcgi.bail('Unable to find document type for %s: %s' % (docId, 
+        cdrcgi.bail('Failure finding publishable version for %s: %s' % (docId, 
                                                                  info[1][0]))
+showProgress("Fetched document type: %s..." % row[0])
+showProgress("Fetched latest version number: %d..." % row[1])
 if not flavor:
     if docType == "Summary": flavor = "summary"
     elif docType == "InScopeProtocol": flavor = "protocol_hp"
-    else: cdrcgi.bail(
-        "Publish preview only available for Summary and Protocol documents")
+    elif docType == "CTGovProtocol": flavor = "CTGovProtocol_HP"
+    else: cdrcgi.bail("Publish preview only available for "
+                      "Summary and Protocol documents")
+showProgress("Using flavor: %s..." % flavor)
 
 #----------------------------------------------------------------------
 # Filter the document.
@@ -144,15 +164,20 @@ doc = cdr.filterDoc(session, filterSets[docType], docId = docId,
                     docVer = docVer)
 if type(doc) == type(()):
     doc = doc[0]
+showProgress("Document filtering complete...")
 pattern1 = re.compile("<\?xml[^?]+\?>", re.DOTALL)
 pattern2 = re.compile("<!DOCTYPE[^>]+>", re.DOTALL)
 doc = pattern1.sub("", doc)
 doc = pattern2.sub("", doc)
+showProgress("Doctype declaration stripped...")
 #cdrcgi.bail("flavor=%s doc=%s" % (flavor, doc))
 try:
     if dbgLog:
         cdr2cg.debuglevel = 1
+        showProgress("Debug logging turned on...")
+    showProgress("Submitting request to Cancer.gov...")
     resp = cdr2cg.pubPreview(doc, flavor)
+    showProgress("Response received from Cancer.gov...")
 except:
     cdrcgi.bail("Preview formatting failure")
 
@@ -162,6 +187,7 @@ except:
 #----------------------------------------------------------------------
 # Show it.
 #----------------------------------------------------------------------
+showProgress("Done...")
 cdrcgi.sendPage("""\
 <html>
  <head>
