@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditExternMap.py,v 1.5 2004-08-19 22:12:23 bkline Exp $
+# $Id: EditExternMap.py,v 1.6 2004-08-27 19:07:32 bkline Exp $
 #
 # Allows a user to edit the table which maps strings from external
 # systems (such as ClinicalTrials.gov) to CDR document IDs.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2004/08/19 22:12:23  bkline
+# Added support for deleting rows from the external_map table.
+#
 # Revision 1.4  2004/08/10 15:38:19  bkline
 # Added support for separate permissions for different mapping types.
 #
@@ -332,7 +335,12 @@ if request in ("Save Changes", "Get Values"):
 """
     else:
         form += """\
-  <br><table border='0' cellspacing='1' cellpadding='1'>
+  <br>
+  <table border='0' cellspacing='1' cellpadding='1'>
+   <tr>
+    <td align='center'><b>Variant String</b></td>
+    <td align='center'><b>CDRID</b></td>
+   </tr>
 """
         while row:
             if not row[2]:
@@ -344,7 +352,7 @@ if request in ("Save Changes", "Get Values"):
             extra = allUsage and (" [%s]" % row[3]) or ""
             value = "%s%s" % (row[1], extra)
             value = cgi.escape(value, 1)
-            value = ("<input class='r' readonly='1' size='120' "
+            value = ("<input class='r' readonly='1' size='80' "
                      "name='name-%d' value=\"%s\">" % (row[0], value))
             docId = "<input size='8' name='id-%d' value='%s'>" % (row[0],
                                                                row[2] or "")
@@ -353,7 +361,9 @@ if request in ("Save Changes", "Get Values"):
     <td valign='top'>%s</a></td>
     <td valign='top'>%s</td>
     <td>%s</td>
-    <td><input type='checkbox' name='del-id-%d'>&nbsp;Delete mapping?</td>
+    <td nowrap='1'>
+     <input type='checkbox' name='del-id-%d'>&nbsp;Delete mapping?
+    </td>
     <input type='hidden' name='old-id-%d' value='%s'>
    </tr>
 """ % (value, docId, button, row[0], row[0], row[2] or "")
