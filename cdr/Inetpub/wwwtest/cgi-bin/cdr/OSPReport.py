@@ -1,16 +1,20 @@
 #----------------------------------------------------------------------
 #
-# $Id: OSPReport.py,v 1.2 2004-02-26 21:11:01 bkline Exp $
+# $Id: OSPReport.py,v 1.3 2004-02-26 21:13:10 bkline Exp $
 #
 # Queue up report for the Office of Science Policy.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2004/02/26 21:11:01  bkline
+# Replaced hard-coded name of development server with macro from cdr
+# module.
+#
 # Revision 1.1  2003/05/08 20:24:01  bkline
 # New report for Office of Science Policy.
 #
 #----------------------------------------------------------------------
 
-import cdrbatch, cdrcgi, cgi, cdrdb
+import cdrbatch, cdrcgi, cgi, cdrdb, cdr
 
 #----------------------------------------------------------------------
 # Set the form variables.
