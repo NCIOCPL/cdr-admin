@@ -15,7 +15,16 @@ output = """\
    </TR>
 """
 for field in fields.keys():
-    output += """\
+    if type(fields[field]) == type([]):
+        for f in fields[field]:
+            output += """\
+   <TR>
+    <TD>%s</TD>
+    <TD>%s</TD>
+   </TR>
+""" % (field, f.value)
+    else:
+        output += """\
    <TR>
     <TD>%s</TD>
     <TD>%s</TD>
