@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditFilterSets.py,v 1.3 2002-11-14 14:05:42 bkline Exp $
+# $Id: EditFilterSets.py,v 1.4 2004-05-11 17:33:18 bkline Exp $
 #
 # Menu of existing filter sets.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2002/11/14 14:05:42  bkline
+# Reduced font sizes for report.
+#
 # Revision 1.2  2002/11/14 01:09:56  bkline
 # Fixed typo (missing closing parenthesis).
 #
@@ -46,7 +49,9 @@ if request == "Log Out":
 #----------------------------------------------------------------------
 # Generate a report listing the content of all filter sets.
 #----------------------------------------------------------------------
-if request == "Report":
+if request == "Deep Report":
+    cdrcgi.navigateTo("ShowFilterSets.py", session)
+elif request == "Report":
     buttons = ["New Filter Set", cdrcgi.MAINMENU, "Log Out"]
     header  = cdrcgi.header(title, title, "Filter Set Report", script, buttons,
             stylesheet = """\
@@ -86,7 +91,8 @@ if request == "New Filter Set":
 #----------------------------------------------------------------------
 # Retrieve and display the action information.
 #----------------------------------------------------------------------
-buttons = ["Report", "New Filter Set", cdrcgi.MAINMENU, "Log Out"]
+buttons = ["Deep Report", "Report", "New Filter Set",
+           cdrcgi.MAINMENU, "Log Out"]
 header  = cdrcgi.header(title, title, section, script, buttons, numBreaks = 1)
 
 #----------------------------------------------------------------------
