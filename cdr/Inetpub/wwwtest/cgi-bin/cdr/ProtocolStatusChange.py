@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolStatusChange.py,v 1.1 2003-01-29 18:46:25 bkline Exp $
+# $Id: ProtocolStatusChange.py,v 1.2 2003-02-07 16:10:45 bkline Exp $
 #
 # Protocol Status Change Report
 #
@@ -170,8 +170,8 @@ try:
                      ON ppd.pub_proc = pp.id
                    JOIN #interesting_protocols ip
                      ON ip.id = ppd.doc_id
-                  WHERE pp.pub_subset = 'Cancer.gov'
-                    AND pp.status     = 'success'
+                  WHERE pp.pub_subset LIKE 'Push_Documents_To_Cancer.Gov%'
+                    AND pp.status = 'Success'
                     AND ppd.failure IS NULL""")
     curs.execute("""
           SELECT ip.id, ps.id, d.xml
@@ -241,7 +241,8 @@ keys = protLeadOrgs.keys()
 keys.sort()
 for key in keys:
     protLeadOrg = protLeadOrgs[key]
-    html += """\
+    if protLeadOrg.prevStatus:
+        html += """\
    <tr>
     <td valign='top'>%s</td>
     <td valign='top'>CDR%010d</td>
@@ -253,7 +254,7 @@ for key in keys:
    </tr>
 """ % (protLeadOrg.protId     or "&nbsp;",
        key[1],
-       protLeadOrg.prevStatus or "None",
+       protLeadOrg.prevStatus,
        protLeadOrg.curStatus  or "&nbsp;",
        protLeadOrg.entryDate  or "&nbsp;",
        protLeadOrg.published,
