@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: Reports.py,v 1.10 2002-03-21 20:01:15 bkline Exp $
+# $Id: Reports.py,v 1.11 2002-04-10 20:07:55 bkline Exp $
 #
 # Prototype for editing CDR linking tables.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.10  2002/03/21 20:01:15  bkline
+# Added Glossary Term Links report and Persons at Org report.
+#
 # Revision 1.9  2002/03/14 04:01:10  bkline
 # Added New Doc Report.
 #
@@ -70,6 +73,7 @@ reports = [
            ('NewDocReport.py', 'New Documents'),
            ('PdqBoards.py', 'PDQ Boards'),
            ('PersonsAtOrg.py', 'Persons Practicing At Orgs'),
+           ('PubJobQueue.py', 'Publishing Job Queue'),
            ('TermUsage.py', 'Term Usage'),
            ('UnchangedDocs.py', 'Unchanged Documents'),
            ('UnverifiedCitations.py', 'Unverified Citations')
