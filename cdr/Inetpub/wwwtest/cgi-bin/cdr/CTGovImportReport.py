@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: CTGovImportReport.py,v 1.2 2003-12-16 15:42:30 bkline Exp $
+# $Id: CTGovImportReport.py,v 1.3 2004-01-22 00:26:31 bkline Exp $
 #
 # Stats on documents imported from ClinicalTrials.gov into CDR.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2003/12/16 15:42:30  bkline
+# Added section for failures creating new publishable versions.  Fixed
+# typo in style section.
+#
 # Revision 1.1  2003/11/10 17:59:06  bkline
 # Reports stats on documents imported from ClinicalTrials.gov into CDR.
 #
@@ -16,6 +20,7 @@ import cdr, cdrdb, time, cgi, cdrcgi, re
 #----------------------------------------------------------------------
 fields    = cgi.FieldStorage()
 action    = cdrcgi.getRequest(fields)
+session   = cdrcgi.getSession(fields)
 job       = fields and fields.getvalue('job') or None
 title     = "CDR Administration"
 section   = "CTGov Import/Update Stats"
