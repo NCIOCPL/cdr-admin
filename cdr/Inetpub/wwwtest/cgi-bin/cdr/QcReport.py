@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.8 2002-06-26 18:30:48 bkline Exp $
+# $Id: QcReport.py,v 1.9 2002-06-26 20:38:52 bkline Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.8  2002/06/26 18:30:48  bkline
+# Fixed bug in mailer query logic.
+#
 # Revision 1.7  2002/06/26 16:35:17  bkline
 # Implmented report of audit_trail activity.
 #
@@ -257,9 +260,9 @@ def getDocsLinkingToPerson(docId):
     return counts
 
 #----------------------------------------------------------------------
-# Plug in pieces that XSL/T can't get to for a Person QC report.
+# Plug in mailer information from database.
 #----------------------------------------------------------------------
-def fixPersonReport(doc):
+def fixMailerInfo(doc):
     mailerDateSent         = "No mailers sent for this document"
     mailerResponseReceived = "N/A"
     mailerTypeOfChange     = "N/A"
@@ -301,18 +304,25 @@ def fixPersonReport(doc):
     except cdrdb.Error, info:    
         cdrcgi.bail('Failure retrieving mailer info for %s: %s' % (docId, 
                                                                    info[1][0]))
-    counts = getDocsLinkingToPerson(intId)
     doc = re.sub("@@MAILER_DATE_SENT@@",         mailerDateSent,         doc)
     doc = re.sub("@@MAILER_RESPONSE_RECEIVED@@", mailerResponseReceived, doc)
     doc = re.sub("@@MAILER_TYPE_OF_CHANGE@@",    mailerTypeOfChange,     doc)
-    doc = re.sub("@@ACTIVE_APPR0VED_TEMPORARILY_CLOSED_PROTOCOLS@@",
-                 counts[0] and "Yes" or "No", doc)
-    doc = re.sub("@@CLOSED_COMPLETED_PROTOCOLS@@",
-                 counts[1] and "Yes" or "No", doc)
-    doc = re.sub("@@HEALTH_PROFESSIONAL_SUMMARIES@@",
-                 counts[2] and "Yes" or "No", doc)
-    doc = re.sub("@@PATIENT_SUMMARIES@@",
-                 counts[3] and "Yes" or "No", doc)
+    return doc
+
+#----------------------------------------------------------------------
+# Plug in pieces that XSL/T can't get to for a Person QC report.
+#----------------------------------------------------------------------
+def fixPersonReport(doc):
+    doc    = fixMailerInfo(doc)
+    counts = getDocsLinkingToPerson(intId)
+    doc    = re.sub("@@ACTIVE_APPR0VED_TEMPORARILY_CLOSED_PROTOCOLS@@",
+                    counts[0] and "Yes" or "No", doc)
+    doc    = re.sub("@@CLOSED_COMPLETED_PROTOCOLS@@",
+                    counts[1] and "Yes" or "No", doc)
+    doc    = re.sub("@@HEALTH_PROFESSIONAL_SUMMARIES@@",
+                    counts[2] and "Yes" or "No", doc)
+    doc    = re.sub("@@PATIENT_SUMMARIES@@",
+                    counts[3] and "Yes" or "No", doc)
     return doc
 
 #----------------------------------------------------------------------
@@ -344,6 +354,8 @@ if type(doc) == type(()):
 doc = cdrcgi.decode(doc)
 doc = re.sub("@@DOCID@@", docId, doc)
 if docType == 'Person':
+    doc = fixPersonReport(doc)
+elif docType == 'Organization':
     doc = fixPersonReport(doc)
 
 #----------------------------------------------------------------------
