@@ -16,6 +16,15 @@ output = \
     <TH>Value</TH>
    </TR>
 """
+if not fields:
+    import os
+    for key in os.environ:
+        output += """\
+   <tr>
+    <td>%s</td>
+    <td>%s</td>
+   </tr>
+""" % (key, os.environ[key])
 for field in fields.keys():
     if type(fields[field]) == type([]):
         for f in fields[field]:
