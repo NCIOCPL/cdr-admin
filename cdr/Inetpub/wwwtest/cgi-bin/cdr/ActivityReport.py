@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ActivityReport.py,v 1.5 2002-07-18 00:55:48 bkline Exp $
+# $Id: ActivityReport.py,v 1.6 2002-07-18 12:38:03 bkline Exp $
 #
 # Reports on audit trail content.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2002/07/18 00:55:48  bkline
+# Added column for comment; added inline CSS.
+#
 # Revision 1.4  2002/07/02 13:46:51  bkline
 # Plugged in cdrcgi.DAY_ONE.
 #
@@ -129,13 +132,13 @@ html = """\
   <br />
   <table border='1' cellspacing='0' cellpadding='2'>
    <tr>
-    <td>Who</td>
-    <td>When</td>
-    <td>Action</td>
-    <td>DocType</td>
-    <td>DocID</td>
-    <td>DocTitle</td>
-    <td>Comment</td>
+    <th>Who</th>
+    <th>When</th>
+    <th>Action</th>
+    <th>DocType</th>
+    <th>DocID</th>
+    <th>DocTitle</th>
+    <th>Comment</th>
    </tr>
 """ % (headerDocType, time.strftime("%m/%d/%Y", now), fromDate, toDate)
    
