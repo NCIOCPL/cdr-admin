@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryAndMiscReports.py,v 1.13 2004-04-16 21:50:48 venglisc Exp $
+# $Id: SummaryAndMiscReports.py,v 1.14 2004-07-13 20:46:33 venglisc Exp $
 #
 # Submenu for summary and miscellanous document reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.13  2004/04/16 21:50:48  venglisc
+# Removed stub to link to proper page for Board Member QC report.
+#
 # Revision 1.12  2004/04/08 20:31:10  bkline
 # Plugged in additions requested by Margaret (request #1059).
 #
@@ -56,7 +59,12 @@ section = "Summary and Miscellaneous Document Reports"
 SUBMENU = "Reports Menu"
 buttons = [SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 header  = cdrcgi.header(title, title, section, "SummaryAndMiscReports.py", 
-                        buttons)
+                        buttons, stylesheet = """\
+  <style type='text/css'>   
+   H2 { font-family: Arial; font-size: 14pt; font-weight: bold }
+   LI { font-family: Arial; font-size: 12pt; font-weight: bold }
+  </style>
+""")
 
 #----------------------------------------------------------------------
 # Handle navigation requests.
@@ -78,7 +86,7 @@ if action == "Log Out":
 form = """\
     <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
     <H3>QC Reports</H3>
-    <H4>Summary QC Reports</H4>
+    <H2>Summary QC Reports</H2>
     <OL>
 """ % (cdrcgi.SESSION, session)
 reports = [
@@ -98,23 +106,18 @@ for r in reports:
 
 form += """\
     </OL>
-    <H4>Management QC Reports</H4>
+    <H2>Management QC Reports</H2>
     <OL>
 """
 reports = [
-           # ('Stub.py?', 'Changes to Summaries'),
-           ('SummaryChanges.py?', 
-            'History of Changes to Summary'),
-           ('PdqBoards.py?', 
-            'PDQ Board Listings'),
-           ('SummaryCitations.py?', 
-            'Summaries Citation'),
-           ('SummaryDateLastModified.py?', 
-            'Summaries Date Last Modified'),
-           ('SummariesLists.py?',
-            'Summaries Lists'),
-           ('SummaryMetaData.py?', 
-            'Summary Metadata'),
+           # ('Stub.py?',                  'Changes to Summaries'),
+           ('SummaryChanges.py?',          'History of Changes to Summary'),
+           ('PdqBoards.py?',               'PDQ Board Listings'),
+           ('SummaryCitations.py?',        'Summaries Citation'),
+           ('SummaryDateLastModified.py?', 'Summaries Date Last Modified'),
+           ('SummariesLists.py?',          'Summaries Lists'),
+           ('SummaryMetaData.py?',         'Summary Metadata'),
+           ('SummariesTocReport.py?',      'Summaries TOC Lists'),
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s%s=%s'>%s</A></LI>\n" % (
@@ -123,7 +126,7 @@ for r in reports:
 
 form += """\
    </OL>
-   <H4>Board Member Information Reports</H4>
+   <H2>Board Member Information Reports</H2>
    <OL>
 """
 
@@ -137,7 +140,7 @@ for choice in (
     
 form += """\
    </OL>
-   <H4>Miscellaneous Document QC Report</H4>
+   <H2>Miscellaneous Document QC Report</H2>
    <OL>
     <LI><A HREF='%s/MiscSearch.py?%s'>Miscellaneous Documents</A></LI>
 """ % (cdrcgi.BASE, session)
