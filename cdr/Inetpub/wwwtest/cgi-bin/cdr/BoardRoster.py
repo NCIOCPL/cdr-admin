@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: BoardRoster.py,v 1.2 2005-02-10 19:17:36 bkline Exp $
+# $Id: BoardRoster.py,v 1.3 2005-02-17 22:10:22 venglisc Exp $
 #
 # Report to display the Board Roster with or without assistant
 # information.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2005/02/10 19:17:36  bkline
+# Converted from POST to GET form request; tightened up SQL query.
+#
 # Revision 1.1  2004/05/21 20:59:37  venglisc
 # Initial Version to create the PDQ Board Member Roster report.
 #
@@ -95,6 +98,22 @@ SELECT DISTINCT board.id, board.title
     except cdrdb.Error, info:
         cdrcgi.bail('Database query failure: %s' % info[1][0])
     return picklist + "</SELECT>\n"
+
+#----------------------------------------------------------------------
+# Get the information for the Board Manager
+#----------------------------------------------------------------------
+def getBoardManagerInfo(orgId):
+    try:
+        cursor.execute("""\
+SELECT path, value
+ FROM query_term
+ WHERE path like '/Organization/PDQBoardInformation/BoardManager%%'
+ AND   doc_id = ?
+ ORDER BY path""", orgId)
+
+    except cdrdb.Error, info:
+        cdrcgi.bail('Database query failure for BoardManager: %s' % info[1][0])
+    return cursor.fetchall()
 
 #----------------------------------------------------------------------
 # If we don't have a request, put up the form.
@@ -255,9 +274,35 @@ for boardMember in boardMembers:
         cdrcgi.bail("%s: %s" % (boardMember.id, response))
     html += response[0]
 
+boardManagerInfo = getBoardManagerInfo(boardId)
+
 html += """
+  <hr width="50%%"><br>
+  <b><u>Board Manager Information</u></b><br>
+  <b>%s</b><br>
+  Cancer Information Products and Systems (CIPS)<br>
+  Office of Communications<br>
+  National Cancer Institute<br>
+  MSC-8321, Suite 3002B<br>
+  6116 Executive Blvd.<br>
+  Bethesda, MD 20892-8321<br><br>
+  <table border="0" width="100%%" cellspacing="0" cellpadding="0">
+   <tr>
+    <td width="35%%">Phone</td>
+    <td width="65%%">%s</td>
+   </tr>
+   <tr>
+    <td>Fax</td>
+    <td>301-480-8105</td>
+   </tr>
+   <tr>
+    <td>Email</td>
+    <td><a href="mailto:%s">%s</a></td>
+   </tr>
+  </table>
  </BODY>   
 </HTML>    
-"""
+""" % (boardManagerInfo[0][1], boardManagerInfo[2][1],
+       boardManagerInfo[1][1], boardManagerInfo[1][1])
 
 cdrcgi.sendPage(html)
