@@ -1,8 +1,11 @@
 #----------------------------------------------------------------------
 #
-# $Id: DiffCTGovProtocol.py,v 1.2 2003-12-17 13:48:32 bkline Exp $
+# $Id: DiffCTGovProtocol.py,v 1.3 2003-12-18 22:05:29 bkline Exp $
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2003/12/17 13:48:32  bkline
+# Implemented wrapping of long lines at Lakshmi's request.
+#
 # Revision 1.1  2003/12/16 16:10:56  bkline
 # Script to show the differences between the current working copy of
 # a CTGovProtocol document and the latest publishable version (or
@@ -38,13 +41,11 @@ def wrap(report):
         if len(line) <= 80:
             newLines.append(line)
         else:
-            newLines.append(line[:80])
-            line = line[80:]
-            while len(line) > 77:
-                newLines.append(u"\u00A0\u00A0\u21aa%s" % line[:77])
-                line = line[77:]
+            while len(line) > 80:
+                newLines.append(line[:80])
+                line = line[80:]
             if line:
-                newLines.append(u"\u00A0\u00A0\u21aa%s" % line)
+                newLines.append(line)
     return "\n".join(newLines)
                 
 #--------------------------------------------------------------------
@@ -72,6 +73,8 @@ else:
 if type(response) in (type(""), type(u"")):
     cdrcgi.bail(response)
 doc1 = unicode(response[0], 'utf-8')
+doc1 = wrap(doc1.encode('latin-1', 'replace'))
+doc2 = wrap(doc2.encode('latin-1', 'replace'))
 cmd = "diff -au %s %s" % (name1, name2)
 try:
     workDir = cdr.makeTempDir('diff')
@@ -79,10 +82,10 @@ try:
 except StandardError, args:
     cdrcgi.bail(str(args))
 f1 = open(name1, "w")
-f1.write(doc1.encode('latin-1', 'replace'))
+f1.write(doc1)
 f1.close()
 f2 = open(name2, "w")
-f2.write(doc2.encode('latin-1', 'replace'))
+f2.write(doc2)
 f2.close()
 result = cdr.runCommand(cmd)
 cleanup(workDir)
@@ -101,4 +104,4 @@ cdrcgi.sendPage("""\
   <h3>%s</h3>
   <pre>%s</pre>
  </body>
-</html>""" % (title, title, cgi.escape(wrap(report))))
+</html>""" % (title, title, cgi.escape(report)))
