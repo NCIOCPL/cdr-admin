@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: HotfixReport.py,v 1.4 2004-07-13 17:48:44 bkline Exp $
+# $Id: HotfixReport.py,v 1.5 2005-03-16 17:20:11 venglisc Exp $
 #
 # Report identifying previously published protocols that should be 
 # included in a hotfix.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2004/07/13 17:48:44  bkline
+# Modified query to use only publishing jobs sent to Cancer.gov.
+#
 # Revision 1.3  2004/06/02 14:59:10  bkline
 # Logic changes requested by Sheri (comment #18 in request #1183).
 #
@@ -56,12 +59,21 @@ if sys.platform == "win32":
 conn = cdrdb.connect('CdrGuest')
 conn.setAutoCommit()
 cursor = conn.cursor()
+
+# Creating table of all InScopeProtocol and CTGovProtocol documents
+# that have been published (and pushed to Cancer.gov)
+# We start looking from the last successfull pushing job of the 
+# full data set since there may be documents that were dropped
+# because of that and did not have a removal record in the 
+# pub_proc_doc table
+# ------------------------------------------------------------------
 cursor.execute("""\
     CREATE TABLE #t0
              (id INTEGER     NOT NULL,
              job INTEGER     NOT NULL,
         doc_type VARCHAR(32) NOT NULL,
    active_status CHAR        NOT NULL)""")
+
 cursor.execute("""\
     INSERT INTO #t0
          SELECT a.id, MAX(p.id), t.name, a.active_status
@@ -76,23 +88,43 @@ cursor.execute("""\
             AND (d.failure IS NULL OR d.failure <> 'Y')
             AND p.status = 'Success'
             AND p.pub_subset LIKE 'Push_Documents_To_Cancer.Gov%'
+            AND P.id >= (SELECT max(id)
+                           FROM pub_proc
+                          WHERE pub_subset = 'Push_Documents_to_Cancer.Gov_Full-Load'
+                            AND status = 'Success'
+                        )
        GROUP BY a.id, t.name, a.active_status""", timeout = 300)
+
+# Create a temp table listing all documents created under #t0 along
+# with it's published version number
+# -----------------------------------------------------------------
 cursor.execute("""\
     CREATE TABLE #t1
              (id INTEGER     NOT NULL,
              ver INTEGER     NOT NULL,
+             job INTEGER     NOT NULL,
         doc_type VARCHAR(32) NOT NULL,
    active_status CHAR        NOT NULL,
          removed CHAR        NOT NULL)
 """)
+
 cursor.execute("""\
     INSERT INTO #t1
-         SELECT p.doc_id, p.doc_version, t.doc_type, t.active_status, p.removed
+         SELECT p.doc_id, p.doc_version, t.job, 
+                t.doc_type, t.active_status, p.removed
            FROM pub_proc_doc p
            JOIN #t0 t
              ON p.doc_id = t.id
             AND p.pub_proc = t.job""", timeout = 300)
+
+# Create a temp table with all the existing latest valid versions
+# These are either the same version numbers as the ones created under
+# #t1 because no other publishable version has been saved since the last
+# publishing or the version numbers are different in which case they 
+# may need to be published.
+# ----------------------------------------------------------------------
 cursor.execute("CREATE TABLE #t2 (id INTEGER, ver INTEGER)")
+
 cursor.execute("""\
     INSERT INTO #t2
          SELECT v.id, MAX(v.num)
@@ -100,12 +132,47 @@ cursor.execute("""\
            JOIN #t1
              ON v.id = #t1.id
           WHERE v.publishable = 'Y'
+            AND v.val_status = 'V'
        GROUP BY v.id""", timeout = 300)
+
+# Creating table of all InScopeProtocol and CTGovProtocol documents
+# that have been published (i.e. a vendor version has been created
+# regardless if it got pushed to Cancer.gov or not)
+# This will show us if a new version of a document got already 
+# published but has not been pushed to Cancer.gov because the vendor
+# output between the old and the new version is identical.
+# ------------------------------------------------------------------
+cursor.execute("""\
+    CREATE TABLE #t3
+             (id INTEGER     NOT NULL,
+             job INTEGER     NOT NULL,
+        doc_type VARCHAR(32) NOT NULL,
+   active_status CHAR        NOT NULL)""")
+
+cursor.execute("""\
+    INSERT INTO #t3
+         SELECT a.id, MAX(p.id), a.job, a.active_status
+           FROM #t0 a
+           JOIN pub_proc_doc d
+             ON d.doc_id = a.id
+           JOIN pub_proc p
+             ON p.id = d.pub_proc
+          WHERE (d.failure IS NULL OR d.failure <> 'Y')
+            AND p.status = 'Success'
+            AND p.pub_subset IN ('Export', 'Hotfix-Export')
+       GROUP BY a.id, a.job, a.active_status""", timeout = 300)
+
+# Create the list of InScopeProtocols for which we find a publishable
+# version whose version number is greater than the version number that
+# has been published.
+# ---------------------------------------------------------------------
 cursor.execute("""\
     SELECT #t1.id, q.value, v.dt
       FROM #t1
       JOIN #t2
         ON #t1.id = #t2.id
+      JOIN #t3
+        ON #t1.id = #t3.id
       JOIN query_term q
         ON q.doc_id = #t1.id
       JOIN doc_version v
@@ -113,14 +180,16 @@ cursor.execute("""\
        AND v.num = #t2.ver
      WHERE q.path = '/InScopeProtocol/ProtocolIDs/PrimaryID/IDString'
        AND #t2.ver > #t1.ver
+       AND #t1.job > #t3.job
        AND #t1.active_status = 'A'
-       AND #t1.doc_type = 'InScopeProtocol'""", timeout = 300)
+       AND #t1.doc_type = 'InScopeProtocol'
+     ORDER BY v.dt""", timeout = 300)
 rows = cursor.fetchall()
 
        
 t = time.strftime("%Y%m%d%H%M%S")
 print "Content-type: application/vnd.ms-excel"
-print "Content-Disposition: attachment; filename=HotfixReport-%s.xls" % t
+print "Content-Disposition: attachment; filename=InterimUpdateReport-%s.xls" % t
 print 
 
 workbook = pyXLWriter.Writer(sys.stdout)
@@ -130,11 +199,18 @@ format.set_bold();
 format.set_color('white')
 format.set_bg_color('blue')
 format.set_align('center')
-titles  = ('Updated In-Scope Protocols', 'Updated CTGov Protocols',
-           'Removed Protocols', 'Updated Summaries')
+
+# Create worksheet listing all updated InScopeProtocols
+# -----------------------------------------------------
+titles  = ('Updated InScopeProtocols', 'Updated CTGov Protocols',
+           'New CTGov Protocols',
+           'Removed Protocols (All)', 'Updated Summaries')
 headers = ['DocID', 'Primary Protocol ID','Latest Publishable Version Date']
 widths  = (8, 35, 40)
 addWorksheet(workbook, titles[0], headers, widths, format, rows)
+
+# Create worksheet listing all updated CTGovProtocols
+# ---------------------------------------------------
 cursor.execute("""\
     SELECT #t1.id, q.value, v.dt
       FROM #t1
@@ -148,11 +224,108 @@ cursor.execute("""\
      WHERE q.path = '/CTGovProtocol/IDInfo/OrgStudyID'
        AND #t2.ver > #t1.ver
        AND #t1.active_status = 'A'
-       AND #t1.doc_type = 'CTGovProtocol'""", timeout = 300)
+       AND #t1.doc_type = 'CTGovProtocol'
+     ORDER BY v.dt""", timeout = 300)
 rows = cursor.fetchall()
 addWorksheet(workbook, titles[1], headers, widths, format, rows)
+
+# Create Worksheet for new CTGov Protocol
+# Note: These queries are taken from the program 
+#       NewlyPublishableTrials.py
+#       CIAT requested to include a modified form of the output to this
+#       Interim Update report.
+# ---------------------------------------
+# Create table listing all CTGov Protocols that are publishable
+# -------------------------------------------------------------
 cursor.execute("""\
-    SELECT #t1.id, q.value, v.dt
+    CREATE TABLE #publishable
+             (id INTEGER     NOT NULL,
+             ver INTEGER     NOT NULL,
+        doc_type VARCHAR(32) NOT NULL,
+          status VARCHAR(32) NOT NULL,
+        ver_date DATETIME        NULL)""")
+
+cursor.execute("""\
+    INSERT INTO #publishable (id, ver, doc_type, status)
+SELECT DISTINCT d.id, MAX(v.num), t.name, s.value
+           FROM active_doc d
+           JOIN doc_type t  
+             ON d.doc_type = t.id
+           JOIN doc_version v    
+             ON v.id = d.id      
+           JOIN query_term s     
+             ON s.doc_id = d.id  
+          WHERE t.name IN ('CTGovProtocol')
+            AND v.publishable = 'Y'
+            AND s.path IN ('/CTGovProtocol/OverallStatus')
+            AND s.value <> 'Withdrawn'
+       GROUP BY d.id, t.name, s.value""", timeout = 300)
+
+# Update the #publishable table to add the publication date
+# ---------------------------------------------------------
+cursor.execute("""\
+    UPDATE #publishable
+       SET ver_date = v.dt
+      FROM #publishable d   
+      JOIN doc_version v    
+        ON d.id = v.id      
+       AND d.ver = v.num""")
+
+# Create table listing all protocol documents already published.
+# --------------------------------------------------------------
+cursor.execute("""\
+         CREATE TABLE #published (id INTEGER NOT NULL)""")
+
+cursor.execute("""\
+    INSERT INTO #published
+SELECT DISTINCT d.doc_id  
+           FROM pub_proc_doc d
+           JOIN #publishable t
+             ON t.id = d.doc_id
+           JOIN pub_proc p
+             ON p.id = d.pub_proc
+          WHERE p.pub_subset LIKE 'Push_Documents_To_Cancer.Gov_%'
+            AND p.pub_subset <> 'Push_Documents_To_Cancer.Gov_Hotfix-Remove'
+            AND p.status = 'Success'
+            AND p.completed IS NOT NULL
+            AND (d.failure IS NULL OR d.failure <> 'Y')""", timeout = 300)
+
+# Create table listing the diff between published and publishable 
+# documents.  These will be all documents that are still unpublished.
+# -------------------------------------------------------------------
+cursor.execute("""\
+         CREATE TABLE #unpublished (id INTEGER NOT NULL)""")
+
+cursor.execute("""\
+    INSERT INTO #unpublished
+         SELECT id
+           FROM #publishable
+          WHERE id NOT IN (SELECT id FROM #published)""", timeout = 300)
+
+# Create worksheet listing all to-be published CTGov Protocols
+# ------------------------------------------------------------
+cursor.execute("""\
+         SELECT p.id, q.value, p.ver_date
+           FROM #publishable p
+           JOIN #unpublished u
+             ON u.id = p.id
+           JOIN query_term q
+             ON p.id = q.doc_id
+          WHERE q.path = '/CTGovProtocol/IDInfo/OrgStudyID'
+          ORDER BY p.ver_date""", timeout = 300)
+rows = cursor.fetchall()
+
+addWorksheet(workbook, titles[2], headers, widths, format, rows)
+
+# Create worksheet listing all removed protocols
+# ----------------------------------------------
+cursor.execute("""\
+    SELECT #t1.id, q.value, v.dt, 
+           CASE q.path 
+                WHEN '/InScopeProtocol/ProtocolIDs/PrimaryID/IDString'
+                THEN 'InScopeProtocol'
+                ELSE 'CTGovProtocol'
+           END
       FROM #t1
       JOIN #t2
         ON #t1.id = #t2.id
@@ -164,9 +337,14 @@ cursor.execute("""\
      WHERE q.path IN ('/InScopeProtocol/ProtocolIDs/PrimaryID/IDString',
                       '/CTGovProtocol/IDInfo/OrgStudyID')
        AND #t1.active_status <> 'A'
-       AND (#t1.removed IS NULL OR #t1.removed <> 'Y')""", timeout = 300)
+       AND (#t1.removed IS NULL OR #t1.removed <> 'Y')
+     ORDER BY q.path, v.dt""", timeout = 300)
 rows = cursor.fetchall()
-addWorksheet(workbook, titles[2], headers, widths, format, rows)
+addWorksheet(workbook, titles[3], headers, widths, format, rows)
+
+# Create empty Summary worksheet
+# ------------------------------
 headers[1] = 'Summary Title'
-addWorksheet(workbook, titles[3], headers, widths, format, [])
+addWorksheet(workbook, titles[4], headers, widths, format, [])
+
 workbook.close()

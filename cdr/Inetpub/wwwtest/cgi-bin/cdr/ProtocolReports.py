@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolReports.py,v 1.13 2004-09-17 14:06:50 venglisc Exp $
+# $Id: ProtocolReports.py,v 1.14 2005-03-16 17:20:11 venglisc Exp $
 #
 # Submenu for protocol reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.13  2004/09/17 14:06:50  venglisc
+# Fixed list items to properly teminate the anker link.
+#
 # Revision 1.12  2004/07/13 17:59:21  bkline
 # Replaced Newly Published Trials with Newly Publishable Trials.
 #
@@ -78,9 +81,12 @@ form = """\
     <H3>QC Reports</H3>
     <OL>
 """ % (cdrcgi.SESSION, session)
-reports = [('ProtSearch.py', 'Protocol QC Reports')]
+reports = [('ProtSearch.py?', 
+            'Protocol QC Reports'),
+           ('QcReport.py?DocType=InScopeProtocol&ReportType=pp&',   
+            'Publish Preview')]
 for r in reports:
-    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI></A>\n" % (
+    form += "<LI><A HREF='%s/%s%s=%s'>%s</LI></A>\n" % (
             cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
 
 form += """\
@@ -88,7 +94,7 @@ form += """\
     <H3>Management Reports</H3>
     <OL>
 """
-filename = time.strftime('HotfixReport-%Y%m%d%H%M%S.xls')
+filename = time.strftime('InterimUpdateReport-%Y%m%d%H%M%S.xls')
 reports = [
            ('ApprovedNotYetActive.py',
             'Approved Not Yet Active Report', ''),
@@ -99,7 +105,7 @@ reports = [
            ('PreferredProtOrgs.py', 
             'Preferred Protocol Organizations', ''),
            ('HotfixReport.py',
-            'Protocol Hotfix Report',
+            'Protocol Interim Update Report',
             '&filename=%s' % filename),
            ('ProtSitesWithoutPhone.py',
             'Protocol Sites Without Phone Numbers', ''),
