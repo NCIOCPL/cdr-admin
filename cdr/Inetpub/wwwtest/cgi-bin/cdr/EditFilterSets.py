@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditFilterSets.py,v 1.1 2002-11-13 20:38:58 bkline Exp $
+# $Id: EditFilterSets.py,v 1.2 2002-11-14 01:09:56 bkline Exp $
 #
 # Menu of existing filter sets.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2002/11/13 20:38:58  bkline
+# New script for managing named CDR filter sets.
+#
 #----------------------------------------------------------------------
 import cdr, cgi, cdrcgi, cdrdb, sys, urllib
 
@@ -16,6 +19,9 @@ session = cdrcgi.getSession(fields)
 request = cdrcgi.getRequest(fields)
 s1      = fields and fields.getvalue('s1') or None
 s2      = fields and fields.getvalue('s2') or None
+title   = "CDR Administration"
+section = "Manage Filters"
+script  = "EditFilterSets.py"
 
 #----------------------------------------------------------------------
 # Make sure we're logged in.
@@ -35,6 +41,28 @@ if request == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
+# Generate a report listing the content of all filter sets.
+#----------------------------------------------------------------------
+if request == "Report":
+    buttons = ["New Filter Set", cdrcgi.MAINMENU, "Log Out"]
+    header  = cdrcgi.header(title, title, "Filter Set Report", script, buttons)
+    sets = cdr.getFilterSets('guest')
+    setDict = {}
+    report = ""
+    for set in sets:
+        filterSet = cdr.getFilterSet('guest', set.name)
+        setDict[set.name] = filterSet
+    keys = setDict.keys()
+    keys.sort()
+    for key in keys:
+        report += "<h2>%s</h2><ul>\n" % cgi.escape(key)
+        for member in setDict[key].members:
+            report += "<li>%s %s</li>\n" % (type(member.id) == type(9) and
+                    "[S]" or "[F]", cgi.escape(member.name))
+        report += "</ul>\n"
+    cdrcgi.sendPage(header + report + "</form></body></html>")
+
+#----------------------------------------------------------------------
 # Handle request for creating a new filter set.
 #----------------------------------------------------------------------
 if request == "New Filter Set": 
@@ -49,10 +77,7 @@ if request == "New Filter Set":
 #----------------------------------------------------------------------
 # Retrieve and display the action information.
 #----------------------------------------------------------------------
-title   = "CDR Administration"
-section = "Manage Filters"
-buttons = ["New Filter Set", cdrcgi.MAINMENU, "Log Out"]
-script  = "EditFilterSets.py"
+buttons = ["Report", "New Filter Set", cdrcgi.MAINMENU, "Log Out"]
 header  = cdrcgi.header(title, title, section, script, buttons, numBreaks = 1)
 
 #----------------------------------------------------------------------
