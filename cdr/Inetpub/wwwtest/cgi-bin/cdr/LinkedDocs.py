@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: LinkedDocs.py,v 1.3 2002-04-24 20:36:03 bkline Exp $
+# $Id: LinkedDocs.py,v 1.4 2002-06-24 17:15:45 bkline Exp $
 #
 # Reports on documents which link to a specified document.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2002/04/24 20:36:03  bkline
+# Changed "Title" label to "DocTitle" as requested by Eileen (issue #161).
+#
 # Revision 1.2  2002/02/21 15:22:03  bkline
 # Added navigation buttons.
 #
@@ -197,7 +200,7 @@ SELECT DISTINCT d.id, d.title, t.name, n.source_elem, n.target_frag
   %s
  </BODY>
 </HTML>""" % getUser()
-    cdrcgi.sendPage(html)
+    cdrcgi.sendPage(cdrcgi.unicodeToLatin1(html))
 
 #----------------------------------------------------------------------
 # Search for linked document by title, if so requested.
@@ -291,4 +294,4 @@ form     = """\
 """ % (makeList("LinkingDocType", docTypes), 
        makeList("DocType", docTypes),
        cdrcgi.SESSION, session and session or '')
-cdrcgi.sendPage(header + form)
+cdrcgi.sendPage(cdrcgi.unicodeToLatin1(header + form))
