@@ -1,11 +1,16 @@
 #----------------------------------------------------------------------
 #
-# $Id: Filter.py,v 1.21 2003-08-29 14:54:52 bkline Exp $
+# $Id: Filter.py,v 1.22 2003-11-12 22:47:30 bkline Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.21  2003/08/29 14:54:52  bkline
+# Modified approach to gathering filter set information, replacing
+# a hand-maintained file in the file system with filter set info
+# extracted directly from the CDR database tables.
+#
 # revision 1.20  2003/08/28 23:01:36  venglisc
 # Renamed the refLevels variable to insRevLevels.  This is needed because
 # we need to pass an additional parameter for delRevLevels to handle
@@ -197,8 +202,8 @@ def qcFilterSets(docId, docVer, filterId = None):
 
         # Form new set of filters.
         revLevels = ""
-        base    = "/cgi-bin/cdr/Filter.py"; 
-        url     = base + "?DocId=" + docId + "&DocVer=" + docVer + \
+        base    = "/cgi-bin/cdr/Filter.py";
+        url     = base + "?DocId=" + docId + "&DocVer=" + str(docVer) + \
                   "&revLevels=" + revLevels + "&vendorOrQC=" + vendorOrQC
         i = 0        
         for filt in filterSets[key].members:
