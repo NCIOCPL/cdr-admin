@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditLinkControl.py,v 1.1 2001-06-13 22:16:32 bkline Exp $
+# $Id: EditLinkControl.py,v 1.2 2002-02-15 06:48:30 ameyer Exp $
 #
 # Prototype for editing CDR linking tables.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2001/06/13 22:16:32  bkline
+# Initial revision
+#
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
@@ -27,11 +30,11 @@ types = cdr.getLinkTypes(session)
 if type(types) == type(""): cdrcgi.bail(types)
 
 for t in types:
-    form += "<LI><A HREF='%s/EditLinkType.py?name=%s&%s=%s'>%s</LI>\n" % (
+    form += "<LI><A HREF='%s/EditLinkType.py?name=%s&linkact=modlink&%s=%s'>%s</LI>\n" % (
             cdrcgi.BASE, t, cdrcgi.SESSION, session, t)
 
 form += """\
-<LI><A HREF="%s/EditLinkType.py?%s=%s">%s</LI>
+<LI><A HREF="%s/EditLinkType.py?linkact=addlink&%s=%s">%s</LI>
 <LI><A HREF="%s/ShowAllLinkTypes.py?%s=%s">%s</LI>
 <LI><A HREF="%s/Logout.py?%s=%s">%s</LI>
 </OL>
