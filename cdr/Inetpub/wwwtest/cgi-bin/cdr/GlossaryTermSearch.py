@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermSearch.py,v 1.2 2002-02-28 15:51:32 bkline Exp $
+# $Id: GlossaryTermSearch.py,v 1.3 2004-01-08 17:47:56 venglisc Exp $
 #
 # Prototype for duplicate-checking interface for GlossaryTerm documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/02/28 15:51:32  bkline
+# Changed title of display filter.
+#
 # Revision 1.1  2002/02/19 13:39:05  bkline
 # Advanced search screen for Glossary Term documents.
 #
@@ -21,6 +24,7 @@ name       = fields and fields.getvalue("Name")             or None
 spanish    = fields and fields.getvalue("Spanish")          or None
 definition = fields and fields.getvalue("Definition")       or None
 status     = fields and fields.getvalue("Status")           or None
+audience   = fields and fields.getvalue("Audience")         or None
 submit     = fields and fields.getvalue("SubmitButton")     or None
 help       = fields and fields.getvalue("HelpButton")       or None
 
@@ -42,6 +46,8 @@ if not submit:
     fields = (('Term Name',                    'Name'),
               ('Spanish Name',                 'Spanish'),
               ('Term Definition',              'Definition'),
+              ('Audience',                     'Audience', 
+                                                 cdrcgi.glossaryAudienceList),
               ('Term Status',                  'Status'))
     buttons = (('submit', 'SubmitButton', 'Search'),
                ('submit', 'HelpButton',   'Help'),
@@ -72,7 +78,9 @@ searchFields = (cdrcgi.SearchField(name,
                              "/GlossaryTerm/SpanishTermDefinition")),
                 cdrcgi.SearchField(status,
                             ("/GlossaryTerm/TermStatus",
-                             "/GlossaryTerm/StatusDate")))
+                             "/GlossaryTerm/StatusDate")),
+                cdrcgi.SearchField(audience,
+                            ("/GlossaryTerm/TermDefinition/Audience",)))
 
 #----------------------------------------------------------------------
 # Construct the query.
@@ -105,3 +113,4 @@ html = cdrcgi.advancedSearchResultsPage("Glossary Term", rows, strings,
 # Send the page back to the browser.
 #----------------------------------------------------------------------
 cdrcgi.sendPage(html)
+
