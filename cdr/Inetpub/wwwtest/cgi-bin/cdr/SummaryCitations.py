@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryCitations.py,v 1.1 2003-05-08 20:26:42 bkline Exp $
+# $Id: SummaryCitations.py,v 1.2 2003-10-08 18:09:09 bkline Exp $
 #
 # Report listing all references cited in a selected version of a
 # cancer information summary.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2003/05/08 20:26:42  bkline
+# New summary reports.
+#
 #----------------------------------------------------------------------
 import xml.dom.minidom, cgi, socket, struct, re, cdr, cdrcgi, cdrdb, time
 
@@ -62,7 +65,7 @@ def report(docId, docVersion):
     summaryTitle = ""
     for refList in dom.getElementsByTagName("ReferenceList"):
         for ref in refList.childNodes:
-            if ref.nodeName == "Reference":
+            if ref.nodeName == "Citation":
                 refString = cdr.getTextContent(ref).strip()
                 if refString:
                     if refString[-1] != ".":
