@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: DocVersionHistory.py,v 1.1 2002-06-28 13:38:07 bkline Exp $
+# $Id: DocVersionHistory.py,v 1.2 2002-06-28 20:13:20 bkline Exp $
 #
 # Show version history of document.
 #----------------------------------------------------------------------
@@ -285,9 +285,9 @@ html = """\
        docType,
        docTitle,
        createdBy,
-       createdDate,
+       createdDate[:10],
        modBy,
-       modDate)
+       modDate[:10])
 
 #----------------------------------------------------------------------
 # Build the report body.
@@ -356,7 +356,7 @@ LEFT OUTER JOIN pub_proc p
      <font size = '3'>%s</font>
     </td>
    </tr>
-""" % (pubDate and str(pubDate) or "&nbsp;")
+""" % (pubDate and pubDate[:10] or "&nbsp;")
         row = cursor.fetchone()
 
 except cdrdb.Error, info:
