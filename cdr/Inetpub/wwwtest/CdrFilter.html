@@ -1,4 +1,4 @@
-<!-- $Id: CdrFilter.html,v 1.3 2003-08-28 22:25:36 venglisc Exp $ -->
+<!-- $Id: CdrFilter.html,v 1.4 2004-02-19 21:28:02 ameyer Exp $ -->
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
  <HEAD>
   <TITLE>CDR Document Filtering</TITLE>
@@ -27,6 +27,7 @@
         var pub   = document.FilterRequest.publish.checked;
         var app   = document.FilterRequest.approved.checked;
         var pro   = document.FilterRequest.proposed.checked;      
+        var port  = document.FilterRequest.port.value;      
       //var uid   = document.FilterRequest.UserName.value;
       //var pwd   = document.FilterRequest.Password.value;
         var url   = base + "?DocId=" + doc
@@ -34,6 +35,7 @@
                   + "&publish=" + pub
                   + "&approved=" + app
                   + "&proposed=" + pro               
+                  + "&port=" + port               
                   + "&Filter=" + filt
                   + "&Filter1=" + filt1
                   + "&Filter2=" + filt2
@@ -161,8 +163,10 @@
       <B>Doc Version&nbsp;</B>
      </TD>
      <TD><INPUT NAME='DocVer' 
-                VALUE='lastp' SIZE = '10'>
-     </TD>     
+                VALUE='lastp' SIZE = '10' />
+      <B>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Port&nbsp;</B>
+      <INPUT NAME='port' VALUE='2019' SIZE='10' />
+     </TD>
     </TR>
     <TR>
      <TD ALIGN='right'>
