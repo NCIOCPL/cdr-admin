@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: Filter.py,v 1.5 2002-07-25 01:51:27 bkline Exp $
+# $Id: Filter.py,v 1.6 2002-07-25 20:38:00 bkline Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2002/07/25 01:51:27  bkline
+# Added option for DTD validation.
+#
 # Revision 1.4  2002/07/15 20:18:03  bkline
 # Added textType argument to cdrcgi.sendPage() call.
 #
@@ -111,5 +114,4 @@ doc = re.sub("@@DOCID@@", docId, doc)
 textType = 'html'
 if doc.find("<?xml") != -1:
     textType = 'xml'
-open('foo.txt', 'wb').write(doc)
 cdrcgi.sendPage(doc, textType)
