@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: TerminologyReports.py,v 1.2 2002-05-25 02:39:14 bkline Exp $
+# $Id: TerminologyReports.py,v 1.3 2002-07-01 14:00:56 bkline Exp $
 #
 # Submenu for terminology reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/05/25 02:39:14  bkline
+# Removed extra blank lines from HTML output.
+#
 # Revision 1.1  2002/05/24 20:37:32  bkline
 # New Report Menu structure implemented.
 #
@@ -59,7 +62,7 @@ form += """\
     <OL>
 """
 reports = [
-           ('TermsByType.py', 'Term By Type')
+           ('Stub.py', 'Term By Type')
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI>\n" % (
