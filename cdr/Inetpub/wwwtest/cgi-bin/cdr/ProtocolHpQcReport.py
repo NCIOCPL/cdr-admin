@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolHpQcReport.py,v 1.4 2002-05-17 21:15:40 bkline Exp $
+# $Id: ProtocolHpQcReport.py,v 1.5 2002-05-30 17:01:06 bkline Exp $
 #
 # Protocol Health Professional QC Report.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2002/05/17 21:15:40  bkline
+# Plugged in new filters from Cheryl.
+#
 # Revision 1.3  2002/05/08 17:41:52  bkline
 # Updated to reflect Volker's new filter names.
 #
@@ -30,9 +33,8 @@ docId   = fields.getvalue(cdrcgi.DOCID) or cdrcgi.bail("No Document", title)
 #----------------------------------------------------------------------
 filters = [
     "name:Denormalization Filter (1/1): InScope Protocol",
-   #"name:Health Professional Protocol QC Content Report"
-    "name:Create InScope Protocol XML for Full Protocol QC Report",
-    "name:Health Professional InScope Protocol Content QC Report"
+    "name:XML for Professional Protocol QC Report",
+    "name:Health Professional Protocol QC Content Report"
 ]
 
 #----------------------------------------------------------------------
