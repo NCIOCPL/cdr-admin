@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolMailerReqForm.py,v 1.7 2002-12-06 16:01:59 bkline Exp $
+# $Id: ProtocolMailerReqForm.py,v 1.8 2003-01-08 23:46:15 bkline Exp $
 #
 # Request form for all protocol mailers.
 #
@@ -17,6 +17,10 @@
 # publication job for the publishing daemon to find and initiate.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.7  2002/12/06 16:01:59  bkline
+# Fixed typo in WHERE clause (doc_verision.publishable = 'P' should have
+# been doc_version.publishable = 'Y').
+#
 # Revision 1.6  2002/11/18 14:39:09  bkline
 # Fixed typo (change Person/Organization to Protocol).
 #
@@ -519,10 +523,10 @@ elif mailType == 'Protocol-Quarterly status/participant check':
                       -- Only send mailers for active or approved protocols
                       WHERE prot_status.value IN ('Active', 
                                                   'Approved-Not Yet Active')
-                        AND prot_status.path       = '%s'
-                        AND lead_org.path          = '%s'AND
-                        doc_version.publishable    = 'Y'
-                        AND doc_version.val_status = 'V'
+                        AND prot_status.path         = '%s'
+                        AND lead_org.path            = '%s'
+                        AND doc_version.publishable  = 'Y'
+                        AND doc_version.val_status   = 'V'
 
                         -- Make sure they've gotten their original mailer.
                         AND EXISTS (SELECT *
