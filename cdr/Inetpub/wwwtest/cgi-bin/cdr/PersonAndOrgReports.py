@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PersonAndOrgReports.py,v 1.6 2003-11-05 14:49:13 bkline Exp $
+# $Id: PersonAndOrgReports.py,v 1.7 2004-03-08 17:47:06 venglisc Exp $
 #
 # Submenu for person and organization reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2003/11/05 14:49:13  bkline
+# Added report for Preferred Protocol Organizations.
+#
 # Revision 1.5  2003/07/29 12:40:13  bkline
 # Added Organization Protocol Review report.
 #
@@ -71,13 +74,18 @@ form += """\
     <OL>
 """
 reports = [
-           ('CoopGroupMembers.py', 'Cooperative Group Investigators'),
-           ('PersonProtocolReview.py', 'Person Protocol Review'),
-           ('OrgProtocolReview.py', 'Organization Protocol Review'),
-           ('PreferredProtOrgs.py', 'Preferred Protocol Organizations'),
-           ('PersonsAtOrg.py', 'Persons Practicing at Organizations'),
+           ('CoopGroupMembers.py', 
+            'Cooperative Group Member Orgs and Investigators'),
            ('InactivePersonsOrgs.py', 
-            'Inactive Persons/Organizations Linked to Protocols')
+            'Inactive Persons/Organizations Linked to Protocols'),
+           ('OrgProtocolReview.py', 
+            'Organization Protocol Review'),
+           ('PersonProtocolReview.py', 
+            'Person Protocol Review'),
+           ('PersonsAtOrg.py', 
+            'Persons Practicing at Organizations'),
+           ('PreferredProtOrgs.py', 
+            'Preferred Protocol Organizations')
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI>\n" % (
