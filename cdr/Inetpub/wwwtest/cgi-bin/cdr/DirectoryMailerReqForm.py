@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: DirectoryMailerReqForm.py,v 1.4 2002-09-26 15:13:55 ameyer Exp $
+# $Id: DirectoryMailerReqForm.py,v 1.5 2002-10-03 16:33:54 ameyer Exp $
 #
 # Request form for all directory mailers.
 #
@@ -31,6 +31,9 @@
 # Bob Kline.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2002/09/26 15:13:55  ameyer
+# Revised queries for selecting docs, other development changes.
+#
 # Revision 1.2  2002/06/07 00:12:44  ameyer
 # Continuing development.  This is still a pre-production version.
 #
@@ -302,14 +305,14 @@ else:
         #         Physician-Annual update
         #         Physician-Annual remail
         qry = """
-            SELECT DISTINCT doc.id, MAX(doc_version.num)
+            SELECT DISTINCT document.id, MAX(doc_version.num)
                        FROM doc_version
-                       JOIN document doc
-                         ON doc_version.id = doc.id
+                       JOIN document
+                         ON doc_version.id = document.id
                        JOIN doc_type
-                         ON doc_type.id = doc.doc_type
+                         ON doc_type.id = document.doc_type
                        JOIN pub_proc_doc pd1
-                         ON doc.id = pd1.doc_id
+                         ON document.id = pd1.doc_id
                        JOIN pub_proc p1
                          ON pd1.pub_proc = p1.id
                        JOIN query_term qstat
@@ -327,12 +330,12 @@ else:
                         AND qinc.path =
                            '/Person/ProfessionalInformation/PhysicianDetails/AdministrativeInformation/Directory/Include'
                         AND qinc.value = 'Include'
-                        AND doc.id NOT IN (
+                        AND document.id NOT IN (
                             SELECT pd2.doc_id
                               FROM pub_proc_doc pd2
                               JOIN pub_proc p2
                                 ON p2.id = pd2.pub_proc
-                             WHERE pd2.doc_id = doc.id
+                             WHERE pd2.doc_id = document.id
                                AND (
                                     -- Would LIKE 'Physician%' be better?
                                     p2.pub_subset = 'Physician-Initial'
@@ -345,7 +348,8 @@ else:
                                    )
                                AND p2.completed > DATEADD(year,-1,GETDATE())
                                AND p2.status <> 'Fail'
-                   GROUP BY doc.id"""
+                          )
+                   GROUP BY document.id"""
 
     elif mailType == 'Organization-Annual update':
         # Select last version (not CWD) of document for which:
@@ -356,12 +360,12 @@ else:
         #   No non-failing update mailer sent in the past year.
         #   No non-failing remailer sent in the past year.
         qry = """
-            SELECT DISTINCT doc.id, MAX(doc_version.num)
+            SELECT DISTINCT document.id, MAX(doc_version.num)
                        FROM doc_version
-                       JOIN document doc
-                         ON doc_version.id = doc.id
+                       JOIN document
+                         ON doc_version.id = document.id
                        JOIN doc_type
-                         ON doc_type.id = doc.doc_type
+                         ON doc_type.id = document.doc_type
                        JOIN query_term qinc
                          ON qinc.doc_id = document.id
                        JOIN query_term qorgtype
@@ -380,7 +384,7 @@ else:
                               FROM pub_proc_doc pd1
                               JOIN pub_proc p1
                                 ON p1.id = pd1.pub_proc
-                             WHERE pd1.doc_id = doc.id
+                             WHERE pd1.doc_id = document.id
                                AND (
                                    p1.pub_subset='Organization-Annual update'
                                  OR
@@ -389,7 +393,7 @@ else:
                                AND p1.completed > DATEADD(year,-1,GETDATE())
                                AND p1.status <> 'Fail'
                             )
-                   GROUP BY doc.id"""
+                   GROUP BY document.id"""
 
     elif timeType == 'Remail':
         # Execute a query that builds a temporary table
@@ -411,21 +415,35 @@ else:
     except cdrdb.Error, info:
         cdrcgi.bail("Failure retrieving document IDs: %s" % info[1][0])
 
+# Do we have any results?
+if len(docList) == 0:
+    cdrcgi.bail ("No documents found")
+
+# Compose the docList results into a format that cdr.publish() wants
+#   e.g., id=25, version=3, then form: "CDR0000000025/3"
+# This works on a docList produced by a query, or produced by user entry
+#   of a single document id
+idVer = []
+for pair in docList:
+    idVer.append (cdr.exNormalize(pair[0])[0] + "/" + str(pair[1]))
+
 # Information to be made available to batch portion of the job
-jobParms = (('docType', docType), ('mailType', mailType),
-            ('timeType', timeType))
+jobParms = (('docType', docType), ('timeType', timeType))
 
 # Drop the job into the queue.
 result = cdr.publish (credentials=session, pubSystem='Mailers',
-                      pubSubset=mailType, parms=jobParms, docList=docList,
-                      email=email)
+                      pubSubset=mailType, parms=jobParms, docList=idVer,
+                      allowNonPub='Y', email=email)
 
 # cdr.publish returns a tuple of job id + messages
 # If serious error, job id = None
-if not result[0] or result[0] < 0:
+if not result[0] or int(result[0]) < 0:
     cdrcgi.bail("Unable to initiate publishing job:<br>%s" % result[1])
 
-header  = cdrcgi.header(title, title, section, None, [])
+jobId = int(result[0])
+
+# Tell user how to get status
+header = cdrcgi.header(title, title, section, None, [])
 html = """\
     <H3>Job Number %d Submitted</H3>
     <B>
@@ -436,11 +454,11 @@ html = """\
    </FORM>
   </BODY>
  </HTML>
-""" % (result[0], cdrcgi.BASE, result[0])
+""" % (jobId, cdrcgi.BASE, jobId)
 
 # Remailers require permanent storage of the associated ids
 #  in the database, using job id as a key
 if timeType == 'Remail':
-    rms.fillMailerIdTable(result[0])
+    rms.fillMailerIdTable(jobId)
 
 cdrcgi.sendPage(header + html)
