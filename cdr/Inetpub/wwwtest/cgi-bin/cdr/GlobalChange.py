@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------
-# $Id: GlobalChange.py,v 1.13 2003-08-28 23:23:05 ameyer Exp $
+# $Id: GlobalChange.py,v 1.14 2003-11-18 17:16:16 ameyer Exp $
 #
 # Perform global changes on XML records in the database.
 #
@@ -14,6 +14,10 @@
 # present the next one - to the end.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.13  2003/08/28 23:23:05  ameyer
+# Changed debug logging to direct it to GlobalChange.log.
+# Added InterventionType qualifier fields to recognized sesson variables.
+#
 # Revision 1.12  2003/08/01 01:11:24  ameyer
 # Fixed misspelling of trm...Field. variables.
 #
@@ -101,12 +105,19 @@ def sendGlblChgPage (parms):
 
     # Create an overall header using the common header code
     html = cdrcgi.header ("CDR Global Change", "CDR Global Change",
-                          header, "GlobalChange.py")
+                          header, "GlobalChange.py", stylesheet="""
+  <style type='text/css'>
+   .termblock { font-size: 120%; font-weight: bold }
+  </style>
+""")
 
     # Save state in the form
     # Values are encoded to prevent quotes or other chars from
     #   causing problems in the output html
-    for key in ssVars.keys():
+    # Sorting is unnecessary but makes it easier to find things in debugging
+    keys = ssVars.keys()
+    keys.sort()
+    for key in keys:
         html += '<input type="hidden" name="%s" value="%s" />\n' %\
                 (key, cgi.escape (str(ssVars[key]), 1))
 
@@ -205,7 +216,8 @@ for fd in ('docType', 'email', 'specificPhone', 'specificRole',
            'trmDelField1', 'trmDelVal1', 'trmDelId1',
            'trmAddField0', 'trmAddVal0', 'trmAddId0',
            'trmAddField1', 'trmAddVal1', 'trmAddId1',
-           'trmTypField0', 'trmTypVal0', 'trmTypId0'):
+           'trmTypField0', 'trmTypVal0', 'trmTypId0',
+           'trmTypField1', 'trmTypVal1', 'trmTypId1'):
     fdVal = fields.getvalue (fd, None)
     if fdVal:
         # If it's an Id type, normalize it to standard CDR000... form
@@ -220,6 +232,17 @@ for fd in ('docType', 'email', 'specificPhone', 'specificRole',
         # Store it in our state container
         ssVars[fd] = fdVal
         cdr.logwrite("   Saving '%s'='%s'" % (fd, ssVars[fd]), LF)
+
+    # If trmStatusName got converted to stringified array, convert it back
+    # This is fragile and will fail if we ever get commas or quotes
+    #  in status values.  But it makes things much simpler.  It will
+    #  fail very obviously if it does fail.
+    if ssVars.has_key ("trmStatusName"):
+        statVals = ssVars["trmStatusName"]
+        if type(statVals)==type("") and statVals[0:1]=="[":
+            statVals = string.replace (statVals, '"', '')
+            statVals = string.replace (statVals, "'", "")
+            ssVars["trmStatusName"] = string.split (statVals[1:-1], ", ")
 
 # What kind of change are we doing?
 # May or may not know this at this time
@@ -378,9 +401,11 @@ ssVars['email'] = email
 # Convert all session info to a sequence of batch job args
 args = []
 for var in ssVars.keys():
+    cdr.logwrite ("Converting arg: %s" % var, LF)
     args.append ((var, ssVars[var]))
 
 # Create batch job
+cdr.logwrite ("About to launch batch job", LF)
 newJob = cdrbatch.CdrBatch (jobName=JOB_NAME,
                             command="lib/Python/GlobalChangeBatch.py",
                             args=args,
