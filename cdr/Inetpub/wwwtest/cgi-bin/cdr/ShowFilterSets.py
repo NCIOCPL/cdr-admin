@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ShowFilterSets.py,v 1.1 2004-07-13 18:08:27 bkline Exp $
+# $Id: ShowFilterSets.py,v 1.2 2004-08-19 20:35:35 bkline Exp $
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2004/07/13 18:08:27  bkline
+# Show all filter sets.
+#
 #----------------------------------------------------------------------
-import cdr, cdrdb, sys, xml.dom.minidom
+import cdr, cdrdb, sys, xml.dom.minidom, cdrcgi
 
 def showFilterSet(filterSet, setName):
     #sys.stderr.write("showFilterSet(%s)\n" % setName)
@@ -19,10 +22,13 @@ def showFilterSet(filterSet, setName):
                 html += showFilterSet(setDict.get(member.name), member.name)
             else:
                 id = cdr.exNormalize(member.id)
-                html += """\
-     <li class='filter'>%s (<a href='javascript:show(%d)'>%d</a>)
-""" % (member.name, id[1], id[1])
                 filter = filters.get(id[1])
+                error = ''
+                if filter and filter.error:
+                    error = "<span class='error'>%s</span>" % filter.error
+                html += """\
+     <li class='filter'>%s (<a href='javascript:show(%d)'>%d</a>) %s
+""" % (member.name, id[1], id[1], error)
                 if filter:
                     html += showIncludedFilters(filter.includes)
                 html += """\
@@ -65,6 +71,7 @@ def showIncludedFilters(includedFilters):
 
 filters = {}
 filtersByName = {}
+errors = []
 class Filter:
     class Include:
         def __init__(self, elem, href):
@@ -77,11 +84,15 @@ class Filter:
         self.id = id
         self.title = title
         self.includes = []
-        dom = xml.dom.minidom.parseString(docXml.encode('utf-8'))
-        for child in dom.documentElement.childNodes:
-            if child.nodeName in ('xsl:include', 'xsl:import'):
-                href = child.getAttribute('href')
-                self.includes.append(self.Include(child.nodeName, href))
+        self.error = None
+        try:
+            dom = xml.dom.minidom.parseString(docXml)
+            for child in dom.documentElement.childNodes:
+                if child.nodeName in ('xsl:include', 'xsl:import'):
+                    href = child.getAttribute('href')
+                    self.includes.append(self.Include(child.nodeName, href))
+        except Exception, e:
+            self.error = "Failure parsing filter: %s" % str(e)
 conn = cdrdb.connect('CdrGuest')
 cursor = conn.cursor()
 cursor.execute("""
@@ -96,7 +107,8 @@ while row:
     #print "%s (%d)" % (row[1], row[0])
     #sys.stderr.write("%s (%d)\n" % (row[1], row[0]))
     nameKey = row[1].upper().strip()
-    filters[row[0]] = filtersByName[nameKey] = Filter(row[0], row[1], row[2])
+    filter = Filter(row[0], row[1], row[2])
+    filters[row[0]] = filtersByName[nameKey] = filter
     row = cursor.fetchone()
 sets = cdr.getFilterSets('guest')
 setDict = {}
@@ -115,6 +127,7 @@ report = """\
    li.filter  { color: blue; }
    li.include { color: green; }
    li.error   { color: red; }
+   span.error { color: red; }
   </style>
   <script language='JavaScript'>
    //<![CDATA[
