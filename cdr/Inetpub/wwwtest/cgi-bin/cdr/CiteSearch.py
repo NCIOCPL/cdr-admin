@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CiteSearch.py,v 1.7 2002-07-15 21:50:37 bkline Exp $
+# $Id: CiteSearch.py,v 1.8 2002-07-25 01:51:03 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Citation documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.7  2002/07/15 21:50:37  bkline
+# Enhancements for issues #323 and #325.
+#
 # Revision 1.6  2002/05/10 21:19:48  bkline
 # Changed PUBMED to PubMed.
 #
@@ -108,7 +111,10 @@ if impReq:
     app     = '/entrez/utils/pmfetch.fcgi'
     base    = 'http://' + host + app + '?db=PubMed&report=sgml&mode=text&id='
     url     = base + importID
-    uobj    = urllib.urlopen(url)
+    try:
+        uobj    = urllib.urlopen(url)
+    except:
+        cdrcgi.bail("NLM server unavailable; please try again later");
     page    = uobj.read()
     article = exp1.findall(page)
     if not article: cdrcgi.bail("Article Not Found")
