@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: PersonsAtOrg.py,v 1.1 2002-03-21 20:00:28 bkline Exp $
+# $Id: PersonsAtOrg.py,v 1.2 2003-02-24 21:16:49 bkline Exp $
 #
 # Identifieds all person documents which are linked to a specified
 # organization document.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2002/03/21 20:00:28  bkline
+# Report for persons practicing at a designated organizaiton.
+#
 #----------------------------------------------------------------------
 
 import cdr, cdrdb, cdrcgi, cgi, re, string, time
@@ -141,7 +144,7 @@ else:
                 SELECT DISTINCT doc_id
                            FROM query_term
                           WHERE path LIKE '%s'
-                            AND value = ?""" % pathPattern, name)
+                            AND value LIKE ?""" % pathPattern, name)
         rows = cursor.fetchall()
     except cdrdb.Error, info:
         cdrcgi.bail("Failure looking up glossary term '%s': %s" % (name,
