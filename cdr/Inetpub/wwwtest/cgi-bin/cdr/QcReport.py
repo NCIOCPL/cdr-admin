@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.9 2002-06-26 20:38:52 bkline Exp $
+# $Id: QcReport.py,v 1.10 2002-08-14 17:26:16 bkline Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.9  2002/06/26 20:38:52  bkline
+# Plugged in mailer info for Organization QC reports.
+#
 # Revision 1.8  2002/06/26 18:30:48  bkline
 # Fixed bug in mailer query logic.
 #
@@ -182,10 +185,12 @@ filters = {
         ["name:Health Professional Summary Report"],
     'Summary:bu': # Bold/Underline
         summaryDenormalizationFilters +
-        ["name:Health Professional Summary Report-Bold/Underline"],
+        ["name:Denormalization Filter:(6/6)Summary",
+         "name:Health Professional Summary Report-Bold/Underline"],
     'Summary:rs': # Redline/Strikeout
         summaryDenormalizationFilters +
-        ["name:Health Professional Summary Report"],
+        ["name:Denormalization Filter:(6/6)Summary",
+         "name:Health Professional Summary Report"],
     'Summary:nm': # No markup
         summaryDenormalizationFilters +
         ["name:Health Professional Summary Report"],
