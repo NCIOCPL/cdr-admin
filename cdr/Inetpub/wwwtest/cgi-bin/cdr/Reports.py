@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: Reports.py,v 1.6 2002-03-02 13:50:31 bkline Exp $
+# $Id: Reports.py,v 1.7 2002-03-09 03:27:40 bkline Exp $
 #
 # Prototype for editing CDR linking tables.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2002/03/02 13:50:31  bkline
+# Added report for checked-out documents.
+#
 # Revision 1.5  2002/02/26 18:55:29  bkline
 # Sorted report menu alphabetically.
 #
@@ -55,7 +58,8 @@ reports = [
            ('ModifiedPubMedDocs.py', 'Modified PubMed Documents'),
            ('PdqBoards.py', 'PDQ Boards'),
            ('TermUsage.py', 'Term Usage'),
-           ('UnchangedDocs.py', 'Unchanged Documents')
+           ('UnchangedDocs.py', 'Unchanged Documents'),
+           ('UnverifiedCitations.py', 'Unverified Citations')
           ]
 if type(reports) == type(""): cdrcgi.bail(reports)
 
