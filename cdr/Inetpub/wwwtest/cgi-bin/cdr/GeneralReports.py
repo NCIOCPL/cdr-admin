@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: GeneralReports.py,v 1.8 2002-09-11 23:28:50 bkline Exp $
+# $Id: GeneralReports.py,v 1.9 2003-12-18 22:19:53 bkline Exp $
 #
 # Submenu for general reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.8  2002/09/11 23:28:50  bkline
+# Added report on documents modified since their most recent publishable
+# version was created.
+#
 # Revision 1.7  2002/07/10 19:33:33  bkline
 # New interface for ad hoc SQL queries.
 #
@@ -63,21 +67,21 @@ form = "<INPUT TYPE='hidden' NAME='%s' VALUE='%s'><OL>\n" % (cdrcgi.SESSION,
 reports = [
            ('AdHocQuery.py', 'Ad-Hoc Reports'),
            ('CheckedOutDocs.py', 'Checked Out Documents'),
+           ('CdrReport.py', 'Checked Out Documents With No Activity'),
+           ('ActiveLogins.py', 'Current Sessions'),
            ('DateLastModified.py', 'Date Last Modified'),
            ('DatedActions.py', 'Dated Actions'),
-           ('CdrReport.py', 'Checked Out Documents With No Activity'),
-           ('LinkedDocs.py', 'Linked Documents'),
-           ('NewDocReport.py', 'New Document Count'),
-           ('PubJobQueue.py', 'Publishing Job Queue'),
-           ('UnchangedDocs.py', 'Unchanged Documents'),
-           ('CheckUrls.py', 'URL Check'),
            ('ActivityReport.py', 'Document Activity Report'),
-           ('ActiveLogins.py', 'Current Sessions'),
            ('DocVersionHistory.py', 'Document Version History'),
+           ('LinkedDocs.py', 'Linked Documents'),
            ('NewDocsWithPubStatus.py', 
             'List of New Documents with Publication Status'),
+           ('NewDocReport.py', 'New Document Count'),
+           ('PubJobQueue.py', 'Publishing Job Queue'),
            ('ModWithoutPubVersion.py', 
-            'Records Modified Since Last Publishable Version')
+            'Records Modified Since Last Publishable Version'),
+           ('UnchangedDocs.py', 'Unchanged Documents'),
+           ('CheckUrls.py', 'URL Check')
           ]
 
 for r in reports:
