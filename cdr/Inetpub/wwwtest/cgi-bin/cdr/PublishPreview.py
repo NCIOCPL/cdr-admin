@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: PublishPreview.py,v 1.22 2003-12-16 15:47:14 bkline Exp $
+# $Id: PublishPreview.py,v 1.23 2004-05-27 20:50:23 bkline Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.22  2003/12/16 15:47:14  bkline
+# Added debugging support and CTGovProtocol support.
+#
 # Revision 1.21  2003/11/25 12:47:41  bkline
 # Added support for testing from command line.
 #
@@ -192,7 +195,12 @@ cdrcgi.sendPage("""\
 <html>
  <head>
   <title>Publish Preview for CDR%010d</title>
-  <link rel="stylesheet" href="http://stage.cancer.gov/stylesheets/nci.css">
+  <link rel='stylesheet'
+        href='http://www.cancer.gov/stylesheets/nci.css'
+        type='text/css'>
+  <link rel='stylesheet'
+        href='http://www.cancer.gov/stylesheets/nci_general_browsers.css'
+        type='text/css'>
  </head>
  <body>
   %s
