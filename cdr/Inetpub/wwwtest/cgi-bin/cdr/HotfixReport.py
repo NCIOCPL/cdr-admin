@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: HotfixReport.py,v 1.3 2004-06-02 14:59:10 bkline Exp $
+# $Id: HotfixReport.py,v 1.4 2004-07-13 17:48:44 bkline Exp $
 #
 # Report identifying previously published protocols that should be 
 # included in a hotfix.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2004/06/02 14:59:10  bkline
+# Logic changes requested by Sheri (comment #18 in request #1183).
+#
 # Revision 1.2  2004/05/17 14:29:30  bkline
 # Bumped up timeout values; fixed typo in column header; added extra
 # blank worksheet; removed dead code.
@@ -72,12 +75,7 @@ cursor.execute("""\
           WHERE t.name IN ('InScopeProtocol', 'CTGovProtocol')
             AND (d.failure IS NULL OR d.failure <> 'Y')
             AND p.status = 'Success'
-            AND p.pub_system = (SELECT document.id
-                                  FROM document
-                                  JOIN doc_type
-                                    ON doc_type.id = document.doc_type
-                                 WHERE doc_type.name = 'PublishingSystem'
-                                   AND document.title = 'Primary')
+            AND p.pub_subset LIKE 'Push_Documents_To_Cancer.Gov%'
        GROUP BY a.id, t.name, a.active_status""", timeout = 300)
 cursor.execute("""\
     CREATE TABLE #t1
