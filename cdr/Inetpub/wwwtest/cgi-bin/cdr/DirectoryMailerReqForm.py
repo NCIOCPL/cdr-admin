@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: DirectoryMailerReqForm.py,v 1.6 2002-10-03 17:38:43 ameyer Exp $
+# $Id: DirectoryMailerReqForm.py,v 1.7 2002-10-03 20:33:35 ameyer Exp $
 #
 # Request form for all directory mailers.
 #
@@ -31,6 +31,9 @@
 # Bob Kline.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2002/10/03 17:38:43  ameyer
+# Optimized physican annual update selection query.  Still untested.
+#
 # Revision 1.4  2002/09/26 15:13:55  ameyer
 # Revised queries for selecting docs, other development changes.
 #
@@ -292,20 +295,10 @@ else:
                    GROUP BY document.id"""
 
     elif mailType == 'Physician-Annual update':
-        # Select last version (not CWD) of document for which:
-        #   Doc_type = Person.
-        #   .../CurrentStatus = "Active".
-        #   .../Directory/Include = "Include".
-        #   There has been at least one previous mailer sent of type
-        #       Physician-Initial, or Physician-Annual update.
-        #   No non-failing mailer has been sent for this person in
-        #       the last one year of any of the following types:
-        #         Physician-Initial
-        #         Physician-Initial remail
-        #         Physician-Annual update
-        #         Physician-Annual remail
-        # Optimization note:
-        #   Creating a temporary table changed this from 125 to 17 seconds.
+        # Preselect all mailers sent to physicians in the last year.
+        # Include initial, annual, and all remailers.
+        # Testing shows that creating a temporary table in this way
+        #   speeds the subsequent query by a factor of about 8
         qry = """
             -- Temp table
             CREATE TABLE #mail_physician_annual_ids (tmpid int)
@@ -325,11 +318,29 @@ else:
                             p2.pub_subset = 'Physician-Annual update'
                          OR
                             p2.pub_subset = 'Physician-Annual remail'
-                           )
+                       )
                        AND p2.completed > DATEADD(year,-1,GETDATE())
                        AND p2.status <> 'Fail'
+        """
+        try:
+            cursor.execute(qry)
+        except cdrdb.Error, info:
+            cdrcgi.bail("Failure creating temp physician remailr table: %s" \
+                        % info[1][0])
 
-            -- Get physicians we want
+        # Select last version (not CWD) of document for which:
+        #   Doc_type = Person.
+        #   .../CurrentStatus = "Active".
+        #   .../Directory/Include = "Include".
+        #   There has been at least one previous mailer sent of type
+        #       Physician-Initial, or Physician-Annual update.
+        #   No non-failing mailer has been sent for this person in
+        #       the last one year of any of the following types:
+        #         Physician-Initial
+        #         Physician-Initial remail
+        #         Physician-Annual update
+        #         Physician-Annual remail
+        qry = """
             SELECT DISTINCT document.id, MAX(doc_version.num)
                        FROM doc_version
                        JOIN document
@@ -362,11 +373,37 @@ else:
                                   FROM #mail_physician_annual_ids
                                  WHERE document.id = tmpid
                              )
-                   GROUP BY document.id
-            -- Delete temp table in case user comes back on same connection
-            DROP TABLE #mail_physician_annual_ids"""
+                   GROUP BY document.id"""
 
     elif mailType == 'Organization-Annual update':
+        # Perform same optimization as for physicians
+        # Preselect all mailers sent to orgs in last year
+        qry = """
+            -- Temp table
+            CREATE TABLE #mail_org_annual_ids (tmpid int)
+
+            -- Fill it with ids of all organization mailers < 1 year old
+            INSERT INTO #mail_org_annual_ids (tmpid)
+                    SELECT pd2.doc_id
+                      FROM pub_proc_doc pd2
+                      JOIN pub_proc p2
+                        ON p2.id = pd2.pub_proc
+                     WHERE
+                       (
+                            p2.pub_subset = 'Organization-Annual update'
+                         OR
+                            p2.pub_subset = 'Organization-Annual remail'
+                       )
+                       AND p2.completed > DATEADD(year,-1,GETDATE())
+                       AND p2.status <> 'Fail'
+        """
+        try:
+            cursor.execute(qry)
+        except cdrdb.Error, info:
+            cdrcgi.bail("Failure creating temp org remailer table: %s" \
+                        % info[1][0])
+
+
         # Select last version (not CWD) of document for which:
         #   Doc_type = Organization.
         #   .../IncludeInDirectory = "Include".
@@ -394,20 +431,13 @@ else:
                                     'NCI division, office, or laboratory'
                         AND qorgtype.value <>
                                     'NIH institute, center, or division'
+
+                        -- But not if a mailer was sent in past year
                         AND NOT EXISTS (
-                            SELECT *
-                              FROM pub_proc_doc pd1
-                              JOIN pub_proc p1
-                                ON p1.id = pd1.pub_proc
-                             WHERE pd1.doc_id = document.id
-                               AND (
-                                   p1.pub_subset='Organization-Annual update'
-                                 OR
-                                   p1.pub_subset='Organization-Annual remail'
-                                   )
-                               AND p1.completed > DATEADD(year,-1,GETDATE())
-                               AND p1.status <> 'Fail'
-                            )
+                                SELECT tmpid
+                                  FROM #mail_org_annual_ids
+                                 WHERE document.id = tmpid
+                             )
                    GROUP BY document.id"""
 
     elif timeType == 'Remail':
