@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PersonLocSearch.py,v 1.7 2002-06-26 20:05:25 bkline Exp $
+# $Id: PersonLocSearch.py,v 1.8 2003-08-25 20:20:18 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Person documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.7  2002/06/26 20:05:25  bkline
+# Modified advanced Person search forms to use QcReport.py for doc display.
+#
 # Revision 1.6  2002/06/06 12:01:26  bkline
 # Added calls to cdrcgi.unicodeToLatin1().
 #
@@ -127,7 +130,8 @@ for i in range(len(rows)):
 </TR>
 """ % (i + 1, cgi.escape(title, 1), cdrcgi.BASE + '/QcReport.py', 
        docId, cdrcgi.SESSION, session, docId)
-    parms = (('docId', docId), ('repName', 'dummy'))
+    parms = (('docId', docId), ('repName', 'dummy'), ('includeHomeAddresses',
+                                                      'yes'))
     response = cdr.filterDoc(session, ['name:Person Locations Picklist'],
                               docId = docId, parm = parms)
     if type(response) == type(""):
@@ -145,7 +149,7 @@ for i in range(len(rows)):
 <UL>
 """
             for address in addresses:
-                html += "<LI>%s</LI>" % address
+                html += u"<LI>%s</LI>" % unicode(address, "utf-8")
             html += """\
 </UL>
 </TD>
