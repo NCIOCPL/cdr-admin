@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.39 2004-07-13 19:43:40 venglisc Exp $
+# $Id: QcReport.py,v 1.40 2004-10-22 20:20:49 venglisc Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.39  2004/07/13 19:43:40  venglisc
+# Modified label from "Date Received" to "Date Response Received" (Bug 1054).
+#
 # Revision 1.38  2004/04/28 16:01:20  venglisc
 # Modified SQL statement to eliminate picking up the value of the PDQKey
 # instead of an organization cdr:ref ID. (Bug 1119)
@@ -665,18 +668,21 @@ SELECT person.doc_id, summary.value, audience.value, max(ppd.pub_proc) as jobid
                                                                    info[1][0]))
 
     # -------------------------------------------------------
-    # Assign protocol count to counts list items
+    # Display the summaries reviewed by this person.
     # -------------------------------------------------------
     rows = cursor.fetchall()
 
-    html = """
+    if rows:
+       html = """
            <DL>"""
-    for row in rows:
-        html += """
+       for row in rows:
+           html += """
             <LI>%s; %s</LI>""" % (row[1], row[2])
-    html += """
+       html += """
            </DL>
 """
+    else:
+       html = "None"
 
     # -----------------------------------------------------------------
     # Substitute @@...@@ strings with Yes/No based on the count
@@ -684,19 +690,25 @@ SELECT person.doc_id, summary.value, audience.value, max(ppd.pub_proc) as jobid
     # -----------------------------------------------------------------
     doc    = re.sub("@@SUMMARIES_REVIEWED@@", html, doc)
 
-
-    # -----------------------------------------------------------------
+    # ------------------------------------------------------------------
     # Database query to select mailer information
     # From the previous query we know the summary IDs, person ID and 
     # Job ID that containted these mailers.  We are using this 
     # information to build this query to extract the response received
     # from the mailer docs.
-    # -----------------------------------------------------------------
-    batchId = row[3]
-    summaryIds = '('
-    for row in rows:
-        summaryIds += repr(row[0]) + ', '
-    summaryIds = summaryIds[:-2] + ')'
+    # If the person is not linked to a summary we're setting the batchId
+    # to zero, otherwise the query would fail.
+    # ------------------------------------------------------------------
+    if rows:
+       batchId = row[3]
+       summaryIds = '('
+       for row in rows:
+          summaryIds += repr(row[0]) + ', '
+       summaryIds = summaryIds[:-2] + ')'
+    else:
+       batchId = 0
+       summaryIds = '(0)'
+
 
     query = """
 SELECT mailer.doc_id, mailer.int_val, summary.value, response.value,
@@ -720,15 +732,15 @@ SELECT mailer.doc_id, mailer.int_val, summary.value, response.value,
  ORDER BY title.value""" % (batchId, summaryIds, personId)
 
     try:
-        cursor.execute(query)
+       cursor.execute(query)
     except cdrdb.Error, info:    
-        cdrcgi.bail('Failure retrieving Mailer info for batch ID %s' % (batchId,
+       cdrcgi.bail('Failure retrieving Mailer info for batch ID %d: %s' % (batchId,
                                                                    info[1][0]))
 
     rows = cursor.fetchall()
 
     # ----------------------------------------------------------------
-    # Create the rows for each summary to be displayed in table format
+    # Display the Summary Mailer information
     # ----------------------------------------------------------------
     html = ''
     for row in rows:
@@ -756,24 +768,31 @@ SELECT mailer.doc_id, mailer.int_val, summary.value, response.value,
     # Database query to select the time of the mailers send
     # -----------------------------------------------------------------
     try:
-        cursor.execute("""\
+	query = """
 SELECT completed
   FROM pub_proc
- WHERE id = ?""", batchId)
+ WHERE id = %d""" % batchId
+        cursor.execute(query)
 
     except cdrdb.Error, info:    
-        cdrcgi.bail('Failure retrieving Mailer Date for batch: %s' % (batchId, 
+        cdrcgi.bail('Failure retrieving Mailer Date for batch %d: %s' % (batchId, 
                                                                    info[1][0]))
     row = cursor.fetchone()
     # -----------------------------------------------------------------
     # Substitute @@...@@ strings for job ID and date send
+    # If the person is not linked to a summary we won't find an entry
+    # in the pub_proc table.  The batchId will have been set to zero
+    # in this case.
     # -----------------------------------------------------------------
-    dateSent = row[0][:10]
-    html = "%s" % (dateSent)
-    doc    = re.sub("@@SUMMARY_DATE_SENT@@", html, doc)
-    html = "%s" % (batchId)
-    doc    = re.sub("@@SUMMARY_JOB_ID@@", html, doc)
-
+    if row:
+       dateSent = row[0][:10]
+       html = "%s" % (dateSent)
+       doc    = re.sub("@@SUMMARY_DATE_SENT@@", html, doc)
+       html = "%s" % (batchId)
+       doc    = re.sub("@@SUMMARY_JOB_ID@@", html, doc)
+    else:
+       doc    = re.sub("@@SUMMARY_DATE_SENT@@", "N/A", doc)
+       doc    = re.sub("@@SUMMARY_JOB_ID@@", "N/A", doc)
 
     return doc
 
