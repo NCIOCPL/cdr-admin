@@ -1,12 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: ModWithoutPubVersion.py,v 1.4 2002-09-12 13:03:35 bkline Exp $
+# $Id: ModWithoutPubVersion.py,v 1.5 2002-09-23 14:42:41 bkline Exp $
 #
 # Reports on documents which have been changed since a previously 
 # publishable version without a new publishable version have been
 # created.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2002/09/12 13:03:35  bkline
+# Added longer timeout values.
+#
 # Revision 1.3  2002/09/12 11:49:04  bkline
 # Fixed bug in first SQL query.
 #
@@ -19,6 +22,24 @@
 #----------------------------------------------------------------------
 import cdr, cdrdb, cdrcgi, cgi, re, time, xml.dom.minidom
 
+#----------------------------------------------------------------------
+# Change date from ISO format to US-centric form.
+#----------------------------------------------------------------------
+def mungeDate(d):
+    if not d: return "None"
+    if len(d) < 10: return "Invalid date (%s)" % str(d)
+    pieces = d[:10].split('-')
+    if len(pieces) != 3: return "Invalid date (%s)" % str(d)
+    try:
+        year  = int(pieces[0])
+        month = int(pieces[1])
+        date  = int(pieces[2])
+        when  = (year, month, date, 0, 0, 0, 0, 0, 0)
+        return time.strftime("%b. %d, %Y", when)
+    except:
+        return "Invalid date (%s)" % str(d)
+
+    
 #----------------------------------------------------------------------
 # Set the form variables.
 #----------------------------------------------------------------------
@@ -273,8 +294,8 @@ for row in rows:
     <td align='center'><font size='3'>%s</font></td>
     <td align='center'><font size='3'>%s</font></td>
    </tr>
-""" % (docId, pubDate[:10], modBy, modDate[:10], 
-       nonPubVerDate and nonPubVerDate[:10] or "None")
+""" % (docId, mungeDate(pubDate), modBy, mungeDate(modDate), 
+       mungeDate(nonPubVerDate))
 
 #----------------------------------------------------------------------
 # Finish and send the report.
