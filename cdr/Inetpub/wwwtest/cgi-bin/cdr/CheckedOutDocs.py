@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CheckedOutDocs.py,v 1.2 2002-03-02 13:04:42 bkline Exp $
+# $Id: CheckedOutDocs.py,v 1.3 2002-03-02 13:51:32 bkline Exp $
 #
 # Report on documents checked out to a user.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/03/02 13:04:42  bkline
+# Fixed header comment.
+#
 # Revision 1.1  2002/03/02 13:04:03  bkline
 # Report on documents checked out to a user.
 #
@@ -32,10 +35,10 @@ elif request == SUBMENU:
 # Put up form if we have no user.
 #----------------------------------------------------------------------
 if not user:
-    header = cdrcgi.header('CDR Report on Inactive Hyperlinks',
+    header = cdrcgi.header('CDR Report on Checked Out Documents',
                            'CDR Reports',
-                           'Inactive Hyperlinks',
-                           'CheckUrls.py',
+                           'Checked Out Documents',
+                           'CheckedOutDocs.py',
                            ("Submit", SUBMENU, cdrcgi.MAINMENU))
     form = """\
       <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
@@ -45,7 +48,7 @@ if not user:
     </BODY>
    </HTML>
 """ % (cdrcgi.SESSION, session)
-    cdrcgi.showpage(header + form)
+    cdrcgi.sendPage(header + form)
 
 #----------------------------------------------------------------------
 # Display the report.
@@ -58,10 +61,10 @@ header = cdrcgi.header('CDR Report on Inactive Hyperlinks',
 table  = """\
 <TABLE BORDER='0' WIDTH='100%' CELLSPACING='1' CELLPADDING='2'>
  <TR BGCOLOR='silver'>
-  <TD><B>Document Type</B></TD>
-  <TD><B>Document Title</B></TD>
-  <TD><B>Document ID</B></TD>
-  <TD><B>Date Checked Out</B></TD>
+  <TD NOWRAP='1'><B>Checked Out</B></TD>
+  <TD><B>Type</B></TD>
+  <TD><B>ID</B></TD>
+  <TD><B>Title</B></TD>
  </TR>
 """
 
@@ -99,12 +102,12 @@ try:
     for row in rows:
         table += """\
    <TR BGCOLOR='white'>
-    <TD>%s</TD>
-    <TD>%s</TD>
-    <TD>CDR%010d</TD>
-    <TD>%s</TD>
+    <TD NOWRAP='1' VALIGN='top'>%s</TD>
+    <TD VALIGN='top'>%s</TD>
+    <TD VALIGN='top'>CDR%010d</TD>
+    <TD VALIGN='top'>%s</TD>
    </TR>
-""" % (row[0], row[1], row[2], row[3])
+""" % (row[3], row[0], row[2], cdrcgi.unicodeToLatin1(row[1]))
 except cdrdb.Error, info:
     cdrcgi.bail('Database failure: %s' % info[1][0])
 
