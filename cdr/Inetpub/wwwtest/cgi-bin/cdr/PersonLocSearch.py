@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PersonLocSearch.py,v 1.5 2002-05-24 18:02:11 bkline Exp $
+# $Id: PersonLocSearch.py,v 1.6 2002-06-06 12:01:26 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Person documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2002/05/24 18:02:11  bkline
+# Wording change requested by Lakshmi.
+#
 # Revision 1.4  2002/05/08 17:41:50  bkline
 # Updated to reflect Volker's new filter names.
 #
@@ -151,4 +154,8 @@ for i in range(len(rows)):
 #----------------------------------------------------------------------
 # Send the page back to the browser.
 #----------------------------------------------------------------------
-cdrcgi.sendPage(html + "  </TABLE>\n </BODY>\n</HTML>\n")
+cdrcgi.sendPage(cdrcgi.unicodeToLatin1(html + """\
+  </TABLE>
+ </BODY>
+</HTML>
+"""))

@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PersonSearch.py,v 1.5 2002-06-04 20:19:35 bkline Exp $
+# $Id: PersonSearch.py,v 1.6 2002-06-06 12:01:27 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Person documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2002/06/04 20:19:35  bkline
+# Fixed typos in query_term paths.
+#
 # Revision 1.4  2002/05/08 17:41:51  bkline
 # Updated to reflect Volker's new filter names.
 #
@@ -154,4 +157,4 @@ html = cdrcgi.advancedSearchResultsPage("Person", rows, strings,
 #----------------------------------------------------------------------
 # Send the page back to the browser.
 #----------------------------------------------------------------------
-cdrcgi.sendPage(html)
+cdrcgi.sendPage(cdrcgi.unicodeToLatin1(html))

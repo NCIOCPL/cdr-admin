@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PdqBoards.py,v 1.3 2002-02-21 15:22:03 bkline Exp $
+# $Id: PdqBoards.py,v 1.4 2002-06-06 12:01:26 bkline Exp $
 #
 # Report on PDQ Board members and topics.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2002/02/21 15:22:03  bkline
+# Added navigation buttons.
+#
 # Revision 1.2  2002/02/20 23:06:34  bkline
 # Multiple enhancements made at users' request.
 #
@@ -143,7 +146,7 @@ if not boardInfo:
      </BODY>
     </HTML>
 """ % (cdrcgi.SESSION, session, getBoardPicklist(), getAudiencePicklist())
-    cdrcgi.sendPage(header + form)
+    cdrcgi.sendPage(cdrcgi.unicodeToLatin1(header + form))
 
 #----------------------------------------------------------------------
 # Build date string for header.
@@ -228,7 +231,7 @@ SELECT DISTINCT board_member.id, board_member.title,
 """
     except cdrdb.Error, info:
         cdrcgi.bail('Database query failure: %s' % info[1][0])
-    cdrcgi.sendPage(header + report)
+    cdrcgi.sendPage(cdrcgi.unicodeToLatin1(header + report))
 
 #----------------------------------------------------------------------
 # Show the members of the board, with associated topics.
@@ -330,4 +333,4 @@ for key in keys:
  </BODY>
 </HTML>
 """
-cdrcgi.sendPage(header + report)
+cdrcgi.sendPage(cdrcgi.unicodeToLatin1(header + report))
