@@ -1,13 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolMailerReqForm.py,v 1.9 2003-01-22 01:43:17 ameyer Exp $
+# $Id: ProtocolMailerReqForm.py,v 1.10 2003-02-07 19:40:07 bkline Exp $
 #
 # Request form for all protocol mailers.
 #
 # This program is invoked twice to  create a mailer job.
 #
 # The first invocation is made by a high level mailer menu from which
-# a user selected directory mailers.  In the first invocation, the program
+# a user selected protocol mailers.  In the first invocation, the program
 # detects that no specific mailer has been requested ("if not request")
 # and returns an input form to the web browser to gather information
 # needed to start a specific mailer job.
@@ -17,6 +17,10 @@
 # publication job for the publishing daemon to find and initiate.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.9  2003/01/22 01:43:17  ameyer
+# Added check for last valid version to single doc id.
+# Added check for returned row with nothing in it at same place.
+#
 # Revision 1.8  2003/01/08 23:46:15  bkline
 # Fixed cosmetic typo in SQL query.
 #
@@ -439,6 +443,7 @@ elif mailType == 'Protocol-Annual abstract remail':
 # Find the protocols which need an initial status and participant check.
 #----------------------------------------------------------------------
 elif mailType == 'Protocol-Initial status/participant check':
+    quarterly = 'Protocol-Quarterly status/participant check'
     try:
         cursor.execute("""\
             SELECT DISTINCT TOP %d protocol.id, MAX(doc_version.num)
@@ -456,6 +461,7 @@ elif mailType == 'Protocol-Initial status/participant check':
                         AND prot_status.path       = '%s'
                         AND lead_org.path          = '%s'
                         AND doc_version.val_status = 'V'
+                        AND protocol.active_status = 'A'
 
                         -- Don't send paper when they want electronic mailers.
                         AND NOT EXISTS (SELECT *
@@ -477,7 +483,7 @@ elif mailType == 'Protocol-Initial status/participant check':
                                           JOIN pub_proc_doc pd
                                             ON p.id = pd.pub_proc
                                          WHERE pd.doc_id = protocol.id
-                                           AND p.pub_subset = '%s'
+                                           AND p.pub_subset IN ('%s', '%s')
                                            AND (p.status = 'Success'
                                             OR p.completed IS NULL))
                    GROUP BY protocol.id""" % (maxDocs,
@@ -486,13 +492,14 @@ elif mailType == 'Protocol-Initial status/participant check':
                                               modePath,
                                               brussels,
                                               sourcePath,
-                                              mailType))
+                                              mailType,
+                                              quarterly))
         docList = cursor.fetchall()
     except cdrdb.Error, info:
         cdrcgi.bail("Failure retrieving document IDs: %s" % info[1][0])
 
 #----------------------------------------------------------------------
-# Find the protocols which need an initial status and participant check.
+# Find the protocols which need a quarterly status and participant check.
 #----------------------------------------------------------------------
 elif mailType == 'Protocol-Quarterly status/participant check':
     try:
@@ -515,6 +522,8 @@ elif mailType == 'Protocol-Quarterly status/participant check':
         # [RMK 2002-11-14: Changed at Lakshmi's request.  We no
         # longer check to make sure that three months have elapsed
         # since the last s&p mailer.
+        # [RMK 2003-02-05: Check for previous S&P mailer of either
+        # type.
         cursor.execute("""\
             SELECT DISTINCT TOP %d protocol.id, MAX(doc_version.num)
                        FROM document protocol
@@ -532,16 +541,21 @@ elif mailType == 'Protocol-Quarterly status/participant check':
                         AND lead_org.path            = '%s'
                         AND doc_version.publishable  = 'Y'
                         AND doc_version.val_status   = 'V'
+                        AND protocol.active_status   = 'A'
 
-                        -- Make sure they've gotten their original mailer.
-                        AND EXISTS (SELECT *
-                                      FROM pub_proc orig_mailer
-                                      JOIN pub_proc_doc om_doc
-                                        ON orig_mailer.id = om_doc.pub_proc
-                                     WHERE orig_mailer.pub_subset = '%s'
-                                       AND orig_mailer.status = 'Success'
-                                       AND om_doc.doc_id = protocol.id)
-
+                /*
+                 * Suppressed this clause at Sheri's request; RMK 2003-02-07.
+                 *
+                 *      -- Make sure they've gotten their initial mailer.
+                 *      AND EXISTS (SELECT *
+                 *                    FROM pub_proc orig_mailer
+                 *                    JOIN pub_proc_doc om_doc
+                 *                      ON orig_mailer.id = om_doc.pub_proc
+                 *                   WHERE orig_mailer.status = 'Success'
+                 *                     AND om_doc.doc_id = protocol.id
+                 *                     AND orig_mailer.pub_subset IN ('%s',
+                 *                                                    '%s'))
+                 */
                         -- Don't send paper to those who want electronic.
                         AND NOT EXISTS (SELECT *
                                           FROM query_term
@@ -558,6 +572,7 @@ elif mailType == 'Protocol-Quarterly status/participant check':
                                               statusPath,
                                               leadOrgPath,
                                               orgMailType,
+                                              mailType,
                                               modePath,
                                               brussels,
                                               sourcePath))
@@ -591,7 +606,7 @@ if not result[0] or int(result[0]) < 0:
 jobId = int(result[0])
 
 # Log what happened
-msgs = ["Started directory mailer job - id = %d" % jobId,
+msgs = [" Started protocol mailer job - id = %d" % jobId,
         "                      Mailer type = %s" % mailType,
         "          Number of docs selected = %d" % docCount]
 if docCount > 0:
