@@ -2,8 +2,11 @@
 #
 # Publishing CGI script.
 #
-# $Id: publishing.py,v 1.7 2002-02-22 17:19:17 pzhang Exp $
+# $Id: publishing.py,v 1.8 2002-03-01 22:43:01 pzhang Exp $
 # $Log: not supported by cvs2svn $
+# Revision 1.7  2002/02/22 17:19:17  pzhang
+# Skiped DocIdParameter page if there is no parameters and no docIds.
+#
 # Revision 1.6  2002/02/22 16:36:40  pzhang
 # Moved hidden Session variable out of initHiddenValues for
 # 	navigateTo to work properly.
@@ -174,7 +177,7 @@ class Display:
             names = string.split(paramList, ",")
             for name in names:
                 if fields.has_key(name):
-                    paramValues += "," + name + " " +  fields.getvalue(name)
+                    paramValues += "," + name + ";" +  fields.getvalue(name)
         form += HIDDEN % ('Parameters', paramValues)    
 
         docIdValues = ""
