@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: CitationSearch.py,v 1.1 2001-12-01 18:11:44 bkline Exp $
+# $Id: CitationSearch.py,v 1.2 2002-05-10 21:19:48 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Citation documents.
 # *** Obsolete version, based on prototype schema for citations. ***
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2001/12/01 18:11:44  bkline
+# Initial revision
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, cdrdb, urllib, sys
 
@@ -80,7 +83,7 @@ if impReq:
  <CdrDocXml><![CDATA[<Citation>
    <VerificationDetails>
     <Verified>Yes</Verified>
-    <VerifiedIn>PUBMED</VerifiedIn>
+    <VerifiedIn>PubMed</VerifiedIn>
     <ModifiedRecord>No</ModifiedRecord>
    </VerificationDetails>
    %s
