@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryAndMiscReports.py,v 1.5 2002-12-30 15:15:47 bkline Exp $
+# $Id: SummaryAndMiscReports.py,v 1.6 2003-05-08 20:26:42 bkline Exp $
 #
 # Submenu for summary and miscellanous document reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2002/12/30 15:15:47  bkline
+# Fixed a typo.
+#
 # Revision 1.4  2002/12/26 19:40:41  bkline
 # Rearranged for issue #545.
 #
@@ -103,7 +106,9 @@ form += """\
     <OL>
 """
 reports = [
-           ('PdqBoards.py', 'PDQ Board Listings')
+           ('PdqBoards.py', 'PDQ Board Listings'),
+           ('SummaryDateLastModified.py', 'Summaries Date Last Modified'),
+           ('SummaryCitations.py', 'Summaries Citation')
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI>\n" % (
