@@ -9,7 +9,7 @@
 
 :: Uncomment and modify any of these if not using these include
 ::  files and libraries on mmdb2 (or wherever the CDR resides).
-rem set CDRWEB=n:/Inetpub/wwwtest
+rem set CDRWEB=n:/Inetpub/wwwtest/cgi-bin/cdr
 
 :: If any of the above variables are set, then you must either uncomment
 ::   the following line to tell make/nmake to override makefile
