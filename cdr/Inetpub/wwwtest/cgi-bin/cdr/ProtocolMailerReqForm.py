@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolMailerReqForm.py,v 1.16 2004-07-13 17:51:26 bkline Exp $
+# $Id: ProtocolMailerReqForm.py,v 1.17 2004-07-17 11:52:21 bkline Exp $
 #
 # Request form for all protocol mailers.
 #
@@ -17,6 +17,9 @@
 # publication job for the publishing daemon to find and initiate.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.16  2004/07/13 17:51:26  bkline
+# Added support for restricting by PUP.
+#
 # Revision 1.15  2004/05/18 12:42:53  bkline
 # Added support for electronic S&P mailers.
 #
@@ -414,7 +417,7 @@ if docId:
                  WHERE path = '/InScopeProtocol/ProtocolAdminInfo'
                             + '/ProtocolLeadOrg/LeadOrganizationID/@cdr:ref'
                    AND doc_id = ?
-                   AND int_val = ?""")
+                   AND int_val = ?""", (intId, leadOrgId))
             row = cursor.fetchone()
             if row[0] < 1:
                 cdrcgi.bail("Protocol %s does not have lead org %s" %
