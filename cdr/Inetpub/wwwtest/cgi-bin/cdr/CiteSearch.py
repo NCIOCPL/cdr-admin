@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CiteSearch.py,v 1.6 2002-05-10 21:19:48 bkline Exp $
+# $Id: CiteSearch.py,v 1.7 2002-07-15 21:50:37 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Citation documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2002/05/10 21:19:48  bkline
+# Changed PUBMED to PubMed.
+#
 # Revision 1.5  2002/05/10 21:14:12  bkline
 # Fixed bug in field lists.
 #
@@ -67,6 +70,23 @@ except cdrdb.Error, info:
     cdrcgi.bail('Failure connecting to CDR: %s' % info[1][0])
 
 #----------------------------------------------------------------------
+# See if citation already exists.
+#----------------------------------------------------------------------
+def findExistingCitation(pmid):
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""\
+                SELECT doc_id
+                  FROM query_term
+                 WHERE path LIKE '/Citation/PubmedArticle/%/PMID'
+                   AND value = ?""", pmid)
+        rows = cursor.fetchall()
+        if not rows: return None
+        return rows[0][0]
+    except cdrdb.Error, info:
+        cdrcgi.bail('Failure checking for existing document: %s' % info[1][0])
+
+#----------------------------------------------------------------------
 # Import a citation document from PubMed.
 #----------------------------------------------------------------------
 if impReq:
@@ -79,6 +99,11 @@ if impReq:
             cdrcgi.bail("Unable to retrieve %s" % replaceID)
         if not exp1.findall(oldDoc):
             cdrcgi.bail("Document %s is not a PubMed Citation")
+    else:
+        docId = findExistingCitation(importID)
+        if docId:
+            cdrcgi.bail("Citation has already been imported as CDR%010d" %
+                        docId)
     host    = 'www.ncbi.nlm.nih.gov'
     app     = '/entrez/utils/pmfetch.fcgi'
     base    = 'http://' + host + app + '?db=PubMed&report=sgml&mode=text&id='
@@ -107,17 +132,30 @@ if impReq:
   </Citation>]]></CdrDocXml>
 </CdrDoc>
 """
-        id = cdr.addDoc(session, doc = doc % (title, article[0]))
+        doc = doc % (title, article[0])
+        resp = cdr.addDoc(session, doc = doc, val = 'Y', showWarnings = 1)
     else:
-        modifiedDoc = exp1.sub(article[0], oldDoc)
-        id = cdr.repDoc(session, doc = modifiedDoc, checkIn = 'Y')
-    if id.find("<Err") != -1:
+        doc = exp1.sub(article[0], oldDoc)
+        resp = cdr.repDoc(session, doc = doc, val = 'Y', showWarnings = 1)
+    if not resp[0]:
         cdrcgi.bail("Failure adding PubMed citation %s: %s" % (
-                    title, cdr.checkErr(id)))
-    if not replaceID:
-        subtitle = "Citation added as %s" % id
+                    title, cdr.checkErr(resp[1])))
+    if not resp[1]:
+        doc = cdr.getDoc(session, resp[0], 'Y')
+        if doc.startswith("<Errors"):
+            cdrcgi.bail("Unable to retrieve %s" % resp[0])
+        resp2 = cdr.repDoc(session, doc = doc, val = 'Y', ver = 'Y',
+                          checkIn = 'Y', showWarnings = 1)
+        if not resp2[0]:
+            cdrcgi.bail("Failure creating publishable version for %s" %
+                    resp[0], resp2[1])
+        pubVerNote = "(with publishable version)"
     else:
-        subtitle = "Citation %s updated" % id
+        pubVerNote = "(with validation errors)"
+    if not replaceID:
+        subtitle = "Citation added as %s %s" % (resp[0], pubVerNote)
+    else:
+        subtitle = "Citation %s updated %s" % (resp[0], pubVerNote)
     # FALL THROUGH TO FORM DISPLAY
 
 #----------------------------------------------------------------------
