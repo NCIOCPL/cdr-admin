@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: DevTasks.py,v 1.4 2001-12-01 17:57:11 bkline Exp $
+# $Id: DevTasks.py,v 1.5 2002-02-26 18:53:44 bkline Exp $
 #
 # Lists CDR development tasks.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2001/12/01 17:57:11  bkline
+# Added support for filtering out completed and abandoned tasks.
+#
 # Revision 1.3  2001/08/22 14:42:13  bkline
 # Changed subtitle from "UI Task List" to "Task List".
 #
@@ -102,7 +105,8 @@ body += """\
 <BR>
 <TABLE BORDER='0' WIDTH='100%%' CELLSPACING='1' CELLPADDING='1'>
  <TR BGCOLOR='silver' VALIGN='center'>
-  <TD ALIGN='center'><FONT SIZE='-1'><B>&nbsp;#&nbsp;</B></FONT></TD>
+  <TD ALIGN='center'><FONT SIZE='-1'><B><a
+  href="DevTasks.py?sortby=id&%s">&nbsp;#&nbsp;</a></B></FONT></TD>
   <TD ALIGN='center'><FONT SIZE='-1'><B>Description</B></FONT></TD>
   <TD ALIGN='center'><FONT SIZE='-1'><B><a
   href='DevTasks.py?sortby=assigned_to&%s'>Assigned To</a></B></FONT></TD>
@@ -113,7 +117,7 @@ body += """\
   <TD ALIGN='center'><FONT SIZE='-1'><B>Done By</B></FONT></TD>
   <TD ALIGN='center'><FONT SIZE='-1'><B>Notes</B></FONT></TD>
   </TR>
-""" % (showAll, showAll, showAll)
+""" % (showAll, showAll, showAll, showAll)
 for rec in tasks:
     body += """
  <TR>
