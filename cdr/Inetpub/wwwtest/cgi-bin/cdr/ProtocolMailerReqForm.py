@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolMailerReqForm.py,v 1.15 2004-05-18 12:42:53 bkline Exp $
+# $Id: ProtocolMailerReqForm.py,v 1.16 2004-07-13 17:51:26 bkline Exp $
 #
 # Request form for all protocol mailers.
 #
@@ -17,6 +17,9 @@
 # publication job for the publishing daemon to find and initiate.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.15  2004/05/18 12:42:53  bkline
+# Added support for electronic S&P mailers.
+#
 # Revision 1.14  2003/05/08 20:23:04  bkline
 # Added code to skip blocked documents.
 #
@@ -81,6 +84,8 @@ request     = cdrcgi.getRequest(fields)
 docId       = fields and fields.getvalue("DocId")      or None
 email       = fields and fields.getvalue("Email")      or None
 userPick    = fields and fields.getvalue("userPick")   or None
+leadOrg     = fields and fields.getvalue("leadOrg")    or None
+pup         = fields and fields.getvalue("pup")        or None
 paper       = fields and fields.getvalue("paper")      or 0
 electronic  = fields and fields.getvalue("electronic") or 0
 maxMails    = fields and fields.getvalue("maxMails")   or 'No limit'
@@ -100,7 +105,10 @@ header      = cdrcgi.header(title, title, section, script, buttons,
         margin-bottom: 10pt; font-weight:normal
    }
    b {  font-size: 12pt; font-family:"Times New Roman"; color:black;
-        margin-bottom: 10pt; font-weight:bold
+        margin-bottom: 10pt; font-weight:bold 
+   }
+   .thLabel { font-size: 11pt; font-weight: bold; 
+              color: black; font-family: Arial;
    }
   </style>
   <script language='JavaScript'>
@@ -116,7 +124,6 @@ header      = cdrcgi.header(title, title, section, script, buttons,
    // -->
   </script>
  """)
-parms       = None
 statusPath  = '/InScopeProtocol/ProtocolAdminInfo/CurrentProtocolStatus'
 brussels    = 'NCI Liaison Office-Brussels'
 sourcePath  = '/InScopeProtocol/ProtocolSources/ProtocolSource/SourceName'
@@ -124,6 +131,7 @@ docType     = 'InScopeProtocol'
 modePath    = '/Organization/OrganizationDetails/PreferredProtocolContactMode'
 leadOrgPath = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg'\
               '/LeadOrganizationID/@cdr:ref'
+statPartTypes =  ('ProtInitStatPart', 'ProtQuarterlyStatPart')
 if maxMails == 'No limit': maxDocs = sys.maxint
 else:
     try:
@@ -132,6 +140,17 @@ else:
         cdrcgi.bail("Invalid value for maxMails: %s" % maxMails)
 if maxDocs < 1:
     cdrcgi.bail("Invalid value for maxMails: %s" % maxMails)
+pupId = None
+leadOrgId = None
+parms = None
+if userPick in statPartTypes:
+    if paper:
+        if electronic:
+            parms = [['UpdateModes', '[Mail][Web-based]']]
+        else:
+            parms = [['UpdateModes', '[Mail]']]
+    else:
+        parms = [['UpdateModes', '[Web-based]']]
 
 #----------------------------------------------------------------------
 # Make sure we're logged in.
@@ -208,9 +227,24 @@ if not request:
    <input type='text' name='maxMails' size='12' value='No limit' />
    <br><br><br>
    <h3>To generate mailer for a single Protocol, enter</h3>
-   <b>Protocol document CDR ID:&nbsp;</b>
-   <input name='DocId' />
+   <table cellspacing='0' cellpadding='1'>
+    <tr>
+     <td width='10'>&nbsp;</td>
+     <th class='thLabel' align='right'>Protocol document CDR ID:&nbsp;</th>
+     <td><input name='DocId' /></td>
+    </tr>
+    <tr>
+     <td width='10'>&nbsp;</td>
+     <th class='thLabel' align='right'>Lead Org ID:&nbsp;</th>
+     <td><input name='leadOrg' /> (Status and Participant mailers only)</td>
+    </tr>
+   </table>
+   <br><br>
+   <h3>OR (Status and Participant mailers only)</h3>
+   <b>PUP ID:&nbsp;</b>
+   <input name='pup' />
    <br><br><br>
+   <h3>
    <h3>To receive email notification when mailer is complete, enter</h3>
    <b>Email address:&nbsp;</b>
    <input name='Email' />
@@ -260,9 +294,20 @@ elif userPick  == 'ProtQuarterlyStatPart':
     orgMailType = 'Protocol-Initial status/participant check'
 if not electronic and not paper:
     cdrcgi.bail("Neither paper nor electronic mailers selected")
-if electronic and userPick not in ('ProtInitStatPart',
-                                   'ProtQuarterlyStatPart'):
+if electronic and userPick not in statPartTypes:
     cdrcgi.bail("Only paper mailers supported for protocol abstracts")
+if leadOrg:
+    if not docId:
+        cdrcgi.bail("Lead organization specified without protocol ID")
+    elif userPick not in statPartTypes:
+        cdrcgi.bail("Lead org can only be specified for Status and "
+                    "Participant mailers.")
+if pup and userPick not in statPartTypes:
+    cdrcgi.bail("Protocol Update Person can only be specified for "
+                "Status and Participant mailers.")
+if pup and docId:
+    cdrcgi.bail("Protocol Update Person and Protocol ID cannot both "
+                "be specified.")
                     
 #----------------------------------------------------------------------
 # Connect to the CDR database.
@@ -359,6 +404,22 @@ if docId:
 
         # Document list contains one tuple of doc id + version number
         docList = ((intId, row[0]),)
+
+        # Check to make sure requested lead org is in protocol.
+        if leadOrg:
+            leadOrgId = int(re.sub('[^\\d]+', '', leadOrg))
+            cursor.execute("""\
+                SELECT COUNT(*)
+                  FROM query_term
+                 WHERE path = '/InScopeProtocol/ProtocolAdminInfo'
+                            + '/ProtocolLeadOrg/LeadOrganizationID/@cdr:ref'
+                   AND doc_id = ?
+                   AND int_val = ?""")
+            row = cursor.fetchone()
+            if row[0] < 1:
+                cdrcgi.bail("Protocol %s does not have lead org %s" %
+                            (docId, leadOrg))
+                            
     except cdrdb.Error, info:
         cdrcgi.bail("Database failure finding version for document %d: %s" %
                     (intId, info[1][0]))
@@ -537,7 +598,7 @@ elif mailType == 'Protocol-Annual abstract remail':
         cdrcgi.bail("Failure selecting protocols: %s" % info[1][0])
 
 #----------------------------------------------------------------------
-# Find the protocols which need an initial status and participant check.
+# Find the protocols which need a status and participant check.
 #----------------------------------------------------------------------
 else:
     if mailType not in ('Protocol-Initial status/participant check',
@@ -600,6 +661,11 @@ SELECT DISTINCT protocol.id, MAX(doc_version.num)
        GROUP BY protocol.id""", timeout = 300)
 
         # Find the lead organizations (and pups) for these protocols
+        pupCheck = ""
+        if pup:
+            pupDigits = re.sub('[^\d]+', '', pup)
+            pupId  = int(pupDigits)
+            pupCheck = " AND p.int_val = %d " % pupId
         cursor.execute("""\
    CREATE TABLE #lead_orgs
        (prot_id INTEGER,
@@ -648,7 +714,7 @@ LEFT OUTER JOIN query_term t
             AND r.path  = '/InScopeProtocol/ProtocolAdminInfo'
                         + '/ProtocolLeadOrg/LeadOrgPersonnel'
                         + '/PersonRole'
-            AND r.value = 'Update person'""", timeout = 300)
+            AND r.value = 'Update person'""" + pupCheck, timeout = 300)
 
 
         # Fill in missing update modes.
@@ -683,13 +749,10 @@ SELECT DISTINCT u.doc_id, MAX(u.value) -- Avoid multiple values
         if paper:
             if electronic:
                 updateMode = "IN ('Web-based', 'Mail')"
-                parms = [['UpdateModes', '[Mail][Web-based]']]
             else:
                 updateMode = "= 'Mail'"
-                parms = [['UpdateModes', '[Mail]']]
         else:
             updateMode = "= 'Web-based'"
-            parms = [['UpdateModes', '[Web-based]']]
         cursor.execute("""\
 SELECT DISTINCT TOP %d prot_id, prot_ver
            FROM #lead_orgs
@@ -715,6 +778,10 @@ for doc in docList:
     docs.append("CDR%010d/%d" % (doc[0], doc[1]))
 
 # Drop the job into the queue.
+if leadOrgId:
+    parms.append(['LeadOrg', "%d" % leadOrgId])
+if pupId:
+    parms.append(['PUP', "%d" % pupId])
 result = cdr.publish(credentials = session, pubSystem = 'Mailers',
                       pubSubset = mailType, docList = docs,
                       allowNonPub = 'Y', email = email, parms = parms)
