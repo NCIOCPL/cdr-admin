@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolMailerReqForm.py,v 1.11 2003-02-13 21:11:27 bkline Exp $
+# $Id: ProtocolMailerReqForm.py,v 1.12 2003-02-13 21:43:41 bkline Exp $
 #
 # Request form for all protocol mailers.
 #
@@ -17,6 +17,9 @@
 # publication job for the publishing daemon to find and initiate.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.11  2003/02/13 21:11:27  bkline
+# Added 'Temporarily closed' for regular S&P mailers.
+#
 # Revision 1.10  2003/02/07 19:40:07  bkline
 # Corrected a typo ("directory" changed to "protocol").  Added check for
 # all S&P mailers to ensure that the protocol document is not blocked
@@ -574,9 +577,12 @@ elif mailType == 'Protocol-Quarterly status/participant check':
         # present as requesting electronic mailers.]
         # [RMK 2002-11-14: Changed at Lakshmi's request.  We no
         # longer check to make sure that three months have elapsed
-        # since the last s&p mailer.
+        # since the last s&p mailer.]
         # [RMK 2003-02-05: Check for previous S&P mailer of either
-        # type.
+        # type.]
+        # [RMK 2003-02-13: Specs changed somewhere along the way;
+        # status can be "Active," "Approved-not yet active," or
+        # "Temporarily closed."]
         cursor.execute("""\
             SELECT DISTINCT TOP %d protocol.id, MAX(doc_version.num)
                        FROM document protocol
