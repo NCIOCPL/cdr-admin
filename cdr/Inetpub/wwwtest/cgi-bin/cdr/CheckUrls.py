@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: CheckUrls.py,v 1.2 2002-02-21 15:22:02 bkline Exp $
+# $Id: CheckUrls.py,v 1.3 2002-02-21 15:43:13 bkline Exp $
 #
 # Reports on URLs which cannot be reached.
 #
@@ -9,7 +9,7 @@
 # Initial revision
 #
 #----------------------------------------------------------------------
-import httplib, urlparse, socket, cdrdb, cdrcgi
+import cgi, httplib, urlparse, socket, cdrdb, cdrcgi
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -61,9 +61,11 @@ SELECT source_doc, source_elem, url
     if not rows:
         cdrcgi.sendPage(header + """\
   <H3>No Inactive Hyperlinks Found</H3>
+  <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
+  </FORM>
  </BODY>
 </HTML>
-""")
+""" % (cdrcgi.SESSION, session))
 except cdrdb.Error, info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
 
@@ -126,4 +128,9 @@ for row in rows:
     except:
         report(row, "Unrecognized error")
 
-cdrcgi.sendPage(header + table + "</TABLE></BODY></HTML>")
+cdrcgi.sendPage(header + table + """\
+   </TABLE>
+   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
+  </FORM>
+ </BODY>
+</HTML>""" % (cdrcgi.SESSION, session))
