@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: DatedActions.py,v 1.2 2002-03-13 17:02:59 bkline Exp $
+# $Id: DatedActions.py,v 1.3 2002-05-25 02:38:56 bkline Exp $
 #
 # Reports on dated actions for a particular document type.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/03/13 17:02:59  bkline
+# Fixed typo in report title.
+#
 # Revision 1.1  2002/03/13 16:58:07  bkline
 # New report for dated actions associated with a specified doc type.
 #
@@ -75,8 +78,16 @@ if not docType:
 parms  = (('DocType', docType),)
 name   = 'Dated Actions'
 report = cdr.report(session, name, parms)
-report = re.sub("<!\[CDATA\[", "", report)
-report = re.sub("\]\]>", "", report)
+report = re.sub(r"<!\[CDATA\[", "", report)
+report = re.sub(r"\]\]>", "", report)
+
+#cdrcgi.bail(report)
+# This is to get around a bug in the XML parser, which is reporting:
+# "xml processing instruction not at start of external entity" -
+# a bogus complaint.
+piPatt = re.compile(r"<\?.*?\?>", re.DOTALL)
+report = piPatt.sub("", report)
+
 report = xml.dom.minidom.parseString(report).documentElement
 now    = time.localtime(time.time())
 
