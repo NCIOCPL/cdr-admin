@@ -1,12 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryDateLastModified.py,v 1.1 2003-05-08 20:26:42 bkline Exp $
+# $Id: SummaryDateLastModified.py,v 1.2 2003-11-03 00:24:51 bkline Exp $
 #
 # Report listing specified set of Cancer Information Summaries, the date
 # they were last modified as entered by a user, and the date the last
 # Modify action was taken.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2003/05/08 20:26:42  bkline
+# New summary reports.
+#
 #----------------------------------------------------------------------
 import cdr, cdrdb, cdrcgi, cgi, re, time
 
@@ -16,15 +19,17 @@ import cdr, cdrdb, cdrcgi, cgi, re, time
 fields      = cgi.FieldStorage()
 session     = cdrcgi.getSession(fields)
 request     = cdrcgi.getRequest(fields)
-summaryType = fields and fields.getvalue('SummaryType') or None
-audience    = fields and fields.getvalue('Audience')    or None
-startDate   = fields and fields.getvalue('StartDate')   or None
-endDate     = fields and fields.getvalue('EndDate')     or None
+summaryType = fields and fields.getvalue('SummaryType')   or None
+audience    = fields and fields.getvalue('Audience')      or None
+uStartDate  = fields and fields.getvalue('UserStartDate') or None
+uEndDate    = fields and fields.getvalue('UserEndDate')   or None
+sStartDate  = fields and fields.getvalue('SysStartDate')  or None
+sEndDate    = fields and fields.getvalue('SysEndDate')    or None
 SUBMENU     = "Report Menu"
 buttons     = ["Submit", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 script      = "SummaryDateLastModified.py"
 title       = "CDR Administration"
-section     = "Pre-Mailer Protocol Check"
+section     = "Summary Date Last Modified"
 header      = cdrcgi.header(title, title, section, script, buttons)
 
 #----------------------------------------------------------------------
@@ -118,20 +123,21 @@ def trim(s):
 #----------------------------------------------------------------------
 # Put up the menu if we don't have selection criteria yet.
 #----------------------------------------------------------------------
-if not audience or not startDate or not endDate:
-    now = time.time()
-    now         = time.localtime(time.time())
-    toDate      = time.strftime("%Y-%m-%d", now)
-    then        = list(now)
-    then[1]    -= 1
-    then[2]    += 1
-    then        = time.localtime(time.mktime(then))
-    fromDate    = time.strftime("%Y-%m-%d", then)
+if not audience or ((not uStartDate or not uEndDate) and
+                    (not sStartDate or not sEndDate)):
+    #now = time.time()
+    #now         = time.localtime(time.time())
+    #toDate      = time.strftime("%Y-%m-%d", now)
+    #then        = list(now)
+    #then[1]    -= 1
+    #then[2]    += 1
+    #then        = time.localtime(time.mktime(then))
+    #fromDate    = time.strftime("%Y-%m-%d", then)
     form = """\
-   <h4>Select Summary board, audience, and date range for report
+   <h4>Select Summary board, Audience, and Date Range by user or system
        and press Submit
    </h4>
-   <input type='hidden' name='%s' value='%s'>
+   <input type='hidden' name='%s' value='%s' width='100%%'>
    <table border='0'>
     <tr>
      <td align='right' nowrap='1'>PDQ Board:&nbsp;</td>
@@ -142,16 +148,38 @@ if not audience or not startDate or not endDate:
      <td>%s</td>
     </tr>
     <tr>
-     <td align='right' nowrap='1'>Date Last Modified:&nbsp;</td>
-     <td><input size='20' name='StartDate' value='%s'></td>
+     <td>&nbsp;</td>
+     <td>&nbsp;<br><b>Report by Date Last Modified (User):</b></td>
     </tr>
     <tr>
-     <td align='right' nowrap='1'>&nbsp;</td>
-     <td><input size='20' name='EndDate' value='%s'></td>
+     <td align='right' nowrap='1'>Start Date:&nbsp;</td>
+     <td><input size='20' name='UserStartDate' value='%s'>
+      &nbsp;(use YYYY-MM-DD for dates, e.g. 2003-01-01
+     </td>
+    </tr>
+    <tr>
+     <td align='right' nowrap='1'>End Date:&nbsp;</td>
+     <td><input size='20' name='UserEndDate' value='%s'></td>
+    </tr>
+    <tr>
+     <td colspan='2'>&nbsp;<br><hr><br></td>
+    </tr>
+    <tr>
+     <td>&nbsp;</td>
+     <td><b>Report by Last Modified Date (System):</b></td>
+    </tr>
+    <tr>
+     <td align='right' nowrap='1'>Start Date:&nbsp;</td>
+     <td><input size='20' name='SysStartDate' value='%s'></td>
+    </tr>
+    <tr>
+     <td align='right' nowrap='1'>End Date:&nbsp;</td>
+     <td><input size='20' name='SysEndDate' value='%s'></td>
     </tr>
    </table>
 """ % (cdrcgi.SESSION, session, getSummaryTypeList(cursor),
-       getAudienceList(cursor), fromDate, toDate)
+       getAudienceList(cursor), '', '', '', '')
+    #fromDate, toDate, fromDate, toDate)
     cdrcgi.sendPage(header + form + """\
  </body>
 </html>
@@ -163,6 +191,17 @@ if not audience or not startDate or not endDate:
 boardFilter = "AND bn.value LIKE '%Editorial Board'"
 if summaryType:
     boardFilter = "AND bn.doc_id = %s" % summaryType
+
+if uStartDate and uEndDate:
+    sStartDate = '1853-01-01'
+    sEndDate   = '9999-12-30'  # Yow!  Y10K bug! :->}
+    startDate  = uStartDate
+    endDate    = uEndDate
+else:
+    uStartDate = '1853-01-01'
+    uEndDate   = '9999-12-30'  # Don't do 9999-12-31 (avoid overflow below)
+    startDate  = sStartDate
+    endDate    = sEndDate
 try:
     cursor.execute("""\
         SELECT DISTINCT st.doc_id,
@@ -190,18 +229,32 @@ try:
                     AND bn.path = '/Organization/OrganizationNameInformation'
                                 + '/OfficialName/Name'
                     AND au.value = ?
-                    AND lm.value BETWEEN ? AND DATEADD(s, -1, DATEADD(d, 1, ?))
+                    
+                    /*
+                     * Have to convert second date back to VARCHAR(40)
+                     * using style 20 (YYYY-MM-DD ...) to avoid blowing
+                     * up in the face of invalid date strings in the
+                     * documents.
+                     */
+                    AND lm.value BETWEEN '%s'
+                                 AND CONVERT(VARCHAR(40),
+                                             DATEADD(s, -1,
+                                                     DATEADD(d, 1, '%s')), 20)
                     %s
                GROUP BY bn.value,
                         au.value,
                         st.value,
                         st.doc_id,
                         lm.value
+                 HAVING MAX(audit_trail.dt) BETWEEN '%s' AND
+                                            DATEADD(s, -1, DATEADD(d, 1, '%s'))
                ORDER BY bn.value,
                         au.value,
-                        st.value""" % boardFilter, (audience,
-                                                    startDate,
-                                                    endDate), timeout = 300)
+                        st.value""" % (uStartDate,
+                                       uEndDate,
+                                       boardFilter,
+                                       sStartDate,
+                                       sEndDate), (audience,), timeout = 300)
     row = cursor.fetchone()
 except cdrdb.Error, info:
     cdrcgi.bail('Failure retrieving report information: %s' % info[1][0])
@@ -244,6 +297,18 @@ html = """\
 lastBoard = None
 while row:
     docId, title, board, audience, lastMod, auditDate = row
+    docId = "CDR%d" % docId
+    lastVersions = cdr.lastVersions('guest', docId)
+    if type(lastVersions) in (type(""), type(u"")):
+        lastVFlag = lastVersions
+    else:
+        lastAny, lastPub, isChanged = lastVersions
+        if lastAny == -1:
+            lastVFlag = 'N/A'
+        elif lastAny == lastPub:
+            lastVFlag = 'Y'
+        else:
+            lastVFlag = 'N'
     if lastBoard != board:
         if lastBoard:
             html += """\
@@ -256,21 +321,23 @@ while row:
   <table border='1' cellpadding='2' cellspacing='0'>
    <tr>
     <th width='500'>Summary Title</th>
-    <th width='150'>DocID</th>
-    <th width='120'>Date Last Modified (User)</th>
-    <th width='120'>Last Modify Action Date (System)</th>
+    <th width='100'>DocID</th>
+    <th width='100'>Date Last Modified (User)</th>
+    <th width='100'>Last Modify Action Date (System)</th>
+    <th width='50'>LastV Publish?</th>
    </tr>
 """ % (board, audience)
         lastBoard = board
     html += """\
    <tr>
     <td>%s</td>
-    <td valign='top'>CDR%010d</td>
     <td valign='top'>%s</td>
     <td valign='top'>%s</td>
+    <td valign='top'>%s</td>
+    <td valign='top' align='center'>%s</td>
    </tr>
 """ % (cgi.escape(title), docId, lastMod,
-       auditDate and auditDate[:10] or "&nbsp;")
+       auditDate and auditDate[:10] or "&nbsp;", lastVFlag)
     try:
         row = cursor.fetchone()
     except cdrdb.Error, info:
