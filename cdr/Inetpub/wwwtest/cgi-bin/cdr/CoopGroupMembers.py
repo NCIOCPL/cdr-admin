@@ -1,13 +1,16 @@
 #----------------------------------------------------------------------
 #
-# $Id: CoopGroupMembers.py,v 1.1 2002-06-04 20:16:45 bkline Exp $
+# $Id: CoopGroupMembers.py,v 1.2 2004-03-08 17:48:12 venglisc Exp $
 #
 # Generates a report on member organizations and their principal
 # investigators for a selected cooperative group.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2002/06/04 20:16:45  bkline
+# New report for member orgs and PIs of cooperative groups.
+#
 #----------------------------------------------------------------------
-import cdrdb, cdrcgi, cgi, time
+import cdrdb, cdrcgi, cgi, time, re
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -16,6 +19,7 @@ fields     = cgi.FieldStorage()
 session    = cdrcgi.getSession(fields)
 request    = cdrcgi.getRequest(fields)
 coopGroup  = fields and fields.getvalue('CoopGroup') or None
+coopGrpId  = fields and fields.getvalue('CoopGroupId') or None
 SUBMENU   = "Report Menu"
 buttons   = ["Submit Request", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 script    = "CoopGroupMembers.py"
@@ -74,19 +78,42 @@ SELECT DISTINCT d.id,
 #----------------------------------------------------------------------
 # If we don't have a request, put up the request form.
 #----------------------------------------------------------------------
-if not coopGroup:
+if not coopGroup and not coopGrpId:
     header = cdrcgi.header(title, title, section, script, buttons)
     form   = """\
-   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-   <B>Organization:&nbsp;</B>
-   <SELECT NAME='CoopGroup'>
+    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
+    <TABLE>
+     <TR>
+      <TD align='right'>Organization ID:</TD>
+      <TD><INPUT size='20' NAME='CoopGroupId'></TD>
+     </TR>
+     <TR>
+      <TD>or</TD>
+     </TR>
+     <TR>
+      <TD>Organization:</TD>
+      <TD>
+       <SELECT NAME='CoopGroup'>
 """ % (cdrcgi.SESSION, session)
+
     for grp in getGroups():
         form += """\
-    <OPTION VALUE='%d'>[CDR%010d] %s</OPTION>
-""" % (grp[0], grp[0], grp[1])
+        <OPTION VALUE='%d'>[CDR%d] %s</OPTION>
+""" % (grp[0], grp[0], grp[1][:80])
+
     cdrcgi.sendPage(header + form + """\
-   </SELECT>
+       </SELECT>
+      </TD>
+     </TR>
+     <TR>
+      <TD></TD>
+      <TD>
+       <font size="-1">
+        <B>Note: Org Name truncated at 80 chars</B>
+       </font>
+      </TD>
+     </TR>
+    </TABLE>
   </FORM>
  </BODY>
 </HTML>
@@ -109,7 +136,14 @@ except:
 #----------------------------------------------------------------------
 # We have a request; do it.
 #----------------------------------------------------------------------
-docId = int(coopGroup)
+# If a Org ID has been entered manually format it and use it.
+# Otherwise use the selected Org from the pick list.
+# -----------------------------------------------------------
+if coopGrpId:
+   docId = int(re.sub('[\D+]', '', coopGrpId))
+else:
+   docId = int(coopGroup)
+
 html = """\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>
