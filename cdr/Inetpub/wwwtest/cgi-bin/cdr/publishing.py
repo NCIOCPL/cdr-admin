@@ -2,8 +2,11 @@
 #
 # Publishing CGI script.
 #
-# $Id: publishing.py,v 1.4 2002-02-20 22:39:53 pzhang Exp $
+# $Id: publishing.py,v 1.5 2002-02-21 15:20:35 bkline Exp $
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2002/02/20 22:39:53  pzhang
+# Changed module publish to cdrpub.
+#
 # Revision 1.3  2002/02/07 14:45:52  mruben
 # added no output option
 #
@@ -185,7 +188,7 @@ class Display:
         <input type="checkbox" name="NoOutput" value="Y"><br><br>
         <input type="submit" name="Publish" value="Yes">&nbsp;&nbsp;
         <input type="submit" name="Publish" value="No">"""
-           
+        form += HIDDEN % (cdrcgi.SESSION, session)   
         cdrcgi.sendPage(header + form + "</FORM></BODY></HTML>")
     
     # Publish and return a link for checking status.
@@ -239,6 +242,7 @@ class Display:
         <LI><A HREF="%s/Logout.py?%s=%s">%s</A></LI>
         </OL>
         """ % (cdrcgi.BASE, cdrcgi.SESSION, session, "Log Out")
+        form += HIDDEN % (cdrcgi.SESSION, session)   
         cdrcgi.sendPage(header + form + "</FORM></BODY></HTML>")
 
     def __initHiddenValues(self):
@@ -263,14 +267,21 @@ class Display:
 #----------------------------------------------------------------------
 fields  = cgi.FieldStorage()
 session = cdrcgi.getSession(fields)
+action  = cdrcgi.getRequest(fields)
 title   = "CDR Administration"
 section = "Publishing"
-buttons = []
+buttons = [cdrcgi.MAINMENU]
 header  = cdrcgi.header(title, title, section, "Publishing.py", buttons)
-HIDDEN = """<INPUT TYPE='HIDDEN' NAME='%s' VALUE='%s'>\n"""
+HIDDEN = """<INPUT TYPE='HIDDEN' NAME='%s' VALUE='%s'>"""
 
 # !!! Disable standout in publish.py. !!!
 cdrpub.NCGI = 0
+
+#----------------------------------------------------------------------
+# Return to the main menu if requested.
+#----------------------------------------------------------------------
+if action == cdrcgi.MAINMENU:
+    cdrcgi.navigateTo("Admin.py", session)
 
 # Initialize Display class.
 # This class is not much helpful yet.

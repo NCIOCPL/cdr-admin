@@ -1,19 +1,40 @@
 #----------------------------------------------------------------------
 #
-# $Id: CheckUrls.py,v 1.1 2001-12-01 18:11:44 bkline Exp $
+# $Id: CheckUrls.py,v 1.2 2002-02-21 15:22:02 bkline Exp $
 #
 # Reports on URLs which cannot be reached.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2001/12/01 18:11:44  bkline
+# Initial revision
+#
 #----------------------------------------------------------------------
 import httplib, urlparse, socket, cdrdb, cdrcgi
+
+#----------------------------------------------------------------------
+# Set the form variables.
+#----------------------------------------------------------------------
+fields  = cgi.FieldStorage()
+session = cdrcgi.getSession(fields)
+request = cdrcgi.getRequest(fields)
+SUBMENU = 'Report Menu'
+
+#----------------------------------------------------------------------
+# Handle navigation requests.
+#----------------------------------------------------------------------
+if request == cdrcgi.MAINMENU:
+    cdrcgi.navigateTo("Admin.py", session)
+elif request == SUBMENU:
+    cdrcgi.navigateTo("reports.py", session)
 
 #----------------------------------------------------------------------
 # Start the page.
 #----------------------------------------------------------------------
 header = cdrcgi.header('CDR Report on Inactive Hyperlinks',
                        'CDR Reports',
-                       'Inactive Hyperlinks')
+                       'Inactive Hyperlinks',
+                       'CheckUrls.py',
+                       (SUBMENU, cdrcgi.MAINMENU))
 table  = """\
 <TABLE BORDER='0' WIDTH='100%' CELLSPACING='1' CELLPADDING='2'>
  <TR BGCOLOR='silver'>

@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: LinkedDocs.py,v 1.1 2002-01-22 21:36:08 bkline Exp $
+# $Id: LinkedDocs.py,v 1.2 2002-02-21 15:22:03 bkline Exp $
 #
 # Reports on documents which link to a specified document.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2002/01/22 21:36:08  bkline
+# Initial revision
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string, cdrdb, time
 
@@ -21,7 +24,16 @@ request  = cdrcgi.getRequest(fields)
 title    = "Linked Documents Report"
 instr    = "Report on documents which link to a specified document"
 script   = "LinkedDocs.py"
-buttons  = ()
+SUBMENU  = 'Report Menu'
+buttons  = (SUBMENU, cdrcgi.MAINMENU)
+
+#----------------------------------------------------------------------
+# Handle navigation requests.
+#----------------------------------------------------------------------
+if request == cdrcgi.MAINMENU:
+    cdrcgi.navigateTo("Admin.py", session)
+elif request == SUBMENU:
+    cdrcgi.navigateTo("reports.py", session)
 
 #----------------------------------------------------------------------
 # Set up a database connection and cursor.
@@ -188,7 +200,9 @@ SELECT DISTINCT d.id, d.title, t.name, n.source_elem, n.target_frag
 # Search for linked document by title, if so requested.
 #----------------------------------------------------------------------
 if docTitle:
-    header   = cdrcgi.header(title, title, instr, script, ("Submit",))
+    header   = cdrcgi.header(title, title, instr, script, ("Submit",
+                                                           SUBMENU,
+                                                           cdrcgi.MAINMENU))
     docTypes = getDocTypes()
     dtConstraint = ""
     if docType and docType != 'Any Type':
@@ -240,7 +254,9 @@ SELECT d.id, d.title
 #----------------------------------------------------------------------
 # Put up the main request form.
 #----------------------------------------------------------------------
-header   = cdrcgi.header(title, title, instr, script, ("Submit",))
+header   = cdrcgi.header(title, title, instr, script, ("Submit",
+                                                       SUBMENU,
+                                                       cdrcgi.MAINMENU))
 docTypes = getDocTypes()
 form     = """\
    <H3>Report On Specific Document ID</H3>

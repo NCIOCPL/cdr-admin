@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditGroup.py,v 1.1 2001-06-13 22:16:32 bkline Exp $
+# $Id: EditGroup.py,v 1.2 2002-02-21 15:22:02 bkline Exp $
 #
 # Prototype for editing a CDR group.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2001/06/13 22:16:32  bkline
+# Initial revision
+#
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
@@ -16,11 +19,20 @@ fields  = cgi.FieldStorage()
 session = cdrcgi.getSession(fields)
 request = cdrcgi.getRequest(fields)
 grpName = fields and fields.getvalue("grp") or None
+SUBMENU = "Group Menu"
 
 #----------------------------------------------------------------------
 # Make sure we have an active session.
 #----------------------------------------------------------------------
 if not session: cdrcgi.bail('Unknown or expired CDR session.')
+
+#----------------------------------------------------------------------
+# Handle navigation requests.
+#----------------------------------------------------------------------
+if request == cdrcgi.MAINMENU:
+    cdrcgi.navigateTo("Admin.py", session)
+elif request == SUBMENU:
+    cdrcgi.navigateTo("EditGroups.py", session)
 
 #----------------------------------------------------------------------
 # Handle request to log out.
@@ -65,7 +77,7 @@ if request == "Save Changes":
 #----------------------------------------------------------------------
 title   = "CDR Administration"
 section = "Edit Group Information"
-buttons = ["Save Changes", "Delete Group", "Log Out"]
+buttons = ["Save Changes", "Delete Group", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 script  = "EditGroup.py"
 #script  = "DumpParams.pl"
 header  = cdrcgi.header(title, title, section, script, buttons)

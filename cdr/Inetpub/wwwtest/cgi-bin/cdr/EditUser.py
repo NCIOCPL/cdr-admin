@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditUser.py,v 1.1 2001-06-13 22:16:32 bkline Exp $
+# $Id: EditUser.py,v 1.2 2002-02-21 15:22:03 bkline Exp $
 #
 # Prototype for editing a CDR user.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2001/06/13 22:16:32  bkline
+# Initial revision
+#
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
@@ -16,11 +19,20 @@ fields  = cgi.FieldStorage()
 session = cdrcgi.getSession(fields)
 request = cdrcgi.getRequest(fields)
 usrName = fields and fields.getvalue("usr") or None
+SUBMENU = "User Menu"
 
 #----------------------------------------------------------------------
 # Make sure we're logged in.
 #----------------------------------------------------------------------
 if not session: cdrcgi.bail('Unknown or expired CDR session.')
+
+#----------------------------------------------------------------------
+# Handle navigation requests.
+#----------------------------------------------------------------------
+if request == cdrcgi.MAINMENU:
+    cdrcgi.navigateTo("Admin.py", session)
+elif request == SUBMENU:
+    cdrcgi.navigateTo("EditUsers.py", session)
 
 #----------------------------------------------------------------------
 # Handle request to log out.
@@ -39,7 +51,7 @@ if request == "Delete User":
                     "System actions have already been recorded for this user."\
                   % usrName
         cdrcgi.bail(error)
-    cdrcgi.mainMenu(session, "Group %s Deleted Successfully" % usrName)
+    cdrcgi.mainMenu(session, "User %s Deleted Successfully" % usrName)
 
 #----------------------------------------------------------------------
 # Handle request to store changes to the user.
@@ -70,7 +82,7 @@ if request == "Save Changes":
 #----------------------------------------------------------------------
 title   = "CDR Administration"
 section = "Edit User Information"
-buttons = ["Save Changes", "Delete User", "Log Out"]
+buttons = ["Save Changes", "Delete User", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 #script  = "DumpParams.pl"
 script  = "EditUser.py"
 header  = cdrcgi.header(title, title, section, script, buttons)

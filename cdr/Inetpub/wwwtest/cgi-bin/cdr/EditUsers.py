@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditUsers.py,v 1.1 2001-06-13 22:16:32 bkline Exp $
+# $Id: EditUsers.py,v 1.2 2002-02-21 15:22:03 bkline Exp $
 #
 # Prototype for editing CDR groups.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2001/06/13 22:16:32  bkline
+# Initial revision
+#
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
@@ -14,15 +17,22 @@ import cgi, cdr, cdrcgi, re, string
 #----------------------------------------------------------------------
 fields  = cgi.FieldStorage()
 session = cdrcgi.getSession(fields)
+action  = cdrcgi.getRequest(fields)
 title   = "CDR Administration"
 section = "Manage Users"
-buttons = []
-header  = cdrcgi.header(title, title, section, "", buttons)
+buttons = [cdrcgi.MAINMENU]
+header  = cdrcgi.header(title, title, section, "EditUsers.py", buttons)
 
 #----------------------------------------------------------------------
 # Make sure the login was successful.
 #----------------------------------------------------------------------
 if not session: cdrcgi.bail('Unknown or expired CDR session.')
+
+#----------------------------------------------------------------------
+# Return to the main menu if requested.
+#----------------------------------------------------------------------
+if action == cdrcgi.MAINMENU:
+    cdrcgi.navigateTo("Admin.py", session)
 
 #----------------------------------------------------------------------
 # Retrieve the list of groups from the server.
@@ -35,7 +45,8 @@ if type(users) == type(""): cdrcgi.bail(users)
 #----------------------------------------------------------------------
 nUsers = 0
 USERS_PER_ROW = 7
-menu = "<TABLE>\n"
+menu = "<INPUT TYPE='hidden' NAME='%s' VALUE='%s'><TABLE>\n" % (cdrcgi.SESSION,
+                                                                session)
 padding = "<TD>&nbsp;&nbsp;</TD>"
 
 for user in users:

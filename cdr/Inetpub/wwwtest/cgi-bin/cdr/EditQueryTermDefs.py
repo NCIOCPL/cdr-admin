@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditQueryTermDefs.py,v 1.2 2001-12-01 18:02:48 bkline Exp $
+# $Id: EditQueryTermDefs.py,v 1.3 2002-02-21 15:22:03 bkline Exp $
 #
 # Prototype for editing CDR query term definitions.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2001/12/01 18:02:48  bkline
+# Enlarged path field size.
+#
 # Revision 1.1  2001/06/13 22:16:32  bkline
 # Initial revision
 #
@@ -19,7 +22,7 @@ fields  = cgi.FieldStorage()
 session = cdrcgi.getSession(fields)
 title   = "CDR Administration"
 section = "Manage Query Term Definitions"
-buttons = ["Log Out"]
+buttons = [cdrcgi.MAINMENU, "Log Out"]
 script  = "EditQueryTermDefs.py"
 #script  = "DumpParams.py"
 header  = cdrcgi.header(title, title, section, script, buttons)
@@ -60,6 +63,12 @@ if deleteKey:
     if err: cdrcgi.bail(err)
 request = fields.getvalue(cdrcgi.REQUEST)
 if request == "Log Out": cdrcgi.logout(session)
+
+#----------------------------------------------------------------------
+# Return to the main menu if requested.
+#----------------------------------------------------------------------
+if request == cdrcgi.MAINMENU:
+    cdrcgi.navigateTo("Admin.py", session)
 
 #----------------------------------------------------------------------
 # Retrieve the lists of rules and query term definitions from the server.

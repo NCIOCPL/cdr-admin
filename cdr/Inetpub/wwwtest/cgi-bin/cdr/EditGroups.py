@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditGroups.py,v 1.2 2002-02-20 23:59:44 bkline Exp $
+# $Id: EditGroups.py,v 1.3 2002-02-21 15:22:02 bkline Exp $
 #
 # Prototype for editing CDR groups.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/02/20 23:59:44  bkline
+# Added button for returning to main Admin menu.
+#
 # Revision 1.1  2001/06/13 22:16:32  bkline
 # Initial revision
 #
@@ -20,7 +23,7 @@ session = cdrcgi.getSession(fields)
 action  = cdrcgi.getRequest(fields)
 title   = "CDR Administration"
 section = "Manage Groups"
-buttons = ["Return to Admin Main Menu"]
+buttons = [cdrcgi.MAINMENU]
 header  = cdrcgi.header(title, title, section, "EditGroups.py", buttons)
 
 #----------------------------------------------------------------------
@@ -31,14 +34,8 @@ if not session: cdrcgi.bail('Unknown or expired CDR session.')
 #----------------------------------------------------------------------
 # Return to the main menu if requested.
 #----------------------------------------------------------------------
-if action == "Return to Admin Main Menu":
-    where = "http://%s%s/Admin.py?%s=%s" % (cdrcgi.WEBSERVER,
-                                            cdrcgi.BASE,
-                                            cdrcgi.SESSION,
-                                            session)
-    #cdrcgi.bail(where)
-    print "Location:%s\n" % where
-    sys.exit(0)
+if action == cdrcgi.MAINMENU:
+    cdrcgi.navigateTo("Admin.py", session)
 
 #----------------------------------------------------------------------
 # Retrieve the list of groups from the server.

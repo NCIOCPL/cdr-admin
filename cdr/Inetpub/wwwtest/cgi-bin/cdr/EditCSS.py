@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditCSS.py,v 1.2 2001-12-01 17:58:02 bkline Exp $
+# $Id: EditCSS.py,v 1.3 2002-02-21 15:22:02 bkline Exp $
 #
 # Prototype for editing CSS stylesheets.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2001/12/01 17:58:02  bkline
+# Added support for version and checkin parameters of repDoc().
+#
 # Revision 1.1  2001/06/13 22:28:28  bkline
 # Initial revision
 #
@@ -41,8 +44,17 @@ css     = fields.getvalue("Css")      or None
 name    = fields.getvalue("FileName") or None
 version = fields.getvalue("Version")  or None
 checkin = fields.getvalue("Checkin")  or None
+SUBMENU = "CSS Menu"
 if not session: cdrcgi.bail("Unable to log into CDR Server", banner)
 if not request: cdrcgi.bail("No request submitted", banner)
+
+#----------------------------------------------------------------------
+# Handle navigation requests.
+#----------------------------------------------------------------------
+if request == cdrcgi.MAINMENU:
+    cdrcgi.navigateTo("Admin.py", session)
+elif request == SUBMENU:
+    cdrcgi.navigateTo("EditCSSs.py", session)
 
 #----------------------------------------------------------------------
 # Display the CDR document form.
@@ -84,13 +96,14 @@ if request in ("Load", "Fetch"):
              doc.blob, 
              doc.id, 
              "Editing existing document", 
-            ("New", "Save", "Clone"))
+            ("New", "Save", "Clone", SUBMENU, cdrcgi.MAINMENU))
 
 #----------------------------------------------------------------------
 # Create a template for a new document.
 #----------------------------------------------------------------------
 elif request == 'New':
-    showForm("", "", "", "Editing new document", ("Save",))
+    showForm("", "", "", "Editing new document", 
+            ("Save", SUBMENU, cdrcgi.MAINMENU))
 
 #--------------------------------------------------------------------
 # Create a new document using the existing data.
@@ -98,7 +111,8 @@ elif request == 'New':
 elif request == 'Clone':
     if not css:
         cdrcgi.bail("No document to clone")
-    showForm('', css, '', "Editing new document", ("New", "Save"))
+    showForm('', css, '', "Editing new document", 
+            ("New", "Save", SUBMENU, cdrcgi.MAINMENU))
 
 #--------------------------------------------------------------------
 # Save the changes to the current document.
@@ -128,7 +142,7 @@ Location:http://mmdb2.nci.nih.gov/cgi-bin/cdr/EditCSSs.py?%s=%s
              doc.blob, 
              doc.id, 
              "Editing existing document", 
-            ("New", "Save", "Clone"))
+            ("New", "Save", "Clone", SUBMENU, cdrcgi.MAINMENU))
 
 #----------------------------------------------------------------------
 # Tell the user we don't know how to do what he asked.

@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ShowAllLinkTypes.py,v 1.2 2001-08-06 18:34:58 bkline Exp $
+# $Id: ShowAllLinkTypes.py,v 1.3 2002-02-21 15:22:03 bkline Exp $
 #
 # Displays a table containing information about all link types.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2001/08/06 18:34:58  bkline
+# Switched to new cdrdb modlue.
+#
 # Revision 1.1  2001/06/13 22:16:32  bkline
 # Initial revision
 #
@@ -18,11 +21,20 @@ import cgi, cdr, cdrcgi, re, string, dbi, cdrdb
 fields  = cgi.FieldStorage()
 session = cdrcgi.getSession(fields)
 request = cdrcgi.getRequest(fields)
+SUBMENU = "Link Menu"
 
 #----------------------------------------------------------------------
 # Make sure we're logged in.
 #----------------------------------------------------------------------
 if not session: cdrcgi.bail('Unknown or expired CDR session.')
+
+#----------------------------------------------------------------------
+# Handle navigation requests.
+#----------------------------------------------------------------------
+if request == cdrcgi.MAINMENU:
+    cdrcgi.navigateTo("Admin.py", session)
+elif request == SUBMENU:
+    cdrcgi.navigateTo("EditLinkControl.py", session)
 
 #----------------------------------------------------------------------
 # Handle request to log out.
@@ -35,7 +47,7 @@ if request == "Log Out":
 #----------------------------------------------------------------------
 title   = "CDR Administration"
 section = "Show All Link Types"
-buttons = ["Log Out"]
+buttons = [SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 #script  = "DumpParams.pl"
 script  = "ShowAllLinkTypes.py"
 header  = cdrcgi.header(title, title, section, script, buttons)

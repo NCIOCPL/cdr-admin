@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PdqBoards.py,v 1.2 2002-02-20 23:06:34 bkline Exp $
+# $Id: PdqBoards.py,v 1.3 2002-02-21 15:22:03 bkline Exp $
 #
 # Report on PDQ Board members and topics.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/02/20 23:06:34  bkline
+# Multiple enhancements made at users' request.
+#
 # Revision 1.1  2002/01/22 21:35:35  bkline
 # Initial revision
 #
@@ -23,13 +26,22 @@ request   = cdrcgi.getRequest(fields)
 title     = "PDQ Board Report"
 instr     = "Report on PDQ Board Members and Topics"
 script    = "PdqBoards.py"
-buttons   = ()
+SUBMENU   = "Report Menu"
+buttons   = (SUBMENU, cdrcgi.MAINMENU)
 stPath    = '/Summary/SummaryTitle'
 sbPath    = '/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref'
 sbmPath   = '/Summary/SummaryMetaData/PDQBoard/BoardMember/@cdr:ref'
 trimPat   = re.compile("[\s;]+$")
 bmPath    = '/Person/ProfessionalInformation/PDQBoardMembershipDetails/PDQ'\
             '%Board/@cdr:ref'
+
+#----------------------------------------------------------------------
+# Handle navigation requests.
+#----------------------------------------------------------------------
+if request == cdrcgi.MAINMENU:
+    cdrcgi.navigateTo("Admin.py", session)
+elif request == SUBMENU:
+    cdrcgi.navigateTo("reports.py", session)
 
 #----------------------------------------------------------------------
 # Set up a database connection and cursor.
@@ -96,8 +108,11 @@ SELECT DISTINCT board.id, board.title
 # If we don't have a request, put up the form.
 #----------------------------------------------------------------------
 if not boardInfo:
-    header   = cdrcgi.header(title, title, instr, script, ("Submit",))
+    header   = cdrcgi.header(title, title, instr, script, ("Submit",
+                                                           SUBMENU,
+                                                           cdrcgi.MAINMENU))
     form     = """\
+      <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
       <TABLE>
        <TR>
         <TD ALIGN='right'><B>PDQ Board:&nbsp;</B></TD>
@@ -127,7 +142,7 @@ if not boardInfo:
       </FORM>
      </BODY>
     </HTML>
-""" % (getBoardPicklist(), getAudiencePicklist())
+""" % (cdrcgi.SESSION, session, getBoardPicklist(), getAudiencePicklist())
     cdrcgi.sendPage(header + form)
 
 #----------------------------------------------------------------------
@@ -162,9 +177,10 @@ if repType == 'ByTopic':
     instr     = 'Board report by topics -- %s.' % dateString
     header    = cdrcgi.header(title, title, instr, script, buttons)
     report    = """\
+   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
   </FORM>
   <H4>Topics for %s</H4>
-""" % boardName
+""" % (cdrcgi.SESSION, session, boardName)
     try:
         cursor.execute("""\
 SELECT DISTINCT board_member.id, board_member.title,
@@ -222,9 +238,10 @@ header    = cdrcgi.header(title, title, instr, script, buttons)
 members   = {}
 topics    = {}
 report    = """\
+   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
   </FORM>
   <H4>Topics for %s</H4>
-""" % boardName
+""" % (cdrcgi.SESSION, session, boardName)
 
 #----------------------------------------------------------------------
 # Type for storing board member information.

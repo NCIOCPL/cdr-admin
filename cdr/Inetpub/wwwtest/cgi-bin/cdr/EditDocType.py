@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------
-# $Id: EditDocType.py,v 1.2 2001-12-01 17:59:37 bkline Exp $
+# $Id: EditDocType.py,v 1.3 2002-02-21 15:22:02 bkline Exp $
 #
 # Prototype for editing CDR document types.
 #----------------------------------------------------------------------
@@ -8,7 +8,6 @@
 # Import required modules.
 #----------------------------------------------------------------------
 import cgi, cdr, re, cdrcgi, sys
-
 
 #----------------------------------------------------------------------
 # Load the fields from the form.
@@ -28,6 +27,15 @@ _created   = fields and fields.getvalue("_created") or None
 dtinfo     = None
 enumSets   = None
 changed    = 0
+SUBMENU    = "DocType Menu"
+
+#----------------------------------------------------------------------
+# Handle navigation requests.
+#----------------------------------------------------------------------
+if request == cdrcgi.MAINMENU:
+    cdrcgi.navigateTo("Admin.py", session)
+elif request == SUBMENU:
+    cdrcgi.navigateTo("EditDocTypes.py", session)
 
 #----------------------------------------------------------------------
 # Get or store the document type information if requested.
@@ -123,10 +131,12 @@ html = html + """\
      <TD>
       <INPUT NAME='doctype' VALUE='%s'>&nbsp;&nbsp;&nbsp;
       <INPUT TYPE='submit' NAME='request' VALUE='Retrieve'>&nbsp;&nbsp;&nbsp;
-      <INPUT TYPE='submit' NAME='request' VALUE='Store'>
+      <INPUT TYPE='submit' NAME='request' VALUE='Store'>&nbsp;&nbsp;&nbsp;
+      <INPUT TYPE='submit' NAME='request' VALUE='%s'>&nbsp;&nbsp;&nbsp;
+      <INPUT TYPE='submit' NAME='request' VALUE='%s'>
      </TD>
     </TR>
-""" % (doctype or '')
+""" % (doctype or '', SUBMENU, cdrcgi.MAINMENU)
 
 #----------------------------------------------------------------------
 # Put up the rest of the form if appropriate.

@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditActions.py,v 1.1 2001-06-13 22:16:32 bkline Exp $
+# $Id: EditActions.py,v 1.2 2002-02-21 15:22:02 bkline Exp $
 #
 # Prototype for editing CDR groups.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2001/06/13 22:16:32  bkline
+# Initial revision
+#
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string, urllib
@@ -14,15 +17,22 @@ import cgi, cdr, cdrcgi, re, string, urllib
 #----------------------------------------------------------------------
 fields  = cgi.FieldStorage()
 session = cdrcgi.getSession(fields)
+action  = cdrcgi.getRequest(fields)
 title   = "CDR Administration"
 section = "Manage Actions"
-buttons = []
-header  = cdrcgi.header(title, title, section, "", buttons)
+buttons = [cdrcgi.MAINMENU]
+header  = cdrcgi.header(title, title, section, "EditActions.py", buttons)
 
 #----------------------------------------------------------------------
 # Make sure the login was successful.
 #----------------------------------------------------------------------
 if not session: cdrcgi.bail('Unknown or expired CDR session.')
+
+#----------------------------------------------------------------------
+# Return to the main menu if requested.
+#----------------------------------------------------------------------
+if action == cdrcgi.MAINMENU:
+    cdrcgi.navigateTo("Admin.py", session)
 
 #----------------------------------------------------------------------
 # Retrieve the list of groups from the server.
@@ -56,7 +66,9 @@ menu += """\
 <TR>%s<TD COLSPAN='3'><A HREF="%s/EditAction.py?%s=%s"><B>%s</B></A></TD></TR>
 <TR>%s<TD COLSPAN='3'><A HREF="%s/Logout.py?%s=%s"><B>%s</B></A></TD></TR>
 </TABLE>
+<INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
 """ % (padding, cdrcgi.BASE, cdrcgi.SESSION, session, "ADD NEW ACTION",
-       padding, cdrcgi.BASE, cdrcgi.SESSION, session, "LOG OUT")
+       padding, cdrcgi.BASE, cdrcgi.SESSION, session, "LOG OUT",
+       cdrcgi.SESSION, session)
 
 cdrcgi.sendPage(header + menu + "</FORM></BODY></HTML>")

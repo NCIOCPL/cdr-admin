@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: Reports.py,v 1.3 2002-01-22 21:32:01 bkline Exp $
+# $Id: Reports.py,v 1.4 2002-02-21 15:22:03 bkline Exp $
 #
 # Prototype for editing CDR linking tables.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2002/01/22 21:32:01  bkline
+# Added three new reports.
+#
 # Revision 1.2  2001/12/01 18:07:34  bkline
 # Added some new reports.
 #
@@ -20,15 +23,23 @@ import cgi, cdr, cdrcgi, re, string
 #----------------------------------------------------------------------
 fields  = cgi.FieldStorage()
 session = cdrcgi.getSession(fields)
+action  = cdrcgi.getRequest(fields)
 title   = "CDR Administration"
 section = "Reports"
-buttons = []
-header  = cdrcgi.header(title, title, section, "", buttons)
+buttons = [cdrcgi.MAINMENU]
+header  = cdrcgi.header(title, title, section, "reports.py", buttons)
 
 #----------------------------------------------------------------------
-# Put up a stub page for now.
+# Return to the main menu if requested.
 #----------------------------------------------------------------------
-form = "<OL>\n"
+if action == cdrcgi.MAINMENU:
+    cdrcgi.navigateTo("Admin.py", session)
+
+#----------------------------------------------------------------------
+# Display available report choices.
+#----------------------------------------------------------------------
+form = "<INPUT TYPE='hidden' NAME='%s' VALUE='%s'><OL>\n" % (cdrcgi.SESSION,
+                                                             session)
 reports = [('CdrReport.py', 'Inactive Documents'),
            ('LinkedDocs.py', 'Linked Documents'),
            ('PdqBoards.py', 'PDQ Boards'),

@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: UnchangedDocs.py,v 1.1 2001-12-01 18:11:44 bkline Exp $
+# $Id: UnchangedDocs.py,v 1.2 2002-02-21 15:22:03 bkline Exp $
 #
 # Reports on documents unchanged for a specified number of days.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2001/12/01 18:11:44  bkline
+# Initial revision
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string, cdrdb
 
@@ -12,10 +15,20 @@ import cgi, cdr, cdrcgi, re, string, cdrdb
 # Set the form variables.
 #----------------------------------------------------------------------
 fields  = cgi.FieldStorage()
+session = cdrcgi.getSession(fields)
+request = cdrcgi.getRequest(fields)
 days    = fields and fields.getvalue("Days")    or None
 type    = fields and fields.getvalue("DocType") or None
 maxRows = fields and fields.getvalue("MaxRows") or None
-request = cdrcgi.getRequest(fields)
+SUBMENU = 'Report Menu'
+
+#----------------------------------------------------------------------
+# Handle navigation requests.
+#----------------------------------------------------------------------
+if request == cdrcgi.MAINMENU:
+    cdrcgi.navigateTo("Admin.py", session)
+elif request == SUBMENU:
+    cdrcgi.navigateTo("reports.py", session)
 
 #----------------------------------------------------------------------
 # Create a picklist for document types.
@@ -78,16 +91,17 @@ if request:
 
     title   = "Documents Unchanged for %d Days" % days
     instr   = "Document type: %s" % type
-    buttons = ()
+    buttons = (SUBMENU, cdrcgi.MAINMENU)
     header  = cdrcgi.header(title, title, instr, "UnchangedDocs.py", buttons)
     html    = """\
+<INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
 <TABLE BORDER='0' WIDTH='100%%' CELLSPACING='1' CELLPADDING='1'>
  <TR BGCOLOR='silver' VALIGN='top'>
   <TD ALIGN='center'><FONT SIZE='-1'><B>Doc ID</B></FONT></TD>
   <TD ALIGN='center'><FONT SIZE='-1'><B>Title</B></FONT></TD>
   <TD ALIGN='center'><FONT SIZE='-1'><B>Last Change</B></FONT></TD>
  </TR>
-"""
+""" % (cdrcgi.SESSION, session)
     for row in rows:
         title = row[1].encode('latin-1')
         shortTitle = title[:100] 
@@ -101,7 +115,7 @@ if request:
 """ % (row[0],
        shortTitle,
        row[2][:10])
-    cdrcgi.sendPage(header + html + "</TABLE></BODY></HTML>")
+    cdrcgi.sendPage(header + html + "</TABLE></FORM></BODY></HTML>")
 
 #----------------------------------------------------------------------
 # Put out the form if we don't have a request.
@@ -119,7 +133,7 @@ SELECT DISTINCT name
         cdrcgi.bail('Database query failure: %s' % info[1][0])
     title   = "Unchanged Documents"
     instr   = "Select Options and Submit Request"
-    buttons = ("Submit Request",)
+    buttons = ("Submit Request", SUBMENU, cdrcgi.MAINMENU)
     header  = cdrcgi.header(title, title, instr, "UnchangedDocs.py", buttons)
     form    = """\
         <TABLE CELLSPACING='0' CELLPADDING='0' BORDER='0'>
@@ -136,8 +150,9 @@ SELECT DISTINCT name
           <TD><INPUT NAME='MaxRows' VALUE='1000'></TD>
         </TR>
        </TABLE>
+       <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
       </FORM>
      </BODY>
     </HTML>
-    """ % makePicklist(docTypes)
+    """ % (makePicklist(docTypes), cdrcgi.SESSION, session)
     cdrcgi.sendPage(header + form)

@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditDocTypes.py,v 1.1 2001-06-13 22:16:32 bkline Exp $
+# $Id: EditDocTypes.py,v 1.2 2002-02-21 15:22:02 bkline Exp $
 #
 # Prototype for editing CDR groups.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2001/06/13 22:16:32  bkline
+# Initial revision
+#
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
@@ -14,15 +17,22 @@ import cgi, cdr, cdrcgi, re, string
 #----------------------------------------------------------------------
 fields  = cgi.FieldStorage()
 session = cdrcgi.getSession(fields)
+action  = cdrcgi.getRequest(fields)
 title   = "CDR Administration"
 section = "Manage Document Types"
-buttons = []
-header  = cdrcgi.header(title, title, section, "", buttons)
+buttons = [cdrcgi.MAINMENU]
+header  = cdrcgi.header(title, title, section, "EditDocTypes.py", buttons)
 
 #----------------------------------------------------------------------
 # Make sure the login was successful.
 #----------------------------------------------------------------------
 if not session: cdrcgi.bail('Unknown or expired CDR session.')
+
+#----------------------------------------------------------------------
+# Return to the main menu if requested.
+#----------------------------------------------------------------------
+if action == cdrcgi.MAINMENU:
+    cdrcgi.navigateTo("Admin.py", session)
 
 #----------------------------------------------------------------------
 # Retrieve the list of groups from the server.
@@ -44,6 +54,8 @@ menu += """\
   <LI><A HREF="%s/EditDoctype.py?%s=%s">Add New Doctype</A></LI>
   <LI><A HREF="%s/Logout.py?%s=%s">Log Out</A></LI>
  </OL>
+ <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
 """ % (cdrcgi.BASE, cdrcgi.SESSION, session,
-       cdrcgi.BASE, cdrcgi.SESSION, session)
+       cdrcgi.BASE, cdrcgi.SESSION, session,
+       cdrcgi.SESSION, session)
 cdrcgi.sendPage(header + menu + "</BODY></HTML>")

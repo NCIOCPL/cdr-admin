@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditLinkType.py,v 1.2 2002-02-15 06:50:11 ameyer Exp $
+# $Id: EditLinkType.py,v 1.3 2002-02-21 15:22:02 bkline Exp $
 #
 # Prototype for editing a CDR link type.
 #
@@ -8,11 +8,15 @@
 # to read the values on the form.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/02/15 06:50:11  ameyer
+# Handling add/edit differences in both uses of this module - to
+# put up an edit form and to process the form after the user fills it in.
+#
 # Revision 1.1  2001/06/13 22:16:32  bkline
 # Initial revision
 #
-#
 #----------------------------------------------------------------------
+
 import cgi, cdr, cdrcgi, re, string, sys
 
 #----------------------------------------------------------------------
@@ -24,6 +28,7 @@ request = cdrcgi.getRequest(fields)
 name    = fields and fields.getvalue("name") or None
 linkForm= fields and fields.getvalue("linkform") or None
 extra   = ""
+SUBMENU = "Link Menu"
 
 #----------------------------------------------------------------------
 # If no linkForm, this is first time through, setup subsequent action
@@ -50,6 +55,14 @@ if not session: cdrcgi.bail('Unknown or expired CDR session.')
 #----------------------------------------------------------------------
 if request == "Log Out":
     cdrcgi.logout(session)
+
+#----------------------------------------------------------------------
+# Handle navigation requests.
+#----------------------------------------------------------------------
+if request == cdrcgi.MAINMENU:
+    cdrcgi.navigateTo("Admin.py", session)
+elif request == SUBMENU:
+    cdrcgi.navigateTo("EditLinkControl.py", session)
 
 #----------------------------------------------------------------------
 # Handle request to delete the link type - Future.
@@ -153,7 +166,7 @@ if linkAct == "addlink":
 else:
     section = "Edit Link Type"
 
-buttons = ["Save Changes", "Log Out"]
+buttons = ["Save Changes", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 #script  = "DumpParams.pl"
 script  = "EditLinkType.py"
 header  = cdrcgi.header(title, title, section, script, buttons)
