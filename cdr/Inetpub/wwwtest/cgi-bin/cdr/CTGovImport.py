@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: CTGovImport.py,v 1.3 2003-12-08 19:23:23 bkline Exp $
+# $Id: CTGovImport.py,v 1.4 2003-12-16 15:41:18 bkline Exp $
 #
 # User interface for selecting Protocols to be imported from
 # ClinicalTrials.gov.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2003/12/08 19:23:23  bkline
+# Modified code to show most recent trials first.
+#
 # Revision 1.2  2003/11/25 12:45:47  bkline
 # Opened NLM display of document in separate window at Lakshmi's request.
 #
@@ -14,7 +17,7 @@
 # ClinicalTrials.gov to determine their disposition.
 #
 #----------------------------------------------------------------------
-import cdr, cdrbatch, cgi, cdrcgi, cdrdb
+import cdr, cdrbatch, cgi, cdrcgi, cdrdb, time
 
 # Parse form variables
 fields   = cgi.FieldStorage()
@@ -45,17 +48,24 @@ def showList(skipPast, cursor):
         disposition = 'reviewed - need CIPS feedback'
         
     # Construct display headers in standard format
+    timeStr = str(time.time()).replace(".", "")
+    timeStr = ''.join([timeStr[-1 - i] for i in xrange(len(timeStr))])
     html = cdrcgi.header ("CDR Import from ClinicalTrials.gov",
                           "Import CTGov Documents",
                           subtitle,
                           "CTGovImport.py",
                           stylesheet = """\
   <script>
-	function openWindow(pageURL) {
-		windowName=window.open(pageURL,'ctgov')
-	}
+    <!--
+    function openWindow(id) {
+        var url        = "http://clinicaltrials.gov/ct/show/" + id;
+        var wn         = "ctg" + id + "%s"; // + id;
+        // alert(wn);
+        windowName = window.open(url, wn); //url,wn);
+    }
+    -->
   </script>
-""")
+""" % timeStr)
     # Add saved session
     html += """
     <input type='hidden' name='%s' value='%s' />
@@ -106,9 +116,8 @@ def showList(skipPast, cursor):
     else:
         values = ('Import', 'Out of scope', 'Duplicate')
     html += "<span style='font-family: arial'>\n"
-    base = "http://clinicaltrials.gov/ct/show/"
     for row in rows:
-        href = 'javascript:openWindow("%s%s")' % (base, row[0])
+        href = 'javascript:openWindow("%s")' % row[0]
         html += "<b><a href='%s'>%s</a></b> <i>%s</i><br>\n" % (href, #base,
                                                                   #row[0],
                                                                   row[0],
