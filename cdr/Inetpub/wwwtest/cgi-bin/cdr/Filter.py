@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: Filter.py,v 1.11 2002-09-19 21:16:02 pzhang Exp $
+# $Id: Filter.py,v 1.12 2002-09-20 16:24:24 pzhang Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.11  2002/09/19 21:16:02  pzhang
+# Sorted filterSets keys.
+#
 # Revision 1.10  2002/09/19 21:00:15  pzhang
 # Display all filter sets when no filter is given.
 #
@@ -58,7 +61,15 @@ filtId  = [filtId0,
            fields.getvalue(cdrcgi.FILTER + "4", ""),
            fields.getvalue(cdrcgi.FILTER + "5", ""),
            fields.getvalue(cdrcgi.FILTER + "6", ""),
-           fields.getvalue(cdrcgi.FILTER + "7", "")]
+           fields.getvalue(cdrcgi.FILTER + "7", ""),
+           fields.getvalue(cdrcgi.FILTER + "8", ""),
+           fields.getvalue(cdrcgi.FILTER + "9", ""),
+           fields.getvalue(cdrcgi.FILTER + "10", ""),
+           fields.getvalue(cdrcgi.FILTER + "11", ""),
+           fields.getvalue(cdrcgi.FILTER + "12", ""),
+           fields.getvalue(cdrcgi.FILTER + "13", ""),
+           fields.getvalue(cdrcgi.FILTER + "14", ""),
+           fields.getvalue(cdrcgi.FILTER + "15", "")]
 
 #----------------------------------------------------------------------
 # QC Filter Sets.
