@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
-# $Id: tsoap.py,v 1.1 2002-04-16 22:06:06 bkline Exp $
+# $Id: tsoap.py,v 1.2 2002-04-16 22:42:08 bkline Exp $
 #
 # Stub for SOAP interface to CDR from Cancer.gov.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2002/04/16 22:06:06  bkline
+# Stub SOAP server.  Does nothing but provide a harness for catching
+# a client message and sending back a response.
+#
 #----------------------------------------------------------------------
-import os, sys, xml.dom.minidom
+import os, sys
 
 #----------------------------------------------------------------------
 # Send an XML SOAP message back to the client.
@@ -28,14 +32,14 @@ Content-type: text/xml
 #----------------------------------------------------------------------
 # Send an error message back to the client.
 #----------------------------------------------------------------------
-def sendErrorMessage(msg, who = "Server", details = None):
+def sendErrorMessage(msg, code = "Server", details = None):
 
     # Start the fault element
     fault = """\
   <env:Fault>
    <faultcode>env:%s</faultcode>
    <faultstring>%s</faultstring>
-""" % (who, msg)
+""" % (code, msg)
 
     # Add option details if specified.
     if details:
