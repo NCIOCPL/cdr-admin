@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: Reports.py,v 1.4 2002-02-21 15:22:03 bkline Exp $
+# $Id: Reports.py,v 1.5 2002-02-26 18:55:29 bkline Exp $
 #
 # Prototype for editing CDR linking tables.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2002/02/21 15:22:03  bkline
+# Added navigation buttons.
+#
 # Revision 1.3  2002/01/22 21:32:01  bkline
 # Added three new reports.
 #
@@ -27,7 +30,7 @@ action  = cdrcgi.getRequest(fields)
 title   = "CDR Administration"
 section = "Reports"
 buttons = [cdrcgi.MAINMENU]
-header  = cdrcgi.header(title, title, section, "reports.py", buttons)
+header  = cdrcgi.header(title, title, section, "Reports.py", buttons)
 
 #----------------------------------------------------------------------
 # Return to the main menu if requested.
@@ -40,14 +43,16 @@ if action == cdrcgi.MAINMENU:
 #----------------------------------------------------------------------
 form = "<INPUT TYPE='hidden' NAME='%s' VALUE='%s'><OL>\n" % (cdrcgi.SESSION,
                                                              session)
-reports = [('CdrReport.py', 'Inactive Documents'),
-           ('LinkedDocs.py', 'Linked Documents'),
-           ('PdqBoards.py', 'PDQ Boards'),
-           ('UnchangedDocs.py', 'Unchanged Documents'),
-           ('CheckUrls.py', 'Inactive Hyperlinks'),
-           ('TermUsage.py', 'Term Usage'),
+reports = [
            ('ConceptTermReviewReport.py', 'Concept/Term Review Report'),
-           ('ModifiedPubMedDocs.py', 'Modified PubMed Documents')]
+           ('CdrReport.py', 'Inactive Documents'),
+           ('CheckUrls.py', 'Inactive Hyperlinks'),
+           ('LinkedDocs.py', 'Linked Documents'),
+           ('ModifiedPubMedDocs.py', 'Modified PubMed Documents'),
+           ('PdqBoards.py', 'PDQ Boards'),
+           ('TermUsage.py', 'Term Usage'),
+           ('UnchangedDocs.py', 'Unchanged Documents')
+          ]
 if type(reports) == type(""): cdrcgi.bail(reports)
 
 for r in reports:
