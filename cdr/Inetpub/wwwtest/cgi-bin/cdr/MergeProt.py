@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: MergeProt.py,v 1.2 2002-02-21 22:34:00 bkline Exp $
+# $Id: MergeProt.py,v 1.3 2004-02-05 13:33:05 bkline Exp $
 #
 # Merge ScientificProtocolInfo document into InScopeProtocol document.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/02/21 22:34:00  bkline
+# Added navigation buttons.
+#
 # Revision 1.1  2001/12/01 18:11:44  bkline
 # Initial revision
 #
@@ -53,7 +56,7 @@ if request == "Merge":
  <SourceDoc>%s</SourceDoc>
  <TargetDoc>%s</TargetDoc>
 </CdrMergeProt>
-""" % (sourceId, targetId)
+""" % (cdr.normalize(sourceId), cdr.normalize(targetId))
     rsp = cdr.sendCommands(cdr.wrapCommand(cmd, session))
     err = cdr.checkErr(rsp)
     if err: cdrcgi.bail(err)
