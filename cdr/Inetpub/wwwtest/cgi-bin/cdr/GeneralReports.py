@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GeneralReports.py,v 1.3 2002-06-26 16:35:16 bkline Exp $
+# $Id: GeneralReports.py,v 1.4 2002-06-27 12:21:01 bkline Exp $
 #
 # Submenu for general reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2002/06/26 16:35:16  bkline
+# Implmented report of audit_trail activity.
+#
 # Revision 1.2  2002/06/07 13:32:12  bkline
 # Issue #255: changed report title at Margaret's request.
 #
@@ -57,6 +60,7 @@ reports = [
            ('UnchangedDocs.py', 'Unchanged Documents'),
            ('CheckUrls.py', 'URL Check'),
            ('ActivityReport.py', 'Document Activity Report'),
+           ('ActiveLogins.py', 'Current Sessions'),
           ]
 
 for r in reports:
