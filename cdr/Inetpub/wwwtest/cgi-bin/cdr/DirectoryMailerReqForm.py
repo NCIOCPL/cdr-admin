@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: DirectoryMailerReqForm.py,v 1.3 2002-09-26 15:13:06 ameyer Exp $
+# $Id: DirectoryMailerReqForm.py,v 1.4 2002-09-26 15:13:55 ameyer Exp $
 #
 # Request form for all directory mailers.
 #
@@ -40,7 +40,7 @@
 #
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, string, cdrdb, cdrmailcommon
+import cgi, cdr, cdrcgi, re, string, cdrdb, cdrpubcgi, cdrmailcommon
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -143,10 +143,6 @@ if userPick == None:
 #   docType     = Document type of document to be mailed.
 #   timeType    = Why we're mailing - 'Initial', 'Update', or 'Remail'
 #   mailType    = MailerType enumeration from the Mailer tracking doc schema
-#                 All of the following must be identical:
-#                    this mailType
-#                    Mailer.xml schema /Mailer/MailType
-#                    Mailer publishing control doc, subset name
 #   orgMailType = For a remailer, the original mailType we are remailing
 #----------------------------------------------------------------------
 if userPick == 'PhysInit':
@@ -188,7 +184,6 @@ except cdrdb.Error, info:
 #----------------------------------------------------------------------
 # Find the publishing system control document.
 #----------------------------------------------------------------------
-# XXXX - SHOULDN'T NEED THIS, NEW VERSION OF cdr.publish USES TITLE
 try:
     cursor = conn.cursor()
     cursor.execute("""\
@@ -231,9 +226,7 @@ if docId:
         cdrcgi.bail("No version found for document %d: %s" % (intId,
                                                               info[1][0]))
 
-    # Validate that the document is the right type
-    # We'll allow user to print a 'wrong' mailer type, he's probably doing
-    #   a single document either as a test or as a result of a printer error
+    # Validate that document matches type implied by mailer type selection
     try:
         cursor.execute ("""\
             SELECT name
@@ -256,7 +249,15 @@ else:
     # Document types are passed in to the query creation and do not
     #   change the structure of the query.
     #------------------------------------------------------------------
-    if timeType == 'Initial':
+    if mailType == 'Physician-Initial':
+        # Select last version (not CWD) of document for which:
+        #   Doc_type = Person.
+        #   Doc is marked ready_for_review ("Ready for Pre-Publication Mailer"
+        #       is checked on last save in XML editor client.)
+        #   .../CurrentStatus = "Active".
+        #   .../Directory/Include = "Pending".
+        #   No non-failing mailer has previously been generated of
+        #       of type Physician-Initial.
         qry = """
             SELECT DISTINCT document.id, MAX(doc_version.num)
                        FROM doc_version
@@ -266,17 +267,40 @@ else:
                          ON document.id = ready_for_review.doc_id
                        JOIN doc_type
                          ON doc_type.id = document.doc_type
-                      WHERE doc_type.name = '%s'
-                        AND NOT EXISTS (SELECT *
-                                          FROM pub_proc p
-                                          JOIN pub_proc_doc pd
-                                            ON p.id = pd.pub_proc
-                                         WHERE pd.doc_id = document.id
-                                           AND p.pub_subset = '%s'
-                                           AND (p.status = 'Success'
-                                            OR p.completed IS NULL))
-                   GROUP BY document.id""" % (docType, mailType)
-    elif timeType == 'Update':
+                       JOIN query_term qstat
+                         ON qstat.doc_id = document.id
+                       JOIN query_term qinc
+                         ON qinc.doc_id = document.id
+                      WHERE doc_type.name = 'Person'
+                        AND qstat.path = '/Person/Status/CurrentStatus'
+                        AND qstat.value = 'Active'
+                        AND qinc.path =
+                           '/Person/ProfessionalInformation/PhysicianDetails/AdministrativeInformation/Directory/Include'
+                        AND qinc.value = 'Pending'
+                        AND NOT EXISTS (
+                                SELECT *
+                                  FROM pub_proc p
+                                  JOIN pub_proc_doc pd
+                                    ON p.id = pd.pub_proc
+                                 WHERE pd.doc_id = document.id
+                                   AND p.pub_subset = 'Physician-Initial'
+                                   AND p.status <> 'Fail'
+                                )
+                   GROUP BY document.id"""
+
+    elif mailType == 'Physician-Annual update':
+        # Select last version (not CWD) of document for which:
+        #   Doc_type = Person.
+        #   .../CurrentStatus = "Active".
+        #   .../Directory/Include = "Include".
+        #   There has been at least one previous mailer sent of type
+        #       Physician-Initial, or Physician-Annual update.
+        #   No non-failing mailer has been sent for this person in
+        #       the last one year of any of the following types:
+        #         Physician-Initial
+        #         Physician-Initial remail
+        #         Physician-Annual update
+        #         Physician-Annual remail
         qry = """
             SELECT DISTINCT doc.id, MAX(doc_version.num)
                        FROM doc_version
@@ -288,19 +312,85 @@ else:
                          ON doc.id = pd1.doc_id
                        JOIN pub_proc p1
                          ON pd1.pub_proc = p1.id
-                      WHERE doc_type.name = '%s'
-                        AND p1.pub_subset LIKE '%s %% Mailers'
+                       JOIN query_term qstat
+                         ON qstat.doc_id = document.id
+                       JOIN query_term qinc
+                         ON qinc.doc_id = document.id
+                      WHERE doc_type.name = 'Person'
+                        AND qstat.path = '/Person/Status/CurrentStatus'
+                        AND qstat.value = 'Active'
+                        AND (
+                             p1.pub_subset = 'Physician-Initial'
+                          OR
+                             p1.pub_subset = 'Physician-Annual update'
+                            )
+                        AND qinc.path =
+                           '/Person/ProfessionalInformation/PhysicianDetails/AdministrativeInformation/Directory/Include'
+                        AND qinc.value = 'Include'
                         AND doc.id NOT IN (
                             SELECT pd2.doc_id
                               FROM pub_proc_doc pd2
                               JOIN pub_proc p2
                                 ON p2.id = pd2.pub_proc
                              WHERE pd2.doc_id = doc.id
-                               AND p2.pub_subset LIKE '%s %% Mailers'
+                               AND (
+                                    -- Would LIKE 'Physician%' be better?
+                                    p2.pub_subset = 'Physician-Initial'
+                                 OR
+                                    p2.pub_subset = 'Physician-Initial remail'
+                                 OR
+                                    p2.pub_subset = 'Physician-Annual update'
+                                 OR
+                                    p2.pub_subset = 'Physician-Annual remail'
+                                   )
                                AND p2.completed > DATEADD(year,-1,GETDATE())
-                               AND (p2.status = 'Success'
-                                OR p2.completed IS NULL))
-                   GROUP BY doc.id""" % (docType, docType, docType)
+                               AND p2.status <> 'Fail'
+                   GROUP BY doc.id"""
+
+    elif mailType == 'Organization-Annual update':
+        # Select last version (not CWD) of document for which:
+        #   Doc_type = Organization.
+        #   .../IncludeInDirectory = "Include".
+        #   .../OrganizationType <> "NCI division, office, or laboratory".
+        #   .../OrganizationType <> "NIH institute, center or division".
+        #   No non-failing update mailer sent in the past year.
+        #   No non-failing remailer sent in the past year.
+        qry = """
+            SELECT DISTINCT doc.id, MAX(doc_version.num)
+                       FROM doc_version
+                       JOIN document doc
+                         ON doc_version.id = doc.id
+                       JOIN doc_type
+                         ON doc_type.id = doc.doc_type
+                       JOIN query_term qinc
+                         ON qinc.doc_id = document.id
+                       JOIN query_term qorgtype
+                         ON qorgtype.doc_id = document.id
+                      WHERE doc_type.name = 'Organization'
+                        AND qinc.path =
+                           '/Organization/OrganizationDetails/OrganizationAdministrativeInformation/IncludeInDirectory'
+                        AND qinc.value = 'Include'
+                        AND qorgtype.path = 'Organization/OrganizationType'
+                        AND qorgtype.value <>
+                                    'NCI division, office, or laboratory'
+                        AND qorgtype.value <>
+                                    'NIH institute, center, or division'
+                        AND NOT EXISTS (
+                            SELECT *
+                              FROM pub_proc_doc pd1
+                              JOIN pub_proc p1
+                                ON p1.id = pd1.pub_proc
+                             WHERE pd1.doc_id = doc.id
+                               AND (
+                                   p1.pub_subset='Organization-Annual update'
+                                 OR
+                                   p1.pub_subset='Organization-Annual remail'
+                                   )
+                               AND p1.completed > DATEADD(year,-1,GETDATE())
+                               AND p1.status <> 'Fail'
+                            )
+                   GROUP BY doc.id"""
+
     elif timeType == 'Remail':
         # Execute a query that builds a temporary table
         try:
@@ -321,7 +411,7 @@ else:
     except cdrdb.Error, info:
         cdrcgi.bail("Failure retrieving document IDs: %s" % info[1][0])
 
-# Setup information to be made available to batch portion of the job
+# Information to be made available to batch portion of the job
 jobParms = (('docType', docType), ('mailType', mailType),
             ('timeType', timeType))
 
@@ -335,8 +425,7 @@ result = cdr.publish (credentials=session, pubSystem='Mailers',
 if not result[0] or result[0] < 0:
     cdrcgi.bail("Unable to initiate publishing job:<br>%s" % result[1])
 
-# Report, with link for status
-header = cdrcgi.header(title, title, section, None, [])
+header  = cdrcgi.header(title, title, section, None, [])
 html = """\
     <H3>Job Number %d Submitted</H3>
     <B>
