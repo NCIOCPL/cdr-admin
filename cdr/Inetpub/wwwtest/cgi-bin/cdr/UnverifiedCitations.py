@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: UnverifiedCitations.py,v 1.2 2002-03-13 16:58:42 bkline Exp $
+# $Id: UnverifiedCitations.py,v 1.3 2004-09-22 19:39:15 venglisc Exp $
 #
 # Reports on citations which have not been verified.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/03/13 16:58:42  bkline
+# Fixed order of date elements.
+#
 # Revision 1.1  2002/03/09 03:27:40  bkline
 # Added report for unverified citations.
 #
@@ -92,10 +95,12 @@ except cdrdb.Error, info:
 #----------------------------------------------------------------------
 # Add one row to the table for each unverified citation.
 #----------------------------------------------------------------------
-textPattern    = re.compile("<Text>(.*)</Text>")
+textPattern    = re.compile("<FormattedReference>(.*)</FormattedReference>")
 commentPattern = re.compile("<Comment>(.*)</Comment>")
 for row in rows:
-    resp = cdr.filterDoc(session, ['name:Citation text and comment'], row[0])
+    resp = cdr.filterDoc(session, ['set:Denormalization Citation Set',
+                                   'name:Copy XML for Citation QC Report'], 
+				   row[0])
     text = textPattern.search(resp[0])
     cmnt = commentPattern.search(resp[0])
     text = text and text.group(1) or 'Unable to retrieve citation title'
