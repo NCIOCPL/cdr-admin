@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
-# $Id: FtpImages.py,v 1.1 2004-11-01 21:29:48 venglisc Exp $
+# $Id: FtpImages.py,v 1.2 2005-01-19 23:48:33 venglisc Exp $
 #
 # Ftp files from the CIPSFTP server from the ciat/qa/Images directory
 # and place them on the CIPS network.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2004/11/01 21:29:48  venglisc
+# Initial version of script allowing to ftp image files from the CIPSFTP
+# server and copy to the CDR server. (Bug 1365)
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string, os, ftplib, shutil
 
@@ -75,7 +79,7 @@ if request == "Get Images" and ftpDone != 'Y':
     except ftplib.error_reply, info:
        cdrcgi.bail("Unexpected Error: %s" % info)
     except ftplib.error_perm, info:
-       cdrcgi.bail("Invalid Username/password: %s" % info)
+       cdrcgi.bail("File or User Permission Error: %s" % info)
     except ftplib.error_proto, info:
        cdrcgi.bail("Server Error: %s" % info)
     #except:
