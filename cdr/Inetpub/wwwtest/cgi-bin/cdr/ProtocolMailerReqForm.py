@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolMailerReqForm.py,v 1.10 2003-02-07 19:40:07 bkline Exp $
+# $Id: ProtocolMailerReqForm.py,v 1.11 2003-02-13 21:11:27 bkline Exp $
 #
 # Request form for all protocol mailers.
 #
@@ -17,6 +17,17 @@
 # publication job for the publishing daemon to find and initiate.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.10  2003/02/07 19:40:07  bkline
+# Corrected a typo ("directory" changed to "protocol").  Added check for
+# all S&P mailers to ensure that the protocol document is not blocked
+# for publication (active_status = 'A').  Expended check for initial
+# mailer to look for any kind of prior S&P mailer, not just another
+# "initial" mailer (because we had to send our first round of quarterly
+# S&P mailers without the benefit of any history from the legacy system).
+# Suppressed check for previous mailer when sending quarterly S&P mailer
+# (Sheri asked that we go ahead and send a quarterly anyway, even if
+# they never got any S&P mailers before).
+#
 # Revision 1.9  2003/01/22 01:43:17  ameyer
 # Added check for last valid version to single doc id.
 # Added check for returned row with nothing in it at same place.
@@ -243,6 +254,47 @@ if len(rows) > 1:
     cdrcgi.bail('Multiple Mailer control documents found')
 ctrlDocId = rows[0][0]
 
+#----------------------------------------------------------------------
+# Just for testing.
+#----------------------------------------------------------------------
+def showDocsAndRun(rows):
+    if not rows:
+        rows = []
+    html = """\
+<!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
+<html>
+ <head>
+  <title>Protocol S&amp;P Doc List</title>
+  <style type='text/css'>
+   th,h2    { font-family: Arial, sans-serif; font-size: 11pt;
+              text-align: center; font-weight: bold; }
+   h1       { font-family: Arial, sans-serif; font-size: 12pt;
+              text-align: center; font-weight: bold; }
+   td       { font-family: Arial, sans-serif; font-size: 10pt; }
+  </style>
+ </head>
+ <body>
+  <h1>Protocol S&amp;P Doc List</h1>
+  <h2>%d docs selected</h2>
+  <br><br>
+  <table border='1' cellspacing='0' cellpadding='1'>
+   <tr>
+    <th>Document</th>
+    <th>Version</th>
+   </tr>
+""" % len(rows)
+    for row in rows:
+        html += """\
+   <tr>
+    <td align='center'>CDR%010d</td>
+    <td align='center'>%d</td>
+   </tr>
+""" % (row[0], row[1])
+    cdrcgi.sendPage(html + """\
+  </table>
+ </body>
+</html>""")
+    
 #----------------------------------------------------------------------
 # Determine which documents are to be published.
 #----------------------------------------------------------------------
@@ -497,6 +549,7 @@ elif mailType == 'Protocol-Initial status/participant check':
         docList = cursor.fetchall()
     except cdrdb.Error, info:
         cdrcgi.bail("Failure retrieving document IDs: %s" % info[1][0])
+    showDocsAndRun(docList)
 
 #----------------------------------------------------------------------
 # Find the protocols which need a quarterly status and participant check.
@@ -536,7 +589,8 @@ elif mailType == 'Protocol-Quarterly status/participant check':
 
                       -- Only send mailers for active or approved protocols
                       WHERE prot_status.value IN ('Active',
-                                                  'Approved-Not Yet Active')
+                                                  'Approved-Not Yet Active',
+                                                  'Temporarily closed')
                         AND prot_status.path         = '%s'
                         AND lead_org.path            = '%s'
                         AND doc_version.publishable  = 'Y'
@@ -579,6 +633,7 @@ elif mailType == 'Protocol-Quarterly status/participant check':
         docList = cursor.fetchall()
     except cdrdb.Error, info:
         cdrcgi.bail("Failure retrieving document IDs: %s" % info[1][0])
+    showDocsAndRun(docList)
 
 # Check to make sure we have at least one mailer to send out.
 docCount = len(docList)
