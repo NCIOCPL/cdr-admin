@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CdrReport.py,v 1.3 2001-04-08 22:53:54 bkline Exp $
+# $Id: CdrReport.py,v 1.4 2001-12-01 17:56:26 bkline Exp $
 #
 # Prototype for CDR reporting/formatting web wrapper.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2001/04/08 22:53:54  bkline
+# First working version for inactive documents report.
+#
 # Revision 1.2  2001/03/27 21:17:40  bkline
 # Extracted some common functionality out to cdrcgi.py.
 #
@@ -28,7 +31,7 @@ if days:
     report  = cdr.report(logon, name, parms)
     report  = re.sub("<!\[CDATA\[", "", report)
     report  = re.sub("\]\]>", "", report)
-    html    = cdr.filterDoc(logon, 'CDR0000190706', doc=report)
+    html    = cdr.filterDoc(logon, 'CDR0000190706', doc=report)[0]
     html    = unicode(html, 'utf-8').encode('latin-1')
     html    = re.sub('@@DAYS@@', days, html)
     cdrcgi.sendPage(html)
