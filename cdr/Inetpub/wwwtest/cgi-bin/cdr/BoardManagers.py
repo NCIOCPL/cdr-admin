@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: BoardManagers.py,v 1.5 2004-04-16 21:56:57 venglisc Exp $
+# $Id: BoardManagers.py,v 1.6 2004-05-11 17:29:53 bkline Exp $
 #
 # Main menu for board managers.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2004/04/16 21:56:57  venglisc
+# Removed stub to link to Board Member QC report. (Bug 1059).
+#
 # Revision 1.4  2004/04/08 20:31:10  bkline
 # Plugged in additions requested by Margaret (request #1059).
 #
@@ -97,7 +100,7 @@ form += """\
 
 for choice in (
     ('QcReport.py',             'Board Member Information QC Report' ),
-    ('Stub.py',                 'Board Roster Reports'               )
+    ('BoardRoster.py',          'Board Roster Reports'               )
     ):
     form += """\
     <li><a href='%s/%s?DocType=PDQBoardMemberInfo&%s'>%s</a></li>
