@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: NewlyPublishedTrials.py,v 1.1 2002-03-20 14:08:19 bkline Exp $
+# $Id: NewlyPublishedTrials.py,v 1.2 2002-03-20 14:11:55 bkline Exp $
 #
 # Report on newly published trials in batch.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2002/03/20 14:08:19  bkline
+# Report on newly published protocols.
+#
 #----------------------------------------------------------------------
 
 import cdr, cdrdb, cdrcgi, cgi, re, time
@@ -103,16 +106,6 @@ def closeCat(category, numTrials):
 """ % (category, numTrials)
 
 #----------------------------------------------------------------------
-# We have a report request.  Honor it.
-#----------------------------------------------------------------------
-"""
-cnPath = "/InScopeProtocol/ProtocolDetail/StudyCategory/StudyCategoryName"
-ctPath = "/InScopeProtocol/ProtocolDetail/StudyCategory/StudyCategoryType"
-stPath = "/InScopeProtocol/ProtocolAdminInfo/CurrentProtocolStatus"
-idPath = "/InScopeProtocol/ProtocolIDs/PrimaryID/IDString"
-"""
-
-#----------------------------------------------------------------------
 # Connect to the CDR database.
 #----------------------------------------------------------------------
 try:
@@ -137,75 +130,12 @@ except cdrdb.Error, info:
     cdrcgi.bail('Failure retrieving job date: %s' % info[1][0])
 
 #----------------------------------------------------------------------
-# Find out whether the last thing we sent to Cancer.gov for these 
-# documents was a publish ('Export') or an unpublish ('Remove') event.
+# Extract the data for the report from the database.  Unfortunately,
+# we are unable to invoke the SQL queries directly from this script,
+# because of a bug in ADO, which can't handle nested queries and
+# placeholders at the same time. :-(
 #----------------------------------------------------------------------
-try:
-    """cursor.execute(""\
-        SELECT ppd1.doc_id,
-               pp1.pub_subset
-          INTO #foo
-          FROM pub_proc_doc ppd1
-          JOIN pub_proc pp1
-            ON pp1.id = ppd1.pub_proc
-          JOIN pub_proc_doc ppd2
-            ON ppd2.doc_id = ppd1.doc_id
-         WHERE ppd2.pub_proc = ?
-           AND pp1.id = (SELECT MAX(pp3.id)
-                           FROM pub_proc pp3
-                           JOIN pub_proc_doc ppd3
-                             ON ppd3.doc_id = ppd1.doc_id
-                            AND ppd3.pub_proc = pp3.id
-                           JOIN query_term ps
-                             ON ps.doc_id = pp3.pub_system
-                          WHERE pp3.id < ppd2.pub_proc
-                            AND ps.path = '/PublishingSystem/SystemName'
-                            AND ps.value = 'Primary'
-                            AND pp3.pub_subset IN ('Export', 'Remove'))"",
-                          jobId)
-    #conn.commit()
-    cursor.execute("SELECT * FROM #foo")
-    numRows2 = len(cursor.fetchall())
-    cdrcgi.bail("first query: %d; second query: %d" % (numRows, numRows2))
-except cdrdb.Error, info:
-    cdrcgi.bail('Failure retrieving publishing history: %s' % info[1][0])
-
-#----------------------------------------------------------------------
-# Pull together the information needed for the report.
-#----------------------------------------------------------------------
-try:
-    cursor.execute(""\
- SELECT DISTINCT ppd.doc_id,
-                 cat.value,
-                 stat.value,
-                 id.value
-            FROM pub_proc_doc ppd
-            JOIN query_term cat
-              ON cat.doc_id = ppd.doc_id
-             AND cat.path = '%s'
-            JOIN query_term cat_type
-              ON cat_type.doc_id = ppd.doc_id
-             AND cat_type.path = '%s'
-             AND LEFT(cat_type.node_loc, 8) = LEFT(cat.node_loc, 8)
-            JOIN query_term stat
-              ON stat.doc_id = ppd.doc_id
-             AND stat.path = '%s'
-            JOIN query_term id
-              ON id.doc_id = ppd.doc_id
-             AND id.path = '%s'
-           WHERE ppd.pub_proc = ?
-             AND ppd.doc_id NOT IN (SELECT doc_id
-                                      FROM #prev_event
-                                     WHERE pub_subset = 'Export')
-        ORDER BY cat.value,
-                 id.value,
-                 stat.value"" % (cnPath,
-                                  ctPath,
-                                  stPath,
-                                  idPath),
-                                  jobId)"""
     cursor.callproc("cdr_newly_pub_trials", jobId)
-    #cursor.execute("{call cdr_newly_pub_trials(?)}", (jobId,))
     cursor.nextset()
     rows = cursor.fetchall()
 except cdrdb.Error, info:
