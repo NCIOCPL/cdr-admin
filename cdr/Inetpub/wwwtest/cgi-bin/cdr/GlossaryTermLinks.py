@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermLinks.py,v 1.1 2002-03-20 18:39:02 bkline Exp $
+# $Id: GlossaryTermLinks.py,v 1.2 2002-03-20 20:08:14 bkline Exp $
 #
-# DESCRIPTION HERE
+# Report of documents linking to a specified glossary term.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2002/03/20 18:39:02  bkline
+# Report of documents linking to a specified glossary term.
+#
 #----------------------------------------------------------------------
 
 import cdr, cdrdb, cdrcgi, cgi, re, string, time
