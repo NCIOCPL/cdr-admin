@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: CTGovImport.py,v 1.4 2003-12-16 15:41:18 bkline Exp $
+# $Id: CTGovImport.py,v 1.5 2004-02-16 23:40:57 bkline Exp $
 #
 # User interface for selecting Protocols to be imported from
 # ClinicalTrials.gov.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2003/12/16 15:41:18  bkline
+# Modified code to open NLM document in a separate window so that it
+# uses a different window for each document.
+#
 # Revision 1.3  2003/12/08 19:23:23  bkline
 # Modified code to show most recent trials first.
 #
@@ -37,7 +41,7 @@ if not session and 0:
     cdrcgi.bail ("Unknown or expired CDR session.")
 
 # If new request or no input parms, we need to output a form
-def showList(skipPast, cursor):
+def showList(skipPast, cursor, errors = None):
 
     # Handle new docs and those waiting for CIPS feedback differently.
     if which == 'new':
@@ -65,6 +69,9 @@ def showList(skipPast, cursor):
     }
     -->
   </script>
+  <style type='text/css'>
+   .err { font-family: Arial; color: red; font-size: 14pt; font-weight: bold; }
+  </style>
 """ % timeStr)
     # Add saved session
     html += """
@@ -72,6 +79,14 @@ def showList(skipPast, cursor):
     <input type='hidden' name='which' value='%s' />
 """ % (cdrcgi.SESSION, session, which)
 
+    for error in errors:
+        html += u"""\
+    <span class='err'>%s</span><br>
+""" % error
+    if errors:
+        html += u"""\
+    <br>
+"""
     where = ""
     if skipPast:
         where = "WHERE c.nlm_id < '%s'" % skipPast
@@ -131,6 +146,8 @@ def showList(skipPast, cursor):
             html += ("&nbsp;&nbsp;<input type='radio' name='disp-%d'"
                      "value='%d'%s>&nbsp;%s\n" % (n, i + 1, checked,
                                                   values[i]))
+            if values[i] == 'Duplicate':
+                html += "of CDR ID <input name='cdrid-%d'>&nbsp;" % n
         html += "<br><br>\n"
         n += 1
 
@@ -142,9 +159,11 @@ def showList(skipPast, cursor):
 
 def applyChoices(cursor, conn):
     n = int(numRows)
+    errors = []
     for i in range(n):
-        id   = fields and fields.getvalue("id-%d" % i) or ""
-        disp = fields and fields.getvalue("disp-%d" % i) or ""
+        id    = fields and fields.getvalue("id-%d" % i) or ""
+        disp  = fields and fields.getvalue("disp-%d" % i) or ""
+        cdrId = fields and fields.getvalue("cdrid-%d" % i) or ""
         #cdrcgi.bail("i=%d id=%s disp=%s" % (i, id, disp))
         if not disp:
             disp = "not yet reviewed"
@@ -158,19 +177,43 @@ def applyChoices(cursor, conn):
             disp = "reviewed - need CIPS feedback"
         else:
             cdrcgi.bail("Invalid disposition code: %s" % disp)
-        cursor.execute("""\
-        UPDATE ctgov_import
-           SET disposition = (SELECT id
-                                FROM ctgov_disposition
-                               WHERE name = '%s')
-         WHERE nlm_id = '%s'""" % (disp, id))
+        if disp == "duplicate":
+            if not cdrId:
+                errors.append(u"%s: 'duplicate' disposition requires CDR ID" %
+                              id)
+                continue
+            normalizedId = cdr.exNormalize(cdrId)
+            intId = normalizedId[1]
+            cursor.execute("SELECT id FROM document WHERE id = %d" % intId)
+            if len(cursor.fetchall()) != 1:
+                errors.append(u"CDR%010d not found for %s" % (intId, id))
+                continue
+            cursor.execute("""\
+                UPDATE ctgov_import
+                   SET disposition = (SELECT id
+                                        FROM ctgov_disposition
+                                       WHERE name = '%s'),
+                       cdr_id = %d
+                 WHERE nlm_id = '%s'""" % (disp, intId, id))
+        else:
+            if cdrId:
+                errors.append(u"CDR ID '%s' ignored for %s because "
+                              u"disposition is not 'duplicate'" % (cdrId,
+                                                                   id))
+            cursor.execute("""\
+                UPDATE ctgov_import
+                   SET disposition = (SELECT id
+                                        FROM ctgov_disposition
+                                       WHERE name = '%s')
+                 WHERE nlm_id = '%s'""" % (disp, id))
         conn.commit()
+    return errors
 conn = cdrdb.connect()
 cursor = conn.cursor()
 if nextPage:
     showList(skipNext, cursor)
 elif apply:
-    applyChoices(cursor, conn)
-    showList(skipCur, cursor)
+    errors = applyChoices(cursor, conn)
+    showList(skipCur, cursor, errors)
 else:
     showList("", cursor)
