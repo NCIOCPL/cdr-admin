@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: NewlyPublishedTrials.py,v 1.2 2002-03-20 14:11:55 bkline Exp $
+# $Id: NewlyPublishedTrials.py,v 1.3 2002-03-20 14:14:25 bkline Exp $
 #
 # Report on newly published trials in batch.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/03/20 14:11:55  bkline
+# Removed dead code and documented ADO bug.
+#
 # Revision 1.1  2002/03/20 14:08:19  bkline
 # Report on newly published protocols.
 #
@@ -135,6 +138,7 @@ except cdrdb.Error, info:
 # because of a bug in ADO, which can't handle nested queries and
 # placeholders at the same time. :-(
 #----------------------------------------------------------------------
+try:
     cursor.callproc("cdr_newly_pub_trials", jobId)
     cursor.nextset()
     rows = cursor.fetchall()
