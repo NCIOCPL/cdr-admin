@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PersonLocSearch.py,v 1.6 2002-06-06 12:01:26 bkline Exp $
+# $Id: PersonLocSearch.py,v 1.7 2002-06-26 20:05:25 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Person documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2002/06/06 12:01:26  bkline
+# Added calls to cdrcgi.unicodeToLatin1().
+#
 # Revision 1.5  2002/05/24 18:02:11  bkline
 # Wording change requested by Lakshmi.
 #
@@ -119,12 +122,11 @@ for i in range(len(rows)):
 <TD>&nbsp;</TD>
 <TD        WIDTH = "20"
           VALIGN = "top">
- <A         HREF = "%s?DocId=%s&Filter=%s">%s</A>
+ <A         HREF = "%s?DocId=%s&%s=%s">%s</A>
 </TD>
 </TR>
-""" % (i + 1, cgi.escape(title, 1), '/cgi-bin/cdr/Filter.py', 
-       docId, 'name:Denormalization Filter (1/1): Person&'
-       'Filter1=name:Person QC Report Filter', docId)
+""" % (i + 1, cgi.escape(title, 1), cdrcgi.BASE + '/QcReport.py', 
+       docId, cdrcgi.SESSION, session, docId)
     parms = (('docId', docId), ('repName', 'dummy'))
     response = cdr.filterDoc(session, ['name:Person Locations Picklist'],
                               docId = docId, parm = parms)
