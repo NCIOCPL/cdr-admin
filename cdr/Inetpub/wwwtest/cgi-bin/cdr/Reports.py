@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: Reports.py,v 1.14 2002-05-03 20:28:54 bkline Exp $
+# $Id: Reports.py,v 1.15 2002-05-16 14:34:42 bkline Exp $
 #
 # Prototype for editing CDR linking tables.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.14  2002/05/03 20:28:54  bkline
+# New Mailer reports.
+#
 # Revision 1.13  2002/04/25 02:58:53  bkline
 # New report for mailer checkin.
 #
@@ -84,6 +87,7 @@ reports = [
            ('MailerHistory.py', 'Mailer History'),
            ('ModifiedPubMedDocs.py', 'Modified PubMed Documents'),
            ('NewDocReport.py', 'New Documents'),
+          #('NewlyPublishedTrials.py', 'Newly Published Trials'),
            ('PdqBoards.py', 'PDQ Boards'),
            ('PersonsAtOrg.py', 'Persons Practicing At Orgs'),
            ('PubJobQueue.py', 'Publishing Job Queue'),
