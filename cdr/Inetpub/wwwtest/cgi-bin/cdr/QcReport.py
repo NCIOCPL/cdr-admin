@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.6 2002-06-24 17:15:24 bkline Exp $
+# $Id: QcReport.py,v 1.7 2002-06-26 16:35:17 bkline Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2002/06/24 17:15:24  bkline
+# Added documents linking to Person.
+#
 # Revision 1.5  2002/06/06 15:01:06  bkline
 # Switched to GET HTTP method so "Edit with Microsoft Word" will work in IE.
 #
@@ -22,7 +25,7 @@
 # New QC reports.
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, cdrdb, re
+import cgi, cdr, cdrcgi, cdrdb, re, sys
 
 #----------------------------------------------------------------------
 # Get the parameters from the request.
@@ -315,7 +318,21 @@ def fixPersonReport(doc):
 if repType: docType += ":%s" % repType
 if version == "-1": version = None
 if not filters.has_key(docType):
-    cdrcgi.bail("Don't have filters set up for %s documents yet" % docType)
+    doc = cdr.getDoc(session, docId, version = version or "Current",
+                     getObject = 1)
+    if type(doc) in (type(""), type(u"")):
+        cdrcgi.bail(doc)
+    html = """\
+<html>
+ <head>
+  <title>%s</title>
+ </head>
+ <body>
+  <pre>%s</pre>
+ </body>
+</html>""" % (doc.ctrl['DocTitle'], cgi.escape(doc.xml))
+    cdrcgi.sendPage(cdrcgi.unicodeToLatin1(html))
+
 doc = cdr.filterDoc(session, filters[docType], docId = docId,
                                                docVer = version or None)
 if type(doc) == type(()):

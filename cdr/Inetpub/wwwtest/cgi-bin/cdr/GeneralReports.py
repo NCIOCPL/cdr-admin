@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GeneralReports.py,v 1.2 2002-06-07 13:32:12 bkline Exp $
+# $Id: GeneralReports.py,v 1.3 2002-06-26 16:35:16 bkline Exp $
 #
 # Submenu for general reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/06/07 13:32:12  bkline
+# Issue #255: changed report title at Margaret's request.
+#
 # Revision 1.1  2002/05/24 20:37:30  bkline
 # New Report Menu structure implemented.
 #
@@ -53,6 +56,7 @@ reports = [
            ('PubJobQueue.py', 'Publishing Job Queue'),
            ('UnchangedDocs.py', 'Unchanged Documents'),
            ('CheckUrls.py', 'URL Check'),
+           ('ActivityReport.py', 'Document Activity Report'),
           ]
 
 for r in reports:
