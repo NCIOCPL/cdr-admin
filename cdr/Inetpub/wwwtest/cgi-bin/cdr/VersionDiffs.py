@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: VersionDiffs.py,v 1.1 2002-09-12 13:06:44 bkline Exp $
+# $Id: VersionDiffs.py,v 1.2 2002-09-13 11:48:22 bkline Exp $
 #
 # Compare two versions of a document.
 #
@@ -119,10 +119,15 @@ v1Xml = getVersion(docId, version1).replace("\r", "")
 v2Xml = getVersion(docId, version2).replace("\r", "")
 if v1Xml == v2Xml: cdrcgi.bail("Versions %s and %s are identical" % (version1,
                                                                      version2))
+filters = ['name:Fast Denormalization Filter With Indent']
+doc1 = cdr.filterDoc('guest', filters, doc = v1Xml.encode('utf-8'))
+doc2 = cdr.filterDoc('guest', filters, doc = v2Xml.encode('utf-8'))
+if not doc1[0]: cdrcgi.bail(doc1[1])
+if not doc2[0]: cdrcgi.bail(doc2[1])
 fn1 = "%d-%s.xml" % (docId, version1)
 fn2 = "%d-%s.xml" % (docId, version2)
-open(fn1, "w").write(v1Xml.encode('latin-1', 'replace'))
-open(fn2, "w").write(v2Xml.encode('latin-1', 'replace'))
+open(fn1, "w").write(unicode(doc1[0], 'utf-8').encode('latin-1', 'replace'))
+open(fn2, "w").write(unicode(doc2[0], 'utf-8').encode('latin-1', 'replace'))
 result = runCommand("diff -au %s %s" % (fn1, fn2))
 report = cgi.escape(result.output)
 cleanup(workDir)
