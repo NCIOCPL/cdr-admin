@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolMailerReqForm.py,v 1.14 2003-05-08 20:23:04 bkline Exp $
+# $Id: ProtocolMailerReqForm.py,v 1.15 2004-05-18 12:42:53 bkline Exp $
 #
 # Request form for all protocol mailers.
 #
@@ -17,6 +17,9 @@
 # publication job for the publishing daemon to find and initiate.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.14  2003/05/08 20:23:04  bkline
+# Added code to skip blocked documents.
+#
 # Revision 1.13  2003/02/19 22:05:37  bkline
 # Turned off query testing code for S&P mailers.
 #
@@ -75,10 +78,12 @@ import cgi, cdr, cdrcgi, re, string, cdrdb, cdrpubcgi, cdrmailcommon, sys
 fields      = cgi.FieldStorage()
 session     = cdrcgi.getSession(fields)
 request     = cdrcgi.getRequest(fields)
-docId       = fields and fields.getvalue("DocId")    or None
-email       = fields and fields.getvalue("Email")    or None
-userPick    = fields and fields.getvalue("userPick") or None
-maxMails    = fields and fields.getvalue("maxMails") or 'No limit'
+docId       = fields and fields.getvalue("DocId")      or None
+email       = fields and fields.getvalue("Email")      or None
+userPick    = fields and fields.getvalue("userPick")   or None
+paper       = fields and fields.getvalue("paper")      or 0
+electronic  = fields and fields.getvalue("electronic") or 0
+maxMails    = fields and fields.getvalue("maxMails")   or 'No limit'
 title       = "CDR Administration"
 section     = "Protocol Mailer Request Form"
 SUBMENU     = "Mailer Menu"
@@ -98,7 +103,20 @@ header      = cdrcgi.header(title, title, section, script, buttons,
         margin-bottom: 10pt; font-weight:bold
    }
   </style>
+  <script language='JavaScript'>
+   <!--
+    function emOff() {
+        document.forms[0].electronic.checked = false;
+        document.forms[0].paper.checked = true;
+    }
+    function emOn() {
+        document.forms[0].electronic.checked = true;
+        document.forms[0].paper.checked = true;
+    }
+   // -->
+  </script>
  """)
+parms       = None
 statusPath  = '/InScopeProtocol/ProtocolAdminInfo/CurrentProtocolStatus'
 brussels    = 'NCI Liaison Office-Brussels'
 sourcePath  = '/InScopeProtocol/ProtocolSources/ProtocolSource/SourceName'
@@ -162,16 +180,26 @@ if not request:
     </li>
    </ul>
    <h3>Select type of mailer</h3>
-   <input type='radio' name='userPick' class='r' value='ProtAbstInit'>
+   <input type='radio' name='userPick' class='r' value='ProtAbstInit'
+          onClick='emOff()'>
     <span class='r'>Initial Abstract Mailer</span><br>
-   <input type='radio' name='userPick' class='r' value='ProtAbstAnnual'>
+   <input type='radio' name='userPick' class='r' value='ProtAbstAnnual'
+          onClick='emOff()'>
     <span class='r'>Annual Abstract Mailer</span><br>
-   <input type='radio' name='userPick' class='r' value='ProtAbstRemail'>
+   <input type='radio' name='userPick' class='r' value='ProtAbstRemail'
+          onClick='emOff()'>
     <span class='r'>Annual Abstract Remail</span><br>
-   <input type='radio' name='userPick' class='r' value='ProtInitStatPart'>
+   <input type='radio' name='userPick' class='r' value='ProtInitStatPart'
+          onClick='emOn()'>
     <span class='r'>Initial Status/Participant Check</span><br>
-   <input type='radio' name='userPick' class='r' value='ProtQuarterlyStatPart'>
+   <input type='radio' name='userPick' class='r' value='ProtQuarterlyStatPart'
+          onClick='emOn()'>
     <span class='r'>Quarterly Status/Participant Check</span>
+   <br><br><br>
+   <input id='paper' type="checkbox" name="paper" />&nbsp;
+   <span class='r'>Paper Mailers</span><br>
+   <input id='electronic' type="checkbox" name="electronic" />&nbsp;
+   <span class='r'>Electronic Mailers</span>
    <br><br><br>
    <b>
     Limit maximum number of documents for which mailers will be
@@ -230,7 +258,12 @@ elif userPick  == 'ProtQuarterlyStatPart':
     timeType    = 'Update'
     mailType    = 'Protocol-Quarterly status/participant check'
     orgMailType = 'Protocol-Initial status/participant check'
-
+if not electronic and not paper:
+    cdrcgi.bail("Neither paper nor electronic mailers selected")
+if electronic and userPick not in ('ProtInitStatPart',
+                                   'ProtQuarterlyStatPart'):
+    cdrcgi.bail("Only paper mailers supported for protocol abstracts")
+                    
 #----------------------------------------------------------------------
 # Connect to the CDR database.
 #----------------------------------------------------------------------
@@ -506,149 +539,167 @@ elif mailType == 'Protocol-Annual abstract remail':
 #----------------------------------------------------------------------
 # Find the protocols which need an initial status and participant check.
 #----------------------------------------------------------------------
-elif mailType == 'Protocol-Initial status/participant check':
-    quarterly = 'Protocol-Quarterly status/participant check'
+else:
+    if mailType not in ('Protocol-Initial status/participant check',
+                        'Protocol-Quarterly status/participant check'):
+        cdrcgi.bail("Unrecognized mailer type (%s)" % str(mailType))
     try:
+
+        # Create a list of active protocols.
+        cursor.execute("CREATE TABLE #mailer_prots (id INT, ver INT)")
+        if mailType == "Protocol-Initial status/participant check":
+            cursor.execute("""\
+    INSERT INTO #mailer_prots (id, ver)
+SELECT DISTINCT protocol.id, MAX(doc_version.num)
+           FROM document protocol
+           JOIN doc_version
+             ON doc_version.id = protocol.id
+           JOIN query_term prot_status
+             ON prot_status.doc_id = protocol.id
+           JOIN ready_for_review
+             ON ready_for_review.doc_id = protocol.id
+          WHERE prot_status.value IN ('Active',
+                                      'Approved-Not Yet Active',
+                                      'Temporarily closed')
+            AND prot_status.path = '/InScopeProtocol/ProtocolAdminInfo'
+                                 + '/CurrentProtocolStatus'
+            AND doc_version.val_status = 'V'
+            AND protocol.active_status = 'A'
+
+            -- Don't send the initial mailer twice.
+            AND NOT EXISTS (SELECT pd.doc_id
+                              FROM pub_proc p
+                              JOIN pub_proc_doc pd
+                                ON p.id = pd.pub_proc
+                             WHERE pd.doc_id = protocol.id
+                               AND p.pub_subset IN ('Protocol-Quarterly status'
+                                                  + '/participant check', 
+                                                    'Protocol-Initial status'
+                                                  + '/participant check')
+                               AND (p.status = 'Success'
+                                OR  p.completed IS NULL)
+                               AND (pd.failure IS NULL
+                                OR  pd.failure = 'N'))
+       GROUP BY protocol.id""", timeout = 300)
+        else:
+            cursor.execute("""\
+    INSERT INTO #mailer_prots (id, ver)
+SELECT DISTINCT protocol.id, MAX(doc_version.num)
+           FROM document protocol
+           JOIN doc_version
+             ON doc_version.id = protocol.id
+           JOIN query_term prot_status
+             ON prot_status.doc_id = protocol.id
+          WHERE prot_status.value IN ('Active',
+                                      'Approved-Not Yet Active',
+                                      'Temporarily closed')
+            AND prot_status.path = '/InScopeProtocol/ProtocolAdminInfo'
+                                 + '/CurrentProtocolStatus'
+            AND doc_version.publishable = 'Y'
+            AND protocol.active_status  = 'A'
+       GROUP BY protocol.id""", timeout = 300)
+
+        # Find the lead organizations (and pups) for these protocols
         cursor.execute("""\
-            SELECT DISTINCT TOP %d protocol.id, MAX(doc_version.num)
-                       FROM document protocol
-                       JOIN doc_version
-                         ON doc_version.id = protocol.id
-                       JOIN ready_for_review
-                         ON ready_for_review.doc_id = protocol.id
-                       JOIN query_term prot_status
-                         ON prot_status.doc_id = protocol.id
-                       JOIN query_term lead_org
-                         ON lead_org.doc_id = protocol.id
-                      WHERE prot_status.value IN ('Active',
-                                                  'Approved-Not Yet Active')
-                        AND prot_status.path       = '%s'
-                        AND lead_org.path          = '%s'
-                        AND doc_version.val_status = 'V'
-                        AND protocol.active_status = 'A'
+   CREATE TABLE #lead_orgs
+       (prot_id INTEGER,
+       prot_ver INTEGER,
+         org_id INTEGER,
+         pup_id INTEGER,
+       pup_link VARCHAR(80),
+    update_mode VARCHAR(80))""")
+        cursor.execute("""\
+    INSERT INTO #lead_orgs (prot_id, prot_ver, org_id, pup_id, pup_link,
+                            update_mode)
+         SELECT m.id, m.ver, o.int_val, p.int_val, p.value, u.value
+           FROM #mailer_prots m
+           JOIN query_term o
+             ON o.doc_id = m.id
+           JOIN query_term s
+             ON s.doc_id = o.doc_id
+            AND LEFT(s.node_loc, 8)  = LEFT(o.node_loc, 8)
+           JOIN query_term p
+             ON p.doc_id = o.doc_id
+            AND LEFT(p.node_loc, 8)  = LEFT(o.node_loc, 8)
+           JOIN query_term r
+             ON r.doc_id = p.doc_id
+            AND LEFT(r.node_loc, 12) = LEFT(p.node_loc, 12)
+LEFT OUTER JOIN query_term u
+             ON u.doc_id = o.doc_id
+            AND LEFT(u.node_loc, 8)  = LEFT(o.node_loc, 8)
+            AND u.path  = '/InScopeProtocol/ProtocolAdminInfo'
+                        + '/ProtocolLeadOrg/UpdateMode'
+LEFT OUTER JOIN query_term t
+             ON t.doc_id = u.doc_id
+            AND LEFT(t.node_loc, 12) = LEFT(u.node_loc, 12)
+            AND t.path  = '/InScopeProtocol/ProtocolAdminInfo'
+                        + '/ProtocolLeadOrg/UpdateMode/@MailerType'
+            AND t.value = 'Protocol_SandP'
+          WHERE o.path  = '/InScopeProtocol/ProtocolAdminInfo'
+                        + '/ProtocolLeadOrg/LeadOrganizationID/@cdr:ref'
+            AND s.path  = '/InScopeProtocol/ProtocolAdminInfo'
+                        + '/ProtocolLeadOrg/LeadOrgProtocolStatuses'
+                        + '/CurrentOrgStatus/StatusName'
+            AND s.value IN ('Active', 'Approved-not yet active',
+                            'Temporarily closed')
+            AND p.path  = '/InScopeProtocol/ProtocolAdminInfo'
+                        + '/ProtocolLeadOrg/LeadOrgPersonnel'
+                        + '/Person/@cdr:ref'
+            AND r.path  = '/InScopeProtocol/ProtocolAdminInfo'
+                        + '/ProtocolLeadOrg/LeadOrgPersonnel'
+                        + '/PersonRole'
+            AND r.value = 'Update person'""", timeout = 300)
 
-                        -- Don't send paper when they want electronic mailers.
-                        AND NOT EXISTS (SELECT *
-                                          FROM query_term contact_mode
-                                         WHERE contact_mode.doc_id =
-                                               lead_org.int_val
-                                           AND contact_mode.path = '%s')
 
-                        -- Don't send mailers for Brussels protocols.
-                        AND NOT EXISTS (SELECT *
-                                          FROM query_term src
-                                         WHERE src.value = '%s'
-                                           AND src.path  = '%s'
-                                           AND src.doc_id = protocol.id)
+        # Fill in missing update modes.
+        cursor.execute("""\
+    CREATE TABLE #pup_update_mode
+         (pup_id INTEGER,
+     update_mode VARCHAR(80))""")
+        cursor.execute("""\
+    INSERT INTO #pup_update_mode (pup_id, update_mode)
+SELECT DISTINCT u.doc_id, MAX(u.value) -- Avoid multiple values
+           FROM #lead_orgs o
+           JOIN query_term u
+             ON u.doc_id = o.pup_id
+           JOIN query_term t
+             ON t.doc_id = u.doc_id
+            AND LEFT(t.node_loc, 8) = LEFT(u.node_loc, 8)
+          WHERE o.update_mode IS NULL
+            AND u.path  = '/Person/PersonLocations/UpdateMode'
+            AND t.path  = '/Person/PersonLocations/UpdateMode/@MailerType'
+            AND t.value = 'Protocol_SandP'
+       GROUP BY u.doc_id""", timeout = 300)
+        cursor.execute("""\
+         UPDATE #lead_orgs
+            SET update_mode = p.update_mode
+           FROM #lead_orgs o
+           JOIN #pup_update_mode p
+             ON p.pup_id = o.pup_id
+          WHERE o.update_mode IS NULL
+            AND p.update_mode IS NOT NULL""")
 
-                        -- Don't send the initial mailer twice.
-                        AND NOT EXISTS (SELECT *
-                                          FROM pub_proc p
-                                          JOIN pub_proc_doc pd
-                                            ON p.id = pd.pub_proc
-                                         WHERE pd.doc_id = protocol.id
-                                           AND p.pub_subset IN ('%s', '%s')
-                                           AND (p.status = 'Success'
-                                            OR p.completed IS NULL))
-                   GROUP BY protocol.id""" % (maxDocs,
-                                              statusPath,
-                                              leadOrgPath,
-                                              modePath,
-                                              brussels,
-                                              sourcePath,
-                                              mailType,
-                                              quarterly))
+        # Select based on update mode.
+        if paper:
+            if electronic:
+                updateMode = "IN ('Web-based', 'Mail')"
+                parms = [['UpdateModes', '[Mail][Web-based]']]
+            else:
+                updateMode = "= 'Mail'"
+                parms = [['UpdateModes', '[Mail]']]
+        else:
+            updateMode = "= 'Web-based'"
+            parms = [['UpdateModes', '[Web-based]']]
+        cursor.execute("""\
+SELECT DISTINCT TOP %d prot_id, prot_ver
+           FROM #lead_orgs
+          WHERE update_mode %s
+       ORDER BY prot_id""" % (maxDocs, updateMode))
         docList = cursor.fetchall()
     except cdrdb.Error, info:
         cdrcgi.bail("Failure retrieving document IDs: %s" % info[1][0])
     #showDocsAndRun(docList)
 
-#----------------------------------------------------------------------
-# Find the protocols which need a quarterly status and participant check.
-#----------------------------------------------------------------------
-elif mailType == 'Protocol-Quarterly status/participant check':
-    try:
-        # From the mailer requirements, section 2.81:  "Regular
-        # Status/Participant Update mailers will be generated for
-        # protocols with Status = Active, and [i.e. or] Approved,
-        # Temporarily Closed [i.e. Approved-not yet active], and
-        # with Source not = NCI Liaison Office, and has flag of
-        # Generate Hardcopy Mailer in Org record [no such flag;
-        # using PreferredContactMode of 'Hardcopy' instead]."
-        # Also, we need to make sure that a successful initial
-        # participant and status check mailer has been sent, and
-        # that the last participant and status check mailer went
-        # out at least three months earlier for the protocols
-        # selected.
-        # [RMK 2002-10-22: Another change in the preferred contact
-        # mode mechanism.  According to the users, we can now regard
-        # any organization with the PreferredContactMode element
-        # present as requesting electronic mailers.]
-        # [RMK 2002-11-14: Changed at Lakshmi's request.  We no
-        # longer check to make sure that three months have elapsed
-        # since the last s&p mailer.]
-        # [RMK 2003-02-05: Check for previous S&P mailer of either
-        # type.]
-        # [RMK 2003-02-13: Specs changed somewhere along the way;
-        # status can be "Active," "Approved-not yet active," or
-        # "Temporarily closed."]
-        cursor.execute("""\
-            SELECT DISTINCT TOP %d protocol.id, MAX(doc_version.num)
-                       FROM document protocol
-                       JOIN doc_version
-                         ON doc_version.id = protocol.id
-                       JOIN query_term prot_status
-                         ON prot_status.doc_id = protocol.id
-                       JOIN query_term lead_org
-                         ON lead_org.doc_id = protocol.id
-
-                      -- Only send mailers for active or approved protocols
-                      WHERE prot_status.value IN ('Active',
-                                                  'Approved-Not Yet Active',
-                                                  'Temporarily closed')
-                        AND prot_status.path         = '%s'
-                        AND lead_org.path            = '%s'
-                        AND doc_version.publishable  = 'Y'
-                        AND doc_version.val_status   = 'V'
-                        AND protocol.active_status   = 'A'
-
-                /*
-                 * Suppressed this clause at Sheri's request; RMK 2003-02-07.
-                 *
-                 *      -- Make sure they've gotten their initial mailer.
-                 *      AND EXISTS (SELECT *
-                 *                    FROM pub_proc orig_mailer
-                 *                    JOIN pub_proc_doc om_doc
-                 *                      ON orig_mailer.id = om_doc.pub_proc
-                 *                   WHERE orig_mailer.status = 'Success'
-                 *                     AND om_doc.doc_id = protocol.id
-                 *                     AND orig_mailer.pub_subset IN ('%s',
-                 *                                                    '%s'))
-                 */
-                        -- Don't send paper to those who want electronic.
-                        AND NOT EXISTS (SELECT *
-                                          FROM query_term
-                                         WHERE doc_id = lead_org.int_val
-                                           AND path = '%s')
-
-                        -- Don't send mailers to Brussels.
-                        AND NOT EXISTS (SELECT *
-                                          FROM query_term
-                                         WHERE value  = '%s'
-                                           AND path   = '%s'
-                                           AND doc_id = protocol.id)
-                   GROUP BY protocol.id""" % (maxDocs,
-                                              statusPath,
-                                              leadOrgPath,
-                                              orgMailType,
-                                              mailType,
-                                              modePath,
-                                              brussels,
-                                              sourcePath))
-        docList = cursor.fetchall()
-    except cdrdb.Error, info:
-        cdrcgi.bail("Failure retrieving document IDs: %s" % info[1][0])
-    #showDocsAndRun(docList)
 
 # Check to make sure we have at least one mailer to send out.
 docCount = len(docList)
@@ -666,7 +717,7 @@ for doc in docList:
 # Drop the job into the queue.
 result = cdr.publish(credentials = session, pubSystem = 'Mailers',
                       pubSubset = mailType, docList = docs,
-                      allowNonPub = 'Y', email = email)
+                      allowNonPub = 'Y', email = email, parms = parms)
 
 # cdr.publish returns a tuple of job id + messages
 # If serious error, job id = None
