@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CdrReport.py,v 1.6 2002-06-07 13:32:12 bkline Exp $
+# $Id: CdrReport.py,v 1.7 2002-08-15 19:17:46 bkline Exp $
 #
 # Prototype for CDR reporting/formatting web wrapper.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2002/06/07 13:32:12  bkline
+# Issue #255: changed report title at Margaret's request.
+#
 # Revision 1.5  2002/02/21 15:22:02  bkline
 # Added navigation buttons.
 #
@@ -43,12 +46,11 @@ elif request == SUBMENU:
 if request and days:
     diff    = "0000-00-%02d" % string.atoi(days)
     parms   = (('InactivityLength', diff),)
-    logon   = ('rmk','***REDACTED***')
-    name    = 'Checked Out Documents With No Activity'
-    report  = cdr.report(logon, name, parms)
+    name    = 'Inactive Checked Out Documents'
+    report  = cdr.report(session, name, parms)
     report  = re.sub("<!\[CDATA\[", "", report)
     report  = re.sub("\]\]>", "", report)
-    html    = cdr.filterDoc(logon, ['name:Inactivity Report Filter'], 
+    html    = cdr.filterDoc(session, ['name:Inactivity Report Filter'], 
                             doc=report)[0]
     html    = unicode(html, 'utf-8').encode('latin-1')
     html    = re.sub('@@DAYS@@', days, html)
