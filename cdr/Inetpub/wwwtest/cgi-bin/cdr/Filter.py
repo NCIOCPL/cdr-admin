@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: Filter.py,v 1.3 2002-01-23 18:50:22 mruben Exp $
+# $Id: Filter.py,v 1.4 2002-07-15 20:18:03 bkline Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2002/01/23 18:50:22  mruben
+# allow up to 8 filters
+#
 # Revision 1.2  2001/04/08 22:56:03  bkline
 # Added Unicode mapping; switched around arguments to filterDoc call.
 #
@@ -46,4 +49,8 @@ doc = re.sub("@@DOCID@@", docId, doc)
 #----------------------------------------------------------------------
 # Send it.
 #----------------------------------------------------------------------
-cdrcgi.sendPage(doc)
+textType = 'html'
+if doc.find("<?xml") != -1:
+    textType = 'xml'
+open('foo.txt', 'wb').write(doc)
+cdrcgi.sendPage(doc, textType)
