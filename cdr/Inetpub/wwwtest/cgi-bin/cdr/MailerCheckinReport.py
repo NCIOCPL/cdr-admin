@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: MailerCheckinReport.py,v 1.1 2002-04-25 02:58:53 bkline Exp $
+# $Id: MailerCheckinReport.py,v 1.2 2003-05-08 20:22:07 bkline Exp $
 #
 # Generates report on mailers for which reponses have been recorded
 # during a specified date range.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2002/04/25 02:58:53  bkline
+# New report for mailer checkin.
+#
 #----------------------------------------------------------------------
 import cdrdb, cdrcgi, cgi, time
 
@@ -15,16 +18,16 @@ import cdrdb, cdrcgi, cgi, time
 fields     = cgi.FieldStorage()
 session    = cdrcgi.getSession(fields)
 request    = cdrcgi.getRequest(fields)
-fromDate   = fields and fields.getvalue('FromDate') or None
-toDate     = fields and fields.getvalue('ToDate')   or None
-mailerType = fields and fields.getvalue('MailerType')  or None
-SUBMENU   = "Report Menu"
-buttons   = ["Submit Request", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-script    = "MailerCheckinReport.py"
-title     = "CDR Administration"
-section   = "Mailer Checkin"
-header    = cdrcgi.header(title, title, section, script, buttons)
-now       = time.localtime(time.time())
+fromDate   = fields and fields.getvalue('FromDate')   or None
+toDate     = fields and fields.getvalue('ToDate')     or None
+mailerType = fields and fields.getvalue('MailerType') or None
+SUBMENU    = "Report Menu"
+buttons    = ["Submit Request", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
+script     = "MailerCheckinReport.py"
+title      = "CDR Administration"
+section    = "Mailer Checkin"
+header     = cdrcgi.header(title, title, section, script, buttons)
+now        = time.localtime(time.time())
 
 #----------------------------------------------------------------------
 # Make sure we're logged in.
@@ -122,20 +125,19 @@ html = """\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>
  <head>
+  <style type='text/css'>
+   body   { font-family: Arial,Helvetica,sans-serif; }
+   h2     { font-size: 13.5pt; font-weight: bold; text-align: center; }
+   td     { font-size: 11pt; text-align: left; }
+   th     { font-size: 12pt; text-align: left; font-weight: bold; }
+   td.r, 
+   th.r   { text-align: right; }
+  </style>
   <title>Mailer Checkin Report %s %s</title>
   <basefont face='Arial, Helvetica, sans-serif'>
  </head>
  <body>
-  <center>
-   <b>
-    <font size='4'>Mailer Responses Checked In</font>
-   </b>
-   <br />
-   <b>
-    <font size='4'>From %s to %s</font>
-   </b>
-  </center>
-  <br />
+  <h2>Mailer Responses Checked In<br>From %s to %s</h2>
   <br />
 """ % (headerMailerType, time.strftime("%m/%d/%Y", now), fromDate, toDate)
    
@@ -158,7 +160,8 @@ try:
                AND t.path = '/Mailer/Type'
                AND c.path = '/Mailer/Response/ChangesCategory'
                %s
-          GROUP BY t.value, c.value""" % typeQual, (fromDate, toDate))
+          GROUP BY t.value, c.value
+          ORDER BY t.value, c.value""" % typeQual, (fromDate, toDate))
     lastMailerType = None
     accumulator    = 0
     row            = cursor.fetchone()
@@ -178,33 +181,17 @@ try:
                 html += """\
   <table border='1' cellspacing='0' cellpadding='2' width='100%%'>
    <tr>
-    <td nowrap='1'>
-     <b>
-      <font size='3'>Mailer Type</font>
-     </b>
-    </td>
-    <td nowrap='1'>
-     <b>
-      <font size='3'>Change Category</font>
-     </b>
-    </td>
-    <td nowrap='1'>
-     <b>
-      <font size='3'>Count</font>
-     </b>
-    </td>
+    <th nowrap='1'>Mailer Type</th>
+    <th nowrap='1'>Change Category</th>
+    <th nowrap='1'>Count</th>
    </tr>
 """
             else:
                 html += """\
    <tr>
+    <th class='r'>Total</td>
     <td>&nbsp;</td>
-    <td>
-     <font size='3'>Subtotal</font>
-    </td>
-    <td align='right'>
-     <font size='3'>%d</font>
-    </td>
+    <th class='r'>%d</td>
    </tr>
    <tr>
     <td colspan='3'>&nbsp;</td>
@@ -213,15 +200,9 @@ try:
             accumulator = 0
         html += """\
    <tr>
-    <td>
-     <font size='3'>%s</font>
-    </td>
-    <td>
-     <font size='3'>%s</font>
-    </td>
-    <td align='right'>
-     <font size='3'>%d</font>
-    </td>
+    <th>%s</td>
+    <td>%s</td>
+    <td class='r'>%d</td>
    </tr>
 """ % (accumulator == 0 and mailerType or "&nbsp;", changeCategory, count)
         accumulator += count
@@ -232,13 +213,9 @@ except cdrdb.Error, info:
 if accumulator:
     html += """\
    <tr>
+    <th class='r'>Total</td>
     <td>&nbsp;</td>
-    <td>
-     <font size='3'>Subtotal</font>
-    </td>
-    <td align='right'>
-     <font size='3'>%d</font>
-    </td>
+    <th class='r'>%d</td>
    </tr>
 """ % accumulator
 
