@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------
-# $Id: GlobalChange.py,v 1.6 2002-11-13 02:39:07 ameyer Exp $
+# $Id: GlobalChange.py,v 1.7 2002-11-20 00:45:35 ameyer Exp $
 #
 # Perform global changes on XML records in the database.
 #
@@ -14,6 +14,9 @@
 # present the next one - to the end.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2002/11/13 02:39:07  ameyer
+# Added support for multiple email addresses.
+#
 # Revision 1.5  2002/09/24 23:40:00  ameyer
 # Fix cgi escape for attribute values with quote marks.
 # Discovered by Bob.
@@ -146,7 +149,7 @@ if not chgType:
   Organization links in protocols</input>
 </td></tr><tr><td>
 <input type='radio' name='chgType' value='%s'>
-  Protocol status of organization</input>
+  Status of protocol site</input>
 </td></tr>
 </table>
 """ % (cdrglblchg.PERSON_CHG, cdrglblchg.ORG_CHG, cdrglblchg.STATUS_CHG)
@@ -291,17 +294,58 @@ sessionVars['restrByLeadOrgChk'] = 'N'
 
 # Input is optional on this form, if no input, then no restriction
 # Did user input an organization ID?
-restrId = fields.getvalue ('restrId', None)
+restrId    = fields.getvalue ('restrId', None)
+restrTitle = fields.getvalue ('restrTitle', None)
 if not restrId:
     # No, perhaps he entered a name
-    restrName = fields.getvalue ("restrName", None)
+    restrName = fields.getvalue ('restrName', None)
     if restrName:
         # Choose matching organization for name
         sendGlblChgPage (chg.getRestrPick (restrName))
 
 else:
     sessionVars['restrId'] = cdr.exNormalize(restrId)[0]
+    if not restrTitle:
+        try:
+            restrTitle = cdrglblchg.verifyId (restrId, 'Organization')
+        except cdrbatch.BatchException, e:
+            cdrcgi.bail ("Error verifying restriction id: %s" % str(e))
+    sessionVars['restrTitle'] = restrTitle
 
+#----------------------------------------------------------------------
+# Get optional restrictions on Principal Investigator involved in a
+#   status change - only when also restricting by lead organization
+#----------------------------------------------------------------------
+restrByPiChk = fields.getvalue ('restrByPiChk', None)
+restrPiId    = fields.getvalue ('restrPiId', None)
+restrPiTitle = fields.getvalue ("restrPiTitle", None)
+restrPiName  = fields.getvalue ('restrPiName', None)
+if chgType == cdrglblchg.STATUS_CHG and restrId:
+    # It's optional, only ask if we haven't already
+    if not restrByPiChk:
+        # Don't check again
+        sessionVars['restrByPiChk'] = 'N'
+        sendGlblChgPage (chg.getRestrPiId())
+
+    # Need to do this here too
+    sessionVars['restrByPiChk'] = 'N'
+
+    # If user entered name instead of ID, translate it
+    if restrPiName and not restrPiId:
+        # Choose matching person ID for name
+        sendGlblChgPage (chg.getRestrPiPick (restrPiName))
+
+    # If we got an id, verify that it's for a person
+    if restrPiId:
+        if not restrPiTitle:
+            try:
+                restrPiTitle = cdrglblchg.verifyId (restrPiId, 'Person')
+            except cdrbatch.BatchException, e:
+                cdrcgi.bail ("Error verifying Principal Investigator id: %s"\
+                             % str(e))
+        # Save the Principal Investigator id and display title
+        sessionVars['restrPiTitle'] = restrPiTitle
+        sessionVars['restrPiId'] = cdr.exNormalize(restrPiId)[0]
 
 #----------------------------------------------------------------------
 # Give user final review
@@ -358,7 +402,6 @@ sessionVars['email'] = email
 args = []
 for var in sessionVars.keys():
     args.append ((var, sessionVars[var]))
-    cdr.logwrite ((str(type(var)), str(type(sessionVars[var]))))
 
 # Create batch job
 newJob = cdrbatch.CdrBatch (jobName="Global Change",
