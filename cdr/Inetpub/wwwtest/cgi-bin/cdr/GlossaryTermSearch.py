@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermSearch.py,v 1.5 2004-10-06 21:07:19 bkline Exp $
+# $Id: GlossaryTermSearch.py,v 1.6 2004-10-20 21:19:58 bkline Exp $
 #
 # Prototype for duplicate-checking interface for GlossaryTerm documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2004/10/06 21:07:19  bkline
+# Fixed paths for definition text.
+#
 # Revision 1.4  2004/09/17 17:42:06  venglisc
 # Creating drop-down TermStatus list populated from the database (Bug 1335).
 #
@@ -116,7 +119,7 @@ except cdrdb.Error, info:
 # Create the results page.
 #----------------------------------------------------------------------
 html = cdrcgi.advancedSearchResultsPage("Glossary Term", rows, strings, 
-        "name:Glossary Term Advanced Search Display")
+        "name:Glossary Term Advanced Search Display", session = session)
 
 #----------------------------------------------------------------------
 # Send the page back to the browser.
