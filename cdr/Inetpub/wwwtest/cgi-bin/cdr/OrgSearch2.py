@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: OrgSearch2.py,v 1.1 2001-12-01 18:11:44 bkline Exp $
+# $Id: OrgSearch2.py,v 1.2 2002-02-14 19:37:23 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Organization documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2001/12/01 18:11:44  bkline
+# Initial revision
+#
 # Revision 1.1  2001/07/17 19:17:43  bkline
 # Initial revision
 #
@@ -73,17 +76,21 @@ searchFields = (cdrcgi.SearchField(orgName,
                              "/Organization/OrganizationNameInformation/"
                              "AlternateName")),
                 cdrcgi.SearchField(city,
-                            ("/Organization/OrganizationLocations/Location/"
-                             "PostalAddress/City",)),
+                            ("/Organization/OrganizationLocations/"
+                             "OrganizationLocation/Location/PostalAddress/"
+                             "City",)),
                 cdrcgi.SearchField(state,
-                            ("/Organization/OrganizationLocations/Location/"
-                             "PostalAddress/PoliticalUnit_State/@cdr:ref",)),
+                            ("/Organization/OrganizationLocations/"
+                             "OrgzniationLocation/Location/PostalAddress/"
+                             "PoliticalSubUnit_State/@cdr:ref",)),
                 cdrcgi.SearchField(country,
-                            ("/Organization/OrganizationLocations/Location/"
-                             "PostalAddress/Country/@cdr:ref",)),
+                            ("/Organization/OrganizationLocations/"
+                             "OrganizationLocation/Location/PostalAddress/"
+                             "Country/@cdr:ref",)),
                 cdrcgi.SearchField(zip,
-                            ("/Organization/OrganizationLocations/Location/"
-                             "PostalAddress/PostalCode_ZIP",)))
+                            ("/Organization/OrganizationLocations/"
+                             "OrganizationLocation/Location/PostalAddress/"
+                             "PostalCode_ZIP",)))
 
 #----------------------------------------------------------------------
 # Construct the query.
@@ -110,7 +117,8 @@ except cdrdb.Error, info:
 # Create the results page.
 #----------------------------------------------------------------------
 html = cdrcgi.advancedSearchResultsPage("Organization", rows, strings, 
-                                        'CDR266295')
+                    'name:Organization Denormalized XML filter&Filter1='
+                    'name:Organization QC Report Filter')
 
 #----------------------------------------------------------------------
 # Send the page back to the browser.
