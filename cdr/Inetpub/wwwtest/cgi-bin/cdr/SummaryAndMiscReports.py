@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryAndMiscReports.py,v 1.7 2003-06-02 14:24:45 bkline Exp $
+# $Id: SummaryAndMiscReports.py,v 1.8 2003-06-13 20:31:17 bkline Exp $
 #
 # Submenu for summary and miscellanous document reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.7  2003/06/02 14:24:45  bkline
+# Plugged in two new summary reports.
+#
 # Revision 1.6  2003/05/08 20:26:42  bkline
 # New summary reports.
 #
@@ -109,7 +112,7 @@ form += """\
     <OL>
 """
 reports = [
-           ('Stub.py?', 'Changes to Summaries'),
+           # ('Stub.py?', 'Changes to Summaries'),
            ('SummaryChanges.py?', 'History of Changes to Summary'),
            ('PdqBoards.py?', 'PDQ Board Listings'),
            ('SummaryCitations.py?', 'Summaries Citation'),
