@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------
-# $Id: GlobalChange.py,v 1.3 2002-08-09 03:49:15 ameyer Exp $
+# $Id: GlobalChange.py,v 1.4 2002-08-27 22:45:40 ameyer Exp $
 #
 # Perform global changes on XML records in the database.
 #
@@ -14,6 +14,11 @@
 # present the next one - to the end.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2002/08/09 03:49:15  ameyer
+# Changes for organization status protocol global change.
+# Some small cosmetic changes.
+# Needs some work on sendGlblChgPage.  See commented out except clause.
+#
 # Revision 1.2  2002/08/02 03:33:48  ameyer
 # First fully working version.  Needs more test and have to add 3rd type
 # of global change.
@@ -189,8 +194,17 @@ sessionVars['fromTitle'] = fromTitle
 #----------------------------------------------------------------------
 # Get fragment if not already supplied
 #----------------------------------------------------------------------
+# Did we already ask for a from fragment?  If not, we will
+didFromFrag = fields.getvalue ("didFromFrag", None)
+sessionVars['didFromFrag'] = 'Y'
+
+# We prompt for a fragment id under the following circumstances:
+#   Don't already have one
+#   This is a person global change (from fragment is required).
+#   This is an org change (from fragment is optional) and we haven't
+#     already asked for a fragment
 if not fromFragment and (chgType == cdrglblchg.PERSON_CHG or
-                         chgType == cdrglblchg.ORG_CHG):
+                         (chgType == cdrglblchg.ORG_CHG and not didFromFrag)):
     try:
         sendGlblChgPage (chg.genFragPickListHtml('from'))
     except cdrbatch.BatchException, e:
@@ -226,7 +240,10 @@ if chgType == cdrglblchg.PERSON_CHG or chgType == cdrglblchg.ORG_CHG:
     #------------------------------------------------------------------
     # Get fragment if not already supplied
     #------------------------------------------------------------------
-    if not toFragment:
+    # See comments on didFromFrag
+    didToFrag = fields.getvalue ("didToFrag", None)
+    sessionVars['didToFrag'] = 'Y'
+    if not toFragment and (chgType == cdrglblchg.PERSON_CHG or not didToFrag):
         try:
             sendGlblChgPage (chg.genFragPickListHtml('to'))
         except cdrbatch.BatchException, e:
