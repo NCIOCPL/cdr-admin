@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtSearch.py,v 1.13 2003-12-17 01:21:33 bkline Exp $
+# $Id: ProtSearch.py,v 1.14 2004-04-06 18:52:37 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Protocol documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.13  2003/12/17 01:21:33  bkline
+# Added code to pass session to results page function (to support
+# CTGovProtocol report).
+#
 # Revision 1.12  2003/12/17 01:06:00  bkline
 # Added support for CTGovProtocol documents.
 #
@@ -55,6 +59,7 @@ idNums    = fields and fields.getvalue("IdNums")           or None
 submit    = fields and fields.getvalue("SubmitButton")     or None
 help      = fields and fields.getvalue("HelpButton")       or None
 dispFmt   = fields and fields.getvalue("DispFormat")       or 'fu'
+docType   = fields and fields.getvalue("DocType")          or 'All'
 if help: 
     cdrcgi.bail("Sorry, help for this interface has not yet been developed.")
 
@@ -98,14 +103,25 @@ def makeDispFormat(fieldName):
         checked = ""
     return field
 
+def makeDoctypePicklist():
+    return """\
+      <BR>
+      <SELECT   NAME        = "DocType"
+                SIZE        = "1">
+       <OPTION  SELECTED>All</OPTION>
+       <OPTION>CTGovProtocol</OPTION>
+       <OPTION>InScopeProtocol</OPTION>
+       <OPTION>OutOfScopeProtocol</OPTION>
+      </SELECT>
+"""
 #----------------------------------------------------------------------
 # Display the search form.
 #----------------------------------------------------------------------
 if not submit:
     fields = (('Title',                        'Title'),
               ('Protocol ID Numbers',          'IdNums'))
-    extraField = ('<br>Display Format', makeDispFormat('DispFormat'))
-              #('Diaplay Format:',               'DispFormat', makeDispFormat))
+    extraFields = (('<br>Display Format', makeDispFormat('DispFormat')),
+                   ('<br>Document Type', makeDoctypePicklist()))
     buttons = (('submit', 'SubmitButton', 'Search'),
                ('submit', 'HelpButton',   'Help'),
                ('reset',  'CancelButton', 'Clear'))
@@ -116,7 +132,7 @@ if not submit:
                                           buttons,
                                           'Protocol',
                                           conn,
-                                          extraField = extraField)
+                                          extraField = extraFields)
     page += """\
   </FORM>
  </BODY>
@@ -127,13 +143,22 @@ if not submit:
 #----------------------------------------------------------------------
 # Define the search fields used for the query.
 #----------------------------------------------------------------------
-searchFields = (cdrcgi.SearchField(title,
+def selectPaths(docType, paths):
+    if docType == 'All':
+        return paths
+    p = []
+    for path in paths:
+        if path.startswith("/%s/" % docType):
+            p.append(path)
+    return p
+
+searchFields = (cdrcgi.SearchField(title, selectPaths(docType, 
                             ("/InScopeProtocol/ProtocolTitle",
                              "/OutOfScopeProtocol/ProtocolTitle/TitleText",
                              "/ScientificProtocolInfo/ProtocolTitle",
                              "/CTGovProtocol/BriefTitle",
-                             "/CTGovProtocol/OfficialTitle")),
-                cdrcgi.SearchField(idNums,
+                             "/CTGovProtocol/OfficialTitle"))),
+                cdrcgi.SearchField(idNums, selectPaths(docType,
                             ("/InScopeProtocol/ProtocolIDs/PrimaryID/IDString",
                              "/InScopeProtocol/ProtocolIDs/OtherID/IDString",
                              "/OutOfScopeProtocol"
@@ -144,16 +169,20 @@ searchFields = (cdrcgi.SearchField(title,
                              "/ProtocolIDs/PrimaryID/IDString",
                              "/ScientificProtocolInfo"
                              "/ProtocolIDs/OtherID/IDString",
-                             "/CTGovProtocol/IDInfo/OrgStudyID")))
+                             "/CTGovProtocol/IDInfo/OrgStudyID",
+                             "/CTGovProtocol/IDInfo/NCTID"))))
 
 #----------------------------------------------------------------------
 # Construct the query.
 #----------------------------------------------------------------------
-(query, strings) = cdrcgi.constructAdvancedSearchQuery(searchFields, boolOp, 
-                                                   ("InScopeProtocol",
-                                                    "OutOfScopeProtocol",
-                                                    "ScientificProtocolInfo",
-                                                    "CTGovProtocol"))
+docTypes = ("InScopeProtocol",
+            "OutOfScopeProtocol",
+            "ScientificProtocolInfo",
+            "CTGovProtocol")
+if docType != 'All':
+    docTypes = docType
+(query, strings) = cdrcgi.constructAdvancedSearchQuery(searchFields, boolOp,
+                                                       docTypes)
 if not query:
     cdrcgi.bail('No query criteria specified')
 #cdrcgi.bail("QUERY: [%s]" % query)
@@ -173,11 +202,15 @@ except cdrdb.Error, info:
 #----------------------------------------------------------------------
 # Create the results page.
 #----------------------------------------------------------------------
-html = cdrcgi.advancedSearchResultsPage("Protocol", rows, strings, 
-    {'InScopeProtocol':'set:%s' % fmts[dispFmt].filterSet,
+filters = {
+     'InScopeProtocol':'set:%s' % fmts[dispFmt].filterSet,
      'OutOfScopeProtocol':'name:Health Professional QC Content Report',
      'ScientificProtocolInfo':'name:Health Professional QC Content Report',
-     'CTGovProtocol':'name:CTGovProtocol QC Report'}, session)
+     'CTGovProtocol':'name:CTGovProtocol QC Report'}
+if docType != 'All':
+    filters = filters[docType]
+html = cdrcgi.advancedSearchResultsPage("Protocol", rows, strings,
+                                        filters, session)
 
 #----------------------------------------------------------------------
 # Send the page back to the browser.
