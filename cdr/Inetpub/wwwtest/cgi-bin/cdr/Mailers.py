@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: Mailers.py,v 1.3 2002-02-21 22:34:00 bkline Exp $
+# $Id: Mailers.py,v 1.4 2002-03-19 23:46:36 ameyer Exp $
 #
 # Main menu for mailer jobs.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2002/02/21 22:34:00  bkline
+# Added navigation buttons.
+#
 # Revision 1.2  2001/12/25 01:19:06  bkline
 # Added missing </A> tag; added two mailers.
 #
@@ -36,15 +39,18 @@ if action == cdrcgi.MAINMENU:
 #----------------------------------------------------------------------
 form = "<OL>\n"
 reports = [('PDQMailerRequestForm.py', 'PDQ Editorial Board Members Mailing'),
-           ('ProtAbstractMailerReqForm.py', 
+           ('ProtAbstractMailerReqForm.py',
             'Protocol Abstract Initial Verification Mailer'),
-           ('ProtAbstractUpdateMailer.py', 
+           ('ProtAbstractUpdateMailer.py',
             'Protocol Abstract Update Mailer'),
-           ('StatAndParticMailer.py', 
+           ('StatAndParticMailer.py',
             'Protocol Status and Participant Initial Verification Mailer'),
-           ('StatAndParticUpdateMailer.py', 
+           ('StatAndParticUpdateMailer.py',
             'Protocol Status and Participant Update Verification Mailer'),
-           ('NewPhysicianInitMailerReqForm.py', 'New Physician Initial Mailer')]
+           ('NewPhysicianInitMailerReqForm.py',
+            'New Physician Initial Mailer'),
+           ('DirectoryMailerReqForm.py',
+            'Directory Mailers')]
 
 for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s'>%s</A></LI>\n" % (
