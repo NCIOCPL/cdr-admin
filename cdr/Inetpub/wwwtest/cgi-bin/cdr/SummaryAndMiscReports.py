@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryAndMiscReports.py,v 1.3 2002-06-06 12:01:09 bkline Exp $
+# $Id: SummaryAndMiscReports.py,v 1.4 2002-12-26 19:40:41 bkline Exp $
 #
 # Submenu for summary and miscellanous document reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2002/06/06 12:01:09  bkline
+# Custom handling for Person and Summary QC reports.
+#
 # Revision 1.2  2002/05/25 02:39:13  bkline
 # Removed extra blank lines from HTML output.
 #
@@ -47,6 +50,7 @@ if action == "Log Out":
 form = """\
     <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
     <H3>QC Reports</H3>
+    <H4>Health Professional/Old Format Patient Summaries</H4>
     <OL>
 """ % (cdrcgi.SESSION, session)
 reports = [
@@ -55,8 +59,7 @@ reports = [
            ('QcReport.py?DocType=Summary&ReportType=nm&', 
             'No Markup QC Report'),
            ('QcReport.py?DocType=Summary&ReportType=rs&', 
-            'Redline/Strikeout QC Report'),
-           ('MiscSearch.py?', 'Miscellaneous Documents QC Report')
+            'Redline/Strikeout QC Report')
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s%s=%s'>%s</LI>\n" % (
@@ -64,14 +67,42 @@ for r in reports:
 
 form += """\
     </OL>
-    <H3>Management Reports</H3>
+    <H4>New Format Patient Summaries</H4>
     <OL>
 """
 reports = [
-           ('PdqBoards.py', 'PDQ Boards')
+           ('QcReport.py?DocType=Summary&ReportType=rs&', 
+            'Redline/Strikeout QC Report'),
+           ('QcReport.py?DocType=Summary&ReportType=nm&', 
+            'No Markup QC Report')
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI>\n" % (
             cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
+
+form += """\
+    </OL>
+    <H4>Miscellaneous Documents</H4>
+    <OL>
+"""
+reports = [
+           ('MiscSearch.py?', 'Miscellaneous Documents QC Report')
+          ]
+for r in reports:
+    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI>\n" % (
+            cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
+
+form += """\
+    </OL>
+    <H4>Management Reports</H4>
+    <OL>
+"""
+reports = [
+           ('PdqBoards.py', 'PDQ Board Listings')
+          ]
+for r in reports:
+    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI>\n" % (
+            cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
+
 
 cdrcgi.sendPage(header + form + "</OL></FORM></BODY></HTML>")
