@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: Reports.py,v 1.19 2003-02-13 23:03:01 pzhang Exp $
+# $Id: Reports.py,v 1.20 2004-09-20 20:31:11 venglisc Exp $
 #
 # Prototype for editing CDR linking tables.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.19  2003/02/13 23:03:01  pzhang
+# Added Publishling item.
+#
 # Revision 1.18  2002/05/24 20:40:38  bkline
 # Fixed misnamed variable (request changed to action).
 #
@@ -91,17 +94,18 @@ if action == "Log Out":
 form = "<INPUT TYPE='hidden' NAME='%s' VALUE='%s'><OL>\n" % (cdrcgi.SESSION,
                                                              session)
 reports = [
-           ('GeneralReports.py', 'General Reports'),
-           ('CitationReports.py', 'Citations'),
-           ('GeographicReports.py', 'Geographic'),
+           ('GeneralReports.py',      'General Reports'),
+           ('CitationReports.py',     'Citations'),
+	   ('CdrDocumentation.py',    'Documentation (as of 2004-09-08)'),
+           ('GeographicReports.py',   'Geographic'),
            ('GlossaryTermReports.py', 'Glossary Terms'),
-           ('MailerReports.py', 'Mailers'),
-           ('PubStatus.py', 'Publishing'),
+           ('MailerReports.py',       'Mailers'),
+           ('PubStatus.py',           'Publishing'),
            ('PersonAndOrgReports.py', 'Persons and Organizations'),
-           ('ProtocolReports.py', 'Protocols'),
+           ('ProtocolReports.py',     'Protocols'),
            ('SummaryAndMiscReports.py', 
-            'Summaries and Miscellaneous Documents'),
-           ('TerminologyReports.py', 'Terminology')
+                                      'Summaries and Miscellaneous Documents'),
+           ('TerminologyReports.py',  'Terminology')
           ]
 
 for r in reports:
