@@ -1,11 +1,16 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.26 2003-08-27 16:39:28 venglisc Exp $
+# $Id: QcReport.py,v 1.27 2003-09-04 21:31:01 bkline Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.26  2003/08/27 16:39:28  venglisc
+# Modified code to include the report type but (bold/underline test)
+# to pass the additional parameter just as report type bu (bold/underline)
+# does.
+#
 # Revision 1.25  2003/08/25 20:27:30  bkline
 # Plugged in support for displaying StandardWording markup in patient
 # summary QC report.
@@ -131,6 +136,7 @@ docTitle = fields.getvalue("DocTitle")   or None
 version  = fields.getvalue("DocVersion") or None
 glossary = fields.getvalue("Glossary")   or None
 standardWording = fields.getvalue("ShowStandardWording") or None
+displayComments = fields.getvalue("DisplayCommentElements") or None
 insRevLvls  = fields.getvalue("revLevels")  or None
 delRevLvls  = fields.getvalue("delRevLevels")  or None
 if not insRevLvls:
@@ -291,6 +297,9 @@ if docType == 'Summary' and repType and not version:
   <BR>
   <INPUT TYPE='checkbox' NAME='ShowStandardWording'>&nbsp;&nbsp;
   Show standard wording with mark-up?<BR>
+  <BR>
+  <INPUT TYPE='checkbox' NAME='DisplayCommentElements' CHECKED='1'>&nbsp;&nbsp;
+  Display comment elements?<BR>
 """
     cdrcgi.sendPage(header + form + """  
  </BODY>
@@ -470,6 +479,9 @@ if not filters.has_key(docType):
 filterParm = []
 if insRevLvls:
     filterParm = [['insRevLevels', insRevLvls]]
+if docType == 'Summary':
+    filterParm.append(['DisplayComments',
+                       displayComments and 'Y' or 'N'])
 if repType == "bu" or repType == "but":
     filterParm.append(['delRevLevels', 'Y'])
 if repType == "pat":
