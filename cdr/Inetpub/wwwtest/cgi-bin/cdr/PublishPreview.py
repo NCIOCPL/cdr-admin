@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: PublishPreview.py,v 1.6 2002-04-11 19:41:48 bkline Exp $
+# $Id: PublishPreview.py,v 1.7 2002-04-12 19:57:20 bkline Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2002/04/11 19:41:48  bkline
+# Plugged in some new filters.
+#
 # Revision 1.5  2002/04/11 14:07:49  bkline
 # Added denormalization filter for Organization documents.
 #
@@ -52,7 +55,8 @@ filters = {
         ["name:Person Denormalized XML Filter",
          "name:Person QC Report Filter"],
     'InScopeProtocol':  
-        ["name:Protocol Display for CDR"],
+        ["name:Protocol Denormalization Filter (InScope)",
+         "name:Health Professional Protocol QC Content Report"],
     'Term':             
         ["name:Denormalized Term XML Filter",
          "name:Terminology QC Report Filter"]
