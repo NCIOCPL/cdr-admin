@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryAndMiscReports.py,v 1.8 2003-06-13 20:31:17 bkline Exp $
+# $Id: SummaryAndMiscReports.py,v 1.9 2003-08-01 21:02:49 bkline Exp $
 #
 # Submenu for summary and miscellanous document reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.8  2003/06/13 20:31:17  bkline
+# Suppressed menu item for "Changes to Summaries" report at Margaret's
+# request.
+#
 # Revision 1.7  2003/06/02 14:24:45  bkline
 # Plugged in two new summary reports.
 #
@@ -117,6 +121,7 @@ reports = [
            ('PdqBoards.py?', 'PDQ Board Listings'),
            ('SummaryCitations.py?', 'Summaries Citation'),
            ('SummaryDateLastModified.py?', 'Summaries Date Last Modified'),
+           ('SummaryMetaData.py?', 'Summary Metadata'),
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s%s=%s'>%s</LI>\n" % (
