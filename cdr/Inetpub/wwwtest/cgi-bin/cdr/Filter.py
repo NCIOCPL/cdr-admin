@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: Filter.py,v 1.14 2002-09-24 20:59:52 pzhang Exp $
+# $Id: Filter.py,v 1.15 2002-09-25 15:03:43 pzhang Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.14  2002/09/24 20:59:52  pzhang
+# Added 'last' and 'lastp' for Doc Version input.
+#
 # Revision 1.13  2002/09/24 20:12:28  pzhang
 # Added DocVersion to the page.
 #
@@ -56,7 +59,7 @@ title   = "CDR Formatting"
 fields  = cgi.FieldStorage() or cdrcgi.bail("No Request Found", title)
 session = 'guest'
 docId   = fields.getvalue(cdrcgi.DOCID) or cdrcgi.bail("No Document", title)
-docVer  = fields.getvalue('DocVer') or cdrcgi.bail("No Doc Version", title)
+docVer  = fields.getvalue('DocVer') or 0
 docVers = cdr.lastVersions('guest', docId)
 if docVer == 'last':
     docVer = '%d' % docVers[0]
