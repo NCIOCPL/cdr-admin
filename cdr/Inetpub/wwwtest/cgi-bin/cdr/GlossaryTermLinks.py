@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermLinks.py,v 1.2 2002-03-20 20:08:14 bkline Exp $
+# $Id: GlossaryTermLinks.py,v 1.3 2003-06-02 14:18:42 bkline Exp $
 #
 # Report of documents linking to a specified glossary term.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/03/20 20:08:14  bkline
+# Added description to header comment.
+#
 # Revision 1.1  2002/03/20 18:39:02  bkline
 # Report of documents linking to a specified glossary term.
 #
@@ -246,7 +249,7 @@ try:
         #cdrcgi.bail(resp[0])
         if type(resp) in (type(''), type(u'')):
             cdrcgi.bail(resp)
-        html += resp[0]
+        html += cdrcgi.decode(resp[0])
         row = cursor.fetchone()
 
 except cdrdb.Error, info:
