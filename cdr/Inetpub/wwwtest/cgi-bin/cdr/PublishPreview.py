@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: PublishPreview.py,v 1.8 2002-04-18 21:46:59 bkline Exp $
+# $Id: PublishPreview.py,v 1.9 2002-05-08 17:41:53 bkline Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.8  2002/04/18 21:46:59  bkline
+# Plugged in some additional filters from Cheryl.
+#
 # Revision 1.7  2002/04/12 19:57:20  bkline
 # Installed new filters.
 #
@@ -43,27 +46,27 @@ docId   = fields.getvalue(cdrcgi.DOCID) or cdrcgi.bail("No Document", title)
 #----------------------------------------------------------------------
 filters = {
     'Summary':
-        ["name:Summary Filter1",
-         "name:Summary Filter2",
-         "name:Summary Filter3",
-         "name:Summary Filter4",
-         "name:Summary Filter5",
+        ["name:Denormalization Filter (1/5): Summary",
+         "name:Denormalization Filter (2/5): Summary",
+         "name:Denormalization Filter (3/5): Summary",
+         "name:Denormalization Filter (4/5): Summary",
+         "name:Denormalization Filter (5/5): Summary",
          "name:Health Professional Summary Report"],
     'GlossaryTerm':         
         ["name:Glossary Term QC Report Filter"],
     'Citation':         
         ["name:Citation QC Report"],
     'Organization':     
-        ["name:Organization Denormalized XML Filter",
+        ["name:Denormalization Filter (1/1): Organization",
          "name:Organization QC Report Filter"],
     'Person':           
-        ["name:Person Denormalized XML Filter",
+        ["name:Denormalization Filter (1/1): Person",
          "name:Person QC Report Filter"],
     'InScopeProtocol':  
-        ["name:Protocol Denormalization Filter (InScope)",
+        ["name:Denormalization Filter (1/1): InScope Protocol",
          "name:Health Professional Protocol QC Content Report"],
     'Term':             
-        ["name:Denormalized Term XML Filter",
+        ["name:Denormalization Filter (1/1): Terminology",
          "name:Terminology QC Report Filter"]
 }
 

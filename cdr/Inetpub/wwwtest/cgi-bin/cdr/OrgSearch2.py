@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: OrgSearch2.py,v 1.3 2002-02-20 03:59:34 bkline Exp $
+# $Id: OrgSearch2.py,v 1.4 2002-05-08 17:41:50 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Organization documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2002/02/20 03:59:34  bkline
+# Modified code to match changes in schemas.
+#
 # Revision 1.2  2002/02/14 19:37:23  bkline
 # Modified search elements to match schema changes; fixed display filter.
 #
@@ -126,7 +129,7 @@ except cdrdb.Error, info:
 # Create the results page.
 #----------------------------------------------------------------------
 html = cdrcgi.advancedSearchResultsPage("Organization", rows, strings, 
-                    'name:Organization Denormalized XML filter&Filter1='
+                    'name:Denormalization Filter (1/1): Organization&Filter1='
                     'name:Organization QC Report Filter')
 
 #----------------------------------------------------------------------

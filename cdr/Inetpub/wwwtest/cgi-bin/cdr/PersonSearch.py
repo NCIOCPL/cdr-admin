@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PersonSearch.py,v 1.3 2002-04-12 19:57:19 bkline Exp $
+# $Id: PersonSearch.py,v 1.4 2002-05-08 17:41:51 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Person documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2002/04/12 19:57:19  bkline
+# Installed new filters.
+#
 # Revision 1.2  2002/02/14 19:38:41  bkline
 # Replaced hardwired filter ID with filter name.
 #
@@ -142,8 +145,8 @@ except cdrdb.Error, info:
 # Create the results page.
 #----------------------------------------------------------------------
 html = cdrcgi.advancedSearchResultsPage("Person", rows, strings, 
-                                        'name:Person Denormalized XML Filter&'
-                                        'Filter1=name:Person QC Report Filter')
+                                'name:Denormalization Filter (1/1): Person&'
+                                'Filter1=name:Person QC Report Filter')
 
 #----------------------------------------------------------------------
 # Send the page back to the browser.

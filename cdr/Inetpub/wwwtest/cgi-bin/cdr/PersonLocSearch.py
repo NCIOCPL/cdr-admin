@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PersonLocSearch.py,v 1.3 2002-04-12 19:57:19 bkline Exp $
+# $Id: PersonLocSearch.py,v 1.4 2002-05-08 17:41:50 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Person documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2002/04/12 19:57:19  bkline
+# Installed new filters.
+#
 # Revision 1.2  2002/02/14 19:38:53  bkline
 # Replaced hardwired filter ID with filter name.
 #
@@ -114,7 +117,7 @@ for i in range(len(rows)):
 </TD>
 </TR>
 """ % (i + 1, cgi.escape(title, 1), '/cgi-bin/cdr/Filter.py', 
-       docId, 'name:Person Denormalized XML Filter&'
+       docId, 'name:Denormalization Filter (1/1): Person&'
        'Filter1=name:Person QC Report Filter', docId)
     parms = (('docId', docId), ('repName', 'dummy'))
     response = cdr.filterDoc(session, ['name:Person Locations Picklist'],

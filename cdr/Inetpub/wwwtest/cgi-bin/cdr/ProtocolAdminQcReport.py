@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolAdminQcReport.py,v 1.1 2002-04-22 13:54:06 bkline Exp $
+# $Id: ProtocolAdminQcReport.py,v 1.2 2002-05-08 17:41:52 bkline Exp $
 #
 # Protocol Admin QC Report.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2002/04/22 13:54:06  bkline
+# New QC reports.
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, cdrdb, re
 
@@ -18,12 +21,10 @@ docId   = fields.getvalue(cdrcgi.DOCID) or cdrcgi.bail("No Document", title)
 
 #----------------------------------------------------------------------
 # Map for finding the filters for this document type.
-# XXX Get the real filters!
 #----------------------------------------------------------------------
 filters = [
-    "name:Protocol Denormalization Filter (InScope)",
-    "name:Protocol XML for Patient QC Report",
-    "name:Protocol Patient QC Content Report filter"
+    "name:Denormalization Filter (1/1): InScope Protocol",
+    "name:InScope Protocol Administrative Report Filter"
 ]
 
 #----------------------------------------------------------------------

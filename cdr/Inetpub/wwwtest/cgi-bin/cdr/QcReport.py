@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.2 2002-05-03 20:30:22 bkline Exp $
+# $Id: QcReport.py,v 1.3 2002-05-08 17:41:53 bkline Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/05/03 20:30:22  bkline
+# New filters and filter names.
+#
 # Revision 1.1  2002/04/22 13:54:07  bkline
 # New QC reports.
 #
@@ -25,28 +28,28 @@ docId   = fields.getvalue(cdrcgi.DOCID) or cdrcgi.bail("No Document", title)
 #----------------------------------------------------------------------
 filters = {
     'Summary':
-        ["name:Summary Filter1",
-         "name:Summary Filter2",
-         "name:Summary Filter3",
-         "name:Summary Filter4",
-         "name:Summary Filter5",
+        ["name:Denormalization Filter (1/5): Summary",
+         "name:Denormalization Filter (2/5): Summary",
+         "name:Denormalization Filter (3/5): Summary",
+         "name:Denormalization Filter (4/5): Summary",
+         "name:Denormalization Filter (5/5): Summary",
          "name:Health Professional Summary Report"],
     'GlossaryTerm':         
         ["name:Glossary Term QC Report Filter"],
     'Citation':         
         ["name:Citation QC Report"],
     'Organization':     
-        ["name:Organization Denormalized XML Filter",
+        ["name:Denormalization Filter (1/1): Organization",
          "name:Organization QC Report Filter"],
     'Person':           
-        ["name:Person Denormalized XML Filter",
+        ["name:Denormalization Filter (1/1): Person",
          "name:Person QC Report Filter"],
     'InScopeProtocol':  
-        ["name:Denormalization Filter: InScope Protocol",
+        ["name:Denormalization Filter (1/1): InScope Protocol",
          "name:Create InScope Protocol XML for Full Protocol QC Report",
          "name:InScope Protocol Full QC Report"],
     'Term':             
-        ["name:Denormalized Term XML Filter",
+        ["name:Denormalization Filter (1/1): Terminology",
          "name:Terminology QC Report Filter"],
     'MiscellaneousDocument':
         ["name:Miscellaneous Document Report Filter"]
