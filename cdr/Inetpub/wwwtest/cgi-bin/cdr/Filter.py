@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: Filter.py,v 1.10 2002-09-19 21:00:15 pzhang Exp $
+# $Id: Filter.py,v 1.11 2002-09-19 21:16:02 pzhang Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.10  2002/09/19 21:00:15  pzhang
+# Display all filter sets when no filter is given.
+#
 # Revision 1.9  2002/09/16 16:58:36  pzhang
 # Stripped off whitespaces in filters
 #
@@ -132,7 +135,9 @@ def qcFilterSets(docId, filterId = None):
     html += """<TR><TD><FONT COLOR=BLACK><B>Set Name</B></FONT></TD>
             <TD><CENTER><B>Action</B></CENTER></TD><TD><B><FONT 
             COLOR=BLACK>Set Detail</B></FONT></TD></TR>\n"""
-    for key in filterSets.keys():
+    keys = filterSets.keys()
+    keys.sort()
+    for key in keys:
         if not dispFilterSet(key, filterSets, filterId):
             continue
 
