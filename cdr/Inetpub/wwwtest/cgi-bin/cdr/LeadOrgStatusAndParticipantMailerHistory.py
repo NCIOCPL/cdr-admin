@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: LeadOrgStatusAndParticipantMailerHistory.py,v 1.1 2003-11-10 18:06:58 bkline Exp $
+# $Id: LeadOrgStatusAndParticipantMailerHistory.py,v 1.2 2003-12-18 01:25:25 bkline Exp $
 #
 # Reports on the history of S&P mailers for a particular protocol.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2003/11/10 18:06:58  bkline
+# Reports on the history of S&P mailers for a particular protocol.
+#
 #----------------------------------------------------------------------
 import cdrdb, cdrcgi, cgi, re, string, time, cdr, xml.dom.minidom
 
@@ -142,7 +145,7 @@ LEFT OUTER JOIN query_term change_type
     for (mailerJobId, protocolId, replyDate, changeType, mailerDate,
          pupId, mailerId) in cursor.fetchall():
         if mailerJobs.has_key(mailerJobId):
-            mailerJob = mailerJobs(mailerJobId)
+            mailerJob = mailerJobs[mailerJobId]
         else:
             mailerJobs[mailerJobId] = mailerJob = MailerJob(mailerJobId,
                                                             mailerDate)
