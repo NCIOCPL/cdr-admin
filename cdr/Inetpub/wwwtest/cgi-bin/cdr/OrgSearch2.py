@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: OrgSearch2.py,v 1.5 2002-06-04 20:19:34 bkline Exp $
+# $Id: OrgSearch2.py,v 1.6 2002-06-28 20:13:57 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Organization documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2002/06/04 20:19:34  bkline
+# Fixed typos in query_term paths.
+#
 # Revision 1.4  2002/05/08 17:41:50  bkline
 # Updated to reflect Volker's new filter names.
 #
@@ -132,8 +135,7 @@ except cdrdb.Error, info:
 # Create the results page.
 #----------------------------------------------------------------------
 html = cdrcgi.advancedSearchResultsPage("Organization", rows, strings, 
-                    'name:Denormalization Filter (1/1): Organization&Filter1='
-                    'name:Organization QC Report Filter')
+                                        None, session)
 
 #----------------------------------------------------------------------
 # Send the page back to the browser.
