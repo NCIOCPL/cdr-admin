@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: LiaisonReport.py,v 1.3 2003-01-02 14:18:47 bkline Exp $
+# $Id: LiaisonReport.py,v 1.4 2003-08-25 20:13:49 bkline Exp $
 #
 # NCI Liaison Office/Brussels Protocol Report.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2003/01/02 14:18:47  bkline
+# Fixed typo on <style> attribute.
+#
 # Revision 1.2  2002/10/18 13:53:51  bkline
 # Added more filtering to SQL query; cosmetic change.
 #
@@ -99,6 +102,31 @@ def protSorter(k1, k2):
     else:
         return cmp(id1, id2)
 
+#----------------------------------------------------------------------
+# Get the protocol original title.
+#----------------------------------------------------------------------
+def getOriginalTitle(id):
+    xslScript = """\
+<?xml version='1.0'?>
+<xsl:transform             xmlns:xsl = 'http://www.w3.org/1999/XSL/Transform'
+                           xmlns:cdr = 'cips.nci.nih.gov/cdr'
+                             version = '1.0'>
+
+ <xsl:output                  method = 'xml'/>
+ <xsl:template                 match = '/'>
+  <OriginalTitle>
+   <xsl:value-of              select = 'InScopeProtocol/ProtocolTitle
+                                        [@Type="Original"]'/>
+  </OriginalTitle>
+ </xsl:template>
+</xsl:transform>
+"""
+    response = cdr.filterDoc('guest', xslScript, id, inline = 1)
+    if type(response) in (type(""), type(u"")):
+        cdrcgi.bail("Failure extracting protocol original "
+                    "title for CDR%010d: %s" % (id, response))
+    return unicode(response[0], "utf-8")
+    
 #----------------------------------------------------------------------
 # Start the page.
 #----------------------------------------------------------------------
@@ -214,10 +242,11 @@ if not protocols:
 html += """\
   <table border='1' cellspacing='0' cellpadding='2' width='100%%'>
    <tr>
-    <th nowrap='1'>CDR Doc ID</th>
-    <th nowrap='1'>Protocol ID</th>
-    <th nowrap='1'>Other IDs</th>
-    <th nowrap='1'>Protocol Status</th>
+    <th>CDR Doc ID</th>
+    <th>Protocol ID</th>
+    <th>Other IDs</th>
+    <th>Original Title</th>
+    <th>Protocol Status</th>
     <th>Date Last Modified</th>
    </tr>
 """
@@ -242,10 +271,12 @@ for key in keys:
     <td align='top'>%s</td>
     <td align='top'>%s</td>
     <td align='top'>%s</td>
+    <td align='top'>%s</td>
    </tr>
 """ % (protocol.id,
        protocol.protocolId or "&nbsp;",
        otherIds or "&nbsp;",
+       getOriginalTitle(protocol.id),
        protocol.status or "&nbsp;",
        protocol.lastMod or "&nbsp;")
 
