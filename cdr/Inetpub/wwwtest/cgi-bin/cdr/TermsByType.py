@@ -1,12 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: TermsByType.py,v 1.1 2001-12-01 18:11:44 bkline Exp $
+# $Id: TermsByType.py,v 1.2 2002-08-15 19:38:42 bkline Exp $
 #
 # Task 176: For a user-specified type or types, a report that displays all
 # terms with the type(s) must be generated.  The report must display all terms
 # within the "type" classification in a hierarchical structure.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2001/12/01 18:11:44  bkline
+# Initial revision
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, cdrdb, string
 
@@ -155,7 +158,7 @@ for name in names:
 else:
     if docId[:3] == "CDR": docId = docId[3:]
     docId = string.atoi(docId)
-    termSet = cdr.getTree(('rmk', '***REDACTED***'), "CDR%010d" % docId)
+    termSet = cdr.getTree('guest', "CDR%010d" % docId)
     if termSet.error: cdrcgi.bail(tree.error)
     roots = []
     terms = termSet.terms

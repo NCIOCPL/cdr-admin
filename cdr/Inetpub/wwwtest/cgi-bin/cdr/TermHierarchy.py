@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: TermHierarchy.py,v 1.4 2002-08-12 20:59:58 bkline Exp $
+# $Id: TermHierarchy.py,v 1.5 2002-08-15 19:38:42 bkline Exp $
 #
 # Prototype for display of Term hierarchy (requirement 2.6 from 
 # Terminology Processing Requirements).
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2002/08/12 20:59:58  bkline
+# Added better error message for terms without hierarchy.
+#
 # Revision 1.3  2002/05/08 17:41:53  bkline
 # Updated to reflect Volker's new filter names.
 #
@@ -140,7 +143,7 @@ if not docId:
 else:
     if docId[:3] == "CDR": docId = docId[3:]
     docId = string.atoi(docId)
-    termSet = cdr.getTree(('rmk', '***REDACTED***'), "CDR%010d" % docId)
+    termSet = cdr.getTree('guest', "CDR%010d" % docId)
     if termSet.error: cdrcgi.bail(tree.error)
     if not termSet.terms: cdrcgi.bail("Term document does not specify "
                                       "any relationships to any other "

@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GetTree.py,v 1.6 2002-01-02 20:45:01 bkline Exp $
+# $Id: GetTree.py,v 1.7 2002-08-15 19:38:41 bkline Exp $
 #
 # Prototype for CDR Terminology tree viewer.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2002/01/02 20:45:01  bkline
+# Fixed typo in error handling; replaced hard-coded filter ID.
+#
 # Revision 1.5  2001/07/13 17:00:28  bkline
 # Added links to the formatted Term documents.
 #
@@ -89,7 +92,7 @@ def showTree(node, level = 0):
 # If we have a request, do it.
 #----------------------------------------------------------------------
 if docId:
-    termSet = cdr.getTree(('rmk', '***REDACTED***'), docId)
+    termSet = cdr.getTree('guest', docId)
     if termSet.error: cdrcgi.bail(termSet.error)
     roots = []
     terms = termSet.terms
