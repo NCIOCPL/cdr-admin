@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CheckedOutDocs.py,v 1.4 2002-04-24 20:36:03 bkline Exp $
+# $Id: CheckedOutDocs.py,v 1.5 2004-07-27 15:56:36 venglisc Exp $
 #
 # Report on documents checked out to a user.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2002/04/24 20:36:03  bkline
+# Changed "Title" label to "DocTitle" as requested by Eileen (issue #161).
+#
 # Revision 1.3  2002/03/02 13:51:32  bkline
 # Rearranged columns.  Added call to unicodeToLatin1().
 #
@@ -56,7 +59,7 @@ if not user:
 #----------------------------------------------------------------------
 # Display the report.
 #----------------------------------------------------------------------
-header = cdrcgi.header('CDR Report on Inactive Hyperlinks',
+header = cdrcgi.header('CDR Report on Checked Out Documents',
                        'CDR Reports',
                        'Checked Out Documents',
                        'CheckUrls.py',
