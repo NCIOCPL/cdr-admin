@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermSearch.py,v 1.4 2004-09-17 17:42:06 venglisc Exp $
+# $Id: GlossaryTermSearch.py,v 1.5 2004-10-06 21:07:19 bkline Exp $
 #
 # Prototype for duplicate-checking interface for GlossaryTerm documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2004/09/17 17:42:06  venglisc
+# Creating drop-down TermStatus list populated from the database (Bug 1335).
+#
 # Revision 1.3  2004/01/08 17:47:56  venglisc
 # Modified GlossaryTerm Advanced Search Screen to allow searching on the
 # Audience field.
@@ -79,8 +82,9 @@ searchFields = (cdrcgi.SearchField(name,
                 cdrcgi.SearchField(spanish,
                             ("/GlossaryTerm/SpanishTermName",)),
                 cdrcgi.SearchField(definition,
-                            ("/GlossaryTerm/TermDefinition",
-                             "/GlossaryTerm/SpanishTermDefinition")),
+                            ("/GlossaryTerm/TermDefinition/DefinitionText",
+                             "/GlossaryTerm/SpanishTermDefinition"
+                             "/DefinitionText")),
                 cdrcgi.SearchField(status,
                             ("/GlossaryTerm/TermStatus",
                              "/GlossaryTerm/StatusDate")),
