@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: DevTasks.py,v 1.2 2001-08-21 20:48:52 shines Exp $
+# $Id: DevTasks.py,v 1.3 2001-08-22 14:42:13 bkline Exp $
 #
 # Lists CDR development tasks.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2001/08/21 20:48:52  shines
+# Added ability to sort by column headings
+#
 # Revision 1.1  2001/08/21 17:18:02  bkline
 # Initial revision
 #
@@ -15,7 +18,7 @@ import cgi, cdr, cdrcgi, re, string, dbi, cdrdb
 # Retrieve and display the user information.
 #----------------------------------------------------------------------
 title   = "CDR Development"
-section = "UI Task List"
+section = "Task List"
 buttons = ["Refresh"]
 #script  = "DumpParams.pl"
 script  = "DevTasks.py"
