@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolMailerReqForm.py,v 1.5 2002-11-14 14:27:15 bkline Exp $
+# $Id: ProtocolMailerReqForm.py,v 1.6 2002-11-18 14:39:09 bkline Exp $
 #
 # Request form for all protocol mailers.
 #
@@ -17,6 +17,9 @@
 # publication job for the publishing daemon to find and initiate.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2002/11/14 14:27:15  bkline
+# Adjusted selection criteria for issue #499.
+#
 # Revision 1.4  2002/11/13 20:34:52  bkline
 # Fixed wording on limit documentation.
 #
@@ -142,7 +145,7 @@ if not request:
    </b>
    <input type='text' name='maxMails' size='12' value='No limit' />
    <br><br><br>
-   <h3>To generate mailer for a single Physician/Organization, enter</h3>
+   <h3>To generate mailer for a single Protocol, enter</h3>
    <b>Protocol document CDR ID:&nbsp;</b>
    <input name='DocId' />
    <br><br><br>
@@ -497,19 +500,9 @@ elif mailType == 'Protocol-Quarterly status/participant check':
         # mode mechanism.  According to the users, we can now regard
         # any organization with the PreferredContactMode element
         # present as requesting electronic mailers.]
-        cursor.execute("""\
-            SELECT DISTINCT d.doc_id
-                       INTO #recent_mailers
-                       FROM pub_proc_doc d
-                       JOIN pub_proc p
-                         ON p.id = d.pub_proc
-                      WHERE p.pub_subset IN ('%s', '%s')
-                        AND p.completed IS NULL
-                         OR (p.status = 'Success'
-                        AND DATEADD(quarter, -1, GETDATE()) < p.completed)
-                        AND p.pub_system = %d""" % (mailType,
-                                                    orgMailType,
-                                                    ctrlDocId))
+        # [RMK 2002-11-14: Changed at Lakshmi's request.  We no
+        # longer check to make sure that three months have elapsed
+        # since the last s&p mailer.
         cursor.execute("""\
             SELECT DISTINCT TOP %d protocol.id, MAX(doc_version.num)
                        FROM document protocol
@@ -542,11 +535,6 @@ elif mailType == 'Protocol-Quarterly status/participant check':
                                           FROM query_term
                                          WHERE doc_id = lead_org.int_val
                                            AND path = '%s')
-
-                        -- Don't bug them too often.
-                        AND NOT EXISTS (SELECT *
-                                          FROM #recent_mailers
-                                         WHERE doc_id = protocol.id)
 
                         -- Don't send mailers to Brussels.
                         AND NOT EXISTS (SELECT *
