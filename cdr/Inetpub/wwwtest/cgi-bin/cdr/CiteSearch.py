@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CiteSearch.py,v 1.3 2002-02-20 04:00:16 bkline Exp $
+# $Id: CiteSearch.py,v 1.4 2002-02-25 13:47:51 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Citation documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2002/02/20 04:00:16  bkline
+# Modified style of prompt at users' request.
+#
 # Revision 1.2  2002/02/14 19:38:10  bkline
 # Fixed search element paths to match schema changes; replaced hardwired
 # filter ID with filter document name.
@@ -28,6 +31,7 @@ year      = fields and fields.getvalue("Year")             or None
 volume    = fields and fields.getvalue("Volume")           or None
 issue     = fields and fields.getvalue("Issue")            or None
 importID  = fields and fields.getvalue("ImportID")         or None
+replaceID = fields and fields.getvalue("ReplaceID")        or None
 submit    = fields and fields.getvalue("SubmitButton")     or None
 help      = fields and fields.getvalue("HelpButton")       or None
 impReq    = fields and fields.getvalue("ImportButton")     or None
@@ -60,21 +64,28 @@ except cdrdb.Error, info:
 #----------------------------------------------------------------------
 if impReq:
     if not session: cdrcgi.bail("User not logged in")
+    exp1    = re.compile("<PubmedArticle>.*?</PubmedArticle>", re.DOTALL)
+    exp2    = re.compile("<ArticleTitle>(.*?)</ArticleTitle>", re.DOTALL)
+    if replaceID:
+        oldDoc = cdr.getDoc(session, replaceID, 'Y')
+        if oldDoc.startswith("<Errors"):
+            cdrcgi.bail("Unable to retrieve %s" % replaceID)
+        if not exp1.findall(oldDoc):
+            cdrcgi.bail("Document %s is not a PubMed Citation")
     host    = 'www.ncbi.nlm.nih.gov'
     app     = '/entrez/utils/pmfetch.fcgi'
     base    = 'http://' + host + app + '?db=PubMed&report=sgml&mode=text&id='
     url     = base + importID
     uobj    = urllib.urlopen(url)
     page    = uobj.read()
-    exp1    = re.compile("<PubmedArticle>.*?</PubmedArticle>", re.DOTALL)
-    exp2    = re.compile("<ArticleTitle>(.*?)</ArticleTitle>", re.DOTALL)
     article = exp1.findall(page)
     if not article: cdrcgi.bail("Article Not Found")
-    title   = exp2.findall(article[0]) 
-    if not title: cdrcgi.bail("Unable to find article title")
-    title   = title[0] or "NO TITLE FOUND"
-    title   = title[:255]
-    doc     = """\
+    if not replaceID:
+        title   = exp2.findall(article[0]) 
+        if not title: cdrcgi.bail("Unable to find article title")
+        title   = title[0] or "NO TITLE FOUND"
+        title   = title[:255]
+        doc     = """\
 <CdrDoc Type='Citation' Id=''>
  <CdrDocCtl>
   <DocType>Citation</DocType>
@@ -84,17 +95,22 @@ if impReq:
    <VerificationDetails>
     <Verified>Yes</Verified>
     <VerifiedIn>PUBMED</VerifiedIn>
-    <ModifiedRecord>No</ModifiedRecord>
    </VerificationDetails>
    %s
   </Citation>]]></CdrDocXml>
 </CdrDoc>
 """
-    id = cdr.addDoc(session, doc = doc % (title, article[0]))
+        id = cdr.addDoc(session, doc = doc % (title, article[0]))
+    else:
+        modifiedDoc = exp1.sub(article[0], oldDoc)
+        id = cdr.repDoc(session, doc = modifiedDoc, checkIn = 'Y')
     if id.find("<Err") != -1:
         cdrcgi.bail("Failure adding PubMed citation %s: %s" % (
                     title, cdr.checkErr(id)))
-    subtitle = "Citation added as %s" % id
+    if not replaceID:
+        subtitle = "Citation added as %s" % id
+    else:
+        subtitle = "Citation %s updated" % id
     # FALL THROUGH TO FORM DISPLAY
 
 #----------------------------------------------------------------------
@@ -120,13 +136,31 @@ if not submit:
                                           conn)
     page += """\
    <CENTER>
-    <INPUT      TYPE        = "submit"
-                NAME        = "ImportButton"
-                VALUE       = "Import">
-    <SPAN       CLASS       = "Page">
-      &nbsp;PubMed Citation ID to Import:&nbsp;&nbsp;
-    </SPAN>
-    <INPUT      NAME        = "ImportID">
+    <TABLE>
+     <TR>
+      <TD ALIGN='right'>
+       <INPUT      TYPE        = "submit"
+                   NAME        = "ImportButton"
+                   VALUE       = "Import">
+       <SPAN       CLASS       = "Page">
+        &nbsp;PubMed Citation ID to Import:&nbsp;&nbsp;
+       </SPAN>
+      </TD>
+      <TD>
+       <INPUT      NAME        = "ImportID">
+      </TD>
+     </TR>
+     <TR>
+      <TD ALIGN='right'>
+       <SPAN       CLASS       = "Page">
+        &nbsp;CDR ID of Document to Replace (Optional):&nbsp;&nbsp;
+       </SPAN>
+      </TD>
+      <TD>
+       <INPUT      NAME        = "ReplaceID">
+      </TD>
+     </TR>
+    </TABLE>
    </CENTER>
   </FORM>
  </BODY>
