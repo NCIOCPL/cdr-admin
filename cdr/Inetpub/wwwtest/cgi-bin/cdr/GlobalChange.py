@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------
-# $Id: GlobalChange.py,v 1.14 2003-11-18 17:16:16 ameyer Exp $
+# $Id: GlobalChange.py,v 1.15 2004-01-30 02:27:14 ameyer Exp $
 #
 # Perform global changes on XML records in the database.
 #
@@ -14,6 +14,9 @@
 # present the next one - to the end.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.14  2003/11/18 17:16:16  ameyer
+# More changes for terminology.
+#
 # Revision 1.13  2003/08/28 23:23:05  ameyer
 # Changed debug logging to direct it to GlobalChange.log.
 # Added InterventionType qualifier fields to recognized sesson variables.
@@ -105,7 +108,8 @@ def sendGlblChgPage (parms):
 
     # Create an overall header using the common header code
     html = cdrcgi.header ("CDR Global Change", "CDR Global Change",
-                          header, "GlobalChange.py", stylesheet="""
+                          header, "GlobalChange.py",
+                          formExtra=" name='glblChgForm'", stylesheet="""
   <style type='text/css'>
    .termblock { font-size: 120%; font-weight: bold }
   </style>
@@ -374,12 +378,13 @@ if not email:
         instruct = """
 <p>A background job will be created to perform the global change.
 Results of the job will be emailed.</p>
-<p>To start the job, review the list of protocols to be modified and
-either:</p>
+<p>To start the job:</p></p>
 <ol>
+ <li>Review the list of protocols to be modified</li>
+ <li>Check or uncheck any documents to include or exclude from processing</li>
  <li>Enter one or more email addresses for results (separated by
-     space, comma or semicolon) and click 'Submit', or</li>
- <li>Click 'Cancel' to return to the administration menu</li>
+     space, comma or semicolon) and click 'Submit'</li>
+ <li>Or click 'Cancel' to return to the administration menu</li>
 </ol>
 <p><p>
 <p>Email(s): <input type='text' name='email' value='%s' size='80' /></p>
@@ -403,6 +408,20 @@ args = []
 for var in ssVars.keys():
     cdr.logwrite ("Converting arg: %s" % var, LF)
     args.append ((var, ssVars[var]))
+
+# Get user selected document ids from the will change report
+docIdList = fields.getvalue ("glblDocId");
+if not docIdList:
+    cdrcgi.bail ("No documents selected, no global change initiated",
+                 logfile=LF)
+
+# Add a single argument which is the list of doc IDs to process
+# It's either a single id, or a comma separated list
+if isinstance (docIdList, list):
+    docIdArg = ",".join (docIdList)
+else:
+    docIdArg = docIdList
+args.append (("glblDocIds", docIdArg))
 
 # Create batch job
 cdr.logwrite ("About to launch batch job", LF)
