@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: PubStatus.py,v 1.12 2003-06-09 18:56:30 pzhang Exp $
+# $Id: PubStatus.py,v 1.13 2003-08-25 17:54:05 bkline Exp $
 #
 # Status of a publishing job.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.12  2003/06/09 18:56:30  pzhang
+# Fixed a bug in TABLE end tag.
+# Changed latin-1 to utf8 in html.encode().
+#
 # Revision 1.11  2003/03/05 16:16:30  pzhang
 # Added messages to be part of the failure report.
 # Column messages are normally NULL unless something is wrong.
@@ -823,6 +827,143 @@ def dispJobsByDates():
   
     cdrcgi.sendPage(header + form + "</BODY></HTML>")
 
+#------------------------------------------------------------------
+# Create some useful temporary tables holding information about
+# the current and previous publishing jobs.  These tables speed
+# things up, and also make the logic for what we're doing more
+# transparent.
+#------------------------------------------------------------------
+def createTemporaryPubInfoTables(cursor, conn, latestFullLoad, cgJob):
+    
+    #------------------------------------------------------------------
+    # What was the last Cancer.gov push job for each document?
+    # This will be before the current job, but no earlier than
+    # the most recent full load of Cancer.gov.
+    #------------------------------------------------------------------
+    try:
+        cursor.execute("""\
+            CREATE TABLE #prev_job_for_doc
+                 (doc_id INTEGER,
+                  job_id INTEGER)""")
+        conn.commit()
+        cursor.execute("""\
+             INSERT INTO #prev_job_for_doc
+                  SELECT d.doc_id, MAX(p.id) job_id
+                    FROM pub_proc_doc d
+                    JOIN primary_pub_job p
+                      ON p.id = d.pub_proc
+                   WHERE p.id BETWEEN %d AND %d
+                     AND p.pub_subset LIKE 'Push_Documents_To_Cancer.Gov_%%'
+                     AND d.failure IS NULL
+                GROUP BY d.doc_id""" % (latestFullLoad, cgJob - 1))
+        conn.commit()
+    except cdrdb.Error, info:
+        cdrcgi.bail("Failure getting previous push job ids: %s" % info[1][0])
+
+    #------------------------------------------------------------------
+    # Now, for each of those documents, get the flag indicating
+    # whether we were sending the document to Cancer.gov or pulling it.
+    #------------------------------------------------------------------
+    try:
+        cursor.execute("""\
+            CREATE TABLE #removed_flag
+                 (doc_id INTEGER,
+                 removed CHAR)""")
+        conn.commit()
+        cursor.execute("""\
+             INSERT INTO #removed_flag
+                  SELECT d.doc_id, d.removed
+                    FROM pub_proc_doc d
+                    JOIN #prev_job_for_doc p
+                      ON p.job_id = d.pub_proc
+                     AND d.doc_id = p.doc_id""")
+        conn.commit()
+    except cdrdb.Error, info:
+        cdrcgi.bail("Failure collecting removed flags for previous push jobs"
+                    ": %s" % info[1][0])
+
+    #------------------------------------------------------------------
+    # Get the document IDs for the documents that were removed by
+    # the current job.
+    #------------------------------------------------------------------
+    try:
+        cursor.execute("CREATE TABLE #removed_docs (doc_id INTEGER)")
+        conn.commit()
+        cursor.execute("""\
+            INSERT INTO #removed_docs
+                 SELECT doc_id
+                   FROM pub_proc_doc
+                  WHERE pub_proc = ?
+                    AND removed = 'Y'
+                    AND failure IS NULL""", cgJob)
+        conn.commit()
+    except cdrdb.Error, info:
+        cdrcgi.bail("Failure getting IDs for removed docs: %s" % info[1][0])
+        
+    #------------------------------------------------------------------
+    # Get the document IDs for the documents that were sent to 
+    # Cancer.gov by the current job (that is, the ones that we
+    # didn't pick up by the previous query).
+    #------------------------------------------------------------------
+    try:
+        cursor.execute("CREATE TABLE #sent_docs (doc_id INTEGER)")
+        conn.commit()
+        cursor.execute("""\
+            INSERT INTO #sent_docs
+                 SELECT doc_id
+                   FROM pub_proc_doc
+                  WHERE pub_proc = ?
+                    AND removed = 'N'
+                    AND failure IS NULL""", cgJob)
+        conn.commit()
+    except cdrdb.Error, info:
+        cdrcgi.bail("Failure getting IDs for docs sent to CG: %s" % info[1][0])
+
+    #------------------------------------------------------------------
+    # Get the IDs for the documents that were changed.  These are the
+    # documents for which we have a previous job (#prev_job_for_doc)
+    # and for which the 'removed' flag is off.
+    #------------------------------------------------------------------
+    try:
+        cursor.execute("CREATE TABLE #changed_docs (doc_id INTEGER)")
+        conn.commit()
+        cursor.execute("""\
+            INSERT INTO #changed_docs
+                 SELECT d.doc_id
+                   FROM pub_proc_doc d
+                   JOIN #removed_flag f
+                     ON f.doc_id = d.doc_id
+                  WHERE d.pub_proc = ?
+                    AND d.failure IS NULL
+                    AND d.removed = 'N'
+                    AND f.removed = 'N'""", cgJob)
+        conn.commit()
+    except cdrdb.Error, info:
+        cdrcgi.bail("Failure getting IDs for docs modified on CG: %s" %
+                    info[1][0])
+
+    #------------------------------------------------------------------
+    # Now get the IDs for the documents which we sent to Cancer.gov
+    # that they didn't have already (because they hadn't ever had
+    # them or because the last transaction removed them).  In this
+    # context "ever" means from the last full load, which sort of
+    # starts history with a clean slate as far as their site goes.
+    # This is just the sent docs minus the changed docs.
+    #------------------------------------------------------------------
+    try:
+        cursor.execute("CREATE TABLE #new_docs (doc_id INTEGER)")
+        conn.commit()
+        cursor.execute("""\
+            INSERT INTO #new_docs
+                 SELECT doc_id
+                   FROM #sent_docs
+                  WHERE doc_id NOT IN (SELECT doc_id
+                                         FROM #changed_docs)""")
+        conn.commit()
+    except cdrdb.Error, info:
+        cdrcgi.bail("Failure getting IDs for docs new to Cancer.gov: %s" %
+                    info[1][0])
+
 #----------------------------------------------------------------------
 # Report what has been added, removed, and updated in this job.
 #----------------------------------------------------------------------
@@ -836,6 +977,7 @@ def dispJobReport():
 
     conn = cdrdb.connect('CdrGuest')
     cursor = conn.cursor()
+
 
     #----------------------------------------------------------------------
     # Get subset name. 
@@ -940,19 +1082,20 @@ def dispJobReport():
     except cdrdb.Error, info:
         cdrcgi.bail("Failure getting latest full load for job %s: %s." % (
             cg_job, info[1][0]))        
-            
+
+    # See comments for this function.
+    createTemporaryPubInfoTables(cursor, conn, latestFullLoad, cg_job)
+    
     # How many documents are published in vendor job?
     try:      
-        cursor.execute("""
+        cursor.execute("""\
             SELECT t.name, count(t.name)       
               FROM pub_proc_doc ppd, document d, doc_type t
              WHERE ppd.failure IS NULL
                AND ppd.doc_id = d.id
                AND d.doc_type = t.id
-               AND ppd.pub_proc = %d  
-          GROUP BY t.name        
-                       """ % vendor_job
-                      )
+               AND ppd.pub_proc = ?
+          GROUP BY t.name""", vendor_job)
         rowsPublished = cursor.fetchall()
         numPublished = 0
         for row in rowsPublished:
@@ -962,112 +1105,71 @@ def dispJobReport():
         cdrcgi.bail("Failure getting vendor_count for %d: %s." % (
                     vendor_job, info[1][0]))
 
-    # How many documents are removed by cg job?
+    #------------------------------------------------------------------
+    # Get the counts (by doc type) of documents removed from Cancer.gov.
+    #------------------------------------------------------------------
     try:      
         cursor.execute("""
             SELECT t.name, count(t.name)       
-              FROM pub_proc_doc ppd, document d, doc_type t
-             WHERE ppd.failure IS NULL
-               AND ppd.doc_id = d.id
-               AND d.doc_type = t.id
-               AND ppd.removed = 'Y'               
-               AND ppd.pub_proc = %d 
-          GROUP BY t.name               
-                       """ % cg_job
-                      )
+              FROM doc_type t
+              JOIN document d
+                ON d.doc_type = t.id
+              JOIN #removed_docs r
+                ON r.doc_id = d.id
+          GROUP BY t.name""")
         rowsRemoved = cursor.fetchall()       
         numRemoved = 0
         for row in rowsRemoved:
             numRemoved += row[1]        
        
     except cdrdb.Error, info:
-        cdrcgi.bail("Failure getting removed for %d: %s." % (
+        cdrcgi.bail("Failure getting removed doc counts for job %d: %s." % (
                     cg_job, info[1][0]))
     
-    # How many documents are updated by cg job?      
-    # An updated document is one that is added in its immediate previous job.
+    #------------------------------------------------------------------
+    # Get the counts (by doc type) of documents updated on Cancer.gov.
+    #------------------------------------------------------------------
     try:      
         cursor.execute("""\
             SELECT t.name, count(t.name)       
-              FROM pub_proc_doc ppd, document d, doc_type t
-             WHERE ppd.failure IS NULL
-               AND ppd.doc_id = d.id
-               AND d.doc_type = t.id
-               AND ppd.removed = 'N'                         
-               AND ppd.pub_proc = %d
-               AND 'N' IN (SELECT TOP 1 ppd2.removed
-                             FROM primary_pub_doc ppd2, pub_proc pp
-                            WHERE pp.id = ppd2.pub_proc
-                              AND pp.pub_subset LIKE '%s%%'
-                              AND ppd2.pub_proc < %d
-                              AND ppd2.pub_proc >= %d
-                              AND ppd2.doc_id = ppd.doc_id                                      
-                         ORDER BY ppd2.pub_proc DESC
-                           ) 
-          GROUP BY t.name  
-                       """ % (cg_job, pushJobName, cg_job, latestFullLoad),
-                       timeout = 360
-                      )
+              FROM doc_type t
+              JOIN document d
+                ON d.doc_type = t.id
+              JOIN #changed_docs c
+                ON c.doc_id = d.id
+          GROUP BY t.name""")
         rowsUpdated = cursor.fetchall() 
         numUpdated = 0
         for row in rowsUpdated:
             numUpdated += row[1]        
-        
     except cdrdb.Error, info:
-        cdrcgi.bail("Failure getting updated documents for job %d: %s." % (
+        cdrcgi.bail("Failure getting updated doc counts for job %d: %s." % (
             cg_job, info[1][0]))
 
-    # How many documents are newly added by cg job?  
-    # A new document is one that is either removed in its immediate
-    # previous job if there is any previous job after the latest Full
-    # Load, or not in previous jobs at all. Full Load cannot contain
-    # removed documents.   
+    #------------------------------------------------------------------
+    # Get the counts (by doc type) of all documents sent to Cancer.gov
+    # that they didn't already have.
+    #------------------------------------------------------------------
     try:      
         cursor.execute("""\
             SELECT t.name, count(t.name)       
-              FROM pub_proc_doc ppd, document d, doc_type t
-             WHERE ppd.failure IS NULL
-               AND ppd.doc_id = d.id
-               AND d.doc_type = t.id
-               AND ppd.removed = 'N'                         
-               AND ppd.pub_proc = %d                
-               AND (NOT EXISTS (SELECT ppd2.pub_proc                           
-                                  FROM pub_proc_doc ppd2, pub_proc pp
-                                 WHERE ppd2.pub_proc < %d
-                                   AND ppd2.pub_proc >= %d
-                                   AND ppd2.doc_id = ppd.doc_id
-                                   AND pp.id = ppd2.pub_proc
-                                   AND pp.pub_subset LIKE '%s%%'
-                                   AND pp.status = 'Success'
-                                )
-                    OR                 
-                    ('Y' IN (SELECT TOP 1 ppd2.removed
-                               FROM pub_proc_doc ppd2, pub_proc pp
-                              WHERE ppd2.pub_proc < %d
-                                AND ppd2.pub_proc >= %d
-                                AND ppd2.doc_id = ppd.doc_id
-                                AND pp.id = ppd2.pub_proc
-                                AND pp.pub_subset LIKE '%s%%'
-                                AND pp.status = 'Success'
-                           ORDER BY ppd2.pub_proc DESC
-                            )
-                    )
-                   )
-          GROUP BY t.name         
-                       """ % (cg_job, 
-                              cg_job, latestFullLoad, pushJobName,
-                              cg_job, latestFullLoad, pushJobName),
-                       timeout = 360
-                      )
+              FROM doc_type t
+              JOIN document d
+                ON d.doc_type = t.id
+              JOIN #new_docs n
+                ON n.doc_id = d.id
+          GROUP BY t.name""")
         rowsAdded = cursor.fetchall()
         numAdded = 0
         for row in rowsAdded:
-            numAdded += row[1]  
-                              
+            numAdded += row[1]
     except cdrdb.Error, info:
-        cdrcgi.bail("Failure getting added documents for job %d: %s." % (
-            cg_job, info[1][0]))
+        cdrcgi.bail("Failure getting counts of new documents sent to CG "
+                    "by job %d: %s" % (cg_job, info[1][0]))
 
+    #------------------------------------------------------------------
+    # Build the report HTML.
+    #------------------------------------------------------------------
     form = """  
        <center>
        <b>
@@ -1204,6 +1306,9 @@ def dispJobRepDetail():
         cdrcgi.bail("Failure getting latest full load for job %s: %s." % (
             jobId, info[1][0])) 
 
+    if cgMode in ('Updated', 'Added'):
+        createTemporaryPubInfoTables(cursor, conn, latestFullLoad, jobId)
+    
     # What documents are removed by cg job?
     if cgMode == 'Removed':
         try:      
@@ -1229,28 +1334,17 @@ def dispJobRepDetail():
     elif cgMode == 'Updated':
         try:      
             cursor.execute("""\
-                SELECT TOP 500 ppd.doc_id, ppd.doc_version, d.title       
-                  FROM pub_proc_doc ppd, document d, doc_type t
-                 WHERE ppd.failure IS NULL
-                   AND ppd.doc_id = d.id
-                   AND d.doc_type = t.id
-                   AND ppd.removed = 'N' 
-                   AND t.name = '%s'                        
-                   AND ppd.pub_proc = %d
-                   AND 'N' IN (SELECT TOP 1 ppd2.removed
-                                 FROM primary_pub_doc ppd2, pub_proc pp
-                                WHERE pp.id = ppd2.pub_proc
-                                  AND pp.pub_subset LIKE '%s%%'
-                                  AND ppd2.pub_proc < %d
-                                  AND ppd2.pub_proc >= %d
-                                  AND ppd2.doc_id = ppd.doc_id                                      
-                             ORDER BY ppd2.pub_proc DESC
-                               ) 
-              ORDER BY d.title  
-                           """ % (
-                           docType, jobId, pushJobName, jobId, latestFullLoad),
-                           timeout = 360
-                          )
+                SELECT TOP 500 p.doc_id, p.doc_version, d.title       
+                  FROM pub_proc_doc p
+                  JOIN #changed_docs c
+                    ON c.doc_id = p.doc_id
+                  JOIN document d
+                    ON d.id = p.doc_id
+                  JOIN doc_type t
+                    ON t.id = d.doc_type
+                 WHERE t.name = ?
+                   AND p.pub_proc = ?
+              ORDER BY d.title""", (docType, jobId))
             rows = cursor.fetchall()                  
         
         except cdrdb.Error, info:
@@ -1261,43 +1355,17 @@ def dispJobRepDetail():
     elif cgMode == 'Added':
         try:      
             cursor.execute("""\
-                SELECT TOP 500 ppd.doc_id, ppd.doc_version, d.title       
-                  FROM pub_proc_doc ppd, document d, doc_type t
-                 WHERE ppd.failure IS NULL
-                   AND ppd.doc_id = d.id
-                   AND d.doc_type = t.id
-                   AND ppd.removed = 'N' 
-                   AND t.name = '%s'                        
-                   AND ppd.pub_proc = %d                
-                   AND (NOT EXISTS (SELECT ppd2.pub_proc                           
-                                      FROM pub_proc_doc ppd2, pub_proc pp
-                                     WHERE ppd2.pub_proc < %d
-                                       AND ppd2.pub_proc >= %d
-                                       AND ppd2.doc_id = ppd.doc_id
-                                       AND pp.id = ppd2.pub_proc
-                                       AND pp.pub_subset LIKE '%s%%'
-                                       AND pp.status = 'Success'
-                                    )
-                        OR                 
-                        ('Y' IN (SELECT TOP 1 ppd2.removed
-                                   FROM pub_proc_doc ppd2, pub_proc pp
-                                  WHERE ppd2.pub_proc < %d
-                                    AND ppd2.pub_proc >= %d
-                                    AND ppd2.doc_id = ppd.doc_id
-                                    AND pp.id = ppd2.pub_proc
-                                    AND pp.pub_subset LIKE '%s%%'
-                                    AND pp.status = 'Success'
-                               ORDER BY ppd2.pub_proc DESC
-                                )
-                        )
-                       )
-              ORDER BY d.title         
-                           """ % (docType,
-                                  jobId, 
-                                  jobId, latestFullLoad, pushJobName,
-                                  jobId, latestFullLoad, pushJobName),
-                           timeout = 360
-                          )
+                SELECT TOP 500 p.doc_id, p.doc_version, d.title       
+                  FROM pub_proc_doc p
+                  JOIN #new_docs n
+                    ON n.doc_id = p.doc_id
+                  JOIN document d
+                    ON d.id = p.doc_id
+                  JOIN doc_type t
+                    ON t.id = d.doc_type
+                 WHERE t.name = ?
+                   AND p.pub_proc = ?
+              ORDER BY d.title""", (docType, jobId))
             rows = cursor.fetchall()
                               
         except cdrdb.Error, info:
