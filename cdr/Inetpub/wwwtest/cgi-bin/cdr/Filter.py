@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: Filter.py,v 1.23 2004-02-19 21:29:11 ameyer Exp $
+# $Id: Filter.py,v 1.24 2004-07-13 18:39:17 ameyer Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.23  2004/02/19 21:29:11  ameyer
+# Allow user interface to pass a port id.
+#
 # Revision 1.22  2003/11/12 22:47:30  bkline
 # Forced string conversion of docVer to make string concatenation work.
 #
@@ -115,14 +118,24 @@ filtId  = [filtId0,
            fields.getvalue(cdrcgi.FILTER + "13", ""),
            fields.getvalue(cdrcgi.FILTER + "14", ""),
            fields.getvalue(cdrcgi.FILTER + "15", "")]
-insRevLevels = (fields.getvalue('publish') == 'true') and 'publish_' or ''
+
+insRevLevels = (fields.getvalue('publish')   == 'true') and 'publish_' or ''
 insRevLevels += (fields.getvalue('approved') == 'true') and 'approved_' or ''
 insRevLevels += (fields.getvalue('proposed') == 'true') and 'proposed_' or ''
 insRevLevels += (fields.getvalue('rejected') == 'true') and 'rejected_' or ''
 insRevLevels += fields.getvalue('insRevLevels') or '' # insRevLevels from links.
+delRevLevels  = (fields.getvalue('rsmarkup') == 'false') and 'Y' or 'N'
 vendorOrQC = (fields.getvalue('QC') == 'true') and 'QC' or ''
 vendorOrQC += fields.getvalue('vendorOrQC') or '' # vendorOrQC from links.
-filterParm = [['insRevLevels', insRevLevels]] # empty insRevLevels is expected.
+displayComments = (fields.getvalue('comments') == 'true') and 'Y' or 'N'
+displayGlossary = (fields.getvalue('glossary') == 'true') and 'Y' or 'N'
+displayStdWord  = (fields.getvalue('stdword')  == 'true') and 'Y' or 'N'
+	      # empty insRevLevels is expected.
+filterParm = [['insRevLevels', insRevLevels],
+              ['delRevLevels', delRevLevels],
+              ['DisplayComments', displayComments],
+	      ['DisplayGlossaryTermList', displayGlossary],
+	      ['ShowStandardWording', displayStdWord]]
 if vendorOrQC:
     filterParm.append(['vendorOrQC', 'QC'])
 
