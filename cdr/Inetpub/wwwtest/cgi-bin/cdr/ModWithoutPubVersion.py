@@ -1,12 +1,16 @@
 #----------------------------------------------------------------------
 #
-# $Id: ModWithoutPubVersion.py,v 1.5 2002-09-23 14:42:41 bkline Exp $
+# $Id: ModWithoutPubVersion.py,v 1.6 2002-09-23 20:38:08 bkline Exp $
 #
 # Reports on documents which have been changed since a previously 
 # publishable version without a new publishable version have been
 # created.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2002/09/23 14:42:41  bkline
+# Added code to replace the ISO format with Mmm. dd, yyyy at Lakshmi's
+# request.
+#
 # Revision 1.4  2002/09/12 13:03:35  bkline
 # Added longer timeout values.
 #
@@ -150,8 +154,11 @@ try:
                 ON a.document = d.id
               JOIN usr u
                 ON u.id = a.usr
+              JOIN action
+                ON action.id = a.action
              WHERE a.dt BETWEEN '%s' AND DATEADD(s, -1, DATEADD(d, 1, '%s'))
                AND u.name LIKE '%s'
+               AND action.name IN ('ADD DOCUMENT', 'MODIFY DOCUMENT')
                AND a.dt = (SELECT MAX(dt)
                              FROM audit_trail
                             WHERE document = d.id)
