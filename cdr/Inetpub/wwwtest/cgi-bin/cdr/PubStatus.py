@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: PubStatus.py,v 1.11 2003-03-05 16:16:30 pzhang Exp $
+# $Id: PubStatus.py,v 1.12 2003-06-09 18:56:30 pzhang Exp $
 #
 # Status of a publishing job.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.11  2003/03/05 16:16:30  pzhang
+# Added messages to be part of the failure report.
+# Column messages are normally NULL unless something is wrong.
+#
 # Revision 1.10  2003/02/13 23:05:36  pzhang
 # Added CgJobDesc textarea for pushing job description.
 # Added code to report published documents.
@@ -223,7 +227,7 @@ def dispFilterFailures():
 
     html  += "</TABLE></BODY></HTML>"       
     
-    cdrcgi.sendPage(header + html.encode('latin-1'))
+    cdrcgi.sendPage(header + html.encode('utf8'))
 
 #----------------------------------------------------------------------
 # Display the job parameters.
@@ -645,16 +649,19 @@ def dispCgWork():
         html   += HEADER % ('Removed', 'Removed') 
         for row in rowsRemoved:
             html += ROW % (row[0], row[1], row[2])
+        html  += "</TABLE></BODY>"
     if nUpdated:
         html   += HEADER % ('Updated', 'Updated') 
         for row in rowsUpdated:
             html += ROW % (row[0], row[1], row[2])
+        html  += "</TABLE></BODY>"
     if nAdded:
         html   += HEADER % ('Added', 'Added')  
         for row in rowsAdded:
-            html += ROW % (row[0], row[1], row[2])        
+            html += ROW % (row[0], row[1], row[2])  
+        html  += "</TABLE></BODY>"      
     
-    html  += "</TABLE></BODY></HTML>"  
+    html  += "</HTML>"  
     
     cdrcgi.sendPage(header + html)
 
