@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PubStatus.py,v 1.17 2005-01-24 19:29:59 venglisc Exp $
+# $Id: PubStatus.py,v 1.18 2005-03-25 17:02:40 venglisc Exp $
 #
 # Status of a publishing job.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.17  2005/01/24 19:29:59  venglisc
+# Minor changes to correctly display the FilterFailure error report table.
+#
 # Revision 1.16  2004/09/27 16:51:00  venglisc
 # Modified header alignment of table to align left.
 #
@@ -660,7 +663,8 @@ def dispCgWork():
 
     HEADER  = """\
                <BR><FONT COLOR="RED">Documents %s (Top 500):</FONT><BR><BR>
-               <TABLE BORDER=1 NAME='%s'>
+               <a NAME='%s'></a>
+               <TABLE BORDER=1>
                 <tr>    
                 <td valign='top'><B>DocId</B></td>   
                 <td valign='top'><B>DocType</B></td>  
@@ -671,20 +675,23 @@ def dispCgWork():
                      <td><FONT COLOR='black'>%s</FONT></td>
                      <td><FONT COLOR='black'>%s</FONT></td></tr>"""  
 
+    # Inserting a space after ';' to allow line breaks between 
+    # protocol numbers in HTML output.        VE, 2005-03-25
+    # --------------------------------------------------------
     if nRemoved:       
         html   += HEADER % ('Removed', 'Removed') 
         for row in rowsRemoved:
-            html += ROW % (row[0], row[1], row[2])
+            html += ROW % (row[0], row[1], string.replace(row[2], ';', '; '))
         html  += "</TABLE></BODY>"
     if nUpdated:
         html   += HEADER % ('Updated', 'Updated') 
         for row in rowsUpdated:
-            html += ROW % (row[0], row[1], row[2])
+            html += ROW % (row[0], row[1], string.replace(row[2], ';', '; '))
         html  += "</TABLE></BODY>"
     if nAdded:
         html   += HEADER % ('Added', 'Added')  
         for row in rowsAdded:
-            html += ROW % (row[0], row[1], row[2])  
+            html += ROW % (row[0], row[1], string.replace(row[2], ';', '; '))  
         html  += "</TABLE></BODY>"      
     
     html  += "</HTML>"  
