@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummarySearch.py,v 1.4 2002-05-03 20:31:02 bkline Exp $
+# $Id: SummarySearch.py,v 1.5 2002-07-15 20:19:51 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Summary documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2002/05/03 20:31:02  bkline
+# New filter added.
+#
 # Revision 1.3  2002/02/20 03:58:19  bkline
 # Truncated long pulldown list strings at users' request.
 #
@@ -44,7 +47,7 @@ def sectionTypeList(conn, fName):
         query  = """\
 SELECT DISTINCT value
            FROM query_term
-          WHERE path = '/Summary/SummarySection/SectMetaData/SectionType'
+          WHERE path LIKE '/Summary/SummarySection%SectMetaData/SectionType'
        ORDER BY value
 """
         cursor.execute(query)
@@ -59,7 +62,8 @@ SELECT DISTINCT value
        <OPTION VALUE='' SELECTED>&nbsp;</OPTION>
 """ % fName
     for row in rows:
-        html += """\
+        if row:
+            html += """\
        <OPTION VALUE='%s'>%s &nbsp;</OPTION>
 """ % (row[0], row[0])
     html += """\
@@ -88,7 +92,8 @@ def sectionDiagList(conn, fName):
         cursor.close()
         cursor = None
     except cdrdb.Error, info:
-        bail('Failure retrieving diagnosis list from CDR: %s' % info[1][0])
+        cdrcgi.bail('Failure retrieving diagnosis list from CDR: %s' 
+                    % info[1][0])
     html = """\
       <SELECT NAME='%s'>
        <OPTION VALUE='' SELECTED>&nbsp;</OPTION>
@@ -128,7 +133,8 @@ def topicList(conn, fName):
         cursor.close()
         cursor = None
     except cdrdb.Error, info:
-        bail('Failure retrieving diagnosis list from CDR: %s' % info[1][0])
+        cdrcgi.bail('Failure retrieving diagnosis list from CDR: %s' 
+                % info[1][0])
     html = """\
       <SELECT NAME='%s'>
        <OPTION VALUE='' SELECTED>&nbsp;</OPTION>
@@ -164,14 +170,15 @@ SELECT DISTINCT value
         cursor.close()
         cursor = None
     except cdrdb.Error, info:
-        bail('Failure retrieving summary section types from CDR: %s' 
+        cdrcgi.bail('Failure retrieving summary section types from CDR: %s' 
                 % info[1][0])
     html = """\
       <SELECT NAME='%s'>
        <OPTION VALUE='' SELECTED>&nbsp;</OPTION>
 """ % fName
     for row in rows:
-        html += """\
+        if row:
+            html += """\
        <OPTION VALUE='%s'>%s &nbsp;</OPTION>
 """ % (row[0], row[0])
     html += """\
@@ -257,9 +264,8 @@ except cdrdb.Error, info:
 #----------------------------------------------------------------------
 # Create the results page.
 #----------------------------------------------------------------------
-html = cdrcgi.advancedSearchResultsPage("Summary", rows, strings, 
-                    "name:Revision Markup Filter&Filter1="
-                    "name:Health Professional Summary Report")
+html = cdrcgi.advancedSearchResultsPage("Summary", rows, strings, None,
+                                        session)
 
 #----------------------------------------------------------------------
 # Send the page back to the browser.
