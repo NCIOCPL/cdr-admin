@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: Filter.py,v 1.1 2001-03-27 21:19:09 bkline Exp $
+# $Id: Filter.py,v 1.2 2001-04-08 22:56:03 bkline Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2001/03/27 21:19:09  bkline
+# Initial revision
+#
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re
@@ -22,7 +25,7 @@ filtId  = fields.getvalue(cdrcgi.FILTER) or cdrcgi.bail("No Filter", title)
 #----------------------------------------------------------------------
 # Filter the document.
 #----------------------------------------------------------------------
-doc = cdr.filterDoc(session, docId, filtId)
+doc = cdrcgi.decode(cdr.filterDoc(session, filtId, docId = docId))
 doc = re.sub("@@DOCID@@", docId, doc)
 
 #----------------------------------------------------------------------
