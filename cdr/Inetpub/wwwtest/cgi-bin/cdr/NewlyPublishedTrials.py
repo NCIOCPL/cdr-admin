@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: NewlyPublishedTrials.py,v 1.3 2002-03-20 14:14:25 bkline Exp $
+# $Id: NewlyPublishedTrials.py,v 1.4 2002-03-20 14:15:18 bkline Exp $
 #
 # Report on newly published trials in batch.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2002/03/20 14:14:25  bkline
+# Added back in missing 'try:' keyword.
+#
 # Revision 1.2  2002/03/20 14:11:55  bkline
 # Removed dead code and documented ADO bug.
 #
@@ -176,7 +179,7 @@ html = """\
   </center>
   <br />
   <br />
-  <table border='0' cellspacing='0' cellpadding='2' width='90%%'>
+  <table border='0' cellspacing='0' cellpadding='2' width='100%%'>
 """ % (time.strftime("%m/%d/%Y", now), pubDate, len(rows))
    
 #----------------------------------------------------------------------
