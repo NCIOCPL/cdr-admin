@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.1 2002-04-22 13:54:07 bkline Exp $
+# $Id: QcReport.py,v 1.2 2002-05-03 20:30:22 bkline Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2002/04/22 13:54:07  bkline
+# New QC reports.
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, cdrdb, re
 
@@ -39,11 +42,14 @@ filters = {
         ["name:Person Denormalized XML Filter",
          "name:Person QC Report Filter"],
     'InScopeProtocol':  
-        ["name:Protocol Denormalization Filter (InScope)",
-         "name:Health Professional Protocol QC Content Report"],
+        ["name:Denormalization Filter: InScope Protocol",
+         "name:Create InScope Protocol XML for Full Protocol QC Report",
+         "name:InScope Protocol Full QC Report"],
     'Term':             
         ["name:Denormalized Term XML Filter",
-         "name:Terminology QC Report Filter"]
+         "name:Terminology QC Report Filter"],
+    'MiscellaneousDocument':
+        ["name:Miscellaneous Document Report Filter"]
 }
 
 #----------------------------------------------------------------------
