@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------
-# $Id: GlobalChange.py,v 1.12 2003-08-01 01:11:24 ameyer Exp $
+# $Id: GlobalChange.py,v 1.13 2003-08-28 23:23:05 ameyer Exp $
 #
 # Perform global changes on XML records in the database.
 #
@@ -14,6 +14,9 @@
 # present the next one - to the end.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.12  2003/08/01 01:11:24  ameyer
+# Fixed misspelling of trm...Field. variables.
+#
 # Revision 1.11  2003/07/29 23:15:08  ameyer
 # Oops, broke something in an oversimplification.
 #
@@ -132,14 +135,15 @@ def sendGlblChgPage (parms):
 # Parse form variables
 fields = cgi.FieldStorage()
 if not fields:
-    cdrcgi.bail ("Unable to load form fields - should not happen!")
+    cdrcgi.bail ("Unable to load form fields - should not happen!", logfile=LF)
 
 # Establish user session and authorization
 session = cdrcgi.getSession(fields)
 if not session:
-    cdrcgi.bail ("Unknown or expired CDR session.")
+    cdrcgi.bail ("Unknown or expired CDR session.", logfile=LF)
 if not cdr.canDo (session, "MAKE GLOBAL CHANGES", "InScopeProtocol"):
-    cdrcgi.bail ("Sorry, user not authorized to make global changes")
+    cdrcgi.bail ("Sorry, user not authorized to make global changes",
+                 logfile=LF)
 
 # Don't allow two global changes to run concurrently
 countRunning = 0
@@ -147,7 +151,7 @@ try:
     # Gets number of active Global Change jobs
     countRunning = cdrbatch.activeCount (JOB_NAME)
 except cdrbatch.BatchException, e:
-    cdrcgi.bail (e)
+    cdrcgi.bail (str(e), logfile=LF)
 if countRunning > 0:
     cdrcgi.bail ("""
 Another global change job is still active.<br>
@@ -200,7 +204,8 @@ for fd in ('docType', 'email', 'specificPhone', 'specificRole',
            'trmDelField0', 'trmDelVal0', 'trmDelId0',
            'trmDelField1', 'trmDelVal1', 'trmDelId1',
            'trmAddField0', 'trmAddVal0', 'trmAddId0',
-           'trmAddField1', 'trmAddVal1', 'trmAddId1'):
+           'trmAddField1', 'trmAddVal1', 'trmAddId1',
+           'trmTypField0', 'trmTypVal0', 'trmTypId0'):
     fdVal = fields.getvalue (fd, None)
     if fdVal:
         # If it's an Id type, normalize it to standard CDR000... form
@@ -210,7 +215,7 @@ for fd in ('docType', 'email', 'specificPhone', 'specificRole',
                 fdVal = cdr.exNormalize (fdVal)[0]
             except StandardError, e:
                 cdrcgi.bail ("Error normalizing id: %s: %s" % \
-                             (str(fdVal), str(e)))
+                             (str(fdVal), str(e)), logfile=LF)
 
         # Store it in our state container
         ssVars[fd] = fdVal
@@ -257,7 +262,7 @@ ssVars["chgType"] = chgType
 try:
     chg = cdrglblchg.createChg (ssVars)
 except Exception, e:
-    cdrcgi.bail ("Error constructing chg object: %s" % str(e))
+    cdrcgi.bail ("Error constructing chg object: %s" % str(e), logfile=LF)
 
 #----------------------------------------------------------------------
 #                               Main loop
@@ -291,7 +296,7 @@ for stage in chg.getStages():
         cdr.logwrite ("Main loop error: " + result.getErrMsg(), LF)
 
         # Tell user and abort.  User must press Back, or something to go on
-        cdrcgi.bail (result.getErrMsg())
+        cdrcgi.bail (result.getErrMsg(), logfile=LF)
 
     # Display HTML?
     if rc == cdrglblchg.RET_HTML:
@@ -304,7 +309,7 @@ for stage in chg.getStages():
     # Sanity check
     if rc != cdrglblchg.RET_NONE:
         cdrcgi.bail ("%s: Internal error, retType=[%s]" % \
-                     (stage.getExcpMsg(), str(result.getRetType)))
+                     (stage.getExcpMsg(), str(result.getRetType)), logfile=LF)
 
 #----------------------------------------------------------------------
 # Give user final review
@@ -318,26 +323,31 @@ if not email:
         # Get current userid so we can get default email address
         resp = cdr.idSessionUser (None, session)
         if type(resp)==type("") or type(resp)==type(u""):
-            cdrcgi.bail ("Error fetching userid for email address: %s", resp)
+            cdrcgi.bail ("Error fetching userid for email address: %s", resp,
+                         logfile=LF)
 
         # Get current user's email address
         usrObj = cdr.getUser (session, resp[0])
         if type(usrObj)==type("") or type(usrObj)==type(u""):
-            cdrcgi.bail ("Error fetching email address: %s" % usrObj)
+            cdrcgi.bail ("Error fetching email address: %s" % usrObj,
+                         logfile=LF)
         email = usrObj.email
     except:
-        cdrcgi.bail ("Unable to fetch email address")
+        cdrcgi.bail ("Unable to fetch email address", logfile=LF)
 
     result = chg.reportWillChange()
     if result.getRetType() == cdrglblchg.RET_ERROR:
-        cdrcgi.bail ("Error creating change report: " + result.getErrMsg())
+        cdrcgi.bail ("Error creating change report: %s" % result.getErrMsg(),
+                     logfile=LF)
 
     if result.getRetType() == cdrglblchg.RET_NONE:
+        cdr.logwrite ("Sending No docs found message to browser", LF);
         sendGlblChgPage (("No documents found", chg.showSoFarHtml() +
             "<h2>No documents found matching global search criteria<h2>\n",
             (('cancel', 'Done'),)))
     else:
 
+        cdr.logwrite ("Sending willChange report to browser", LF);
         instruct = """
 <p>A background job will be created to perform the global change.
 Results of the job will be emailed.</p>
@@ -354,6 +364,8 @@ either:</p>
 """ % email
 
         html = chg.showSoFarHtml() + instruct + result.getPageHtml()
+
+        cdr.logwrite (html, LF)
 
         sendGlblChgPage (("Final review", html))
 
@@ -378,7 +390,7 @@ newJob = cdrbatch.CdrBatch (jobName=JOB_NAME,
 try:
     newJob.queue()
 except Exception, e:
-    cdrcgi.bail ("Batch job could not be started: " + str (e))
+    cdrcgi.bail ("Batch job could not be started: " + str (e), logfile=LF)
 
 # Get an id user can use to find out what happened
 jobId = newJob.getJobId()
