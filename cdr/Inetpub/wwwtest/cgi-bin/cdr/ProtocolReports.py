@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolReports.py,v 1.11 2004-05-11 17:38:36 bkline Exp $
+# $Id: ProtocolReports.py,v 1.12 2004-07-13 17:59:21 bkline Exp $
 #
 # Submenu for protocol reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.11  2004/05/11 17:38:36  bkline
+# Plugged in protocol hotfix report.
+#
 # Revision 1.10  2004/02/17 19:13:33  venglisc
 # Removed unused Menu entries and alphabetized remaining entries.
 #
@@ -88,8 +91,8 @@ reports = [
             'Approved Not Yet Active Report', ''),
            ('LiaisonReport.py', 
             'NCI Liaison Office/Brussels Protocol Report', ''),
-           ('NewlyPublishedTrials.py', 
-            'Newly Published Protocols', ''),
+           ('NewlyPublishableTrials.py', 
+            'Newly Publishable Trials', ''),
            ('PreferredProtOrgs.py', 
             'Preferred Protocol Organizations', ''),
            ('HotfixReport.py',
