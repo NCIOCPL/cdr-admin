@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: PersonProtocolReview.py,v 1.7 2004-10-07 15:50:20 venglisc Exp $
+# $Id: PersonProtocolReview.py,v 1.8 2004-11-08 21:07:32 venglisc Exp $
 #
 # Report to assist editors in checking links to a specified person from
 # protocols.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.7  2004/10/07 15:50:20  venglisc
+# Increased timeout time for subqueries.
+#
 # Revision 1.6  2004/09/24 15:48:25  venglisc
 # Reformatting report to follow output layout of other QC reports. (Bug 1261)
 #
@@ -289,9 +292,12 @@ try:
        INSERT INTO #persprotrev1
        SELECT ProtID.value doc_id, CDRID.value person_fragment, 
               CDRID.doc_id protocol_id,  Status.value  protocol_status, 
-	      CDRID.int_val person_id, 
-              CASE WHEN CDRID.path = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg/LeadOrgPersonnel/Person/@cdr:ref'                                    THEN 'Lead'
-                   WHEN CDRID.path = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg/ProtocolSites/OrgSite/OrgSiteContact/SpecificPerson/Person/@cdr:ref' THEN 'Site'
+              CDRID.int_val person_id, 
+              CASE WHEN CDRID.path =   '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg'
+                                     + '/LeadOrgPersonnel/Person/@cdr:ref'  THEN 'Lead'
+                   WHEN CDRID.path =   '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg'
+                                     + '/ProtocolSites/OrgSite/OrgSiteContact'
+                                     + '/SpecificPerson/Person/@cdr:ref'    THEN 'Site'
                    ELSE 'Unknown'
               END islead 
          FROM query_term CDRID
@@ -300,8 +306,11 @@ try:
          JOIN query_term Status
            ON CDRID.doc_id = Status.doc_id
         WHERE CDRID.int_val = ?    -- Person ID is passed to the script
-          AND (CDRID.path = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg/LeadOrgPersonnel/Person/@cdr:ref'
-           OR CDRID.path = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg/ProtocolSites/OrgSite/OrgSiteContact/SpecificPerson/Person/@cdr:ref'
+          AND (CDRID.path =   '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg'
+                            + '/LeadOrgPersonnel/Person/@cdr:ref'
+           OR CDRID.path  =   '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg'
+                            + '/ProtocolSites/OrgSite/OrgSiteContact'
+                            + '/SpecificPerson/Person/@cdr:ref'
               )
           AND ProtID.path = '/InScopeProtocol/ProtocolIDs/PrimaryID/IDString'
           AND Status.path = '/InScopeProtocol/ProtocolAdminInfo/CurrentProtocolStatus'
@@ -321,8 +330,10 @@ try:
         FROM query_term role
         JOIN query_term person
           ON role.doc_id = person.doc_id
-       WHERE role.path = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg/LeadOrgPersonnel/PersonRole'
-         AND person.path = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg/LeadOrgPersonnel/Person/@cdr:ref'
+       WHERE role.path   =   '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg'
+                           + '/LeadOrgPersonnel/PersonRole'
+         AND person.path =   '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg'
+                           + '/LeadOrgPersonnel/Person/@cdr:ref'
          AND role.doc_id in (select protocol_id from #persprotrev1)
          AND person.int_val = %s
          AND left(role.node_loc, 12) = left(person.node_loc, 12)
@@ -341,8 +352,11 @@ try:
         FROM query_term role
         JOIN query_term person
           ON role.doc_id = person.doc_id
-       WHERE role.path = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg/ProtocolSites/OrgSite/OrgSiteContact/SpecificPerson/Role'
-         AND person.path = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg/ProtocolSites/OrgSite/OrgSiteContact/SpecificPerson/Person/@cdr:ref'
+       WHERE role.path   =   '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg'
+                           + '/ProtocolSites/OrgSite/OrgSiteContact/SpecificPerson/Role'
+         AND person.path =   '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg'
+                           + '/ProtocolSites/OrgSite/OrgSiteContact/SpecificPerson'
+                           + '/Person/@cdr:ref'
          AND role.doc_id in (select protocol_id from #persprotrev1)
          AND person.int_val = %s
          AND left(role.node_loc, 24) = left(person.node_loc, 24)
@@ -365,8 +379,10 @@ try:
               JOIN #persprotrev1
                 ON protocol.doc_id = #persprotrev1.protocol_id
                AND protocol.value  = #persprotrev1.person_fragment
-             WHERE protocol.path = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg/LeadOrgPersonnel/Person/@cdr:ref'
-               AND specific.path = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg/LeadOrgPersonnel/ProtocolSpecificContact/@cdr:id'
+             WHERE protocol.path =   '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg'
+                                   + '/LeadOrgPersonnel/Person/@cdr:ref'
+               AND specific.path =   '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg'
+                                   + '/LeadOrgPersonnel/ProtocolSpecificContact/@cdr:id'
                AND left(protocol.node_loc, 8) = left(specific.node_loc, 8)
                AND #persprotrev2.protocol_id = protocol.doc_id
                AND #persprotrev2.person_fragment = protocol.value  
@@ -391,9 +407,15 @@ try:
                JOIN #persprotrev1
                  ON protocol.doc_id = #persprotrev1.protocol_id
                 AND protocol.value  = #persprotrev1.person_fragment
-              WHERE protocol.path = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg/ProtocolSites/OrgSite/OrgSiteContact/SpecificPerson/Person/@cdr:ref'
-                AND (specific.path = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg/ProtocolSites/OrgSite/OrgSiteContact/SpecificPerson/SpecificPhone'
-                 OR specific.path = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg/ProtocolSites/OrgSite/OrgSiteContact/SpecificPerson/SpecificEmail'
+              WHERE protocol.path  =   '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg'
+                                     + '/ProtocolSites/OrgSite/OrgSiteContact'
+                                     + '/SpecificPerson/Person/@cdr:ref'
+                AND (specific.path =   '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg'
+                                     + '/ProtocolSites/OrgSite/OrgSiteContact'
+                                     + '/SpecificPerson/SpecificPhone'
+                 OR specific.path  =   '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg'
+                                     + '/ProtocolSites/OrgSite/OrgSiteContact'
+                                     + '/SpecificPerson/SpecificEmail'
              )
          AND left(protocol.node_loc, 24) = left(specific.node_loc, 24)
          AND #persprotrev2.protocol_id = protocol.doc_id
@@ -516,6 +538,7 @@ for row in fragId:
                   JOIN #persprotrev2 v2
                     ON v1.protocol_id = v2.protocol_id
                    AND v1.person_fragment = v2.person_fragment
+                   AND v1.islead = v2.roletype
                  WHERE v1.person_fragment = '%s'
                  ORDER BY v1.protocol_status, v1.doc_id
 """ % (id + "#" + frag)
