@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummarySearch.py,v 1.2 2002-02-14 19:35:24 bkline Exp $
+# $Id: SummarySearch.py,v 1.3 2002-02-20 03:58:19 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Summary documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/02/14 19:35:24  bkline
+# Replaced hardwired filter ID with filter name.
+#
 # Revision 1.1  2001/12/01 18:11:44  bkline
 # Initial revision
 #
@@ -88,9 +91,14 @@ def sectionDiagList(conn, fName):
        <OPTION VALUE='' SELECTED>&nbsp;</OPTION>
 """ % fName
     for row in rows:
+        semi = row[1].find(';')
+        if semi != -1:
+            diag = row[1][:semi]
+        else:
+            diag = row[1]
         html += """\
        <OPTION VALUE='CDR%010d'>%s &nbsp;</OPTION>
-""" % (row[0], row[1])
+""" % (row[0], diag)
     html += """\
       </SELECT>
 """
@@ -123,9 +131,14 @@ def topicList(conn, fName):
        <OPTION VALUE='' SELECTED>&nbsp;</OPTION>
 """ % fName
     for row in rows:
+        semi = row[1].find(';')
+        if semi != -1:
+            topic = row[1][:semi]
+        else:
+            topic = row[1]
         html += """\
        <OPTION VALUE='CDR%010d'>%s &nbsp;</OPTION>
-""" % (row[0], row[1])
+""" % (row[0], topic)
     html += """\
       </SELECT>
 """
