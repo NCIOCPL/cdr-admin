@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: NewlyPublishedTrials.py,v 1.5 2002-03-20 14:23:58 bkline Exp $
+# $Id: NewlyPublishedTrials.py,v 1.6 2004-07-13 20:55:59 bkline Exp $
 #
 # Report on newly published trials in batch.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2002/03/20 14:23:58  bkline
+# Added code to put up form if we don't have a job ID.
+#
 # Revision 1.4  2002/03/20 14:15:18  bkline
 # Changed table width from 90% to 100%.
 #
@@ -145,6 +148,8 @@ try:
           FROM pub_proc
          WHERE id = ?""", jobId)
     row = cursor.fetchone()
+    if row == None:
+        cdrcgi.bail("Publication job %s does not exist" % jobId)
     if not row[0]:
         cdrcgi.bail("Publication job %d has not completed" % jobId)
     pubDate = row[0]
@@ -158,7 +163,7 @@ except cdrdb.Error, info:
 # placeholders at the same time. :-(
 #----------------------------------------------------------------------
 try:
-    cursor.callproc("cdr_newly_pub_trials", jobId)
+    cursor.callproc("cdr_newly_pub_trials_ve", jobId)
     cursor.nextset()
     rows = cursor.fetchall()
 except cdrdb.Error, info:
@@ -222,7 +227,7 @@ for row in rows:
      <font size='3'>%s</font>
     </td>
     <td>
-     <font size='3'>%010d</font>
+     <font size='3'>%d</font>
     </td>
    </tr>
 """ % (protId, stat, docId)
