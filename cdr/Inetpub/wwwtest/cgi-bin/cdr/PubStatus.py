@@ -1,10 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: PubStatus.py,v 1.15 2004-03-19 18:48:35 venglisc Exp $
+# $Id: PubStatus.py,v 1.16 2004-09-27 16:51:00 venglisc Exp $
 #
 # Status of a publishing job.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.15  2004/03/19 18:48:35  venglisc
+# Modified code to pick up document types (the rows of the statistics report)
+# from a database query instead of having them hard coded.
+# Also made some minor formatting changes:  table columns are now same size.
+#
 # Revision 1.14  2004/02/27 18:40:05  venglisc
 # Added CTGovProtocol Document type to the report output.  Alphabetized the
 # display of the document types.
@@ -227,9 +232,9 @@ def dispFilterFailures():
    <tr>    
     <td valign='top'><B>Id</B></td>   
     <td valign='top'><B>Ver</B></td>   
-    <td valign='top' align='right'><B>Type</B></td>
-    <td valign='top' align='right'><B>Title</B></td>
-    <td valign='top' align='right'><B>Message</B></td> 
+    <td valign='top'><B>Type</B></td>
+    <td valign='top'><B>Title</B></td>
+    <td valign='top'><B>Message</B></td> 
     </tr>
 """ 
     html   += addRow(row)
