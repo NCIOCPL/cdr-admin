@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PersonAndOrgReports.py,v 1.9 2004-09-17 14:06:50 venglisc Exp $
+# $Id: PersonAndOrgReports.py,v 1.10 2004-10-28 18:59:07 venglisc Exp $
 #
 # Submenu for person and organization reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.9  2004/09/17 14:06:50  venglisc
+# Fixed list items to properly teminate the anker link.
+#
 # Revision 1.8  2004/03/29 21:33:38  bkline
 # Added CCOPOrgReport.py.
 #
@@ -86,6 +89,8 @@ reports = [
             'Inactive Persons/Organizations Linked to Protocols'),
            ('CCOPOrgReport.py',
             'NCI Funded CCOP/MBCCOP Organization Report'),
+	   ('OrgProtocolAcronym.py',
+	    'Organization Protocol Acronym Report'),
            ('OrgProtocolReview.py', 
             'Organization Protocol Review'),
            ('PersonProtocolReview.py', 
