@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.12 2002-09-26 15:31:17 bkline Exp $
+# $Id: QcReport.py,v 1.13 2002-12-26 21:50:24 bkline Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.12  2002/09/26 15:31:17  bkline
+# New filters for summary QC reports.
+#
 # Revision 1.11  2002/09/19 15:14:26  bkline
 # Added filters at Cheryl's request.
 #
@@ -94,8 +97,12 @@ if not docId and not docTitle:
   %s
   <TABLE>
    <TR>
-    <TD>Document title:&nbsp;</TD>
+    <TD ALIGN='right'>Document title:&nbsp;</TD>
     <TD><INPUT SIZE='60' NAME='DocTitle'></TD>
+   </TR>
+   <TR>
+    <TD ALIGN='right'>Document ID:&nbsp;</TD>
+    <TD><INPUT SIZE='60' NAME='DocId'></TD>
    </TR>
   </TABLE>
 """ % (cdrcgi.SESSION, session, extra)
@@ -114,13 +121,33 @@ except cdrdb.Error, info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
 
 #----------------------------------------------------------------------
+# More than one matching title; let the user choose one.
+#----------------------------------------------------------------------
+def showTitleChoices(choices):
+    form = """\
+   <H3>More than one matching document found; please choose one.</H3>
+"""
+    for choice in choices:
+        form += """\
+   <INPUT TYPE='radio' NAME='DocId' VALUE='CDR%010d'>%s<BR>
+""" % (choice[0], cgi.escape(choice[1]))
+    cdrcgi.sendPage(header + form + """\
+   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
+   <INPUT TYPE='hidden' NAME='DocType' VALUE='%s'>
+   <INPUT TYPE='hidden' NAME='ReportType' VALUE='%s'>
+  </FORM>
+ </BODY>
+</HTML>
+""" % (cdrcgi.SESSION, session, docType or '', repType or ''))
+                    
+#----------------------------------------------------------------------
 # If we have a document title but not a document ID, find the ID.
 #----------------------------------------------------------------------
 if docTitle and not docId:
     try:
         if docType:
             cursor.execute("""\
-                SELECT document.id
+                SELECT document.id, document.title
                   FROM document
                   JOIN doc_type
                     ON doc_type.id = document.doc_type
@@ -135,7 +162,7 @@ if docTitle and not docId:
         if not rows:
             cdrcgi.bail("Unable to find document with title '%s'" % docTitle)
         if len(rows) > 1:
-            cdrcgi.bail("Ambiguous title '%s'" % docTitle)
+            showTitleChoices(rows)
         intId = rows[0][0]
         docId = "CDR%010d" % intId
     except cdrdb.Error, info:
