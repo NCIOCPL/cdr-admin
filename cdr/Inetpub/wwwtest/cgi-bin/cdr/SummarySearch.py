@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummarySearch.py,v 1.3 2002-02-20 03:58:19 bkline Exp $
+# $Id: SummarySearch.py,v 1.4 2002-05-03 20:31:02 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Summary documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2002/02/20 03:58:19  bkline
+# Truncated long pulldown list strings at users' request.
+#
 # Revision 1.2  2002/02/14 19:35:24  bkline
 # Replaced hardwired filter ID with filter name.
 #
@@ -255,6 +258,7 @@ except cdrdb.Error, info:
 # Create the results page.
 #----------------------------------------------------------------------
 html = cdrcgi.advancedSearchResultsPage("Summary", rows, strings, 
+                    "name:Revision Markup Filter&Filter1="
                     "name:Health Professional Summary Report")
 
 #----------------------------------------------------------------------
