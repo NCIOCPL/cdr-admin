@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: CiteSearch.py,v 1.4 2002-02-25 13:47:51 bkline Exp $
+# $Id: CiteSearch.py,v 1.5 2002-05-10 21:14:12 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Citation documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2002/02/25 13:47:51  bkline
+# Added ability to designate CDR document to be overridden by fresh import
+# of PubMed doc (task #57).
+#
 # Revision 1.3  2002/02/20 04:00:16  bkline
 # Modified style of prompt at users' request.
 #
@@ -190,7 +194,7 @@ searchFields = (cdrcgi.SearchField(title,
                 cdrcgi.SearchField(volume,
                             ("/Citation/PubmedArticle/MedlineCitation"
                              "/Article/Journal/JournalIssue/Volume",)),
-                cdrcgi.SearchField(journal,
+                cdrcgi.SearchField(issue,
                             ("/Citation/PubMedArticle/MedlineCitation"
                              "/Article/Journal/JournalIssue/Issue",)))
 
