@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: ExternMapFailures.py,v 1.4 2003-12-17 00:36:48 bkline Exp $
+# $Id: ExternMapFailures.py,v 1.5 2003-12-18 16:00:27 bkline Exp $
 #
 # Report on values found in external systems (such as ClinicalTrials.gov)
 # which have not yet been mapped to CDR documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2003/12/17 00:36:48  bkline
+# Modified queries to ignore time portion of date-time value in sorting and
+# display, and to show latest rows first.
+#
 # Revision 1.3  2003/12/16 15:43:45  bkline
 # Split report into two sections and modified the sort order at Lakshmi's
 # request.
@@ -18,7 +22,7 @@
 # which have not yet been mapped to CDR documents.
 #
 #----------------------------------------------------------------------
-import cdrdb, cdrcgi
+import cdrdb, cdrcgi, time
 
 #----------------------------------------------------------------------
 # Establish a database connection.
@@ -49,14 +53,19 @@ html = """\
   </style>
  </head>
  <body>
-  <h2>External Map Failures (Other Than CT.gov Persons)</h2>
+  <center>
+   <h1>External Map Failures Report</h1>
+   <h3>%s</h3>
+  </center>
+  <br>
+  <h2>External Map Failures (excluding Person failures)</h2>
   <table border='1' cellpadding='2' cellspacing='0'>
    <tr>
     <th>Usage</th>
     <th>Value</th>
     <th>Recorded</th>
    </tr>
-"""
+""" % time.strftime("%B %d, %Y")
 while row:
     html += """\
    <tr>
