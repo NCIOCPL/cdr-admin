@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolReports.py,v 1.1 2002-05-24 20:37:31 bkline Exp $
+# $Id: ProtocolReports.py,v 1.2 2002-05-25 02:39:13 bkline Exp $
 #
 # Submenu for protocol reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2002/05/24 20:37:31  bkline
+# New Report Menu structure implemented.
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
 
@@ -63,9 +66,7 @@ for r in reports:
 
 form += """\
     </OL>
-    <BR>
     <H3>Management Reports</H3>
-    <BR>
     <OL>
 """
 reports = [

@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CitationReports.py,v 1.1 2002-05-24 20:37:29 bkline Exp $
+# $Id: CitationReports.py,v 1.2 2002-05-25 02:39:12 bkline Exp $
 #
 # Submenu for citation reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2002/05/24 20:37:29  bkline
+# New Report Menu structure implemented.
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
 
@@ -40,7 +43,6 @@ if action == "Log Out":
 form = """\
     <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
     <H3>QC Reports</H3>
-    <BR>
     <OL>
 """ % (cdrcgi.SESSION, session)
 reports = [
@@ -52,9 +54,7 @@ for r in reports:
     
 form += """\
     </OL>
-    <BR>
     <H3>Other Reports</H3>
-    <BR>
     <OL>
 """
 reports = [
@@ -67,9 +67,7 @@ for r in reports:
     
 form += """\
     </OL>
-    <BR>
     <H3>Management Reports</H3>
-    <BR>
     <OL>
 """
 reports = [
