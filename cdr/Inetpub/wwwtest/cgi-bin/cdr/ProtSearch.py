@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtSearch.py,v 1.9 2003-03-04 22:46:58 bkline Exp $
+# $Id: ProtSearch.py,v 1.10 2003-12-08 18:46:08 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Protocol documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.9  2003/03/04 22:46:58  bkline
+# Modifications for CDR enhancement request #301.
+#
 # Revision 1.8  2002/07/11 20:50:18  bkline
 # Caught up with changed filter title.
 #
@@ -146,7 +149,7 @@ if not query:
 #----------------------------------------------------------------------
 try:
     cursor = conn.cursor()
-    cursor.execute(query)
+    cursor.execute(query, timeout = 300)
     rows = cursor.fetchall()
     cursor.close()
     cursor = None
