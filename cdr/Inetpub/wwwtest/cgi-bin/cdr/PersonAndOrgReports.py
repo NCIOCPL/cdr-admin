@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PersonAndOrgReports.py,v 1.4 2002-07-16 15:39:37 bkline Exp $
+# $Id: PersonAndOrgReports.py,v 1.5 2003-07-29 12:40:13 bkline Exp $
 #
 # Submenu for person and organization reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2002/07/16 15:39:37  bkline
+# New report on inactive persons and orgs.
+#
 # Revision 1.3  2002/06/04 20:16:45  bkline
 # New report for member orgs and PIs of cooperative groups.
 #
@@ -67,6 +70,7 @@ form += """\
 reports = [
            ('CoopGroupMembers.py', 'Cooperative Group Investigators'),
            ('PersonProtocolReview.py', 'Person Protocol Review'),
+           ('OrgProtocolReview.py', 'Organization Protocol Review'),
            ('PersonsAtOrg.py', 'Persons Practicing at Organizations'),
            ('InactivePersonsOrgs.py', 
             'Inactive Persons/Organizations Linked to Protocols')
