@@ -1,31 +1,40 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditExternMap.py,v 1.1 2003-12-16 15:57:45 bkline Exp $
+# $Id: EditExternMap.py,v 1.2 2003-12-19 20:40:18 bkline Exp $
 #
 # Allows a user to edit the table which maps strings from external
 # systems (such as ClinicalTrials.gov) to CDR document IDs.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2003/12/16 15:57:45  bkline
+# Allows a user to edit the table which maps strings from external
+# systems (such as ClinicalTrials.gov) to CDR document IDs.
+#
 #----------------------------------------------------------------------
 import cdrdb, cdrcgi, cgi, re, cdr
 
 #----------------------------------------------------------------------
 # Set the form variables.
 #----------------------------------------------------------------------
-fields  = cgi.FieldStorage()
-session = cdrcgi.getSession(fields)
-request = cdrcgi.getRequest(fields)
-usage   = fields and fields.getvalue('usage')   or None
-value   = fields and fields.getvalue('value')   or None
-pattern = fields and fields.getvalue('pattern') or ""
-title   = "CDR Administration"
-section = "External Map Editor"
-script  = "EditExternMap.py"
-logFile = cdr.DEFAULT_LOGDIR + "/EditExternMap.log"
-buttons = ["Get Values", cdrcgi.MAINMENU, "Log Out"]
-extra   = usage and ["Save Changes"] or []
-buttons = extra + buttons
-style   = """\
+fields   = cgi.FieldStorage()
+session  = cdrcgi.getSession(fields)
+request  = cdrcgi.getRequest(fields)
+usage    = fields and fields.getvalue('usage')   or None
+value    = fields and fields.getvalue('value')   or None
+pattern  = fields and fields.getvalue('pattern') or ""
+docId    = fields and fields.getvalue('docId')   or ""
+title    = "CDR Administration"
+section  = "External Map Editor"
+script   = "EditExternMap.py"
+logFile  = cdr.DEFAULT_LOGDIR + "/EditExternMap.log"
+buttons  = ["Get Values", cdrcgi.MAINMENU, "Log Out"]
+extra    = usage and ["Save Changes"] or []
+buttons  = extra + buttons
+intUsage = usage and int(usage) or None
+allUsage = not intUsage
+if docId and not pattern:
+    allUsage = 1
+style    = """\
   <style  type='text/css'>input.r { background-color: EEEEEE }</style>
   <script type='text/javascript'>
    <!--
@@ -160,54 +169,7 @@ if request == "Save Changes":
         form += """\
   <br><br>
 """
-##     html = """\
-## <html>
-##  <body>
-## """
-##     for key in pairs:
-##         pair = pairs[key]
-##         didWhat = pair[0] == pair[1] and "(unchanged)" or ("(changed to %s)"
-##                                                            % pair[1])
-##         html += """\
-## value in row %d was %s %s<br>
-## """ % (key, pair[0], didWhat)
-##     cdrcgi.sendPage(html + """\
-##  </body>
-## </html>
-## """)
-##     html = """\
-## <html>
-##  <body>
-##   <table>
-## """
-##     for field in fields.keys():
-##         if type(fields[field]) != type([]):
-##             html += """\
-##    <tr>
-##     <td>%s</td>
-##     <td>%s</td>
-##    </tr>
-## """ % (field, fields[field].value)
-##         else:
-##             for f in fields[field]:
-##                 html += """\
-##    <tr>
-##     <td>%s</td>
-##     <td>%s</td>
-##    </tr>
-## """ % (field, f.value)
-##     #cdrcgi.bail("Haven't implemented Save Changes yet")
-##     cdrcgi.sendPage(html + """\
-##   </table>
-##  </body>
-## </html>""")
 
-#----------------------------------------------------------------------
-# Edit a single record if requested.
-#----------------------------------------------------------------------
-## if value:
-##     cdrcgi.bail("Haven't implemented that part yet")
-    
 #----------------------------------------------------------------------
 # Show the list of usage possibilities.
 #----------------------------------------------------------------------
@@ -224,11 +186,11 @@ form += """\
      </td>
      <td>
       <select name='usage' width='60'>
-"""
-intUsage = usage and int(usage) or None
+       <option value='0'%s>All usages</option>
+""" % (allUsage and " selected='1'" or "")
 for row in rows:
     selected = ""
-    if intUsage is not None and intUsage == row[0]:
+    if not allUsage and intUsage == row[0]:
         selected = " selected='1'"
     form += """\
        <option value='%d'%s>%s</option>
@@ -245,32 +207,50 @@ form += """\
       <input name='pattern' value="%s">
      </td>
     </tr>
+    <tr>
+     <td align='right' nowrap='1'>
+      <b>Document ID:&nbsp;</b>
+     </td>
+     <td>
+      <input name='docId' value="%s">
+     </td>
+    </tr>
    </table>
    <input type='hidden' name='%s' value='%s'>
 """ % (pattern and cgi.escape(pattern, 1) or "",
-                cdrcgi.SESSION, session)
+       docId, cdrcgi.SESSION, session)
 
 #----------------------------------------------------------------------
 # Show the rows that match the selection criteria.
 #----------------------------------------------------------------------
-if intUsage:
+if request in ("Save Changes", "Get Values"):
+    whereUsage = intUsage and ("AND m.usage = %d" % intUsage) or ""
     if pattern:
         cursor.execute("""\
-         SELECT m.id, m.value, m.doc_id, u.name, m.last_mod
+         SELECT m.id, m.value, m.doc_id, u.name
            FROM external_map m
-LEFT OUTER JOIN usr u
-             ON u.id = m.usr
-          WHERE m.usage = ?
-            AND m.value LIKE ?
-       ORDER BY m.value""", (intUsage, pattern))
+           JOIN external_map_usage u
+             ON u.id = m.usage
+          WHERE m.value LIKE ?
+            %s
+       ORDER BY m.value""" % whereUsage, pattern)
+    elif docId:
+        cursor.execute("""\
+         SELECT m.id, m.value, m.doc_id, u.name
+           FROM external_map m
+           JOIN external_map_usage u
+             ON u.id = m.usage
+          WHERE m.doc_id = %d
+       ORDER BY m.value""" % extractInt(docId))
     else:
         cursor.execute("""\
-         SELECT m.id, m.value, m.doc_id, u.name, m.last_mod
+         SELECT m.id, m.value, m.doc_id, u.name
            FROM external_map m
-LEFT OUTER JOIN usr u
-             ON u.id = m.usr
-          WHERE m.usage = ?
-       ORDER BY m.value""", intUsage)
+           JOIN external_map_usage u
+             ON u.id = m.usage
+          WHERE 1 = 1
+            %s
+       ORDER BY m.value""" % whereUsage)
     row = cursor.fetchone()
     if not row:
         form += """\
@@ -280,15 +260,6 @@ LEFT OUTER JOIN usr u
     else:
         form += """\
   <br><table border='0' cellspacing='1' cellpadding='1'>
-    <!--
-  <table border='1' cellpadding='0' cellspacing='0'>
-   <tr>
-    <td align='center' nowrap='1'><b>Value</b></td>
-    <td align='center' nowrap='1' ><b>DocId</b></td>
-    <td align='center' nowrap='1' width='120'><b>Last Changed</b></td>
-    <td align='center' nowrap='1' width='100'><b>Mapped By</b></td>
-   </tr>
-      -->
 """
         while row:
             if not row[2]:
@@ -297,9 +268,9 @@ LEFT OUTER JOIN usr u
                 button = ("<button name='view' type='submit' value='%s'"
                           " onclick='viewDoc(%s)'>"
                           "View</button>" % (row[2], row[2]))
-            value = cgi.escape(row[1], 1)
-##             href  = ("%s/EditExternMap.py?%s=%s&value=%s&usage=%s" %
-##                      (cdrcgi.BASE, cdrcgi.SESSION, session, value, usage))
+            extra = allUsage and (" [%s]" % row[3]) or ""
+            value = "%s%s" % (row[1], extra)
+            value = cgi.escape(value, 1)
             value = ("<input class='r' readonly='1' size='120' "
                      "name='name-%d' value=\"%s\">" % (row[0], value))
             docId = "<input size='8' name='id-%d' value='%s'>" % (row[0],
@@ -310,14 +281,8 @@ LEFT OUTER JOIN usr u
     <td valign='top'>%s</td>
     <td>%s</td>
     <input type='hidden' name='old-id-%d' value='%s'>
-    <!--
-    <td valign='top'>%s</td>
-    <td valign='top'>%s</td>
-      -->
    </tr>
-""" % (value, docId, button, row[0], row[2] or "",
-       #row[2] and ("CDR%d" % row[2]) or "&nbsp;",
-       row[4] or "&nbsp;", row[3] or "&nbsp;")
+""" % (value, docId, button, row[0], row[2] or "")
             row = cursor.fetchone()
         form += """\
   </table>
