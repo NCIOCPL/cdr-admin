@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: Filter.py,v 1.8 2002-09-16 16:35:31 pzhang Exp $
+# $Id: Filter.py,v 1.9 2002-09-16 16:58:36 pzhang Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
@@ -65,7 +65,8 @@ def dispFilterSet(key, filterSets, filterId):
     filtExpr = re.compile("^(CDR)*(0*)(\d+)$", re.IGNORECASE)
     for filt in filterId:  
         if not filt:
-            continue      
+            continue    
+        filt = filt.strip()  
         match = filtExpr.search(filt)
         if match:            
             id = match.group(3) + ":"          
