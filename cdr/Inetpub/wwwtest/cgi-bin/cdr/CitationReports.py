@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CitationReports.py,v 1.2 2002-05-25 02:39:12 bkline Exp $
+# $Id: CitationReports.py,v 1.3 2004-02-17 19:37:52 venglisc Exp $
 #
 # Submenu for citation reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/05/25 02:39:12  bkline
+# Removed extra blank lines from HTML output.
+#
 # Revision 1.1  2002/05/24 20:37:29  bkline
 # New Report Menu structure implemented.
 #
@@ -58,7 +61,6 @@ form += """\
     <OL>
 """
 reports = [
-           ('Stub.py', 'Citation Source'),
            ('UnverifiedCitations.py', 'Unverified Citations')
           ]
 for r in reports:
@@ -71,12 +73,7 @@ form += """\
     <OL>
 """
 reports = [
-
-           ('Stub.py', 'Attached Citations Count'),
            ('ModifiedPubMedDocs.py', 'Modified PubMed Documents'),
-           ('Stub.py', 'New Citation Count'),
-           ('Stub.py', 'Newly Published Citation Count'),
-           ('Stub.py', 'No Abstracts'),
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI>\n" % (
