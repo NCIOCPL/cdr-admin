@@ -1,4 +1,4 @@
-<!-- $Id: CdrFilter.html,v 1.5 2004-02-19 21:31:54 ameyer Exp $ -->
+<!-- $Id: CdrFilter.html,v 1.6 2004-07-27 21:12:29 venglisc Exp $ -->
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
  <HEAD>
   <TITLE>CDR Document Filtering</TITLE>
@@ -27,6 +27,10 @@
         var pub   = document.FilterRequest.publish.checked;
         var app   = document.FilterRequest.approved.checked;
         var pro   = document.FilterRequest.proposed.checked;      
+        var cmt   = document.FilterRequest.comments.checked;
+        var gls   = document.FilterRequest.glossary.checked;
+        var std   = document.FilterRequest.stdword.checked;
+	var mrk   = document.FilterRequest.rsmarkup[0].checked;
         var port  = document.FilterRequest.port.value;      
       //var uid   = document.FilterRequest.UserName.value;
       //var pwd   = document.FilterRequest.Password.value;
@@ -35,6 +39,10 @@
                   + "&publish=" + pub
                   + "&approved=" + app
                   + "&proposed=" + pro               
+                  + "&comments=" + cmt
+		  + "&rsmarkup=" + mrk
+                  + "&glossary=" + gls
+                  + "&stdword=" + std               
                   + "&port=" + port               
                   + "&Filter=" + filt
                   + "&Filter1=" + filt1
@@ -139,17 +147,74 @@
 -->
     <TR>     
      <TD ALIGN='right' COLSPAN='1'>
-      <B>Display RevLevels&nbsp;</B>
+      <B>Display RevLevels: </B>
      </TD> 
      <TD ALIGN='Left' COLSPAN='1'>
-      <B>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;publish&nbsp;</B>
-     <INPUT TYPE="checkbox" checked NAME="publish">
-      <B>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;approved&nbsp;</B>
-     <INPUT TYPE="checkbox" NAME="approved">
-     <B>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;proposed&nbsp;</B>
-     <INPUT TYPE="checkbox" NAME="proposed">     
+      <TABLE border='0' width='100%'>
+       <TR>
+        <TD width='25%' align='right'>
+         <B>publish</B>
+	</TD>
+	<TD>
+         <INPUT TYPE="checkbox" NAME="publish">
+	</TD>
+	<TD width='25%' align='right'>
+         <B>approved</B>
+	</TD>
+	<TD>
+         <INPUT TYPE="checkbox" NAME="approved" CHECKED>
+	</TD>
+	<TD width='25%' align='right'>
+         <B>proposed</B>
+	</TD>
+	<TD>
+         <INPUT TYPE="checkbox" NAME="proposed">     
+        </TD>
+       </TR>
+      </TABLE>
      </TD> 
     </TR>    
+    <TR>
+     <TD ALIGN='right' COLSPAN='1'>
+      <B>Include: </B>
+     </TD>
+     <TD>
+      <TABLE border='0' width='100%'>
+       <TR>
+        <TD width='25%' align='right'>
+	 <B>Comments</B>
+	</TD>
+        <TD>
+         <INPUT TYPE="checkbox" NAME="comments" CHECKED>
+	</TD>
+        <TD width='25%' align='right'>
+	 <B>GlossTerms</B>
+	</TD>
+        <TD>
+         <INPUT TYPE="checkbox" NAME="glossary">
+	</TD>
+        <TD width='25%' align='right'>
+	 <B>Std Wording</B>
+	</TD>
+        <TD>
+         <INPUT TYPE="checkbox" NAME="stdword">
+	</TD>
+       </TR>
+      </TABLE>
+     </TD>
+    </TR>
+    <TR>
+     <TD VALIGN="top" ALIGN="right">
+      <B>Summary Markup:</B>
+     </TD>
+     <TD>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+      <INPUT TYPE="radio" NAME="rsmarkup" VALUE="RS" CHECKED>
+      <B>Redline/Strikeout, New Patient</B>
+      <BR/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+      <INPUT TYPE="radio" NAME="rsmarkup" VALUE="BU">
+      <B>Bold/Underline</B>
+     </TD>
+    </TR>
     <TR>
      <TD ALIGN='right'>
       <B>Document ID&nbsp;</B>
