@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditIssue.py,v 1.1 2001-12-01 18:11:44 bkline Exp $
+# $Id: EditIssue.py,v 1.2 2002-04-16 14:10:26 bkline Exp $
 #
 # Edit CDR development issue.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2001/12/01 18:11:44  bkline
+# Initial revision
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string, dbi, cdrdb
 
@@ -117,6 +120,19 @@ VALUES(?,GETDATE(),?,%s,?,%s,?,?,?)
 #----------------------------------------------------------------------
 # Get what we need from the database.
 #----------------------------------------------------------------------
+if id == -1:
+    # By convention, -1 means show oldest unresolved issue.
+    try:
+        cursor.execute("""\
+            SELECT MIN(id)
+              FROM issue
+             WHERE resolved IS NULL
+               AND priority NOT LIKE 'X%'""")
+        row = cursor.fetchone()
+        id = row and row[0] or 0
+    except cdrdb.Error, info:
+        cdrcgi.bail('Failure looking up earliest unresolved issue: %s' % 
+                    info[1][0])
 try:
     if id:
         query  = """\
