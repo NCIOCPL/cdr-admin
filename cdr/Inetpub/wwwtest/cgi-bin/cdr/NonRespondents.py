@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: NonRespondents.py,v 1.3 2003-07-29 12:33:25 bkline Exp $
+# $Id: NonRespondents.py,v 1.4 2004-02-26 21:11:01 bkline Exp $
 #
 # Report on mailers which haven't been responded to (other than
 # status and participant mailers).
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2003/07/29 12:33:25  bkline
+# Changed label (60-120) at users' request.  Plugged in hard-coded
+# web server name (Mahler).
+#
 # Revision 1.2  2003/06/13 20:29:42  bkline
 # Moved primary functionality to CdrLongReports.py
 #
@@ -92,10 +96,11 @@ if not docType or not age or not email:
 #----------------------------------------------------------------------
 args = (("Age", age), ("BaseDocType", docType), ("Host", cdrcgi.WEBSERVER))
 
-# Have to do this on Mahler, since that's the only server with Excel installed.
+# Have to do this on the development machine, since that's the only
+# server with Excel installed.
 batch = cdrbatch.CdrBatch(jobName = "Mailer Non-Respondents",
                           command = command, email = email,
-                          args = args, host='mahler.nci.nih.gov')
+                          args = args, host = cdr.DEV_HOST)
 try:
     batch.queue()
 except Exception, e:
@@ -113,13 +118,12 @@ cdrcgi.sendPage(header + """\
    <h4>Report has been queued for background processing</h4>
    <p>
     To monitor the status of the job, click this
-    <a href='%s/getBatchStatus.py?%s=%s&jobId=%s'><u>link</u></a>
+    <a href='http://%s%s/getBatchStatus.py?%s=%s&jobId=%s'><u>link</u></a>
     or use the CDR Administration menu to select 'View
     Batch Job Status'.
    </p>
   </form>
  </body>
 </html>
-""" % ('http://mahler.nci.nih.gov/cgi-bin/cdr', cdrcgi.SESSION, session,
-       jobId))
+""" % (cdr.DEV_HOST, cdrcgi.BASE, cdrcgi.SESSION, session, jobId))
 

@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: OSPReport.py,v 1.1 2003-05-08 20:24:01 bkline Exp $
+# $Id: OSPReport.py,v 1.2 2004-02-26 21:11:01 bkline Exp $
 #
 # Queue up report for the Office of Science Policy.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2003/05/08 20:24:01  bkline
+# New report for Office of Science Policy.
+#
 #----------------------------------------------------------------------
 
 import cdrbatch, cdrcgi, cgi, cdrdb
@@ -129,9 +132,10 @@ args = []
 for c in cancer:
     name = "TermId%d" % (len(args) + 1)
     args.append((name, c))
-# Have to do this on Mahler, since that's the only server with Excel installed.
+# Have to do this on the development machine, since that's the only
+# server with Excel installed.
 batch = cdrbatch.CdrBatch(jobName = section, command = command, email = email,
-                          args = args, host='mahler.nci.nih.gov')
+                          args = args, host = cdr.DEV_HOST)
 try:
     batch.queue()
 except Exception, e:
@@ -149,11 +153,11 @@ cdrcgi.sendPage(header + """\
    <h4>Report has been queued for background processing</h4>
    <p>
     To monitor the status of the job, click this
-    <a href='getBatchStatus.py?%s=%s&jobId=%s'><u>link</u></a>
+    <a href='http://%s%s/getBatchStatus.py?%s=%s&jobId=%s'><u>link</u></a>
     or use the CDR Administration menu to select 'View
     Batch Job Status'.
    </p>
   </form>
  </body>
 </html>
-""" % (cdrcgi.SESSION, session, jobId))
+""" % (cdr.DEV_HOST, cdrcgi.BASE, cdrcgi.SESSION, session, jobId))
