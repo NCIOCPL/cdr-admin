@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: PublishPreview.py,v 1.12 2002-08-29 12:32:08 bkline Exp $
+# $Id: PublishPreview.py,v 1.13 2002-10-22 17:47:05 bkline Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.12  2002/08/29 12:32:08  bkline
+# Hooked up with Cancer.gov.
+#
 # Revision 1.11  2002/05/30 17:06:41  bkline
 # Corrected CVS log comment for previous version.
 #
@@ -128,6 +131,7 @@ doc = pattern1.sub("", doc)
 doc = pattern2.sub("", doc)
 #cdrcgi.bail("flavor=%s doc=%s" % (flavor, doc))
 try:
+    #cdr2cg.debuglevel = 1
     resp = cdr2cg.pubPreview(doc, flavor)
 except:
     cdrcgi.bail("Preview formatting failure")
