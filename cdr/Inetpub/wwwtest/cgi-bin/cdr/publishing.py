@@ -2,8 +2,11 @@
 #
 # Publishing CGI script.
 #
-# $Id: publishing.py,v 1.17 2002-11-05 16:04:34 pzhang Exp $
+# $Id: publishing.py,v 1.18 2002-11-05 18:42:30 pzhang Exp $
 # $Log: not supported by cvs2svn $
+# Revision 1.17  2002/11/05 16:04:34  pzhang
+# Enhanced interface per Eileen's input
+#
 # Revision 1.16  2002/10/29 21:01:33  pzhang
 # Called cdr.publish() with parameter allowInActive for Hotfix-Remove.
 #
@@ -211,7 +214,7 @@ class Display:
 
             form += "<LI><H5>Modify default parameter values: </H5>\n"
             form += "<TABLE BORDER='1'><TR><TD><B>Name</B></TD><TD><B>"               
-            form += "Default Value</B></TD><TD><B>New Value</B></TD></TR>\n"
+            form += "Default Value</B></TD><TD><B>Current Value</B></TD></TR>\n"
         
             paramList = ""
             for r in params:
