@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CTGov.py,v 1.5 2004-01-14 14:04:40 bkline Exp $
+# $Id: CTGov.py,v 1.6 2004-05-11 17:30:43 bkline Exp $
 #
 # Submenu for ClinicalTrials.gov activities.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2004/01/14 14:04:40  bkline
+# Plugged in new CTGov download report.
+#
 # Revision 1.4  2003/12/16 15:36:45  bkline
 # Replaced some of the stubs.
 #
@@ -86,7 +89,8 @@ form += """\
     <OL>
 """
 reports = [
-           ('EditExternMap.py', 'Update Mapping Table')
+           ('EditExternMap.py', 'Update Mapping Table'), 
+           ('CTGovMarkDuplicate.py', 'Mark Protocols as Duplicates')
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI>\n" % (
