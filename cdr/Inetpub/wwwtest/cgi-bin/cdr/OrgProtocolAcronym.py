@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: OrgProtocolAcronym.py,v 1.1 2004-10-28 20:20:00 venglisc Exp $
+# $Id: OrgProtocolAcronym.py,v 1.2 2004-11-03 20:12:20 venglisc Exp $
 #
 # Creates a report listing Organizations and Protocol Acronym IDs
 # sorted by either the Org or the Acronym.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2004/10/28 20:20:00  venglisc
+# Initial version of Org with Protocol Acronym Report.
+#
 #----------------------------------------------------------------------
 import cdrdb, cdrcgi, cgi, time, string
 
@@ -20,7 +23,7 @@ SUBMENU   = "Report Menu"
 buttons   = ["Submit Request", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 script    = "OrgProtocolAcronym.py"
 title     = "CDR Administration"
-section   = "Organization Protocol Acronym Report"
+section   = "Organizations Protocol Acronym Report"
 now       = time.localtime(time.time())
 
 #----------------------------------------------------------------------
@@ -58,7 +61,7 @@ if not sortField:
     header = cdrcgi.header(title, title, section, script, buttons)
     form   = """\
     <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-    <H3>Organization with Protocol Acronym Report</H3>
+    <H3>Organizations with Protocol Acronym Report</H3>
     <TABLE>
      <TR>
       <TD>&nbsp;&nbsp;&nbsp;&nbsp;</TD>
@@ -83,17 +86,23 @@ if not sortField:
 # We have a request; do what needs to be done.
 #----------------------------------------------------------------------
 if sortField:
+   sortString = ['Organization', 'Acronym']
+      
    html = """\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>
  <head>
-  <title>CDR - %s</title>
+  <title>Organizations with Protocol Acronym Report (by %s) - %s</title>
   <basefont face='Arial, Helvetica, sans-serif'>
  </head>
  <body>
-   <H2>Organization with Protocol Acronym Report</H2>
+   <CENTER>
+      <H2>Organizations with Protocol Acronym Report - sorted by %s</BR>
+          Date: %s</H2>
+   </CENTER>
   <p/>
-""" % (time.strftime("%m/%d/%Y", now))
+""" % (sortString[string.atoi(sortField) - 2], time.strftime("%Y-%m-%d", now), 
+       sortString[string.atoi(sortField) - 2], time.strftime("%Y-%m-%d", now))
 
    #----------------------------------------------------------------------
    # Extract the group's names from the database.
@@ -116,7 +125,7 @@ if sortField:
    # Put together the body of the report.
    #----------------------------------------------------------------------
    html += """\
-  <table border='0' width='100%' cellspacing='0' cellpadding='2'>
+  <table border='1' width='100%' cellspacing='0' cellpadding='5'>
    <tr>
     <td align='center' valign='top'>
      <b>CDR ID </b>
