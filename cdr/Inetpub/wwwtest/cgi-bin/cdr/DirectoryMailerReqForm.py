@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: DirectoryMailerReqForm.py,v 1.11 2002-11-01 05:25:45 ameyer Exp $
+# $Id: DirectoryMailerReqForm.py,v 1.12 2002-11-08 02:35:07 ameyer Exp $
 #
 # Request form for all directory mailers.
 #
@@ -31,6 +31,11 @@
 # Bob Kline.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.11  2002/11/01 05:25:45  ameyer
+# Changed form of parameter passed to remail selector.
+# Added publishable='Y' to version selection (forgot to comment this
+# in previous checkin.)
+#
 # Revision 1.10  2002/11/01 02:44:44  ameyer
 # Fix top document/distinct selection commands.
 #
@@ -76,7 +81,21 @@ title   = "CDR Administration"
 section = "Directory Mailer Request Form"
 buttons = ["Submit", "Log Out"]
 script  = 'DirectoryMailerReqForm.py'
-header  = cdrcgi.header(title, title, section, script, buttons)
+header  = cdrcgi.header(title, title, section, script, buttons,
+                            stylesheet = """\
+ <style type='text/css'>
+   ul { margin-left: 40pt }
+   h2 { font-size: 14pt; font-family:Arial; color:navy }
+   h3 { font-size: 13pt; font-family:Arial; color:black; font-weight:bold }
+   li, span.r {
+        font-size: 12pt; font-family:"Times New Roman"; color:black;
+        margin-bottom: 10pt; font-weight:normal
+   }
+   b {  font-size: 12pt; font-family:"Times New Roman"; color:black;
+        margin-bottom: 10pt; font-weight:bold
+   }
+  </style>
+ """)
 
 #----------------------------------------------------------------------
 # Make sure we're logged in.
@@ -94,59 +113,57 @@ if request == "Log Out":
 #----------------------------------------------------------------------
 if not request:
     form = """\
-   <h2>Enter request parameters</h2>
-   <b>Document ID and email notification address are both optional.
-       If document ID is specified, only a mailer for that document
-       will be generated; otherwise all eligible documents for which
-       mailers have not yet been sent will have mailers generated.</b>
-   <table>
-    <tr>
-     <th align='right' nowrap>
-      <b>Directory document CDR ID: &nbsp;</b>
-     </th>
-     <td><input name='DocId' /></td>
-    </tr>
-    <tr>
-     <th align='right' nowrap>
-      <b>Notification email address: &nbsp;</b>
-     </th>
-     <td><input name='Email' /></td>
-    </tr>
-    <tr><td>&nbsp;</td></tr>
-   </table>
-   <p><p>
-   <table>
-    <tr><td><b>
-     Select the directory mailer type to generate, then click Submit.<br>
-     Please be patient, it may take a minute to select documents for mailing.
-     <br>
-    </b></td></tr>
-    <tr><td><input type='radio' name='userPick'
-          value='PhysInit'>Physician-Initial</input>
-    </td></tr>
-    <tr><td><input type='radio' name='userPick'
-          value='PhysInitRemail'>Physician-Initial remail</input>
-    </td></tr>
-    <tr><td><input type='radio' name='userPick'
-          value='PhysAnnUpdate'>Physician-Annual update</input>
-    </td></tr>
-    <tr><td><input type='radio' name='userPick'
-          value='PhysAnnRemail'>Physician-Annual remail</input>
-    </td></tr>
-    <tr><td><input type='radio' name='userPick'
-          value='OrgAnnUpdate'>Organization-Annual update</input>
-    </td></tr>
-    <tr><td><input type='radio' name='userPick'
-          value='OrgAnnRemail'>Organization-Annual remail</input>
-    </td></tr>
-   </table>
-   <input type='hidden' name='%s' value='%s'>
-   <p><p>
-   Maximum number of mailers to generate:
+   <h2>%s</h2>
+   <ul>
+    <li>
+     To generate mailers for a batch, select type of mailer.
+     It may take a minute to select documents to be included in the mailing.
+     Please be patient.
+     If you want to, you can limit the number of directory documents for
+     which mailers will be generated in a given job, by entering a
+     maximum number.
+    </li>
+    <li>
+     To generate mailers for a single directory entry, select type of mailer
+     and enter the document ID of the Physician or Organization.
+    </li>
+    <li>
+     To receive email notification when the job is completed, enter your
+     email address.
+    </li>
+    <li>
+     Click Submit to start the mailer job.
+    </li>
+   </ul>
+   <h3>Select type of mailer</h3>
+   <input type='radio' name='userPick' class='r' value='PhysInit'>
+    <span class='r'>Physician-Initial</span><br>
+   <input type='radio' name='userPick' class='r' value='PhysInitRemail'>
+    <span class='r'>Physician-Initial remail</span><br>
+   <input type='radio' name='userPick' class='r' value='PhysAnnUpdate'>
+    <span class='r'>Physician-Annual update</span><br>
+   <input type='radio' name='userPick' class='r' value='PhysAnnRemail'>
+    <span class='r'>Physician-Annual remail</span><br>
+   <input type='radio' name='userPick' class='r' value='OrgAnnUpdate'>
+    <span class='r'>Organization-Annual update</span><br>
+   <input type='radio' name='userPick' class='r' value='OrgAnnRemail'>
+    <span class='r'>Organization-Annual remail</span><br>
+   <br><br><br>
+   <b>Limit maximum number of mailers generated:&nbsp;</b>
    <input type='text' name='maxMails' size='12' value='No limit' />
-
+   <br><br><br>
+   <h3>To generate mailer for a single Physician/Organization, enter</h3>
+   <b>Directory document CDR ID:&nbsp;</b>
+   <input name='DocId' />
+   <br><br><br>
+   <h3>To receive email notification when mailer is complete, enter</h3>
+   <b>Email address:&nbsp;</b>
+   <input name='Email' />
+   <br><br><br>
+   <input type='Submit' name = 'Request' value = 'Submit'>
+   <input type='hidden' name='%s' value='%s'>
   </form>
-""" % (cdrcgi.SESSION, session)
+""" % (section, cdrcgi.SESSION, session)
     #------------------------------------------------------------------
     # cdrcgi.sendPage exits after sending page.
     # If we sent a page, we're done for this invocation.
