@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: NewlyPublishedTrials.py,v 1.4 2002-03-20 14:15:18 bkline Exp $
+# $Id: NewlyPublishedTrials.py,v 1.5 2002-03-20 14:23:58 bkline Exp $
 #
 # Report on newly published trials in batch.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2002/03/20 14:15:18  bkline
+# Changed table width from 90% to 100%.
+#
 # Revision 1.3  2002/03/20 14:14:25  bkline
 # Added back in missing 'try:' keyword.
 #
@@ -34,6 +37,11 @@ header  = cdrcgi.header(title, title, section, script, buttons)
 now     = time.localtime(time.time())
 
 #----------------------------------------------------------------------
+# Make sure we're logged in.
+#----------------------------------------------------------------------
+if not jobId and not session: cdrcgi.bail('Unknown or expired CDR session.')
+
+#----------------------------------------------------------------------
 # Handle navigation requests.
 #----------------------------------------------------------------------
 if request == cdrcgi.MAINMENU:
@@ -51,7 +59,15 @@ if request == "Log Out":
 # If we don't have a request, put up the request form.
 #----------------------------------------------------------------------
 if not jobId:
-    pass
+    form = """\
+   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
+   Publishing Job ID:&nbsp;
+   <INPUT NAME='JobId'>
+  </FORM>
+ </BODY>
+</HTML>
+""" % (cdrcgi.SESSION, session)
+    cdrcgi.sendPage(header + form)
 
 #----------------------------------------------------------------------
 # Routine for generating HTML for top of a category break.
