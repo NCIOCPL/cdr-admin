@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: Filter.py,v 1.18 2003-03-04 21:32:23 pzhang Exp $
+# $Id: Filter.py,v 1.19 2003-04-09 20:09:05 pzhang Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.18  2003/03/04 21:32:23  pzhang
+# Fixed a bug introduced by using not-list for filter parameter
+# in filterDoc().
+#
 # Revision 1.17  2003/03/04 19:07:57  pzhang
 # Added feature to handle message instruction with terminate='no'.
 #
@@ -94,6 +98,16 @@ filtId  = [filtId0,
            fields.getvalue(cdrcgi.FILTER + "13", ""),
            fields.getvalue(cdrcgi.FILTER + "14", ""),
            fields.getvalue(cdrcgi.FILTER + "15", "")]
+revLevels = (fields.getvalue('publish') == 'true') and 'publish_' or '' 
+revLevels += (fields.getvalue('approved') == 'true') and 'approved_' or ''
+revLevels += (fields.getvalue('proposed') == 'true') and 'proposed_' or '' 
+revLevels += (fields.getvalue('rejected') == 'true') and 'rejected_' or ''
+revLevels += fields.getvalue('revLevels') or '' # revLevels from links.
+vendorOrQC = (fields.getvalue('QC') == 'true') and 'QC' or ''
+vendorOrQC += fields.getvalue('vendorOrQC') or '' # vendorOrQC from links.
+filterParm = [['revLevels', revLevels]] # empty revLevels is expected.
+if vendorOrQC:
+    filterParm.append(['vendorOrQC', 'QC']) 
 
 #----------------------------------------------------------------------
 # QC Filter Sets.
@@ -137,7 +151,7 @@ def dispFilterSet(key, filterSets, filterId):
 def qcFilterSets(docId, docVer, filterId = None):
     
     # Where the filtersets file is.
-    # Don't want this page to be working on FRANCK or BACH.
+    # Do want this page to be working on FRANCK and BACH.
     fileName = "d:/cdr/filters/FilterSets.xml"
 
     # Hash for filter set: name->[filters]
@@ -178,7 +192,8 @@ def qcFilterSets(docId, docVer, filterId = None):
 
         # Form new set of filters.
         base    = "/cgi-bin/cdr/Filter.py"; 
-        url     = base + "?DocId=" + docId + "&DocVer=" + docVer
+        url     = base + "?DocId=" + docId + "&DocVer=" + docVer + \
+                  "&revLevels=" + revLevels + "&vendorOrQC=" + vendorOrQC
         docIdExpr = re.compile("^(\d+):")
         i = 0        
         for filt in filterSets[key]:
@@ -208,7 +223,7 @@ if fields.getvalue('qcFilterSets'):
 #----------------------------------------------------------------------
 filterWarning = ""
 doc = cdr.filterDoc(session, filtId, docId = docId, docVer = docVer,
-                    port = cdr.getPubPort())                    
+                    parm = filterParm, port = cdr.getPubPort())                    
 if type(doc) == type(()):
     if doc[1]: filterWarning += doc[1]
     doc = doc[0]     
