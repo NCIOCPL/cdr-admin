@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: OrgSearch2.py,v 1.9 2003-12-09 19:13:26 bkline Exp $
+# $Id: OrgSearch2.py,v 1.10 2004-02-03 14:40:14 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Organization documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.9  2003/12/09 19:13:26  bkline
+# Bumped up the timeout value for the query.
+#
 # Revision 1.8  2003/08/25 20:19:05  bkline
 # Added support for searching on FormerName element.
 #
@@ -42,6 +45,7 @@ fields  = cgi.FieldStorage()
 session = cdrcgi.getSession(fields)
 boolOp  = fields and fields.getvalue("Boolean")         or "AND"
 orgName = fields and fields.getvalue("OrgName")         or None
+orgType = fields and fields.getvalue("OrgType")         or None
 street  = fields and fields.getvalue("Street")          or None
 city    = fields and fields.getvalue("City")            or None
 state   = fields and fields.getvalue("State")           or None
@@ -52,6 +56,20 @@ help    = fields and fields.getvalue("HelpButton")      or None
 
 if help: 
     cdrcgi.bail("Sorry, help for this interface has not yet been developed.")
+
+#----------------------------------------------------------------------
+# Generate picklist for countries.
+#----------------------------------------------------------------------
+def orgTypeList(conn, fName):
+    query  = """\
+  SELECT DISTINCT value, value
+    FROM query_term
+   WHERE path = '/Organization/OrganizationType'
+     AND value IS NOT NULL
+     AND value <> ''
+ORDER BY value"""
+    pattern = "<option value='%s'>%s &nbsp;</option>"
+    return cdrcgi.generateHtmlPicklist(conn, fName, query, pattern)
 
 #----------------------------------------------------------------------
 # Connect to the CDR database.
@@ -66,6 +84,7 @@ except cdrdb.Error, info:
 #----------------------------------------------------------------------
 if not submit:
     fields = (('Organization Name',       'OrgName'),
+              ('Organization Type',       'OrgType', orgTypeList),
               ('Street',                  'Street'),
               ('City',                    'City'),
               ('State',                   'State', cdrcgi.stateList),
@@ -100,6 +119,8 @@ searchFields = (cdrcgi.SearchField(orgName,
                              "AlternateName",
                              "/Organization/OrganizationNameInformation/"
                              "FormerName")),
+                cdrcgi.SearchField(orgType,
+                            ("/Organization/OrganizationType",)),
                 cdrcgi.SearchField(street,
                             ("/Organization/OrganizationLocations/"
                              "OrganizationLocation/Location/PostalAddress/"
