@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: BoardMemberMailerReqForm.py,v 1.2 2004-08-26 14:40:26 bkline Exp $
+# $Id: BoardMemberMailerReqForm.py,v 1.3 2005-03-02 15:48:10 bkline Exp $
 #
 # Request form for generating RTF letters to board members.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2004/08/26 14:40:26  bkline
+# First working code version.
+#
 # Revision 1.1  2004/07/17 11:52:54  bkline
 # Plugged in user interface for generating PDQ Board Member Correspondence
 # Mailers.
@@ -379,9 +382,15 @@ header = cdrcgi.header(title, title, section, script, buttons,
        'editorial': [
            new Option('Editorial Board Invitation Letter', 'ed-invitation'),
            new Option('Editorial Board Welcome Letter',    'ed-welcome'),
+           new Option('Editorial Board Short Welcome Letter',
+                      'ed-short-welcome'),
            new Option('Editorial Board Renewal Letter',    'ed-renewal'),
-           new Option('Editorial Board Goodbye Letter',    'ed-goodbye')
-       ]
+           new Option('Editorial Board Editor-in-Chief Renewal Letter',
+                      'ed-ec-renewal'),
+           new Option('Editorial Board Goodbye Letter',    'ed-goodbye'), 
+           new Option('Editorial Board Goodbye For Good Letter',
+                      'ed-goodbye-forever')
+      ]
    };
        
    function boardChange() {
