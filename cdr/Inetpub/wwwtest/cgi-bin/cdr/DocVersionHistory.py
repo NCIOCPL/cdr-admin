@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: DocVersionHistory.py,v 1.14 2004-05-11 17:32:03 bkline Exp $
+# $Id: DocVersionHistory.py,v 1.15 2004-07-13 19:20:21 venglisc Exp $
 #
 # Show version history of document.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.14  2004/05/11 17:32:03  bkline
+# Plugged in information about publication blocks and removals.
+#
 # Revision 1.13  2004/03/23 22:43:46  venglisc
 # Modified to display an "R " in front of version if document has been
 # removed from Cancer.gov display.
@@ -132,6 +135,10 @@ except cdrdb.Error, info:
 # Put in a placeholder first at this point.
 # Note:  The date will only be displayed if the docStatus has been set
 #        to 'I'.
+#        Also, if a document is blocked from publication it can happen
+#        that the document version does not display a removed='Y'
+#        entry.  In this case the document was dropped due to a full
+#        data load.  
 #----------------------------------------------------------------------
 if docStatus == 'I':
     docStatusLine = """
@@ -315,6 +322,8 @@ class DocVersion:
         # -------------------------------------------------
         if row[9] == 'Y':
            removeDate = row[1][:10]
+	else:
+	   removeDate = 'Full-load removal'
         whichJob            = row[7] and '(V-' or '(C-' 
         whichJob           += row[8] and "%d)" % row[8] or ')'
         self.pubDates       = row[1] and [row[1][:10] + whichJob] or []
@@ -390,9 +399,10 @@ LEFT OUTER JOIN primary_pub_doc d
         if currentVer:
             if currentVer.num == row[0]:
                 if row[1]:
-                    # If a version has been removed from C.gov, mark it
+                    # If a version has been removed from C.gov, extract
+		    # the removal date for later display
                     # -------------------------------------------------
-                    if row[9] == 'Y':
+                    if row[9] == 'Y' and docStatus == 'I':
                        removeDate = row[1][:10]
                     whichJob = (row[7] and '(V-' or '(C-') + "%d)" % row[8]
                     currentVer.pubDates.append(row[1][:10] + whichJob)
@@ -401,7 +411,71 @@ LEFT OUTER JOIN primary_pub_doc d
                 currentVer = DocVersion(row)
         else:
             currentVer = DocVersion(row)
+	lastJob = row[8]
         row = cursor.fetchone()
+    
+    # A document has been blocked but none of the document versions 
+    # indicate the removal.  This could have two reasons:
+    # a) the document has been blocked since the last publication
+    #    (and will be removed as part of the next publication)
+    #    However, only a versioned document can be removed.  We also
+    #    need to check if the document exists with a newer version
+    #    or not.
+    # b) the document got removed as part of a full load
+    # -------------------------------------------------------------
+    if docStatus == 'I' and not removeDate:
+       try:
+          cursor.execute("""\
+             SELECT * from pub_proc_cg
+	     WHERE  id = ?""", intId)
+          rowcg = cursor.fetchone()
+	  if rowcg:             # Doc currently exists on Cancer.gov
+	     try:
+	        cursor.execute("""\
+		   SELECT * 
+		   FROM  pub_proc_doc ppd, doc_version dv, 
+		         pub_proc_cg ppc, pub_proc pp
+		   WHERE ppc.pub_proc = pp.id
+		     AND ppc.id = dv.id
+		     AND ppc.id = ppd.doc_id
+		     AND dv.id  = ?
+		     AND ppc.pub_proc    = ppd.pub_proc
+		     AND ppd.doc_version = dv.num
+		     AND updated_dt < started
+		     AND NOT EXISTS (SELECT 'x'
+		                     FROM  doc_version i 
+				     WHERE i.id  = ppd.doc_id
+				     AND   i.num > ppd.doc_version
+		                    )
+		   ORDER BY ppd.pub_proc""", intId)
+		rowVer = cursor.fetchone()
+		if rowVer:
+                   removeDate = 'Needs Versioning'
+		else:
+		   removeDate = 'Not yet removed'
+             except cdrdb.Error, info:
+                cdrcgi.bail('Failure getting document version date')
+	     
+	  else:                 # Doc does not exist on Cancer.gov
+	     try:
+	        cursor.execute("""\
+		   SELECT MIN(o.id), o.started 
+		   FROM pub_proc o
+		   JOIN pub_proc i
+		     ON i.status = o.status
+		    AND i.pub_subset = o.pub_subset
+		    AND i.started < o.started
+		  WHERE o.pub_subset = 'Full-Load'
+		    AND o.status = 'Success'
+		    AND o.id > ?
+		  GROUP BY o.started""", lastJob)
+		rowcg = cursor.fetchone()
+	        removeDate = rowcg[1][:10]
+             except cdrdb.Error, info:
+                cdrcgi.bail('Failure getting following Full-Load date')
+
+       except cdrdb.Error, info:
+          cdrcgi.bail('Failure query pub_prog_cg')
     if currentVer:
         html += currentVer.display()
 
