@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: TerminologyReports.py,v 1.6 2003-06-13 20:32:43 bkline Exp $
+# $Id: TerminologyReports.py,v 1.7 2004-05-11 17:40:11 bkline Exp $
 #
 # Submenu for terminology reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2003/06/13 20:32:43  bkline
+# Plugged in a couple of new reports for Cancer diagnosis hierarchy.
+#
 # Revision 1.5  2003/05/08 20:27:27  bkline
 # New terminology report for menu information.
 #
@@ -79,7 +82,9 @@ reports = [
             'Cancer Diagnosis Hierarchy (Without Alternate Names)',
             '&flavor=short'),
            ('InterventionAndProcedureTerms.py',
-            'Intervention/Procedure Terms', '')
+            'Intervention/Procedure Terms', ''),
+           ('DrugAgentReport.py', 'Drug/Agent Report', '')
+            
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s%s'>%s</LI>\n" % (
