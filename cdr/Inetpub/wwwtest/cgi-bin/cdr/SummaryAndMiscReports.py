@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryAndMiscReports.py,v 1.15 2004-09-09 19:19:44 venglisc Exp $
+# $Id: SummaryAndMiscReports.py,v 1.16 2005-02-16 19:12:35 venglisc Exp $
 #
 # Submenu for summary and miscellanous document reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.15  2004/09/09 19:19:44  venglisc
+# Minor changes to menu entries to have menu items match between the
+# CIAT and CIPS summary menu. (Bug 1329).
+#
 # Revision 1.14  2004/07/13 20:46:33  venglisc
 # Added new menu item for SummariesTocReport. (Bug 1231)
 # Added CSS code to display headers and list items properly.
@@ -136,7 +140,7 @@ form += """\
 
 for choice in (
     ('QcReport.py',         'Board Member Information QC Report' ),
-    ('Stub.py',             'Board Roster Reports'               )
+    ('BoardRoster.py',      'Board Roster Reports'               )
     ):
     form += """\
     <LI><A href='%s/%s?DocType=PDQBoardMemberInfo&Session=%s'>%s</A></LI>
