@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PdqBoards.py,v 1.1 2002-01-22 21:35:35 bkline Exp $
+# $Id: PdqBoards.py,v 1.2 2002-02-20 23:06:34 bkline Exp $
 #
 # Report on PDQ Board members and topics.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2002/01/22 21:35:35  bkline
+# Initial revision
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string, cdrdb, time
 
@@ -13,6 +16,7 @@ import cgi, cdr, cdrcgi, re, string, cdrdb, time
 #----------------------------------------------------------------------
 fields    = cgi.FieldStorage()
 boardInfo = fields and fields.getvalue("BoardInfo")      or None
+audience  = fields and fields.getvalue("Audience")       or None
 repType   = fields and fields.getvalue("RepType")        or None
 session   = cdrcgi.getSession(fields)
 request   = cdrcgi.getRequest(fields)
@@ -20,6 +24,7 @@ title     = "PDQ Board Report"
 instr     = "Report on PDQ Board Members and Topics"
 script    = "PdqBoards.py"
 buttons   = ()
+stPath    = '/Summary/SummaryTitle'
 sbPath    = '/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref'
 sbmPath   = '/Summary/SummaryMetaData/PDQBoard/BoardMember/@cdr:ref'
 trimPat   = re.compile("[\s;]+$")
@@ -42,6 +47,24 @@ def trim(s):
     return trimPat.sub("", s)
 
 #----------------------------------------------------------------------
+# Build a picklist for Summary Audience.
+#----------------------------------------------------------------------
+def getAudiencePicklist():
+    picklist = "<SELECT NAME='Audience'><OPTION SELECTED>&nbsp;</OPTION>"
+    try:
+        cursor.execute("""\
+SELECT DISTINCT value
+           FROM query_term
+          WHERE path = '/Summary/SummaryMetaData/SummaryAudience'
+       ORDER BY value""")
+        for row in cursor.fetchall():
+            if row[0]:
+                picklist += "<OPTION>%s</OPTION>" % row[0]
+    except cdrdb.Error, info:
+        cdrcgi.bail('Database query failure: %s' % info[1][0])
+    return picklist + "</SELECT>"
+
+#----------------------------------------------------------------------
 # Build a picklist for PDQ Boards.
 #----------------------------------------------------------------------
 def getBoardPicklist():
@@ -58,9 +81,12 @@ SELECT DISTINCT board.id, board.title
                                    'PDQ Advisory Board')
        ORDER BY board.title""")
         for row in cursor.fetchall():
+            semi = row[1].find(';')
+            if semi != -1: boardTitle = trim(row[1][:semi])
+            else:          boardTitle = trim(row[1])
             picklist += "<OPTION%s>[CDR%010d] %s</OPTION>" % (selected,
                                                               row[0],
-                                                              trim(row[1]))
+                                                              boardTitle)
             selected = ""
     except cdrdb.Error, info:
         cdrcgi.bail('Database query failure: %s' % info[1][0])
@@ -72,7 +98,16 @@ SELECT DISTINCT board.id, board.title
 if not boardInfo:
     header   = cdrcgi.header(title, title, instr, script, ("Submit",))
     form     = """\
-      <B>PDQ Board:&nbsp;</B>%s<BR>
+      <TABLE>
+       <TR>
+        <TD ALIGN='right'><B>PDQ Board:&nbsp;</B></TD>
+        <TD>%s</TD>
+       </TR>
+       <TR>
+        <TD ALIGN='right'><B>Summary Audience:&nbsp;</B></TD>
+        <TD>%s</TD>
+       </TR>
+      </TABLE>
       <CENTER>
        <TABLE>
         <TR>
@@ -92,8 +127,13 @@ if not boardInfo:
       </FORM>
      </BODY>
     </HTML>
-""" % getBoardPicklist()
+""" % (getBoardPicklist(), getAudiencePicklist())
     cdrcgi.sendPage(header + form)
+
+#----------------------------------------------------------------------
+# Build date string for header.
+#----------------------------------------------------------------------
+dateString = time.strftime("%B %d, %Y", time.localtime(time.time()))
 
 #----------------------------------------------------------------------
 # We have a board specified; extract its ID and doc title.
@@ -105,19 +145,30 @@ boardId   = int(match.group(1))
 boardName = trim(match.group(2))
 
 #----------------------------------------------------------------------
+# Prepare for filtering on audience type, if appropriate.
+#----------------------------------------------------------------------
+audienceJoin = ''
+if audience and len(audience) > 1:
+    audienceJoin = """\
+           JOIN query_term audience
+             ON audience.doc_id = summary.doc_id
+            AND audience.path = '/Summary/SummaryMetaData/SummaryAudience'
+            AND audience.value = '%s'""" % audience
+
+#----------------------------------------------------------------------
 # Show the summaries linked to the board, with associated board members.
 #----------------------------------------------------------------------
 if repType == 'ByTopic':
-    instr     = 'Board report by topics.'
+    instr     = 'Board report by topics -- %s.' % dateString
     header    = cdrcgi.header(title, title, instr, script, buttons)
     report    = """\
   </FORM>
-  <H2>Topics for %s</H2>
+  <H4>Topics for %s</H4>
 """ % boardName
     try:
         cursor.execute("""\
 SELECT DISTINCT board_member.id, board_member.title,
-                summary.id, summary.title
+                summary.doc_id, summary.value
            FROM document board_member
            JOIN query_term summary_board_member
              ON summary_board_member.int_val = board_member.id
@@ -127,10 +178,13 @@ SELECT DISTINCT board_member.id, board_member.title,
             AND summary_board.path = '%s'
             AND LEFT(summary_board.node_loc, 8) = 
                 LEFT(summary_board_member.node_loc, 8)
-           JOIN document summary
-             ON summary.id = summary_board.doc_id
+           JOIN query_term summary
+             ON summary.doc_id = summary_board.doc_id
+            AND summary.path = '%s'
+             %s
           WHERE summary_board.int_val = ?
-       ORDER BY summary.title, board_member.title""" % (sbmPath, sbPath), 
+       ORDER BY summary.value, board_member.title""" % (sbmPath, sbPath,
+                                                        stPath, audienceJoin), 
                 boardId)
         prevSummaryId = 0
         for row in cursor.fetchall():
@@ -140,13 +194,13 @@ SELECT DISTINCT board_member.id, board_member.title,
   </UL>
 """
                 report += """\
-  <H3>%s [CDR%010d]</H3>
+  <H4><FONT SIZE='-0'>%s [CDR%010d]</FONT></H4>
   <UL>
 """ % (re.sub(";", "--", trim(row[3])), row[2])
                 prevSummaryId = row[2]
 
             report += """\
-   <LI>%s [CDR%010d]</LI>
+   <LI><FONT SIZE='-0'>%s [CDR%010d]</FONT></LI>
 """ % (re.sub(";", ", ", trim(row[1]), 1), row[0])
         if prevSummaryId:
             report += """\
@@ -163,13 +217,13 @@ SELECT DISTINCT board_member.id, board_member.title,
 #----------------------------------------------------------------------
 # Show the members of the board, with associated topics.
 #----------------------------------------------------------------------
-instr     = 'Board report by members.'
+instr     = 'Board report by members -- %s.' % dateString
 header    = cdrcgi.header(title, title, instr, script, buttons)
 members   = {}
 topics    = {}
 report    = """\
   </FORM>
-  <H2>Topics for %s</H2>
+  <H4>Topics for %s</H4>
 """ % boardName
 
 #----------------------------------------------------------------------
@@ -210,7 +264,7 @@ SELECT DISTINCT board_member.id, board_member.title
 
     cursor.execute("""\
 SELECT DISTINCT board_member.id, board_member.title,
-                summary.id, summary.title
+                summary.doc_id, summary.value
            FROM document board_member
            JOIN query_term summary_board_member
              ON summary_board_member.int_val = board_member.id
@@ -220,9 +274,13 @@ SELECT DISTINCT board_member.id, board_member.title,
             AND summary_board.path = '%s'
             AND LEFT(summary_board.node_loc, 8) = 
                 LEFT(summary_board_member.node_loc, 8)
-           JOIN document summary
-             ON summary.id = summary_board.doc_id
-          WHERE summary_board.int_val = ?""" % (sbmPath, sbPath), boardId)
+           JOIN query_term summary
+             ON summary.doc_id = summary_board.doc_id
+            AND summary.path = '%s'
+             %s
+          WHERE summary_board.int_val = ?""" % (sbmPath, sbPath, stPath,
+                                                audienceJoin), 
+            boardId)
     for row in cursor.fetchall():
         if not members.has_key(row[0]):
             members[row[0]] = Member(row[0], re.sub(";", ", ", trim(row[1])))
@@ -237,15 +295,16 @@ keys.sort(lambda a, b: cmp(members[a].name, members[b].name))
 for key in keys:
     member = members[key]
     report += """\
-  <H3>%s [CDR%010d]</H3>
+  <H4><FONT SIZE='-0'>%s [CDR%010d]</FONT></H4>
 """ % (member.name, member.id)
     if member.topics:
         report += """\
   <UL>
 """
+        member.topics.sort(lambda a, b: cmp(a.name, b.name))
         for topic in member.topics:
             report += """\
-   <LI>%s [CDR%010d]</LI>
+   <LI><FONT SIZE='-0'>%s [CDR%010d]</FONT></LI>
 """ % (topic.name, topic.id)
         report += """\
   </UL>
