@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditQueryTermDefs.py,v 1.1 2001-06-13 22:16:32 bkline Exp $
+# $Id: EditQueryTermDefs.py,v 1.2 2001-12-01 18:02:48 bkline Exp $
 #
 # Prototype for editing CDR query term definitions.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2001/06/13 22:16:32  bkline
+# Initial revision
+#
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string, urllib
@@ -70,7 +73,7 @@ if type(defs) == type(""): cdrcgi.bail(defs)
 # Routines to make data entry fields.
 #----------------------------------------------------------------------
 def makePathField(val, row):
-    return "<INPUT NAME='path-%d' SIZE='50' VALUE='%s'>" % (row, val)
+    return "<INPUT NAME='path-%d' SIZE='80' VALUE='%s'>" % (row, val)
 
 def makeRuleField(val, row):
     selected = " SELECTED"
@@ -100,7 +103,14 @@ menu = """\
      <TH>Rule</TH>
      <TH>Action</TH>
     </TR>
-"""
+    <TR>
+     <TD>%s</TD>
+     <TD>%s</TD>
+     <TD ALIGN='center'>%s</TD>
+    </TR>
+""" % (makePathField("", 0),
+       makeRuleField("", 0),
+       makeAddButton())
 for definition in defs:
     menu += """\
     <TR>
@@ -113,20 +123,11 @@ for definition in defs:
        makeDeleteButton(row))
     row += 1
 menu += """\
-    <TR>
-     <TD>%s</TD>
-     <TD>%s</TD>
-     <TD ALIGN='center'>%s</TD>
-    </TR>
    </TABLE>
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
   </FORM>
  </BODY>
 <HTML>
-""" % (makePathField("", 0),
-       makeRuleField("", 0),
-       makeAddButton(),
-       cdrcgi.SESSION,
-       session)
+""" % (cdrcgi.SESSION, session)
 
 cdrcgi.sendPage(header + menu)
