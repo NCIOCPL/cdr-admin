@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolMailerReqForm.py,v 1.6 2002-11-18 14:39:09 bkline Exp $
+# $Id: ProtocolMailerReqForm.py,v 1.7 2002-12-06 16:01:59 bkline Exp $
 #
 # Request form for all protocol mailers.
 #
@@ -17,6 +17,9 @@
 # publication job for the publishing daemon to find and initiate.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2002/11/18 14:39:09  bkline
+# Fixed typo (change Person/Organization to Protocol).
+#
 # Revision 1.5  2002/11/14 14:27:15  bkline
 # Adjusted selection criteria for issue #499.
 #
@@ -343,7 +346,7 @@ elif mailType == 'Protocol-Annual abstract':
                                                   'Approved-Not Yet Active')
                         AND prot_status.path = '%s'
                         AND doc_version.val_status = 'V'
-                        AND doc_version.publishable = 'P'
+                        AND doc_version.publishable = 'Y'
 
                         -- Make sure the initial mailer has gone out.
                         AND EXISTS (SELECT *
