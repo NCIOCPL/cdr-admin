@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtAbstractMailerReqForm.py,v 1.4 2002-10-10 19:18:09 bkline Exp $
+# $Id: ProtAbstractMailerReqForm.py,v 1.5 2002-11-01 05:32:27 ameyer Exp $
 #
 # Request form for Initial Protocol Abstract Mailer.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2002/10/10 19:18:09  bkline
+# Changed subset name to track schema modification.  Brought in line with
+# Alan's modifications to the mailer subsystem.
+#
 # Revision 1.3  2002/02/21 22:34:00  bkline
 # Added navigation buttons.
 #
@@ -46,7 +50,7 @@ elif request == SUBMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if request == "Log Out": 
+if request == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
@@ -120,7 +124,9 @@ if docId:
         cursor.execute("""\
             SELECT MAX(num)
               FROM doc_version
-             WHERE id = ?""", (intId,))
+             WHERE id = ?
+               AND val_status = 'V'
+        """, (intId,))
         row = cursor.fetchone()
         if not row:
             cdrcgi.bail("No versions have been saved yet for CDR%010d" % intId)
@@ -142,9 +148,10 @@ else:
                          ON protocol.id = ready_for_review.doc_id
                        JOIN query_term prot_status
                          ON prot_status.doc_id = protocol.id
-                      WHERE prot_status.value IN ('Active', 
+                      WHERE prot_status.value IN ('Active',
                                                   'Approved-not yet active')
                         AND prot_status.path = '%s'
+                        AND doc_version.val_status = 'V'
                         AND NOT EXISTS (SELECT *
                                           FROM query_term src
                                          WHERE src.value = '%s'
