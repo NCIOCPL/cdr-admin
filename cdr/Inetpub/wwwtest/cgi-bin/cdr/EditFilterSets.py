@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditFilterSets.py,v 1.2 2002-11-14 01:09:56 bkline Exp $
+# $Id: EditFilterSets.py,v 1.3 2002-11-14 14:05:42 bkline Exp $
 #
 # Menu of existing filter sets.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/11/14 01:09:56  bkline
+# Fixed typo (missing closing parenthesis).
+#
 # Revision 1.1  2002/11/13 20:38:58  bkline
 # New script for managing named CDR filter sets.
 #
@@ -45,7 +48,13 @@ if request == "Log Out":
 #----------------------------------------------------------------------
 if request == "Report":
     buttons = ["New Filter Set", cdrcgi.MAINMENU, "Log Out"]
-    header  = cdrcgi.header(title, title, "Filter Set Report", script, buttons)
+    header  = cdrcgi.header(title, title, "Filter Set Report", script, buttons,
+            stylesheet = """\
+  <style type='text/css'>
+   li { font-size: 12pt; font-weight: normal; color:black }
+   h2 {font-size: 13pt; font-family:Arial; color:black; font-weight:bold }
+  </style>
+""")
     sets = cdr.getFilterSets('guest')
     setDict = {}
     report = ""
