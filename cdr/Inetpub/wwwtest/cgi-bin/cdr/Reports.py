@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: Reports.py,v 1.17 2002-05-24 20:37:31 bkline Exp $
+# $Id: Reports.py,v 1.18 2002-05-24 20:40:38 bkline Exp $
 #
 # Prototype for editing CDR linking tables.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.17  2002/05/24 20:37:31  bkline
+# New Report Menu structure implemented.
+#
 # Revision 1.16  2002/05/24 18:02:38  bkline
 # Added Person Protocol Review report.
 #
@@ -76,7 +79,7 @@ if action == cdrcgi.MAINMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if request == "Log Out": 
+if action == "Log Out": 
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
