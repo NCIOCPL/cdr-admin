@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.21 2003-06-13 20:27:26 bkline Exp $
+# $Id: QcReport.py,v 1.22 2003-07-29 12:45:35 bkline Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.21  2003/06/13 20:27:26  bkline
+# Added interface for choosing whether to include glossary terms list
+# at the bottom of the patient summary report.
+#
 # Revision 1.20  2003/05/22 13:25:39  bkline
 # Checked 'approved' option by default at Margaret's request.
 #
@@ -90,11 +94,11 @@ docTitle = fields.getvalue("DocTitle")   or None
 version  = fields.getvalue("DocVersion") or None
 glossary = fields.getvalue("Glossary")   or None
 
-revLvls  = fields.getvalue("revLevels")  or None
-if not revLvls:
-    revLvls = fields.getvalue('publish') and 'publish|' or '' 
-    revLvls += fields.getvalue('approved') and 'approved|' or ''
-    revLvls += fields.getvalue('proposed') and 'proposed' or '' 
+insRevLvls  = fields.getvalue("revLevels")  or None
+if not insRevLvls:
+    insRevLvls = fields.getvalue('publish') and 'publish|' or '' 
+    insRevLvls += fields.getvalue('approved') and 'approved|' or ''
+    insRevLvls += fields.getvalue('proposed') and 'proposed' or '' 
  
 if not docId and not docType:
     cdrcgi.bail("No document specified", repTitle)
@@ -239,6 +243,11 @@ if docType == 'Summary' and repType and not version:
   <INPUT TYPE="checkbox" NAME="approved"
                          CHECKED='1'>&nbsp;&nbsp; With approved attribute<BR>
   <INPUT TYPE="checkbox" NAME="proposed">&nbsp;&nbsp; With proposed attribute
+  <BR><BR>
+  <INPUT TYPE="checkbox" NAME="dpublish">&nbsp;&nbsp; delete With publish attribute<BR>
+  <INPUT TYPE="checkbox" NAME="dapproved"
+                         CHECKED='1'>&nbsp;&nbsp; delete With approved attribute<BR>
+  <INPUT TYPE="checkbox" NAME="dproposed">&nbsp;&nbsp; delete With proposed attribute
 """
     if repType == "pat":
         form += """\
@@ -261,6 +270,10 @@ filters = {
         ["set:QC Summary Set (Bold/Underline)"],
     'Summary:rs': # Redline/Strikeout
         ["set:QC Summary Set"],
+    'Summary:but': # Bold/Underline
+        ["set:QC Summary Test Set (Bold/Underline)"],
+    'Summary:rst': # Redline/Strikeout
+        ["set:QC Summary Test Set"],
     'Summary:nm': # No markup
         ["set:QC Summary Set"],
     'Summary:pat': # Patient
@@ -418,8 +431,8 @@ if not filters.has_key(docType):
     cdrcgi.sendPage(cdrcgi.unicodeToLatin1(html))
 
 filterParm = []
-if revLvls:
-    filterParm = [['revLevels', revLvls]]
+if insRevLvls:
+    filterParm = [['insRevLevels', insRevLvls]]
 if repType == "pat":
     filterParm.append(['DisplayGlossaryTermList',
                        glossary and "Y" or "N"])
