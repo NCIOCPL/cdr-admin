@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------
-# $Id: GlobalChange.py,v 1.18 2004-07-07 00:24:34 ameyer Exp $
+# $Id: GlobalChange.py,v 1.19 2004-09-21 20:33:45 ameyer Exp $
 #
 # Perform global changes on XML records in the database.
 #
@@ -14,6 +14,9 @@
 # present the next one - to the end.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.18  2004/07/07 00:24:34  ameyer
+# Added session variables for document types - InScopeProtocol or CTGovProtocol.
+#
 # Revision 1.17  2004/02/26 22:06:32  ameyer
 # Modified document id list handling to pass an actual list passed via
 # the database rather than a list parsable string.  Overcomes database
@@ -207,7 +210,7 @@ ssVars[cdrcgi.SESSION] = session
 # Get all relevant fields that can be saved as state in the system
 # Not all of these will be present
 for fd in ('docType', 'email', 'specificPhone', 'specificRole',
-                'coopType', 'coopChk',
+                'coopType', 'coopChk', 'testOnly',
            'typeCDR', 'typeCTG',
            'fromId', 'fromName', 'fromTitle', 'fromFragChk',
            'toId', 'toName', 'toTitle', 'toFragChk',
@@ -400,8 +403,18 @@ Results of the job will be emailed.</p>
  <li>Review the list of protocols to be modified</li>
  <li>Check or uncheck any documents to include or exclude from processing</li>
  <li>Enter one or more email addresses for results (separated by
-     space, comma or semicolon) and click 'Submit'</li>
- <li>Or click 'Cancel' to return to the administration menu</li>
+     space, comma or semicolon)</li>
+ <li>Click one of the command buttons:<br>
+     <dl>
+       <dt>Submit</dt>
+       <dd>Submits the job and posts updates to the database.</dd>
+       <dt>Test</dt>
+       <dd>Submits the job but writes all the changes to output files in<br>
+           a directory named \cdr\GlobalChange\yyyy-mm-dd_hh-mm-ss.</dd>
+       <dt>Cancel</dt>
+       <dd>Exits global change with no further processing.</dd>
+     </dl>
+ </li>
 </ol>
 <p><p>
 <p>Email(s): <input type='text' name='email' value='%s' size='80' /></p>
@@ -412,7 +425,9 @@ Results of the job will be emailed.</p>
 
         cdr.logwrite (html, LF)
 
-        sendGlblChgPage (("Final review", html))
+        buttons = (('submit', 'Submit'), ('testOnly', 'Test'),
+                   ('cancel', 'Cancel'))
+        sendGlblChgPage (("Final review", html, buttons))
 
 # If user pressed Cancel, we never got here
 ssVars['email'] = email
