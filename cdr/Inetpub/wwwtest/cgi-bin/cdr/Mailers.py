@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: Mailers.py,v 1.6 2002-10-24 02:49:45 bkline Exp $
+# $Id: Mailers.py,v 1.7 2002-10-24 02:50:38 bkline Exp $
 #
 # Main menu for mailer jobs.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2002/10/24 02:49:45  bkline
+# Further consolidation of menu items.
+#
 # Revision 1.5  2002/06/04 19:15:01  ameyer
 # Removed New Physician Initial Mailer - now part of directory mailers.
 #
@@ -46,7 +49,7 @@ if action == cdrcgi.MAINMENU:
 form = "<OL>\n"
 reports = (('DirectoryMailerReqForm.py', 'Directory Mailers'),
            ('ProtocolMailerReqForm.py',  'Protocol Mailers'),
-           ('PDQMailerRequestForm.py',   'Summary Mailers'),
+           ('PDQMailerRequestForm.py',   'Summary Mailers'))
 
 for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s'>%s</A></LI>\n" % (
