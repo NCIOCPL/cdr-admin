@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolCitationsQcReport.py,v 1.3 2002-05-08 17:41:52 bkline Exp $
+# $Id: ProtocolCitationsQcReport.py,v 1.4 2003-04-11 18:30:56 pzhang Exp $
 #
 # Protocol Citations QC Report.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2002/05/08 17:41:52  bkline
+# Updated to reflect Volker's new filter names.
+#
 # Revision 1.2  2002/05/03 20:27:33  bkline
 # Changed filter name to match name change made by Cheryl.
 #
@@ -21,19 +24,20 @@ title   = "CDR Protocol Citations QC Report"
 fields  = cgi.FieldStorage() or cdrcgi.bail("No Request Found", title)
 session = cdrcgi.getSession(fields) or cdrcgi.bail("Not logged in")
 docId   = fields.getvalue(cdrcgi.DOCID) or cdrcgi.bail("No Document", title)
+revLvls = fields.getvalue("revLevels")  or None
 
 #----------------------------------------------------------------------
 # Map for finding the filters for this document type.
 #----------------------------------------------------------------------
-filters = [
-    "name:Denormalization Filter (1/1): InScope Protocol",
-    "name:HP Protocol Citations QC Report Filter"
-]
+filters = ["set:QC InScopeProtocol Citation Set"]
 
 #----------------------------------------------------------------------
 # Filter the document.
 #----------------------------------------------------------------------
-doc = cdr.filterDoc(session, filters, docId = docId)
+filterParm = [['vendorOrQC', 'QC']]
+if revLvls:
+    filterParm.append(['revLevels', revLvls]) 
+doc = cdr.filterDoc(session, filters, docId = docId, parm = filterParm)
 if type(doc) == type(()):
     doc = doc[0]
 
