@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: MailerReports.py,v 1.4 2003-05-20 19:28:50 bkline Exp $
+# $Id: MailerReports.py,v 1.5 2003-08-25 20:15:22 bkline Exp $
 #
 # Submenu for mailer reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2003/05/20 19:28:50  bkline
+# Plugged in mailer non-respondents report.
+#
 # Revision 1.3  2002/05/24 20:37:30  bkline
 # New Report Menu structure implemented.
 #
@@ -48,6 +51,8 @@ reports = [
            ('MailerActivityStatistics.py', 'Mailer Activity Counts'),
            ('MailerCheckinReport.py', 'Mailer Check-In Count'),
            ('MailerHistory.py', 'Mailer History'),
+           ('LeadOrgStatusAndParticipantMailerHistory.py',
+            'Lead Organization Status and Participant Mailer History'),
            ('Stub.py', 'Recipients'),
            ('NonRespondents.py', 'Non-Respondents')
           ]
