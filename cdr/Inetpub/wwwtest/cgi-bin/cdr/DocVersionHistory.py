@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: DocVersionHistory.py,v 1.4 2002-08-29 12:31:24 bkline Exp $
+# $Id: DocVersionHistory.py,v 1.5 2002-08-29 13:12:26 bkline Exp $
 #
 # Show version history of document.
 #----------------------------------------------------------------------
@@ -252,7 +252,7 @@ html = """\
        docType,
        docTitle,
        createdBy or "[Conversion]",
-       createdDate and createdDate[:10] or "2002-06-24",
+       createdDate and createdDate[:10] or "2002-06-22",
        modBy or "N/A",
        modDate and modDate[:10] or "N/A")
 
