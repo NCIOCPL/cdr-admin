@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: DocVersionHistory.py,v 1.6 2002-09-25 15:28:32 pzhang Exp $
+# $Id: DocVersionHistory.py,v 1.7 2002-10-07 15:39:01 pzhang Exp $
 #
 # Show version history of document.
 #----------------------------------------------------------------------
@@ -279,6 +279,7 @@ try:
 LEFT OUTER JOIN primary_pub_doc d
              ON d.doc_id = v.id
             AND d.doc_version = v.num
+            AND d.failure is null
           WHERE v.id = ?
        ORDER BY v.num DESC,
                 d.completed""", intId)
