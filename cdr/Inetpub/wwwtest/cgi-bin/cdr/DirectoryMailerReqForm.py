@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: DirectoryMailerReqForm.py,v 1.8 2002-10-09 15:23:06 ameyer Exp $
+# $Id: DirectoryMailerReqForm.py,v 1.9 2002-10-22 21:54:26 ameyer Exp $
 #
 # Request form for all directory mailers.
 #
@@ -31,6 +31,10 @@
 # Bob Kline.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.8  2002/10/09 15:23:06  ameyer
+# Optimized queries - run significantly faster.
+# Set autocommit on.
+#
 # Revision 1.7  2002/10/03 20:33:35  ameyer
 # About to change the queries yet again, and want to save this version.
 #
@@ -49,10 +53,10 @@
 #
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, string, cdrdb, cdrpubcgi, cdrmailcommon
+import sys, cgi, cdr, cdrcgi, re, string, cdrdb, cdrpubcgi, cdrmailcommon
 
 #----------------------------------------------------------------------
-# Set the form variables.
+# If we've been through the form already, gather form variables
 #----------------------------------------------------------------------
 fields  = cgi.FieldStorage()
 session = cdrcgi.getSession(fields)
@@ -60,6 +64,8 @@ request = cdrcgi.getRequest(fields)
 docId   = fields and fields.getvalue("DocId")    or None
 email   = fields and fields.getvalue("Email")    or None
 userPick= fields and fields.getvalue("userPick") or None
+maxMails= fields and fields.getvalue("maxMails") or 'No limit'
+
 title   = "CDR Administration"
 section = "Directory Mailer Request Form"
 buttons = ["Submit", "Log Out"]
@@ -129,6 +135,9 @@ if not request:
     </td></tr>
    </table>
    <input type='hidden' name='%s' value='%s'>
+   <p><p>
+   Maximum number of mailers to generate:
+   <input type='text' name='maxMails' size='12' value='No limit' />
 
   </form>
 """ % (cdrcgi.SESSION, session)
@@ -146,6 +155,19 @@ if not request:
 #----------------------------------------------------------------------
 if userPick == None:
     cdrcgi.bail ('Must select a directory mailer type')
+
+#----------------------------------------------------------------------
+# Figure out how many mailers to produce
+# If user accepted default 'No limit' or put in anything other than
+#   a number, we set the limit arbitrarily high
+# But if user entered a number, it must be positive
+#----------------------------------------------------------------------
+try:
+    maxMailers = int (maxMails)
+except ValueError:
+    maxMailers = sys.maxint
+if maxMailers < 1:
+    cdrcgi.bail ("Can't request less than 1 mailer")
 
 #----------------------------------------------------------------------
 # Set variables based on user selections on CGI form:
@@ -203,7 +225,7 @@ try:
             ON t.id    = d.doc_type
          WHERE t.name  = 'PublishingSystem'
            AND d.title = 'Mailers'
-""")
+""", timeout=90)
     rows = cursor.fetchall()
 except cdrdb.Error, info:
     cdrcgi.bail('Database failure looking up control document: %s' %
@@ -273,7 +295,7 @@ else:
         #   they've already had one
         tmpQry = """
             INSERT INTO #already_mailed_ids (tmpid)
-                    SELECT pd2.doc_id
+                    SELECT DISTINCT pd2.doc_id
                       FROM pub_proc_doc pd2
                       JOIN pub_proc p2
                         ON p2.id = pd2.pub_proc
@@ -295,20 +317,17 @@ else:
         #   No non-failing mailer has previously been generated of
         #       of type Physician-Initial.
         qry = """
-            SELECT DISTINCT document.id, MAX(doc_version.num)
+            SELECT top %d document.id, MAX(doc_version.num)
                        FROM doc_version
                        JOIN ready_for_review
                          ON ready_for_review.doc_id = doc_version.id
                        JOIN document document
                          ON document.id = ready_for_review.doc_id
-                       JOIN doc_type
-                         ON doc_type.id = document.doc_type
                        JOIN query_term qstat
                          ON qstat.doc_id = document.id
                        JOIN query_term qinc
                          ON qinc.doc_id = document.id
-                      WHERE doc_type.name = 'Person'
-                        AND qstat.path = '/Person/Status/CurrentStatus'
+                      WHERE qstat.path = '/Person/Status/CurrentStatus'
                         AND qstat.value = 'Active'
                         AND qinc.path =
                            '/Person/ProfessionalInformation/PhysicianDetails/AdministrativeInformation/Directory/Include'
@@ -318,14 +337,14 @@ else:
                                   FROM #already_mailed_ids
                                  WHERE document.id = tmpid
                              )
-                   GROUP BY document.id"""
+                   GROUP BY document.id""" % maxMailers
 
     elif mailType == 'Physician-Annual update':
         # Preselect all mailers sent to physicians in the last year.
         # Include initial, annual, and all remailers.
         tmpQry = """
             INSERT INTO #already_mailed_ids (tmpid)
-                    SELECT pd2.doc_id
+                    SELECT DISTINCT pd2.doc_id
                       FROM pub_proc_doc pd2
                       JOIN pub_proc p2
                         ON p2.id = pd2.pub_proc
@@ -339,7 +358,8 @@ else:
                          OR
                             p2.pub_subset = 'Physician-Annual remail'
                        )
-                       AND p2.completed > DATEADD(year,-1,GETDATE())
+                       -- AND p2.completed > DATEADD(year,-1,GETDATE())
+                       AND p2.completed > DATEADD(day,-360,GETDATE())
                        AND p2.status <> 'Failure'
         """
 
@@ -357,12 +377,10 @@ else:
         #         Physician-Annual update
         #         Physician-Annual remail
         qry = """
-            SELECT DISTINCT document.id, MAX(doc_version.num)
+            SELECT top %d document.id, MAX(doc_version.num)
                        FROM doc_version
                        JOIN document
                          ON doc_version.id = document.id
-                       JOIN doc_type
-                         ON doc_type.id = document.doc_type
                        JOIN pub_proc_doc pd1
                          ON document.id = pd1.doc_id
                        JOIN pub_proc p1
@@ -371,8 +389,7 @@ else:
                          ON qstat.doc_id = document.id
                        JOIN query_term qinc
                          ON qinc.doc_id = document.id
-                      WHERE doc_type.name = 'Person'
-                        AND qstat.path = '/Person/Status/CurrentStatus'
+                      WHERE qstat.path = '/Person/Status/CurrentStatus'
                         AND qstat.value = 'Active'
                         AND (
                              p1.pub_subset = 'Physician-Initial'
@@ -389,14 +406,14 @@ else:
                                   FROM #already_mailed_ids
                                  WHERE document.id = tmpid
                              )
-                   GROUP BY document.id"""
+                   GROUP BY document.id""" % maxMailers
 
     elif mailType == 'Organization-Annual update':
         # Perform same optimization as for physicians
         # Preselect all mailers sent to orgs in last year
         tmpQry = """
             INSERT INTO #already_mailed_ids (tmpid)
-                    SELECT pd2.doc_id
+                    SELECT DISTINCT pd2.doc_id
                       FROM pub_proc_doc pd2
                       JOIN pub_proc p2
                         ON p2.id = pd2.pub_proc
@@ -419,21 +436,18 @@ else:
         #   No non-failing update mailer sent in the past year.
         #   No non-failing remailer sent in the past year.
         qry = """
-            SELECT DISTINCT document.id, MAX(doc_version.num)
+            SELECT top %d document.id, MAX(doc_version.num)
                        FROM doc_version
                        JOIN document
                          ON doc_version.id = document.id
-                       JOIN doc_type
-                         ON doc_type.id = document.doc_type
                        JOIN query_term qinc
                          ON qinc.doc_id = document.id
                        JOIN query_term qorgtype
                          ON qorgtype.doc_id = document.id
-                      WHERE doc_type.name = 'Organization'
-                        AND qinc.path =
+                      WHERE qinc.path =
                            '/Organization/OrganizationDetails/OrganizationAdministrativeInformation/IncludeInDirectory'
                         AND qinc.value = 'Include'
-                        AND qorgtype.path = 'Organization/OrganizationType'
+                        AND qorgtype.path = '/Organization/OrganizationType'
                         AND qorgtype.value <>
                                     'NCI division, office, or laboratory'
                         AND qorgtype.value <>
@@ -445,13 +459,13 @@ else:
                                   FROM #already_mailed_ids
                                  WHERE document.id = tmpid
                              )
-                   GROUP BY document.id"""
+                   GROUP BY document.id""" % maxMailers
 
     elif timeType == 'Remail':
         # Execute a query that builds a temporary table
         try:
             rms = cdrmailcommon.RemailSelector (conn)
-            rms.select (orgMailType)
+            rms.select (orgMailType, maxMailers=maxMailers)
 
             # And create one to fetch the doc ids from it
             qry = rms.getDocIdVerQuery()
@@ -526,14 +540,17 @@ header = cdrcgi.header(title, title, section, None, [])
 html = """\
     <H3>Job Number %d Submitted</H3>
     <B>
-     <FONT COLOR='black'>Use
+     <P>Mailer type = %s</P>
+     <P>Number of documents to be mailed = %d</P>
+     <P><FONT COLOR='black'>Use
       <A HREF='%s/PubStatus.py?id=%d'>this link</A> to view job status.
      </FONT>
+     </P>
     </B>
    </FORM>
   </BODY>
  </HTML>
-""" % (jobId, cdrcgi.BASE, jobId)
+""" % (jobId, mailType, docCount, cdrcgi.BASE, jobId)
 
 # Remailers require permanent storage of the associated ids
 #  in the database, using job id as a key
