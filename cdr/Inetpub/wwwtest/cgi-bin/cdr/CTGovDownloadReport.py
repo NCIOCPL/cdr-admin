@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CTGovDownloadReport.py,v 1.1 2004-01-14 14:05:12 bkline Exp $
+# $Id: CTGovDownloadReport.py,v 1.2 2004-01-23 15:34:21 bkline Exp $
 #
 # Stats on documents downloaded from ClinicalTrials.gov.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2004/01/14 14:05:12  bkline
+# New report on download jobs from ClinicalTrials.gov.
+#
 #----------------------------------------------------------------------
 import cdr, cdrdb, time, cgi, cdrcgi, re
 
@@ -70,6 +73,28 @@ if not fromDate or not toDate:
 </html>""" % (then, now, cdrcgi.SESSION, session))
 
 #----------------------------------------------------------------------
+# Request #1062: added dropped trials to the report.
+#----------------------------------------------------------------------
+class DroppedTrial:
+    def __init__(self, nlmId, cdrId, disposition):
+        self.nlmId       = nlmId
+        self.cdrId       = cdrId
+        self.disposition = disposition
+
+def findDroppedTrials(cursor):
+    droppedTrials = []
+    cursor.execute("""\
+        SELECT i.nlm_id, i.cdr_id, d.name
+          FROM ctgov_import i
+          JOIN ctgov_disposition d
+            ON d.id = i.disposition
+         WHERE dropped = 'Y'
+      ORDER BY i.nlm_id""")
+    for row in cursor.fetchall():
+        droppedTrials.append(DroppedTrial(row[0], row[1], row[2]))
+    return droppedTrials
+
+#----------------------------------------------------------------------
 # Gather the report data.
 #----------------------------------------------------------------------
 cursor.execute("""\
@@ -97,7 +122,34 @@ html = """\
   <center>
    <h1>ClinicalTrials.gov Download Statistics Report</h1>
    <h2>%s through %s</h2>
+   <br>
+""" % (fromDate, toDate, fromDate, toDate)
+droppedTrials = findDroppedTrials(cursor)
+if droppedTrials:
+    html += """\
+   <h2>These trials have been dropped by NLM</h2>
+   <table border='1' cellpadding='2' cellspacing='0'>
+    <tr>
+     <th>NCT ID</th>
+     <th>CDR ID</th>
+     <th>Disposition</th>
+    </tr>
+"""
+    for droppedTrial in droppedTrials:
+        html += """\
+    <tr>
+     <td>%s</td>
+     <td>%s</td>
+     <td>%s</td>
+    </tr>
+""" % (droppedTrial.nlmId,
+       droppedTrial.cdrId and ("CDR%d" % droppedTrial.cdrId) or "None",
+       droppedTrial.disposition)
+    html += """\
+   </table>
    <br><br>
+"""
+html += """\
    <table border='1' cellpadding='2' cellspacing='0'>
     <tr>
      <th>Date</th>
@@ -110,7 +162,7 @@ html = """\
      <th>Out of scope</th>
      <th>Closed</th>
     </tr>
-""" % (fromDate, toDate, fromDate, toDate)
+"""
 for row in rows:
     html += """\
     <tr>
