@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolReports.py,v 1.4 2003-01-22 23:28:30 bkline Exp $
+# $Id: ProtocolReports.py,v 1.5 2003-01-29 18:46:25 bkline Exp $
 #
 # Submenu for protocol reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2003/01/22 23:28:30  bkline
+# New report for issue #560.
+#
 # Revision 1.3  2002/09/23 17:36:40  bkline
 # New report for European protocols.
 #
@@ -83,7 +86,9 @@ reports = [
            ('PreMailerProtReport.py',
             'Pre-Mailer Protocol Check'),
            ('ApprovedNotYetActive.py',
-            'Approved Not Yet Active Report')
+            'Approved Not Yet Active Report'),
+           ('ProtocolStatusChange.py',
+            'Protocol Status Change Report')
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI>\n" % (
