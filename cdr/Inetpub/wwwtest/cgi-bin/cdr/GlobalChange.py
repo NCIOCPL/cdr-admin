@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------
-# $Id: GlobalChange.py,v 1.10 2003-07-29 20:05:36 ameyer Exp $
+# $Id: GlobalChange.py,v 1.11 2003-07-29 23:15:08 ameyer Exp $
 #
 # Perform global changes on XML records in the database.
 #
@@ -14,6 +14,9 @@
 # present the next one - to the end.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.10  2003/07/29 20:05:36  ameyer
+# Added support for global terminology changes.
+#
 # Revision 1.9  2003/03/27 18:30:50  ameyer
 # Major refactoring of the program to work with a more scriptable logic
 # and to handle a new, fourth type of global change.
@@ -79,8 +82,9 @@ def sendGlblChgPage (parms):
                 or None
     """
     # Passed parameters
-    header = parms[0]
+    header      = parms[0]
     formContent = parms[1]
+    buttons     = None
     if len (parms) > 2:
         # Passed buttons
         buttons=parms[2]
