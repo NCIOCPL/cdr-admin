@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditFilter.py,v 1.9 2002-09-13 11:36:50 bkline Exp $
+# $Id: EditFilter.py,v 1.10 2002-09-13 17:08:10 bkline Exp $
 #
 # Prototype for editing CDR filter documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.9  2002/09/13 11:36:50  bkline
+# Added Compare function.
+#
 # Revision 1.8  2002/09/07 13:14:25  bkline
 # Added auto-cvs to filter editing.
 #
@@ -74,7 +77,8 @@ if not request: cdrcgi.bail("No request submitted", banner)
 # Display the CDR document form.
 #----------------------------------------------------------------------
 def showForm(doc, subBanner, buttons):
-    hdr = cdrcgi.header(title, banner, subBanner, "EditFilter.py", buttons)
+    hdr = cdrcgi.header(title, banner, subBanner, "EditFilter.py", buttons,
+            numBreaks = 1)
     html = hdr + """\
    <input name='version' type='checkbox'%s>
    Create new version for Save, Checkin or Clone? 
@@ -384,14 +388,22 @@ def doCvs(docId, doc, cvsid, cvspw, cvscomment, session):
 #----------------------------------------------------------------------
 # Load an existing document.
 #----------------------------------------------------------------------
-if request == "Load":
+if request in ("Load", "View"):
     if not fields.has_key(cdrcgi.DOCID):
         cdrcgi.bail("No document ID specified", banner)
-    doc = cdrcgi.decode(cdr.getDoc(session, fields[cdrcgi.DOCID].value, 'Y'))
+    if request == "Load":
+        checkOut = "Y"
+        buttons  = ("Load", "Save", "Checkin", "Clone")
+        banner   = "Edit existing document"
+    else:
+        checkOut = "N"
+        buttons  = ("Load", "Clone")
+        banner   = "View existing document"
+    doc = cdr.getDoc(session, fields[cdrcgi.DOCID].value, checkOut)
+    doc = cdrcgi.decode(doc)
     if doc.find("<Errors>") >= 0:
         cdrcgi.bail(doc, banner)
-    showForm(cgi.escape(doc), #.replace("&", "&amp;"), 
-             "Editing existing document", ("Load", "Save", "Checkin", "Clone"))
+    showForm(cgi.escape(doc), banner, buttons)
 
 #----------------------------------------------------------------------
 # Create a template for a new document.
