@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolMailerReqForm.py,v 1.12 2003-02-13 21:43:41 bkline Exp $
+# $Id: ProtocolMailerReqForm.py,v 1.13 2003-02-19 22:05:37 bkline Exp $
 #
 # Request form for all protocol mailers.
 #
@@ -17,6 +17,9 @@
 # publication job for the publishing daemon to find and initiate.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.12  2003/02/13 21:43:41  bkline
+# Fixed comment to match previous change.
+#
 # Revision 1.11  2003/02/13 21:11:27  bkline
 # Added 'Temporarily closed' for regular S&P mailers.
 #
@@ -552,7 +555,7 @@ elif mailType == 'Protocol-Initial status/participant check':
         docList = cursor.fetchall()
     except cdrdb.Error, info:
         cdrcgi.bail("Failure retrieving document IDs: %s" % info[1][0])
-    showDocsAndRun(docList)
+    #showDocsAndRun(docList)
 
 #----------------------------------------------------------------------
 # Find the protocols which need a quarterly status and participant check.
@@ -639,7 +642,7 @@ elif mailType == 'Protocol-Quarterly status/participant check':
         docList = cursor.fetchall()
     except cdrdb.Error, info:
         cdrcgi.bail("Failure retrieving document IDs: %s" % info[1][0])
-    showDocsAndRun(docList)
+    #showDocsAndRun(docList)
 
 # Check to make sure we have at least one mailer to send out.
 docCount = len(docList)
