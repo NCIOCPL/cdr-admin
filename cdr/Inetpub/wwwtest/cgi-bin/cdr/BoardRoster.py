@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: BoardRoster.py,v 1.4 2005-02-19 04:08:13 bkline Exp $
+# $Id: BoardRoster.py,v 1.5 2005-02-22 19:17:02 venglisc Exp $
 #
 # Report to display the Board Roster with or without assistant
 # information.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2005/02/19 04:08:13  bkline
+# Fixed bug in determining which board members are current.  Fixed bug
+# in identifying editors-in-chief.
+#
 # Revision 1.3  2005/02/17 22:10:22  venglisc
 # Added Board Manager's contact information at end of report (Bug 1527).
 #
@@ -254,6 +258,13 @@ html = """\
    TD.hdg   { font-family: Arial, sans-serif; font-size: 16pt;
               font-weight: bold; }
    P        { font-family: Arial, sans-serif; font-size: 12pt; }
+
+   # The Board Member Roster information is created via a global 
+   # template for Persons.  The italic display used for the QC
+   # report does therefore need to be suppressed here.
+   # -----------------------------------------------------------
+   I        { font-family: Arial, sans-serif; font-size: 12pt; 
+              font-style: normal; }
    SPAN.SectionRef { text-decoration: underline; font-weight: bold; }
   </STYLE>
  </HEAD>  
