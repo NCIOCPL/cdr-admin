@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditIssue.py,v 1.2 2002-04-16 14:10:26 bkline Exp $
+# $Id: EditIssue.py,v 1.3 2002-06-04 20:18:19 bkline Exp $
 #
 # Edit CDR development issue.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/04/16 14:10:26  bkline
+# Added code to find earliest unresolved issue on request.
+#
 # Revision 1.1  2001/12/01 18:11:44  bkline
 # Initial revision
 #
@@ -127,7 +130,8 @@ if id == -1:
             SELECT MIN(id)
               FROM issue
              WHERE resolved IS NULL
-               AND priority NOT LIKE 'X%'""")
+               AND priority NOT LIKE 'X%'
+               AND priority NOT LIKE '1%'""")
         row = cursor.fetchone()
         id = row and row[0] or 0
     except cdrdb.Error, info:
