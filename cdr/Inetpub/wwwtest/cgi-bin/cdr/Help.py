@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: Help.py,v 1.1 2002-06-04 20:18:52 bkline Exp $
+# $Id: Help.py,v 1.2 2002-08-15 19:26:26 bkline Exp $
 #
 # Display the table of contents for the CDR help system.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2002/06/04 20:18:52  bkline
+# New interface to Eileen's Help pages.
+#
 #----------------------------------------------------------------------
 import cdr, cdrcgi, cdrdb
 
@@ -36,8 +39,7 @@ except cdrdb.Error, info:
 #----------------------------------------------------------------------
 # Filter the document to create the HTML page.
 #----------------------------------------------------------------------
-response = cdr.filterDoc(('rmk', '***REDACTED***'), ['name:Help Table of Contents'],
-                         rows[0][0])
+response = cdr.filterDoc('guest', ['name:Help Table of Contents'], rows[0][0])
 if type(response) in (type(''), type(u'')):
     cdrcgi.bail(response)
 
