@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CitationReports.py,v 1.3 2004-02-17 19:37:52 venglisc Exp $
+# $Id: CitationReports.py,v 1.4 2004-03-30 20:28:05 bkline Exp $
 #
 # Submenu for citation reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2004/02/17 19:37:52  venglisc
+# Removed unused menu items
+#
 # Revision 1.2  2002/05/25 02:39:12  bkline
 # Removed extra blank lines from HTML output.
 #
@@ -74,6 +77,7 @@ form += """\
 """
 reports = [
            ('ModifiedPubMedDocs.py', 'Modified PubMed Documents'),
+           ('NewCitations.py', 'New Citations Report')
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI>\n" % (
