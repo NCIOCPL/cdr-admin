@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: Filter.py,v 1.16 2002-10-21 15:42:02 pzhang Exp $
+# $Id: Filter.py,v 1.17 2003-03-04 19:07:57 pzhang Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.16  2002/10/21 15:42:02  pzhang
+# Added port parameter into lastVersions() and filterDoc().
+#
 # Revision 1.15  2002/09/25 15:03:43  pzhang
 # Default docVer to 0 when no value is given.
 #
@@ -200,10 +203,17 @@ if fields.getvalue('qcFilterSets'):
 #----------------------------------------------------------------------
 # Filter the document.
 #----------------------------------------------------------------------
-doc = cdr.filterDoc(session, filtId, docId = docId, docVer = docVer,
-                    port = cdr.getPubPort())
+port = cdr.getPubPort()
+filterWarning = ""
+doc = cdr.filterDoc(session, filtId[0], docId = docId, docVer = docVer,
+                    port = port)
+if doc[1]: filterWarning += doc[1]
+for filter in filtId[1:]:
+    if filter:
+        doc = cdr.filterDoc(session, filter, doc = doc[0], port = port)
+        if doc[1]: filterWarning += doc[1]                      
 if type(doc) == type(()):
-    doc = doc[0]
+    doc = doc[0] 
 
 #----------------------------------------------------------------------
 # Add a table row for an error or warning.
@@ -236,7 +246,7 @@ if valFlag:
  <body>
  <h2>Validation results for CDR%010d</h2>
 """ % (idNum, idNum)
-    if not errObj.Warnings and not errObj.Errors:
+    if not errObj.Warnings and not errObj.Errors and not filterWarning: 
         html += """\
  <h3>Document comes out clean: no errors, no warnings!</h3>
 """
@@ -250,7 +260,9 @@ if valFlag:
     <th>Position</th>
     <th>Message</th>
    </tr>
-"""
+"""     
+        if filterWarning:
+            html += addRow('Warning', '%d.xml:0:0:%s' % (idNum, filterWarning))
         for warning in errObj.Warnings:
             html += addRow('Warning', warning)
         for error in errObj.Errors:
