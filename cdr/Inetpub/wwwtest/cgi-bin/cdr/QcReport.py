@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.33 2003-12-16 15:49:13 bkline Exp $
+# $Id: QcReport.py,v 1.34 2004-01-14 18:45:22 venglisc Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.33  2003/12/16 15:49:13  bkline
+# Modifed report to drop PDQ indexing section if first attempt to filter
+# a CTGovProtocol document fails.
+#
 # Revision 1.32  2003/11/25 12:48:34  bkline
 # Added code to plug in information about latest mods to document.
 #
@@ -308,9 +312,6 @@ if docType == 'Summary' and repType and not version:
                          CHECKED='1'>&nbsp;&nbsp; With approved attribute<BR>
   <INPUT TYPE="checkbox" NAME="proposed">&nbsp;&nbsp; With proposed attribute
   <BR><BR>
-"""
-    if repType in ('bu', 'rs'):
-        form += """\
   <INPUT TYPE='checkbox' NAME='DisplayCommentElements' CHECKED='1'>&nbsp;&nbsp;
   Display Comments?
 """
