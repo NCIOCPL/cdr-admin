@@ -1,0 +1,87 @@
+<!-- $Id: CdrFilter.html,v 1.1 2001-03-26 18:02:56 bkline Exp $ -->
+<!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
+ <HEAD>
+  <TITLE>CDR Document Filtering</TITLE>
+  <SCRIPT LANGUAGE='JavaScript'>
+   <!--
+    function filterDoc() {
+        var base  = "http://mmdb2/cgi-bin/cdr/Filter.py";
+        var doc   = document.FilterRequest.DocId.value;
+        var filt  = document.FilterRequest.Filter.value;
+        var url   = base + "?DocId=" + doc + "&Filter=" + filt;
+        var opts  = "scrollbars=yes,resizable=yes,status=yes,menubar=yes";
+        if (doc.length == 0 || url.length == 0) {
+            alert("Document and Filter IDs Required");
+        }
+        else {
+            wind = window.open(url, doc, opts);
+            wind.focus();
+        }
+    }
+   -->
+  </SCRIPT>
+ </HEAD>
+ <BASEFONT FACE='Arial, Helvetica, sans-serif'>
+ <LINK REL='STYLESHEET' 
+       HREF='/stylesheets/dataform.css'>
+ <BODY BACKGROUND='/images/back.jpg' 
+       BGCOLOR='lightgrey'>
+  <FORM ACTION='/cgi-bin/cdr/Filter.py' 
+        METHOD='POST' 
+        NAME='FilterRequest'>
+   <TABLE WIDTH='100%' 
+          CELLSPACING='0' 
+          CELLPADDING='0' 
+          BORDER='0'>
+    <TR>
+     <TH NOWRAP BGCOLOR='silver' 
+         ALIGN='left' 
+         BACKGROUND='/images/nav1.jpg'>
+      <FONT SIZE='6' 
+            COLOR='white'>&nbsp;CDR Document Filtering
+      </FONT>
+     </TH>
+     <TD BGCOLOR='silver'
+         VALIGN='middle'
+         ALIGN='right'
+         WIDTH='100%'
+         BACKGROUND='/images/nav1.jpg'>
+      <INPUT TYPE='button' 
+             VALUE='Submit Filter Request' 
+             onClick='filterDoc()'>&nbsp;
+     </TD>
+    </TR>
+    <TR>
+     <TD BGCOLOR='#FFFFCC' COLSPAN='3'>
+      <FONT SIZE='-1' 
+            COLOR='navy'>&nbsp;Enter document IDs<BR>
+      </FONT>
+     </TD>
+    </TR>
+   </TABLE>
+   <BR>
+   <BR>
+   <TABLE CELLSPACING='0' 
+          CELLPADDING='0' 
+          BORDER='0'>
+    <TR>
+     <TD ALIGN='right'>
+      <B>Document ID&nbsp;</B>
+     </TD>
+     <TD><INPUT NAME='DocId' 
+                VALUE='CDR106085'>
+     </TD>
+    </TR>
+    <TR>
+     <TD ALIGN='right'>
+      <B>Filter ID&nbsp;</B>
+     </TD>
+     <TD>
+      <INPUT NAME='Filter' 
+             VALUE='CDR190703'>
+     </TD>
+    </TR>
+   </TABLE>
+  </FORM>
+ </BODY>
+</HTML>
