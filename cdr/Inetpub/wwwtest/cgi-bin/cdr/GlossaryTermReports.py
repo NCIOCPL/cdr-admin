@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermReports.py,v 1.2 2002-05-25 02:39:13 bkline Exp $
+# $Id: GlossaryTermReports.py,v 1.3 2004-08-10 15:44:20 bkline Exp $
 #
 # Submenu for glossary term reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/05/25 02:39:13  bkline
+# Removed extra blank lines from HTML output.
+#
 # Revision 1.1  2002/05/24 20:37:30  bkline
 # New Report Menu structure implemented.
 #
@@ -59,6 +62,7 @@ form += """\
     <OL>
 """
 reports = [
+           ('GlossaryTermPhrases.py', 'Glossary Term Search Report'),
            ('Stub.py', 'Terms By Status')
           ]
 for r in reports:
