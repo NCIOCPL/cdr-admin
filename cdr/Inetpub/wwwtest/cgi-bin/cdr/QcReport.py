@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.30 2003-11-12 19:58:47 bkline Exp $
+# $Id: QcReport.py,v 1.31 2003-11-20 21:36:04 bkline Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.30  2003/11/12 19:58:47  bkline
+# Modified Person QC report to reflect use in external_map table.
+#
 # Revision 1.29  2003/09/16 21:15:39  bkline
 # Changed test for Summary docType to take into account suffixes that
 # may have been added to the string to indicate which flavor of report
@@ -350,7 +353,9 @@ filters = {
     'Term':             
         ["set:QC Term Set"],
     'MiscellaneousDocument':
-        ["set:QC MiscellaneousDocument Set"]
+        ["set:QC MiscellaneousDocument Set"],
+    'CTGovProtocol':
+        ["set:QC CTGovProtocol Set"]
 }
 
 #----------------------------------------------------------------------
