@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------
-# $Id: GlobalChange.py,v 1.11 2003-07-29 23:15:08 ameyer Exp $
+# $Id: GlobalChange.py,v 1.12 2003-08-01 01:11:24 ameyer Exp $
 #
 # Perform global changes on XML records in the database.
 #
@@ -14,6 +14,9 @@
 # present the next one - to the end.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.11  2003/07/29 23:15:08  ameyer
+# Oops, broke something in an oversimplification.
+#
 # Revision 1.10  2003/07/29 20:05:36  ameyer
 # Added support for global terminology changes.
 #
@@ -178,26 +181,26 @@ for fd in ('docType', 'email', 'specificPhone', 'specificRole',
            'insertPersId', 'insertPersName', 'insertPersTitle',
                 'insertPersFragChk',
            'insertOrgId', 'insertOrgName', 'insertOrgTitle',
-           'fromStatusName', 'toStatusName',
-           'trmReqField0', 'trmReqVal0', 'termReqId0',
-           'trmReqField1', 'trmReqVal1', 'termReqId1',
-           'trmReqField2', 'trmReqVal2', 'termReqId2',
-           'trmReqField3', 'trmReqVal3', 'termReqId3',
-           'trmReqField4', 'trmReqVal4', 'termReqId4',
-           'trmOptField0', 'trmOptVal0', 'termOptId0',
-           'trmOptField1', 'trmOptVal1', 'termOptId1',
-           'trmOptField2', 'trmOptVal2', 'termOptId2',
-           'trmOptField3', 'trmOptVal3', 'termOptId3',
-           'trmOptField4', 'trmOptVal4', 'termOptId4',
-           'trmNotField0', 'trmNotVal0', 'termNotId0',
-           'trmNotField1', 'trmNotVal1', 'termNotId1',
-           'trmNotField2', 'trmNotVal2', 'termNotId2',
-           'trmNotField3', 'trmNotVal3', 'termNotId3',
-           'trmNotField4', 'trmNotVal4', 'termNotId4',
-           'trmDelField0', 'trmDelVal0', 'termDelId0',
-           'trmDelField1', 'trmDelVal1', 'termDelId1',
-           'trmAddField0', 'trmAddVal0', 'termAddId0',
-           'trmAddField1', 'trmAddVal1', 'termAddId1'):
+           'fromStatusName', 'toStatusName', 'trmStatusName',
+           'trmReqField0', 'trmReqVal0', 'trmReqId0',
+           'trmReqField1', 'trmReqVal1', 'trmReqId1',
+           'trmReqField2', 'trmReqVal2', 'trmReqId2',
+           'trmReqField3', 'trmReqVal3', 'trmReqId3',
+           'trmReqField4', 'trmReqVal4', 'trmReqId4',
+           'trmOptField0', 'trmOptVal0', 'trmOptId0',
+           'trmOptField1', 'trmOptVal1', 'trmOptId1',
+           'trmOptField2', 'trmOptVal2', 'trmOptId2',
+           'trmOptField3', 'trmOptVal3', 'trmOptId3',
+           'trmOptField4', 'trmOptVal4', 'trmOptId4',
+           'trmNotField0', 'trmNotVal0', 'trmNotId0',
+           'trmNotField1', 'trmNotVal1', 'trmNotId1',
+           'trmNotField2', 'trmNotVal2', 'trmNotId2',
+           'trmNotField3', 'trmNotVal3', 'trmNotId3',
+           'trmNotField4', 'trmNotVal4', 'trmNotId4',
+           'trmDelField0', 'trmDelVal0', 'trmDelId0',
+           'trmDelField1', 'trmDelVal1', 'trmDelId1',
+           'trmAddField0', 'trmAddVal0', 'trmAddId0',
+           'trmAddField1', 'trmAddVal1', 'trmAddId1'):
     fdVal = fields.getvalue (fd, None)
     if fdVal:
         # If it's an Id type, normalize it to standard CDR000... form
