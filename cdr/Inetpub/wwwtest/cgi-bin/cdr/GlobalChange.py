@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------
-# $Id: GlobalChange.py,v 1.5 2002-09-24 23:40:00 ameyer Exp $
+# $Id: GlobalChange.py,v 1.6 2002-11-13 02:39:07 ameyer Exp $
 #
 # Perform global changes on XML records in the database.
 #
@@ -14,6 +14,10 @@
 # present the next one - to the end.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2002/09/24 23:40:00  ameyer
+# Fix cgi escape for attribute values with quote marks.
+# Discovered by Bob.
+#
 # Revision 1.4  2002/08/27 22:45:40  ameyer
 # Now allowing user to enter organization ids with or without address
 # fragments.
@@ -302,9 +306,23 @@ else:
 #----------------------------------------------------------------------
 # Give user final review
 #----------------------------------------------------------------------
-# If review already done, we already have an email address
+# If review already done, we already have one or more email addresses
 email = fields.getvalue ('email', None)
 if not email:
+    try:
+        # Get current userid so we can get default email address
+        resp = cdr.idSessionUser (None, session)
+        if type(resp)==type("") or type(resp)==type(u""):
+            cdrcgi.bail ("Error fetching userid for email address: %s", resp)
+
+        # Get current user's email address
+        usrObj = cdr.getUser (session, resp[0])
+        if type(usrObj)==type("") or type(usrObj)==type(u""):
+            cdrcgi.bail ("Error fetching email address: %s", resp)
+        email = usrObj.email
+    except:
+        cdrcgi.bail ("Unable to fetch email address")
+
     report = chg.reportWillChange()
     if not report:
         sendGlblChgPage (("",
@@ -317,13 +335,15 @@ Results of the job will be emailed.</p>
 <p>To start the job, review the list of protocols to be modified and
 either:</p>
 <ol>
- <li>Fill in an email address for results and click 'Submit', or</li>
+ <li>Enter one or more email addresses for results (separated by
+     space, comma or semicolon) and click 'Submit', or</li>
  <li>Click 'Cancel' to return to the administration menu</li>
 </ol>
 <p><p>
-<p>Email address: <input type='text' name='email' size='50' /></p>
+<p>Email(s): <input type='text' name='email' value='%s' size='80' /></p>
 <p><p><p>
-"""
+""" % email
+
         html = chg.showSoFarHtml() + instruct + report
 
         sendGlblChgPage (("Final review", html))
