@@ -1,6 +1,8 @@
 import cgi
 fields = cgi.FieldStorage()
-output = """\
+output = \
+"""Content-type: text/html
+
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <HTML>
  <HEAD>
