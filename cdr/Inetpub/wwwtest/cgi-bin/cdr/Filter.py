@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: Filter.py,v 1.12 2002-09-20 16:24:24 pzhang Exp $
+# $Id: Filter.py,v 1.13 2002-09-24 20:12:28 pzhang Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.12  2002/09/20 16:24:24  pzhang
+# Added 8 more input boxes to allow 15 filters.
+#
 # Revision 1.11  2002/09/19 21:16:02  pzhang
 # Sorted filterSets keys.
 #
@@ -50,6 +53,7 @@ title   = "CDR Formatting"
 fields  = cgi.FieldStorage() or cdrcgi.bail("No Request Found", title)
 session = 'guest'
 docId   = fields.getvalue(cdrcgi.DOCID) or cdrcgi.bail("No Document", title)
+docVer  = fields.getvalue('DocVer') or cdrcgi.bail("No Doc Version", title)
 filtId0 = fields.getvalue(cdrcgi.FILTER)
 if not fields.getvalue('qcFilterSets'):
     filtId0 or cdrcgi.bail("No Filter", title)
@@ -110,7 +114,7 @@ def dispFilterSet(key, filterSets, filterId):
         return 1
 
 # Do all real work here.
-def qcFilterSets(docId, filterId = None):
+def qcFilterSets(docId, docVer, filterId = None):
     
     # Where the filtersets file is.
     # Don't want this page to be working on FRANCK or BACH.
@@ -154,7 +158,7 @@ def qcFilterSets(docId, filterId = None):
 
         # Form new set of filters.
         base    = "/cgi-bin/cdr/Filter.py"; 
-        url     = base + "?DocId=" + docId    
+        url     = base + "?DocId=" + docId + "&DocVer=" + docVer
         docIdExpr = re.compile("^(\d+):")
         i = 0        
         for filt in filterSets[key]:
@@ -177,12 +181,12 @@ def qcFilterSets(docId, filterId = None):
     cdrcgi.sendPage(header + html + "<BODY></HTML>")
 
 if fields.getvalue('qcFilterSets'):
-    qcFilterSets(docId, filtId)
+    qcFilterSets(docId, docVer, filtId)
     
 #----------------------------------------------------------------------
 # Filter the document.
 #----------------------------------------------------------------------
-doc = cdr.filterDoc(session, filtId, docId = docId)
+doc = cdr.filterDoc(session, filtId, docId = docId, docVer = docVer)
 if type(doc) == type(()):
     doc = doc[0]
 
