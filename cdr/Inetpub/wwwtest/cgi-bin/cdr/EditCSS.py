@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditCSS.py,v 1.3 2002-02-21 15:22:02 bkline Exp $
+# $Id: EditCSS.py,v 1.4 2002-07-30 13:08:56 bkline Exp $
 #
 # Prototype for editing CSS stylesheets.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2002/02/21 15:22:02  bkline
+# Added navigation buttons.
+#
 # Revision 1.2  2001/12/01 17:58:02  bkline
 # Added support for version and checkin parameters of repDoc().
 #
@@ -132,11 +135,7 @@ elif request == 'Save':
         if err: cdrcgi.bail(err, banner)
         else: cdrcgi.bail("Unparseable error return: %s" % docId, banner)
     if checkin:
-        print """\
-Location:http://mmdb2.nci.nih.gov/cgi-bin/cdr/EditCSSs.py?%s=%s
-
-""" % (cdrcgi.SESSION, session)
-        sys.exit(0)
+        cdrcgi.navigateTo('EditCSSs.py', session)
     doc = fetch(docId)
     showForm(doc.ctrl['DocTitle'], 
              doc.blob, 
