@@ -2,8 +2,12 @@
 #
 # Publishing CGI script.
 #
-# $Id: publishing.py,v 1.6 2002-02-22 16:36:40 pzhang Exp $
+# $Id: publishing.py,v 1.7 2002-02-22 17:19:17 pzhang Exp $
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2002/02/22 16:36:40  pzhang
+# Moved hidden Session variable out of initHiddenValues for
+# 	navigateTo to work properly.
+#
 # Revision 1.5  2002/02/21 15:20:35  bkline
 # Added navigation buttons.
 #
@@ -64,7 +68,7 @@ class Display:
     def displaySubsets(self, ctrlId):
         
         subsets = []
-        subset = ["Publishing.py", "", ""]
+        subset = ["Publishing.py", "", "", ""]
         p = cdrpub.Publish(ctrlId, "Fake", "Fake", "Fake", "Fake")
         pickList = p.getPubSubset()
         sysName = pickList[0][2] # Not a good implementation.
@@ -72,6 +76,14 @@ class Display:
             subset[1] =  s[0] 
             subset[2] = s[0]
             subset[2] += "<BR>[Desc]: &nbsp;"  + s[1]
+            subset[2] += "<BR>[Params]: &nbsp;"  + s[3]
+            subset[2] += "<BR>[UserSel]: &nbsp;"  + s[4]
+            subset[3] = s[3] and s[3] or s[4]
+            if subset[3]:
+                subset[3] = 'DocParam=Yes'
+            else:
+                subset[3] = 'Confirm=Yes'
+                
             deep = copy.deepcopy(subset)
             subsets.append(deep)
         if type(subsets) == type(""): cdrcgi.bail(subsets)    
@@ -80,9 +92,9 @@ class Display:
         form += "<OL>\n"
 
         for r in subsets:
-            form += """<LI><A HREF='%s/%s?%s=%s&ctrlId=%s&SubSet=%s&DocParam="Flag"'>
+            form += """<LI><A HREF='%s/%s?%s=%s&ctrlId=%s&SubSet=%s&%s'>
                 %s</A></LI>\n""" % (cdrcgi.BASE, r[0], cdrcgi.SESSION, session, 
-                ctrlId, urllib.quote_plus(r[1]), r[2])
+                ctrlId, urllib.quote_plus(r[1]), r[3], r[2])
 
         form += HIDDEN % (cdrcgi.SESSION, session)   
         self.__addFooter(form)
@@ -156,14 +168,14 @@ class Display:
 
         # Form the parameters and documents to match the required 
         # format of argument in publish.py.
-        paraValues = ""
+        paramValues = ""
         if fields.has_key('Params'):
             paramList = fields.getvalue('Params')
             names = string.split(paramList, ",")
             for name in names:
                 if fields.has_key(name):
-                    paraValues += "," + name + " " +  fields.getvalue(name)
-        form += HIDDEN % ('Parameters', paraValues)    
+                    paramValues += "," + name + " " +  fields.getvalue(name)
+        form += HIDDEN % ('Parameters', paramValues)    
 
         docIdValues = ""
         if fields.has_key('DocIds'):
@@ -173,7 +185,7 @@ class Display:
                 if fields.has_key(name):
                     value = fields.getvalue(name)
                     p = cdrpub.Publish(0, "Fake", "Fake", "Fake", "Fake")  
-                    if p.isPublishable(value):
+                    if -1 != p.isPublishable(value):
                         docIdValues += "," + fields.getvalue(name)
                     else:
                         form = "<H4>Document: %s is not publishable. " \
@@ -189,7 +201,7 @@ class Display:
         # form += "of system %s?</p>\n" % fields.getvalue('PubSys')
         form += """Email notification of completion?
         <input type="checkbox" checked name="Email" value="y">&nbsp;&nbsp;
-        <BR> Use comma to separate receivers: &nbsp
+        <BR> Use comma to separate recipients: &nbsp
         <input type="text" size="50" name="EmailAddr" value="***REMOVED***"><br><br>
         Messages only?
         <input type="checkbox" name="NoOutput" value="Y"><br><br>
