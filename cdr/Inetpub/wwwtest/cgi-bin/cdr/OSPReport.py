@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: OSPReport.py,v 1.3 2004-02-26 21:13:10 bkline Exp $
+# $Id: OSPReport.py,v 1.4 2005-03-01 20:18:00 bkline Exp $
 #
 # Queue up report for the Office of Science Policy.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2004/02/26 21:13:10  bkline
+# Added cdr module.
+#
 # Revision 1.2  2004/02/26 21:11:01  bkline
 # Replaced hard-coded name of development server with macro from cdr
 # module.
@@ -14,7 +17,7 @@
 #
 #----------------------------------------------------------------------
 
-import cdrbatch, cdrcgi, cgi, cdrdb, cdr
+import cdrbatch, cdrcgi, cgi, cdrdb, cdr, time
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -24,6 +27,8 @@ session     = cdrcgi.getSession(fields)
 request     = cdrcgi.getRequest(fields)
 email       = fields and fields.getvalue("Email")    or None
 cancer      = fields and fields.getvalue("Cancer")   or None
+begin       = fields and fields.getvalue("begin")    or None
+end         = fields and fields.getvalue("end")      or None
 title       = "CDR Administration"
 section     = "Report for Office of Science Policy"
 SUBMENU     = "Report Menu"
@@ -90,6 +95,14 @@ def listTermChoices():
       </select>"""
 
 #----------------------------------------------------------------------
+# Use default date range if not specified.
+#----------------------------------------------------------------------
+if not begin or not end:
+    now   = time.localtime()
+    begin = begin or str(now[0] - 6)
+    end   = end   or str(now[0] - 1)
+
+#----------------------------------------------------------------------
 # Put up the form if we don't have a request yet.
 #----------------------------------------------------------------------
 if not email or not cancer or request != "Submit":
@@ -119,12 +132,21 @@ if not email or not cancer or request != "Submit":
 %s
      </td>
     </tr>
+    <tr>
+     <td>
+      <b>Active between:&nbsp;</b>
+     </td>
+     <td>
+      <input name='begin' size='4' value='%s'> and 
+      <input name='end' size='4' value='%s'><br>
+     </td>
+    </tr>
    </table>
    <input type='hidden' name='%s' value='%s'>
   </form>
  </body>
 </html>
-""" % (listTermChoices(), cdrcgi.SESSION, session)
+""" % (listTermChoices(), begin, end, cdrcgi.SESSION, session)
     cdrcgi.sendPage(header + form)
 
 #----------------------------------------------------------------------    
@@ -136,6 +158,9 @@ args = []
 for c in cancer:
     name = "TermId%d" % (len(args) + 1)
     args.append((name, c))
+args.append(('begin', begin))
+args.append(('end', end))
+
 # Have to do this on the development machine, since that's the only
 # server with Excel installed.
 batch = cdrbatch.CdrBatch(jobName = section, command = command, email = email,
