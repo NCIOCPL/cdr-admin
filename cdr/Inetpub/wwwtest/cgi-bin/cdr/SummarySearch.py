@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummarySearch.py,v 1.5 2002-07-15 20:19:51 bkline Exp $
+# $Id: SummarySearch.py,v 1.6 2003-06-02 14:23:06 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Summary documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2002/07/15 20:19:51  bkline
+# XML paths altered to match changed schemas.
+#
 # Revision 1.4  2002/05/03 20:31:02  bkline
 # New filter added.
 #
@@ -50,12 +53,12 @@ SELECT DISTINCT value
           WHERE path LIKE '/Summary/SummarySection%SectMetaData/SectionType'
        ORDER BY value
 """
-        cursor.execute(query)
+        cursor.execute(query, timeout=120)
         rows = cursor.fetchall()
         cursor.close()
         cursor = None
     except cdrdb.Error, info:
-        bail('Failure retrieving summary section types from CDR: %s' 
+        cdrcgi.bail('Failure retrieving summary section types from CDR: %s' 
                 % info[1][0])
     html = """\
       <SELECT NAME='%s'>
