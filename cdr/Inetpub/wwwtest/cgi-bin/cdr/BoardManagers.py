@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: BoardManagers.py,v 1.1 2003-12-16 16:02:14 bkline Exp $
+# $Id: BoardManagers.py,v 1.2 2003-12-18 22:16:41 bkline Exp $
 #
 # Main menu for board managers.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2003/12/16 16:02:14  bkline
+# Main menu for board managers.
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
 
@@ -36,9 +39,9 @@ form = """\
 for choice in (
     ('GeneralReports.py', 'All General Reports'         ),
     ('CheckedOutDocs.py', 'Checked Out Documents Report'),
+    ('ActivityReport.py', 'Document Activity Report'    ),
     ('LinkedDocs.py',     'Linked Documents Report'     ),
-    ('UnchangedDocs.py',  'Unchanged Documents Report'  ),
-    ('ActivityReport.py', 'Document Activity Report'    )
+    ('UnchangedDocs.py',  'Unchanged Documents Report'  )
     ):
     form += """\
     <li><a href='%s/%s?%s'>%s</a></li>
