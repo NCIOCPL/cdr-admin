@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolReports.py,v 1.7 2003-03-06 20:54:03 bkline Exp $
+# $Id: ProtocolReports.py,v 1.8 2003-03-06 20:55:04 bkline Exp $
 #
 # Submenu for protocol reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.7  2003/03/06 20:54:03  bkline
+# Added back in two menu items which had disappeared.
+#
 # Revision 1.6  2003/03/04 22:46:58  bkline
 # Modifications for CDR enhancement request #301.
 #
@@ -74,7 +77,7 @@ reports = [
            ('Stub.py', 'Approved Protocols'),
            ('NewlyPublishedTrials.py', 'Newly Published Protocols'),
            ('Stub.py', 'Published Protocol Count'),
-           ('LiaisonReport.py', 'NCI Liaison Orrice/Brussels Protocol Report'),
+           ('LiaisonReport.py', 'NCI Liaison Office/Brussels Protocol Report'),
            ('PreMailerProtReport.py',
             'Pre-Mailer Protocol Check'),
            ('ApprovedNotYetActive.py',
