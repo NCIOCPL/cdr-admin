@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditFilter.py,v 1.2 2001-04-08 22:54:59 bkline Exp $
+# $Id: EditFilter.py,v 1.3 2001-06-13 20:15:39 bkline Exp $
 #
 # Prototype for editing CDR filter documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2001/04/08 22:54:59  bkline
+# Added Unicode mapping calls.
+#
 #
 #----------------------------------------------------------------------
 
@@ -53,7 +56,7 @@ def showForm(doc, subBanner, buttons):
     html = hdr + ("<CENTER><TEXTAREA NAME='Doc' ROWS='20' COLS='80'>%s"
                   "</TEXTAREA><INPUT TYPE='hidden' NAME='%s' VALUE='%s'>"
                   "</FORM></CENTER></BODY></HTML>"
-                  % (doc, cdrcgi.SESSION, session))
+                  % (doc.replace('\r', ''), cdrcgi.SESSION, session))
     cdrcgi.sendPage(html)
 
 #----------------------------------------------------------------------
