@@ -2,8 +2,11 @@
 #
 # Publishing CGI script.
 #
-# $Id: publishing.py,v 1.22 2003-02-07 21:15:53 pzhang Exp $
+# $Id: publishing.py,v 1.23 2003-06-19 19:37:08 bkline Exp $
 # $Log: not supported by cvs2svn $
+# Revision 1.22  2003/02/07 21:15:53  pzhang
+# Changed "reason +=" to "reason =".
+#
 # Revision 1.21  2002/11/20 16:57:15  pzhang
 # Added GroupEmailAddrs and extracted user email from usr table.
 #
@@ -206,7 +209,7 @@ class Display:
             # This is up to userselect element in the control document.
             # Will revisit this.
             docIdList = ""
-            for r in range(10):
+            for r in range(24):
                 form += "<TR>"
                 for i in range(5):
                     id = 10 * r + i
