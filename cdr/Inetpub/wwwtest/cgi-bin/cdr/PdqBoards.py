@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PdqBoards.py,v 1.4 2002-06-06 12:01:26 bkline Exp $
+# $Id: PdqBoards.py,v 1.5 2003-06-13 21:14:12 bkline Exp $
 #
 # Report on PDQ Board members and topics.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2002/06/06 12:01:26  bkline
+# Added calls to cdrcgi.unicodeToLatin1().
+#
 # Revision 1.3  2002/02/21 15:22:03  bkline
 # Added navigation buttons.
 #
@@ -65,7 +68,7 @@ def trim(s):
 # Build a picklist for Summary Audience.
 #----------------------------------------------------------------------
 def getAudiencePicklist():
-    picklist = "<SELECT NAME='Audience'><OPTION SELECTED>&nbsp;</OPTION>"
+    picklist = "<SELECT NAME='Audience'><OPTION SELECTED></OPTION>"
     try:
         cursor.execute("""\
 SELECT DISTINCT value
@@ -179,11 +182,14 @@ if audience and len(audience) > 1:
 if repType == 'ByTopic':
     instr     = 'Board report by topics -- %s.' % dateString
     header    = cdrcgi.header(title, title, instr, script, buttons)
+    audString = ""
+    if audience:
+        audString = "<BR>(%s)" % audience
     report    = """\
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
   </FORM>
-  <H4>Topics for %s</H4>
-""" % (cdrcgi.SESSION, session, boardName)
+  <H4>Topics for %s%s</H4>
+""" % (cdrcgi.SESSION, session, boardName, audString)
     try:
         cursor.execute("""\
 SELECT DISTINCT board_member.id, board_member.title,
@@ -240,11 +246,14 @@ instr     = 'Board report by members -- %s.' % dateString
 header    = cdrcgi.header(title, title, instr, script, buttons)
 members   = {}
 topics    = {}
+audString = ""
+if audience and audience <> u"\x00A0":
+    audString = "<BR>(%s)" % audience
 report    = """\
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
   </FORM>
-  <H4>Topics for %s</H4>
-""" % (cdrcgi.SESSION, session, boardName)
+  <H4>Topics for %s%s</H4>
+""" % (cdrcgi.SESSION, session, boardName, audString)
 
 #----------------------------------------------------------------------
 # Type for storing board member information.
@@ -314,9 +323,13 @@ keys = members.keys()
 keys.sort(lambda a, b: cmp(members[a].name, members[b].name))
 for key in keys:
     member = members[key]
-    report += """\
+    try:
+        report += """\
   <H4><FONT SIZE='-0'>%s [CDR%010d]</FONT></H4>
 """ % (member.name, member.id)
+    except:
+        cdrcgi.bail("member.name = " + member.name)
+        raise
     if member.topics:
         report += """\
   <UL>
@@ -333,4 +346,4 @@ for key in keys:
  </BODY>
 </HTML>
 """
-cdrcgi.sendPage(cdrcgi.unicodeToLatin1(header + report))
+cdrcgi.sendPage(header + report)
