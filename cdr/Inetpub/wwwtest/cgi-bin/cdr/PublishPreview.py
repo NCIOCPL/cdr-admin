@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: PublishPreview.py,v 1.19 2002-11-15 18:36:23 bkline Exp $
+# $Id: PublishPreview.py,v 1.20 2003-08-25 20:31:44 bkline Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.19  2002/11/15 18:36:23  bkline
+# Fixed typo (InScopePrototocol).
+#
 # Revision 1.18  2002/11/13 20:33:37  bkline
 # Plugged in filter sets.
 #
@@ -77,38 +80,8 @@ dbgLog  = fields.getvalue("DebugLog") or None
 #----------------------------------------------------------------------
 # Map for finding the filters for a given document type.
 #----------------------------------------------------------------------
-filters = {
-    'Summary':
-        ["name:Denormalization Filter (1/5): Summary",
-         "name:Denormalization Filter (2/5): Summary",
-         "name:Denormalization Filter (3/5): Summary",
-         "name:Denormalization Filter (4/5): Summary",
-         "name:Denormalization Filter (5/5): Summary",
-         "name:Denormalization Filter:(6/6)Summary",
-         "name:Summary-Add Citation Wrapper Data Element",
-         "name:Summary-Sort Citations by refidx",
-         "name:Vendor Filter: Summary"],
-    'GlossaryTerm':         
-        ["name:Glossary Term QC Report Filter"],
-    'Citation':         
-        ["name:Citation QC Report"],
-    'Organization':     
-        ["name:Denormalization Filter (1/1): Organization",
-         "name:Organization QC Report Filter"],
-    'Person':           
-        ["name:Denormalization Filter (1/1): Person",
-         "name:Person QC Report Filter"],
-    'InScopeProtocol':  
-        ["name:Denormalization Filter (1/1): InScope Protocol",
-         "name:Denormalization: sort OrganizationName for Postal Address",
-         "name:Vendor Filter: InScopeProtocol"],
-    'Term':             
-        ["name:Denormalization Filter (1/1): Terminology",
-         "name:Terminology QC Report Filter"]
-}
-
 filterSets = {
-    'Summary':           ['set:Vendor Summary Set'],
+    'Summary'        : ['set:Vendor Summary Set'],
     'InScopeProtocol': ['set:Vendor InScopeProtocol Set']
 }
 
