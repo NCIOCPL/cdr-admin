@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditFilter.py,v 1.12 2003-03-19 15:33:51 bkline Exp $
+# $Id: EditFilter.py,v 1.13 2003-03-19 17:43:42 bkline Exp $
 #
 # Prototype for editing CDR filter documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.12  2003/03/19 15:33:51  bkline
+# Added massive amounts of (conditional) debug logging to CVS processing.
+# Trying to track down failures which leave CVS lockfiles hanging around.
+#
 # Revision 1.11  2003/02/25 20:03:59  pzhang
 # Show edit feature only on Dev machine (MAHLER now).
 #
@@ -397,7 +401,9 @@ def doCvs(docId, doc, cvsid, cvspw, cvscomment, session):
             if not errorMessage:
                 debugLog("creating file %s.xml" % prodId)
                 try:
-                    open("%s.xml" % prodId, "wb").write(doc)
+                    f = open("%s.xml" % prodId, "wb")
+                    f.write(doc)
+                    f.close()
                 except Exception, info:
                     path = "%s/filt/%s.xml" % (abspath, prodId)
                     errorMessage = "failure creating %s: %s" % (path,
@@ -426,7 +432,9 @@ def doCvs(docId, doc, cvsid, cvspw, cvscomment, session):
             if not errorMessage:
                 debugLog("writing file %s.xml" % prodId)
                 try:
-                    open("%s.xml" % prodId, "wb").write(doc)
+                    f = open("%s.xml" % prodId, "wb")
+                    f.write(doc)
+                    f.close()
                 except:
                     path = "%s/filt/%s.xml" % (abspath, prodId)
                     errorMessage = "failure creating %s: %s" % (path,
@@ -506,8 +514,12 @@ elif request == 'Compare With':
         workDir = cdr.makeTempDir('diff')
     except StandardError, args:
         cdrcgi.bail("%s: %s" % (args[0], args[1]))
-    open(name1, "w").write(doc1.encode('latin-1', 'replace'))
-    open(name2, "w").write(doc2.encode('latin-1', 'replace'))
+    f1 = open(name1, "w")
+    f1.write(doc1.encode('latin-1', 'replace'))
+    f1.close()
+    f2 = open(name2, "w")
+    f2.write(doc2.encode('latin-1', 'replace'))
+    f2.close()
     result = cdr.runCommand(cmd)
     cleanup(workDir)
     report = cgi.escape(result.output)
