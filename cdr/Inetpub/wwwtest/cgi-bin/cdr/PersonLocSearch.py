@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PersonLocSearch.py,v 1.4 2002-05-08 17:41:50 bkline Exp $
+# $Id: PersonLocSearch.py,v 1.5 2002-05-24 18:02:11 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Person documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2002/05/08 17:41:50  bkline
+# Updated to reflect Volker's new filter names.
+#
 # Revision 1.3  2002/04/12 19:57:19  bkline
 # Installed new filters.
 #
@@ -52,12 +55,12 @@ if not submit:
                ('submit', 'HelpButton',   'Help'),
                ('reset',  'CancelButton', 'Clear'))
     page = cdrcgi.startAdvancedSearchPage(session,
-                                          "Person (with Locations) Search Form",
-                                          "PersonLocSearch.py",
-                                          fields,
-                                          buttons,
-                                          'Person',
-                                          conn)
+                          "Person (Locations in Result Display) Search Form",
+                          "PersonLocSearch.py",
+                          fields,
+                          buttons,
+                          'Person',
+                          conn)
     page += """\
   </FORM>
  </BODY>
