@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: BoardManagers.py,v 1.2 2003-12-18 22:16:41 bkline Exp $
+# $Id: BoardManagers.py,v 1.3 2003-12-19 18:29:08 bkline Exp $
 #
 # Main menu for board managers.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2003/12/18 22:16:41  bkline
+# Alphabetized first section at Volker's request (with Lakshmi's
+# concurrence).
+#
 # Revision 1.1  2003/12/16 16:02:14  bkline
 # Main menu for board managers.
 #
@@ -76,7 +80,7 @@ for choice in (
     ('PdqBoards.py',               'PDQ Board Listings'          ),
     ('SummaryCitations.py',        'Summaries Citations'         ),
     ('SummaryDateLastModified.py', 'Summaries Date Last Modified'),
-    ('Stub.py',                    'Summaries Lists'             ),
+    ('SummariesLists.py',          'Summaries Lists'             ),
     ('SummaryMetaData.py',         'Summaries Metadata'         )
     ):
     form += """\
