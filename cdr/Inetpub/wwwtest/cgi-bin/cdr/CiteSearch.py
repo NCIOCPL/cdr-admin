@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CiteSearch.py,v 1.10 2003-03-04 14:11:52 bkline Exp $
+# $Id: CiteSearch.py,v 1.11 2003-09-12 12:34:37 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Citation documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.10  2003/03/04 14:11:52  bkline
+# Added missing parameter for %s placeholder in failure message.
+#
 # Revision 1.9  2003/01/29 20:59:11  bkline
 # Added more obnoxious error message when citation import fails
 # validation.
@@ -263,7 +266,7 @@ searchFields = (cdrcgi.SearchField(title,
                             ("/Citation/PubmedArticle/MedlineCitation"
                              "/MedlineJournalInfo/MedlineTA",
                              "/Citation/PDQCitation/PublicationDetails"
-                             "/PublishedIn")),
+                             "/PublishedIn/@cdr:ref[int_val]")),
                 cdrcgi.SearchField(year,
                             ("/Citation/PDQCitation/PublicationDetails"
                              "/PublicationYear",
@@ -289,7 +292,7 @@ if not query:
 #----------------------------------------------------------------------
 try:
     cursor = conn.cursor()
-    cursor.execute(query)
+    cursor.execute(query, timeout = 300)
     rows = cursor.fetchall()
     cursor.close()
     cursor = None
