@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.17 2003-04-10 21:34:23 pzhang Exp $
+# $Id: QcReport.py,v 1.18 2003-05-08 20:25:24 bkline Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.17  2003/04/10 21:34:23  pzhang
+# Added Insertion/Deletion revision level feature.
+# Used filter set names for all filter sets.
+#
 # Revision 1.16  2003/04/02 21:21:15  pzhang
 # Added the filter to sort OrganizationName.
 #
@@ -75,7 +79,13 @@ docType  = fields.getvalue("DocType")    or None
 repType  = fields.getvalue("ReportType") or None
 docTitle = fields.getvalue("DocTitle")   or None
 version  = fields.getvalue("DocVersion") or None
-revLvls  = fields.getvalue("revLevels")  or None
+
+revLvls  = fields.getvalue("revLevels") or None
+if not revLvls:
+    revLvls = fields.getvalue('publish') and 'publish|' or '' 
+    revLvls += fields.getvalue('approved') and 'approved|' or ''
+    revLvls += fields.getvalue('proposed') and 'proposed' or '' 
+ 
 if not docId and not docType:
     cdrcgi.bail("No document specified", repTitle)
 if docId:
@@ -210,8 +220,16 @@ if docType == 'Summary' and repType and not version:
    <OPTION VALUE='%d'>[V%d %s] %s</OPTION>
 """ % (row[0], row[0], row[2][:10], row[1] or "[No comment]")
         selected = ""
-    cdrcgi.sendPage(header + form + """\
-  </SELECT>
+    form += "</SELECT>"
+    form += """
+  <BR><BR>
+  Select Insertion/Deletion markup to be displayed in the report (one or more):
+  <BR>
+  <INPUT TYPE="checkbox" NAME="publish">&nbsp;&nbsp; With publish attribute<BR>
+  <INPUT TYPE="checkbox" CHECKED='1' NAME="approved">&nbsp;&nbsp; With approved attribute<BR>
+  <INPUT TYPE="checkbox" NAME="proposed">&nbsp;&nbsp; With proposed attribute
+""" 
+    cdrcgi.sendPage(header + form + """  
  </BODY>
 </HTML>
 """)
@@ -380,9 +398,9 @@ if not filters.has_key(docType):
 </html>""" % (doc.ctrl['DocTitle'], cgi.escape(doc.xml))
     cdrcgi.sendPage(cdrcgi.unicodeToLatin1(html))
 
-filterParm = [['vendorOrQC', 'QC']]
+filterParm = []
 if revLvls:
-    filterParm.append(['revLevels', revLvls])    
+    filterParm = [['revLevels', revLvls]]   
 doc = cdr.filterDoc(session, filters[docType], docId = docId,
                     docVer = version or None, parm = filterParm)
 if type(doc) == type(()):
