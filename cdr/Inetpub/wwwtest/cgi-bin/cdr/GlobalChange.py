@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------
-# $Id: GlobalChange.py,v 1.15 2004-01-30 02:27:14 ameyer Exp $
+# $Id: GlobalChange.py,v 1.16 2004-02-19 15:33:29 ameyer Exp $
 #
 # Perform global changes on XML records in the database.
 #
@@ -14,6 +14,10 @@
 # present the next one - to the end.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.15  2004/01/30 02:27:14  ameyer
+# Added support for picking individual documents to process or not
+# by using checkboxes on the Will Change report.
+#
 # Revision 1.14  2003/11/18 17:16:16  ameyer
 # More changes for terminology.
 #
@@ -62,6 +66,10 @@
 # of global change.
 #
 #----------------------------------------------------------------------
+
+# Useful for testing, but for production, let's keep any tracebacks
+#  in the standard GlobalChange.log file
+# import cgitb; cgitb.enable()
 
 import cgi, time, string, cdr, cdrcgi, cdrglblchg, cdrbatch
 
