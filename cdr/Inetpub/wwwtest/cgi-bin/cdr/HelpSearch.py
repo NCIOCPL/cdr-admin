@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: HelpSearch.py,v 1.2 2002-04-05 14:00:19 bkline Exp $
+# $Id: HelpSearch.py,v 1.3 2002-05-03 20:29:49 bkline Exp $
 #
 # Duplicate-checking interface for Help (Documentation) documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/04/05 14:00:19  bkline
+# Added DocumentationTitle to keyword search.
+#
 # Revision 1.1  2002/02/22 02:18:58  bkline
 # Added advanced search page for Documentation documents.
 #
@@ -164,7 +167,7 @@ searchFields = (cdrcgi.SearchField(docType,
                             ("/Documentation/Metadata/Function",)),
                 cdrcgi.SearchField(keyword,
                             ("/Documentation/Metadata/Subject",
-                            ("/Documentation/Body/DocumentationTitle",)),
+                             "/Documentation/Body/DocumentationTitle",)),
                 cdrcgi.SearchField(infoType,
                             ("/Documentation/@InfoType",)))
 
@@ -193,7 +196,7 @@ except cdrdb.Error, info:
 # Create the results page.
 #----------------------------------------------------------------------
 html = cdrcgi.advancedSearchResultsPage("Documentation", rows, strings, 
-                                        'name:Terminology QC Report Filter')
+                                    'name:Documentation Help Screens Filter')
 
 #----------------------------------------------------------------------
 # Send the page back to the browser.
