@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: MiscSearch.py,v 1.2 2002-05-30 16:59:23 bkline Exp $
+# $Id: MiscSearch.py,v 1.3 2002-07-11 17:20:10 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Miscellaneous documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/05/30 16:59:23  bkline
+# New filters from Cheryl plugged in.
+#
 # Revision 1.1  2001/12/01 18:11:44  bkline
 # Initial revision
 #
@@ -96,7 +99,8 @@ searchFields = (cdrcgi.SearchField(title,
                             ("/MiscellaneousDocument"
                              "/MiscellaneousDocumentTitle",)),
                 cdrcgi.SearchField(type,
-                            ("/MiscellaneousDocument/MiscellaneousMetadata"
+                            ("/MiscellaneousDocument"
+                             "/MiscellaneousDocumentMetadata"
                              "/MiscellaneousDocumentType",)))
 
 #----------------------------------------------------------------------
