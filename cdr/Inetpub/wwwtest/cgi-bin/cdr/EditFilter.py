@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditFilter.py,v 1.6 2002-06-26 11:46:45 bkline Exp $
+# $Id: EditFilter.py,v 1.7 2002-07-29 19:23:37 bkline Exp $
 #
 # Prototype for editing CDR filter documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2002/06/26 11:46:45  bkline
+# Added option to version document.
+#
 # Revision 1.5  2001/12/01 17:58:54  bkline
 # Added support for checking the filter back in to the CDR.
 #
@@ -133,11 +136,11 @@ elif request in ('Save', 'Checkin'):
         docId = cdr.addDoc(session, doc=cdrcgi.encode(doc), checkIn = checkIn,
                            ver = ver)
     if docId.find("<Errors>") >= 0:
-        cdrcgi.bail(doc, banner)
+        cdrcgi.bail(docId, banner)
     else:
         doc = cdrcgi.decode(cdr.getDoc(session, docId))
         if doc.find("<Errors>") >= 0:
-            cdrcgi.bail(doc, banner)
+            cdrcgi.bail(docId, banner)
         if request == 'Save':
             buttons = ("Load", "Save", "Checkin", "Clone")
         else:
