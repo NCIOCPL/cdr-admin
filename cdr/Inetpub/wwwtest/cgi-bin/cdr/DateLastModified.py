@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: DateLastModified.py,v 1.1 2002-04-22 22:15:45 bkline Exp $
+# $Id: DateLastModified.py,v 1.2 2002-06-07 13:28:59 bkline Exp $
 #
 # Reports documents last modified during a specified time period.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2002/04/22 22:15:45  bkline
+# New report (Generic Date Last Modified).
+#
 #----------------------------------------------------------------------
 import cdr, cdrdb, cdrcgi, cgi, re, time, xml.dom.minidom
 
@@ -102,7 +105,7 @@ html = """\
  <body>
   <center>
    <b>
-    <font size='4'>New Documents Created In CDR</font>
+    <font size='4'>Date Last Modified Report</font>
    </b>
    <br />
    <b>
