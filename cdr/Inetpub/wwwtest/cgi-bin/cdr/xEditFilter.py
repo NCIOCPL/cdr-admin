@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: xEditFilter.py,v 1.1 2003-05-08 20:31:53 bkline Exp $
+# $Id: xEditFilter.py,v 1.2 2003-07-29 12:53:53 bkline Exp $
 #
 # Prototype for editing CDR filter documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2003/05/08 20:31:53  bkline
+# Peter decided to use this name instead.
+#
 # Revision 1.11  2003/02/25 20:03:59  pzhang
 # Show edit feature only on Dev machine (MAHLER now).
 #
@@ -42,6 +45,8 @@
 # Import required modules.
 #----------------------------------------------------------------------
 import cgi, cdr, cdrdb, os, re, cdrcgi, sys, tempfile, string, socket, time
+
+CVSROOT = "verdi.nci.nih.gov:/usr/local/cvsroot"
 
 #----------------------------------------------------------------------
 # Edit only on Dev machine.
@@ -105,8 +110,9 @@ def debugLog(what):
 # Display the CDR document form.
 #----------------------------------------------------------------------
 def showForm(doc, subBanner, buttons):
-    hdr = cdrcgi.header(title, banner, subBanner, "xEditFilter.py", buttons,
-            numBreaks = 1)
+    hdr = cdrcgi.header(title, banner, subBanner, "xEditFilter.py",
+                        buttons,
+                        numBreaks = 1)
     html = hdr + """\
    <input name='version' type='checkbox'%s>
    Create new version for Save, Checkin or Clone? 
@@ -338,7 +344,7 @@ def doCvs(docId, doc, cvsid, cvspw, cvscomment, session):
         doc = replaceId(doc, docId, prodId)
 
     # Set up cvs strings and directories
-    cvsroot = "-d:pserver:%s:%s@%s" % (cvsid, cvspw, cdr.CVSROOT)
+    cvsroot = "-d:pserver:%s:%s@%s" % (cvsid, cvspw, CVSROOT)
     debugLog("initializing CVS workspace: CVSROOT=%s" % cvsroot)
     if os.environ.has_key("TMP"):
         tempfile.tempdir = os.environ["TMP"]
