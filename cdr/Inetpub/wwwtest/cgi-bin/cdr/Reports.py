@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: Reports.py,v 1.18 2002-05-24 20:40:38 bkline Exp $
+# $Id: Reports.py,v 1.19 2003-02-13 23:03:01 pzhang Exp $
 #
 # Prototype for editing CDR linking tables.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.18  2002/05/24 20:40:38  bkline
+# Fixed misnamed variable (request changed to action).
+#
 # Revision 1.17  2002/05/24 20:37:31  bkline
 # New Report Menu structure implemented.
 #
@@ -93,6 +96,7 @@ reports = [
            ('GeographicReports.py', 'Geographic'),
            ('GlossaryTermReports.py', 'Glossary Terms'),
            ('MailerReports.py', 'Mailers'),
+           ('PubStatus.py', 'Publishing'),
            ('PersonAndOrgReports.py', 'Persons and Organizations'),
            ('ProtocolReports.py', 'Protocols'),
            ('SummaryAndMiscReports.py', 
