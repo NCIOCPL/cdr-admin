@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: Filter.py,v 1.19 2003-04-09 20:09:05 pzhang Exp $
+# $Id: Filter.py,v 1.20 2003-08-28 23:01:36 venglisc Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.19  2003/04/09 20:09:05  pzhang
+# Added feature to handle Insertion/Deletion with RevisionLevel.
+#
 # Revision 1.18  2003/03/04 21:32:23  pzhang
 # Fixed a bug introduced by using not-list for filter parameter
 # in filterDoc().
@@ -98,14 +101,14 @@ filtId  = [filtId0,
            fields.getvalue(cdrcgi.FILTER + "13", ""),
            fields.getvalue(cdrcgi.FILTER + "14", ""),
            fields.getvalue(cdrcgi.FILTER + "15", "")]
-revLevels = (fields.getvalue('publish') == 'true') and 'publish_' or '' 
-revLevels += (fields.getvalue('approved') == 'true') and 'approved_' or ''
-revLevels += (fields.getvalue('proposed') == 'true') and 'proposed_' or '' 
-revLevels += (fields.getvalue('rejected') == 'true') and 'rejected_' or ''
-revLevels += fields.getvalue('revLevels') or '' # revLevels from links.
+insRevLevels = (fields.getvalue('publish') == 'true') and 'publish_' or '' 
+insRevLevels += (fields.getvalue('approved') == 'true') and 'approved_' or ''
+insRevLevels += (fields.getvalue('proposed') == 'true') and 'proposed_' or '' 
+insRevLevels += (fields.getvalue('rejected') == 'true') and 'rejected_' or ''
+insRevLevels += fields.getvalue('insRevLevels') or '' # insRevLevels from links.
 vendorOrQC = (fields.getvalue('QC') == 'true') and 'QC' or ''
 vendorOrQC += fields.getvalue('vendorOrQC') or '' # vendorOrQC from links.
-filterParm = [['revLevels', revLevels]] # empty revLevels is expected.
+filterParm = [['insRevLevels', insRevLevels]] # empty insRevLevels is expected.
 if vendorOrQC:
     filterParm.append(['vendorOrQC', 'QC']) 
 
