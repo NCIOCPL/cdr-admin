@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditUser.py,v 1.2 2002-02-21 15:22:03 bkline Exp $
+# $Id: EditUser.py,v 1.3 2002-10-10 19:16:53 bkline Exp $
 #
 # Prototype for editing a CDR user.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/02/21 15:22:03  bkline
+# Added navigation buttons.
+#
 # Revision 1.1  2001/06/13 22:16:32  bkline
 # Initial revision
 #
@@ -51,7 +54,8 @@ if request == "Delete User":
                     "System actions have already been recorded for this user."\
                   % usrName
         cdrcgi.bail(error)
-    cdrcgi.mainMenu(session, "User %s Deleted Successfully" % usrName)
+    cdrcgi.navigateTo("EditUsers.py", session)
+    #cdrcgi.mainMenu(session, "User %s Deleted Successfully" % usrName)
 
 #----------------------------------------------------------------------
 # Handle request to store changes to the user.
