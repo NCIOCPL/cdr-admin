@@ -1,10 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditFilter.py,v 1.14 2003-09-16 19:14:56 bkline Exp $
+# $Id: EditFilter.py,v 1.15 2003-11-05 14:48:35 bkline Exp $
 #
 # Prototype for editing CDR filter documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.14  2003/09/16 19:14:56  bkline
+# Escaped blank filter template to work around bug in Mozilla.  Removed
+# hook to xEditFilter.py (added by Peter back in the spring for an
+# unspecified reason).
+#
 # Revision 1.13  2003/03/19 17:43:42  bkline
 # Modified file writing code to ensure timely file closing.
 #
@@ -89,6 +94,7 @@ version    = fields.getvalue('version')
 cvsid      = fields.getvalue('cvsid')
 cvspw      = fields.getvalue('cvspw')
 cvscomment = fields.getvalue('cvscomment')
+bachid     = fields.getvalue('bachid') or None
 logName    = "%s/cvs-filter.log" % cdr.DEFAULT_LOGDIR
 debugging  = 1
 if not session: cdrcgi.bail("Unable to log into CDR Server", banner)
@@ -128,6 +134,10 @@ def showForm(doc, subBanner, buttons):
     <tr>
      <td align=right nowrap=1>CVS comment:&nbsp;</td>
      <td><input name='cvscomment' value='%s' size=50></td>
+    </tr>
+    <tr>
+     <td align=right nowrap>Name change for Bach CDR ID (optional): &nbsp;</td>
+     <td><input name='bachid'></td>
     </tr>
    </table>
     (Fill in CVS user ID, password, and comment if you are 
@@ -251,6 +261,9 @@ def cvsCleanup(abspath, cvsroot = None):
 # Find id of document on production server; create doc if necessary.
 #----------------------------------------------------------------------
 def getProdId(docId, doc, session):
+    if bachid:
+        id = int(re.sub(r'[^\d]+', '', bachid))
+        return "CDR%010d" % id
     try:
         # Find out what the title is.
         id = int(re.sub(r'[^\d]+', '', docId))
