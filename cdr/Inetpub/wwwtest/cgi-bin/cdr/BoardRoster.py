@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: BoardRoster.py,v 1.3 2005-02-17 22:10:22 venglisc Exp $
+# $Id: BoardRoster.py,v 1.4 2005-02-19 04:08:13 bkline Exp $
 #
 # Report to display the Board Roster with or without assistant
 # information.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2005/02/17 22:10:22  venglisc
+# Added Board Manager's contact information at end of report (Bug 1527).
+#
 # Revision 1.2  2005/02/10 19:17:36  bkline
 # Converted from POST to GET form request; tightened up SQL query.
 #
@@ -178,8 +181,8 @@ class BoardMember:
     def __init__(self, docId, start, finish, name):
         self.id    = docId
         self.name  = cleanTitle(name)
-        self.isEic = (start and start >= BoardMember.now and
-                      (not finish or finish <= BoardMember.now))
+        self.isEic = (start and start <= BoardMember.now and
+                      (not finish or finish > BoardMember.now))
     def __cmp__(self, other):
         if self.isEic == other.isEic:
             return cmp(self.name.upper(), other.name.upper())
@@ -203,6 +206,7 @@ try:
             FROM query_term member
             JOIN query_term curmemb
               ON curmemb.doc_id = member.doc_id
+             AND LEFT(curmemb.node_loc, 4) = LEFT(member.node_loc, 4)
             JOIN query_term person
               ON person.doc_id = member.doc_id
             JOIN document person_doc
