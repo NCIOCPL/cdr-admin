@@ -1,10 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolStatusChange.py,v 1.2 2003-02-07 16:10:45 bkline Exp $
+# $Id: ProtocolStatusChange.py,v 1.3 2003-03-19 19:46:10 bkline Exp $
 #
 # Protocol Status Change Report
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2003/02/07 16:10:45  bkline
+# Fix and enhancement requested by Bugzilla #542: changed subset name
+# for Cancer.Gov publication to match Peter's new names; dropped rows
+# for Organizations with no previous protocol status.
+#
 #----------------------------------------------------------------------
 import cdr, cdrdb, cdrcgi, cgi, time, xml.dom.minidom
 
@@ -12,7 +17,8 @@ import cdr, cdrdb, cdrcgi, cgi, time, xml.dom.minidom
 # Get the parameters from the request.
 #----------------------------------------------------------------------
 repTitle = "Protocol Status Change Report"
-fields   = cgi.FieldStorage() or cdrcgi.bail("CGI Field Storage Not Found", repTitle)
+fields   = cgi.FieldStorage() or cdrcgi.bail("CGI Field Storage Not Found",
+                                             repTitle)
 session  = cdrcgi.getSession(fields) or cdrcgi.bail("Not logged in")
 action   = cdrcgi.getRequest(fields)
 title    = "CDR Administration"
@@ -20,7 +26,8 @@ section  = "QC Report"
 SUBMENU  = "Reports Menu"
 buttons  = ["Submit", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 script   = "ProtocolStatusChange.py"
-header   = cdrcgi.header(title, title, repTitle, script, buttons, method = 'GET')
+header   = cdrcgi.header(title, title, repTitle, script, buttons,
+                         method = 'GET')
 docId    = fields.getvalue(cdrcgi.DOCID) or None
 start    = fields.getvalue("start")      or None
 end      = fields.getvalue("end")        or None
@@ -73,13 +80,14 @@ if not action:
 #----------------------------------------------------------------------
 class ProtLeadOrg:
     def __init__(self, protId, curStatus, entryDate, enteredBy, prevStatus,
-                 published):
+                 published, protStatus):
         self.protId     = protId
         self.curStatus  = curStatus
         self.entryDate  = entryDate
         self.enteredBy  = enteredBy
         self.prevStatus = prevStatus
         self.published  = published
+        self.protStatus = protStatus
 
 #----------------------------------------------------------------------
 # If this is a lead org which is in scope (that is, the entry date
@@ -87,7 +95,7 @@ class ProtLeadOrg:
 # by start and end) then return a ProtLeadOrg object for it.  Otherwise
 # return None.
 #----------------------------------------------------------------------
-def extractProtLeadOrg(node, start, end, published):
+def extractProtLeadOrg(node, start, end, published, protStatus):
     protId     = None
     prevStatus = None
     curStatus  = None
@@ -122,7 +130,7 @@ def extractProtLeadOrg(node, start, end, published):
                             prevStatus = s
     if curStatus and entryDate and entryDate >= start and entryDate <= end:
         return ProtLeadOrg(protId, curStatus, entryDate, enteredBy, prevStatus,
-                           published)
+                           published, protStatus)
     """
     cdrcgi.bail(
 "curStatus=%s protId=%s entryDate=%s by=%s prevStatus=%s start=%s end=%s" %
@@ -189,8 +197,13 @@ try:
             dom = xml.dom.minidom.parseString(doc.encode('utf-8'))
         except:
             cdrcgi.bail("Failure parsing CDR%010d" % id)
+        statElems = dom.getElementsByTagName("CurrentProtocolStatus")
+        protStat = ""
+        if statElems:
+            protStat = cdr.getTextContent(statElems[0])
         for elem in dom.getElementsByTagName("ProtocolLeadOrg"):
-            protLeadOrg = extractProtLeadOrg(elem, start, end, published)
+            protLeadOrg = extractProtLeadOrg(elem, start, end, published,
+                                             protStat)
             if protLeadOrg:
                 #cdrcgi.bail("got one!")
                 key = (protLeadOrg.protId, id)
@@ -228,6 +241,7 @@ html = """\
     <th>DocID</th>
     <th>Previous Org Status</th>
     <th>Current Org Status</th>
+    <th>Current Protocol Status</th>
     <th>Entry Date</th>
     <th>Published</th>
     <th>Entered By</th>
@@ -248,6 +262,7 @@ for key in keys:
     <td valign='top'>CDR%010d</td>
     <td valign='top'>%s</td>
     <td valign='top'>%s</td>
+    <td valign='top'>%s</td>
     <td valign='top' align='center'>%s</td>
     <td valign='top' align='center'>%s</td>
     <td valign='top'>%s</td>
@@ -256,6 +271,7 @@ for key in keys:
        key[1],
        protLeadOrg.prevStatus,
        protLeadOrg.curStatus  or "&nbsp;",
+       protLeadOrg.protStatus or "&nbsp;",
        protLeadOrg.entryDate  or "&nbsp;",
        protLeadOrg.published,
        protLeadOrg.enteredBy  or "&nbsp;")
