@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtSearch.py,v 1.1 2001-12-01 18:11:44 bkline Exp $
+# $Id: ProtSearch.py,v 1.2 2002-02-14 19:35:51 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Protocol documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2001/12/01 18:11:44  bkline
+# Initial revision
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, cdrdb
 
@@ -112,9 +115,9 @@ except cdrdb.Error, info:
 # Create the results page.
 #----------------------------------------------------------------------
 html = cdrcgi.advancedSearchResultsPage("Protocol", rows, strings, 
-                                        {'InScopeProtocol':'CDR266310',
-                                         'OutOfScopeProtocol':'CDR266310',
-                                         'ScientificProtocolInfo':'CDR266310'})
+        {'InScopeProtocol':'name:Health Professional QC Content Report',
+         'OutOfScopeProtocol':'name:Health Professional QC Content Report',
+         'ScientificProtocolInfo':'name:Health Professional QC Content Report'})
 
 #----------------------------------------------------------------------
 # Send the page back to the browser.

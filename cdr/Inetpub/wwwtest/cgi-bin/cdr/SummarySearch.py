@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummarySearch.py,v 1.1 2001-12-01 18:11:44 bkline Exp $
+# $Id: SummarySearch.py,v 1.2 2002-02-14 19:35:24 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Summary documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2001/12/01 18:11:44  bkline
+# Initial revision
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, cdrdb
 
@@ -239,7 +242,7 @@ except cdrdb.Error, info:
 # Create the results page.
 #----------------------------------------------------------------------
 html = cdrcgi.advancedSearchResultsPage("Summary", rows, strings, 
-                                        "CDR190755")
+                    "name:Health Professional Summary Report")
 
 #----------------------------------------------------------------------
 # Send the page back to the browser.

@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PersonSearch.py,v 1.1 2001-12-01 18:11:44 bkline Exp $
+# $Id: PersonSearch.py,v 1.2 2002-02-14 19:38:41 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Person documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2001/12/01 18:11:44  bkline
+# Initial revision
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, cdrdb
 
@@ -135,7 +138,8 @@ except cdrdb.Error, info:
 #----------------------------------------------------------------------
 # Create the results page.
 #----------------------------------------------------------------------
-html = cdrcgi.advancedSearchResultsPage("Person", rows, strings, 'CDR266296')
+html = cdrcgi.advancedSearchResultsPage("Person", rows, strings, 
+        'name:Person QC Report Filter')
 
 #----------------------------------------------------------------------
 # Send the page back to the browser.

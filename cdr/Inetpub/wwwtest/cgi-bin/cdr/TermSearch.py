@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: TermSearch.py,v 1.1 2001-12-01 18:11:44 bkline Exp $
+# $Id: TermSearch.py,v 1.2 2002-02-14 19:34:52 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Term documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2001/12/01 18:11:44  bkline
+# Initial revision
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, cdrdb
 
@@ -158,7 +161,7 @@ except cdrdb.Error, info:
 # Create the results page.
 #----------------------------------------------------------------------
 html = cdrcgi.advancedSearchResultsPage("Term", rows, strings, 
-                                        'CDR266307')
+                                        'name:Terminology QC Report Filter')
 
 #----------------------------------------------------------------------
 # Send the page back to the browser.
