@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtSearch.py,v 1.2 2002-02-14 19:35:51 bkline Exp $
+# $Id: ProtSearch.py,v 1.3 2002-02-20 03:58:55 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Protocol documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/02/14 19:35:51  bkline
+# Replaced hardwired filter ID with filter name.
+#
 # Revision 1.1  2001/12/01 18:11:44  bkline
 # Initial revision
 #
@@ -19,7 +22,6 @@ session   = cdrcgi.getSession(fields)
 boolOp    = fields and fields.getvalue("Boolean")          or "AND"
 title     = fields and fields.getvalue("Title")            or None
 idNums    = fields and fields.getvalue("IdNums")           or None
-loPers    = fields and fields.getvalue("LeadOrgPersonnel") or None
 submit    = fields and fields.getvalue("SubmitButton")     or None
 help      = fields and fields.getvalue("HelpButton")       or None
 
@@ -39,8 +41,7 @@ except cdrdb.Error, info:
 #----------------------------------------------------------------------
 if not submit:
     fields = (('Title',                        'Title'),
-              ('Protocol ID Numbers',          'IdNums'),
-              ('Lead Organization Personnel',  'LeadOrgPersonnel'))
+              ('Protocol ID Numbers',          'IdNums'))
     buttons = (('submit', 'SubmitButton', 'Search'),
                ('submit', 'HelpButton',   'Help'),
                ('reset',  'CancelButton', 'Clear'))
@@ -66,27 +67,16 @@ searchFields = (cdrcgi.SearchField(title,
                              "/OutOfScopeProtocol/ProtocolTitle",
                              "/ScientificProtocolInfo/ProtocolTitle")),
                 cdrcgi.SearchField(idNums,
-                            ("/InScopeProtocol/IdentificationInfo"
-                             "/ProtocolPDQID",
-                             "/InScopeProtocol/IdentificationInfo"
-                             "/ProtocolIDs/PrimaryID/IDstring",
-                             "/InScopeProtocol/IdentificationInfo"
-                             "/ProtocolIDs/OtherID/IDstring",
-                             "/OutOfScopeProtocol/IdentificationInfo"
-                             "/ProtocolPDQID",
-                             "/OutOfScopeProtocol/IdentificationInfo"
-                             "/ProtocolIDs/PrimaryID/IDstring",
-                             "/OutOfScopeProtocol/IdentificationInfo"
-                             "/ProtocolIDs/OtherID/IDstring",
-                             "/ScientificProtocolInfo/IdentificationInfo"
-                             "/ProtocolPDQID",
-                             "/ScientificProtocolInfo/IdentificationInfo"
-                             "/ProtocolIDs/PrimaryID/IDstring",
-                             "/ScientificProtocolInfo/IdentificationInfo"
-                             "/ProtocolIDs/OtherID/IDstring")),
-                cdrcgi.SearchField(loPers,
-                            ("/InScopeProtocol/ProtocolAdminInfo"
-                             "/ProtocolLeadOrg/LeadOrgPersonnel/Person",)))
+                            ("/InScopeProtocol/ProtocolIDs/PrimaryID/IDString",
+                             "/InScopeProtocol/ProtocolIDs/OtherID/IDString",
+                             "/OutOfScopeProtocol"
+                             "/ProtocolIDs/PrimaryID/IDString",
+                             "/OutOfScopeProtocol"
+                             "/ProtocolIDs/OtherID/IDString",
+                             "/ScientificProtocolInfo"
+                             "/ProtocolIDs/PrimaryID/IDString",
+                             "/ScientificProtocolInfo"
+                             "/ProtocolIDs/OtherID/IDString")))
 
 #----------------------------------------------------------------------
 # Construct the query.
