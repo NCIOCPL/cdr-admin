@@ -2,8 +2,11 @@
 #
 # Publishing CGI script.
 #
-# $Id: publishing.py,v 1.5 2002-02-21 15:20:35 bkline Exp $
+# $Id: publishing.py,v 1.6 2002-02-22 16:36:40 pzhang Exp $
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2002/02/21 15:20:35  bkline
+# Added navigation buttons.
+#
 # Revision 1.4  2002/02/20 22:39:53  pzhang
 # Changed module publish to cdrpub.
 #
@@ -53,6 +56,8 @@ class Display:
         for r in publishes:
             form += "<LI><A HREF='%s/%s?%s=%s&ctrlId=%s'>%s</A></LI>\n" \
                 % (cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1], r[2])
+
+        form += HIDDEN % (cdrcgi.SESSION, session)   
         self.__addFooter(form)
 
     # Display the pick list of all subsets of a publishing system.
@@ -78,6 +83,8 @@ class Display:
             form += """<LI><A HREF='%s/%s?%s=%s&ctrlId=%s&SubSet=%s&DocParam="Flag"'>
                 %s</A></LI>\n""" % (cdrcgi.BASE, r[0], cdrcgi.SESSION, session, 
                 ctrlId, urllib.quote_plus(r[1]), r[2])
+
+        form += HIDDEN % (cdrcgi.SESSION, session)   
         self.__addFooter(form)
 
     # Display the pick list of parameters of a publishing subset.
@@ -137,9 +144,9 @@ class Display:
         form += "<LI><INPUT NAME='Confirm' TYPE='SUBMIT' "
         form += "VALUE='Confirm Publishing This SubSet'></LI>"
         form += "<BR><BR>\n"
-
+        
+        form += HIDDEN % (cdrcgi.SESSION, session)   
         self.__addFooter(form)
-
 
     # Display a confirmation page.
     def displayConfirm(self):
@@ -187,8 +194,9 @@ class Display:
         Messages only?
         <input type="checkbox" name="NoOutput" value="Y"><br><br>
         <input type="submit" name="Publish" value="Yes">&nbsp;&nbsp;
-        <input type="submit" name="Publish" value="No">"""
-        form += HIDDEN % (cdrcgi.SESSION, session)   
+        <input type="submit" name="Publish" value="No">""" 
+         
+        form += HIDDEN % (cdrcgi.SESSION, session)           
         cdrcgi.sendPage(header + form + "</FORM></BODY></HTML>")
     
     # Publish and return a link for checking status.
@@ -210,6 +218,7 @@ class Display:
                     """ % (cdrcgi.BASE, 'PubStatus.py', jobId,
                         "status of publishing job: %d" % jobId)
 
+        form += HIDDEN % (cdrcgi.SESSION, session)   
         self.__addFooter(form)
 
     # Display the status. Use Bob's PubStatus.py instead.
@@ -234,6 +243,7 @@ class Display:
             form += "<TD>%s</TD>" % row[i]
         form += "</TR></TABLE><BR></LI>"    
 
+        form += HIDDEN % (cdrcgi.SESSION, session)   
         self.__addFooter(form)
           
     def __addFooter(self, form):
@@ -241,16 +251,13 @@ class Display:
         form += """\
         <LI><A HREF="%s/Logout.py?%s=%s">%s</A></LI>
         </OL>
-        """ % (cdrcgi.BASE, cdrcgi.SESSION, session, "Log Out")
-        form += HIDDEN % (cdrcgi.SESSION, session)   
+        """ % (cdrcgi.BASE, cdrcgi.SESSION, session, "Log Out")      
         cdrcgi.sendPage(header + form + "</FORM></BODY></HTML>")
 
     def __initHiddenValues(self):
             
         form = ""
-        
-        if fields.has_key('Session'):
-            form += HIDDEN % ('Session', fields.getvalue('Session'))    
+   
         if fields.has_key('ctrlId'):
             form += HIDDEN % ('ctrlId', fields.getvalue('ctrlId'))                  
         if fields.has_key('SubSet'):
@@ -272,7 +279,7 @@ title   = "CDR Administration"
 section = "Publishing"
 buttons = [cdrcgi.MAINMENU]
 header  = cdrcgi.header(title, title, section, "Publishing.py", buttons)
-HIDDEN = """<INPUT TYPE='HIDDEN' NAME='%s' VALUE='%s'>"""
+HIDDEN = """<INPUT TYPE='HIDDEN' NAME='%s' VALUE='%s'>\n"""
 
 # !!! Disable standout in publish.py. !!!
 cdrpub.NCGI = 0
