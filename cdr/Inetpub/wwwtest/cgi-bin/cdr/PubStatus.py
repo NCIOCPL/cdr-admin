@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PubStatus.py,v 1.16 2004-09-27 16:51:00 venglisc Exp $
+# $Id: PubStatus.py,v 1.17 2005-01-24 19:29:59 venglisc Exp $
 #
 # Status of a publishing job.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.16  2004/09/27 16:51:00  venglisc
+# Modified header alignment of table to align left.
+#
 # Revision 1.15  2004/03/19 18:48:35  venglisc
 # Modified code to pick up document types (the rows of the statistics report)
 # from a database query instead of having them hard coded.
@@ -164,6 +167,10 @@ def dispJobStatus():
 # Add a table row for an published documents.
 #----------------------------------------------------------------------
 def addRow(row):  
+    # Replacing the ";" for the document title since this caused the 
+    # table formatting to be off due to too words that couldn't be 
+    # wrapped within the given column width.
+    # --------------------------------------------------------------
     return """\
    <tr>
     <td valign='top'><FONT COLOR='black'>%d</FONT></td>   
@@ -172,7 +179,7 @@ def addRow(row):
     <td valign='top'><FONT COLOR='black'>%s</FONT></td>
     <td valign='top'><FONT COLOR='black'>%s</FONT></td>   
    </tr>
-""" % (row[0], row[1], row[2], row[3], row[4])
+""" % (row[0], row[1], row[2], string.replace(row[3], ";", "; "), row[4])
 
 #----------------------------------------------------------------------
 # Display the filter failures: docId, docVer, docType, docTitle, Message.
@@ -230,11 +237,11 @@ def dispFilterFailures():
     html   += "<BR><TABLE BORDER=1>"
     html   += """\
    <tr>    
-    <td valign='top'><B>Id</B></td>   
-    <td valign='top'><B>Ver</B></td>   
-    <td valign='top'><B>Type</B></td>
-    <td valign='top'><B>Title</B></td>
-    <td valign='top'><B>Message</B></td> 
+    <td width='10%%' valign='top'><B>Id</B></td>   
+    <td width='5%%'  valign='top'><B>Ver</B></td>   
+    <td width='15%%' valign='top'><B>Type</B></td>
+    <td width='50%%' valign='top'><B>Title</B></td>
+    <td width='25%%' valign='top'><B>Message</B></td> 
     </tr>
 """ 
     html   += addRow(row)
