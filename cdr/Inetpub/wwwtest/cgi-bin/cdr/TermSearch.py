@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: TermSearch.py,v 1.3 2002-02-20 03:57:33 bkline Exp $
+# $Id: TermSearch.py,v 1.4 2003-08-25 20:25:54 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Term documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2002/02/20 03:57:33  bkline
+# Fixed bail() -> cdrcgi.bail().
+#
 # Revision 1.2  2002/02/14 19:34:52  bkline
 # Replaced hardwired filter ID with filter name.
 #
@@ -166,7 +169,7 @@ except cdrdb.Error, info:
 # Create the results page.
 #----------------------------------------------------------------------
 html = cdrcgi.advancedSearchResultsPage("Term", rows, strings, 
-                                        'name:Terminology QC Report Filter')
+                                        'set:QC Term Set')
 
 #----------------------------------------------------------------------
 # Send the page back to the browser.
