@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: HotfixReport.py,v 1.2 2004-05-17 14:29:30 bkline Exp $
+# $Id: HotfixReport.py,v 1.3 2004-06-02 14:59:10 bkline Exp $
 #
 # Report identifying previously published protocols that should be 
 # included in a hotfix.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2004/05/17 14:29:30  bkline
+# Bumped up timeout values; fixed typo in column header; added extra
+# blank worksheet; removed dead code.
+#
 # Revision 1.1  2004/05/11 17:49:27  bkline
 # Report identifying previously published protocols that should be
 # included in a hotfix.
@@ -50,6 +54,32 @@ conn = cdrdb.connect('CdrGuest')
 conn.setAutoCommit()
 cursor = conn.cursor()
 cursor.execute("""\
+    CREATE TABLE #t0
+             (id INTEGER     NOT NULL,
+             job INTEGER     NOT NULL,
+        doc_type VARCHAR(32) NOT NULL,
+   active_status CHAR        NOT NULL)""")
+cursor.execute("""\
+    INSERT INTO #t0
+         SELECT a.id, MAX(p.id), t.name, a.active_status
+           FROM all_docs a
+           JOIN doc_type t
+             ON a.doc_type = t.id
+           JOIN pub_proc_doc d
+             ON d.doc_id = a.id
+           JOIN pub_proc p
+             ON p.id = d.pub_proc
+          WHERE t.name IN ('InScopeProtocol', 'CTGovProtocol')
+            AND (d.failure IS NULL OR d.failure <> 'Y')
+            AND p.status = 'Success'
+            AND p.pub_system = (SELECT document.id
+                                  FROM document
+                                  JOIN doc_type
+                                    ON doc_type.id = document.doc_type
+                                 WHERE doc_type.name = 'PublishingSystem'
+                                   AND document.title = 'Primary')
+       GROUP BY a.id, t.name, a.active_status""", timeout = 300)
+cursor.execute("""\
     CREATE TABLE #t1
              (id INTEGER     NOT NULL,
              ver INTEGER     NOT NULL,
@@ -59,24 +89,11 @@ cursor.execute("""\
 """)
 cursor.execute("""\
     INSERT INTO #t1
-         SELECT d.doc_id, MAX(d.doc_version), t.name, all_docs.active_status,
-                d.removed
-           FROM pub_proc_doc d
-           JOIN pub_proc p
-             ON p.id = d.pub_proc
-           JOIN document pub_system
-             ON pub_system.id = p.pub_system
-           JOIN all_docs
-             ON all_docs.id = d.doc_id
-           JOIN doc_type t
-             ON t.id = all_docs.doc_type
-          WHERE t.name IN ('InScopeProtocol', 'CTGovProtocol')
-            AND pub_system.title = 'Primary'
-            AND (d.failure IS NULL
-             OR  d.failure <> 'Y')
-            AND p.status = 'Success'
-       GROUP BY d.doc_id, t.name, all_docs.active_status, d.removed""",
-               timeout = 300)
+         SELECT p.doc_id, p.doc_version, t.doc_type, t.active_status, p.removed
+           FROM pub_proc_doc p
+           JOIN #t0 t
+             ON p.doc_id = t.id
+            AND p.pub_proc = t.job""", timeout = 300)
 cursor.execute("CREATE TABLE #t2 (id INTEGER, ver INTEGER)")
 cursor.execute("""\
     INSERT INTO #t2
@@ -130,7 +147,7 @@ cursor.execute("""\
       JOIN doc_version v
         ON v.id = #t2.id
        AND v.num = #t2.ver
-     WHERE q.path = '/CTGovProtocol/IDInfo/SecondaryID'
+     WHERE q.path = '/CTGovProtocol/IDInfo/OrgStudyID'
        AND #t2.ver > #t1.ver
        AND #t1.active_status = 'A'
        AND #t1.doc_type = 'CTGovProtocol'""", timeout = 300)
@@ -147,7 +164,7 @@ cursor.execute("""\
         ON v.id = #t2.id
        AND v.num = #t2.ver
      WHERE q.path IN ('/InScopeProtocol/ProtocolIDs/PrimaryID/IDString',
-                      '/CTGovProtocol/IDInfo/SecondaryID')
+                      '/CTGovProtocol/IDInfo/OrgStudyID')
        AND #t1.active_status <> 'A'
        AND (#t1.removed IS NULL OR #t1.removed <> 'Y')""", timeout = 300)
 rows = cursor.fetchall()
