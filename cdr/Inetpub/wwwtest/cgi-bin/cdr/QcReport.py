@@ -1,11 +1,17 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.42 2005-02-23 20:00:35 venglisc Exp $
+# $Id: QcReport.py,v 1.43 2005-02-24 21:06:55 venglisc Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.42  2005/02/23 20:00:35  venglisc
+# Made changes to replace two @@..@@ strings with results from database
+# queries for the Organization QC report. (Bug 1516)
+# Some additional changes are included to address PublishPreview changes
+# which do not affect the Org reports.
+#
 # Revision 1.41  2004/12/01 23:56:12  venglisc
 # So far, a list of glossary terms used throughout a summary could only be
 # displayed at the end of a document for patient summaries.  These
@@ -555,6 +561,8 @@ def fixPersonReport(doc):
                     (row[0] > 0) and "Yes" or "No", doc)
     doc    = re.sub("@@CTGOV_PROTOCOLS@@",
                     (counts[4]) and "Yes" or "No", doc)
+    doc    = re.sub("@@SESSION@@",
+                    session, doc)
     return doc
 
 #----------------------------------------------------------------------
