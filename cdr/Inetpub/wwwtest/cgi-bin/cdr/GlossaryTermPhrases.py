@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermPhrases.py,v 1.2 2004-08-12 13:43:28 bkline Exp $
+# $Id: GlossaryTermPhrases.py,v 1.3 2004-08-26 14:08:58 bkline Exp $
 #
 # Report on phrases matching specified glossary term.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2004/08/12 13:43:28  bkline
+# Changes requested by Margaret (including ability to restrict the
+# report to search specified document types).
+#
 # Revision 1.1  2004/05/11 17:58:51  bkline
 # Report on phrases matching specified glossary term.
 #
@@ -115,6 +119,7 @@ def putUpSelection(rows):
    <INPUT TYPE='hidden' NAME='Email' VALUE='%s'>
    <INPUT TYPE='hidden' NAME='hp' VALUE='%s'>
    <INPUT TYPE='hidden' NAME='patient' VALUE='%s'>
+   <INPUT TYPE='hidden' NAME='trials' VALUE='%s'>
    <H3>Select term for report:<H3>
    <SELECT NAME='Id'>
     %s
@@ -122,7 +127,7 @@ def putUpSelection(rows):
   </FORM>
  </BODY>
 </HTML>
-""" % (cdrcgi.SESSION, session, email or "", hp or "", patient or "", options)
+""" % (cdrcgi.SESSION, session, email or "", hp or "", patient or "", trials or "", options)
     cdrcgi.sendPage(header + form)
     
 #----------------------------------------------------------------------
