@@ -2,8 +2,11 @@
 #
 # Publishing CGI script.
 #
-# $Id: publishing.py,v 1.16 2002-10-29 21:01:33 pzhang Exp $
+# $Id: publishing.py,v 1.17 2002-11-05 16:04:34 pzhang Exp $
 # $Log: not supported by cvs2svn $
+# Revision 1.16  2002/10/29 21:01:33  pzhang
+# Called cdr.publish() with parameter allowInActive for Hotfix-Remove.
+#
 # Revision 1.15  2002/10/21 15:42:55  pzhang
 # Increased number of Hotfix DocIds from 25 to 50.
 #
@@ -99,21 +102,21 @@ class Display:
         for s in pickList:
             pubsys[1] = "%s" % s[1]
             pubsys[2] = "%s" % s[2]
-            pubsys[3] = "%s [Version %s]<BR>[%s]" % (s[0], s[2], s[3])            
+            pubsys[3] = "%s [Version %s]:&nbsp;&nbsp;%s" % (s[0], s[2], s[3])            
             deep = copy.deepcopy(pubsys)
             publishes.append(deep)
         if type(publishes) == type(""): cdrcgi.bail(publishes)    
 
         form = "<H4>Publication Types</H4>\n"
         form += "<OL>\n"
-        form += "<LI><A HREF='%s/%s?id=1&%s=%s&type=Manage'>%s</A>\
+        form += "<LI><A href='%s/%s?id=1&%s=%s&type=Manage'>%s</A>\
                      </LI>\n" % (cdrcgi.BASE, "PubStatus.py", cdrcgi.SESSION,
                      session, "Manage Publishing Job Status")
 
         for r in publishes:
             if r[3][0:7] == "Mailers":
                 continue
-            form += "<LI><A HREF='%s/%s?%s=%s&ctrlId=%s&version=%s'>%s</A>\
+            form += "<LI><A href='%s/%s?%s=%s&ctrlId=%s&version=%s'>%s</A>\
                      </LI>\n" % (cdrcgi.BASE, r[0], cdrcgi.SESSION, session, 
                      r[1], r[2], r[3])
 
@@ -130,9 +133,10 @@ class Display:
         for s in pickList:
             subset[1] =  s[1] 
             subset[2] = s[1]
-            subset[2] += "<BR>[Desc]: &nbsp;"  + s[2]
+            subset[2] += ":&nbsp;&nbsp;"  + s[2]
             #subset[2] += "<BR>[Params]: &nbsp;" + s[3]             
-            #subset[2] += "<BR>[UserSel]: &nbsp;"  + s[4]            
+            #subset[2] += "<BR>[UserSel]: &nbsp;"  + s[4]  
+            subset[2] += "<BR><BR>"            
             subset[3] = s[3] and 'Param=Yes' or ''                        
             if s[4]:
                 subset[3] += '&Doc=Yes'
@@ -143,12 +147,12 @@ class Display:
             subsets.append(deep)
         if type(subsets) == type(""): cdrcgi.bail(subsets)    
 
-        form = "<H4>Publishing Subsets of %s</H4>\n" % sysName
+        form = "<H4>Publishing Subsets of System: %s</H4>\n" % sysName
         form += "<OL>\n"
 
         for r in subsets:
             form += """<LI><A 
-                HREF='%s/%s?%s=%s&ctrlId=%s&version=%s&SubSet=%s&%s'>
+                href='%s/%s?%s=%s&ctrlId=%s&version=%s&SubSet=%s&%s'>
                 %s</A></LI>\n""" % (cdrcgi.BASE, r[0], cdrcgi.SESSION, 
                 session, ctrlId, version, urllib.quote_plus(r[1]), r[3], r[2])
 
@@ -168,13 +172,13 @@ class Display:
         # Initialize hidden values.
         form = self.__initHiddenValues()  
         
-        form += "<H4>User Selected Documents and Parameters for Subset %s \
+        form += "<H4>User Selected Documents and Parameters for Subset: %s \
                  </H4>\n" % SubSet 
         form += "<OL>\n"
         
         # UserSelect is allowed.
         if Doc:
-            form += "<LI><H5>Enter Publishable Document Id/Version [e.g. \
+            form += "<LI><H5>Enter publishable document Id/Version [e.g.,\
                      190930 or 190930/3]: </H5></LI>\n"
             form += "<TABLE BORDER='1'>"
         
@@ -205,9 +209,9 @@ class Display:
                 deep = copy.deepcopy(param)
                 params.append(deep) 
 
-            form += "<LI><H5>Modify Default Parameter Values: </H5>\n"
-            form += "<TABLE BORDER='1'><TR><TD>Name</TD><TD>Default "               
-            form += "Value</TD>\n<TD>New Value</TD></TR>\n"
+            form += "<LI><H5>Modify default parameter values: </H5>\n"
+            form += "<TABLE BORDER='1'><TR><TD><B>Name</B></TD><TD><B>"               
+            form += "Default Value</B></TD><TD><B>New Value</B></TD></TR>\n"
         
             paramList = ""
             for r in params:
@@ -271,17 +275,17 @@ class Display:
         form += HIDDEN % ('Documents', docIdValues)    
 
         # Display message.
-        form += "<H4>Publishing System Confirmation</H4>\n" 
-        form += "<p>Do you want to publish subset: %s? <BR><BR>\n" \
-             % fields.getvalue('SubSet')
-        # form += "of system %s?</p>\n" % fields.getvalue('PubSys')
+        form += "<H4>Publishing System Confirmation</H4>\n"  
         form += """Email notification of completion?
         <input type="checkbox" checked name="Email" value="y">&nbsp;&nbsp;
-        <BR> Use comma to separate recipients: &nbsp
-        <input type="text" size="50" name="EmailAddr" 
-        value="***REMOVED***"><br><br>Messages only?
-        <input type="checkbox" name="NoOutput" value="Y"><br><br>
-        <input type="submit" name="Publish" value="Yes">&nbsp;&nbsp; """      
+        <BR> Email to [use comma or semicolon between addresses]: &nbsp
+        <input type="text" size="100" name="EmailAddr" 
+        value="***REMOVED***"><br><br>Messages only [no document files
+        created]?<input type="checkbox" name="NoOutput" value="Y"><br><br>"""
+        form += "<p>Do you want to publish the subset: %s? <BR><BR>\n" \
+             % fields.getvalue('SubSet')
+        # form += "of system %s?</p>\n" % fields.getvalue('PubSys')
+        form += """<input type="submit" name="Publish" value="Yes">"""      
          
         form += HIDDEN % (cdrcgi.SESSION, session)           
         cdrcgi.sendPage(header + form + "</FORM></BODY></HTML>")
@@ -307,8 +311,9 @@ class Display:
             form += "<B>Failed:</B> %s\n" % resp[1]
         else:
             form += "<B>Started:</B> "            
-            form += "Check the <A HREF='%s/%s?id=%s'>%s</A>\n" % (cdrcgi.BASE, 
-                'PubStatus.py', jobId, "status of publishing job: %s" % jobId)
+            form += "<A style='text-decoration: underline;' \
+                    href='%s/%s?id=%s'>%s</A>\n" % (cdrcgi.BASE, 'PubStatus.py', 
+                    jobId, "Check the status of publishing job: %s" % jobId)
 
         form += HIDDEN % (cdrcgi.SESSION, session)   
         self.__addFooter(form)

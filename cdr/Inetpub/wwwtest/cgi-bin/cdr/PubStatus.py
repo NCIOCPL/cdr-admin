@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PubStatus.py,v 1.7 2002-09-11 21:11:18 pzhang Exp $
+# $Id: PubStatus.py,v 1.8 2002-11-05 16:04:34 pzhang Exp $
 #
 # Status of a publishing job.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.7  2002/09/11 21:11:18  pzhang
+# Displayed the top 500 document infor for each type.
+#
 # Revision 1.6  2002/08/20 15:58:04  pzhang
 # Checked session validity before killing or resuming.
 #
@@ -69,7 +72,8 @@ def dispJobStatus(jobId):
 
     title   = "CDR Publishing Job Status" 
     instr   = "Job Number %d" % jobId
-    setting = """[<A href="pubstatus.py?id=%d&type=Setting">Job settings
+    setting = """[<A style="text-decoration: underline;" href=
+                "pubstatus.py?id=%d&type=Setting">Job settings
                  </A>]""" % jobId
     buttons = []
     header  = cdrcgi.header(title, title, instr, None, buttons)
