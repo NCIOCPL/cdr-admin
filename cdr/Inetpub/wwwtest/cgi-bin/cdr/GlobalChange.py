@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------
-# $Id: GlobalChange.py,v 1.7 2002-11-20 00:45:35 ameyer Exp $
+# $Id: GlobalChange.py,v 1.8 2002-11-21 14:00:42 bkline Exp $
 #
 # Perform global changes on XML records in the database.
 #
@@ -14,6 +14,10 @@
 # present the next one - to the end.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.7  2002/11/20 00:45:35  ameyer
+# Added interface to query user for Principal Investigator if a Lead Org
+# restriction is imposed.
+#
 # Revision 1.6  2002/11/13 02:39:07  ameyer
 # Added support for multiple email addresses.
 #
@@ -362,7 +366,7 @@ if not email:
         # Get current user's email address
         usrObj = cdr.getUser (session, resp[0])
         if type(usrObj)==type("") or type(usrObj)==type(u""):
-            cdrcgi.bail ("Error fetching email address: %s", resp)
+            cdrcgi.bail ("Error fetching email address: %s" % usrObj)
         email = usrObj.email
     except:
         cdrcgi.bail ("Unable to fetch email address")
