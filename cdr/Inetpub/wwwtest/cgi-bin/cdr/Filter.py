@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: Filter.py,v 1.13 2002-09-24 20:12:28 pzhang Exp $
+# $Id: Filter.py,v 1.14 2002-09-24 20:59:52 pzhang Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.13  2002/09/24 20:12:28  pzhang
+# Added DocVersion to the page.
+#
 # Revision 1.12  2002/09/20 16:24:24  pzhang
 # Added 8 more input boxes to allow 15 filters.
 #
@@ -54,6 +57,11 @@ fields  = cgi.FieldStorage() or cdrcgi.bail("No Request Found", title)
 session = 'guest'
 docId   = fields.getvalue(cdrcgi.DOCID) or cdrcgi.bail("No Document", title)
 docVer  = fields.getvalue('DocVer') or cdrcgi.bail("No Doc Version", title)
+docVers = cdr.lastVersions('guest', docId)
+if docVer == 'last':
+    docVer = '%d' % docVers[0]
+elif docVer == 'lastp':
+    docVer = '%d' % docVers[1]    
 filtId0 = fields.getvalue(cdrcgi.FILTER)
 if not fields.getvalue('qcFilterSets'):
     filtId0 or cdrcgi.bail("No Filter", title)
