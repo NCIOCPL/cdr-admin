@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------
-# $Id: GlobalChange.py,v 1.9 2003-03-27 18:30:50 ameyer Exp $
+# $Id: GlobalChange.py,v 1.10 2003-07-29 20:05:36 ameyer Exp $
 #
 # Perform global changes on XML records in the database.
 #
@@ -14,6 +14,10 @@
 # present the next one - to the end.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.9  2003/03/27 18:30:50  ameyer
+# Major refactoring of the program to work with a more scriptable logic
+# and to handle a new, fourth type of global change.
+#
 # Revision 1.8  2002/11/21 14:00:42  bkline
 # Fixed bug in call to cdrcgi.bail().
 #
@@ -78,9 +82,12 @@ def sendGlblChgPage (parms):
     header = parms[0]
     formContent = parms[1]
     if len (parms) > 2:
+        # Passed buttons
         buttons=parms[2]
-    else:
-        buttons = None
+
+    if buttons == None:
+        # Default buttons if none (or None) passed
+        buttons = (('submit', 'Submit'), ('cancel', 'Cancel'))
 
     # Create an overall header using the common header code
     html = cdrcgi.header ("CDR Global Change", "CDR Global Change",
@@ -95,10 +102,6 @@ def sendGlblChgPage (parms):
 
     # Add form contents
     html += formContent
-
-    # Construct default buttons
-    if not buttons:
-        buttons = (('submit', 'Submit'), ('cancel', 'Cancel'))
 
     # Button table
     html += "<p><p><table border='0' align='center'>\n <tr>\n"
@@ -159,7 +162,8 @@ if fields.getvalue ("cancel", None):
 ssVars = {}
 ssVars[cdrcgi.SESSION] = session
 
-# Get all relevant fields that are saved as state in the system
+# Get all relevant fields that can be saved as state in the system
+# Not all of these will be present
 for fd in ('docType', 'email', 'specificPhone', 'specificRole',
                 'coopType', 'coopChk',
            'fromId', 'fromName', 'fromTitle', 'fromFragChk',
@@ -170,7 +174,26 @@ for fd in ('docType', 'email', 'specificPhone', 'specificRole',
            'insertPersId', 'insertPersName', 'insertPersTitle',
                 'insertPersFragChk',
            'insertOrgId', 'insertOrgName', 'insertOrgTitle',
-           'fromStatusName', 'toStatusName'):
+           'fromStatusName', 'toStatusName',
+           'trmReqField0', 'trmReqVal0', 'termReqId0',
+           'trmReqField1', 'trmReqVal1', 'termReqId1',
+           'trmReqField2', 'trmReqVal2', 'termReqId2',
+           'trmReqField3', 'trmReqVal3', 'termReqId3',
+           'trmReqField4', 'trmReqVal4', 'termReqId4',
+           'trmOptField0', 'trmOptVal0', 'termOptId0',
+           'trmOptField1', 'trmOptVal1', 'termOptId1',
+           'trmOptField2', 'trmOptVal2', 'termOptId2',
+           'trmOptField3', 'trmOptVal3', 'termOptId3',
+           'trmOptField4', 'trmOptVal4', 'termOptId4',
+           'trmNotField0', 'trmNotVal0', 'termNotId0',
+           'trmNotField1', 'trmNotVal1', 'termNotId1',
+           'trmNotField2', 'trmNotVal2', 'termNotId2',
+           'trmNotField3', 'trmNotVal3', 'termNotId3',
+           'trmNotField4', 'trmNotVal4', 'termNotId4',
+           'trmDelField0', 'trmDelVal0', 'termDelId0',
+           'trmDelField1', 'trmDelVal1', 'termDelId1',
+           'trmAddField0', 'trmAddVal0', 'termAddId0',
+           'trmAddField1', 'trmAddVal1', 'termAddId1'):
     fdVal = fields.getvalue (fd, None)
     if fdVal:
         # If it's an Id type, normalize it to standard CDR000... form
@@ -207,11 +230,15 @@ if not chgType:
   Insert new organization link in protocols</input>
 </td></tr><tr><td>
 <input type='radio' name='chgType' value='%s'>
+  Modify terminology in protocols</input>
+</td></tr><tr><td>
+<input type='radio' name='chgType' value='%s'>
   Change status of protocol site</input>
 </td></tr>
 </table>
 """ % (cdrglblchg.PERSON_CHG, cdrglblchg.ORG_CHG,
-       cdrglblchg.INS_ORG_CHG, cdrglblchg.STATUS_CHG)
+       cdrglblchg.INS_ORG_CHG, cdrglblchg.TERM_CHG,
+       cdrglblchg.STATUS_CHG)
 
     sendGlblChgPage (("Choose type of change to perform", html))
 
