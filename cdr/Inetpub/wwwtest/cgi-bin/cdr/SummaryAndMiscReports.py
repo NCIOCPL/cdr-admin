@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryAndMiscReports.py,v 1.9 2003-08-01 21:02:49 bkline Exp $
+# $Id: SummaryAndMiscReports.py,v 1.10 2004-03-05 21:47:44 venglisc Exp $
 #
 # Submenu for summary and miscellanous document reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.9  2003/08/01 21:02:49  bkline
+# Plugged in Summary Metadata report.
+#
 # Revision 1.8  2003/06/13 20:31:17  bkline
 # Suppressed menu item for "Changes to Summaries" report at Margaret's
 # request.
@@ -66,16 +69,19 @@ if action == "Log Out":
 form = """\
     <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
     <H3>QC Reports</H3>
-    <H4>Health Professional/Old Format Patient Summaries</H4>
+    <H4>Summary QC Reports</H4>
     <OL>
 """ % (cdrcgi.SESSION, session)
 reports = [
+           # ('Stub.py?', 'Changes to Summaries')
            ('QcReport.py?DocType=Summary&ReportType=bu&', 
-            'Bold/Underline QC Report'),
-           ('QcReport.py?DocType=Summary&ReportType=nm&', 
-            'No Markup QC Report'),
+            'Bold/Underline (HP/Old Patient)'),
            ('QcReport.py?DocType=Summary&ReportType=rs&', 
-            'Redline/Strikeout QC Report')
+            'Redline/Strikeout (HP/Old Patient)'),
+           ('QcReport.py?DocType=Summary&ReportType=pat&', 
+            'New Patient')
+           # ('QcReport.py?DocType=Summary&ReportType=nm&', 
+           #  'No Markup QC Report')
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s%s=%s'>%s</LI>\n" % (
@@ -83,26 +89,12 @@ for r in reports:
 
 form += """\
     </OL>
-    <H4>New Format Patient Summaries</H4>
+    <H4>Miscellaneous Document QC Report</H4>
     <OL>
 """
 reports = [
-           ('QcReport.py?DocType=Summary&ReportType=rs&', 
-            'Redline/Strikeout QC Report'),
-           ('QcReport.py?DocType=Summary&ReportType=nm&', 
-            'No Markup QC Report')
-          ]
-for r in reports:
-    form += "<LI><A HREF='%s/%s%s=%s'>%s</LI>\n" % (
-            cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
-
-form += """\
-    </OL>
-    <H4>Miscellaneous Documents</H4>
-    <OL>
-"""
-reports = [
-           ('MiscSearch.py?', 'Miscellaneous Documents QC Report')
+           ('MiscSearch.py?', 
+            'Miscellaneous Documents QC Report')
           ]
 for r in reports:
     # Careful!  The pattern in the HREF='...' below is intentionally
@@ -112,16 +104,23 @@ for r in reports:
 
 form += """\
     </OL>
-    <H4>Management Reports</H4>
+    <H4>Management QC Reports</H4>
     <OL>
 """
 reports = [
            # ('Stub.py?', 'Changes to Summaries'),
-           ('SummaryChanges.py?', 'History of Changes to Summary'),
-           ('PdqBoards.py?', 'PDQ Board Listings'),
-           ('SummaryCitations.py?', 'Summaries Citation'),
-           ('SummaryDateLastModified.py?', 'Summaries Date Last Modified'),
-           ('SummaryMetaData.py?', 'Summary Metadata'),
+           ('SummaryChanges.py?', 
+            'History of Changes to Summary'),
+           ('PdqBoards.py?', 
+            'PDQ Board Listings'),
+           ('SummaryCitations.py?', 
+            'Summaries Citation'),
+           ('SummaryDateLastModified.py?', 
+            'Summaries Date Last Modified'),
+           ('SummariesLists.py?',
+            'Summaries Lists'),
+           ('SummaryMetaData.py?', 
+            'Summary Metadata'),
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s%s=%s'>%s</LI>\n" % (
