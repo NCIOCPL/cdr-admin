@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: Reports.py,v 1.9 2002-03-14 04:01:10 bkline Exp $
+# $Id: Reports.py,v 1.10 2002-03-21 20:01:15 bkline Exp $
 #
 # Prototype for editing CDR linking tables.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.9  2002/03/14 04:01:10  bkline
+# Added New Doc Report.
+#
 # Revision 1.8  2002/03/13 16:58:25  bkline
 # Added dated actions report.
 #
@@ -59,12 +62,14 @@ reports = [
            ('CheckedOutDocs.py', 'Checked Out Documents'),
            ('ConceptTermReviewReport.py', 'Concept/Term Review Report'),
            ('DatedActions.py', 'Dated Actions'),
+           ('GlossaryTermLinks.py', 'Glossary Term Links Report'),
            ('CdrReport.py', 'Inactive Documents'),
            ('CheckUrls.py', 'Inactive Hyperlinks'),
            ('LinkedDocs.py', 'Linked Documents'),
            ('ModifiedPubMedDocs.py', 'Modified PubMed Documents'),
            ('NewDocReport.py', 'New Documents'),
            ('PdqBoards.py', 'PDQ Boards'),
+           ('PersonsAtOrg.py', 'Persons Practicing At Orgs'),
            ('TermUsage.py', 'Term Usage'),
            ('UnchangedDocs.py', 'Unchanged Documents'),
            ('UnverifiedCitations.py', 'Unverified Citations')
