@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditFilter.py,v 1.8 2002-09-07 13:14:25 bkline Exp $
+# $Id: EditFilter.py,v 1.9 2002-09-13 11:36:50 bkline Exp $
 #
 # Prototype for editing CDR filter documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.8  2002/09/07 13:14:25  bkline
+# Added auto-cvs to filter editing.
+#
 # Revision 1.7  2002/07/29 19:23:37  bkline
 # Fixed some bail() calls (had wrong first arg.
 #
@@ -72,32 +75,33 @@ if not request: cdrcgi.bail("No request submitted", banner)
 #----------------------------------------------------------------------
 def showForm(doc, subBanner, buttons):
     hdr = cdrcgi.header(title, banner, subBanner, "EditFilter.py", buttons)
-    verField = "<INPUT NAME='version' TYPE='checkbox'%s>&nbsp;" \
-               "Create new version for Save, Checkin, or Clone<BR><BR>" % (
-               version and " CHECKED" or "")
     html = hdr + """\
-    <input name='version' type='checkbox'%s>
-    Create new version for Save, Checkin or Clone? 
-    <table border=0>
-     <tr>
-      <td align='right' nowrap=1>CVS user ID:&nbsp;</td>
-      <td><input name='cvsid' value='%s'></td>
-     </tr>
-     <tr>
-      <td align='right' nowrap=1>CVS password:&nbsp;</td>
-      <td><input type='password' name='cvspw' value='%s'></td>
-     </tr>
-     <tr>
-      <td align=right nowrap=1>CVS comment:&nbsp;</td>
-      <td><input name='cvscomment' value='%s' size=50></td>
-     </tr>
-    </table>
-     (Fill in CVS user ID, password, and comment if you are 
-      creating a new version.)
-    <br>
-    <br>
-    <textarea name='Doc' rows='20' cols='80'>%s</textarea>
+   <input name='version' type='checkbox'%s>
+   Create new version for Save, Checkin or Clone? 
+   <table border=0>
+    <tr>
+     <td align='right' nowrap=1>CVS user ID:&nbsp;</td>
+     <td><input name='cvsid' value='%s'></td>
+    </tr>
+    <tr>
+     <td align='right' nowrap=1>CVS password:&nbsp;</td>
+     <td><input type='password' name='cvspw' value='%s'></td>
+    </tr>
+    <tr>
+     <td align=right nowrap=1>CVS comment:&nbsp;</td>
+     <td><input name='cvscomment' value='%s' size=50></td>
+    </tr>
+   </table>
+    (Fill in CVS user ID, password, and comment if you are 
+     creating a new version.)
+   <br>
+   <br>
+   <textarea name='Doc' rows='20' cols='80'>%s</textarea>
    <input type='hidden' name='%s' value='%s'>
+   <br>
+   <br>
+   <input type='submit' name='%s' value='Compare With'>&nbsp;&nbsp;
+   <input name='DiffWith' value='bach'>
   </form>
  </body>
 </html>
@@ -107,14 +111,62 @@ def showForm(doc, subBanner, buttons):
        cvscomment and cgi.escape(cvscomment, 1) or '',
        doc.replace('\r', ''),
        cdrcgi.SESSION,
-       session)
+       session,
+       cdrcgi.REQUEST)
     cdrcgi.sendPage(html)
 
+#----------------------------------------------------------------------
+# Don't leave dross around if we can help it.
+#----------------------------------------------------------------------
+def cleanup(abspath):
+    try:
+        os.chdir("..")
+        runCommand("rm -rf %s" % abspath)
+    except:
+        pass
+
+#----------------------------------------------------------------------
+# Fetch a document by title for a specified server.
+#----------------------------------------------------------------------
+def getFilterXml(title, server = 'localhost'):
+    filters = ['name:Fast Denormalization Filter With Indent']
+    try:
+        conn = cdrdb.connect('CdrGuest', server)
+        cursor = conn.cursor()
+        cursor.execute("""\
+                SELECT d.xml
+                  FROM document d
+                  JOIN doc_type t
+                    ON t.id = d.doc_type
+                 WHERE t.name = 'Filter'
+                   AND d.title = ?""", title)
+        rows = cursor.fetchall()
+        if not rows:
+            cdrcgi.bail("Cannot find filter '%s' on %s" %
+                    (cgi.escape(title), server))
+        if len(rows) > 1:
+            cdrcgi.bail("Ambiguous filter document title '%s' on %s" %
+                    (cgi.escape(title), server))
+        return rows[0][0].replace('\r', '')
+                
+        """
+        doc = rows[0][0].encode('utf-8')
+        doc = cdr.filterDoc('guest', filters, doc = doc, host = 'mahler')
+        if not doc[0]:
+            cdrcgi.bail("Failure filtering '%s' %s" %
+                    (cgi.escape(title), doc[1]))
+        return unicode(doc[0], 'utf-8').replace('\r', '')
+        """
+    except:
+        raise
+        cdrcgi.bail("Failure retrieving '%s' from %s" %
+                    (cgi.escape(title), server))
+                              
 #----------------------------------------------------------------------
 # Remove the document ID attribute so we can save the doc under a new ID.
 #----------------------------------------------------------------------
 def stripId(doc):
-    pattern = re.compile("(.*<CdrDoc[^>]*)\sId='[^']*'(.*)", re.DOTALL)
+    pattern = re.compile(r"(.*<CdrDoc[^>]*)\sId='[^']*'(.*)", re.DOTALL)
     return pattern.sub(r'\1\2', doc)
 
 #----------------------------------------------------------------------
@@ -346,6 +398,50 @@ if request == "Load":
 #----------------------------------------------------------------------
 elif request == 'New':
     showForm(BLANKDOC, "Editing new document", ("Load", "Save", "Checkin"))
+
+#--------------------------------------------------------------------
+# Show the differences with a copy of the filter on another server.
+#--------------------------------------------------------------------
+elif request == 'Compare With':
+    if not fields.has_key("Doc"):
+        cdrcgi.bail("No document found to compare")
+    if not fields.has_key("DiffWith"):
+        cdrcgi.bail("No server specified for comparison")
+    doc = fields["Doc"].value
+    server = fields["DiffWith"].value
+    pattern = re.compile(r"<DocTitle[^>]*>([^<]+)</DocTitle>", re.DOTALL)
+    match = pattern.search(doc)
+    if not match: cdrcgi.bail("No DocTitle found")
+    title = match.group(1)
+    doc1 = getFilterXml(title, 'localhost')
+    doc2 = getFilterXml(title, server)
+    name1 = "localhost-copy.xml"
+    name2 = "%s-copy.xml" % server
+    cmd = "diff -au %s %s" % (name1, name2)
+    try:
+        workDir = cdr.makeTempDir('diff')
+    except StandardError, args:
+        cdrcgi.bail("%s: %s" % (args[0], args[1]))
+    open(name1, "w").write(doc1.encode('latin-1', 'replace'))
+    open(name2, "w").write(doc2.encode('latin-1', 'replace'))
+    result = cdr.runCommand(cmd)
+    cleanup(workDir)
+    report = cgi.escape(result.output)
+    if report.strip():
+        title = "Differences between %s and %s" % (name1, name2)
+    else:
+        title = "%s and %s are identical" % (name1, name2)
+    cdrcgi.sendPage("""\
+<!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
+<html>
+ <head>
+  <title>%s</title>
+ </head>
+ <body>
+  <h3>%s</h3>
+  <pre>%s</pre>
+ </body>
+</html>""" % (title, title, report))
 
 #--------------------------------------------------------------------
 # Create a new document using the existing data.
