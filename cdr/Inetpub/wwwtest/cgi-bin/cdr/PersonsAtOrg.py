@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: PersonsAtOrg.py,v 1.5 2004-02-24 12:44:59 bkline Exp $
+# $Id: PersonsAtOrg.py,v 1.6 2004-05-20 22:19:59 venglisc Exp $
 #
 # Identifieds all person documents which are linked to a specified
 # organization document.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2004/02/24 12:44:59  bkline
+# Added person document IDs at Sheri's request (request #1107).
+#
 # Revision 1.4  2003/08/25 20:29:55  bkline
 # Eliminated dross left over from clone of another report.
 #
@@ -118,52 +121,49 @@ if not name and not id:
 # Generate HTML for persons at a specific location.
 #----------------------------------------------------------------------
 def personsAtLocation(cursor, id, fragId):
-    path = "/Person/PersonLocations/OtherPracticeLocation/"\
+    path1 = "/Person/PersonLocations/OtherPracticeLocation/"\
            "OrganizationLocation/@cdr:ref"
+    path2 = "/Person/PersonLocations/OtherPracticeLocation/@cdr:id"
     fragLink = "CDR%010d#%s" % (id, fragId)
     parms = [["fragLink", fragLink]]
     personPos = 0
     #cdrcgi.bail("value should be CDR%010d#%s" % (id, fragId))
     try:
         cursor.execute("""\
-            SELECT DISTINCT query_term.doc_id,
-                            document.title
-                       FROM query_term
-                       JOIN document
-                         ON document.id = query_term.doc_id
-                      WHERE path = '%s'
-                        AND value = '%s'
-                   ORDER BY document.title""" % (path, fragLink))
+	    SELECT q1.doc_id, d.title, q2.value
+	      FROM query_term q1
+	      JOIN document d
+	        ON d.id = q1.doc_id
+	      JOIN query_term q2
+	        ON d.id = q2.doc_id
+	     WHERE q1.path = '%s'
+	       AND q2.path = '%s'
+	       AND q1.value = '%s'
+	       AND LEFT(q1.node_loc, 8) = q2.node_loc
+	     ORDER BY d.title""" % (path1, path2, fragLink))
         row = cursor.fetchone()
         if not row:
             return "None"
-        table = """\
-   <table border='0' cellspacing='0' cellpadding='0'>
+        personsList = """\
+        <ol>
 """
         while row:
             personPos += 1
-            resp = cdr.filterDoc(session, ['name:Person at Org Location'], 
-                                 row[0], parm = parms)
+            locparms = [["location", row[2]]]
+            resp = cdr.filterDoc(session, ['set:Denormalization Person Set',
+	                                 'name:Copy XML for Person 2',
+			                'name:Person at Org - Person Location'],
+	                                  row[0], parm = locparms) 
             if type(resp) in (type(''), type(u'')):
                 cdrcgi.bail(resp)
-            table += """
-    <tr>
-     <td valign='top' align='right'>
-      <b>
-       <font size='3'>%d.&nbsp;&nbsp;</font>
-      </b>
-     </td>
-     <td>%s</td>
-    </tr>
-    <tr>
-     <td colspan="2">&nbsp;</td>
-    </tr>
-""" % (personPos, cdrcgi.decode(resp[0].replace("@@DOCID@@", "(%d)" % row[0])))
+            personsList += """
+    <li>%s</li>
+""" % (cdrcgi.decode(resp[0].replace("@@DOCID@@", "(%d)" % row[0])))
             row = cursor.fetchone()
     except cdrdb.Error, info:
         cdrcgi.bail('Failure collecting person document IDs: %s' % info[1][0])
-    return table + """\
-  </table>
+    return personsList + """\
+  </ol>
 """
 
 #----------------------------------------------------------------------
@@ -237,89 +237,73 @@ except cdrdb.Error, info:
 #----------------------------------------------------------------------
 # Start the page.
 #----------------------------------------------------------------------
-ellipsis = '.' * 30
 html = """\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>
  <head>
-  <title>CDR%010d - %s - %s</title>
+  <title>CDR%d: %s - %s</title>
  </head>
  <basefont face='Arial, Helvetica, sans-serif'>
  <body>
   <center>
    <b>
-    <font size='4'>Persons Practicing at Organization Report</font>
+    <font size='4'>Persons Practicing at Organization<br/>Report</font>
+    <br/>%s
    </b>
    <br />
    <br />
   </center>
   <b>
+   <font size='4'>CDR%d</font>
+  </b>
+  <br/><br/>
+  <b>
    <font size='4'>Name</font>
   </b>
   <br />
-  <table border='0'>
+  <table border='0' width="100%%" cellspacing='0' cellpadding='0'>
    <tr>
     <td valign='top' nowrap='1'>
-     <b>
-      <font size='3'>Official Name</font>
-     </b>
-    </td>
-    <td valign='top' nowrap='1'>
-     <font size='3'>%s</font>
+     <b>Official Name</b>
     </td>
     <td>
-     <font size='3'>%s</font>
+     %s
     </td>
    </tr>
-""" % (id, officialName, time.strftime("%B %d, %Y", now), ellipsis, 
-       officialName)
+""" % (id, officialName, time.strftime("%B %d, %Y", now), 
+       time.strftime("%B %d, %Y", now), id, officialName)
 
 for shortName in shortNames:
     html += """\
    <tr>
     <td valign='top' nowrap='1'>
-     <b>
-      <font size='3'>Short Name</font>
-     </b>
-    </td>
-    <td valign='top' nowrap='1'>
-     <font size='3'>%s</font>
+     <b>Short Name</b>
     </td>
     <td>
-     <font size='3'>%s</font>
+     %s
     </td>
    </tr>
-""" % (ellipsis, shortName)
+""" % (shortName)
 
 for alternateName in alternateNames:
     html += """\
    <tr>
     <td valign='top' nowrap='1'>
-     <b>
-      <font size='3'>Alternate Name</font>
-     </b>
-    </td>
-    <td valign='top' nowrap='1'>
-     <font size='3'>%s</font>
+     <b>Alternate Name</b>
     </td>
     <td>
-     <font size='3'>%s</font>
+     %s
     </td>
    </tr>
-""" % (ellipsis, alternateName)
+""" % (alternateName)
 
 html += """\
   </table>
   <br />
-  <br />
-  <b>
-   <font size='4'>Locations</font>
-  </b>
-  <br />
-  <table border='0'>
 """
 
-resp = cdr.filterDoc(session, ['name:Org Locations for Linking Persons'], id)
+resp = cdr.filterDoc(session, ['set:Denormalization Organization Set', 
+                               'name:Person at Org - Org Location'], id)
 if type(resp) in (type(''), type(u'')):
     cdrcgi.bail(resp)
 expr1 = re.compile(u"<Location>(.*?)</Location>", re.DOTALL)
@@ -328,54 +312,22 @@ expr3 = re.compile(u"<FragmentId>(.*)</FragmentId>")
 locations = expr1.findall(cdrcgi.decode(resp[0]))
 locPos = 0
 for location in locations:
-    #cdrcgi.bail(location)
     locPos += 1
     table  = expr2.search(location)
     fragId = expr3.search(location)
-    if not table: cdrcgi.bail("failure extracting address information")
+    if not table: cdrcgi.bail("Failure extracting address information")
     html += """\
-   <tr>
-    <td colspan='2'>&nbsp;</td>
-   </tr>
-   <tr>
-    <td colspan='2'>
      <b>
-      <font size='3'>Location</font>
+      <font size='4'>%s. Location</font>
      </b>
-    </td>
-   </tr>
-   <tr>
-    <td colspan='2'>&nbsp;</td>
-   </tr>
-   <tr>
-    <td valign='top'>
-     <font size='3'>%s.&nbsp;&nbsp;&nbsp;</font>
-    </td>
-    <td>%s</td>
-   </tr>
-   <tr>
-    <td colspan='2'>&nbsp;</td>
-   </tr>
-   <tr>
-    <td>&nbsp;</td>
-    <td>
-     <b>
-      <font size='3'>Persons at Location</font>
-     </b>
-    </td>
-   </tr>
-   <tr>
-    <td colspan='2'>&nbsp;</td>
-   </tr>
-   <tr>
-    <td>&nbsp;</td>
-    <td>%s</td>
-   </tr>
+     %s
+     <br/>
+     <b>Persons at Location</b>
+     %s
 """ % (cdrcgi.int_to_roman(locPos), cdrcgi.decode(table.group(1)),
        personsAtLocation(cursor, id, fragId.group(1)))
 
 cdrcgi.sendPage(html + """\
-  </table>
  </body>
 </html>
 """)
