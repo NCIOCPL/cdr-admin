@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.32 2003-11-25 12:48:34 bkline Exp $
+# $Id: QcReport.py,v 1.33 2003-12-16 15:49:13 bkline Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.32  2003/11/25 12:48:34  bkline
+# Added code to plug in information about latest mods to document.
+#
 # Revision 1.31  2003/11/20 21:36:04  bkline
 # Plugged in support for CTGovProtocol documents.
 #
@@ -503,7 +506,8 @@ def fixCTGovProtocol(doc):
     else:
         doc = doc.replace("@@UPDATEDBY@@", "&nbsp;")
         doc = doc.replace("@@UPDATEDDATE@@", "&nbsp;")
-    return doc
+    #cdrcgi.bail("NPI=" + noPdqIndexing)
+    return doc.replace("@@NOPDQINDEXING@@", noPdqIndexing)
         
 
 #----------------------------------------------------------------------
@@ -544,11 +548,24 @@ doc = cdr.filterDoc(session, filters[docType], docId = docId,
                     docVer = version or None, parm = filterParm)
 #if (type(doc) in (type(""), type(u"")):
 #    cdrcgi.bail("OOPS! %s" % doc)
-if (type(doc) in (type(""), type(u"")) and
-    doc.find("undefined/lastp") != -1  and
-    docType == "CTGovProtocol"):
-    cdrcgi.bail("CTGovProtocol QC Report cannot be run until PDQIndexing "
-                "block has been completed")
+if docType == "CTGovProtocol":
+    if (type(doc) in (type(""), type(u"")) and
+        doc.find("undefined/lastp") != -1):
+        # cdrcgi.bail("CTGovProtocol QC Report cannot be run until "
+        #             "PDQIndexing block has been completed")
+        filterParm.append(['skipPdqIndexing', 'Y'])
+        doc = cdr.filterDoc(session, filters[docType], docId = docId,
+                            docVer = version or None, parm = filterParm)
+        noPdqIndexing = """
+   <br>
+   <br>
+   <h1 style='color: red'>*** PDQ INDEXING BLOCK HAS BEEN OMITTED
+                              TO AVOID BROKEN LINK FAILURES ***</h1>
+"""
+    else:
+        noPdqIndexing = ""
+if type(doc) in (type(""), type(u"")):
+    cdrcgi.bail(doc)
 if type(doc) == type(()):
     doc = doc[0]
 
