@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: StatAndParticUpdateMailer.py,v 1.1 2001-11-30 22:12:28 bkline Exp $
+# $Id: StatAndParticUpdateMailer.py,v 1.2 2002-01-22 21:33:12 bkline Exp $
 #
 # Request form for Initial Status and Participant Protocol Mailer.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2001/11/30 22:12:28  bkline
+# Initial revision
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string, cdrdb, cdrpub
 
@@ -14,19 +17,21 @@ import cgi, cdr, cdrcgi, re, string, cdrdb, cdrpub
 fields     = cgi.FieldStorage()
 session    = cdrcgi.getSession(fields)
 request    = cdrcgi.getRequest(fields)
-docId      = fields and fields.getvalue("DocId")       or None
+docId      = fields and fields.getvalue("DocId") or None
 email      = fields and fields.getvalue("Email") or None
 title      = "CDR Administration"
-section    = "Protocol Status and Participant Initial Mailer"
+section    = "Protocol Status and Participant Update Mailer"
 buttons    = ["Submit", "Log Out"]
-script     = 'StatAndParticMailer.py'
+script     = 'StatAndParticUpdateMailer.py'
 header     = cdrcgi.header(title, title, section, script, buttons)
-subsetName = 'Initial Protocol Status and Participant Verification Mailers'
+subsetName = 'Update Protocol Status and Participant Verification Mailers'
+subsetOrig = 'Initial Protocol Status and Participant Verification Mailers'
 brussels   = 'NCI Liaison Office-Brussels'
 sourcePath = '/InScopeProtocol/ProtocolSources/ProtocolSource/SourceName'
 statusPath = '/InScopeProtocol/ProtocolAdminInfo/CurrentProtocolStatus'
-modePath   = '/Organization/OrganizationDetails'\
-             '/OrganizationAdministrativeInformation/PreferredContactMode'
+modePath   = '/Organization/OrganizationDetails/PreferredProtocolContactMode'
+orgPath    = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg'\
+             '/LeadOrganizationID/@cdr:ref'
 
 #----------------------------------------------------------------------
 # Make sure we're logged in.
@@ -48,8 +53,8 @@ if not request:
    <H5>Protocol ID and email notification address are both optional.
        If Protocol ID is specified, only a mailer for that protocol
        will be generated; otherwise all eligible protocols for which
-       abstract mailers have not yet been sent will have mailers
-       generated.</H5>
+       this quarter's participant and status check update mailers have
+       not yet been sent will have mailers generated.</H5>
    <TABLE>
     <TR>
      <TD ALIGN='right' NOWRAP>
@@ -118,40 +123,68 @@ if docId:
                                                               info[1][0]))
 else:
     try:
+        # From the mailer requirements, section 2.81:  "Regular 
+        # Status/Participant Update mailers will be generated for 
+        # protocols with Status = Active, and [i.e. or] Approved,
+        # Temporarily Closed [i.e. Approved-not yet active], and
+        # with Source not = NCI Liaison Office, and has flag of
+        # Generate Hardcopy Mailer in Org record [no such flag;
+        # using PreferredContactMode of 'Hardcopy' instead]."
+        # Also, we need to make sure that a successful initial
+        # participant and status check mailer has been sent, and
+        # that the last participant and status check mailer went
+        # out at least three months earlier for the protocols
+        # selected.
         cursor.execute("""\
             SELECT DISTINCT protocol.doc_id, MAX(doc_version.num)
                        FROM doc_version
-                       JOIN ready_for_review protocol
-                         ON protocol.doc_id = doc_version.id
+                       JOIN document protocol
+                         ON protocol.id = doc_version.id
                        JOIN query_term prot_status
-                         ON prot_status.doc_id = protocol.doc_id
+                         ON prot_status.doc_id = protocol.id
                        JOIN query_term lead_org
                          ON lead_org.doc_id = prot_status.doc_id
-                       JOIN query_term contact_mode
-                         ON contact_mode.doc_id = lead_org.int_val
-                        AND prot_status.value IN ('Active', 
+                      WHERE prot_status.value IN ('Active', 
                                                   'Approved-Not Yet Active')
                         AND prot_status.path   = '%s'
-                        AND contact_mode.value = 'Hardcopy'
-                        AND contact_mode.path  = '%s'
+                        AND lead_org.path      = '%s'
+                        AND EXISTS (SELECT *
+                                      FROM pub_proc orig_mailer
+                                      JOIN pub_proc_doc om_doc
+                                        ON orig_mailer.id = om_doc.pub_proc
+                                     WHERE orig_mailer.pub_subset = '%s'
+                                       AND orig_mailer.status = 'Success'
+                                       AND om_doc.doc_id = protocol.id)
+                        AND NOT EXISTS (SELECT *
+                                          FROM query_term contact_mode
+                                         WHERE contact_mode.doc_id =
+                                               lead_org.int_val
+                                           AND contact_mode.path = '%s')
+                        AND NOT EXISTS (SELECT *
+                                          FROM pub_proc prev_mailer
+                                          JOIN pub_proc_doc ppd
+                                            ON prev_mailer.id = ppd.pub_proc
+                                         WHERE ppd.doc_id = protocol.id
+                                           AND prev_mailer.subset in 
+                                               ('%s',
+                                                '%s')
+                                           AND prev_mailer.completed IS NULL
+                                            OR (prev_mailer.status = 'Success'
+                                           AND DATEADD(quarter, -1, GETDATE())
+                                                     < prev_mailer.completed))
                         AND NOT EXISTS (SELECT *
                                           FROM query_term src
-                                         WHERE src.value = '%s'
-                                           AND src.path  = '%s'
+                                         WHERE src.value  = '%s'
+                                           AND src.path   = '%s'
                                            AND src.doc_id = protocol.doc_id)
-                        AND NOT EXISTS (SELECT *
-                                          FROM pub_proc p
-                                          JOIN pub_proc_doc pd
-                                            ON p.id = pd.pub_proc
-                                         WHERE pd.doc_id = protocol.doc_id
-                                           AND p.pub_subset = '%s'
-                                           AND (p.status = 'Success'
-                                            OR p.completed IS NULL))
-                   GROUP BY protocol.doc_id""" % (statusPath, 
+                   GROUP BY protocol.doc_id""" % (statusPath,
+                                                  orgPath,
+                                                  subsetOrig,
                                                   modePath,
-                                                  brussels, 
-                                                  sourcePath,
-                                                  subsetName))
+                                                  subsetOrig,
+                                                  subsetPath,
+                                                  brussels,
+                                                  sourcePath))
         docList = cursor.fetchall()
     except cdrdb.Error, info:
         cdrcgi.bail("Failure retrieving document IDs: %s" % info[1][0])
