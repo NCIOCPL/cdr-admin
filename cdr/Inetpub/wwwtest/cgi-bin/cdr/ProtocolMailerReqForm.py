@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolMailerReqForm.py,v 1.2 2002-10-24 02:46:22 bkline Exp $
+# $Id: ProtocolMailerReqForm.py,v 1.3 2002-11-07 18:54:47 bkline Exp $
 #
 # Request form for all protocol mailers.
 #
@@ -17,6 +17,9 @@
 # publication job for the publishing daemon to find and initiate.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/10/24 02:46:22  bkline
+# Ready for user testing.
+#
 # Revision 1.1  2002/10/22 14:41:51  bkline
 # Consolidated menu for all protocol mailers.
 #
@@ -38,7 +41,21 @@ section     = "Protocol Mailer Request Form"
 SUBMENU     = "Mailer Menu"
 buttons     = ["Submit", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 script      = 'ProtocolMailerReqForm.py'
-header      = cdrcgi.header(title, title, section, script, buttons)
+header      = cdrcgi.header(title, title, section, script, buttons, 
+                            stylesheet = """\
+ <style type='text/css'>
+   ul { margin-left: 40pt }
+   h2 { font-size: 14pt; font-family:Arial; color:navy }
+   h3 { font-size: 13pt; font-family:Arial; color:black; font-weight:bold }
+   li, span.r { 
+        font-size: 12pt; font-family:"Times New Roman"; color:black;
+        margin-bottom: 10pt; font-weight:normal 
+   }
+   b {  font-size: 12pt; font-family:"Times New Roman"; color:black;
+        margin-bottom: 10pt; font-weight:bold 
+   }
+  </style>
+ """)
 statusPath  = '/InScopeProtocol/ProtocolAdminInfo/CurrentProtocolStatus'
 brussels    = 'NCI Liaison Office-Brussels'
 sourcePath  = '/InScopeProtocol/ProtocolSources/ProtocolSource/SourceName'
@@ -79,56 +96,55 @@ if request == "Log Out":
 #----------------------------------------------------------------------
 if not request:
     form = """\
-   <h2>Enter request parameters</h2>
-   <b>Document ID and email notification address are both optional.
-       If document ID is specified, only a mailer for that document
-       will be generated; otherwise all eligible documents for which
-       mailers have not yet been sent will have mailers generated.</b>
-   <table>
-    <tr>
-     <th align='right' nowrap>
-      <b>Protocol document CDR ID: &nbsp;</b>
-     </th>
-     <td><input name='DocId' /></td>
-    </tr>
-    <tr>
-     <th align='right' nowrap>
-      <b>Notification email address: &nbsp;</b>
-     </th>
-     <td><input name='Email' /></td>
-    </tr>
-    <tr><td>&nbsp;</td></tr>
-   </table>
-   <p><p>
-   <table>
-    <tr><td><b>
-     Select the protocol mailer type to generate, then click Submit.<br>
-     Please be patient, it may take a minute to select documents for mailing.
-     <br>
-    </b></td></tr>
-    <tr><td><input type='radio' name='userPick'
-          value='ProtAbstInit'>Initial Abstract Mailer</input>
-    </td></tr>
-    <tr><td><input type='radio' name='userPick'
-          value='ProtAbstAnnual'>Annual Abstract Mailer</input>
-    </td></tr>
-    <tr><td><input type='radio' name='userPick'
-          value='ProtAbstRemail'>Annual Abstract Remail</input>
-    </td></tr>
-    <tr><td><input type='radio' name='userPick'
-          value='ProtInitStatPart'>Initial Status/Participant Check</input>
-    </td></tr>
-    <tr><td><input type='radio' name='userPick'
-          value='ProtQuarterlyStatPart'>Quarterly Status/Participant 
-                                        Check</input>
-    </td></tr>
-   </table>
-   <input type='hidden' name='%s' value='%s'>
-   <p><p>
-    Maximum number of mailers to generate:
+   <h2>%s</h2>
+   <ul>
+    <li>
+     To generate mailers for a batch, select type of mailer. 
+     It may take a minute to select documents to be included in the mailing.
+     Please be patient.
+     If you want to, you can limit the number of protocol documents for
+     which mailers will be generated in a given job, by entering a 
+     maximum number.
+    </li>
+    <li>
+     To generate mailers for a single Protocol, select type of mailer 
+     and enter the document ID of the Protocol.
+    </li>
+    <li>
+     To receive email notification when the job is completed, enter your 
+     email address.
+    </li>
+    <li>
+     Click Submit to start the mailer job.
+    </li>
+   </ul>
+   <h3>Select type of mailer</h3>
+   <input type='radio' name='userPick' class='r' value='ProtAbstInit'>
+    <span class='r'>Initial Abstract Mailer</span><br>
+   <input type='radio' name='userPick' class='r' value='ProtAbstAnnual'>
+    <span class='r'>Annual Abstract Mailer</span><br>
+   <input type='radio' name='userPick' class='r' value='ProtAbstRemail'>
+    <span class='r'>Annual Abstract Remail</span><br>
+   <input type='radio' name='userPick' class='r' value='ProtInitStatPart'>
+    <span class='r'>Initial Status/Participant Check</span><br>
+   <input type='radio' name='userPick' class='r' value='ProtQuarterlyStatPart'>
+    <span class='r'>Quarterly Status/Participant Check</span>
+   <br><br><br>
+   <b>Limit maximum number of mailers generated:&nbsp;</b>
    <input type='text' name='maxMails' size='12' value='No limit' />
+   <br><br><br>
+   <h3>To generate mailer for a single Physician/Organization, enter</h3>
+   <b>Protocol document CDR ID:&nbsp;</b>
+   <input name='DocId' />
+   <br><br><br>
+   <h3>To receive email notification when mailer is complete, enter</h3>
+   <b>Email address:&nbsp;</b>
+   <input name='Email' />
+   <br><br><br>
+   <input type='Submit' name = 'Request' value = 'Submit'>
+   <input type='hidden' name='%s' value='%s'>
   </form>
-""" % (cdrcgi.SESSION, session)
+""" % (section, cdrcgi.SESSION, session)
     #------------------------------------------------------------------
     # cdrcgi.sendPage exits after sending page.
     # If we sent a page, we're done for this invocation.
