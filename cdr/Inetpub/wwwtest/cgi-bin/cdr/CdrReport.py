@@ -1,93 +1,72 @@
 #----------------------------------------------------------------------
-# $Id: CdrReport.py,v 1.1 2001-03-26 12:21:03 bkline Exp $
+#
+# $Id: CdrReport.py,v 1.2 2001-03-27 21:17:40 bkline Exp $
 #
 # Prototype for CDR reporting/formatting web wrapper.
+#
+# $Log: not supported by cvs2svn $
 #----------------------------------------------------------------------
-import cgi
+import cgi, cdr, cdrcgi, re
+
 
 #----------------------------------------------------------------------
-# Set some string variables.
+# Set some session and form variables.
 #----------------------------------------------------------------------
-title = "CDR Reporting and Printing"
-instr = "Select Options and Submit Request"
-hdr   = cdrcgi.header(title, banner, instr, "CdrReport.py", buttons)
-form  = """Content-type: text/html
-<!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
-<HTML><HEAD><TITLE>%s</TITLE></HEAD>
-<BASEFONT FACE='Arial, Helvetica, sans-serif'>
-<LINK REL='STYLESHEET' HREF='/stylesheets/dataform.css'>
-<BODY BACKGROUND='/images/back.jpg' BGCOLOR='#2F5E5E'>
-<FORM ACTION='/cgi-bin/cdr/CdrReport.py' METHOD='POST'>
-<TABLE WIDTH=100%% CELLSPACING='0' CELLPADDING='0' BORDER='0'>
-  <TR>
-    <TH NOWRAP BGCOLOR='silver' ALIGN='left'
-        BACKGROUND='/images/nav1.jpg'>
-        <FONT SIZE='6' COLOR='white'>&nbsp;%s</FONT>
-    </TH>
-    <TD BGCOLOR='silver' VALIGN='middle' ALIGN='right' WIDTH='100%%'
-        BACKGROUND='/images/nav1.jpg'>
-        <INPUT TYPE='hidden' NAME='FormMode' VALUE='View'>&nbsp;
-        <INPUT TYPE='submit' NAME='NewQuery'
-               VALUE='Submit Request'>&nbsp;
-    </TD>
-  </TR>
-  <TR>
-    <TD BGCOLOR=#FFFFCC COLSPAN=3>
-        <FONT SIZE=-1 color='navy'>&nbsp;&nbsp;%s<BR>
-        </FONT>
-    </TD>
-  </TR>
-</TABLE>
-<BR><BR>
-<CENTER>
-<TABLE CELLSPACING='0' CELLPADDING='0' BORDER='0'>
-  <!--
-  <TR>
-    <TH>Setting</TH>
-    <TH>Value</TH>
-  </TR>
-   -->
-  <TR>
-    <TD ALIGN='right'><B>CDR User Name&nbsp;</B></TD>
-    <TD><INPUT NAME='UserName'></TD>
-  </TR>
-  <TR>
-    <TD ALIGN='right'><B>CDR Password&nbsp;</B></TD>
-    <TD><INPUT TYPE='password' NAME='Password'></TD>
-  </TR>
-  <TR>
-    <TD ALIGN='right'><B>CDR Document ID&nbsp;</B></TD>
-    <TD><INPUT NAME='DocID'></TD>
-  </TR>
-  <TR>
-    <TD ALIGN='right'><B>XSL/T Filter&nbsp;</B></TD>
-    <TD VALIGN='top'>
-      <SELECT NAME='Filter'>
-        <OPTION VALUE='CDR190703' SELECTED>Fancy Filter&nbsp;</OPTION>
-        <OPTION VALUE='CDR190703'>Plain Filter&nbsp;</OPTION>
-      </SELECT>
-    </TD>
-  </TR>
-</TABLE>
-</CENTER>
-</FORM>
-</BODY>
-</HTML>""" % (title, title, instr)
+title   = "CDR Reporting and Printing"
+instr   = "Select Options and Submit Request"
+buttons = ("Submit Request",)
+header  = cdrcgi.header(title, title, instr, "CdrReport.py", buttons)
+fields  = cgi.FieldStorage()
+session = fields and cdrcgi.getSession(fields) or None
+request = fields and cdrcgi.getRequest(fields) or None
+docId   = fields and fields.getvalue(cdrcgi.DOCID) or 'CDR106085'
+filtId  = fields and fields.getvalue(cdrcgi.FILTER) or 'CDR190703'
 
 #----------------------------------------------------------------------
-# Get the form variables and decide what to do.
+# Build some data-entry fields for a new request.
 #----------------------------------------------------------------------
-fields = cgi.FieldStorage()
-
-if not fields.has_key("FormMode"):
-    # This is the first call: just put up the form.
-    print form
+form    = "<TABLE CELLSPACING='0' CELLPADDING='0' BORDER='0'>\n"
+if session:
+    form = form + "<INPUT TYPE='hidden' NAME='%s' VALUE='%s'>\n" % (
+                  cdrcgi.SESSION, session)
 else:
-    import cdr
-    print "Content-type: text/html\n"
-    if fields.has_key("session"):
-        credentials = fields["session"].value
-    else:
-        credentials = (fields["UserName"].value, fields["Password"].value)
-    print cdr.filterDoc(credentials, fields["DocID"].value,
-                                     fields["Filter"].value)
+    form = form + """\
+        <TR>
+         <TD ALIGN='right'><B>CDR User Name&nbsp;</B></TD>
+         <TD><INPUT NAME='%s'></TD>
+        </TR>
+        <TR>
+         <TD ALIGN='right'><B>CDR Password&nbsp;</B></TD>
+         <TD><INPUT TYPE='password' NAME='%s'></TD>
+        </TR>\n""" % (cdrcgi.USERNAME, cdrcgi.PASSWORD)
+form = form + """\
+        <TR>
+          <TD ALIGN='right'><B>Document ID&nbsp;</B></TD>
+          <TD><INPUT NAME='%s' VALUE='%s'></TD>
+        </TR>
+        <TR>
+          <TD ALIGN='right'><B>Filter ID&nbsp;</B></TD>
+          <TD><INPUT NAME='%s' VALUE='%s'></TD>
+        </TR>
+       </TABLE>
+      </FORM>\n""" % (cdrcgi.DOCID, docId, cdrcgi.FILTER, filtId)
+
+#----------------------------------------------------------------------
+# Print what we have so far
+#----------------------------------------------------------------------
+print header + form
+
+#----------------------------------------------------------------------
+# If we have a filter request, do it.
+#----------------------------------------------------------------------
+if session and docId and filtId and request == "Submit Request":
+    print "<HR>"
+    doc = cdr.filterDoc(session, docId, filtId)
+    doc = re.sub("@@DOCID@@", docId, doc)
+    print "<TABLE WIDTH='100%' CELLSPACING='0' CELLPADDING='0' BORDER='0'>" 
+    print "<TR><TD>%s</TD></TR></TABLE>" % doc
+
+#----------------------------------------------------------------------
+# Wrap up and go home.
+#----------------------------------------------------------------------
+print "</BODY></HTML>"
