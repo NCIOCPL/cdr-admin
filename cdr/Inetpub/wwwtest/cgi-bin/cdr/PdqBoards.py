@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PdqBoards.py,v 1.5 2003-06-13 21:14:12 bkline Exp $
+# $Id: PdqBoards.py,v 1.6 2003-07-29 12:38:55 bkline Exp $
 #
 # Report on PDQ Board members and topics.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2003/06/13 21:14:12  bkline
+# Added indication of audience under title.
+#
 # Revision 1.4  2002/06/06 12:01:26  bkline
 # Added calls to cdrcgi.unicodeToLatin1().
 #
@@ -247,7 +250,7 @@ header    = cdrcgi.header(title, title, instr, script, buttons)
 members   = {}
 topics    = {}
 audString = ""
-if audience and audience <> u"\x00A0":
+if audience:
     audString = "<BR>(%s)" % audience
 report    = """\
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
