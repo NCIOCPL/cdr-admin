@@ -80,7 +80,7 @@ try:
           AND a.userid = b.assigned_to
           AND r.userid = b.reporter
           AND q.userid = b.qa_contact */
-     ORDER BY b.bug_id""" % op)
+     ORDER BY b.priority, b.bug_id""" % op)
 except:
     bail("can't execute query!")
 try:
@@ -108,6 +108,16 @@ Content-type: text/html
                                          len(rows),
                                          when == "future" and "Future " or "",
                                          time.strftime("%Y-%m-%d"))
+
+def showComment(row):
+    (name, when, text) = row
+    print """\
+  <span class='info'>
+   <b>Comments entered %s by %s:</b><br>
+   <pre>%s</pre><br>
+  </span>
+""" % (when, name, cgi.escape(text))
+
 for row in rows:
     id, assignee, severity, status, component, created, short, priority, \
         reporter, resolution, qa, votes = row
@@ -154,13 +164,13 @@ for row in rows:
          WHERE d.who = p.userid
            AND bug_id = %d
       ORDER BY d.bug_when""" % id)
-    for name, when, text in curs.fetchall():
-        print """\
-  <span class='info'>
-   <b>Comments entered %s by %s:</b><br>
-   <pre>%s</pre><br>
-  </span>
-""" % (when, name, cgi.escape(text))
+    rows = curs.fetchall()
+    if flavor == 'medium' and len(rows) > 2:
+        showComment(rows[0])
+        showComment(rows[-1])
+    else:
+        for row in rows:
+            showComment(row)
     print "  <hr>"
 print """\
  </body>
