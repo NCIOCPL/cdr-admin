@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: NonRespondents.py,v 1.2 2003-06-13 20:29:42 bkline Exp $
+# $Id: NonRespondents.py,v 1.3 2003-07-29 12:33:25 bkline Exp $
 #
 # Report on mailers which haven't been responded to (other than
 # status and participant mailers).
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2003/06/13 20:29:42  bkline
+# Moved primary functionality to CdrLongReports.py
+#
 # Revision 1.1  2003/06/10 13:56:11  bkline
 # First cut at Mailer non-respondents report.
 #
@@ -70,7 +73,7 @@ if not docType or not age or not email:
      <SELECT NAME='Age'>
       <OPTION VALUE='15'>15-29 days since last mailer</OPTION>
       <OPTION VALUE='30'>30-59 days since last mailer</OPTION>
-      <OPTION VALUE='60'>120-60 days since last mailer</OPTION>
+      <OPTION VALUE='60'>60-120 days since last mailer</OPTION>
      </SELECT>
     </LI>
     <BR><BR><BR>
@@ -110,12 +113,13 @@ cdrcgi.sendPage(header + """\
    <h4>Report has been queued for background processing</h4>
    <p>
     To monitor the status of the job, click this
-    <a href='getBatchStatus.py?%s=%s&jobId=%s'><u>link</u></a>
+    <a href='%s/getBatchStatus.py?%s=%s&jobId=%s'><u>link</u></a>
     or use the CDR Administration menu to select 'View
     Batch Job Status'.
    </p>
   </form>
  </body>
 </html>
-""" % (cdrcgi.SESSION, session, jobId))
+""" % ('http://mahler.nci.nih.gov/cgi-bin/cdr', cdrcgi.SESSION, session,
+       jobId))
 
