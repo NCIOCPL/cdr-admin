@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GeneralReports.py,v 1.5 2002-06-28 13:38:07 bkline Exp $
+# $Id: GeneralReports.py,v 1.6 2002-07-02 13:47:55 bkline Exp $
 #
 # Submenu for general reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2002/06/28 13:38:07  bkline
+# New report for document version history added.
+#
 # Revision 1.4  2002/06/27 12:21:01  bkline
 # Added new report for active sessions.
 #
@@ -65,6 +68,8 @@ reports = [
            ('ActivityReport.py', 'Document Activity Report'),
            ('ActiveLogins.py', 'Current Sessions'),
            ('DocVersionHistory.py', 'Document Version History'),
+           ('NewDocsWithPubStatus.py', 
+            'List of New Documents with Publication Status'),
           ]
 
 for r in reports:
