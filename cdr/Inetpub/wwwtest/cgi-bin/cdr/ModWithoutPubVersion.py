@@ -1,12 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: ModWithoutPubVersion.py,v 1.2 2002-09-12 01:07:36 bkline Exp $
+# $Id: ModWithoutPubVersion.py,v 1.3 2002-09-12 11:49:04 bkline Exp $
 #
 # Reports on documents which have been changed since a previously 
 # publishable version without a new publishable version have been
 # created.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/09/12 01:07:36  bkline
+# Broken down SQL query into manageable chunks.
+#
 # Revision 1.1  2002/09/11 23:30:14  bkline
 # New report on documents modified since their last publishable version.
 #
@@ -125,6 +128,9 @@ try:
                 ON u.id = a.usr
              WHERE a.dt BETWEEN '%s' AND DATEADD(s, -1, DATEADD(d, 1, '%s'))
                AND u.name LIKE '%s'
+               AND a.dt = (SELECT MAX(dt)
+                             FROM audit_trail
+                            WHERE document = d.id)
                %s""" % (fromDate, toDate, modUser, dtQual))
     cursor.execute("""\
             SELECT v.id              doc_id, 
