@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditFilter.py,v 1.3 2001-06-13 20:15:39 bkline Exp $
+# $Id: EditFilter.py,v 1.4 2001-07-06 16:02:40 bkline Exp $
 #
 # Prototype for editing CDR filter documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2001/06/13 20:15:39  bkline
+# Added code to strip carriage returns from text for TEXTAREA control.
+#
 # Revision 1.2  2001/04/08 22:54:59  bkline
 # Added Unicode mapping calls.
 #
@@ -35,7 +38,7 @@ BLANKDOC = """\
    </xsl:template>
   </xsl:transform>]]>
  </CdrDocXml>
-<CdrDoc>
+</CdrDoc>
 """
 
 #----------------------------------------------------------------------
