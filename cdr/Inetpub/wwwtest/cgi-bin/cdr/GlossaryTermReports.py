@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermReports.py,v 1.5 2004-10-07 21:39:33 bkline Exp $
+# $Id: GlossaryTermReports.py,v 1.6 2004-11-27 00:01:52 bkline Exp $
 #
 # Submenu for glossary term reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2004/10/07 21:39:33  bkline
+# Added new report for Sheri, for finding glossary terms created in a
+# given date range, and having specified status.
+#
 # Revision 1.4  2004/09/17 14:06:50  venglisc
 # Fixed list items to properly teminate the anker link.
 #
@@ -56,7 +60,6 @@ form = """\
 """ % (cdrcgi.SESSION, session)
 reports = [
            ('GlossaryTermSearch.py', 'Glossary Term QC Report'),
-           ('GlossaryTermLinks.py', 'Links')
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI></A>\n" % (
@@ -68,21 +71,11 @@ form += """\
     <OL>
 """
 reports = [
-           ('GlossaryTermPhrases.py', 'Glossary Term Search Report'),
-           ('Stub.py', 'Terms By Status'),
-           ('GlossaryTermsByStatus.py', 'Glossary Terms By Status')
-          ]
-for r in reports:
-    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI></A>\n" % (
-            cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
-
-form += """\
-    </OL>
-    <H3>Management Reports</H3>
-    <OL>
-"""
-reports = [
-           ('Stub.py', 'New Glossary Term Count By Status')
+           ('GlossaryTermLinks.py',
+            'Documents Linked to Glossary Term Report'),
+           ('GlossaryTermPhrases.py',
+            'Glossary Term and Variant Search Report'),
+           ('GlossaryTermsByStatus.py', 'Glossary Term By Status Report')
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI></A>\n" % (
