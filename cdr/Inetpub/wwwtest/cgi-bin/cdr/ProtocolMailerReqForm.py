@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolMailerReqForm.py,v 1.19 2004-10-20 21:21:08 bkline Exp $
+# $Id: ProtocolMailerReqForm.py,v 1.20 2005-03-03 13:44:07 bkline Exp $
 #
 # Request form for all protocol mailers.
 #
@@ -17,6 +17,9 @@
 # publication job for the publishing daemon to find and initiate.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.19  2004/10/20 21:21:08  bkline
+# Removed temporary block or Brussels protocols.
+#
 # Revision 1.18  2004/10/07 22:08:37  bkline
 # Added temporary code to block some brussels mailers (see request #1350).
 #
@@ -577,6 +580,8 @@ elif mailType == 'Protocol-Annual abstract remail':
                 ON mailer_type.doc_id = mailer_prot_doc.doc_id
               JOIN query_term mailer_sent
                 ON mailer_sent.doc_id = mailer_type.doc_id
+             JOIN query_term prot_status
+               ON prot_status.doc_id = protocol.id
              WHERE mailer_prot_doc.path = '/Mailer/Document/@cdr:ref'
                AND mailer_type.path = '/Mailer/Type'
                AND mailer_type.value = '%s'
@@ -586,6 +591,10 @@ elif mailType == 'Protocol-Annual abstract remail':
                AND doc_version.publishable = 'Y'
                AND doc_version.val_status  = 'V'
                AND protocol.active_status = 'A'
+               AND prot_status.path = '/InScopeProtocol/ProtocolAdminInfo'
+                                    + '/CurrentProtocolStatus'
+               AND prot_status.value IN ('Active',
+                                         'Approved-Not Yet Active')
 
                -- Don't bug the folks who have already answered.
                AND NOT EXISTS (SELECT *
