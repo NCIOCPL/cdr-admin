@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryChanges.py,v 1.1 2003-08-29 18:14:39 bkline Exp $
+# $Id: SummaryChanges.py,v 1.2 2003-11-05 14:50:28 bkline Exp $
 #
 # Report of history of changes to a single summary.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2003/08/29 18:14:39  bkline
+# Report on changes made to a specified summary in the last 1 or 2 years.
+#
 #----------------------------------------------------------------------
 import cdr, cdrdb, time, cgi, cdrcgi, re
 
@@ -51,6 +54,7 @@ def getCommonCssStyle():
    td.hdg   { font-family: Arial, sans-serif; font-size: 16pt;
               font-weight: bold; }
    p        { font-family: Arial, sans-serif; font-size: 12pt; }
+   body     { font-family: Arial; font-size: 12pt; }
    span.SectionRef { text-decoration: underline; font-weight: bold; }
   </style>
  </xsl:template>
