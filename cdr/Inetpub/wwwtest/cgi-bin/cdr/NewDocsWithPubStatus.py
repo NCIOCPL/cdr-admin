@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: NewDocsWithPubStatus.py,v 1.2 2003-06-13 20:28:57 bkline Exp $
+# $Id: NewDocsWithPubStatus.py,v 1.3 2004-05-03 13:59:28 bkline Exp $
 #
 # Reports on newly created documents and their publication statuses.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2003/06/13 20:28:57  bkline
+# Implemented changes requested by Margaret in issue #754.
+#
 # Revision 1.1  2002/07/02 13:47:56  bkline
 # New report on new documents with publication status.
 #
@@ -139,12 +142,12 @@ try:
                 epv,
                 doc_title
            FROM docs_with_pub_status
-          WHERE cre_date BETWEEN ? AND ?
+          WHERE cre_date BETWEEN '%s' AND DATEADD(s, -1, DATEADD(d, 1, '%s'))
             %s
        ORDER BY doc_type, 
                 pv, 
                 cre_date, 
-                ver_date""" % dtQual, (fromDate, toDate))
+                ver_date""" % (fromDate, toDate, dtQual))
     rows = cursor.fetchall()
 except cdrdb.Error, info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
