@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: Reports.py,v 1.11 2002-04-10 20:07:55 bkline Exp $
+# $Id: Reports.py,v 1.12 2002-04-22 22:15:45 bkline Exp $
 #
 # Prototype for editing CDR linking tables.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.11  2002/04/10 20:07:55  bkline
+# Added Publishing Job Queue report.
+#
 # Revision 1.10  2002/03/21 20:01:15  bkline
 # Added Glossary Term Links report and Persons at Org report.
 #
@@ -65,6 +68,7 @@ reports = [
            ('CheckedOutDocs.py', 'Checked Out Documents'),
            ('ConceptTermReviewReport.py', 'Concept/Term Review Report'),
            ('DatedActions.py', 'Dated Actions'),
+           ('DateLastModified.py', 'Date Last Modified'),
            ('GlossaryTermLinks.py', 'Glossary Term Links Report'),
            ('CdrReport.py', 'Inactive Documents'),
            ('CheckUrls.py', 'Inactive Hyperlinks'),
