@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryAndMiscReports.py,v 1.2 2002-05-25 02:39:13 bkline Exp $
+# $Id: SummaryAndMiscReports.py,v 1.3 2002-06-06 12:01:09 bkline Exp $
 #
 # Submenu for summary and miscellanous document reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/05/25 02:39:13  bkline
+# Removed extra blank lines from HTML output.
+#
 # Revision 1.1  2002/05/24 20:37:32  bkline
 # New Report Menu structure implemented.
 #
@@ -21,7 +24,8 @@ title   = "CDR Administration"
 section = "Summary and Miscellaneous Document Reports"
 SUBMENU = "Reports Menu"
 buttons = [SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-header  = cdrcgi.header(title, title, section, "Reports.py", buttons)
+header  = cdrcgi.header(title, title, section, "SummaryAndMiscReports.py", 
+                        buttons)
 
 #----------------------------------------------------------------------
 # Handle navigation requests.
@@ -46,13 +50,16 @@ form = """\
     <OL>
 """ % (cdrcgi.SESSION, session)
 reports = [
-           ('Stub.py', 'Bold/Underline QC Report'),
-           ('Stub.py', 'No Markup QC Report'),
-           ('Stub.py', 'Redline/Strikeout QC Report'),
-           ('MiscSearch.py', 'Miscellaneous Documents QC Report')
+           ('QcReport.py?DocType=Summary&ReportType=bu&', 
+            'Bold/Underline QC Report'),
+           ('QcReport.py?DocType=Summary&ReportType=nm&', 
+            'No Markup QC Report'),
+           ('QcReport.py?DocType=Summary&ReportType=rs&', 
+            'Redline/Strikeout QC Report'),
+           ('MiscSearch.py?', 'Miscellaneous Documents QC Report')
           ]
 for r in reports:
-    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI>\n" % (
+    form += "<LI><A HREF='%s/%s%s=%s'>%s</LI>\n" % (
             cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
 
 form += """\
