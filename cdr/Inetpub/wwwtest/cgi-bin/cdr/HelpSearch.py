@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: HelpSearch.py,v 1.1 2002-02-22 02:18:58 bkline Exp $
+# $Id: HelpSearch.py,v 1.2 2002-04-05 14:00:19 bkline Exp $
 #
 # Duplicate-checking interface for Help (Documentation) documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2002/02/22 02:18:58  bkline
+# Added advanced search page for Documentation documents.
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, cdrdb
 
@@ -160,7 +163,8 @@ searchFields = (cdrcgi.SearchField(docType,
                 cdrcgi.SearchField(function,
                             ("/Documentation/Metadata/Function",)),
                 cdrcgi.SearchField(keyword,
-                            ("/Documentation/Metadata/Subject",)),
+                            ("/Documentation/Metadata/Subject",
+                            ("/Documentation/Body/DocumentationTitle",)),
                 cdrcgi.SearchField(infoType,
                             ("/Documentation/@InfoType",)))
 
