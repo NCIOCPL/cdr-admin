@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: PubStatus.py,v 1.14 2004-02-27 18:40:05 venglisc Exp $
+# $Id: PubStatus.py,v 1.15 2004-03-19 18:48:35 venglisc Exp $
 #
 # Status of a publishing job.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.14  2004/02/27 18:40:05  venglisc
+# Added CTGovProtocol Document type to the report output.  Alphabetized the
+# display of the document types.
+#
 # Revision 1.13  2003/08/25 17:54:05  bkline
 # Replaced SQL queries for publication job report with queries that are:
 #  * much more efficient;
@@ -139,7 +143,7 @@ def dispJobStatus():
          <TD><FONT COLOR='black'>%s</FONT></TD>
         </TR>
         <TR>
-         <TD ALIGN='right' NOWRAP><B>Messages: &nbsp;</B></TD>
+         <TD ALIGN='right' valign='top' NOWRAP><B>Messages: &nbsp;</B></TD>
          <TD><FONT COLOR='black'>%s</FONT></TD>
         </TR>
        </TABLE>
@@ -1174,6 +1178,47 @@ def dispJobReport():
                     "by job %d: %s" % (cg_job, info[1][0]))
 
     #------------------------------------------------------------------
+    # Get the list of document types. 
+    # We need this so that we are able to display doc types even if
+    # there is no entry/count in the document table. The output of this
+    # query serves as the row label for the statistics Report output.
+    # We do this by selecting all known doc types from the last Export
+    # job and combine the result with all new doc types from the 
+    # current job (in case a new doc type gets introduces with a 
+    # hotfix). 
+    #------------------------------------------------------------------
+    try:      
+        cursor.execute("""\
+            SELECT DISTINCT t.name
+              FROM doc_type t
+              JOIN document d
+                ON d.doc_type = t.id
+              JOIN pub_proc_doc ppd
+                ON ppd.doc_id = d.id
+              JOIN pub_proc p
+                ON p.id = ppd.pub_proc
+             WHERE p.id = (SELECT MAX(id)
+                             FROM pub_proc
+                            WHERE pub_subset IN ('Full-Load', 'Export')
+                          )
+            UNION
+            SELECT DISTINCT t.name
+              FROM doc_type t
+              JOIN document d
+                ON d.doc_type = t.id
+              JOIN #new_docs n
+                ON n.doc_id = d.id
+             ORDER BY 1
+""")
+
+        docTypes = []
+        for row in cursor.fetchall():
+            if row[0]:
+               docTypes.append(row[0])
+    except cdrdb.Error, info:
+        cdrcgi.bail("Failure getting list of document types from pub_proc ")
+
+    #------------------------------------------------------------------
     # Build the report HTML.
     #------------------------------------------------------------------
     form = """  
@@ -1213,21 +1258,16 @@ def dispJobReport():
               """ % (vendor_job_name, vendor_job, cg_job_name, cg_job, 
                      numPublished, numAdded, numUpdated, numRemoved)
 
-    docTypes = ["Country",          "CTGovProtocol", "GlossaryTerm", 
-                "InScopeProtocol",  "Organization",  "Person", 
-                "PoliticalSubUnit", "Summary",       "Term"] 
-               
-
     form += """
         <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
         <BR>
-        <TABLE ALIGN='center' BORDER='1'>   
+        <TABLE WIDTH="50%%" ALIGN='center' BORDER='1'>   
            <TR>
-             <TD ALIGN='center' NOWRAP><B>DocType</B></TD>
-             <TD ALIGN='center' NOWRAP><B>Published</B></TD>
-             <TD ALIGN='center' NOWRAP><B>Added</B></TD>
-             <TD ALIGN='center' NOWRAP><B>Updated</B></TD>
-             <TD ALIGN='center' NOWRAP><B>Removed</B></TD>            
+             <TD              ALIGN='center'><B>DocType</B></TD>
+             <TD WIDTH="18%%" ALIGN='center'><B>Published</B></TD>
+             <TD WIDTH="18%%" ALIGN='center'><B>Added</B></TD>
+             <TD WIDTH="18%%" ALIGN='center'><B>Updated</B></TD>
+             <TD WIDTH="18%%" ALIGN='center'><B>Removed</B></TD>            
            </TR>
            """ % (cdrcgi.SESSION, session)
     ROW = """<TR>
