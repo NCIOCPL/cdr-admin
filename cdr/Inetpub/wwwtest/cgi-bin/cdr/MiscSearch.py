@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: MiscSearch.py,v 1.1 2001-12-01 18:11:44 bkline Exp $
+# $Id: MiscSearch.py,v 1.2 2002-05-30 16:59:23 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Miscellaneous documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2001/12/01 18:11:44  bkline
+# Initial revision
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, cdrdb
 
@@ -121,7 +124,7 @@ except cdrdb.Error, info:
 # Create the results page.
 #----------------------------------------------------------------------
 html = cdrcgi.advancedSearchResultsPage("Miscellaneous", rows, strings, 
-                                        "CDR266315")
+                                "name:Miscellaneous Document Report Filter")
 
 #----------------------------------------------------------------------
 # Send the page back to the browser.
