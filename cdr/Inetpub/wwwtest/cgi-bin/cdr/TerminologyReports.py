@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: TerminologyReports.py,v 1.4 2002-12-11 17:27:54 bkline Exp $
+# $Id: TerminologyReports.py,v 1.5 2003-05-08 20:27:27 bkline Exp $
 #
 # Submenu for terminology reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2002/12/11 17:27:54  bkline
+# Plugged in the new Intervention/Procedure terminology report.
+#
 # Revision 1.3  2002/07/01 14:00:56  bkline
 # Plugged in stub for Term by Type report.
 #
@@ -65,6 +68,7 @@ form += """\
     <OL>
 """
 reports = [
+           ('MenuHierarchy.py', 'Menu Hierarchy Report'),
            ('Stub.py', 'Term By Type'),
            ('InterventionAndProcedureTerms.py',
             'Intervention/Procedure Terms')
