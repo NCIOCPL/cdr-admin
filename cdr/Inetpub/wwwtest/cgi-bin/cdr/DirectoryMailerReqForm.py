@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: DirectoryMailerReqForm.py,v 1.2 2002-06-07 00:12:44 ameyer Exp $
+# $Id: DirectoryMailerReqForm.py,v 1.3 2002-09-26 15:13:06 ameyer Exp $
 #
 # Request form for all directory mailers.
 #
@@ -31,13 +31,16 @@
 # Bob Kline.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/06/07 00:12:44  ameyer
+# Continuing development.  This is still a pre-production version.
+#
 # Revision 1.1  2002/03/19 23:39:06  ameyer
 # CGI portion of the directory mailer selection software.
 # Displays menu, selects documents, initiates publishing job.
 #
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, string, cdrdb, cdrpubcgi, cdrmailcommon
+import cgi, cdr, cdrcgi, re, string, cdrdb, cdrmailcommon
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -140,6 +143,10 @@ if userPick == None:
 #   docType     = Document type of document to be mailed.
 #   timeType    = Why we're mailing - 'Initial', 'Update', or 'Remail'
 #   mailType    = MailerType enumeration from the Mailer tracking doc schema
+#                 All of the following must be identical:
+#                    this mailType
+#                    Mailer.xml schema /Mailer/MailType
+#                    Mailer publishing control doc, subset name
 #   orgMailType = For a remailer, the original mailType we are remailing
 #----------------------------------------------------------------------
 if userPick == 'PhysInit':
@@ -181,6 +188,7 @@ except cdrdb.Error, info:
 #----------------------------------------------------------------------
 # Find the publishing system control document.
 #----------------------------------------------------------------------
+# XXXX - SHOULDN'T NEED THIS, NEW VERSION OF cdr.publish USES TITLE
 try:
     cursor = conn.cursor()
     cursor.execute("""\
@@ -296,7 +304,7 @@ else:
     elif timeType == 'Remail':
         # Execute a query that builds a temporary table
         try:
-            rms = cdrmailcommon.RemailSelector (cursor)
+            rms = cdrmailcommon.RemailSelector (conn)
             rms.select (orgMailType)
 
             # And create one to fetch the doc ids from it
@@ -313,14 +321,22 @@ else:
     except cdrdb.Error, info:
         cdrcgi.bail("Failure retrieving document IDs: %s" % info[1][0])
 
+# Setup information to be made available to batch portion of the job
+jobParms = (('docType', docType), ('mailType', mailType),
+            ('timeType', timeType))
+
 # Drop the job into the queue.
-# Subset names in the publishing control document must match mailType
-result = cdrpubcgi.initNewJob(ctrlDocId, mailType, session, docList, [], email)
-if type(result) == type(""):
-    cdrcgi.bail(result)
-elif type(result) == type(u""):
-    cdrcgi.bail(result.encode('latin-1'))
-header  = cdrcgi.header(title, title, section, None, [])
+result = cdr.publish (credentials=session, pubSystem='Mailers',
+                      pubSubset=mailType, parms=jobParms, docList=docList,
+                      email=email)
+
+# cdr.publish returns a tuple of job id + messages
+# If serious error, job id = None
+if not result[0] or result[0] < 0:
+    cdrcgi.bail("Unable to initiate publishing job:<br>%s" % result[1])
+
+# Report, with link for status
+header = cdrcgi.header(title, title, section, None, [])
 html = """\
     <H3>Job Number %d Submitted</H3>
     <B>
