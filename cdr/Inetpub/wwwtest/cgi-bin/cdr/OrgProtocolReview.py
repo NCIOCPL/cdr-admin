@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: OrgProtocolReview.py,v 1.2 2003-08-25 20:18:05 bkline Exp $
+# $Id: OrgProtocolReview.py,v 1.3 2004-07-28 20:51:41 venglisc Exp $
 #
 # Report to assist editors in checking links to a specified org from
 # protocols.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2003/08/25 20:18:05  bkline
+# Converted to batch report.
+#
 # Revision 1.1  2003/08/11 15:50:11  bkline
 # Pure CGI version of report on protocols associated with an organization.
 #
@@ -50,18 +53,25 @@ if request == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
-# If we don't have a request, put up the request form.
+# If we don't have an email address raise an error 
 #----------------------------------------------------------------------
+if (name or id) and not email:
+   cdrcgi.bail("Email required to process this request")
+
+#----------------------------------------------------------------------
+# If we don't have a request, put up the request form.
 if not name and not id or not email:
     form = """\
-   <p>
+   <br/>
+   <b>
     This report requires a few minutes to complete.
     When the report processing has completed, email notification
     will be sent to the addresses specified below.  At least
     one email address must be provided.  If more than one
     address is specified, separate the addresses with a blank.
-   </p>
-   <br>
+   </b>
+   <br/>
+   <br/>
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
    <TABLE BORDER='0'>
     <TR>
