@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditFilters.py,v 1.3 2002-11-08 13:40:52 bkline Exp $
+# $Id: EditFilters.py,v 1.4 2003-02-25 20:04:49 pzhang Exp $
 #
 # Menu of existing filters.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2002/11/08 13:40:52  bkline
+# Added new report to show all top-level param for XSL/T filters.
+#
 # Revision 1.2  2002/09/13 17:08:52  bkline
 # Added View command and button to compare all filters between two
 # servers.
@@ -13,7 +16,7 @@
 # Easier access to CDR filter editing.
 #
 #----------------------------------------------------------------------
-import cgi, cdrcgi, cdrdb, sys
+import cgi, cdrcgi, cdrdb, sys, string, socket
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -23,6 +26,14 @@ session = cdrcgi.getSession(fields)
 request = cdrcgi.getRequest(fields)
 s1      = fields and fields.getvalue('s1') or None
 s2      = fields and fields.getvalue('s2') or None
+orderBy = fields and fields.getvalue('OrderBy') or None
+
+#----------------------------------------------------------------------
+# Edit only on Dev machine.
+#----------------------------------------------------------------------
+localhost = socket.gethostname()
+if string.upper(localhost) == "MAHLER":
+    localhost= "Dev"
 
 #----------------------------------------------------------------------
 # Make sure we're logged in.
@@ -73,13 +84,21 @@ if request == "New Filter":
 #----------------------------------------------------------------------
 title   = "CDR Administration"
 section = "Manage Filters"
-buttons = ["New Filter", "Filter Params", cdrcgi.MAINMENU, "Log Out"]
+if localhost == "Dev":
+    buttons = ["New Filter", "Filter Params", cdrcgi.MAINMENU, "Log Out"]
+else:
+    buttons = ["Filter Params", cdrcgi.MAINMENU, "Log Out"]
 script  = "EditFilters.py"
 header  = cdrcgi.header(title, title, section, script, buttons, numBreaks = 1)
 
 #----------------------------------------------------------------------
 # Show the list of existing filters.
 #----------------------------------------------------------------------
+if orderBy and orderBy == "DocId":
+    orderBy = "d.id, d.title"
+else:
+    orderBy = "d.title, d.id"
+
 try:
     conn = cdrdb.connect('CdrGuest')
     cursor = conn.cursor()
@@ -90,10 +109,12 @@ try:
             JOIN doc_type t
               ON t.id = d.doc_type
            WHERE t.name = 'Filter'
-        ORDER BY d.title, d.id""")
+        ORDER BY %s""" % orderBy)
     rows = cursor.fetchall()
 except cdrdb.Error, info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
+
+sortReq = "<A HREF='%s/EditFilters.py?%s=%s&OrderBy=%s'>%s</A>"
 form = """\
    <INPUT TYPE='submit' NAME='%s' VALUE='Compare Filters'>&nbsp;&nbsp;
    between
@@ -103,24 +124,32 @@ form = """\
    <H2>CDR Filters</H2>
    <TABLE border='1' cellspacing='0' cellpadding='2'>
     <TR>
-     <TD><B>DocId</B></TD>
+     <TD><B>%s</B></TD>
      <TD><B>Action</B></TD>
-     <TD><B>DocTitle</B></TD>
+     <TD><B>%s</B></TD>
     </TR>
-""" % cdrcgi.REQUEST
+""" % (cdrcgi.REQUEST,
+       sortReq % (cdrcgi.BASE, cdrcgi.SESSION, session, "DocId", "DocId"),
+       sortReq % (cdrcgi.BASE, cdrcgi.SESSION, session, "", "DocTitle")
+      )
+
+DevEdit = """
+          <A HREF='%s/EditFilter.py?%s=%s&Request=Load&DocId=CDR%010d'>Edit</A>
+          """ 
 
 for row in rows:
     form += """\
     <TR>
      <TD>CDR%010d</TD>
      <TD NOALIGN='1'>
-      <A HREF='%s/EditFilter.py?%s=%s&Request=Load&DocId=CDR%010d'>Edit</A>
+      %s
       <A HREF='%s/EditFilter.py?%s=%s&Request=View&DocId=CDR%010d'>View</A>
      </TD>
      <TD VALIGN='top'>%s</TD>
     </TR>
 """ % (row[0], 
-       cdrcgi.BASE, cdrcgi.SESSION, session, row[0],
+       (localhost == "Dev") and DevEdit % (cdrcgi.BASE, 
+                                cdrcgi.SESSION, session, row[0]) or "",
        cdrcgi.BASE, cdrcgi.SESSION, session, row[0],
        cgi.escape(row[1]))
 
