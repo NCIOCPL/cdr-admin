@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditFilters.py,v 1.2 2002-09-13 17:08:52 bkline Exp $
+# $Id: EditFilters.py,v 1.3 2002-11-08 13:40:52 bkline Exp $
 #
 # Menu of existing filters.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/09/13 17:08:52  bkline
+# Added View command and button to compare all filters between two
+# servers.
+#
 # Revision 1.1  2002/07/17 18:51:29  bkline
 # Easier access to CDR filter editing.
 #
@@ -30,6 +34,12 @@ if not session: cdrcgi.bail('Unknown or expired CDR session.')
 #----------------------------------------------------------------------
 if request == cdrcgi.MAINMENU:
     cdrcgi.navigateTo("Admin.py", session)
+
+#----------------------------------------------------------------------
+# Show top-level filter params.
+#----------------------------------------------------------------------
+if request == "Filter Params":
+    cdrcgi.navigateTo("GetXsltParams.py", session)
 
 #----------------------------------------------------------------------
 # Handle request to log out.
@@ -63,7 +73,7 @@ if request == "New Filter":
 #----------------------------------------------------------------------
 title   = "CDR Administration"
 section = "Manage Filters"
-buttons = ["New Filter", cdrcgi.MAINMENU, "Log Out"]
+buttons = ["New Filter", "Filter Params", cdrcgi.MAINMENU, "Log Out"]
 script  = "EditFilters.py"
 header  = cdrcgi.header(title, title, section, script, buttons, numBreaks = 1)
 
