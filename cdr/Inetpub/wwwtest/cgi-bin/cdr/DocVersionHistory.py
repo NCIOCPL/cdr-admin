@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: DocVersionHistory.py,v 1.7 2002-10-07 15:39:01 pzhang Exp $
+# $Id: DocVersionHistory.py,v 1.8 2002-10-10 19:15:26 bkline Exp $
 #
 # Show version history of document.
 #----------------------------------------------------------------------
@@ -246,7 +246,7 @@ html = """\
     </td>
     <td align='center' valign='top'>
      <b>
-      <font size='3'>PUBLICATION DATE</font>
+      <font size='3'>PUBLICATION DATE(S)</font>
      </b>
     </td>
    </tr>
@@ -262,36 +262,19 @@ html = """\
        modDate and modDate[:10] or "N/A")
 
 #----------------------------------------------------------------------
-# Build the report body.
+# Object to hold info for a single version.
 #----------------------------------------------------------------------
-try:
-    cursor.execute("""\
-         SELECT v.num, 
-                v.comment,
-                u.fullname,
-                v.dt,
-                v.val_status,
-                v.publishable,
-                d.completed
-           FROM doc_version v
-           JOIN usr u
-             ON u.id = v.usr
-LEFT OUTER JOIN primary_pub_doc d
-             ON d.doc_id = v.id
-            AND d.doc_version = v.num
-            AND d.failure is null
-          WHERE v.id = ?
-       ORDER BY v.num DESC,
-                d.completed""", intId)
-
-    lastVer = None
-    row = cursor.fetchone()
-    while row:
-        verNum, verComment, verUser, verDate, verValStatus, \
-            verPublishable, pubDate = row
-        if verNum != lastVer:
-            lastVer = verNum
-            html += """\
+class DocVersion:
+    def __init__(self, row):
+        self.num            = row[0]
+        self.pubDates       = row[1] and [row[1][:10]] or []
+        self.comment        = row[2]
+        self.user           = row[3]
+        self.date           = row[4][:10]
+        self.valStatus      = row[5]
+        self.publishable    = row[6]
+    def display(self):
+        return """\
    <tr>
     <td align = 'center' valign = 'top'>
      <font size = '3'>%d</font>
@@ -311,29 +294,56 @@ LEFT OUTER JOIN primary_pub_doc d
     <td align = 'center' valign = 'top'>
      <font size = '3'>%s</font>
     </td>
-""" % (verNum,
-       verComment or "&nbsp;",
-       verDate[:10],
-       verUser,
-       verValStatus,
-       verPublishable == 'Y' and 'Y' or 'N')
-        else:
-            html += """\
-   <tr>
-    <td>&nbsp;</td>
-    <td>&nbsp;</td>
-    <td>&nbsp;</td>
-    <td>&nbsp;</td>
-    <td>&nbsp;</td>
-    <td>&nbsp;</td>
-"""
-        html += """
     <td align = 'center' valign = 'top'>
      <font size = '3'>%s</font>
     </td>
    </tr>
-""" % (pubDate and pubDate[:10] or "&nbsp;")
+""" % (self.num,
+       self.comment or "&nbsp;",
+       self.date,
+       self.user,
+       self.valStatus,
+       self.publishable == 'Y' and 'Y' or 'N',
+       self.pubDates and "<br>".join(self.pubDates) or "&nbsp;")
+        
+#----------------------------------------------------------------------
+# Build the report body.
+#----------------------------------------------------------------------
+try:
+    cursor.execute("""\
+         SELECT v.num, 
+                d.completed,
+                v.comment,
+                u.fullname,
+                v.dt,
+                v.val_status,
+                v.publishable
+           FROM doc_version v
+           JOIN usr u
+             ON u.id = v.usr
+LEFT OUTER JOIN primary_pub_doc d
+             ON d.doc_id = v.id
+            AND d.doc_version = v.num
+            AND d.failure is null
+          WHERE v.id = ?
+       ORDER BY v.num DESC,
+                d.completed""", intId)
+
+    currentVer = None
+    row = cursor.fetchone()
+    while row:
+        if currentVer:
+            if currentVer.num == row[0]:
+                if row[1]:
+                    currentVer.pubDates.append(row[1][:10])
+            else:
+                html += currentVer.display()
+                currentVer = DocVersion(row)
+        else:
+            currentVer = DocVersion(row)
         row = cursor.fetchone()
+    if currentVer:
+        html += currentVer.display()
 
 except cdrdb.Error, info:
     cdrcgi.bail('Failure extracting version information: %s' % info[1][0])
