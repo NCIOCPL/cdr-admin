@@ -1,10 +1,12 @@
 #----------------------------------------------------------------------
 #
-# $Id: GetTree.py,v 1.1 2001-04-08 17:21:28 bkline Exp $
+# $Id: GetTree.py,v 1.2 2001-04-08 22:56:59 bkline Exp $
 #
 # Prototype for CDR Terminology tree viewer.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2001/04/08 17:21:28  bkline
+# Initial revision
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
@@ -41,59 +43,44 @@ html = """\
 
 def showTerm(term, offset, primaryTerm = 0):
     global html
+    termId = "CDR%010d" % string.atoi(term.id)
     if primaryTerm:
         html = html + "%s<FONT COLOR='red'><B>%s (%s)</B></FONT>\n" % (
-                #ffset and ('+' + '-' * offset) or '',
                 offset and (' ' * (offset - 1) * 2 + '+-') or '',
                 term.name, 
-                term.id)
+                termId)
     else:
         html = html + "%s<FONT COLOR='blue'>%s</FONT> "\
                       "(<A href='%s?id=%s'>%s</A>)\n" % (
-                #ffset and ('+' + '-' * offset) or '',
                 offset and (' ' * (offset - 1) * 2 + '+-') or '',
                 term.name, 
                 SCRIPT, 
-                term.id,
-                term.id)
+                termId,
+                termId)
 
-def showTermAndChildren(node, offset, primaryTerm = 0):
-    global html
-    if not offset:
-        html += "<H2>Hierarchy from %s</H2><PRE>\n" % node.name
-    showTerm(node, offset, primaryTerm)
+def showTree(node, level = 0):
+    global html, docId
+    if not level:
+        html += "<H3>Hierarchy from %s</H3><PRE>\n" % node.name
+    showTerm(node, level, node.id == docId)
     if node.children:
         for child in node.children:
-            showTermAndChildren(child, offset + 1)
-    if not offset:
-        html += "</PRE>\n"
-
-def showTree(tree, parentList):
-    global html
-    topParent = parentList[-1]
-    if topParent.parents:
-        for parent in topParent.parents:
-            showTree(tree, parentList + [parent])
-    else:
-        offset = 0
-        html = html + "<H2 COLOR='blue'>Hierarchy from %s</H2><PRE>\n" % topParent.name
-        parentList.reverse()
-        for parent in parentList:
-            showTerm(parent, offset)
-            offset = offset + 1
-        showTermAndChildren(tree, offset, 1)
-        html = html + "</PRE>\n"
+            showTree(child, level + 1)
+    if not level: html += "</PRE>\n"
 
 #----------------------------------------------------------------------
 # If we have a request, do it.
 #----------------------------------------------------------------------
 if docId:
-    tree = cdr.getTree(('rmk', '***REDACTED***'), docId)
-    if tree.error: cdrcgi.bail(tree.error)
-    if tree.parents:
-        for parent in tree.parents:
-            showTree(tree, [parent])
-    else: showTermAndChildren(tree, 0, 1)
+    termSet = cdr.getTree(('rmk', '***REDACTED***'), docId)
+    if termSet.error: cdrcgi.bail(tree.error)
+    roots = []
+    terms = termSet.terms
+    docId = `string.atoi(docId[3:])`
+    html += "<H2>%s</H2>\n" % terms[docId].name
+    for term in terms.values():
+        if not term.parents: roots.append(term.id)
+    for root in roots: showTree(terms[root])
 
 #----------------------------------------------------------------------
 # Send the page back to the browser.
