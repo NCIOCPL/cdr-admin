@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: Mailers.py,v 1.1 2001-12-01 18:11:44 bkline Exp $
+# $Id: Mailers.py,v 1.2 2001-12-25 01:19:06 bkline Exp $
 #
 # Main menu for mailer jobs.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2001/12/01 18:11:44  bkline
+# Initial revision
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
 
@@ -29,10 +32,12 @@ reports = [('PDQMailerRequestForm.py', 'PDQ Editorial Board Members Mailing'),
             'Protocol Abstract Update Mailer'),
            ('StatAndParticMailer.py', 
             'Protocol Status and Participant Initial Verification Mailer'),
+           ('StatAndParticUpdateMailer.py', 
+            'Protocol Status and Participant Update Verification Mailer'),
            ('NewPhysicianInitMailerReqForm.py', 'New Physician Initial Mailer')]
 
 for r in reports:
-    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI>\n" % (
+    form += "<LI><A HREF='%s/%s?%s=%s'>%s</A></LI>\n" % (
             cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
 
 form += """\
