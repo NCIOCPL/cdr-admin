@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolReports.py,v 1.10 2004-02-17 19:13:33 venglisc Exp $
+# $Id: ProtocolReports.py,v 1.11 2004-05-11 17:38:36 bkline Exp $
 #
 # Submenu for protocol reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.10  2004/02/17 19:13:33  venglisc
+# Removed unused Menu entries and alphabetized remaining entries.
+#
 # Revision 1.9  2003/05/08 20:24:01  bkline
 # New report for Office of Science Policy.
 #
@@ -33,7 +36,7 @@
 # New Report Menu structure implemented.
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, string
+import cgi, cdr, cdrcgi, re, string, time
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -79,26 +82,30 @@ form += """\
     <H3>Management Reports</H3>
     <OL>
 """
+filename = time.strftime('HotfixReport-%Y%m%d%H%M%S.xls')
 reports = [
            ('ApprovedNotYetActive.py',
-            'Approved Not Yet Active Report'),
+            'Approved Not Yet Active Report', ''),
            ('LiaisonReport.py', 
-            'NCI Liaison Office/Brussels Protocol Report'),
+            'NCI Liaison Office/Brussels Protocol Report', ''),
            ('NewlyPublishedTrials.py', 
-            'Newly Published Protocols'),
+            'Newly Published Protocols', ''),
            ('PreferredProtOrgs.py', 
-            'Preferred Protocol Organizations'),
+            'Preferred Protocol Organizations', ''),
+           ('HotfixReport.py',
+            'Protocol Hotfix Report',
+            '&filename=%s' % filename),
            ('ProtSitesWithoutPhone.py',
-            'Protocol Sites Without Phone Numbers'),
+            'Protocol Sites Without Phone Numbers', ''),
            ('ProtocolStatusChange.py',
-            'Protocol Status Change Report'),
+            'Protocol Status Change Report', ''),
            ('BogusActiveLeadOrgs.py',
-            'Protocols with Active Lead Orgs But No Active Sites'),
+            'Protocols with Active Lead Orgs But No Active Sites', ''),
            ('OSPReport.py',
-            'Report for Office of Science Policy')
+            'Report for Office of Science Policy', ''),
           ]
 for r in reports:
-    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI>\n" % (
-            cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
+    form += "<LI><A HREF='%s/%s?%s=%s%s'>%s</LI>\n" % (
+            cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[2], r[1])
 
 cdrcgi.sendPage(header + form + "</OL></FORM></BODY></HTML>")
