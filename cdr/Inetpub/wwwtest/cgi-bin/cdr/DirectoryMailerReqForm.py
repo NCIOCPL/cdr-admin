@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: DirectoryMailerReqForm.py,v 1.15 2003-02-04 22:00:24 ameyer Exp $
+# $Id: DirectoryMailerReqForm.py,v 1.16 2003-03-05 02:54:41 ameyer Exp $
 #
 # Request form for all directory mailers.
 #
@@ -31,6 +31,9 @@
 # Bob Kline.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.15  2003/02/04 22:00:24  ameyer
+# Increased timeouts from default 30 to 120 seconds on selection queries.
+#
 # Revision 1.14  2003/01/22 01:49:08  ameyer
 # Added check for returned row with nothing in it to validation of
 # single doc id entered by user.
@@ -311,6 +314,13 @@ if docId:
         cdrcgi.bail("Unable to find document type for id = %d: %s" %
                     (intId, info[1][0]))
 
+    # If it's a remailer, have to build a remail selector for it so
+    #   rest of software knows what to do
+    if timeType == 'Remail':
+        rms = cdrmailcommon.RemailSelector (conn)
+        if rms.select ("'%s'" % orgMailType, singleId = intId) == 0:
+            cdrcgi.bail("Can't remail document - no mailer found")
+
 
 else:
     #------------------------------------------------------------------
@@ -540,7 +550,7 @@ else:
 # Do we have any results?
 docCount = len(docList)
 if docCount == 0:
-    cdrcgi.bail ("No documents found")
+    cdrcgi.bail ("No documents found that qualify for this mailer type")
 
 # Compose the docList results into a format that cdr.publish() wants
 #   e.g., id=25, version=3, then form: "CDR0000000025/3"
