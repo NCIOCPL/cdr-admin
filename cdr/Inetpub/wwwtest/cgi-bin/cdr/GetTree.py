@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GetTree.py,v 1.5 2001-07-13 17:00:28 bkline Exp $
+# $Id: GetTree.py,v 1.6 2002-01-02 20:45:01 bkline Exp $
 #
 # Prototype for CDR Terminology tree viewer.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2001/07/13 17:00:28  bkline
+# Added links to the formatted Term documents.
+#
 # Revision 1.4  2001/04/09 17:50:02  bkline
 # Fixed bug in call to cdr.normalize().
 #
@@ -56,7 +59,7 @@ def showTerm(term, offset, primaryTerm = 0):
     termId = "CDR%010d" % string.atoi(term.id)
     coloredId = "<FONT COLOR='%s'>%s</FONT>" % (
                     primaryTerm and 'red' or 'blue', termId)
-    termName = "<A HREF='%s?DocId=%s&Filter=CDR190732'><FONT COLOR='%s'>"\
+    termName = "<A HREF='%s?DocId=%s&Filter=name:Terminology QC Report'><FONT COLOR='%s'>"\
                "%s</FONT></A>" % (
                     FILTER, termId, primaryTerm and 'red' or 'blue', term.name)
     if primaryTerm:
@@ -87,7 +90,7 @@ def showTree(node, level = 0):
 #----------------------------------------------------------------------
 if docId:
     termSet = cdr.getTree(('rmk', '***REDACTED***'), docId)
-    if termSet.error: cdrcgi.bail(tree.error)
+    if termSet.error: cdrcgi.bail(termSet.error)
     roots = []
     terms = termSet.terms
     docId = `string.atoi(docId[3:])`
