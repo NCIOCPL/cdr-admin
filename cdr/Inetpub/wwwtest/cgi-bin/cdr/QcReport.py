@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.35 2004-03-06 23:23:37 bkline Exp $
+# $Id: QcReport.py,v 1.36 2004-04-02 19:46:20 venglisc Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.35  2004/03/06 23:23:37  bkline
+# Added code to replace @@CTGOV_PROTOCOLS@@.
+#
 # Revision 1.34  2004/01/14 18:45:22  venglisc
 # Modified user input form to allow Reformatted Patient Summaries to use the
 # Comment element as well as Redline/Strikeout and Bold/Under reports.
@@ -483,10 +486,17 @@ def fixPersonReport(doc):
     row    = cursor.fetchone()
     doc    = fixMailerInfo(doc)
     counts = getDocsLinkingToPerson(intId)
-    doc    = re.sub("@@ACTIVE_APPR0VED_TEMPORARILY_CLOSED_PROTOCOLS@@",
+    #cdrcgi.bail("doctype = %s" % docType)
+    # ---------------------------------------------------------
+    # Suppress replacing the strings if this function is called
+    # for the Organization docType
+    # ---------------------------------------------------------
+    if docType != 'Organization':
+       doc    = re.sub("@@ACTIVE_APPR0VED_TEMPORARILY_CLOSED_PROTOCOLS@@",
                     counts[0] and "Yes" or "No", doc)
-    doc    = re.sub("@@CLOSED_COMPLETED_PROTOCOLS@@",
+       doc    = re.sub("@@CLOSED_COMPLETED_PROTOCOLS@@",
                     counts[1] and "Yes" or "No", doc)
+
     doc    = re.sub("@@HEALTH_PROFESSIONAL_SUMMARIES@@",
                     counts[2] and "Yes" or "No", doc)
     doc    = re.sub("@@PATIENT_SUMMARIES@@",
@@ -522,6 +532,48 @@ def fixCTGovProtocol(doc):
     #cdrcgi.bail("NPI=" + noPdqIndexing)
     return doc.replace("@@NOPDQINDEXING@@", noPdqIndexing)
         
+
+#----------------------------------------------------------------------
+# Plug in pieces that XSL/T can't get to for an Organization QC report.
+#----------------------------------------------------------------------
+def fixOrgReport(doc):
+    counts = [0, 0]
+    # -----------------------------------------------------------------
+    # Database query to count all protocols that link to this 
+    # organization split by Active and Closed protocol status.
+    # -----------------------------------------------------------------
+    cursor.execute("""\
+    SELECT count(prot.doc_id) AS prot_count, 
+           CASE WHEN prot.value = 'Completed'               THEN 'Closed'
+                WHEN prot.value = 'Temporarily closed'      THEN 'Active'
+                WHEN prot.value = 'Approved-not yet active' THEN 'Active'
+                ELSE prot.value END as status
+      FROM query_term prot
+      JOIN query_term org
+        ON prot.doc_id = org.doc_id
+     WHERE prot.path ='/InScopeProtocol/ProtocolAdminInfo/CurrentProtocolStatus'
+       AND prot.value in ('Active', 'Temporarily closed', 
+                          'Approved-not yet active', 'Closed', 'Completed') 
+       AND org.int_val = ?
+     GROUP BY prot.value""", intId)
+
+    # -------------------------------------------------------
+    # Assign protocol count to counts list items
+    # -------------------------------------------------------
+    rows = cursor.fetchall()
+    for row in rows:
+        if row[1] == 'Active':        counts[0] += row[0]
+        if row[1] == 'Closed':        counts[1] += row[0]
+
+    # -----------------------------------------------------------------
+    # Substitute @@...@@ strings with Yes/No based on the count
+    # from the query.  If counts[] = 0 ==> "No", "Yes" otherwise
+    # -----------------------------------------------------------------
+    doc    = re.sub("@@ACTIVE_APPR0VED_TEMPORARILY_CLOSED_PROTOCOLS@@",
+                    counts[0] and "Yes" or "No", doc)
+    doc    = re.sub("@@CLOSED_COMPLETED_PROTOCOLS@@",
+                    counts[1] and "Yes" or "No", doc)
+    return doc
 
 #----------------------------------------------------------------------
 # Filter the document.
@@ -587,7 +639,15 @@ doc = re.sub("@@DOCID@@", docId, doc)
 if docType == 'Person':
     doc = fixPersonReport(doc)
 elif docType == 'Organization':
+    # -----------------------------------------------------
+    # We call the fixPersonReport for Organizations to 
+    # since Person and Orgs have the Record Info and 
+    # Most Recent Mailer Info in common.
+    # The resulting document goes through the fixOrgReport
+    # module to resolve the protocol link entries
+    # -----------------------------------------------------
     doc = fixPersonReport(doc)
+    doc = fixOrgReport(doc)
 elif docType == 'CTGovProtocol':
     doc = fixCTGovProtocol(doc)
     
