@@ -1,8 +1,11 @@
 #----------------------------------------------------------------------
 #
-# $Id: EmailerReview.py,v 1.1 2004-07-13 18:02:48 bkline Exp $
+# $Id: EmailerReview.py,v 1.2 2005-02-19 23:49:22 bkline Exp $
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2004/07/13 18:02:48  bkline
+# Administrative support for electronic mailers.
+#
 #----------------------------------------------------------------------
 import cdrdb, glob, xml.dom.minidom, os, sys, cgi, cdrcgi, cdr, cdrmailcommon
 import tarfile
@@ -138,6 +141,13 @@ if not jobId:
 </html>
 """
     cdrcgi.sendPage(html)
+#----------------------------------------------------------------------
+# Dig the pub_subset value out of the manifest file.
+#----------------------------------------------------------------------
+def lookupMailerType():
+    dom = xml.minidom.parse('manifest.xml')
+    mailerType = dom.documentElement.getAttribute('PubSubset')
+    return mailerType or "Unknown"
 
 #----------------------------------------------------------------------
 # Display the components of a single emailer job.
@@ -152,6 +162,7 @@ if action == 'Send Job':
     rows = emCursor.fetchall()
     if rows[0][0]:
         cdrcgi.bail("Job %s already sent" % jobId)
+    mailerType = lookupMailerType()
     #result = cdr.runCommand("d:\\bin\\zip ../%s *" % jobName)
     #if result.code:
     #    cdrcgi.bail("Failure creating archive for %s: %s" % (jobName,
@@ -166,8 +177,10 @@ if action == 'Send Job':
     package = file.read()
     file.close()
     emCursor.execute("""\
-        INSERT INTO emailer_job (id, archive, archive_type, uploaded)
-             VALUES (%s, %s, %s, NOW())""", (jobId, package, "tarfile"))
+        INSERT INTO emailer_job (id, archive, archive_type, uploaded,
+                                 mailer_type)
+             VALUES (%s, %s, %s, NOW(), %s)""", (jobId, package, "tarfile",
+                                                 mailerType))
     emConn.commit()
 
 if rtsBatch:
