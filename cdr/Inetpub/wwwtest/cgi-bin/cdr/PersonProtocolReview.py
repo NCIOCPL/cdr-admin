@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: PersonProtocolReview.py,v 1.1 2002-05-22 18:42:11 bkline Exp $
+# $Id: PersonProtocolReview.py,v 1.2 2002-05-23 15:01:22 bkline Exp $
 #
 # Report to assist editors in checking links to a specified person from
 # protocols.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2002/05/22 18:42:11  bkline
+# Lists all the protocols which link to a specified Person document.
+#
 #----------------------------------------------------------------------
 
 import cdr, cdrdb, cdrcgi, cgi, re, string, time, xml.dom.minidom
@@ -208,10 +211,8 @@ class P2PLink:
         self.orgRoles           = orgRoles
         self.specificContact    = specificContact
         self.sortKey            = 100
-        if linkType == 'PrivatePracticeSite':
+        if linkType in ('PrivatePracticeSite', 'SpecificPerson'):
             self.sortKey        = 200
-        if linkType == 'SpecificPerson':
-            self.sortKey        = 300
         if 'Active' in statuses:
             self.sortKey       += 1
         elif 'Approved-not yet active' in statuses:
