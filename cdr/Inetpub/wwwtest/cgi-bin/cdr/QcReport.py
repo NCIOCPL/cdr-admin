@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.5 2002-06-06 15:01:06 bkline Exp $
+# $Id: QcReport.py,v 1.6 2002-06-24 17:15:24 bkline Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2002/06/06 15:01:06  bkline
+# Switched to GET HTTP method so "Edit with Microsoft Word" will work in IE.
+#
 # Revision 1.4  2002/06/06 12:01:08  bkline
 # Custom handling for Person and Summary QC reports.
 #
@@ -218,6 +221,36 @@ if not docType:
                                                                  info[1][0]))
 
 #----------------------------------------------------------------------
+# Get count of links to a person document from protocols and summaries.
+# Returns a list of 4 numbers:
+#  * Count of linking active, approved, or temporarily closed protocols
+#  * Count of linking closed or completed protocols
+#  * Count of linking health professional summaries
+#  * Count of linking patient summaries
+#----------------------------------------------------------------------
+def getDocsLinkingToPerson(docId):
+    counts = [0, 0, 0, 0]
+    statusValues = [ ('Active',
+                      'Approved-not yet active', 
+                      'Temporarily Closed'),
+                     ('Closed',
+                      'Completed')
+                   ]
+
+    try:
+        cursor.callproc('cdr_get_count_of_links_to_persons', docId)
+        for row in cursor.fetchall():
+            if row[1] in statusValues[0]:        counts[0] += row[0]
+            if row[1] in statusValues[1]:        counts[1] += row[0]
+        cursor.nextset()
+        for row in cursor.fetchall():
+            if row[1] == 'Health professionals': counts[2] += row[0]
+            if row[1] == 'Patients':             counts[3] += row[0]
+    except cdrdb.Error, info:    
+        cdrcgi.bail('Failure retrieving link counts: %s' % info[1][0])
+    return counts
+
+#----------------------------------------------------------------------
 # Plug in pieces that XSL/T can't get to for a Person QC report.
 #----------------------------------------------------------------------
 def fixPersonReport(doc):
@@ -262,9 +295,18 @@ def fixPersonReport(doc):
     except cdrdb.Error, info:    
         cdrcgi.bail('Failure retrieving mailer info for %s: %s' % (docId, 
                                                                    info[1][0]))
+    counts = getDocsLinkingToPerson(intId)
     doc = re.sub("@@MAILER_DATE_SENT@@",         mailerDateSent,         doc)
     doc = re.sub("@@MAILER_RESPONSE_RECEIVED@@", mailerResponseReceived, doc)
     doc = re.sub("@@MAILER_TYPE_OF_CHANGE@@",    mailerTypeOfChange,     doc)
+    doc = re.sub("@@ACTIVE_APPR0VED_TEMPORARILY_CLOSED_PROTOCOLS@@",
+                 counts[0] and "Yes" or "No", doc)
+    doc = re.sub("@@CLOSED_COMPLETED_PROTOCOLS@@",
+                 counts[1] and "Yes" or "No", doc)
+    doc = re.sub("@@HEALTH_PROFESSIONAL_SUMMARIES@@",
+                 counts[2] and "Yes" or "No", doc)
+    doc = re.sub("@@PATIENT_SUMMARIES@@",
+                 counts[3] and "Yes" or "No", doc)
     return doc
 
 #----------------------------------------------------------------------
