@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermPhrases.py,v 1.1 2004-05-11 17:58:51 bkline Exp $
+# $Id: GlossaryTermPhrases.py,v 1.2 2004-08-12 13:43:28 bkline Exp $
 #
 # Report on phrases matching specified glossary term.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2004/05/11 17:58:51  bkline
+# Report on phrases matching specified glossary term.
+#
 #----------------------------------------------------------------------
 
 import cdr, cdrdb, cdrcgi, cgi, re, cdrbatch, socket
@@ -15,9 +18,12 @@ import cdr, cdrdb, cdrcgi, cgi, re, cdrbatch, socket
 fields   = cgi.FieldStorage()
 session  = cdrcgi.getSession(fields)
 request  = cdrcgi.getRequest(fields)
-id       = fields and fields.getvalue('Id')    or None
-name     = fields and fields.getvalue('Name')  or None
-email    = fields and fields.getvalue("Email") or cdr.getEmail(session)
+id       = fields and fields.getvalue('Id')      or None
+name     = fields and fields.getvalue('Name')    or None
+hp       = fields and fields.getvalue('hp')      or None
+patient  = fields and fields.getvalue('patient') or None
+trials   = fields and fields.getvalue('trials')  or None
+email    = fields and fields.getvalue("Email")   or cdr.getEmail(session)
 SUBMENU  = "Report Menu"
 buttons  = ["Submit Request", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 script   = "GlossaryTermPhrases.py"
@@ -66,13 +72,17 @@ if not name and not id or not email:
     </TR>
     <TR>
      <TD ALIGN='right'><B>Glossary Term Name:&nbsp;</B></TD>
-     <TD><INPUT NAME='Name'>
-     </TD>
+     <TD><INPUT NAME='Name'></TD>
     </TR>
     <TR>
      <TD ALIGN='right'><B>Email:&nbsp;</B></TD>
-     <TD><INPUT NAME='Email'>
-     </TD>
+     <TD><INPUT NAME='Email'></TD>
+    </TR>
+    <TR>
+     <TD ALIGN='right' VALIGN='top'><B>Document Type:&nbsp;</B></TD>
+     <TD><INPUT TYPE='checkbox' NAME='hp'>Health Professional Summaries<BR>
+         <INPUT TYPE='checkbox' NAME='patient'>Patient Summaries<BR>
+         <INPUT TYPE='checkbox' NAME='trials'>Patient Abstracts</TD>
     </TR>
    </TABLE>
    <BR>
@@ -82,6 +92,12 @@ if not name and not id or not email:
 </HTML>
 """ % (cdrcgi.SESSION, session, id and (" VALUE='%s'" % id) or "")
     cdrcgi.sendPage(header + form)
+
+#----------------------------------------------------------------------
+# Make sure the user has selected at least one document type.
+#----------------------------------------------------------------------
+if not hp and not patient and not trials:
+    cdrcgi.bail("No document type selected")
 
 #----------------------------------------------------------------------
 # Allow the user to select from a list of protocols matching title string.
@@ -97,14 +113,16 @@ def putUpSelection(rows):
     form = u"""\
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
    <INPUT TYPE='hidden' NAME='Email' VALUE='%s'>
-   <H3>Select organization for report:<H3>
+   <INPUT TYPE='hidden' NAME='hp' VALUE='%s'>
+   <INPUT TYPE='hidden' NAME='patient' VALUE='%s'>
+   <H3>Select term for report:<H3>
    <SELECT NAME='Id'>
     %s
    </SELECT>
   </FORM>
  </BODY>
 </HTML>
-""" % (cdrcgi.SESSION, session, email or "", options)
+""" % (cdrcgi.SESSION, session, email or "", hp or "", patient or "", options)
     cdrcgi.sendPage(header + form)
     
 #----------------------------------------------------------------------
@@ -137,7 +155,15 @@ else:
 #----------------------------------------------------------------------    
 # If we get here, we're ready to queue up a request for the report.
 #----------------------------------------------------------------------
-args = (("id", str(id)),)
+doctypes = ""
+if trials:
+    doctypes = "PatientAbstracts "
+if hp:
+    doctypes += "HPSummaries "
+if patient:
+    doctypes += "PatientSummaries"
+doctypes = doctypes.strip()
+args = (("id", str(id)),("types", doctypes))
 
 batch = cdrbatch.CdrBatch(jobName = "Glossary Term Search",
                           command = command, email = email,
