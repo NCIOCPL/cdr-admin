@@ -1,10 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummariesTocReport.py,v 1.1 2004-07-13 20:11:36 venglisc Exp $
+# $Id: SummariesTocReport.py,v 1.2 2004-08-16 20:03:24 venglisc Exp $
 #
 # Report on lists of summaries.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2004/07/13 20:11:36  venglisc
+# Initial version of program to display a list of Summary Section Titles by
+# summary board (Bug 1231).
+# The user interface has been "borrowed" from SummariesLists.py.
+#
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string, cdrdb, time
@@ -95,34 +100,45 @@ if not lang:
     </tr>
    </table>
  
-   <table>
-    <tr>
-    <td>
-    <table>
-    <tr>
-     <td width='160'>
-      <input name='audience' type='radio' value='Health Professional' CHECKED>
-      <b>Health Professional</b>
-     </td>
-     <td width='160'>
-      <input name='showId' type='radio' value='Y'><b>With CDR ID</b>
-     </td>
-    </tr>
+   <table border="0">
     <tr>
      <td>
-      <input name='audience' type='radio' value='Patient'>
-       <b>Patient</b>
+      <table border="0">
+       <tr>
+        <td nowrap>
+         <input name='audience' type='radio' value='Health Professional' CHECKED>
+         <b>Health Professional</b>
+        </td>
+        <td nowrap>
+         <input name='showId' type='radio' value='Y'>
+	 <b>With CDR ID</b>
+        </td>
+       </tr>
+       <tr>
+        <td nowrap>
+         <input name='audience' type='radio' value='Patient'>
+          <b>Patient</b>
+        </td>
+        <td nowrap>
+         <input name='showId' type='radio' value='N' CHECKED>
+	 <b>Without CDR ID</b>
+        </td>
+       </tr>
+      </table>
      </td>
-     <td>
-      <input name='showId' type='radio' value='N' CHECKED><b>Without CDR ID</b>
+     <td valign='center'>
+      <table border="0">
+       <tr>
+        <td>
+         <input name='tocLevel' type='text' size='1' value='3' CHECKED>
+	</td>
+	<td>
+         <b>TOC Levels Displayed</b> 
+        </td>
+        <td>(QC Report uses "3"; <br>leave blank to see all levels)</td>
+       </tr>
+      </table>
      </td>
-    </tr>
-    </table>
-    </td>
-    <td valign='center'>
-      <input name='tocLevel' type='text' size='1' value='3' CHECKED>
-      <b>TOC Levels Displayed</b> (QC Report uses "3")
-    </td>
     </tr>
    </table>
 
@@ -379,7 +395,11 @@ instr     = 'Section Titles for %s Summaries -- %s.' % (lang, dateString)
 header    = cdrcgi.header(title, title, instr, script, buttons, 
                           stylesheet = """\
    <STYLE type="text/css">
-    UL      { margin: 0pt; }
+    UL             { margin: 0pt; }
+    UL UL          { margin-left: 30pt; }
+    UL UL UL       { margin-left: 30pt; }
+    UL UL UL UL    { margin-left: 30pt; }
+    UL UL UL UL UL { margin-left: 30pt; }
     LI      { font-style: normal;
 	      font-family: Arial;
               font-weight: normal; 
