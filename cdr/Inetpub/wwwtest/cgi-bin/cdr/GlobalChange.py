@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------
-# $Id: GlobalChange.py,v 1.17 2004-02-26 22:06:32 ameyer Exp $
+# $Id: GlobalChange.py,v 1.18 2004-07-07 00:24:34 ameyer Exp $
 #
 # Perform global changes on XML records in the database.
 #
@@ -14,6 +14,11 @@
 # present the next one - to the end.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.17  2004/02/26 22:06:32  ameyer
+# Modified document id list handling to pass an actual list passed via
+# the database rather than a list parsable string.  Overcomes database
+# value length limit.
+#
 # Revision 1.16  2004/02/19 15:33:29  ameyer
 # Added, but commented out, use of cgitb.
 #
@@ -203,6 +208,7 @@ ssVars[cdrcgi.SESSION] = session
 # Not all of these will be present
 for fd in ('docType', 'email', 'specificPhone', 'specificRole',
                 'coopType', 'coopChk',
+           'typeCDR', 'typeCTG',
            'fromId', 'fromName', 'fromTitle', 'fromFragChk',
            'toId', 'toName', 'toTitle', 'toFragChk',
            'restrId', 'restrName', 'restrTitle', 'restrChk', 'restrFragChk',
