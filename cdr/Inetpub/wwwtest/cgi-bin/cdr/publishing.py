@@ -2,8 +2,11 @@
 #
 # Publishing CGI script.
 #
-# $Id: publishing.py,v 1.18 2002-11-05 18:42:30 pzhang Exp $
+# $Id: publishing.py,v 1.19 2002-11-05 21:26:27 pzhang Exp $
 # $Log: not supported by cvs2svn $
+# Revision 1.18  2002/11/05 18:42:30  pzhang
+# Changed New to Current
+#
 # Revision 1.17  2002/11/05 16:04:34  pzhang
 # Enhanced interface per Eileen's input
 #
@@ -105,7 +108,8 @@ class Display:
         for s in pickList:
             pubsys[1] = "%s" % s[1]
             pubsys[2] = "%s" % s[2]
-            pubsys[3] = "%s [Version %s]:&nbsp;&nbsp;%s" % (s[0], s[2], s[3])            
+            pubsys[3] = "%s [Version %s]<BR><FONT SIZE=3>%s</FONT>" % (
+                s[0], s[2], s[3])            
             deep = copy.deepcopy(pubsys)
             publishes.append(deep)
         if type(publishes) == type(""): cdrcgi.bail(publishes)    
@@ -136,7 +140,7 @@ class Display:
         for s in pickList:
             subset[1] =  s[1] 
             subset[2] = s[1]
-            subset[2] += ":&nbsp;&nbsp;"  + s[2]
+            subset[2] += "<BR><FONT SIZE=3>%s</FONT>" % s[2]
             #subset[2] += "<BR>[Params]: &nbsp;" + s[3]             
             #subset[2] += "<BR>[UserSel]: &nbsp;"  + s[4]  
             subset[2] += "<BR><BR>"            
@@ -230,10 +234,11 @@ class Display:
                 elif r[2] == "Yes" or r[2] == "No":
                
                     # Create a picklist for parameter name/value pairs.
-                    pickList = "<SELECT NAME='%s'>\n<OPTION>Yes</OPTION>"
-                    pickList += "\n<OPTION>No</OPTION>\n</SELECT>" 
+                    YesNo = (r[2] == "No") and "Yes" or "No"
+                    pickList = "<SELECT NAME='%s'>\n<OPTION>%s</OPTION>"
+                    pickList += "\n<OPTION>%s</OPTION>\n</SELECT>" 
                     form += "<TR><TD>%s</TD><TD>%s</TD><TD>%s</TD></TR>\n" % (
-                        r[1], r[2], pickList % r[1])
+                        r[1], r[2], pickList % (r[1], r[2], YesNo))
                 else:
                     form += """<TR><TD>%s</TD><TD>%s</TD><TD><INPUT \
                         NAME='%s' VALUE='%s'></TD></TR>\n""" % (r[1], r[2], 
