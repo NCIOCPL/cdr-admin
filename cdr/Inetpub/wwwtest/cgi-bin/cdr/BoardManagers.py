@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
 #
-# $Id: BoardManagers.py,v 1.9 2004-09-09 19:19:44 venglisc Exp $
+# $Id: BoardManagers.py,v 1.10 2005-02-23 14:38:01 bkline Exp $
 #
 # Main menu for board managers.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.9  2004/09/09 19:19:44  venglisc
+# Minor changes to menu entries to have menu items match between the
+# CIAT and CIPS summary menu. (Bug 1329).
+#
 # Revision 1.8  2004/07/13 19:11:14  venglisc
 # Added menu item for Summaries TOC Report (Bug 1231).
 # Minor formatting changes to list HTML tags in upper case.
@@ -124,6 +128,11 @@ cdrcgi.sendPage(header + form + """\
    <OL>
     <LI><a href='%s/MiscSearch.py?%s'>Miscellaneous Documents</a></LI>
    </OL>
+   <H2>Mailers</H2>
+   <OL>
+    <LI><a href='%s/BoardMemberMailerReqForm.py?%s'>PDQ&reg; Board
+     Member Correspondence Mailers</a></LI>
+   </OL>
   </FORM>
  </BODY>
-</HTML>""" % (cdrcgi.BASE, session))
+</HTML>""" % (cdrcgi.BASE, session, cdrcgi.BASE, session))
