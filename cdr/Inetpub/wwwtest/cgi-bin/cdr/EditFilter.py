@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditFilter.py,v 1.7 2002-07-29 19:23:37 bkline Exp $
+# $Id: EditFilter.py,v 1.8 2002-09-07 13:14:25 bkline Exp $
 #
 # Prototype for editing CDR filter documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.7  2002/07/29 19:23:37  bkline
+# Fixed some bail() calls (had wrong first arg.
+#
 # Revision 1.6  2002/06/26 11:46:45  bkline
 # Added option to version document.
 #
@@ -26,7 +29,7 @@
 #----------------------------------------------------------------------
 # Import required modules.
 #----------------------------------------------------------------------
-import cgi, cdr, re, cdrcgi, sys
+import cgi, cdr, cdrdb, os, re, cdrcgi, sys, tempfile
 
 #----------------------------------------------------------------------
 # Set some initial values.
@@ -53,11 +56,14 @@ BLANKDOC = """\
 #----------------------------------------------------------------------
 # Load the fields from the form.
 #----------------------------------------------------------------------
-fields  = cgi.FieldStorage()
+fields     = cgi.FieldStorage()
 if not fields: cdrcgi.bail("Unable to read form fields", banner)
-session = cdrcgi.getSession(fields)
-request = cdrcgi.getRequest(fields)
-version = fields.getvalue('version')
+session    = cdrcgi.getSession(fields)
+request    = cdrcgi.getRequest(fields)
+version    = fields.getvalue('version')
+cvsid      = fields.getvalue('cvsid')
+cvspw      = fields.getvalue('cvspw')
+cvscomment = fields.getvalue('cvscomment')
 if not session: cdrcgi.bail("Unable to log into CDR Server", banner)
 if not request: cdrcgi.bail("No request submitted", banner)
 
@@ -69,10 +75,39 @@ def showForm(doc, subBanner, buttons):
     verField = "<INPUT NAME='version' TYPE='checkbox'%s>&nbsp;" \
                "Create new version for Save, Checkin, or Clone<BR><BR>" % (
                version and " CHECKED" or "")
-    html = hdr + ("<CENTER>%s<TEXTAREA NAME='Doc' ROWS='20' COLS='80'>%s"
-                  "</TEXTAREA><INPUT TYPE='hidden' NAME='%s' VALUE='%s'>"
-                  "</FORM></CENTER></BODY></HTML>"
-                  % (verField, doc.replace('\r', ''), cdrcgi.SESSION, session))
+    html = hdr + """\
+    <input name='version' type='checkbox'%s>
+    Create new version for Save, Checkin or Clone? 
+    <table border=0>
+     <tr>
+      <td align='right' nowrap=1>CVS user ID:&nbsp;</td>
+      <td><input name='cvsid' value='%s'></td>
+     </tr>
+     <tr>
+      <td align='right' nowrap=1>CVS password:&nbsp;</td>
+      <td><input type='password' name='cvspw' value='%s'></td>
+     </tr>
+     <tr>
+      <td align=right nowrap=1>CVS comment:&nbsp;</td>
+      <td><input name='cvscomment' value='%s' size=50></td>
+     </tr>
+    </table>
+     (Fill in CVS user ID, password, and comment if you are 
+      creating a new version.)
+    <br>
+    <br>
+    <textarea name='Doc' rows='20' cols='80'>%s</textarea>
+   <input type='hidden' name='%s' value='%s'>
+  </form>
+ </body>
+</html>
+""" % (version and " CHECKED" or "",
+       cvsid or '',
+       cvspw or '',
+       cvscomment and cgi.escape(cvscomment, 1) or '',
+       doc.replace('\r', ''),
+       cdrcgi.SESSION,
+       session)
     cdrcgi.sendPage(html)
 
 #----------------------------------------------------------------------
@@ -81,7 +116,219 @@ def showForm(doc, subBanner, buttons):
 def stripId(doc):
     pattern = re.compile("(.*<CdrDoc[^>]*)\sId='[^']*'(.*)", re.DOTALL)
     return pattern.sub(r'\1\2', doc)
-  
+
+#----------------------------------------------------------------------
+# Object for results of an external command.
+#----------------------------------------------------------------------
+class CommandResult:
+    def __init__(self, code, output):
+        self.code   = code
+        self.output = output
+
+#----------------------------------------------------------------------
+# Run an external command.
+#----------------------------------------------------------------------
+def runCommand(command):
+    commandStream = os.popen('%s 2>&1' % command)
+    output = commandStream.read()
+    code = commandStream.close()
+    return CommandResult(code, output)
+
+#----------------------------------------------------------------------
+# Don't leave dross around if we can help it.
+#----------------------------------------------------------------------
+def cvsCleanup(abspath, cvsroot = None):
+    try:
+        os.chdir(abspath)
+        if cvsroot:
+            runCommand("cvs -Q %s release -d filt" % cvsroot)
+        os.chdir("..")
+        runCommand("rm -rf %s" % abspath)
+    except:
+        pass
+
+#----------------------------------------------------------------------
+# Find id of document on production server; create doc if necessary.
+#----------------------------------------------------------------------
+def getProdId(docId, doc, session):
+    try:
+        # Find out what the title is.
+        id = int(re.sub(r'[^\d]+', '', docId))
+        conn = cdrdb.connect('CdrGuest')
+        devCursor = conn.cursor()
+        devCursor.execute("""\
+                SELECT title
+                  FROM document
+                 WHERE id = ?""", id)
+        row = devCursor.fetchone()
+        if not row:
+            cdrcgi.bail("Cannot find title for %s" % docId)
+        title = row[0]
+
+        # Look up the ID on the production server using the title.
+        conn = cdrdb.connect('CdrGuest', dataSource = cdr.PROD_HOST)
+        prodCursor = conn.cursor()
+        prodCursor.execute("""\
+            SELECT d.id
+              FROM document d
+              JOIN doc_type t
+                ON t.id = d.doc_type
+             WHERE d.title = ?
+               AND t.name = 'Filter'""", title)
+        rows = prodCursor.fetchall()
+
+        # If there's exactly one document, we're done.
+        if len(rows) == 1:
+            return "CDR%010d" % rows[0][0]
+
+        # If there are multiple documents, stop.
+        if len(rows) > 1:
+            cdrcgi.bail("More than one document found on %s with title %s" %
+                    (cdr.PROD_SERVER, cgi.escape(title)))
+
+        # The production server doesn't have the document yet; create it.
+        devCursor.execute("""\
+                SELECT u.name, u.password
+                  FROM usr u
+                  JOIN session s
+                    ON s.usr = u.id
+                 WHERE s.name = ?""", session)
+        rows = devCursor.fetchall()
+        if not rows:
+            cdrcgi.bail("Failure locating session information")
+        uid, pwd = rows[0]
+        reason = "Migrating new filter from development server"
+        prodSession = cdr.login(uid, pwd, host = cdr.PROD_HOST)
+        if session.find("<Err") != -1:
+            cdrcgi.bail("Failure logging onto production server: %s" %
+                    prodSession)
+        doc = cdrcgi.encode(stripId(doc))
+        docId = cdr.addDoc(prodSession, doc = doc, reason = reason, 
+                host = cdr.PROD_HOST)
+        if docId.find("<Err") != -1:
+            cdr.logout(prodSession, host = cdr.PROD_HOST)
+            cdrcgi.bail("Failure adding %s to production server: %s" %
+                    (cgi.escape(title), docId))
+        doc = cdr.getDoc(prodSession, docId, 'Y', host = cdr.PROD_HOST)
+        if doc.find("<Err") == 0:
+            cdr.logout(prodSession, host = cdr.PROD_HOST)
+            cdrcgi.bail("Failure checking out %s from production server: %s" %
+                    (cgi.escape(title), doc))
+        docId = cdr.repDoc(prodSession, doc = doc, checkIn = 'Y',
+                ver = 'Y', reason = reason, host = cdr.PROD_HOST)
+        cdr.logout(prodSession, host = cdr.PROD_HOST)
+        if docId.find("<Err") != -1:
+            cdrcgi.bail("Failure checking in %s to production server: %s" %
+                    (cgi.escape(title), docId))
+        return docId
+    except:
+        raise
+        cdrcgi.bail("Failure locating production document ID")
+
+#----------------------------------------------------------------------
+# Replace the development document ID with the production document ID.
+#----------------------------------------------------------------------
+def replaceId(doc, devId, prodId):
+    if doc.find(devId) == -1:
+        cdrcgi.bail("Cannot find document ID %s in document" % devId)
+    return doc.replace(devId, prodId, 1)
+
+#----------------------------------------------------------------------
+# Check the document into CVS archives.
+#----------------------------------------------------------------------
+def doCvs(docId, doc, cvsid, cvspw, cvscomment, session):
+
+    # Replace the document ID with the production server's if needed.
+    prodId = getProdId(docId, doc, session)
+    if prodId != docId:
+        doc = replaceId(doc, docId, prodId)
+
+    # Set up cvs strings and directories
+    cvsroot = "-d:pserver:%s:%s@%s" % (cvsid, cvspw, cdr.CVSROOT)
+    if os.environ.has_key("TMP"):
+        tempfile.tempdir = os.environ["TMP"]
+    where = tempfile.mktemp("cvswork")
+    abspath = os.path.abspath(where)
+    try: os.mkdir(abspath)
+    except: cdrcgi.bail("Cannot create directory %s" % abspath)
+    try: os.chdir(abspath)
+    except: 
+        cvsCleanup(abspath)
+        cdrcgi.bail("Cannot cd to %s" % abspath)
+
+    try:
+        # Check the document out from CVS.
+        cmd = "cvs %s checkout -d filt cdr/Filters/%s.xml" % (cvsroot, prodId)
+        res = runCommand(cmd)
+        if res.code is not None:
+
+            # Is failure because document is new to CVS?
+            # XXX Fragile, but the best we can do, I think.
+            if res.output.find("cannot find module") == -1:
+                cvsCleanup(abspath, cvsroot)
+                cdrcgi.bail("cvs checkout failure: %d: %s" %
+                        (res.code, res.output))
+
+            # Then use a known document to create a minimal working directory.
+            cmd = "cvs %s co -d filt cdr/Filters/CDR0000000100.xml" % cvsroot
+            res = runCommand(cmd)
+            if res.code is not None:
+                cvsCleanup(abspath, cvsroot)
+                cdrcgi.bail("cvs checkout failure: %d: %s" % 
+                        (res.code, res.output))
+
+            # Move into the working directory.
+            try: os.chdir('filt')
+            except:
+                cvsCleanup(abspath, cvsroot)
+                cdrcgi.bail("Cannot cd to %s/filt" % abspath)
+
+            # Create the file.
+            try: open("%s.xml" % prodId, "wb").write(doc)
+            except:
+                cvsCleanup(abspath, cvsroot)
+                cdrcgi.bail("Cannot write %s/filt/%s.xml" % (abspath, prodId))
+
+            # Add it to the CVS archives.
+            cmd = "cvs %s add %s.xml" % (cvsroot, prodId)
+            res = runCommand(cmd)
+            if res.code is not None:
+                cvsCleanup(abspath, cvsroot)
+                cdrcgi.bail("cvs add failure: %d: %s" % (res.code, res.output))
+
+        else:
+            
+            # Move into the working directory.
+            try: os.chdir('filt')
+            except:
+                cvsCleanup(abspath, cvsroot)
+                cdrcgi.bail("Cannot cd to %s/filt" % abspath)
+
+            # Create the file.
+            try: open("%s.xml" % prodId, "wb").write(doc)
+            except:
+                cvsCleanup(abspath, cvsroot)
+                cdrcgi.bail("Cannot write %s/filt/%s.xml" % (abspath, prodId))
+
+        # Commit the version of the document.
+        cmd = runCommand('cvs %s commit -m"%s" %s.xml' %
+                (cvsroot, 
+                 cvscomment.replace('\r', '')
+                           .replace('\n', ' ')
+                           .replace('"', "'"),
+                 prodId))
+        if cmd.code is not None:
+            cvsCleanup(abspath, cvsroot)
+            cdrcgi.bail("cvs commit failure: %d: %s" % (cmd.code, cmd.output))
+
+    except:
+        cvsCleanup(abspath, cvsroot)
+        raise
+        cdrcgi.bail("Unknown failure running CVS command")
+
+    # Remove the working directory.
+    cvsCleanup(abspath, cvsroot)
+    
 #----------------------------------------------------------------------
 # Load an existing document.
 #----------------------------------------------------------------------
@@ -104,20 +351,26 @@ elif request == 'New':
 # Create a new document using the existing data.
 #----------------------------------------------------------------------
 elif request == 'Clone':
+    if version:
+        if not cvsid or not cvspw or not cvscomment:
+            cdrcgi.bail("CVS user id, password, and comment are all "
+                        "required when versioning.")
     if not fields.has_key("Doc"):
         cdrcgi.bail("No document to save")
     doc = stripId(fields["Doc"].value)
     docId = cdr.addDoc(session, doc=cdrcgi.encode(doc), 
                                 ver=version and 'Y' or 'N')
     if docId.find("<Errors>") >= 0:
-        cdrcgi.bail(doc, banner)
+        cdrcgi.bail(docId, banner)
     else:
-        doc = cdrcgi.decode(cdr.getDoc(session, docId, 'Y'))
+        doc = cdr.getDoc(session, docId, 'Y')
         if doc.find("<Errors>") >= 0:
-            cdrcgi.bail(doc, banner)
-        showForm(cgi.escape(doc), #.replace("&", "&amp;"), 
-                 "Editing existing document", ("Load", "Save", "Checkin",
-                                               "Clone"))
+            cdrcgi.bail(cdrcgi.decode(doc), banner)
+        if version:
+            doCvs(docId, doc, cvsid, cvspw, cvscomment, session)
+        doc = cdrcgi.decode(doc)
+        buttons = ("Load", "Save", "Checkin", "Clone")
+        showForm(cgi.escape(doc), "Editing existing document", buttons)
 
 #--------------------------------------------------------------------
 # Save the changes to the current document.
@@ -126,7 +379,10 @@ elif request in ('Save', 'Checkin'):
     if not fields.has_key("Doc"):
         cdrcgi.bail("No document to save")
     doc = fields["Doc"].value
-    open('d:/cdr/log/filtersave.doc', 'w').write(doc)
+    if version:
+        if not cvsid or not cvspw or not cvscomment:
+            cdrcgi.bail("CVS user id, password, and comment are all "
+                        "required when versioning.")
     checkIn = request == 'Checkin' and 'Y' or 'N'
     ver = version and 'Y' or 'N'
     if re.search("<CdrDoc[^>]*\sId='[^']*'", doc, re.DOTALL):
@@ -138,15 +394,17 @@ elif request in ('Save', 'Checkin'):
     if docId.find("<Errors>") >= 0:
         cdrcgi.bail(docId, banner)
     else:
-        doc = cdrcgi.decode(cdr.getDoc(session, docId))
+        doc = cdr.getDoc(session, docId)
         if doc.find("<Errors>") >= 0:
-            cdrcgi.bail(docId, banner)
+            cdrcgi.bail(cdrcgi.decode(doc), banner)
+        if version and cvsid and cvspw:
+            doCvs(docId, doc, cvsid, cvspw, cvscomment, session)
+        doc = cdrcgi.decode(doc)
         if request == 'Save':
             buttons = ("Load", "Save", "Checkin", "Clone")
         else:
             buttons = ("Load", "Clone")
-        showForm(cgi.escape(doc), #.replace("&", "&amp;"), 
-                 "Editing existing document", buttons)
+        showForm(cgi.escape(doc), "Editing existing document", buttons)
 
 #----------------------------------------------------------------------
 # Tell the user we don't know how to do what he asked.
