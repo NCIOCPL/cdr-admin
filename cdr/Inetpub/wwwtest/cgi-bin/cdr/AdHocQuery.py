@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: AdHocQuery.py,v 1.2 2002-07-10 19:47:32 bkline Exp $
+# $Id: AdHocQuery.py,v 1.3 2003-02-12 19:17:32 pzhang Exp $
 #
 # Displays result set for SQL query.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/07/10 19:47:32  bkline
+# Escaped tagged data.
+#
 # Revision 1.1  2002/07/10 19:33:33  bkline
 # New interface for ad hoc SQL queries.
 #
@@ -18,6 +21,7 @@ fields  = cgi.FieldStorage()
 session = cdrcgi.getSession(fields)
 action  = cdrcgi.getRequest(fields)
 query   = fields and fields.getvalue('Query') or None
+timeout = fields and fields.getvalue('TimeOut') or '20'
 title   = "CDR Administration"
 section = "Reports"
 SUBMENU = "Reports Menu"
@@ -54,6 +58,8 @@ if not query:
     WHERE t.name = 'Filter'
  ORDER BY d.title
      </textarea>
+     <br><b>Enter timeout in seconds:</b><br>
+    <INPUT TYPE='text' NAME='TimeOut' VALUE='20'>
 """ % (cdrcgi.SESSION, session)
     cdrcgi.sendPage(header + form + "</FORM></BODY></HTML>")
 
@@ -62,8 +68,8 @@ if not query:
 #----------------------------------------------------------------------
 try:
     conn = cdrdb.connect('CdrGuest')
-    cursor = conn.cursor()
-    cursor.execute(query)
+    cursor = conn.cursor()    
+    cursor.execute(query, timeout = int(timeout))
     if not cursor.description:
         cdrcgi.bail('No result set returned')
     html = """\
