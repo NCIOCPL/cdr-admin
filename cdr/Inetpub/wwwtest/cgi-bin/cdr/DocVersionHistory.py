@@ -1,8 +1,10 @@
 #----------------------------------------------------------------------
 #
-# $Id: DocVersionHistory.py,v 1.10 2002-12-19 19:11:36 pzhang Exp $
+# $Id: DocVersionHistory.py,v 1.11 2003-02-12 16:19:10 pzhang Exp $
 #
 # Show version history of document.
+#
+# $Log: not supported by cvs2svn $
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, cdrdb, re, sys, time
 
@@ -287,12 +289,15 @@ html = """\
 class DocVersion:
     def __init__(self, row):
         self.num            = row[0]
-        self.pubDates       = row[1] and [row[1][:10]] or []
+        whichJob            = row[7] and '(V-' or '(C-' 
+        whichJob           += row[8] and "%d)" % row[8] or ')'
+        self.pubDates       = row[1] and [row[1][:10] + whichJob] or []
         self.comment        = row[2]
         self.user           = row[3]
         self.date           = row[4][:10]
         self.valStatus      = row[5]
         self.publishable    = row[6]
+ 
     def display(self):
         return """\
    <tr>
@@ -332,12 +337,14 @@ class DocVersion:
 try:
     cursor.execute("""\
          SELECT v.num, 
-                d.completed,
+                d.started,
                 v.comment,
                 u.fullname,
                 v.dt,
                 v.val_status,
-                v.publishable
+                v.publishable,
+                d.output_dir,
+                d.pub_proc
            FROM doc_version v
            JOIN usr u
              ON u.id = v.usr
@@ -347,7 +354,7 @@ LEFT OUTER JOIN primary_pub_doc d
             AND d.failure is null
           WHERE v.id = ?
        ORDER BY v.num DESC,
-                d.completed""", intId)
+                d.started""", intId)
 
     currentVer = None
     row = cursor.fetchone()
@@ -355,7 +362,8 @@ LEFT OUTER JOIN primary_pub_doc d
         if currentVer:
             if currentVer.num == row[0]:
                 if row[1]:
-                    currentVer.pubDates.append(row[1][:10])
+                    whichJob = (row[7] and '(V-' or '(C-') + "%d)" % row[8]
+                    currentVer.pubDates.append(row[1][:10] + whichJob)
             else:
                 html += currentVer.display()
                 currentVer = DocVersion(row)
