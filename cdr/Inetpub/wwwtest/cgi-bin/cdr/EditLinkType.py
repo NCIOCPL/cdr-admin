@@ -1,22 +1,44 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditLinkType.py,v 1.1 2001-06-13 22:16:32 bkline Exp $
+# $Id: EditLinkType.py,v 1.2 2002-02-15 06:50:11 ameyer Exp $
 #
 # Prototype for editing a CDR link type.
 #
+# Script is run twice - first to create a form on screen, then
+# to read the values on the form.
+#
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2001/06/13 22:16:32  bkline
+# Initial revision
+#
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string, sys
 
 #----------------------------------------------------------------------
-# Set the form variables.
+# Get the form variables.
 #----------------------------------------------------------------------
 fields  = cgi.FieldStorage()
 session = cdrcgi.getSession(fields)
 request = cdrcgi.getRequest(fields)
 name    = fields and fields.getvalue("name") or None
+linkForm= fields and fields.getvalue("linkform") or None
 extra   = ""
+
+#----------------------------------------------------------------------
+# If no linkForm, this is first time through, setup subsequent action
+#----------------------------------------------------------------------
+linkAct = linkForm
+if linkForm is None:
+    urlDict = cgi.parse()
+    if urlDict == None:
+        cdrcgi.bail ("No urlDict")
+    if urlDict != None and urlDict.has_key ("linkact"):
+        urlArg = urlDict["linkact"]
+        if urlArg != None:
+            linkAct = urlArg[0]
+            if (linkAct != "addlink" and linkAct != "modlink"):
+                cdrcgi.bail("Invalid form linkact='%s' - can't happen" % linkAct)
 
 #----------------------------------------------------------------------
 # Make sure we're logged in.
@@ -26,17 +48,17 @@ if not session: cdrcgi.bail('Unknown or expired CDR session.')
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if request == "Log Out": 
+if request == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
-# Handle request to delete the user.
+# Handle request to delete the link type - Future.
 #----------------------------------------------------------------------
 if request == "Delete Link Type":
     cdrcgi.bail("Delete Link Type command not yet implemented")
-    unused_code = """\
+    unused_code = """ - MODEL FROM delUser\
     error = cdr.delUser(session, usrName)
-    if error: 
+    if error:
         if error.upper().find("COLUMN REFERENCE CONSTRAINT"):
             error = "Cannot delete user %s.  "\
                     "System actions have already been recorded for this user."\
@@ -117,7 +139,7 @@ if request == "Save Changes":
                 propComment = arrayFields["prop_comment"][propKey]
                 if propComment == "None": propComment = ""
             linkType.linkProps.append((propName, propValue, propComment))
-    error = cdr.putLinkType(session, name, linkType)
+    error = cdr.putLinkType(session, name, linkType, linkForm)
     if error: cdrcgi.bail(error)
     name = linkTypeName
     extra = "\n<H4>(Successfully Updated)</H4>"
@@ -126,7 +148,11 @@ if request == "Save Changes":
 # Retrieve and display the link type information.
 #----------------------------------------------------------------------
 title   = "CDR Administration"
-section = "Edit Link Type"
+if linkAct == "addlink":
+    section = "Add Link Type"
+else:
+    section = "Edit Link Type"
+
 buttons = ["Save Changes", "Log Out"]
 #script  = "DumpParams.pl"
 script  = "EditLinkType.py"
@@ -170,7 +196,7 @@ def dtList(doctype, nameBase, rowNum):
         str += "<OPTION%s>%s</OPTION>\n" % (dt == doctype and " SELECTED" or "",
                                             dt)
     return str + "</SELECT>\n"
-    
+
 #----------------------------------------------------------------------
 # Create a dropdown list of link properties, possibly with one selected.
 #----------------------------------------------------------------------
@@ -181,13 +207,13 @@ def propList(prop, nameBase, rowNum):
         n = p.name
         str += "<OPTION%s>%s</OPTION>\n" % (n == prop and " SELECTED" or "", n)
     return str + "</SELECT>\n"
-    
+
 #----------------------------------------------------------------------
 # Create a text data entry field.
 #----------------------------------------------------------------------
 def textField(elemName, nameBase, rowNum):
-    return "<INPUT NAME='%s-%d' VALUE='%s' SIZE='45'>" % (nameBase, 
-                                                          rowNum, 
+    return "<INPUT NAME='%s-%d' VALUE='%s' SIZE='45'>" % (nameBase,
+                                                          rowNum,
                                                           elemName)
 
 #----------------------------------------------------------------------
@@ -200,9 +226,14 @@ def textArea(value, nameBase, rowNum):
             value)
 
 #----------------------------------------------------------------------
+# Create a form with a hidden field to indicate add or modify
+#----------------------------------------------------------------------
+form = """<INPUT type='hidden' name='linkform' value='%s' />""" % linkAct
+
+#----------------------------------------------------------------------
 # Display the information for the user.
 #----------------------------------------------------------------------
-form = """\
+form += """\
 <H2>%s</H2>%s
 <TABLE>
 <TR>
@@ -224,7 +255,7 @@ for linkSource in linkType.linkSources:
     </TR>""" % (
             leftCol,
             checkbox("src_sel", rowNum, 1),
-            dtList(linkSource[0], "src_dt", rowNum), 
+            dtList(linkSource[0], "src_dt", rowNum),
             textField(linkSource[1], "src_elem", rowNum))
     leftCol = "<TD>&nbsp;</TD>"
     rowNum += 1
@@ -240,7 +271,7 @@ for i in range(3):
     """ % (
             leftCol,
             checkbox("src_sel", rowNum, 0),
-            dtList("", "src_dt", rowNum), 
+            dtList("", "src_dt", rowNum),
             textField("", "src_elem", rowNum))
     rowNum += 1
 
@@ -270,7 +301,7 @@ for i in range(3):
     </TR>""" % (
             leftCol,
             checkbox("dst_sel", rowNum, 0),
-            dtList("", "dst_dt", rowNum)) 
+            dtList("", "dst_dt", rowNum))
     rowNum += 1
 
 #----------------------------------------------------------------------
