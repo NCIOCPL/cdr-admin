@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: CiteSearch.py,v 1.12 2003-10-22 13:44:06 bkline Exp $
+# $Id: CiteSearch.py,v 1.13 2003-11-26 20:53:21 venglisc Exp $
 #
 # Prototype for duplicate-checking interface for Citation documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.12  2003/10/22 13:44:06  bkline
+# Removed dependency on Python regular expression package, which was
+# choking on complex documents.
+#
 # Revision 1.11  2003/09/12 12:34:37  bkline
 # Added support for searching values in linked documents (for the
 # Published In field of the search form).  Request #257.
@@ -342,7 +346,7 @@ except cdrdb.Error, info:
 # Create the results page.
 #----------------------------------------------------------------------
 html = cdrcgi.advancedSearchResultsPage("Citation", rows, strings, 
-                                        "name:Citation QC Report")
+                                        "set:QC Citation Set")
 
 #----------------------------------------------------------------------
 # Send the page back to the browser.
