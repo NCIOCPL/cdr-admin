@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: PersonsAtOrg.py,v 1.2 2003-02-24 21:16:49 bkline Exp $
+# $Id: PersonsAtOrg.py,v 1.3 2003-03-10 21:05:30 bkline Exp $
 #
 # Identifieds all person documents which are linked to a specified
 # organization document.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2003/02/24 21:16:49  bkline
+# Added support for wildcards in org name.
+#
 # Revision 1.1  2002/03/21 20:00:28  bkline
 # Report for persons practicing at a designated organizaiton.
 #
@@ -29,6 +32,41 @@ section = "Persons Linked to Organization Report"
 header  = cdrcgi.header(title, title, section, script, buttons)
 now     = time.localtime(time.time())
 
+#----------------------------------------------------------------------
+# Put up a list of possible choices if the 
+#----------------------------------------------------------------------
+def showChoices(pathPattern, name):
+    global buttons
+    try:
+        cursor.execute("""\
+                SELECT DISTINCT doc_id, value
+                           FROM query_term
+                          WHERE path LIKE '%s'
+                            AND value LIKE ?
+                       ORDER BY value""" % pathPattern, name)
+        rows = cursor.fetchall()
+    except cdrdb.Error, info:
+        cdrcgi.bail("Failure looking up organization name '%s': %s" % (name,
+                                                                   info[1][0]))
+    buttons = buttons[1:]
+    header = cdrcgi.header(title, title, section, script, buttons)
+    form = """\
+   <H3>Select Organization for Report</H3>
+   <UL>
+"""
+    for row in rows:
+        form += """\
+    <LI>
+     <A HREF="%s?%s=%s&Id=%d">%s (CDR%010d)</A>
+    </LI>
+""" % (script, cdrcgi.SESSION, session, row[0], cgi.escape(row[1], 1), row[0])
+    cdrcgi.sendPage(header + form + """\
+   </UL>
+  </FORM>
+ </BODY>
+</HTML>
+""")
+    
 #----------------------------------------------------------------------
 # Make sure we're logged in.
 #----------------------------------------------------------------------
@@ -147,9 +185,9 @@ else:
                             AND value LIKE ?""" % pathPattern, name)
         rows = cursor.fetchall()
     except cdrdb.Error, info:
-        cdrcgi.bail("Failure looking up glossary term '%s': %s" % (name,
+        cdrcgi.bail("Failure looking up organization name '%s': %s" % (name,
                                                                    info[1][0]))
-    if len(rows) > 1: cdrcgi.bail("Ambiguous organization name '%s'" % name)
+    if len(rows) > 1: showChoices(pathPattern, name)
     if len(rows) < 1: cdrcgi.bail("Unknown organization '%s'" % name)
     id = rows[0][0]
 
