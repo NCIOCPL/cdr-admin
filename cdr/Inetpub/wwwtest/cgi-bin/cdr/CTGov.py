@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CTGov.py,v 1.4 2003-12-16 15:36:45 bkline Exp $
+# $Id: CTGov.py,v 1.5 2004-01-14 14:04:40 bkline Exp $
 #
 # Submenu for ClinicalTrials.gov activities.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2003/12/16 15:36:45  bkline
+# Replaced some of the stubs.
+#
 # Revision 1.3  2003/11/25 12:44:48  bkline
 # Plugged in QC report.
 #
@@ -107,7 +110,7 @@ form += """\
     <OL>
 """
 reports = [
-           ('Stub.py', 'Download Statistics Report'),
+           ('CTGovDownloadReport.py', 'Download Statistics Report'),
            ('CTGovImportReport.py', 'Import Statistics Report'),
            ('ExternMapFailures.py', 'External Map Failures Report'),
            ('CTGovOutOfScope.py', 'Records Marked Out of Scope'),
