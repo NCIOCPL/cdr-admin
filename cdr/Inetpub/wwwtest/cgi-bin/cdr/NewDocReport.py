@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: NewDocReport.py,v 1.3 2002-03-14 04:06:24 bkline Exp $
+# $Id: NewDocReport.py,v 1.4 2002-04-23 22:57:01 bkline Exp $
 #
 # Reports on newly created documents and their statuses.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2002/03/14 04:06:24  bkline
+# Adjusted default date range.
+#
 # Revision 1.2  2002/03/14 04:03:17  bkline
 # Fixed numerical column alignment.
 #
@@ -197,7 +200,7 @@ try:
                                           AND DATEADD(s, -1, 
                                                       DATEADD(d, 1, '%s'))
       %s
-""" % (fromDate, toDate, dtQual))
+""" % (fromDate, toDate, dtQual), timeout = 120)
     cursor.execute("""\
     SELECT name, dstat, COUNT(*)
       FROM #doc_statuses
