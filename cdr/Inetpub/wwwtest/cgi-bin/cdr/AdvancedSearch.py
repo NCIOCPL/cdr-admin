@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: AdvancedSearch.py,v 1.5 2002-05-16 14:33:04 bkline Exp $
+# $Id: AdvancedSearch.py,v 1.6 2004-09-10 17:09:53 venglisc Exp $
 #
 # Main menu for advanced search forms.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2002/05/16 14:33:04  bkline
+# Changed wording of menu for Person with locations.
+#
 # Revision 1.4  2002/02/22 02:18:58  bkline
 # Added advanced search page for Documentation documents.
 #
@@ -42,6 +45,9 @@ header  = """\
             text-decoration: none }
     :Link:visited { font-family: Arial, Helvetica, sans-serif; 
             color: #000066;
+            text-decoration: none }
+    :Link:hover { font-family: Arial, Helvetica, sans-serif; 
+            background: #FFFFCC;
             text-decoration: none }
    -->
   </STYLE>
