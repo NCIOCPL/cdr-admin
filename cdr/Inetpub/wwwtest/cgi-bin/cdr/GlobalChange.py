@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------
-# $Id: GlobalChange.py,v 1.2 2002-08-02 03:33:48 ameyer Exp $
+# $Id: GlobalChange.py,v 1.3 2002-08-09 03:49:15 ameyer Exp $
 #
 # Perform global changes on XML records in the database.
 #
@@ -14,6 +14,9 @@
 # present the next one - to the end.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/08/02 03:33:48  ameyer
+# First fully working version.  Needs more test and have to add 3rd type
+# of global change.
 #
 #----------------------------------------------------------------------
 
@@ -128,7 +131,7 @@ if not chgType:
   Organization links in protocols</input>
 </td></tr><tr><td>
 <input type='radio' name='chgType' value='%s'>
-  Protocol status</input>
+  Protocol status of organization</input>
 </td></tr>
 </table>
 """ % (cdrglblchg.PERSON_CHG, cdrglblchg.ORG_CHG, cdrglblchg.STATUS_CHG)
@@ -142,8 +145,8 @@ sessionVars["chgType"] = chgType
 
 try:
     chg = cdrglblchg.createChg (sessionVars)
-except cdrbatch.BatchException, be:
-    cdrcgi.bail (str(be))
+except Exception, e:
+    cdrcgi.bail ("Error constructing chg object: %s" % str(e))
 
 #----------------------------------------------------------------------
 # Change from what?
@@ -156,8 +159,8 @@ fromTitle = fields.getvalue ("fromTitle", None)
 if fromId and not fromTitle:
     try:
         fromTitle = cdrglblchg.verifyId (fromId, sessionVars['docType'])
-    except cdrbatch.BatchException, be:
-        cdrcgi.bail (str(be))
+    except Exception, e:
+        cdrcgi.bail ("Error verifying from ID: %s" % str(e))
 
 # If no id present, there may be a name, or partial name
 if not fromId:
@@ -190,72 +193,87 @@ if not fromFragment and (chgType == cdrglblchg.PERSON_CHG or
                          chgType == cdrglblchg.ORG_CHG):
     try:
         sendGlblChgPage (chg.genFragPickListHtml('from'))
-    except cdrbatch.BatchException, be:
-        cdrcgi.bail (str(be))
+    except cdrbatch.BatchException, e:
+        cdrcgi.bail ("Error generating FROM fragment picklist: %s" % str(e))
 
 
 #----------------------------------------------------------------------
 # Change to what? - just like change from
 #----------------------------------------------------------------------
-toId    = fields.getvalue ("toId", None)
-toTitle = fields.getvalue ("toTitle", None)
-if toId and not toTitle:
-    try:
-        toTitle = cdrglblchg.verifyId (toId, sessionVars['docType'])
-    except cdrbatch.BatchException, be:
-        cdrcgi.bail (str(be))
+# Not needed for status change
+if chgType == cdrglblchg.PERSON_CHG or chgType == cdrglblchg.ORG_CHG:
+    toId    = fields.getvalue ("toId", None)
+    toTitle = fields.getvalue ("toTitle", None)
+    if toId and not toTitle:
+        try:
+            toTitle = cdrglblchg.verifyId (toId, sessionVars['docType'])
+        except cdrbatch.BatchException, e:
+            cdrcgi.bail ("Error verifying TO id: %s" % str(e))
 
-if not toId:
+    if not toId:
 
-    toName = fields.getvalue ("toName", None)
-    if not toName:
-        sendGlblChgPage (chg.getToId())
+        toName = fields.getvalue ("toName", None)
+        if not toName:
+            sendGlblChgPage (chg.getToId())
 
-    else:
-        sendGlblChgPage (chg.getToPick (toName))
+        else:
+            sendGlblChgPage (chg.getToPick (toName))
 
-(toId, toIdNum, toFragment) = cdr.exNormalize (toId)
-sessionVars['toId'] = cdr.exNormalize(toId)[0]
-sessionVars['toTitle'] = toTitle
+    (toId, toIdNum, toFragment) = cdr.exNormalize (toId)
+    sessionVars['toId'] = cdr.exNormalize(toId)[0]
+    sessionVars['toTitle'] = toTitle
+
+    #------------------------------------------------------------------
+    # Get fragment if not already supplied
+    #------------------------------------------------------------------
+    if not toFragment:
+        try:
+            sendGlblChgPage (chg.genFragPickListHtml('to'))
+        except cdrbatch.BatchException, e:
+            cdrcgi.bail ("Error generating TO fragment picklist: %s" % str(e))
 
 
 #----------------------------------------------------------------------
-# Get fragment if not already supplied
+# For status change only, get to/from status
 #----------------------------------------------------------------------
-if not toFragment and (chgType == cdrglblchg.PERSON_CHG or
-                         chgType == cdrglblchg.ORG_CHG):
-    try:
-        sendGlblChgPage (chg.genFragPickListHtml('to'))
-    except cdrbatch.BatchException, be:
-        cdrcgi.bail (str(be))
+if chgType == cdrglblchg.STATUS_CHG:
+    fromStatusName = fields.getvalue ('fromStatusName', None)
+    toStatusName   = fields.getvalue ('toStatusName', None)
+
+    if not fromStatusName or not toStatusName:
+        # try:
+        sendGlblChgPage (chg.getFromToStatus())
+        # except cdrbatch.BatchException, e:
+        #    cdrcgi.bail ("Error getting status picklist: %s" % str(e))
+
+    sessionVars['fromStatusName'] = fromStatusName
+    sessionVars['toStatusName']   = toStatusName
 
 
 #----------------------------------------------------------------------
 # Get any restrictions on protocols to be processed
 #----------------------------------------------------------------------
-if chgType != cdrglblchg.STATUS_CHG:
+# Has user chosen whether or not to restrict ids?
+restrByLeadOrgChk = fields.getvalue ('restrByLeadOrgChk', None)
+if not restrByLeadOrgChk:
+    # Haven't chosen yet.  Choose
+    sendGlblChgPage (chg.getRestrId())
 
-    # Has user chosen whether or not to restrict ids?
-    restrByLeadOrgChk = fields.getvalue ('restrByLeadOrgChk', None)
-    if not restrByLeadOrgChk:
-        # Haven't chosen yet.  Choose
-        sendGlblChgPage (chg.getRestrId())
+# Don't check again
+sessionVars['restrByLeadOrgChk'] = 'N'
 
-    # Don't check again
-    sessionVars['restrByLeadOrgChk'] = 'N'
+# Input is optional on this form, if no input, then no restriction
+# Did user input an organization ID?
+restrId = fields.getvalue ('restrId', None)
+if not restrId:
+    # No, perhaps he entered a name
+    restrName = fields.getvalue ("restrName", None)
+    if restrName:
+        # Choose matching organization for name
+        sendGlblChgPage (chg.getRestrPick (restrName))
 
-    # Input is optional on this form, if no input, then no restriction
-    # Did user input an organization ID?
-    restrId = fields.getvalue ('restrId', None)
-    if not restrId:
-        # No, perhaps he entered a name
-        restrName = fields.getvalue ("restrName", None)
-        if restrName:
-            # Choose matching organization for name
-            sendGlblChgPage (chg.getRestrPick (restrName))
-
-    else:
-        sessionVars['restrId'] = cdr.exNormalize(restrId)[0]
+else:
+    sessionVars['restrId'] = cdr.exNormalize(restrId)[0]
 
 
 #----------------------------------------------------------------------
