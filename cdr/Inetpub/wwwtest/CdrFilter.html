@@ -1,14 +1,33 @@
-<!-- $Id: CdrFilter.html,v 1.1 2001-03-26 18:02:56 bkline Exp $ -->
+<!-- $Id: CdrFilter.html,v 1.2 2002-01-22 21:28:54 bkline Exp $ -->
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
  <HEAD>
   <TITLE>CDR Document Filtering</TITLE>
   <SCRIPT LANGUAGE='JavaScript'>
    <!--
     function filterDoc() {
-        var base  = "http://mmdb2/cgi-bin/cdr/Filter.py";
+        var base  = "http://mmdb2.nci.nih.gov/cgi-bin/cdr/Filter.py";
         var doc   = document.FilterRequest.DocId.value;
         var filt  = document.FilterRequest.Filter.value;
-        var url   = base + "?DocId=" + doc + "&Filter=" + filt;
+        var filt1 = document.FilterRequest.Filter1.value;
+        var filt2 = document.FilterRequest.Filter2.value;
+        var filt3 = document.FilterRequest.Filter3.value;
+        var filt4 = document.FilterRequest.Filter4.value;
+        var filt5 = document.FilterRequest.Filter5.value;
+        var filt6 = document.FilterRequest.Filter6.value;
+        var filt7 = document.FilterRequest.Filter7.value;
+      //var uid   = document.FilterRequest.UserName.value;
+      //var pwd   = document.FilterRequest.Password.value;
+        var url   = base + "?DocId=" + doc
+                  + "&Filter=" + filt
+                  + "&Filter1=" + filt1
+                  + "&Filter2=" + filt2
+                  + "&Filter3=" + filt3
+                  + "&Filter4=" + filt4
+                  + "&Filter5=" + filt5
+                  + "&Filter6=" + filt6
+                  + "&Filter7=" + filt7
+      //          + "&UserName=" + uid + "&Password=" + pwd
+            ;
         var opts  = "scrollbars=yes,resizable=yes,status=yes,menubar=yes";
         if (doc.length == 0 || url.length == 0) {
             alert("Document and Filter IDs Required");
@@ -64,6 +83,22 @@
    <TABLE CELLSPACING='0' 
           CELLPADDING='0' 
           BORDER='0'>
+<!--
+    <TR>
+     <TD ALIGN='right'>
+      <B>CDR User ID&nbsp;</B>
+     </TD>
+     <TD><INPUT NAME='UserName'></TD>
+    </TR>
+    <TR>
+     <TD ALIGN='right'>
+      <B>CDR Password&nbsp;</B>
+     </TD>
+     <TD><INPUT NAME='Password' 
+                TYPE='password'>
+     </TD>
+    </TR>
+-->
     <TR>
      <TD ALIGN='right'>
       <B>Document ID&nbsp;</B>
@@ -79,6 +114,62 @@
      <TD>
       <INPUT NAME='Filter' 
              VALUE='CDR190703'>
+     </TD>
+    </TR>
+    <TR>
+     <TD ALIGN='right'>
+      &nbsp;
+     </TD>
+     <TD>
+      <INPUT NAME='Filter1'>
+     </TD>
+    </TR>
+    <TR>
+     <TD ALIGN='right'>
+      &nbsp;
+     </TD>
+     <TD>
+      <INPUT NAME='Filter2'>
+     </TD>
+    </TR>
+    <TR>
+     <TD ALIGN='right'>
+      &nbsp;
+     </TD>
+     <TD>
+      <INPUT NAME='Filter3'>
+     </TD>
+    </TR>
+    <TR>
+     <TD ALIGN='right'>
+      &nbsp;
+     </TD>
+     <TD>
+      <INPUT NAME='Filter4'>
+     </TD>
+    </TR>
+    <TR>
+     <TD ALIGN='right'>
+      &nbsp;
+     </TD>
+     <TD>
+      <INPUT NAME='Filter5'>
+     </TD>
+    </TR>
+    <TR>
+     <TD ALIGN='right'>
+      &nbsp;
+     </TD>
+     <TD>
+      <INPUT NAME='Filter6'>
+     </TD>
+    </TR>
+    <TR>
+     <TD ALIGN='right'>
+      &nbsp;
+     </TD>
+     <TD>
+      <INPUT NAME='Filter7'>
      </TD>
     </TR>
    </TABLE>
