@@ -2,8 +2,11 @@
 #
 # Publishing CGI script.
 #
-# $Id: publishing.py,v 1.3 2002-02-07 14:45:52 mruben Exp $
+# $Id: publishing.py,v 1.4 2002-02-20 22:39:53 pzhang Exp $
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2002/02/07 14:45:52  mruben
+# added no output option
+#
 # Revision 1.2  2001/12/03 23:10:05  Pzhang
 # Added email notification feature. Used PubStatus.py for status check.
 #
@@ -12,7 +15,7 @@
 #
 #
 #----------------------------------------------------------------------
-import cgi, cdrcgi, re, string, copy, os, sys, urllib, publish
+import cgi, cdrcgi, re, string, copy, os, sys, urllib, cdrpub
 
 #----------------------------------------------------------------------
 # Display Publishing System PickList
@@ -29,7 +32,7 @@ class Display:
 
         publishes = []
         pubsys = ["Publishing.py", "", ""]
-        p = publish.Publish("Fake", "Fake", "Fake", "Fake", "Fake")    
+        p = cdrpub.Publish("Fake", "Fake", "Fake", "Fake", "Fake")    
         pickList = p.getPubSys()
         for s in pickList:
             pubsys[1] =  "%d" % s[1] 
@@ -54,7 +57,7 @@ class Display:
         
         subsets = []
         subset = ["Publishing.py", "", ""]
-        p = publish.Publish(ctrlId, "Fake", "Fake", "Fake", "Fake")
+        p = cdrpub.Publish(ctrlId, "Fake", "Fake", "Fake", "Fake")
         pickList = p.getPubSubset()
         sysName = pickList[0][2] # Not a good implementation.
         for s in pickList:
@@ -83,7 +86,7 @@ class Display:
         
         params = []
         param = ["Publishing.py", "", ""]
-        p = publish.Publish(ctrlId, SubSet, "Fake", "Fake", "Fake")
+        p = cdrpub.Publish(ctrlId, SubSet, "Fake", "Fake", "Fake")
         pickList = p.getParamSQL()
         for s in pickList:
             param[1] =  s[0] 
@@ -159,7 +162,7 @@ class Display:
             for name in names:
                 if fields.has_key(name):
                     value = fields.getvalue(name)
-                    p = publish.Publish(0, "Fake", "Fake", "Fake", "Fake")  
+                    p = cdrpub.Publish(0, "Fake", "Fake", "Fake", "Fake")  
                     if p.isPublishable(value):
                         docIdValues += "," + fields.getvalue(name)
                     else:
@@ -193,7 +196,7 @@ class Display:
         form += "<OL>\n"
     
         # Get publishing job ID.       
-        p = publish.Publish(ctrlDocId, subsetName, credential, docIds, params,
+        p = cdrpub.Publish(ctrlDocId, subsetName, credential, docIds, params,
                             email, no_output)
         jobId = p.getJobId()
         if type(jobId) == type(""):            
@@ -221,7 +224,7 @@ class Display:
                 "<TD>Messages</TD></TR>"
         
         # Return pub_proc id or an error message.
-        p = publish.Publish("Fake", "Fake", "Fake", "Fake", "Fake")
+        p = cdrpub.Publish("Fake", "Fake", "Fake", "Fake", "Fake")
         row = p.getStatus(jobId)
         form += "<TR>"
         for i in range(6):
@@ -267,7 +270,7 @@ header  = cdrcgi.header(title, title, section, "Publishing.py", buttons)
 HIDDEN = """<INPUT TYPE='HIDDEN' NAME='%s' VALUE='%s'>\n"""
 
 # !!! Disable standout in publish.py. !!!
-publish.NCGI = 0
+cdrpub.NCGI = 0
 
 # Initialize Display class.
 # This class is not much helpful yet.
