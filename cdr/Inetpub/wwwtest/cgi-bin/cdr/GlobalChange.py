@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------
-# $Id: GlobalChange.py,v 1.1 2002-07-25 15:50:11 ameyer Exp $
+# $Id: GlobalChange.py,v 1.2 2002-08-02 03:33:48 ameyer Exp $
 #
 # Perform global changes on XML records in the database.
 #
@@ -81,31 +81,6 @@ def sendGlblChgPage (parms):
     cdrcgi.sendPage (html)
 
 
-#----------------------------------------------------------------------
-# Log an error and return message suitable for display
-#----------------------------------------------------------------------
-def logErr (docId, where, msg):
-    """
-    Write a message to the log file and return it.
-
-    Pass:
-        Doc id  - Document id (numeric form).
-        where   - Where it happened
-        msg     - Error message.
-
-    Return:
-        Error message suitable for display.
-    """
-    # If the error message is in XML, extract error portion from it
-    msg = cdr.getErrors (msg)
-
-    # Put it together for log file
-    cdr.logwrite (("Error on doc %d %s:" % (docId, where), msg), LF)
-
-    # Different format for HTML report to user
-    return ("Error %s:<br>%s" % (where, msg))
-
-
 ##----------------------------------------------------------------------
 ##----------------------------------------------------------------------
 ## START OF MAIN
@@ -164,7 +139,11 @@ if not chgType:
 # Construct an object of the proper type of global change
 #----------------------------------------------------------------------
 sessionVars["chgType"] = chgType
-chg = cdrglblchg.createChg (sessionVars)
+
+try:
+    chg = cdrglblchg.createChg (sessionVars)
+except cdrbatch.BatchException, be:
+    cdrcgi.bail (str(be))
 
 #----------------------------------------------------------------------
 # Change from what?
@@ -172,9 +151,13 @@ chg = cdrglblchg.createChg (sessionVars)
 fromId    = fields.getvalue ("fromId", None)
 fromTitle = fields.getvalue ("fromTitle", None)
 
-# If found, verify title and doctype.  Bails out if doctype is wrong.
+# If found, verify title and doctype.
+# Bails out if doctype is wrong or id format won't parse
 if fromId and not fromTitle:
-    fromTitle = cdrglblchg.verifyId (fromId, sessionVars['docType'])
+    try:
+        fromTitle = cdrglblchg.verifyId (fromId, sessionVars['docType'])
+    except cdrbatch.BatchException, be:
+        cdrcgi.bail (str(be))
 
 # If no id present, there may be a name, or partial name
 if not fromId:
@@ -205,7 +188,10 @@ sessionVars['fromTitle'] = fromTitle
 #----------------------------------------------------------------------
 if not fromFragment and (chgType == cdrglblchg.PERSON_CHG or
                          chgType == cdrglblchg.ORG_CHG):
-    sendGlblChgPage (chg.genFragPickListHtml('from'))
+    try:
+        sendGlblChgPage (chg.genFragPickListHtml('from'))
+    except cdrbatch.BatchException, be:
+        cdrcgi.bail (str(be))
 
 
 #----------------------------------------------------------------------
@@ -214,7 +200,10 @@ if not fromFragment and (chgType == cdrglblchg.PERSON_CHG or
 toId    = fields.getvalue ("toId", None)
 toTitle = fields.getvalue ("toTitle", None)
 if toId and not toTitle:
-    toTitle = cdrglblchg.verifyId (toId, sessionVars['docType'])
+    try:
+        toTitle = cdrglblchg.verifyId (toId, sessionVars['docType'])
+    except cdrbatch.BatchException, be:
+        cdrcgi.bail (str(be))
 
 if not toId:
 
@@ -235,7 +224,10 @@ sessionVars['toTitle'] = toTitle
 #----------------------------------------------------------------------
 if not toFragment and (chgType == cdrglblchg.PERSON_CHG or
                          chgType == cdrglblchg.ORG_CHG):
-    sendGlblChgPage (chg.genFragPickListHtml('to'))
+    try:
+        sendGlblChgPage (chg.genFragPickListHtml('to'))
+    except cdrbatch.BatchException, be:
+        cdrcgi.bail (str(be))
 
 
 #----------------------------------------------------------------------
@@ -267,201 +259,67 @@ if chgType != cdrglblchg.STATUS_CHG:
 
 
 #----------------------------------------------------------------------
-# Select the protocols to change
+# Give user final review
 #----------------------------------------------------------------------
-okToRun = fields.getvalue ('okToRun', None)
-if not okToRun:
-    html = chg.reportWillChange()
-    if not html:
+# If review already done, we already have an email address
+email = fields.getvalue ('email', None)
+if not email:
+    report = chg.reportWillChange()
+    if not report:
         sendGlblChgPage (("",
             "<h2>No documents found matching global search criteria<h2>\n",
             (('cancel', 'Done'),)))
     else:
-        html = chg.showSoFarHtml() + \
-               "<p>The following protocols will be modified<br>\n" + \
-               "Please review and Submit or Cancel</p>\n" + html
+        instruct = """
+<p>A background job will be created to perform the global change.
+Results of the job will be emailed.</p>
+<p>To start the job, review the list of protocols to be modified and
+either:</p>
+<ol>
+ <li>Fill in an email address for results and click 'Submit', or</li>
+ <li>Click 'Cancel' to return to the administration menu</li>
+</ol>
+<p><p>
+<p>Email address: <input type='text' name='email' size='50' /></p>
+<p><p><p>
+"""
+        html = chg.showSoFarHtml() + instruct + report
 
         sendGlblChgPage (("Final review", html))
 
 # If user pressed Cancel, we never got here
-sessionVars['okToRun'] = okToRun
+sessionVars['email'] = email
 
 #----------------------------------------------------------------------
-# Perform the global change
+# Invoke the batch process to complete the actual processing
 #----------------------------------------------------------------------
+# Convert all session info to a sequence of batch job args
+args = []
+for var in sessionVars.keys():
+    args.append ((var, sessionVars[var]))
+    cdr.logwrite ((str(type(var)), str(type(sessionVars[var]))))
 
-# We'll store up to 3 versions of the doc
-oldCwdXml = None    # Original current working document
-chgCwdXml = None    # Transformed CWD
-chgPubVerXml = None # Transformed version of last pub version
+# Create batch job
+newJob = cdrbatch.CdrBatch (jobName="Global Change",
+                            command="lib/Python/GlobalChangeBatch.py",
+                            args=args,
+                            email=email)
 
-# We'll build two lists of docs to report
-# Documents successfully changed, id + title tuples
-changedDocs = [("<b>CDR ID</b>", "<b>Title</b>")]
+# Queue it for background processing
+try:
+    newJob.queue()
+except Exception, e:
+    cdrcgi.bail ("Batch job could not be started: " + str (e))
 
-# Couldn't be changed, id + title + error text
-failedDocs  = [("<b>CDR ID</b>", "<b>Title</b>", "<b>Reason</b>")]
+# Get an id user can use to find out what happened
+jobId = newJob.getJobId()
 
-# Get the list of documents - different for each type of change
-# Gets list of tuples of id + title
-cdr.logwrite ("Selecting docs for final processing", LF)
-originalDocs = chg.selDocs()
-cdr.logwrite ("Done selecting docs for final processing", LF)
-cdr.logwrite ("Processing %d docs, changing %s to %s" % \
-              (len(originalDocs), fromId, toId), LF)
+# Tell user how to find the results
+html = """
+<h4>Global change has been queued for background processing</h4>
+<p>To monitor the status of the job, click this
+<a href='getBatchStatus.py?Session=%s&jobId=%s'><u>link</u></a>
+or go to the CDR Administration menu and select 'View Batch Job Status'.</p>
+<p><p><p>""" % (session, jobId)
 
-# Process each one
-for idTitle in originalDocs:
-
-    docId    = idTitle[0]
-    title    = idTitle[1]
-    docIdStr = cdr.exNormalize(docId)[0]
-
-    # No problems yet
-    failed     = None
-    checkedOut = 0
-
-    # Attempt to check it out, getting a Doc object (in cdr.py)
-    cdr.logwrite ("Fetching doc %d for final processing" % docId, LF)
-    oldCwdDocObj = cdr.getDoc (session, docId=docId, checkout='Y',
-                               version='Current', getObject=1)
-    cdr.logwrite ("Finished fetch of doc %d for final processing" % docId, LF)
-
-    # Got a Doc object, or a string of errors
-    if type (oldCwdDocObj) == type (""):
-        failed = logErr (docId, "checking out document", oldCwdDocObj)
-    else:
-        oldCwdXml = oldCwdDocObj.xml
-
-    # Filter current working document
-    # XXXX Check that Volker uses these same variables in all scripts
-    parms = [['changeFrom', fromId], ['changeTo', toId]]
-
-    if not failed:
-        # We need to check this back in at end
-        checkedOut = 1
-
-        # Get version info
-        cdr.logwrite ("Checking lastVersions", LF)
-        result = cdr.lastVersions (session, docIdStr)
-        cdr.logwrite ("Finished checking lastVersions", LF)
-        if type (result) == type ("") or type (result) == (u""):
-            failed = logErr (docId, "fetching last version information",result)
-        else:
-            (lastVerNum, lastPubVerNum, isChanged) = result
-
-            # Filter doc to get new, changed CWD
-            cdr.logwrite ("Filtering doc", LF)
-            filtResp = cdr.filterDoc (session, filter=chg.chgFilter, parm=parms,
-                                      docId=docId, docVer=None)
-
-            if type(filtResp) != type(()):
-                failed = logErr (docId, "filtering CWD", filtResp)
-            else:
-                # Get document, ignore messages (filtResp[1])
-                chgCwdXml = filtResp[0]
-            cdr.logwrite ("Finished filtering doc", LF)
-
-    if not failed:
-        # If there was a publishable version, and
-        # It's different from the CWD,
-        #   Filter the last publishable version too
-        if (lastVerNum == lastPubVerNum and isChanged):
-
-            cdr.logwrite ("Filtering last version", LF)
-            filtResp = cdr.filterDoc (session, filter=chg.chgFilter,
-                                      parm=parms, docId=docId,
-                                      docVer=lastPubVerNum)
-            if type(filtResp) != type(()):
-                failed = logErr (docId, "filtering last publishable version",
-                                 filtResp)
-            else:
-                chgPubVerXml = filtResp[0]
-            cdr.logwrite ("Finished filtering last version", LF)
-
-    if not failed:
-        # For debug
-        # willDo = ""
-        # if isChanged:
-        #     willDo = "<h1>Saved old working copy:</h1>" + oldCwdXml
-        # if chgPubVerXml:
-        #     willDo += "<h1>Changed published version:</h1>" + chgPubVerXml
-        # willDo += "<h1>New CWD version:</h1>" + chgCwdXml
-        # cdrcgi.bail (willDo)
-
-        # Store documents in the following order:
-        #    CWD before filtering - if it's not the same as last version
-        #    Filtered publishable version, if there is one
-        #    Filtered CWD
-        if isChanged:
-            cdr.logwrite ("Saving copy of working doc before change", LF)
-            repDocResp = cdr.repDoc (session, doc=str(oldCwdDocObj), ver='Y',
-                checkIn='N', verPublishable='N',
-                reason="Copy of working document from before global change "
-                       "of %s to %s at %s" % (fromId, toId,
-                                              time.ctime (time.time())))
-            if repDocResp.startswith ("<Errors"):
-                failed = logErr (docId,
-                         "attempting to create version of pre-change doc",
-                         repDocResp)
-                cdr.logwrite (("Creating pre-change doc", "Original CWD:",
-                               oldCwdXml, "================"), LF)
-            cdr.logwrite ("Finished saving copy of working doc before change",
-                           LF)
-
-    if not failed:
-        # If new publishable version was created, store it
-        if chgPubVerXml:
-            chgPubVerDocObj = cdr.Doc(id=docId, type='InScopeProtocol',
-                                      x=chgPubVerXml)
-            repDocResp = cdr.repDoc (session, doc=str(chgPubVerDocObj),
-                ver='Y', checkIn='N', verPublishable='Y',
-                reason="Last publishable version, revised by global change "
-                       "of %s to %s at %s" % (fromId, toId,
-                                              time.ctime (time.time())))
-            if repDocResp.startswith ("<Errors"):
-                failed = logErr (docId,
-                  "attempting to store last publishable version after change",
-                  + repDocResp)
-
-    if not failed:
-        # Finally, the working document
-        chgCwdDocObj = cdr.Doc(id=docIdStr, type='InScopeProtocol',
-                               x=chgCwdXml)
-        cdr.logwrite ("Saving CWD after change", LF)
-        repDocResp = cdr.repDoc (session, doc=str(chgCwdDocObj), ver='N',
-            checkIn='Y',
-            reason="Revised by global change "
-                   "of %s to %s at %s" % (fromId, toId,
-                                          time.ctime (time.time())))
-        if repDocResp.startswith ("<Errors"):
-            failed = logErr (docId, "attempting to store changed CWD",
-                             repDocResp)
-
-        else:
-            # Replace was successful.  Document checked in
-            checkedOut = 0
-        cdr.logwrite ("Finished saving CWD after change", LF)
-
-    # If we did not complete all the way to check-in, have to unlock doc
-    if checkedOut:
-        cdr.unlock (session, docId)
-
-    # If successful, add this document to the list of sucesses
-    if not failed:
-        changedDocs.append ((docId, title))
-    else:
-        failedDocs.append ((docId, title, failed))
-
-# Final report
-html = "<h2>Please print this report now if you need a permanent copy</h2>\n"
-if len (failedDocs) > 1:
-    html += \
-    "<h2>Documents that could <font color='red'>NOT</font> be changed</h2>\n"+\
-    cdrcgi.tabularize (failedDocs, "border='1' align='center'")
-
-if len (changedDocs) > 1:
-    html += "<h2>Documents successfully changed</h2>\n" +\
-           cdrcgi.tabularize (changedDocs, "border='1' align='center'")
-
-sendGlblChgPage (("Global Change Completion Report",html,(("cancel","Done"),)))
+sendGlblChgPage (("Background job queued", html, (('cancel', 'Done'),)))
