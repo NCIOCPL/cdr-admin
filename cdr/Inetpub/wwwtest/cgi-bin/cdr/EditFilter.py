@@ -1,7 +1,11 @@
 #----------------------------------------------------------------------
-# $Id: EditFilter.py,v 1.1 2001-03-26 05:01:37 bkline Exp $
+#
+# $Id: EditFilter.py,v 1.2 2001-04-08 22:54:59 bkline Exp $
 #
 # Prototype for editing CDR filter documents.
+#
+# $Log: not supported by cvs2svn $
+#
 #----------------------------------------------------------------------
 
 #----------------------------------------------------------------------
@@ -65,7 +69,7 @@ def stripId(doc):
 if request == "Load":
     if not fields.has_key(cdrcgi.DOCID):
         cdrcgi.bail("No document ID specified", banner)
-    doc = cdr.getDoc(session, fields[cdrcgi.DOCID].value, 'Y')
+    doc = cdrcgi.decode(cdr.getDoc(session, fields[cdrcgi.DOCID].value, 'Y'))
     if doc.find("<Errors>") >= 0:
         cdrcgi.bail(doc, banner)
     showForm(doc, "Editing existing document", ("Load", "Save", "Clone"))
@@ -83,11 +87,11 @@ elif request == 'Clone':
     if not fields.has_key("Doc"):
         cdrcgi.bail("No document to save")
     doc = stripId(fields["Doc"].value)
-    docId = cdr.addDoc(session, doc=doc)
+    docId = cdr.addDoc(session, doc=cdrcgi.encode(doc))
     if docId.find("<Errors>") >= 0:
         cdrcgi.bail(doc, banner)
     else:
-        doc = cdr.getDoc(session, docId, 'Y')
+        doc = cdrcgi.decode(cdr.getDoc(session, docId, 'Y'))
         if doc.find("<Errors>") >= 0:
             cdrcgi.bail(doc, banner)
         showForm(doc, "Editing existing document", ("Load", "Save", "Clone"))
@@ -100,13 +104,13 @@ elif request == 'Save':
         cdrcgi.bail("No document to save")
     doc = fields["Doc"].value
     if re.search("<CdrDoc[^>]*\sId='[^']*'", doc, re.DOTALL):
-        docId = cdr.repDoc(session, doc=doc)
+        docId = cdr.repDoc(session, doc=cdrcgi.encode(doc))
     else:
-        docId = cdr.addDoc(session, doc=doc)
+        docId = cdr.addDoc(session, doc=cdrcgi.encode(doc))
     if docId.find("<Errors>") >= 0:
         cdrcgi.bail(doc, banner)
     else:
-        doc = cdr.getDoc(session, docId)
+        doc = cdrcgi.decode(cdr.getDoc(session, docId))
         if doc.find("<Errors>") >= 0:
             cdrcgi.bail(doc, banner)
         showForm(doc, "Editing existing document", ("Load", "Save", "Clone"))
