@@ -1,11 +1,17 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.37 2004-04-16 22:06:51 venglisc Exp $
+# $Id: QcReport.py,v 1.38 2004-04-28 16:01:20 venglisc Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.37  2004/04/16 22:06:51  venglisc
+# Modified program to achieve the following:
+# a)  Create user interface to run the QC report from the menus (Bug 1059)
+# b)  Update the @@...@@ parameters of the BoardMember QC report to
+#     populate these with the output from database queries. (Bug 1054).
+#
 # Revision 1.36  2004/04/02 19:46:20  venglisc
 # Included function to populate the active/closed protocol link variables
 # for the Organization QC report.
@@ -573,6 +579,7 @@ def fixOrgReport(doc):
            AND prot.value in ('Active', 'Temporarily closed', 
                               'Approved-not yet active', 'Closed', 'Completed') 
            AND org.int_val = ?
+           AND org.path like '%@cdr:ref'
          GROUP BY prot.value""", intId)
     except cdrdb.Error, info:    
         cdrcgi.bail('Failure retrieving Protocol info for %s: %s' % (intId, 
