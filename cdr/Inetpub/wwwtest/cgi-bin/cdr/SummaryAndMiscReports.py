@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryAndMiscReports.py,v 1.16 2005-02-16 19:12:35 venglisc Exp $
+# $Id: SummaryAndMiscReports.py,v 1.17 2005-03-24 21:12:36 bkline Exp $
 #
 # Submenu for summary and miscellanous document reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.16  2005/02/16 19:12:35  venglisc
+# Replaced the Stub.py to run the BoardRoster report. (Bug 1537)
+#
 # Revision 1.15  2004/09/09 19:19:44  venglisc
 # Minor changes to menu entries to have menu items match between the
 # CIAT and CIPS summary menu. (Bug 1329).
@@ -118,7 +121,7 @@ form += """\
     <OL>
 """
 reports = [
-           # ('Stub.py?',                  'Changes to Summaries'),
+           ('ChangesToSummaries.py?',      'Changes to Summaries'),
            ('SummaryChanges.py?',          'History of Changes to Summary'),
            ('PdqBoards.py?',               'PDQ Board Listings'),
            ('SummaryCitations.py?',        'Summaries Citations'),
