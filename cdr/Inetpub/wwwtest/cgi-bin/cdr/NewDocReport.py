@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: NewDocReport.py,v 1.1 2002-03-14 04:01:10 bkline Exp $
+# $Id: NewDocReport.py,v 1.2 2002-03-14 04:03:17 bkline Exp $
 #
 # Reports on newly created documents and their statuses.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2002/03/14 04:01:10  bkline
+# Added New Doc Report.
+#
 #----------------------------------------------------------------------
 import cdr, cdrdb, cdrcgi, cgi, re, time, xml.dom.minidom
 
@@ -232,7 +235,7 @@ for key in keys:
     <td nowrap='1'>
      <font size='3'>%s</font>
     </td>
-    <td align='left'>
+    <td align='right'>
      <font size='3'>%d</font>
     </td>
    </tr>
@@ -250,7 +253,7 @@ for key in keys:
      </b>
     </td>
     <td>&nbsp;</td>
-    <td align='left'>
+    <td align='right'>
      <b>
       <font size='3'>%d</font>
      </b>
