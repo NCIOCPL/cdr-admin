@@ -1,13 +1,16 @@
 #----------------------------------------------------------------------
 #
-# $Id: ShowAllLinkTypes.py,v 1.1 2001-06-13 22:16:32 bkline Exp $
+# $Id: ShowAllLinkTypes.py,v 1.2 2001-08-06 18:34:58 bkline Exp $
 #
-# Prototype for editing a CDR user.
+# Displays a table containing information about all link types.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2001/06/13 22:16:32  bkline
+# Initial revision
+#
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, string, dbi, odbc
+import cgi, cdr, cdrcgi, re, string, dbi, cdrdb
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -15,7 +18,6 @@ import cgi, cdr, cdrcgi, re, string, dbi, odbc
 fields  = cgi.FieldStorage()
 session = cdrcgi.getSession(fields)
 request = cdrcgi.getRequest(fields)
-usrName = fields and fields.getvalue("usr") or None
 
 #----------------------------------------------------------------------
 # Make sure we're logged in.
@@ -41,8 +43,10 @@ header  = cdrcgi.header(title, title, section, script, buttons)
 #----------------------------------------------------------------------
 # Retrieve the information directly from the database.
 #----------------------------------------------------------------------
-conn = odbc.odbc('cdr/CdrGuest/readonly')
-if not conn: cdrcgi.bail('Unable to connect to CDR server.')
+try:
+    conn = cdrdb.connect('CdrGuest')
+except cdrdb.Error, info:
+    cdrcgi.bail('Database failure: %s' % info[1][0])
 cursor = conn.cursor()
 query  = """\
 SELECT DISTINCT link_type.name, 
@@ -59,7 +63,10 @@ SELECT DISTINCT link_type.name,
             AND link_xml.doc_type = source.id
             AND link_target.target_doc_type = target.id
 """
-cursor.execute(query)
+try:
+    cursor.execute(query)
+except cdrdb.Error, info:
+    cdrcgi.bail('Database query failure: %s' % info[1][0])
 
 #----------------------------------------------------------------------
 # Display the information in a table.
@@ -74,10 +81,14 @@ form = """\
   <TD><B>Target Doctype</TD>
  </TR>
 """
-for rec in cursor.fetchall():
-    form += " <TR>\n"
-    for col in rec:
-        form += "  <TD>%s</TD>\n" % col
+try:
+    for rec in cursor.fetchall():
+        form += " <TR>\n"
+        for col in rec:
+            form += "  <TD>%s</TD>\n" % col
+except cdrdb.Error, info:
+    cdrcgi.bail('Failure fetching query results: %s' % info[1][0])
+
 form += "</TABLE>\n"
 
 #----------------------------------------------------------------------
