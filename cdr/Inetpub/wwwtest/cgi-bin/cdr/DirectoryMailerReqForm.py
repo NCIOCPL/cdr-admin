@@ -1,8 +1,19 @@
 #----------------------------------------------------------------------
 #
-# $Id: DirectoryMailerReqForm.py,v 1.1 2002-03-19 23:39:06 ameyer Exp $
+# $Id: DirectoryMailerReqForm.py,v 1.2 2002-06-07 00:12:44 ameyer Exp $
 #
 # Request form for all directory mailers.
+#
+# Selection criteria for documents to mail include:
+#   Must be person or organization documents.
+#   Must be under version control, latest version is selected, whether
+#     or not it is publishable.
+#   Unless individual doc id entered by user, the mailer history for
+#     the document must meet criteria for mailer type:
+#       Initial mailers - Never mailed before.
+#                         Marked "ready for review".
+#       Update mailers  - Minimum 12 months since last mailer.
+#       Remailers       - No response rcvd to initial or update in 60 days.
 #
 # This program is invoked twice to  create a mailer job.
 #
@@ -20,9 +31,13 @@
 # Bob Kline.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2002/03/19 23:39:06  ameyer
+# CGI portion of the directory mailer selection software.
+# Displays menu, selects documents, initiates publishing job.
+#
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, string, cdrdb, cdrpub
+import cgi, cdr, cdrcgi, re, string, cdrdb, cdrpubcgi, cdrmailcommon
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -32,8 +47,7 @@ session = cdrcgi.getSession(fields)
 request = cdrcgi.getRequest(fields)
 docId   = fields and fields.getvalue("DocId")    or None
 email   = fields and fields.getvalue("Email")    or None
-dirType = fields and fields.getvalue("dirType")  or None
-mailType= fields and fields.getvalue("mailType") or None
+userPick= fields and fields.getvalue("userPick") or None
 title   = "CDR Administration"
 section = "Directory Mailer Request Form"
 buttons = ["Submit", "Log Out"]
@@ -57,54 +71,53 @@ if request == "Log Out":
 if not request:
     form = """\
    <h2>Enter request parameters</h2>
-   <h5>Document ID and email notification address are both optional.
+   <b>Document ID and email notification address are both optional.
        If document ID is specified, only a mailer for that document
        will be generated; otherwise all eligible documents for which
-       mailers have not yet been sent will have mailers generated.</h5>
+       mailers have not yet been sent will have mailers generated.</b>
    <table>
     <tr>
      <th align='right' nowrap>
       <b>Directory document CDR ID: &nbsp;</b>
-     </TD>
+     </th>
      <td><input name='DocId' /></td>
     </tr>
     <tr>
      <th align='right' nowrap>
       <b>Notification email address: &nbsp;</b>
-     </TD>
+     </th>
      <td><input name='Email' /></td>
     </tr>
     <tr><td>&nbsp;</td></tr>
    </table>
-   <p><p><h5>
-   Select the type of directory and type of mailer for which mailers
-   are to be generated.  Both are required.</h5>
+   <p><p>
    <table>
-    <tr>
-     <th align='right'><B>Directory type: &nbsp;</B></th>
-     <td>
-       <label><input type='radio' name='dirType'
-          value='Physician'>Physician</label>
-     </td><td>
-       <label><input type='radio' name='dirType'
-          value='Organization'>Organization</label>
-     </td>
-    </tr>
-    <tr><td>&nbsp;</td></tr>
-    <th align='right'><b>Mailer type: &nbsp;</B></th>
-     <td>
-       <label><input type='radio' name='mailType'
-          value='Initial'>Initial</label>
-     </td><td>
-       <label><input type='radio' name='mailType'
-          value='Update'>Update</label>
-     </td><td>
-       <label><input type='radio' name='mailType'
-          value='Remail'>Remailer</label>
-     </td>
-    </tr>
+    <tr><td><b>
+     Select the directory mailer type to generate, then click Submit.<br>
+     Please be patient, it may take a minute to select documents for mailing.
+     <br>
+    </b></td></tr>
+    <tr><td><input type='radio' name='userPick'
+          value='PhysInit'>Physician-Initial</input>
+    </td></tr>
+    <tr><td><input type='radio' name='userPick'
+          value='PhysInitRemail'>Physician-Initial remail</input>
+    </td></tr>
+    <tr><td><input type='radio' name='userPick'
+          value='PhysAnnUpdate'>Physician-Annual update</input>
+    </td></tr>
+    <tr><td><input type='radio' name='userPick'
+          value='PhysAnnRemail'>Physician-Annual remail</input>
+    </td></tr>
+    <tr><td><input type='radio' name='userPick'
+          value='OrgAnnUpdate'>Organization-Annual update</input>
+    </td></tr>
+    <tr><td><input type='radio' name='userPick'
+          value='OrgAnnRemail'>Organization-Annual remail</input>
+    </td></tr>
    </table>
-   <input type='hidden' name='%s' value='%s' />
+   <input type='hidden' name='%s' value='%s'>
+
   </form>
 """ % (cdrcgi.SESSION, session)
     #------------------------------------------------------------------
@@ -115,23 +128,47 @@ if not request:
     cdrcgi.sendPage(header + form + "</BODY></HTML>")
 
 
-
 #----------------------------------------------------------------------
-# Validate that all required info is received
+# Validate that user picked a mailer type
 # We only get here on the second invocation - user filled in form
 #----------------------------------------------------------------------
-if (dirType == None or mailType == None):
-    cdrcgi.bail ('Directory type and Mailer type must be selected')
+if userPick == None:
+    cdrcgi.bail ('Must select a directory mailer type')
 
 #----------------------------------------------------------------------
-# Set variables based on the form
+# Set variables based on user selections on CGI form:
+#   docType     = Document type of document to be mailed.
+#   timeType    = Why we're mailing - 'Initial', 'Update', or 'Remail'
+#   mailType    = MailerType enumeration from the Mailer tracking doc schema
+#   orgMailType = For a remailer, the original mailType we are remailing
 #----------------------------------------------------------------------
-docType = dirType
-if doctype == 'Physician':
-    # Organization directory name and doc_type are the same, but
-    #   Physician and Person are different
-    docType = 'Person'
-subset  = dirType + ' ' + mailType + ' Mailers'
+if userPick == 'PhysInit':
+    docType     = 'Person'
+    timeType    = 'Initial'
+    mailType    = 'Physician-Initial'
+elif userPick == 'PhysInitRemail':
+    docType     = 'Person'
+    timeType    = 'Remail'
+    mailType    = 'Physician-Initial remail'
+    orgMailType = 'Physician-Initial'
+elif userPick == 'PhysAnnUpdate':
+    docType     = 'Person'
+    timeType    = 'Update'
+    mailType    = 'Physician-Annual update'
+elif userPick == 'PhysAnnRemail':
+    docType     = 'Person'
+    timeType    = 'Remail'
+    mailType    = 'Physician-Annual remail'
+    orgMailType = 'Physician-Annual update'
+elif userPick == 'OrgAnnUpdate':
+    docType     = 'Organization'
+    timeType    = 'Update'
+    mailType    = 'Organization-Annual update'
+elif userPick == 'OrgAnnRemail':
+    docType     = 'Organization'
+    timeType    = 'Remail'
+    mailType    = 'Organization-Annual remail'
+    orgMailType = 'Organization-Annual update'
 
 #----------------------------------------------------------------------
 # Connect to the CDR database.
@@ -168,15 +205,19 @@ ctrlDocId = rows[0][0]
 # Determine which documents are to be published.
 #----------------------------------------------------------------------
 if docId:
-    # Simple case - user submitted single document id
+    # Simple case - user submitted single document id, isolate the digits
     digits = re.sub('[^\d]+', '', docId)
     intId  = int(digits)
+
+    # Make sure the corresponding document exists in version control
     try:
         cursor.execute("""\
             SELECT MAX(num)
               FROM doc_version
              WHERE id = ?""", (intId,))
         row = cursor.fetchone()
+
+        # Document list contains one tuple of doc id + version number
         docList = ((intId, row[0]),)
     except cdrdb.Error, info:
         cdrcgi.bail("No version found for document %d: %s" % (intId,
@@ -188,16 +229,16 @@ if docId:
     try:
         cursor.execute ("""\
             SELECT name
-              FROM docType t, document d
+              FROM doc_type t, document d
              WHERE t.id = d.doc_type
                AND d.id = %d""" % intId)
-        row = cursor.fetchone
+        row = cursor.fetchone()
         if (row[0] != docType):
             cdrcgi.bail ("Document %d is of type %s, expecting type %s" %
                          (intId, row[0], docType))
     except cdrdb.Error, info:
-        cdrcgi.bail("Unable to find document type for id = %s" % (intId,
-                                                                  info[1][0]))
+        cdrcgi.bail("Unable to find document type for id = %d: %s" %
+                    (intId, info[1][0]))
 
 
 else:
@@ -207,7 +248,7 @@ else:
     # Document types are passed in to the query creation and do not
     #   change the structure of the query.
     #------------------------------------------------------------------
-    if mailType == 'Initial':
+    if timeType == 'Initial':
         qry = """
             SELECT DISTINCT document.id, MAX(doc_version.num)
                        FROM doc_version
@@ -226,8 +267,8 @@ else:
                                            AND p.pub_subset = '%s'
                                            AND (p.status = 'Success'
                                             OR p.completed IS NULL))
-                   GROUP BY document.id""" % (docType, subset)
-    elif mailType == 'Update':
+                   GROUP BY document.id""" % (docType, mailType)
+    elif timeType == 'Update':
         qry = """
             SELECT DISTINCT doc.id, MAX(doc_version.num)
                        FROM doc_version
@@ -252,12 +293,18 @@ else:
                                AND (p2.status = 'Success'
                                 OR p2.completed IS NULL))
                    GROUP BY doc.id""" % (docType, docType, docType)
-    elif mailType == 'Remailer':
-        qry = """
-            XXXX - NOT YET WRITTEN - XXXX
-            """
-    else:
-        cdrcgi.bail("Impossible value: %s in mailer type" % mailType)
+    elif timeType == 'Remail':
+        # Execute a query that builds a temporary table
+        try:
+            rms = cdrmailcommon.RemailSelector (cursor)
+            rms.select (orgMailType)
+
+            # And create one to fetch the doc ids from it
+            qry = rms.getDocIdVerQuery()
+
+        except cdrdb.Error, info:
+            cdrcgi.bail('Database failure selecting remailers: %s'
+                        % info[1][0])
 
     # Execute the query to find all matching documents
     try:
@@ -267,7 +314,8 @@ else:
         cdrcgi.bail("Failure retrieving document IDs: %s" % info[1][0])
 
 # Drop the job into the queue.
-result = cdrpub.initNewJob(ctrlDocId, subset, session, docList, [], email)
+# Subset names in the publishing control document must match mailType
+result = cdrpubcgi.initNewJob(ctrlDocId, mailType, session, docList, [], email)
 if type(result) == type(""):
     cdrcgi.bail(result)
 elif type(result) == type(u""):
@@ -284,5 +332,10 @@ html = """\
   </BODY>
  </HTML>
 """ % (result[0], cdrcgi.BASE, result[0])
+
+# Remailers require permanent storage of the associated ids
+#  in the database, using job id as a key
+if timeType == 'Remail':
+    rms.fillMailerIdTable(result[0])
 
 cdrcgi.sendPage(header + html)
