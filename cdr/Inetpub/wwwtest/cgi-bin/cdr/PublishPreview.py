@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: PublishPreview.py,v 1.16 2002-10-31 02:06:06 bkline Exp $
+# $Id: PublishPreview.py,v 1.17 2002-11-05 14:00:29 bkline Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.16  2002/10/31 02:06:06  bkline
+# Changed www.cancer.gov to stage.cancer.gov for css url.
+#
 # Revision 1.15  2002/10/28 13:59:11  bkline
 # Added hook to debuglevel.  Added link to Cancer.gov stylesheet.
 #
@@ -75,6 +78,9 @@ filters = {
          "name:Denormalization Filter (3/5): Summary",
          "name:Denormalization Filter (4/5): Summary",
          "name:Denormalization Filter (5/5): Summary",
+         "name:Denormalization Filter:(6/6)Summary",
+         "name:Summary-Add Citation Wrapper Data Element",
+         "name:Summary-Sort Citations by refidx",
          "name:Vendor Filter: Summary"],
     'GlossaryTerm':         
         ["name:Glossary Term QC Report Filter"],
@@ -88,6 +94,7 @@ filters = {
          "name:Person QC Report Filter"],
     'InScopeProtocol':  
         ["name:Denormalization Filter (1/1): InScope Protocol",
+         "name:Denormalization: sort OrganizationName for Postal Address",
          "name:Vendor Filter: InScopeProtocol"],
     'Term':             
         ["name:Denormalization Filter (1/1): Terminology",
