@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.11 2002-09-19 15:14:26 bkline Exp $
+# $Id: QcReport.py,v 1.12 2002-09-26 15:31:17 bkline Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.11  2002/09/19 15:14:26  bkline
+# Added filters at Cheryl's request.
+#
 # Revision 1.10  2002/08/14 17:26:16  bkline
 # Added new denormalization filters for summaries.
 #
@@ -181,24 +184,23 @@ summaryDenormalizationFilters = [
          "name:Denormalization Filter (2/5): Summary",
          "name:Denormalization Filter (3/5): Summary",
          "name:Denormalization Filter (4/5): Summary",
-         "name:Denormalization Filter (5/5): Summary"]
+         "name:Denormalization Filter (5/5): Summary",
+         "name:Denormalization Filter:(6/6)Summary",
+         "name:Summary-Add Citation Wrapper Data Element",
+         "name:Summary-Sort Citations by refidx"]
 filters = {
     'Summary':
         summaryDenormalizationFilters +
-        ["name:Denormalization Filter:(6/6)Summary",
-         "name:Health Professional Summary Report"],
+        ["name:Health Professional Summary Report"],
     'Summary:bu': # Bold/Underline
         summaryDenormalizationFilters +
-        ["name:Denormalization Filter:(6/6)Summary",
-         "name:Health Professional Summary Report-Bold/Underline"],
+        ["name:Health Professional Summary Report-Bold/Underline"],
     'Summary:rs': # Redline/Strikeout
         summaryDenormalizationFilters +
-        ["name:Denormalization Filter:(6/6)Summary",
-         "name:Health Professional Summary Report"],
+        ["name:Health Professional Summary Report"],
     'Summary:nm': # No markup
         summaryDenormalizationFilters +
-        ["name:Denormalization Filter:(6/6)Summary",
-         "name:Health Professional Summary Report"],
+        ["name:Health Professional Summary Report"],
     'GlossaryTerm':         
         ["name:Glossary Term QC Report Filter"],
     'Citation':         
