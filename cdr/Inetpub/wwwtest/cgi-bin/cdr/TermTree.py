@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: TermTree.py,v 1.1 2001-12-01 18:11:44 bkline Exp $
+# $Id: TermTree.py,v 1.2 2002-08-15 19:44:28 bkline Exp $
 #
 # Second prototype for CDR Terminology tree viewer.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2001/12/01 18:11:44  bkline
+# Initial revision
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
 
@@ -43,7 +46,6 @@ html = """\
   <HR>
 """
 
-session  = None
 topNodes = (cdr.QueryResult('CDR0000183045', 'Term', 'antineoplatic'),
             cdr.QueryResult('CDR0000182216', 'Term', 'cancer'),
             cdr.QueryResult('CDR0000187268', 'Term', 'gene'),
@@ -51,7 +53,7 @@ topNodes = (cdr.QueryResult('CDR0000183045', 'Term', 'antineoplatic'),
             cdr.QueryResult('CDR0000184264', 'Term', 'supportive care/therapy'))
 
 def showNodes(nodes, level, parentPath):
-    global session, html
+    global html
     pathSep = parentPath and "/" or ""
     prevNode = ""
     for node in nodes:
@@ -72,9 +74,7 @@ def showNodes(nodes, level, parentPath):
                 FILTER, node.docId)
         html += "\n<FONT COLOR='blue'>%s</FONT></A><BR>\n" % node.docTitle
         if image == MINUS:
-            if not session:
-                session = cdr.login('rmk', '***REDACTED***')
-            children = cdr.search(session, 
+            children = cdr.search('guest', 
                     'CdrAttr/Term/TermParent/@cdr:ref="%s"' % node.docId)
             if type(children) == type(""): cdrcgi.bail(children)
             showNodes(children, level + 1, 
