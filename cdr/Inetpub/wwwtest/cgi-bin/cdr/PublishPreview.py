@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: PublishPreview.py,v 1.20 2003-08-25 20:31:44 bkline Exp $
+# $Id: PublishPreview.py,v 1.21 2003-11-25 12:47:41 bkline Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.20  2003/08/25 20:31:44  bkline
+# Eliminated obsolete lists of filters (replaced by named filter sets).
+#
 # Revision 1.19  2002/11/15 18:36:23  bkline
 # Fixed typo (InScopePrototocol).
 #
@@ -65,17 +68,25 @@
 # Initial revision
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, cdrdb, re, cdr2cg
+import cgi, cdr, cdrcgi, cdrdb, re, cdr2cg, sys
 
 #----------------------------------------------------------------------
 # Get the parameters from the request.
 #----------------------------------------------------------------------
 title   = "CDR Publish Preview"
-fields  = cgi.FieldStorage() or cdrcgi.bail("No Request Found", title)
-session = cdrcgi.getSession(fields) or cdrcgi.bail("Not logged in")
-docId   = fields.getvalue(cdrcgi.DOCID) or cdrcgi.bail("No Document", title)
-flavor  = fields.getvalue("Flavor") or None
-dbgLog  = fields.getvalue("DebugLog") or None
+fields  = cgi.FieldStorage() or None
+
+if not fields:
+    session = 'guest'
+    docId   = sys.argv[1]
+    dbgLog  = len(sys.argv) > 2 and sys.argv[2] or None
+    flavor  = len(sys.argv) > 3 and sys.argv[3] or None
+else:
+    session = cdrcgi.getSession(fields) or cdrcgi.bail("Not logged in")
+    docId   = fields.getvalue(cdrcgi.DOCID) or cdrcgi.bail("No Document",
+                                                           title)
+    flavor  = fields.getvalue("Flavor") or None
+    dbgLog  = fields.getvalue("DebugLog") or None
 
 #----------------------------------------------------------------------
 # Map for finding the filters for a given document type.
