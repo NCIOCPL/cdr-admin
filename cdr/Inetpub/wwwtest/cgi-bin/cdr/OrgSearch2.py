@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: OrgSearch2.py,v 1.8 2003-08-25 20:19:05 bkline Exp $
+# $Id: OrgSearch2.py,v 1.9 2003-12-09 19:13:26 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Organization documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.8  2003/08/25 20:19:05  bkline
+# Added support for searching on FormerName element.
+#
 # Revision 1.7  2002/08/08 12:16:29  bkline
 # Changed path for AlternateName.
 #
@@ -132,7 +135,7 @@ if not query:
 #----------------------------------------------------------------------
 try:
     cursor = conn.cursor()
-    cursor.execute(query)
+    cursor.execute(query, timeout = 300)
     rows = cursor.fetchall()
     cursor.close()
     cursor = None
