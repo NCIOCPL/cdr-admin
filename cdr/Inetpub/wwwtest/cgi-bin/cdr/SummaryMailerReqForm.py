@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryMailerReqForm.py,v 1.3 2002-10-24 20:02:03 bkline Exp $
+# $Id: SummaryMailerReqForm.py,v 1.4 2002-11-07 12:51:25 bkline Exp $
 #
 # Request form for generating PDQ Editorial Board Members Mailing.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2002/10/24 20:02:03  bkline
+# Expanded script to handle both board types.
+#
 # Revision 1.2  2002/02/21 22:34:00  bkline
 # Added navigation buttons.
 #
@@ -12,7 +15,7 @@
 # Initial revision
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrdb, cdrpub, cdrcgi, re, string
+import cgi, cdr, cdrdb, cdrpub, cdrcgi, re, string, cdrmailcommon
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -132,7 +135,7 @@ if request == "Submit":
 
     # Log what happened
     msgs = ["Started directory mailer job - id = %d" % jobId,
-            "                      Mailer type = %s" % mailType,
+            "                      Mailer type = %s" % subset,
             "          Number of docs selected = %d" % docCount]
     if docCount > 0:
         msgs.append ("                        First doc = %s" % docs[0])
