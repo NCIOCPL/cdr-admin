@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: BoardMemberMailerReqForm.py,v 1.1 2004-07-17 11:52:54 bkline Exp $
+# $Id: BoardMemberMailerReqForm.py,v 1.2 2004-08-26 14:40:26 bkline Exp $
 #
 # Request form for generating RTF letters to board members.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2004/07/17 11:52:54  bkline
+# Plugged in user interface for generating PDQ Board Member Correspondence
+# Mailers.
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrdb, cdrpub, cdrcgi, re, string, cdrmailcommon, sys
 
@@ -15,6 +19,7 @@ fields    = cgi.FieldStorage()
 session   = cdrcgi.getSession(fields)
 request   = cdrcgi.getRequest(fields)
 board     = fields and fields.getvalue("board") or None
+letter    = fields and fields.getvalue("letter") or None
 email     = fields and fields.getvalue("email") or None
 members   = fields and fields.getlist("member") or []
 title     = "CDR Administration"
@@ -52,95 +57,153 @@ except cdrdb.Error, info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
 
 #----------------------------------------------------------------------
+# Just for testing.
+#----------------------------------------------------------------------
+def showDocsAndRun(rows):
+    if not rows:
+        rows = []
+    html = """\
+<!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
+<html>
+ <head>
+  <title>Protocol S&amp;P Doc List</title>
+  <style type='text/css'>
+   th,h2    { font-family: Arial, sans-serif; font-size: 11pt;
+              text-align: center; font-weight: bold; }
+   h1       { font-family: Arial, sans-serif; font-size: 12pt;
+              text-align: center; font-weight: bold; }
+   td       { font-family: Arial, sans-serif; font-size: 10pt; }
+  </style>
+ </head>
+ <body>
+  <h1>Protocol S&amp;P Doc List</h1>
+  <h2>%d docs selected</h2>
+  <br><br>
+  <table border='1' cellspacing='0' cellpadding='1'>
+   <tr>
+    <th>Document</th>
+    <th>Version</th>
+   </tr>
+""" % len(rows)
+    for row in rows:
+        html += """\
+   <tr>
+    <td align='center'>CDR%010d</td>
+    <td align='center'>%d</td>
+   </tr>
+""" % (row[0], row[1])
+    cdrcgi.sendPage(html + """\
+  </table>
+ </body>
+</html>""")
+
+#----------------------------------------------------------------------
 # Submit request if we have one.
 #----------------------------------------------------------------------
+boardError = "&nbsp;"
+letterError = "&nbsp;"
 if request == "Submit":
 
     # Reality check.
     if not board:
-        cdrcgi.bail('Board not selected')
+        boardError = "<span class='error'>Board selection is required</span>"
+    if not letter:
+        letterError = "<span class='error'>Letter selection is required</span>"
 
-    # Find the publishing system control document.
-    try:
-        cursor = conn.cursor()
-        cursor.execute("""\
+    if board and letter:
+        board = int(board)
+    
+        # Find the publishing system control document.
+        try:
+            cursor = conn.cursor()
+            cursor.execute("""\
             SELECT d.id
               FROM document d
               JOIN doc_type t
                 ON t.id    = d.doc_type
              WHERE t.name  = 'PublishingSystem'
                AND d.title = 'Mailers'""")
-        rows = cursor.fetchall()
-    except cdrdb.Error, info:
-        cdrcgi.bail('Database failure looking up control document: %s' %
-                    info[1][0])
-    if len(rows) < 1:
-        cdrcgi.bail('Unable to find control document for Mailers')
-    if len(rows) > 1:
-        cdrcgi.bail('Multiple Mailer control documents found')
-    ctrlDocId = rows[0][0]
+            rows = cursor.fetchall()
+        except cdrdb.Error, info:
+            cdrcgi.bail('Database failure looking up control document: %s' %
+                        info[1][0])
+        if len(rows) < 1:
+            cdrcgi.bail('Unable to find control document for Mailers')
+        if len(rows) > 1:
+            cdrcgi.bail('Multiple Mailer control documents found')
+        ctrlDocId = rows[0][0]
 
-    # Find the documents to be published.
-    try:
-        cursor.execute("""\
-            SELECT DISTINCT TOP %d d.id, MAX(v.num)
-                       FROM doc_version v
-                       JOIN document d
-                         ON d.id = v.id
-                       JOIN query_term q
-                         ON q.doc_id = d.id
-                       JOIN query_term a
-                         ON a.doc_id = d.id
-                      WHERE d.active_status = 'A'
-                        AND v.publishable = 'Y'
-                        AND q.value = ?
-                        AND q.path = '/Summary/SummaryMetaData/PDQBoard'
-                                   + '/Board/@cdr:ref'
-                        AND a.path = '/Summary/SummaryMetaData/SummaryAudience'
-                        AND a.value = 'Health professionals'
-                   GROUP BY d.id""" % maxDocs, (board,))
-        docList = cursor.fetchall()
-    except cdrdb.Error, info:
-        cdrcgi.bail("Failure retrieving document IDs: %s" % info[1][0])
+        # Find the documents to be published.
+        try:
+            if not members or 'all' in members:
+                cursor.execute("""\
+    SELECT DISTINCT v.id, MAX(v.num)
+               FROM doc_version v
+               JOIN query_term q
+                 ON q.doc_id = v.id
+               JOIN document d
+                 ON d.id = v.id
+              WHERE q.path = '/PDQBoardMemberInfo/BoardMembershipDetails'
+                           + '/BoardName/@cdr:ref'
+                AND v.val_status = 'V'
+                AND q.int_val = ?
+                AND d.active_status = 'A'
+           GROUP BY v.id""", board, timeout = 300)
+                docList = cursor.fetchall()
+            else:
+                docList = []
+                for member in members:
+                    member = int(member)
+                    cursor.execute("""\
+            SELECT MAX(num)
+              FROM doc_version
+             WHERE id = ?
+               AND val_status = 'V'""", member)
+                    docList.append((member, cursor.fetchall()[0][0]))
+        except cdrdb.Error, info:
+            cdrcgi.bail("Failure retrieving document IDs: %s" % info[1][0])
+        #showDocsAndRun(docList)
 
-    # Check to make sure we have at least one mailer to send out.
-    docCount = len(docList)
-    if docCount == 0:
-        cdrcgi.bail ("No documents found")
+        # Check to make sure we have at least one mailer to send out.
+        docCount = len(docList)
+        if docCount == 0:
+            cdrcgi.bail ("No documents found")
 
-    # Compose the docList results into a format that cdr.publish() wants
-    #   e.g., id=25, version=3, then form: "CDR0000000025/3"
-    docs = []
-    for doc in docList:
-        docs.append("CDR%010d/%d" % (doc[0], doc[1]))
+        # Compose the docList results into a format that cdr.publish() wants
+        #   e.g., id=25, version=3, then form: "CDR0000000025/3"
+        docs = []
+        for doc in docList:
+            docs.append("CDR%010d/%d" % (doc[0], doc[1]))
 
-    # Drop the job into the queue.
-    subset = 'Summary-PDQ %s Board' % boardType
-    parms = (('Board', board),)
-    result = cdr.publish(credentials = session, pubSystem = 'Mailers',
-                         pubSubset = subset, docList = docs,
-                         allowNonPub = 'Y', email = email, parms = parms)
+        # Drop the job into the queue.
+        subset = 'PDQ Board Member Correspondence Mailer'
+        parms = (('Board', board),('Letter', letter))
+        result = cdr.publish(credentials = session, pubSystem = 'Mailers',
+                             pubSubset = subset, docList = docs,
+                             allowNonPub = 'Y', email = email, parms = parms)
 
-    # cdr.publish returns a tuple of job id + messages
-    # If serious error, job id = None
-    if not result[0] or int(result[0]) < 0:
-        cdrcgi.bail("Unable to initiate publishing job:<br>%s" % result[1])
+        # cdr.publish returns a tuple of job id + messages
+        # If serious error, job id = None
+        if not result[0] or int(result[0]) < 0:
+            cdrcgi.bail("Unable to initiate publishing job:<br>%s" % result[1])
 
-    jobId = int(result[0])
+        jobId = int(result[0])
 
-    # Log what happened
-    msgs = ["Started directory mailer job - id = %d" % jobId,
-            "                      Mailer type = %s" % subset,
-            "          Number of docs selected = %d" % docCount]
-    if docCount > 0:
-        msgs.append ("                        First doc = %s" % docs[0])
-    if docCount > 1:
-        msgs.append ("                       Second doc = %s" % docs[1])
-    cdr.logwrite (msgs, cdrmailcommon.LOGFILE)
+        # Log what happened
+        msgs = ["Started correspondence mailer job - id = %d" % jobId,
+                "                           Mailer type = %s" % subset,
+                "               Number of docs selected = %d" % docCount]
+        if docCount > 0:
+            msgs.append("                             First doc = %s" %
+                        docs[0])
+        if docCount > 1:
+            msgs.append("                            Second doc = %s" %
+                        docs[1])
+        cdr.logwrite (msgs, cdrmailcommon.LOGFILE)
 
-    # Tell user how to get status
-    header = cdrcgi.header(title, title, section, None, [])
-    cdrcgi.sendPage(header + """\
+        # Tell user how to get status
+        header = cdrcgi.header(title, title, section, None, [])
+        cdrcgi.sendPage(header + """\
     <H3>Job Number %d Submitted</H3>
     <B>
      <FONT COLOR='black'>Use
@@ -161,7 +224,7 @@ class Board:
       FROM query_term
      WHERE path = '/Organization/OrganizationNameInformation'
                 + '/OfficialName/Name'
-       AND doc_id = ?""", id)
+       AND doc_id = ?""", id, timeout = 300)
         rows = cursor.fetchall()
         if not rows:
             cdrcgi.bail("No name found for board %d" % id)
@@ -171,7 +234,8 @@ class Board:
       FROM query_term
      WHERE doc_id = ?
        AND path = '/Organization/OrganizationType'
-       AND value IN ('PDQ Editorial Board', 'PDQ Advisory Board')""", id)
+       AND value IN ('PDQ Editorial Board', 'PDQ Advisory Board')""", id,
+                       timeout = 300)
         rows = cursor.fetchall()
         if not rows:
             cdrcgi.bail("Can't find board type for '%s'" % self.name)
@@ -202,8 +266,12 @@ cursor.execute("""\
                FROM query_term q
                JOIN document d
                  ON q.doc_id = d.id
+               JOIN doc_version v
+                 ON v.id = d.id
               WHERE path = '/PDQBoardMemberInfo/BoardMembershipDetails'
-                         + '/BoardName/@cdr:ref'""")
+                         + '/BoardName/@cdr:ref'
+                AND v.val_status = 'V'
+                AND d.active_status = 'A'""", timeout = 300)
 rows = cursor.fetchall()
 for memberId, boardId, docTitle in rows:
     if boardId not in boards:
@@ -214,6 +282,9 @@ for memberId, boardId, docTitle in rows:
     member = members[memberId]
     board.members.append(member)
 
+#----------------------------------------------------------------------
+# Generate a picklist for the PDQ Editorial Boards.
+#----------------------------------------------------------------------
 def makeBoardList(boards):
     keys = boards.keys()
     keys.sort(lambda a,b: cmp(boards[a].name, boards[b].name))
@@ -232,43 +303,7 @@ def makeBoardList(boards):
 """
 
 #----------------------------------------------------------------------
-# Generate a picklist for the PDQ Editorial Boards.
-#----------------------------------------------------------------------
-def makePicklist(conn):
-
-    try:
-        cursor = conn.cursor()
-        cursor.execute("""\
-            SELECT DISTINCT d.id, d.title
-                       FROM document d
-                       JOIN query_term q
-                         ON q.doc_id = d.id
-                      WHERE q.path = '/Organization/OrganizationType'
-                        AND q.value = 'PDQ %s Board'""" % boardType)
-        rows = cursor.fetchall()
-        cursor.close()
-        cursor = None
-    except cdrdb.Error, info:
-        cdrcgi.bail("Failure retrieving PDQ %s Board info: %s" % 
-                    (boardType, info[1][0]))
-    if not rows:
-        cdrcgi.bail("Unable to find any PDQ %s Board documents" % boardType)
-    html = """\
-      <SELECT NAME='Board'>
-       <OPTION VALUE='' SELECTED>&nbsp;</OPTION>
-"""
-    for id, title in rows:
-        boardName = title.split(';')[0]
-        html += """\
-       <OPTION VALUE='CDR%010d'>%s &nbsp;</OPTION>
-""" % (id, boardName)
-    html += """\
-      </SELECT>
-"""
-    return html
-
-#----------------------------------------------------------------------
-# Put up the form if we don't have a request yet.
+# Create JavaScript for a list of Board objects.
 #----------------------------------------------------------------------
 def makeBoardObjects():
     objects = """\
@@ -293,19 +328,23 @@ def makeBoardObjects():
     return objects + """
    };"""
         
+#----------------------------------------------------------------------
+# Put up the form if we don't have a request yet.
+#----------------------------------------------------------------------
 header = cdrcgi.header(title, title, section, script, buttons,
                        stylesheet = """\
  <style type='text/css'>
-   ul { margin-left: 40pt }
-   h2 { font-size: 14pt; font-family:Arial; color:navy }
+   ul { margin-left: 20pt }
+   h2 { font-size: 14pt; font-family:Arial; color:maroon }
    h3 { font-size: 13pt; font-family:Arial; color:black; font-weight:bold }
    li, span.r { 
         font-size: 11pt; font-family:'Arial'; color:black;
         margin-bottom: 10pt; font-weight:normal 
    }
-   b, th {  font-size: 12pt; font-family:'Arial'; color:black;
+   b, th {  font-size: 11pt; font-family:'Arial'; color:black;
         margin-bottom: 10pt; font-weight:bold 
    }
+   .error { color: red; }
   </style>
   <script language='JavaScript'>
    function submitRequest() {
@@ -316,12 +355,13 @@ header = cdrcgi.header(title, title, section, script, buttons,
            return;
        }
        if (!document.forms[0].letter.value) {
-           alert('OK, which letter am I supposed to send out?');
+           alert('OK, which letter should we send out?');
            if (document.forms[0].letter.focus)
                document.forms[0].letter.focus();
            return;
        }
        document.forms[0].action = 'DumpParams.py';
+       document.forms[0].Request.value = 'Submit';
        document.forms[0].method = 'POST';
        document.forms[0].submit();
    }
@@ -358,20 +398,20 @@ header = cdrcgi.header(title, title, section, script, buttons,
        var boardIndex       = boardElem.selectedIndex;
        if (boardIndex == -1)
            return;
-       var boardId         = boardOptions[boardIndex].value;
+       var boardId          = boardOptions[boardIndex].value;
        if (!boardId)
            return;
-       var board           = boards[boardId];
-       var lettersForBoard = letters[board.boardType];
+       var board            = boards[boardId];
+       var lettersForBoard  = letters[board.boardType];
        for (var i = 0; i < lettersForBoard.length; ++i) {
-           var letter = lettersForBoard[i];
-           letter.selected = false;
+           var letter       = lettersForBoard[i];
+           letter.selected  = false;
            letterOptions[letterOptions.length] = letter;
        }
-       var membersForBoard = board.members;
+       var membersForBoard  = board.members;
        for (var i = 0; i < membersForBoard.length; ++i) {
-           var member = membersForBoard[i];
-           member.selected = false;
+           var member       = membersForBoard[i];
+           member.selected  = false;
            memberOptions[memberOptions.length] = member;
        }
    }
@@ -401,6 +441,7 @@ form = """\
      <td>
 %s
      </td>
+     <td>%s</td>
     </tr>
     <tr>
      <th align='right'>Select Letter:&nbsp;</th>
@@ -409,6 +450,7 @@ form = """\
        <option value='' selected>Choose One</option>
       </select>
      </td>
+     <td>%s</td>
     </tr>
     <tr>
      <th align='right'>Select Board Member(s):&nbsp;<br></th>
@@ -417,22 +459,24 @@ form = """\
        <option value='all' selected>All Members of Board</option>
       </select>
      </td>
+     <td>&nbsp;</td>
     </tr>
     <tr>
      <th align='right'>Email Address:&nbsp;</th>
      <td><input name='email' style='width: 500px'></td>
+     <td>&nbsp;</td>
     </tr>
     <tr>
      <td align='center' colspan='2'>
-      <br><br><br>
-      <input type='button' name='Request' value='Submit'
-             onclick='submitRequest();'><br>(Stub for now)
+      <br><br>
+      <input type='submit' name='Request' value='Submit'>
      </td>
+     <td>&nbsp;</td>
     </tr>
    </table>
    <input type='hidden' name='%s' value='%s'>
   </form>
  </body>
 </html>
-""" % (makeBoardList(boards), cdrcgi.SESSION, session)
+""" % (makeBoardList(boards), boardError, letterError, cdrcgi.SESSION, session)
 cdrcgi.sendPage(header + form)
