@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CdrReport.py,v 1.7 2002-08-15 19:17:46 bkline Exp $
+# $Id: CdrReport.py,v 1.8 2004-02-17 19:51:03 venglisc Exp $
 #
 # Prototype for CDR reporting/formatting web wrapper.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.7  2002/08/15 19:17:46  bkline
+# Fixed report name; replaced hardcoded credentials.
+#
 # Revision 1.6  2002/06/07 13:32:12  bkline
 # Issue #255: changed report title at Margaret's request.
 #
@@ -60,8 +63,8 @@ if request and days:
 # Put out the form if we don't have a request.
 #----------------------------------------------------------------------
 else:
-    title   = "Checked Out Documents With No Activity"
-    instr   = "Select Options and Submit Request"
+    title   = "CDR Administration"
+    instr   = "Checked Out Documents With No Activity"
     buttons = ("Submit Request", SUBMENU, cdrcgi.MAINMENU)
     header  = cdrcgi.header(title, title, instr, "CdrReport.py", buttons)
     form    = """\
