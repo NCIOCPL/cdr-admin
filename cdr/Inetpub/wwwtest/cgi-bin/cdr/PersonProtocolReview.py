@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: PersonProtocolReview.py,v 1.4 2003-06-13 20:30:21 bkline Exp $
+# $Id: PersonProtocolReview.py,v 1.5 2003-08-25 20:24:43 bkline Exp $
 #
 # Report to assist editors in checking links to a specified person from
 # protocols.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2003/06/13 20:30:21  bkline
+# Added identification of previous locations.
+#
 # Revision 1.3  2002/06/26 20:26:19  bkline
 # Changed query to match new Person DocTitle format rules.
 #
@@ -86,8 +89,7 @@ def showProtocols(fragId):
     pLinks = links.get(fragId, [])
     htmlFrag = """\
   <b>
-   <font size='3'>Active, Approved, Temporarily Closed Protocols
-                  at this location</font>
+   <font size='3'>Protocols at this location</font>
   </b>
   <br />
 """
@@ -219,12 +221,18 @@ class P2PLink:
         self.sortKey            = 100
         if linkType in ('PrivatePracticeSite', 'SpecificPerson'):
             self.sortKey        = 200
-        if 'Active' in statuses:
+        if 'Approved-not yet active' in statuses:
             self.sortKey       += 1
-        elif 'Approved-not yet active' in statuses:
+        elif 'Active' in statuses:
             self.sortKey       += 2
-        else:
+        elif 'Temporarily closed' in statuses:
             self.sortKey       += 3
+        elif 'Closed' in statuses:
+            self.sortKey       += 4
+        elif 'Completed' in statuses:
+            self.sortKey       += 5
+        else: # unknown?
+            self.sortKey       += 6
         
 #----------------------------------------------------------------------
 # Get all the protocols which link to this person.
@@ -255,7 +263,9 @@ try:
                     AND org_status.value IN (
                         'Active',
                         'Approved-not yet active',
-                        'Temporarily closed'
+                        'Temporarily closed',
+                        'Completed',
+                        'Closed'
                         )""" % (linkPaths[0], 
                                 linkPaths[1], 
                                 linkPaths[2],
