@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtSearch.py,v 1.10 2003-12-08 18:46:08 bkline Exp $
+# $Id: ProtSearch.py,v 1.11 2003-12-16 15:45:42 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Protocol documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.10  2003/12/08 18:46:08  bkline
+# Increased query timeout.
+#
 # Revision 1.9  2003/03/04 22:46:58  bkline
 # Modifications for CDR enhancement request #301.
 #
@@ -120,7 +123,7 @@ if not submit:
 #----------------------------------------------------------------------
 searchFields = (cdrcgi.SearchField(title,
                             ("/InScopeProtocol/ProtocolTitle",
-                             "/OutOfScopeProtocol/ProtocolTitle",
+                             "/OutOfScopeProtocol/ProtocolTitle/TitleText",
                              "/ScientificProtocolInfo/ProtocolTitle")),
                 cdrcgi.SearchField(idNums,
                             ("/InScopeProtocol/ProtocolIDs/PrimaryID/IDString",
