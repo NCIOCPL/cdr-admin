@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtAbstractMailerReqForm.py,v 1.2 2001-12-01 18:06:37 bkline Exp $
+# $Id: ProtAbstractMailerReqForm.py,v 1.3 2002-02-21 22:34:00 bkline Exp $
 #
 # Request form for Initial Protocol Abstract Mailer.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2001/12/01 18:06:37  bkline
+# Replaced SQL query approach to work around SQL Server bug.
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string, cdrdb, cdrpub
 
@@ -18,7 +21,8 @@ docId      = fields and fields.getvalue("DocId") or None
 email      = fields and fields.getvalue("Email") or None
 title      = "CDR Administration"
 section    = "Protocol Abstract Initial Mailer"
-buttons    = ["Submit", "Log Out"]
+SUBMENU    = "Mailer Menu"
+buttons    = ["Submit", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 script     = 'ProtAbstractMailerReqForm.py'
 header     = cdrcgi.header(title, title, section, script, buttons)
 subsetName = 'Initial Protocol Abstract Verification Mailers'
@@ -27,6 +31,14 @@ subsetName = 'Initial Protocol Abstract Verification Mailers'
 # Make sure we're logged in.
 #----------------------------------------------------------------------
 if not session: cdrcgi.bail('Unknown or expired CDR session.')
+
+#----------------------------------------------------------------------
+# Handle navigation requests.
+#----------------------------------------------------------------------
+if request == cdrcgi.MAINMENU:
+    cdrcgi.navigateTo("Admin.py", session)
+elif request == SUBMENU:
+    cdrcgi.navigateTo("Mailers.py", session)
 
 #----------------------------------------------------------------------
 # Handle request to log out.
@@ -161,8 +173,9 @@ html = """\
       <A HREF='%s/PubStatus.py?id=%d'>this link</A> to view job status.
      </FONT>
     </B>
+    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
    </FORM>
   </BODY>
  </HTML>
-""" % (result[0], cdrcgi.BASE, result[0])
+""" % (result[0], cdrcgi.BASE, result[0], cdrcgi.SESSION, session)
 cdrcgi.sendPage(header + html)

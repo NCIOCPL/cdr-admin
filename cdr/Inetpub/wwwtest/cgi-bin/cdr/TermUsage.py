@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: TermUsage.py,v 1.1 2001-12-01 18:11:44 bkline Exp $
+# $Id: TermUsage.py,v 1.2 2002-02-21 22:34:01 bkline Exp $
 #
 # Reports on documents which link to specified terms.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2001/12/01 18:11:44  bkline
+# Initial revision
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string, cdrdb
 
@@ -13,7 +16,17 @@ import cgi, cdr, cdrcgi, re, string, cdrdb
 #----------------------------------------------------------------------
 fields  = cgi.FieldStorage()
 docIds  = fields and fields.getvalue("DocId")   or None
+session = cdrcgi.getSession(fields)
 request = cdrcgi.getRequest(fields)
+SUBMENU = "Report Menu"
+
+#----------------------------------------------------------------------
+# Handle navigation requests.
+#----------------------------------------------------------------------
+if request == cdrcgi.MAINMENU:
+    cdrcgi.navigateTo("Admin.py", session)
+elif request == SUBMENU:
+    cdrcgi.navigateTo("reports.py", session)
 
 #----------------------------------------------------------------------
 # Put out the form if we don't have a request.
@@ -22,7 +35,7 @@ if not docIds:
     title   = "Term Usage"
     instr   = "Report on documents indexed by specified terms"
     script  = "TermUsage.py"
-    buttons = ("Submit Request",)
+    buttons = ("Submit Request", SUBMENU, cdrcgi.MAINMENU)
     header  = cdrcgi.header(title, title, instr, script, buttons)
     form    = """\
     <TABLE CELLSPACING='0' CELLPADDING='0' BORDER='0'>
@@ -39,10 +52,11 @@ if not docIds:
       <TD><INPUT NAME='DocId'></TD>
     </TR>
    </TABLE>
+   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
   </FORM>
  </BODY>
 </HTML>
-"""
+""" % (cdrcgi.SESSION, session)
     cdrcgi.sendPage(header + form)
 
 #----------------------------------------------------------------------
@@ -101,7 +115,7 @@ except cdrdb.Error, info:
 
 title   = "CDR Term Usage Report"
 instr   = "Number of documents using specified terms: %d" % len(rows)
-buttons = ()
+buttons = (SUBMENU, cdrcgi.MAINMENU)
 header  = cdrcgi.header(title, title, instr, "TermUsage.py", buttons)
 html    = """\
 <TABLE BORDER='0' WIDTH='100%%' CELLSPACING='1' CELLPADDING='3'>
@@ -133,4 +147,9 @@ for row in rows:
        title, #shortTitle,
        row[3],
        termName) #shortTermName)
-cdrcgi.sendPage(header + html + "</TABLE></FORM></BODY></HTML>")
+cdrcgi.sendPage(header + html + """\
+   </TABLE>
+   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
+  </FORM>
+ </BODY>
+</HTML>""" % (cdrcgi.SESSION, session))

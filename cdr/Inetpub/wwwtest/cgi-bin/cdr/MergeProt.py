@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: MergeProt.py,v 1.1 2001-12-01 18:11:44 bkline Exp $
+# $Id: MergeProt.py,v 1.2 2002-02-21 22:34:00 bkline Exp $
 #
 # Merge ScientificProtocolInfo document into InScopeProtocol document.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2001/12/01 18:11:44  bkline
+# Initial revision
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
 
@@ -18,7 +21,7 @@ sourceId = fields and fields.getvalue("SourceId") or None
 targetId = fields and fields.getvalue("TargetId") or None
 title    = "CDR Administration"
 section  = "Merge Protocol Documents"
-buttons  = ["Merge", "Log Out"]
+buttons  = ["Merge", cdrcgi.MAINMENU, "Log Out"]
 #script  = "DumpParams.pl"
 script   = "MergeProt.py"
 
@@ -32,6 +35,12 @@ if not session: cdrcgi.bail('Unknown or expired CDR session.')
 #----------------------------------------------------------------------
 if request == "Log Out": 
     cdrcgi.logout(session)
+
+#----------------------------------------------------------------------
+# Return to the main menu if requested.
+#----------------------------------------------------------------------
+if request == cdrcgi.MAINMENU:
+    cdrcgi.navigateTo("Admin.py", session)
 
 #----------------------------------------------------------------------
 # Handle request to delete the user.

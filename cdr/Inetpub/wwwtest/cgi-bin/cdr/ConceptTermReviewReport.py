@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ConceptTermReviewReport.py,v 1.1 2002-01-22 21:36:45 bkline Exp $
+# $Id: ConceptTermReviewReport.py,v 1.2 2002-02-21 22:34:00 bkline Exp $
 #
 # Report for task 174.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2002/01/22 21:36:45  bkline
+# Initial revision
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string, cdrdb
 
@@ -18,7 +21,16 @@ depth    = fields and fields.getvalue("Depth")    or "1"
 request  = cdrcgi.getRequest(fields)
 session  = cdrcgi.getSession(fields)
 depth    = string.atoi(depth)
+SUBMENU  = 'Report Menu'
 if not session: cdrcgi.bail("User not logged in.")
+
+#----------------------------------------------------------------------
+# Handle navigation requests.
+#----------------------------------------------------------------------
+if request == cdrcgi.MAINMENU:
+    cdrcgi.navigateTo("Admin.py", session)
+elif request == SUBMENU:
+    cdrcgi.navigateTo("reports.py", session)
 
 #----------------------------------------------------------------------
 # Put out the form if we don't have a request.
@@ -27,7 +39,7 @@ if not docId and not termName:
     title   = "Terminology"
     instr   = "Concept/Term Review Report"
     script  = "ConceptTermReviewReport.py"
-    buttons = ("Submit Request",)
+    buttons = ("Submit Request", SUBMENU, cdrcgi.MAINMENU)
     header  = cdrcgi.header(title, title, instr, script, buttons)
     form    = """\
     <TABLE CELLSPACING='0' CELLPADDING='0' BORDER='0'>
@@ -123,7 +135,7 @@ for root in roots: showTree(terms[root])
 #----------------------------------------------------------------------
 # Filter the term and plug in the hierarchical tree display.
 #----------------------------------------------------------------------
-resp = cdr.filterDoc(session, ['name:Terminology QC Report'], docId)
+resp = cdr.filterDoc(session, ['name:Terminology QC Report Filter'], docId)
 if type(resp) != type(()) and type(resp) != type([]):
     cdrcgi.bail(resp)
 html = resp[0].replace('@@TERMTREE@@', ' --> %s <!-- ' % tree)

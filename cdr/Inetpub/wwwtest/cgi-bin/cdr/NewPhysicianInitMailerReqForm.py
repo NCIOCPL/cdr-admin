@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: NewPhysicianInitMailerReqForm.py,v 1.2 2002-01-22 21:31:03 bkline Exp $
+# $Id: NewPhysicianInitMailerReqForm.py,v 1.3 2002-02-21 22:34:00 bkline Exp $
 #
 # Request form for initial physician mailers.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/01/22 21:31:03  bkline
+# Replaced stub with real code.
+#
 # Revision 1.1  2001/12/01 18:11:44  bkline
 # Initial revision
 #
@@ -22,7 +25,8 @@ email   = fields and fields.getvalue("Email")    or None
 flavor  = fields and fields.getvalue("MailType") or None
 title   = "CDR Administration"
 section = "New Physician Initial Mailer"
-buttons = ["Submit", "Log Out"]
+SUBMENU = "Mailer Menu"
+buttons = ["Submit", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 script  = 'NewPhysicianInitMailerReqForm.py'
 header  = cdrcgi.header(title, title, section, script, buttons)
 subset  = 'New Physician Initial Mailers'
@@ -31,6 +35,14 @@ subset  = 'New Physician Initial Mailers'
 # Make sure we're logged in.
 #----------------------------------------------------------------------
 if not session: cdrcgi.bail('Unknown or expired CDR session.')
+
+#----------------------------------------------------------------------
+# Handle navigation requests.
+#----------------------------------------------------------------------
+if request == cdrcgi.MAINMENU:
+    cdrcgi.navigateTo("Admin.py", session)
+elif request == SUBMENU:
+    cdrcgi.navigateTo("Mailers.py", session)
 
 #----------------------------------------------------------------------
 # Handle request to log out.
@@ -153,9 +165,10 @@ html = """\
       <A HREF='%s/PubStatus.py?id=%d'>this link</A> to view job status.
      </FONT>
     </B>
+    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
    </FORM>
   </BODY>
  </HTML>
-""" % (result[0], cdrcgi.BASE, result[0])
+""" % (result[0], cdrcgi.BASE, result[0], cdrcgi.SESSION, session)
 
 cdrcgi.sendPage(header + html)
