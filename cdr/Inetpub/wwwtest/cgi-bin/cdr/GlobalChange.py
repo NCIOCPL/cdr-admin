@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------
-# $Id: GlobalChange.py,v 1.16 2004-02-19 15:33:29 ameyer Exp $
+# $Id: GlobalChange.py,v 1.17 2004-02-26 22:06:32 ameyer Exp $
 #
 # Perform global changes on XML records in the database.
 #
@@ -14,6 +14,9 @@
 # present the next one - to the end.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.16  2004/02/19 15:33:29  ameyer
+# Added, but commented out, use of cgitb.
+#
 # Revision 1.15  2004/01/30 02:27:14  ameyer
 # Added support for picking individual documents to process or not
 # by using checkboxes on the Will Change report.
@@ -423,13 +426,8 @@ if not docIdList:
     cdrcgi.bail ("No documents selected, no global change initiated",
                  logfile=LF)
 
-# Add a single argument which is the list of doc IDs to process
-# It's either a single id, or a comma separated list
-if isinstance (docIdList, list):
-    docIdArg = ",".join (docIdList)
-else:
-    docIdArg = docIdList
-args.append (("glblDocIds", docIdArg))
+# Add them to arguments
+args.append (("glblDocIds", docIdList))
 
 # Create batch job
 cdr.logwrite ("About to launch batch job", LF)
