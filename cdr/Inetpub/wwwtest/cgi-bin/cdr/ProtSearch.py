@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtSearch.py,v 1.3 2002-02-20 03:58:55 bkline Exp $
+# $Id: ProtSearch.py,v 1.4 2002-04-12 20:01:55 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Protocol documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2002/02/20 03:58:55  bkline
+# Modified search paths to match modified schemas.
+#
 # Revision 1.2  2002/02/14 19:35:51  bkline
 # Replaced hardwired filter ID with filter name.
 #
@@ -105,7 +108,8 @@ except cdrdb.Error, info:
 # Create the results page.
 #----------------------------------------------------------------------
 html = cdrcgi.advancedSearchResultsPage("Protocol", rows, strings, 
-        {'InScopeProtocol':'name:Health Professional QC Content Report',
+        {'InScopeProtocol':'name:Protocol Denormalization Filter (InScope)'
+           '&Filter1=name:Health Professional Protocol QC Content Report',
          'OutOfScopeProtocol':'name:Health Professional QC Content Report',
          'ScientificProtocolInfo':'name:Health Professional QC Content Report'})
 
