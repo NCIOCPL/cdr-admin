@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.31 2003-11-20 21:36:04 bkline Exp $
+# $Id: QcReport.py,v 1.32 2003-11-25 12:48:34 bkline Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.31  2003/11/20 21:36:04  bkline
+# Plugged in support for CTGovProtocol documents.
+#
 # Revision 1.30  2003/11/12 19:58:47  bkline
 # Modified Person QC report to reflect use in external_map table.
 #
@@ -479,6 +482,31 @@ def fixPersonReport(doc):
     return doc
 
 #----------------------------------------------------------------------
+# Plug in last update info for CTGovProtocol.
+#----------------------------------------------------------------------
+def fixCTGovProtocol(doc):
+    cursor.execute("""\
+    SELECT TOP 1 t.dt, u.name
+      FROM audit_trail t
+      JOIN action a
+        ON a.id = t.action
+      JOIN usr u
+        ON u.id = t.usr
+     WHERE a.name = 'MODIFY DOCUMENT'
+       AND u.name <> 'CTGovImport'
+       AND t.document = ?
+  ORDER BY t.dt DESC""", intId)
+    row = cursor.fetchone()
+    if row:
+        doc = doc.replace("@@UPDATEDBY@@", row[1])
+        doc = doc.replace("@@UPDATEDDATE@@", row[0][:10])
+    else:
+        doc = doc.replace("@@UPDATEDBY@@", "&nbsp;")
+        doc = doc.replace("@@UPDATEDDATE@@", "&nbsp;")
+    return doc
+        
+
+#----------------------------------------------------------------------
 # Filter the document.
 #----------------------------------------------------------------------
 if repType: docType += ":%s" % repType
@@ -514,6 +542,13 @@ if repType == "pat":
                        standardWording and "Y" or "N"])
 doc = cdr.filterDoc(session, filters[docType], docId = docId,
                     docVer = version or None, parm = filterParm)
+#if (type(doc) in (type(""), type(u"")):
+#    cdrcgi.bail("OOPS! %s" % doc)
+if (type(doc) in (type(""), type(u"")) and
+    doc.find("undefined/lastp") != -1  and
+    docType == "CTGovProtocol"):
+    cdrcgi.bail("CTGovProtocol QC Report cannot be run until PDQIndexing "
+                "block has been completed")
 if type(doc) == type(()):
     doc = doc[0]
 
@@ -523,7 +558,9 @@ if docType == 'Person':
     doc = fixPersonReport(doc)
 elif docType == 'Organization':
     doc = fixPersonReport(doc)
-
+elif docType == 'CTGovProtocol':
+    doc = fixCTGovProtocol(doc)
+    
 #----------------------------------------------------------------------
 # Send it.
 #----------------------------------------------------------------------
