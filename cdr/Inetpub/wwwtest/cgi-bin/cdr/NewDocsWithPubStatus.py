@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: NewDocsWithPubStatus.py,v 1.1 2002-07-02 13:47:56 bkline Exp $
+# $Id: NewDocsWithPubStatus.py,v 1.2 2003-06-13 20:28:57 bkline Exp $
 #
 # Reports on newly created documents and their publication statuses.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2002/07/02 13:47:56  bkline
+# New report on new documents with publication status.
+#
 #----------------------------------------------------------------------
 import cdr, cdrdb, cdrcgi, cgi, re, time
 
@@ -133,7 +136,8 @@ try:
                 ver_user,
                 doc_type,
                 pv,
-                epv
+                epv,
+                doc_title
            FROM docs_with_pub_status
           WHERE cre_date BETWEEN ? AND ?
             %s
@@ -147,7 +151,8 @@ except cdrdb.Error, info:
 
 curDocType = None
 for row in rows:
-    docId, creUser, creDate, verDate, verUser, docType, pvFlag, epvCount = row
+    (docId, creUser, creDate, verDate, verUser, docType, pvFlag,
+     epvCount, docTitle) = row
     if curDocType != docType:
         if curDocType:
             html += """\
@@ -164,7 +169,12 @@ for row in rows:
    <tr>
     <td valign='top'>
      <b>
-      <font size='3'>DocID</font>
+      <font size='3'>CDR ID</font>
+     </b>
+    </td>
+    <td valign='top'>
+     <b>
+      <font size='3'>DocTitle</font>
      </b>
     </td>
     <td valign='top'>
@@ -189,20 +199,23 @@ for row in rows:
     </td>
     <td valign='top'>
      <b>
-      <font size='3'>Publishable?</font>
+      <font size='3'>Pub?</font>
      </b>
     </td>
     <td valign='top'>
      <b>
-      <font size='3'>Any Earlier Publishable Versions?</font>
+      <font size='3'>Earlier PubVer?</font>
      </b>
     </td>
    </tr>
 """ % docType
     html += """\
    <tr>
+    <td align='center'>
+     <font size='3'>%d</font>
+    </td>
     <td>
-     <font size='3'>CDR%010d</font>
+     <font size='3'>%s</font>
     </td>
     <td>
      <font size='3'>%s</font>
@@ -224,6 +237,7 @@ for row in rows:
     </td>
    </tr>
 """ % (docId,
+       cgi.escape(docTitle),
        creUser.upper(),
        creDate[:10],
        verDate and verDate[:10] or "None",
