@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditLinkType.py,v 1.3 2002-02-21 15:22:02 bkline Exp $
+# $Id: EditLinkType.py,v 1.4 2002-02-21 20:09:47 ameyer Exp $
 #
 # Prototype for editing a CDR link type.
 #
@@ -8,6 +8,9 @@
 # to read the values on the form.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2002/02/21 15:22:02  bkline
+# Added navigation buttons.
+#
 # Revision 1.2  2002/02/15 06:50:11  ameyer
 # Handling add/edit differences in both uses of this module - to
 # put up an edit form and to process the form after the user fills it in.
@@ -31,19 +34,14 @@ extra   = ""
 SUBMENU = "Link Menu"
 
 #----------------------------------------------------------------------
-# If no linkForm, this is first time through, setup subsequent action
+# If no linkForm, this is first time through, setup subsequent action.
+# Initialize linkAct to value from form variable or URL parameter.
 #----------------------------------------------------------------------
 linkAct = linkForm
 if linkForm is None:
-    urlDict = cgi.parse()
-    if urlDict == None:
-        cdrcgi.bail ("No urlDict")
-    if urlDict != None and urlDict.has_key ("linkact"):
-        urlArg = urlDict["linkact"]
-        if urlArg != None:
-            linkAct = urlArg[0]
-            if (linkAct != "addlink" and linkAct != "modlink"):
-                cdrcgi.bail("Invalid form linkact='%s' - can't happen" % linkAct)
+    linkAct = fields and fields.getvalue("linkact") or None;
+    if (linkAct != "addlink" and linkAct != "modlink"):
+        cdrcgi.bail("Invalid form linkact='%s' - can't happen" % linkAct)
 
 #----------------------------------------------------------------------
 # Make sure we're logged in.
