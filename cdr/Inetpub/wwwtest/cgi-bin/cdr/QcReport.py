@@ -1,11 +1,17 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.41 2004-12-01 23:56:12 venglisc Exp $
+# $Id: QcReport.py,v 1.42 2005-02-23 20:00:35 venglisc Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.41  2004/12/01 23:56:12  venglisc
+# So far, a list of glossary terms used throughout a summary could only be
+# displayed at the end of a document for patient summaries.  These
+# modifications allow to have the list of glossary terms be available for
+# HP summaries as well. (Bug 1415)
+#
 # Revision 1.40  2004/10/22 20:20:49  venglisc
 # The BoardMember QC report failed if a person was not linked to a summary.
 # This has been fixed by setting a bogus batch job ID to query the database.
@@ -165,6 +171,8 @@ def getSectionTitle(repType):
         return "QC Report (No Markup)"
     elif repType == "pat":
         return "Patient QC Report"
+    elif repType == "pp":
+        return "Publish Preview Report"
     else:
         return "QC Report (Unrecognized Type)"
 
@@ -315,7 +323,7 @@ if docTitle and not docId:
 #----------------------------------------------------------------------
 # Let the user pick the version for most Summary reports.
 #----------------------------------------------------------------------
-if docType == 'Summary' and repType and not version:
+if docType == 'Summary' and repType and repType != 'pp' and not version:
     try:
         cursor.execute("""\
             SELECT num,
@@ -455,12 +463,16 @@ def getDocsLinkingToPerson(docId):
         for row in cursor.fetchall():
             if row[1] == 'Health professionals': counts[2] += row[0]
             if row[1] == 'Patients':             counts[3] += row[0]
+
+        # Test for CTGov documents linking here
+        # -------------------------------------
         cursor.execute("""\
             SELECT COUNT(DISTINCT doc_id)
               FROM query_term
              WHERE int_val = ?
                AND path LIKE '/CTGovProtocol/%/@cdr:ref'""", docId)
         counts[4] = cursor.fetchall()[0][0]
+
     except cdrdb.Error, info:    
         cdrcgi.bail('Failure retrieving link counts: %s' % info[1][0])
     return counts
@@ -575,7 +587,7 @@ def fixCTGovProtocol(doc):
 # Plug in pieces that XSL/T can't get to for an Organization QC report.
 #----------------------------------------------------------------------
 def fixOrgReport(doc):
-    counts = [0, 0]
+    counts = [0, 0, 0, 0]
     # -----------------------------------------------------------------
     # Database query to count all protocols that link to this 
     # organization split by Active and Closed protocol status.
@@ -608,6 +620,24 @@ def fixOrgReport(doc):
         if row[1] == 'Active':        counts[0] += row[0]
         if row[1] == 'Closed':        counts[1] += row[0]
 
+    # Test for Person documents linking here
+    # --------------------------------------
+    cursor.execute("""\
+        SELECT COUNT(DISTINCT doc_id)
+          FROM query_term
+         WHERE int_val = ?
+           AND path LIKE '/Person/%/@cdr:ref'""", intId)
+    counts[2] = cursor.fetchall()[0][0]
+
+    # Test for Organization documents linking here
+    # --------------------------------------------
+    cursor.execute("""\
+        SELECT COUNT(DISTINCT doc_id)
+          FROM query_term
+         WHERE int_val = ?
+           AND path LIKE '/Organization/%/@cdr:ref'""", intId)
+    counts[3] = cursor.fetchall()[0][0]
+
     # -----------------------------------------------------------------
     # Substitute @@...@@ strings with Yes/No based on the count
     # from the query.  If counts[] = 0 ==> "No", "Yes" otherwise
@@ -616,6 +646,11 @@ def fixOrgReport(doc):
                     counts[0] and "Yes" or "No", doc)
     doc    = re.sub("@@CLOSED_COMPLETED_PROTOCOLS@@",
                     counts[1] and "Yes" or "No", doc)
+    doc    = re.sub("@@PERSON_DOC_LINKS@@",
+                    counts[2] and "Yes" or "No", doc)
+    doc    = re.sub("@@ORG_DOC_LINKS@@",
+                    counts[3] and "Yes" or "No", doc)
+
     return doc
 
 #----------------------------------------------------------------------
@@ -804,6 +839,15 @@ SELECT completed
 
     return doc
 
+# --------------------------------------------------------------------
+# If we want to see the publish preview report call the PublishPreview
+# script.
+# --------------------------------------------------------------------
+if repType == "pp":
+    cmd = "python d:\\Inetpub\\wwwroot\\cgi-bin\\cdr\\PublishPreview.py %s summary" % docId
+    result = cdr.runCommand(cmd)
+    cdrcgi.sendPage(result.output)
+
 #----------------------------------------------------------------------
 # Filter the document.
 #----------------------------------------------------------------------
@@ -871,7 +915,7 @@ if docType == 'Person':
     doc = fixPersonReport(doc)
 elif docType == 'Organization':
     # -----------------------------------------------------
-    # We call the fixPersonReport for Organizations to 
+    # We call the fixPersonReport for Organizations too 
     # since Person and Orgs have the Record Info and 
     # Most Recent Mailer Info in common.
     # The resulting document goes through the fixOrgReport
