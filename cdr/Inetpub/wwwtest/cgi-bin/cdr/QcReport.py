@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.7 2002-06-26 16:35:17 bkline Exp $
+# $Id: QcReport.py,v 1.8 2002-06-26 18:30:48 bkline Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.7  2002/06/26 16:35:17  bkline
+# Implmented report of audit_trail activity.
+#
 # Revision 1.6  2002/06/24 17:15:24  bkline
 # Added documents linking to Person.
 #
@@ -267,7 +270,7 @@ def fixPersonReport(doc):
              WHERE path = '/Mailer/Document/@cdr:ref'
                AND int_val = ?""", intId)
         row = cursor.fetchone()
-        if row:
+        if row and row[0]:
             mailerId = row[0]
             cursor.execute("""\
                 SELECT date_sent.value,
