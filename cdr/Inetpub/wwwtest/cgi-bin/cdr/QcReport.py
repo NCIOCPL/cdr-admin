@@ -1,11 +1,16 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.24 2003-08-11 21:57:19 venglisc Exp $
+# $Id: QcReport.py,v 1.25 2003-08-25 20:27:30 bkline Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.24  2003/08/11 21:57:19  venglisc
+# Modified code to pass an additional parameter named delRefLevels to the
+# summary QC reports to handle insertion/deletion markup properly.
+# The parameter revLevels has been renamed to insRevLevels.
+#
 # Revision 1.23  2003/08/01 21:01:43  bkline
 # Added code to create subtitle dynamically based on report subtype;
 # added separate CGI variables for deletion markup settings.
@@ -121,7 +126,7 @@ docType  = fields.getvalue("DocType")    or None
 docTitle = fields.getvalue("DocTitle")   or None
 version  = fields.getvalue("DocVersion") or None
 glossary = fields.getvalue("Glossary")   or None
-
+standardWording = fields.getvalue("ShowStandardWording") or None
 insRevLvls  = fields.getvalue("revLevels")  or None
 delRevLvls  = fields.getvalue("delRevLevels")  or None
 if not insRevLvls:
@@ -279,6 +284,9 @@ if docType == 'Summary' and repType and not version:
   <BR><BR>
   <INPUT TYPE='checkbox' NAME='Glossary'>&nbsp;&nbsp;
   Include glossary terms at end of report?<BR>
+  <BR>
+  <INPUT TYPE='checkbox' NAME='ShowStandardWording'>&nbsp;&nbsp;
+  Show standard wording with mark-up?<BR>
 """
     cdrcgi.sendPage(header + form + """  
  </BODY>
@@ -463,6 +471,8 @@ if repType == "bu":
 if repType == "pat":
     filterParm.append(['DisplayGlossaryTermList',
                        glossary and "Y" or "N"])
+    filterParm.append(['ShowStandardWording',
+                       standardWording and "Y" or "N"])
 doc = cdr.filterDoc(session, filters[docType], docId = docId,
                     docVer = version or None, parm = filterParm)
 if type(doc) == type(()):
