@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ActivityReport.py,v 1.6 2002-07-18 12:38:03 bkline Exp $
+# $Id: ActivityReport.py,v 1.7 2004-07-29 20:28:19 bkline Exp $
 #
 # Reports on audit trail content.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2002/07/18 12:38:03  bkline
+# Changed column headers from <td> to <th>.
+#
 # Revision 1.5  2002/07/18 00:55:48  bkline
 # Added column for comment; added inline CSS.
 #
@@ -32,6 +35,7 @@ request  = cdrcgi.getRequest(fields)
 fromDate = fields and fields.getvalue('FromDate') or None
 toDate   = fields and fields.getvalue('ToDate')   or None
 docType  = fields and fields.getvalue('DocType')  or None
+user     = fields and fields.getvalue('User')     or None
 SUBMENU = "Report Menu"
 buttons = ["Submit Request", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 script  = "ActivityReport.py"
@@ -75,6 +79,10 @@ if not fromDate or not toDate:
     form = """\
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
    <TABLE BORDER='0'>
+    <TR>
+     <TD><B>User:&nbsp;</B></TD>
+     <TD><INPUT NAME='User' VALUE=''>&nbsp;</TD>
+    </TR>
     <TR>
      <TD><B>Document Type:&nbsp;</B></TD>
      <TD>
@@ -147,9 +155,10 @@ html = """\
 #----------------------------------------------------------------------
 if fromDate < cdrcgi.DAY_ONE: fromDate = cdrcgi.DAY_ONE
 try:
-    conn   = cdrdb.connect()
-    cursor = conn.cursor()
-    dtQual = docType and ("AND t.name = '%s'" % docType) or ""
+    conn     = cdrdb.connect()
+    cursor   = conn.cursor()
+    dtQual   = docType and ("AND t.name = '%s'" % docType) or ""
+    userQual = user and ("AND u.name = '%s'" % user) or "" 
     cursor.execute("""\
          SELECT a.document,
                 u.name,
@@ -170,7 +179,9 @@ try:
              ON act.id = a.action
           WHERE a.dt BETWEEN '%s' AND DATEADD(s, -1, DATEADD(d, 1, '%s'))
             %s
-        ORDER BY a.dt DESC""" % (fromDate, toDate, dtQual), timeout = 120)
+            %s
+        ORDER BY a.dt DESC""" % (fromDate, toDate, userQual, dtQual),
+                   timeout = 120)
 
     rows = cursor.fetchall()
 except cdrdb.Error, info:
