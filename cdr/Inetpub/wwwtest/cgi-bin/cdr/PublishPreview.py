@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: PublishPreview.py,v 1.13 2002-10-22 17:47:05 bkline Exp $
+# $Id: PublishPreview.py,v 1.14 2002-10-24 15:38:08 bkline Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.13  2002/10/22 17:47:05  bkline
+# Added, then commented out, the debugging flag for cdr2cg.
+#
 # Revision 1.12  2002/08/29 12:32:08  bkline
 # Hooked up with Cancer.gov.
 #
@@ -93,21 +96,26 @@ except cdrdb.Error, info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
 
 #----------------------------------------------------------------------
-# Determine the document type.
+# Determine the document type and version.
 #----------------------------------------------------------------------
 try:
     digits = re.sub('[^\d]+', '', docId)
     intId  = int(digits)
     cursor.execute("""\
-        SELECT name
+        SELECT doc_type.name, MAX(doc_version.num)
           FROM doc_type
           JOIN document
             ON document.doc_type = doc_type.id
-         WHERE document.id = ?""", (intId,))
+          JOIN doc_version
+            ON doc_version.id = document.id
+         WHERE document.id = ?
+           AND doc_version.publishable = 'Y'
+      GROUP BY doc_type.name""", (intId,))
+
     row = cursor.fetchone()
     if not row:
         cdrcgi.bail("Unable to find document type for %s" % docId)
-    docType = row[0]
+    docType, docVer = row
 except cdrdb.Error, info:    
         cdrcgi.bail('Unable to find document type for %s: %s' % (docId, 
                                                                  info[1][0]))
@@ -122,7 +130,7 @@ if not flavor:
 #----------------------------------------------------------------------
 if not filters.has_key(docType):
     cdrcgi.bail("Don't have filters set up for %s documents yet" % docType)
-doc = cdr.filterDoc(session, filters[docType], docId = docId)
+doc = cdr.filterDoc(session, filters[docType], docId = docId, docVer = docVer)
 if type(doc) == type(()):
     doc = doc[0]
 pattern1 = re.compile("<\?xml[^?]+\?>", re.DOTALL)
