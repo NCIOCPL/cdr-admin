@@ -2,8 +2,11 @@
 #
 # Publishing CGI script.
 #
-# $Id: publishing.py,v 1.14 2002-09-12 18:50:56 pzhang Exp $
+# $Id: publishing.py,v 1.15 2002-10-21 15:42:55 pzhang Exp $
 # $Log: not supported by cvs2svn $
+# Revision 1.14  2002/09/12 18:50:56  pzhang
+# Added port parameter to cdr.py function call.
+#
 # Revision 1.13  2002/09/03 22:27:39  pzhang
 # Added picklist for values 'Yes'/'No'.
 #
@@ -175,7 +178,7 @@ class Display:
             # This is up to userselect element in the control document.
             # Will revisit this.
             docIdList = ""
-            for r in range(5):
+            for r in range(10):
                 form += "<TR>"
                 for i in range(5):
                     id = 10 * r + i
