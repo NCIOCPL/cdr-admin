@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: PersonProtocolReview.py,v 1.2 2002-05-23 15:01:22 bkline Exp $
+# $Id: PersonProtocolReview.py,v 1.3 2002-06-26 20:26:19 bkline Exp $
 #
 # Report to assist editors in checking links to a specified person from
 # protocols.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/05/23 15:01:22  bkline
+# Changed the sort logic to match the latest criteria.
+#
 # Revision 1.1  2002/05/22 18:42:11  bkline
 # Lists all the protocols which link to a specified Person document.
 #
@@ -63,7 +66,7 @@ if not name and not id:
     <TR>
      <TD ALIGN='right'><B>Person Name:&nbsp;</B></TD>
      <TD><INPUT NAME='Name'>
-      &nbsp;(e.g., Doroshow;James)
+      &nbsp;(e.g., Doroshow, James)
      </TD>
     </TR>
    </TABLE>
@@ -181,7 +184,7 @@ if id:
     id     = string.atoi(digits)
 else:
     try:
-        namePattern = "%s%%" % name.replace(',', ';')
+        namePattern = name + "%"
         cursor.execute("""\
                 SELECT DISTINCT d.id
                            FROM document d
