@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ListIssues.py,v 1.1 2001-12-01 18:11:44 bkline Exp $
+# $Id: ListIssues.py,v 1.2 2002-05-10 19:27:16 bkline Exp $
 #
 # Lists CDR development issues.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2001/12/01 18:11:44  bkline
+# Initial revision
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string, dbi, cdrdb
 
@@ -19,6 +22,7 @@ sort_by = fields and fields.getvalue("sort_by") or "logged"
 script  = "ListIssues.py"
 buttons = ["Hide Resolved Issues", "Show Resolved Issues"]
 filter  = request == "Hide Resolved Issues" and " AND resolved IS NULL" or ""
+nextVer = fields and fields.getvalue("NextVer") and 1 or 0
 #script  = "DumpParams.pl"
 header  = cdrcgi.header(title, title, section, script, buttons, numBreaks = 1)
 
@@ -31,6 +35,8 @@ except cdrdb.Error, info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
 cursor = conn.cursor()
 if sort_by == "priority": sort_by = "priority DESC"
+if not nextVer:
+    filter += " AND priority <> '1 - Later Version' "
 query  = """\
    SELECT id, logged, logged_by, substring(priority, 1, 1),
           description, assigned, assigned_to, resolved, resolved_by
@@ -46,7 +52,10 @@ except cdrdb.Error, info:
 #----------------------------------------------------------------------
 # Display the information in a table.
 #----------------------------------------------------------------------
+flag = nextVer and "CHECKED" or ""
 body = """\
+<RIGHT><B>Show enhancements for future releases</B>
+<INPUT TYPE='checkbox' NAME='NextVer' %s></RIGHT>
 <TABLE BORDER='0' WIDTH='100%%' CELLSPACING='1' CELLPADDING='1'>
  <TR BGCOLOR='silver' VALIGN='top'>
   <TD ALIGN='center'><FONT SIZE='-1'><B>&nbsp;#&nbsp;</B></FONT></TD>
@@ -67,7 +76,8 @@ body = """\
   <TD ALIGN='center'><FONT SIZE='-1'><B>Resolved</B></FONT></TD>
   <TD ALIGN='center'><FONT SIZE='-1'><B>By</B></FONT></TD>
  </TR>
-""" % (cdrcgi.REQUEST, request,
+""" % (flag,
+       cdrcgi.REQUEST, request,
        cdrcgi.REQUEST, request,
        cdrcgi.REQUEST, request,
        cdrcgi.REQUEST, request)
