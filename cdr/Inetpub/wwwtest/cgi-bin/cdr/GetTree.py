@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GetTree.py,v 1.4 2001-04-09 17:50:02 bkline Exp $
+# $Id: GetTree.py,v 1.5 2001-07-13 17:00:28 bkline Exp $
 #
 # Prototype for CDR Terminology tree viewer.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2001/04/09 17:50:02  bkline
+# Fixed bug in call to cdr.normalize().
+#
 # Revision 1.3  2001/04/09 15:45:11  bkline
 # Added call to normlize document ID.
 #
@@ -21,6 +24,7 @@ import cgi, cdr, cdrcgi, re, string
 # Named constants.
 #----------------------------------------------------------------------
 SCRIPT  = '/cgi-bin/cdr/GetTree.py'
+FILTER  = '/cgi-bin/cdr/Filter.py'
 
 #----------------------------------------------------------------------
 # Get the form variables.
@@ -50,19 +54,23 @@ html = """\
 def showTerm(term, offset, primaryTerm = 0):
     global html
     termId = "CDR%010d" % string.atoi(term.id)
+    coloredId = "<FONT COLOR='%s'>%s</FONT>" % (
+                    primaryTerm and 'red' or 'blue', termId)
+    termName = "<A HREF='%s?DocId=%s&Filter=CDR190732'><FONT COLOR='%s'>"\
+               "%s</FONT></A>" % (
+                    FILTER, termId, primaryTerm and 'red' or 'blue', term.name)
     if primaryTerm:
-        html = html + "%s<FONT COLOR='red'><B>%s (%s)</B></FONT>\n" % (
+        html = html + "%s<B>%s (%s)</B>\n" % (
                 offset and (' ' * (offset - 1) * 2 + '+-') or '',
-                term.name, 
-                termId)
+                termName,
+                coloredId)
     else:
-        html = html + "%s<FONT COLOR='blue'>%s</FONT> "\
-                      "(<A href='%s?id=%s'>%s</A>)\n" % (
+        html = html + "%s%s (<A href='%s?id=%s'>%s</A>)\n" % (
                 offset and (' ' * (offset - 1) * 2 + '+-') or '',
-                term.name, 
+                termName,
                 SCRIPT, 
                 termId,
-                termId)
+                coloredId)
 
 def showTree(node, level = 0):
     global html, docId
@@ -84,6 +92,8 @@ if docId:
     terms = termSet.terms
     docId = `string.atoi(docId[3:])`
     html += "<H2>%s</H2>\n" % terms[docId].name
+    html += "<I>Click term to view formatted term document.<BR>\n"
+    html += "Click document ID to navigate tree.</I><BR>\n"
     for term in terms.values():
         if not term.parents: roots.append(term.id)
     for root in roots: showTree(terms[root])
