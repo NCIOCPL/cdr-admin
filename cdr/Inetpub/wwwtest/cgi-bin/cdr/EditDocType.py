@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------
-# $Id: EditDocType.py,v 1.1 2001-06-13 22:16:32 bkline Exp $
+# $Id: EditDocType.py,v 1.2 2001-12-01 17:59:37 bkline Exp $
 #
 # Prototype for editing CDR document types.
 #----------------------------------------------------------------------
@@ -80,7 +80,7 @@ html = """\
  </HEAD>
  <BASEFONT FACE="Arial, Helvetica, sans-serif">
  <LINK REL=STYLESHEET HREF=/stylesheets/dataform2.css>
- <BODY BACKGROUND=/images/back.jpg BGCOLOR=#2F5E5E>
+ <BODY BGCOLOR=#EFEFEF>
   <H1>CDR Document Type Editor</H1>
   %s
   <FORM ACTION='/cgi-bin/cdr/EditDocType.py' METHOD='POST'>
