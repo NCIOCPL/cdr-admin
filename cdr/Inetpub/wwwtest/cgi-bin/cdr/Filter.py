@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: Filter.py,v 1.22 2003-11-12 22:47:30 bkline Exp $
+# $Id: Filter.py,v 1.23 2004-02-19 21:29:11 ameyer Exp $
 #
-# Transform a CDR document using an XSL/T filter and send it back to 
+# Transform a CDR document using an XSL/T filter and send it back to
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.22  2003/11/12 22:47:30  bkline
+# Forced string conversion of docVer to make string concatenation work.
+#
 # Revision 1.21  2003/08/29 14:54:52  bkline
 # Modified approach to gathering filter set information, replacing
 # a hand-maintained file in the file system with filter set info
@@ -83,13 +86,15 @@ import cgi, cdr, cdrcgi, cdrpub, re, string, xml.dom.minidom
 title   = "CDR Formatting"
 fields  = cgi.FieldStorage() or cdrcgi.bail("No Request Found", title)
 session = 'guest'
+cdrPort = fields.getvalue('port') or cdr.getPubPort()
+cdrPort = int(cdrPort)
 docId   = fields.getvalue(cdrcgi.DOCID) or cdrcgi.bail("No Document", title)
 docVer  = fields.getvalue('DocVer') or 0
-docVers = cdr.lastVersions('guest', docId, port = cdr.getPubPort())
+docVers = cdr.lastVersions('guest', docId, port = cdrPort)
 if docVer == 'last':
     docVer = '%d' % docVers[0]
 elif docVer == 'lastp':
-    docVer = '%d' % docVers[1]    
+    docVer = '%d' % docVers[1]
 filtId0 = fields.getvalue(cdrcgi.FILTER)
 if not fields.getvalue('qcFilterSets'):
     filtId0 or cdrcgi.bail("No Filter", title)
@@ -110,16 +115,16 @@ filtId  = [filtId0,
            fields.getvalue(cdrcgi.FILTER + "13", ""),
            fields.getvalue(cdrcgi.FILTER + "14", ""),
            fields.getvalue(cdrcgi.FILTER + "15", "")]
-insRevLevels = (fields.getvalue('publish') == 'true') and 'publish_' or '' 
+insRevLevels = (fields.getvalue('publish') == 'true') and 'publish_' or ''
 insRevLevels += (fields.getvalue('approved') == 'true') and 'approved_' or ''
-insRevLevels += (fields.getvalue('proposed') == 'true') and 'proposed_' or '' 
+insRevLevels += (fields.getvalue('proposed') == 'true') and 'proposed_' or ''
 insRevLevels += (fields.getvalue('rejected') == 'true') and 'rejected_' or ''
 insRevLevels += fields.getvalue('insRevLevels') or '' # insRevLevels from links.
 vendorOrQC = (fields.getvalue('QC') == 'true') and 'QC' or ''
 vendorOrQC += fields.getvalue('vendorOrQC') or '' # vendorOrQC from links.
 filterParm = [['insRevLevels', insRevLevels]] # empty insRevLevels is expected.
 if vendorOrQC:
-    filterParm.append(['vendorOrQC', 'QC']) 
+    filterParm.append(['vendorOrQC', 'QC'])
 
 #----------------------------------------------------------------------
 # QC Filter Sets.
@@ -131,7 +136,7 @@ def displayFilterList(set):
     for element in set.members:
         strRet += "%s:%s<BR>" % (element.id, element.name)
     return strRet
-        
+
 #----------------------------------------------------------------------
 # Determine whether we want to show this filter set.  If any filters
 # are explicitly listed in the filter data entry fields, then we
@@ -143,7 +148,7 @@ def wantFilterSet(filterSet, filterIds):
     # If no filters are explicitly identified, show all the filter sets.
     if not filterIds:
         return 1
-    
+
     idsInSet = [cdr.exNormalize(m.id)[1] for m in filterSet.members]
     for filterId in filterIds:
         if filterId not in idsInSet:
@@ -182,17 +187,17 @@ def qcFilterSets(docId, docVer, filterId = None):
                     filterIds.append(cdr.exNormalize(id)[1])
                 except Exception, info:
                     cdrcgi.bail("Invalid filter [%s]: %s" % (id, str(info)))
-                
+
     #----------------------------------------------------------------------
     # Format HTML page.
-    #---------------------------------------------------------------------- 
+    #----------------------------------------------------------------------
     title   = "CDR XSLT Filtering"
     section = "QC Filter Sets"
     header  = cdrcgi.header(title, title, section, "Filter.py", "")
-   
+
     html = "<TABLE BORDER=1>\n"
     html += """<TR><TD><FONT COLOR=BLACK><B>Set Name</B></FONT></TD>
-            <TD><CENTER><B>Action</B></CENTER></TD><TD><B><FONT 
+            <TD><CENTER><B>Action</B></CENTER></TD><TD><B><FONT
             COLOR=BLACK>Set Detail</B></FONT></TD></TR>\n"""
     keys = filterSets.keys()
     keys.sort()
@@ -205,36 +210,36 @@ def qcFilterSets(docId, docVer, filterId = None):
         base    = "/cgi-bin/cdr/Filter.py";
         url     = base + "?DocId=" + docId + "&DocVer=" + str(docVer) + \
                   "&revLevels=" + revLevels + "&vendorOrQC=" + vendorOrQC
-        i = 0        
+        i = 0
         for filt in filterSets[key].members:
             id = str(cdr.exNormalize(filt.id)[1])
             if i == 0:
                 url += "&Filter=" + id
             else:
                 url += "&Filter%d=" % i + id
-            i += 1             
-    
+            i += 1
+
         filter = "<A TARGET='_new' HREF='%s'>Filter</A>" % url
         validate = "<A TARGET='_new' HREF='%s&validate=Y'>Validate</A>" % url
         html += """<TR><TD><FONT COLOR=BLACK>%s</FONT></TD><TD>%s&nbsp;%s</TD>
                        <TD><FONT COLOR=BLACK>%s</FONT></TD>
-                       </TR>\n""" % (key, filter, validate, 
+                       </TR>\n""" % (key, filter, validate,
                        displayFilterList(filterSets[key]))
     html += "</TABLE>"
     cdrcgi.sendPage(header + html + "<BODY></HTML>")
 
 if fields.getvalue('qcFilterSets'):
     qcFilterSets(docId, docVer, filtId)
-    
+
 #----------------------------------------------------------------------
 # Filter the document.
 #----------------------------------------------------------------------
 filterWarning = ""
 doc = cdr.filterDoc(session, filtId, docId = docId, docVer = docVer,
-                    parm = filterParm, port = cdr.getPubPort())                    
+                    parm = filterParm, port = cdrPort)
 if type(doc) == type(()):
     if doc[1]: filterWarning += doc[1]
-    doc = doc[0]     
+    doc = doc[0]
 
 #----------------------------------------------------------------------
 # Add a table row for an error or warning.
@@ -267,7 +272,7 @@ if valFlag:
  <body>
  <h2>Validation results for CDR%010d</h2>
 """ % (idNum, idNum)
-    if not errObj.Warnings and not errObj.Errors and not filterWarning: 
+    if not errObj.Warnings and not errObj.Errors and not filterWarning:
         html += """\
  <h3>Document comes out clean: no errors, no warnings!</h3>
 """
@@ -281,7 +286,7 @@ if valFlag:
     <th>Position</th>
     <th>Message</th>
    </tr>
-"""     
+"""
         if filterWarning:
             html += addRow('Warning', '%d.xml:0:0:%s' % (idNum, filterWarning))
         for warning in errObj.Warnings:
