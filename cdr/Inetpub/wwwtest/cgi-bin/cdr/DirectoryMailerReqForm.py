@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: DirectoryMailerReqForm.py,v 1.16 2003-03-05 02:54:41 ameyer Exp $
+# $Id: DirectoryMailerReqForm.py,v 1.17 2003-05-12 15:48:58 bkline Exp $
 #
 # Request form for all directory mailers.
 #
@@ -31,6 +31,9 @@
 # Bob Kline.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.16  2003/03/05 02:54:41  ameyer
+# Changed handling of remailers for single, named document - was broken.
+#
 # Revision 1.15  2003/02/04 22:00:24  ameyer
 # Increased timeouts from default 30 to 120 seconds on selection queries.
 #
@@ -284,14 +287,18 @@ if docId:
     #   and is publishable
     try:
         cursor.execute("""\
-            SELECT MAX(num)
-              FROM doc_version
-             WHERE id = ?
-               AND publishable = 'Y'
+            SELECT MAX(v.num)
+              FROM doc_version v
+              JOIN document d
+                ON d.id = v.id
+             WHERE v.id = ?
+               AND v.publishable = 'Y'
+               AND d.active_status = 'A'
             """, (intId,))
         row = cursor.fetchone()
         if not row or not row[0]:
-            cdrcgi.bail("No publishable version found for document %d" % intId)
+            cdrcgi.bail("No active publishable version found for document %d" %
+                        intId)
 
         # Document list contains one tuple of doc id + version number
         docList = ((intId, row[0]),)
@@ -347,12 +354,8 @@ else:
                       FROM pub_proc_doc pd2
                       JOIN pub_proc p2
                         ON p2.id = pd2.pub_proc
-                     WHERE
-                       (
-                            p2.pub_subset = 'Physician-Initial'
-                         OR
-                            p2.pub_subset = 'Physician-Annual update'
-                       )
+                     WHERE p2.pub_subset IN ('Physician-Initial',
+                                             'Physician-Annual update')
                        AND p2.status <> 'Failure'
         """
         # Main query:
@@ -381,6 +384,7 @@ else:
                         AND qinc.path =
                            '/Person/ProfessionalInformation/PhysicianDetails/AdministrativeInformation/Directory/Include'
                         AND qinc.value = 'Pending'
+                        AND document.active_status = 'A'
                         AND NOT EXISTS (
                                 SELECT tmpid
                                   FROM #already_mailed_ids
@@ -397,16 +401,10 @@ else:
                       FROM pub_proc_doc pd2
                       JOIN pub_proc p2
                         ON p2.id = pd2.pub_proc
-                     WHERE
-                       (
-                            p2.pub_subset = 'Physician-Initial'
-                         OR
-                            p2.pub_subset = 'Physician-Initial remail'
-                         OR
-                            p2.pub_subset = 'Physician-Annual update'
-                         OR
-                            p2.pub_subset = 'Physician-Annual remail'
-                       )
+                     WHERE p2.pub_subset IN ('Physician-Initial',
+                                             'Physician-Initial remail',
+                                             'Physician-Annual update',
+                                             'Physician-Annual remail')
                        AND p2.completed > DATEADD(year,-1,GETDATE())
                        AND p2.status <> 'Failure'
         """
@@ -440,14 +438,12 @@ else:
                       WHERE qstat.path = '/Person/Status/CurrentStatus'
                         AND doc_version.publishable = 'Y'
                         AND qstat.value = 'Active'
-                        AND (
-                             p1.pub_subset = 'Physician-Initial'
-                          OR
-                             p1.pub_subset = 'Physician-Annual update'
-                            )
+                        AND p1.pub_subset IN ('Physician-Initial',
+                                              'Physician-Annual update')
                         AND qinc.path =
                            '/Person/ProfessionalInformation/PhysicianDetails/AdministrativeInformation/Directory/Include'
                         AND qinc.value = 'Include'
+                        AND document.active_status = 'A'
 
                         -- But not if a mailer was sent in past year
                         AND NOT EXISTS (
@@ -466,12 +462,8 @@ else:
                       FROM pub_proc_doc pd2
                       JOIN pub_proc p2
                         ON p2.id = pd2.pub_proc
-                     WHERE
-                       (
-                            p2.pub_subset = 'Organization-Annual update'
-                         OR
-                            p2.pub_subset = 'Organization-Annual remail'
-                       )
+                     WHERE p2.pub_subset IN ('Organization-Annual update',
+                                             'Organization-Annual remail')
                        AND p2.completed > DATEADD(year,-1,GETDATE())
                        AND p2.status <> 'Failure'
         """
@@ -496,12 +488,12 @@ else:
                       WHERE qinc.path =
                            '/Organization/OrganizationDetails/OrganizationAdministrativeInformation/IncludeInDirectory'
                         AND doc_version.publishable = 'Y'
+                        AND document.active_status = 'A'
                         AND qinc.value = 'Include'
                         AND qorgtype.path = '/Organization/OrganizationType'
-                        AND qorgtype.value <>
-                                    'NCI division, office, or laboratory'
-                        AND qorgtype.value <>
-                                    'NIH institute, center, or division'
+                        AND qorgtype.value NOT IN
+                                   ('NCI division, office, or laboratory',
+                                    'NIH institute, center, or division')
 
                         -- But not if a mailer was sent in past year
                         AND NOT EXISTS (
