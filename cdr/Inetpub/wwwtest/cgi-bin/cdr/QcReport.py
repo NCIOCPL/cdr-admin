@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.36 2004-04-02 19:46:20 venglisc Exp $
+# $Id: QcReport.py,v 1.37 2004-04-16 22:06:51 venglisc Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.36  2004/04/02 19:46:20  venglisc
+# Included function to populate the active/closed protocol link variables
+# for the Organization QC report.
+#
 # Revision 1.35  2004/03/06 23:23:37  bkline
 # Added code to replace @@CTGOV_PROTOCOLS@@.
 #
@@ -202,6 +206,13 @@ if not docId and not docTitle:
     extra = ""
     if docType:
         extra += "<INPUT TYPE='hidden' NAME='DocType' VALUE='%s'>" % docType
+        if docType == 'PDQBoardMemberInfo':
+           label = ['Board Member Name',
+                    'Board Member CDR ID']
+        else:
+           label = ['Document Title',
+                    'Document CDR ID']
+
     if repType:
         extra += "<INPUT TYPE='hidden' NAME='ReportType' VALUE='%s'>" % repType
     form = """\
@@ -209,15 +220,19 @@ if not docId and not docTitle:
   %s
   <TABLE>
    <TR>
-    <TD ALIGN='right'>Document title:&nbsp;</TD>
+    <TD ALIGN='right'><B>%s:&nbsp;</B><BR/>(use %% as wildcard)</TD>
     <TD><INPUT SIZE='60' NAME='DocTitle'></TD>
    </TR>
    <TR>
-    <TD ALIGN='right'>Document ID:&nbsp;</TD>
+    <TD> </TD>
+    <TD>... or ...</TD>
+   </TR>
+   <TR>
+    <TD ALIGN='right'><B>%s:&nbsp;</B></TD>
     <TD><INPUT SIZE='60' NAME='DocId'></TD>
    </TR>
   </TABLE>
-""" % (cdrcgi.SESSION, session, extra)
+""" % (cdrcgi.SESSION, session, extra, label[0], label[1])
     cdrcgi.sendPage(header + form + """\
  </BODY>
 </HTML>
@@ -241,7 +256,7 @@ def showTitleChoices(choices):
 """
     for choice in choices:
         form += """\
-   <INPUT TYPE='radio' NAME='DocId' VALUE='CDR%010d'>[CDR%010d] %s<BR>
+   <INPUT TYPE='radio' NAME='DocId' VALUE='CDR%010d'>[CDR%d] %s<BR>
 """ % (choice[0], choice[0], cgi.escape(choice[1]))
     cdrcgi.sendPage(header + form + """\
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
@@ -362,6 +377,8 @@ filters = {
         ["set:QC Organization Set"],
     'Person':           
         ["set:QC Person Set"],
+    'PDQBoardMemberInfo':           
+        ["set:QC PDQBoardMemberInfo Set"],
     'InScopeProtocol':  
         ["set:QC InScopeProtocol Set"],
     'Term':             
@@ -542,20 +559,24 @@ def fixOrgReport(doc):
     # Database query to count all protocols that link to this 
     # organization split by Active and Closed protocol status.
     # -----------------------------------------------------------------
-    cursor.execute("""\
-    SELECT count(prot.doc_id) AS prot_count, 
-           CASE WHEN prot.value = 'Completed'               THEN 'Closed'
-                WHEN prot.value = 'Temporarily closed'      THEN 'Active'
-                WHEN prot.value = 'Approved-not yet active' THEN 'Active'
-                ELSE prot.value END as status
-      FROM query_term prot
-      JOIN query_term org
-        ON prot.doc_id = org.doc_id
-     WHERE prot.path ='/InScopeProtocol/ProtocolAdminInfo/CurrentProtocolStatus'
-       AND prot.value in ('Active', 'Temporarily closed', 
-                          'Approved-not yet active', 'Closed', 'Completed') 
-       AND org.int_val = ?
-     GROUP BY prot.value""", intId)
+    try:
+        cursor.execute("""\
+        SELECT count(prot.doc_id) AS prot_count, 
+               CASE WHEN prot.value = 'Completed'               THEN 'Closed'
+                    WHEN prot.value = 'Temporarily closed'      THEN 'Active'
+                    WHEN prot.value = 'Approved-not yet active' THEN 'Active'
+                    ELSE prot.value END as status
+          FROM query_term prot
+          JOIN query_term org
+            ON prot.doc_id = org.doc_id
+         WHERE prot.path ='/InScopeProtocol/ProtocolAdminInfo/CurrentProtocolStatus'
+           AND prot.value in ('Active', 'Temporarily closed', 
+                              'Approved-not yet active', 'Closed', 'Completed') 
+           AND org.int_val = ?
+         GROUP BY prot.value""", intId)
+    except cdrdb.Error, info:    
+        cdrcgi.bail('Failure retrieving Protocol info for %s: %s' % (intId, 
+                                                                   info[1][0]))
 
     # -------------------------------------------------------
     # Assign protocol count to counts list items
@@ -573,6 +594,176 @@ def fixOrgReport(doc):
                     counts[0] and "Yes" or "No", doc)
     doc    = re.sub("@@CLOSED_COMPLETED_PROTOCOLS@@",
                     counts[1] and "Yes" or "No", doc)
+    return doc
+
+#----------------------------------------------------------------------
+# Plug in pieces that XSL/T can't get to for an BoardMember QC report.
+#----------------------------------------------------------------------
+def fixBoardMemberReport(doc):
+    counts = [0, 0]
+    # -----------------------------------------------------------------
+    # Database query to get the person ID for the BoardMember     
+    # -----------------------------------------------------------------
+    try:
+        cursor.execute("""\
+SELECT int_val
+  FROM query_term
+ WHERE doc_id = ?
+   AND path = '/PDQBoardMemberInfo/BoardMemberName/@cdr:ref'""", intId)
+
+    except cdrdb.Error, info:    
+        cdrcgi.bail('Failure retrieving Person ID for %s: %s' % (intId, 
+                                                                   info[1][0]))
+
+    row = cursor.fetchone()
+    if not row:
+        cdrcgi.bail('Unable to select Person ID for CDR%s' % intId)
+    else:
+        personId = row[0]
+
+    # -----------------------------------------------------------------
+    # Database query to select all summaries reviewed by this member
+    # and the batch job ID of the latest mailer submitted
+    # and replace the result with the @@SUMMARIES_REVIEWED@@ parameter.
+    # -----------------------------------------------------------------
+    try:
+        cursor.execute("""\
+SELECT person.doc_id, summary.value, audience.value, max(ppd.pub_proc) as jobid
+  FROM query_term person
+  JOIN query_term summary
+    ON person.doc_id = summary.doc_id
+  JOIN query_term audience
+    ON summary.doc_id = audience.doc_id
+  JOIN document doc
+    ON person.doc_id = doc.id
+  JOIN pub_proc_doc ppd
+    ON doc.id = ppd.doc_id
+  JOIN pub_proc pp
+    ON pp.id = ppd.pub_proc
+ WHERE person.int_val = ?
+   AND person.path = '/Summary/SummaryMetaData/PDQBoard/BoardMember/@cdr:ref'
+   AND summary.path = '/Summary/SummaryTitle'
+   AND audience.path = '/Summary/SummaryMetaData/SummaryAudience'
+   AND doc.active_status = 'A'
+   AND pp.status = 'Success'
+   AND pp.pub_subset = 'Summary-PDQ Editorial Board'
+ GROUP BY summary.value, person.doc_id, audience.value""", personId)
+
+    except cdrdb.Error, info:    
+        cdrcgi.bail('Failure retrieving Summary info for CDR%s: %s' % (intId, 
+                                                                   info[1][0]))
+
+    # -------------------------------------------------------
+    # Assign protocol count to counts list items
+    # -------------------------------------------------------
+    rows = cursor.fetchall()
+
+    html = """
+           <DL>"""
+    for row in rows:
+        html += """
+            <LI>%s; %s</LI>""" % (row[1], row[2])
+    html += """
+           </DL>
+"""
+
+    # -----------------------------------------------------------------
+    # Substitute @@...@@ strings with Yes/No based on the count
+    # from the query.  If counts[] = 0 ==> "No", "Yes" otherwise
+    # -----------------------------------------------------------------
+    doc    = re.sub("@@SUMMARIES_REVIEWED@@", html, doc)
+
+
+    # -----------------------------------------------------------------
+    # Database query to select mailer information
+    # From the previous query we know the summary IDs, person ID and 
+    # Job ID that containted these mailers.  We are using this 
+    # information to build this query to extract the response received
+    # from the mailer docs.
+    # -----------------------------------------------------------------
+    batchId = row[3]
+    summaryIds = '('
+    for row in rows:
+        summaryIds += repr(row[0]) + ', '
+    summaryIds = summaryIds[:-2] + ')'
+
+    query = """
+SELECT mailer.doc_id, mailer.int_val, summary.value, response.value,
+       title.value
+  FROM query_term mailer
+  JOIN query_term summary
+    ON mailer.doc_id = summary.doc_id
+  LEFT OUTER 
+  JOIN query_term response
+    ON mailer.doc_id = response.doc_id
+   AND response.path = '/Mailer/Response/Received'
+  JOIN query_term title
+    ON title.doc_id = summary.int_val
+  JOIN query_term person
+    ON mailer.doc_id = person.doc_id
+ WHERE mailer.int_val = %d
+   AND mailer.path = '/Mailer/JobId'
+   AND summary.int_val in %s 
+   AND title.path = '/Summary/SummaryTitle'
+   AND person.int_val = %s
+ ORDER BY title.value""" % (batchId, summaryIds, personId)
+
+    try:
+        cursor.execute(query)
+    except cdrdb.Error, info:    
+        cdrcgi.bail('Failure retrieving Mailer info for batch ID %s' % (batchId,
+                                                                   info[1][0]))
+
+    rows = cursor.fetchall()
+
+    # ----------------------------------------------------------------
+    # Create the rows for each summary to be displayed in table format
+    # ----------------------------------------------------------------
+    html = ''
+    for row in rows:
+        html += """
+      <TR>
+       <TD xsl:use-attribute-sets = "cell1of2">
+        <B>Summary</B>
+       </TD>
+       <TD xsl:use-attribute-sets = "cell2of2">
+        %s
+       </TD>
+      </TR>
+      <TR>
+       <TD xsl:use-attribute-sets = "cell1of2">
+        <B>Date Received</B>
+       </TD>
+       <TD xsl:use-attribute-sets = "cell2of2">
+        %s
+       </TD>
+      </TR>
+""" % (row[4], row[3])
+    doc    = re.sub("@@SUMMARY_MAILER_SENT@@", html, doc)
+
+    # -----------------------------------------------------------------
+    # Database query to select the time of the mailers send
+    # -----------------------------------------------------------------
+    try:
+        cursor.execute("""\
+SELECT completed
+  FROM pub_proc
+ WHERE id = ?""", batchId)
+
+    except cdrdb.Error, info:    
+        cdrcgi.bail('Failure retrieving Mailer Date for batch: %s' % (batchId, 
+                                                                   info[1][0]))
+    row = cursor.fetchone()
+    # -----------------------------------------------------------------
+    # Substitute @@...@@ strings for job ID and date send
+    # -----------------------------------------------------------------
+    dateSent = row[0][:10]
+    html = "%s" % (dateSent)
+    doc    = re.sub("@@SUMMARY_DATE_SENT@@", html, doc)
+    html = "%s" % (batchId)
+    doc    = re.sub("@@SUMMARY_JOB_ID@@", html, doc)
+
+
     return doc
 
 #----------------------------------------------------------------------
@@ -650,6 +841,9 @@ elif docType == 'Organization':
     doc = fixOrgReport(doc)
 elif docType == 'CTGovProtocol':
     doc = fixCTGovProtocol(doc)
+elif docType == 'PDQBoardMemberInfo':
+    doc = fixBoardMemberReport(doc)
+# cdrcgi.bail("docType = %s" % docType)
     
 #----------------------------------------------------------------------
 # Send it.
