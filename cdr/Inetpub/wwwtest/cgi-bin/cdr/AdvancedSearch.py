@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: AdvancedSearch.py,v 1.4 2002-02-22 02:18:58 bkline Exp $
+# $Id: AdvancedSearch.py,v 1.5 2002-05-16 14:33:04 bkline Exp $
 #
 # Main menu for advanced search forms.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2002/02/22 02:18:58  bkline
+# Added advanced search page for Documentation documents.
+#
 # Revision 1.3  2002/02/20 04:00:51  bkline
 # Added menu item for GlossaryTerm search.
 #
@@ -96,7 +99,8 @@ menu    = """\
     <LI><A HREF='%s/MiscSearch.py%s'>Miscellaneous</A></LI>
     <LI><A HREF='%s/OrgSearch2.py%s'>Organization</A></LI>
     <LI><A HREF='%s/PersonSearch.py%s'>Person</A></LI>
-    <LI><A HREF='%s/PersonLocSearch.py%s'>Person (with Locations)</A></LI>
+    <LI><A HREF='%s/PersonLocSearch.py%s'>Person (Locations in Result
+                                                  Display)</A></LI>
     <LI><A HREF='%s/PoliticalSubUnitSearch.py%s'>Political SubUnit</A></LI>
     <LI><A HREF='%s/ProtSearch.py%s'>Protocol</A></LI>
     <LI><A HREF='%s/SummarySearch.py%s'>Summary</A></LI>
