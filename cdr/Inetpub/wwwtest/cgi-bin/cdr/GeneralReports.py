@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: GeneralReports.py,v 1.9 2003-12-18 22:19:53 bkline Exp $
+# $Id: GeneralReports.py,v 1.10 2004-02-17 20:01:01 venglisc Exp $
 #
 # Submenu for general reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.9  2003/12/18 22:19:53  bkline
+# Alphabetized menu items at Volker's request (with Lakshmi's
+# concurrence).
+#
 # Revision 1.8  2002/09/11 23:28:50  bkline
 # Added report on documents modified since their most recent publishable
 # version was created.
@@ -65,23 +69,34 @@ if action == "Log Out":
 form = "<INPUT TYPE='hidden' NAME='%s' VALUE='%s'><OL>\n" % (cdrcgi.SESSION,
                                                              session)
 reports = [
-           ('AdHocQuery.py', 'Ad-Hoc Reports'),
-           ('CheckedOutDocs.py', 'Checked Out Documents'),
-           ('CdrReport.py', 'Checked Out Documents With No Activity'),
-           ('ActiveLogins.py', 'Current Sessions'),
-           ('DateLastModified.py', 'Date Last Modified'),
-           ('DatedActions.py', 'Dated Actions'),
-           ('ActivityReport.py', 'Document Activity Report'),
-           ('DocVersionHistory.py', 'Document Version History'),
-           ('LinkedDocs.py', 'Linked Documents'),
+           ('AdHocQuery.py', 
+            'Ad-Hoc Reports'),
+           ('CheckedOutDocs.py', 
+            'Checked Out Documents'),
+           ('CdrReport.py', 
+            'Checked Out Documents With No Activity'),
+           ('ActiveLogins.py', 
+            'Current Sessions'),
+           ('DateLastModified.py', 
+            'Date Last Modified'),
+           ('DatedActions.py', 
+            'Dated Actions'),
+           ('ActivityReport.py', 
+            'Document Activity Report'),
+           ('DocVersionHistory.py', 
+            'Document Version History'),
+           ('LinkedDocs.py', 
+            'Linked Documents'),
            ('NewDocsWithPubStatus.py', 
             'List of New Documents with Publication Status'),
-           ('NewDocReport.py', 'New Document Count'),
-           ('PubJobQueue.py', 'Publishing Job Queue'),
+           ('NewDocReport.py', 
+            'New Document Count'),
            ('ModWithoutPubVersion.py', 
             'Records Modified Since Last Publishable Version'),
-           ('UnchangedDocs.py', 'Unchanged Documents'),
-           ('CheckUrls.py', 'URL Check')
+           ('UnchangedDocs.py', 
+            'Unchanged Documents'),
+           ('CheckUrls.py', 
+            'URL Check')
           ]
 
 for r in reports:
