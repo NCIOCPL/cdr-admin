@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: DocVersionHistory.py,v 1.2 2002-06-28 20:13:20 bkline Exp $
+# $Id: DocVersionHistory.py,v 1.3 2002-07-05 18:02:15 bkline Exp $
 #
 # Show version history of document.
 #----------------------------------------------------------------------
@@ -299,20 +299,16 @@ try:
                 u.fullname,
                 v.dt,
                 v.publishable,
-                p.completed
+                d.completed
            FROM doc_version v
            JOIN usr u
              ON u.id = v.usr
-LEFT OUTER JOIN pub_proc_doc d
+LEFT OUTER JOIN primary_pub_doc d
              ON d.doc_id = v.id
             AND d.doc_version = v.num
-            AND d.failure IS NULL OR d.failure <> 'Y'
-LEFT OUTER JOIN pub_proc p
-             ON p.id = d.pub_proc
-            AND p.status = 'success'
           WHERE v.id = ?
        ORDER BY v.num DESC,
-                p.completed""", intId)
+                d.completed""", intId)
 
     lastVer = None
     row = cursor.fetchone()
