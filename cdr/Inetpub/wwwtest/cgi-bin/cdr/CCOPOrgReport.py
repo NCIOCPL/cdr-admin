@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: CCOPOrgReport.py,v 1.1 2004-03-23 21:44:39 bkline Exp $
+# $Id: CCOPOrgReport.py,v 1.2 2004-03-29 21:34:17 bkline Exp $
 #
 # The NCI Funded CCOP/MBCCOP Organization Report will serve as an
 # additional QC report to check the accuracy of Principal Investigator's
@@ -8,6 +8,9 @@
 # co-investigators that need to be removed from documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2004/03/23 21:44:39  bkline
+# New report for Sheri (see Bugzilla entry #1117).
+#
 #----------------------------------------------------------------------
 import cdr, cdrdb, cgi, cdrcgi, xml.dom.minidom
 
@@ -77,13 +80,17 @@ class Organization:
             return locs[cipsContact].state
     def __loadPersons(self):
         cursor.execute("""\
-            SELECT d.id, d.title
+   SELECT DISTINCT d.id, d.title
               FROM document d
               JOIN query_term q
                 ON q.doc_id = d.id
+              JOIN query_term s
+                ON s.doc_id = d.id
              WHERE q.path = '/Person/PersonLocations/OtherPracticeLocation' +
                             '/OrganizationLocation/@cdr:ref'
-               AND q.int_val = ?""", self.id)
+               AND q.int_val = ?
+               AND s.path = '/Person/Status/CurrentStatus'
+               AND s.value = 'Active'""", self.id)
         rows = cursor.fetchall()
         for row in rows:
             self.persons.append(self.Person(row[0], row[1]))
@@ -256,7 +263,7 @@ for state in keys:
                         br = u"<br>"
                 html += """\
    <tr>
-    <td>%s</td>
+    <td align='center'>%s</td>
     <td>%s</td>
     <td>%s</td>
     <td>%s</td>
