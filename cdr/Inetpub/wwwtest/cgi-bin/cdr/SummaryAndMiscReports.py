@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryAndMiscReports.py,v 1.10 2004-03-05 21:47:44 venglisc Exp $
+# $Id: SummaryAndMiscReports.py,v 1.11 2004-03-11 20:53:28 venglisc Exp $
 #
 # Submenu for summary and miscellanous document reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.10  2004/03/05 21:47:44  venglisc
+# Modified the menu selection and added new SummariesLists menu item.
+#
 # Revision 1.9  2003/08/01 21:02:49  bkline
 # Plugged in Summary Metadata report.
 #
@@ -94,7 +97,7 @@ form += """\
 """
 reports = [
            ('MiscSearch.py?', 
-            'Miscellaneous Documents QC Report')
+            'Miscellaneous Documents')
           ]
 for r in reports:
     # Careful!  The pattern in the HREF='...' below is intentionally
