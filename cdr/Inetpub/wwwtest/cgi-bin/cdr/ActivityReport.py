@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ActivityReport.py,v 1.3 2002-06-27 20:30:54 bkline Exp $
+# $Id: ActivityReport.py,v 1.4 2002-07-02 13:46:51 bkline Exp $
 #
 # Reports on audit trail content.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2002/06/27 20:30:54  bkline
+# Changed document to all_docs.
+#
 # Revision 1.2  2002/06/26 20:04:14  bkline
 # Removed bold markup from data.
 #
@@ -63,7 +66,7 @@ if not fromDate or not toDate:
     docTypes = cdr.getDoctypes(session)
     if type(docTypes) in [type(""), type(u"")]:
         cdrcgi.bail(docTypes)
-    if fromDate < '2002-06-24': fromDate = '2002-06-24'
+    if fromDate < cdrcgi.DAY_ONE: fromDate = cdrcgi.DAY_ONE
     form = """\
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
    <TABLE BORDER='0'>
@@ -82,7 +85,7 @@ if not fromDate or not toDate:
     <TR>
      <TD><B>Start Date:&nbsp;</B></TD>
      <TD><INPUT NAME='FromDate' VALUE='%s'>&nbsp;
-         (use format YYYY-MM-DD for dates, e.g. 2002-01-01)</TD>
+         (use format YYYY-MM-DD for dates, e.g. %s)</TD>
     </TR>
     <TR>
      <TD><B>End Date:&nbsp;</B></TD>
@@ -92,7 +95,7 @@ if not fromDate or not toDate:
   </FORM>
  </BODY>
 </HTML>
-""" % (fromDate, toDate)
+""" % (fromDate, cdrcgi.DAY_ONE, toDate)
     cdrcgi.sendPage(header + form)
 
 #----------------------------------------------------------------------
@@ -156,7 +159,7 @@ html = """\
 #----------------------------------------------------------------------
 # Extract the information from the database.
 #----------------------------------------------------------------------
-if fromDate < '2002-06-24': fromDate = '2002-06-24'
+if fromDate < cdrcgi.DAY_ONE: fromDate = cdrcgi.DAY_ONE
 try:
     conn   = cdrdb.connect()
     cursor = conn.cursor()
