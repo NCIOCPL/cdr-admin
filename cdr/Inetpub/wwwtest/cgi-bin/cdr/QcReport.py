@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.18 2003-05-08 20:25:24 bkline Exp $
+# $Id: QcReport.py,v 1.19 2003-05-09 20:41:20 pzhang Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.18  2003/05/08 20:25:24  bkline
+# User now allowed to specify revision level.
+#
 # Revision 1.17  2003/04/10 21:34:23  pzhang
 # Added Insertion/Deletion revision level feature.
 # Used filter set names for all filter sets.
@@ -80,7 +83,7 @@ repType  = fields.getvalue("ReportType") or None
 docTitle = fields.getvalue("DocTitle")   or None
 version  = fields.getvalue("DocVersion") or None
 
-revLvls  = fields.getvalue("revLevels") or None
+revLvls  = fields.getvalue("revLevels")  or None
 if not revLvls:
     revLvls = fields.getvalue('publish') and 'publish|' or '' 
     revLvls += fields.getvalue('approved') and 'approved|' or ''
@@ -226,7 +229,7 @@ if docType == 'Summary' and repType and not version:
   Select Insertion/Deletion markup to be displayed in the report (one or more):
   <BR>
   <INPUT TYPE="checkbox" NAME="publish">&nbsp;&nbsp; With publish attribute<BR>
-  <INPUT TYPE="checkbox" CHECKED='1' NAME="approved">&nbsp;&nbsp; With approved attribute<BR>
+  <INPUT TYPE="checkbox" NAME="approved">&nbsp;&nbsp; With approved attribute<BR>
   <INPUT TYPE="checkbox" NAME="proposed">&nbsp;&nbsp; With proposed attribute
 """ 
     cdrcgi.sendPage(header + form + """  
@@ -246,6 +249,8 @@ filters = {
         ["set:QC Summary Set"],
     'Summary:nm': # No markup
         ["set:QC Summary Set"],
+    'Summary:pat': # Patient
+        ["set:QC Summary Patient Set"],
     'GlossaryTerm':         
         ["set:QC GlossaryTerm Set"],
     'Citation':         
