@@ -1,12 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: ModWithoutPubVersion.py,v 1.6 2002-09-23 20:38:08 bkline Exp $
+# $Id: ModWithoutPubVersion.py,v 1.7 2003-12-24 00:09:36 venglisc Exp $
 #
 # Reports on documents which have been changed since a previously 
 # publishable version without a new publishable version have been
 # created.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2002/09/23 20:38:08  bkline
+# Fixed bug in first SQL query.
+#
 # Revision 1.5  2002/09/23 14:42:41  bkline
 # Added code to replace the ISO format with Mmm. dd, yyyy at Lakshmi's
 # request.
@@ -160,8 +163,12 @@ try:
                AND u.name LIKE '%s'
                AND action.name IN ('ADD DOCUMENT', 'MODIFY DOCUMENT')
                AND a.dt = (SELECT MAX(dt)
-                             FROM audit_trail
-                            WHERE document = d.id)
+                             FROM audit_trail a
+                             JOIN action
+                               ON action.id = a.action
+                            WHERE document = d.id
+                              AND action.name IN ('ADD DOCUMENT', 
+                                                    'MODIFY DOCUMENT'))
                %s""" % (fromDate, toDate, modUser, dtQual), timeout = 120)
     cursor.execute("""\
             SELECT v.id              doc_id, 
