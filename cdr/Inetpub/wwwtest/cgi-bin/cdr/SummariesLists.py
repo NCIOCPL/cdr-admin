@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummariesLists.py,v 1.3 2004-01-13 23:51:18 venglisc Exp $
+# $Id: SummariesLists.py,v 1.4 2004-03-30 23:09:24 venglisc Exp $
 #
 # Report on lists of summaries.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2004/01/13 23:51:18  venglisc
+# Added comments to the code.  Removed query_s since it is now handled with
+# one query for both, English and Spanish requests.
+#
 # Revision 1.2  2004/01/13 23:23:40  venglisc
 # Creating new summaries list reports per request (Bug 1010/1011).
 #
@@ -31,6 +35,67 @@ instr     = "Summaries Lists"
 script    = "SummariesLists.py"
 SUBMENU   = "Report Menu"
 buttons   = (SUBMENU, cdrcgi.MAINMENU)
+
+# Functions to replace sevaral repeated HTML snippets
+# ===================================================
+def boardHeader(header):
+    """Return the HTML code to display the Summary Board Header"""
+    html = """\
+  </DL>
+  <U><FONT size="+1">%s</FONT></U>
+  <DL>
+""" % board_type
+    return html
+
+def boardHeaderWithID(header):
+    """Return the HTML code to display the Summary Board Header with ID"""
+    html = """\
+  </TABLE>
+  <P/>
+
+  <U><FONT size="+1">%s</FONT></U><P/>
+  <TABLE width = "100%%"> 
+""" % header
+    return html
+
+def summaryRow(summary):
+    """Return the HTML code to display a Summary row"""
+    html = """\
+   <LI>%s</LI>
+""" % (row[1])
+    return html
+
+def summaryRowWithID(id, summary):
+    """Return the HTML code to display a Summary row with ID"""
+    html = """\
+   <TR>
+    <TD width = "10%%" align = "right" valign = "top">%s</TD>
+    <TD width = "2%%"></TD>
+    <TD>%s</TD>
+   </TR>
+""" % (id, summary)
+    return html
+
+def summaryRowSpan(summary, translation):
+    """Return the HTML code to display a Spanish Summary"""
+    html = """\
+   <LI>%s</LI>
+   <LI class="none">&nbsp;&nbsp;&nbsp;(%s)</LI>
+""" % (row[1], row[4])
+    return html
+
+def summaryRowSpanWithID(id, summary, translation):
+    """Return the HTML code to display a Spanish Summary row with ID"""
+    html = """\
+   <TR>
+    <TD width = "10%%" align = "right" valign = "top">%s</TD>
+    <TD width = "2%%"></TD>
+    <TD>%s<BR/>
+     (%s)
+    </TD>
+   </TR>
+""" % (id, summary, translation)
+    return html
 
 #----------------------------------------------------------------------
 # If the user only picked one summary group, put it into a list so we
@@ -402,25 +467,20 @@ if showId == 'N':
         # ----------------------------------------------------------
         if row[5] == board_type:
             if lang == 'English':
-                report += """\
-   <LI>%s</LI>
-""" % (row[1])
+                report += summaryRow(row[1])
             else:
-                report += """\
-   <LI>%s</LI>
-   <LI class="none">&nbsp;&nbsp;&nbsp;(%s)</LI>
-""" % (row[1], row[4])
+                report += summaryRowSpan(row[1], row[4])
 
         # For the Treatment Summary Type we need to check if this is an 
         # adult or pediatric summary
         # -------------------------------------------------------------
         else:
             board_type = row[5]
-            report += """\
-  </DL>
-  <U><FONT size="+1">%s</FONT></U>
-  <DL>
-""" % board_type
+            report += boardHeader(board_type)
+            if lang == 'English':
+                report += summaryRow(row[1])
+            else:
+                report += summaryRowSpan(row[1], row[4])
 # ------------------------------------------------------------------------
 # Display data including CDR ID
 # English and Spanish data to be displayed identically except that the 
@@ -438,32 +498,17 @@ else:
         # ----------------------------------------------------------
         if row[5] == board_type:
             if lang == 'English':
-                report += """\
-   <TR>
-    <TD width = "10%%" align = "right" valign = "top">%s</TD>
-    <TD width = "2%%"></TD>
-    <TD>%s</TD>
-   </TR>
-""" % (row[0], row[1])
+                report += summaryRowWithID(row[0], row[1])
             else:
-                report += """\
-   <TR>
-    <TD width = "10%%" align = "right" valign = "top">%s</TD>
-    <TD width = "2%%"></TD>
-    <TD>%s<BR/>
-     (%s)
-    </TD>
-   </TR>
-""" % (row[0], row[1], row[4])
+                report += summaryRowSpanWithID(row[0], row[1], row[4])
         else:
             board_type = row[5]
-            report += """\
-  </TABLE>
-  <P/>
+            report += boardHeaderWithID(board_type)
+            if lang == 'English':
+                report += summaryRowWithID(row[0], row[1])
+            else:
+                report += summaryRowSpanWithID(row[0], row[1], row[4])
 
-  <U><FONT size="+1">%s</FONT></U><P/>
-  <TABLE width = "100%%"> 
-""" % board_type
     report += """
   </TABLE>
 """
