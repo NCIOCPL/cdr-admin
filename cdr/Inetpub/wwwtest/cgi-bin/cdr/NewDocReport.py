@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: NewDocReport.py,v 1.2 2002-03-14 04:03:17 bkline Exp $
+# $Id: NewDocReport.py,v 1.3 2002-03-14 04:06:24 bkline Exp $
 #
 # Reports on newly created documents and their statuses.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/03/14 04:03:17  bkline
+# Fixed numerical column alignment.
+#
 # Revision 1.1  2002/03/14 04:01:10  bkline
 # Added New Doc Report.
 #
@@ -54,6 +57,7 @@ if not fromDate or not toDate:
     toDate   = time.strftime("%Y-%m-%d", now)
     then     = list(now)
     then[1] -= 1
+    then[2] += 1
     then     = time.localtime(time.mktime(then))
     fromDate = time.strftime("%Y-%m-%d", then)
     docTypes = cdr.getDoctypes(session)
