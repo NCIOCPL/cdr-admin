@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.14 2002-12-26 21:54:40 bkline Exp $
+# $Id: QcReport.py,v 1.15 2002-12-30 15:15:47 bkline Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.14  2002/12/26 21:54:40  bkline
+# Added doc id to new screen for multiple matching titles.
+#
 # Revision 1.13  2002/12/26 21:50:24  bkline
 # Changes implemented for issue #545.
 #
@@ -133,7 +136,7 @@ def showTitleChoices(choices):
     for choice in choices:
         form += """\
    <INPUT TYPE='radio' NAME='DocId' VALUE='CDR%010d'>[CDR%010d] %s<BR>
-""" % (choice[0], cgi.escape(choice[1]))
+""" % (choice[0], choice[0], cgi.escape(choice[1]))
     cdrcgi.sendPage(header + form + """\
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
    <INPUT TYPE='hidden' NAME='DocType' VALUE='%s'>
