@@ -1,28 +1,27 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtAbstractMailerReqForm.py,v 1.1 2001-10-16 13:51:35 bkline Exp $
+# $Id: ProtAbstractMailerReqForm.py,v 1.2 2001-12-01 18:06:37 bkline Exp $
 #
 # Request form for Initial Protocol Abstract Mailer.
 #
 # $Log: not supported by cvs2svn $
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, string, time, cdrdb, cdrpub
+import cgi, cdr, cdrcgi, re, string, cdrdb, cdrpub
 
 #----------------------------------------------------------------------
 # Set the form variables.
 #----------------------------------------------------------------------
-fields  = cgi.FieldStorage()
-session = cdrcgi.getSession(fields)
-request = cdrcgi.getRequest(fields)
-docId   = fields and fields.getvalue("DocId")       or None
-reqType = fields and fields.getvalue("RequestType") or None
-start   = fields and fields.getvalue("StartDate")   or None
-email   = fields and fields.getvalue("Email") or None
-title   = "CDR Administration"
-section = "Protocol Abstract Initial Mailer"
-buttons = ["Submit", "Log Out"]
-script  = 'ProtAbstractMailerReqForm.py'
-header  = cdrcgi.header(title, title, section, script, buttons)
+fields     = cgi.FieldStorage()
+session    = cdrcgi.getSession(fields)
+request    = cdrcgi.getRequest(fields)
+docId      = fields and fields.getvalue("DocId") or None
+email      = fields and fields.getvalue("Email") or None
+title      = "CDR Administration"
+section    = "Protocol Abstract Initial Mailer"
+buttons    = ["Submit", "Log Out"]
+script     = 'ProtAbstractMailerReqForm.py'
+header     = cdrcgi.header(title, title, section, script, buttons)
+subsetName = 'Initial Protocol Abstract Verification Mailers'
 
 #----------------------------------------------------------------------
 # Make sure we're logged in.
@@ -39,50 +38,30 @@ if request == "Log Out":
 # Put up the form if we don't have a request yet.
 #----------------------------------------------------------------------
 if not request:
-    now = time.localtime(time.time())
-    then = (now[0], now[1] - 1, now[2], 0, 0, 0, 0, 0, -1)
-    then = time.localtime(time.mktime(then))
-    then = time.strftime("%Y-%m-%d", then)
     form = """\
    <H2>Enter request parameters</H2>
+   <H5>Protocol ID and email notification address are both optional.
+       If Protocol ID is specified, only a mailer for that protocol
+       will be generated; otherwise all eligible protocols for which
+       abstract mailers have not yet been sent will have mailers
+       generated.</H5>
    <TABLE>
     <TR>
      <TD ALIGN='right' NOWRAP>
       <B>Protocol CDR ID: &nbsp;</B>
      </TD>
      <TD><INPUT NAME='DocId'></TD>
-     <TD>
-      <B>
-       <INPUT TYPE='radio' 
-              NAME='RequestType' 
-              VALUE='Individual'>Individual Mailer Request
-      </B>
-     </TD>
     </TR>
     <TR>
      <TD ALIGN='right' NOWRAP>
-      <B>Protocols Entered Since (YYYY-MM-DD): &nbsp;</B>
+      <B>Notification email address: &nbsp;</B>
      </TD>
-     <TD><INPUT NAME='StartDate' VALUE='%s'></TD>
-     <TD>
-      <B>
-       <INPUT TYPE='radio' 
-              NAME='RequestType' 
-              VALUE='Batch'
-              CHECKED>Batch Request
-      </B>
-     </TD>
-    </TR>
-    <TR>
-     <TD ALIGN='right' NOWRAP>
-      <B>Optional email notification address: &nbsp;</B>
-     </TD>
-     <TD COLSPAN='2'><INPUT NAME='Email'></TD>
+     <TD><INPUT NAME='Email'></TD>
     </TR>
    </TABLE>
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
   </FORM>
-""" % (then, cdrcgi.SESSION, session)
+""" % (cdrcgi.SESSION, session)
     cdrcgi.sendPage(header + form + "</BODY></HTML>")
 
 #----------------------------------------------------------------------
@@ -119,12 +98,9 @@ ctrlDocId = rows[0][0]
 #----------------------------------------------------------------------
 # Determine which documents are to be published.
 #----------------------------------------------------------------------
-if reqType == 'Individual':
-    if not docId:
-        cdrcgi.bail('No document ID specified.')
+if docId:
     digits = re.sub('[^\d]+', '', docId)
     intId  = int(digits)
-    parms  = []
     try:
         cursor.execute("""\
             SELECT MAX(num)
@@ -136,46 +112,43 @@ if reqType == 'Individual':
         cdrcgi.bail("No version found for document %d: %s" % (intId,
                                                               info[1][0]))
 else:
-    if not start:
-        cdrcgi.bail('No start date specified')
-    parms = [('BeginDate', start)]
+    statPath = '/InScopeProtocol/ProtocolAdminInfo/CurrentProtocolStatus'
+    srcPath  = '/InScopeProtocol/ProtocolSources/ProtocolSource/SourceName'
+    brussels = 'NCI Liaison Office-Brussels'
     try:
-        cursor.callproc("prot_init_mailer_docs", (start,))
-        cantUseThisBecauseOfABugInMicrosoftADOCOMObjects = """\
-            SELECT DISTINCT d.id, MAX(v.num)
-                       FROM doc_version v
-                       JOIN document d
-                         ON d.id = v.id
-                       JOIN query_term s
-                         ON s.doc_id = d.id
-                      WHERE d.active_status <> 'A'
-                        AND s.value IN ('Active', 'Approved-Not Yet Active')
-                        AND s.path = '/InScopeProtocol/ProtocolAdminInfo' +
-                                     '/CurrentProtocolStatus'
+        cursor.execute("""\
+            SELECT DISTINCT protocol.id, MAX(doc_version.num)
+                       FROM doc_version
+                       JOIN ready_for_review
+                         ON ready_for_review.doc_id = doc_version.id
+                       JOIN document protocol
+                         ON protocol.id = ready_for_review.doc_id
+                       JOIN query_term prot_status
+                         ON prot_status.doc_id = protocol.id
+                      WHERE prot_status.value IN ('Active', 
+                                                  'Approved-Not Yet Active')
+                        AND prot_status.path = '%s'
                         AND NOT EXISTS (SELECT *
                                           FROM query_term src
-                                         WHERE src.value = 'NCI Liaison ' +
-                                                           'Office-Brussels'
-                                           AND src.path  = '/InScopeProtocol' +
-                                                           '/ProtocolSources' +
-                                                           '/ProtocolSource' +
-                                                           '/SourceName'
-                                           AND src.doc_id = d.id)
+                                         WHERE src.value = '%s'
+                                           AND src.path  = '%s'
+                                           AND src.doc_id = protocol.id)
                         AND NOT EXISTS (SELECT *
-                                          FROM pub_proc_doc p
-                                         WHERE p.doc_id = d.id)
-                        AND (SELECT MIN(dt)
-                               FROM audit_trail a
-                              WHERE a.document = d.id) > ?
-                   GROUP BY d.id""" #, (start,))
+                                          FROM pub_proc p
+                                          JOIN pub_proc_doc pd
+                                            ON p.id = pd.pub_proc
+                                         WHERE pd.doc_id = protocol.id
+                                           AND p.pub_subset = '%s'
+                                           AND (p.status = 'Success'
+                                            OR p.completed IS NULL))
+                   GROUP BY protocol.id""" % (statPath, brussels, srcPath,
+                                              subsetName))
         docList = cursor.fetchall()
     except cdrdb.Error, info:
         cdrcgi.bail("Failure retrieving document IDs: %s" % info[1][0])
 
 # Drop the job into the queue.
-subsetName = 'Initial Protocol Abstract Verification Mailers'
-result = cdrpub.initNewJob(ctrlDocId, subsetName, session, docList, parms,
-                           email)
+result = cdrpub.initNewJob(ctrlDocId, subsetName, session, docList, [], email)
 if type(result) == type(""):
     cdrcgi.bail(result)
 elif type(result) == type(u""):
