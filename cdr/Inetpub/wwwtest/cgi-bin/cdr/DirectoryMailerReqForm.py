@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: DirectoryMailerReqForm.py,v 1.13 2002-11-08 03:07:50 ameyer Exp $
+# $Id: DirectoryMailerReqForm.py,v 1.14 2003-01-22 01:49:08 ameyer Exp $
 #
 # Request form for all directory mailers.
 #
@@ -31,6 +31,9 @@
 # Bob Kline.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.13  2002/11/08 03:07:50  ameyer
+# Removed a debugging line inadvertently left in, restoring the correct one.
+#
 # Revision 1.12  2002/11/08 02:35:07  ameyer
 # Revised user interface to match Lakshmi's change request.
 #
@@ -271,6 +274,7 @@ if docId:
     intId  = int(digits)
 
     # Make sure the corresponding document exists in version control
+    #   and is publishable
     try:
         cursor.execute("""\
             SELECT MAX(num)
@@ -279,12 +283,14 @@ if docId:
                AND publishable = 'Y'
             """, (intId,))
         row = cursor.fetchone()
+        if not row or not row[0]:
+            cdrcgi.bail("No publishable version found for document %d" % intId)
 
         # Document list contains one tuple of doc id + version number
         docList = ((intId, row[0]),)
     except cdrdb.Error, info:
-        cdrcgi.bail("No version found for document %d: %s" % (intId,
-                                                              info[1][0]))
+        cdrcgi.bail("Database error finding version for document %d: %s" % \
+                    (intId, info[1][0]))
 
     # Validate that document matches type implied by mailer type selection
     try:
