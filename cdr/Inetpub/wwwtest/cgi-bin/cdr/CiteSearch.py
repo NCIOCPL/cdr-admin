@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: CiteSearch.py,v 1.11 2003-09-12 12:34:37 bkline Exp $
+# $Id: CiteSearch.py,v 1.12 2003-10-22 13:44:06 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Citation documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.11  2003/09/12 12:34:37  bkline
+# Added support for searching values in linked documents (for the
+# Published In field of the search form).  Request #257.
+#
 # Revision 1.10  2003/03/04 14:11:52  bkline
 # Added missing parameter for %s placeholder in failure message.
 #
@@ -110,17 +114,52 @@ def findExistingCitation(pmid):
         cdrcgi.bail('Failure checking for existing document: %s' % info[1][0])
 
 #----------------------------------------------------------------------
+# Replace PubmedArticle element in document with new version.
+#----------------------------------------------------------------------
+def replacePubmedArticle(doc, newPubmedArticle):
+    endTag = "</PubmedArticle>"
+    start = doc.find("<PubmedArticle>")
+    if start == -1:
+        cdrcgi.bail("Unable to find PubmedArticle in existing document")
+    end = doc.find(endTag, start + 1)
+    return doc[:start] + newPubmedArticle + doc[end + len(endTag) : ]
+    
+#----------------------------------------------------------------------
+# Extract the PubmedArticle element from the document.
+#----------------------------------------------------------------------
+def getPubmedArticle(doc):
+    endTag = "</PubmedArticle>"
+    start = doc.find("<PubmedArticle>")
+    if start == -1:
+        return None
+    end = doc.find(endTag, start + 1)
+    if end == -1:
+        return None
+    return doc[start : end + len(endTag)]
+    
+#----------------------------------------------------------------------
+# Extract the text content of the ArticleTitle element.
+#----------------------------------------------------------------------
+def getArticleTitle(article):
+    startTag = "<ArticleTitle>"
+    start = article.find(startTag)
+    if start == -1:
+        return None
+    end = article.find("</ArticleTitle>", start + 1)
+    if end == -1:
+        return None
+    return article[start + len(startTag) : end]
+
+#----------------------------------------------------------------------
 # Import a citation document from PubMed.
 #----------------------------------------------------------------------
 if impReq:
     if not session: cdrcgi.bail("User not logged in")
-    exp1    = re.compile("<PubmedArticle>.*?</PubmedArticle>", re.DOTALL)
-    exp2    = re.compile("<ArticleTitle>(.*?)</ArticleTitle>", re.DOTALL)
     if replaceID:
         oldDoc = cdr.getDoc(session, replaceID, 'Y')
         if oldDoc.startswith("<Errors"):
             cdrcgi.bail("Unable to retrieve %s" % replaceID)
-        if not exp1.findall(oldDoc):
+        if not getPubmedArticle(oldDoc):
             cdrcgi.bail("Document %s is not a PubMed Citation" % replaceID)
     else:
         docId = findExistingCitation(importID)
@@ -136,12 +175,11 @@ if impReq:
     except:
         cdrcgi.bail("NLM server unavailable; please try again later");
     page    = uobj.read()
-    article = exp1.findall(page)
+    article = getPubmedArticle(page)
     if not article: cdrcgi.bail("Article Not Found")
     if not replaceID:
-        title   = exp2.findall(article[0]) 
+        title   = getArticleTitle(article) 
         if not title: cdrcgi.bail("Unable to find article title")
-        title   = title[0] or "NO TITLE FOUND"
         title   = title[:255]
         doc     = """\
 <CdrDoc Type='Citation' Id=''>
@@ -158,10 +196,10 @@ if impReq:
   </Citation>]]></CdrDocXml>
 </CdrDoc>
 """
-        doc = doc % (title, article[0])
+        doc = doc % (title, article)
         resp = cdr.addDoc(session, doc = doc, val = 'Y', showWarnings = 1)
     else:
-        doc = exp1.sub(article[0], oldDoc)
+        doc = replacePubmedArticle(oldDoc, article)
         resp = cdr.repDoc(session, doc = doc, val = 'Y', showWarnings = 1)
     if not resp[0]:
         cdrcgi.bail("Failure adding PubMed citation %s: %s" % (
