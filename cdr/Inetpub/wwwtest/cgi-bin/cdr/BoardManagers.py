@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: BoardManagers.py,v 1.6 2004-05-11 17:29:53 bkline Exp $
+#
+# $Id: BoardManagers.py,v 1.7 2004-06-02 15:19:58 venglisc Exp $
 #
 # Main menu for board managers.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2004/05/11 17:29:53  bkline
+# Plugged in Board Roster report.
+#
 # Revision 1.5  2004/04/16 21:56:57  venglisc
 # Removed stub to link to Board Member QC report. (Bug 1059).
 #
