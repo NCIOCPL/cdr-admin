@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: MailerHistory.py,v 1.2 2002-10-09 13:00:11 bkline Exp $
+# $Id: MailerHistory.py,v 1.3 2005-03-17 12:54:19 bkline Exp $
 #
 # Reports on the history of mailers for a particular document.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/10/09 13:00:11  bkline
+# Bumped up timeout for database query.
+#
 # Revision 1.1  2002/05/03 20:28:54  bkline
 # New Mailer reports.
 #
@@ -124,7 +127,8 @@ try:
             SELECT type.value,
                    sent.value,
                    checkin.value,
-                   change.value
+                   change.value,
+                   sent.doc_id
               FROM query_term doc
               JOIN query_term type
                 ON type.doc_id = doc.doc_id
@@ -155,6 +159,11 @@ try:
    <tr>
     <td nowrap='1'>
      <b>
+      <font size='3'>Doc ID</font>
+     </b>
+    </td>
+    <td nowrap='1'>
+     <b>
       <font size='3'>Mailer Type</font>
      </b>
     </td>
@@ -179,6 +188,9 @@ try:
         html += """\
    <tr>
     <td align='top'>
+     <font size='3'>CDR%d</font>
+    </td>
+    <td align='top'>
      <font size='3'>%s</font>
     </td>
     <td align='top'>
@@ -191,7 +203,8 @@ try:
      <font size='3'>%s</font>
     </td>
    </tr>
-""" % (row[0],
+""" % (row[4],
+       row[0],
        row[1],
        row[2] or "&nbsp;",
        row[3] or "&nbsp;")
