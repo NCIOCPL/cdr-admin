@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GeneralReports.py,v 1.10 2004-02-17 20:01:01 venglisc Exp $
+# $Id: GeneralReports.py,v 1.11 2004-11-04 21:40:45 venglisc Exp $
 #
 # Submenu for general reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.10  2004/02/17 20:01:01  venglisc
+# Removed unused menu items.
+#
 # Revision 1.9  2003/12/18 22:19:53  bkline
 # Alphabetized menu items at Volker's request (with Lakshmi's
 # concurrence).
@@ -85,6 +88,8 @@ reports = [
             'Document Activity Report'),
            ('DocVersionHistory.py', 
             'Document Version History'),
+	   ('ShowGlobalChangeTestResults.py',
+	    'Global Change Test Results'),
            ('LinkedDocs.py', 
             'Linked Documents'),
            ('NewDocsWithPubStatus.py', 
