@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolMailerReqForm.py,v 1.3 2002-11-07 18:54:47 bkline Exp $
+# $Id: ProtocolMailerReqForm.py,v 1.4 2002-11-13 20:34:52 bkline Exp $
 #
 # Request form for all protocol mailers.
 #
@@ -17,6 +17,9 @@
 # publication job for the publishing daemon to find and initiate.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2002/11/07 18:54:47  bkline
+# Incorporated interface changes requested by Lakshmi.
+#
 # Revision 1.2  2002/10/24 02:46:22  bkline
 # Ready for user testing.
 #
@@ -130,7 +133,10 @@ if not request:
    <input type='radio' name='userPick' class='r' value='ProtQuarterlyStatPart'>
     <span class='r'>Quarterly Status/Participant Check</span>
    <br><br><br>
-   <b>Limit maximum number of mailers generated:&nbsp;</b>
+   <b>
+    Limit maximum number of documents for which mailers will be 
+    generated:&nbsp;
+   </b>
    <input type='text' name='maxMails' size='12' value='No limit' />
    <br><br><br>
    <h3>To generate mailer for a single Physician/Organization, enter</h3>
