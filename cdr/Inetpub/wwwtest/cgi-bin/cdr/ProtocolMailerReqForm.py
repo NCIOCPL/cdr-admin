@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolMailerReqForm.py,v 1.18 2004-10-07 22:08:37 bkline Exp $
+# $Id: ProtocolMailerReqForm.py,v 1.19 2004-10-20 21:21:08 bkline Exp $
 #
 # Request form for all protocol mailers.
 #
@@ -17,6 +17,9 @@
 # publication job for the publishing daemon to find and initiate.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.18  2004/10/07 22:08:37  bkline
+# Added temporary code to block some brussels mailers (see request #1350).
+#
 # Revision 1.17  2004/07/17 11:52:21  bkline
 # Added missing arguments for string format placeholder in SQL query.
 #
@@ -721,24 +724,6 @@ LEFT OUTER JOIN query_term t
                         + '/ProtocolLeadOrg/LeadOrgPersonnel'
                         + '/PersonRole'
             AND r.value = 'Update person'""" + pupCheck, timeout = 300)
-
-        # TEMPORARY ====================================================
-        # (see request #1350)
-        cursor.execute("CREATE TABLE #brussels (id INTEGER)")
-        cursor.execute("""\
-    INSERT INTO #brussels (id)
-SELECT DISTINCT doc_id
-           FROM query_term
-          WHERE path = '/InScopeProtocol/ProtocolSources/ProtocolSource'
-                     + '/SourceName'
-            AND value = 'NCI Liaison Office-Brussels'""")
-        cursor.execute("""\
-    DELETE #lead_org
-      FROM #lead_org o
-      JOIN #brussels b
-        ON o.prot_id = b.id
-     WHERE o.update_mode IS NULL or o.update_mode <> 'Web-based'""")
-        # END TEMPORARY ================================================
 
         # Fill in missing update modes.
         cursor.execute("""\
