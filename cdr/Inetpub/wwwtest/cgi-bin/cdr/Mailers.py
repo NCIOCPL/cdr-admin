@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: Mailers.py,v 1.5 2002-06-04 19:15:01 ameyer Exp $
+# $Id: Mailers.py,v 1.6 2002-10-24 02:49:45 bkline Exp $
 #
 # Main menu for mailer jobs.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2002/06/04 19:15:01  ameyer
+# Removed New Physician Initial Mailer - now part of directory mailers.
+#
 # Revision 1.4  2002/03/19 23:46:36  ameyer
 # Added line for directory mailers.  Will eventually remove physician mailer.
 #
@@ -41,17 +44,9 @@ if action == cdrcgi.MAINMENU:
 # List the available options.
 #----------------------------------------------------------------------
 form = "<OL>\n"
-reports = [('PDQMailerRequestForm.py', 'PDQ Editorial Board Members Mailing'),
-           ('ProtAbstractMailerReqForm.py',
-            'Protocol Abstract Initial Verification Mailer'),
-           ('ProtAbstractUpdateMailer.py',
-            'Protocol Abstract Update Mailer'),
-           ('StatAndParticMailer.py',
-            'Protocol Status and Participant Initial Verification Mailer'),
-           ('StatAndParticUpdateMailer.py',
-            'Protocol Status and Participant Update Verification Mailer'),
-           ('DirectoryMailerReqForm.py',
-            'Directory Mailers')]
+reports = (('DirectoryMailerReqForm.py', 'Directory Mailers'),
+           ('ProtocolMailerReqForm.py',  'Protocol Mailers'),
+           ('PDQMailerRequestForm.py',   'Summary Mailers'),
 
 for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s'>%s</A></LI>\n" % (
