@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryAndMiscReports.py,v 1.12 2004-04-08 20:31:10 bkline Exp $
+# $Id: SummaryAndMiscReports.py,v 1.13 2004-04-16 21:50:48 venglisc Exp $
 #
 # Submenu for summary and miscellanous document reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.12  2004/04/08 20:31:10  bkline
+# Plugged in additions requested by Margaret (request #1059).
+#
 # Revision 1.11  2004/03/11 20:53:28  venglisc
 # Minor change to one menu entry.
 #
@@ -125,11 +128,11 @@ form += """\
 """
 
 for choice in (
-    ('Stub.py',          'Board Member Information QC Report' ),
-    ('Stub.py',               'Board Roster Reports'               )
+    ('QcReport.py',         'Board Member Information QC Report' ),
+    ('Stub.py',             'Board Roster Reports'               )
     ):
     form += """\
-    <LI><A href='%s/%s?%s'>%s</A></LI>
+    <LI><A href='%s/%s?DocType=PDQBoardMemberInfo&Session=%s'>%s</A></LI>
 """ % (cdrcgi.BASE, choice[0], session, choice[1])
     
 form += """\
