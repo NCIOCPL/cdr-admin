@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: DocVersionHistory.py,v 1.9 2002-12-19 17:12:50 pzhang Exp $
+# $Id: DocVersionHistory.py,v 1.10 2002-12-19 19:11:36 pzhang Exp $
 #
 # Show version history of document.
 #----------------------------------------------------------------------
@@ -116,9 +116,21 @@ except cdrdb.Error, info:
 # Build the report header.
 #----------------------------------------------------------------------
 if docStatus == 'I':
-    docStatus = "<B>I [Blocked]</B>"
+    docStatusLine = """
+   <tr>
+    <b>
+     <td valign = 'top' align='right' nowrap='1'>
+      <font size='3'>Document Status:&nbsp;</font>
+     </td>
+    <b>
+    <b>
+     <td colspan='3'>
+      <font size='3'><b>BLOCKED FOR PUBLICATION</b></font>
+     </td>
+    </b>
+   </tr>"""
 elif docStatus == 'A':
-    docStatus = "A [Active]"
+    docStatusLine = ""
 
 html = """\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
@@ -172,18 +184,7 @@ html = """\
      </td>
     </b>
    </tr>
-   <tr>
-    <b>
-     <td valign = 'top' align='right' nowrap='1'>
-      <font size='3'>Document Status:&nbsp;</font>
-     </td>
-    <b>
-    <b>
-     <td colspan='3'>
-      <font size='3'>%s</font>
-     </td>
-    </b>
-   </tr>
+   %s
    <tr>
     <b>
      <td align='right' nowrap='1'>
@@ -274,7 +275,7 @@ html = """\
        intId,
        docType,
        docTitle,
-       docStatus,
+       docStatusLine,
        createdBy or "[Conversion]",
        createdDate and createdDate[:10] or "2002-06-22",
        modBy or "N/A",
