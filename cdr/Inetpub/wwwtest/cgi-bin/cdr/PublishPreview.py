@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: PublishPreview.py,v 1.2 2001-12-24 23:18:15 bkline Exp $
+# $Id: PublishPreview.py,v 1.3 2002-01-22 21:31:41 bkline Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2001/12/24 23:18:15  bkline
+# Replaced document IDs with filter names.
+#
 # Revision 1.1  2001/12/01 18:11:44  bkline
 # Initial revision
 #
@@ -31,10 +34,11 @@ filters = {
          "name:Summary Filter4",
          "name:Summary Filter5",
          "name:Summary Filter6"],
-    'Citation':     ["name:Display PDQ and PubMed Citations"],
-    'Organization': ["name:Organization Information QC Report"],
-    'Person':       ["name:Person QC Report Filter"],
-    'Term':         ["name:Terminology QC Report"]
+    'Citation':         ["name:Display PDQ and PubMed Citations"],
+    'Organization':     ["name:Organization Information QC Report"],
+    'Person':           ["name:Person QC Report Filter"],
+    'InScopeProtocol':  ["name:Protocol Display for CDR"],
+    'Term':             ["name:Terminology QC Report"]
 }
 
 #----------------------------------------------------------------------
