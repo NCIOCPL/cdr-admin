@@ -1,15 +1,12 @@
 #----------------------------------------------------------------------
 #
-# $Id: CheckedOutDocs.py,v 1.1 2002-03-02 13:04:03 bkline Exp $
+# $Id: CheckedOutDocs.py,v 1.2 2002-03-02 13:04:42 bkline Exp $
 #
-# Reports on URLs which cannot be reached.
+# Report on documents checked out to a user.
 #
 # $Log: not supported by cvs2svn $
-# Revision 1.3  2002/02/21 15:43:13  bkline
-# Added navigation buttons.
-#
-# Revision 1.1  2001/12/01 18:11:44  bkline
-# Initial revision
+# Revision 1.1  2002/03/02 13:04:03  bkline
+# Report on documents checked out to a user.
 #
 #----------------------------------------------------------------------
 import cgi, httplib, urlparse, socket, cdrdb, cdrcgi
