@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: Filter.py,v 1.17 2003-03-04 19:07:57 pzhang Exp $
+# $Id: Filter.py,v 1.18 2003-03-04 21:32:23 pzhang Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.17  2003/03/04 19:07:57  pzhang
+# Added feature to handle message instruction with terminate='no'.
+#
 # Revision 1.16  2002/10/21 15:42:02  pzhang
 # Added port parameter into lastVersions() and filterDoc().
 #
@@ -203,17 +206,12 @@ if fields.getvalue('qcFilterSets'):
 #----------------------------------------------------------------------
 # Filter the document.
 #----------------------------------------------------------------------
-port = cdr.getPubPort()
 filterWarning = ""
-doc = cdr.filterDoc(session, filtId[0], docId = docId, docVer = docVer,
-                    port = port)
-if doc[1]: filterWarning += doc[1]
-for filter in filtId[1:]:
-    if filter:
-        doc = cdr.filterDoc(session, filter, doc = doc[0], port = port)
-        if doc[1]: filterWarning += doc[1]                      
+doc = cdr.filterDoc(session, filtId, docId = docId, docVer = docVer,
+                    port = cdr.getPubPort())                    
 if type(doc) == type(()):
-    doc = doc[0] 
+    if doc[1]: filterWarning += doc[1]
+    doc = doc[0]     
 
 #----------------------------------------------------------------------
 # Add a table row for an error or warning.
