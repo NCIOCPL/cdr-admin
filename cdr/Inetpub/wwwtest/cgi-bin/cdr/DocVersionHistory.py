@@ -1,10 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: DocVersionHistory.py,v 1.15 2004-07-13 19:20:21 venglisc Exp $
+# $Id: DocVersionHistory.py,v 1.16 2004-07-27 16:03:16 venglisc Exp $
 #
 # Show version history of document.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.15  2004/07/13 19:20:21  venglisc
+# Added code to display information on why the removal date of a document
+# can not be displayed, i.e. blocked via full-load, not versioned yet
+# (Bug #216).
+#
 # Revision 1.14  2004/05/11 17:32:03  bkline
 # Plugged in information about publication blocks and removals.
 #
@@ -472,7 +477,9 @@ LEFT OUTER JOIN primary_pub_doc d
 		rowcg = cursor.fetchone()
 	        removeDate = rowcg[1][:10]
              except cdrdb.Error, info:
-                cdrcgi.bail('Failure getting following Full-Load date')
+		# No Version of this document ever got published
+                removeDate = 'Never Published'
+                # cdrcgi.bail('Failure getting following Full-Load date')
 
        except cdrdb.Error, info:
           cdrcgi.bail('Failure query pub_prog_cg')
