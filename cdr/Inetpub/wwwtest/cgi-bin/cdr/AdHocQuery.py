@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: AdHocQuery.py,v 1.1 2002-07-10 19:33:33 bkline Exp $
+# $Id: AdHocQuery.py,v 1.2 2002-07-10 19:47:32 bkline Exp $
 #
 # Displays result set for SQL query.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2002/07/10 19:33:33  bkline
+# New interface for ad hoc SQL queries.
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string, cdrdb
 
@@ -72,7 +75,7 @@ try:
   <pre>
 %s
   </pre>
-  <table border='1' cellspacing='0' cellpadding='1'>
+  <table border='1' cellspacing='0' cellpadding='3'>
    <tr>
 """ % query.replace("\r", "").rstrip()
     for col in cursor.description:
@@ -89,6 +92,8 @@ try:
 """
         for col in row:
             if col is None: col = "NULL"
+            elif not col: col = "&nbsp;"
+            elif type(col) in (type(""), type(u"")): col = cgi.escape(col)
             html += """\
     <td valign='top'>%s</td>
 """ % col
