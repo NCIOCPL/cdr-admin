@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: DevTasks.py,v 1.3 2001-08-22 14:42:13 bkline Exp $
+# $Id: DevTasks.py,v 1.4 2001-12-01 17:57:11 bkline Exp $
 #
 # Lists CDR development tasks.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2001/08/22 14:42:13  bkline
+# Changed subtitle from "UI Task List" to "Task List".
+#
 # Revision 1.2  2001/08/21 20:48:52  shines
 # Added ability to sort by column headings
 #
@@ -19,7 +22,7 @@ import cgi, cdr, cdrcgi, re, string, dbi, cdrdb
 #----------------------------------------------------------------------
 title   = "CDR Development"
 section = "Task List"
-buttons = ["Refresh"]
+buttons = ["Show Pending Tasks", "Show All Tasks"]
 #script  = "DumpParams.pl"
 script  = "DevTasks.py"
 header  = cdrcgi.header(title, title, section, script, buttons, numBreaks = 1)
@@ -29,12 +32,20 @@ header  = cdrcgi.header(title, title, section, script, buttons, numBreaks = 1)
 # Get the form variables.
 #----------------------------------------------------------------------
 fields  = cgi.FieldStorage()
-sortby    = fields and fields.getvalue("sortby") or ""
+sortby  = fields and fields.getvalue("sortby") or ""
+action  = cdrcgi.getRequest(fields)
+showAll = fields and fields.getvalue("showall") or None
 
 #----------------------------------------------------------------------
 # Retrieve the information directly from the database.
 #----------------------------------------------------------------------
 orderby = sortby
+where   = "WHERE status NOT IN ('Complete', 'Abandoned')"
+if showAll == 'Y' or action == "Show All Tasks":
+    where = ""
+    showAll = "showall=Y"
+else:
+    showAll = "showall=N"
 orderlist = ['category', 'assigned_to', 'status DESC', 'id']
 for item in orderlist:
     if item != sortby:
@@ -49,8 +60,9 @@ cursor = conn.cursor()
 query1  = """\
    SELECT id, description, assigned_to, status, category,est_complete,notes
      FROM dev_task
+    %s
  ORDER BY %s
-""" % orderby
+""" % (where, orderby)
 
 query2 = """\
    SELECT status, COUNT(*)
@@ -93,15 +105,15 @@ body += """\
   <TD ALIGN='center'><FONT SIZE='-1'><B>&nbsp;#&nbsp;</B></FONT></TD>
   <TD ALIGN='center'><FONT SIZE='-1'><B>Description</B></FONT></TD>
   <TD ALIGN='center'><FONT SIZE='-1'><B><a
-  href='DevTasks.py?sortby=assigned_to' >Assigned To</a></B></FONT></TD>
+  href='DevTasks.py?sortby=assigned_to&%s'>Assigned To</a></B></FONT></TD>
   <TD ALIGN='center'><FONT SIZE='-1'><B><a
-  href="DevTasks.py?sortby=status%20DESC">Status</a></B></FONT></TD>
+  href="DevTasks.py?sortby=status%%20DESC&%s">Status</a></B></FONT></TD>
   <TD ALIGN='center'><FONT SIZE='-1'><B><a
-  href="DevTasks.py?sortby=category" >Category</A></B></FONT></TD>
+  href="DevTasks.py?sortby=category&%s" >Category</A></B></FONT></TD>
   <TD ALIGN='center'><FONT SIZE='-1'><B>Done By</B></FONT></TD>
   <TD ALIGN='center'><FONT SIZE='-1'><B>Notes</B></FONT></TD>
   </TR>
-"""
+""" % (showAll, showAll, showAll)
 for rec in tasks:
     body += """
  <TR>
@@ -119,7 +131,7 @@ for rec in tasks:
        rec[2],
        rec[3],
        rec[4],
-       rec[5],
+       rec[5] and rec[5][:10] or "&nbsp;No estimate&nbsp;",
        rec[6])
 
 body += "</TABLE>\n"
