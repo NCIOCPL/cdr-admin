@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: PreMailerProtReport.py,v 1.2 2004-09-09 18:49:42 venglisc Exp $
+# $Id: PreMailerProtReport.py,v 1.3 2004-09-10 20:31:56 venglisc Exp $
 #
 # Checks run prior to generating mailers for protocols.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2004/09/09 18:49:42  venglisc
+# Added third section to PreMailer Check Report listing all persons
+# attached to protocols that do not have an UpdateMode element. (Bug 1313)
+#
 # Revision 1.1  2003/01/29 18:47:47  bkline
 # New report run before kicking off a protocol mailer job.
 #
@@ -67,11 +71,10 @@ matPath    = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg' \
              '/MailAbstractTo'
 lopPath    = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg' \
              '/LeadOrgPersonnel/@cdr:id'
-persPath1  = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg' \
+persPath   = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg' \
              '/LeadOrgPersonnel/Person/@cdr:ref'
-persPath2  = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg' \
-             '/ProtocolSites/OrgSite/OrgSiteContact/SpecificPerson' \
-	     '/Person/@cdr:ref'
+pupPath    = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg' \
+             '/LeadOrgPersonnel/PersonRole'
 loPath     = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg' \
              '/LeadOrganizationID/@cdr:ref'
 updMode    = '/Person/PersonLocations/UpdateMode'
@@ -216,13 +219,18 @@ try:
           FROM query_term prot
           JOIN query_term pers
             ON prot.doc_id = pers.doc_id
+	  JOIN query_term pup
+	    ON prot.doc_id = pup.doc_id
          WHERE prot.path = '%s'
            AND prot.value in ('Active', 
                               'Approved-Not Yet Active')
-           AND pers.path in  ('%s', '%s')
+           AND pers.path = '%s'
+	   AND pup.path  = '%s'
+	   AND pup.value = 'Update person'
+	   AND left(pup.node_loc, 12) = left(pers.node_loc, 12)
          ORDER BY pers.int_val""" % (statusPath, 
-	                             persPath1, 
-				     persPath2), 
+	                             persPath, 
+				     pupPath), 
 	           timeout = 120)
     conn.commit()
 
