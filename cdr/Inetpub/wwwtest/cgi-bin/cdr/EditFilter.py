@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditFilter.py,v 1.10 2002-09-13 17:08:10 bkline Exp $
+# $Id: EditFilter.py,v 1.11 2003-02-25 20:03:59 pzhang Exp $
 #
 # Prototype for editing CDR filter documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.10  2002/09/13 17:08:10  bkline
+# Added View command.
+#
 # Revision 1.9  2002/09/13 11:36:50  bkline
 # Added Compare function.
 #
@@ -35,7 +38,14 @@
 #----------------------------------------------------------------------
 # Import required modules.
 #----------------------------------------------------------------------
-import cgi, cdr, cdrdb, os, re, cdrcgi, sys, tempfile
+import cgi, cdr, cdrdb, os, re, cdrcgi, sys, tempfile, string, socket
+
+#----------------------------------------------------------------------
+# Edit only on Dev machine.
+#----------------------------------------------------------------------
+localhost = socket.gethostname()
+if string.upper(localhost) == "MAHLER":
+    localhost= "Dev"
 
 #----------------------------------------------------------------------
 # Set some initial values.
@@ -397,7 +407,7 @@ if request in ("Load", "View"):
         banner   = "Edit existing document"
     else:
         checkOut = "N"
-        buttons  = ("Load", "Clone")
+        buttons  = (localhost == "Dev") and ("Load", "Clone") or ()
         banner   = "View existing document"
     doc = cdr.getDoc(session, fields[cdrcgi.DOCID].value, checkOut)
     doc = cdrcgi.decode(doc)
@@ -511,7 +521,7 @@ elif request in ('Save', 'Checkin'):
         if request == 'Save':
             buttons = ("Load", "Save", "Checkin", "Clone")
         else:
-            buttons = ("Load", "Clone")
+            buttons = ("Load", "Clone")     
         showForm(cgi.escape(doc), "Editing existing document", buttons)
 
 #----------------------------------------------------------------------
