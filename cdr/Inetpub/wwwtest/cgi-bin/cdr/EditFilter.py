@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditFilter.py,v 1.13 2003-03-19 17:43:42 bkline Exp $
+# $Id: EditFilter.py,v 1.14 2003-09-16 19:14:56 bkline Exp $
 #
 # Prototype for editing CDR filter documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.13  2003/03/19 17:43:42  bkline
+# Modified file writing code to ensure timely file closing.
+#
 # Revision 1.12  2003/03/19 15:33:51  bkline
 # Added massive amounts of (conditional) debug logging to CVS processing.
 # Trying to track down failures which leave CVS lockfiles hanging around.
@@ -22,7 +25,7 @@
 # Added auto-cvs to filter editing.
 #
 # Revision 1.7  2002/07/29 19:23:37  bkline
-# Fixed some bail() calls (had wrong first arg.
+# Fixed some bail() calls (had wrong first arg).
 #
 # Revision 1.6  2002/06/26 11:46:45  bkline
 # Added option to version document.
@@ -38,7 +41,6 @@
 #
 # Revision 1.2  2001/04/08 22:54:59  bkline
 # Added Unicode mapping calls.
-#
 #
 #----------------------------------------------------------------------
 
@@ -59,7 +61,7 @@ if string.upper(localhost) == "MAHLER":
 #----------------------------------------------------------------------
 banner   = "CDR Filter Editing"
 title    = "Edit CDR Filter"
-BLANKDOC = """\
+BLANKDOC = cgi.escape("""\
 <CdrDoc Type='Filter'>
  <CdrDocCtl>
   <DocTitle>*** PUT YOUR TITLE HERE ***</DocTitle>
@@ -74,7 +76,7 @@ BLANKDOC = """\
   </xsl:transform>]]>
  </CdrDocXml>
 </CdrDoc>
-"""
+""")
 
 #----------------------------------------------------------------------
 # Load the fields from the form.
@@ -109,8 +111,8 @@ def debugLog(what):
 # Display the CDR document form.
 #----------------------------------------------------------------------
 def showForm(doc, subBanner, buttons):
-    hdr = cdrcgi.header(title, banner, subBanner, "xEditFilter.py", buttons,
-            numBreaks = 1)
+    hdr = cdrcgi.header(title, banner, subBanner, "EditFilter.py", buttons,
+                        numBreaks = 1)
     html = hdr + """\
    <input name='version' type='checkbox'%s>
    Create new version for Save, Checkin or Clone? 
