@@ -2,8 +2,12 @@
 #
 # Publishing CGI script.
 #
-# $Id: publishing.py,v 1.11 2002-05-15 22:47:49 pzhang Exp $
+# $Id: publishing.py,v 1.12 2002-09-03 17:20:37 pzhang Exp $
 # $Log: not supported by cvs2svn $
+# Revision 1.11  2002/05/15 22:47:49  pzhang
+# Added code for control document version.
+# Detected valid PubType parameter values.
+#
 # Revision 1.10  2002/05/10 16:12:40  pzhang
 # Made PubType parameter READONLY.
 #
@@ -89,8 +93,13 @@ class Display:
 
         form = "<H4>Publication Types</H4>\n"
         form += "<OL>\n"
+        form += "<LI><A HREF='%s/%s?id=1&%s=%s&type=Manage'>%s</A>\
+                     </LI>\n" % (cdrcgi.BASE, "PubStatus.py", cdrcgi.SESSION,
+                     session, "Manage Publishing Job Status")
 
         for r in publishes:
+            if r[3][0:7] == "Mailers":
+                continue
             form += "<LI><A HREF='%s/%s?%s=%s&ctrlId=%s&version=%s'>%s</A>\
                      </LI>\n" % (cdrcgi.BASE, r[0], cdrcgi.SESSION, session, 
                      r[1], r[2], r[3])
@@ -321,7 +330,11 @@ class Display:
                    FROM doc_version d 
                    JOIN doc_type t 
                      ON d.doc_type = t.id 
+                   JOIN document active 
+                     ON active.id = d.id
                   WHERE t.name = 'PublishingSystem' 
+                    AND d.val_status = 'V'
+                    and d.publishable = 'Y'
                     AND d.num = (SELECT MAX(num) 
                                    FROM doc_version 
                                   WHERE d.id = id)"""
