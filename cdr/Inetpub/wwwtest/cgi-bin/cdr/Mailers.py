@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: Mailers.py,v 1.7 2002-10-24 02:50:38 bkline Exp $
+# $Id: Mailers.py,v 1.8 2002-10-24 20:10:42 bkline Exp $
 #
 # Main menu for mailer jobs.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.7  2002/10/24 02:50:38  bkline
+# Fixed typo (missing closing parenthesis).
+#
 # Revision 1.6  2002/10/24 02:49:45  bkline
 # Further consolidation of menu items.
 #
@@ -47,12 +50,15 @@ if action == cdrcgi.MAINMENU:
 # List the available options.
 #----------------------------------------------------------------------
 form = "<OL>\n"
-reports = (('DirectoryMailerReqForm.py', 'Directory Mailers'),
-           ('ProtocolMailerReqForm.py',  'Protocol Mailers'),
-           ('PDQMailerRequestForm.py',   'Summary Mailers'))
+reports = (('DirectoryMailerReqForm.py?', 'Directory Mailers'),
+           ('ProtocolMailerReqForm.py?',  'Protocol Mailers'),
+           ('SummaryMailerReqForm.py?BoardType=Editorial&',
+            'Summary Mailers (Editorial Board)'),
+           ('SummaryMailerReqForm.py?BoardType=Advisory&',
+            'Summary Mailers (Advisory Board)'))
 
 for r in reports:
-    form += "<LI><A HREF='%s/%s?%s=%s'>%s</A></LI>\n" % (
+    form += "<LI><A HREF='%s/%s%s=%s'>%s</A></LI>\n" % (
             cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
 
 form += """\
