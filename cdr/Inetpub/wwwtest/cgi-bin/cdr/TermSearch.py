@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: TermSearch.py,v 1.2 2002-02-14 19:34:52 bkline Exp $
+# $Id: TermSearch.py,v 1.3 2002-02-20 03:57:33 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Term documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/02/14 19:34:52  bkline
+# Replaced hardwired filter ID with filter name.
+#
 # Revision 1.1  2001/12/01 18:11:44  bkline
 # Initial revision
 #
@@ -43,7 +46,8 @@ def termTypeList(conn, fName):
         cursor.close()
         cursor = None
     except cdrdb.Error, info:
-        bail('Failure retrieving term type list from CDR: %s' % info[1][0])
+        cdrcgi.bail('Failure retrieving term type list from CDR: %s' % 
+                    info[1][0])
     html = """\
       <SELECT NAME='%s'>
        <OPTION VALUE='' SELECTED>&nbsp;</OPTION>
@@ -77,7 +81,8 @@ def semanticTypeList(conn, fName):
         cursor.close()
         cursor = None
     except cdrdb.Error, info:
-        bail('Failure retrieving semantic type list from CDR: %s' % info[1][0])
+        cdrcgi.bail('Failure retrieving semantic type list from CDR: %s' % 
+                    info[1][0])
     html = """\
       <SELECT NAME='%s'>
        <OPTION VALUE='' SELECTED>&nbsp;</OPTION>
