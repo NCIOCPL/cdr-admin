@@ -1,21 +1,27 @@
 #----------------------------------------------------------------------
 #
-# $Id: NewlyPublishableTrials.py,v 1.1 2004-06-02 17:53:00 bkline Exp $
+# $Id: NewlyPublishableTrials.py,v 1.2 2004-07-13 17:56:36 bkline Exp $
 #
 # Report identifying unpublished trials with publishable versions.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2004/06/02 17:53:00  bkline
+# Report identifying unpublished trials with publishable versions.
 #----------------------------------------------------------------------
 import cdrdb, pyXLWriter, sys, time, cdrcgi
 
 class Protocol:
-    def __init__(self, id, date, user):
-        self.id          = id
-        self.date        = date
-        self.user        = user
-        self.primaryIds  = []
-        self.studyCats   = []
-        self.specialCats = []
+    def __init__(self, id, date, user, status):
+        self.id                 = id
+        self.date               = date
+        self.user               = user
+        self.status             = status
+        self.reviewApprovalType = ''
+        self.primaryIds         = []
+        self.studyCats          = []
+        self.specialCats        = []
+        self.sourceNames        = []
+
 inScope = {}
 ctGov   = {}
 prots   = {}
@@ -28,7 +34,7 @@ def show(what):
 def fixString(s):
     if type(s) == type(u""):
         return s.encode('latin-1', 'replace')
-    return `s`
+    return str(s)
 
 def fixList(list):
     if not list: return ''
@@ -74,6 +80,7 @@ def addWorksheet(workbook, title, headers, widths, prots):
         prot.primaryIds.sort()
         prot.studyCats.sort()
         prot.specialCats.sort()
+        prot.sourceNames.sort()
     def sorter(a, b):
         result = cmp(prots[a].studyCats, prots[b].studyCats)
         if result:
@@ -83,20 +90,33 @@ def addWorksheet(workbook, title, headers, widths, prots):
     r = 6
     for key in keys:
         prot = prots[key]
-        c = 0
-        worksheet.write([r, c], `prot.id`, lformat)
-        c += 1
-        worksheet.write([r, c], fixList(prot.primaryIds), lformat)
-        c += 1
-        worksheet.write([r, c], fixList(prot.studyCats), lformat)
-        c += 1
-        if title == 'InScope':
-            worksheet.write([r, c], fixList(prot.specialCats), lformat)
+        nRows = len(prot.studyCats) or 1
+        for rowNum in range(nRows):
+            c = 0
+            worksheet.write([r, c], `prot.id`, lformat)
             c += 1
-        worksheet.write([r, c], prot.date and prot.date[:10] or "", lformat)
-        c += 1
-        worksheet.write([r, c], fixString(prot.user), lformat)
-        r += 1
+            worksheet.write([r, c], fixList(prot.primaryIds), lformat)
+            c += 1
+            if prot.studyCats:
+                worksheet.write([r, c], fixString(prot.studyCats[rowNum]),
+                                lformat)
+            c += 1
+            if title == 'InScope':
+                worksheet.write([r, c], fixList(prot.specialCats), lformat)
+                c += 1
+            worksheet.write([r, c], fixString(prot.status), lformat);
+            c += 1
+            if title == 'InScope':
+                worksheet.write([r, c], fixList(prot.sourceNames), lformat)
+                c += 1
+                worksheet.write([r, c], fixString(prot.reviewApprovalType),
+                                lformat)
+                c += 1
+            worksheet.write([r, c], prot.date and prot.date[:10] or "",
+                            lformat)
+            c += 1
+            worksheet.write([r, c], fixString(prot.user), lformat)
+            r += 1
 
 if sys.platform == "win32":
     import os, msvcrt
@@ -110,20 +130,27 @@ cursor.execute("""\
              (id INTEGER     NOT NULL,
              ver INTEGER     NOT NULL,
         doc_type VARCHAR(32) NOT NULL,
+          status VARCHAR(32) NOT NULL,
         ver_date DATETIME        NULL,
         usr_name VARCHAR(32)     NULL)""")
 show("#publishable created...")
 cursor.execute("""\
-    INSERT INTO #publishable (id, ver, doc_type)
-SELECT DISTINCT d.id, MAX(v.num), t.name
+    INSERT INTO #publishable (id, ver, doc_type, status)
+SELECT DISTINCT d.id, MAX(v.num), t.name, s.value
            FROM active_doc d
            JOIN doc_type t
              ON d.doc_type = t.id
            JOIN doc_version v
              ON v.id = d.id
+           JOIN query_term s
+             ON s.doc_id = d.id
           WHERE t.name IN ('InScopeProtocol', 'CTGovProtocol')
             AND v.publishable = 'Y'
-       GROUP BY d.id, t.name""", timeout = 300)
+            AND s.path IN ('/InScopeProtocol/ProtocolAdminInfo' +
+                           '/CurrentProtocolStatus',
+                           '/CTGovProtocol/OverallStatus')
+            AND s.value <> 'Withdrawn'
+       GROUP BY d.id, t.name, s.value""", timeout = 300)
 show("#publishable populated...")
 cursor.execute("""\
     UPDATE #publishable
@@ -161,14 +188,14 @@ cursor.execute("""\
           WHERE id NOT IN (SELECT id FROM #published)""", timeout = 300)
 show("#unpublished populated...")
 cursor.execute("""\
-    SELECT p.id, p.ver_date, p.usr_name, p.doc_type
+    SELECT p.id, p.ver_date, p.usr_name, p.doc_type, p.status
       FROM #publishable p
       JOIN #unpublished u
         ON u.id = p.id""", timeout = 300)
 rows = cursor.fetchall()
 show("%d rows fetched..." % len(rows))
-for id, verDate, usrName, docType in rows:
-    protocol = prots[id] = Protocol(id, verDate, usrName)
+for id, verDate, usrName, docType, status in rows:
+    protocol = prots[id] = Protocol(id, verDate, usrName, status)
     if docType == 'InScopeProtocol':
         inScope[id] = protocol
     else:
@@ -218,6 +245,31 @@ for id, value in rows:
     if value not in prots[id].specialCats:
         prots[id].specialCats.append(value)
 show("special categories inserted into protocol objects...")       
+cursor.execute("""\
+    SELECT DISTINCT q.doc_id, q.value
+               FROM query_term q
+               JOIN #unpublished u
+                 ON u.id = q.doc_id
+              WHERE q.path = '/InScopeProtocol/ProtocolApproval' +
+                             '/ReviewApprovalType'""", timeout = 300)
+rows = cursor.fetchall()
+show("%d review approval types fetched..." % len(rows))
+for id, value in rows:
+    prots[id].reviewApprovalType = value
+show("review approval types inserted into protocol objects...")
+cursor.execute("""\
+    SELECT DISTINCT q.doc_id, q.value
+               FROM query_term q
+               JOIN #unpublished u
+                 ON u.id = q.doc_id
+              WHERE q.path = '/InScopeProtocol/ProtocolSources/ProtocolSource'
+                           + '/SourceName'""", timeout = 300)
+rows = cursor.fetchall()
+show("%d protocol sources fetched..." % len(rows))
+for id, value in rows:
+    if value not in prots[id].sourceNames:
+        prots[id].sourceNames.append(value)
+show("protocol sources inserted into protocol objects...")       
 t = time.strftime("%Y%m%d%H%M%S")
 if not debug:
     print "Content-type: application/vnd.ms-excel"
@@ -246,12 +298,14 @@ lformat.set_align('left')
 titles  = ('InScope', 'CTGov')
 headers = (
     ('DocID', 'ProtocolID','Study Category', 'Special Category',
+     'Current\nProtocol\nStatus', 'Source', 'Approval',
      'Date Made\nPublishable', 'User'),
-    ('DocID', 'ProtocolID', 'Study Category', 'Date Made\nPublishable', 'User')
+    ('DocID', 'ProtocolID', 'Study Category', 'Overall\nStatus',
+     'Date Made\nPublishable', 'User')
     )
 widths  = (
-    (9.71, 25.29, 18.43, 18.43, 18, 12),
-    (9.71, 25.29, 18.43, 18, 12)
+    (9.71, 25.29, 18.43, 18.43, 18.43, 18.43, 18.43, 18, 12),
+    (9.71, 25.29, 18.43, 18.43, 18, 12)
     )
 
 addWorksheet(workbook, titles[0], headers[0], widths[0], inScope)
