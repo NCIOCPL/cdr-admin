@@ -1,10 +1,16 @@
 #----------------------------------------------------------------------
 #
-# $Id: PubStatus.py,v 1.13 2003-08-25 17:54:05 bkline Exp $
+# $Id: PubStatus.py,v 1.14 2004-02-27 18:40:05 venglisc Exp $
 #
 # Status of a publishing job.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.13  2003/08/25 17:54:05  bkline
+# Replaced SQL queries for publication job report with queries that are:
+#  * much more efficient;
+#  * easier to understand; and
+#  * correct.
+#
 # Revision 1.12  2003/06/09 18:56:30  pzhang
 # Fixed a bug in TABLE end tag.
 # Changed latin-1 to utf8 in html.encode().
@@ -1207,8 +1213,10 @@ def dispJobReport():
               """ % (vendor_job_name, vendor_job, cg_job_name, cg_job, 
                      numPublished, numAdded, numUpdated, numRemoved)
 
-    docTypes = ["InScopeProtocol", "Summary", "Person", "Organization",
-               "GlossaryTerm", "Term", "Country", "PoliticalSubUnit"]
+    docTypes = ["Country",          "CTGovProtocol", "GlossaryTerm", 
+                "InScopeProtocol",  "Organization",  "Person", 
+                "PoliticalSubUnit", "Summary",       "Term"] 
+               
 
     form += """
         <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
