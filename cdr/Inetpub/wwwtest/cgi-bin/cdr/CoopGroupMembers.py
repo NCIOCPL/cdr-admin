@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: CoopGroupMembers.py,v 1.2 2004-03-08 17:48:12 venglisc Exp $
+# $Id: CoopGroupMembers.py,v 1.3 2004-03-08 18:04:59 venglisc Exp $
 #
 # Generates a report on member organizations and their principal
 # investigators for a selected cooperative group.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2004/03/08 17:48:12  venglisc
+# Modified length of organization picklist field and added field to allow
+# entering a single organization ID. (Bug 1094)
+#
 # Revision 1.1  2002/06/04 20:16:45  bkline
 # New report for member orgs and PIs of cooperative groups.
 #
@@ -140,6 +144,9 @@ except:
 # Otherwise use the selected Org from the pick list.
 # -----------------------------------------------------------
 if coopGrpId:
+   if coopGrpId == re.sub('[\d+]', '', coopGrpId):
+      cdrcgi.bail("Invalid CDR ID entered: %s" % coopGrpId)
+
    docId = int(re.sub('[\D+]', '', coopGrpId))
 else:
    docId = int(coopGroup)
