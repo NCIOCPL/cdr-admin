@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolReports.py,v 1.8 2003-03-06 20:55:04 bkline Exp $
+# $Id: ProtocolReports.py,v 1.9 2003-05-08 20:24:01 bkline Exp $
 #
 # Submenu for protocol reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.8  2003/03/06 20:55:04  bkline
+# Fixed typo (Orrice -> Office).
+#
 # Revision 1.7  2003/03/06 20:54:03  bkline
 # Added back in two menu items which had disappeared.
 #
@@ -87,7 +90,9 @@ reports = [
            ('BogusActiveLeadOrgs.py',
             'Protocols with Active Lead Orgs But No Active Sites'),
            ('ProtSitesWithoutPhone.py',
-            'Protocol Sites Without Phone Numbers')
+            'Protocol Sites Without Phone Numbers'),
+           ('OSPReport.py',
+            'Report for Office of Science Policy')
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI>\n" % (
