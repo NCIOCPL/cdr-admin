@@ -2,8 +2,11 @@
 #
 # Publishing CGI script.
 #
-# $Id: publishing.py,v 1.10 2002-05-10 16:12:40 pzhang Exp $
+# $Id: publishing.py,v 1.11 2002-05-15 22:47:49 pzhang Exp $
 # $Log: not supported by cvs2svn $
+# Revision 1.10  2002/05/10 16:12:40  pzhang
+# Made PubType parameter READONLY.
+#
 # Revision 1.9  2002/04/17 21:43:24  pzhang
 # Rewrote code to match new cdrpub.py design.
 # Dropped all CGI helpers in cdrpub.py.
@@ -35,7 +38,7 @@
 #
 #
 #----------------------------------------------------------------------
-import cgi, cdrcgi, string, copy, urllib, cdr, xml.dom.minidom
+import cgi, cdrcgi, string, copy, urllib, cdr, cdr2cg, xml.dom.minidom
 from win32com.client import Dispatch
 import pythoncom
 
@@ -46,7 +49,7 @@ import pythoncom
 class Display:
 
     # Class private variables
-    __cdrConn = None
+    __cdrConn = None    
 
     #----------------------------------------------------------------
     # Set up a connection to CDR. Abort when failed.
@@ -74,11 +77,12 @@ class Display:
     def displaySystems(self):
 
         publishes = []
-        pubsys = ["Publishing.py", "", ""]        
+        pubsys = ["Publishing.py", "", "", ""]        
         pickList = self.__getPubSys()
         for s in pickList:
             pubsys[1] = "%s" % s[1]
-            pubsys[2] = "%s [Version %s]<BR>[%s]" % (s[0], s[2], s[3])
+            pubsys[2] = "%s" % s[2]
+            pubsys[3] = "%s [Version %s]<BR>[%s]" % (s[0], s[2], s[3])            
             deep = copy.deepcopy(pubsys)
             publishes.append(deep)
         if type(publishes) == type(""): cdrcgi.bail(publishes)    
@@ -87,18 +91,19 @@ class Display:
         form += "<OL>\n"
 
         for r in publishes:
-            form += "<LI><A HREF='%s/%s?%s=%s&ctrlId=%s'>%s</A></LI>\n" \
-                % (cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1], r[2])
+            form += "<LI><A HREF='%s/%s?%s=%s&ctrlId=%s&version=%s'>%s</A>\
+                     </LI>\n" % (cdrcgi.BASE, r[0], cdrcgi.SESSION, session, 
+                     r[1], r[2], r[3])
 
         form += HIDDEN % (cdrcgi.SESSION, session)   
         self.__addFooter(form)
 
     # Display the pick list of all subsets of a publishing system.
-    def displaySubsets(self, ctrlId):
+    def displaySubsets(self, ctrlId, version):
         
         subsets = []
         subset = ["Publishing.py", "", "", "", ""]      
-        pickList = self.__getPubSubsets(ctrlId)
+        pickList = self.__getPubSubsets(ctrlId, version)
         sysName = pickList[0][0] 
         for s in pickList:
             subset[1] =  s[1] 
@@ -120,9 +125,10 @@ class Display:
         form += "<OL>\n"
 
         for r in subsets:
-            form += """<LI><A HREF='%s/%s?%s=%s&ctrlId=%s&SubSet=%s&%s'>
-                %s</A></LI>\n""" % (cdrcgi.BASE, r[0], cdrcgi.SESSION, session, 
-                ctrlId, urllib.quote_plus(r[1]), r[3], r[2])
+            form += """<LI><A 
+                HREF='%s/%s?%s=%s&ctrlId=%s&version=%s&SubSet=%s&%s'>
+                %s</A></LI>\n""" % (cdrcgi.BASE, r[0], cdrcgi.SESSION, 
+                session, ctrlId, version, urllib.quote_plus(r[1]), r[3], r[2])
 
         form += HIDDEN % (cdrcgi.SESSION, session)   
         self.__addFooter(form)
@@ -134,17 +140,20 @@ class Display:
     #       Params and DocIds to avoid multiple values yielding
     #       a list instead of a string. Tricky!
     #----------------------------------------------------------------------
-    def displayDocParam(self, ctrlId, SubSet, Param = None, Doc = None, Redirected = None):
+    def displayDocParam(self, ctrlId, version, SubSet, Param = None, 
+                        Doc = None, Redirected = None):
         
         # Initialize hidden values.
         form = self.__initHiddenValues()  
         
-        form += "<H4>User Selected Documents and Parameters for Subset %s</H4>\n" % SubSet 
+        form += "<H4>User Selected Documents and Parameters for Subset %s \
+                 </H4>\n" % SubSet 
         form += "<OL>\n"
         
         # UserSelect is allowed.
         if Doc:
-            form += "<LI><H5>Enter Publishable Document Id/Version [e.g. 190930 or 190930/3]: </H5></LI>\n"
+            form += "<LI><H5>Enter Publishable Document Id/Version [e.g. \
+                     190930 or 190930/3]: </H5></LI>\n"
             form += "<TABLE BORDER='1'>"
         
             # This is up to userselect element in the control document.
@@ -155,8 +164,8 @@ class Display:
                 for i in range(5):
                     id = 10 * r + i
                     docIdList += ",CdrDoc%d" % id
-                    form += """<TD><INPUT NAME='CdrDoc%d' TYPE='TEXT' SIZE='10'>
-                        </TD>""" % id
+                    form += """<TD><INPUT NAME='CdrDoc%d' TYPE='TEXT' 
+                               SIZE='10'></TD>""" % id
                 form += "</TR>\n"
             if not Redirected: 
                 form += HIDDEN % ('DocIds', docIdList)
@@ -167,7 +176,7 @@ class Display:
         if Param:
             params = []
             param = ["Publishing.py", "", ""]  
-            pickList = self.__getParamSQL(ctrlId, SubSet)
+            pickList = self.__getParamSQL(ctrlId, version, SubSet)
             for s in pickList:
                 param[1] =  s[0] 
                 param[2] = s[1]        
@@ -175,18 +184,24 @@ class Display:
                 params.append(deep) 
 
             form += "<LI><H5>Modify Default Parameter Values: </H5>\n"
-            form += "<TABLE BORDER='1'><TR><TD>Name</TD><TD>Default Value</TD>\n"
-            form += "<TD>New Value</TD></TR>\n"
+            form += "<TABLE BORDER='1'><TR><TD>Name</TD><TD>Default "               
+            form += "Value</TD>\n<TD>New Value</TD></TR>\n"
         
             paramList = ""
             for r in params:
                 paramList += ",%s" % r[1]
                 if r[1] == "PubType":
-                    form += """<TR><TD>%s</TD><TD>%s</TD><TD><INPUT NAME='%s' \
-                        VALUE='%s' READONLY></TD></TR>\n""" % (r[1], r[2], r[1], r[2])
+                    if not cdr2cg.PUBTYPES.has_key(r[2]):
+                        self.__addFooter("The value of parameter PubType,\
+                             %s, is not supported. <BR>Please modify \
+                            the control document or the source code." % r[2])
+                    form += """<TR><TD>%s</TD><TD>%s</TD><TD><INPUT \
+                        NAME='%s' VALUE='%s' READONLY></TD></TR>\n""" % (
+                        r[1], r[2], r[1], r[2])
                 else:
-                    form += """<TR><TD>%s</TD><TD>%s</TD><TD><INPUT NAME='%s' \
-                        VALUE='%s'></TD></TR>\n""" % (r[1], r[2], r[1], r[2])
+                    form += """<TR><TD>%s</TD><TD>%s</TD><TD><INPUT \
+                        NAME='%s' VALUE='%s'></TD></TR>\n""" % (r[1], r[2], 
+                        r[1], r[2])
             if not Redirected:
                 form += HIDDEN % ('Params', paramList)
         
@@ -234,8 +249,8 @@ class Display:
         form += """Email notification of completion?
         <input type="checkbox" checked name="Email" value="y">&nbsp;&nbsp;
         <BR> Use comma to separate recipients: &nbsp
-        <input type="text" size="50" name="EmailAddr" value="***REMOVED***"><br><br>
-        Messages only?
+        <input type="text" size="50" name="EmailAddr" 
+        value="***REMOVED***"><br><br>Messages only?
         <input type="checkbox" name="NoOutput" value="Y"><br><br>
         <input type="submit" name="Publish" value="Yes">&nbsp;&nbsp; """      
          
@@ -243,12 +258,12 @@ class Display:
         cdrcgi.sendPage(header + form + "</FORM></BODY></HTML>")
     
     # Publish and return a link for checking status.
-    def initPublish(self, credential, ctrlDocId, subsetName, params, docIds,
-                    email, no_output):
+    def initPublish(self, credential, ctrlDocId, version, subsetName, params,
+                    docIds, email, no_output):
     
-        systemName = self.__getPubSubsets(ctrlDocId)[0][0]
+        systemName = self.__getPubSubsets(ctrlDocId, version)[0][0]
 
-        form = "<H4>Publishing SubSet: %s</H4>\n" % subsetName
+        form = "<H4>Publishing SubSet: %s</H4>\n" % subsetName     
            
         # Get publishing job ID.       
         resp = cdr.publish(credential, systemName, subsetName, params, docIds,
@@ -259,7 +274,7 @@ class Display:
         else:
             form += "<B>Started:</B> "            
             form += "Check the <A HREF='%s/%s?id=%s'>%s</A>\n" % (cdrcgi.BASE, 
-                    'PubStatus.py', jobId, "status of publishing job: %s" % jobId)
+                'PubStatus.py', jobId, "status of publishing job: %s" % jobId)
 
         form += HIDDEN % (cdrcgi.SESSION, session)   
         self.__addFooter(form)
@@ -273,7 +288,9 @@ class Display:
         form = ""
    
         if fields.has_key('ctrlId'):
-            form += HIDDEN % ('ctrlId', fields.getvalue('ctrlId'))                  
+            form += HIDDEN % ('ctrlId', fields.getvalue('ctrlId'))  
+        if fields.has_key('version'):
+            form += HIDDEN % ('version', fields.getvalue('version'))                      
         if fields.has_key('SubSet'):
             form += HIDDEN % ('SubSet', fields.getvalue('SubSet'))
         if fields.has_key('Params'):
@@ -289,7 +306,7 @@ class Display:
     #----------------------------------------------------------------------
     def __logPub(self, line):
         file = "d:/cdr/log/publish.log"
-        open(file, "a").write("Job %d: %s\n" % (self.jobId, line))
+        open(file, "a").write("== %s\n" % line)
 
     #----------------------------------------------------------------------
     # Return a list of publishing systems.
@@ -338,14 +355,15 @@ class Display:
     #----------------------------------------------------------------
     # Return all subsets based on ctrlId.   
     #----------------------------------------------------------------
-    def __getPubSubsets(self, ctrlId):
+    def __getPubSubsets(self, ctrlId, version):
 
         # Initialized the list of tuples: (sysName, subsetName, desc, 
         #       param, userSelect, docTypes).
         pickList = []
         tuple = ["", "", "", "", ""]
 
-        sql = "SELECT xml FROM document WHERE id = %s" % ctrlId
+        sql = "SELECT xml FROM doc_version \
+                WHERE id = %s AND num = %s" % (ctrlId, version)
         rs = self.__execSQL(sql)
 
         while not rs.EOF:
@@ -417,13 +435,14 @@ class Display:
     # Wanted to return the SQL statement for picking up DocIds as well, 
     # but not done yet. Only returns the parameters so far.
     #----------------------------------------------------------------
-    def __getParamSQL(self, ctrlId, Subset):
+    def __getParamSQL(self, ctrlId, version, Subset):
       
         # Initialized the list of tuples: (name, value).
         pickList = []
         tuple = ["", ""]
 
-        sql = "SELECT xml FROM document WHERE id = %s" % ctrlId
+        sql = "SELECT xml FROM doc_version \
+                WHERE id = %s AND num = %s" % (ctrlId, version)
         rs = self.__execSQL(sql)
 
         while not rs.EOF:
@@ -508,6 +527,7 @@ d = Display()
 if fields.has_key('Session') and fields.has_key('SubSet') and \
     fields.has_key('Publish'):
     ctrlDocId = fields.getvalue('ctrlId')
+    version = fields.getvalue('version')
     subsetName = fields.getvalue('SubSet')
     credential = fields.getvalue('Session')
     answer = fields.getvalue('Publish')
@@ -537,17 +557,18 @@ if fields.has_key('Session') and fields.has_key('SubSet') and \
             no_output = "Y"
         else:
             no_output = "N"
-        d.initPublish(credential, ctrlDocId, subsetName, listParams, docIds,
-                      email, no_output)
+        d.initPublish(credential, ctrlDocId, version, subsetName, 
+                      listParams, docIds, email, no_output)
 
 elif fields.has_key('Session') and fields.has_key('SubSet') and \
     fields.has_key('ctrlId') and (fields.has_key('Param') or \
     fields.has_key('Doc')):
     ctrlId = fields.getvalue('ctrlId')
+    version = fields.getvalue('version')
     SubSet = fields.getvalue('SubSet')
     param = fields.getvalue('Param')
     doc = fields.getvalue('Doc')
-    d.displayDocParam(ctrlId, SubSet, param, doc)
+    d.displayDocParam(ctrlId, version, SubSet, param, doc)
 
 elif fields.has_key('Session') and fields.has_key('SubSet') \
     and fields.has_key('ctrlId') and fields.has_key('Confirm'):
@@ -555,7 +576,8 @@ elif fields.has_key('Session') and fields.has_key('SubSet') \
 
 elif fields.has_key('Session') and fields.has_key('ctrlId'):
     ctrlId = fields.getvalue('ctrlId')
-    d.displaySubsets(ctrlId)
+    version = fields.getvalue('version')
+    d.displaySubsets(ctrlId, version)
 
 elif fields.has_key('Session'):    
     d.displaySystems()
