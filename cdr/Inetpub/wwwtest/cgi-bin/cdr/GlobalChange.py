@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------
-# $Id: GlobalChange.py,v 1.8 2002-11-21 14:00:42 bkline Exp $
+# $Id: GlobalChange.py,v 1.9 2003-03-27 18:30:50 ameyer Exp $
 #
 # Perform global changes on XML records in the database.
 #
@@ -14,6 +14,9 @@
 # present the next one - to the end.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.8  2002/11/21 14:00:42  bkline
+# Fixed bug in call to cdrcgi.bail().
+#
 # Revision 1.7  2002/11/20 00:45:35  ameyer
 # Added interface to query user for Principal Investigator if a Lead Org
 # restriction is imposed.
@@ -40,10 +43,14 @@
 #
 #----------------------------------------------------------------------
 
-import cgi, cdr, cdrcgi, cdrglblchg, cdrbatch, time
+import cgi, time, string, cdr, cdrcgi, cdrglblchg, cdrbatch
 
 # Logfile
 LF=cdr.DEFAULT_LOGDIR + "/GlobalChange.log"
+
+# Name of job for batch_job table
+JOB_NAME = "Global Change"
+JOB_HTML_NAME = "Global+Change"
 
 #----------------------------------------------------------------------
 # Generate a page in uniform style for form
@@ -82,9 +89,9 @@ def sendGlblChgPage (parms):
     # Save state in the form
     # Values are encoded to prevent quotes or other chars from
     #   causing problems in the output html
-    for key in sessionVars.keys():
+    for key in ssVars.keys():
         html += '<input type="hidden" name="%s" value="%s" />\n' %\
-                (key, cgi.escape (sessionVars[key], 1))
+                (key, cgi.escape (str(ssVars[key]), 1))
 
     # Add form contents
     html += formContent
@@ -111,6 +118,7 @@ def sendGlblChgPage (parms):
 ## START OF MAIN
 ##----------------------------------------------------------------------
 ##----------------------------------------------------------------------
+
 # Parse form variables
 fields = cgi.FieldStorage()
 if not fields:
@@ -123,6 +131,22 @@ if not session:
 if not cdr.canDo (session, "MAKE GLOBAL CHANGES", "InScopeProtocol"):
     cdrcgi.bail ("Sorry, user not authorized to make global changes")
 
+# Don't allow two global changes to run concurrently
+countRunning = 0
+try:
+    # Gets number of active Global Change jobs
+    countRunning = cdrbatch.activeCount (JOB_NAME)
+except cdrbatch.BatchException, e:
+    cdrcgi.bail (e)
+if countRunning > 0:
+    cdrcgi.bail ("""
+Another global change job is still active.<br>
+Please wait until it completes before starting another.<br>
+See <a href='getBatchStatus.py?Session=%s&jobName=%s&jobAge=1'>
+<u>Batch Status Report</u></a>
+or go to the CDR Administration menu and select 'View Batch Job Status'.</p>
+<p><p><p>""" % (session, JOB_HTML_NAME))
+
 # Is user cancelling global change operations?
 if fields.getvalue ("cancel", None):
     # Cancel button pressed.  Return user to admin screen
@@ -132,10 +156,37 @@ if fields.getvalue ("cancel", None):
 #   as hidden html form variables.  Used to preserve state between
 #   executions of this program.
 # We always remember the session, usually other things too
-sessionVars = {}
-sessionVars[cdrcgi.SESSION] = session
+ssVars = {}
+ssVars[cdrcgi.SESSION] = session
 
-# Are we doing a person, organization, or protocol status change?
+# Get all relevant fields that are saved as state in the system
+for fd in ('docType', 'email', 'specificPhone', 'specificRole',
+                'coopType', 'coopChk',
+           'fromId', 'fromName', 'fromTitle', 'fromFragChk',
+           'toId', 'toName', 'toTitle', 'toFragChk',
+           'restrId', 'restrName', 'restrTitle', 'restrChk', 'restrFragChk',
+           'restrPiId', 'restrPiName', 'restrPiTitle',
+                'restrPiChk', 'restrPiFragChk',
+           'insertPersId', 'insertPersName', 'insertPersTitle',
+                'insertPersFragChk',
+           'insertOrgId', 'insertOrgName', 'insertOrgTitle',
+           'fromStatusName', 'toStatusName'):
+    fdVal = fields.getvalue (fd, None)
+    if fdVal:
+        # If it's an Id type, normalize it to standard CDR000... form
+        # Warning, only CDR IDs should have names ending in "Id"
+        if fd[-2:] == "Id":
+            try:
+                fdVal = cdr.exNormalize (fdVal)[0]
+            except StandardError, e:
+                cdrcgi.bail ("Error normalizing id: %s: %s" % \
+                             (str(fdVal), str(e)))
+
+        # Store it in our state container
+        ssVars[fd] = fdVal
+        cdr.logwrite("   Saving '%s'='%s'" % (fd, ssVars[fd]), LF)
+
+# What kind of change are we doing?
 # May or may not know this at this time
 chgType = fields.getvalue ("chgType", None)
 
@@ -147,212 +198,84 @@ if not chgType:
 <table border='0'>
 <tr><td>
 <input type='radio' name='chgType' value='%s' checked='1'>
-  Person links in protocols</input>
+  Change person links in protocols</input>
 </td></tr><tr><td>
 <input type='radio' name='chgType' value='%s'>
-  Organization links in protocols</input>
+  Change organization links in protocols</input>
 </td></tr><tr><td>
 <input type='radio' name='chgType' value='%s'>
-  Status of protocol site</input>
+  Insert new organization link in protocols</input>
+</td></tr><tr><td>
+<input type='radio' name='chgType' value='%s'>
+  Change status of protocol site</input>
 </td></tr>
 </table>
-""" % (cdrglblchg.PERSON_CHG, cdrglblchg.ORG_CHG, cdrglblchg.STATUS_CHG)
+""" % (cdrglblchg.PERSON_CHG, cdrglblchg.ORG_CHG,
+       cdrglblchg.INS_ORG_CHG, cdrglblchg.STATUS_CHG)
 
     sendGlblChgPage (("Choose type of change to perform", html))
 
 #----------------------------------------------------------------------
 # Construct an object of the proper type of global change
 #----------------------------------------------------------------------
-sessionVars["chgType"] = chgType
+ssVars["chgType"] = chgType
 
 try:
-    chg = cdrglblchg.createChg (sessionVars)
+    chg = cdrglblchg.createChg (ssVars)
 except Exception, e:
     cdrcgi.bail ("Error constructing chg object: %s" % str(e))
 
 #----------------------------------------------------------------------
-# Change from what?
+#                               Main loop
 #----------------------------------------------------------------------
-fromId    = fields.getvalue ("fromId", None)
-fromTitle = fields.getvalue ("fromTitle", None)
 
-# If found, verify title and doctype.
-# Bails out if doctype is wrong or id format won't parse
-if fromId and not fromTitle:
-    try:
-        fromTitle = cdrglblchg.verifyId (fromId, sessionVars['docType'])
-    except Exception, e:
-        cdrcgi.bail ("Error verifying from ID: %s" % str(e))
+# We've got everything we need to start all the steps for one
+# type of global change.
+# We know:
+#   All of the variables entered so far: (ssVars)
+#   What kind of change we're doing: (ssVars['chgType'])
+#   Everything specific for this type of change: (chg)
+# Now we execute each stage in the global change.
+for stage in chg.getStages():
 
-# If no id present, there may be a name, or partial name
-if not fromId:
-    fromName = fields.getvalue ("fromName", None)
-    if not fromName:
-        # User hasn't entered any "from" information yet
-        # Put form up to get id or name
-        # Different types of chg object construct slightly
-        #   different html for this
-        sendGlblChgPage (chg.getFromId())
-    else:
-        # We got a name (from previous sendGlblChg) but user hasn't yet
-        #   picked a definite hit from a picklist generated from the name
-        # That's why we don't have an id yet
-        # Get the picklist
-        sendGlblChgPage (chg.getFromPick (fromName))
+    # For DEBUG, log something
+    cdr.logwrite ("Main loop: " + stage.getExcpMsg(), LF)
 
-# We have an id, get the parts
-(fromId, fromIdNum, fromFragment) = cdr.exNormalize (fromId)
+    # Execute the stage
+    # It will tell us if we need to go on or stop and talk to the user
+    # It may not actually execute anything at all, just evaluate its
+    #   condition and decide that no further processing is required in
+    #   this stage.  After each user interaction the ssVars state will
+    #   change so that work already done is passed over and we eventually
+    #   get to something that needs doing, or we finish.
+    result = chg.execStage (stage)
 
-# Save for future use
-sessionVars['fromId'] = fromId
-sessionVars['fromTitle'] = fromTitle
+    # Was there an error?
+    rc = result.getRetType()
+    if rc == cdrglblchg.RET_ERROR:
+        # Log it
+        cdr.logwrite ("Main loop error: " + result.getErrMsg(), LF)
 
+        # Tell user and abort.  User must press Back, or something to go on
+        cdrcgi.bail (result.getErrMsg())
 
-#----------------------------------------------------------------------
-# Get fragment if not already supplied
-#----------------------------------------------------------------------
-# Did we already ask for a from fragment?  If not, we will
-didFromFrag = fields.getvalue ("didFromFrag", None)
-sessionVars['didFromFrag'] = 'Y'
+    # Display HTML?
+    if rc == cdrglblchg.RET_HTML:
+        # Send page to user and exit
+        # User fills something in and comes back when he's ready
+        sendGlblChgPage ((result.getPageTitle(),
+                          result.getPageHtml(),
+                          result.getPageButtons()))
 
-# We prompt for a fragment id under the following circumstances:
-#   Don't already have one
-#   This is a person global change (from fragment is required).
-#   This is an org change (from fragment is optional) and we haven't
-#     already asked for a fragment
-if not fromFragment and (chgType == cdrglblchg.PERSON_CHG or
-                         (chgType == cdrglblchg.ORG_CHG and not didFromFrag)):
-    try:
-        sendGlblChgPage (chg.genFragPickListHtml('from'))
-    except cdrbatch.BatchException, e:
-        cdrcgi.bail ("Error generating FROM fragment picklist: %s" % str(e))
-
-
-#----------------------------------------------------------------------
-# Change to what? - just like change from
-#----------------------------------------------------------------------
-# Not needed for status change
-if chgType == cdrglblchg.PERSON_CHG or chgType == cdrglblchg.ORG_CHG:
-    toId    = fields.getvalue ("toId", None)
-    toTitle = fields.getvalue ("toTitle", None)
-    if toId and not toTitle:
-        try:
-            toTitle = cdrglblchg.verifyId (toId, sessionVars['docType'])
-        except cdrbatch.BatchException, e:
-            cdrcgi.bail ("Error verifying TO id: %s" % str(e))
-
-    if not toId:
-
-        toName = fields.getvalue ("toName", None)
-        if not toName:
-            sendGlblChgPage (chg.getToId())
-
-        else:
-            sendGlblChgPage (chg.getToPick (toName))
-
-    (toId, toIdNum, toFragment) = cdr.exNormalize (toId)
-    sessionVars['toId'] = cdr.exNormalize(toId)[0]
-    sessionVars['toTitle'] = toTitle
-
-    #------------------------------------------------------------------
-    # Get fragment if not already supplied
-    #------------------------------------------------------------------
-    # See comments on didFromFrag
-    didToFrag = fields.getvalue ("didToFrag", None)
-    sessionVars['didToFrag'] = 'Y'
-    if not toFragment and (chgType == cdrglblchg.PERSON_CHG or not didToFrag):
-        try:
-            sendGlblChgPage (chg.genFragPickListHtml('to'))
-        except cdrbatch.BatchException, e:
-            cdrcgi.bail ("Error generating TO fragment picklist: %s" % str(e))
-
-
-#----------------------------------------------------------------------
-# For status change only, get to/from status
-#----------------------------------------------------------------------
-if chgType == cdrglblchg.STATUS_CHG:
-    fromStatusName = fields.getvalue ('fromStatusName', None)
-    toStatusName   = fields.getvalue ('toStatusName', None)
-
-    if not fromStatusName or not toStatusName:
-        # try:
-        sendGlblChgPage (chg.getFromToStatus())
-        # except cdrbatch.BatchException, e:
-        #    cdrcgi.bail ("Error getting status picklist: %s" % str(e))
-
-    sessionVars['fromStatusName'] = fromStatusName
-    sessionVars['toStatusName']   = toStatusName
-
-
-#----------------------------------------------------------------------
-# Get any restrictions on protocols to be processed
-#----------------------------------------------------------------------
-# Has user chosen whether or not to restrict ids?
-restrByLeadOrgChk = fields.getvalue ('restrByLeadOrgChk', None)
-if not restrByLeadOrgChk:
-    # Haven't chosen yet.  Choose
-    sendGlblChgPage (chg.getRestrId())
-
-# Don't check again
-sessionVars['restrByLeadOrgChk'] = 'N'
-
-# Input is optional on this form, if no input, then no restriction
-# Did user input an organization ID?
-restrId    = fields.getvalue ('restrId', None)
-restrTitle = fields.getvalue ('restrTitle', None)
-if not restrId:
-    # No, perhaps he entered a name
-    restrName = fields.getvalue ('restrName', None)
-    if restrName:
-        # Choose matching organization for name
-        sendGlblChgPage (chg.getRestrPick (restrName))
-
-else:
-    sessionVars['restrId'] = cdr.exNormalize(restrId)[0]
-    if not restrTitle:
-        try:
-            restrTitle = cdrglblchg.verifyId (restrId, 'Organization')
-        except cdrbatch.BatchException, e:
-            cdrcgi.bail ("Error verifying restriction id: %s" % str(e))
-    sessionVars['restrTitle'] = restrTitle
-
-#----------------------------------------------------------------------
-# Get optional restrictions on Principal Investigator involved in a
-#   status change - only when also restricting by lead organization
-#----------------------------------------------------------------------
-restrByPiChk = fields.getvalue ('restrByPiChk', None)
-restrPiId    = fields.getvalue ('restrPiId', None)
-restrPiTitle = fields.getvalue ("restrPiTitle", None)
-restrPiName  = fields.getvalue ('restrPiName', None)
-if chgType == cdrglblchg.STATUS_CHG and restrId:
-    # It's optional, only ask if we haven't already
-    if not restrByPiChk:
-        # Don't check again
-        sessionVars['restrByPiChk'] = 'N'
-        sendGlblChgPage (chg.getRestrPiId())
-
-    # Need to do this here too
-    sessionVars['restrByPiChk'] = 'N'
-
-    # If user entered name instead of ID, translate it
-    if restrPiName and not restrPiId:
-        # Choose matching person ID for name
-        sendGlblChgPage (chg.getRestrPiPick (restrPiName))
-
-    # If we got an id, verify that it's for a person
-    if restrPiId:
-        if not restrPiTitle:
-            try:
-                restrPiTitle = cdrglblchg.verifyId (restrPiId, 'Person')
-            except cdrbatch.BatchException, e:
-                cdrcgi.bail ("Error verifying Principal Investigator id: %s"\
-                             % str(e))
-        # Save the Principal Investigator id and display title
-        sessionVars['restrPiTitle'] = restrPiTitle
-        sessionVars['restrPiId'] = cdr.exNormalize(restrPiId)[0]
+    # Sanity check
+    if rc != cdrglblchg.RET_NONE:
+        cdrcgi.bail ("%s: Internal error, retType=[%s]" % \
+                     (stage.getExcpMsg(), str(result.getRetType)))
 
 #----------------------------------------------------------------------
 # Give user final review
+#   If we finish the for loop it means we've got all the chgType
+#   specific info we need to do the actual work
 #----------------------------------------------------------------------
 # If review already done, we already have one or more email addresses
 email = fields.getvalue ('email', None)
@@ -371,12 +294,16 @@ if not email:
     except:
         cdrcgi.bail ("Unable to fetch email address")
 
-    report = chg.reportWillChange()
-    if not report:
-        sendGlblChgPage (("",
+    result = chg.reportWillChange()
+    if result.getRetType() == cdrglblchg.RET_ERROR:
+        cdrcgi.bail ("Error creating change report: " + result.getErrMsg())
+
+    if result.getRetType() == cdrglblchg.RET_NONE:
+        sendGlblChgPage (("No documents found", chg.showSoFarHtml() +
             "<h2>No documents found matching global search criteria<h2>\n",
             (('cancel', 'Done'),)))
     else:
+
         instruct = """
 <p>A background job will be created to perform the global change.
 Results of the job will be emailed.</p>
@@ -392,23 +319,23 @@ either:</p>
 <p><p><p>
 """ % email
 
-        html = chg.showSoFarHtml() + instruct + report
+        html = chg.showSoFarHtml() + instruct + result.getPageHtml()
 
         sendGlblChgPage (("Final review", html))
 
 # If user pressed Cancel, we never got here
-sessionVars['email'] = email
+ssVars['email'] = email
 
 #----------------------------------------------------------------------
 # Invoke the batch process to complete the actual processing
 #----------------------------------------------------------------------
 # Convert all session info to a sequence of batch job args
 args = []
-for var in sessionVars.keys():
-    args.append ((var, sessionVars[var]))
+for var in ssVars.keys():
+    args.append ((var, ssVars[var]))
 
 # Create batch job
-newJob = cdrbatch.CdrBatch (jobName="Global Change",
+newJob = cdrbatch.CdrBatch (jobName=JOB_NAME,
                             command="lib/Python/GlobalChangeBatch.py",
                             args=args,
                             email=email)
