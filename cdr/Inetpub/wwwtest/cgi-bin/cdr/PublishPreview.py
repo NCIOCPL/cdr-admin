@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: PublishPreview.py,v 1.4 2002-04-10 20:08:45 bkline Exp $
+# $Id: PublishPreview.py,v 1.5 2002-04-11 14:07:49 bkline Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2002/04/10 20:08:45  bkline
+# Added denormalizing filter for Person display.
+#
 # Revision 1.3  2002/01/22 21:31:41  bkline
 # Added filter for Protocols.
 #
@@ -38,7 +41,9 @@ filters = {
          "name:Summary Filter5",
          "name:Summary Filter6"],
     'Citation':         ["name:Display PDQ and PubMed Citations"],
-    'Organization':     ["name:Organization Information QC Report"],
+    'Organization':     
+        ["name:Organization Denormalized XML Filter",
+         "name:Organization QC Report Filter"],
     'Person':           
         ["name:Person Denormalized XML Filter",
          "name:Person QC Report Filter"],
