@@ -2,8 +2,11 @@
 #
 # Publishing CGI script.
 #
-# $Id: publishing.py,v 1.15 2002-10-21 15:42:55 pzhang Exp $
+# $Id: publishing.py,v 1.16 2002-10-29 21:01:33 pzhang Exp $
 # $Log: not supported by cvs2svn $
+# Revision 1.15  2002/10/21 15:42:55  pzhang
+# Increased number of Hotfix DocIds from 25 to 50.
+#
 # Revision 1.14  2002/09/12 18:50:56  pzhang
 # Added port parameter to cdr.py function call.
 #
@@ -291,8 +294,13 @@ class Display:
 
         form = "<H4>Publishing SubSet: %s</H4>\n" % subsetName     
            
-        # Get publishing job ID.       
-        resp = cdr.publish(credential, systemName, subsetName, params, docIds,
+        # Get publishing job ID.  
+        if subsetName == 'Hotfix-Remove':     
+            resp = cdr.publish(credential, systemName, subsetName, params, docIds,
+                            email, no_output, port = cdr.getPubPort(), 
+                            allowInActive = 'Y')
+        else:
+            resp = cdr.publish(credential, systemName, subsetName, params, docIds,
                             email, no_output, port = cdr.getPubPort())
         jobId = resp[0]
         if not jobId:            
