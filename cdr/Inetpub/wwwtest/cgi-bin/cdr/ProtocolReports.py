@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolReports.py,v 1.6 2003-03-04 22:46:58 bkline Exp $
+# $Id: ProtocolReports.py,v 1.7 2003-03-06 20:54:03 bkline Exp $
 #
 # Submenu for protocol reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2003/03/04 22:46:58  bkline
+# Modifications for CDR enhancement request #301.
+#
 # Revision 1.5  2003/01/29 18:46:25  bkline
 # New report on protocols with status change entered in a given date range.
 #
@@ -77,7 +80,11 @@ reports = [
            ('ApprovedNotYetActive.py',
             'Approved Not Yet Active Report'),
            ('ProtocolStatusChange.py',
-            'Protocol Status Change Report')
+            'Protocol Status Change Report'),
+           ('BogusActiveLeadOrgs.py',
+            'Protocols with Active Lead Orgs But No Active Sites'),
+           ('ProtSitesWithoutPhone.py',
+            'Protocol Sites Without Phone Numbers')
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI>\n" % (
