@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PdqBoards.py,v 1.6 2003-07-29 12:38:55 bkline Exp $
+# $Id: PdqBoards.py,v 1.7 2004-01-07 15:48:04 venglisc Exp $
 #
 # Report on PDQ Board members and topics.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2003/07/29 12:38:55  bkline
+# Removed unnecessary test for non-breaking space in audience string.
+#
 # Revision 1.5  2003/06/13 21:14:12  bkline
 # Added indication of audience under title.
 #
@@ -30,6 +33,7 @@ fields    = cgi.FieldStorage()
 boardInfo = fields and fields.getvalue("BoardInfo")      or None
 audience  = fields and fields.getvalue("Audience")       or None
 repType   = fields and fields.getvalue("RepType")        or None
+showCdrId = fields and fields.getvalue("ShowCdrId")      or None
 session   = cdrcgi.getSession(fields)
 request   = cdrcgi.getRequest(fields)
 title     = "PDQ Board Report"
@@ -71,7 +75,8 @@ def trim(s):
 # Build a picklist for Summary Audience.
 #----------------------------------------------------------------------
 def getAudiencePicklist():
-    picklist = "<SELECT NAME='Audience'><OPTION SELECTED></OPTION>"
+    picklist = "<SELECT NAME='Audience'>"
+    selected = " SELECTED"
     try:
         cursor.execute("""\
 SELECT DISTINCT value
@@ -80,15 +85,21 @@ SELECT DISTINCT value
        ORDER BY value""")
         for row in cursor.fetchall():
             if row[0]:
-                picklist += "<OPTION>%s</OPTION>" % row[0]
+                picklist += "<OPTION%s>%s</OPTION>" % (selected, row[0])
+            selected = ""
+
     except cdrdb.Error, info:
         cdrcgi.bail('Database query failure: %s' % info[1][0])
     return picklist + "</SELECT>"
 
 #----------------------------------------------------------------------
 # Build a picklist for PDQ Boards.
+# This function serves two purposes:
+# a)  create the picklist for the selection of the board
+# b)  create a dictionary in subsequent calles to select the board
+#     ID based on the board selected in the first call.
 #----------------------------------------------------------------------
-def getBoardPicklist():
+def getBoardPicklist(boardDict):
     picklist = "<SELECT NAME='BoardInfo'>"
     selected = " SELECTED"
     try:
@@ -105,10 +116,9 @@ SELECT DISTINCT board.id, board.title
             semi = row[1].find(';')
             if semi != -1: boardTitle = trim(row[1][:semi])
             else:          boardTitle = trim(row[1])
-            picklist += "<OPTION%s>[CDR%010d] %s</OPTION>" % (selected,
-                                                              row[0],
-                                                              boardTitle)
+            picklist += "<OPTION%s>%s</OPTION>" % (selected, boardTitle)
             selected = ""
+            boardDict[boardTitle] = row[0]
     except cdrdb.Error, info:
         cdrcgi.bail('Database query failure: %s' % info[1][0])
     return picklist + "</SELECT>"
@@ -116,6 +126,7 @@ SELECT DISTINCT board.id, board.title
 #----------------------------------------------------------------------
 # If we don't have a request, put up the form.
 #----------------------------------------------------------------------
+boardList = {}
 if not boardInfo:
     header   = cdrcgi.header(title, title, instr, script, ("Submit",
                                                            SUBMENU,
@@ -133,14 +144,22 @@ if not boardInfo:
        </TR>
       </TABLE>
       <CENTER>
-       <TABLE>
+       <TABLE border='0'>
         <TR>
+         <TD>
+          <INPUT TYPE='radio' NAME='ShowCdrId' VALUE='Yes'>
+           With CDR ID<BR>
+         </TD>
          <TD>
           <INPUT TYPE='radio' NAME='RepType' VALUE='ByTopic' checked='1'>
            Order by Topic<BR>
          </TD>
         </TR>
         <TR>
+         <TD>
+          <INPUT TYPE='radio' NAME='ShowCdrId' VALUE='No' CHECKED>
+           Without CDR ID<BR>
+         </TD>
          <TD>
           <INPUT TYPE='radio' NAME='RepType' VALUE='ByMember'>
            Order by Board Member<BR>
@@ -151,7 +170,8 @@ if not boardInfo:
       </FORM>
      </BODY>
     </HTML>
-""" % (cdrcgi.SESSION, session, getBoardPicklist(), getAudiencePicklist())
+""" % (cdrcgi.SESSION, session, getBoardPicklist(boardList), getAudiencePicklist())
+
     cdrcgi.sendPage(cdrcgi.unicodeToLatin1(header + form))
 
 #----------------------------------------------------------------------
@@ -160,13 +180,14 @@ if not boardInfo:
 dateString = time.strftime("%B %d, %Y", time.localtime(time.time()))
 
 #----------------------------------------------------------------------
-# We have a board specified; extract its ID and doc title.
+# We have a board specified; extract its ID based on its doc title
+# as the key of a dictionary created with getBoardPicklist().
 #----------------------------------------------------------------------
-pattern   = re.compile(r"\[CDR0*(\d+)\] (.+)")
-match     = pattern.match(boardInfo)
-if not match: cdrcgi.bail("Board information garbled: %s" % boardInfo)
-boardId   = int(match.group(1))
-boardName = trim(match.group(2))
+getBoardPicklist(boardList)
+boardId    = boardList[boardInfo]
+boardName  = boardInfo
+if not boardId: 
+    cdrcgi.bail("Board information garbled: %s" % boardInfo)
 
 #----------------------------------------------------------------------
 # Prepare for filtering on audience type, if appropriate.
@@ -183,7 +204,7 @@ if audience and len(audience) > 1:
 # Show the summaries linked to the board, with associated board members.
 #----------------------------------------------------------------------
 if repType == 'ByTopic':
-    instr     = 'Board report by topics -- %s.' % dateString
+    instr     = 'Board Report by Topics -- %s.' % dateString
     header    = cdrcgi.header(title, title, instr, script, buttons)
     audString = ""
     if audience:
@@ -214,27 +235,81 @@ SELECT DISTINCT board_member.id, board_member.title,
        ORDER BY summary.value, board_member.title""" % (sbmPath, sbPath,
                                                         stPath, audienceJoin), 
                 boardId)
+
         prevSummaryId = 0
         for row in cursor.fetchall():
-            if row[2] != prevSummaryId:
+
+# Decision if the report will be printed with or without CDR ID
+# =============================================================
+            if showCdrId == 'Yes':
+                if row[2] != prevSummaryId:
+#                    if prevSummaryId:
+#                        report += """\
+#"""
+                     report += """\
+  </TABLE>
+  <TABLE width='100%%' border='0'>
+   <TR>
+    <TD width='10%%' align='right'>
+     <BR/>
+     <FONT SIZE='4'>%10d</FONT>
+    </TD>
+    <TD>
+     <BR/>
+     <FONT SIZE='4'>%s</FONT>
+    </TD>
+   </TR>
+""" % (row[2], re.sub(";", "--", trim(row[3])))
+                     prevSummaryId = row[2]
+
+                report += """\
+   <TR>
+    <TD width='10%%'> </TD>
+    <TD>
+     <FONT SIZE='3'>%s</FONT>
+    </TD>
+   </TR>
+""" % (trim(row[1][:row[1].index(';')]))
                 if prevSummaryId:
                     report += """\
-  </UL>
 """
-                report += """\
-  <H4><FONT SIZE='-0'>%s [CDR%010d]</FONT></H4>
-  <UL>
-""" % (re.sub(";", "--", trim(row[3])), row[2])
-                prevSummaryId = row[2]
+### Code for report without CDR ID
+### ==============================
+#                    if prevSummaryId:
+#                        report += """\
+#"""
+            else:
+                if row[2] != prevSummaryId:
+                     report += """\
+  </TABLE>
+  <TABLE width='100%%' border='0'>
+   <TR>
+    <TD colspan='2'>
+     <BR/>
+     <FONT SIZE='4'>%s</FONT>
+    </TD>
+    <TD width='5%%' align='right'>
+     <BR/>
+     <FONT SIZE='4'></FONT>
+    </TD>
+   </TR>
+""" % (re.sub(";", "--", trim(row[3])))
+                     prevSummaryId = row[2]
 
-            report += """\
-   <LI><FONT SIZE='-0'>%s [CDR%010d]</FONT></LI>
-""" % (re.sub(";", ", ", trim(row[1]), 1), row[0])
-        if prevSummaryId:
-            report += """\
-  </UL>
+                report += """\
+   <TR>
+    <TD width='5%%'> </TD>
+    <TD>
+     <FONT SIZE='3'>%s</FONT>
+    </TD>
+   </TR>
+""" % (trim(row[1][:row[1].index(';')]))
+                if prevSummaryId:
+                    report += """\
 """
+# =======================================
         report += """\
+  </TABLE>
  </BODY>
 </HTML>
 """
@@ -245,7 +320,7 @@ SELECT DISTINCT board_member.id, board_member.title,
 #----------------------------------------------------------------------
 # Show the members of the board, with associated topics.
 #----------------------------------------------------------------------
-instr     = 'Board report by members -- %s.' % dateString
+instr     = 'Board Report by Members -- %s.' % dateString
 header    = cdrcgi.header(title, title, instr, script, buttons)
 members   = {}
 topics    = {}
@@ -255,7 +330,7 @@ if audience:
 report    = """\
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
   </FORM>
-  <H4>Topics for %s%s</H4>
+  <H4>Reviewers for %s%s</H4>
 """ % (cdrcgi.SESSION, session, boardName, audString)
 
 #----------------------------------------------------------------------
@@ -315,7 +390,7 @@ SELECT DISTINCT board_member.id, board_member.title,
             boardId)
     for row in cursor.fetchall():
         if not members.has_key(row[0]):
-            members[row[0]] = Member(row[0], re.sub(";", ", ", trim(row[1])))
+            members[row[0]] = Member(row[0], trim(row[1][:row[1].index(';')]))
         members[row[0]].topics.append(Topic(row[2], 
                     re.sub(";", "--", trim(row[3]))))
 
@@ -328,22 +403,38 @@ for key in keys:
     member = members[key]
     try:
         report += """\
-  <H4><FONT SIZE='-0'>%s [CDR%010d]</FONT></H4>
-""" % (member.name, member.id)
+  <FONT SIZE='4'>%s</FONT>
+  <TABLE width='100%%' border='0'>
+   <TR>
+""" % (member.name)
     except:
         cdrcgi.bail("member.name = " + member.name)
         raise
     if member.topics:
         report += """\
-  <UL>
 """
         member.topics.sort(lambda a, b: cmp(a.name, b.name))
         for topic in member.topics:
-            report += """\
-   <LI><FONT SIZE='-0'>%s [CDR%010d]</FONT></LI>
-""" % (topic.name, topic.id)
+
+# Decision if the report will be printed with or without CDR ID
+# ============================================================
+            if showCdrId == 'Yes':
+               report += """\
+    <TD width='10%%' align='right'><FONT SIZE='-0'>%10d</FONT></TD>
+    <TD width='2%%'></TD>
+    <TD><FONT SIZE='-0'>%s</FONT></TD>
+   </TR>
+""" % (topic.id, topic.name)
+            else:
+               report += """\
+    <TD width='5%%'></TD>
+    <TD><FONT SIZE='-0'>%s</FONT></TD>
+   </TR>
+""" % (topic.name)
+
         report += """\
-  </UL>
+  </TABLE>
+  <BR/>
 """
     report += """\
  </BODY>
