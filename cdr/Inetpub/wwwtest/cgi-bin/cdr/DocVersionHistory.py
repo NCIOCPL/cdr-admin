@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: DocVersionHistory.py,v 1.12 2004-02-05 13:36:47 bkline Exp $
+# $Id: DocVersionHistory.py,v 1.13 2004-03-23 22:43:46 venglisc Exp $
 #
 # Show version history of document.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.12  2004/02/05 13:36:47  bkline
+# Changed title bar from "QC Reports" to "Document Version History" (request
+# #1096).
+#
 # Revision 1.11  2003/02/12 16:19:10  pzhang
 # Showed Vendor or CG job suffix with publication dates.
 #
@@ -116,7 +120,6 @@ except cdrdb.Error, info:
         cdrcgi.bail('Unable to find document information for %s: %s' % (docId, 
                                                                  info[1][0]))
 
-    
 #----------------------------------------------------------------------
 # Build the report header.
 #----------------------------------------------------------------------
@@ -292,9 +295,15 @@ html = """\
 class DocVersion:
     def __init__(self, row):
         self.num            = row[0]
+        # If a version has been removed from C.gov, mark it
+        # -------------------------------------------------
+        if row[9] == 'N':
+           isRemoved        = ''
+        else:
+           isRemoved        = 'R '
         whichJob            = row[7] and '(V-' or '(C-' 
         whichJob           += row[8] and "%d)" % row[8] or ')'
-        self.pubDates       = row[1] and [row[1][:10] + whichJob] or []
+        self.pubDates       = row[1] and [isRemoved + row[1][:10] + whichJob] or []
         self.comment        = row[2]
         self.user           = row[3]
         self.date           = row[4][:10]
@@ -347,7 +356,8 @@ try:
                 v.val_status,
                 v.publishable,
                 d.output_dir,
-                d.pub_proc
+                d.pub_proc,
+                d.removed
            FROM doc_version v
            JOIN usr u
              ON u.id = v.usr
@@ -365,8 +375,14 @@ LEFT OUTER JOIN primary_pub_doc d
         if currentVer:
             if currentVer.num == row[0]:
                 if row[1]:
+                    # If a version has been removed from C.gov, mark it
+                    # -------------------------------------------------
+                    if row[9] == 'N':
+                       isRemoved = ''
+                    else:
+                       isRemoved = 'R '
                     whichJob = (row[7] and '(V-' or '(C-') + "%d)" % row[8]
-                    currentVer.pubDates.append(row[1][:10] + whichJob)
+                    currentVer.pubDates.append(isRemoved + row[1][:10] + whichJob)
             else:
                 html += currentVer.display()
                 currentVer = DocVersion(row)
