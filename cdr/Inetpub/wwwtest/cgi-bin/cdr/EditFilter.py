@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditFilter.py,v 1.15 2003-11-05 14:48:35 bkline Exp $
+# $Id: EditFilter.py,v 1.16 2003-12-30 22:49:14 venglisc Exp $
 #
 # Prototype for editing CDR filter documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.15  2003/11/05 14:48:35  bkline
+# Added optional field for ID of existing CDR document on Bach when
+# title is being changed.
+#
 # Revision 1.14  2003/09/16 19:14:56  bkline
 # Escaped blank filter template to work around bug in Mozilla.  Removed
 # hook to xEditFilter.py (added by Peter back in the spring for an
@@ -137,7 +141,7 @@ def showForm(doc, subBanner, buttons):
     </tr>
     <tr>
      <td align=right nowrap>Name change for Bach CDR ID (optional): &nbsp;</td>
-     <td><input name='bachid'></td>
+     <td><input name='bachid'> Must be specified until Filter is migrated!</td>
     </tr>
    </table>
     (Fill in CVS user ID, password, and comment if you are 
