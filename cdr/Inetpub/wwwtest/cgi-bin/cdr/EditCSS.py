@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditCSS.py,v 1.1 2001-06-13 22:28:28 bkline Exp $
+# $Id: EditCSS.py,v 1.2 2001-12-01 17:58:02 bkline Exp $
 #
 # Prototype for editing CSS stylesheets.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2001/06/13 22:28:28  bkline
+# Initial revision
+#
 #----------------------------------------------------------------------
 
 #----------------------------------------------------------------------
@@ -36,6 +39,8 @@ request = cdrcgi.getRequest(fields)
 docId   = fields.getvalue("DocId")    or None
 css     = fields.getvalue("Css")      or None
 name    = fields.getvalue("FileName") or None
+version = fields.getvalue("Version")  or None
+checkin = fields.getvalue("Checkin")  or None
 if not session: cdrcgi.bail("Unable to log into CDR Server", banner)
 if not request: cdrcgi.bail("No request submitted", banner)
 
@@ -46,7 +51,11 @@ def showForm(fileName, css, docId, subBanner, buttons):
     css = css.replace('\r', '')
     hdr = cdrcgi.header(title, banner, subBanner, "EditCSS.py", buttons)
     html = hdr + ("<TABLE><TR><TD ALIGN='right'><B>Filename: </B></TD>"
-                  "<TD><INPUT NAME='FileName' VALUE='%s'></TD></TR>"
+                  "<TD><INPUT NAME='FileName' VALUE='%s'>"
+                  "&nbsp;&nbsp;<INPUT TYPE='checkbox' NAME='Version'>"
+                  "Create new version when saving"
+                  "&nbsp;&nbsp;<INPUT Type='checkbox' NAME='Checkin'>"
+                  "Check in when saving</TD></TR>"
                   "<TR><TD ALIGN='right' VALIGN='top'><B>Stylesheet: </B></TD>"
                   "<TD><TEXTAREA NAME='Css' ROWS='20' COLS='80'>%s"
                   "</TEXTAREA></TD></TR></TABLE>"
@@ -102,11 +111,18 @@ elif request == 'Save':
     doc = cdr.Doc('<FileName>%s</FileName>' % name, 'css',
             { 'DocTitle': name }, css, docId or None)
     cmd = docId and cdr.repDoc or cdr.addDoc
-    docId = cmd(session, doc = doc)
+    docId = cmd(session, doc = doc, ver = version and 'Y' or 'N',
+                checkIn = checkin and 'Y' or 'N')
     if docId.find("<Errors>") >= 0:
         err = cdr.checkErr(docId)
         if err: cdrcgi.bail(err, banner)
         else: cdrcgi.bail("Unparseable error return: %s" % docId, banner)
+    if checkin:
+        print """\
+Location:http://mmdb2.nci.nih.gov/cgi-bin/cdr/EditCSSs.py?%s=%s
+
+""" % (cdrcgi.SESSION, session)
+        sys.exit(0)
     doc = fetch(docId)
     showForm(doc.ctrl['DocTitle'], 
              doc.blob, 
