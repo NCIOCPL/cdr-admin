@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryMailerPreview.py,v 1.1 2003-07-29 12:52:07 bkline Exp $
+# $Id: SummaryMailerPreview.py,v 1.2 2005-02-15 13:09:21 bkline Exp $
 #
 # Generate PostScript for a Summary mailer (also has some support for
 # protocol mailers).
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2003/07/29 12:52:07  bkline
+# Generates PostScript for summary mailers.
+#
 #----------------------------------------------------------------------
 import cdrdb, cdrcgi, re, sys
 sys.path.insert(0, "d:\\cdr\\mailers")
@@ -13,12 +16,10 @@ import cdr, cdrxmllatex, cgi, cdrcgi, os, tempfile
 
 LOPTS   = ("-halt-on-error -quiet -interaction batchmode "
            "-include-directory d:/cdr/mailers/style")
-#cdrcgi.bail("PATH=%s" % "<br>".join(os.environ["PATH"].split(';')))
-#result  = cdr.runCommand("dir \"d:\\Program Files\\MiKTeX\\miktex\\*\"")
-#cdrcgi.bail(result.output)
 fields  = cgi.FieldStorage()
 docId   = fields and fields.getvalue("DocId") or cdrcgi.bail("No Doc ID")
 digits  = re.sub(r"[^\d]+", "", docId)
+version = fields and fields.getvalue("ver") or None
 id      = int(digits)
 conn    = cdrdb.connect('CdrGuest')
 cursor  = conn.cursor()
@@ -38,8 +39,8 @@ if typNam.upper() == "SUMMARY":
 elif typNam.upper() == "INSCOPEPROTOCOL":
     filters = ["set:Mailer InScopeProtocol Set"]
     docType = "Protocol"
-resp    = cdr.filterDoc("guest", filters, docId)
-if type(resp) in (type(""), type(u"")): cdrcgi.bail(resp)
+resp    = cdr.filterDoc("guest", filters, docId, docVer = version)
+if type(resp) in (str, unicode): cdrcgi.bail(resp)
 if not resp[0]: cdrcgi.bail(resp[1])
 #cdrcgi.bail(resp[0])
 latex   = cdrxmllatex.makeLatex (resp[0], docType, "")
