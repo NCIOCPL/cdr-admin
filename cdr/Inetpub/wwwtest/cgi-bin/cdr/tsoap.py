@@ -1,9 +1,12 @@
 #----------------------------------------------------------------------
-# $Id: tsoap.py,v 1.2 2002-04-16 22:42:08 bkline Exp $
+# $Id: tsoap.py,v 1.3 2002-04-16 22:43:25 bkline Exp $
 #
 # Stub for SOAP interface to CDR from Cancer.gov.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/04/16 22:42:08  bkline
+# Eliminated some unneeded imports.
+#
 # Revision 1.1  2002/04/16 22:06:06  bkline
 # Stub SOAP server.  Does nothing but provide a harness for catching
 # a client message and sending back a response.
@@ -32,7 +35,7 @@ Content-type: text/xml
 #----------------------------------------------------------------------
 # Send an error message back to the client.
 #----------------------------------------------------------------------
-def sendErrorMessage(msg, code = "Server", details = None):
+def bailOut(msg, code = "Server", details = None):
 
     # Start the fault element
     fault = """\
