@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GeneralReports.py,v 1.1 2002-05-24 20:37:30 bkline Exp $
+# $Id: GeneralReports.py,v 1.2 2002-06-07 13:32:12 bkline Exp $
 #
 # Submenu for general reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2002/05/24 20:37:30  bkline
+# New Report Menu structure implemented.
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
 
@@ -44,7 +47,7 @@ reports = [
            ('CheckedOutDocs.py', 'Checked Out Documents'),
            ('DateLastModified.py', 'Date Last Modified'),
            ('DatedActions.py', 'Dated Actions'),
-           ('CdrReport.py', 'Inactive Documents'),
+           ('CdrReport.py', 'Checked Out Documents With No Activity'),
            ('LinkedDocs.py', 'Linked Documents'),
            ('NewDocReport.py', 'New Document Count'),
            ('PubJobQueue.py', 'Publishing Job Queue'),

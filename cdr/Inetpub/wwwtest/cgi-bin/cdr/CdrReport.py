@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CdrReport.py,v 1.5 2002-02-21 15:22:02 bkline Exp $
+# $Id: CdrReport.py,v 1.6 2002-06-07 13:32:12 bkline Exp $
 #
 # Prototype for CDR reporting/formatting web wrapper.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2002/02/21 15:22:02  bkline
+# Added navigation buttons.
+#
 # Revision 1.4  2001/12/01 17:56:26  bkline
 # Changed FilterDoc() call to match new return value type.
 #
@@ -41,7 +44,7 @@ if request and days:
     diff    = "0000-00-%02d" % string.atoi(days)
     parms   = (('InactivityLength', diff),)
     logon   = ('rmk','***REDACTED***')
-    name    = 'Inactive Checked Out Documents'
+    name    = 'Checked Out Documents With No Activity'
     report  = cdr.report(logon, name, parms)
     report  = re.sub("<!\[CDATA\[", "", report)
     report  = re.sub("\]\]>", "", report)
@@ -55,7 +58,7 @@ if request and days:
 # Put out the form if we don't have a request.
 #----------------------------------------------------------------------
 else:
-    title   = "Inactive Documents"
+    title   = "Checked Out Documents With No Activity"
     instr   = "Select Options and Submit Request"
     buttons = ("Submit Request", SUBMENU, cdrcgi.MAINMENU)
     header  = cdrcgi.header(title, title, instr, "CdrReport.py", buttons)
