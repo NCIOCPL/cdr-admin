@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: MailerReports.py,v 1.3 2002-05-24 20:37:30 bkline Exp $
+# $Id: MailerReports.py,v 1.4 2003-05-20 19:28:50 bkline Exp $
 #
 # Submenu for mailer reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2002/05/24 20:37:30  bkline
+# New Report Menu structure implemented.
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
 
@@ -46,7 +49,7 @@ reports = [
            ('MailerCheckinReport.py', 'Mailer Check-In Count'),
            ('MailerHistory.py', 'Mailer History'),
            ('Stub.py', 'Recipients'),
-           ('Stub.py', '60-Day Non-Responders')
+           ('NonRespondents.py', 'Non-Respondents')
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI>\n" % (
