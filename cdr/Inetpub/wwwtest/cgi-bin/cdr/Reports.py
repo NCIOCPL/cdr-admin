@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: Reports.py,v 1.16 2002-05-24 18:02:38 bkline Exp $
+# $Id: Reports.py,v 1.17 2002-05-24 20:37:31 bkline Exp $
 #
 # Prototype for editing CDR linking tables.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.16  2002/05/24 18:02:38  bkline
+# Added Person Protocol Review report.
+#
 # Revision 1.15  2002/05/16 14:34:42  bkline
 # Added future entry for newly published trials.
 #
@@ -50,7 +53,6 @@
 # Revision 1.1  2001/06/13 22:16:32  bkline
 # Initial revision
 #
-#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
 
@@ -62,7 +64,7 @@ session = cdrcgi.getSession(fields)
 action  = cdrcgi.getRequest(fields)
 title   = "CDR Administration"
 section = "Reports"
-buttons = [cdrcgi.MAINMENU]
+buttons = [cdrcgi.MAINMENU, "Log Out"]
 header  = cdrcgi.header(title, title, section, "Reports.py", buttons)
 
 #----------------------------------------------------------------------
@@ -72,41 +74,31 @@ if action == cdrcgi.MAINMENU:
     cdrcgi.navigateTo("Admin.py", session)
 
 #----------------------------------------------------------------------
+# Handle request to log out.
+#----------------------------------------------------------------------
+if request == "Log Out": 
+    cdrcgi.logout(session)
+
+#----------------------------------------------------------------------
 # Display available report choices.
 #----------------------------------------------------------------------
 form = "<INPUT TYPE='hidden' NAME='%s' VALUE='%s'><OL>\n" % (cdrcgi.SESSION,
                                                              session)
 reports = [
-           ('CheckedOutDocs.py', 'Checked Out Documents'),
-           ('ConceptTermReviewReport.py', 'Concept/Term Review Report'),
-           ('DatedActions.py', 'Dated Actions'),
-           ('DateLastModified.py', 'Date Last Modified'),
-           ('GlossaryTermLinks.py', 'Glossary Term Links Report'),
-           ('CdrReport.py', 'Inactive Documents'),
-           ('CheckUrls.py', 'Inactive Hyperlinks'),
-           ('LinkedDocs.py', 'Linked Documents'),
-           ('MailerActivityStatistics.py', 'Mailer Activity Statistics'),
-           ('MailerCheckinReport.py', 'Mailer Checkin'),
-           ('MailerHistory.py', 'Mailer History'),
-           ('ModifiedPubMedDocs.py', 'Modified PubMed Documents'),
-           ('NewDocReport.py', 'New Documents'),
-          #('NewlyPublishedTrials.py', 'Newly Published Trials'),
-           ('PdqBoards.py', 'PDQ Boards'),
-           ('PersonsAtOrg.py', 'Persons Practicing At Orgs'),
-           ('PersonProtocolReview.py', 'Person Protocol Review'),
-           ('PubJobQueue.py', 'Publishing Job Queue'),
-           ('TermUsage.py', 'Term Usage'),
-           ('UnchangedDocs.py', 'Unchanged Documents'),
-           ('UnverifiedCitations.py', 'Unverified Citations')
+           ('GeneralReports.py', 'General Reports'),
+           ('CitationReports.py', 'Citations'),
+           ('GeographicReports.py', 'Geographic'),
+           ('GlossaryTermReports.py', 'Glossary Terms'),
+           ('MailerReports.py', 'Mailers'),
+           ('PersonAndOrgReports.py', 'Persons and Organizations'),
+           ('ProtocolReports.py', 'Protocols'),
+           ('SummaryAndMiscReports.py', 
+            'Summaries and Miscellaneous Documents'),
+           ('TerminologyReports.py', 'Terminology')
           ]
-if type(reports) == type(""): cdrcgi.bail(reports)
 
 for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI>\n" % (
             cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
 
-form += """\
-<LI><A HREF="%s/Logout.py?%s=%s">%s</LI>
-</OL>
-""" % (cdrcgi.BASE, cdrcgi.SESSION, session, "Log Out")
-cdrcgi.sendPage(header + form + "</FORM></BODY></HTML>")
+cdrcgi.sendPage(header + form + "</OL></FORM></BODY></HTML>")
