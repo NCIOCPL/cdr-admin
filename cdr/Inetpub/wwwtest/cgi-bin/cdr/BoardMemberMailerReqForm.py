@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: BoardMemberMailerReqForm.py,v 1.3 2005-03-02 15:48:10 bkline Exp $
+# $Id: BoardMemberMailerReqForm.py,v 1.4 2005-03-17 20:17:48 bkline Exp $
 #
 # Request form for generating RTF letters to board members.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2005/03/02 15:48:10  bkline
+# Support for additional letters from Margaret.
+#
 # Revision 1.2  2004/08/26 14:40:26  bkline
 # First working code version.
 #
@@ -432,7 +435,7 @@ form = """\
     <li>
      Select a PDQ Board from the first picklist below.  Then select
      which letter should be sent and one or more individuals from the
-     list of board members (or prosective board members).
+     list of board members (or prospective board members).
      It may take a minute to select documents to be included in the mailing.
      Please be patient.
     </li>
