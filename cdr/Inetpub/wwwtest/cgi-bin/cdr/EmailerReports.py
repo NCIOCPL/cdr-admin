@@ -1,12 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: EmailerReports.py,v 1.1 2004-07-13 18:02:48 bkline Exp $
+# $Id: EmailerReports.py,v 1.2 2004-09-09 15:23:46 bkline Exp $
 #
 # Reports on status of electronic mailers.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2004/07/13 18:02:48  bkline
+# Administrative support for electronic mailers.
+#
 #----------------------------------------------------------------------
-import cdr, cdrdb, cdrcgi, cgi
+import cdr, cdrdb, cdrcgi, cgi, time
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -95,18 +98,22 @@ def makeJobList():
 #----------------------------------------------------------------------
 # Put up the request form.
 #----------------------------------------------------------------------
+now = time.localtime()
+then = list(now)
+then[2] -= 1
+then = time.localtime(time.mktime(then))
 form = """\
    <input type='hidden' name='%s' value='%s'>
-   <b>1. Enter a date range to veiw returns to web-based mailers:</b><br><br>
+   <b>1. Enter a date range to view returns to web-based mailers:</b><br><br>
    <table border='0'>
     <tr>
      <td align='right' nowrap><b>Start Date:&nbsp;</b></td>
-     <td><input name='start'>&nbsp;</td>
+     <td><input size='10' name='start' value='%s'>&nbsp;</td>
      <td rowspan='2'>(use format YYYY-MM-DD for dates, e.g. 2004-01-01)</td>
     </tr>
     <tr>
      <td align='right' nowrap><b>End Date:&nbsp;</b></td>
-     <td><input name='end'></td>
+     <td><input size='10' name='end' value='%s'></td>
     </tr>
    </table>
    <br>
@@ -125,5 +132,8 @@ form = """\
   </form>
  </body>
 </html>
-""" % (cdrcgi.SESSION, session, makeJobList())
+""" % (cdrcgi.SESSION, session,
+       time.strftime("%Y-%m-%d", then),
+       time.strftime("%Y-%m-%d", now),
+       makeJobList())
 cdrcgi.sendPage(header + form)
