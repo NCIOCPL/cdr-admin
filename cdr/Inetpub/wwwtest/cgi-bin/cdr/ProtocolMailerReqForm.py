@@ -1,10 +1,10 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolMailerReqForm.py,v 1.13 2003-02-19 22:05:37 bkline Exp $
+# $Id: ProtocolMailerReqForm.py,v 1.14 2003-05-08 20:23:04 bkline Exp $
 #
 # Request form for all protocol mailers.
 #
-# This program is invoked twice to  create a mailer job.
+# This program is invoked twice to create a mailer job.
 #
 # The first invocation is made by a high level mailer menu from which
 # a user selected protocol mailers.  In the first invocation, the program
@@ -17,6 +17,9 @@
 # publication job for the publishing daemon to find and initiate.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.13  2003/02/19 22:05:37  bkline
+# Turned off query testing code for S&P mailers.
+#
 # Revision 1.12  2003/02/13 21:43:41  bkline
 # Fixed comment to match previous change.
 #
@@ -360,6 +363,7 @@ elif mailType == 'Protocol-Initial abstract':
                                                   'Approved-not yet active')
                         AND prot_status.path       = '%s'
                         AND doc_version.val_status = 'V'
+                        AND protocol.active_status = 'A'
 
                         -- Don't send mailers to Brussels.
                         AND NOT EXISTS (SELECT *
@@ -418,6 +422,7 @@ elif mailType == 'Protocol-Annual abstract':
                         AND prot_status.path = '%s'
                         AND doc_version.val_status = 'V'
                         AND doc_version.publishable = 'Y'
+                        AND protocol.active_status = 'A'
 
                         -- Make sure the initial mailer has gone out.
                         AND EXISTS (SELECT *
@@ -477,6 +482,7 @@ elif mailType == 'Protocol-Annual abstract remail':
                                          AND DATEADD(day,  -60, GETDATE())
                AND doc_version.publishable = 'Y'
                AND doc_version.val_status  = 'V'
+               AND protocol.active_status = 'A'
 
                -- Don't bug the folks who have already answered.
                AND NOT EXISTS (SELECT *
