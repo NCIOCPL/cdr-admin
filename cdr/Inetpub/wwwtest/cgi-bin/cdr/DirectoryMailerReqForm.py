@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: DirectoryMailerReqForm.py,v 1.5 2002-10-03 16:33:54 ameyer Exp $
+# $Id: DirectoryMailerReqForm.py,v 1.6 2002-10-03 17:38:43 ameyer Exp $
 #
 # Request form for all directory mailers.
 #
@@ -304,7 +304,32 @@ else:
         #         Physician-Initial remail
         #         Physician-Annual update
         #         Physician-Annual remail
+        # Optimization note:
+        #   Creating a temporary table changed this from 125 to 17 seconds.
         qry = """
+            -- Temp table
+            CREATE TABLE #mail_physician_annual_ids (tmpid int)
+
+            -- Fill it with ids of all physician mailers < 1 year old
+            INSERT INTO #mail_physician_annual_ids (tmpid)
+                    SELECT pd2.doc_id
+                      FROM pub_proc_doc pd2
+                      JOIN pub_proc p2
+                        ON p2.id = pd2.pub_proc
+                     WHERE
+                       (
+                            p2.pub_subset = 'Physician-Initial'
+                         OR
+                            p2.pub_subset = 'Physician-Initial remail'
+                         OR
+                            p2.pub_subset = 'Physician-Annual update'
+                         OR
+                            p2.pub_subset = 'Physician-Annual remail'
+                           )
+                       AND p2.completed > DATEADD(year,-1,GETDATE())
+                       AND p2.status <> 'Fail'
+
+            -- Get physicians we want
             SELECT DISTINCT document.id, MAX(doc_version.num)
                        FROM doc_version
                        JOIN document
@@ -330,26 +355,16 @@ else:
                         AND qinc.path =
                            '/Person/ProfessionalInformation/PhysicianDetails/AdministrativeInformation/Directory/Include'
                         AND qinc.value = 'Include'
-                        AND document.id NOT IN (
-                            SELECT pd2.doc_id
-                              FROM pub_proc_doc pd2
-                              JOIN pub_proc p2
-                                ON p2.id = pd2.pub_proc
-                             WHERE pd2.doc_id = document.id
-                               AND (
-                                    -- Would LIKE 'Physician%' be better?
-                                    p2.pub_subset = 'Physician-Initial'
-                                 OR
-                                    p2.pub_subset = 'Physician-Initial remail'
-                                 OR
-                                    p2.pub_subset = 'Physician-Annual update'
-                                 OR
-                                    p2.pub_subset = 'Physician-Annual remail'
-                                   )
-                               AND p2.completed > DATEADD(year,-1,GETDATE())
-                               AND p2.status <> 'Fail'
-                          )
-                   GROUP BY document.id"""
+
+                        -- But not if a mailer was sent in past year
+                        AND NOT EXISTS (
+                                SELECT tmpid
+                                  FROM #mail_physician_annual_ids
+                                 WHERE document.id = tmpid
+                             )
+                   GROUP BY document.id
+            -- Delete temp table in case user comes back on same connection
+            DROP TABLE #mail_physician_annual_ids"""
 
     elif mailType == 'Organization-Annual update':
         # Select last version (not CWD) of document for which:
