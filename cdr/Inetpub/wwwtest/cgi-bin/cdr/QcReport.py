@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.16 2003-04-02 21:21:15 pzhang Exp $
+# $Id: QcReport.py,v 1.17 2003-04-10 21:34:23 pzhang Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.16  2003/04/02 21:21:15  pzhang
+# Added the filter to sort OrganizationName.
+#
 # Revision 1.15  2002/12/30 15:15:47  bkline
 # Fixed a typo.
 #
@@ -72,6 +75,7 @@ docType  = fields.getvalue("DocType")    or None
 repType  = fields.getvalue("ReportType") or None
 docTitle = fields.getvalue("DocTitle")   or None
 version  = fields.getvalue("DocVersion") or None
+revLvls  = fields.getvalue("revLevels")  or None
 if not docId and not docType:
     cdrcgi.bail("No document specified", repTitle)
 if docId:
@@ -215,49 +219,29 @@ if docType == 'Summary' and repType and not version:
 #----------------------------------------------------------------------
 # Map for finding the filters for a given document type.
 #----------------------------------------------------------------------
-summaryDenormalizationFilters = [
-         "name:Denormalization Filter (1/5): Summary",
-         "name:Denormalization Filter (2/5): Summary",
-         "name:Denormalization Filter (3/5): Summary",
-         "name:Denormalization Filter (4/5): Summary",
-         "name:Denormalization Filter (5/5): Summary",
-         "name:Denormalization Filter:(6/6)Summary",
-         "name:Summary-Add Citation Wrapper Data Element",
-         "name:Summary-Sort Citations by refidx"]
 filters = {
-    'Summary':
-        summaryDenormalizationFilters +
-        ["name:Health Professional Summary Report"],
+    'Summary':        
+        ["set:QC Summary Set"],
     'Summary:bu': # Bold/Underline
-        summaryDenormalizationFilters +
-        ["name:Health Professional Summary Report-Bold/Underline"],
+        ["set:QC Summary Set (Bold/Underline)"],
     'Summary:rs': # Redline/Strikeout
-        summaryDenormalizationFilters +
-        ["name:Health Professional Summary Report"],
+        ["set:QC Summary Set"],
     'Summary:nm': # No markup
-        summaryDenormalizationFilters +
-        ["name:Health Professional Summary Report"],
+        ["set:QC Summary Set"],
     'GlossaryTerm':         
-        ["name:Glossary Term QC Report Filter"],
+        ["set:QC GlossaryTerm Set"],
     'Citation':         
-        ["name:Citation QC Report"],
+        ["set:QC Citation Set"],
     'Organization':     
-        ["name:Denormalization Filter (1/1): Organization",
-         "name:Denormalization: sort OrganizationName for Postal Address",
-         "name:Organization QC Report Filter"],
+        ["set:QC Organization Set"],
     'Person':           
-        ["name:Denormalization Filter (1/1): Person",
-         "name:Denormalization: sort OrganizationName for Postal Address",
-         "name:Person QC Report Filter"],
+        ["set:QC Person Set"],
     'InScopeProtocol':  
-        ["name:Denormalization Filter (1/1): InScope Protocol",
-         "name:Create InScope Protocol XML for Full Protocol QC Report",
-         "name:InScope Protocol Full QC Report"],
+        ["set:QC InScopeProtocol Set"],
     'Term':             
-        ["name:Denormalization Filter (1/1): Terminology",
-         "name:Terminology QC Report Filter"],
+        ["set:QC Term Set"],
     'MiscellaneousDocument':
-        ["name:Miscellaneous Document Report Filter"]
+        ["set:QC MiscellaneousDocument Set"]
 }
 
 #----------------------------------------------------------------------
@@ -396,8 +380,11 @@ if not filters.has_key(docType):
 </html>""" % (doc.ctrl['DocTitle'], cgi.escape(doc.xml))
     cdrcgi.sendPage(cdrcgi.unicodeToLatin1(html))
 
+filterParm = [['vendorOrQC', 'QC']]
+if revLvls:
+    filterParm.append(['revLevels', revLvls])    
 doc = cdr.filterDoc(session, filters[docType], docId = docId,
-                                               docVer = version or None)
+                    docVer = version or None, parm = filterParm)
 if type(doc) == type(()):
     doc = doc[0]
 
