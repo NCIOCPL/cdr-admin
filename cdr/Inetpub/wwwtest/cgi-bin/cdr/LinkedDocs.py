@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: LinkedDocs.py,v 1.4 2002-06-24 17:15:45 bkline Exp $
+# $Id: LinkedDocs.py,v 1.5 2005-02-17 22:48:45 venglisc Exp $
 #
 # Reports on documents which link to a specified document.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2002/06/24 17:15:45  bkline
+# Fixed encoding problems.
+#
 # Revision 1.3  2002/04/24 20:36:03  bkline
 # Changed "Title" label to "DocTitle" as requested by Eileen (issue #161).
 #
@@ -144,19 +147,29 @@ SELECT DISTINCT d.id, d.title, t.name, n.source_elem, n.target_frag
         cdrcgi.bail('Database query failure: %s' % info[1][0])
 
     # Build the report and show it.
-    title2 = "%s for %s Document CDR%010d %s" % (title, targetDocInfo[1], 
+    title2 = "%s for %s Document CDR%d %s" % (title, targetDocInfo[1], 
             docId, makeDate())
     html = cdrcgi.header(title2, title, instr, script, buttons)
     report = """\
-<H4>Document Type</H4>
-%s
-<H4>DocTitle</H4>
-%s
-<BR>&nbsp;<BR>&nbsp;<BR>
+    <table>
+     <tr>
+      <td class="docLabel" align="right">Document Type:</td>
+      <td class="docValue">%s</td>
+     </tr>
+     <tr>
+      <td class="docLabel" align="right">Document Title:</td>
+      <td class="docValue">%s</td>
+     </tr>
+     <tr>
+      <td class="docLabel" align="right">Document ID:</td>
+      <td class="docValue">%s</td>
+     </tr>
+    </table>
+<BR>
 
 <B><I>Linked Documents</I></B>
 <BR>&nbsp;<BR>
-""" % (targetDocInfo[1], targetDocInfo[0])
+""" % (targetDocInfo[1], targetDocInfo[0], docId)
 
     prevDocType = ""
     row = cursor.fetchone()
