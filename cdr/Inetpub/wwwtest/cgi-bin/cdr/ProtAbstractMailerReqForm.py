@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtAbstractMailerReqForm.py,v 1.3 2002-02-21 22:34:00 bkline Exp $
+# $Id: ProtAbstractMailerReqForm.py,v 1.4 2002-10-10 19:18:09 bkline Exp $
 #
 # Request form for Initial Protocol Abstract Mailer.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2002/02/21 22:34:00  bkline
+# Added navigation buttons.
+#
 # Revision 1.2  2001/12/01 18:06:37  bkline
 # Replaced SQL query approach to work around SQL Server bug.
 #
@@ -25,7 +28,7 @@ SUBMENU    = "Mailer Menu"
 buttons    = ["Submit", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 script     = 'ProtAbstractMailerReqForm.py'
 header     = cdrcgi.header(title, title, section, script, buttons)
-subsetName = 'Initial Protocol Abstract Verification Mailers'
+subsetName = 'Protocol-Initial abstract'
 
 #----------------------------------------------------------------------
 # Make sure we're logged in.
@@ -119,6 +122,8 @@ if docId:
               FROM doc_version
              WHERE id = ?""", (intId,))
         row = cursor.fetchone()
+        if not row:
+            cdrcgi.bail("No versions have been saved yet for CDR%010d" % intId)
         docList = ((intId, row[0]),)
     except cdrdb.Error, info:
         cdrcgi.bail("No version found for document %d: %s" % (intId,
@@ -138,7 +143,7 @@ else:
                        JOIN query_term prot_status
                          ON prot_status.doc_id = protocol.id
                       WHERE prot_status.value IN ('Active', 
-                                                  'Approved-Not Yet Active')
+                                                  'Approved-not yet active')
                         AND prot_status.path = '%s'
                         AND NOT EXISTS (SELECT *
                                           FROM query_term src
@@ -152,19 +157,31 @@ else:
                                          WHERE pd.doc_id = protocol.id
                                            AND p.pub_subset = '%s'
                                            AND (p.status = 'Success'
+                                           AND pd.failure IS NULL
                                             OR p.completed IS NULL))
                    GROUP BY protocol.id""" % (statPath, brussels, srcPath,
                                               subsetName))
         docList = cursor.fetchall()
+        if not docList:
+            cdrcgi.bail("No documents match the selection criteria")
     except cdrdb.Error, info:
         cdrcgi.bail("Failure retrieving document IDs: %s" % info[1][0])
 
 # Drop the job into the queue.
-result = cdrpub.initNewJob(ctrlDocId, subsetName, session, docList, [], email)
-if type(result) == type(""):
-    cdrcgi.bail(result)
-elif type(result) == type(u""):
-    cdrcgi.bail(result.encode('latin-1'))
+docs = []
+for doc in docList:
+    docs.append("CDR%010d/%d" % (doc[0], doc[1]))
+result = cdr.publish(credentials = session, pubSystem = 'Mailers',
+                     pubSubset = subsetName, docList = docs,
+                     allowNonPub = 'Y', email = email)
+
+# cdr.publish returns a tuple of job id + messages
+# If serious error, job id = None
+if not result[0] or int(result[0]) < 0:
+    cdrcgi.bail("Unable to initiate publishing job:<br>%s" % result[1])
+
+jobId = int(result[0])
+
 header  = cdrcgi.header(title, title, section, None, [])
 html = """\
     <H3>Job Number %d Submitted</H3>
@@ -177,5 +194,5 @@ html = """\
    </FORM>
   </BODY>
  </HTML>
-""" % (result[0], cdrcgi.BASE, result[0], cdrcgi.SESSION, session)
+""" % (jobId, cdrcgi.BASE, jobId, cdrcgi.SESSION, session)
 cdrcgi.sendPage(header + html)
