@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.4 2002-06-06 12:01:08 bkline Exp $
+# $Id: QcReport.py,v 1.5 2002-06-06 15:01:06 bkline Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2002/06/06 12:01:08  bkline
+# Custom handling for Person and Summary QC reports.
+#
 # Revision 1.3  2002/05/08 17:41:53  bkline
 # Updated to reflect Volker's new filter names.
 #
@@ -29,7 +32,8 @@ title    = "CDR Administration"
 section  = "QC Report"
 SUBMENU  = "Reports Menu"
 buttons  = ["Submit", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-header   = cdrcgi.header(title, title, section, "QcReport.py", buttons)
+header   = cdrcgi.header(title, title, section, "QcReport.py", buttons, method
+         = 'GET')
 docId    = fields.getvalue(cdrcgi.DOCID) or None
 docType  = fields.getvalue("DocType")    or None
 repType  = fields.getvalue("ReportType") or None
