@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: AdHocQuery.py,v 1.4 2003-03-21 16:48:41 pzhang Exp $
+# $Id: AdHocQuery.py,v 1.5 2004-01-14 18:00:59 venglisc Exp $
 #
 # Displays result set for SQL query.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2003/03/21 16:48:41  pzhang
+# Added a new default query to find sample documents.
+# Commented out the old default query.
+#
 # Revision 1.3  2003/02/12 19:17:32  pzhang
 # Added timeout field.
 #
@@ -60,22 +64,12 @@ if not query:
    the given type. Remember to use %% as the wildcard.
 */
 SELECT TOP 10 d.id 
-  FROM document d, doc_type t
+  FROM document d
+  JOIN doc_type t
+    ON d.doc_type = t.id
  WHERE d.xml like '%%<MenuInformation%%' 
-   AND d.doc_type = t.id
    AND t.name = 'Term'
 
-/* This was the old default query that has been
-   commented out.
-
-   SELECT d.id,
-          d.title
-     FROM document d
-     JOIN doc_type t
-       ON t.id = d.doc_type
-    WHERE t.name = 'Filter'
- ORDER BY d.title
-*/
      </textarea>
      <br><b>Enter timeout in seconds:</b><br>
     <INPUT TYPE='text' NAME='TimeOut' VALUE='20'>
