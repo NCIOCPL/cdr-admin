@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: PersonsAtOrg.py,v 1.3 2003-03-10 21:05:30 bkline Exp $
+# $Id: PersonsAtOrg.py,v 1.4 2003-08-25 20:29:55 bkline Exp $
 #
 # Identifieds all person documents which are linked to a specified
 # organization document.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2003/03/10 21:05:30  bkline
+# Added support for ambiguous organization name pattern.
+#
 # Revision 1.2  2003/02/24 21:16:49  bkline
 # Added support for wildcards in org name.
 #
@@ -33,7 +36,7 @@ header  = cdrcgi.header(title, title, section, script, buttons)
 now     = time.localtime(time.time())
 
 #----------------------------------------------------------------------
-# Put up a list of possible choices if the 
+# Put up a list of possible choices if the name is not unique.
 #----------------------------------------------------------------------
 def showChoices(pathPattern, name):
     global buttons
@@ -373,95 +376,3 @@ cdrcgi.sendPage(html + """\
  </body>
 </html>
 """)
-    
-html += resp[0]
-row = cursor.fetchone()
-
-#----------------------------------------------------------------------
-# Get the list of documents which link to this glossary term.
-#----------------------------------------------------------------------
-try:
-    cursor.execute("""\
-            SELECT DISTINCT query_term.doc_id,
-                            document.title,
-                            doc_type.name
-                       FROM query_term
-                       JOIN document
-                         ON document.id = query_term.doc_id
-                       JOIN doc_type
-                         ON doc_type.id = document.doc_type
-                      WHERE query_term.value = 'CDR%010d'
-                   ORDER BY doc_type.name,
-                            query_term.doc_id""" % id)
-except cdrdb.Error, info:
-    cdrcgi.bail('Failure fetching list of linking documents: %s' % info[1][0])
-
-#----------------------------------------------------------------------
-# Display the report rows.
-#----------------------------------------------------------------------
-filterParms = [['linkTarget', 'CDR%010d' % id]]
-try:
-    row = cursor.fetchone()
-    currentDoctype = None
-    while row:
-        (docId, docTitle, docType) = row
-        if docType != currentDoctype:
-            if currentDoctype:
-                html += """\
-  </table>
-"""
-    """
-            currentDoctype = docType
-            html += "x""\
-  <br />
-  <br />
-  <b>
-   <font size='3'>%s</font>
-  </b>
-  <br />
-  <table border='1' cellspacing='0' cellpadding='1' width='100%%'>
-   <tr>
-    <td>
-     <b>
-      <font size='3'>DocID</font>
-     </b>
-    </td>
-    <td>
-     <b>
-      <font size='3'>DocTitle</font>
-     </b>
-    </td>
-    <td>
-     <b>
-      <font size='3'>ElementName</font>
-     </b>
-    </td>
-    <td>
-     <b>
-      <font size='3'>FragmentID</font>
-     </b>
-    </td>
-   </tr>
-"x"" % currentDoctype
-
-        resp = cdr.filterDoc(session, ['name:Glossary Link Report Filter'],
-                             docId, parm = filterParms)
-        #cdrcgi.bail(resp[0])
-        if type(resp) in (type(''), type(u'')):
-            cdrcgi.bail(resp)
-        html += resp[0]
-        row = cursor.fetchone()
-
-except cdrdb.Error, info:
-    cdrcgi.bail('Failure fetching linking document: %s' % info[1][0])
-
-if currentDoctype:
-    html += "x""\
-  </table>
-"x""
-cdrcgi.sendPage(html + "x""\
- </body>
-</html>
-"x"")
-"""
-except: pass
