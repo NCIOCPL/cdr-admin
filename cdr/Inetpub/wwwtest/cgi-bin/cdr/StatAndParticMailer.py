@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: StatAndParticMailer.py,v 1.1 2001-12-01 18:11:44 bkline Exp $
+# $Id: StatAndParticMailer.py,v 1.2 2002-01-22 21:32:36 bkline Exp $
 #
 # Request form for Initial Status and Participant Protocol Mailer.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2001/12/01 18:11:44  bkline
+# Initial revision
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string, cdrdb, cdrpub
 
@@ -14,7 +17,7 @@ import cgi, cdr, cdrcgi, re, string, cdrdb, cdrpub
 fields     = cgi.FieldStorage()
 session    = cdrcgi.getSession(fields)
 request    = cdrcgi.getRequest(fields)
-docId      = fields and fields.getvalue("DocId")       or None
+docId      = fields and fields.getvalue("DocId") or None
 email      = fields and fields.getvalue("Email") or None
 title      = "CDR Administration"
 section    = "Protocol Status and Participant Initial Mailer"
@@ -25,8 +28,9 @@ subsetName = 'Initial Protocol Status and Participant Verification Mailers'
 brussels   = 'NCI Liaison Office-Brussels'
 sourcePath = '/InScopeProtocol/ProtocolSources/ProtocolSource/SourceName'
 statusPath = '/InScopeProtocol/ProtocolAdminInfo/CurrentProtocolStatus'
-modePath   = '/Organization/OrganizationDetails'\
-             '/OrganizationAdministrativeInformation/PreferredContactMode'
+modePath   = '/Organization/OrganizationDetails/PreferredProtocolContactMode'
+orgPath    = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg'\
+             '/LeadOrganizationID/@cdr:ref'
 
 #----------------------------------------------------------------------
 # Make sure we're logged in.
@@ -48,8 +52,8 @@ if not request:
    <H5>Protocol ID and email notification address are both optional.
        If Protocol ID is specified, only a mailer for that protocol
        will be generated; otherwise all eligible protocols for which
-       abstract mailers have not yet been sent will have mailers
-       generated.</H5>
+       status and participant mailers have not yet been sent will have
+       mailers generated.</H5>
    <TABLE>
     <TR>
      <TD ALIGN='right' NOWRAP>
@@ -127,13 +131,15 @@ else:
                          ON prot_status.doc_id = protocol.doc_id
                        JOIN query_term lead_org
                          ON lead_org.doc_id = prot_status.doc_id
-                       JOIN query_term contact_mode
-                         ON contact_mode.doc_id = lead_org.int_val
-                        AND prot_status.value IN ('Active', 
+                      WHERE prot_status.value IN ('Active', 
                                                   'Approved-Not Yet Active')
                         AND prot_status.path   = '%s'
-                        AND contact_mode.value = 'Hardcopy'
-                        AND contact_mode.path  = '%s'
+                        AND lead_org.path      = '%s'
+                        AND NOT EXISTS (SELECT *
+                                          FROM query_term contact_mode
+                                         WHERE contact_mode.doc_id =
+                                               lead_org.int_val
+                                           AND contact_mode.path = '%s')
                         AND NOT EXISTS (SELECT *
                                           FROM query_term src
                                          WHERE src.value = '%s'
@@ -148,6 +154,7 @@ else:
                                            AND (p.status = 'Success'
                                             OR p.completed IS NULL))
                    GROUP BY protocol.doc_id""" % (statusPath, 
+                                                  orgPath,
                                                   modePath,
                                                   brussels, 
                                                   sourcePath,
