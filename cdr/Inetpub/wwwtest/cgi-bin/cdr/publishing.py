@@ -2,8 +2,11 @@
 #
 # Publishing CGI script.
 #
-# $Id: publishing.py,v 1.20 2002-11-07 23:11:28 pzhang Exp $
+# $Id: publishing.py,v 1.21 2002-11-20 16:57:15 pzhang Exp $
 # $Log: not supported by cvs2svn $
+# Revision 1.20  2002/11/07 23:11:28  pzhang
+# Hid QcFilterSets system; Made SubSetName readonly.
+#
 # Revision 1.19  2002/11/05 21:26:27  pzhang
 # Changed FONT of DESC.
 # Added code to show default value based on control document.
@@ -239,7 +242,7 @@ class Display:
                     form += """<TR><TD>%s</TD><TD>%s</TD><TD><INPUT \
                         NAME='%s' VALUE='%s' READONLY></TD></TR>\n""" % (
                         r[1], r[2], r[1], r[2])
-                elif r[1] == "SubSetName":
+                elif r[1] == "SubSetName" or r[1] == "GroupEmailAddrs":
                     form += """<TR><TD>%s</TD><TD>%s</TD><TD><INPUT \
                         NAME='%s' VALUE='%s' READONLY></TD></TR>\n""" % (
                         r[1], r[2], r[1], r[2])
@@ -276,12 +279,18 @@ class Display:
         # Form the parameters and documents to match the required 
         # format of argument in publish.py.
         paramValues = ""
+        grpEmailAddr = ""
         if fields.has_key('Params'):
             paramList = fields.getvalue('Params')
             names = string.split(paramList, ",")
             for name in names:
                 if fields.has_key(name):
-                    paramValues += "," + name + ";" +  fields.getvalue(name)
+                    if name == "GroupEmailAddrs":
+                        grpEmailAddr += fields.getvalue(name)
+                    else:
+                        paramValues += "," + name + ";" + \
+                            fields.getvalue(name)
+                    
         form += HIDDEN % ('Parameters', paramValues)    
 
         docIdValues = ""
@@ -296,12 +305,15 @@ class Display:
 
         # Display message.
         form += "<H4>Publishing System Confirmation</H4>\n"  
+        addresses = grpEmailAddr and (grpEmailAddr + ";") or ""
+        addresses += self.__getUsrAddr()
         form += """Email notification of completion?
         <input type="checkbox" checked name="Email" value="y">&nbsp;&nbsp;
         <BR> Email to [use comma or semicolon between addresses]: &nbsp
         <input type="text" size="100" name="EmailAddr" 
-        value="***REMOVED***"><br><br>Messages only [no document files
-        created]?<input type="checkbox" name="NoOutput" value="Y"><br><br>"""
+        value="%s"><br><br>Messages only [no document files
+        created]?<input type="checkbox" name="NoOutput" value="Y"><br>
+        <br>""" % addresses
         form += "<p>Do you want to publish the subset: %s? <BR><BR>\n" \
              % fields.getvalue('SubSet')
         # form += "of system %s?</p>\n" % fields.getvalue('PubSys')
@@ -539,6 +551,27 @@ class Display:
                         pickList.append(deep)
                
         return pickList
+
+    #----------------------------------------------------------------------
+    # Return the email address of the session owner.
+    #----------------------------------------------------------------------
+    def __getUsrAddr(self):       
+       
+        sql = """SELECT u.email 
+                   FROM usr u 
+                   JOIN session s 
+                     ON u.id = s.usr                 
+                  WHERE s.name = '%s'""" % session
+        rs = self.__execSQL(sql)
+
+        email = ""
+        while not rs.EOF:
+            email = rs.Fields("email").Value or ""
+            break
+        rs.Close()
+        rs = None
+   
+        return email
         
     #----------------------------------------------------------------
     # Execute the SQL statement using ADODB.
