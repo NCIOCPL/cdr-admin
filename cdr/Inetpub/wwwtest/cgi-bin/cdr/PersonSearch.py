@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PersonSearch.py,v 1.4 2002-05-08 17:41:51 bkline Exp $
+# $Id: PersonSearch.py,v 1.5 2002-06-04 20:19:35 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Person documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2002/05/08 17:41:51  bkline
+# Updated to reflect Volker's new filter names.
+#
 # Revision 1.3  2002/04/12 19:57:19  bkline
 # Installed new filters.
 #
@@ -99,12 +102,12 @@ searchFields = (cdrcgi.SearchField(surname,
                              "SpecificContact/PostalAddress/City")),
                 cdrcgi.SearchField(state,
                             ("/Person/PersonLocations/Home/PostalAddress/"
-                             "PoliticalUnit_State/@cdr:ref",
+                             "PoliticalSubUnit_State/@cdr:ref",
                              "/Person/PersonLocations/PrivatePractice/"
-                             "PostalAddress/PoliticalUnit_State/@cdr:ref",
+                             "PostalAddress/PoliticalSubUnit_State/@cdr:ref",
                              "/Person/PersonLocations/OtherPracticeLocation/"
                              "SpecificContact/PostalAddress/"
-                             "PoliticalUnit_State/@cdr:ref")),
+                             "PoliticalSubUnit_State/@cdr:ref")),
                 cdrcgi.SearchField(zip,
                             ("/Person/PersonLocations/Home/PostalAddress/"
                              "PostalCode_ZIP",

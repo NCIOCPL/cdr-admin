@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: OrgSearch2.py,v 1.4 2002-05-08 17:41:50 bkline Exp $
+# $Id: OrgSearch2.py,v 1.5 2002-06-04 20:19:34 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Organization documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2002/05/08 17:41:50  bkline
+# Updated to reflect Volker's new filter names.
+#
 # Revision 1.3  2002/02/20 03:59:34  bkline
 # Modified code to match changes in schemas.
 #
@@ -93,7 +96,7 @@ searchFields = (cdrcgi.SearchField(orgName,
                              "City",)),
                 cdrcgi.SearchField(state,
                             ("/Organization/OrganizationLocations/"
-                             "OrgzniationLocation/Location/PostalAddress/"
+                             "OrganizationLocation/Location/PostalAddress/"
                              "PoliticalSubUnit_State/@cdr:ref",)),
                 cdrcgi.SearchField(country,
                             ("/Organization/OrganizationLocations/"
