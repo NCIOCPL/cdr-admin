@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: MailerReports.py,v 1.5 2003-08-25 20:15:22 bkline Exp $
+# $Id: MailerReports.py,v 1.6 2004-02-17 19:46:39 venglisc Exp $
 #
 # Submenu for mailer reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2003/08/25 20:15:22  bkline
+# Plugged in new report for Lead Org S&P Mailer history.
+#
 # Revision 1.4  2003/05/20 19:28:50  bkline
 # Plugged in mailer non-respondents report.
 #
@@ -48,13 +51,18 @@ form = """\
     <OL>
 """ % (cdrcgi.SESSION, session)
 reports = [
-           ('MailerActivityStatistics.py', 'Mailer Activity Counts'),
-           ('MailerCheckinReport.py', 'Mailer Check-In Count'),
-           ('MailerHistory.py', 'Mailer History'),
            ('LeadOrgStatusAndParticipantMailerHistory.py',
             'Lead Organization Status and Participant Mailer History'),
-           ('Stub.py', 'Recipients'),
-           ('NonRespondents.py', 'Non-Respondents')
+           ('MailerActivityStatistics.py', 
+            'Mailer Activity Counts'),
+           ('MailerCheckinReport.py', 
+            'Mailer Check-In Count'),
+           ('MailerHistory.py', 
+            'Mailer History'),
+           ('NonRespondents.py', 
+            'Non-Respondents'),
+           ('PreMailerProtReport.py',
+            'Pre-Mailer Protocol Check')
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI>\n" % (
