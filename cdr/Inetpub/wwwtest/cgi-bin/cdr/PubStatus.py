@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PubStatus.py,v 1.6 2002-08-20 15:58:04 pzhang Exp $
+# $Id: PubStatus.py,v 1.7 2002-09-11 21:11:18 pzhang Exp $
 #
 # Status of a publishing job.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2002/08/20 15:58:04  pzhang
+# Checked session validity before killing or resuming.
+#
 # Revision 1.5  2002/08/19 22:04:23  pzhang
 # Added dispJobSetting(), dispJobControl() and dispCgWork().
 #
@@ -396,9 +399,26 @@ def dispJobControl(jobId, session):
 #----------------------------------------------------------------------
 def dispCgWork(jobId):
     
+    title   = "CDR Document Pushing Information"
+    instr   = "Job Number %d" % jobId
+    buttons = []
+    header  = cdrcgi.header(title, title, instr, None, buttons)
+
     conn = cdrdb.connect('CdrGuest')
     cursor = conn.cursor()
 
+    # Is there any documents in PPCW?
+    try:      
+        cursor.execute("""\
+            SELECT count(*)              
+              FROM pub_proc_cg_work ppcw              
+                       """)
+        numRows = cursor.fetchone()
+        if numRows and numRows[0] == 0:
+            cdrcgi.bail("No rows in pub_proc_cg_work. No docs to be pushed.")
+    except cdrdb.Error, info:
+        cdrcgi.bail("Failure getting row count in PPCW.")
+    
     #----------------------------------------------------------------------
     # Find vendor and push jobs.
     #----------------------------------------------------------------------  
@@ -416,27 +436,63 @@ def dispCgWork(jobId):
         cdrcgi.bail("Failure getting vendor and push job info from PPCW.")
 
     #----------------------------------------------------------------------
-    # Find removed document information.
+    # Find number of removed documents.
     #----------------------------------------------------------------------  
     try:      
         cursor.execute("""\
-            SELECT ppcw.id, ppcw.doc_type, d.title               
+            SELECT count(ppcw.id) 
+              FROM pub_proc_cg_work ppcw 
+             WHERE ppcw.xml IS NULL             
+                       """)
+        oneRow = cursor.fetchone()
+        nRemoved = 0
+	if oneRow and oneRow[0]:
+	    nRemoved = oneRow[0]
+    except cdrdb.Error, info:
+        cdrcgi.bail("Failure getting removed count from PPCW.")
+
+    #----------------------------------------------------------------------
+    # Find removed document information.
+    #----------------------------------------------------------------------  
+    try:      
+        numDocs = (nRemoved > 500) and 500 or nRemoved or 1
+        cursor.execute("""\
+            SELECT TOP %d ppcw.id, ppcw.doc_type, d.title               
               FROM pub_proc_cg_work ppcw 
               JOIN document d
                 ON d.id = ppcw.id
              WHERE ppcw.xml IS NULL             
           ORDER BY ppcw.doc_type, d.title
-                       """)
+                       """ % numDocs)
         rowsRemoved = cursor.fetchall()
     except cdrdb.Error, info:
         cdrcgi.bail("Failure getting removed info from PPCW.")
 
     #----------------------------------------------------------------------
-    # Find updated document information.
+    # Find number of updated documents.
     #----------------------------------------------------------------------  
     try:      
         cursor.execute("""\
-            SELECT ppcw.id, ppcw.doc_type, d.title               
+            SELECT count(*)
+              FROM pub_proc_cg_work ppcw 
+              JOIN pub_proc_cg ppc
+                ON ppcw.id = ppc.id
+             WHERE NOT ppcw.xml IS NULL             
+                       """)
+        oneRow = cursor.fetchone()
+        nUpdated = 0
+	if oneRow and oneRow[0]:
+	    nUpdated = oneRow[0]
+    except cdrdb.Error, info:
+        cdrcgi.bail("Failure getting updated count from PPCW.")
+
+    #----------------------------------------------------------------------
+    # Find updated document information.
+    #----------------------------------------------------------------------  
+    try:      
+        numDocs = (nUpdated> 500) and 500 or nUpdated or 1 
+        cursor.execute("""\
+            SELECT TOP %d ppcw.id, ppcw.doc_type, d.title               
               FROM pub_proc_cg_work ppcw 
               JOIN document d
                 ON d.id = ppcw.id
@@ -444,17 +500,41 @@ def dispCgWork(jobId):
                 ON ppcw.id = ppc.id
              WHERE NOT ppcw.xml IS NULL             
           ORDER BY ppcw.doc_type, d.title
-                       """)
+                       """ % numDocs)
         rowsUpdated = cursor.fetchall()
     except cdrdb.Error, info:
         cdrcgi.bail("Failure getting updated info from PPCW.")
 
     #----------------------------------------------------------------------
-    # Find added document information.
+    # Find number of added documents.
     #----------------------------------------------------------------------  
     try:      
         cursor.execute("""\
-            SELECT ppcw.id, ppcw.doc_type, d.title               
+            SELECT count(*)
+              FROM pub_proc_cg_work ppcw 
+              JOIN document d
+                ON d.id = ppcw.id
+             WHERE NOT ppcw.xml IS NULL   
+               AND NOT EXISTS (
+                       SELECT * 
+                         FROM pub_proc_cg ppc
+                        WHERE ppc.id = ppcw.id
+                              )         
+                       """)
+        oneRow = cursor.fetchone()
+        nAdded = 0
+	if oneRow and oneRow[0]:
+	    nAdded = oneRow[0]
+    except cdrdb.Error, info:
+        cdrcgi.bail("Failure getting added count from PPCW.")
+
+    #----------------------------------------------------------------------
+    # Find added document information.
+    #----------------------------------------------------------------------  
+    try:      
+        numDocs = (nAdded> 500) and 500 or nAdded or 1
+        cursor.execute("""\
+            SELECT TOP %d ppcw.id, ppcw.doc_type, d.title               
               FROM pub_proc_cg_work ppcw 
               JOIN document d
                 ON d.id = ppcw.id
@@ -465,24 +545,17 @@ def dispCgWork(jobId):
                         WHERE ppc.id = ppcw.id
                               )         
           ORDER BY ppcw.doc_type, d.title
-                       """)
+                       """ % numDocs)
         rowsAdded = cursor.fetchall()
     except cdrdb.Error, info:
         cdrcgi.bail("Failure getting added info from PPCW.")
 
     # Create links when appropriate.
-    nRemoved = len(rowsRemoved)
-    nUpdated = len(rowsUpdated)
-    nAdded   = len(rowsAdded)
     LINK     = "<A href='#%s'>%d</A>"
     lRemoved = nRemoved and LINK % ('Removed', nRemoved) or '%d' % nRemoved
     lUpdated = nUpdated and LINK % ('Updated', nUpdated) or '%d' % nUpdated
     lAdded   = nAdded and LINK % ('Added', nAdded) or '%d' % nAdded
 
-    title   = "CDR Document Pushing Information"
-    instr   = "Job Number %d" % jobId
-    buttons = []
-    header  = cdrcgi.header(title, title, instr, None, buttons)
     html    = """\
         <TABLE>   
            <TR>
@@ -509,7 +582,7 @@ def dispCgWork(jobId):
               """ % (vendor, push, lRemoved, lUpdated, lAdded)
 
     HEADER  = """\
-               <BR><FONT COLOR="RED">Documents %s:</FONT><BR><BR>
+               <BR><FONT COLOR="RED">Documents %s (Top 500):</FONT><BR><BR>
                <TABLE BORDER=1 NAME='%s'>
                 <tr>    
                 <td valign='top'><B>DocId</B></td>   
