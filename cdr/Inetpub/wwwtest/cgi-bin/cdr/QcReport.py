@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.19 2003-05-09 20:41:20 pzhang Exp $
+# $Id: QcReport.py,v 1.20 2003-05-22 13:25:39 bkline Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.19  2003/05/09 20:41:20  pzhang
+# Added Summary:pat to filter sets.
+#
 # Revision 1.18  2003/05/08 20:25:24  bkline
 # User now allowed to specify revision level.
 #
@@ -229,7 +232,8 @@ if docType == 'Summary' and repType and not version:
   Select Insertion/Deletion markup to be displayed in the report (one or more):
   <BR>
   <INPUT TYPE="checkbox" NAME="publish">&nbsp;&nbsp; With publish attribute<BR>
-  <INPUT TYPE="checkbox" NAME="approved">&nbsp;&nbsp; With approved attribute<BR>
+  <INPUT TYPE="checkbox" NAME="approved"
+                         CHECKED='1'>&nbsp;&nbsp; With approved attribute<BR>
   <INPUT TYPE="checkbox" NAME="proposed">&nbsp;&nbsp; With proposed attribute
 """ 
     cdrcgi.sendPage(header + form + """  
