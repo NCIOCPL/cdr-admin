@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ActivityReport.py,v 1.4 2002-07-02 13:46:51 bkline Exp $
+# $Id: ActivityReport.py,v 1.5 2002-07-18 00:55:48 bkline Exp $
 #
 # Reports on audit trail content.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2002/07/02 13:46:51  bkline
+# Plugged in cdrcgi.DAY_ONE.
+#
 # Revision 1.3  2002/06/27 20:30:54  bkline
 # Changed document to all_docs.
 #
@@ -59,8 +62,7 @@ if request == "Log Out":
 if not fromDate or not toDate:
     toDate   = time.strftime("%Y-%m-%d", now)
     then     = list(now)
-    then[1] -= 1
-    then[2] += 1
+    then[2] -= 6
     then     = time.localtime(time.mktime(then))
     fromDate = time.strftime("%Y-%m-%d", then)
     docTypes = cdr.getDoctypes(session)
@@ -106,53 +108,34 @@ html = """\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>
  <head>
-  <title>Document Activity Report %s %s</title>
+  <title>Document Activity Report %s -- %s</title>
+  <style type 'text/css'>
+   body    { font-family: Arial, Helvetica, sans-serif }
+   span.ti { font-size: 14pt; font-weight: bold }
+   th      { text-align: center; vertical-align: top; 
+             font-size: 12pt; font-weight: bold }
+   td      { text-align: left; vertical-align: top; 
+             font-size: 12pt; font-weight: normal }
+  </style>
  </head>
  <basefont face='Arial, Helvetica, sans-serif'>
  <body>
   <center>
-   <b>
-    <font size='4'>CDR Document Activity</font>
-   </b>
+   <span class='ti'>CDR Document Activity</span>
    <br />
-   <b>
-    <font size='4'>From %s to %s</font>
-   </b>
+   <span class='ti'>From %s to %s</span>
   </center>
   <br />
   <br />
-  <table border='1' cellspacing='0' cellpadding='2' width='100%%'>
+  <table border='1' cellspacing='0' cellpadding='2'>
    <tr>
-    <td nowrap='1' align='center'>
-     <b>
-      <font size='3'>Who</font>
-     </b>
-    </td>
-    <td nowrap='1' align='center'>
-     <b>
-      <font size='3'>When</font>
-     </b>
-    </td>
-    <td nowrap='1' align='center'>
-     <b>
-      <font size='3'>Action</font>
-     </b>
-    </td>
-    <td nowrap='1' align='center'>
-     <b>
-      <font size='3'>DocType</font>
-     </b>
-    </td>
-    <td nowrap='1' align='center'>
-     <b>
-      <font size='3'>DocID</font>
-     </b>
-    </td>
-    <td nowrap='1' align='center'>
-     <b>
-      <font size='3'>DocTitle</font>
-     </b>
-    </td>
+    <td>Who</td>
+    <td>When</td>
+    <td>Action</td>
+    <td>DocType</td>
+    <td>DocID</td>
+    <td>DocTitle</td>
+    <td>Comment</td>
    </tr>
 """ % (headerDocType, time.strftime("%m/%d/%Y", now), fromDate, toDate)
    
@@ -171,7 +154,8 @@ try:
                 a.dt,
                 t.name,
                 act.name,
-                d.title
+                d.title,
+                a.comment
            FROM audit_trail a
            JOIN usr u
              ON u.id = a.usr
@@ -192,30 +176,20 @@ except cdrdb.Error, info:
 for row in rows:
     html += """\
    <tr>
+    <td nowrap='1'>%s (%s)</td>
+    <td nowrap='1'>%s</td>
+    <td nowrap='1'>%s</td>
+    <td nowrap='1'>%s</td>
     <td nowrap='1'>
-     <font size='3'>%s (%s)</font>
+     <a href='%s/QcReport.py?DocId=CDR%010d&%s=%s'>CDR%010d</a>
     </td>
-    <td nowrap='1'>
-     <font size='3'>%s</font>
-    </td>
-    <td nowrap='1'>
-     <font size='3'>%s</font>
-    </td>
-    <td nowrap='1'>
-     <font size='3'>%s</font>
-    </td>
-    <td nowrap='1'>
-     <font size='3'>
-      <a href='%s/QcReport.py?DocId=CDR%010d&%s=%s'>CDR%010d</a>
-     </font>
-    </td>
-    <td nowrap='1'>
-     <font size='3'>%s ...</font>
-    </td>
+    <td nowrap='1'>%s ...</td>
+    <td>%s</td>
    </tr>
 """ % (row[2], row[1], row[3], row[5], row[4], 
        cdrcgi.BASE, row[0], cdrcgi.SESSION, session, row[0],
-       cdrcgi.unicodeToLatin1(row[6][:20]))
+       cdrcgi.unicodeToLatin1(row[6][:20]),
+       row[7] and cdrcgi.unicodeToLatin1(row[7]) or "&nbsp;")
 
 cdrcgi.sendPage(html + """\
   </table>
