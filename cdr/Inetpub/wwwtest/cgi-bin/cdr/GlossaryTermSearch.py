@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermSearch.py,v 1.1 2002-02-19 13:39:05 bkline Exp $
+# $Id: GlossaryTermSearch.py,v 1.2 2002-02-28 15:51:32 bkline Exp $
 #
 # Prototype for duplicate-checking interface for GlossaryTerm documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2002/02/19 13:39:05  bkline
+# Advanced search screen for Glossary Term documents.
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, cdrdb
 
@@ -96,7 +99,7 @@ except cdrdb.Error, info:
 # Create the results page.
 #----------------------------------------------------------------------
 html = cdrcgi.advancedSearchResultsPage("Glossary Term", rows, strings, 
-        "name:Glossary Term QC Report")
+        "name:Glossary Term Advanced Search Display")
 
 #----------------------------------------------------------------------
 # Send the page back to the browser.
