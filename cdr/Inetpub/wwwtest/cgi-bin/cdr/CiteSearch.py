@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: CiteSearch.py,v 1.2 2002-02-14 19:38:10 bkline Exp $
+# $Id: CiteSearch.py,v 1.3 2002-02-20 04:00:16 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Citation documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/02/14 19:38:10  bkline
+# Fixed search element paths to match schema changes; replaced hardwired
+# filter ID with filter document name.
+#
 # Revision 1.1  2001/12/01 18:11:44  bkline
 # Initial revision
 #
@@ -119,7 +123,9 @@ if not submit:
     <INPUT      TYPE        = "submit"
                 NAME        = "ImportButton"
                 VALUE       = "Import">
-    &nbsp;PubMed Citation ID TO Import:&nbsp;&nbsp;
+    <SPAN       CLASS       = "Page">
+      &nbsp;PubMed Citation ID to Import:&nbsp;&nbsp;
+    </SPAN>
     <INPUT      NAME        = "ImportID">
    </CENTER>
   </FORM>
