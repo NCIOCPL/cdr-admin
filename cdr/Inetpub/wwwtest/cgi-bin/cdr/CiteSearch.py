@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CiteSearch.py,v 1.1 2001-12-01 18:11:44 bkline Exp $
+# $Id: CiteSearch.py,v 1.2 2002-02-14 19:38:10 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Citation documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2001/12/01 18:11:44  bkline
+# Initial revision
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, cdrdb, urllib, sys
 
@@ -129,30 +132,23 @@ if not submit:
 # Define the search fields used for the query.
 #----------------------------------------------------------------------
 searchFields = (cdrcgi.SearchField(title,
-                            ("/Citation/PubMedArticle/MedlineCitation"
-                             "/Article/ArticleTitle",
-                             "/Citation/PDQCitation/CitationTitle")),
+                        ("/Citation/PubmedArticle/%/Article/%Title",
+                         "/Citation/PDQCitation/CitationTitle")),
                 cdrcgi.SearchField(author,
-                            ("/Citation/PubMedArticle/MedlineCitation"
-                             "/Article/AuthorList/Author/PersonalName"
-                             "/LastName",
-                             "/Citation/PubMedArticle/MedlineCitation"
-                             "/Article/AuthorList/Author/PersonalName"
-                             "/FirstName",
-                             "/Citation/PubMedArticle/MedlineCitation"
-                             "/Article/AuthorList/Author/CollectiveName")),
+                        ("/Citation/PDQCitation/AuthorList/Author/%Name",
+                         "/Citation/PubmedArticle/%/AuthorList/Author/%Name")),
                 cdrcgi.SearchField(journal,
-                            ("/Citation/PubMedArticle/MedlineCitation"
-                             "/MedlineJournalInformation/MedlineTA",
+                            ("/Citation/PubmedArticle/MedlineCitation"
+                             "/MedlineJournalInfo/MedlineTA",
                              "/Citation/PDQCitation/PublicationDetails"
                              "/PublishedIn")),
                 cdrcgi.SearchField(year,
                             ("/Citation/PDQCitation/PublicationDetails"
                              "/PublicationYear",
-                             "/Citation/PubMedArticle/PubMedData/History"
+                             "/Citation/PubmedArticle/PubmedData/History"
                              "/PubMedPubDate/Year")),
                 cdrcgi.SearchField(volume,
-                            ("/Citation/PubMedArticle/MedlineCitation"
+                            ("/Citation/PubmedArticle/MedlineCitation"
                              "/Article/Journal/JournalIssue/Volume",)),
                 cdrcgi.SearchField(journal,
                             ("/Citation/PubMedArticle/MedlineCitation"
@@ -183,7 +179,7 @@ except cdrdb.Error, info:
 # Create the results page.
 #----------------------------------------------------------------------
 html = cdrcgi.advancedSearchResultsPage("Citation", rows, strings, 
-                                        "CDR266311")
+                                        "name:Citation QC Report")
 
 #----------------------------------------------------------------------
 # Send the page back to the browser.
