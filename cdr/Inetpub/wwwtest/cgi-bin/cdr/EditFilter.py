@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditFilter.py,v 1.4 2001-07-06 16:02:40 bkline Exp $
+# $Id: EditFilter.py,v 1.5 2001-12-01 17:58:54 bkline Exp $
 #
 # Prototype for editing CDR filter documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2001/07/06 16:02:40  bkline
+# Added missing / for closing CdrDoc tag in BLANKDOC.
+#
 # Revision 1.3  2001/06/13 20:15:39  bkline
 # Added code to strip carriage returns from text for TEXTAREA control.
 #
@@ -78,13 +81,14 @@ if request == "Load":
     doc = cdrcgi.decode(cdr.getDoc(session, fields[cdrcgi.DOCID].value, 'Y'))
     if doc.find("<Errors>") >= 0:
         cdrcgi.bail(doc, banner)
-    showForm(doc, "Editing existing document", ("Load", "Save", "Clone"))
+    showForm(cgi.escape(doc), #.replace("&", "&amp;"), 
+             "Editing existing document", ("Load", "Save", "Checkin", "Clone"))
 
 #----------------------------------------------------------------------
 # Create a template for a new document.
 #----------------------------------------------------------------------
 elif request == 'New':
-    showForm(BLANKDOC, "Editing new document", ("Load", "Save"))
+    showForm(BLANKDOC, "Editing new document", ("Load", "Save", "Checkin"))
 
 #--------------------------------------------------------------------
 # Create a new document using the existing data.
@@ -100,26 +104,35 @@ elif request == 'Clone':
         doc = cdrcgi.decode(cdr.getDoc(session, docId, 'Y'))
         if doc.find("<Errors>") >= 0:
             cdrcgi.bail(doc, banner)
-        showForm(doc, "Editing existing document", ("Load", "Save", "Clone"))
+        showForm(cgi.escape(doc), #.replace("&", "&amp;"), 
+                 "Editing existing document", ("Load", "Save", "Checkin",
+                                               "Clone"))
 
 #--------------------------------------------------------------------
 # Save the changes to the current document.
 #----------------------------------------------------------------------
-elif request == 'Save':
+elif request in ('Save', 'Checkin'):
     if not fields.has_key("Doc"):
         cdrcgi.bail("No document to save")
     doc = fields["Doc"].value
+    open('d:/cdr/log/filtersave.doc', 'w').write(doc)
+    checkIn = request == 'Checkin' and 'Y' or 'N'
     if re.search("<CdrDoc[^>]*\sId='[^']*'", doc, re.DOTALL):
-        docId = cdr.repDoc(session, doc=cdrcgi.encode(doc))
+        docId = cdr.repDoc(session, doc=cdrcgi.encode(doc), checkIn = checkIn)
     else:
-        docId = cdr.addDoc(session, doc=cdrcgi.encode(doc))
+        docId = cdr.addDoc(session, doc=cdrcgi.encode(doc), checkIn = checkIn)
     if docId.find("<Errors>") >= 0:
         cdrcgi.bail(doc, banner)
     else:
         doc = cdrcgi.decode(cdr.getDoc(session, docId))
         if doc.find("<Errors>") >= 0:
             cdrcgi.bail(doc, banner)
-        showForm(doc, "Editing existing document", ("Load", "Save", "Clone"))
+        if request == 'Save':
+            buttons = ("Load", "Save", "Checkin", "Clone")
+        else:
+            buttons = ("Load", "Clone")
+        showForm(cgi.escape(doc), #.replace("&", "&amp;"), 
+                 "Editing existing document", buttons)
 
 #----------------------------------------------------------------------
 # Tell the user we don't know how to do what he asked.
