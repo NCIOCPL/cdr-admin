@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ApprovedNotYetActive.py,v 1.1 2003-01-22 23:28:30 bkline Exp $
+# $Id: ApprovedNotYetActive.py,v 1.2 2003-02-26 13:52:25 bkline Exp $
 #
 # Approved Not Yet Active Protocols Verification Report
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2003/01/22 23:28:30  bkline
+# New report for issue #560.
+#
 #----------------------------------------------------------------------
 import cdr, cdrdb, cdrcgi, cgi, time, xml.dom.minidom
 
@@ -43,10 +46,17 @@ path = "/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg" \
        "/LeadOrgProtocolStatuses/CurrentOrgStatus/StatusName"
 try:
     curs.execute("""\
-        SELECT DISTINCT doc_id
-                   FROM query_term
-                  WHERE path = '%s'
-                    AND value = 'Approved-not yet active'""" % path)
+        SELECT v.id, MAX(v.num)
+          FROM doc_version v
+          JOIN query_term q
+            ON q.doc_id = v.id
+          JOIN document d
+            ON d.id = q.doc_id
+         WHERE v.publishable = 'Y'
+           AND d.active_status = 'A'
+           AND path = '%s'
+           AND value = 'Approved-not yet active'
+      GROUP BY v.id""" % path)
     rows = curs.fetchall()
 except:
     raise
@@ -58,15 +68,14 @@ except:
 filter = ['name:Approved Not Yet Active Protocols Report Filter']
 pups = {}
 for row in rows:
-    resp = cdr.filterDoc('guest', filter, row[0])
+    resp = cdr.filterDoc('guest', filter, row[0], docVer = row[1])
     if type(resp) in (type(''), type(u'')):
         cdrcgi.bail(resp)
-    if row[0] == 6331499:
-        cdrcgi.bail(resp[0])
     try:
         elem = xml.dom.minidom.parseString(resp[0]).documentElement
     except:
-        cdrcgi.bail("Failure parsing filtered protocol CDR%010d" % row[0])
+        cdrcgi.bail("Failure parsing filtered protocol "
+                    "CDR%010d version %d" % (row[0], row[1]))
 
     for topNode in elem.childNodes:
         if topNode.nodeName == "LeadOrg":
@@ -110,22 +119,7 @@ for row in rows:
                 else:
                     pup = pups[key]
                 pup.protocols.append(protocol)
-"""
-<?xml version="1.0" encoding="UTF-8"?>
-<LeadOrgs xmlns:cdr="cips.nci.nih.gov/cdr">
- <LeadOrg>
-  <OrgName>Radiation Therapy Oncology Group</OrgName>
-  <OrgProtId>RTOG-0122</OrgProtId>
-  <PUP>
-   <GivenName>Beverly</GivenName>
-   <MiddleInitial></MiddleInitial>
-   <Surname>Kratzel</Surname>
-   <Phone>215-574-3212</Phone>
-   <Email>bkratzel@phila.acr.org</Email>
-  </PUP>
- </LeadOrg>
-</LeadOrgs>
-"""
+
 #----------------------------------------------------------------------
 # Start the page.
 #----------------------------------------------------------------------
