@@ -1,0 +1,104 @@
+#----------------------------------------------------------------------
+#
+# $Id: GlossaryTermSearch.py,v 1.1 2002-02-19 13:39:05 bkline Exp $
+#
+# Prototype for duplicate-checking interface for GlossaryTerm documents.
+#
+# $Log: not supported by cvs2svn $
+#----------------------------------------------------------------------
+import cgi, cdr, cdrcgi, re, cdrdb
+
+#----------------------------------------------------------------------
+# Get the form variables.
+#----------------------------------------------------------------------
+fields     = cgi.FieldStorage()
+session    = cdrcgi.getSession(fields)
+boolOp     = fields and fields.getvalue("Boolean")          or "AND"
+name       = fields and fields.getvalue("Name")             or None
+spanish    = fields and fields.getvalue("Spanish")          or None
+definition = fields and fields.getvalue("Definition")       or None
+status     = fields and fields.getvalue("Status")           or None
+submit     = fields and fields.getvalue("SubmitButton")     or None
+help       = fields and fields.getvalue("HelpButton")       or None
+
+if help: 
+    cdrcgi.bail("Sorry, help for this interface has not yet been developed.")
+
+#----------------------------------------------------------------------
+# Connect to the CDR database.
+#----------------------------------------------------------------------
+try:
+    conn = cdrdb.connect('CdrGuest')
+except cdrdb.Error, info:
+    cdrcgi.bail('Failure connecting to CDR: %s' % info[1][0])
+
+#----------------------------------------------------------------------
+# Display the search form.
+#----------------------------------------------------------------------
+if not submit:
+    fields = (('Term Name',                    'Name'),
+              ('Spanish Name',                 'Spanish'),
+              ('Term Definition',              'Definition'),
+              ('Term Status',                  'Status'))
+    buttons = (('submit', 'SubmitButton', 'Search'),
+               ('submit', 'HelpButton',   'Help'),
+               ('reset',  'CancelButton', 'Clear'))
+    page = cdrcgi.startAdvancedSearchPage(session,
+                                          "Glossary Term Search Form",
+                                          "GlossaryTermSearch.py",
+                                          fields,
+                                          buttons,
+                                          'Glossary Term',
+                                          conn)
+    page += """\
+  </FORM>
+ </BODY>
+</HTML>
+"""
+    cdrcgi.sendPage(page)
+
+#----------------------------------------------------------------------
+# Define the search fields used for the query.
+#----------------------------------------------------------------------
+searchFields = (cdrcgi.SearchField(name,
+                            ("/GlossaryTerm/TermName",)),
+                cdrcgi.SearchField(spanish,
+                            ("/GlossaryTerm/SpanishTermName",)),
+                cdrcgi.SearchField(definition,
+                            ("/GlossaryTerm/TermDefinition",
+                             "/GlossaryTerm/SpanishTermDefinition")),
+                cdrcgi.SearchField(status,
+                            ("/GlossaryTerm/TermStatus",
+                             "/GlossaryTerm/StatusDate")))
+
+#----------------------------------------------------------------------
+# Construct the query.
+#----------------------------------------------------------------------
+(query, strings) = cdrcgi.constructAdvancedSearchQuery(searchFields, boolOp, 
+                                                       "GlossaryTerm")
+if not query:
+    cdrcgi.bail('No query criteria specified')
+#cdrcgi.bail("QUERY: [%s]" % query)
+#----------------------------------------------------------------------
+# Submit the query to the database.
+#----------------------------------------------------------------------
+try:
+    cursor = conn.cursor()
+    cursor.execute(query)
+    rows = cursor.fetchall()
+    cursor.close()
+    cursor = None
+except cdrdb.Error, info:
+    cdrcgi.bail('Failure retrieving GlossaryTerm documents: %s' % 
+                info[1][0])
+
+#----------------------------------------------------------------------
+# Create the results page.
+#----------------------------------------------------------------------
+html = cdrcgi.advancedSearchResultsPage("Glossary Term", rows, strings, 
+        "name:Glossary Term QC Report")
+
+#----------------------------------------------------------------------
+# Send the page back to the browser.
+#----------------------------------------------------------------------
+cdrcgi.sendPage(html)
