@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PreMailerProtReport.py,v 1.1 2003-01-29 18:47:47 bkline Exp $
+# $Id: PreMailerProtReport.py,v 1.2 2004-09-09 18:49:42 venglisc Exp $
 #
 # Checks run prior to generating mailers for protocols.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2003/01/29 18:47:47  bkline
+# New report run before kicking off a protocol mailer job.
+#
 #----------------------------------------------------------------------
 import cdr, cdrdb, cdrcgi, cgi
 
@@ -64,11 +67,19 @@ matPath    = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg' \
              '/MailAbstractTo'
 lopPath    = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg' \
              '/LeadOrgPersonnel/@cdr:id'
+persPath1  = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg' \
+             '/LeadOrgPersonnel/Person/@cdr:ref'
+persPath2  = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg' \
+             '/ProtocolSites/OrgSite/OrgSiteContact/SpecificPerson' \
+	     '/Person/@cdr:ref'
 loPath     = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg' \
              '/LeadOrganizationID/@cdr:ref'
+updMode    = '/Person/PersonLocations/UpdateMode'
 try:
 
+    # ---------------------------------------------------
     # Which protocols are candidates for summary mailers?
+    # ---------------------------------------------------
     cursor.execute("""\
         SELECT DISTINCT protocol.id,
                         MAX(doc_version.num) AS ver_num
@@ -110,7 +121,9 @@ try:
             ON lop.doc_id = mat.doc_id
            AND lop.value = mat.value
          WHERE mat.path = '%s'
-           AND lop.path = '%s'""" % (matPath, lopPath), timeout = 120)
+           AND lop.path = '%s'""" % (matPath, 
+	                             lopPath), 
+	           timeout = 120)
     conn.commit()
 
     # The rest are the problems we report.
@@ -120,10 +133,13 @@ try:
           JOIN document d
             ON d.id = c.id
          WHERE d.id NOT IN (SELECT id 
-                              FROM #have_mail_abstract_to)""", timeout = 120)
+                              FROM #have_mail_abstract_to)""", 
+                   timeout = 120)
     missingMailAbstractTo = cursor.fetchall()
 
+    # ----------------------------------------------------------------
     # Which protocols are eligible for status and participant mailers?
+    # ----------------------------------------------------------------
     cursor.execute("""\
              SELECT protocol.id,
                     MAX(doc_version.num) AS ver_num
@@ -187,8 +203,42 @@ try:
           JOIN document d
             ON d.id = c.id
          WHERE d.id NOT IN (SELECT id
-                              FROM #has_update_person)""", timeout = 120)
+                              FROM #has_update_person)""", 
+                   timeout = 120)
     missingUpdatePersons = cursor.fetchall()
+    
+    # ----------------------------------------
+    # Which person is attached to protocols?
+    # ----------------------------------------
+    cursor.execute("""\
+        SELECT distinct pers.int_val person_id
+          INTO #person_attached_to_protocol   
+          FROM query_term prot
+          JOIN query_term pers
+            ON prot.doc_id = pers.doc_id
+         WHERE prot.path = '%s'
+           AND prot.value in ('Active', 
+                              'Approved-Not Yet Active')
+           AND pers.path in  ('%s', '%s')
+         ORDER BY pers.int_val""" % (statusPath, 
+	                             persPath1, 
+				     persPath2), 
+	           timeout = 120)
+    conn.commit()
+
+    # Which of these persons don't have an UpdateMode element?
+    cursor.execute("""\
+        SELECT person_id, d.title
+          FROM #person_attached_to_protocol pap
+          JOIN document d
+            ON d.id = pap.person_id
+         WHERE person_id NOT IN (SELECT doc_id 
+	                           FROM query_term 
+				  WHERE path = '%s')""" % updMode, 
+                   timeout = 120)
+
+    missingUpdateMode = cursor.fetchall()
+
 except cdrdb.Error, info:
     cdrcgi.bail('Failure retrieving report information: %s' % info[1][0])
 
@@ -201,15 +251,24 @@ html = """\
  <head>
   <title>Pre-Mailer Protocol Check</title>
   <style type='text/css'>
-   h1 { font-family: sans-serif; font-size: 18; font-weight: bold }
-   h2 { font-family: sans-serif; font-size: 16; }
-   th { font-family: serif; font-size: 14; font-weight: bold; }
-   td { font-family: sans-serif; font-size: 14; }
+   h1     { font-family: sans-serif; 
+            font-size: 18; 
+	    font-weight: bold }
+   h2     { font-family: sans-serif; 
+            font-size: 16; }
+
+   th     { font-family: sans-serif; 
+            font-size: 14; 
+	    font-weight: bold; }
+   td     { font-family: sans-serif; 
+            font-size: 14; }
+   .first { width: 15%; 
+            text-align: left; }
   </style>
  </head>
  <body>
   <h1>Pre-Mailer Protocol Check</h1>
-  <br>
+
   <h2>Protocols without MailAbstractTo element</h2>
 """
 
@@ -219,16 +278,16 @@ if not missingMailAbstractTo:
 """
 else:
     html += """\
-  <table border='1' cellspacing='0' cellpadding='2'>
+  <table border='1' width='100%%' cellspacing='0' cellpadding='2'>
    <tr>
-    <th nowrap='1'>Document ID</th>
+    <th nowrap='1' class='first'>Document ID</th>
     <th nowrap='1'>Document Title</th>
    </tr>
 """
     for row in missingMailAbstractTo:
         html += """\
    <tr>
-    <td valign='top'>CDR%010d</td>
+    <td valign='top'>CDR%d</td>
     <td>%s</td>
    </tr>
 """ % (row[0], cgi.escape(row[1]))
@@ -237,8 +296,9 @@ else:
 """
 
 html += """\
-  <br>
-  <h2>Protocols without update persons</h2>
+  <br><br>
+  <h2>Protocols without update persons 
+      (excluding orgs receiving update by email)</h2>
 """
 
 if not missingUpdatePersons:
@@ -247,20 +307,48 @@ if not missingUpdatePersons:
 """
 else:
     html += """\
-  <table border='1' cellspacing='0' cellpadding='2'>
+  <table border='1' width='100%%' cellspacing='0' cellpadding='2'>
    <tr>
-    <th nowrap='1'>Document ID</th>
+    <th nowrap='1' class='first'>Document ID</th>
     <th nowrap='1'>Document Title</th>
    </tr>
 """
     for row in missingUpdatePersons:
         html += """\
    <tr>
-    <td valign='top'>CDR%010d</td>
+    <td valign='top'>CDR%d</td>
     <td>%s</td>
    </tr>
 """ % (row[0], cgi.escape(row[1]))
     html += """\
+  </table>
+"""
+
+html += """\
+  <br><br>
+  <h2>Persons attached to protocols without UpdateMode element</h2>
+"""
+if not missingUpdateMode:
+    html += """\
+  <p>None</p>
+"""
+else:
+    html += """\
+  <table border='1' width='100%%' cellspacing='0' cellpadding='2'>
+   <tr>
+    <th nowrap='1' class='first'>Document ID</th>
+    <th nowrap='1'>Document Title</th>
+   </tr>
+"""
+    for row in missingUpdateMode:
+        html += """\
+   <tr>
+    <td valign='top'>CDR%d</td>
+    <td>%s</td>
+   </tr>
+""" % (row[0], cgi.escape(row[1]))
+
+html += """\
   </table>
  </body>
 </html>
