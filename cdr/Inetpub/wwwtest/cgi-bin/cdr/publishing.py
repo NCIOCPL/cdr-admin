@@ -2,8 +2,11 @@
 #
 # Publishing CGI script.
 #
-# $Id: publishing.py,v 1.1 2001-12-01 18:11:44 bkline Exp $
+# $Id: publishing.py,v 1.2 2001-12-03 23:10:05 Pzhang Exp $
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2001/12/01 18:11:44  bkline
+# Initial revision
+#
 #
 #----------------------------------------------------------------------
 import cgi, cdrcgi, re, string, copy, os, sys, urllib, publish
@@ -170,32 +173,33 @@ class Display:
         # form += "of system %s?</p>\n" % fields.getvalue('PubSys')
         form += """Email notification of completion?
         <input type="checkbox" checked name="Email" value="y">&nbsp;&nbsp;
-        <input type="text" name="EmailAddr" value="***REMOVED***"><br><br>
+        <BR> Use comma to separate receivers: &nbsp
+        <input type="text" size="50" name="EmailAddr" value="***REMOVED***"><br><br>
         <input type="submit" name="Publish" value="Yes">&nbsp;&nbsp;
         <input type="submit" name="Publish" value="No">"""
            
         cdrcgi.sendPage(header + form + "</FORM></BODY></HTML>")
     
     # Publish and return a link for checking status.
-    def initPublish(self, ctrlDocId, subsetName, credential, docIds, params):
+    def initPublish(self, ctrlDocId, subsetName, credential, docIds, params, email):
 
         form = "<H4>Publishing SubSet %s</H4>\n" % subsetName
         form += "<OL>\n"
     
         # Get publishing job ID.       
-        p = publish.Publish(ctrlDocId, subsetName, credential, docIds, params)
+        p = publish.Publish(ctrlDocId, subsetName, credential, docIds, params, email)
         jobId = p.getJobId()
         if type(jobId) == type(""):            
             form += "<LI>Failed: <H5>%s</H5></LI>\n" % jobId
         else:
             form += "<LI>Started: </LI><BR>\n"            
-            form += """Check the <A HREF='%s/%s?jobId=%d&%s=%s'>%s</A></LI>\n
-                    """ % (cdrcgi.BASE, 'Publishing.py', jobId, cdrcgi.SESSION, 
-                    session, "status of publishing job: %d" % jobId)
+            form += """Check the <A HREF='%s/%s?id=%d'>%s</A></LI>\n
+                    """ % (cdrcgi.BASE, 'PubStatus.py', jobId,
+                        "status of publishing job: %d" % jobId)
 
         self.__addFooter(form)
 
-    # Display the status.
+    # Display the status. Use Bob's PubStatus.py instead.
     def getStatus(self, jobId):
 
         # Initialize hidden values.
@@ -280,7 +284,11 @@ if fields.has_key('Session') and fields.has_key('SubSet') and \
         params = None
         if parms:
             params = string.split(parms[1:], ",")
-        d.initPublish(ctrlDocId, subsetName, credential, docIds, params)
+        if fields.getvalue('Email') == 'y':        
+            email = fields.getvalue('EmailAddr')
+        else:
+            email = "Do not notify"
+        d.initPublish(ctrlDocId, subsetName, credential, docIds, params, email)
 
 elif fields.has_key('Session') and fields.has_key('SubSet') and \
     fields.has_key('ctrlId') and fields.has_key('DocParam'):
