@@ -1,10 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: PreMailerProtReport.py,v 1.3 2004-09-10 20:31:56 venglisc Exp $
+# $Id: PreMailerProtReport.py,v 1.4 2004-09-15 20:40:05 venglisc Exp $
 #
 # Checks run prior to generating mailers for protocols.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2004/09/10 20:31:56  venglisc
+# The requirements have been modified to only check for an existing
+# UpdateMode element for those persons listed as a PUP on a protocol.
+# (Bug 1313).
+#
 # Revision 1.2  2004/09/09 18:49:42  venglisc
 # Added third section to PreMailer Check Report listing all persons
 # attached to protocols that do not have an UpdateMode element. (Bug 1313)
@@ -334,7 +339,7 @@ else:
 
 html += """\
   <br><br>
-  <h2>Persons attached to protocols without UpdateMode element</h2>
+  <h2>Update persons attached to protocols without UpdateMode element</h2>
 """
 if not missingUpdateMode:
     html += """\
