@@ -1,72 +1,55 @@
 #----------------------------------------------------------------------
 #
-# $Id: CdrReport.py,v 1.2 2001-03-27 21:17:40 bkline Exp $
+# $Id: CdrReport.py,v 1.3 2001-04-08 22:53:54 bkline Exp $
 #
 # Prototype for CDR reporting/formatting web wrapper.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2001/03/27 21:17:40  bkline
+# Extracted some common functionality out to cdrcgi.py.
+#
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re
+import cgi, cdr, cdrcgi, re, string
 
-
 #----------------------------------------------------------------------
-# Set some session and form variables.
+# Set the form variables.
 #----------------------------------------------------------------------
-title   = "CDR Reporting and Printing"
-instr   = "Select Options and Submit Request"
-buttons = ("Submit Request",)
-header  = cdrcgi.header(title, title, instr, "CdrReport.py", buttons)
 fields  = cgi.FieldStorage()
-session = fields and cdrcgi.getSession(fields) or None
-request = fields and cdrcgi.getRequest(fields) or None
-docId   = fields and fields.getvalue(cdrcgi.DOCID) or 'CDR106085'
-filtId  = fields and fields.getvalue(cdrcgi.FILTER) or 'CDR190703'
+days    = fields and fields.getvalue("Days") or None
 
 #----------------------------------------------------------------------
-# Build some data-entry fields for a new request.
+# Do the report if we have a request.
 #----------------------------------------------------------------------
-form    = "<TABLE CELLSPACING='0' CELLPADDING='0' BORDER='0'>\n"
-if session:
-    form = form + "<INPUT TYPE='hidden' NAME='%s' VALUE='%s'>\n" % (
-                  cdrcgi.SESSION, session)
+if days:
+    diff    = "0000-00-%02d" % string.atoi(days)
+    parms   = (('InactivityLength', diff),)
+    logon   = ('rmk','***REDACTED***')
+    name    = 'Inactive Checked Out Documents'
+    report  = cdr.report(logon, name, parms)
+    report  = re.sub("<!\[CDATA\[", "", report)
+    report  = re.sub("\]\]>", "", report)
+    html    = cdr.filterDoc(logon, 'CDR0000190706', doc=report)
+    html    = unicode(html, 'utf-8').encode('latin-1')
+    html    = re.sub('@@DAYS@@', days, html)
+    cdrcgi.sendPage(html)
+
+#----------------------------------------------------------------------
+# Put out the form if we don't have a request.
+#----------------------------------------------------------------------
 else:
-    form = form + """\
+    title   = "Inactive Documents"
+    instr   = "Select Options and Submit Request"
+    buttons = ("Submit Request",)
+    header  = cdrcgi.header(title, title, instr, "CdrReport.py", buttons)
+    form    = """\
+        <TABLE CELLSPACING='0' CELLPADDING='0' BORDER='0'>
         <TR>
-         <TD ALIGN='right'><B>CDR User Name&nbsp;</B></TD>
-         <TD><INPUT NAME='%s'></TD>
-        </TR>
-        <TR>
-         <TD ALIGN='right'><B>CDR Password&nbsp;</B></TD>
-         <TD><INPUT TYPE='password' NAME='%s'></TD>
-        </TR>\n""" % (cdrcgi.USERNAME, cdrcgi.PASSWORD)
-form = form + """\
-        <TR>
-          <TD ALIGN='right'><B>Document ID&nbsp;</B></TD>
-          <TD><INPUT NAME='%s' VALUE='%s'></TD>
-        </TR>
-        <TR>
-          <TD ALIGN='right'><B>Filter ID&nbsp;</B></TD>
-          <TD><INPUT NAME='%s' VALUE='%s'></TD>
+          <TD ALIGN='right'><B>Days of Inactivity&nbsp;</B></TD>
+          <TD><INPUT NAME='Days' VALUE='2'></TD>
         </TR>
        </TABLE>
-      </FORM>\n""" % (cdrcgi.DOCID, docId, cdrcgi.FILTER, filtId)
-
-#----------------------------------------------------------------------
-# Print what we have so far
-#----------------------------------------------------------------------
-print header + form
-
-#----------------------------------------------------------------------
-# If we have a filter request, do it.
-#----------------------------------------------------------------------
-if session and docId and filtId and request == "Submit Request":
-    print "<HR>"
-    doc = cdr.filterDoc(session, docId, filtId)
-    doc = re.sub("@@DOCID@@", docId, doc)
-    print "<TABLE WIDTH='100%' CELLSPACING='0' CELLPADDING='0' BORDER='0'>" 
-    print "<TR><TD>%s</TD></TR></TABLE>" % doc
-
-#----------------------------------------------------------------------
-# Wrap up and go home.
-#----------------------------------------------------------------------
-print "</BODY></HTML>"
+      </FORM>
+     </BODY>
+    </HTML>
+    """
+    cdrcgi.sendPage(header + form)
