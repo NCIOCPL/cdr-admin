@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: Reports.py,v 1.5 2002-02-26 18:55:29 bkline Exp $
+# $Id: Reports.py,v 1.6 2002-03-02 13:50:31 bkline Exp $
 #
 # Prototype for editing CDR linking tables.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2002/02/26 18:55:29  bkline
+# Sorted report menu alphabetically.
+#
 # Revision 1.4  2002/02/21 15:22:03  bkline
 # Added navigation buttons.
 #
@@ -44,6 +47,7 @@ if action == cdrcgi.MAINMENU:
 form = "<INPUT TYPE='hidden' NAME='%s' VALUE='%s'><OL>\n" % (cdrcgi.SESSION,
                                                              session)
 reports = [
+           ('CheckedOutDocs.py', 'Checked Out Documents'),
            ('ConceptTermReviewReport.py', 'Concept/Term Review Report'),
            ('CdrReport.py', 'Inactive Documents'),
            ('CheckUrls.py', 'Inactive Hyperlinks'),
