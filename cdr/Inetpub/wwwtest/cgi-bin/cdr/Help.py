@@ -1,15 +1,24 @@
 #----------------------------------------------------------------------
 #
-# $Id: Help.py,v 1.2 2002-08-15 19:26:26 bkline Exp $
+# $Id: Help.py,v 1.3 2002-10-18 13:54:49 bkline Exp $
 #
 # Display the table of contents for the CDR help system.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/08/15 19:26:26  bkline
+# Removed hard-coded CDR login credentials.
+#
 # Revision 1.1  2002/06/04 20:18:52  bkline
 # New interface to Eileen's Help pages.
 #
 #----------------------------------------------------------------------
-import cdr, cdrcgi, cdrdb
+import cdr, cgi, cdrcgi, cdrdb
+
+#----------------------------------------------------------------------
+# Get the parameters from the request.
+#----------------------------------------------------------------------
+fields    = cgi.FieldStorage()
+flavor    = fields and fields.getvalue('flavor') or 'CDR Help'
 
 #----------------------------------------------------------------------
 # Connect to the CDR database.
@@ -23,16 +32,18 @@ except cdrdb.Error, info:
 # Find the table of contents document.
 #----------------------------------------------------------------------
 try:
+    
     cursor = conn.cursor()
     cursor.execute("""\
             SELECT TOP 1 document.id
                     FROM document
                     JOIN doc_type
                       ON doc_type.id = document.doc_type
-                   WHERE doc_type.name = 'DocumentationToC'""")
+                   WHERE doc_type.name = 'DocumentationToC'
+                     AND document.title LIKE '%s%%'""" % flavor)
     rows = cursor.fetchall()
-    if len(rows) != 1:
-        cdrcgi.bail("Should be exactly one table of contents for CDR Help")
+    if not rows:
+        cdrcgi.bail("Cannot find %s table of contents")
 except cdrdb.Error, info:
     cdrcgi.bail('Failure locating table of contents document: %s' % info[1][0])
 
