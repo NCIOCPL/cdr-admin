@@ -2,8 +2,11 @@
 #
 # Publishing CGI script.
 #
-# $Id: publishing.py,v 1.21 2002-11-20 16:57:15 pzhang Exp $
+# $Id: publishing.py,v 1.22 2003-02-07 21:15:53 pzhang Exp $
 # $Log: not supported by cvs2svn $
+# Revision 1.21  2002/11/20 16:57:15  pzhang
+# Added GroupEmailAddrs and extracted user email from usr table.
+#
 # Revision 1.20  2002/11/07 23:11:28  pzhang
 # Hid QcFilterSets system; Made SubSetName readonly.
 #
@@ -582,10 +585,10 @@ class Display:
             (rs, err) = self.__cdrConn.Execute(sql)
         except pythoncom.com_error, (hr, msg, exc, arg):            
             if exc is None:
-                reason += "Code %d: %s" % (hr, msg)
+                reason = "Code %d: %s" % (hr, msg)
             else:
                 wcode, source, text, helpFile, helpId, scode = exc
-                reason += "Src: " + source + ". Msg: " + text          
+                reason = "Src: " + source + ". Msg: " + text          
             rs = None
             self.__cdrConn.Close()
             self.__cdrConn = None
