@@ -2,8 +2,11 @@
 #
 # Publishing CGI script.
 #
-# $Id: publishing.py,v 1.13 2002-09-03 22:27:39 pzhang Exp $
+# $Id: publishing.py,v 1.14 2002-09-12 18:50:56 pzhang Exp $
 # $Log: not supported by cvs2svn $
+# Revision 1.13  2002/09/03 22:27:39  pzhang
+# Added picklist for values 'Yes'/'No'.
+#
 # Revision 1.12  2002/09/03 17:20:37  pzhang
 # Added managing status link.
 # Dropped inactive and mailer control documents from being displayed.
@@ -122,8 +125,8 @@ class Display:
             subset[1] =  s[1] 
             subset[2] = s[1]
             subset[2] += "<BR>[Desc]: &nbsp;"  + s[2]
-            subset[2] += "<BR>[Params]: &nbsp;" + s[3]             
-            subset[2] += "<BR>[UserSel]: &nbsp;"  + s[4]            
+            #subset[2] += "<BR>[Params]: &nbsp;" + s[3]             
+            #subset[2] += "<BR>[UserSel]: &nbsp;"  + s[4]            
             subset[3] = s[3] and 'Param=Yes' or ''                        
             if s[4]:
                 subset[3] += '&Doc=Yes'
@@ -287,7 +290,7 @@ class Display:
            
         # Get publishing job ID.       
         resp = cdr.publish(credential, systemName, subsetName, params, docIds,
-                            email, no_output)
+                            email, no_output, port = cdr.getPubPort())
         jobId = resp[0]
         if not jobId:            
             form += "<B>Failed:</B> %s\n" % resp[1]
