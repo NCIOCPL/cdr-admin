@@ -1,13 +1,16 @@
 #----------------------------------------------------------------------
 #
-# $Id: NonRespondents.py,v 1.1 2003-06-10 13:56:11 bkline Exp $
+# $Id: NonRespondents.py,v 1.2 2003-06-13 20:29:42 bkline Exp $
 #
 # Report on mailers which haven't been responded to (other than
 # status and participant mailers).
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2003/06/10 13:56:11  bkline
+# First cut at Mailer non-respondents report.
+#
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, cdrdb, re, sys, time
+import cgi, cdr, cdrcgi, cdrdb, re, sys, time, cdrbatch
 
 #----------------------------------------------------------------------
 # Get the parameters from the request.
@@ -21,8 +24,10 @@ SUBMENU  = "Reports Menu"
 buttons  = ["Submit", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 header   = cdrcgi.header(title, title, section, "NonRespondents.py",
                          buttons, method = 'GET')
-docType  = fields.getvalue("DocType")    or None
-age      = fields.getvalue("Age")        or None
+docType  = fields and fields.getvalue("DocType")    or None
+age      = fields and fields.getvalue("Age")        or None
+email    = fields and fields.getvalue("Email")      or None
+command  = 'lib/Python/CdrLongReports.py'
 
 #----------------------------------------------------------------------
 # Handle navigation requests.
@@ -41,8 +46,16 @@ if action == "Log Out":
 #----------------------------------------------------------------------
 # Put up the request interface if appropriate.
 #----------------------------------------------------------------------
-if not docType or not age:
+if not docType or not age or not email:
     form = """\
+   <p>
+    This report requires a few minutes to complete.
+    When the report processing has completed, email notification
+    will be sent to the addresses specified below.  At least
+    one email address must be provided.  If more than one
+    address is specified, separate the addresses with a blank.
+   </p>
+   <br>
   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
    <OL>
     <LI>Type of mailer:&nbsp;&nbsp;&nbsp;
@@ -57,8 +70,12 @@ if not docType or not age:
      <SELECT NAME='Age'>
       <OPTION VALUE='15'>15-29 days since last mailer</OPTION>
       <OPTION VALUE='30'>30-59 days since last mailer</OPTION>
-      <OPTION VALUE='60'>over 60 days since last mailer</OPTION>
+      <OPTION VALUE='60'>120-60 days since last mailer</OPTION>
      </SELECT>
+    </LI>
+    <BR><BR><BR>
+    <LI>Email address(es):&nbsp;&nbsp;&nbsp;
+     <INPUT Name='Email' Size='40'>
     </LI>
    </OL>
 """ % (cdrcgi.SESSION, session)
@@ -67,183 +84,38 @@ if not docType or not age:
 </HTML>
 """)
 
+#----------------------------------------------------------------------    
+# If we get here, we're ready to queue up a request for the report.
 #----------------------------------------------------------------------
-# Set up a database connection and cursor.
-#----------------------------------------------------------------------
-try:
-    conn = cdrdb.connect('CdrGuest')
-    cursor = conn.cursor()
-except cdrdb.Error, info:
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
+args = (("Age", age), ("BaseDocType", docType), ("Host", cdrcgi.WEBSERVER))
 
-#----------------------------------------------------------------------
-# Create the report.
-#----------------------------------------------------------------------
-now = time.localtime()
-startDate = list(now)
-endDate   = list(now)
-if age == "15":
-    startDate[2] -= 29
-    endDate[2]   -= 15
-    ageString     = '15-29 days since last mailer'
-elif age == "30":
-    startDate[2] -= 59
-    endDate[2]   -= 30
-    ageString     = '30-59 days since last mailer'
-else:
-    startDate[0]  = 1990
-    endDate[2]   -= 60
-    ageString     = 'Over 60 days since last mailer'
-startDate = time.mktime(startDate)
-endDate   = time.mktime(endDate)
-startDate = time.strftime("%Y-%m-%d", time.localtime(startDate))
-endDate   = time.strftime("%Y-%m-%d 23:59:59.999", time.localtime(endDate))
+# Have to do this on Mahler, since that's the only server with Excel installed.
+batch = cdrbatch.CdrBatch(jobName = "Mailer Non-Respondents",
+                          command = command, email = email,
+                          args = args, host='mahler.nci.nih.gov')
 try:
-    cursor.execute("""\
-        CREATE TABLE #last_mailers (doc_id INTEGER, mailer_id INTEGER)""")
-    conn.commit()
-    cursor.execute("""\
-INSERT INTO #last_mailers
-     SELECT q1.int_val, MAX(q1.doc_id)
-       FROM query_term q1
-       JOIN query_term q2
-         ON q1.doc_id = q2.doc_id
-       JOIN document d
-         ON d.id = q1.int_val
-       JOIN doc_type t
-         ON t.id = d.doc_type
-      WHERE t.name = ?
-        AND q1.path = '/Mailer/Document/@cdr:ref'
-        AND q2.path = '/Mailer/Sent'
-        AND q2.value BETWEEN ? AND ?
-   GROUP BY q1.int_val""", (docType, startDate, endDate), timeout = 300)
-    conn.commit()
-    cursor.execute("""\
-        CREATE TABLE #no_reply (doc_id INTEGER, mailer_id INTEGER)""")
-    conn.commit()
-    cursor.execute("""\
-INSERT INTO #no_reply
-     SELECT lm.doc_id, lm.mailer_id
-       FROM #last_mailers lm
-      WHERE NOT EXISTS(SELECT *
-                         FROM query_term q
-                        WHERE q.doc_id = lm.mailer_id
-                          AND q.path = '/Mailer/Response/Received')""",
-                   timeout = 300)
-    conn.commit()
-    cursor.execute("""\
-         SELECT recip_name.title, 
-                #no_reply.doc_id, 
-                base_doc.doc_id, 
-                mailer_type.value, 
-                mailer_sent.value, 
-                response_received.value,
-                changes_category.value
-           FROM document recip_name
-           JOIN query_term recipient
-             ON recipient.int_val = recip_name.id
-           JOIN #no_reply
-             ON #no_reply.mailer_id = recipient.doc_id
-           JOIN query_term base_doc
-             ON base_doc.int_val = #no_reply.doc_id
-           JOIN query_term mailer_type
-             ON mailer_type.doc_id = base_doc.doc_id
-           JOIN query_term mailer_sent
-             ON mailer_sent.doc_id = base_doc.doc_id
-LEFT OUTER JOIN query_term response_received
-             ON response_received.doc_id = base_doc.doc_id
-            AND response_received.path = '/Mailer/Response/Received'
-LEFT OUTER JOIN query_term changes_category
-             ON changes_category.doc_id = base_doc.doc_id
-            AND changes_category.path = '/Mailer/Response/ChangesCategory'
-          WHERE recipient.path = '/Mailer/Recipient/@cdr:ref'
-            AND mailer_type.path = '/Mailer/Type'
-            AND mailer_sent.path = '/Mailer/Sent'
-            AND base_doc.path = '/Mailer/Document/@cdr:ref'
-       ORDER BY recip_name.title, #no_reply.doc_id, base_doc.doc_id DESC""",
-    timeout = 300)
-    rows = cursor.fetchall()
-except Exception, info:
-    cdrcgi.bail("Database failure fetching report information: %s" % str(info))
-if docType == "InScopeProtocol":
-    docType = "Protocol Summary"
-html = """\
-<html>
- <head>
-  <title>Mailer Non-Respondents Report</title>
+    batch.queue()
+except Exception, e:
+    cdrcgi.bail("Could not start job: " + str(e))
+jobId       = batch.getJobId()
+buttons     = [SUBMENU, cdrcgi.MAINMENU, "Log Out"]
+script      = 'osp.py'
+header      = cdrcgi.header(title, title, section, script, buttons,
+                            stylesheet = """\
   <style type='text/css'>
-   h1 { font-family: Arial; font-size: 14pt; text-align: center; }
-   tr { vertical-align: top; }
-   th { font-family: Arial; font-size: 11pt; font-weight: bold;
-        text-align: left; }
-   td { font-family: Arial; font-size: 10pt; }
+   body { font-family: Arial }
   </style>
- </head>
- <body>
-  <h1>Mailer Non-Respondents Report<br>%s</h1>
-  <br><br>
-  <table border='0'>
-   <tr>
-    <th>Mailer Type</th>
-    <th>%s</th>
-   </tr>
-   <tr>
-    <th>Non response Time&nbsp;&nbsp;&nbsp;&nbsp;</th>
-    <th>%s</th>
-   </tr>
-  </table>
-  <br><br>
-""" % (time.strftime("%B %d, %Y"), docType, ageString)
-lastRecipName = ""
-lastBaseDocId = None
-if not rows:
-    cdrcgi.bail("No data found for report")
-for row in rows:
-    if row[0] == lastRecipName:
-        recipName = "&nbsp;"
-    else:
-        if lastRecipName:
-            html += """\
-  </table>
-  <br>
-"""
-        html += """
-  <table border='1' cellpadding='2' cellspacing='0'>
-   <tr>
-    <th nowrap='1' width='26%'>Recipient Name</th>
-    <th nowrap='1' width='12%'>Base DocID</th>
-    <th nowrap='1' width='12%'>Mailer DocID</th>
-    <th nowrap='1' width='26%'>Mailer Type</th>
-    <th nowrap='1' width='12%'>Generated Date</th>
-    <th nowrap='1' width='12%'>Response Date</th>
-   </tr>
-"""
-        recipName = lastRecipName = row[0]
-        semicolon = recipName.find(";")
-        if semicolon != -1:
-            recipName = recipName[:semicolon]
-        recipName = cgi.escape(cdrcgi.unicodeToLatin1(recipName))
-    if row[1] == lastBaseDocId:
-        baseDocId = "&nbsp;"
-    else:
-        baseDocId = "CDR%d" % row[1]
-        lastBaseDocId = row[1]
-    generatedDate = row[4] and row[4][:10] or "&nbsp;"
-    responseDate  = row[5] and row[5][:10] or "&nbsp;"
-    if row[6] == "Returned to sender":
-        responseDate = "RTS"
-    html += """
-   <tr>
-    <td>%s</td>
-    <td>%s</td>
-    <td>CDR%d</td>
-    <td>%s</td>
-    <td>%s</td>
-    <td>%s</td>
-   </tr>
-""" % (recipName, baseDocId, row[2], row[3], generatedDate, responseDate)
-cdrcgi.sendPage(html + """\
-  </table>
+ """)
+cdrcgi.sendPage(header + """\
+   <h4>Report has been queued for background processing</h4>
+   <p>
+    To monitor the status of the job, click this
+    <a href='getBatchStatus.py?%s=%s&jobId=%s'><u>link</u></a>
+    or use the CDR Administration menu to select 'View
+    Batch Job Status'.
+   </p>
+  </form>
  </body>
 </html>
-""")
+""" % (cdrcgi.SESSION, session, jobId))
+
