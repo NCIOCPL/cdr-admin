@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermPhrases.py,v 1.3 2004-08-26 14:08:58 bkline Exp $
+# $Id: GlossaryTermPhrases.py,v 1.4 2004-08-31 12:55:17 bkline Exp $
 #
 # Report on phrases matching specified glossary term.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2004/08/26 14:08:58  bkline
+# Added missing hidden field for trials.
+#
 # Revision 1.2  2004/08/12 13:43:28  bkline
 # Changes requested by Margaret (including ability to restrict the
 # report to search specified document types).
@@ -58,12 +61,12 @@ if request == "Log Out":
 #----------------------------------------------------------------------
 # If we don't have a request, put up the request form.
 #----------------------------------------------------------------------
-if not name and not id or not email:
+if not name and not id or not email or not (hp or patient or trials):
     form = """\
    <p>
     This report requires a few minutes to complete.
     When the report processing has completed, email notification
-    will be sent to the addresses specified below.  At least
+    will be sent to all addresses specified below.  At least
     one email address must be provided.  If more than one
     address is specified, separate the addresses with a blank.
    </p>
@@ -96,12 +99,6 @@ if not name and not id or not email:
 </HTML>
 """ % (cdrcgi.SESSION, session, id and (" VALUE='%s'" % id) or "")
     cdrcgi.sendPage(header + form)
-
-#----------------------------------------------------------------------
-# Make sure the user has selected at least one document type.
-#----------------------------------------------------------------------
-if not hp and not patient and not trials:
-    cdrcgi.bail("No document type selected")
 
 #----------------------------------------------------------------------
 # Allow the user to select from a list of protocols matching title string.
