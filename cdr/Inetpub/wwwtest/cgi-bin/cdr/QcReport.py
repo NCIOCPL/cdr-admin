@@ -1,11 +1,16 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.29 2003-09-16 21:15:39 bkline Exp $
+# $Id: QcReport.py,v 1.30 2003-11-12 19:58:47 bkline Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.29  2003/09/16 21:15:39  bkline
+# Changed test for Summary docType to take into account suffixes that
+# may have been added to the string to indicate which flavor of report
+# has been requested.
+#
 # Revision 1.28  2003/09/05 21:05:43  bkline
 # Tweaks for "Display Comments" checkbox requested by Margaret.
 #
@@ -451,6 +456,9 @@ def fixMailerInfo(doc):
 # Plug in pieces that XSL/T can't get to for a Person QC report.
 #----------------------------------------------------------------------
 def fixPersonReport(doc):
+    cursor.execute("SELECT COUNT(*) FROM external_map WHERE doc_id = ?",
+                   intId)
+    row    = cursor.fetchone()
     doc    = fixMailerInfo(doc)
     counts = getDocsLinkingToPerson(intId)
     doc    = re.sub("@@ACTIVE_APPR0VED_TEMPORARILY_CLOSED_PROTOCOLS@@",
@@ -461,6 +469,8 @@ def fixPersonReport(doc):
                     counts[2] and "Yes" or "No", doc)
     doc    = re.sub("@@PATIENT_SUMMARIES@@",
                     counts[3] and "Yes" or "No", doc)
+    doc    = re.sub("@@IN_EXTERNAL_MAP_TABLE@@",
+                    (row[0] > 0) and "Yes" or "No", doc)
     return doc
 
 #----------------------------------------------------------------------
