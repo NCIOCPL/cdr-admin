@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.28 2003-09-05 21:05:43 bkline Exp $
+# $Id: QcReport.py,v 1.29 2003-09-16 21:15:39 bkline Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.28  2003/09/05 21:05:43  bkline
+# Tweaks for "Display Comments" checkbox requested by Margaret.
+#
 # Revision 1.27  2003/09/04 21:31:01  bkline
 # Added checkbox for DisplayComments (summary reports).
 #
@@ -484,7 +487,7 @@ if not filters.has_key(docType):
 filterParm = []
 if insRevLvls:
     filterParm = [['insRevLevels', insRevLvls]]
-if docType == 'Summary':
+if docType.startswith('Summary'):
     filterParm.append(['DisplayComments',
                        displayComments and 'Y' or 'N'])
 if repType == "bu" or repType == "but":
