@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: DocVersionHistory.py,v 1.11 2003-02-12 16:19:10 pzhang Exp $
+# $Id: DocVersionHistory.py,v 1.12 2004-02-05 13:36:47 bkline Exp $
 #
 # Show version history of document.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.11  2003/02/12 16:19:10  pzhang
+# Showed Vendor or CG job suffix with publication dates.
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, cdrdb, re, sys, time
 
@@ -16,7 +19,7 @@ fields   = cgi.FieldStorage() or cdrcgi.bail("No Request Found", repTitle)
 session  = cdrcgi.getSession(fields) or cdrcgi.bail("Not logged in")
 action   = cdrcgi.getRequest(fields)
 title    = "CDR Administration"
-section  = "QC Report"
+section  = "Document Version History"
 SUBMENU  = "Reports Menu"
 buttons  = ["Submit", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 script   = "DocVersionHistory.py"
