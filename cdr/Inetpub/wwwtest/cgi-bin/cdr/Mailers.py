@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: Mailers.py,v 1.9 2004-07-13 17:47:06 bkline Exp $
+# $Id: Mailers.py,v 1.10 2004-07-17 11:52:54 bkline Exp $
 #
 # Main menu for mailer jobs.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.9  2004/07/13 17:47:06  bkline
+# Added electronic mailer review.
+#
 # Revision 1.8  2002/10/24 20:10:42  bkline
 # Added separate items for Editorial and Advisory boards mailers.
 #
@@ -59,6 +62,8 @@ reports = (('DirectoryMailerReqForm.py?', 'Directory Mailers'),
             'Summary Mailers (Editorial Board)'),
            ('SummaryMailerReqForm.py?BoardType=Advisory&',
             'Summary Mailers (Advisory Board)'),
+           ('BoardMemberMailerReqForm.py?',
+            'PDQ&reg; Board Member Correspondence Mailers'),
            ('EmailerReview.py?', 'Electronic Mailer Review'))
 
 for r in reports:
