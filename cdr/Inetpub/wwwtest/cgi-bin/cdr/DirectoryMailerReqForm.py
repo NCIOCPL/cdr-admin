@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: DirectoryMailerReqForm.py,v 1.9 2002-10-22 21:54:26 ameyer Exp $
+# $Id: DirectoryMailerReqForm.py,v 1.10 2002-11-01 02:44:44 ameyer Exp $
 #
 # Request form for all directory mailers.
 #
@@ -31,6 +31,9 @@
 # Bob Kline.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.9  2002/10/22 21:54:26  ameyer
+# Added user control to limit the number of docs selected for mailing.
+#
 # Revision 1.8  2002/10/09 15:23:06  ameyer
 # Optimized queries - run significantly faster.
 # Set autocommit on.
@@ -249,7 +252,9 @@ if docId:
         cursor.execute("""\
             SELECT MAX(num)
               FROM doc_version
-             WHERE id = ?""", (intId,))
+             WHERE id = ?
+               AND publishable = 'Y'
+            """, (intId,))
         row = cursor.fetchone()
 
         # Document list contains one tuple of doc id + version number
@@ -317,7 +322,7 @@ else:
         #   No non-failing mailer has previously been generated of
         #       of type Physician-Initial.
         qry = """
-            SELECT top %d document.id, MAX(doc_version.num)
+            SELECT TOP %d document.id, MAX(doc_version.num)
                        FROM doc_version
                        JOIN ready_for_review
                          ON ready_for_review.doc_id = doc_version.id
@@ -328,6 +333,7 @@ else:
                        JOIN query_term qinc
                          ON qinc.doc_id = document.id
                       WHERE qstat.path = '/Person/Status/CurrentStatus'
+                        AND doc_version.publishable = 'Y'
                         AND qstat.value = 'Active'
                         AND qinc.path =
                            '/Person/ProfessionalInformation/PhysicianDetails/AdministrativeInformation/Directory/Include'
@@ -377,7 +383,7 @@ else:
         #         Physician-Annual update
         #         Physician-Annual remail
         qry = """
-            SELECT top %d document.id, MAX(doc_version.num)
+            SELECT TOP %d document.id, MAX(doc_version.num)
                        FROM doc_version
                        JOIN document
                          ON doc_version.id = document.id
@@ -390,6 +396,7 @@ else:
                        JOIN query_term qinc
                          ON qinc.doc_id = document.id
                       WHERE qstat.path = '/Person/Status/CurrentStatus'
+                        AND doc_version.publishable = 'Y'
                         AND qstat.value = 'Active'
                         AND (
                              p1.pub_subset = 'Physician-Initial'
@@ -436,7 +443,7 @@ else:
         #   No non-failing update mailer sent in the past year.
         #   No non-failing remailer sent in the past year.
         qry = """
-            SELECT top %d document.id, MAX(doc_version.num)
+            SELECT DISTINCT TOP %d document.id, MAX(doc_version.num)
                        FROM doc_version
                        JOIN document
                          ON doc_version.id = document.id
@@ -446,6 +453,7 @@ else:
                          ON qorgtype.doc_id = document.id
                       WHERE qinc.path =
                            '/Organization/OrganizationDetails/OrganizationAdministrativeInformation/IncludeInDirectory'
+                        AND doc_version.publishable = 'Y'
                         AND qinc.value = 'Include'
                         AND qorgtype.path = '/Organization/OrganizationType'
                         AND qorgtype.value <>
