@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: CTGovImport.py,v 1.5 2004-02-16 23:40:57 bkline Exp $
+# $Id: CTGovImport.py,v 1.6 2004-02-23 15:31:20 bkline Exp $
 #
 # User interface for selecting Protocols to be imported from
 # ClinicalTrials.gov.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2004/02/16 23:40:57  bkline
+# Rewrote interface to allow user to specify the CDR document ID for
+# duplicate trials (enhancement request #1104).
+#
 # Revision 1.4  2003/12/16 15:41:18  bkline
 # Modified code to open NLM document in a separate window so that it
 # uses a different window for each document.
@@ -79,11 +83,11 @@ def showList(skipPast, cursor, errors = None):
     <input type='hidden' name='which' value='%s' />
 """ % (cdrcgi.SESSION, session, which)
 
-    for error in errors:
-        html += u"""\
+    if errors:
+        for error in errors:
+            html += u"""\
     <span class='err'>%s</span><br>
 """ % error
-    if errors:
         html += u"""\
     <br>
 """
