@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ActivityReport.py,v 1.1 2002-06-26 16:35:16 bkline Exp $
+# $Id: ActivityReport.py,v 1.2 2002-06-26 20:04:14 bkline Exp $
 #
 # Reports on audit trail content.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2002/06/26 16:35:16  bkline
+# Implmented report of audit_trail activity.
+#
 #----------------------------------------------------------------------
 import cdr, cdrdb, cdrcgi, cgi, re, time
 
@@ -184,36 +187,24 @@ for row in rows:
     html += """\
    <tr>
     <td nowrap='1'>
-     <b>
-      <font size='3'>%s (%s)</font>
-     </b>
+     <font size='3'>%s (%s)</font>
     </td>
     <td nowrap='1'>
-     <b>
-      <font size='3'>%s</font>
-     </b>
+     <font size='3'>%s</font>
     </td>
     <td nowrap='1'>
-     <b>
-      <font size='3'>%s</font>
-     </b>
+     <font size='3'>%s</font>
     </td>
     <td nowrap='1'>
-     <b>
-      <font size='3'>%s</font>
-     </b>
+     <font size='3'>%s</font>
     </td>
     <td nowrap='1'>
-     <b>
-      <font size='3'>
-       <a href='%s/QcReport.py?DocId=CDR%010d&%s=%s'>CDR%010d</a>
-      </font>
-     </b>
+     <font size='3'>
+      <a href='%s/QcReport.py?DocId=CDR%010d&%s=%s'>CDR%010d</a>
+     </font>
     </td>
     <td nowrap='1'>
-     <b>
-      <font size='3'>%s ...</font>
-     </b>
+     <font size='3'>%s ...</font>
     </td>
    </tr>
 """ % (row[2], row[1], row[3], row[5], row[4], 
