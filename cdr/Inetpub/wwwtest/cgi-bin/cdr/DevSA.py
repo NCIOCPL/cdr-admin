@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: DevSA.py,v 1.1 2003-12-16 16:09:20 bkline Exp $
+# $Id: DevSA.py,v 1.2 2004-08-10 15:39:26 bkline Exp $
 #
 # Main menu for Developers and System Administrators.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2003/12/16 16:09:20  bkline
+# Main menu for Developers and System Administrators.
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
 
@@ -47,6 +50,7 @@ items   = (('EditGroups.py',           'Manage Groups'                 ),
            ('MessageLoggedInUsers.py', 'Send Email to Users Currently '
                                        'Logged in to the CDR'          ),
            ('CTGov.py',                'CTGov Protocols'               ),
+           ('EditExternMap.py',        'Update Mapping Table'          ),
            ('Logout.py',               'Log Out'                       )
            )
 for item in items:

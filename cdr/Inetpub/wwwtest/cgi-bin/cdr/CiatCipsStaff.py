@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CiatCipsStaff.py,v 1.1 2003-12-16 16:06:08 bkline Exp $
+# $Id: CiatCipsStaff.py,v 1.2 2004-08-10 15:39:26 bkline Exp $
 #
 # Main menu for CIAT/CIPS staff.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2003/12/16 16:06:08  bkline
+# Main menu for CIAT/CIPS staff.
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
 
@@ -28,13 +31,14 @@ buttons = []
 html    = cdrcgi.header(title, title, section, "", buttons) + """\
    <ol>
 """
-items   = (('AdvancedSearch.py', 'Advanced Search' ),
-           ('Reports.py',        'Reports'         ),
-           ('MergeProt.py',      'Protocol Merge'  ),
-           ('CTGov.py',          'CTGov Protocols' ),
-           ('Mailers.py',        'Mailers'         ),
-           ('GlobalChange.py',   'Global Changes'  ),
-           ('getBatchStatus.py', 'Batch Job Status')
+items   = (('AdvancedSearch.py', 'Advanced Search'      ),
+           ('Reports.py',        'Reports'              ),
+           ('MergeProt.py',      'Protocol Merge'       ),
+           ('CTGov.py',          'CTGov Protocols'      ),
+           ('EditExternMap.py',  'Update Mapping Table' ),
+           ('Mailers.py',        'Mailers'              ),
+           ('GlobalChange.py',   'Global Changes'       ),
+           ('getBatchStatus.py', 'Batch Job Status'     )
            )
 for item in items:
     html += """\
