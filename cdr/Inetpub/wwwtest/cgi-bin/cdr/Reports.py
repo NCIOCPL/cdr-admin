@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: Reports.py,v 1.2 2001-12-01 18:07:34 bkline Exp $
+# $Id: Reports.py,v 1.3 2002-01-22 21:32:01 bkline Exp $
 #
 # Prototype for editing CDR linking tables.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2001/12/01 18:07:34  bkline
+# Added some new reports.
+#
 # Revision 1.1  2001/06/13 22:16:32  bkline
 # Initial revision
 #
@@ -27,9 +30,12 @@ header  = cdrcgi.header(title, title, section, "", buttons)
 #----------------------------------------------------------------------
 form = "<OL>\n"
 reports = [('CdrReport.py', 'Inactive Documents'),
+           ('LinkedDocs.py', 'Linked Documents'),
+           ('PdqBoards.py', 'PDQ Boards'),
            ('UnchangedDocs.py', 'Unchanged Documents'),
            ('CheckUrls.py', 'Inactive Hyperlinks'),
            ('TermUsage.py', 'Term Usage'),
+           ('ConceptTermReviewReport.py', 'Concept/Term Review Report'),
            ('ModifiedPubMedDocs.py', 'Modified PubMed Documents')]
 if type(reports) == type(""): cdrcgi.bail(reports)
 
