@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: HotfixReport.py,v 1.1 2004-05-11 17:49:27 bkline Exp $
+# $Id: HotfixReport.py,v 1.2 2004-05-17 14:29:30 bkline Exp $
 #
 # Report identifying previously published protocols that should be 
 # included in a hotfix.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2004/05/11 17:49:27  bkline
+# Report identifying previously published protocols that should be
+# included in a hotfix.
+#
 #----------------------------------------------------------------------
 import cdrdb, pyXLWriter, sys, time, cdrcgi
 
@@ -71,7 +75,8 @@ cursor.execute("""\
             AND (d.failure IS NULL
              OR  d.failure <> 'Y')
             AND p.status = 'Success'
-       GROUP BY d.doc_id, t.name, all_docs.active_status, d.removed""")
+       GROUP BY d.doc_id, t.name, all_docs.active_status, d.removed""",
+               timeout = 300)
 cursor.execute("CREATE TABLE #t2 (id INTEGER, ver INTEGER)")
 cursor.execute("""\
     INSERT INTO #t2
@@ -80,7 +85,7 @@ cursor.execute("""\
            JOIN #t1
              ON v.id = #t1.id
           WHERE v.publishable = 'Y'
-       GROUP BY v.id""")
+       GROUP BY v.id""", timeout = 300)
 cursor.execute("""\
     SELECT #t1.id, q.value, v.dt
       FROM #t1
@@ -94,67 +99,27 @@ cursor.execute("""\
      WHERE q.path = '/InScopeProtocol/ProtocolIDs/PrimaryID/IDString'
        AND #t2.ver > #t1.ver
        AND #t1.active_status = 'A'
-       AND #t1.doc_type = 'InScopeProtocol'""")
+       AND #t1.doc_type = 'InScopeProtocol'""", timeout = 300)
 rows = cursor.fetchall()
 
        
-## cursor.execute(query1)
-## cursor.execute(query2)
-## cursor.execute("""\
-##     INSERT INTO #t1
-##     SELECT MAX(p.completed)
-##       FROM pub_proc p
-##       JOIN document d
-##         ON d.id = p.pub_system
-##      WHERE p.status = 'Success'
-##        AND d.title = 'Primary'""")
-## lastPubJobDate = cursor.fetchall()[0][0]
-## #lastPubJobDate = '2004-02-01'
-## cursor.execute("""\
-##     SELECT v.id, q.value, MAX(v.dt)
-##       FROM doc_version v
-##       JOIN query_term q
-##         ON q.doc_id = v.id
-##      WHERE v.publishable = 'Y'
-##        AND q.path = '/InScopeProtocol/ProtocolIDs/PrimaryID/IDString'
-##   GROUP BY v.id, q.value
-##     HAVING MAX(v.dt) > ?
-##   ORDER BY v.id""", lastPubJobDate)
-## rows = cursor.fetchall()
-# print len(rows)
 t = time.strftime("%Y%m%d%H%M%S")
 print "Content-type: application/vnd.ms-excel"
 print "Content-Disposition: attachment; filename=HotfixReport-%s.xls" % t
 print 
 
-#file = open("b:/tmp/foo.xls", "wb")
-#workbook = pyXLWriter.Writer(file)
 workbook = pyXLWriter.Writer(sys.stdout)
-# worksheet = workbook.add_worksheet('New In-Scope Protocols')
 
 format = workbook.add_format()
-#datefmt = workbook.add_format()
-#datefmt.set_num_format("YYYY")
 format.set_bold();
-# format.set_size(12);
 format.set_color('white')
 format.set_bg_color('blue')
 format.set_align('center')
-titles  = ('Updated In-Scope Protocols', 'Updated CTGov Protocolss',
-           'Removed Protocols')
-headers = ('DocId', 'Primary Protocol ID','Latest Publishable Version Date')
+titles  = ('Updated In-Scope Protocols', 'Updated CTGov Protocols',
+           'Removed Protocols', 'Updated Summaries')
+headers = ['DocID', 'Primary Protocol ID','Latest Publishable Version Date']
 widths  = (8, 35, 40)
 addWorksheet(workbook, titles[0], headers, widths, format, rows)
-# std.stderr.write("created %s\n" % titles[0])
-## cursor.execute("""\
-##     SELECT v.id, q.value, MAX(v.dt)
-##       FROM doc_version v
-##       JOIN query_term q
-##         ON q.doc_id = v.id
-##      WHERE v.publishable = 'Y'
-##        AND q.path = '/CTGovProtocol/IDInfo/SecondaryID'
-##   GROUP BY v.id, q.value
-##     HAVING MAX(v.dt) > ?""", lastPubJobDate)
 cursor.execute("""\
     SELECT #t1.id, q.value, v.dt
       FROM #t1
@@ -168,7 +133,7 @@ cursor.execute("""\
      WHERE q.path = '/CTGovProtocol/IDInfo/SecondaryID'
        AND #t2.ver > #t1.ver
        AND #t1.active_status = 'A'
-       AND #t1.doc_type = 'CTGovProtocol'""")
+       AND #t1.doc_type = 'CTGovProtocol'""", timeout = 300)
 rows = cursor.fetchall()
 addWorksheet(workbook, titles[1], headers, widths, format, rows)
 cursor.execute("""\
@@ -184,7 +149,9 @@ cursor.execute("""\
      WHERE q.path IN ('/InScopeProtocol/ProtocolIDs/PrimaryID/IDString',
                       '/CTGovProtocol/IDInfo/SecondaryID')
        AND #t1.active_status <> 'A'
-       AND (#t1.removed IS NULL OR #t1.removed <> 'Y')""")
+       AND (#t1.removed IS NULL OR #t1.removed <> 'Y')""", timeout = 300)
 rows = cursor.fetchall()
 addWorksheet(workbook, titles[2], headers, widths, format, rows)
+headers[1] = 'Summary Title'
+addWorksheet(workbook, titles[3], headers, widths, format, [])
 workbook.close()
