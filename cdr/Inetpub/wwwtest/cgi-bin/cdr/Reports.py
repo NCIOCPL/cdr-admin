@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: Reports.py,v 1.13 2002-04-25 02:58:53 bkline Exp $
+# $Id: Reports.py,v 1.14 2002-05-03 20:28:54 bkline Exp $
 #
 # Prototype for editing CDR linking tables.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.13  2002/04/25 02:58:53  bkline
+# New report for mailer checkin.
+#
 # Revision 1.12  2002/04/22 22:15:45  bkline
 # New report (Generic Date Last Modified).
 #
@@ -76,7 +79,9 @@ reports = [
            ('CdrReport.py', 'Inactive Documents'),
            ('CheckUrls.py', 'Inactive Hyperlinks'),
            ('LinkedDocs.py', 'Linked Documents'),
+           ('MailerActivityStatistics.py', 'Mailer Activity Statistics'),
            ('MailerCheckinReport.py', 'Mailer Checkin'),
+           ('MailerHistory.py', 'Mailer History'),
            ('ModifiedPubMedDocs.py', 'Modified PubMed Documents'),
            ('NewDocReport.py', 'New Documents'),
            ('PdqBoards.py', 'PDQ Boards'),
