@@ -2,8 +2,12 @@
 #
 # Publishing CGI script.
 #
-# $Id: publishing.py,v 1.9 2002-04-17 21:43:24 pzhang Exp $
+# $Id: publishing.py,v 1.10 2002-05-10 16:12:40 pzhang Exp $
 # $Log: not supported by cvs2svn $
+# Revision 1.9  2002/04/17 21:43:24  pzhang
+# Rewrote code to match new cdrpub.py design.
+# Dropped all CGI helpers in cdrpub.py.
+#
 # Revision 1.8  2002/03/01 22:43:01  pzhang
 # Fixed a bug in forming param using white space as delimeter.
 #
@@ -177,8 +181,12 @@ class Display:
             paramList = ""
             for r in params:
                 paramList += ",%s" % r[1]
-                form += """<TR><TD>%s</TD><TD>%s</TD><TD><INPUT NAME='%s' \
-                    VALUE='%s'></TD></TR>\n""" % (r[1], r[2], r[1], r[2])
+                if r[1] == "PubType":
+                    form += """<TR><TD>%s</TD><TD>%s</TD><TD><INPUT NAME='%s' \
+                        VALUE='%s' READONLY></TD></TR>\n""" % (r[1], r[2], r[1], r[2])
+                else:
+                    form += """<TR><TD>%s</TD><TD>%s</TD><TD><INPUT NAME='%s' \
+                        VALUE='%s'></TD></TR>\n""" % (r[1], r[2], r[1], r[2])
             if not Redirected:
                 form += HIDDEN % ('Params', paramList)
         
