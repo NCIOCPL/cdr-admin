@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtSearch.py,v 1.12 2003-12-17 01:06:00 bkline Exp $
+# $Id: ProtSearch.py,v 1.13 2003-12-17 01:21:33 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Protocol documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.12  2003/12/17 01:06:00  bkline
+# Added support for CTGovProtocol documents.
+#
 # Revision 1.11  2003/12/16 15:45:42  bkline
 # Added TitleText to path for out of scope protocol searches.
 #
@@ -174,7 +177,7 @@ html = cdrcgi.advancedSearchResultsPage("Protocol", rows, strings,
     {'InScopeProtocol':'set:%s' % fmts[dispFmt].filterSet,
      'OutOfScopeProtocol':'name:Health Professional QC Content Report',
      'ScientificProtocolInfo':'name:Health Professional QC Content Report',
-     'CTGovProtocol':'name:CTGovProtocol QC Report'})
+     'CTGovProtocol':'name:CTGovProtocol QC Report'}, session)
 
 #----------------------------------------------------------------------
 # Send the page back to the browser.
