@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: PersonProtocolReview.py,v 1.5 2003-08-25 20:24:43 bkline Exp $
+# $Id: PersonProtocolReview.py,v 1.6 2004-09-24 15:48:25 venglisc Exp $
 #
 # Report to assist editors in checking links to a specified person from
 # protocols.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2003/08/25 20:24:43  bkline
+# Juggled sort order of report results at users' requets.
+#
 # Revision 1.4  2003/06/13 20:30:21  bkline
 # Added identification of previous locations.
 #
@@ -100,59 +103,54 @@ def showProtocols(fragId):
   <br />
 """
     pLinks.sort(lambda a, b: cmp(a.sortKey, b.sortKey))
+    htmlFrag += """\
+  <table border = '1' cellpadding = '0' cellspacing = '2'>
+   <tr>
+    <td width='25%%' align='center' valign='bottom'>
+     <b>Protocol ID</b>
+    </td>
+    <td width='15%%' align='center' valign='bottom'>
+     <b>CDR-ID</b>
+    </td>
+    <td width='15%%' align='center' valign='bottom'>
+     <b>Org Protocol Status</b>
+    </td>
+    <td width='15%%' align='center' valign='bottom'>
+     <b>Overall Protocol Status</b>
+    </td>
+    <td width='15%%' align='center' valign='bottom'>
+     <b>Lead Org Role</b>
+    </td>
+    <td width='25%%' align='center' valign='bottom'>
+     <b>Role</b>
+    </td>
+   </tr>
+"""
+
     for link in pLinks:
         htmlFrag += """\
-  <table border = '0' cellpadding = '0' cellspacing = '2'>
-   <tr>
-    <td nowrap = '1' valign = 'top' align = 'right'>
-     <font size = '3'>Protocol ID</font>
+    <tr>
     <td>
-    <td nowrap = '1' align = 'right' valign = 'top'>
+     <font size = '3'>%s</font>
+    </td>
+    <td>
      <font size = '3'>%s</font>
     </td>
     <td>
      <font size = '3'>%s</font>
     </td>
-   </tr>
-   <tr>
-    <td nowrap = '1' valign = 'top' align = 'right'>
-     <font size = '3'>Lead Org Role</font>
     <td>
-    <td nowrap = '1' align = 'right' valign = 'top'>
+     <font size = '3'>%s</font>
+    </td>
+    <td>
      <font size = '3'>%s</font>
     </td>
     <td>
      <font size = '3'>%s</font>
     </td>
    </tr>
-   <tr>
-    <td nowrap = '1' valign = 'top' align = 'right'>
-     <font size = '3'>Current Protocol Status</font>
-    <td>
-    <td nowrap = '1' align = 'right' valign = 'top'>
-     <font size = '3'>%s</font>
-    </td>
-    <td>
-     <font size = '3'>%s</font>
-    </td>
-   </tr>
-   <tr>
-    <td nowrap = '1' valign = 'top' align = 'right'>
-     <font size = '3'>Role</font>
-    <td>
-    <td nowrap = '1' align = 'right' valign = 'top'>
-     <font size = '3'>%s</font>
-    </td>
-    <td>
-     <font size = '3'>%s</font>
-    </td>
-   </tr>
-  </table>
-  <br />
-""" % (ellipsis, ", ".join(link.ids), 
-       ellipsis, ", ".join(link.orgRoles),
-       ellipsis, ", ".join(link.statuses),
-       ellipsis, ", ".join(link.roles))
+""" % (link.ids, 'none', link.statuses, 'none', link.orgRoles, link.roles)
+
         if link.specificContact:
             htmlFrag += """\
   SpecificContact
@@ -170,6 +168,7 @@ def showProtocols(fragId):
 
     return htmlFrag + """\
   <br />
+  </table>
 """
 
 #----------------------------------------------------------------------
@@ -248,243 +247,394 @@ for i in range(len(linkPaths)):
     linkPaths[i] = pathStart + linkPaths[i]
 statPath = pathStart + statPath
 
+# Recreate two Temp tables for this run
+# -------------------------------------
 try:
     query = """\
-        SELECT DISTINCT link.doc_id, 
-                        link.value
-                   FROM query_term link
-                   JOIN query_term org_status
-                     ON org_status.doc_id = link.doc_id
-                    AND LEFT(org_status.node_loc, 8) =
-                        LEFT(link.node_loc, 8)
-                  WHERE link.int_val = ?
-                    AND link.path IN ('%s', '%s', '%s')
-                    AND org_status.path = '%s'
-                    AND org_status.value IN (
-                        'Active',
-                        'Approved-not yet active',
-                        'Temporarily closed',
-                        'Completed',
-                        'Closed'
-                        )""" % (linkPaths[0], 
-                                linkPaths[1], 
-                                linkPaths[2],
-                                statPath)
-    cursor.execute(query, id)
-    #cdrcgi.bail("got %d rows" % len(cursor.fetchall()))
-    links = {}
-    for row in cursor.fetchall():
-        linkPieces = row[1].split('#', 1)
-        if len(linkPieces) == 2 and linkPieces[1]:
-            fragId = linkPieces[1]
-            if not links.has_key(fragId):
-                links[fragId] = []
-            resp = cdr.filterDoc(session,
-                             ['name:Person Protocol Review Report Filter 2'],
-                             row[0], parm = [('personLink', row[1])])
-            if type(resp) in (type(''), type(u'')):
-                cdrcgi.bail(resp)
-            protocol = xml.dom.minidom.parseString(resp[0]).documentElement
-            for child in protocol.childNodes:
-                if child.nodeName in ('LeadOrgPersonnel',
-                                      'PrivatePracticeSite',
-                                      'SpecificPerson'):
-                    linkType        = child.nodeName
-                    ids             = []
-                    statuses        = []
-                    roles           = []
-                    orgRoles        = []
-                    specificContact = None
-                    for grandchild in child.childNodes:
-                        if grandchild.nodeName == 'Id':
-                            ids.append(cdr.getTextContent(grandchild))
-                        elif grandchild.nodeName == 'Status':
-                            statuses.append(cdr.getTextContent(grandchild))
-                        elif grandchild.nodeName == 'PersonRole':
-                            roles.append(cdr.getTextContent(grandchild))
-                        elif grandchild.nodeName == 'OrgRole':
-                            orgRoles.append(cdr.getTextContent(grandchild))
-                        elif grandchild.nodeName == 'SpecificContact':
-                            specificContact = grandchild
-                    pLink = P2PLink(row[0], linkType, ids, statuses, roles,
-                                    orgRoles, specificContact)
-                    links[fragId].append(pLink)
-
+        CREATE TABLE #persprotrev1
+          (doc_id          varchar(512) NOT NULL, 
+           person_fragment varchar(512) NOT NULL, 
+           protocol_id     INTEGER      NOT NULL,
+           protocol_status varchar(512) NOT NULL, 
+           person_id       varchar(512) NOT NULL, 
+           islead          varchar(10)  NOT NULL
+          )
+"""
+    cursor.execute(query)
 except cdrdb.Error, info:
-    cdrcgi.bail('Failure fetching protocols: %s' % info[1][0])
+    cdrcgi.bail('Failure creating #persprotrev1: %s' % info[1][0])
+
+
+try:
+    query = """\
+        CREATE TABLE #persprotrev2 
+          (protocol_id          INTEGER      NOT NULL, 
+           person_fragment varchar(512) NOT NULL,
+           role            varchar(512) NOT NULL,
+           roletype        varchar(10)  NOT NULL, 
+           spec_info       varchar(1)
+          )
+"""
+    cursor.execute(query)
+except cdrdb.Error, info:
+    cdrcgi.bail('Failure creating #persprotrev2: %s' % info[1][0])
+
+# Populate first temp table
+# -------------------------
+try:
+    query = """\
+       INSERT INTO #persprotrev1
+       SELECT ProtID.value doc_id, CDRID.value person_fragment, 
+              CDRID.doc_id protocol_id,  Status.value  protocol_status, 
+	      CDRID.int_val person_id, 
+              CASE WHEN CDRID.path = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg/LeadOrgPersonnel/Person/@cdr:ref'                                    THEN 'Lead'
+                   WHEN CDRID.path = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg/ProtocolSites/OrgSite/OrgSiteContact/SpecificPerson/Person/@cdr:ref' THEN 'Site'
+                   ELSE 'Unknown'
+              END islead 
+         FROM query_term CDRID
+         JOIN query_term ProtID
+           ON CDRID.doc_id = ProtID.doc_id
+         JOIN query_term Status
+           ON CDRID.doc_id = Status.doc_id
+        WHERE CDRID.int_val = ?    -- Person ID is passed to the script
+          AND (CDRID.path = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg/LeadOrgPersonnel/Person/@cdr:ref'
+           OR CDRID.path = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg/ProtocolSites/OrgSite/OrgSiteContact/SpecificPerson/Person/@cdr:ref'
+              )
+          AND ProtID.path = '/InScopeProtocol/ProtocolIDs/PrimaryID/IDString'
+          AND Status.path = '/InScopeProtocol/ProtocolAdminInfo/CurrentProtocolStatus'
+        ORDER BY Status.value, protID.value, CDRID.doc_id, IsLead
+"""
+    cursor.execute(query, id)
+except cdrdb.Error, info:
+    cdrcgi.bail('Failure populating #persprotrev1: %s' % info[1][0])
+
+
+# Populate second temp table
+# --------------------------
+try:
+    query = """\
+      INSERT INTO #persprotrev2
+      SELECT role.doc_id, person.value, role.value, 'Lead', null
+        FROM query_term role
+        JOIN query_term person
+          ON role.doc_id = person.doc_id
+       WHERE role.path = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg/LeadOrgPersonnel/PersonRole'
+         AND person.path = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg/LeadOrgPersonnel/Person/@cdr:ref'
+         AND role.doc_id in (select protocol_id from #persprotrev1)
+         AND person.int_val = %s
+         AND left(role.node_loc, 12) = left(person.node_loc, 12)
+       ORDER BY role.doc_id
+""" % id
+    cursor.execute(query)
+except cdrdb.Error, info:
+    cdrcgi.bail('Failure populating #persprotrev2 - Lead: %s' % info[1][0])
+
+# Populate second temp table
+# --------------------------
+try:
+    query = """\
+      INSERT INTO #persprotrev2
+      SELECT role.doc_id, person.value, role.value, 'Site', NULL
+        FROM query_term role
+        JOIN query_term person
+          ON role.doc_id = person.doc_id
+       WHERE role.path = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg/ProtocolSites/OrgSite/OrgSiteContact/SpecificPerson/Role'
+         AND person.path = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg/ProtocolSites/OrgSite/OrgSiteContact/SpecificPerson/Person/@cdr:ref'
+         AND role.doc_id in (select protocol_id from #persprotrev1)
+         AND person.int_val = %s
+         AND left(role.node_loc, 24) = left(person.node_loc, 24)
+""" % id 
+    cursor.execute(query)
+    conn.commit()
+except cdrdb.Error, info:
+    cdrcgi.bail('Failure populating #persprotrev2 - Site: %s' % info[1][0])
+
+# Update special contact information
+# ----------------------------------
+try:
+    query = """\
+      UPDATE #persprotrev2 SET spec_info = 'Y'
+      WHERE EXISTS (
+            SELECT protocol.doc_id Protocol, protocol.value Person 
+              FROM query_term protocol
+              JOIN query_term specific
+                ON protocol.doc_id = specific.doc_id
+              JOIN #persprotrev1
+                ON protocol.doc_id = #persprotrev1.protocol_id
+               AND protocol.value  = #persprotrev1.person_fragment
+             WHERE protocol.path = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg/LeadOrgPersonnel/Person/@cdr:ref'
+               AND specific.path = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg/LeadOrgPersonnel/ProtocolSpecificContact/@cdr:id'
+               AND left(protocol.node_loc, 8) = left(specific.node_loc, 8)
+               AND #persprotrev2.protocol_id = protocol.doc_id
+               AND #persprotrev2.person_fragment = protocol.value  
+               AND #persprotrev2.roletype = 'Lead'
+            )
+"""
+    cursor.execute(query)
+    conn.commit()
+except cdrdb.Error, info:
+    cdrcgi.bail('Failure updating #persprotrev2 - Lead: %s' % info[1][0])
+
+# Update special contact information
+# ----------------------------------
+try:
+    query = """\
+      UPDATE #persprotrev2 SET spec_info = 'Y'
+       WHERE EXISTS (
+             SELECT protocol.doc_id Protocol, protocol.value Person
+               FROM query_term protocol
+               JOIN query_term specific
+                 ON protocol.doc_id = specific.doc_id
+               JOIN #persprotrev1
+                 ON protocol.doc_id = #persprotrev1.protocol_id
+                AND protocol.value  = #persprotrev1.person_fragment
+              WHERE protocol.path = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg/ProtocolSites/OrgSite/OrgSiteContact/SpecificPerson/Person/@cdr:ref'
+                AND (specific.path = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg/ProtocolSites/OrgSite/OrgSiteContact/SpecificPerson/SpecificPhone'
+                 OR specific.path = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg/ProtocolSites/OrgSite/OrgSiteContact/SpecificPerson/SpecificEmail'
+             )
+         AND left(protocol.node_loc, 24) = left(specific.node_loc, 24)
+         AND #persprotrev2.protocol_id = protocol.doc_id
+         AND #persprotrev2.person_fragment = protocol.value  
+         AND #persprotrev2.roletype = 'Site'
+)
+"""
+    cursor.execute(query)
+    conn.commit()
+except cdrdb.Error, info:
+    cdrcgi.bail('Failure updating #persprotrev2 - Site: %s' % info[1][0])
+
+links = {}
 
 #----------------------------------------------------------------------
 # Extract information from the Person document.
 #----------------------------------------------------------------------
 resp = cdr.filterDoc(session, 
-                     ['name:Person Protocol Review Report Filter 1'],
+                     ['set:Denormalization Person Set',
+		      'name:Copy XML for Person 2',
+		      'name:Person Protocol Review - Person Info'],
                      id)
+html = unicode(resp[0], "utf-8")
 if type(resp) in (type(''), type(u'')):
     cdrcgi.bail(resp)
-person = xml.dom.minidom.parseString(resp[0]).documentElement
-oplList = []
-ppList = []
-pName = None
-pSuffix = ''
-for child in person.childNodes:
-    if child.nodeName == 'Name':
-        pName = cdr.getTextContent(child)
-    elif child.nodeName == 'ProfessionalSuffix':
-        pSuffix = cdr.getTextContent(child)
-    elif child.nodeName == 'OtherPracticeLocation':
-        oplList.append(child)
-    elif child.nodeName == 'PrivatePracticeLocation':
-        ppList.append(child)
-if pName is None:
-    cdrcgi.bail("Failure extracting name for CDR%010d" % id)
-
 #----------------------------------------------------------------------
 # Start the page.
 #----------------------------------------------------------------------
-html = """\
-<!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
-<html>
- <head>
-  <title>CDR%010d - %s - %s</title>
-  <meta name="ProgId" content="Word.Document">
- </head>
- <basefont face='Arial, Helvetica, sans-serif'>
- <body>
-  <hr />
-  <b>
-   <font size='4'>PERSON PROTOCOL REVIEW REPORT</font>
-  </b>
-  <br />
-  <br />
-  <b>
-   <font size='4'>Name</font>
-  </b>
-  <br />
-  <br />
-  %s
-  <br />
-  <br />
-  <b>
-   <font size='4'>Locations</font>
-  </b>
-  <br />
-  <br />
-  <b>
-   <u>
-    <font size='3'>Private Practice</font>
-   </u>
-  </b>
-  <br />
-  <br />
-""" % (id, pName, time.strftime("%B %d, %Y"), pName + pSuffix)
 
-
-#----------------------------------------------------------------------
-# List the private practice locations.
-#----------------------------------------------------------------------
-num = 1
-for pp in ppList:
-    loc = None
-    for child in pp.childNodes:
-        if child.nodeName == 'Location':
-            loc = child
-            break
-    if loc is None:
-        cdrcgi.bail("Missing Location information for private practice %d" %
-                    num)
-    prevLoc = pp.getAttribute("PreviousLocation")
-    if prevLoc:
-        prevLoc = " (Previous Location = %s)" % prevLoc
-    html += """\
-  <b>
-   <i>
-    <font size='3'>%d.%s</font>
-   </i>
-  </b>
-  <br />
-  <font size='3'>
-""" % (num, prevLoc)
-    for child in loc.childNodes:
-        if child.nodeName == 'Line':
-            html += """\
-  %s<br />
-""" % cdr.getTextContent(child)
-    html += """\
-  </font>
-  <br />
+try:
+    query = """\
+        SELECT DISTINCT person_fragment 
+          FROM #persprotrev1 
 """
-    fragId = pp.getAttribute("id")
-    if fragId:
-        html += showProtocols(fragId)
-    num += 1
+    cursor.execute(query)
+except cdrdb.Error, info:
+    cdrcgi.bail('Failure selecting fragment IDs: %s' % info[1][0])
+fragId = cursor.fetchall()
 
+frag = []
+for row in fragId:
+    id,frag = row[0].split('#')
+    # cdrcgi.bail("id = %s, frag = %s" % (id, frag))
+    prottable = """
+    <table border="1" width="100%" cellspacing="0" cellpadding="0">
+"""
+    # Create the table header 
+    # -----------------------
+    tabheader = """
+    <tr>
 
-#----------------------------------------------------------------------
-# List the other practice locations.
-#----------------------------------------------------------------------
-html += """\
-  <br />
-  <br />
-  <b>
-   <u>
-    <font size='3'>Other Practice Locations</font>
-   </u>
-  </b>
-  <br />
-  <br />
+     <td width="15%" align="center" valign="bottom">
+      <b>CDR-ID</b>
+     </td>
+     <td width="20%" align="center" valign="bottom">
+      <b>Lead Org Protocol ID</b>
+     </td>
+     <td width="20%" align="center" valign="bottom">
+      <b>Lead Org Current Protocol Status</b>
+
+     </td>
+     <td width="15%" align="center" valign="bottom">
+      <b>Role</b>
+     </td>
+     <td valign="bottom"> 
+      <table border="1" cellpadding="0" cellspacing="0" frame="void">
+       <tr> 
+        <td align="center" colspan="2" align="center">
+         <b>Occurs in</b>
+
+        </td>
+       </tr>
+       <tr>
+        <td align="center" width="50%">
+         <b>Lead Org</b>
+        </td>
+        <td align="center" width="50%">
+         <b>Part Site</b>
+ 
+        </td>
+       </tr>
+      </table>
+     </td>
+     <td valign="bottom"> 
+      <table border="1" cellpadding="0" cellspacing="0" frame="void">
+       <tr> 
+        <td align="center" colspan="2" align="center">
+         <b>Specific Contact</b>
+
+        </td>
+       </tr>
+       <tr>
+        <td align="center" width="50%">
+         <b>Lead Org</b>
+        </td>
+        <td align="center" width="50%">
+         <b>Part Site</b>
+ 
+        </td>
+       </tr>
+      </table>
+     </td>
+    </tr>
+"""
+    # Select the protocol rows from the temp tables by fragment ID
+    # ------------------------------------------------------------
+    #cdrcgi.bail(id + "#" + frag)
+    try:
+        query = """\
+                SELECT v1.protocol_id, v1.doc_id,  
+                       CASE WHEN v1.protocol_status = 'Approved-not yet active'
+		              THEN 'Approved'
+                            WHEN v1.protocol_status = 'Temporarily closed' 
+			      THEN 'Temp closed'
+                            ELSE v1.protocol_status
+                       END protocol_status, 
+                       v2.role, v1.islead, v2.roletype, 
+		       COALESCE (v2.spec_info, 'N') spec_info
+                  FROM #persprotrev1 v1
+                  JOIN #persprotrev2 v2
+                    ON v1.protocol_id = v2.protocol_id
+                   AND v1.person_fragment = v2.person_fragment
+                 WHERE v1.person_fragment = '%s'
+                 ORDER BY v1.protocol_status, v1.doc_id
+""" % (id + "#" + frag)
+
+        cursor.execute(query)
+    except cdrdb.Error, info:
+        cdrcgi.bail('Failure selecting fragment IDs: %s' % info[1][0])
+
+    protocols = cursor.fetchall()
+
+    # Create a row for the protocol table one record at a time
+    # The first four elements are placed into one cell each.
+    # A background color is being set based on the status of the protocol
+    # -------------------------------------------------------------------
+    protrow = ""
+    for prot in protocols:
+	if prot[2] == 'Active' or prot[2] == 'Approved':
+            protrow += """
+      <tr>
+       <td>%s</td>
+       <td>%s</td>
+       <td>%s</td>
+       <td>%s</td>
+""" % (prot[0], prot[1], prot[2], prot[3])
+	elif prot[2] == '':
+            protrow += """
+      <tr class="status_err">
+       <td>%s</td>
+       <td>%s</td>
+       <td>%s</td>
+       <td>%s</td>
+""" % (prot[0], prot[1], prot[2], prot[3])
+	else:
+            protrow += """
+      <tr class="status_closed">
+       <td>%s</td>
+       <td>%s</td>
+       <td>%s</td>
+       <td>%s</td>
+""" % (prot[0], prot[1], prot[2], prot[3])
+
+	# The fifth and sixth cells are populated based on the contend of 
+	# the query element five indicating if the information is for a 
+	# Lead org (Lead) or Participant (Site).
+	# ----------------------------------------------------------------
+        if prot[4] == 'Lead':
+            protrow += """
+       <td>
+        <table width="100%" border="1" cellpadding="0" cellspacing="0" frame="void">
+	 <tr>
+          <td align="center" width="50%">X</td>
+          <td align="center" width="50%"></td>
+	 </tr>
+	</table>
+       </td>
+"""
+        else:
+            protrow += """
+       <td>
+        <table width="100%" border="1" cellpadding="0" cellspacing="0" frame="void">
+	 <tr>
+          <td align="center" width="50%"></td>
+          <td align="center" width="50%">X</td>
+	 </tr>
+	</table>
+       </td>
+"""
+	# The last two columns specify if the person included specific
+	# information or not.
+	# For the combination (Lead, Y) mark the seventh column with an X
+	# For the combination (Site, Y) mark the eight column with an X
+	# Otherwise no X is placed in either column
+	# ---------------------------------------------------------------
+        if prot[5] == 'Lead' and prot[6] == 'Y':
+            protrow += """
+       <td>
+        <table width="100%" border="1" cellpadding="0" cellspacing="0" frame="void">
+	 <tr>
+          <td align="center" width="50%">X</td>
+          <td align="center" width="50%"></td>
+	 </tr>
+	</table>
+       </td>
+"""
+        elif prot[5] == 'Site' and prot[6] == 'Y':
+            protrow += """
+       <td>
+        <table width="100%" border="1" cellpadding="0" cellspacing="0" frame="void">
+	 <tr>
+          <td align="center" width="50%"></td>
+          <td align="center" width="50%">X</td>
+	 </tr>
+	</table>
+       </td>
+      </tr>
+"""
+        else:
+            protrow += """
+       <td>
+        <table width="100%" border="1" cellpadding="0" cellspacing="0" frame="void">
+	 <tr>
+          <td align="center" width="50%">&nbsp;</td>
+          <td align="center" width="50%"></td>
+	 </tr>
+	</table>
+       </td>
+      </tr>
+"""
+    prottable += tabheader + protrow
+    prottable += """
+   </table> 
 """
 
-num = 1
-for opl in oplList:
-    loc = None
-    orgName = None
-    pTitle = None
-    for child in opl.childNodes:
-        if child.nodeName == 'OrgName':
-            orgName = cdr.getTextContent(child)
-        elif child.nodeName == 'PersonTitle':
-            pTitle = cdr.getTextContent(child)
-        elif child.nodeName == 'Location':
-            loc = child
-    if not loc:
-        cdrcgi.bail("Missing Location information")
-    if not orgName:
-        cdrcgi.bail("Missing org name for other practice location %d" % num)
-    prevLoc = opl.getAttribute("PreviousLocation")
-    if prevLoc:
-        prevLoc = " (Previous Location = %s)" % prevLoc
-    html += """\
-  <b>
-   <i>
-    <font size='3'>%d. %s%s</font>
-   </i>
-  </b>
-  <br />
-  <font size='3'>
-""" % (num, orgName, prevLoc)
-    if pTitle:
-        html += """\
-  %s<br />
-""" % pTitle
-    for child in loc.childNodes:
-        if child.nodeName == 'Line':
-            html += """\
-  %s<br />
-""" % cdr.getTextContent(child)
-    html += """\
-  </font>
-  <br />
-"""
-    fragId = opl.getAttribute("id")
-    if fragId:
-        html += showProtocols(fragId)
-    num += 1
+    html    = re.sub("@@FRAGMENTID\["+frag+"]@@", prottable, html)
 
+# If there is still a fragment ID left we don't have any protocols
+# to display.
+# ----------------------------------------------------------------
+noprotocol = "No protocol at this location"
+html    = re.sub("@@FRAGMENTID\[.*]@@", noprotocol, html)
 
 #----------------------------------------------------------------------
 # Send the page back to the browser.
 #----------------------------------------------------------------------
-cdrcgi.sendPage(html + """\
- </body>
-</html>
-""")
+cdrcgi.sendPage(html)
