@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtSearch.py,v 1.6 2002-05-30 17:01:05 bkline Exp $
+# $Id: ProtSearch.py,v 1.7 2002-05-30 17:06:41 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Protocol documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2002/05/30 17:01:05  bkline
+# New protocol filters from Cheryl.
+#
 # Revision 1.5  2002/05/08 17:41:51  bkline
 # Updated to reflect Volker's new filter names.
 #

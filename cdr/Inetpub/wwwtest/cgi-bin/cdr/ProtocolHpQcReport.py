@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolHpQcReport.py,v 1.5 2002-05-30 17:01:06 bkline Exp $
+# $Id: ProtocolHpQcReport.py,v 1.6 2002-05-30 17:06:41 bkline Exp $
 #
 # Protocol Health Professional QC Report.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2002/05/30 17:01:06  bkline
+# New protocol filters from Cheryl.
+#
 # Revision 1.4  2002/05/17 21:15:40  bkline
 # Plugged in new filters from Cheryl.
 #
