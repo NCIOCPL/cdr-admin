@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CTGov.py,v 1.3 2003-11-25 12:44:48 bkline Exp $
+# $Id: CTGov.py,v 1.4 2003-12-16 15:36:45 bkline Exp $
 #
 # Submenu for ClinicalTrials.gov activities.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2003/11/25 12:44:48  bkline
+# Plugged in QC report.
+#
 # Revision 1.2  2003/11/10 17:54:58  bkline
 # Split interface for reviewing new protocols into two, separating out
 # those waiting for CIPS feedback.  Plugged in reports for import
@@ -80,7 +83,7 @@ form += """\
     <OL>
 """
 reports = [
-           ('Stub.py', 'Update Mapping Table')
+           ('EditExternMap.py', 'Update Mapping Table')
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI>\n" % (
@@ -107,8 +110,8 @@ reports = [
            ('Stub.py', 'Download Statistics Report'),
            ('CTGovImportReport.py', 'Import Statistics Report'),
            ('ExternMapFailures.py', 'External Map Failures Report'),
-           ('Stub.py', 'Records Marked Out of Scope'),
-           ('Stub.py', 'Records Marked Duplicate'),
+           ('CTGovOutOfScope.py', 'Records Marked Out of Scope'),
+           ('CTGovDupReport.py', 'Records Marked Duplicate'),
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI>\n" % (
