@@ -2,8 +2,12 @@
 #
 # Publishing CGI script.
 #
-# $Id: publishing.py,v 1.12 2002-09-03 17:20:37 pzhang Exp $
+# $Id: publishing.py,v 1.13 2002-09-03 22:27:39 pzhang Exp $
 # $Log: not supported by cvs2svn $
+# Revision 1.12  2002/09/03 17:20:37  pzhang
+# Added managing status link.
+# Dropped inactive and mailer control documents from being displayed.
+#
 # Revision 1.11  2002/05/15 22:47:49  pzhang
 # Added code for control document version.
 # Detected valid PubType parameter values.
@@ -207,6 +211,13 @@ class Display:
                     form += """<TR><TD>%s</TD><TD>%s</TD><TD><INPUT \
                         NAME='%s' VALUE='%s' READONLY></TD></TR>\n""" % (
                         r[1], r[2], r[1], r[2])
+                elif r[2] == "Yes" or r[2] == "No":
+               
+                    # Create a picklist for parameter name/value pairs.
+                    pickList = "<SELECT NAME='%s'>\n<OPTION>Yes</OPTION>"
+                    pickList += "\n<OPTION>No</OPTION>\n</SELECT>" 
+                    form += "<TR><TD>%s</TD><TD>%s</TD><TD>%s</TD></TR>\n" % (
+                        r[1], r[2], pickList % r[1])
                 else:
                     form += """<TR><TD>%s</TD><TD>%s</TD><TD><INPUT \
                         NAME='%s' VALUE='%s'></TD></TR>\n""" % (r[1], r[2], 
