@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolReports.py,v 1.3 2002-09-23 17:36:40 bkline Exp $
+# $Id: ProtocolReports.py,v 1.4 2003-01-22 23:28:30 bkline Exp $
 #
 # Submenu for protocol reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2002/09/23 17:36:40  bkline
+# New report for European protocols.
+#
 # Revision 1.2  2002/05/25 02:39:13  bkline
 # Removed extra blank lines from HTML output.
 #
@@ -76,7 +79,11 @@ reports = [
            ('Stub.py', 'Approved Protocols'),
            ('NewlyPublishedTrials.py', 'Newly Published Protocols'),
            ('Stub.py', 'Published Protocol Count'),
-           ('LiaisonReport.py', 'NCI Liaison Orrice/Brussels Protocol Report')
+           ('LiaisonReport.py', 'NCI Liaison Orrice/Brussels Protocol Report'),
+           ('PreMailerProtReport.py',
+            'Pre-Mailer Protocol Check'),
+           ('ApprovedNotYetActive.py',
+            'Approved Not Yet Active Report')
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI>\n" % (
