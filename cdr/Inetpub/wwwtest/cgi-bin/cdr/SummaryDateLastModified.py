@@ -1,12 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryDateLastModified.py,v 1.2 2003-11-03 00:24:51 bkline Exp $
+# $Id: SummaryDateLastModified.py,v 1.3 2003-12-03 20:42:14 bkline Exp $
 #
 # Report listing specified set of Cancer Information Summaries, the date
 # they were last modified as entered by a user, and the date the last
 # Modify action was taken.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2003/11/03 00:24:51  bkline
+# Changes requested by issue #913.
+#
 # Revision 1.1  2003/05/08 20:26:42  bkline
 # New summary reports.
 #
@@ -268,6 +271,10 @@ if not summaryType:
     title = "All Boards/%s" % audience
 else:
     title = "%s/%s" % (row[2], audience)
+if uStartDate and uEndDate:
+    bodyTitle = "Summary Date Last Modified (User) Report"
+else:
+    bodyTitle = "Summary Last Modified Date (System) Report"
 html = """\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>
@@ -285,11 +292,11 @@ html = """\
  </head>
  <body>
   <center>
-   <span class='title'>Summary Date Last Modified Report</span><br>
+   <span class='title'>%s</span><br>
    <span class='subtitle'>%s to %s</span>
   </center>
   <br><br>
-""" % (title, startDate, endDate)
+""" % (title, bodyTitle, startDate, endDate)
 
 #----------------------------------------------------------------------
 # Walk through the rows.
