@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: MailerReports.py,v 1.6 2004-02-17 19:46:39 venglisc Exp $
+# $Id: MailerReports.py,v 1.7 2004-07-13 17:46:42 bkline Exp $
 #
 # Submenu for mailer reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2004/02/17 19:46:39  venglisc
+# Modified menu to remove unused menu items.
+#
 # Revision 1.5  2003/08/25 20:15:22  bkline
 # Plugged in new report for Lead Org S&P Mailer history.
 #
@@ -62,7 +65,9 @@ reports = [
            ('NonRespondents.py', 
             'Non-Respondents'),
            ('PreMailerProtReport.py',
-            'Pre-Mailer Protocol Check')
+            'Pre-Mailer Protocol Check'),
+           ('EmailerReports.py',
+            'Web Mailers')
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI>\n" % (
