@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: DatedActions.py,v 1.1 2002-03-13 16:58:07 bkline Exp $
+# $Id: DatedActions.py,v 1.2 2002-03-13 17:02:59 bkline Exp $
 #
 # Reports on dated actions for a particular document type.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2002/03/13 16:58:07  bkline
+# New report for dated actions associated with a specified doc type.
+#
 #----------------------------------------------------------------------
 import cdr, cdrdb, cdrcgi, cgi, re, time, xml.dom.minidom
 
@@ -107,13 +110,13 @@ html = """\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>
  <head>
-  <title>Date Action Report %s %s</title>
+  <title>Dated Action Report %s %s</title>
  </head>
  <basefont face='Arial, Helvetica, sans-serif'>
  <body>
   <center>
    <b>
-    <font size='4'>Date Action Report</font>
+    <font size='4'>Dated Action Report</font>
    </b>
    <br />
    <b>
