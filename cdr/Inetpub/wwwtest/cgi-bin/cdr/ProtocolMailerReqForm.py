@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolMailerReqForm.py,v 1.1 2002-10-22 14:41:51 bkline Exp $
+# $Id: ProtocolMailerReqForm.py,v 1.2 2002-10-24 02:46:22 bkline Exp $
 #
 # Request form for all protocol mailers.
 #
@@ -17,8 +17,11 @@
 # publication job for the publishing daemon to find and initiate.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2002/10/22 14:41:51  bkline
+# Consolidated menu for all protocol mailers.
+#
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, string, cdrdb, cdrpubcgi, cdrmailcommon
+import cgi, cdr, cdrcgi, re, string, cdrdb, cdrpubcgi, cdrmailcommon, sys
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -29,6 +32,7 @@ request     = cdrcgi.getRequest(fields)
 docId       = fields and fields.getvalue("DocId")    or None
 email       = fields and fields.getvalue("Email")    or None
 userPick    = fields and fields.getvalue("userPick") or None
+maxMails    = fields and fields.getvalue("maxMails") or 'No limit'
 title       = "CDR Administration"
 section     = "Protocol Mailer Request Form"
 SUBMENU     = "Mailer Menu"
@@ -42,6 +46,14 @@ docType     = 'InScopeProtocol'
 modePath    = '/Organization/OrganizationDetails/PreferredProtocolContactMode'
 leadOrgPath = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg'\
               '/LeadOrganizationID/@cdr:ref'
+if maxMails == 'No limit': maxDocs = sys.maxint
+else:
+    try:
+        maxDocs = int(maxMails)
+    except:
+        cdrcgi.bail("Invalid value for maxMails: %s" % maxMails)
+if maxDocs < 1:
+    cdrcgi.bail("Invalid value for maxMails: %s" % maxMails)
 
 #----------------------------------------------------------------------
 # Make sure we're logged in.
@@ -112,7 +124,9 @@ if not request:
     </td></tr>
    </table>
    <input type='hidden' name='%s' value='%s'>
-
+   <p><p>
+    Maximum number of mailers to generate:
+   <input type='text' name='maxMails' size='12' value='No limit' />
   </form>
 """ % (cdrcgi.SESSION, session)
     #------------------------------------------------------------------
@@ -232,7 +246,7 @@ if docId:
 elif mailType == 'Protocol-Initial abstract':
     try:
         cursor.execute("""\
-            SELECT DISTINCT protocol.id, MAX(doc_version.num)
+        SELECT DISTINCT TOP %d protocol.id, MAX(doc_version.num)
                        FROM doc_version
                        JOIN ready_for_review
                          ON ready_for_review.doc_id = doc_version.id
@@ -261,8 +275,8 @@ elif mailType == 'Protocol-Initial abstract':
                                            AND (p.status = 'Success'
                                            AND pd.failure IS NULL
                                             OR p.completed IS NULL))
-                   GROUP BY protocol.id""" % (statPath, brussels, sourcePath,
-                                              mailType))
+                   GROUP BY protocol.id""" % (maxDocs, statusPath, brussels,
+                                              sourcePath, mailType))
         docList = cursor.fetchall()
         if not docList:
             cdrcgi.bail("No documents match the selection criteria")
@@ -272,7 +286,7 @@ elif mailType == 'Protocol-Initial abstract':
 #----------------------------------------------------------------------
 # Select protocols ready for an annual abstract update mailer.
 #----------------------------------------------------------------------
-elif mailType == 'Protocol-Annual abstract'
+elif mailType == 'Protocol-Annual abstract':
     try:
 
         # For which protocols have we already sent abstract mailers this year?
@@ -290,7 +304,7 @@ elif mailType == 'Protocol-Annual abstract'
                         AND p.pub_system = %d""" % ctrlDocId)
                                              
         cursor.execute("""\
-            SELECT DISTINCT protocol.id, MAX(doc_version.num)
+            SELECT DISTINCT TOP %d protocol.id, MAX(doc_version.num)
                        FROM document protocol
                        JOIN doc_version
                          ON doc_version.id = protocol.id
@@ -318,7 +332,8 @@ elif mailType == 'Protocol-Annual abstract'
                         AND NOT EXISTS (SELECT *
                                           FROM #already_mailed
                                          WHERE doc_id = protocol.id)
-                   GROUP BY protocol.id""" % (statusPath,
+                   GROUP BY protocol.id""" % (maxDocs,
+                                              statusPath,
                                               ctrlDocId,
                                               orgMailType,
                                               brussels,
@@ -329,11 +344,17 @@ elif mailType == 'Protocol-Annual abstract'
 
 #----------------------------------------------------------------------
 # Send out a protocol abstract mailer reminder for the slackers.
+# Note that the remailers are specified in section 2.6.2 of the
+# requirements document.  This is a subsection of the requirements
+# for the annual abstract update mailers, not for all protocol
+# abstract mailers, so these don't get sent for the initial abstract
+# mailers.
 #----------------------------------------------------------------------
 elif mailType == 'Protocol-Annual abstract remail':
+    annualMailers = 'Protocol-Annual abstract'
     try:
         cursor.execute("""\
-            SELECT protocol.id, MAX(doc_version.num)
+   SELECT DISTINCT TOP %d protocol.id, MAX(doc_version.num)
               FROM document protocol
               JOIN doc_version
                 ON doc_version.id = protocol.id
@@ -350,7 +371,7 @@ elif mailType == 'Protocol-Annual abstract remail':
                AND mailer_sent.value BETWEEN DATEADD(day, -120, GETDATE())
                                          AND DATEADD(day,  -60, GETDATE())
 
-               -- Don't dun them more than once.
+               -- Don't bug the folks who have already answered.
                AND NOT EXISTS (SELECT *
                                  FROM query_term
                                 WHERE path = '/Mailer/Response/Received'
@@ -358,12 +379,12 @@ elif mailType == 'Protocol-Annual abstract remail':
                                   AND value IS NOT NULL
                                   AND value <> '')
 
-               -- Don't bug the folks who have already answered.
+               -- Don't dun them more than once.
                AND NOT EXISTS (SELECT *
                                  FROM query_term
                                 WHERE path = '/Mailer/RemailerFor/@cdr:ref'
                                   AND int_val = mailer_sent.doc_id)
-          GROUP BY protocol.id""" % orgMailType)
+          GROUP BY protocol.id""" % (maxDocs, annualMailers))
     
         docList = cursor.fetchall()
     except cdrdb.Error, info:
@@ -375,7 +396,7 @@ elif mailType == 'Protocol-Annual abstract remail':
 elif mailType == 'Protocol-Initial status/participant check':
     try:
         cursor.execute("""\
-            SELECT DISTINCT protocol.id, MAX(doc_version.num)
+            SELECT DISTINCT TOP %d protocol.id, MAX(doc_version.num)
                        FROM document protocol
                        JOIN doc_version
                          ON doc_version.id = protocol.id
@@ -413,7 +434,8 @@ elif mailType == 'Protocol-Initial status/participant check':
                                            AND p.pub_subset = '%s'
                                            AND (p.status = 'Success'
                                             OR p.completed IS NULL))
-                   GROUP BY protocol.id""" % (statusPath, 
+                   GROUP BY protocol.id""" % (maxDocs,
+                                              statusPath, 
                                               leadOrgPath,
                                               modePath,
                                               brussels, 
@@ -445,7 +467,7 @@ elif mailType == 'Protocol-Quarterly status/participant check':
         # any organization with the PreferredContactMode element
         # present as requesting electronic mailers.]
         cursor.execute("""\
-            SELECT DISTINCT pub_proc_doc.doc_id
+            SELECT DISTINCT d.doc_id
                        INTO #recent_mailers
                        FROM pub_proc_doc d
                        JOIN pub_proc p
@@ -456,9 +478,9 @@ elif mailType == 'Protocol-Quarterly status/participant check':
                         AND DATEADD(quarter, -1, GETDATE()) < p.completed)
                         AND p.pub_system = %d""" % (mailType,
                                                     orgMailType,
-                                                    ctrlDocId)
+                                                    ctrlDocId))
         cursor.execute("""\
-            SELECT DISTINCT protocol.id, MAX(doc_version.num)
+            SELECT DISTINCT TOP %d protocol.id, MAX(doc_version.num)
                        FROM document protocol
                        JOIN doc_version
                          ON doc_version.id = protocol.id
@@ -499,8 +521,9 @@ elif mailType == 'Protocol-Quarterly status/participant check':
                                          WHERE value  = '%s'
                                            AND path   = '%s'
                                            AND doc_id = protocol.id)
-                   GROUP BY protocol.id""" % (statusPath,
-                                              orgPath,
+                   GROUP BY protocol.id""" % (maxDocs,
+                                              statusPath,
+                                              leadOrgPath,
                                               orgMailType,
                                               modePath,
                                               brussels,
