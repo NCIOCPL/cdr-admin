@@ -1,6 +1,6 @@
 import cgi, glob, os, re, time
 
-job = "d:/bkline/vendors/test-20020824"
+job = "d:/bkline/vendors/test-20020901"
 try:
     fields = cgi.FieldStorage()
     job    = fields and fields.getvalue("job") or job
