@@ -2,8 +2,11 @@
 #
 # Publishing CGI script.
 #
-# $Id: publishing.py,v 1.23 2003-06-19 19:37:08 bkline Exp $
+# $Id: publishing.py,v 1.24 2004-01-21 22:42:40 venglisc Exp $
 # $Log: not supported by cvs2svn $
+# Revision 1.23  2003/06/19 19:37:08  bkline
+# Bumped up the number of rows for document IDs from 10 to 24.
+#
 # Revision 1.22  2003/02/07 21:15:53  pzhang
 # Changed "reason +=" to "reason =".
 #
@@ -78,7 +81,7 @@
 #
 #----------------------------------------------------------------------
 import cgi, cdrcgi, string, copy, urllib, cdr, cdr2cg, xml.dom.minidom
-import socket
+import socket, re
 from win32com.client import Dispatch
 import pythoncom
 
@@ -113,6 +116,7 @@ class Display:
     #---------------------------------------------------------------- 
     # Display the pick list of all publishing systems by PubCtrl 
     # document type.
+    # This is the main screen of the Publishing interface
     #----------------------------------------------------------------
     def displaySystems(self):
 
@@ -147,21 +151,21 @@ class Display:
         form += HIDDEN % (cdrcgi.SESSION, session)   
         self.__addFooter(form)
 
-    # Display the pick list of all subsets of a publishing system.
+
+    #----------------------------------------------------------------
+    # Display all subsets of the publishing system main menu.
+    #----------------------------------------------------------------
     def displaySubsets(self, ctrlId, version):
-        
         subsets = []
         subset = ["Publishing.py", "", "", "", ""]      
         pickList = self.__getPubSubsets(ctrlId, version)
         sysName = pickList[0][0] 
         for s in pickList:
-            subset[1] =  s[1] 
-            subset[2] = s[1]
+            subset[1]  = s[1] 
+            subset[2]  = s[1]
             subset[2] += "<BR><FONT SIZE=3>%s</FONT>" % s[2]
-            #subset[2] += "<BR>[Params]: &nbsp;" + s[3]             
-            #subset[2] += "<BR>[UserSel]: &nbsp;"  + s[4]  
             subset[2] += "<BR><BR>"            
-            subset[3] = s[3] and 'Param=Yes' or ''                        
+            subset[3]  = s[3] and 'Param=Yes' or ''                        
             if s[4]:
                 subset[3] += '&Doc=Yes'
             if not subset[3]:
@@ -171,7 +175,7 @@ class Display:
             subsets.append(deep)
         if type(subsets) == type(""): cdrcgi.bail(subsets)    
 
-        form = "<H4>Publishing Subsets of System: %s</H4>\n" % sysName
+        form  = "<H4>Publishing Subsets of System: %s</H4>\n" % sysName
         form += "<OL>\n"
 
         for r in subsets:
@@ -191,36 +195,67 @@ class Display:
     #       a list instead of a string. Tricky!
     #----------------------------------------------------------------------
     def displayDocParam(self, ctrlId, version, SubSet, Param = None, 
-                        Doc = None, Redirected = None):
+                        Doc = None, Redirected = None, idMethod = None):
         
         # Initialize hidden values.
         form = self.__initHiddenValues()  
         
-        form += "<H4>User Selected Documents and Parameters for Subset: %s \
-                 </H4>\n" % SubSet 
+        form += HIDDEN % ('idMethod', idMethod)  
+        
+        form += """
+<H4>User Selected Documents and Parameters for Subset: %s</H4>
+""" % SubSet 
         form += "<OL>\n"
         
-        # UserSelect is allowed.
         if Doc:
-            form += "<LI><H5>Enter publishable document Id/Version [e.g.,\
-                     190930 or 190930/3]: </H5></LI>\n"
-            form += "<TABLE BORDER='1'>"
+            # -------------------------------------------------------------
+            # The idMethod "enter" has been selected.  Presenting a form
+            # to copy/paste CDR IDs one by one
+            # -------------------------------------------------------------
+            # cdrcgi.bail("IDMethod: %s" % idMethod)
+            if idMethod == 'enter':
+                form += """
+<LI>
+ <H5>Enter publishable document Id/Version [e.g.,190930 or 190930/3]: </H5>
+</LI>
+"""
+                form += "<TABLE BORDER='1'>"
         
-            # This is up to userselect element in the control document.
-            # Will revisit this.
-            docIdList = ""
-            for r in range(24):
-                form += "<TR>"
-                for i in range(5):
-                    id = 10 * r + i
-                    docIdList += ",CdrDoc%d" % id
-                    form += """<TD><INPUT NAME='CdrDoc%d' TYPE='TEXT' 
-                               SIZE='10'></TD>""" % id
-                form += "</TR>\n"
-            if not Redirected: 
-                form += HIDDEN % ('DocIds', docIdList)
+                # This is up to userselect element in the control document.
+                # Will revisit this.
+                docIdList = ""
+                for r in range(4):
+                    form += "<TR>"
+                    for i in range(5):
+                        id = 10 * r + i
+                        docIdList += ",CdrDoc%d" % id
+                        form += """
+ <TD>
+  <INPUT NAME='CdrDoc%d' TYPE='TEXT' SIZE='10'>
+ </TD>""" % id
+                    form += """
+</TR>
+"""
+                if not Redirected: 
+                    form += HIDDEN % ('DocIds', docIdList)
 
-            form += "</TABLE></LI><BR>\n"
+                form += "</TABLE></LI><BR>\n"
+
+            else:
+                # ---------------------------------------------------------
+                # Enter the CDR IDs by copy/pasting from e-mail to operator
+                # ---------------------------------------------------------
+                form += """
+<LI>
+ <H5>Paste in all CDR IDs</H5>
+</LI>
+"""
+                form += "<TABLE BORDER='1'>"
+                form +="""
+<TEXTAREA NAME='DocIds' rows="10" cols="40"></TEXTAREA>
+"""
+                form += "</TABLE></LI><BR>\n"
+
 
         # Subset parameters exist.
         if Param:
@@ -276,7 +311,10 @@ class Display:
         form += HIDDEN % (cdrcgi.SESSION, session)   
         self.__addFooter(form)
 
+
+    # -----------------------------------------------
     # Display a confirmation page.
+    # -----------------------------------------------
     def displayConfirm(self):
 
         # Initialize hidden values.
@@ -328,7 +366,10 @@ class Display:
         form += HIDDEN % (cdrcgi.SESSION, session)           
         cdrcgi.sendPage(header + form + "</FORM></BODY></HTML>")
     
+
+    # -----------------------------------------------
     # Publish and return a link for checking status.
+    # -----------------------------------------------
     def initPublish(self, credential, ctrlDocId, version, subsetName, params,
                     docIds, email, no_output):
     
@@ -356,12 +397,46 @@ class Display:
         form += HIDDEN % (cdrcgi.SESSION, session)   
         self.__addFooter(form)
 
+    # -------------------------------------------------
+    # Display screen to request load option for CDR IDs
+    # -------------------------------------------------
+    def displayLoadParam(self, ctrlId, version, SubSet, Param = None, 
+                        Doc = None, Redirected = None):
+        
+        # Initialize hidden values.
+        form = self.__initHiddenValues()  
+        if fields.has_key('Param'):
+            form += HIDDEN % ('Param', fields.getvalue('Param'))  
+        if fields.has_key('Doc'):
+            form += HIDDEN % ('Doc', fields.getvalue('Doc'))  
+        
+        form += """
+<H4>User Selected Documents and Parameters for Subset: %s</H4>
+""" % SubSet 
+        form += "<OL>\n"
+        
+        # UserSelect is allowed.
+        form += """
+<p>
+<INPUT TYPE="radio" NAME="id-method" value="enter">&nbsp; Enter CDR IDs<BR>
+<INPUT TYPE="radio" NAME="id-method" value="load" CHECKED="1">&nbsp; Load/Paste CDR IDs<BR>
+"""
+
+        form += "<BR>\n"
+            
+        form += "<INPUT NAME='Load' TYPE='SUBMIT' "
+        form += "VALUE='Click to Enter CDR IDs'>"
+        form += "<BR><BR>\n"
+        
+        form += HIDDEN % (cdrcgi.SESSION, session)   
+        self.__addFooter(form)
+
+
     def __addFooter(self, form):
-       
         cdrcgi.sendPage(header + form + "</FORM></BODY></HTML>")
 
+
     def __initHiddenValues(self):
-            
         form = ""
    
         if fields.has_key('ctrlId'):
@@ -374,7 +449,8 @@ class Display:
             form += HIDDEN % ('Params', fields.getvalue('Params'))
         if fields.has_key('DocIds'):
             form += HIDDEN % ('DocIds', fields.getvalue('DocIds'))                    
-        
+        if fields.has_key('idMethod'):
+            form += HIDDEN % ('idMethod', fields.getvalue('idMethod'))                    
         return form
 
 
@@ -385,11 +461,11 @@ class Display:
         file = "d:/cdr/log/publish.log"
         open(file, "a").write("== %s\n" % line)
 
+
     #----------------------------------------------------------------------
     # Return a list of publishing systems.
     #----------------------------------------------------------------------
     def __getPubSys(self):
-       
         # Initialized the list of tuples: (title, id, version, desc).
         pickList = []
         tuple = ["", "", "", ""]
@@ -432,6 +508,7 @@ class Display:
         rs = None
    
         return pickList
+
 
     #----------------------------------------------------------------
     # Return all subsets based on ctrlId.   
@@ -517,7 +594,6 @@ class Display:
     # but not done yet. Only returns the parameters so far.
     #----------------------------------------------------------------
     def __getParamSQL(self, ctrlId, version, Subset):
-      
         # Initialized the list of tuples: (name, value).
         pickList = []
         tuple = ["", ""]
@@ -601,14 +677,15 @@ class Display:
 #----------------------------------------------------------------------
 # Set the form variables.
 #----------------------------------------------------------------------
-fields  = cgi.FieldStorage()
-session = cdrcgi.getSession(fields)
-action  = cdrcgi.getRequest(fields)
-title   = "CDR Administration"
-section = "Publishing"
-buttons = [cdrcgi.MAINMENU, "Log Out"]
-header  = cdrcgi.header(title, title, section, "Publishing.py", buttons)
-HIDDEN = """<INPUT TYPE='HIDDEN' NAME='%s' VALUE='%s'>\n"""
+fields   = cgi.FieldStorage()
+idMethod = fields and fields.getvalue("id-method") or "enter"
+session  = cdrcgi.getSession(fields)
+action   = cdrcgi.getRequest(fields)
+title    = "CDR Administration"
+section  = "Publishing"
+buttons  = [cdrcgi.MAINMENU, "Log Out"]
+header   = cdrcgi.header(title, title, section, "Publishing.py", buttons)
+HIDDEN   = """<INPUT TYPE='HIDDEN' NAME='%s' VALUE='%s'>\n"""
 
 #----------------------------------------------------------------------
 # Return to the main menu if requested.
@@ -626,6 +703,12 @@ if action == "Log Out":
 # This class does all the complex work.
 d = Display()
 
+# ------------------------------------------------------------------
+# Submit the publishing job
+# If the Publish variable exists we've entered Doc IDs to be 
+# published.
+# Otherwise we are running a full set of documents to be published.
+# ------------------------------------------------------------------
 if fields.has_key('Session') and fields.has_key('SubSet') and \
     fields.has_key('Publish'):
     ctrlDocId = fields.getvalue('ctrlId')
@@ -633,14 +716,37 @@ if fields.has_key('Session') and fields.has_key('SubSet') and \
     subsetName = fields.getvalue('SubSet')
     credential = fields.getvalue('Session')
     answer = fields.getvalue('Publish')
+    getCdrIds = fields.getvalue('idMethod')
 
     if answer == 'No':
         d.displayDocParam(ctrlDocId, subsetName, Redirected = "Redirect")
     else:        
-        docs = fields.getvalue('Documents')
         docIds = None
-        if docs:
-            docIds = string.split(docs[1:], ",")  
+        # ---------------------------------------------------
+        # Process CDR IDs based on individual data entry
+        # ---------------------------------------------------
+        if getCdrIds == 'enter':
+            docs = fields.getvalue('Documents')
+            if docs:
+                docIds = string.split(docs[1:], ",")  
+        # ---------------------------------------------------
+        # Process CDR IDs based on pasted data into textarea
+        # ---------------------------------------------------
+        else:
+            docs = fields.getvalue('DocIds')
+            if docs:
+                docIds = re.split('\D+', docs)
+
+                # Sort the list and remove empty elements
+                # ----------------------------------------
+                docIds.sort()
+                docIds.reverse()
+                for j in 1,2:
+                    if docIds[len(docIds)-1] == '':
+                        docIds.pop()
+                # cdr.logwrite("docIds After: %s" % docIds)
+                for i in range(len(docIds)):
+                    docIds[i] = 'CDR' + str(int(docIds[i]))
 
         params = None
         listParams = []
@@ -662,27 +768,76 @@ if fields.has_key('Session') and fields.has_key('SubSet') and \
         d.initPublish(credential, ctrlDocId, version, subsetName, 
                       listParams, docIds, email, no_output)
 
+# ------------------------------------------------------------------
+# Display the HotFix menu if the Param and Doc parameters are set
+# in addition to session, control ID, and Subset ID
+# ------------------------------------------------------------------
 elif fields.has_key('Session') and fields.has_key('SubSet') and \
-    fields.has_key('ctrlId') and (fields.has_key('Param') or \
-    fields.has_key('Doc')):
+    fields.has_key('ctrlId') and fields.has_key('Load') and \
+    fields.has_key('Param') and fields.has_key('Doc'):
     ctrlId = fields.getvalue('ctrlId')
     version = fields.getvalue('version')
     SubSet = fields.getvalue('SubSet')
     param = fields.getvalue('Param')
     doc = fields.getvalue('Doc')
+    d.displayDocParam(ctrlId, version, SubSet, param, doc, idMethod = idMethod)
+
+# ------------------------------------------------------------------
+# Display Intermediary page to enter if CDR IDs should be entered
+# manually or entered as copy/paste
+# ------------------------------------------------------------------
+elif fields.has_key('Session') and fields.has_key('SubSet') and \
+    fields.has_key('ctrlId') and fields.has_key('Param') and \
+    fields.has_key('Doc') and not fields.has_key('Load'):
+    ctrlId = fields.getvalue('ctrlId')
+    version = fields.getvalue('version')
+    SubSet = fields.getvalue('SubSet')
+    param = fields.getvalue('Param')
+    doc = fields.getvalue('Doc')
+    d.displayLoadParam(ctrlId, version, SubSet, param, doc)
+
+# ------------------------------------------------------------------
+# Display the Push Jobs menu if the Param and Doc parameters are set
+# in addition to session, control ID, and Subset ID
+# ------------------------------------------------------------------
+elif fields.has_key('Session') and fields.has_key('SubSet') and \
+    fields.has_key('ctrlId') and not fields.has_key('Load') and \
+    (fields.has_key('Param') or fields.has_key('Doc')):
+    ctrlId = fields.getvalue('ctrlId')
+    version = fields.getvalue('version')
+    SubSet = fields.getvalue('SubSet')
+    param = fields.getvalue('Param')
+    doc = fields.getvalue('Doc')
+    idMethod = fields.getvalue('idMethod')
     d.displayDocParam(ctrlId, version, SubSet, param, doc)
 
+# ------------------------------------------------------------------
+# Display the confirmation page when the session parameter is 
+# specified, the control ID, and the SubSet ID and the submit button
+# has been entered.
+# ------------------------------------------------------------------
 elif fields.has_key('Session') and fields.has_key('SubSet') \
     and fields.has_key('ctrlId') and fields.has_key('Confirm'):
     d.displayConfirm()
 
+# ------------------------------------------------------------------
+# Display the SubMenu System when the session parameter is specified
+# and a control ID exists (identifying the parent menu item)
+# ------------------------------------------------------------------
 elif fields.has_key('Session') and fields.has_key('ctrlId'):
     ctrlId = fields.getvalue('ctrlId')
     version = fields.getvalue('version')
     d.displaySubsets(ctrlId, version)
 
+# ------------------------------------------------------------------
+# Display the Menu System if only the Session parameter is specified
+# (the program is started)
+# ------------------------------------------------------------------
 elif fields.has_key('Session'):    
     d.displaySystems()
 
+# ------------------------------------------------------------------
+# Log off if no parameters are specified
+# ------------------------------------------------------------------
 else:
     cdrcgi.logout(session)
