@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermReports.py,v 1.4 2004-09-17 14:06:50 venglisc Exp $
+# $Id: GlossaryTermReports.py,v 1.5 2004-10-07 21:39:33 bkline Exp $
 #
 # Submenu for glossary term reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2004/09/17 14:06:50  venglisc
+# Fixed list items to properly teminate the anker link.
+#
 # Revision 1.3  2004/08/10 15:44:20  bkline
 # Plugged in Glossary Term Search report.
 #
@@ -66,7 +69,8 @@ form += """\
 """
 reports = [
            ('GlossaryTermPhrases.py', 'Glossary Term Search Report'),
-           ('Stub.py', 'Terms By Status')
+           ('Stub.py', 'Terms By Status'),
+           ('GlossaryTermsByStatus.py', 'Glossary Terms By Status')
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI></A>\n" % (
