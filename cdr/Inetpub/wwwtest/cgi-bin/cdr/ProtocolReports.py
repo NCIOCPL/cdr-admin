@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolReports.py,v 1.9 2003-05-08 20:24:01 bkline Exp $
+# $Id: ProtocolReports.py,v 1.10 2004-02-17 19:13:33 venglisc Exp $
 #
 # Submenu for protocol reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.9  2003/05/08 20:24:01  bkline
+# New report for Office of Science Policy.
+#
 # Revision 1.8  2003/03/06 20:55:04  bkline
 # Fixed typo (Orrice -> Office).
 #
@@ -77,20 +80,20 @@ form += """\
     <OL>
 """
 reports = [
-           ('Stub.py', 'Approved Protocols'),
-           ('NewlyPublishedTrials.py', 'Newly Published Protocols'),
-           ('Stub.py', 'Published Protocol Count'),
-           ('LiaisonReport.py', 'NCI Liaison Office/Brussels Protocol Report'),
-           ('PreMailerProtReport.py',
-            'Pre-Mailer Protocol Check'),
            ('ApprovedNotYetActive.py',
             'Approved Not Yet Active Report'),
+           ('LiaisonReport.py', 
+            'NCI Liaison Office/Brussels Protocol Report'),
+           ('NewlyPublishedTrials.py', 
+            'Newly Published Protocols'),
+           ('PreferredProtOrgs.py', 
+            'Preferred Protocol Organizations'),
+           ('ProtSitesWithoutPhone.py',
+            'Protocol Sites Without Phone Numbers'),
            ('ProtocolStatusChange.py',
             'Protocol Status Change Report'),
            ('BogusActiveLeadOrgs.py',
             'Protocols with Active Lead Orgs But No Active Sites'),
-           ('ProtSitesWithoutPhone.py',
-            'Protocol Sites Without Phone Numbers'),
            ('OSPReport.py',
             'Report for Office of Science Policy')
           ]
