@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: BoardManagers.py,v 1.4 2004-04-08 20:31:10 bkline Exp $
+# $Id: BoardManagers.py,v 1.5 2004-04-16 21:56:57 venglisc Exp $
 #
 # Main menu for board managers.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2004/04/08 20:31:10  bkline
+# Plugged in additions requested by Margaret (request #1059).
+#
 # Revision 1.3  2003/12/19 18:29:08  bkline
 # Plugged in new Summaries LIsts report.
 #
@@ -93,11 +96,11 @@ form += """\
 """
 
 for choice in (
-    ('Stub.py',          'Board Member Information QC Report' ),
-    ('Stub.py',               'Board Roster Reports'               )
+    ('QcReport.py',             'Board Member Information QC Report' ),
+    ('Stub.py',                 'Board Roster Reports'               )
     ):
     form += """\
-    <li><a href='%s/%s?%s'>%s</a></li>
+    <li><a href='%s/%s?DocType=PDQBoardMemberInfo&%s'>%s</a></li>
 """ % (cdrcgi.BASE, choice[0], session, choice[1])
     
 cdrcgi.sendPage(header + form + """\
