@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PubStatus.py,v 1.2 2002-02-14 21:46:52 mruben Exp $
+# $Id: PubStatus.py,v 1.3 2002-04-25 21:12:22 bkline Exp $
 #
 # Status of a publishing job.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/02/14 21:46:52  mruben
+# Added support for no_output flag [bkline for mruben].
+#
 # Revision 1.1  2001/12/01 18:11:44  bkline
 # Initial revision
 #
@@ -44,7 +47,7 @@ try:
             ON u.id = p.usr
          WHERE p.id = ?
 """, (jobId,))
-    (title, subset, name, dir, started, completed, status,
+    (pubSystem, subset, name, dir, started, completed, status,
      messages, no_output) = cursor.fetchone()
 except cdrdb.Error, info:
     cdrcgi.bail("Failure retrieving job information: %s" % info[1][0])
@@ -95,6 +98,6 @@ html    = """\
   </FORM>
  </BODY>
 </HTML>
-""" % (jobId, title, subset, name, (no_output == 'Y' and "None") or dir,
+""" % (jobId, pubSystem, subset, name, (no_output == 'Y' and "None") or dir,
        started, completed and completed or "No", status, messages)
 cdrcgi.sendPage(header + html)
