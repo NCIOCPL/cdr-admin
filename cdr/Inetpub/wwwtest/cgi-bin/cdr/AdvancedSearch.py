@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: AdvancedSearch.py,v 1.1 2001-12-01 18:11:44 bkline Exp $
+# $Id: AdvancedSearch.py,v 1.2 2002-02-14 19:34:21 bkline Exp $
 #
 # Main menu for advanced search forms.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2001/12/01 18:11:44  bkline
+# Initial revision
+#
 #----------------------------------------------------------------------
 import cgi, cdrcgi, urllib
 
@@ -81,17 +84,19 @@ menu    = """\
    <UL>
     <SPAN CLASS='Page'>
     <LI><A HREF='%s/CiteSearch.py%s'>Citation</A></LI>
-    <LI><A HREF='%s/GeoSearch.py%s'>Geographic Unit</A></LI>
+    <LI><A HREF='%s/CountrySearch.py%s'>Country</A></LI>
     <LI><A HREF='%s/MiscSearch.py%s'>Miscellaneous</A></LI>
     <LI><A HREF='%s/OrgSearch2.py%s'>Organization</A></LI>
     <LI><A HREF='%s/PersonSearch.py%s'>Person</A></LI>
     <LI><A HREF='%s/PersonLocSearch.py%s'>Person (with Locations)</A></LI>
+    <LI><A HREF='%s/PoliticalSubUnitSearch.py%s'>Political SubUnit</A></LI>
     <LI><A HREF='%s/ProtSearch.py%s'>Protocol</A></LI>
     <LI><A HREF='%s/SummarySearch.py%s'>Summary</A></LI>
     <LI><A HREF='%s/TermSearch.py%s'>Term</A></LI>
     </SPAN>
    </OL>
 """ % (cdrcgi.BASE, session,
+       cdrcgi.BASE, session,
        cdrcgi.BASE, session,
        cdrcgi.BASE, session,
        cdrcgi.BASE, session,
