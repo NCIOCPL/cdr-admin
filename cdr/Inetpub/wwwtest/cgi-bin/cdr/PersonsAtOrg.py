@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: PersonsAtOrg.py,v 1.4 2003-08-25 20:29:55 bkline Exp $
+# $Id: PersonsAtOrg.py,v 1.5 2004-02-24 12:44:59 bkline Exp $
 #
 # Identifieds all person documents which are linked to a specified
 # organization document.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2003/08/25 20:29:55  bkline
+# Eliminated dross left over from clone of another report.
+#
 # Revision 1.3  2003/03/10 21:05:30  bkline
 # Added support for ambiguous organization name pattern.
 #
@@ -31,7 +34,7 @@ SUBMENU = "Report Menu"
 buttons = ["Submit Request", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 script  = "PersonsAtOrg.py"
 title   = "CDR Administration"
-section = "Persons Linked to Organization Report"
+section = "Persons Practicing at Organization Report"
 header  = cdrcgi.header(title, title, section, script, buttons)
 now     = time.localtime(time.time())
 
@@ -155,7 +158,7 @@ def personsAtLocation(cursor, id, fragId):
     <tr>
      <td colspan="2">&nbsp;</td>
     </tr>
-""" % (personPos, cdrcgi.decode(resp[0]))
+""" % (personPos, cdrcgi.decode(resp[0].replace("@@DOCID@@", "(%d)" % row[0])))
             row = cursor.fetchone()
     except cdrdb.Error, info:
         cdrcgi.bail('Failure collecting person document IDs: %s' % info[1][0])
@@ -245,7 +248,7 @@ html = """\
  <body>
   <center>
    <b>
-    <font size='4'>Persons Linked to Organization Report</font>
+    <font size='4'>Persons Practicing at Organization Report</font>
    </b>
    <br />
    <br />
