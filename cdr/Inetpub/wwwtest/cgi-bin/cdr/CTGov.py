@@ -1,10 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: CTGov.py,v 1.2 2003-11-10 17:54:58 bkline Exp $
+# $Id: CTGov.py,v 1.3 2003-11-25 12:44:48 bkline Exp $
 #
 # Submenu for ClinicalTrials.gov activities.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2003/11/10 17:54:58  bkline
+# Split interface for reviewing new protocols into two, separating out
+# those waiting for CIPS feedback.  Plugged in reports for import
+# statistics and external map failures.
+#
 # Revision 1.1  2003/11/03 16:09:03  bkline
 # Menu of actions for ClinicalTrials.gov protocols.
 #
@@ -17,6 +22,7 @@ import cgi, cdr, cdrcgi, re, string
 fields  = cgi.FieldStorage()
 session = cdrcgi.getSession(fields)
 action  = cdrcgi.getRequest(fields)
+qcFlag  = fields and fields.getvalue("qc") or 0
 title   = "CDR Administration"
 section = "ClinicalTrials.Gov Protocols"
 buttons = [cdrcgi.MAINMENU, "Log Out"]
@@ -34,6 +40,24 @@ if action == cdrcgi.MAINMENU:
 if action == "Log Out": 
     cdrcgi.logout(session)
 
+#----------------------------------------------------------------------
+# Handle request for QC report.
+#----------------------------------------------------------------------
+if qcFlag:
+    header = cdrcgi.header(title, title, "CTGovProtocol QC Report",
+                           "QcReport.py", buttons)
+    form = """\
+   <input type='hidden' name='%s' value='%s'>
+   <b>Document ID:&nbsp;</b>
+   <input name='DocId'>&nbsp;
+   <input type='submit' name='Generate Report'>
+""" % (cdrcgi.SESSION, session)
+    cdrcgi.sendPage(header + form + """\
+  </form>
+ </body>
+</html>
+""")
+    
 #----------------------------------------------------------------------
 # Display available report choices.
 #----------------------------------------------------------------------
@@ -68,10 +92,10 @@ form += """\
     <OL>
 """
 reports = [
-           ('Stub.py', 'CTGov Protocol QC Report')
+           ('CTGov.py?qc=1', 'CTGov Protocol QC Report')
           ]
 for r in reports:
-    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI>\n" % (
+    form += "<LI><A HREF='%s/%s&%s=%s'>%s</LI>\n" % (
             cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
 
 form += """\
