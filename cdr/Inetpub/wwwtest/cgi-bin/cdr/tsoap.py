@@ -1,0 +1,89 @@
+#----------------------------------------------------------------------
+# $Id: tsoap.py,v 1.1 2002-04-16 22:06:06 bkline Exp $
+#
+# Stub for SOAP interface to CDR from Cancer.gov.
+#
+# $Log: not supported by cvs2svn $
+#----------------------------------------------------------------------
+import os, sys, xml.dom.minidom
+
+#----------------------------------------------------------------------
+# Send an XML SOAP message back to the client.
+#----------------------------------------------------------------------
+def sendMessage(msg):
+    print """\
+Content-type: text/xml
+
+<?xml                  version = "1.0"
+                      encoding = "UTF-8"?>
+<env:Envelope        xmlns:env = "http://schemas.xmlsoap.org/soap/envelope/"
+             env:encodingStyle = "http://schemas.xmlsoap.org/soap/encoding/">
+ <env:Body>
+%s
+ </env:Body>
+</env:Envelope>
+""" % msg
+    sys.exit(0)
+
+#----------------------------------------------------------------------
+# Send an error message back to the client.
+#----------------------------------------------------------------------
+def sendErrorMessage(msg, who = "Server", details = None):
+
+    # Start the fault element
+    fault = """\
+  <env:Fault>
+   <faultcode>env:%s</faultcode>
+   <faultstring>%s</faultstring>
+""" % (who, msg)
+
+    # Add option details if specified.
+    if details:
+        fault += """
+   <detail>
+    <details>%s</details>
+   </detail>
+""" % details
+
+    # Finish up and send it off.
+    sendMessage("""\
+   %s
+  </env:Fault>
+""" % fault)
+
+#----------------------------------------------------------------------
+# Gather in the client's message.
+#----------------------------------------------------------------------
+def readRequest():
+    requestMethod = os.getenv("REQUEST_METHOD")
+    if not requestMethod:
+        bailOut("Request method not specified")
+    if requestMethod != "POST":
+        bailOut("Request method should be POST; was %s" % requestMethod,
+                "Client")
+    contentLengthString = os.getenv("CONTENT_LENGTH")
+    if not contentLengthString:
+        bailOut("Content length not specified")
+    try:
+        contentLength = int(contentLengthString)
+    except:
+        bailOut("Invalid content length: %s" % contentLengthString)
+    if contentLength < 1:
+        bailOut("Invalid content length: %s" % contentLengthString)
+    try:
+        request = sys.stdin.read(contentLength)
+    except:
+        bailOut("Failure reading message")
+    return request
+
+#----------------------------------------------------------------------
+# Catch the request and echo back a dummy response.
+#----------------------------------------------------------------------
+request = readRequest()
+sendMessage("""\
+  <PubEventResp         system = "CDR"
+                          when = "2002-11-01T19:48:06.780"
+                       pubType = "Export"
+                       docType = "Term"
+                       lastJob = "287398"/>
+""")
