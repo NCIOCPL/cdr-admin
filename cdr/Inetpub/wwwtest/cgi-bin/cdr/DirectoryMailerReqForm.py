@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: DirectoryMailerReqForm.py,v 1.17 2003-05-12 15:48:58 bkline Exp $
+# $Id: DirectoryMailerReqForm.py,v 1.18 2003-12-24 21:46:05 bkline Exp $
 #
 # Request form for all directory mailers.
 #
@@ -31,6 +31,10 @@
 # Bob Kline.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.17  2003/05/12 15:48:58  bkline
+# Filtered out blocked documents in SQL queries; consolidated some
+# multiple-test SQL clauses using "IN".
+#
 # Revision 1.16  2003/03/05 02:54:41  ameyer
 # Changed handling of remailers for single, named document - was broken.
 #
@@ -349,14 +353,16 @@ else:
         # ID's of docs not requiring an initial mailer because
         #   they've already had one
         tmpQry = """
-            INSERT INTO #already_mailed_ids (tmpid)
-                    SELECT DISTINCT pd2.doc_id
+               INSERT INTO #already_mailed_ids (tmpid, dt)
+                    SELECT pd2.doc_id, MAX(p2.completed)
                       FROM pub_proc_doc pd2
                       JOIN pub_proc p2
                         ON p2.id = pd2.pub_proc
                      WHERE p2.pub_subset IN ('Physician-Initial',
                                              'Physician-Annual update')
                        AND p2.status <> 'Failure'
+                       AND p2.completed IS NOT NULL
+                  GROUP BY pd2.doc_id
         """
         # Main query:
         # Select last version (not CWD) of document for which:
@@ -393,115 +399,177 @@ else:
                    GROUP BY document.id""" % maxMailers
 
     elif mailType == 'Physician-Annual update':
-        # Preselect all mailers sent to physicians in the last year.
-        # Include initial, annual, and all remailers.
-        tmpQry = """
-            INSERT INTO #already_mailed_ids (tmpid)
-                    SELECT DISTINCT pd2.doc_id
-                      FROM pub_proc_doc pd2
-                      JOIN pub_proc p2
-                        ON p2.id = pd2.pub_proc
-                     WHERE p2.pub_subset IN ('Physician-Initial',
-                                             'Physician-Initial remail',
-                                             'Physician-Annual update',
-                                             'Physician-Annual remail')
-                       AND p2.completed > DATEADD(year,-1,GETDATE())
-                       AND p2.status <> 'Failure'
-        """
 
-        # Main query:
-        # Select last version (not CWD) of document for which:
+        #----------------------------------------------------------------
+        # Get a list of the eligible person documents.
+        #
+        # Select last publishable version (not CWD) of document for which:
         #   Doc_type = Person.
         #   .../CurrentStatus = "Active".
         #   .../Directory/Include = "Include".
         #   There has been at least one previous mailer sent of type
         #       Physician-Initial, or Physician-Annual update.
-        #   No non-failing mailer has been sent for this person in
-        #       the last one year of any of the following types:
+        #----------------------------------------------------------------
+        cursor.execute("CREATE TABLE #eligible (id INT, ver INT)")
+        cursor.execute("""\
+    INSERT INTO #eligible (id, ver)
+         SELECT document.id, MAX(doc_version.num)
+           FROM doc_version
+           JOIN document
+             ON doc_version.id = document.id
+           JOIN pub_proc_doc
+             ON document.id = pub_proc_doc.doc_id
+           JOIN pub_proc
+             ON pub_proc_doc.pub_proc = pub_proc.id
+           JOIN query_term person_status
+             ON person_status.doc_id = document.id
+           JOIN query_term include_flag
+             ON include_flag.doc_id = document.id
+          WHERE person_status.path  = '/Person/Status/CurrentStatus'
+            AND person_status.value = 'Active'
+            AND include_flag.path   = '/Person/ProfessionalInformation'
+                                    + '/PhysicianDetails'
+                                    + '/AdministrativeInformation'
+                                    + '/Directory/Include'
+            AND include_flag.value  = 'Include'
+            AND pub_proc.pub_subset IN ('Physician-Initial',
+                                        'Physician-Annual update')
+            AND doc_version.publishable = 'Y'
+            AND document.active_status  = 'A'
+       GROUP BY document.id""", timeout = 120)
+
+        #----------------------------------------------------------------
+        # Create a list containing the date of the last successful mailer 
+        # for each physician to whom we have successfully sent at least
+        # one mailer of any of the following types:
         #         Physician-Initial
         #         Physician-Initial remail
         #         Physician-Annual update
         #         Physician-Annual remail
-        qry = """
-            SELECT TOP %d document.id, MAX(doc_version.num)
-                       FROM doc_version
-                       JOIN document
-                         ON doc_version.id = document.id
-                       JOIN pub_proc_doc pd1
-                         ON document.id = pd1.doc_id
-                       JOIN pub_proc p1
-                         ON pd1.pub_proc = p1.id
-                       JOIN query_term qstat
-                         ON qstat.doc_id = document.id
-                       JOIN query_term qinc
-                         ON qinc.doc_id = document.id
-                      WHERE qstat.path = '/Person/Status/CurrentStatus'
-                        AND doc_version.publishable = 'Y'
-                        AND qstat.value = 'Active'
-                        AND p1.pub_subset IN ('Physician-Initial',
-                                              'Physician-Annual update')
-                        AND qinc.path =
-                           '/Person/ProfessionalInformation/PhysicianDetails/AdministrativeInformation/Directory/Include'
-                        AND qinc.value = 'Include'
-                        AND document.active_status = 'A'
+        #----------------------------------------------------------------
+        tmpQry = """\
+           INSERT INTO #already_mailed_ids (tmpid, dt)
+                SELECT pub_proc_doc.doc_id, MAX(pub_proc.completed)
+                  FROM pub_proc_doc
+                  JOIN pub_proc
+                    ON pub_proc.id = pub_proc_doc.pub_proc
+                 WHERE pub_proc.pub_subset IN ('Physician-Initial',
+                                               'Physician-Initial remail',
+                                               'Physician-Annual update',
+                                               'Physician-Annual remail')
+                   AND pub_proc.status <> 'Failure'
+                   AND pub_proc.completed IS NOT NULL
+              GROUP BY pub_proc_doc.doc_id"""
 
-                        -- But not if a mailer was sent in past year
-                        AND NOT EXISTS (
-                                SELECT tmpid
-                                  FROM #already_mailed_ids
-                                 WHERE document.id = tmpid
-                             )
-                   GROUP BY document.id""" % maxMailers
+        #----------------------------------------------------------------
+        # Pick off the ones whose mailers will be due earliest.
+        # We want to divide the year's worth of mailers into 52 weeks.
+        #----------------------------------------------------------------
+        cursor.execute("SELECT COUNT(*) FROM #eligible")
+        numEligible = cursor.fetchone()[0]
+        weeksWorth = int(numEligible / 52)
+        if weeksWorth > maxMailers:
+            weeksWorth = maxMailers
+        qry = """\
+         SELECT TOP %d e.id, e.ver, a.dt
+           FROM #eligible e
+           JOIN #already_mailed_ids a
+             ON a.tmpid = e.id
+       ORDER BY a.dt, e.id""" % weeksWorth
 
     elif mailType == 'Organization-Annual update':
-        # Perform same optimization as for physicians
-        # Preselect all mailers sent to orgs in last year
-        tmpQry = """
-            INSERT INTO #already_mailed_ids (tmpid)
-                    SELECT DISTINCT pd2.doc_id
-                      FROM pub_proc_doc pd2
-                      JOIN pub_proc p2
-                        ON p2.id = pd2.pub_proc
-                     WHERE p2.pub_subset IN ('Organization-Annual update',
-                                             'Organization-Annual remail')
-                       AND p2.completed > DATEADD(year,-1,GETDATE())
-                       AND p2.status <> 'Failure'
-        """
 
-        # Main query:
-        # Select last version (not CWD) of document for which:
+        #----------------------------------------------------------------
+        # Get a list of the eligible organization documents.
+        #
+        # Select last publishable version (not CWD) of document for which:
         #   Doc_type = Organization.
         #   .../IncludeInDirectory = "Include".
         #   .../OrganizationType <> "NCI division, office, or laboratory".
         #   .../OrganizationType <> "NIH institute, center or division".
-        #   No non-failing update mailer sent in the past year.
-        #   No non-failing remailer sent in the past year.
-        qry = """
-            SELECT DISTINCT TOP %d document.id, MAX(doc_version.num)
-                       FROM doc_version
-                       JOIN document
-                         ON doc_version.id = document.id
-                       JOIN query_term qinc
-                         ON qinc.doc_id = document.id
-                       JOIN query_term qorgtype
-                         ON qorgtype.doc_id = document.id
-                      WHERE qinc.path =
-                           '/Organization/OrganizationDetails/OrganizationAdministrativeInformation/IncludeInDirectory'
-                        AND doc_version.publishable = 'Y'
-                        AND document.active_status = 'A'
-                        AND qinc.value = 'Include'
-                        AND qorgtype.path = '/Organization/OrganizationType'
-                        AND qorgtype.value NOT IN
-                                   ('NCI division, office, or laboratory',
-                                    'NIH institute, center, or division')
+        #
+        # Remember when the org documents were created so we can do the
+        # right thing with organizations which have never been sent a
+        # mailer when we're deciding which mailers get highest priority.
+        #----------------------------------------------------------------
+        cursor.execute("""\
+           CREATE TABLE #eligible
+                    (id INT,
+                    ver INT,
+                created DATETIME)""")
+        cursor.execute("""\
+    INSERT INTO #eligible (id, ver, created)
+         SELECT document.id, MAX(doc_version.num), MIN(audit_trail.dt)
+           FROM doc_version
+           JOIN document
+             ON doc_version.id = document.id
+           JOIN audit_trail
+             ON audit_trail.document = document.id
+           JOIN query_term include_flag
+             ON include_flag.doc_id = document.id
+           JOIN query_term org_type
+             ON org_type.doc_id = document.id
+          WHERE include_flag.path  = '/Organization/OrganizationDetails'
+                                   + '/OrganizationAdministrativeInformation'
+                                   + '/IncludeInDirectory'
+            AND include_flag.value = 'Include'
+            AND org_type.path = '/Organization/OrganizationType'
+            AND org_type.value NOT IN ('NCI division, office, or laboratory',
+                                       'NIH institute, center, or division')
+            AND doc_version.publishable = 'Y'
+            AND document.active_status  = 'A'
+       GROUP BY document.id""", timeout = 120)
 
-                        -- But not if a mailer was sent in past year
-                        AND NOT EXISTS (
-                                SELECT tmpid
-                                  FROM #already_mailed_ids
-                                 WHERE document.id = tmpid
-                             )
-                   GROUP BY document.id""" % maxMailers
+        #----------------------------------------------------------------
+        # Create a list containing the date of the last successful mailer 
+        # for each organization for which we have successfully sent at 
+        # least one mailer of any of the following types:
+        #         Organization-Annual update
+        #         Organization-Annual remail
+        #----------------------------------------------------------------
+        tmpQry = """\
+       INSERT INTO #already_mailed_ids (tmpid, dt)
+            SELECT pub_proc_doc.doc_id, MAX(pub_proc.completed)
+              FROM pub_proc_doc
+              JOIN pub_proc
+                ON pub_proc.id = pub_proc_doc.pub_proc
+             WHERE pub_proc.pub_subset IN ('Organization-Annual update',
+                                           'Organization-Annual remail')
+               AND pub_proc.status <> 'Failure'
+               AND pub_proc.completed IS NOT NULL
+          GROUP BY pub_proc_doc.doc_id"""
+
+        #----------------------------------------------------------------
+        # Pick off the ones whose mailers will be due earliest.
+        # We want to divide the year's worth of mailers into 52 weeks.
+        #
+        # This query is slightly more complex than the comparable one
+        # for physician mailers, because since there is no initial
+        # mailer for organizations, we can't count on there being a
+        # matching row for all eligible organizations in the temporary
+        # table for most recent previous mailers.  For organizations
+        # which have never been sent a mailer before, we put in a
+        # date one year before the date the organization document
+        # was created, which will position them correctly in the
+        # queue for the other organizations, whose mailers are
+        # projected to go out one year later than the most recent
+        # mailer.
+        #----------------------------------------------------------------
+        cursor.execute("SELECT COUNT(*) FROM #eligible")
+        numEligible = cursor.fetchone()[0]
+        weeksWorth = int(numEligible / 52)
+        if weeksWorth > maxMailers:
+            weeksWorth = maxMailers
+        qry = """\
+         SELECT TOP %d e.id, e.ver,
+                CASE
+                    WHEN a.dt IS NOT NULL THEN a.dt
+                    ELSE DATEADD(year, -1, e.created)
+                END
+           FROM #eligible e
+LEFT OUTER JOIN #already_mailed_ids a
+             ON a.tmpid = e.id
+       ORDER BY 3, 1""" % weeksWorth
 
     elif timeType == 'Remail':
         # Execute a query that builds a temporary table
@@ -519,7 +587,8 @@ else:
     # Create the temp table - remailers are handled differently
     if timeType != 'Remail':
         try:
-            cursor.execute ("CREATE TABLE #already_mailed_ids (tmpid int)")
+            ddl = "CREATE TABLE #already_mailed_ids (tmpid int, dt DATETIME)"
+            cursor.execute (ddl)
         except cdrdb.Error, info:
             cdrcgi.bail("Failure creating temp table for mailers: %s" \
                         % info[1][0])
