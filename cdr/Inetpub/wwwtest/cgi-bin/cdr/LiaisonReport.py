@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: LiaisonReport.py,v 1.1 2002-09-23 17:36:40 bkline Exp $
+# $Id: LiaisonReport.py,v 1.2 2002-10-18 13:53:51 bkline Exp $
 #
 # NCI Liaison Office/Brussels Protocol Report.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2002/09/23 17:36:40  bkline
+# New report for European protocols.
+#
 #----------------------------------------------------------------------
 import cdr, cdrdb, cdrcgi, cgi, re, time
 
@@ -18,7 +21,7 @@ SUBMENU  = "Report Menu"
 buttons  = ["Submit Request", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 script   = "LiaisonReport.py"
 title    = "CDR Administration"
-repTitle = "NCI Liaison Orrice/Brussels Protocol Report"
+repTitle = "NCI Liaison Office/Brussels Protocol Report"
 section  = repTitle
 header   = cdrcgi.header(title, title, section, script, buttons)
 now      = time.localtime(time.time())
@@ -139,10 +142,16 @@ SELECT DISTINCT d.doc_id,
                 d.value
            INTO #european_protocols
            FROM query_term d
+           JOIN document p
+             ON p.id = d.doc_id
           WHERE d.path = '%s'
             AND d.value IN ('Active', 
                             'Approved-not yet active', 
                             'Temporarily Closed')
+            AND p.active_status = 'A'
+            AND EXISTS (SELECT *
+                          FROM primary_pub_doc
+                         WHERE doc_id = d.doc_id)
             AND (EXISTS (SELECT * 
                            FROM query_term
                           WHERE path IN ('%s', '%s')
@@ -204,7 +213,7 @@ html += """\
    <tr>
     <th nowrap='1'>CDR Doc ID</th>
     <th nowrap='1'>Protocol ID</th>
-    <th nowrap='1'>Other Ids</th>
+    <th nowrap='1'>Other IDs</th>
     <th nowrap='1'>Protocol Status</th>
     <th>Date Last Modified</th>
    </tr>
