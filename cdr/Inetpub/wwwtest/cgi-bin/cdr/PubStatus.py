@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PubStatus.py,v 1.5 2002-08-19 22:04:23 pzhang Exp $
+# $Id: PubStatus.py,v 1.6 2002-08-20 15:58:04 pzhang Exp $
 #
 # Status of a publishing job.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2002/08/19 22:04:23  pzhang
+# Added dispJobSetting(), dispJobControl() and dispCgWork().
+#
 # Revision 1.4  2002/08/19 16:23:34  pzhang
 # Added dispFilterFailures().
 #
@@ -268,6 +271,28 @@ def dispJobSetting(jobId):
 #----------------------------------------------------------------------
 def dispJobControl(jobId, session):
 
+    # Need CdrPublishing to update pub_proc status.
+    conn = cdrdb.connect('CdrPublishing')
+    conn.setAutoCommit(1)
+    cursor = conn.cursor()
+
+    # Check session validity first by getting user name.
+    try:        
+        cursor.execute("""\
+            SELECT TOP 1 u.name                  
+              FROM usr u       
+              JOIN session s
+                ON s.usr = u.id                          
+             WHERE s.name = ? 
+                       """, (session,))
+        row = cursor.fetchone()
+        if row and row[0]:
+            name = row and row[0]
+        else:
+            cdrcgi.bail("Invalid session, failure getting user name")          
+    except cdrdb.Error, info:
+        cdrcgi.bail("Failure getting user name: %s" % info[1][0])
+
     # Get a list of jobs to be killed or resumed.
     jobs = fields and fields.getvalue("Jobs") or []
     if jobs and type(jobs) != type([]):
@@ -277,10 +302,7 @@ def dispJobControl(jobId, session):
     action = fields and fields.getvalue("Kill") or \
              fields and fields.getvalue("Resume") or None
 
-    # Go ahead and do it!
-    conn = cdrdb.connect('CdrPublishing')
-    conn.setAutoCommit(1)
-    cursor = conn.cursor()
+    # Go ahead and kill or resume!    
     msg = ""
     if action and jobs:            
         msg += " [Jobs just "
@@ -301,21 +323,6 @@ def dispJobControl(jobId, session):
             except cdrdb.Error, info:
                 cdrcgi.bail("Failure killing or resuming: %s" % info[1][0])
         msg = msg[:-2] + "]"
-
-    # Get user name.
-    try:        
-        cursor.execute("""\
-            SELECT TOP 1 u.name                  
-              FROM usr u       
-              JOIN session s
-                ON s.usr = u.id                          
-             WHERE s.name = ? 
-                       """, (session,))
-        row = cursor.fetchone()
-        name = row and row[0] or 'Unknown'
-        cursor.close()
-    except cdrdb.Error, info:
-        cdrcgi.bail("Failure getting user name: %s" % info[1][0])
 
     # Get jobs waiting for user approval.
     try:        
