@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GeneralReports.py,v 1.7 2002-07-10 19:33:33 bkline Exp $
+# $Id: GeneralReports.py,v 1.8 2002-09-11 23:28:50 bkline Exp $
 #
 # Submenu for general reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.7  2002/07/10 19:33:33  bkline
+# New interface for ad hoc SQL queries.
+#
 # Revision 1.6  2002/07/02 13:47:55  bkline
 # New report on new documents with publication status.
 #
@@ -73,6 +76,8 @@ reports = [
            ('DocVersionHistory.py', 'Document Version History'),
            ('NewDocsWithPubStatus.py', 
             'List of New Documents with Publication Status'),
+           ('ModWithoutPubVersion.py', 
+            'Records Modified Since Last Publishable Version')
           ]
 
 for r in reports:
