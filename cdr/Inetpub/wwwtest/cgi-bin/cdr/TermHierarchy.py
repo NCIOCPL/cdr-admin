@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: TermHierarchy.py,v 1.1 2001-12-01 18:11:44 bkline Exp $
+# $Id: TermHierarchy.py,v 1.2 2002-04-25 02:58:29 bkline Exp $
 #
 # Prototype for display of Term hierarchy (requirement 2.6 from 
 # Terminology Processing Requirements).
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2001/12/01 18:11:44  bkline
+# Initial revision
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, cdrdb, string
 
@@ -38,7 +41,9 @@ def showTerm(term, offset, primaryTerm = 0):
     idStr = "CDR%010d" % idInt
     coloredId = "<FONT COLOR='%s'>%s</FONT>" % (
                     primaryTerm and 'red' or 'blue', idStr)
-    termName = "<A HREF='%s?DocId=%d&Filter=CDR266307'><FONT COLOR='%s'>"\
+    termName = "<A HREF='%s?DocId=%d&Filter=name:Denormalized Term XML"\
+               " Filter&Filter1=name:Terminology QC Report Filter'>"\
+               "<FONT COLOR='%s'>"\
                "%s</FONT></A>" % (
                 FILTER, idInt, primaryTerm and 'red' or 'blue', term.name)
     if primaryTerm:
