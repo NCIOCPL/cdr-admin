@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: ExternMapFailures.py,v 1.6 2004-12-22 16:35:40 bkline Exp $
+# $Id: ExternMapFailures.py,v 1.7 2004-12-27 20:33:18 bkline Exp $
 #
 # Report on values found in external systems (such as ClinicalTrials.gov)
 # which have not yet been mapped to CDR documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2004/12/22 16:35:40  bkline
+# Implemented modifications requested in issue #1339.
+#
 # Revision 1.5  2003/12/18 16:00:27  bkline
 # Modified table titles at Lakshmi's request and added overall title
 # for report.
@@ -76,8 +79,9 @@ if not usages:
    <input type='hidden' name='%s' value='%s'>
    <table border='0'>
     <tr>
-     <td valign='center'>
+     <td valign='center' align='right'>
       <b>Select map usage(s):&nbsp;</b>
+      <br>(Use Ctrl key to select multiple usages)&nbsp;&nbsp;
      </td>
      <td>
       <select multiple='multiple' name='usage'>
@@ -94,8 +98,8 @@ if not usages:
     form += """\
       </select>
      </td>
-     <td valign='center'>%sView failures from past
-      <input name='age' value='30' size='3'> days
+     <td valign='center'><b>%sView failures from past
+      <input name='age' value='30' size='3'> days</b>
      </td>
     </tr>
    </table>
@@ -143,17 +147,17 @@ ORDER BY CONVERT(CHAR(10), m.last_mod, 102) DESC, m.value""", (usage, age))
     rows = cursor.fetchall()
     if rows:
         html += """\
-  <table border='1' cellpadding='2' cellspacing='0'>
+  <table border='1' cellpadding='2' cellspacing='0' width='100%'>
    <tr>
     <th>Value</th>
-    <th>Recorded</th>
+    <th width='110'>Recorded</th>
    </tr>
 """
         for value, recorded in rows:
             html += """\
    <tr>
     <td>%s</td>
-    <td nowrap = '1' valign='top'>%s</td>
+    <td nowrap = '1' align='center' valign='top'>%s</td>
    </tr>
 """ % (cdrcgi.unicodeToLatin1(value), recorded[:10])
         html += """\
