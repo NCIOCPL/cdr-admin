@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: LeadOrgStatusAndParticipantMailerHistory.py,v 1.2 2003-12-18 01:25:25 bkline Exp $
+# $Id: LeadOrgStatusAndParticipantMailerHistory.py,v 1.3 2004-02-16 22:49:06 bkline Exp $
 #
 # Reports on the history of S&P mailers for a particular protocol.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2003/12/18 01:25:25  bkline
+# Fixed bug indexing dict (used parens instead of braces).
+#
 # Revision 1.1  2003/11/10 18:06:58  bkline
 # Reports on the history of S&P mailers for a particular protocol.
 #
@@ -99,9 +102,10 @@ except cdrdb.Error, info:
 # Get the S&P mailers for this organization; go back three years.
 #----------------------------------------------------------------------
 class MailerJob:
-    def __init__(self, id, date):
+    def __init__(self, id, date, jobType):
         self.id             = id
         self.date           = date
+        self.jobType        = jobType
         self.noResponse     = []
         self.respNoChange   = []
         self.respWithChange = []
@@ -119,7 +123,8 @@ try:
                 change_type.value AS change_type,
                 mailer_date.value AS mailer_date,
                 pup_id.int_val AS pup_id,
-                mailer_job.doc_id as mailer_id
+                mailer_job.doc_id AS mailer_id,
+                pub_proc.pub_subset AS job_type
            FROM query_term org_id
            JOIN query_term mailer_job
              ON mailer_job.doc_id = org_id.doc_id
@@ -133,6 +138,8 @@ try:
            JOIN query_term mailer_date
              ON mailer_date.doc_id = org_id.doc_id
             AND mailer_date.path = '/Mailer/Sent'
+           JOIN pub_proc
+             ON pub_proc.id = mailer_job.int_val
 LEFT OUTER JOIN query_term reply_date
              ON reply_date.doc_id = org_id.doc_id
             AND reply_date.path = '/Mailer/Response/Received'
@@ -143,12 +150,13 @@ LEFT OUTER JOIN query_term change_type
             AND org_id.path = '/Mailer/ProtocolOrg/@cdr:ref'
             AND mailer_date.value >= ?""", (id, threeYearsAgo), 300)
     for (mailerJobId, protocolId, replyDate, changeType, mailerDate,
-         pupId, mailerId) in cursor.fetchall():
+         pupId, mailerId, jobType) in cursor.fetchall():
         if mailerJobs.has_key(mailerJobId):
             mailerJob = mailerJobs[mailerJobId]
         else:
             mailerJobs[mailerJobId] = mailerJob = MailerJob(mailerJobId,
-                                                            mailerDate)
+                                                            mailerDate,
+                                                            jobType)
         if not replyDate:
             mailerJob.noResponse.append((protocolId, mailerId))
         elif not changeType or changeType == "None":
@@ -233,6 +241,7 @@ html = """\
   <table border='1' cellpadding='2' cellspacing='0'>
    <tr>
     <th>Mailer Job</th>
+    <th>Mailer Type</th>
     <th>Mailer Date</th>
     <th># of protocols</th>
     <th># no response</th>
@@ -255,12 +264,14 @@ for jobId in jobIds:
    <tr>
     <td>%d</td>
     <td>%s</td>
+    <td>%s</td>
     <td align='center'>%d</td>
     <td align='center'>%d</td>
     <td align='center'>%d</td>
     <td align='center'>%d</td>
    </tr>
 """ % (jobId,
+       job.jobType,
        job.date and job.date[:10] or "*** NO DATE ***",
        totalProtocols,
        len(job.noResponse),
@@ -272,7 +283,7 @@ html += """\
 """
 
 #----------------------------------------------------------------------
-# Show protocols with no response in most recent job.
+# Show protocols with no response in most recent jobs.
 #----------------------------------------------------------------------
 if not jobIds:
     cdrcgi.sendPage(html + """\
@@ -282,26 +293,24 @@ if not jobIds:
  </body>
 </html>
 """)
-lastJob = mailerJobs[jobIds[0]]
-if not lastJob.noResponse:
-    cdrcgi.sendPage(html + """\
-  <b>
-   <font size='3'>All protocols in last mailer job have responses.</font>
-  </b>
- </body>
-</html>
-""")
-html += """\
-  <b>
-   <font size='3'>List of protocols in last mailer job with no response</font>
-  </b>
-  <table border='1' cellpadding='2' cellspacing='0'>
-   <tr>
-    <th align='left'>Mailer ID</th>
-    <th align='left'>Protocol ID</th>
-    <th align='left'>Title</th>
-   </tr>
-"""
+
+#----------------------------------------------------------------------
+# Find the last jobs of each of the two job types.
+#----------------------------------------------------------------------
+lastQuarterlyJob = None
+lastInitialJob   = None
+for jobId in jobIds:
+    if mailerJobs[jobId].jobType.upper().find("QUARTERLY") != -1:
+        lastQuarterlyJob = mailerJobs[jobId]
+        break
+for jobId in jobIds:
+    if mailerJobs[jobId].jobType.upper().find("INITIAL") != -1:
+        lastInitialJob = mailerJobs[jobId]
+        break
+
+#----------------------------------------------------------------------
+# XSL/T script for extracting rows for the non-response tables.
+#----------------------------------------------------------------------
 xslScript = """\
 <?xml version='1.0'?>
 <xsl:transform             xmlns:xsl = 'http://www.w3.org/1999/XSL/Transform'
@@ -331,7 +340,12 @@ xslScript = """\
  </xsl:template>
 </xsl:transform>
 """ % id
-for protocolId, mailerId in lastJob.noResponse:
+
+#----------------------------------------------------------------------
+# Create HTML for a row showing a protocol for which no response was
+# received.
+#----------------------------------------------------------------------
+def addRowForNonResponse(protocolId, mailerId):
     response = cdr.filterDoc('guest', xslScript, protocolId, inline = 1)
     if type(response) in (type(""), type(u"")):
         cdrcgi.bail("Failure extracting protocol titles for CDR%010d: %s"
@@ -344,7 +358,7 @@ for protocolId, mailerId in lastJob.noResponse:
             originalTitle = cdr.getTextContent(node)
         elif node.nodeName == "OrgProtocolId":
             orgProtId = cdr.getTextContent(node)
-    html += u"""\
+    return u"""\
    <tr>
     <td valign='top'>CDR%010d</td>
     <td valign='top'>%s</td>
@@ -353,10 +367,90 @@ for protocolId, mailerId in lastJob.noResponse:
 """ % (mailerId, orgProtId, originalTitle)
 
 #----------------------------------------------------------------------
+# Show protocols with no response in most recent quarterly S&P mailer job.
+#----------------------------------------------------------------------
+if not lastQuarterlyJob:
+    html += """\
+  <b>
+   <font size='3'>
+    No quarterly S&P mailer jobs have been run for this protocol.
+   </font>
+  </b>
+  <br><br>
+"""
+elif not lastQuarterlyJob.noResponse:
+    html += """\
+  <b>
+   <font size='3'>
+    All protocols in the last quarterly mailer job have responses.
+   </font>
+  </b>
+  <br><br>
+"""
+else:
+    html += """\
+  <b>
+   <font size='3'>
+    Protocols in Last Quarterly Mailer Job Without a Response
+   </font>
+  </b>
+  <table border='1' cellpadding='2' cellspacing='0'>
+   <tr>
+    <th align='left'>Mailer ID</th>
+    <th align='left'>Protocol ID</th>
+    <th align='left'>Title</th>
+   </tr>
+"""
+    for protocolId, mailerId in lastQuarterlyJob.noResponse:
+        html += addRowForNonResponse(protocolId, mailerId)
+    html += """\
+  </table>
+  <br><br>
+"""
+
+#----------------------------------------------------------------------
+# Show protocols with no response in most recent initial S&P mailer job.
+#----------------------------------------------------------------------
+if not lastInitialJob:
+    html += """\
+  <b>
+   <font size='3'>
+    No initial S&P mailer jobs have been run for this protocol.
+   </font>
+  </b>
+"""
+elif not lastInitialJob.noResponse:
+    html += """\
+  <b>
+   <font size='3'>
+    All protocols in the last initial mailer job have responses.
+   </font>
+  </b>
+"""
+else:
+    html += """\
+  <b>
+   <font size='3'>
+    Protocols in Last Initial Mailer Job Without a Response
+   </font>
+  </b>
+  <table border='1' cellpadding='2' cellspacing='0'>
+   <tr>
+    <th align='left'>Mailer ID</th>
+    <th align='left'>Protocol ID</th>
+    <th align='left'>Title</th>
+   </tr>
+"""
+    for protocolId, mailerId in lastInitialJob.noResponse:
+        html += addRowForNonResponse(protocolId, mailerId)
+    html += """\
+  </table>
+"""
+
+#----------------------------------------------------------------------
 # Display the report.
 #----------------------------------------------------------------------
 cdrcgi.sendPage(html + """\
-  </table>
  </body>
 </html>
 """)
