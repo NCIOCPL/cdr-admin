@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: Mailers.py,v 1.8 2002-10-24 20:10:42 bkline Exp $
+# $Id: Mailers.py,v 1.9 2004-07-13 17:47:06 bkline Exp $
 #
 # Main menu for mailer jobs.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.8  2002/10/24 20:10:42  bkline
+# Added separate items for Editorial and Advisory boards mailers.
+#
 # Revision 1.7  2002/10/24 02:50:38  bkline
 # Fixed typo (missing closing parenthesis).
 #
@@ -55,7 +58,8 @@ reports = (('DirectoryMailerReqForm.py?', 'Directory Mailers'),
            ('SummaryMailerReqForm.py?BoardType=Editorial&',
             'Summary Mailers (Editorial Board)'),
            ('SummaryMailerReqForm.py?BoardType=Advisory&',
-            'Summary Mailers (Advisory Board)'))
+            'Summary Mailers (Advisory Board)'),
+           ('EmailerReview.py?', 'Electronic Mailer Review'))
 
 for r in reports:
     form += "<LI><A HREF='%s/%s%s=%s'>%s</A></LI>\n" % (
