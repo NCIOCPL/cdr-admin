@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditExternMap.py,v 1.2 2003-12-19 20:40:18 bkline Exp $
+# $Id: EditExternMap.py,v 1.3 2003-12-31 18:35:43 bkline Exp $
 #
 # Allows a user to edit the table which maps strings from external
 # systems (such as ClinicalTrials.gov) to CDR document IDs.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2003/12/19 20:40:18  bkline
+# Added ability to get mapping values by mapped document ID.
+#
 # Revision 1.1  2003/12/16 15:57:45  bkline
 # Allows a user to edit the table which maps strings from external
 # systems (such as ClinicalTrials.gov) to CDR document IDs.
@@ -265,7 +268,7 @@ if request in ("Save Changes", "Get Values"):
             if not row[2]:
                 button = "&nbsp;"
             else:
-                button = ("<button name='view' type='submit' value='%s'"
+                button = ("<button name='view' type='button' value='%s'"
                           " onclick='viewDoc(%s)'>"
                           "View</button>" % (row[2], row[2]))
             extra = allUsage and (" [%s]" % row[3]) or ""
