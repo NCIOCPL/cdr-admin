@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CTGovImportReport.py,v 1.1 2003-11-10 17:59:06 bkline Exp $
+# $Id: CTGovImportReport.py,v 1.2 2003-12-16 15:42:30 bkline Exp $
 #
 # Stats on documents imported from ClinicalTrials.gov into CDR.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2003/11/10 17:59:06  bkline
+# Reports stats on documents imported from ClinicalTrials.gov into CDR.
+#
 #----------------------------------------------------------------------
 import cdr, cdrdb, time, cgi, cdrcgi, re
 
@@ -78,11 +81,13 @@ class Doc:
         self.pubVersion  = row[4] == 'Y'
         self.cdrId       = row[5]
         self.title       = row[6]
+        self.pubVFailed  = row[4] == 'F'
 newTrials         = {}
 pubVersionCreated = {}
 needReview        = {}
 noReviewNeeded    = {}
 locked            = {}
+pubVersionFailure = {}
 cursor.execute("SELECT dt FROM ctgov_import_job where id = %s" % job)
 dt = cursor.fetchone()[0][:19]
 cursor.execute("""\
@@ -105,6 +110,8 @@ while row:
         pubVersionCreated[doc.nlmId] = doc
     elif doc.needsReview:
         needReview[doc.nlmId] = doc
+    elif doc.pubVFailed:
+        pubVersionFailure[doc.nlmId] = doc
     else:
         noReviewNeeded[doc.nlmId] = doc
     row = cursor.fetchone()
@@ -135,7 +142,7 @@ def makeSection(docs, label):
      <td valign='top'>%d</td>
      <td valign='top'>%s</td>
     </tr>
-""" % (doc.nlmId, doc.cdrId, doc.title.encode('utf-8'))
+""" % (doc.nlmId, doc.cdrId, cgi.escape(doc.title))
         html += """\
    </table>
    <br>
@@ -150,7 +157,7 @@ html = """\
   <style type='text/css'>
    body { font-family: Arial }
    h1   { font-size: 14pt; font-weight: bold }
-   h2   { font-size: 12pt; fotn-weight: bold }
+   h2   { font-size: 12pt; font-weight: bold }
   </style>
  </head>
  <body>
@@ -164,6 +171,9 @@ html += makeSection(newTrials, "New trials imported into CDR")
 html += makeSection(needReview, "Updated trials that require review")
 html += makeSection(pubVersionCreated,
                     "Updated trials with new publishable version created")
+html += makeSection(pubVersionFailure,
+                    "Updated trials for which publishable version could "
+                    "not be created")
 html += makeSection(noReviewNeeded,
                     "Other updated trials that do not require review")
 html += makeSection(locked,
