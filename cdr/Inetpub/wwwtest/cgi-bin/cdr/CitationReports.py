@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CitationReports.py,v 1.4 2004-03-30 20:28:05 bkline Exp $
+# $Id: CitationReports.py,v 1.5 2004-09-17 14:06:50 venglisc Exp $
 #
 # Submenu for citation reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2004/03/30 20:28:05  bkline
+# Plugged in New Citations report.
+#
 # Revision 1.3  2004/02/17 19:37:52  venglisc
 # Removed unused menu items
 #
@@ -55,7 +58,7 @@ reports = [
            ('CiteSearch.py', 'Citation QC Report')
           ]
 for r in reports:
-    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI>\n" % (
+    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI></A>\n" % (
             cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
     
 form += """\
@@ -67,7 +70,7 @@ reports = [
            ('UnverifiedCitations.py', 'Unverified Citations')
           ]
 for r in reports:
-    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI>\n" % (
+    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI></A>\n" % (
             cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
     
 form += """\
@@ -80,7 +83,7 @@ reports = [
            ('NewCitations.py', 'New Citations Report')
           ]
 for r in reports:
-    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI>\n" % (
+    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI></A>\n" % (
             cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
 
 cdrcgi.sendPage(header + form + "</OL></FORM></BODY></HTML>")

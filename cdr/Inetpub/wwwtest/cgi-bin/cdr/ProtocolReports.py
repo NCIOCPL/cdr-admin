@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolReports.py,v 1.12 2004-07-13 17:59:21 bkline Exp $
+# $Id: ProtocolReports.py,v 1.13 2004-09-17 14:06:50 venglisc Exp $
 #
 # Submenu for protocol reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.12  2004/07/13 17:59:21  bkline
+# Replaced Newly Published Trials with Newly Publishable Trials.
+#
 # Revision 1.11  2004/05/11 17:38:36  bkline
 # Plugged in protocol hotfix report.
 #
@@ -77,7 +80,7 @@ form = """\
 """ % (cdrcgi.SESSION, session)
 reports = [('ProtSearch.py', 'Protocol QC Reports')]
 for r in reports:
-    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI>\n" % (
+    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI></A>\n" % (
             cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
 
 form += """\
@@ -108,7 +111,7 @@ reports = [
             'Report for Office of Science Policy', ''),
           ]
 for r in reports:
-    form += "<LI><A HREF='%s/%s?%s=%s%s'>%s</LI>\n" % (
+    form += "<LI><A HREF='%s/%s?%s=%s%s'>%s</LI></A>\n" % (
             cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[2], r[1])
 
 cdrcgi.sendPage(header + form + "</OL></FORM></BODY></HTML>")

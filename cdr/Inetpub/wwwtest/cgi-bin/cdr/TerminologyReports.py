@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: TerminologyReports.py,v 1.7 2004-05-11 17:40:11 bkline Exp $
+# $Id: TerminologyReports.py,v 1.8 2004-09-17 14:06:50 venglisc Exp $
 #
 # Submenu for terminology reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.7  2004/05/11 17:40:11  bkline
+# Plugged in Drug/Agent report.
+#
 # Revision 1.6  2003/06/13 20:32:43  bkline
 # Plugged in a couple of new reports for Cancer diagnosis hierarchy.
 #
@@ -65,7 +68,7 @@ reports = [
            ('TermSearch.py', 'Terminology QC Report')
           ]
 for r in reports:
-    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI>\n" % (
+    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI></A>\n" % (
             cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
 
 form += """\
@@ -87,7 +90,7 @@ reports = [
             
           ]
 for r in reports:
-    form += "<LI><A HREF='%s/%s?%s=%s%s'>%s</LI>\n" % (
+    form += "<LI><A HREF='%s/%s?%s=%s%s'>%s</LI></A>\n" % (
             cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[2], r[1])
 
 cdrcgi.sendPage(header + form + "</OL></FORM></BODY></HTML>")

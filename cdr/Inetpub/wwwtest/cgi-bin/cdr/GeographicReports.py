@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GeographicReports.py,v 1.1 2002-05-24 20:37:30 bkline Exp $
+# $Id: GeographicReports.py,v 1.2 2004-09-17 14:06:50 venglisc Exp $
 #
 # Submenu for geographic reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2002/05/24 20:37:30  bkline
+# New Report Menu structure implemented.
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
 
@@ -46,7 +49,7 @@ reports = [
            ('PoliticalSubUnitSearch.py', 'Political Subunit QC Report')
           ]
 for r in reports:
-    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI>\n" % (
+    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI></A>\n" % (
             cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
     
 cdrcgi.sendPage(header + form + "</OL></FORM></BODY></HTML>")

@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PersonAndOrgReports.py,v 1.8 2004-03-29 21:33:38 bkline Exp $
+# $Id: PersonAndOrgReports.py,v 1.9 2004-09-17 14:06:50 venglisc Exp $
 #
 # Submenu for person and organization reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.8  2004/03/29 21:33:38  bkline
+# Added CCOPOrgReport.py.
+#
 # Revision 1.7  2004/03/08 17:47:06  venglisc
 # Modified Menu title and alphabetized entries. (Bug 1094)
 #
@@ -68,7 +71,7 @@ reports = [
            ('PersonSearch.py', 'Person QC Report')
           ]
 for r in reports:
-    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI>\n" % (
+    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI></A>\n" % (
             cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
 
 form += """\
@@ -93,7 +96,7 @@ reports = [
             'Preferred Protocol Organizations')
           ]
 for r in reports:
-    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI>\n" % (
+    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI></A>\n" % (
             cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
 
 cdrcgi.sendPage(header + form + "</OL></FORM></BODY></HTML>")

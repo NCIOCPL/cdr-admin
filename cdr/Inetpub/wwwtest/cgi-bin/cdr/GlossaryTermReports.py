@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermReports.py,v 1.3 2004-08-10 15:44:20 bkline Exp $
+# $Id: GlossaryTermReports.py,v 1.4 2004-09-17 14:06:50 venglisc Exp $
 #
 # Submenu for glossary term reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2004/08/10 15:44:20  bkline
+# Plugged in Glossary Term Search report.
+#
 # Revision 1.2  2002/05/25 02:39:13  bkline
 # Removed extra blank lines from HTML output.
 #
@@ -53,7 +56,7 @@ reports = [
            ('GlossaryTermLinks.py', 'Links')
           ]
 for r in reports:
-    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI>\n" % (
+    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI></A>\n" % (
             cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
 
 form += """\
@@ -66,7 +69,7 @@ reports = [
            ('Stub.py', 'Terms By Status')
           ]
 for r in reports:
-    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI>\n" % (
+    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI></A>\n" % (
             cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
 
 form += """\
@@ -78,7 +81,7 @@ reports = [
            ('Stub.py', 'New Glossary Term Count By Status')
           ]
 for r in reports:
-    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI>\n" % (
+    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI></A>\n" % (
             cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
 
 cdrcgi.sendPage(header + form + "</OL></FORM></BODY></HTML>")

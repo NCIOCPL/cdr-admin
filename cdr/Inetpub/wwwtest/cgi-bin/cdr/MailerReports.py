@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: MailerReports.py,v 1.7 2004-07-13 17:46:42 bkline Exp $
+# $Id: MailerReports.py,v 1.8 2004-09-17 14:06:50 venglisc Exp $
 #
 # Submenu for mailer reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.7  2004/07/13 17:46:42  bkline
+# Added web mailer reports.
+#
 # Revision 1.6  2004/02/17 19:46:39  venglisc
 # Modified menu to remove unused menu items.
 #
@@ -70,7 +73,7 @@ reports = [
             'Web Mailers')
           ]
 for r in reports:
-    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI>\n" % (
+    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI></A>\n" % (
             cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
 
 cdrcgi.sendPage(header + form + "</OL></FORM></BODY></HTML>")
