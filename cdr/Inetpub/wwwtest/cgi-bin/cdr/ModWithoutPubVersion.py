@@ -1,12 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: ModWithoutPubVersion.py,v 1.3 2002-09-12 11:49:04 bkline Exp $
+# $Id: ModWithoutPubVersion.py,v 1.4 2002-09-12 13:03:35 bkline Exp $
 #
 # Reports on documents which have been changed since a previously 
 # publishable version without a new publishable version have been
 # created.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2002/09/12 11:49:04  bkline
+# Fixed bug in first SQL query.
+#
 # Revision 1.2  2002/09/12 01:07:36  bkline
 # Broken down SQL query into manageable chunks.
 #
@@ -131,7 +134,7 @@ try:
                AND a.dt = (SELECT MAX(dt)
                              FROM audit_trail
                             WHERE document = d.id)
-               %s""" % (fromDate, toDate, modUser, dtQual))
+               %s""" % (fromDate, toDate, modUser, dtQual), timeout = 120)
     cursor.execute("""\
             SELECT v.id              doc_id, 
                    MAX(v.updated_dt) pub_ver_date
@@ -140,7 +143,7 @@ try:
               JOIN #last_mod m
                 ON m.doc_id = v.id
              WHERE v.publishable = 'Y'
-          GROUP BY v.id""")
+          GROUP BY v.id""", timeout = 120)
     cursor.execute("""\
             SELECT v.id              doc_id, 
                    MAX(v.updated_dt) unpub_ver_date
@@ -149,7 +152,7 @@ try:
               JOIN #last_mod m
                 ON m.doc_id = v.id
              WHERE v.publishable = 'N'
-          GROUP BY v.id""")
+          GROUP BY v.id""", timeout = 120)
     cursor.execute("""
    SELECT DISTINCT d.doc_type,
                    d.doc_id,
@@ -165,7 +168,7 @@ try:
              WHERE p.pub_ver_date < d.mod_date
           ORDER BY d.doc_type,
                    d.mod_date,
-                   d.user_name""")
+                   d.user_name""", timeout = 120)
     rows = cursor.fetchall()
 except cdrdb.Error, info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
