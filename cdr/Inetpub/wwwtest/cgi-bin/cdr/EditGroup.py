@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditGroup.py,v 1.2 2002-02-21 15:22:02 bkline Exp $
+# $Id: EditGroup.py,v 1.3 2002-07-31 19:03:10 bkline Exp $
 #
 # Prototype for editing a CDR group.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/02/21 15:22:02  bkline
+# Added navigation buttons.
+#
 # Revision 1.1  2001/06/13 22:16:32  bkline
 # Initial revision
 #
@@ -195,7 +198,7 @@ for actionKey in actionKeys:
 #----------------------------------------------------------------------
 # Add the session key and send back the form.
 #----------------------------------------------------------------------
-form += """"\
+form += """\
 <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
 <INPUT TYPE='hidden' NAME='grp' VALUE='%s'>
 """ % (cdrcgi.SESSION, session, group.name)
