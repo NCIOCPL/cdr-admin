@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: CiteSearch.py,v 1.9 2003-01-29 20:59:11 bkline Exp $
+# $Id: CiteSearch.py,v 1.10 2003-03-04 14:11:52 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Citation documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.9  2003/01/29 20:59:11  bkline
+# Added more obnoxious error message when citation import fails
+# validation.
+#
 # Revision 1.8  2002/07/25 01:51:03  bkline
 # Added code to catch network exception.
 #
@@ -114,7 +118,7 @@ if impReq:
         if oldDoc.startswith("<Errors"):
             cdrcgi.bail("Unable to retrieve %s" % replaceID)
         if not exp1.findall(oldDoc):
-            cdrcgi.bail("Document %s is not a PubMed Citation")
+            cdrcgi.bail("Document %s is not a PubMed Citation" % replaceID)
     else:
         docId = findExistingCitation(importID)
         if docId:
