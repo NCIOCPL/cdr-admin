@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryAndMiscReports.py,v 1.14 2004-07-13 20:46:33 venglisc Exp $
+# $Id: SummaryAndMiscReports.py,v 1.15 2004-09-09 19:19:44 venglisc Exp $
 #
 # Submenu for summary and miscellanous document reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.14  2004/07/13 20:46:33  venglisc
+# Added new menu item for SummariesTocReport. (Bug 1231)
+# Added CSS code to display headers and list items properly.
+#
 # Revision 1.13  2004/04/16 21:50:48  venglisc
 # Removed stub to link to proper page for Board Member QC report.
 #
@@ -113,10 +117,10 @@ reports = [
            # ('Stub.py?',                  'Changes to Summaries'),
            ('SummaryChanges.py?',          'History of Changes to Summary'),
            ('PdqBoards.py?',               'PDQ Board Listings'),
-           ('SummaryCitations.py?',        'Summaries Citation'),
+           ('SummaryCitations.py?',        'Summaries Citations'),
            ('SummaryDateLastModified.py?', 'Summaries Date Last Modified'),
            ('SummariesLists.py?',          'Summaries Lists'),
-           ('SummaryMetaData.py?',         'Summary Metadata'),
+           ('SummaryMetaData.py?',         'Summaries Metadata'),
            ('SummariesTocReport.py?',      'Summaries TOC Lists'),
           ]
 for r in reports:

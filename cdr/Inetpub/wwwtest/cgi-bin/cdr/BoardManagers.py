@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
 #
-# $Id: BoardManagers.py,v 1.8 2004-07-13 19:11:14 venglisc Exp $
+# $Id: BoardManagers.py,v 1.9 2004-09-09 19:19:44 venglisc Exp $
 #
 # Main menu for board managers.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.8  2004/07/13 19:11:14  venglisc
+# Added menu item for Summaries TOC Report (Bug 1231).
+# Minor formatting changes to list HTML tags in upper case.
+#
 # Revision 1.7  2004/06/02 15:19:58  venglisc
 # Testing CVS server:  Adding extra comment line.
 #
@@ -88,13 +92,13 @@ form += """\
 """
 
 for choice in (
-    ('SummaryChanges.py',          'History of Changes'          ),
-    ('PdqBoards.py',               'PDQ Board Listings'          ),
-    ('SummaryCitations.py',        'Summaries Citations'         ),
-    ('SummaryDateLastModified.py', 'Summaries Date Last Modified'),
-    ('SummariesLists.py',          'Summaries Lists'             ),
-    ('SummaryMetaData.py',         'Summaries Metadata'          ),
-    ('SummariesTocReport.py',      'Summaries TOC Lists'         )
+    ('SummaryChanges.py',          'History of Changes to Summary'),
+    ('PdqBoards.py',               'PDQ Board Listings'           ),
+    ('SummaryCitations.py',        'Summaries Citations'          ),
+    ('SummaryDateLastModified.py', 'Summaries Date Last Modified' ),
+    ('SummariesLists.py',          'Summaries Lists'              ),
+    ('SummaryMetaData.py',         'Summaries Metadata'           ),
+    ('SummariesTocReport.py',      'Summaries TOC Lists'          )
     ):
     form += """\
     <LI><a href='%s/%s?%s'>%s</a></LI>
