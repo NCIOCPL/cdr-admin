@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: PubStatus.py,v 1.10 2003-02-13 23:05:36 pzhang Exp $
+# $Id: PubStatus.py,v 1.11 2003-03-05 16:16:30 pzhang Exp $
 #
 # Status of a publishing job.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.10  2003/02/13 23:05:36  pzhang
+# Added CgJobDesc textarea for pushing job description.
+# Added code to report published documents.
+#
 # Revision 1.9  2003/01/08 22:26:31  pzhang
 # Added a draft of dispJobDiff().
 # Displayed output_dir as None when it is "".
@@ -176,7 +180,7 @@ def dispFilterFailures():
               JOIN doc_type t
                 ON t.id = d.doc_type
              WHERE ppd.pub_proc = ?
-               AND ppd.failure = 'Y'
+               AND (ppd.failure = 'Y' OR ppd.messages IS NOT NULL)
           ORDER BY t.name, d.title
     """, (jobId,))
         row = cursor.fetchone()
