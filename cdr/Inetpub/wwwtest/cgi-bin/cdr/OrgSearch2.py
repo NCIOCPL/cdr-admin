@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: OrgSearch2.py,v 1.6 2002-06-28 20:13:57 bkline Exp $
+# $Id: OrgSearch2.py,v 1.7 2002-08-08 12:16:29 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Organization documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2002/06/28 20:13:57  bkline
+# Plugged in QcReport.py for Organization advanced search.
+#
 # Revision 1.5  2002/06/04 20:19:34  bkline
 # Fixed typos in query_term paths.
 #
@@ -88,7 +91,7 @@ searchFields = (cdrcgi.SearchField(orgName,
                              "/Organization/OrganizationNameInformation/"
                              "ShortName/Name",
                              "/Organization/OrganizationNameInformation/"
-                             "AlternateName/Name")),
+                             "AlternateName")),
                 cdrcgi.SearchField(street,
                             ("/Organization/OrganizationLocations/"
                              "OrganizationLocation/Location/PostalAddress/"
