@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.38 2004-04-28 16:01:20 venglisc Exp $
+# $Id: QcReport.py,v 1.39 2004-07-13 19:43:40 venglisc Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.38  2004/04/28 16:01:20  venglisc
+# Modified SQL statement to eliminate picking up the value of the PDQKey
+# instead of an organization cdr:ref ID. (Bug 1119)
+#
 # Revision 1.37  2004/04/16 22:06:51  venglisc
 # Modified program to achieve the following:
 # a)  Create user interface to run the QC report from the menus (Bug 1059)
@@ -739,7 +743,7 @@ SELECT mailer.doc_id, mailer.int_val, summary.value, response.value,
       </TR>
       <TR>
        <TD xsl:use-attribute-sets = "cell1of2">
-        <B>Date Received</B>
+        <B>Date Response Received</B>
        </TD>
        <TD xsl:use-attribute-sets = "cell2of2">
         %s
