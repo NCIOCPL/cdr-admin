@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: DocVersionHistory.py,v 1.13 2004-03-23 22:43:46 venglisc Exp $
+# $Id: DocVersionHistory.py,v 1.14 2004-05-11 17:32:03 bkline Exp $
 #
 # Show version history of document.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.13  2004/03/23 22:43:46  venglisc
+# Modified to display an "R " in front of version if document has been
+# removed from Cancer.gov display.
+#
 # Revision 1.12  2004/02/05 13:36:47  bkline
 # Changed title bar from "QC Reports" to "Document Version History" (request
 # #1096).
@@ -122,6 +126,12 @@ except cdrdb.Error, info:
 
 #----------------------------------------------------------------------
 # Build the report header.
+# If a document has been blocked for publication display the date that
+# the document had been removed from Cancer.gov.
+# The date itself will be selected from the database in a later query.
+# Put in a placeholder first at this point.
+# Note:  The date will only be displayed if the docStatus has been set
+#        to 'I'.
 #----------------------------------------------------------------------
 if docStatus == 'I':
     docStatusLine = """
@@ -132,10 +142,16 @@ if docStatus == 'I':
      </td>
     <b>
     <b>
-     <td colspan='3'>
-      <font size='3'><b>BLOCKED FOR PUBLICATION</b></font>
+     <td colspan='1'>
+      <b>BLOCKED FOR PUBLICATION</b>
      </td>
     </b>
+    <td align='right'>
+     <b>Removal Date:&nbsp;</b>
+    </td>
+    <td>
+     <b>@@REMOVAL_DATE@@</b>
+    </td>
    </tr>"""
 elif docStatus == 'A':
     docStatusLine = ""
@@ -297,13 +313,11 @@ class DocVersion:
         self.num            = row[0]
         # If a version has been removed from C.gov, mark it
         # -------------------------------------------------
-        if row[9] == 'N':
-           isRemoved        = ''
-        else:
-           isRemoved        = 'R '
+        if row[9] == 'Y':
+           removeDate = row[1][:10]
         whichJob            = row[7] and '(V-' or '(C-' 
         whichJob           += row[8] and "%d)" % row[8] or ')'
-        self.pubDates       = row[1] and [isRemoved + row[1][:10] + whichJob] or []
+        self.pubDates       = row[1] and [row[1][:10] + whichJob] or []
         self.comment        = row[2]
         self.user           = row[3]
         self.date           = row[4][:10]
@@ -371,18 +385,17 @@ LEFT OUTER JOIN primary_pub_doc d
 
     currentVer = None
     row = cursor.fetchone()
+    removeDate = ''
     while row:
         if currentVer:
             if currentVer.num == row[0]:
                 if row[1]:
                     # If a version has been removed from C.gov, mark it
                     # -------------------------------------------------
-                    if row[9] == 'N':
-                       isRemoved = ''
-                    else:
-                       isRemoved = 'R '
+                    if row[9] == 'Y':
+                       removeDate = row[1][:10]
                     whichJob = (row[7] and '(V-' or '(C-') + "%d)" % row[8]
-                    currentVer.pubDates.append(isRemoved + row[1][:10] + whichJob)
+                    currentVer.pubDates.append(row[1][:10] + whichJob)
             else:
                 html += currentVer.display()
                 currentVer = DocVersion(row)
@@ -398,7 +411,13 @@ except cdrdb.Error, info:
 #----------------------------------------------------------------------
 # Send it.
 #----------------------------------------------------------------------
-cdrcgi.sendPage(html + """\
+html += """\
   </table>
  </body>
-</html>""")
+</html>"""
+
+# -------------------------------------------------------
+# Substitute the removal date once we've got is assigned.
+# -------------------------------------------------------
+html = re.sub("@@REMOVAL_DATE@@", removeDate, html)
+cdrcgi.sendPage(html)
