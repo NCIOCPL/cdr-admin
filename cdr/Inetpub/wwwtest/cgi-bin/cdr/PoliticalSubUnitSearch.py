@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PoliticalSubUnitSearch.py,v 1.1 2002-02-14 19:36:35 bkline Exp $
+# $Id: PoliticalSubUnitSearch.py,v 1.2 2003-07-29 12:42:23 bkline Exp $
 #
 # Duplicate-checking interface for Political SubUnit documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2002/02/14 19:36:35  bkline
+# Broken out from original GeographicEntity search pages.
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, cdrdb
 
@@ -84,7 +87,7 @@ except cdrdb.Error, info:
 # Create the results page.
 #----------------------------------------------------------------------
 html = cdrcgi.advancedSearchResultsPage("PoliticalSubUnit", rows, strings, 
-                                        'name:Political SubUnit QC Report')
+                                        'set:QC PoliticalSubUnit Set')
 
 #----------------------------------------------------------------------
 # Send the page back to the browser.
