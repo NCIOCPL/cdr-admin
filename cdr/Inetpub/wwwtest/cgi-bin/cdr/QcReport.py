@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.20 2003-05-22 13:25:39 bkline Exp $
+# $Id: QcReport.py,v 1.21 2003-06-13 20:27:26 bkline Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.20  2003/05/22 13:25:39  bkline
+# Checked 'approved' option by default at Margaret's request.
+#
 # Revision 1.19  2003/05/09 20:41:20  pzhang
 # Added Summary:pat to filter sets.
 #
@@ -85,6 +88,7 @@ docType  = fields.getvalue("DocType")    or None
 repType  = fields.getvalue("ReportType") or None
 docTitle = fields.getvalue("DocTitle")   or None
 version  = fields.getvalue("DocVersion") or None
+glossary = fields.getvalue("Glossary")   or None
 
 revLvls  = fields.getvalue("revLevels")  or None
 if not revLvls:
@@ -235,7 +239,13 @@ if docType == 'Summary' and repType and not version:
   <INPUT TYPE="checkbox" NAME="approved"
                          CHECKED='1'>&nbsp;&nbsp; With approved attribute<BR>
   <INPUT TYPE="checkbox" NAME="proposed">&nbsp;&nbsp; With proposed attribute
-""" 
+"""
+    if repType == "pat":
+        form += """\
+  <BR><BR>
+  <INPUT TYPE='checkbox' NAME='Glossary'>&nbsp;&nbsp;
+  Include glossary terms at end of report?<BR>
+"""
     cdrcgi.sendPage(header + form + """  
  </BODY>
 </HTML>
@@ -409,7 +419,10 @@ if not filters.has_key(docType):
 
 filterParm = []
 if revLvls:
-    filterParm = [['revLevels', revLvls]]   
+    filterParm = [['revLevels', revLvls]]
+if repType == "pat":
+    filterParm.append(['DisplayGlossaryTermList',
+                       glossary and "Y" or "N"])
 doc = cdr.filterDoc(session, filters[docType], docId = docId,
                     docVer = version or None, parm = filterParm)
 if type(doc) == type(()):
