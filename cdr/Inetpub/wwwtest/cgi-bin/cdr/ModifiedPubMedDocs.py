@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ModifiedPubMedDocs.py,v 1.3 2002-04-24 20:36:03 bkline Exp $
+# $Id: ModifiedPubMedDocs.py,v 1.4 2004-02-17 19:38:18 venglisc Exp $
 #
 # Reports on documents unchanged for a specified number of days.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2002/04/24 20:36:03  bkline
+# Changed "Title" label to "DocTitle" as requested by Eileen (issue #161).
+#
 # Revision 1.2  2002/02/21 22:34:00  bkline
 # Added navigation buttons.
 #
@@ -68,17 +71,18 @@ try:
 except cdrdb.Error, info:
     cdrcgi.bail('Database query failure: %s' % info[1][0])
 
-title   = "Modified PubMed Documents"
-instr   = "Number of modified documents: %d" % len(rows)
+title   = "CDR Administration"
+instr   = "Modified PubMed Documents"
 buttons = (SUBMENU, cdrcgi.MAINMENU)
 header  = cdrcgi.header(title, title, instr, "ModifiedPubMedDocs.py", buttons)
 html    = """\
+<b>Number of modified documents: %d<b>
 <TABLE BORDER='0' WIDTH='100%%' CELLSPACING='1' CELLPADDING='1'>
  <TR BGCOLOR='silver' VALIGN='top'>
   <TD ALIGN='center'><FONT SIZE='-1'><B>Doc ID</B></FONT></TD>
   <TD ALIGN='center'><FONT SIZE='-1'><B>DocTitle</B></FONT></TD>
  </TR>
-"""
+""" % len(rows)
 for row in rows:
     docId = "CDR%010d" % row[0]
     title = row[1].encode('latin-1')
