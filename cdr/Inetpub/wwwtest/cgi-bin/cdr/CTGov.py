@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CTGov.py,v 1.7 2004-07-13 15:40:12 venglisc Exp $
+# $Id: CTGov.py,v 1.8 2004-10-26 19:56:33 venglisc Exp $
 #
 # Submenu for ClinicalTrials.gov activities.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.7  2004/07/13 15:40:12  venglisc
+# Modified menu item to "Mark/Remove Protocols as Duplicates".
+#
 # Revision 1.6  2004/05/11 17:30:43  bkline
 # Plugged in CTGovMarkDuplicate.py.
 #
@@ -83,7 +86,7 @@ reports = [
            ('CTGovImport.py?which=cips', 'Review Protocols Sent to CIPS')
           ]
 for r in reports:
-    form += "<LI><A HREF='%s/%s&%s=%s'>%s</LI>\n" % (
+    form += "<LI><A HREF='%s/%s&%s=%s'>%s</A></LI>\n" % (
             cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
 
 form += """\
@@ -96,7 +99,7 @@ reports = [
            ('CTGovMarkDuplicate.py', 'Mark/Remove Protocols as Duplicates')
           ]
 for r in reports:
-    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI>\n" % (
+    form += "<LI><A HREF='%s/%s?%s=%s'>%s</A></LI>\n" % (
             cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
 
 form += """\
@@ -108,7 +111,7 @@ reports = [
            ('CTGov.py?qc=1', 'CTGov Protocol QC Report')
           ]
 for r in reports:
-    form += "<LI><A HREF='%s/%s&%s=%s'>%s</LI>\n" % (
+    form += "<LI><A HREF='%s/%s&%s=%s'>%s</A></LI>\n" % (
             cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
 
 form += """\
@@ -124,7 +127,7 @@ reports = [
            ('CTGovDupReport.py', 'Records Marked Duplicate'),
           ]
 for r in reports:
-    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI>\n" % (
+    form += "<LI><A HREF='%s/%s?%s=%s'>%s</A></LI>\n" % (
             cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
 
 cdrcgi.sendPage(header + form + "</OL></FORM></BODY></HTML>")
