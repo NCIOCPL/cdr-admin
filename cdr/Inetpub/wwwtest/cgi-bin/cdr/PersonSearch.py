@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PersonSearch.py,v 1.7 2002-06-26 20:05:25 bkline Exp $
+# $Id: PersonSearch.py,v 1.8 2002-11-14 13:53:41 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Person documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.7  2002/06/26 20:05:25  bkline
+# Modified advanced Person search forms to use QcReport.py for doc display.
+#
 # Revision 1.6  2002/06/06 12:01:27  bkline
 # Added calls to cdrcgi.unicodeToLatin1().
 #
@@ -98,21 +101,21 @@ searchFields = (cdrcgi.SearchField(surname,
                              "/Person/PersonLocations/PrivatePractice/"
                              "PostalAddress/Street",
                              "/Person/PersonLocations/OtherPracticeLocation/"
-                             "SpecificContact/PostalAddress/Street")),
+                             "SpecificPostalAddress/Street")),
                 cdrcgi.SearchField(city,
                             ("/Person/PersonLocations/Home/PostalAddress/"
                              "City",
                              "/Person/PersonLocations/PrivatePractice/"
                              "PostalAddress/City",
                              "/Person/PersonLocations/OtherPracticeLocation/"
-                             "SpecificContact/PostalAddress/City")),
+                             "SpecificPostalAddress/City")),
                 cdrcgi.SearchField(state,
                             ("/Person/PersonLocations/Home/PostalAddress/"
                              "PoliticalSubUnit_State/@cdr:ref",
                              "/Person/PersonLocations/PrivatePractice/"
                              "PostalAddress/PoliticalSubUnit_State/@cdr:ref",
                              "/Person/PersonLocations/OtherPracticeLocation/"
-                             "SpecificContact/PostalAddress/"
+                             "SpecificPostalAddress/"
                              "PoliticalSubUnit_State/@cdr:ref")),
                 cdrcgi.SearchField(zip,
                             ("/Person/PersonLocations/Home/PostalAddress/"
@@ -120,14 +123,14 @@ searchFields = (cdrcgi.SearchField(surname,
                              "/Person/PersonLocations/PrivatePractice/"
                              "PostalAddress/PostalCode_ZIP",
                              "/Person/PersonLocations/OtherPracticeLocation/"
-                             "SpecificContact/PostalAddress/PostalCode_ZIP")),
+                             "SpecificPostalAddress/PostalCode_ZIP")),
                 cdrcgi.SearchField(country,
                             ("/Person/PersonLocations/Home/PostalAddress/"
                              "Country/@cdr:ref",
                              "/Person/PersonLocations/PrivatePractice/"
                              "PostalAddress/Country/@cdr:ref",
                              "/Person/PersonLocations/OtherPracticeLocation/"
-                             "SpecificContact/PostalAddress/"
+                             "SpecificPostalAddress/"
                              "Country/@cdr:ref")))
 
 #----------------------------------------------------------------------
