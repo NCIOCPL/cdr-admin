@@ -2,8 +2,12 @@
 #
 # Publishing CGI script.
 #
-# $Id: publishing.py,v 1.19 2002-11-05 21:26:27 pzhang Exp $
+# $Id: publishing.py,v 1.20 2002-11-07 23:11:28 pzhang Exp $
 # $Log: not supported by cvs2svn $
+# Revision 1.19  2002/11/05 21:26:27  pzhang
+# Changed FONT of DESC.
+# Added code to show default value based on control document.
+#
 # Revision 1.18  2002/11/05 18:42:30  pzhang
 # Changed New to Current
 #
@@ -65,6 +69,7 @@
 #
 #----------------------------------------------------------------------
 import cgi, cdrcgi, string, copy, urllib, cdr, cdr2cg, xml.dom.minidom
+import socket
 from win32com.client import Dispatch
 import pythoncom
 
@@ -122,7 +127,10 @@ class Display:
 
         for r in publishes:
             if r[3][0:7] == "Mailers":
-                continue
+                continue            
+            if "FRANCK" !=  string.upper(socket.gethostname()):
+                if r[3][0:12] == "QcFilterSets":
+                    continue
             form += "<LI><A href='%s/%s?%s=%s&ctrlId=%s&version=%s'>%s</A>\
                      </LI>\n" % (cdrcgi.BASE, r[0], cdrcgi.SESSION, session, 
                      r[1], r[2], r[3])
@@ -216,8 +224,8 @@ class Display:
                 deep = copy.deepcopy(param)
                 params.append(deep) 
 
-            form += "<LI><H5>Modify default parameter values: </H5>\n"
-            form += "<TABLE BORDER='1'><TR><TD><B>Name</B></TD><TD><B>"               
+            form += "<LI><H5>Modify default parameter values if applicable:"
+            form += "</H5><TABLE BORDER='1'><TR><TD><B>Name</B></TD><TD><B>"               
             form += "Default Value</B></TD><TD><B>Current Value</B></TD></TR>\n"
         
             paramList = ""
@@ -228,6 +236,10 @@ class Display:
                         self.__addFooter("The value of parameter PubType,\
                              %s, is not supported. <BR>Please modify \
                             the control document or the source code." % r[2])
+                    form += """<TR><TD>%s</TD><TD>%s</TD><TD><INPUT \
+                        NAME='%s' VALUE='%s' READONLY></TD></TR>\n""" % (
+                        r[1], r[2], r[1], r[2])
+                elif r[1] == "SubSetName":
                     form += """<TR><TD>%s</TD><TD>%s</TD><TD><INPUT \
                         NAME='%s' VALUE='%s' READONLY></TD></TR>\n""" % (
                         r[1], r[2], r[1], r[2])
