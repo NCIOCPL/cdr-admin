@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: PublishPreview.py,v 1.18 2002-11-13 20:33:37 bkline Exp $
+# $Id: PublishPreview.py,v 1.19 2002-11-15 18:36:23 bkline Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.18  2002/11/13 20:33:37  bkline
+# Plugged in filter sets.
+#
 # Revision 1.17  2002/11/05 14:00:29  bkline
 # Updated filter lists from publication control document.
 #
@@ -106,7 +109,7 @@ filters = {
 
 filterSets = {
     'Summary':           ['set:Vendor Summary Set'],
-    'InScopePrototocol': ['set:Vendor InScopeProtocol Set']
+    'InScopeProtocol': ['set:Vendor InScopeProtocol Set']
 }
 
 #----------------------------------------------------------------------
