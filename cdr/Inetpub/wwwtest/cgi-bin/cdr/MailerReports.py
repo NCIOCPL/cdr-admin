@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: MailerReports.py,v 1.8 2004-09-17 14:06:50 venglisc Exp $
+# $Id: MailerReports.py,v 1.9 2005-03-03 14:27:21 bkline Exp $
 #
 # Submenu for mailer reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.8  2004/09/17 14:06:50  venglisc
+# Fixed list items to properly teminate the anker link.
+#
 # Revision 1.7  2004/07/13 17:46:42  bkline
 # Added web mailer reports.
 #
@@ -68,11 +71,17 @@ reports = [
            ('NonRespondents.py', 
             'Non-Respondents'),
            ('PreMailerProtReport.py',
-            'Pre-Mailer Protocol Check'),
-           ('EmailerReports.py',
-            'Web Mailers')
+            'Pre-Mailer Protocol Check')
           ]
 for r in reports:
+    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI></A>\n" % (
+            cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
+form += "<LI><A HREF='%s/RespondentReport.py'>%s</LI></A>\n" % (
+            cdr.emailerCgi(), 'Web Mailer Respondents')
+for r in [
+           ('EmailerReports.py',
+            'Web Mailer Updates')
+         ]:
     form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI></A>\n" % (
             cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
 

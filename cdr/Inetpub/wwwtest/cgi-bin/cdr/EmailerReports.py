@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EmailerReports.py,v 1.3 2004-12-27 20:32:56 bkline Exp $
+# $Id: EmailerReports.py,v 1.4 2005-03-03 14:27:21 bkline Exp $
 #
 # Reports on status of electronic mailers.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2004/12/27 20:32:56  bkline
+# Added missing import for sys module.
+#
 # Revision 1.2  2004/09/09 15:23:46  bkline
 # Fixed typo; added date-range defaults (request #1328).
 #
@@ -28,7 +31,7 @@ SUBMENU  = "Report Menu"
 buttons  = ["Submit Request", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 script   = "EmailerReports.py"
 title    = "CDR Administration"
-section  = "Web-Based Mailer Reports"
+section  = "Web Mailer Updates"
 header   = cdrcgi.header(title, title, section, script, buttons,
                          stylesheet ="""\
   <style type='text/css'>
