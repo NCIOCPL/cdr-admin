@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: PersonProtocolReview.py,v 1.6 2004-09-24 15:48:25 venglisc Exp $
+# $Id: PersonProtocolReview.py,v 1.7 2004-10-07 15:50:20 venglisc Exp $
 #
 # Report to assist editors in checking links to a specified person from
 # protocols.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2004/09/24 15:48:25  venglisc
+# Reformatting report to follow output layout of other QC reports. (Bug 1261)
+#
 # Revision 1.5  2003/08/25 20:24:43  bkline
 # Juggled sort order of report results at users' requets.
 #
@@ -325,7 +328,7 @@ try:
          AND left(role.node_loc, 12) = left(person.node_loc, 12)
        ORDER BY role.doc_id
 """ % id
-    cursor.execute(query)
+    cursor.execute(query, timeout = 120)
 except cdrdb.Error, info:
     cdrcgi.bail('Failure populating #persprotrev2 - Lead: %s' % info[1][0])
 
@@ -344,7 +347,7 @@ try:
          AND person.int_val = %s
          AND left(role.node_loc, 24) = left(person.node_loc, 24)
 """ % id 
-    cursor.execute(query)
+    cursor.execute(query, timeout = 120)
     conn.commit()
 except cdrdb.Error, info:
     cdrcgi.bail('Failure populating #persprotrev2 - Site: %s' % info[1][0])
@@ -370,7 +373,7 @@ try:
                AND #persprotrev2.roletype = 'Lead'
             )
 """
-    cursor.execute(query)
+    cursor.execute(query, timeout = 120)
     conn.commit()
 except cdrdb.Error, info:
     cdrcgi.bail('Failure updating #persprotrev2 - Lead: %s' % info[1][0])
@@ -398,7 +401,7 @@ try:
          AND #persprotrev2.roletype = 'Site'
 )
 """
-    cursor.execute(query)
+    cursor.execute(query, timeout = 120)
     conn.commit()
 except cdrdb.Error, info:
     cdrcgi.bail('Failure updating #persprotrev2 - Site: %s' % info[1][0])
