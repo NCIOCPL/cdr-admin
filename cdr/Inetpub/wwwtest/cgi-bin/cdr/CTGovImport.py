@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: CTGovImport.py,v 1.2 2003-11-25 12:45:47 bkline Exp $
+# $Id: CTGovImport.py,v 1.3 2003-12-08 19:23:23 bkline Exp $
 #
 # User interface for selecting Protocols to be imported from
 # ClinicalTrials.gov.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2003/11/25 12:45:47  bkline
+# Opened NLM display of document in separate window at Lakshmi's request.
+#
 # Revision 1.1  2003/11/10 17:57:34  bkline
 # User interface for reviewing protocol documents downloaded from
 # ClinicalTrials.gov to determine their disposition.
@@ -59,24 +62,31 @@ def showList(skipPast, cursor):
     <input type='hidden' name='which' value='%s' />
 """ % (cdrcgi.SESSION, session, which)
 
+    where = ""
+    if skipPast:
+        where = "WHERE c.nlm_id < '%s'" % skipPast
     try:
         cursor.execute("""\
     SELECT TOP 20 c.nlm_id, c.title, d.name
       FROM ctgov_import c
       JOIN ctgov_disposition d
         ON d.id = c.disposition
-     WHERE c.nlm_id > '%s'
+     %s
        AND d.name = '%s'
-  ORDER BY c.nlm_id""" % (skipPast, disposition))
+  ORDER BY c.nlm_id DESC""" % (where, disposition))
         rows = cursor.fetchall()
+
+        #------------------------------------------------------------
+        # If we ran out of rows before the end, get the last 20 rows.
+        #------------------------------------------------------------
         if len(rows) < 20:
             cursor.execute("""\
     SELECT TOP 20 c.nlm_id, c.title, d.name
       FROM ctgov_import c
       JOIN ctgov_disposition d
         ON d.id = c.disposition
-     WHERE d.name = '%s'
-  ORDER BY c.nlm_id DESC""" % disposition)
+       AND d.name = '%s'
+  ORDER BY c.nlm_id""" % disposition)
             rows = cursor.fetchall()
             if rows:
                 rows.reverse()
@@ -86,7 +96,7 @@ def showList(skipPast, cursor):
     if not rows:
         cdrcgi.bail("No documents awaiting review")
     html += "<input type='hidden' name='numRows' value='%d'>\n" % len(rows)
-    html += "<input type='hidden' name='skipCur' value='%s'>\n" % skipCur
+    html += "<input type='hidden' name='skipCur' value='%s'>\n" % skipPast
     html += "<input type='hidden' name='skipNext' value='%s'>\n" % rows[-1][0]
 
     n = 0
