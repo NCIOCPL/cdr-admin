@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: DevSA.py,v 1.2 2004-08-10 15:39:26 bkline Exp $
+# $Id: DevSA.py,v 1.3 2004-08-26 14:05:52 bkline Exp $
 #
 # Main menu for Developers and System Administrators.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2004/08/10 15:39:26  bkline
+# Plugged in new menu items for editing the external mapping values.
+#
 # Revision 1.1  2003/12/16 16:09:20  bkline
 # Main menu for Developers and System Administrators.
 #
@@ -50,6 +53,7 @@ items   = (('EditGroups.py',           'Manage Groups'                 ),
            ('MessageLoggedInUsers.py', 'Send Email to Users Currently '
                                        'Logged in to the CDR'          ),
            ('CTGov.py',                'CTGov Protocols'               ),
+           ('UnblockDoc.py',           'Unblock Documents'             ),
            ('EditExternMap.py',        'Update Mapping Table'          ),
            ('Logout.py',               'Log Out'                       )
            )
