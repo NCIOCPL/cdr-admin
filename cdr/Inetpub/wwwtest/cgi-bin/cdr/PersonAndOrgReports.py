@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PersonAndOrgReports.py,v 1.7 2004-03-08 17:47:06 venglisc Exp $
+# $Id: PersonAndOrgReports.py,v 1.8 2004-03-29 21:33:38 bkline Exp $
 #
 # Submenu for person and organization reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.7  2004/03/08 17:47:06  venglisc
+# Modified Menu title and alphabetized entries. (Bug 1094)
+#
 # Revision 1.6  2003/11/05 14:49:13  bkline
 # Added report for Preferred Protocol Organizations.
 #
@@ -78,6 +81,8 @@ reports = [
             'Cooperative Group Member Orgs and Investigators'),
            ('InactivePersonsOrgs.py', 
             'Inactive Persons/Organizations Linked to Protocols'),
+           ('CCOPOrgReport.py',
+            'NCI Funded CCOP/MBCCOP Organization Report'),
            ('OrgProtocolReview.py', 
             'Organization Protocol Review'),
            ('PersonProtocolReview.py', 
