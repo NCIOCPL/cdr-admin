@@ -1,12 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: ModWithoutPubVersion.py,v 1.1 2002-09-11 23:30:14 bkline Exp $
+# $Id: ModWithoutPubVersion.py,v 1.2 2002-09-12 01:07:36 bkline Exp $
 #
 # Reports on documents which have been changed since a previously 
 # publishable version without a new publishable version have been
 # created.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2002/09/11 23:30:14  bkline
+# New report on documents modified since their last publishable version.
+#
 #----------------------------------------------------------------------
 import cdr, cdrdb, cdrcgi, cgi, re, time, xml.dom.minidom
 
@@ -54,8 +57,7 @@ if not request:
     if not toDate: toDate = time.strftime("%Y-%m-%d", now)
     if not fromDate:
         then     = list(now)
-        then[1] -= 1
-        then[2] += 1
+        then[2] -= 6
         then     = time.localtime(time.mktime(then))
         fromDate = time.strftime("%Y-%m-%d", then)
     docTypes = cdr.getDoctypes(session)
@@ -107,39 +109,57 @@ if not modUser : modUser = '%'
 try:
     conn   = cdrdb.connect()
     cursor = conn.cursor()
+    conn.setAutoCommit(1)
     cursor.execute("""\
-            SELECT t.name,
-                   d.id,
-                   p.updated_dt,
-                   u.fullname,
-                   m.dt,
-                   n.updated_dt
+            SELECT t.name      doc_type,
+                   d.id        doc_id,
+                   u.fullname  user_name,
+                   a.dt        mod_date
+              INTO #last_mod
               FROM doc_type t
               JOIN document d
                 ON d.doc_type = t.id
-              JOIN audit_trail m
-                ON m.document = d.id
+              JOIN audit_trail a
+                ON a.document = d.id
               JOIN usr u
-                ON u.id = m.usr
-              JOIN doc_version p
-                ON p.id = d.id
-        LEFT OUTER JOIN doc_version n
-                ON n.id = d.id
-               AND n.updated_dt = (SELECT MAX(updated_dt)
-                                     FROM doc_version
-                                    WHERE id = d.id
-                                      AND publishable = 'N')
-             WHERE m.dt BETWEEN '%s' AND DATEADD(s, -1, DATEADD(d, 1, '%s'))
+                ON u.id = a.usr
+             WHERE a.dt BETWEEN '%s' AND DATEADD(s, -1, DATEADD(d, 1, '%s'))
                AND u.name LIKE '%s'
-               AND p.updated_dt = (SELECT MAX(updated_dt)
-                                     FROM doc_version
-                                    WHERE id = d.id
-                                      AND publishable = 'Y'
-                                      AND updated_dt < m.dt)
-               %s
-          ORDER BY t.name,
-                   m.dt,
-                   u.fullname""" % (fromDate, toDate, modUser, dtQual))
+               %s""" % (fromDate, toDate, modUser, dtQual))
+    cursor.execute("""\
+            SELECT v.id              doc_id, 
+                   MAX(v.updated_dt) pub_ver_date
+              INTO #last_publishable_version
+              FROM doc_version v
+              JOIN #last_mod m
+                ON m.doc_id = v.id
+             WHERE v.publishable = 'Y'
+          GROUP BY v.id""")
+    cursor.execute("""\
+            SELECT v.id              doc_id, 
+                   MAX(v.updated_dt) unpub_ver_date
+              INTO #last_unpublishable_version
+              FROM doc_version v
+              JOIN #last_mod m
+                ON m.doc_id = v.id
+             WHERE v.publishable = 'N'
+          GROUP BY v.id""")
+    cursor.execute("""
+   SELECT DISTINCT d.doc_type,
+                   d.doc_id,
+                   p.pub_ver_date,
+                   d.user_name,
+                   d.mod_date,
+                   u.unpub_ver_date
+              FROM #last_mod d
+              JOIN #last_publishable_version p
+                ON d.doc_id = p.doc_id
+   LEFT OUTER JOIN #last_unpublishable_version u
+                ON u.doc_id = d.doc_id
+             WHERE p.pub_ver_date < d.mod_date
+          ORDER BY d.doc_type,
+                   d.mod_date,
+                   d.user_name""")
     rows = cursor.fetchall()
 except cdrdb.Error, info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
@@ -169,6 +189,7 @@ html = """\
      But Without a New Publishable Version
     </font>
    </b>
+   <br />
    <b>
     <font size='4'>From: %s&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;To: %s</font>
    </b>
@@ -239,11 +260,12 @@ for row in rows:
    <tr>
     <td align='center'><font size='3'>CDR%010d</font></td>
     <td align='center'><font size='3'>%s</font></td>
-    <td align='center'><font size='3'>%s</font></td>
+    <td align='center' nowrap='1'><font size='3'>%s</font></td>
     <td align='center'><font size='3'>%s</font></td>
     <td align='center'><font size='3'>%s</font></td>
    </tr>
-""" % (docId, pubDate, modBy, modDate, nonPubVerDate or "None")
+""" % (docId, pubDate[:10], modBy, modDate[:10], 
+       nonPubVerDate and nonPubVerDate[:10] or "None")
 
 #----------------------------------------------------------------------
 # Finish and send the report.
