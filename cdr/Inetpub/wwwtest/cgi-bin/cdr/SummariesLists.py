@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummariesLists.py,v 1.2 2004-01-13 23:23:40 venglisc Exp $
+# $Id: SummariesLists.py,v 1.3 2004-01-13 23:51:18 venglisc Exp $
 #
 # Report on lists of summaries.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2004/01/13 23:23:40  venglisc
+# Creating new summaries list reports per request (Bug 1010/1011).
+#
 # Revision 1.1  2003/12/19 18:30:00  bkline
 # New report for CDR requests #1010/1011.
 #
@@ -108,11 +111,6 @@ if not lang:
    </table>
 
    <table border = '0'>
-<!--
-    <tr>
-     <td colspan='2'>If <u>English</u> is selected above:<br>&nbsp;</td>
-    </tr>
--->
     <tr>
      <td width=100>
       <input name='lang' type='radio' value='English' CHECKED><b>English</b>
@@ -141,11 +139,6 @@ if not lang:
        <b>Supportive Care</b><br><br>
      </td>
     </tr>
-<!-- 
-    <tr>
-     <td colspan='2'>If <u>Spanish</u> is selected above:<br>&nbsp;</td>
-    </tr>
--->
     <tr>
      <td width=100>
       <input name='lang' type='radio' value='Spanish'><b>Spanish</b>
@@ -182,10 +175,15 @@ if not lang:
 # - English, HP, without CDR ID
 # - English, Patient, with CDR ID ...
 #----------------------------------------------------------------------
-# Construct the query.
+
 #----------------------------------------------------------------------
 # Create the selection criteria based on the groups picked by the user
-# But the decision will be based on the content of the board.
+# But the decision will be based on the content of the board instead
+# of the SummaryType.
+# Based on the SummaryType selected on the form the boardPick list is
+# being created including the Editorial and Advisory board for each
+# type.  These board IDs can then be decoded into the proper 
+# heading to be used for each selected summary type.
 # --------------------------------------------------------------------
 boardPick = ''
 for i in range(len(groups)):
@@ -211,6 +209,9 @@ for i in range(len(groups)):
   else:
       boardPick += """'""" + groups[i] + """', """
 
+# --------------------------------------------------------------
+# Define the Headings under which the summaries should be listed
+# --------------------------------------------------------------
 q_case = """\
        CASE WHEN board.value = 'CDR0000028327'  THEN 'Adult Treatment'
             WHEN board.value = 'CDR0000035049'  THEN 'Adult Treatment'
@@ -226,11 +227,24 @@ q_case = """\
             ELSE board.value END
 """
 
+# ------------------------------------------------------------------------
+# Create the selection criteria for the summary language (English/Spanish)
+# ------------------------------------------------------------------------
 q_lang = """\
 AND    lang.path = '/Summary/SummaryMetaData/SummaryLanguage'
 AND    lang.value = '%s'
 """ % lang
 
+# ---------------------------------------------------------------------
+# Define the selection criteria parts that are different for English or
+# Spanish documents:
+# q_fields:  Fields to be selected, i.e. the Spanish version needs to 
+#            display the English translation
+# q_join:    The Spanish version has to evaluate the board and language
+#            elements differently
+# q_board:   Don't restrict on selected boards if All English/Spanish
+#            has been selected as well
+# --------------------------------------------------------------------
 if lang == 'English': 
     q_fields = """
                 'dummy1', 'dummy2', title.value EnglTitle, 
@@ -271,6 +285,9 @@ AND   qt.path          = '/Summary/TranslationOf/@cdr:ref'
 AND    board.value in (%s)
 """ % boardPick[:-2]
 
+# ---------------------------------------------------
+# Create selection criteria for HP or Patient version
+# ---------------------------------------------------
 if audience == 'Patient':
     q_audience = """\
 AND audience.value = 'Patients'
@@ -280,27 +297,10 @@ else:
 AND audience.value = 'Health professionals'
 """
 
-query_s = """\
-SELECT DISTINCT qt.doc_id, title.value DocTitle, 
-%s
-%s
-FROM  query_term qt
-%s
-JOIN  query_term title
-ON    qt.doc_id    = title.doc_id
-JOIN  query_term audience
-ON    qt.doc_id        = audience.doc_id
-WHERE title.path       = '/Summary/SummaryTitle'
-%s
-AND   board.path       = '/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref'
-%s
-AND   audience.path = '/Summary/SummaryMetaData/SummaryAudience'
-%s
-%s
-ORDER BY 6, 2
-""" % (q_fields, q_case, q_join, q_trans, q_board, q_audience, q_lang)
-
-query_e = """\
+# -------------------------------------------------------------
+# Put all the pieces together for the SELECT statement
+# -------------------------------------------------------------
+query = """\
 SELECT DISTINCT qt.doc_id, title.value DocTitle, 
 %s
 %s
@@ -327,18 +327,10 @@ AND qt.doc_id not in (select doc_id
                        and doc_type = 'Summary')
 ORDER BY 6, 2
 """ % (q_fields, q_case, q_join, q_trans, q_board, q_audience, q_lang)
-# cdrcgi.bail("QUERY board: [%s]" % q_board)
-# cdrcgi.bail("QUERY: [%s]" % query)
-
-if lang == 'English':
-    query = query_e
-else:
-    query = query_e
 
 if not query:
     cdrcgi.bail('No query criteria specified')   
 
-#cdrcgi.bail("Query: [%s]" % query)
 #----------------------------------------------------------------------
 # Submit the query to the database.
 #----------------------------------------------------------------------
@@ -369,6 +361,10 @@ header    = cdrcgi.header(title, title, instr, script, buttons,
     DL      { margin-left: 0; padding-left: 0 }
    </STYLE>
 """)
+
+# -------------------------
+# Display the Report Title
+# -------------------------
 if lang == 'English':
     report    = """\
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
@@ -384,8 +380,16 @@ else:
 
 board_type = rows[0][5]
 
-# Decision if the CDR IDs are displayed along with the summary titles
 # -------------------------------------------------------------------
+# Decision if the CDR IDs are displayed along with the summary titles
+# - The report without CDR ID is displayed as a bulleted list.
+# - The report with    CDR ID is displayed in a table format.
+# -------------------------------------------------------------------
+# ------------------------------------------------------------------------
+# Display data including CDR ID
+# English and Spanish data to be displayed identically except that the 
+# English translation of the summary titles is displayed under the title
+# ------------------------------------------------------------------------
 if showId == 'N':
     report += """\
   <U><FONT size="+1">%s</FONT></U>
@@ -417,8 +421,12 @@ if showId == 'N':
   <U><FONT size="+1">%s</FONT></U>
   <DL>
 """ % board_type
-
-else:    # Display data including CDR ID
+# ------------------------------------------------------------------------
+# Display data including CDR ID
+# English and Spanish data to be displayed identically except that the 
+# English translation of the summary titles is displayed under the title
+# ------------------------------------------------------------------------
+else:
     report += """\
   <U><FONT size="+1">%s</FONT></U><P/>
   <TABLE width = "100%%">
