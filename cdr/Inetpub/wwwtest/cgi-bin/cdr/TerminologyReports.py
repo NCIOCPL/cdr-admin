@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: TerminologyReports.py,v 1.5 2003-05-08 20:27:27 bkline Exp $
+# $Id: TerminologyReports.py,v 1.6 2003-06-13 20:32:43 bkline Exp $
 #
 # Submenu for terminology reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2003/05/08 20:27:27  bkline
+# New terminology report for menu information.
+#
 # Revision 1.4  2002/12/11 17:27:54  bkline
 # Plugged in the new Intervention/Procedure terminology report.
 #
@@ -68,13 +71,18 @@ form += """\
     <OL>
 """
 reports = [
-           ('MenuHierarchy.py', 'Menu Hierarchy Report'),
-           ('Stub.py', 'Term By Type'),
+           ('MenuHierarchy.py', 'Menu Hierarchy Report', ''),
+           ('Stub.py', 'Term By Type', ''),
+           ('DiseaseDiagnosisTerms.py',
+            'Cancer Diagnosis Hierarchy', ''),
+           ('DiseaseDiagnosisTerms.py',
+            'Cancer Diagnosis Hierarchy (Without Alternate Names)',
+            '&flavor=short'),
            ('InterventionAndProcedureTerms.py',
-            'Intervention/Procedure Terms')
+            'Intervention/Procedure Terms', '')
           ]
 for r in reports:
-    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI>\n" % (
-            cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
+    form += "<LI><A HREF='%s/%s?%s=%s%s'>%s</LI>\n" % (
+            cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[2], r[1])
 
 cdrcgi.sendPage(header + form + "</OL></FORM></BODY></HTML>")
