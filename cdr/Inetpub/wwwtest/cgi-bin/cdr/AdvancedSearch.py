@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: AdvancedSearch.py,v 1.3 2002-02-20 04:00:51 bkline Exp $
+# $Id: AdvancedSearch.py,v 1.4 2002-02-22 02:18:58 bkline Exp $
 #
 # Main menu for advanced search forms.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2002/02/20 04:00:51  bkline
+# Added menu item for GlossaryTerm search.
+#
 # Revision 1.2  2002/02/14 19:34:21  bkline
 # Replaced Geographic Unit with Country and Political SubUnit choices.
 #
@@ -88,6 +91,7 @@ menu    = """\
     <SPAN CLASS='Page'>
     <LI><A HREF='%s/CiteSearch.py%s'>Citation</A></LI>
     <LI><A HREF='%s/CountrySearch.py%s'>Country</A></LI>
+    <LI><A HREF='%s/HelpSearch.py%s'>Documentation</A></LI>
     <LI><A HREF='%s/GlossaryTermSearch.py%s'>Glossary Term</A></LI>
     <LI><A HREF='%s/MiscSearch.py%s'>Miscellaneous</A></LI>
     <LI><A HREF='%s/OrgSearch2.py%s'>Organization</A></LI>
@@ -100,6 +104,7 @@ menu    = """\
     </SPAN>
    </OL>
 """ % (cdrcgi.BASE, session,
+       cdrcgi.BASE, session,
        cdrcgi.BASE, session,
        cdrcgi.BASE, session,
        cdrcgi.BASE, session,
