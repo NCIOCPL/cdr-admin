@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ActivityReport.py,v 1.2 2002-06-26 20:04:14 bkline Exp $
+# $Id: ActivityReport.py,v 1.3 2002-06-27 20:30:54 bkline Exp $
 #
 # Reports on audit trail content.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/06/26 20:04:14  bkline
+# Removed bold markup from data.
+#
 # Revision 1.1  2002/06/26 16:35:16  bkline
 # Implmented report of audit_trail activity.
 #
@@ -169,7 +172,7 @@ try:
            FROM audit_trail a
            JOIN usr u
              ON u.id = a.usr
-           JOIN document d
+           JOIN all_docs d
              ON d.id = a.document
            JOIN doc_type t
              ON t.id = d.doc_type
