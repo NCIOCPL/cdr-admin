@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: Reports.py,v 1.7 2002-03-09 03:27:40 bkline Exp $
+# $Id: Reports.py,v 1.8 2002-03-13 16:58:25 bkline Exp $
 #
 # Prototype for editing CDR linking tables.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.7  2002/03/09 03:27:40  bkline
+# Added report for unverified citations.
+#
 # Revision 1.6  2002/03/02 13:50:31  bkline
 # Added report for checked-out documents.
 #
@@ -52,6 +55,7 @@ form = "<INPUT TYPE='hidden' NAME='%s' VALUE='%s'><OL>\n" % (cdrcgi.SESSION,
 reports = [
            ('CheckedOutDocs.py', 'Checked Out Documents'),
            ('ConceptTermReviewReport.py', 'Concept/Term Review Report'),
+           ('DatedActions.py', 'Dated Actions'),
            ('CdrReport.py', 'Inactive Documents'),
            ('CheckUrls.py', 'Inactive Hyperlinks'),
            ('LinkedDocs.py', 'Linked Documents'),
