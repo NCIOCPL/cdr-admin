@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditFilterSet.py,v 1.1 2002-11-13 20:38:25 bkline Exp $
+# $Id: EditFilterSet.py,v 1.2 2002-11-14 13:54:21 bkline Exp $
 #
 # Form for editing named CDR filter sets.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2002/11/13 20:38:25  bkline
+# New script for maintaining a named CDR filter set.
+#
 #----------------------------------------------------------------------
 
 #----------------------------------------------------------------------
@@ -185,8 +188,9 @@ def showForm(isNew, members = None):
         %s
     }
     function blockChange() {
+        %s
         var frm = document.forms[0];
-        frm.elements.setName.value = "Don't change me!";
+        frm.elements.newName.value = "%s";
     }
     function addFilter() {
         var frm    = document.forms[0];
@@ -292,7 +296,7 @@ def showForm(isNew, members = None):
     <tr>
      <td align='right' nowrap=1><b>Set Name:</b>&nbsp;</td>
      <td>
-      <input name='newName' size='80' value="%s">
+      <input name='newName' size='80' value="%s" onChange='blockChange()'>
      </td>
     </tr>
     <tr>
@@ -361,6 +365,8 @@ def showForm(isNew, members = None):
  </body>
 </html>
 """ % (makeDelFunction(),
+       isNew == 'Y' and "return;" or "",
+       setName and cgi.escape(setName, 1) or '',
        noMembers,
        isNew != 'Y' and """\
       <input type='button' name='DelSet' value='Delete Set' 
