@@ -1,8 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: DiffCTGovProtocol.py,v 1.1 2003-12-16 16:10:56 bkline Exp $
+# $Id: DiffCTGovProtocol.py,v 1.2 2003-12-17 13:48:32 bkline Exp $
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2003/12/16 16:10:56  bkline
+# Script to show the differences between the current working copy of
+# a CTGovProtocol document and the latest publishable version (or
+# the first version if there are no publishable versions).
+#
 #----------------------------------------------------------------------
 import cdr, cdrcgi, cdrdb, sys, cgi, re, sys, os
 
@@ -22,6 +27,26 @@ def cleanup(abspath):
     except:
         pass
 
+#--------------------------------------------------------------------
+# Wrap long lines in the report.
+#--------------------------------------------------------------------
+def wrap(report):
+    report = report.replace("\r", "")
+    oldLines = report.split("\n")
+    newLines = []
+    for line in oldLines:
+        if len(line) <= 80:
+            newLines.append(line)
+        else:
+            newLines.append(line[:80])
+            line = line[80:]
+            while len(line) > 77:
+                newLines.append(u"\u00A0\u00A0\u21aa%s" % line[:77])
+                line = line[77:]
+            if line:
+                newLines.append(u"\u00A0\u00A0\u21aa%s" % line)
+    return "\n".join(newLines)
+                
 #--------------------------------------------------------------------
 # Show the differences between the CWD and the last (pub) version.
 #--------------------------------------------------------------------
@@ -61,7 +86,7 @@ f2.write(doc2.encode('latin-1', 'replace'))
 f2.close()
 result = cdr.runCommand(cmd)
 cleanup(workDir)
-report = cgi.escape(result.output)
+report = result.output
 if report.strip():
     title = "Differences between %s and %s" % (name1, name2)
 else:
@@ -76,5 +101,4 @@ cdrcgi.sendPage("""\
   <h3>%s</h3>
   <pre>%s</pre>
  </body>
-</html>""" % (title, title, report))
-
+</html>""" % (title, title, cgi.escape(wrap(report))))
