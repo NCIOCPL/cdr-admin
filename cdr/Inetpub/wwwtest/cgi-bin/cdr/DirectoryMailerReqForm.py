@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: DirectoryMailerReqForm.py,v 1.7 2002-10-03 20:33:35 ameyer Exp $
+# $Id: DirectoryMailerReqForm.py,v 1.8 2002-10-09 15:23:06 ameyer Exp $
 #
 # Request form for all directory mailers.
 #
@@ -31,6 +31,9 @@
 # Bob Kline.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.7  2002/10/03 20:33:35  ameyer
+# About to change the queries yet again, and want to save this version.
+#
 # Revision 1.6  2002/10/03 17:38:43  ameyer
 # Optimized physican annual update selection query.  Still untested.
 #
@@ -184,6 +187,7 @@ elif userPick == 'OrgAnnRemail':
 #----------------------------------------------------------------------
 try:
     conn = cdrdb.connect('CdrPublishing')
+    conn.setAutoCommit (1)
 except cdrdb.Error, info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
 
@@ -250,12 +254,38 @@ if docId:
 
 else:
     #------------------------------------------------------------------
-    # Create a query for the correct document and mailer type
-    # A different query is required for each of the three mailer types.
-    # Document types are passed in to the query creation and do not
-    #   change the structure of the query.
+    # Create queries for the correct document and mailer type.
+    #
+    # Two queries are created for each type of original mailer
+    # (remailers are done differently).
+    #
+    # One query creates a temporary table of id's of mailers that
+    # went out in the last year - indicating that no new mailer is
+    # needed, and one selects candidates for mailing, which then
+    # drop out ones for which mailers have already been sent (because
+    # they are found in the temporary table.
+    #
+    # The original version of this didn't use a temporary table,
+    # but the temp table speeds things up dramatically.
     #------------------------------------------------------------------
     if mailType == 'Physician-Initial':
+        # ID's of docs not requiring an initial mailer because
+        #   they've already had one
+        tmpQry = """
+            INSERT INTO #already_mailed_ids (tmpid)
+                    SELECT pd2.doc_id
+                      FROM pub_proc_doc pd2
+                      JOIN pub_proc p2
+                        ON p2.id = pd2.pub_proc
+                     WHERE
+                       (
+                            p2.pub_subset = 'Physician-Initial'
+                         OR
+                            p2.pub_subset = 'Physician-Annual update'
+                       )
+                       AND p2.status <> 'Failure'
+        """
+        # Main query:
         # Select last version (not CWD) of document for which:
         #   Doc_type = Person.
         #   Doc is marked ready_for_review ("Ready for Pre-Publication Mailer"
@@ -284,27 +314,17 @@ else:
                            '/Person/ProfessionalInformation/PhysicianDetails/AdministrativeInformation/Directory/Include'
                         AND qinc.value = 'Pending'
                         AND NOT EXISTS (
-                                SELECT *
-                                  FROM pub_proc p
-                                  JOIN pub_proc_doc pd
-                                    ON p.id = pd.pub_proc
-                                 WHERE pd.doc_id = document.id
-                                   AND p.pub_subset = 'Physician-Initial'
-                                   AND p.status <> 'Fail'
-                                )
+                                SELECT tmpid
+                                  FROM #already_mailed_ids
+                                 WHERE document.id = tmpid
+                             )
                    GROUP BY document.id"""
 
     elif mailType == 'Physician-Annual update':
         # Preselect all mailers sent to physicians in the last year.
         # Include initial, annual, and all remailers.
-        # Testing shows that creating a temporary table in this way
-        #   speeds the subsequent query by a factor of about 8
-        qry = """
-            -- Temp table
-            CREATE TABLE #mail_physician_annual_ids (tmpid int)
-
-            -- Fill it with ids of all physician mailers < 1 year old
-            INSERT INTO #mail_physician_annual_ids (tmpid)
+        tmpQry = """
+            INSERT INTO #already_mailed_ids (tmpid)
                     SELECT pd2.doc_id
                       FROM pub_proc_doc pd2
                       JOIN pub_proc p2
@@ -320,14 +340,10 @@ else:
                             p2.pub_subset = 'Physician-Annual remail'
                        )
                        AND p2.completed > DATEADD(year,-1,GETDATE())
-                       AND p2.status <> 'Fail'
+                       AND p2.status <> 'Failure'
         """
-        try:
-            cursor.execute(qry)
-        except cdrdb.Error, info:
-            cdrcgi.bail("Failure creating temp physician remailr table: %s" \
-                        % info[1][0])
 
+        # Main query:
         # Select last version (not CWD) of document for which:
         #   Doc_type = Person.
         #   .../CurrentStatus = "Active".
@@ -370,7 +386,7 @@ else:
                         -- But not if a mailer was sent in past year
                         AND NOT EXISTS (
                                 SELECT tmpid
-                                  FROM #mail_physician_annual_ids
+                                  FROM #already_mailed_ids
                                  WHERE document.id = tmpid
                              )
                    GROUP BY document.id"""
@@ -378,12 +394,8 @@ else:
     elif mailType == 'Organization-Annual update':
         # Perform same optimization as for physicians
         # Preselect all mailers sent to orgs in last year
-        qry = """
-            -- Temp table
-            CREATE TABLE #mail_org_annual_ids (tmpid int)
-
-            -- Fill it with ids of all organization mailers < 1 year old
-            INSERT INTO #mail_org_annual_ids (tmpid)
+        tmpQry = """
+            INSERT INTO #already_mailed_ids (tmpid)
                     SELECT pd2.doc_id
                       FROM pub_proc_doc pd2
                       JOIN pub_proc p2
@@ -395,15 +407,10 @@ else:
                             p2.pub_subset = 'Organization-Annual remail'
                        )
                        AND p2.completed > DATEADD(year,-1,GETDATE())
-                       AND p2.status <> 'Fail'
+                       AND p2.status <> 'Failure'
         """
-        try:
-            cursor.execute(qry)
-        except cdrdb.Error, info:
-            cdrcgi.bail("Failure creating temp org remailer table: %s" \
-                        % info[1][0])
 
-
+        # Main query:
         # Select last version (not CWD) of document for which:
         #   Doc_type = Organization.
         #   .../IncludeInDirectory = "Include".
@@ -435,7 +442,7 @@ else:
                         -- But not if a mailer was sent in past year
                         AND NOT EXISTS (
                                 SELECT tmpid
-                                  FROM #mail_org_annual_ids
+                                  FROM #already_mailed_ids
                                  WHERE document.id = tmpid
                              )
                    GROUP BY document.id"""
@@ -453,15 +460,32 @@ else:
             cdrcgi.bail('Database failure selecting remailers: %s'
                         % info[1][0])
 
-    # Execute the query to find all matching documents
+    # Create the temp table - remailers are handled differently
+    if timeType != 'Remail':
+        try:
+            cursor.execute ("CREATE TABLE #already_mailed_ids (tmpid int)")
+        except cdrdb.Error, info:
+            cdrcgi.bail("Failure creating temp table for mailers: %s" \
+                        % info[1][0])
+
+        # Fill it
+        try:
+            cursor.execute(tmpQry)
+        except cdrdb.Error, info:
+            cdrcgi.bail("Failure filling temp table for mailers: %s" \
+                        % info[1][0])
+
+    # Execute the main query to find all matching documents
     try:
         cursor.execute(qry)
         docList = cursor.fetchall()
     except cdrdb.Error, info:
         cdrcgi.bail("Failure retrieving document IDs: %s" % info[1][0])
 
+# Log what we're doing
 # Do we have any results?
-if len(docList) == 0:
+docCount = len(docList)
+if docCount == 0:
     cdrcgi.bail ("No documents found")
 
 # Compose the docList results into a format that cdr.publish() wants
@@ -486,6 +510,16 @@ if not result[0] or int(result[0]) < 0:
     cdrcgi.bail("Unable to initiate publishing job:<br>%s" % result[1])
 
 jobId = int(result[0])
+
+# Log what happened
+msgs = ["Started directory mailer job - id = %d" % jobId,
+        "                      Mailer type = %s" % mailType,
+        "          Number of docs selected = %d" % docCount]
+if docCount > 0:
+    msgs.append ("                        First doc = %s" % idVer[0])
+if docCount > 1:
+    msgs.append ("                       Second doc = %s" % idVer[1])
+cdr.logwrite (msgs, cdrmailcommon.LOGFILE)
 
 # Tell user how to get status
 header = cdrcgi.header(title, title, section, None, [])
