@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditExternMap.py,v 1.3 2003-12-31 18:35:43 bkline Exp $
+# $Id: EditExternMap.py,v 1.4 2004-08-10 15:38:19 bkline Exp $
 #
 # Allows a user to edit the table which maps strings from external
 # systems (such as ClinicalTrials.gov) to CDR document IDs.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2003/12/31 18:35:43  bkline
+# Changed type of button form widget to 'button'.
+#
 # Revision 1.2  2003/12/19 20:40:18  bkline
 # Added ability to get mapping values by mapped document ID.
 #
@@ -87,13 +90,39 @@ def extractInt(str):
         return None
     return int(digits)
 
+
+def allowed(key):
+    cursor.execute("""\
+    SELECT a.name, u.name
+      FROM action a
+      JOIN external_map_usage u
+        ON u.auth_action = a.id
+      JOIN external_map m
+        ON m.usage = u.id
+     WHERE m.id = ?""", key)
+    rows = cursor.fetchall()
+    if not rows:
+        errors.append("Failure looking up row %s in external_map table" % key)
+        return False
+    actionName, usageName = rows[0]
+    if actionName not in allowed.actions:
+        allowed.actions[actionName] = cdr.canDo(session, actionName)
+    if allowed.actions[actionName]:
+        return True
+    if usageName not in allowed.usageErrors:
+        allowed.usageErrors[usageName] = 1
+        errors.append("User %s not authorized "
+                      "to edit %s mappings" % (uName,
+                                               usageName))
+    return False
+allowed.actions = {}
+allowed.usageErrors = {}
+    
 #----------------------------------------------------------------------
 # Save changes to the current record if appropriate.
 #----------------------------------------------------------------------
 form = ""
 if request == "Save Changes":
-    if not cdr.canDo(session, "EDIT EXTERNAL MAP"):
-        cdrcgi.bail("User not authorized to make changes to this data.")
     cursor.execute("""\
     SELECT u.id, u.name
       FROM session s
@@ -125,7 +154,7 @@ if request == "Save Changes":
     errors = []
     for key in pairs:
         pair = pairs[key]
-        if pair[0] != pair[1]:
+        if pair[0] != pair[1] and allowed(key):
             try:
                 cursor.execute("""\
                 UPDATE external_map
