@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolReports.py,v 1.5 2003-01-29 18:46:25 bkline Exp $
+# $Id: ProtocolReports.py,v 1.6 2003-03-04 22:46:58 bkline Exp $
 #
 # Submenu for protocol reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2003/01/29 18:46:25  bkline
+# New report on protocols with status change entered in a given date range.
+#
 # Revision 1.4  2003/01/22 23:28:30  bkline
 # New report for issue #560.
 #
@@ -52,23 +55,9 @@ if action == "Log Out":
 form = """\
     <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
     <H3>QC Reports</H3>
-    [Note that most of these are stubbed because they were
-     originally intended to be invoked directly from XMetaL
-     for the currently open document, so we still need to
-     implement a page for specifying which document the
-     QC report is to be launched for.
-     The Advanced Protocol Search form uses the Health
-     Professional Protocol QC Report, so that choice below
-     works now.
     <OL>
 """ % (cdrcgi.SESSION, session)
-reports = [
-           ('Stub.py', 'Administrative Protocol QC Report'),
-           ('Stub.py', 'Full Protocol QC Report'),
-           ('ProtSearch.py', 'Health Professional Protocol QC Report'),
-           ('Stub.py', 'Patient Protocol QC Report'),
-           ('Stub.py', 'Protocol Citation QC Report')
-          ]
+reports = [('ProtSearch.py', 'Protocol QC Reports')]
 for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI>\n" % (
             cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])

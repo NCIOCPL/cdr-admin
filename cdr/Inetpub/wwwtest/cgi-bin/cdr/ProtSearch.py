@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtSearch.py,v 1.8 2002-07-11 20:50:18 bkline Exp $
+# $Id: ProtSearch.py,v 1.9 2003-03-04 22:46:58 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Protocol documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.8  2002/07/11 20:50:18  bkline
+# Caught up with changed filter title.
+#
 # Revision 1.7  2002/05/30 17:06:41  bkline
 # Corrected CVS log comment for previous version.
 #
@@ -39,7 +42,7 @@ title     = fields and fields.getvalue("Title")            or None
 idNums    = fields and fields.getvalue("IdNums")           or None
 submit    = fields and fields.getvalue("SubmitButton")     or None
 help      = fields and fields.getvalue("HelpButton")       or None
-
+dispFmt   = fields and fields.getvalue("DispFormat")       or 'fu'
 if help: 
     cdrcgi.bail("Sorry, help for this interface has not yet been developed.")
 
@@ -52,11 +55,45 @@ except cdrdb.Error, info:
     cdrcgi.bail('Failure connecting to CDR: %s' % info[1][0])
 
 #----------------------------------------------------------------------
+# Accomodate multiple display formats.
+#----------------------------------------------------------------------
+class DisplayFormat:
+    def __init__(self, pos, display, filterSet):
+        self.pos       = pos
+        self.display   = display
+        self.filterSet = filterSet
+    def __cmp__(self, other):
+        return cmp(self.pos, other.pos)
+
+fmts = {}
+fmts['fu'] = DisplayFormat(1, 'Full',     'QC InScopeProtocol Full Set')
+fmts['ad'] = DisplayFormat(2, 'Admin',    'QC InScopeProtocol Admin Set')
+fmts['hp'] = DisplayFormat(3, 'HP',       'QC InScopeProtocol HP Set')
+fmts['pa'] = DisplayFormat(4, 'Patient',  'QC InScopeProtocol Patient Set')
+fmts['ci'] = DisplayFormat(5, 'Citation', 'QC InScopeProtocol Citation Set')
+
+def makeDispFormat(fieldName):
+    field = "<br>"
+    keys = fmts.keys()
+    keys.sort(lambda a,b: cmp(fmts[a], fmts[b]))
+    checked = " checked='1'"
+    for key in keys:
+        fmt = fmts[key]
+        field += """
+    <input type='radio' name='%s' value='%s'%s>
+     Protocol %s QC Report Format<br>
+""" % (fieldName, key, checked, fmt.display)
+        checked = ""
+    return field
+
+#----------------------------------------------------------------------
 # Display the search form.
 #----------------------------------------------------------------------
 if not submit:
     fields = (('Title',                        'Title'),
               ('Protocol ID Numbers',          'IdNums'))
+    extraField = ('<br>Display Format', makeDispFormat('DispFormat'))
+              #('Diaplay Format:',               'DispFormat', makeDispFormat))
     buttons = (('submit', 'SubmitButton', 'Search'),
                ('submit', 'HelpButton',   'Help'),
                ('reset',  'CancelButton', 'Clear'))
@@ -66,7 +103,8 @@ if not submit:
                                           fields,
                                           buttons,
                                           'Protocol',
-                                          conn)
+                                          conn,
+                                          extraField = extraField)
     page += """\
   </FORM>
  </BODY>
@@ -120,9 +158,7 @@ except cdrdb.Error, info:
 # Create the results page.
 #----------------------------------------------------------------------
 html = cdrcgi.advancedSearchResultsPage("Protocol", rows, strings, 
-    {'InScopeProtocol':'name:Denormalization Filter (1/1): InScope Protocol'
-     '&Filter1=name:XML for Professional Protocol QC Report'
-     '&Filter2=name:Health Professional InScope Protocol Content QC Report',
+    {'InScopeProtocol':'set:%s' % fmts[dispFmt].filterSet,
      'OutOfScopeProtocol':'name:Health Professional QC Content Report',
      'ScientificProtocolInfo':'name:Health Professional QC Content Report'})
 
