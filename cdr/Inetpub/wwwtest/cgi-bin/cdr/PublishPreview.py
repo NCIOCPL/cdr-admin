@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: PublishPreview.py,v 1.11 2002-05-30 17:06:41 bkline Exp $
+# $Id: PublishPreview.py,v 1.12 2002-08-29 12:32:08 bkline Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.11  2002/05/30 17:06:41  bkline
+# Corrected CVS log comment for previous version.
+#
 # Revision 1.10  2002/05/30 17:01:06  bkline
 # New protocol filters from Cheryl.
 #
@@ -37,7 +40,7 @@
 # Initial revision
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, cdrdb, re
+import cgi, cdr, cdrcgi, cdrdb, re, cdr2cg
 
 #----------------------------------------------------------------------
 # Get the parameters from the request.
@@ -46,6 +49,7 @@ title   = "CDR Publish Preview"
 fields  = cgi.FieldStorage() or cdrcgi.bail("No Request Found", title)
 session = cdrcgi.getSession(fields) or cdrcgi.bail("Not logged in")
 docId   = fields.getvalue(cdrcgi.DOCID) or cdrcgi.bail("No Document", title)
+flavor  = fields.getvalue("Flavor") or None
 
 #----------------------------------------------------------------------
 # Map for finding the filters for a given document type.
@@ -57,7 +61,7 @@ filters = {
          "name:Denormalization Filter (3/5): Summary",
          "name:Denormalization Filter (4/5): Summary",
          "name:Denormalization Filter (5/5): Summary",
-         "name:Health Professional Summary Report"],
+         "name:Vendor Filter: Summary"],
     'GlossaryTerm':         
         ["name:Glossary Term QC Report Filter"],
     'Citation':         
@@ -70,8 +74,7 @@ filters = {
          "name:Person QC Report Filter"],
     'InScopeProtocol':  
         ["name:Denormalization Filter (1/1): InScope Protocol",
-         "name:XML for Professional Protocol QC Report",
-         "name:Health Professional Protocol QC Content Report"],
+         "name:Vendor Filter: InScopeProtocol"],
     'Term':             
         ["name:Denormalization Filter (1/1): Terminology",
          "name:Terminology QC Report Filter"]
@@ -105,6 +108,11 @@ try:
 except cdrdb.Error, info:    
         cdrcgi.bail('Unable to find document type for %s: %s' % (docId, 
                                                                  info[1][0]))
+if not flavor:
+    if docType == "Summary": flavor = "summary"
+    elif docType == "InScopeProtocol": flavor = "protocol_hp"
+    else: cdrcgi.bail(
+        "Publish preview only available for Summary and Protocol documents")
 
 #----------------------------------------------------------------------
 # Filter the document.
@@ -114,11 +122,28 @@ if not filters.has_key(docType):
 doc = cdr.filterDoc(session, filters[docType], docId = docId)
 if type(doc) == type(()):
     doc = doc[0]
+pattern1 = re.compile("<\?xml[^?]+\?>", re.DOTALL)
+pattern2 = re.compile("<!DOCTYPE[^>]+>", re.DOTALL)
+doc = pattern1.sub("", doc)
+doc = pattern2.sub("", doc)
+#cdrcgi.bail("flavor=%s doc=%s" % (flavor, doc))
+try:
+    resp = cdr2cg.pubPreview(doc, flavor)
+except:
+    cdrcgi.bail("Preview formatting failure")
 
-doc = cdrcgi.decode(doc)
-doc = re.sub("@@DOCID@@", docId, doc)
+#doc = cdrcgi.decode(doc)
+#doc = re.sub("@@DOCID@@", docId, doc)
 
 #----------------------------------------------------------------------
-# Send it.
+# Show it.
 #----------------------------------------------------------------------
-cdrcgi.sendPage(doc)
+cdrcgi.sendPage("""\
+<html>
+ <head>
+  <title>Publish Preview for CDR%010d</title>
+ </head>
+ <body>
+  %s
+ </body>
+</html>""" % (intId, resp.xmlResult))
