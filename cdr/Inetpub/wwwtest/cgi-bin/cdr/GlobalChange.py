@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------
-# $Id: GlobalChange.py,v 1.19 2004-09-21 20:33:45 ameyer Exp $
+# $Id: GlobalChange.py,v 1.20 2004-09-22 00:16:16 ameyer Exp $
 #
 # Perform global changes on XML records in the database.
 #
@@ -14,6 +14,10 @@
 # present the next one - to the end.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.19  2004/09/21 20:33:45  ameyer
+# Added user interface to new ability to submit a change for test only,
+# writing output to files.
+#
 # Revision 1.18  2004/07/07 00:24:34  ameyer
 # Added session variables for document types - InScopeProtocol or CTGovProtocol.
 #
@@ -438,7 +442,6 @@ ssVars['email'] = email
 # Convert all session info to a sequence of batch job args
 args = []
 for var in ssVars.keys():
-    cdr.logwrite ("Converting arg: %s" % var, LF)
     args.append ((var, ssVars[var]))
 
 # Get user selected document ids from the will change report
