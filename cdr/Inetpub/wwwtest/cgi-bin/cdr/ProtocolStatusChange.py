@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolStatusChange.py,v 1.3 2003-03-19 19:46:10 bkline Exp $
+# $Id: ProtocolStatusChange.py,v 1.4 2003-11-05 14:49:54 bkline Exp $
 #
 # Protocol Status Change Report
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2003/03/19 19:46:10  bkline
+# Added new column for protocol status (enhancement request #647).
+#
 # Revision 1.2  2003/02/07 16:10:45  bkline
 # Fix and enhancement requested by Bugzilla #542: changed subset name
 # for Cancer.Gov publication to match Peter's new names; dropped rows
@@ -80,14 +83,15 @@ if not action:
 #----------------------------------------------------------------------
 class ProtLeadOrg:
     def __init__(self, protId, curStatus, entryDate, enteredBy, prevStatus,
-                 published, protStatus):
-        self.protId     = protId
-        self.curStatus  = curStatus
-        self.entryDate  = entryDate
-        self.enteredBy  = enteredBy
-        self.prevStatus = prevStatus
-        self.published  = published
-        self.protStatus = protStatus
+                 published, protStatus, activeStatus):
+        self.protId       = protId
+        self.curStatus    = curStatus
+        self.entryDate    = entryDate
+        self.enteredBy    = enteredBy
+        self.prevStatus   = prevStatus
+        self.published    = published
+        self.protStatus   = protStatus
+        self.activeStatus = activeStatus
 
 #----------------------------------------------------------------------
 # If this is a lead org which is in scope (that is, the entry date
@@ -95,7 +99,7 @@ class ProtLeadOrg:
 # by start and end) then return a ProtLeadOrg object for it.  Otherwise
 # return None.
 #----------------------------------------------------------------------
-def extractProtLeadOrg(node, start, end, published, protStatus):
+def extractProtLeadOrg(node, start, end, published, protStatus, activeStatus):
     protId     = None
     prevStatus = None
     curStatus  = None
@@ -130,16 +134,7 @@ def extractProtLeadOrg(node, start, end, published, protStatus):
                             prevStatus = s
     if curStatus and entryDate and entryDate >= start and entryDate <= end:
         return ProtLeadOrg(protId, curStatus, entryDate, enteredBy, prevStatus,
-                           published, protStatus)
-    """
-    cdrcgi.bail(
-"curStatus=%s protId=%s entryDate=%s by=%s prevStatus=%s start=%s end=%s" %
-    (str(curStatus),
-     str(entryDate),
-     str(protId),
-     str(enteredBy),
-     str(prevStatus), start, end))
-    """
+                           published, protStatus, activeStatus)
     return None
     
 #----------------------------------------------------------------------
@@ -182,7 +177,7 @@ try:
                     AND pp.status = 'Success'
                     AND ppd.failure IS NULL""")
     curs.execute("""
-          SELECT ip.id, ps.id, d.xml
+          SELECT ip.id, ps.id, d.xml, d.active_status
             FROM #interesting_protocols ip
             JOIN document d
               ON d.id = ip.id
@@ -190,7 +185,7 @@ try:
               ON ps.id = d.id""")
     row = curs.fetchone()
     while row:
-        id, pubId, doc = row
+        id, pubId, doc, activeStatus = row
         #cdrcgi.bail("id is %d" % id)
         published = pubId and "Y" or "N"
         try:
@@ -203,7 +198,7 @@ try:
             protStat = cdr.getTextContent(statElems[0])
         for elem in dom.getElementsByTagName("ProtocolLeadOrg"):
             protLeadOrg = extractProtLeadOrg(elem, start, end, published,
-                                             protStat)
+                                             protStat, activeStatus)
             if protLeadOrg:
                 #cdrcgi.bail("got one!")
                 key = (protLeadOrg.protId, id)
@@ -243,7 +238,8 @@ html = """\
     <th>Current Org Status</th>
     <th>Current Protocol Status</th>
     <th>Entry Date</th>
-    <th>Published</th>
+    <th>Any Pub?</th>
+    <th>LastV Pub?</th>
     <th>Entered By</th>
    </tr>
 """ % (today, start, end)
@@ -256,24 +252,38 @@ keys.sort()
 for key in keys:
     protLeadOrg = protLeadOrgs[key]
     if protLeadOrg.prevStatus:
+        docId = "CDR%d" % key[1]
+        vers = cdr.lastVersions('guest', docId)
+        if type(vers) in (type(''), type(u'')):
+            lastVPub = vers
+        elif vers[0] == -1:
+            lastVPub = 'N/A'
+        elif vers[0] == vers[1]:
+            lastVPub = 'Y'
+        else:
+            lastVPub = 'N'
+        if protLeadOrg.activeStatus != 'A':
+            lastVPub += ' (B)'
         html += """\
    <tr>
     <td valign='top'>%s</td>
-    <td valign='top'>CDR%010d</td>
     <td valign='top'>%s</td>
     <td valign='top'>%s</td>
     <td valign='top'>%s</td>
+    <td valign='top'>%s</td>
+    <td valign='top' align='center'>%s</td>
     <td valign='top' align='center'>%s</td>
     <td valign='top' align='center'>%s</td>
     <td valign='top'>%s</td>
    </tr>
 """ % (protLeadOrg.protId     or "&nbsp;",
-       key[1],
+       docId,
        protLeadOrg.prevStatus,
        protLeadOrg.curStatus  or "&nbsp;",
        protLeadOrg.protStatus or "&nbsp;",
        protLeadOrg.entryDate  or "&nbsp;",
        protLeadOrg.published,
+       lastVPub,
        protLeadOrg.enteredBy  or "&nbsp;")
 
 #----------------------------------------------------------------------
