@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditExternMap.py,v 1.4 2004-08-10 15:38:19 bkline Exp $
+# $Id: EditExternMap.py,v 1.5 2004-08-19 22:12:23 bkline Exp $
 #
 # Allows a user to edit the table which maps strings from external
 # systems (such as ClinicalTrials.gov) to CDR document IDs.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2004/08/10 15:38:19  bkline
+# Added support for separate permissions for different mapping types.
+#
 # Revision 1.3  2003/12/31 18:35:43  bkline
 # Changed type of button form widget to 'button'.
 #
@@ -141,20 +144,56 @@ if request == "Save Changes":
             val = extractInt(fields[field].value)
             if not pairs.has_key(key):
                 pairs[key] = [None, val]
-            else:
+            elif pairs[key] != "DELETE":
                 pairs[key][1] = val
         elif field.startswith("old-id"):
             key = extractInt(field)
             val = extractInt(fields[field].value)
             if not pairs.has_key(key):
                 pairs[key] = [val, None]
-            else:
+            elif pairs[key] != "DELETE":
                 pairs[key][0] = val
+        elif field.startswith("del-id"):
+            key = extractInt(field)
+            pairs[key] = "DELETE"
     numChanges = 0
+    numDeletions = 0
     errors = []
     for key in pairs:
         pair = pairs[key]
-        if pair[0] != pair[1] and allowed(key):
+        if pair == "DELETE" and allowed(key):
+            row = None
+            try:
+                cursor.execute("""\
+                SELECT u.name, m.value, m.doc_id
+                  FROM external_map_usage u
+                  JOIN external_map m
+                    ON m.usage = u.id
+                 WHERE m.id = ?""", key)
+                rows = cursor.fetchall()
+                if rows:
+                    row = rows[0]
+            except:
+                pass
+            if not row:
+                error = "failure looking up values for row %d" % key
+                cdr.logwrite(error, logFile)
+                errors.append(error)
+                continue
+            usageName, mapValue, docId = row
+            try:
+                cursor.execute("DELETE FROM external_map WHERE id = %d" % key)
+                conn.commit()
+                cdr.logwrite("row %d (usage=%s; value=%s; CdrDocId=%d) "
+                             "deleted by %s" % (key, usageName, mapValue,
+                                                docId, uName),
+                             logFile)
+                numDeletions += 1
+            except:
+                error = "Failure deleting row %d" % key
+                cdr.logwrite(error, logFile)
+                errors.append(error)
+        elif pair != "DELETE" and pair[0] != pair[1] and allowed(key):
             try:
                 cursor.execute("""\
                 UPDATE external_map
@@ -189,8 +228,10 @@ if request == "Save Changes":
                                                           question))
                 except:
                     cdrcgi.bail("Database failure looking up row %s" % key)
-    section += " (%d change%s saved)" % (numChanges,
-                                         numChanges != 1 and "s" or "")
+    section += " (%d change%s saved; %d row%s deleted)" % (numChanges,
+                                         numChanges != 1 and "s" or "",
+                                         numDeletions,
+                                         numDeletions != 1 and "s" or "")
     header  = cdrcgi.header(title, title, section, script, buttons,
                             stylesheet = style)
     for error in errors:
@@ -312,9 +353,10 @@ if request in ("Save Changes", "Get Values"):
     <td valign='top'>%s</a></td>
     <td valign='top'>%s</td>
     <td>%s</td>
+    <td><input type='checkbox' name='del-id-%d'>&nbsp;Delete mapping?</td>
     <input type='hidden' name='old-id-%d' value='%s'>
    </tr>
-""" % (value, docId, button, row[0], row[2] or "")
+""" % (value, docId, button, row[0], row[0], row[2] or "")
             row = cursor.fetchone()
         form += """\
   </table>
