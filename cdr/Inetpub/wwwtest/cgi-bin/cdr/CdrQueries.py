@@ -1,11 +1,14 @@
 #!/usr/bin/python
 #----------------------------------------------------------------------
 #
-# $Id: CdrQueries.py,v 1.1 2002-12-10 13:34:06 bkline Exp $
+# $Id: CdrQueries.py,v 1.2 2003-11-05 14:47:14 bkline Exp $
 #
 # Ad-hoc SQL query tool for CDR database.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2002/12/10 13:34:06  bkline
+# Add-hoc SQL query tool for CDR database.
+#
 #----------------------------------------------------------------------
 
 import CgiQuery, cdrdb
@@ -13,7 +16,7 @@ import CgiQuery, cdrdb
 class CdrQuery(CgiQuery.CgiQuery):
     def __init__(self):
         conn = cdrdb.connect('CdrGuest')
-        CgiQuery.CgiQuery.__init__(self, conn, "CDR", "CdrQueries.py")
+        CgiQuery.CgiQuery.__init__(self, conn, "CDR", "CdrQueries.py", 300)
 
 cdrQuery = CdrQuery()
 cdrQuery.run()
