@@ -1,11 +1,22 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtPublishedCitations.py,v 1.1 2005-04-11 21:05:44 venglisc Exp $
+# $Id: ProtPublishedCitations.py,v 1.2 2005-04-11 21:12:57 venglisc Exp $
 #
 # Report identifying previously published protocols that should be 
 # included in a hotfix.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2005/04/11 21:05:44  venglisc
+# Initial version of Protocol Published Citation Report.
+# The report displayes all citations linked to InScopeProtocols along with
+# the citations formatted output.
+# Due to the fact that the formatted output has to be displayed each
+# individual citation will have to be filtered -- a very time consuming
+# process.
+# The command is run from the command line
+#    $ python ProtPublishedCitations.py > filename.xls
+# (Bug 1612)
+#
 #
 #----------------------------------------------------------------------
 import cdr, cdrdb, pyXLWriter, sys, time, cdrcgi
@@ -195,7 +206,7 @@ cursor.execute("""\
 # has been published.
 # ---------------------------------------------------------------------
 cursor.execute("""\
-         SELECT top 10 t1.id, t1.protid, t1.ptitle, t1.otitle, t1.cit, t2.pmid
+         SELECT t1.id, t1.protid, t1.ptitle, t1.otitle, t1.cit, t2.pmid
            FROM #t1 t1
 LEFT OUTER JOIN #t2 t2
              ON t1.cit = t2.cit
