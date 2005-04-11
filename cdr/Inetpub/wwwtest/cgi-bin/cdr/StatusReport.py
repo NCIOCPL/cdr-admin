@@ -24,10 +24,7 @@ Content-type: text/html
 </html>""" % cgi.escape(msg)
     sys.exit(1)
 import sys, cgi, time
-## try:
-##     sys.path.append("/var/www/cgi-bin/cdr/lib")
-## except:
-##     bail("can't insert!")
+
 try:
     import MySQLdb
 except ImportError, err:
@@ -64,7 +61,7 @@ try:
     op = when == "future" and "=" or "<>"
     curs.execute("""\
           SELECT b.bug_id, a.realname, b.bug_severity, b.bug_status,
-                 b.component, b.creation_ts, b.short_desc, b.priority,
+                 b.component_id, b.creation_ts, b.short_desc, b.priority,
                  r.realname, b.resolution, q.realname, b.votes
             FROM bugs b
  LEFT OUTER JOIN profiles a
@@ -76,15 +73,19 @@ try:
            WHERE bug_status <> 'CLOSED'
              AND priority %s 'P5'
              AND resolution <> 'DUPLICATE'
+             AND (resolution <> 'WONTFIX' OR bug_status <> 'RESOLVED')
+             AND b.product_id = 1 -- 'CDR'
              /*
           AND a.userid = b.assigned_to
           AND r.userid = b.reporter
           AND q.userid = b.qa_contact */
-     ORDER BY b.priority, b.bug_id""" % op)
+     ORDER BY b.short_desc, b.bug_id""" % op)
 except:
-    bail("can't execute query!")
+    bail("Can't execute query!")
 try:
-    rows = curs.fetchall()
+    rows = list(curs.fetchall())
+    rows.sort(lambda a,b: cmp(a[6].replace("[", "\t"),
+                              b[6].replace("[", "\t")))
 except:
     bail("can't fetch rows!")
 print """\
@@ -117,9 +118,9 @@ def showComment(row):
    <pre>%s</pre><br>
   </span>
 """ % (when, name, cgi.escape(text))
-
+    
 for row in rows:
-    id, assignee, severity, status, component, created, short, priority, \
+    id, assignee, severity, status, component_id, created, short, priority, \
         reporter, resolution, qa, votes = row
     if resolution: status += "-%s" % resolution
     print """\
@@ -167,7 +168,10 @@ for row in rows:
     rows = curs.fetchall()
     if flavor == 'medium' and len(rows) > 2:
         showComment(rows[0])
-        showComment(rows[-1])
+        if rows[-1][2] == 'Put standard tag in front of issue summary line.':
+            showComment(rows[-2])
+        else:
+            showComment(rows[-1])
     else:
         for row in rows:
             showComment(row)
