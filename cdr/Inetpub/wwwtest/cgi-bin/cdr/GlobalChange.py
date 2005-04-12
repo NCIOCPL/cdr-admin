@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------
-# $Id: GlobalChange.py,v 1.20 2004-09-22 00:16:16 ameyer Exp $
+# $Id: GlobalChange.py,v 1.21 2005-04-12 16:05:21 ameyer Exp $
 #
 # Perform global changes on XML records in the database.
 #
@@ -14,6 +14,9 @@
 # present the next one - to the end.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.20  2004/09/22 00:16:16  ameyer
+# Removed a debugging logwrite that used a lot of space in the log.
+#
 # Revision 1.19  2004/09/21 20:33:45  ameyer
 # Added user interface to new ability to submit a change for test only,
 # writing output to files.
@@ -220,10 +223,11 @@ for fd in ('docType', 'email', 'specificPhone', 'specificRole',
            'toId', 'toName', 'toTitle', 'toFragChk',
            'restrId', 'restrName', 'restrTitle', 'restrChk', 'restrFragChk',
            'restrPiId', 'restrPiName', 'restrPiTitle',
-                'restrPiChk', 'restrPiFragChk',
+                'restrPiChk', 'restrPiFragChk', 'statusName',
            'insertPersId', 'insertPersName', 'insertPersTitle',
                 'insertPersFragChk',
-           'insertOrgId', 'insertOrgName', 'insertOrgTitle',
+           'chgOrgId', 'chgOrgName', 'chgOrgTitle',
+           'delOrgId', 'delOrgName', 'delOrgTitle',
            'fromStatusName', 'toStatusName', 'trmStatusName',
            'trmReqField0', 'trmReqVal0', 'trmReqId0',
            'trmReqField1', 'trmReqVal1', 'trmReqId1',
@@ -293,6 +297,9 @@ if not chgType:
   Insert new organization link in protocols</input>
 </td></tr><tr><td>
 <input type='radio' name='chgType' value='%s'>
+  Delete participating organization from protocols</input>
+</td></tr><tr><td>
+<input type='radio' name='chgType' value='%s'>
   Modify terminology in protocols</input>
 </td></tr><tr><td>
 <input type='radio' name='chgType' value='%s'>
@@ -300,8 +307,8 @@ if not chgType:
 </td></tr>
 </table>
 """ % (cdrglblchg.PERSON_CHG, cdrglblchg.ORG_CHG,
-       cdrglblchg.INS_ORG_CHG, cdrglblchg.TERM_CHG,
-       cdrglblchg.STATUS_CHG)
+       cdrglblchg.INS_ORG_CHG, cdrglblchg.DEL_ORG_CHG,
+       cdrglblchg.TERM_CHG, cdrglblchg.STATUS_CHG)
 
     sendGlblChgPage (("Choose type of change to perform", html))
 
