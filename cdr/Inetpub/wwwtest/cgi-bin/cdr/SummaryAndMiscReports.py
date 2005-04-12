@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryAndMiscReports.py,v 1.17 2005-03-24 21:12:36 bkline Exp $
+# $Id: SummaryAndMiscReports.py,v 1.18 2005-04-12 19:21:09 venglisc Exp $
 #
 # Submenu for summary and miscellanous document reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.17  2005/03/24 21:12:36  bkline
+# Plugged in Changes to Summaries report.
+#
 # Revision 1.16  2005/02/16 19:12:35  venglisc
 # Replaced the Stub.py to run the BoardRoster report. (Bug 1537)
 #
@@ -107,9 +110,9 @@ reports = [
            ('QcReport.py?DocType=Summary&ReportType=rs&', 
             'Redline/Strikeout (HP/Old Patient)'),
            ('QcReport.py?DocType=Summary&ReportType=pat&', 
-            'New Patient')
-           # ('QcReport.py?DocType=Summary&ReportType=nm&', 
-           #  'No Markup QC Report')
+            'New Patient'),
+           ('QcReport.py?DocType=Summary&ReportType=pp&', 
+            'Publish Preview')
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s%s=%s'>%s</A></LI>\n" % (
