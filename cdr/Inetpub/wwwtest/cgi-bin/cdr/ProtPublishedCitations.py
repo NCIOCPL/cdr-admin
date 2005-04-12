@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtPublishedCitations.py,v 1.2 2005-04-11 21:12:57 venglisc Exp $
+# $Id: ProtPublishedCitations.py,v 1.3 2005-04-12 19:06:51 venglisc Exp $
 #
 # Report identifying previously published protocols that should be 
 # included in a hotfix.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2005/04/11 21:12:57  venglisc
+# Forgot to remove the limitation to only create output for 10 citations.
+#
 # Revision 1.1  2005/04/11 21:05:44  venglisc
 # Initial version of Protocol Published Citation Report.
 # The report displayes all citations linked to InScopeProtocols along with
@@ -21,8 +24,14 @@
 #----------------------------------------------------------------------
 import cdr, cdrdb, pyXLWriter, sys, time, cdrcgi
 
+# ---------------------------------------
+# Function to create a worksheet
+# ---------------------------------------
 def addWorksheet(workbook, title, headers, widths, headerFormat, rows):
     worksheet = workbook.add_worksheet(title)
+
+    # Setting the worksteet format
+    # ----------------------------
     worksheet.set_landscape()
     worksheet.set_margin_top(0.50)
     worksheet.set_margins_LR(0.25)
@@ -30,12 +39,38 @@ def addWorksheet(workbook, title, headers, widths, headerFormat, rows):
     worksheet.set_header('&RPage &P of &N', 0.25)
     worksheet.repeat_rows(3)
     worksheet.center_horizontally
+    
     worksheet.write([1, 3], 'Protocol Published Citation Report',
                     workbook.add_format(bold=1))
+
+    # Setting the format for the individual columns
+    # Note: The set_column only effects the formatting after the 
+    #       worksheet is written.
+    # ---------------------------------------------
+    defaultFormat = workbook.add_format(align='top',
+                                        size=8)
+    textFormat    = workbook.add_format(align='top',
+                                        size=8,
+                                        text_wrap=1 )
+    urlFormat     = workbook.add_format(align='top',
+                                        size=8,
+                                        color='blue',
+                                        underline=1)
+
+    # Create the header column and set the width of each column
+    # ---------------------------------------------------------
     for col in range(len(headers)):
         worksheet.set_column(col, widths[col])
         worksheet.write([3, col], headers[col], headerFormat)
 
+        # Set the format for the entire column for the two existint emtpy columns
+        # -----------------------------------------------------------------------
+        if col == 7 or col == 8:
+            worksheet.set_column(col, widths[col], defaultFormat)
+
+
+    # Populate the spreadsheet row by row beginning after the header row
+    # ------------------------------------------------------------------
     r = 4
     for row in rows:
         c = 0
@@ -44,32 +79,27 @@ def addWorksheet(workbook, title, headers, widths, headerFormat, rows):
                 col = `col`
             elif type(col) == type(u""):
                 col = col.encode('latin-1', 'replace')
-            if 0 and c == 2:
-                worksheet.write([r, c], col, datefmt)
-            elif c == 5:
+
+            #if 0 and c == 2:
+            #    worksheet.write([r, c], col, datefmt)
+            if c == 5:
                 if row[5] != None:
                     url = ("http://www.ncbi.nlm.nih.gov/entrez/query.fcgi"
                            "?cmd=Retrieve&amp;db=pubmed&amp;dopt=Abstract" 
                            "&amp;list_uids=%s" % (row[5]))
-                    worksheet.write_url([r, c], url, col,
-                                    workbook.add_format(align='top',
-                                                        size=8, 
-                                                        color='blue',
-                                                        underline=1))
+                    worksheet.write_url([r, c], url, col, urlFormat)
                 else:
-                    worksheet.write([r, c], col,
-                                    workbook.add_format(align='top',
-                                                        size=8))
+                    worksheet.write([r, c], col, defaultFormat)
             else:
-                worksheet.write([r, c], col, 
-                                workbook.add_format(align='top', 
-                                                    text_wrap=1,
-                                                    size=8))
+                worksheet.write([r, c], col, textFormat)
             c += 1
         #worksheet.write([r, c], url)
         r += 1
     #sys.stderr.write("Created worksheet %s\n" % title)
 
+# --------------------------------------------------------------------------
+# Main
+# --------------------------------------------------------------------------
 if sys.platform == "win32":
     import os, msvcrt
     msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
@@ -206,7 +236,7 @@ cursor.execute("""\
 # has been published.
 # ---------------------------------------------------------------------
 cursor.execute("""\
-         SELECT t1.id, t1.protid, t1.ptitle, t1.otitle, t1.cit, t2.pmid
+         SELECT top 10 t1.id, t1.protid, t1.ptitle, t1.otitle, t1.cit, t2.pmid
            FROM #t1 t1
 LEFT OUTER JOIN #t2 t2
              ON t1.cit = t2.cit
@@ -260,7 +290,7 @@ colheaders = ['DocID',    'Protocol IDs',
            'HP Title', 'Original Title', 
            'CID', 'PMID', 
            'Formatted Citation', 'Kp/Rm', 'Comment']
-widths  = (5, 15, 25, 25, 7, 8, 25, 5, 15)
+widths  = (6, 15, 25, 25, 6, 8, 25, 6, 14)
 addWorksheet(workbook, titles[0], colheaders, widths, format, rows)
 
 workbook.close()
