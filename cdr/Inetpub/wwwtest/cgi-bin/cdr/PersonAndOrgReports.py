@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: PersonAndOrgReports.py,v 1.11 2004-11-03 20:14:37 venglisc Exp $
+# $Id: PersonAndOrgReports.py,v 1.12 2005-04-13 20:13:25 venglisc Exp $
 #
 # Submenu for person and organization reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.11  2004/11/03 20:14:37  venglisc
+# Added Organization Affiliations report ad Organization Acronym report as
+# new menu items. (Bug 1378, 1380)
+#
 # Revision 1.10  2004/10/28 18:59:07  venglisc
 # Added Organization Protocol Acronym menu option.
 #
@@ -92,12 +96,14 @@ reports = [
             'Inactive Persons/Organizations Linked to Protocols'),
            ('CCOPOrgReport.py',
             'NCI Funded CCOP/MBCCOP Organization Report'),
-	   ('OrgAffiliations.py',
-	    'Organization Affiliations Report'),
+           ('MemberOfAdhocGroup.py',
+            'Member Of Adhoc Group Report'),
+	       ('OrgAffiliations.py',
+	        'Organization Affiliations Report'),
            ('OrgProtocolReview.py', 
             'Organization Protocol Review'),
-	   ('OrgProtocolAcronym.py',
-	    'Organizations Protocol Acronym Report'),
+	       ('OrgProtocolAcronym.py',
+	        'Organizations Protocol Acronym Report'),
            ('PersonProtocolReview.py', 
             'Person Protocol Review'),
            ('PersonsAtOrg.py', 
