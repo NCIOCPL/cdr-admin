@@ -1,10 +1,16 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolReports.py,v 1.14 2005-03-16 17:20:11 venglisc Exp $
+# $Id: ProtocolReports.py,v 1.15 2005-04-21 21:27:25 venglisc Exp $
 #
 # Submenu for protocol reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.14  2005/03/16 17:20:11  venglisc
+# Corrected some problems in the queries to eliminate incorrect hits.
+# Added another worksheet to include new CTGovProtocols.
+# Modified the output file from HotFixReport to InterimUpdateReport.
+# Added the prtocol type to the list of removed protocols. (Bugs 1396, 1538)
+#
 # Revision 1.13  2004/09/17 14:06:50  venglisc
 # Fixed list items to properly teminate the anker link.
 #
@@ -84,7 +90,9 @@ form = """\
 reports = [('ProtSearch.py?', 
             'Protocol QC Reports'),
            ('QcReport.py?DocType=InScopeProtocol&ReportType=pp&',   
-            'Publish Preview')]
+            'Publish Preview - InScopeProtocol'),
+           ('QcReport.py?DocType=CTGovProtocol&ReportType=pp&',   
+            'Publish Preview - CTGovProtocol')]
 for r in reports:
     form += "<LI><A HREF='%s/%s%s=%s'>%s</LI></A>\n" % (
             cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
