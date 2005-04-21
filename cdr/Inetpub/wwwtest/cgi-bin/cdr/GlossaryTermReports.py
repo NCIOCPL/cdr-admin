@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermReports.py,v 1.6 2004-11-27 00:01:52 bkline Exp $
+# $Id: GlossaryTermReports.py,v 1.7 2005-04-21 21:31:35 venglisc Exp $
 #
 # Submenu for glossary term reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2004/11/27 00:01:52  bkline
+# Menu rearranged at Margaret's request (#1447).
+#
 # Revision 1.5  2004/10/07 21:39:33  bkline
 # Added new report for Sheri, for finding glossary terms created in a
 # given date range, and having specified status.
@@ -59,10 +62,13 @@ form = """\
     <OL>
 """ % (cdrcgi.SESSION, session)
 reports = [
-           ('GlossaryTermSearch.py', 'Glossary Term QC Report'),
+           ('GlossaryTermSearch.py?', 
+            'Glossary Term QC Report'),
+           ('QcReport.py?DocType=GlossaryTerm&ReportType=pp&', 
+            'Publish Preview'),
           ]
 for r in reports:
-    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI></A>\n" % (
+    form += "<LI><A HREF='%s/%s%s=%s'>%s</LI></A>\n" % (
             cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
 
 form += """\
