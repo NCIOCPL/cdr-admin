@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: MailerCheckinReport.py,v 1.2 2003-05-08 20:22:07 bkline Exp $
+# $Id: MailerCheckinReport.py,v 1.3 2005-04-21 21:37:28 bkline Exp $
 #
 # Generates report on mailers for which reponses have been recorded
 # during a specified date range.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2003/05/08 20:22:07  bkline
+# Style cleanup; added sort of report rows.
+#
 # Revision 1.1  2002/04/25 02:58:53  bkline
 # New report for mailer checkin.
 #
@@ -67,7 +70,7 @@ def getMailerTypes():
             SELECT DISTINCT value
                        FROM query_term
                       WHERE path = '/Mailer/Type'
-                   ORDER BY value""")
+                   ORDER BY value""", timeout = 300)
         for row in cursor.fetchall():
             types.append(row[0])
     except cdrdb.Error, info:
@@ -148,6 +151,20 @@ try:
     typeQual = mailerType and ("AND t.value = '%s'" % mailerType) or ""
     cursor.execute("""\
             SELECT t.value,
+                   COUNT(DISTINCT t.doc_id)
+              FROM query_term t
+              JOIN query_term i
+                ON i.doc_id = t.doc_id
+             WHERE i.value BETWEEN ? AND ?
+               AND i.path = '/Mailer/Response/Received'
+               AND t.path = '/Mailer/Type'
+               %s
+          GROUP BY t.value""" % typeQual, (fromDate, toDate))
+    totals = {}
+    for mailerType, total in cursor.fetchall():
+        totals[mailerType] = total
+    cursor.execute("""\
+            SELECT t.value,
                    c.value,
                    COUNT(*)
               FROM query_term t
@@ -163,7 +180,6 @@ try:
           GROUP BY t.value, c.value
           ORDER BY t.value, c.value""" % typeQual, (fromDate, toDate))
     lastMailerType = None
-    accumulator    = 0
     row            = cursor.fetchone()
     if not row:
         cdrcgi.sendPage(html + """\
@@ -173,12 +189,7 @@ try:
  </body>
 </html>
 """)
-    while row:
-        mailerType, changeCategory, count = row
-        if mailerType != lastMailerType:
-            lastMailerType = mailerType
-            if not accumulator:
-                html += """\
+    html += """\
   <table border='1' cellspacing='0' cellpadding='2' width='100%%'>
    <tr>
     <th nowrap='1'>Mailer Type</th>
@@ -186,7 +197,13 @@ try:
     <th nowrap='1'>Count</th>
    </tr>
 """
-            else:
+    mailerTypeLabel = "&nbsp;"
+    while row:
+        mailerType, changeCategory, count = row
+        if mailerType != lastMailerType:
+            mailerTypeLabel = mailerType
+            if lastMailerType:
+                total = totals.get(lastMailerType, 0)
                 html += """\
    <tr>
     <th class='r'>Total</td>
@@ -196,28 +213,29 @@ try:
    <tr>
     <td colspan='3'>&nbsp;</td>
    </tr>
-""" % accumulator
-            accumulator = 0
+""" % total
+            lastMailerType = mailerType
         html += """\
    <tr>
     <th>%s</td>
     <td>%s</td>
     <td class='r'>%d</td>
    </tr>
-""" % (accumulator == 0 and mailerType or "&nbsp;", changeCategory, count)
-        accumulator += count
+""" % (mailerTypeLabel, changeCategory, count)
+        mailerTypeLabel = "&nbsp;"
         row = cursor.fetchone()
 except cdrdb.Error, info:
     cdrcgi.bail('Failure executing query: %s' % info[1][0])
 
-if accumulator:
+if lastMailerType:
+    total = totals.get(lastMailerType, 0)
     html += """\
    <tr>
     <th class='r'>Total</td>
     <td>&nbsp;</td>
     <th class='r'>%d</td>
    </tr>
-""" % accumulator
+""" % total
 
 cdrcgi.sendPage(html + """\
   </table>
