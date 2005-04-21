@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: PublishPreview.py,v 1.25 2005-02-15 13:07:13 bkline Exp $
+# $Id: PublishPreview.py,v 1.26 2005-04-21 21:30:06 venglisc Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.25  2005/02/15 13:07:13  bkline
+# Added ability to override default for host from which to pull the
+# stylesheet.
+#
 # Revision 1.24  2004/12/28 16:20:55  bkline
 # Added cgHost parameter.
 #
@@ -125,9 +129,10 @@ showProgress("Started...")
 # Map for finding the filters for a given document type.
 #----------------------------------------------------------------------
 filterSets = {
-    'Summary'        : ['set:Vendor Summary Set'],
+    'CTGovProtocol'  : ['set:Vendor CTGovProtocol Set'],
+    'GlossaryTerm'   : ['set:Vendor GlossaryTerm Set'], 
     'InScopeProtocol': ['set:Vendor InScopeProtocol Set'],
-    'CTGovProtocol'  : ['set:Vendor CTGovProtocol Set']
+    'Summary'        : ['set:Vendor Summary Set']
 }
 
 #----------------------------------------------------------------------
@@ -167,11 +172,12 @@ except cdrdb.Error, info:
 showProgress("Fetched document type: %s..." % row[0])
 showProgress("Fetched latest version number: %d..." % row[1])
 if not flavor:
-    if docType == "Summary": flavor = "summary"
+    if docType == "Summary":           flavor = "summary"
     elif docType == "InScopeProtocol": flavor = "protocol_hp"
-    elif docType == "CTGovProtocol": flavor = "CTGovProtocol_HP"
+    elif docType == "CTGovProtocol":   flavor = "CTGovProtocol_HP"
+    elif docType == "GlossaryTerm":    flavor = "glossary"
     else: cdrcgi.bail("Publish preview only available for "
-                      "Summary and Protocol documents")
+                      "Summary, GlossaryTerm and Protocol documents")
 showProgress("Using flavor: %s..." % flavor)
 
 #----------------------------------------------------------------------
@@ -210,7 +216,7 @@ showProgress("Done...")
 cdrcgi.sendPage("""\
 <html>
  <head>
-  <title>Publish Preview for CDR%010d</title>
+  <title>Publish Preview for CDR%d</title>
   <link rel='stylesheet'
         href='http://%s/stylesheets/nci.css'
         type='text/css'>
