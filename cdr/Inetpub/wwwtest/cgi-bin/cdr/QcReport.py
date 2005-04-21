@@ -1,11 +1,16 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.43 2005-02-24 21:06:55 venglisc Exp $
+# $Id: QcReport.py,v 1.44 2005-04-21 21:24:37 venglisc Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.43  2005/02/24 21:06:55  venglisc
+# Added coded to replace @@SESSION@@ string with the session id.  This
+# allows to create a link in the Person QC documents to the Organization QC
+# report or a particular org. (Bug 1545)
+#
 # Revision 1.42  2005/02/23 20:00:35  venglisc
 # Made changes to replace two @@..@@ strings with results from database
 # queries for the Organization QC report. (Bug 1516)
@@ -368,7 +373,6 @@ if docType == 'Summary' and repType and repType != 'pp' and not version:
   <INPUT TYPE='checkbox' NAME='DisplayCommentElements' CHECKED='1'>&nbsp;&nbsp;
   Display Comments?
 """
-#if repType == "pat":
     form += """\
   <BR><BR>
   <INPUT TYPE='checkbox' NAME='Glossary'>&nbsp;&nbsp;
@@ -852,8 +856,9 @@ SELECT completed
 # script.
 # --------------------------------------------------------------------
 if repType == "pp":
-    cmd = "python d:\\Inetpub\\wwwroot\\cgi-bin\\cdr\\PublishPreview.py %s summary" % docId
-    result = cdr.runCommand(cmd)
+    cdrcgi.navigateTo("PublishPreview.py", session, ReportType='pp',
+                                                    DocId=docId)
+
     cdrcgi.sendPage(result.output)
 
 #----------------------------------------------------------------------
