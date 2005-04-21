@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
 #
-# $Id: BoardManagers.py,v 1.10 2005-02-23 14:38:01 bkline Exp $
+# $Id: BoardManagers.py,v 1.11 2005-04-21 21:26:11 venglisc Exp $
 #
 # Main menu for board managers.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.10  2005/02/23 14:38:01  bkline
+# Added link to board member mailer page.
+#
 # Revision 1.9  2004/09/09 19:19:44  venglisc
 # Minor changes to menu entries to have menu items match between the
 # CIAT and CIPS summary menu. (Bug 1329).
@@ -83,7 +86,8 @@ form += """\
 for choice in (
     ('bu',  'Bold/Underline (HP/Old Patient)'   ),
     ('rs',  'Redline/Strikeout (HP/Old Patient)'),
-    ('pat', 'New Patient'                       )
+    ('pat', 'New Patient'                       ),
+    ('pp',  'Publish Preview'                   )
     ):
     form += """\
     <LI><a href='%s/QcReport.py?DocType=Summary&ReportType=%s&%s'>%s</a></LI>
