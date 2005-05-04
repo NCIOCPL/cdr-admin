@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GeneralReports.py,v 1.12 2004-11-12 15:57:02 venglisc Exp $
+# $Id: GeneralReports.py,v 1.13 2005-05-04 19:19:53 bkline Exp $
 #
 # Submenu for general reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.12  2004/11/12 15:57:02  venglisc
+# Added External Map Failures Report menu option. (Bug 1417)
+#
 # Revision 1.11  2004/11/04 21:40:45  venglisc
 # Added menu option for access to Global Change Diff reports (Bug 1373).
 #
@@ -91,6 +94,8 @@ reports = [
             'Document Activity Report'),
            ('DocVersionHistory.py', 
             'Document Version History'),
+           ('DocumentsModified.py', 
+            'Documents Modified'),
            ('ExternMapFailures.py', 
             'External Map Failures Report'),
            ('ShowGlobalChangeTestResults.py',
