@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: Reports.py,v 1.20 2004-09-20 20:31:11 venglisc Exp $
+# $Id: Reports.py,v 1.21 2005-05-04 18:11:33 venglisc Exp $
 #
 # Prototype for editing CDR linking tables.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.20  2004/09/20 20:31:11  venglisc
+# Added CdrDocumentation.py menu item for PDF formatted CDR documentation.
+# (Bug 1338).
+#
 # Revision 1.19  2003/02/13 23:03:01  pzhang
 # Added Publishling item.
 #
@@ -96,10 +100,11 @@ form = "<INPUT TYPE='hidden' NAME='%s' VALUE='%s'><OL>\n" % (cdrcgi.SESSION,
 reports = [
            ('GeneralReports.py',      'General Reports'),
            ('CitationReports.py',     'Citations'),
-	   ('CdrDocumentation.py',    'Documentation (as of 2004-09-08)'),
+           ('CdrDocumentation.py',    'Documentation (as of 2004-09-08)'),
            ('GeographicReports.py',   'Geographic'),
            ('GlossaryTermReports.py', 'Glossary Terms'),
            ('MailerReports.py',       'Mailers'),
+           ('MediaReports.py',        'Media'),
            ('PubStatus.py',           'Publishing'),
            ('PersonAndOrgReports.py', 'Persons and Organizations'),
            ('ProtocolReports.py',     'Protocols'),
