@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.44 2005-04-21 21:24:37 venglisc Exp $
+# $Id: QcReport.py,v 1.45 2005-05-04 18:04:06 venglisc Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.44  2005/04/21 21:24:37  venglisc
+# Modifications to allow PublishPreview QC reports. (Bug 1531)
+#
 # Revision 1.43  2005/02/24 21:06:55  venglisc
 # Added coded to replace @@SESSION@@ string with the session id.  This
 # allows to create a link in the Person QC documents to the Organization QC
@@ -184,6 +187,8 @@ def getSectionTitle(repType):
         return "Patient QC Report"
     elif repType == "pp":
         return "Publish Preview Report"
+    elif repType == "img":
+        return "Media QC Report"
     else:
         return "QC Report (Unrecognized Type)"
 
@@ -422,6 +427,8 @@ filters = {
         ["set:QC InScopeProtocol Set"],
     'Term':             
         ["set:QC Term Set"],
+    'Media:img':
+        ["set:QC Media Set"],
     'MiscellaneousDocument':
         ["set:QC MiscellaneousDocument Set"],
     'CTGovProtocol':
@@ -867,6 +874,7 @@ if repType == "pp":
 if repType: docType += ":%s" % repType
 if version == "-1": version = None
 if not filters.has_key(docType):
+    # cdrcgi.bail(filters)
     doc = cdr.getDoc(session, docId, version = version or "Current",
                      getObject = 1)
     if type(doc) in (type(""), type(u"")):
