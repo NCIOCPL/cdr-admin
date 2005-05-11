@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolReports.py,v 1.15 2005-04-21 21:27:25 venglisc Exp $
+# $Id: ProtocolReports.py,v 1.16 2005-05-11 20:57:24 bkline Exp $
 #
 # Submenu for protocol reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.15  2005/04/21 21:27:25  venglisc
+# Added menu option to allow Publish Preview QC report. (Bug 1531)
+#
 # Revision 1.14  2005/03/16 17:20:11  venglisc
 # Corrected some problems in the queries to eliminate incorrect hits.
 # Added another worksheet to include new CTGovProtocols.
@@ -123,6 +126,7 @@ reports = [
             'Protocols with Active Lead Orgs But No Active Sites', ''),
            ('OSPReport.py',
             'Report for Office of Science Policy', ''),
+           ('RssImportReport.py', 'RSS Import/Update Statistics Report, '')
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s%s'>%s</LI></A>\n" % (
