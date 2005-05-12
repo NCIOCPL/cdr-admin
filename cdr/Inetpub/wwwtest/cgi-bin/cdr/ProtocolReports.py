@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolReports.py,v 1.16 2005-05-11 20:57:24 bkline Exp $
+# $Id: ProtocolReports.py,v 1.17 2005-05-12 14:49:38 bkline Exp $
 #
 # Submenu for protocol reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.16  2005/05/11 20:57:24  bkline
+# Report created for Sheri (request #1669).
+#
 # Revision 1.15  2005/04/21 21:27:25  venglisc
 # Added menu option to allow Publish Preview QC report. (Bug 1531)
 #
@@ -126,7 +129,8 @@ reports = [
             'Protocols with Active Lead Orgs But No Active Sites', ''),
            ('OSPReport.py',
             'Report for Office of Science Policy', ''),
-           ('RssImportReport.py', 'RSS Import/Update Statistics Report, '')
+           ('RssImportReport.py', 'RSS Import/Update Statistics Report', ''),
+           ('RssDocsNoSites.py', 'RSS Imports With No External Sites', '')
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s%s'>%s</LI></A>\n" % (
