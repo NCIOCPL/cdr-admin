@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: BoardMemberMailerReqForm.py,v 1.5 2005-05-13 21:09:35 venglisc Exp $
+# $Id: BoardMemberMailerReqForm.py,v 1.6 2005-05-13 22:47:10 venglisc Exp $
 #
 # Request form for generating RTF letters to board members.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2005/05/13 21:09:35  venglisc
+# Modified to prepopulate the email input field with the email address
+# from the CDR login session. (Bug 1664)
+#
 # Revision 1.4  2005/03/17 20:17:48  bkline
 # Fixed typo (prosective for prospective).
 #
@@ -338,32 +342,6 @@ def makeBoardObjects():
    };"""
         
 #----------------------------------------------------------------------
-# Select the email address for the user.  
-# Input is the session ID.
-# Output is the email address.
-#----------------------------------------------------------------------
-def getEmail(id):
-    query = """\
-    SELECT u.email
-      FROM session s
-      JOIN usr u
-        ON u.id   = s.usr
-     WHERE s.name = '%s'
-       AND ended   IS NULL
-       AND expired IS NULL""" % id
-
-    cursor.execute(query)
-    rows = cursor.fetchall()
-
-    if len(rows) < 1:
-       cdrcgi.bail("ERROR: User not authorized to run this report!")
-    elif len(rows) > 1:
-       cdrcgi.bail("ERROR: User session not unique!")
-    else:
-       return rows[0][0]
-
-
-#----------------------------------------------------------------------
 # Put up the form if we don't have a request yet.
 #----------------------------------------------------------------------
 header = cdrcgi.header(title, title, section, script, buttons,
@@ -519,6 +497,6 @@ form = """\
   </form>
  </body>
 </html>
-""" % (makeBoardList(boards), boardError, letterError, getEmail(session),
+""" % (makeBoardList(boards), boardError, letterError, cdr.getEmail(session),
        cdrcgi.SESSION, session)
 cdrcgi.sendPage(header + form)
