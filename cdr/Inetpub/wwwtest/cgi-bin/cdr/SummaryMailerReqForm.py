@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryMailerReqForm.py,v 1.5 2002-11-13 20:35:25 bkline Exp $
+# $Id: SummaryMailerReqForm.py,v 1.6 2005-05-13 22:41:04 venglisc Exp $
 #
 # Request form for generating PDQ Editorial Board Members Mailing.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2002/11/13 20:35:25  bkline
+# Ready for user testing.
+#
 # Revision 1.4  2002/11/07 12:51:25  bkline
 # Fixed variable name (changed mailType to subset).
 #
@@ -258,10 +261,11 @@ form = """\
    <br><br><br>
    <h3>To receive email notification when mailer is complete, enter</h3>
    <b>Email address:&nbsp;</b>
-   <input name='Email' />
+   <input name='Email' value='%s'/>
    <br><br><br>
    <input type='Submit' name = 'Request' value = 'Submit'>
    <input type='hidden' name='%s' value='%s'>
   </form>
-""" % (section, boardType, makePicklist(conn), cdrcgi.SESSION, session)
+""" % (section, boardType, makePicklist(conn), cdr.getEmail(session), 
+       cdrcgi.SESSION, session)
 cdrcgi.sendPage(header + form + "</body></html>")

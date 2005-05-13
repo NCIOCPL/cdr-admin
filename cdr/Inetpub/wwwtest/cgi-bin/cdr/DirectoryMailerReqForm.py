@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: DirectoryMailerReqForm.py,v 1.18 2003-12-24 21:46:05 bkline Exp $
+# $Id: DirectoryMailerReqForm.py,v 1.19 2005-05-13 22:40:37 venglisc Exp $
 #
 # Request form for all directory mailers.
 #
@@ -31,6 +31,11 @@
 # Bob Kline.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.18  2003/12/24 21:46:05  bkline
+# Implemented modifications to physician and organization annual update
+# mailer processing to smooth out the workflow throughout the year
+# (enhancement request #1016).
+#
 # Revision 1.17  2003/05/12 15:48:58  bkline
 # Filtered out blocked documents in SQL queries; consolidated some
 # multiple-test SQL clauses using "IN".
@@ -178,12 +183,12 @@ if not request:
    <br><br><br>
    <h3>To receive email notification when mailer is complete, enter</h3>
    <b>Email address:&nbsp;</b>
-   <input name='Email' />
+   <input name='Email' value='%s'/>
    <br><br><br>
    <input type='Submit' name = 'Request' value = 'Submit'>
    <input type='hidden' name='%s' value='%s'>
   </form>
-""" % (section, cdrcgi.SESSION, session)
+""" % (section, cdr.getEmail(session), cdrcgi.SESSION, session)
     #------------------------------------------------------------------
     # cdrcgi.sendPage exits after sending page.
     # If we sent a page, we're done for this invocation.

@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolMailerReqForm.py,v 1.21 2005-03-24 21:20:16 bkline Exp $
+# $Id: ProtocolMailerReqForm.py,v 1.22 2005-05-13 22:42:12 venglisc Exp $
 #
 # Request form for all protocol mailers.
 #
@@ -17,6 +17,9 @@
 # publication job for the publishing daemon to find and initiate.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.21  2005/03/24 21:20:16  bkline
+# Increased database query timeout thresholds.
+#
 # Revision 1.20  2005/03/03 13:44:07  bkline
 # Modified the selection criteria for protocol abstract remailers at
 # Sheri's request (#1570).
@@ -263,12 +266,12 @@ if not request:
    <h3>
    <h3>To receive email notification when mailer is complete, enter</h3>
    <b>Email address:&nbsp;</b>
-   <input name='Email' />
+   <input name='Email' value='%s'/>
    <br><br><br>
    <input type='Submit' name = 'Request' value = 'Submit'>
    <input type='hidden' name='%s' value='%s'>
   </form>
-""" % (section, cdrcgi.SESSION, session)
+""" % (section, cdr.getEmail(session), cdrcgi.SESSION, session)
     #------------------------------------------------------------------
     # cdrcgi.sendPage exits after sending page.
     # If we sent a page, we're done for this invocation.
