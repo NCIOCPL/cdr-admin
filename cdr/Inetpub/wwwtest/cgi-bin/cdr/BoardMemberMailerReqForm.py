@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: BoardMemberMailerReqForm.py,v 1.4 2005-03-17 20:17:48 bkline Exp $
+# $Id: BoardMemberMailerReqForm.py,v 1.5 2005-05-13 21:09:35 venglisc Exp $
 #
 # Request form for generating RTF letters to board members.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2005/03/17 20:17:48  bkline
+# Fixed typo (prosective for prospective).
+#
 # Revision 1.3  2005/03/02 15:48:10  bkline
 # Support for additional letters from Margaret.
 #
@@ -335,13 +338,39 @@ def makeBoardObjects():
    };"""
         
 #----------------------------------------------------------------------
+# Select the email address for the user.  
+# Input is the session ID.
+# Output is the email address.
+#----------------------------------------------------------------------
+def getEmail(id):
+    query = """\
+    SELECT u.email
+      FROM session s
+      JOIN usr u
+        ON u.id   = s.usr
+     WHERE s.name = '%s'
+       AND ended   IS NULL
+       AND expired IS NULL""" % id
+
+    cursor.execute(query)
+    rows = cursor.fetchall()
+
+    if len(rows) < 1:
+       cdrcgi.bail("ERROR: User not authorized to run this report!")
+    elif len(rows) > 1:
+       cdrcgi.bail("ERROR: User session not unique!")
+    else:
+       return rows[0][0]
+
+
+#----------------------------------------------------------------------
 # Put up the form if we don't have a request yet.
 #----------------------------------------------------------------------
 header = cdrcgi.header(title, title, section, script, buttons,
                        stylesheet = """\
  <style type='text/css'>
    ul { margin-left: 20pt }
-   h2 { font-size: 14pt; font-family:Arial; color:maroon }
+   h2 { font-size: 14pt; font-family:Arial; color:Navy }
    h3 { font-size: 13pt; font-family:Arial; color:black; font-weight:bold }
    li, span.r { 
         font-size: 11pt; font-family:'Arial'; color:black;
@@ -475,7 +504,7 @@ form = """\
     </tr>
     <tr>
      <th align='right'>Email Address:&nbsp;</th>
-     <td><input name='email' style='width: 500px'></td>
+     <td><input name='email' style='width: 500px' value='%s'></td>
      <td>&nbsp;</td>
     </tr>
     <tr>
@@ -490,5 +519,6 @@ form = """\
   </form>
  </body>
 </html>
-""" % (makeBoardList(boards), boardError, letterError, cdrcgi.SESSION, session)
+""" % (makeBoardList(boards), boardError, letterError, getEmail(session),
+       cdrcgi.SESSION, session)
 cdrcgi.sendPage(header + form)
