@@ -1,4 +1,4 @@
-<!-- $Id: CdrFilter.html,v 1.6 2004-07-27 21:12:29 venglisc Exp $ -->
+<!-- $Id: CdrFilter.html,v 1.7 2005-05-14 00:03:14 venglisc Exp $ -->
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
  <HEAD>
   <TITLE>CDR Document Filtering</TITLE>
@@ -19,11 +19,8 @@
         var filt8 = document.FilterRequest.Filter8.value;
         var filt9 = document.FilterRequest.Filter9.value;
         var filt10 = document.FilterRequest.Filter10.value;
-        var filt11 = document.FilterRequest.Filter11.value;
-        var filt12 = document.FilterRequest.Filter12.value;
-        var filt13 = document.FilterRequest.Filter13.value;
-        var filt14 = document.FilterRequest.Filter14.value;
-        var filt15 = document.FilterRequest.Filter15.value; 
+        var edt   = document.FilterRequest.editorial.checked;
+        var adv   = document.FilterRequest.advisory.checked;
         var pub   = document.FilterRequest.publish.checked;
         var app   = document.FilterRequest.approved.checked;
         var pro   = document.FilterRequest.proposed.checked;      
@@ -36,11 +33,13 @@
       //var pwd   = document.FilterRequest.Password.value;
         var url   = base + "?DocId=" + doc
                   + "&DocVer=" + ver
+                  + "&editorial=" + edt
+                  + "&advisory=" + adv
                   + "&publish=" + pub
                   + "&approved=" + app
-                  + "&proposed=" + pro               
+                  + "&proposed=" + pro
                   + "&comments=" + cmt
-		  + "&rsmarkup=" + mrk
+		          + "&rsmarkup=" + mrk
                   + "&glossary=" + gls
                   + "&stdword=" + std               
                   + "&port=" + port               
@@ -55,11 +54,6 @@
                   + "&Filter8=" + filt8
                   + "&Filter9=" + filt9
                   + "&Filter10=" + filt10
-                  + "&Filter11=" + filt11
-                  + "&Filter12=" + filt12
-                  + "&Filter13=" + filt13
-                  + "&Filter14=" + filt14
-                  + "&Filter15=" + filt15                 
       //          + "&UserName=" + uid + "&Password=" + pwd
             ;
         if (doValidate == 1) {
@@ -129,22 +123,31 @@
    <TABLE CELLSPACING='0' 
           CELLPADDING='0' 
           BORDER='0'>
-<!--
-    <TR>
-     <TD ALIGN='right'>
-      <B>CDR User ID&nbsp;</B>
-     </TD>
-     <TD><INPUT NAME='UserName'></TD>
-    </TR>
-    <TR>
-     <TD ALIGN='right'>
-      <B>CDR Password&nbsp;</B>
-     </TD>
-     <TD><INPUT NAME='Password' 
-                TYPE='password'>
-     </TD>
-    </TR>
--->
+    <TR>     
+     <TD ALIGN='right' COLSPAN='1'>
+      <B>Display Board: </B>
+     </TD> 
+     <TD ALIGN='Left' COLSPAN='1'>
+      <TABLE border='0' width='100%'>
+       <TR>
+        <TD width='25%' align='right'>
+         <B>Editorial</B>
+	    </TD>
+	    <TD width='5%'>
+         <INPUT TYPE="checkbox" NAME="editorial" CHECKED>
+	    </TD>
+	    <TD width='25%' align='right'>
+         <B>Advisory</B>
+	    </TD>
+	    <TD width='5%'>
+         <INPUT TYPE="checkbox" NAME="advisory">
+	    </TD>
+	    <TD width='25%' align='right'></TD>
+	    <TD width='5%' align='right'></TD>
+       </TR>
+      </TABLE>
+     </TD> 
+    </TR>    
     <TR>     
      <TD ALIGN='right' COLSPAN='1'>
       <B>Display RevLevels: </B>
@@ -154,20 +157,20 @@
        <TR>
         <TD width='25%' align='right'>
          <B>publish</B>
-	</TD>
-	<TD>
+	    </TD>
+	    <TD width='5%'>
          <INPUT TYPE="checkbox" NAME="publish">
-	</TD>
-	<TD width='25%' align='right'>
+	    </TD>
+	    <TD width='25%' align='right'>
          <B>approved</B>
-	</TD>
-	<TD>
+	    </TD>
+	    <TD width='5%'>
          <INPUT TYPE="checkbox" NAME="approved" CHECKED>
-	</TD>
-	<TD width='25%' align='right'>
+	    </TD>
+	    <TD width='25%' align='right'>
          <B>proposed</B>
-	</TD>
-	<TD>
+	    </TD>
+	    <TD width='5%'>
          <INPUT TYPE="checkbox" NAME="proposed">     
         </TD>
        </TR>
@@ -182,23 +185,23 @@
       <TABLE border='0' width='100%'>
        <TR>
         <TD width='25%' align='right'>
-	 <B>Comments</B>
-	</TD>
-        <TD>
+	     <B>Comments</B>
+	    </TD>
+        <TD width='5%'>
          <INPUT TYPE="checkbox" NAME="comments" CHECKED>
-	</TD>
+	    </TD>
         <TD width='25%' align='right'>
-	 <B>GlossTerms</B>
-	</TD>
-        <TD>
+	     <B>GlossTerms</B>
+	    </TD>
+        <TD width='5%'>
          <INPUT TYPE="checkbox" NAME="glossary">
-	</TD>
+	    </TD>
         <TD width='25%' align='right'>
-	 <B>Std Wording</B>
-	</TD>
-        <TD>
+	     <B>Std Wording</B>
+	    </TD>
+        <TD width='5%'>
          <INPUT TYPE="checkbox" NAME="stdword">
-	</TD>
+	    </TD>
        </TR>
       </TABLE>
      </TD>
@@ -323,46 +326,6 @@
       <INPUT NAME='Filter10' SIZE = '60'>
      </TD>
     </TR>
-    <TR>
-     <TD ALIGN='right'>
-      &nbsp;
-     </TD>
-     <TD>
-      <INPUT NAME='Filter11' SIZE = '60'>
-     </TD>
-    </TR>
-    <TR>
-     <TD ALIGN='right'>
-      &nbsp;
-     </TD>
-     <TD>
-      <INPUT NAME='Filter12' SIZE = '60'>
-     </TD>
-    </TR>
-    <TR>
-     <TD ALIGN='right'>
-      &nbsp;
-     </TD>
-     <TD>
-      <INPUT NAME='Filter13' SIZE = '60'>
-     </TD>
-    </TR>
-    <TR>
-     <TD ALIGN='right'>
-      &nbsp;
-     </TD>
-     <TD>
-      <INPUT NAME='Filter14' SIZE = '60'>
-     </TD>
-    </TR>
-    <TR>
-     <TD ALIGN='right'>
-      &nbsp;
-     </TD>
-     <TD>
-      <INPUT NAME='Filter15' SIZE = '60'>
-     </TD>
-    </TR>    
    </TABLE>
   </FORM>
  </BODY>
