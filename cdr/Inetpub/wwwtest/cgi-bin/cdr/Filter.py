@@ -1,11 +1,16 @@
 #----------------------------------------------------------------------
 #
-# $Id: Filter.py,v 1.24 2004-07-13 18:39:17 ameyer Exp $
+# $Id: Filter.py,v 1.25 2005-05-14 00:01:45 venglisc Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.24  2004/07/13 18:39:17  ameyer
+# Provide for insertion and deletion revision levels (bug #846).
+# Allow for displaying of glossary terms and standard wording elements.
+# [Done by Volker - checked in by Alan].
+#
 # Revision 1.23  2004/02/19 21:29:11  ameyer
 # Allow user interface to pass a port id.
 #
@@ -125,6 +130,8 @@ insRevLevels += (fields.getvalue('proposed') == 'true') and 'proposed_' or ''
 insRevLevels += (fields.getvalue('rejected') == 'true') and 'rejected_' or ''
 insRevLevels += fields.getvalue('insRevLevels') or '' # insRevLevels from links.
 delRevLevels  = (fields.getvalue('rsmarkup') == 'false') and 'Y' or 'N'
+displayBoard = (fields.getvalue('editorial') == 'true') and 'editorial-board_' or ''
+displayBoard += (fields.getvalue('advisory') == 'true') and 'advisory-board' or ''
 vendorOrQC = (fields.getvalue('QC') == 'true') and 'QC' or ''
 vendorOrQC += fields.getvalue('vendorOrQC') or '' # vendorOrQC from links.
 displayComments = (fields.getvalue('comments') == 'true') and 'Y' or 'N'
@@ -135,7 +142,8 @@ filterParm = [['insRevLevels', insRevLevels],
               ['delRevLevels', delRevLevels],
               ['DisplayComments', displayComments],
 	      ['DisplayGlossaryTermList', displayGlossary],
-	      ['ShowStandardWording', displayStdWord]]
+	      ['ShowStandardWording', displayStdWord],
+          ['displayBoard', displayBoard]]
 if vendorOrQC:
     filterParm.append(['vendorOrQC', 'QC'])
 
