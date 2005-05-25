@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.45 2005-05-04 18:04:06 venglisc Exp $
+# $Id: QcReport.py,v 1.46 2005-05-25 16:18:02 venglisc Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.45  2005/05/04 18:04:06  venglisc
+# Added option for Media QC Report. (Bug 1653)
+#
 # Revision 1.44  2005/04/21 21:24:37  venglisc
 # Modifications to allow PublishPreview QC reports. (Bug 1531)
 #
@@ -213,15 +216,19 @@ version  = fields.getvalue("DocVersion") or None
 glossary = fields.getvalue("Glossary")   or None
 standardWording = fields.getvalue("ShowStandardWording") or None
 displayComments = fields.getvalue("DisplayCommentElements") or None
+displayBoard    = fields.getvalue('Editorial-board') and 'editorial-board_' or ''
+displayBoard   += fields.getvalue('Advisory-board')  and 'advisory-board'   or ''
+
 insRevLvls  = fields.getvalue("revLevels")  or None
 delRevLvls  = fields.getvalue("delRevLevels")  or None
 if not insRevLvls:
     insRevLvls = fields.getvalue('publish') and 'publish|' or '' 
     insRevLvls += fields.getvalue('approved') and 'approved|' or ''
     insRevLvls += fields.getvalue('proposed') and 'proposed' or '' 
- 
+
 if not docId and not docType:
     cdrcgi.bail("No document specified", repTitle)
+
 if docId:
     digits = re.sub('[^\d]+', '', docId)
     intId  = int(digits)
@@ -370,11 +377,60 @@ if docType == 'Summary' and repType and repType != 'pp' and not version:
   <BR><BR>
   Select Insertion/Deletion markup to be displayed in the report (one or more):
   <BR>
-  <INPUT TYPE="checkbox" NAME="publish">&nbsp;&nbsp; With publish attribute<BR>
-  <INPUT TYPE="checkbox" NAME="approved"
+  <table width="60%" border="0">
+   <tr>
+"""
+    # The Board Markup does not apply to the Patient Version Summaries
+    # ----------------------------------------------------------------
+    if repType != 'pat':
+        form += """\
+    <td valign="top">
+     <table>
+      <tr>
+       <td class="colheading">Board Markup</td>
+      </tr>
+       <td>
+        <INPUT TYPE    = "checkbox" 
+               NAME    = "Editorial-board"
+               CHECKED = '1'>&nbsp;&nbsp; Editorial board markup
+       </td>
+      </tr>
+      <tr>
+       <td>
+        <INPUT TYPE    = "checkbox" 
+               NAME    = "Advisory-board">&nbsp;&nbsp; Advisory board markup
+       </td>
+      </tr>
+     </table>
+    </td>
+"""
+    form += """\
+    <td valign="top">
+     <table>
+      <tr>
+       <td class="colheading">Revision-level Markup</td>
+      </tr>
+      <tr>
+       <td>
+        <INPUT TYPE="checkbox" NAME="publish">&nbsp;&nbsp; With publish attribute
+       </td>
+      </tr>
+      <tr>
+       <td>
+        <INPUT TYPE="checkbox" NAME="approved"
                          CHECKED='1'>&nbsp;&nbsp; With approved attribute<BR>
-  <INPUT TYPE="checkbox" NAME="proposed">&nbsp;&nbsp; With proposed attribute
-  <BR><BR>
+       </td>
+      </tr>
+      <tr>
+       <td>
+        <INPUT TYPE="checkbox" NAME="proposed">&nbsp;&nbsp; With proposed attribute
+       </td>
+      </tr>
+     </table>
+    </td>
+   </tr>
+  </table>
+  <BR>
   <INPUT TYPE='checkbox' NAME='DisplayCommentElements' CHECKED='1'>&nbsp;&nbsp;
   Display Comments?
 """
@@ -406,9 +462,9 @@ filters = {
     'Summary:rs': # Redline/Strikeout
         ["set:QC Summary Set"],
     'Summary:but': # Bold/Underline
-        ["set:QC Summary Test Set (Bold/Underline)"],
+        ["set:QC Summary Set (Bold/Underline) Test"],
     'Summary:rst': # Redline/Strikeout
-        ["set:QC Summary Test Set"],
+        ["set:QC Summary Set Test"],
     'Summary:nm': # No markup
         ["set:QC Summary Set"],
     'Summary:pat': # Patient
@@ -872,6 +928,13 @@ if repType == "pp":
 # Filter the document.
 #----------------------------------------------------------------------
 if repType: docType += ":%s" % repType
+
+# ---------------------------------------------------------------------
+# This next line is needed to run the Media QC report from within
+# XMetaL since the repType argument is not passed by the macro
+# ---------------------------------------------------------------------
+if docType == 'Media': docType += ":img"
+
 if version == "-1": version = None
 if not filters.has_key(docType):
     # cdrcgi.bail(filters)
@@ -893,9 +956,12 @@ if not filters.has_key(docType):
 filterParm = []
 if insRevLvls:
     filterParm = [['insRevLevels', insRevLvls]]
+
 if docType.startswith('Summary'):
     filterParm.append(['DisplayComments',
                        displayComments and 'Y' or 'N'])
+    filterParm.append(['displayBoard', displayBoard])
+
 if repType == "bu" or repType == "but":
     filterParm.append(['delRevLevels', 'Y'])
 
@@ -905,6 +971,7 @@ filterParm.append(['DisplayGlossaryTermList',
 if repType == "pat":
     filterParm.append(['ShowStandardWording',
                        standardWording and "Y" or "N"])
+
 doc = cdr.filterDoc(session, filters[docType], docId = docId,
                     docVer = version or None, parm = filterParm)
 #if (type(doc) in (type(""), type(u"")):
