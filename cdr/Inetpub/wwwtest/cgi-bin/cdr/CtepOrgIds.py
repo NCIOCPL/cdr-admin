@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: CtepOrgIds.py,v 1.1 2005-05-25 14:08:46 bkline Exp $
+# $Id: CtepOrgIds.py,v 1.2 2005-05-25 14:13:22 bkline Exp $
 #
 # Create report that can be used to verify that CTEP org ID mappings
 # are correct.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2005/05/25 14:08:46  bkline
+# Report used to verify that CTEP org ID mappings are correct.
+#
 #----------------------------------------------------------------------
 import cdrcgi, cdrdb, sys, pyXLWriter, csv, urllib, os, msvcrt, time
 
@@ -70,7 +73,7 @@ for values in csv.reader(urlObj):
                 cdrId       = "%d" % org.id
                 cdrName     = org.name.strip().encode('latin-1', 'ignore')
             else:
-                cdrId       = ""
+                cdrId       = "-----"
                 cdrName     = "No match"
         sheet.write([row, 0], cdrId)
         sheet.write_string([row, 1], cdrName)
