@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: DrugAgentReport2.py,v 1.1 2005-03-24 21:15:04 bkline Exp $
+# $Id: DrugAgentReport2.py,v 1.2 2005-05-25 19:00:05 bkline Exp $
 #
 # Request #1602 (second report on Drug/Agent terms).
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2005/03/24 21:15:04  bkline
+# Drug/Agent Other Names Report.
+#
 #----------------------------------------------------------------------
 import cdrdb, pyXLWriter, sys, time
 
@@ -26,11 +29,20 @@ class Term:
         if rows:
             self.name = rows[0][0]
         cursor.execute("""\
-   SELECT DISTINCT n.value, t.value
+   SELECT DISTINCT n.value, t.value, v.value, r.value
               FROM query_term n
               JOIN query_term t
                 ON n.doc_id = t.doc_id
                AND LEFT(n.node_loc, 4) = LEFT(t.node_loc, 4)
+   LEFT OUTER JOIN query_term v
+                ON v.doc_id = t.doc_id
+               AND LEFT(v.node_loc, 4) = LEFT(t.node_loc, 4)
+               AND v.path = '/Term/OtherName/SourceInformation'
+                          + '/VocabularySource/SourceCode'
+   LEFT OUTER JOIN query_term r
+                ON r.doc_id = t.doc_id
+               AND LEFT(r.node_loc, 4) = LEFT(t.node_loc, 4)
+               AND r.path = '/Term/OtherName/SourceInformation/ReferenceSource'
              WHERE n.path = '/Term/OtherName/OtherTermName'
                AND t.path = '/Term/OtherName/OtherNameType'
                AND n.doc_id = ?""", id)
@@ -99,12 +111,16 @@ format.set_color('white')
 format.set_bg_color('blue')
 format.set_align('center')
 
-worksheet.set_column(0, 50)
+worksheet.set_column(0, 7)
 worksheet.set_column(1, 50)
-worksheet.set_column(2, 18)
-worksheet.write([0, 0], "Preferred Name", format)
-worksheet.write([0, 1], "Other Names", format)
-worksheet.write([0, 2], "Other Name Type", format)
+worksheet.set_column(2, 50)
+worksheet.set_column(3, 25)
+worksheet.set_column(4, 30)
+worksheet.write([0, 0], "CDR ID", format)
+worksheet.write([0, 1], "Preferred Name", format)
+worksheet.write([0, 2], "Other Names", format)
+worksheet.write([0, 3], "Other Name Type", format)
+worksheet.write([0, 4], "Source", format)
 row = 1
 
 def fix(name):
@@ -112,12 +128,18 @@ def fix(name):
                 .replace(u'\u2122', u'(TM)')
                 .encode('latin-1', 'ignore'))
 for term in terms:
-    worksheet.write([row, 0], fix(term.name))
+    worksheet.write([row, 0], term.id)
+    worksheet.write_string([row, 1], fix(term.name))
     for i in range(len(term.otherNames)):
         name = fix(term.otherNames[i][0])
         nameType = fix(term.otherNames[i][1])
-        worksheet.write([row, 1], name)
-        worksheet.write([row, 2], nameType)
+        worksheet.write_string([row, 2], name)
+        worksheet.write_string([row, 3], nameType)
+        if term.otherNames[i][2]:
+            worksheet.write_string([row, 4], fix(term.otherNames[i][2] +
+                                                 " Vocabulary"))
+        elif term.otherNames[i][3]:
+            worksheet.write_string([row, 4], fix(term.otherNames[i][3]))
         row += 1
     if not term.otherNames:
         row += 1
