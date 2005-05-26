@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: ShowGlobalChangeTestResults.py,v 1.1 2004-10-25 16:39:12 bkline Exp $
+# $Id: ShowGlobalChangeTestResults.py,v 1.2 2005-05-26 12:19:22 bkline Exp $
 #
 # Web interface for showing changes which would be made by a
 # global change.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2004/10/25 16:39:12  bkline
+# Web interface to changes from proposed global change job.
+#
 #----------------------------------------------------------------------
 import cgi, glob, cdrcgi, os, xml.dom.minidom, cdr
 
@@ -20,12 +23,13 @@ def prettyPrint(doc):
     if type(doc) == type(u""):
         doc = doc.encode('utf-8')
     return cdr.stripBlankLines(doc)
+
 if file and directory:
     f = open(BASE + directory + "/" + file)
     doc = f.read()
     if file.lower().endswith('.xml'):
         doc = prettyPrint(doc)
-    cdrcgi.sendPage("""\
+    cdrcgi.sendPage(u"""\
 <html>
  <body>
   <pre>
@@ -33,7 +37,7 @@ if file and directory:
   </pre>
  </body>
 </html>
-""" % cgi.escape(doc))
+""" % cgi.escape(unicode(doc, "utf-8")))
 
 class Set:
     def __init__(self):
@@ -116,6 +120,7 @@ if directory:
     
 dirs =  glob.glob(BASE + '/20*')
 dirs.sort()
+dirs.reverse()
 links = []
 for d in dirs:
     d2 = os.path.basename(d)
@@ -131,7 +136,7 @@ cdrcgi.sendPage("""\
   </style>
  </head>
  <body>
-  <h3>Select Test Run</h3>
+  <h3>Select Global Change Test Run</h3>
 %s
  </body>
 </html>""" % "".join(links))
