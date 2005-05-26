@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: OSPReport.py,v 1.4 2005-03-01 20:18:00 bkline Exp $
+# $Id: OSPReport.py,v 1.5 2005-05-26 21:33:52 venglisc Exp $
 #
 # Queue up report for the Office of Science Policy.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2005/03/01 20:18:00  bkline
+# Added active date range fields.
+#
 # Revision 1.3  2004/02/26 21:13:10  bkline
 # Added cdr module.
 #
@@ -122,7 +125,7 @@ if not email or not cancer or request != "Submit":
       <b>Email address(es):&nbsp;</b>
      </td>
      <td>
-      <input name='Email' size='80'><br>
+      <input name='Email' size='80' value='%s'><br>
      </td>
     </tr>
     <tr>
@@ -146,7 +149,8 @@ if not email or not cancer or request != "Submit":
   </form>
  </body>
 </html>
-""" % (listTermChoices(), begin, end, cdrcgi.SESSION, session)
+""" % (cdr.getEmail(session), listTermChoices(), begin, end, 
+       cdrcgi.SESSION, session)
     cdrcgi.sendPage(header + form)
 
 #----------------------------------------------------------------------    

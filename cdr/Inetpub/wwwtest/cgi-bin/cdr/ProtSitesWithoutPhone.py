@@ -1,13 +1,17 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtSitesWithoutPhone.py,v 1.1 2003-03-04 22:45:01 bkline Exp $
+# $Id: ProtSitesWithoutPhone.py,v 1.2 2005-05-26 21:33:52 venglisc Exp $
 #
 # Queue up report for Protocol sites without contact phone.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2003/03/04 22:45:01  bkline
+# New report on protocol participating sites without a phone after
+# vendor filtering.
+#
 #----------------------------------------------------------------------
 
-import cdrbatch, cdrcgi, cgi
+import cdr, cdrbatch, cdrcgi, cgi
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -62,12 +66,12 @@ if not email or request != "Submit":
    </p>
    <br>
    <b>Email address(es):&nbsp;</b>
-   <input name='Email' size='60'><br>
+   <input name='Email' size='60' value='%s'><br>
    <input type='hidden' name='%s' value='%s'>
   </form>
  </body>
 </html>
-""" % (cdrcgi.SESSION, session)
+""" % (cdr.getEmail(session), cdrcgi.SESSION, session)
     cdrcgi.sendPage(header + form)
 
 #----------------------------------------------------------------------    
