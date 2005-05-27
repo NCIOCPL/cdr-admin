@@ -1,12 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryDateLastModified.py,v 1.4 2003-12-16 15:50:23 bkline Exp $
+# $Id: SummaryDateLastModified.py,v 1.5 2005-05-27 17:21:03 bkline Exp $
 #
 # Report listing specified set of Cancer Information Summaries, the date
 # they were last modified as entered by a user, and the date the last
 # Modify action was taken.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2003/12/16 15:50:23  bkline
+# Fixed bug in title display showing which date range user specified.
+#
 # Revision 1.3  2003/12/03 20:42:14  bkline
 # Added designation of which date range was specified (user or system).
 #
@@ -17,7 +20,7 @@
 # New summary reports.
 #
 #----------------------------------------------------------------------
-import cdr, cdrdb, cdrcgi, cgi, re, time
+import cdr, cdrdb, cdrcgi, cgi, re, time, pyXLWriter, sys
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -204,12 +207,16 @@ if uStartDate and uEndDate:
     startDate  = uStartDate
     endDate    = uEndDate
     bodyTitle  = "Summary Date Last Modified (User) Report"
+    reportType = 'U'
 else:
     uStartDate = '1853-01-01'
     uEndDate   = '9999-12-30'  # Don't do 9999-12-31 (avoid overflow below)
     startDate  = sStartDate
     endDate    = sEndDate
     bodyTitle  = "Summary Last Modified Date (System) Report"
+    reportType = 'S'
+    cmtConn    = cdrdb.connect('CdrGuest')
+    cmtCursor  = cmtConn.cursor()
 try:
     cursor.execute("""\
         SELECT DISTINCT st.doc_id,
@@ -270,42 +277,147 @@ if not row:
     cdrcgi.bail("No summaries match report criteria")
 
 #----------------------------------------------------------------------
-# Start the HTML page.
+# Get the comment from the last version of the document.
 #----------------------------------------------------------------------
+def getComment(docId, cursor):
+    cursor.execute("""\
+       SELECT comment
+         FROM doc_version
+        WHERE id = %s
+          AND num = (SELECT MAX(num)
+                       FROM doc_version
+                      WHERE id = %s)""" % (docId, docId))
+    rows = cursor.fetchall()
+    return rows and rows[0][0] or None
+
+#----------------------------------------------------------------------
+# Prepare string for insertion into worksheet cell.
+#----------------------------------------------------------------------
+def fix(s):
+    if not s:
+        return ""
+    if type(s) == unicode:
+        return s.replace(u"\u2019", "'").encode('latin-1', 'replace')
+    return str(s)
+
+#----------------------------------------------------------------------
+# Map board name to abbreviation.
+#----------------------------------------------------------------------
+def getBoardAbbreviation(board):
+    if board.upper().find('PEDIATRIC') != -1:
+        return 'PTEB'
+    if board.upper().find('ADULT TREATMENT') != -1:
+        return 'ATEB'
+    if board.upper().find('COMPLEMENTARY AND ALT') != -1:
+        return 'CAM'
+    if board.upper().find('SCREENING & PREVENTION') != -1:
+        return 'SPEB'
+    if board.upper().find('SUPPORTIVE CARE') != -1:
+        return 'SCEB'
+    if board.upper().find('CANCER GENETICS') != -1:
+        return 'CGEB'
+    return fix(board)
+
+#----------------------------------------------------------------------
+# Map audience name to abbreviation.
+#----------------------------------------------------------------------
+def getTypeAbbreviation(audience):
+    if audience.upper().find('PROFESSIONAL'):
+        return 'HP'
+    return 'PAT'
+
+#----------------------------------------------------------------------
+# Add column headers for a new board/audience combo.
+#----------------------------------------------------------------------
+def addColHeaders(sheet, rowNum, repType, format):
+    colNum = 0
+    sheet.write_string([rowNum, colNum], "DocID", format)
+    colNum += 1
+    sheet.write_string([rowNum, colNum], "Summary Title", format)
+    colNum += 1
+    if repType == 'S':
+        sheet.write_string([rowNum, colNum], "Board", format)
+        colNum += 1
+        sheet.write_string([rowNum, colNum], "Type", format)
+        colNum += 1
+        sheet.write_string([rowNum, colNum], "Last Comment", format)
+        colNum += 1
+    sheet.write_string([rowNum, colNum], "Date Last Modified", format)
+    colNum += 1
+    sheet.write_string([rowNum, colNum], "Last Modify Action Date (System)",
+                       format)
+    colNum += 1
+    sheet.write_string([rowNum, colNum], "LastV Publish?", format)
+
+#----------------------------------------------------------------------
+# Create the workbook.
+#----------------------------------------------------------------------
+if sys.platform == "win32":
+    import os, msvcrt
+    msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
 if not summaryType:
     title = "All Boards/%s" % audience
 else:
     title = "%s/%s" % (row[2], audience)
-html = """\
-<!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
-<html>
- <head>
-  <title>%s</title>
-  <style type='text/css'>
-   body { font-family: sans-serif }
-   span.title { font-size: 20; font-weight: bold; text-align: center; }
-   span.subtitle { font-size: 18; text-align: center; }
-   th { font-size: 16; font-weight: bold; vertical-align: top; }
-   td { font-family: sans-serif; font-size: 16; }
-   span.audience { font-size: 16; font-weight: bold; }
-   span.board    { font-size: 18; font-weight: bold; }
-  </style>
- </head>
- <body>
-  <center>
-   <span class='title'>%s</span><br>
-   <span class='subtitle'>%s to %s</span>
-  </center>
-  <br><br>
-""" % (title, bodyTitle, startDate, endDate)
+stamp     = time.strftime("%Y%m%d%H%M%S")
+print "Content-type: application/vnd.ms-excel"
+print "Content-Disposition: attachment; filename=sdlm-%s.xls" % stamp
+print
+book      = pyXLWriter.Writer(sys.stdout)
+sheet     = book.add_worksheet("CTEP Orgs")
+rowNum    = 1
+format1   = book.add_format()
+format2   = book.add_format()
+format3   = book.add_format()
+format4   = book.add_format()
+format1.set_bold();
+format1.set_size(12)
+format1.set_align('center')
+format1.set_merge(1)
+format2.set_bold();
+format2.set_size(12)
+format2.set_merge(0)
+format2.set_align('left')
+format3.set_bold();
+format3.set_size(12)
+format3.set_merge(0)
+format3.set_align('center')
+format3.set_text_wrap(1)
+format4.set_align('center')
+
+sheet.write_string([0, 0], fix(bodyTitle), format1)
+colNum = 0
+sheet.set_column(colNum, 12)
+colNum += 1
+sheet.set_column(colNum, 50)
+sheet.write_blank([0, colNum], format1)
+colNum += 1
+if reportType == 'S':
+    sheet.set_column(colNum, 7)
+    sheet.write_blank([0, colNum], format1)
+    colNum += 1
+    sheet.set_column(colNum, 7)
+    sheet.write_blank([0, colNum], format1)
+    colNum += 1
+    sheet.set_column(colNum, 50)
+    sheet.write_blank([0, colNum], format1)
+    colNum += 1
+sheet.set_column(colNum, 15)
+sheet.write_blank([0, colNum], format1)
+colNum += 1
+sheet.set_column(colNum, 15)
+sheet.write_blank([0, colNum], format1)
+colNum += 1
+sheet.set_column(colNum, 10)
+sheet.write_blank([0, colNum], format1)
 
 #----------------------------------------------------------------------
 # Walk through the rows.
 #----------------------------------------------------------------------
 lastBoard = None
 while row:
-    docId, title, board, audience, lastMod, auditDate = row
-    docId = "CDR%d" % docId
+    intId, title, board, audience, lastMod, auditDate = row
+    docId = "CDR%d" % intId
     lastVersions = cdr.lastVersions('guest', docId)
     if type(lastVersions) in (type(""), type(u"")):
         lastVFlag = lastVersions
@@ -318,41 +430,31 @@ while row:
         else:
             lastVFlag = 'N'
     if lastBoard != board:
-        if lastBoard:
-            html += """\
-  </table>
-  <br><br>
-"""
-        html += """\
-  <span class='board'>%s</span><br>
-  <span class='audience'>%s</span>
-  <table border='1' cellpadding='2' cellspacing='0'>
-   <tr>
-    <th width='500'>Summary Title</th>
-    <th width='100'>DocID</th>
-    <th width='100'>Date Last Modified (User)</th>
-    <th width='100'>Last Modify Action Date (System)</th>
-    <th width='50'>LastV Publish?</th>
-   </tr>
-""" % (board, audience)
+        sheet.write_string([rowNum + 1, 0], fix(board), format2)
+        sheet.write_string([rowNum + 2, 0], fix(audience), format2)
+        addColHeaders(sheet, rowNum + 3, reportType, format3)
+        rowNum += 4
         lastBoard = board
-    html += """\
-   <tr>
-    <td>%s</td>
-    <td valign='top'>%s</td>
-    <td valign='top'>%s</td>
-    <td valign='top'>%s</td>
-    <td valign='top' align='center'>%s</td>
-   </tr>
-""" % (cgi.escape(title), docId, lastMod,
-       auditDate and auditDate[:10] or "&nbsp;", lastVFlag)
-    try:
-        row = cursor.fetchone()
-    except cdrdb.Error, info:
-        cdrcgi.bail('Failure fetching report information: %s' % info[1][0])
-
-cdrcgi.sendPage(html + """\
-  </table>
- </body>
-</html>
-""")
+    colNum = 0
+    sheet.write_string([rowNum, colNum], docId)
+    colNum += 1
+    sheet.write_string([rowNum, colNum], fix(title))
+    colNum += 1
+    if reportType == 'S':
+        sheet.write_string([rowNum, colNum], getBoardAbbreviation(board))
+        colNum += 1
+        sheet.write_string([rowNum, colNum], getTypeAbbreviation(audience))
+        colNum += 1
+        comment = getComment(intId, cmtCursor)
+        if comment:
+            sheet.write_string([rowNum, colNum], fix(comment))
+        colNum += 1
+    sheet.write_string([rowNum, colNum], fix(lastMod), format4)
+    colNum += 1
+    if auditDate:
+        sheet.write_string([rowNum, colNum], fix(auditDate[:10]), format4)
+    colNum += 1
+    sheet.write_string([rowNum, colNum], lastVFlag, format4)
+    row = cursor.fetchone()
+    rowNum += 1
+book.close()
