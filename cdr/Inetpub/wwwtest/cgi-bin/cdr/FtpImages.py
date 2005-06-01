@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
-# $Id: FtpImages.py,v 1.2 2005-01-19 23:48:33 venglisc Exp $
+# $Id: FtpImages.py,v 1.3 2005-06-01 21:22:00 venglisc Exp $
 #
 # Ftp files from the CIPSFTP server from the ciat/qa/Images directory
 # and place them on the CIPS network.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2005/01/19 23:48:33  venglisc
+# Modified Error message when error ftplib.error_perm is being raised.
+# (Bug 1465).
+#
 # Revision 1.1  2004/11/01 21:29:48  venglisc
 # Initial version of script allowing to ftp image files from the CIPSFTP
 # server and copy to the CDR server. (Bug 1365)
@@ -16,6 +20,7 @@ import cgi, cdr, cdrcgi, re, string, os, ftplib, shutil
 # Set the form variables.
 #----------------------------------------------------------------------
 defTarget = "Images_from_Cipsftp"
+CiatTarget= "Images_for_CIAT"
 defSource = "CDR_Images"
 fields    = cgi.FieldStorage()
 session   = cdrcgi.getSession(fields) or "guest"
@@ -50,7 +55,7 @@ if request == cdrcgi.MAINMENU:
     cdrcgi.navigateTo("Admin.py", session)
 
 #----------------------------------------------------------------------
-# Handle request to delete the user.
+# Copy the files from the FTP Server to the local network
 #----------------------------------------------------------------------
 if request == "Get Images" and ftpDone != 'Y':
     if not sourceDir or not targetDir:
@@ -62,17 +67,29 @@ if request == "Get Images" and ftpDone != 'Y':
        ftp.cwd(baseDir + sourceDir)
        for name in ftp.nlst():
            if name.endswith('.jpg') or name.endswith('.gif') \
-	                            or name.endswith('.psd'):
+                                    or name.endswith('.psd'):
                bytes = []
                ftp.retrbinary('RETR ' + name, lambda a: bytes.append(a))
-               f = open(os.path.join('..', '..', 'cdr', targetDir, name), 'wb')
+               targetFile = os.path.join('..', '..', 'cdr', targetDir, name)
+               f = open(targetFile, 'wb')
                # f = open(os.path.join(netwkDir, name), 'wb')
                f.write("".join(bytes))
                f.close()
-	       # Delete the file if it was transferred from default directory
-	       # ------------------------------------------------------------
-	       if sourceDir == 'CDR_Images':
-	          ftp.delete(name)
+
+           # Copy the file to the CIAT review directory if it was 
+           # transferred from the default directory
+           # We do this so that Margaret isn't dependend on CIAT
+           # to download the data before she has access to the 
+           # Images.
+           # ----------------------------------------------------
+           if sourceDir == 'CDR_Images':
+               ciatFile = '../' + CiatTarget + '/' + name
+               ftp.storbinary('STOR ' + ciatFile, open(targetFile, 'rb')) 
+
+           # Delete the file if it was transferred from default directory
+           # ------------------------------------------------------------
+           if sourceDir == 'CDR_Images':
+               ftp.delete(name)
                #print "%d chunks for %s" % (len(bytes), name)
        ftp.quit()
        ftpDone = 'Y'
