@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: RssImportReport.py,v 1.1 2005-05-11 20:57:24 bkline Exp $
+# $Id: RssImportReport.py,v 1.2 2005-06-01 12:46:14 bkline Exp $
 #
 # Reports on import/update of RSS protocol site information.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2005/05/11 20:57:24  bkline
+# Report created for Sheri (request #1669).
+#
 #----------------------------------------------------------------------
 import cdr, cdrdb, cdrcgi, cgi, re, time
 
@@ -100,7 +103,7 @@ class Doc:
     <td>%s</td>
     <td>%s</td>
    </tr>
-""" % (self.cdrId, self.title.replace(";", "; "), self.pubVer and "Y" or "N",
+""" % (self.cdrId, self.title.replace(";", "; "), self.pubVer or "N",
        self.rssMode and "Y" or "N")
     
 #----------------------------------------------------------------------
