@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: CTGovMarkDuplicate.py,v 1.2 2004-07-13 15:46:26 venglisc Exp $
+# $Id: CTGovMarkDuplicate.py,v 1.3 2005-06-02 20:07:32 venglisc Exp $
 #
 # Interface to allow users to mark a CTGov protocol as a duplicate in
 # the system.  The protocol will be updated in the ctgov_import table
@@ -8,6 +8,12 @@
 # a duplicate of.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2004/07/13 15:46:26  venglisc
+# Modified so that document for which the CDR-ID has been removed will
+# set the disposition from "duplicate" to "import requested".
+# With this change the trial will not appear on the report listing all
+# duplicates.
+#
 # Revision 1.1  2004/04/26 20:37:17  venglisc
 # Initial version for user interface allowing to update the CDRID of the
 # ctgov_import table.
@@ -63,18 +69,18 @@ if request == "Update":
     # Test proper entry of input data
     # -------------------------------
     if not usrCmt:
-       cdrcgi.bail("Comment required to update Protocol")
+        cdrcgi.bail("Comment required to update Protocol")
 
     if not cdrId or not nctId:
-	if not unmarkCdr:
-           cdrcgi.bail("Both document IDs are required.")
-	elif unmarkCdr and not nctId:
-	   cdrcgi.bail("NCT ID required.")
-	elif unmarkCdr and not usrCmt:
-	   cdrcgi.bail("Comment is required to remove CDR ID")
+        if not unmarkCdr:
+             cdrcgi.bail("Both document IDs are required.")
+    elif unmarkCdr and not nctId:
+        cdrcgi.bail("NCT ID required.")
+    elif unmarkCdr and not usrCmt:
+        cdrcgi.bail("Comment is required to remove CDR ID")
     else:
-	if unmarkCdr and cdrId:
-	   cdrcgi.bail("CDR ID not allowed when unmarking NCT ID")
+        if unmarkCdr and cdrId:
+            cdrcgi.bail("CDR ID not allowed when unmarking NCT ID")
 
     # ----------------------------------------------------------
     # Find out if the NCTID exists
@@ -87,6 +93,10 @@ if request == "Update":
 """ % nctId
         cursor.execute(query)
         row = cursor.fetchone()
+
+        if row == None:
+            cdrcgi.bail("No record found: " + nctId)
+
     except cdrdb.Error, info:
         cdrcgi.bail("Invalid NCT ID entered: %s - %s" % (nctId, info[1][0]))
     
@@ -105,40 +115,40 @@ if request == "Update":
     # Unmarking the duplicate record 
     # ------------------------------
     if unmarkCdr:
-	if not row[2]:
-            dbmarkCmt = usrCmt
-	else:
-            dbmarkCmt = row[2] + "; REMOVE CDR-ID:" + usrCmt
+        if not row[2]:
+                dbmarkCmt = usrCmt
+        else:
+                dbmarkCmt = row[2] + "; REMOVE CDR-ID:" + usrCmt
 
         query = """\
-            UPDATE ctgov_import
-               SET cdr_id = null, 
-                   dt = GETDATE(), 
-                   disposition = (SELECT id
-                                    FROM ctgov_disposition
-                                   WHERE name = 'import requested'
-                                 ),
-	           comment = '%s'
-             WHERE nlm_id = '%s'
+                UPDATE ctgov_import
+                   SET cdr_id = null, 
+                       dt = GETDATE(), 
+                       disposition = (SELECT id
+                                        FROM ctgov_disposition
+                                       WHERE name = 'import requested'
+                                     ),
+                       comment = '%s'
+                 WHERE nlm_id = '%s'
 """ % (dbmarkCmt, nctId )
     # Updating a duplicate record 
     # ----------------------------
     else:
-	if not row[2]:
-            dbmarkCmt = usrCmt
-	else:
-            dbmarkCmt = row[2] + "; MARK DUPLICATE:" + usrCmt
+        if not row[2]:
+                dbmarkCmt = usrCmt
+        else:
+                dbmarkCmt = row[2] + "; MARK DUPLICATE:" + usrCmt
 
         query = """\
-            UPDATE ctgov_import
-               SET cdr_id = %s, 
-                   dt = GETDATE(), 
-                   disposition = (SELECT id
-                                    FROM ctgov_disposition
-                                   WHERE name = 'duplicate'
-                                 ),
-	           comment = '%s'
-             WHERE nlm_id = '%s'
+                UPDATE ctgov_import
+                   SET cdr_id = %s, 
+                       dt = GETDATE(), 
+                       disposition = (SELECT id
+                                        FROM ctgov_disposition
+                                       WHERE name = 'duplicate'
+                                     ),
+                       comment = '%s'
+                 WHERE nlm_id = '%s'
 """ % (cdr.normalize(cdrId)[3:], dbmarkCmt, nctId)
     try:
         cursor.execute(query)
