@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: OrgProtocolReview.py,v 1.3 2004-07-28 20:51:41 venglisc Exp $
+# $Id: OrgProtocolReview.py,v 1.4 2005-06-02 21:52:42 venglisc Exp $
 #
 # Report to assist editors in checking links to a specified org from
 # protocols.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2004/07/28 20:51:41  venglisc
+# Removed <p> tags to display text as Arial instead of Times New Roman.
+# Added error check to check if email has been given or not.
+#
 # Revision 1.2  2003/08/25 20:18:05  bkline
 # Converted to batch report.
 #
@@ -85,7 +89,7 @@ if not name and not id or not email:
     </TR>
     <TR>
      <TD ALIGN='right'><B>Email:&nbsp;</B></TD>
-     <TD><INPUT NAME='Email'>
+     <TD><INPUT NAME='Email' value='%s'>
      </TD>
     </TR>
    </TABLE>
@@ -94,7 +98,7 @@ if not name and not id or not email:
   </FORM>
  </BODY>
 </HTML>
-""" % (cdrcgi.SESSION, session)
+""" % (cdrcgi.SESSION, session, cdr.getEmail(session))
     cdrcgi.sendPage(header + form)
 
 #----------------------------------------------------------------------
