@@ -1,11 +1,17 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.46 2005-05-25 16:18:02 venglisc Exp $
+# $Id: QcReport.py,v 1.47 2005-06-02 19:48:20 venglisc Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.46  2005/05/25 16:18:02  venglisc
+# Added code to allow summary QC reports to be run with Editorial Board or
+# Advisory Board mark-up. (Bug 1657)
+# Modifications to CDR Admin Interface to allow specification of the
+# individual board mark-up. (Bug 1555)
+#
 # Revision 1.45  2005/05/04 18:04:06  venglisc
 # Added option for Media QC Report. (Bug 1653)
 #
@@ -957,9 +963,13 @@ filterParm = []
 if insRevLvls:
     filterParm = [['insRevLevels', insRevLvls]]
 
+# Patient Summaries are displayed like editorial board markup
+# -----------------------------------------------------------
 if docType.startswith('Summary'):
     filterParm.append(['DisplayComments',
                        displayComments and 'Y' or 'N'])
+    if repType == "pat":
+        displayBoard += 'editorial-board_'
     filterParm.append(['displayBoard', displayBoard])
 
 if repType == "bu" or repType == "but":
@@ -968,6 +978,7 @@ if repType == "bu" or repType == "but":
 # Added GlossaryTermList to HP documents, not just patient.
 filterParm.append(['DisplayGlossaryTermList',
                        glossary and "Y" or "N"])
+
 if repType == "pat":
     filterParm.append(['ShowStandardWording',
                        standardWording and "Y" or "N"])
