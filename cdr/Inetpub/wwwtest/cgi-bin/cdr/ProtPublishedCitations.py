@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtPublishedCitations.py,v 1.3 2005-04-12 19:06:51 venglisc Exp $
+# $Id: ProtPublishedCitations.py,v 1.4 2005-06-06 18:53:16 venglisc Exp $
 #
 # Report identifying previously published protocols that should be 
 # included in a hotfix.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2005/04/12 19:06:51  venglisc
+# Some more changes on the way the formatting is being handled.  Added some
+# additional comments.  (Bug 1612)
+#
 # Revision 1.2  2005/04/11 21:12:57  venglisc
 # Forgot to remove the limitation to only create output for 10 citations.
 #
@@ -22,7 +26,7 @@
 #
 #
 #----------------------------------------------------------------------
-import cdr, cdrdb, pyXLWriter, sys, time, cdrcgi
+import cdr, cdrcgi, cdrdb, pyXLWriter, sys, time
 
 # ---------------------------------------
 # Function to create a worksheet
@@ -63,9 +67,10 @@ def addWorksheet(workbook, title, headers, widths, headerFormat, rows):
         worksheet.set_column(col, widths[col])
         worksheet.write([3, col], headers[col], headerFormat)
 
-        # Set the format for the entire column for the two existint emtpy columns
-        # -----------------------------------------------------------------------
-        if col == 7 or col == 8:
+        # Set the format for the entire column for the two existing empty 
+        # columns
+        # ----------------------------------------------------------------
+        if col == 8 or col == 9:
             worksheet.set_column(col, widths[col], defaultFormat)
 
 
@@ -82,16 +87,34 @@ def addWorksheet(workbook, title, headers, widths, headerFormat, rows):
 
             #if 0 and c == 2:
             #    worksheet.write([r, c], col, datefmt)
-            if c == 5:
+            if c == 0:
+                if row[0] != None:
+                    url = ("http://%s%s/Filter.py?DocId=CDR%s&amp;"
+                           "Filter=set:QC InScopeProtocol Citation Set" % 
+                        (cdrcgi.WEBSERVER, cdrcgi.BASE, row[0]))
+                    worksheet.write_url([r, c], url, col, urlFormat)
+                else:
+                    worksheet.write([r, c], col, defaultFormat)
+            elif c == 5:
                 if row[5] != None:
+                    url = ("http://%s%s/Filter.py?DocId=CDR%s&amp;"
+                           "Filter=set:QC Citation Set" % (cdrcgi.WEBSERVER, 
+                                                           cdrcgi.BASE, row[5]))
+                    worksheet.write_url([r, c], url, col, urlFormat)
+                else:
+                    worksheet.write([r, c], col, defaultFormat)
+            elif c == 6:
+                if row[6] != None:
                     url = ("http://www.ncbi.nlm.nih.gov/entrez/query.fcgi"
                            "?cmd=Retrieve&amp;db=pubmed&amp;dopt=Abstract" 
-                           "&amp;list_uids=%s" % (row[5]))
+                           "&amp;list_uids=%s" % (row[6]))
                     worksheet.write_url([r, c], url, col, urlFormat)
                 else:
                     worksheet.write([r, c], col, defaultFormat)
             else:
                 worksheet.write([r, c], col, textFormat)
+            #if c == 2 or c == 6:
+            #    print col
             c += 1
         #worksheet.write([r, c], url)
         r += 1
@@ -142,6 +165,7 @@ cursor.execute("""\
                           WHERE pub_subset = 'Push_Documents_to_Cancer.Gov_Full-Load'
                             AND status = 'Success'
                         )
+--       and a.id in (67564, 67560, 67568, 67603)
        GROUP BY a.id, t.name, a.active_status
 """, timeout = 300)
 
@@ -153,6 +177,7 @@ cursor.execute("""\
              (id INTEGER       NOT NULL,
              cit INTEGER       NOT NULL,
           protid NVARCHAR(32)  NOT NULL,
+           phase NVARCHAR(510) NOT NULL,
            title NVARCHAR(510) NOT NULL,
           otitle NVARCHAR(510) NOT NULL,
           ptitle NVARCHAR(510) NOT NULL,
@@ -164,8 +189,9 @@ cursor.execute("""\
 
 cursor.execute("""\
     INSERT INTO #t1
-         SELECT t.id, c.int_val, pid.value, d.title, tot.value, tpt.value, 
-                t.job, t.doc_type, t.active_status, p.removed
+         SELECT t.id, c.int_val, pid.value, ph.value, d.title, 
+                tot.value, tpt.value, t.job, t.doc_type, 
+                t.active_status, p.removed
            FROM pub_proc_doc p
            JOIN #t0 t
              ON p.doc_id = t.id
@@ -175,6 +201,9 @@ cursor.execute("""\
            JOIN query_term pid
              ON t.id = pid.doc_id
             AND pid.path = '/InScopeProtocol/ProtocolIDs/PrimaryID/IDString'
+           JOIN query_term ph
+             ON t.id = ph.doc_id
+            AND ph.path  = '/InScopeProtocol/ProtocolPhase'
            JOIN query_term tot
              ON t.id = tot.doc_id
             AND tot.path = '/InScopeProtocol/ProtocolTitle'
@@ -236,7 +265,8 @@ cursor.execute("""\
 # has been published.
 # ---------------------------------------------------------------------
 cursor.execute("""\
-         SELECT top 10 t1.id, t1.protid, t1.ptitle, t1.otitle, t1.cit, t2.pmid
+         SELECT t1.id, t1.protid, t1.phase, t1.ptitle, t1.otitle, 
+                t1.cit, t2.pmid
            FROM #t1 t1
 LEFT OUTER JOIN #t2 t2
              ON t1.cit = t2.cit
@@ -250,7 +280,7 @@ rows = cursor.fetchall()
 # --------------------------------------------------------------
 for row in rows:
     response = []
-    response = cdr.filterDoc('guest', ['set:Format Citation'], row[4])
+    response = cdr.filterDoc('guest', ['set:Format Citation'], row[5])
     row.append(response[0])
 
 # Select the protocol OtherIDs and concatenate them to the primary
@@ -271,9 +301,6 @@ for row in rows:
     row[1] += otherNames
 
 t = time.strftime("%Y%m%d%H%M%S")
-#print "Content-type: application/vnd.ms-excel"
-#print "Content-Disposition: attachment; filename=PublishedCitationReport-%s.xls" % t
-#print 
 
 workbook = pyXLWriter.Writer(sys.stdout)
 
@@ -286,11 +313,11 @@ format.set_align('top')
 # Create worksheet listing all updated InScopeProtocols
 # -----------------------------------------------------
 titles  = ('InScopeProtocol Citations', 'Summary Titles')
-colheaders = ['DocID',    'Protocol IDs',
+colheaders = ['DocID',    'Protocol IDs', 'Phase', 
            'HP Title', 'Original Title', 
            'CID', 'PMID', 
            'Formatted Citation', 'Kp/Rm', 'Comment']
-widths  = (6, 15, 25, 25, 6, 8, 25, 6, 14)
+widths  = (6, 15, 10, 20, 20, 6, 8, 25, 6, 10)
 addWorksheet(workbook, titles[0], colheaders, widths, format, rows)
 
 workbook.close()
