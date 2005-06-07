@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolReports.py,v 1.17 2005-05-12 14:49:38 bkline Exp $
+# $Id: ProtocolReports.py,v 1.18 2005-06-07 15:49:54 bkline Exp $
 #
 # Submenu for protocol reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.17  2005/05/12 14:49:38  bkline
+# New report for Sheri (request #1684).
+#
 # Revision 1.16  2005/05/11 20:57:24  bkline
 # Report created for Sheri (request #1669).
 #
@@ -112,8 +115,12 @@ filename = time.strftime('InterimUpdateReport-%Y%m%d%H%M%S.xls')
 reports = [
            ('ApprovedNotYetActive.py',
             'Approved Not Yet Active Report', ''),
+           ('Request1687.py',
+            'CTEP Orgs Without Phones', ''),
            ('LiaisonReport.py', 
             'NCI Liaison Office/Brussels Protocol Report', ''),
+           ('NciClinicalTrialsStats.py', 
+            'NCI Clinical Trials Statistics', ''),
            ('NewlyPublishableTrials.py', 
             'Newly Publishable Trials', ''),
            ('PreferredProtOrgs.py', 
