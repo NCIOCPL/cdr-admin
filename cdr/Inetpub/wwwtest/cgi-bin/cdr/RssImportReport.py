@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: RssImportReport.py,v 1.2 2005-06-01 12:46:14 bkline Exp $
+# $Id: RssImportReport.py,v 1.3 2005-06-09 18:42:41 bkline Exp $
 #
 # Reports on import/update of RSS protocol site information.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2005/06/01 12:46:14  bkline
+# Fixed bug in reporting whether a publishable version was created.
+#
 # Revision 1.1  2005/05/11 20:57:24  bkline
 # Report created for Sheri (request #1669).
 #
@@ -190,7 +193,7 @@ for cdrId, locked, pubVer, new in rows:
         doc = Doc(cdrId, locked, pubVer, new)
         if doc.locked == 'Y':
             lockedDocs[cdrId] = doc
-        elif doc.new:
+        elif doc.new == 'Y':
             newDocs[cdrId] = doc
         else:
             updatedDocs[cdrId] = doc
