@@ -1,13 +1,16 @@
 #----------------------------------------------------------------------
 #
-# $Id: NciClinicalTrialsStats.py,v 1.1 2005-06-06 20:49:32 bkline Exp $
+# $Id: NciClinicalTrialsStats.py,v 1.2 2005-06-09 18:37:41 bkline Exp $
 #
 # "We want to create a new report to be added to the Protocols Menu
 # in the CDR, to respond to requests for Clinical Trial Statistics."
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2005/06/06 20:49:32  bkline
+# New report for clinical trials statistics.
+#
 #----------------------------------------------------------------------
-import cdrdb, cdrcgi
+import cdrdb, cdrcgi, time
 
 def showTotal(label, total):
     totalString = str(total)
@@ -21,7 +24,8 @@ htmlStrings = [u"""\
  </head>
  <body>
   <h3>NCI Clinical Trials Statistics Report</h3>
-  <pre>"""]
+  <h4>%s</h4>
+  <pre>""" % time.strftime("%Y-%m-%d")]
 conn = cdrdb.connect('CdrGuest')
 cursor = conn.cursor()
 cursor.execute("CREATE TABLE #a (id INTEGER)")
@@ -30,16 +34,21 @@ cursor.execute("""\
     INSERT INTO #a
 SELECT DISTINCT s.doc_id
            FROM query_term s
+           JOIN query_term n
+             ON n.doc_id = s.doc_id
            JOIN pub_proc_cg p
              ON p.id = s.doc_id
           WHERE s.path = '/InScopeProtocol/ProtocolAdminInfo'
                        + '/CurrentProtocolStatus'
+            AND n.path = '/InScopeProtocol/ProtocolSponsors/SponsorName'
+            AND n.value = 'NCI'
             AND s.value IN ('Active', 'Approved-not yet active')""",
                timeout = 300)
 conn.commit()
 cursor.execute("SELECT COUNT(*) FROM #a")
 #print "total protocols:", cursor.fetchall()[0][0]
-htmlStrings.append(showTotal(u"TOTAL PROTOCOLS", cursor.fetchall()[0][0]))
+htmlStrings.append(showTotal(u"TOTAL NUMBER OF NCI SPONSORED PDQ PROTOCOLS",
+                             cursor.fetchall()[0][0]))
 #print ""
 
 htmlStrings.append("")
@@ -168,6 +177,9 @@ for key in keys:
     htmlStrings.append(u"    %-60s %5d" % (key, types[key]))
 
 htmlStrings.append(u"""\
+
+[* Numbers of trials may be lower than sums of individual breakdown
+   counts because of overlap within trials.]
   </pre>
  </body>
 </html>""")
