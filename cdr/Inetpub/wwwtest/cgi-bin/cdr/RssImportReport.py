@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: RssImportReport.py,v 1.3 2005-06-09 18:42:41 bkline Exp $
+# $Id: RssImportReport.py,v 1.4 2005-06-23 15:16:32 bkline Exp $
 #
 # Reports on import/update of RSS protocol site information.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2005/06/09 18:42:41  bkline
+# Fixed test for new imports.
+#
 # Revision 1.2  2005/06/01 12:46:14  bkline
 # Fixed bug in reporting whether a publishable version was created.
 #
@@ -71,8 +74,10 @@ def addTable(docs, header):
 """
         for key in keys:
             html += docs[key].toHtml()
-    return html + u"""\
+        html += u"""\
   </table>
+"""
+    return html + u"""\
   <br />
 """
 
@@ -153,6 +158,14 @@ rows = cursor.fetchall()
 if not rows:
     cdrcgi.bail("Invalid job ID %s" % jobId)
 jobDate = rows[0][0]
+cursor.execute("""\
+    SELECT DISTINCT doc_id
+               FROM query_term
+              WHERE path = '/InScopeProtocol/ProtocolDetail/StudyType'
+                AND value = 'Research study'""")
+researchStudyIds = {}
+for row in cursor.fetchall():
+    researchStudyIds[row[0]] = True
 html = """\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>
@@ -186,19 +199,40 @@ cursor.execute("""\
      WHERE e.job = ?""", jobId)
 rows = cursor.fetchall()
 lockedDocs = {}
-newDocs = {}
-updatedDocs = {}
+newDocsPub = {}
+newDocsNonPub = {}
+updatedDocsPub = {}
+updatedDocsNonPub = {}
+researchStudies = {}
 for cdrId, locked, pubVer, new in rows:
     if cdrId:
         doc = Doc(cdrId, locked, pubVer, new)
         if doc.locked == 'Y':
             lockedDocs[cdrId] = doc
+        elif cdrId in researchStudyIds:
+            researchStudies[cdrId] = doc
         elif doc.new == 'Y':
+            if doc.pubVer == 'Y':
+                newDocsPub[cdrId] = doc
+            else:
+                newDocsNonPub[cdrId] = doc
             newDocs[cdrId] = doc
         else:
-            updatedDocs[cdrId] = doc
-html += addTable(newDocs, 'Trials with initial external sites imported')
-html += addTable(updatedDocs, 'Updated trials')
+            if doc.pubVer == 'Y':
+                updatedDocsPub[cdrId] = doc
+            else:
+                updatedDocsNonPub[cdrId] = doc
+html += addTable(newDocsNonPub,
+                 'Trials with initial external sites imported with '
+                 'Non-Publishable Versions')
+html += addTable(newDocsPub,
+                 'Trials with initial external sites imported with '
+                 'Publishable Versions')
+html += addTable(updatedDocsNonPub,
+                 'Updated trials with Non-Publishable Versions')
+html += addTable(updatedDocsPub,
+                 'Updated trials with Publishable Versions')
+html += addTable(researchStudies, 'Research Studies')
 html += addTable(lockedDocs,
                  'Trials not updated because document was checked out')
 cdrcgi.sendPage(html + """\
