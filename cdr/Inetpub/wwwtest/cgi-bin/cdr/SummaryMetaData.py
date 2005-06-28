@@ -1,32 +1,38 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryMetaData.py,v 1.1 2003-11-10 18:14:24 bkline Exp $
+# $Id: SummaryMetaData.py,v 1.2 2005-06-28 20:47:48 venglisc Exp $
 #
 # Report on the metadata for one or more summaries.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2003/11/10 18:14:24  bkline
+# Report on the metadata for one or more summaries.
+#
 #----------------------------------------------------------------------
 import cdr, cgi, cdrcgi, cdrdb, re
 
 #----------------------------------------------------------------------
 # Get the parameters from the request.
 #----------------------------------------------------------------------
-fields   = cgi.FieldStorage()
-session  = cdrcgi.getSession(fields)
-request  = cdrcgi.getRequest(fields)
-docId    = fields and fields.getvalue('id')       or None #"62864"
-docTitle = fields and fields.getvalue('title')    or None
-board    = fields and fields.getvalue('board')    or None
-audience = fields and fields.getvalue('audience') or None
-language = fields and fields.getvalue('language') or None
-trimPat  = re.compile("[\s;]+$")
-SUBMENU  = "Report Menu"
-buttons  = ["Submit Request", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-script   = "SummaryMetaData.py"
-title    = "CDR Administration"
-section  = "Summary Metadata Report"
-header   = cdrcgi.header(title, title, section, script, buttons)
-rptHead  = """\
+fields      = cgi.FieldStorage()
+session     = cdrcgi.getSession(fields)
+request     = cdrcgi.getRequest(fields)
+docId       = fields and fields.getvalue('id')          or None #"62864"
+docTitle    = fields and fields.getvalue('title')       or None
+board       = fields and fields.getvalue('board')       or None
+audience    = fields and fields.getvalue('audience')    or None
+language    = fields and fields.getvalue('language')    or None
+description = fields and fields.getvalue('description') or None
+urltext     = fields and fields.getvalue('urltext')     or None
+url         = fields and fields.getvalue('url')         or None
+trimPat     = re.compile("[\s;]+$")
+SUBMENU     = "Report Menu"
+buttons     = ["Submit Request", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
+script      = "SummaryMetaData.py"
+title       = "CDR Administration"
+section     = "Summary Metadata Report"
+header      = cdrcgi.header(title, title, section, script, buttons)
+rptHead     = """\
  <head>
   <title>Summary Metadata Report</title>
   <style type='text/css'>
@@ -127,14 +133,17 @@ class SummarySection:
 
 class Summary:
     def __init__(self, id, cursor):
-        self.id       = id
-        self.cursor   = cursor
-        self.boards   = self.getBoards()
-        self.title    = self.getTitle()
-        self.language = self.getLanguage()
-        self.audience = self.getAudience()
-        self.topics   = self.getTopics()
-        self.sections = self.getSections()
+        self.id          = id
+        self.cursor      = cursor
+        self.boards      = self.getBoards()
+        self.title       = self.getTitle()
+        self.language    = self.getLanguage()
+        self.audience    = self.getAudience()
+        self.description = self.getDescription()
+        self.urltext     = self.getUrlText()
+        self.url         = self.getUrl()
+        self.topics      = self.getTopics()
+        self.sections    = self.getSections()
 
     def getBoards(self):
         boardPath = '/Summary/SummaryMetaData/PdqBoard/Board/@cdr:ref'
@@ -175,6 +184,30 @@ class Summary:
             SELECT value
               FROM query_term
              WHERE path = '/Summary/SummaryMetaData/SummaryAudience'
+               AND doc_id = ?""", self.id)
+        return self.cursor.fetchall()[0][0]
+
+    def getDescription(self):
+        self.cursor.execute("""\
+            SELECT value
+              FROM query_term
+             WHERE path = '/Summary/SummaryMetaData/SummaryDescription'
+               AND doc_id = ?""", self.id)
+        return self.cursor.fetchall()[0][0]
+
+    def getUrlText(self):
+        self.cursor.execute("""\
+            SELECT value
+              FROM query_term
+             WHERE path = '/Summary/SummaryMetaData/SummaryURL'
+               AND doc_id = ?""", self.id)
+        return self.cursor.fetchall()[0][0]
+
+    def getUrl(self):
+        self.cursor.execute("""\
+            SELECT value
+              FROM query_term
+             WHERE path = '/Summary/SummaryMetaData/SummaryURL/@cdr:xref'
                AND doc_id = ?""", self.id)
         return self.cursor.fetchall()[0][0]
 
@@ -286,7 +319,24 @@ class Summary:
     </td>
     <td>%s</td>
    </tr>
-""" % (self.audience, self.language)
+   <tr>
+    <td align='right' valign='top'>
+     <b>Description:&nbsp;</b>
+    </td>
+    <td>%s</td>
+   </tr>
+   <tr>
+    <td align='right' valign='top'>
+     <b>Pretty URL:&nbsp;</b>
+    </td>
+    <td>%s
+     <br/>
+     <a href="%s">%s</a>
+    </td>
+   </tr>
+""" % (self.audience, self.language, self.description, self.urltext, 
+       self.url, self.url)
+
         html += """\
    <tr>
     <td align='right' valign='top'>
