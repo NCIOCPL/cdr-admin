@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolReports.py,v 1.18 2005-06-07 15:49:54 bkline Exp $
+# $Id: ProtocolReports.py,v 1.19 2005-06-30 21:55:39 bkline Exp $
 #
 # Submenu for protocol reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.18  2005/06/07 15:49:54  bkline
+# Two new reports plugged in: CTEP orgs without phones and NCI trials.
+#
 # Revision 1.17  2005/05/12 14:49:38  bkline
 # New report for Sheri (request #1684).
 #
@@ -119,12 +122,12 @@ reports = [
             'CTEP Orgs Without Phones', ''),
            ('LiaisonReport.py', 
             'NCI Liaison Office/Brussels Protocol Report', ''),
-           ('NciClinicalTrialsStats.py', 
-            'NCI Clinical Trials Statistics', ''),
            ('NewlyPublishableTrials.py', 
             'Newly Publishable Trials', ''),
            ('PreferredProtOrgs.py', 
             'Preferred Protocol Organizations', ''),
+           ('NciClinicalTrialsStats.py', 
+            'Profile of NCI Sponsored Clinical Trials', ''),
            ('HotfixReport.py',
             'Protocol Interim Update Report',
             '&filename=%s' % filename),
