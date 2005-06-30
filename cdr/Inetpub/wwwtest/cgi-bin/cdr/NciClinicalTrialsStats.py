@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: NciClinicalTrialsStats.py,v 1.2 2005-06-09 18:37:41 bkline Exp $
+# $Id: NciClinicalTrialsStats.py,v 1.3 2005-06-30 21:56:30 bkline Exp $
 #
 # "We want to create a new report to be added to the Protocols Menu
 # in the CDR, to respond to requests for Clinical Trial Statistics."
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2005/06/09 18:37:41  bkline
+# Cosmetic mods requested by Lakshmi.
+#
 # Revision 1.1  2005/06/06 20:49:32  bkline
 # New report for clinical trials statistics.
 #
@@ -20,10 +23,10 @@ def showTotal(label, total):
 htmlStrings = [u"""\
 <html>
  <head>
-  <title>NCI Clinical Trials Statistics Report</title>
+  <title>Profile of NCI Sponsored Clinical Trials</title>
  </head>
  <body>
-  <h3>NCI Clinical Trials Statistics Report</h3>
+  <h3>Profile of NCI Sponsored Clinical Trials</h3>
   <h4>%s</h4>
   <pre>""" % time.strftime("%Y-%m-%d")]
 conn = cdrdb.connect('CdrGuest')
@@ -175,6 +178,28 @@ keys = types.keys()
 keys.sort()
 for key in keys:
     htmlStrings.append(u"    %-60s %5d" % (key, types[key]))
+
+htmlStrings.append("")
+cursor.execute("""\
+    SELECT DISTINCT #a.id, c.value
+      FROM #a
+      JOIN query_term c
+        ON c.doc_id = #a.id
+     WHERE c.path = '/InScopeProtocol/ProtocolSpecialCategory/SpecialCategory'
+""", timeout = 300)
+cats = {}
+prots = {}
+for docId, cat in cursor.fetchall():
+    prots[docId] = True
+    cats[cat] = cats.get(cat, 0) + 1
+htmlStrings.append(showTotal(u"NCI-SPONSORED PDQ PROTOCOLS WITH "
+                             "SPECIAL CATEGORY ELEMENT", len(prots)))
+keys = cats.keys()
+keys.sort()
+for key in keys:
+    htmlStrings.append(u"    %-60s %5d" %
+                       (key or "[element present but empty]", cats[key]))
+htmlStrings.append("")
 
 htmlStrings.append(u"""\
 
