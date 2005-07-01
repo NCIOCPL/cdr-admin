@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.47 2005-06-02 19:48:20 venglisc Exp $
+# $Id: QcReport.py,v 1.48 2005-07-01 19:29:45 venglisc Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.47  2005/06/02 19:48:20  venglisc
+# Fixed code to pass a default for the displayBoard variable for patient
+# summaries. (Bug 1707)
+#
 # Revision 1.46  2005/05/25 16:18:02  venglisc
 # Added code to allow summary QC reports to be run with Editorial Board or
 # Advisory Board mark-up. (Bug 1657)
@@ -194,6 +198,10 @@ def getSectionTitle(repType):
         return "QC Report (No Markup)"
     elif repType == "pat":
         return "Patient QC Report"
+    elif repType == "patrs":
+        return "Patient Redline/Strikeout QC Report"
+    elif repType == "patbu":
+        return "Patient Bold/Underline QC Report"
     elif repType == "pp":
         return "Publish Preview Report"
     elif repType == "img":
@@ -388,7 +396,7 @@ if docType == 'Summary' and repType and repType != 'pp' and not version:
 """
     # The Board Markup does not apply to the Patient Version Summaries
     # ----------------------------------------------------------------
-    if repType != 'pat':
+    if repType != 'pat' and repType != 'patbu' and repType != 'patrs':
         form += """\
     <td valign="top">
      <table>
@@ -446,7 +454,7 @@ if docType == 'Summary' and repType and repType != 'pp' and not version:
   Include glossary terms at end of report?<BR>
 """
 
-    if repType == "pat":
+    if repType == 'pat' or repType == 'patbu' or repType == 'patrs':
         form += """\
   <BR>
   <INPUT TYPE='checkbox' NAME='ShowStandardWording'>&nbsp;&nbsp;
@@ -475,6 +483,10 @@ filters = {
         ["set:QC Summary Set"],
     'Summary:pat': # Patient
         ["set:QC Summary Patient Set"],
+    'Summary:patrs': # Patient
+        ["set:QC Summary Patient Set"],
+    'Summary:patbu': # Patient
+        ["set:QC Summary Patient Set (Bold/Underline)"],
     'GlossaryTerm':         
         ["set:QC GlossaryTerm Set"],
     'Citation':         
@@ -968,7 +980,7 @@ if insRevLvls:
 if docType.startswith('Summary'):
     filterParm.append(['DisplayComments',
                        displayComments and 'Y' or 'N'])
-    if repType == "pat":
+    if repType == 'pat' or repType == 'patrs' or repType == 'patbu':
         displayBoard += 'editorial-board_'
     filterParm.append(['displayBoard', displayBoard])
 
@@ -979,7 +991,7 @@ if repType == "bu" or repType == "but":
 filterParm.append(['DisplayGlossaryTermList',
                        glossary and "Y" or "N"])
 
-if repType == "pat":
+if repType == 'pat' or repType == 'patrs' or repType == 'patbu':
     filterParm.append(['ShowStandardWording',
                        standardWording and "Y" or "N"])
 
