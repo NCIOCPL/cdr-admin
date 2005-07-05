@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditExternMap.py,v 1.6 2004-08-27 19:07:32 bkline Exp $
+# $Id: EditExternMap.py,v 1.7 2005-07-05 12:33:34 bkline Exp $
 #
 # Allows a user to edit the table which maps strings from external
 # systems (such as ClinicalTrials.gov) to CDR document IDs.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2004/08/27 19:07:32  bkline
+# Cosmetic changes requested by Lakshmi (comment #4, request #1297).
+#
 # Revision 1.5  2004/08/19 22:12:23  bkline
 # Added support for deleting rows from the external_map table.
 #
@@ -141,6 +144,8 @@ if request == "Save Changes":
     uid = rows[0][0]
     uName = rows[0][1]
     pairs = {}
+    oldBogus = {}
+    newBogus = {}
     for field in fields.keys():
         if field.startswith("id-"):
             key = extractInt(field)
@@ -159,9 +164,33 @@ if request == "Save Changes":
         elif field.startswith("del-id"):
             key = extractInt(field)
             pairs[key] = "DELETE"
+        elif field.startswith("old-bogus-"):
+            key = extractInt(field)
+            oldBogus[key] = fields[field].value
+        elif field.startswith("bogus-"):
+            key = extractInt(field)
+            newBogus[key] = "Y"
     numChanges = 0
     numDeletions = 0
     errors = []
+    for rowId, oldValue in oldBogus.items():
+        newValue = None
+        if oldValue == 'Y' and rowId not in newBogus:
+            newValue = 'N'
+        elif oldValue == 'N' and rowId in newBogus:
+            newValue = 'Y'
+        if newValue:
+            try:
+                cursor.execute("""\
+                    UPDATE external_map
+                       SET bogus = ?
+                     WHERE id = ?""", (newValue, rowId))
+                numChanges += 1
+            except Exception, e:
+                errors.append("failure setting external_map.bogus column "
+                              "to '%s' for row %d: %s" % (newValue, rowId,
+                                                          str(e)))
+                
     for key in pairs:
         pair = pairs[key]
         if pair == "DELETE" and allowed(key):
@@ -303,7 +332,7 @@ if request in ("Save Changes", "Get Values"):
     whereUsage = intUsage and ("AND m.usage = %d" % intUsage) or ""
     if pattern:
         cursor.execute("""\
-         SELECT m.id, m.value, m.doc_id, u.name
+         SELECT m.id, m.value, m.doc_id, u.name, m.bogus
            FROM external_map m
            JOIN external_map_usage u
              ON u.id = m.usage
@@ -312,7 +341,7 @@ if request in ("Save Changes", "Get Values"):
        ORDER BY m.value""" % whereUsage, pattern)
     elif docId:
         cursor.execute("""\
-         SELECT m.id, m.value, m.doc_id, u.name
+         SELECT m.id, m.value, m.doc_id, u.name, m.bogus
            FROM external_map m
            JOIN external_map_usage u
              ON u.id = m.usage
@@ -320,7 +349,7 @@ if request in ("Save Changes", "Get Values"):
        ORDER BY m.value""" % extractInt(docId))
     else:
         cursor.execute("""\
-         SELECT m.id, m.value, m.doc_id, u.name
+         SELECT m.id, m.value, m.doc_id, u.name, m.bogus
            FROM external_map m
            JOIN external_map_usage u
              ON u.id = m.usage
@@ -352,6 +381,7 @@ if request in ("Save Changes", "Get Values"):
             extra = allUsage and (" [%s]" % row[3]) or ""
             value = "%s%s" % (row[1], extra)
             value = cgi.escape(value, 1)
+            bogus = row[4] == 'Y' and " checked='1'" or ""
             value = ("<input class='r' readonly='1' size='80' "
                      "name='name-%d' value=\"%s\">" % (row[0], value))
             docId = "<input size='8' name='id-%d' value='%s'>" % (row[0],
@@ -364,9 +394,14 @@ if request in ("Save Changes", "Get Values"):
     <td nowrap='1'>
      <input type='checkbox' name='del-id-%d'>&nbsp;Delete mapping?
     </td>
+    <td nowrap='1'>
+     <input type='checkbox' name='bogus-%d'%s>&nbsp;Bogus?
+    </td>
     <input type='hidden' name='old-id-%d' value='%s'>
+    <input type='hidden' name='old-bogus-%d' value='%s'>
    </tr>
-""" % (value, docId, button, row[0], row[0], row[2] or "")
+""" % (value, docId, button, row[0], row[0], bogus, row[0], row[2] or "",
+       row[0], row[4])
             row = cursor.fetchone()
         form += """\
   </table>
