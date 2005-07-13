@@ -1,12 +1,16 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryDateLastModified.py,v 1.5 2005-05-27 17:21:03 bkline Exp $
+# $Id: SummaryDateLastModified.py,v 1.6 2005-07-13 01:28:03 bkline Exp $
 #
 # Report listing specified set of Cancer Information Summaries, the date
 # they were last modified as entered by a user, and the date the last
 # Modify action was taken.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2005/05/27 17:21:03  bkline
+# Modifications requested by Sheri (issue #1698): converted to Excel
+# workbook; added three new columns for System report.
+#
 # Revision 1.4  2003/12/16 15:50:23  bkline
 # Fixed bug in title display showing which date range user specified.
 #
@@ -224,8 +228,11 @@ try:
                         bn.value AS board_name,
                         au.value AS audience,
                         lm.value AS last_mod,
+                        ty.value AS summary_type,
                         MAX(audit_trail.dt) AS audit_date
                    FROM query_term st
+                   JOIN query_term ty
+                     ON ty.doc_id = st.doc_id
                    JOIN query_term sb
                      ON sb.doc_id = st.doc_id
                    JOIN query_term au
@@ -237,6 +244,7 @@ try:
                    JOIN audit_trail
                      ON audit_trail.document = st.doc_id
                   WHERE st.path = '/Summary/SummaryTitle'
+                    AND ty.path = '/Summary/SummaryMetaData/SummaryType'
                     AND sb.path = '/Summary/SummaryMetaData/PDQBoard'
                                 + '/Board/@cdr:ref'
                     AND au.path = '/Summary/SummaryMetaData/SummaryAudience'
@@ -260,7 +268,8 @@ try:
                         au.value,
                         st.value,
                         st.doc_id,
-                        lm.value
+                        lm.value,
+                        ty.value
                  HAVING MAX(audit_trail.dt) BETWEEN '%s' AND
                                             DATEADD(s, -1, DATEADD(d, 1, '%s'))
                ORDER BY bn.value,
@@ -322,7 +331,7 @@ def getBoardAbbreviation(board):
 # Map audience name to abbreviation.
 #----------------------------------------------------------------------
 def getTypeAbbreviation(audience):
-    if audience.upper().find('PROFESSIONAL'):
+    if audience.upper().find('PROFESSIONAL') != -1:
         return 'HP'
     return 'PAT'
 
@@ -364,12 +373,13 @@ print "Content-type: application/vnd.ms-excel"
 print "Content-Disposition: attachment; filename=sdlm-%s.xls" % stamp
 print
 book      = pyXLWriter.Writer(sys.stdout)
-sheet     = book.add_worksheet("CTEP Orgs")
+sheet     = book.add_worksheet("Summary Date Last Modified")
 rowNum    = 1
 format1   = book.add_format()
 format2   = book.add_format()
 format3   = book.add_format()
 format4   = book.add_format()
+format5   = book.add_format()
 format1.set_bold();
 format1.set_size(12)
 format1.set_align('center')
@@ -384,6 +394,9 @@ format3.set_merge(0)
 format3.set_align('center')
 format3.set_text_wrap(1)
 format4.set_align('center')
+format5.set_align('center')
+format5.set_color('blue')
+format5.set_underline(1)
 
 sheet.write_string([0, 0], fix(bodyTitle), format1)
 colNum = 0
@@ -393,7 +406,7 @@ sheet.set_column(colNum, 50)
 sheet.write_blank([0, colNum], format1)
 colNum += 1
 if reportType == 'S':
-    sheet.set_column(colNum, 7)
+    sheet.set_column(colNum, 14)
     sheet.write_blank([0, colNum], format1)
     colNum += 1
     sheet.set_column(colNum, 7)
@@ -416,8 +429,10 @@ sheet.write_blank([0, colNum], format1)
 #----------------------------------------------------------------------
 lastBoard = None
 while row:
-    intId, title, board, audience, lastMod, auditDate = row
+    intId, title, board, audience, lastMod, summaryType, auditDate = row
     docId = "CDR%d" % intId
+    if summaryType == 'Complementary and alternative medicine':
+        summaryType = 'CAM'
     lastVersions = cdr.lastVersions('guest', docId)
     if type(lastVersions) in (type(""), type(u"")):
         lastVFlag = lastVersions
@@ -441,7 +456,7 @@ while row:
     sheet.write_string([rowNum, colNum], fix(title))
     colNum += 1
     if reportType == 'S':
-        sheet.write_string([rowNum, colNum], getBoardAbbreviation(board))
+        sheet.write_string([rowNum, colNum], fix(summaryType))
         colNum += 1
         sheet.write_string([rowNum, colNum], getTypeAbbreviation(audience))
         colNum += 1
@@ -452,7 +467,13 @@ while row:
     sheet.write_string([rowNum, colNum], fix(lastMod), format4)
     colNum += 1
     if auditDate:
-        sheet.write_string([rowNum, colNum], fix(auditDate[:10]), format4)
+        if reportType == 'S':
+            url = ("http://%s/cgi-bin/cdr/AuditTrail.py?id=%s" %
+                   (cdrcgi.WEBSERVER, docId))
+            sheet.write_url([rowNum, colNum], url, fix(auditDate[:10]),
+                            format5)
+        else:
+            sheet.write_string([rowNum, colNum], fix(auditDate[:10]), format4)
     colNum += 1
     sheet.write_string([rowNum, colNum], lastVFlag, format4)
     row = cursor.fetchone()
