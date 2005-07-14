@@ -1,12 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryDateLastModified.py,v 1.6 2005-07-13 01:28:03 bkline Exp $
+# $Id: SummaryDateLastModified.py,v 1.7 2005-07-14 09:49:41 bkline Exp $
 #
 # Report listing specified set of Cancer Information Summaries, the date
 # they were last modified as entered by a user, and the date the last
 # Modify action was taken.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2005/07/13 01:28:03  bkline
+# Fixed bug in test of audience for lookup of abbreviation.
+#
 # Revision 1.5  2005/05/27 17:21:03  bkline
 # Modifications requested by Sheri (issue #1698): converted to Excel
 # workbook; added three new columns for System report.
@@ -243,6 +246,8 @@ try:
                      ON bn.doc_id = sb.int_val
                    JOIN audit_trail
                      ON audit_trail.document = st.doc_id
+                   JOIN action
+                     ON action.id = audit_trail.action
                   WHERE st.path = '/Summary/SummaryTitle'
                     AND ty.path = '/Summary/SummaryMetaData/SummaryType'
                     AND sb.path = '/Summary/SummaryMetaData/PDQBoard'
@@ -251,6 +256,7 @@ try:
                     AND lm.path = '/Summary/DateLastModified'
                     AND bn.path = '/Organization/OrganizationNameInformation'
                                 + '/OfficialName/Name'
+                    AND action.name <> 'UNLOCK'
                     AND au.value = ?
                     
                     /*
