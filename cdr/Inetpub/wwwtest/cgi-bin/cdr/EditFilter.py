@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditFilter.py,v 1.16 2003-12-30 22:49:14 venglisc Exp $
+# $Id: EditFilter.py,v 1.17 2005-07-19 15:13:24 venglisc Exp $
 #
 # Prototype for editing CDR filter documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.16  2003/12/30 22:49:14  venglisc
+# Added text explaining usage of bachid field.
+#
 # Revision 1.15  2003/11/05 14:48:35  bkline
 # Added optional field for ID of existing CDR document on Bach when
 # title is being changed.
@@ -283,7 +286,7 @@ def getProdId(docId, doc, session):
         title = row[0]
 
         # Look up the ID on the production server using the title.
-        conn = cdrdb.connect('CdrGuest', dataSource = cdr.PROD_HOST)
+        conn = cdrdb.connect('CdrGuest', dataSource = cdr.PROD_NAME)
         prodCursor = conn.cursor()
         prodCursor.execute("""\
             SELECT d.id
@@ -315,25 +318,25 @@ def getProdId(docId, doc, session):
             cdrcgi.bail("Failure locating session information")
         uid, pwd = rows[0]
         reason = "Migrating new filter from development server"
-        prodSession = cdr.login(uid, pwd, host = cdr.PROD_HOST)
+        prodSession = cdr.login(uid, pwd, host = cdr.PROD_NAME)
         if session.find("<Err") != -1:
             cdrcgi.bail("Failure logging onto production server: %s" %
                     prodSession)
         doc = cdrcgi.encode(stripId(doc))
         docId = cdr.addDoc(prodSession, doc = doc, reason = reason, 
-                host = cdr.PROD_HOST)
+                host = cdr.PROD_NAME)
         if docId.find("<Err") != -1:
-            cdr.logout(prodSession, host = cdr.PROD_HOST)
+            cdr.logout(prodSession, host = cdr.PROD_NAME)
             cdrcgi.bail("Failure adding %s to production server: %s" %
                     (cgi.escape(title), docId))
-        doc = cdr.getDoc(prodSession, docId, 'Y', host = cdr.PROD_HOST)
+        doc = cdr.getDoc(prodSession, docId, 'Y', host = cdr.PROD_NAME)
         if doc.find("<Err") == 0:
-            cdr.logout(prodSession, host = cdr.PROD_HOST)
+            cdr.logout(prodSession, host = cdr.PROD_NAME)
             cdrcgi.bail("Failure checking out %s from production server: %s" %
                     (cgi.escape(title), doc))
         docId = cdr.repDoc(prodSession, doc = doc, checkIn = 'Y',
-                ver = 'Y', reason = reason, host = cdr.PROD_HOST)
-        cdr.logout(prodSession, host = cdr.PROD_HOST)
+                ver = 'Y', reason = reason, host = cdr.PROD_NAME)
+        cdr.logout(prodSession, host = cdr.PROD_NAME)
         if docId.find("<Err") != -1:
             cdrcgi.bail("Failure checking in %s to production server: %s" %
                     (cgi.escape(title), docId))

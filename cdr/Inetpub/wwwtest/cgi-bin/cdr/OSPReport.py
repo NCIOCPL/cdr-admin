@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: OSPReport.py,v 1.5 2005-05-26 21:33:52 venglisc Exp $
+# $Id: OSPReport.py,v 1.6 2005-07-19 15:13:24 venglisc Exp $
 #
 # Queue up report for the Office of Science Policy.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2005/05/26 21:33:52  venglisc
+# Modified to pre-populate the email input field with the session owners
+# email address. (Bug 1664)
+#
 # Revision 1.4  2005/03/01 20:18:00  bkline
 # Added active date range fields.
 #
@@ -67,7 +71,7 @@ if request == "Log Out":
 def listTermChoices():
     path = "/Term/MenuInformation/MenuItem/MenuParent/@cdr:ref"
     try:
-        conn = cdrdb.connect('CdrGuest', dataSource='bach.nci.nih.gov')
+        conn = cdrdb.connect('CdrGuest', dataSource=cdr.PROD_NAME)
         cursor = conn.cursor()
         cursor.execute("""\
    SELECT DISTINCT c.doc_id,
