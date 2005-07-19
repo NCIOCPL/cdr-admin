@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryMetaData.py,v 1.2 2005-06-28 20:47:48 venglisc Exp $
+# $Id: SummaryMetaData.py,v 1.3 2005-07-19 22:02:28 ameyer Exp $
 #
 # Report on the metadata for one or more summaries.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2005/06/28 20:47:48  venglisc
+# Added two new MetaData elements (SummaryDescription, SummaryURL) to the QC
+# report. (Bug 1724)
+#
 # Revision 1.1  2003/11/10 18:14:24  bkline
 # Report on the metadata for one or more summaries.
 #
@@ -56,7 +60,7 @@ elif request == SUBMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if request == "Log Out": 
+if request == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
@@ -161,7 +165,7 @@ class Summary:
         boards = []
         for row in self.cursor.fetchall():
             boards.append(row[0])
-        return boards
+        return missCheck(boards)
 
     def getTitle(self):
         self.cursor.execute("""\
@@ -169,7 +173,7 @@ class Summary:
               FROM query_term
              WHERE path = '/Summary/SummaryTitle'
                AND doc_id = ?""", self.id)
-        return self.cursor.fetchall()[0][0]
+        return missCheck(self.cursor.fetchall())
 
     def getLanguage(self):
         self.cursor.execute("""\
@@ -177,7 +181,7 @@ class Summary:
               FROM query_term
              WHERE path = '/Summary/SummaryMetaData/SummaryLanguage'
                AND doc_id = ?""", self.id)
-        return self.cursor.fetchall()[0][0]
+        return missCheck(self.cursor.fetchall())
 
     def getAudience(self):
         self.cursor.execute("""\
@@ -185,7 +189,7 @@ class Summary:
               FROM query_term
              WHERE path = '/Summary/SummaryMetaData/SummaryAudience'
                AND doc_id = ?""", self.id)
-        return self.cursor.fetchall()[0][0]
+        return missCheck(self.cursor.fetchall())
 
     def getDescription(self):
         self.cursor.execute("""\
@@ -193,7 +197,7 @@ class Summary:
               FROM query_term
              WHERE path = '/Summary/SummaryMetaData/SummaryDescription'
                AND doc_id = ?""", self.id)
-        return self.cursor.fetchall()[0][0]
+        return missCheck(self.cursor.fetchall())
 
     def getUrlText(self):
         self.cursor.execute("""\
@@ -201,7 +205,7 @@ class Summary:
               FROM query_term
              WHERE path = '/Summary/SummaryMetaData/SummaryURL'
                AND doc_id = ?""", self.id)
-        return self.cursor.fetchall()[0][0]
+        return missCheck(self.cursor.fetchall())
 
     def getUrl(self):
         self.cursor.execute("""\
@@ -209,7 +213,7 @@ class Summary:
               FROM query_term
              WHERE path = '/Summary/SummaryMetaData/SummaryURL/@cdr:xref'
                AND doc_id = ?""", self.id)
-        return self.cursor.fetchall()[0][0]
+        return missCheck(self.cursor.fetchall())
 
     def getTopics(self):
         mainTopicPath = '/Summary/SummaryMetaData/MainTopics/Term/@cdr:ref'
@@ -230,7 +234,8 @@ class Summary:
                     topics.append(topic + " (M)")
                 else:
                     topics.append(topic + " (S)")
-        return topics
+        return missCheck(topics)
+
 
     def getSections(self):
         sections     = []
@@ -334,7 +339,7 @@ class Summary:
      <a href="%s">%s</a>
     </td>
    </tr>
-""" % (self.audience, self.language, self.description, self.urltext, 
+""" % (self.audience, self.language, self.description, self.urltext,
        self.url, self.url)
 
         html += """\
@@ -383,11 +388,61 @@ class Summary:
 """
 
 #----------------------------------------------------------------------
+# Check a fetchall result
+#----------------------------------------------------------------------
+def missCheck(result):
+    """
+    Check to see if data was available from a database select.
+    If so, return the information in a format compatible with the
+    structure of the data itself.
+
+    Pass:
+        One of:
+            Result of a cursor.fetch...() - a list of lists:
+                Return just one item from the result.
+            List built up of multiple selects:
+                Return the whole list.
+            A simple string.
+                Return the string.
+
+    Return:
+        Data of the proper type.
+        If no result passed,
+            return an error message of the proper type.
+    """
+    noData = "[ <font color='red'>Missing</font> ]"
+
+    # Return is based on type of result passed
+    if (type(result) == type('')) or (type(result) == type(u'')):
+        # Simple string
+        if result:
+            return result
+        return noData
+
+    if type(result) == type([]):
+        if len(result):
+            # cursor.fetchall() result, a list of lists (list of rows)
+            if type(result[0]) == type([]):
+                if len(result[0]):
+                    return result[0][0]
+                return noData
+
+            # List built up from numerous fetches, return it as a list
+            return result
+        return [noData]
+
+    raise StandardError("""
+Unexpected data type passed to missCheck():
+    type = %s
+    data = %s""" % (str(type(result)), str(result)))
+
+
+#----------------------------------------------------------------------
 # Get a database connection.
 #----------------------------------------------------------------------
 conn    = cdrdb.connect('CdrGuest')
 cursor  = conn.cursor()
-    
+
 #----------------------------------------------------------------------
 # If we have a title string but no ID, find the matching summary.
 #----------------------------------------------------------------------
@@ -425,7 +480,7 @@ if docTitle and not docId:
  </body>
 </html>
 """)
-    
+
 #----------------------------------------------------------------------
 # Handle request to display report for a single summary.
 #----------------------------------------------------------------------
