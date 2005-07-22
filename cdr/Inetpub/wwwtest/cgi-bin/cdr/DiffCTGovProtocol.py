@@ -1,8 +1,12 @@
 #----------------------------------------------------------------------
 #
-# $Id: DiffCTGovProtocol.py,v 1.3 2003-12-18 22:05:29 bkline Exp $
+# $Id: DiffCTGovProtocol.py,v 1.4 2005-07-22 19:41:20 venglisc Exp $
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2003/12/18 22:05:29  bkline
+# Moved the line splitting before the invocation of diff and removed
+# the visual clues about where extra line breaks have been added.
+#
 # Revision 1.2  2003/12/17 13:48:32  bkline
 # Implemented wrapping of long lines at Lakshmi's request.
 #
@@ -55,10 +59,12 @@ docId        = cdr.normalize(docId)
 lastVersions = cdr.lastVersions('guest', docId)
 filt         = ['name:Extract Significant CTGovProtocol Elements']
 name2        = "CurrentWorkingDocument.xml"
-print "docId=%s type(docId)=%s" % (str(docId), type(docId))
+# print "docId=%s type(docId)=%s" % (str(docId), type(docId))
 response     = cdr.filterDoc('guest', filt, docId)
+
 if type(response) in (type(""), type(u"")):
     cdrcgi.bail(response)
+
 doc2         = unicode(response[0], 'utf-8')
 if lastVersions[1] != -1:
     name1 = "LastPublishableVersion.xml"
@@ -70,8 +76,10 @@ elif lastVersions[0] != -1:
                              #docVer = str(lastVersions[0]))
 else:
     cdrcgi.bail("No versions exist for %s" % docId)
+
 if type(response) in (type(""), type(u"")):
     cdrcgi.bail(response)
+
 doc1 = unicode(response[0], 'utf-8')
 doc1 = wrap(doc1.encode('latin-1', 'replace'))
 doc2 = wrap(doc2.encode('latin-1', 'replace'))
