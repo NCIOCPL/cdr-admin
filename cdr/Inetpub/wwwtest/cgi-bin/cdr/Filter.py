@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: Filter.py,v 1.25 2005-05-14 00:01:45 venglisc Exp $
+# $Id: Filter.py,v 1.26 2005-07-28 21:46:14 venglisc Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.25  2005/05/14 00:01:45  venglisc
+# Added code to allow display of editorial and advisory board markup to
+# be displayed. (Bug 1683)
+#
 # Revision 1.24  2004/07/13 18:39:17  ameyer
 # Provide for insertion and deletion revision levels (bug #846).
 # Allow for displaying of glossary terms and standard wording elements.
@@ -98,7 +102,8 @@ cdrPort = fields.getvalue('port') or cdr.getPubPort()
 cdrPort = int(cdrPort)
 docId   = fields.getvalue(cdrcgi.DOCID) or cdrcgi.bail("No Document", title)
 docVer  = fields.getvalue('DocVer') or 0
-docVers = cdr.lastVersions('guest', docId, port = cdrPort)
+docVers = cdr.lastVersions('guest', cdr.normalize(docId), port = cdrPort)
+
 if docVer == 'last':
     docVer = '%d' % docVers[0]
 elif docVer == 'lastp':
