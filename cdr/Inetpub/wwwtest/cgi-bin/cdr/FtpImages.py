@@ -1,10 +1,15 @@
 #----------------------------------------------------------------------
-# $Id: FtpImages.py,v 1.3 2005-06-01 21:22:00 venglisc Exp $
+# $Id: FtpImages.py,v 1.4 2005-07-28 21:14:40 venglisc Exp $
 #
 # Ftp files from the CIPSFTP server from the ciat/qa/Images directory
 # and place them on the CIPS network.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2005/06/01 21:22:00  venglisc
+# Modified program to create a copy for CIAT in the Images_for_CIAT
+# directory before deleting the files from the CDR_Images directory.
+# (Bug 1699)
+#
 # Revision 1.2  2005/01/19 23:48:33  venglisc
 # Modified Error message when error ftplib.error_perm is being raised.
 # (Bug 1465).
@@ -60,7 +65,18 @@ if request == cdrcgi.MAINMENU:
 if request == "Get Images" and ftpDone != 'Y':
     if not sourceDir or not targetDir:
         cdrcgi.bail("Both document IDs are required.")
-    netwkDir  = "\\\\imbncipf01\\public\\CDR Images\\" + targetDir
+    ### # Create directory path and check if directory exists. 
+    ### # If it does not exist, create it
+    ### # This doesn't work because we don't have permissions to
+    ### # access a network drive.
+    ### # ----------------------------------------------------
+    ### netwkDir  = "\\\\imbncipf01\\public\\CDR Images\\" + targetDir
+    ### if not os.path.exists(netwkDir):
+    ###    os.chdir('\\\\imbncipf01\\public\\CDR Images\\')
+    ###    os.mkdir(netwkDir)
+    if not os.path.exists(os.path.join('d:\\cdr', targetDir)):
+       os.mkdir(os.path.join('d:\\cdr', targetDir))
+
     ftp = ftplib.FTP(ftphost)
     try: 
        ftp.login(ftpuser, ftppwd)
@@ -70,7 +86,7 @@ if request == "Get Images" and ftpDone != 'Y':
                                     or name.endswith('.psd'):
                bytes = []
                ftp.retrbinary('RETR ' + name, lambda a: bytes.append(a))
-               targetFile = os.path.join('..', '..', 'cdr', targetDir, name)
+               targetFile = os.path.join('d:\\cdr', targetDir, name)
                f = open(targetFile, 'wb')
                # f = open(os.path.join(netwkDir, name), 'wb')
                f.write("".join(bytes))
