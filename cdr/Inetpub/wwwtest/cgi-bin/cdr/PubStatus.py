@@ -1,10 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: PubStatus.py,v 1.18 2005-03-25 17:02:40 venglisc Exp $
+# $Id: PubStatus.py,v 1.19 2005-07-28 23:05:08 venglisc Exp $
 #
 # Status of a publishing job.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.18  2005/03/25 17:02:40  venglisc
+# Corrected anker link to updated/removed/added section.
+# Modified table output by inserting a space after each semicolon ';' to
+# allow protocols with many protocol IDs to format properly.
+#
 # Revision 1.17  2005/01/24 19:29:59  venglisc
 # Minor changes to correctly display the FilterFailure error report table.
 #
@@ -430,9 +435,15 @@ def dispJobControl():
     buttons = []
     header  = cdrcgi.header(title, title, instr, script, buttons)
         
-    HEADER  = """             
-               <BR><FONT COLOR="RED">Jobs waiting for user approval%s</FONT>
-               <BR><BR><TABLE BORDER=1>
+    HEADER1 = """             
+               <BR><FONT COLOR="NAVY">
+                    <b>Jobs waiting for user approval%s<b>
+                   </FONT>
+               <BR><TABLE BORDER=0>
+              """ % msg
+    HEADER2 = """
+                <tr><td>
+                <table border="1">
                 <tr>    
                 <td valign='top'></td>   
                 <td valign='top'><B>JobId</B></td>  
@@ -440,8 +451,8 @@ def dispJobControl():
                 <td valign='top'><B>Started</B></td>  
                 <td valign='top'><B>Status</B></td>  
                 </tr> 
-              """ % msg
-    ROW     = """<tr><td><INPUT TYPE='CHECKBOX' NAME='Jobs' VALUE='%d'></td>
+              """
+    ROW     = """<tr><td><INPUT TYPE='CHECKBOX' NAME='Jobs' VALUE='%d' CHECKED></td>
                      <td><FONT COLOR='black'>%d</FONT></td>
                      <td><FONT COLOR='black'>%s</FONT></td>
                      <td><FONT COLOR='black'>%s</FONT></td>
@@ -449,24 +460,38 @@ def dispJobControl():
               """  
 
     if not len(rows):
-        html = "User %s doesn't have any job waiting for approval." % name
+        html = "User <i>%s</i>: There are no (more) push jobs waiting for approval." % name
     else:
-        html = """<CENTER>
-            <INPUT TYPE='SUBMIT' NAME='Kill' VALUE='Kill checked jobs'>
-            <INPUT TYPE='SUBMIT' NAME='Resume' VALUE='Resume checked jobs'>
-            </CENTER>"""
-        html += """
+        html = """
             <INPUT TYPE='HIDDEN' NAME='id' VALUE='%d'>
             <INPUT TYPE='HIDDEN' NAME='Session' VALUE='%s'>
             <INPUT TYPE='HIDDEN' NAME='type' VALUE='Manage'>
                 """ % (jobId, session)
      
-        html += HEADER
+        html += HEADER1
+        html += """
+                <tr>
+                 <td>
+                  <table border="0" width="100%%">
+                   <tr>
+                    <td colspan="5" align="center" valign="center">
+                    <br/>
+                    <INPUT TYPE='SUBMIT' NAME='Kill' VALUE='Kill checked jobs'>
+                    <INPUT TYPE='SUBMIT' NAME='Resume' VALUE='Resume checked jobs'>
+                    <br/>&nbsp;
+                   </td>
+                  </tr>
+                 </table>
+                </td>
+               </tr>
+                """
+        html += HEADER2
+
         for row in rows:
             html += ROW % (row[0], row[0], row[1], row[2], row[3])
-        html += "</TABLE>"
-        html += "<BR><FONT COLOR='RED'>Resume one job at a time to associate "
-        html += "the following description with the checked job</FONT>"
+        html += "</TABLE></td></tr></table>"
+        html += "<BR><FONT COLOR='NAVY'>Resume checked job(s) with "
+        html += "the following description</FONT>"
         html += "<TEXTAREA NAME='CgJobDesc' ROWS='5' COLS='80'>"
         html += "Enter a brief job description for Cancer.gov.</TEXTAREA>"
                
