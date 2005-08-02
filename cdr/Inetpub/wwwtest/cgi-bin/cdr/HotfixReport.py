@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: HotfixReport.py,v 1.6 2005-07-14 09:57:35 bkline Exp $
+# $Id: HotfixReport.py,v 1.7 2005-08-02 20:28:02 bkline Exp $
 #
 # Report identifying previously published protocols that should be 
 # included in a hotfix.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2005/07/14 09:57:35  bkline
+# Changes made for issue #1718.
+#
 # Revision 1.5  2005/03/16 17:20:11  venglisc
 # Corrected some problems in the queries to eliminate incorrect hits.
 # Added another worksheet to include new CTGovProtocols.
@@ -184,7 +187,9 @@ cursor.execute("""\
            FROM doc_version v
            JOIN #last_published p
              ON p.id = v.id
-          WHERE publishable = 'Y'""", timeout = 300)
+          WHERE v.publishable = 'Y'
+            AND v.val_status = 'V'
+       GROUP BY v.id""", timeout = 300)
 
 #----------------------------------------------------------------------
 # Find InScopeProtocol documents with newer publishable versions.
@@ -200,7 +205,7 @@ cursor.execute("""\
       JOIN query_term i
         ON i.doc_id = v3.id
      WHERE i.path = '/InScopeProtocol/ProtocolIDs/PrimaryID/IDString'
-       AND v2.ver > v1.ver"""
+       AND v2.ver > v1.ver
   ORDER BY v3.dt""", timeout = 300)
 rows = cursor.fetchall()
 
@@ -296,7 +301,7 @@ cursor.execute("""\
       JOIN query_term i
         ON i.doc_id = v3.id
      WHERE i.path = '/CTGovProtocol/IDInfo/OrgStudyID'
-       AND v2.ver > v1.ver"""
+       AND v2.ver > v1.ver
   ORDER BY v3.dt""", timeout = 300)
 rows = cursor.fetchall()
 
