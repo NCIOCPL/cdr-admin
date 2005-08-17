@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GeneralReports.py,v 1.13 2005-05-04 19:19:53 bkline Exp $
+# $Id: GeneralReports.py,v 1.14 2005-08-17 19:14:24 venglisc Exp $
 #
 # Submenu for general reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.13  2005/05/04 19:19:53  bkline
+# Added Documents Modified report.
+#
 # Revision 1.12  2004/11/12 15:57:02  venglisc
 # Added External Map Failures Report menu option. (Bug 1417)
 #
@@ -98,6 +101,8 @@ reports = [
             'Documents Modified'),
            ('ExternMapFailures.py', 
             'External Map Failures Report'),
+           ('CdrFilter',
+            'Filter Document')
            ('ShowGlobalChangeTestResults.py',
             'Global Change Test Results'),
            ('LinkedDocs.py', 
@@ -115,7 +120,11 @@ reports = [
           ]
 
 for r in reports:
-    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI>\n" % (
+    if r[0] != 'CdrFilter':
+       form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI>\n" % (
             cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
+    else:
+       form += "<LI><A HREF='/cdrFilter.html'>%s</LI>\n" % (
+            r[1])
 
 cdrcgi.sendPage(header + form + "</OL></FORM></BODY></HTML>")
