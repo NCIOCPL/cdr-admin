@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: HotfixReport.py,v 1.7 2005-08-02 20:28:02 bkline Exp $
+# $Id: HotfixReport.py,v 1.8 2005-08-17 20:00:59 venglisc Exp $
 #
 # Report identifying previously published protocols that should be 
 # included in a hotfix.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.7  2005/08/02 20:28:02  bkline
+# Version approved by users for issue #1718.
+#
 # Revision 1.6  2005/07/14 09:57:35  bkline
 # Changes made for issue #1718.
 #
@@ -209,61 +212,7 @@ cursor.execute("""\
   ORDER BY v3.dt""", timeout = 300)
 rows = cursor.fetchall()
 
-#----------------------------------------------------------------------
-# Next block commented out by RMK 2005-06-15, replaced by code above.
-#----------------------------------------------------------------------
-## # Creating table of all InScopeProtocol and CTGovProtocol documents
-## # that have been published (i.e. a vendor version has been created
-## # regardless if it got pushed to Cancer.gov or not)
-## # This will show us if a new version of a document got already 
-## # published but has not been pushed to Cancer.gov because the vendor
-## # output between the old and the new version is identical.
-## # ------------------------------------------------------------------
-## cursor.execute("""\
-##     CREATE TABLE #t3
-##              (id INTEGER     NOT NULL,
-##              job INTEGER     NOT NULL,
-##         doc_type VARCHAR(32) NOT NULL,
-##    active_status CHAR        NOT NULL)""")
 
-## cursor.execute("""\
-##     INSERT INTO #t3
-##          SELECT a.id, MAX(p.id), a.job, a.active_status
-##            FROM #t0 a
-##            JOIN pub_proc_doc d
-##              ON d.doc_id = a.id
-##            JOIN pub_proc p
-##              ON p.id = d.pub_proc
-##           WHERE (d.failure IS NULL OR d.failure <> 'Y')
-##             AND p.status = 'Success'
-##             AND p.pub_subset IN ('Export', 'Hotfix-Export')
-##        GROUP BY a.id, a.job, a.active_status""", timeout = 300)
-
-## # Create the list of InScopeProtocols for which we find a publishable
-## # version whose version number is greater than the version number that
-## # has been published.
-## # ---------------------------------------------------------------------
-## cursor.execute("""\
-##     SELECT #t1.id, q.value, v.dt
-##       FROM #t1
-##       JOIN #t2
-##         ON #t1.id = #t2.id
-##       JOIN #t3
-##         ON #t1.id = #t3.id
-##       JOIN query_term q
-##         ON q.doc_id = #t1.id
-##       JOIN doc_version v
-##         ON v.id = #t2.id
-##        AND v.num = #t2.ver
-##      WHERE q.path = '/InScopeProtocol/ProtocolIDs/PrimaryID/IDString'
-##        AND #t2.ver > #t1.ver
-##        AND #t1.job > #t3.job
-##        AND #t1.active_status = 'A'
-##        AND #t1.doc_type = 'InScopeProtocol'
-##      ORDER BY v.dt""", timeout = 300)
-## rows = cursor.fetchall()
-
-       
 t = time.strftime("%Y%m%d%H%M%S")
 print "Content-type: application/vnd.ms-excel"
 print "Content-Disposition: attachment; filename=InterimUpdateReport-%s.xls" % t
@@ -305,24 +254,6 @@ cursor.execute("""\
   ORDER BY v3.dt""", timeout = 300)
 rows = cursor.fetchall()
 
-## # Create worksheet listing all updated CTGovProtocols
-## # ---------------------------------------------------
-## cursor.execute("""\
-##     SELECT #t1.id, q.value, v.dt
-##       FROM #t1
-##       JOIN #t2
-##         ON #t1.id = #t2.id
-##       JOIN query_term q
-##         ON q.doc_id = #t1.id
-##       JOIN doc_version v
-##         ON v.id = #t2.id
-##        AND v.num = #t2.ver
-##      WHERE q.path = '/CTGovProtocol/IDInfo/OrgStudyID'
-##        AND #t2.ver > #t1.ver
-##        AND #t1.active_status = 'A'
-##        AND #t1.doc_type = 'CTGovProtocol'
-##      ORDER BY v.dt""", timeout = 300)
-## rows = cursor.fetchall()
 addWorksheet(workbook, titles[1], headers, widths, format, rows)
 
 # Create Worksheet for new CTGov Protocol
