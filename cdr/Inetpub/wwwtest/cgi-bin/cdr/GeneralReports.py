@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GeneralReports.py,v 1.14 2005-08-17 19:14:24 venglisc Exp $
+# $Id: GeneralReports.py,v 1.15 2005-08-17 20:08:19 venglisc Exp $
 #
 # Submenu for general reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.14  2005/08/17 19:14:24  venglisc
+# Added new menu item under for the CdrFilter.html UI.
+#
 # Revision 1.13  2005/05/04 19:19:53  bkline
 # Added Documents Modified report.
 #
@@ -89,6 +92,8 @@ reports = [
             'Checked Out Documents With No Activity'),
            ('ActiveLogins.py', 
             'Current Sessions'),
+           ('db-tables.py',
+            'Database Tables/Columns'),
            ('DateLastModified.py', 
             'Date Last Modified'),
            ('DatedActions.py', 
@@ -102,7 +107,7 @@ reports = [
            ('ExternMapFailures.py', 
             'External Map Failures Report'),
            ('CdrFilter',
-            'Filter Document')
+            'Filter Document'),
            ('ShowGlobalChangeTestResults.py',
             'Global Change Test Results'),
            ('LinkedDocs.py', 
