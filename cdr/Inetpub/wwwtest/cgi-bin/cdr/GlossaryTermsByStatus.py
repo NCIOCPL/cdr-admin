@@ -1,14 +1,18 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermsByStatus.py,v 1.1 2004-10-07 21:39:33 bkline Exp $
+# $Id: GlossaryTermsByStatus.py,v 1.2 2005-08-18 15:00:04 bkline Exp $
 #
 # The Glossary Terms by Status Report will server as a QC report to check
 # which glossary terms were created within a given time frame with a
 # particular status set.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2004/10/07 21:39:33  bkline
+# Added new report for Sheri, for finding glossary terms created in a
+# given date range, and having specified status.
+#
 #----------------------------------------------------------------------
-import cgi, cdr, cdrdb, cdrcgi, string, time, xml.dom.minidom
+import cgi, cdr, cdrdb, cdrcgi, string, time, xml.dom.minidom, xml.sax.saxutils
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -71,6 +75,7 @@ if not fromDate or not toDate or not status:
        <OPTION VALUE=''>Select One</OPTION>
        <OPTION VALUE='Approved'>Approved</OPTION>
        <OPTION VALUE='Pending'>Pending</OPTION>
+       <OPTION VALUE='Revision pending'>Revision pending</OPTION>
       </SELECT>
      </TD>
     </TR>
@@ -82,27 +87,61 @@ if not fromDate or not toDate or not status:
     cdrcgi.sendPage(header + form)
 
 #----------------------------------------------------------------------
+# Escape markup special characters.
+#----------------------------------------------------------------------
+def fix(me):
+    if not me:
+        return u"&nbsp;"
+    return xml.sax.saxutils.escape(me)
+
+#----------------------------------------------------------------------
+# Prepare definitions for display.
+#----------------------------------------------------------------------
+def fixList(defs):
+    if not defs:
+        return u"&nbsp;"
+    return fix(u"; ".join(defs))
+
+#----------------------------------------------------------------------
 # Create/display the report.
 #----------------------------------------------------------------------
+revisionInfo = status.upper() == 'REVISION PENDING'
 conn = cdrdb.connect('CdrGuest')
 cursor = conn.cursor()
-cursor.execute("""\
+if revisionInfo:
+    cursor.execute("""\
+    SELECT s.doc_id, MAX(v.dt)
+      FROM query_term s
+      JOIN doc_version v
+        ON v.id = s.doc_id
+     WHERE s.path = '/GlossaryTerm/TermStatus'
+       AND s.value = ?
+  GROUP BY s.doc_id
+    HAVING MAX(v.dt) BETWEEN '%s' AND DATEADD(s, -1, DATEADD(d, 1, '%s'))""" %
+                   (fromDate, toDate), status)
+else:
+    cursor.execute("""\
     SELECT s.doc_id, MIN(a.dt)
       FROM query_term s
       JOIN audit_trail a
         ON a.document = s.doc_id
      WHERE s.path = '/GlossaryTerm/TermStatus'
        AND s.value = ?
---       AND MIN(a.dt) BETWEEN 'xs' AND DATEADD(s, -1, DATEADD(d, 1, 'xs'))
   GROUP BY s.doc_id
-  HAVING MIN(a.dt) BETWEEN '%s' AND DATEADD(s, -1, DATEADD(d, 1, '%s'))""" % (fromDate, toDate), status)
+    HAVING MIN(a.dt) BETWEEN '%s' AND DATEADD(s, -1, DATEADD(d, 1, '%s'))""" %
+               (fromDate, toDate), status)
+
 class GlossaryTerm:
-    def __init__(self, id, node):
+    def __init__(self, id, node, pubNode = None):
         self.id = id
         self.name = None
         self.pronunciation = None
         self.definitions = []
         self.source = None
+        self.pubPronunciation = None
+        self.pubDefinitions = []
+        self.types = []
+        self.statusDate = None
         for child in node.childNodes:
             if child.nodeName == "TermName":
                 self.name = cdr.getTextContent(child)
@@ -115,11 +154,35 @@ class GlossaryTerm:
                         break
             elif child.nodeName == "TermSource":
                 self.source = cdr.getTextContent(child)
+            elif child.nodeName == "TermType":
+                self.types.append(cdr.getTextContent(child))
+            elif child.nodeName == "StatusDate":
+                self.statusDate = cdr.getTextContent(child)
+
+        if pubNode:
+            for child in pubNode.childNodes:
+                if child.nodeName == "TermPronunciation":
+                    self.pubPronunciation = cdr.getTextContent(child)
+                elif child.nodeName == "TermDefinition":
+                    for grandchild in child.childNodes:
+                        if grandchild.nodeName == "DefinitionText":
+                            value = cdr.getTextContent(grandchild)
+                            self.pubDefinitions.append(value)
+                            break
+
 terms = []
 for row in cursor.fetchall():
     doc = cdr.getDoc('guest', row[0], getObject = True)
     dom = xml.dom.minidom.parseString(doc.xml)
-    terms.append(GlossaryTerm(row[0], dom.documentElement))
+    pdom = None
+    if revisionInfo:
+        versions = cdr.lastVersions('guest', 'CDR%010d' % row[0])
+        if versions[1] != -1:
+            doc = cdr.getDoc('guest', row[0], getObject = True,
+                             version = str(versions[1]))
+            pdom = xml.dom.minidom.parseString(doc.xml)
+    terms.append(GlossaryTerm(row[0], dom.documentElement,
+                              pdom and pdom.documentElement or None))
 terms.sort(lambda a,b: cmp(a.name, b.name))
 html = u"""\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
@@ -130,8 +193,10 @@ html = u"""\
    body    { font-family: Arial, Helvetica, sans-serif }
    span.t1 { font-size: 14pt; font-weight: bold }
    span.t2 { font-size: 12pt; font-weight: bold }
-   th      { font-size: 12pt; font-weight: bold }
-   td      { font-size: 12pt; font-weight: normal }
+   th      { font-size: 10pt; font-weight: bold }
+   td      { font-size: 10pt; font-weight: normal }
+   @page   { margin-left: 0cm; margin-right: 0cm; }
+   body, table   { margin-left: 0cm; margin-right: 0cm; }
   </style>
  </head>
  <body>
@@ -141,29 +206,75 @@ html = u"""\
    <br />
    <span class='t2'>%s Terms<br />From %s to %s</span>
   </center>
-  <table border='1' cellspacing='0' cellpadding='2'>
+  <table border='1' cellspacing='0' cellpadding='2' width='100%%'>
+""" % (status, fromDate, toDate)
+if revisionInfo:
+    html += """\
+   <tr>
+    <th>CDR ID</th>
+    <th>Term</th>
+    <th>Last Pub Ver Pronunciation</th>
+    <th>Revised Pronunciation</th>
+    <th>Last Pub Ver Definition</th>
+    <th>Revised Definition</th>
+    <th>Definition Source</th>
+    <th>Term Type</th>
+    <th>Status Date</th>
+   </tr>
+"""
+else:
+    html += """\
    <tr>
     <th>CDR ID</th>
     <th>Term</th>
     <th>Pronunciation</th>
     <th>Definition</th>
     <th>Definition Source</th>
+    <th>Term Type</th>
+    <th>Status Date</th>
    </tr>
-""" % (status, fromDate, toDate)
+"""
 for term in terms:
-    html += u"""\
+    if revisionInfo:
+        html += u"""\
    <tr>
     <td>%d</td>
     <td>%s</td>
     <td>%s</td>
     <td>%s</td>
     <td>%s</td>
+    <td>%s</td>
+    <td>%s</td>
+    <td>%s</td>
+    <td>%s</td>
    </tr>
 """ % (term.id,
-       term.name and cgi.escape(term.name) or u"&nbsp;",
-       term.pronunciation and cgi.escape(term.pronunciation) or u"&nbsp;",
-       term.definitions and cgi.escape(u"; ".join(term.definitions)) or u"&nbsp;",
-       term.source and cgi.escape(term.source) or u"&nbsp;")
+       fix(term.name),
+       fix(term.pubPronunciation),
+       fix(term.pronunciation),
+       fixList(term.pubDefinitions),
+       fixList(term.definitions),
+       fix(term.source),
+       fixList(term.types),
+       term.statusDate and term.statusDate[:10] or u"&nbsp;")
+    else:
+        html += u"""\
+   <tr>
+    <td>%d</td>
+    <td>%s</td>
+    <td>%s</td>
+    <td>%s</td>
+    <td>%s</td>
+    <td>%s</td>
+    <td>%s</td>
+   </tr>
+""" % (term.id,
+       fix(term.name),
+       fix(term.pronunciation),
+       fixList(term.definitions),
+       fix(term.source),
+       fixList(term.types),
+       term.statusDate and term.statusDate[:10] or u"&nbsp;")
 cdrcgi.sendPage(html + u"""\
   </table>
  </body>
