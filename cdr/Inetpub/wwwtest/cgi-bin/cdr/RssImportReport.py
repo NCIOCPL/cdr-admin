@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: RssImportReport.py,v 1.4 2005-06-23 15:16:32 bkline Exp $
+# $Id: RssImportReport.py,v 1.5 2005-08-29 17:02:50 bkline Exp $
 #
 # Reports on import/update of RSS protocol site information.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2005/06/23 15:16:32  bkline
+# Modifications requested in issue #1730 (tables split).
+#
 # Revision 1.3  2005/06/09 18:42:41  bkline
 # Fixed test for new imports.
 #
@@ -55,7 +58,7 @@ if request == "Log Out":
 #----------------------------------------------------------------------
 # Create a table for a subset of the trials.
 #----------------------------------------------------------------------
-def addTable(docs, header):
+def addTable(docs, header, rssModeCol = True):
     html = u"""\
   <span class='sub'>%s - %d</span>
   <br>
@@ -69,11 +72,16 @@ def addTable(docs, header):
     <th>CDR DocId</th>
     <th>DocTitle</th>
     <th>Pub Ver?</th>
+"""
+        if rssModeCol:
+            html += u"""\
     <th>RSS Mode?</th>
+"""
+        html += u"""\
    </tr>
 """
         for key in keys:
-            html += docs[key].toHtml()
+            html += docs[key].toHtml(rssModeCol)
         html += u"""\
   </table>
 """
@@ -92,6 +100,7 @@ class Doc:
         self.new        = new
         self.title      = None
         self.rssMode    = False
+        self.needDate   = False
         if cdrId:
             cursor.execute("SELECT title FROM document WHERE id = ?", cdrId)
             self.title = cursor.fetchall()[0][0]
@@ -103,16 +112,33 @@ class Doc:
                    AND value = 'RSS'
                    AND doc_id = ?""", cdrId)
             self.rssMode = cursor.fetchall()[0][0] > 0
-    def toHtml(self):
-        return u"""\
+            cursor.execute("""\
+               SELECT COUNT(*)
+                 FROM query_term
+                WHERE path = '/InScopeProtocol/DateLastModified'
+                  AND doc_id = ?""", cdrId)
+            if cursor.fetchall()[0][0] == 0:
+                cursor.execute("""\
+                    SELECT COUNT(*)
+                      FROM pub_proc_cg
+                     WHERE id = ?""", cdrId)
+                if cursor.fetchall()[0][0] > 0:
+                    self.needDate = True
+    def toHtml(self, rssModeCol = True):
+        html = u"""\
    <tr>
     <td>%s</td>
     <td>%s</td>
     <td>%s</td>
+""" % (self.cdrId, self.title.replace(";", "; "), self.pubVer or "N")
+        if rssModeCol:
+            html += u"""\
     <td>%s</td>
+""" % (self.rssMode and "Y" or "N")
+        html += u"""\
    </tr>
-""" % (self.cdrId, self.title.replace(";", "; "), self.pubVer or "N",
-       self.rssMode and "Y" or "N")
+"""
+        return html
     
 #----------------------------------------------------------------------
 # If we don't have a request, put up the request form.
@@ -204,6 +230,7 @@ newDocsNonPub = {}
 updatedDocsPub = {}
 updatedDocsNonPub = {}
 researchStudies = {}
+noDateLastModified = {}
 for cdrId, locked, pubVer, new in rows:
     if cdrId:
         doc = Doc(cdrId, locked, pubVer, new)
@@ -216,12 +243,13 @@ for cdrId, locked, pubVer, new in rows:
                 newDocsPub[cdrId] = doc
             else:
                 newDocsNonPub[cdrId] = doc
-            newDocs[cdrId] = doc
         else:
             if doc.pubVer == 'Y':
                 updatedDocsPub[cdrId] = doc
             else:
                 updatedDocsNonPub[cdrId] = doc
+        if doc.needDate:
+            noDateLastModified[cdrId] = doc
 html += addTable(newDocsNonPub,
                  'Trials with initial external sites imported with '
                  'Non-Publishable Versions')
@@ -235,6 +263,8 @@ html += addTable(updatedDocsPub,
 html += addTable(researchStudies, 'Research Studies')
 html += addTable(lockedDocs,
                  'Trials not updated because document was checked out')
+html += addTable(noDateLastModified,
+                 'Updated trials without DateLastModified', False)
 cdrcgi.sendPage(html + """\
  </body>
 </html>""")
