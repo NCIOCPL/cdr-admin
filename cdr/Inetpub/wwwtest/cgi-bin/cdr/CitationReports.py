@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CitationReports.py,v 1.5 2004-09-17 14:06:50 venglisc Exp $
+# $Id: CitationReports.py,v 1.6 2005-08-29 16:53:14 bkline Exp $
 #
 # Submenu for citation reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2004/09/17 14:06:50  venglisc
+# Fixed list items to properly teminate the anker link.
+#
 # Revision 1.4  2004/03/30 20:28:05  bkline
 # Plugged in New Citations report.
 #
@@ -79,6 +82,8 @@ form += """\
     <OL>
 """
 reports = [
+           ('CitationsAddedToProtocols.py',
+            'Citations Added to Protocols'),
            ('ModifiedPubMedDocs.py', 'Modified PubMed Documents'),
            ('NewCitations.py', 'New Citations Report')
           ]
