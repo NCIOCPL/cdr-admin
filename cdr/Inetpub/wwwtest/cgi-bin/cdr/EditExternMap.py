@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditExternMap.py,v 1.7 2005-07-05 12:33:34 bkline Exp $
+# $Id: EditExternMap.py,v 1.8 2005-08-29 20:08:44 bkline Exp $
 #
 # Allows a user to edit the table which maps strings from external
 # systems (such as ClinicalTrials.gov) to CDR document IDs.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.7  2005/07/05 12:33:34  bkline
+# Added support for new 'bogus' column in external_map table.
+#
 # Revision 1.6  2004/08/27 19:07:32  bkline
 # Cosmetic changes requested by Lakshmi (comment #4, request #1297).
 #
@@ -87,6 +90,25 @@ conn = cdrdb.connect()
 cursor = conn.cursor()
 
 #----------------------------------------------------------------------
+# Collect some useful names.
+#----------------------------------------------------------------------
+cursor.execute("SELECT id, name FROM external_map_usage")
+usageNames = {}
+for usageId, usageName in cursor.fetchall():
+    usageNames[usageId] = usageName
+cursor.execute("SELECT id, name FROM doc_type")
+typeNames = {}
+for typeId, typeName in cursor.fetchall():
+    typeNames[typeId] = typeName
+cursor.execute("SELECT usage, doc_type FROM external_map_type")
+usageTypes = {}
+for mapId, mapType in cursor.fetchall():
+    if mapId in usageTypes:
+        usageTypes[mapId][mapType] = typeNames[mapType]
+    else:
+        usageTypes[mapId] = { mapType: typeNames[mapType] }
+
+#----------------------------------------------------------------------
 # Extract integer from string; uses all decimal digits.
 #----------------------------------------------------------------------
 def extractInt(str):
@@ -126,7 +148,32 @@ def allowed(key):
     return False
 allowed.actions = {}
 allowed.usageErrors = {}
-    
+
+def typeOk(mapId, docId):
+    if not docId:
+        return True
+    cursor.execute("SELECT usage FROM external_map WHERE id = ?", mapId)
+    rows = cursor.fetchall()
+    if not rows:
+        errors.append("Unable to find usage for mapping %s" % mapId)
+        return False
+    usageId = rows[0][0]
+    cursor.execute("SELECT doc_type FROM document WHERE id = ?", docId)
+    rows = cursor.fetchall()
+    if not rows:
+        errors.append("Unable to find document type for CDR%s" % docId)
+        return False
+    typeId = rows[0][0]
+    if usageId not in usageTypes:
+        errors.append("CDR%s: %s documents not allowed for %s" %
+                      (docId, typeNames[typeId], usageNames[usageId]))
+        return False
+    if typeId not in usageTypes[usageId].keys():
+        errors.append("CDR%s: %s documents not allowed for %s" %
+                      (docId, typeNames[typeId], usageNames[usageId]))
+        return False
+    return True
+
 #----------------------------------------------------------------------
 # Save changes to the current record if appropriate.
 #----------------------------------------------------------------------
@@ -185,6 +232,7 @@ if request == "Save Changes":
                     UPDATE external_map
                        SET bogus = ?
                      WHERE id = ?""", (newValue, rowId))
+                conn.commit()
                 numChanges += 1
             except Exception, e:
                 errors.append("failure setting external_map.bogus column "
@@ -225,7 +273,8 @@ if request == "Save Changes":
                 error = "Failure deleting row %d" % key
                 cdr.logwrite(error, logFile)
                 errors.append(error)
-        elif pair != "DELETE" and pair[0] != pair[1] and allowed(key):
+        elif (pair != "DELETE" and pair[0] != pair[1] and allowed(key) and
+              typeOk(key, pair[1])):
             try:
                 cursor.execute("""\
                 UPDATE external_map
