@@ -17,7 +17,7 @@ output = \
    </TR>
 """
 if not fields:
-    import os
+    import os, sys
     for key in os.environ:
         output += """\
    <tr>
@@ -25,6 +25,16 @@ if not fields:
     <td>%s</td>
    </tr>
 """ % (key, os.environ[key])
+    output += """\
+   <tr>
+    <td>cwd</td>
+    <td>%s</td>
+   </tr>
+   <tr>
+    <td>argv[0]</td>
+    <td>%s</td>
+   </tr>
+""" % (os.getcwd(), sys.argv[0])
 for field in fields.keys():
     if type(fields[field]) == type([]):
         for f in fields[field]:
