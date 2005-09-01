@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: TermSearch.py,v 1.5 2005-08-29 17:07:40 bkline Exp $
+# $Id: TermSearch.py,v 1.6 2005-09-01 11:50:53 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Term documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2005/08/29 17:07:40  bkline
+# Added code to import new Term document from NCI thesaurus concept.
+#
 # Revision 1.4  2003/08/25 20:25:54  bkline
 # Plugged in named filter set.
 #
@@ -68,7 +71,7 @@ def extractError(node):
 
 def mapType(nciThesaurusType):
     return {
-        "PT"               : "Preferred term",
+        "PT"               : "Synonym", # "Preferred term",
         "AB"               : "Abbreviation",
         "AQ"               : "Obsolete name",
         "BR"               : "US brand name",
@@ -88,7 +91,7 @@ def makeOtherName(name, termType, sourceTermType, code = None):
   <OtherNameType>%s</OtherNameType>
   <SourceInformation>
    <VocabularySource>
-    <SourceCode>NCI</SourceCode>
+    <SourceCode>NCI Thesaurus</SourceCode>
     <SourceTermType>%s</SourceTermType>
 """ % (fix(name), fix(termType), fix(sourceTermType))
     if code:
