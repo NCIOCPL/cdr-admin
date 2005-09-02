@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: LiaisonReport.py,v 1.4 2003-08-25 20:13:49 bkline Exp $
+# $Id: LiaisonReport.py,v 1.5 2005-09-02 14:15:13 bkline Exp $
 #
 # NCI Liaison Office/Brussels Protocol Report.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2003/08/25 20:13:49  bkline
+# Added new column for protocol original title.
+#
 # Revision 1.3  2003/01/02 14:18:47  bkline
 # Fixed typo on <style> attribute.
 #
@@ -197,7 +200,7 @@ SELECT DISTINCT d.doc_id,
             protStatPath,
             primaryIdPath,
             otherIdPath,
-            sourcePath))
+            sourcePath), timeout = 300)
     cursor.execute("""\
    SELECT DISTINCT p.doc_id,
                    p.value,
@@ -209,7 +212,8 @@ SELECT DISTINCT d.doc_id,
                AND i.path = '%s'
    LEFT OUTER JOIN query_term m
                 ON m.doc_id = p.doc_id
-               AND m.path = '%s'""" % (primaryIdPath, lastModPath))
+               AND m.path = '%s'""" % (primaryIdPath, lastModPath), 
+               timeout = 300)
     for row in cursor.fetchall():
         protocols[row[0]] = Protocol(row[0], row[1], row[2], row[3])
     cursor.execute("""\
@@ -218,7 +222,7 @@ SELECT DISTINCT d.doc_id,
               FROM #european_protocols p
               JOIN query_term i
                 ON i.doc_id = p.doc_id
-             WHERE i.path = '%s'""" % otherIdPath)
+             WHERE i.path = '%s'""" % otherIdPath, timeout = 300)
     for row in cursor.fetchall():
         key, otherId = row
         if otherId:
