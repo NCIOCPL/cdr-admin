@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: TermSearch.py,v 1.6 2005-09-01 11:50:53 bkline Exp $
+# $Id: TermSearch.py,v 1.7 2005-09-09 20:11:20 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Term documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2005/09/01 11:50:53  bkline
+# Corrected values incorrectly set in the mapping spec document.
+#
 # Revision 1.5  2005/08/29 17:07:40  bkline
 # Added code to import new Term document from NCI thesaurus concept.
 #
@@ -79,8 +82,8 @@ def mapType(nciThesaurusType):
         "FB"               : "Foreign brand name",
         "SN"               : "Chemical structure name",
         "SY"               : "Synonym",
-        "INDCode"          : "IND Code",
-        "NscCode"          : "NSC Code",
+        "INDCode"          : "IND code",
+        "NscCode"          : "NSC code",
         "CAS_Registry_Name": "CAS Registry name" 
     }.get(nciThesaurusType, "????")
 
@@ -126,9 +129,9 @@ class Definition:
   <DefinitionText>%s</DefinitionText>
   <DefinitionType>Health professional</DefinitionType>
   <DefinitionSource>
-   <DefinitionSourceName>NCI</DefinitionSourceName>
-   <ReviewStatus>Reviewed</ReviewStatus>
+   <DefinitionSourceName>NCI Thesaurus</DefinitionSourceName>
   </DefinitionSource>
+  <ReviewStatus>Reviewed</ReviewStatus>
  </Definition>
 """ % fix(self.text or u'')
 
@@ -354,11 +357,11 @@ if impReq:
             doc += makeOtherName(syn.termName, termType, syn.termGroup,
                                  code)
     for indCode in concept.indCodes:
-        doc += makeOtherName(indCode, 'IND Code', 'INDCode')
+        doc += makeOtherName(indCode, 'IND code', 'IND_Code')
     for nscCode in concept.nscCodes:
-        doc += makeOtherName(nscCode, 'NSC Code', 'NscCode')
+        doc += makeOtherName(nscCode, 'NSC code', 'NSC_Code')
     for casCode in concept.casCodes:
-        doc += makeOtherName(casCode, 'CAS Registry name', 'CAS_Registry_Name')
+        doc += makeOtherName(casCode, 'CAS Registry name', 'CAS_Registry')
     for definition in concept.definitions:
         if definition.source == 'NCI':
             doc += definition.toXml()
@@ -448,6 +451,7 @@ if not submit:
        <INPUT      NAME        = "ConceptCode">
       </TD>
      </TR>
+<!--
      <TR>
       <TD ALIGN='right'>
        <SPAN       CLASS       = "Page">
@@ -458,6 +462,7 @@ if not submit:
        <INPUT      NAME        = "ReplaceID">
       </TD>
      </TR>
+-->
      <TR>
       <TD>&nbsp;</TD>
       <TD>
