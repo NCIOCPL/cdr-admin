@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: RssImportReport.py,v 1.5 2005-08-29 17:02:50 bkline Exp $
+# $Id: RssImportReport.py,v 1.6 2005-09-13 21:45:36 bkline Exp $
 #
 # Reports on import/update of RSS protocol site information.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2005/08/29 17:02:50  bkline
+# Added table for protocols which have been published, but don't have a
+# DateLastModified element.
+#
 # Revision 1.4  2005/06/23 15:16:32  bkline
 # Modifications requested in issue #1730 (tables split).
 #
@@ -78,6 +82,7 @@ def addTable(docs, header, rssModeCol = True):
     <th>RSS Mode?</th>
 """
         html += u"""\
+    <th>Protocol Status</th>
    </tr>
 """
         for key in keys:
@@ -101,6 +106,7 @@ class Doc:
         self.title      = None
         self.rssMode    = False
         self.needDate   = False
+        self.status     = None
         if cdrId:
             cursor.execute("SELECT title FROM document WHERE id = ?", cdrId)
             self.title = cursor.fetchall()[0][0]
@@ -112,6 +118,15 @@ class Doc:
                    AND value = 'RSS'
                    AND doc_id = ?""", cdrId)
             self.rssMode = cursor.fetchall()[0][0] > 0
+            cursor.execute("""\
+                SELECT value
+                  FROM query_term
+                 WHERE path = '/InScopeProtocol/ProtocolAdminInfo'
+                            + '/CurrentProtocolStatus'
+                   AND doc_id = ?""", cdrId)
+            rows = cursor.fetchall()
+            if rows:
+                self.status = rows[0][0]
             cursor.execute("""\
                SELECT COUNT(*)
                  FROM query_term
@@ -136,8 +151,9 @@ class Doc:
     <td>%s</td>
 """ % (self.rssMode and "Y" or "N")
         html += u"""\
+    <td>%s</td>
    </tr>
-"""
+""" % (self.status or u"&nbsp;")
         return html
     
 #----------------------------------------------------------------------
