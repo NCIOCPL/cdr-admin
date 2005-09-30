@@ -1,8 +1,12 @@
 #----------------------------------------------------------------------
 #
-# $Id: DiffCTGovProtocol.py,v 1.4 2005-07-22 19:41:20 venglisc Exp $
+# $Id: DiffCTGovProtocol.py,v 1.5 2005-09-30 03:51:02 ameyer Exp $
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2005/07/22 19:41:20  venglisc
+# Removed print statement in code that caused IIS on BACH to trip up.
+# (Bug 1779)
+#
 # Revision 1.3  2003/12/18 22:05:29  bkline
 # Moved the line splitting before the invocation of diff and removed
 # the visual clues about where extra line breaks have been added.
@@ -51,39 +55,87 @@ def wrap(report):
             if line:
                 newLines.append(line)
     return "\n".join(newLines)
-                
-#--------------------------------------------------------------------
-# Show the differences between the CWD and the last (pub) version.
-#--------------------------------------------------------------------
-docId        = cdr.normalize(docId)
-lastVersions = cdr.lastVersions('guest', docId)
-filt         = ['name:Extract Significant CTGovProtocol Elements']
-name2        = "CurrentWorkingDocument.xml"
-# print "docId=%s type(docId)=%s" % (str(docId), type(docId))
-response     = cdr.filterDoc('guest', filt, docId)
 
+
+#--------------------------------------------------------------------
+# Find the last pub version created by CTGovImport, and
+# last pub version prior to that.
+#
+# In query:
+#   MAX(v1.num) = Last pub version created by import program.
+#   MAX(v2.num) = Previous pub version from before MAX(v1.num).
+#--------------------------------------------------------------------
+(docIdStr, docIdNum, dontCare) = cdr.exNormalize(docId)
+try:
+    conn   = cdrdb.connect()
+    cursor = conn.cursor()
+    qry    = """
+      SELECT MAX(v1.num), MAX(v2.num)
+      FROM doc_version v1, doc_version v2
+       WHERE v1.id = %d
+         AND v1.comment LIKE 'ImportCTGovProtocols: %%'
+         AND v1.publishable = 'Y'
+         AND v2.id = v1.id
+         AND v2.publishable = 'Y'
+         AND v2.num < v1.num""" % docIdNum
+
+    # cgi.bail(qry)
+    cursor.execute(qry)
+    row = cursor.fetchone()
+    if not row or not row[0]:
+        cdrcgi.bail("Could not find any CTGovImport publishable version")
+    if not row[1]:
+        cdrcgi.bail(\
+            "Could not find publishable version to compare import against")
+
+    (verImport, verPrev) = row
+
+except Exception, info:
+    cdrcgi.bail("Error retrieving documents: %s" % str(info))
+
+# Get info describing the previous version
+try:
+    cursor.execute("""
+      SELECT v.dt, v.comment, u.name, u.fullname
+        FROM doc_version v, usr u
+       WHERE v.id = %d
+         AND v.num = %d
+         AND u.id = v.usr""" % (docIdNum, verPrev))
+
+    row = cursor.fetchone()
+    if not row:
+        cdrcgi.bail("Could not fetch info for prev version - Can't happen!")
+
+    (prevDate, prevComment, usrName, usrFullName) = row
+
+except Exception, info:
+    cdrcgi.bail("Error retrieving version info: %s" % str(info))
+
+
+#--------------------------------------------------------------------
+# Select out the significant fields for comparison
+#--------------------------------------------------------------------
+filt     = ['name:Extract Significant CTGovProtocol Elements']
+response = cdr.filterDoc('guest', filt, docIdStr, docVer=verImport)
 if type(response) in (type(""), type(u"")):
     cdrcgi.bail(response)
+docImport = unicode(response[0], 'utf-8')
 
-doc2         = unicode(response[0], 'utf-8')
-if lastVersions[1] != -1:
-    name1 = "LastPublishableVersion.xml"
-    response = cdr.filterDoc('guest', filt, docId,
-                             docVer = str(lastVersions[1]))
-elif lastVersions[0] != -1:
-    name1 = "FirstVersion.xml"
-    response = cdr.filterDoc('guest', filt, docId, docVer = "1")
-                             #docVer = str(lastVersions[0]))
-else:
-    cdrcgi.bail("No versions exist for %s" % docId)
-
+response = cdr.filterDoc('guest', filt, docIdStr, docVer=verPrev)
 if type(response) in (type(""), type(u"")):
     cdrcgi.bail(response)
+docPrev  = unicode(response[0], 'utf-8')
 
-doc1 = unicode(response[0], 'utf-8')
-doc1 = wrap(doc1.encode('latin-1', 'replace'))
-doc2 = wrap(doc2.encode('latin-1', 'replace'))
-cmd = "diff -au %s %s" % (name1, name2)
+#--------------------------------------------------------------------
+# Save and difference docs
+#--------------------------------------------------------------------
+name1 = "LastImportedPubVersion"
+name2 = "PreviousPubVersion"
+# doc1  = wrap(docImport.encode('latin-1', 'replace'))
+# doc2  = wrap(docPrev.encode('latin-1', 'replace'))
+doc1  = wrap(docImport.encode('ascii', 'replace'))
+doc2  = wrap(docPrev.encode('ascii', 'replace'))
+cmd   = "diff -aiu %s %s" % (name1, name2)
 try:
     workDir = cdr.makeTempDir('diff')
     os.chdir(workDir)
@@ -98,10 +150,22 @@ f2.close()
 result = cdr.runCommand(cmd)
 cleanup(workDir)
 report = result.output
+
+#--------------------------------------------------------------------
+# Report to user
+#--------------------------------------------------------------------
 if report.strip():
     title = "Differences between %s and %s" % (name1, name2)
 else:
     title = "%s and %s are identical" % (name1, name2)
+description = \
+"""
+Last CTGovImport version is %d<br /><br />
+PreviousPubVersion %d created by %s (%s) on %s<br />
+Comment: %s
+""" % (verImport, verPrev, usrName, usrFullName, prevDate, prevComment)
+
+
 cdrcgi.sendPage("""\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>
@@ -110,6 +174,7 @@ cdrcgi.sendPage("""\
  </head>
  <body>
   <h3>%s</h3>
+  <font color='blue'><strong>%s</strong></font>
   <pre>%s</pre>
  </body>
-</html>""" % (title, title, cgi.escape(report)))
+</html>""" % (title, title, description, cgi.escape(report)))
