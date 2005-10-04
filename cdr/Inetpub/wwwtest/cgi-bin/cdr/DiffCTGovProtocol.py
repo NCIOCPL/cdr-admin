@@ -1,8 +1,11 @@
 #----------------------------------------------------------------------
 #
-# $Id: DiffCTGovProtocol.py,v 1.5 2005-09-30 03:51:02 ameyer Exp $
+# $Id: DiffCTGovProtocol.py,v 1.6 2005-10-04 18:18:38 ameyer Exp $
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2005/09/30 03:51:02  ameyer
+# Modified report to diff different versions from before (Issue 1845).
+#
 # Revision 1.4  2005/07/22 19:41:20  venglisc
 # Removed print statement in code that caused IIS on BACH to trip up.
 # (Bug 1779)
@@ -66,6 +69,7 @@ def wrap(report):
 #   MAX(v2.num) = Previous pub version from before MAX(v1.num).
 #--------------------------------------------------------------------
 (docIdStr, docIdNum, dontCare) = cdr.exNormalize(docId)
+errMsg = None
 try:
     conn   = cdrdb.connect()
     cursor = conn.cursor()
@@ -83,15 +87,16 @@ try:
     cursor.execute(qry)
     row = cursor.fetchone()
     if not row or not row[0]:
-        cdrcgi.bail("Could not find any CTGovImport publishable version")
-    if not row[1]:
-        cdrcgi.bail(\
-            "Could not find publishable version to compare import against")
-
-    (verImport, verPrev) = row
+        errMsg = "Could not find any CTGovImport publishable version"
+    elif not row[1]:
+        errMsg = "Could not find publishable version to compare import against"
+    else:
+        (verImport, verPrev) = row
 
 except Exception, info:
     cdrcgi.bail("Error retrieving documents: %s" % str(info))
+if errMsg:
+    cdrcgi.bail(errMsg)
 
 # Get info describing the previous version
 try:
@@ -104,12 +109,14 @@ try:
 
     row = cursor.fetchone()
     if not row:
-        cdrcgi.bail("Could not fetch info for prev version - Can't happen!")
-
-    (prevDate, prevComment, usrName, usrFullName) = row
+        errMsg = "Could not fetch info for prev version - Can't happen!"
+    else:
+        (prevDate, prevComment, usrName, usrFullName) = row
 
 except Exception, info:
     cdrcgi.bail("Error retrieving version info: %s" % str(info))
+if errMsg:
+    cdrcgi.bail(errMsg)
 
 
 #--------------------------------------------------------------------
@@ -131,10 +138,10 @@ docPrev  = unicode(response[0], 'utf-8')
 #--------------------------------------------------------------------
 name1 = "LastImportedPubVersion"
 name2 = "PreviousPubVersion"
-# doc1  = wrap(docImport.encode('latin-1', 'replace'))
-# doc2  = wrap(docPrev.encode('latin-1', 'replace'))
-doc1  = wrap(docImport.encode('ascii', 'replace'))
-doc2  = wrap(docPrev.encode('ascii', 'replace'))
+doc1  = wrap(docImport.encode('latin-1', 'replace'))
+doc2  = wrap(docPrev.encode('latin-1', 'replace'))
+# doc1  = wrap(docImport.encode('ascii', 'replace'))
+# doc2  = wrap(docPrev.encode('ascii', 'replace'))
 cmd   = "diff -aiu %s %s" % (name1, name2)
 try:
     workDir = cdr.makeTempDir('diff')
