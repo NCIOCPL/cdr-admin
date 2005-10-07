@@ -1,8 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: DiffCTGovProtocol.py,v 1.6 2005-10-04 18:18:38 ameyer Exp $
+# $Id: DiffCTGovProtocol.py,v 1.7 2005-10-07 03:08:43 ameyer Exp $
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2005/10/04 18:18:38  ameyer
+# Restructured bailouts when inside a try block to keep the bailout from
+# triggering the catch clause.
+# Reverted to latin-1 from experimental use of ascii encoding.
+#
 # Revision 1.5  2005/09/30 03:51:02  ameyer
 # Modified report to diff different versions from before (Issue 1845).
 #
@@ -138,10 +143,10 @@ docPrev  = unicode(response[0], 'utf-8')
 #--------------------------------------------------------------------
 name1 = "LastImportedPubVersion"
 name2 = "PreviousPubVersion"
-doc1  = wrap(docImport.encode('latin-1', 'replace'))
-doc2  = wrap(docPrev.encode('latin-1', 'replace'))
-# doc1  = wrap(docImport.encode('ascii', 'replace'))
-# doc2  = wrap(docPrev.encode('ascii', 'replace'))
+# doc1  = wrap(docImport.encode('latin-1', 'replace'))
+# doc2  = wrap(docPrev.encode('latin-1', 'replace'))
+doc1  = wrap(docImport.encode('ascii', 'replace'))
+doc2  = wrap(docPrev.encode('ascii', 'replace'))
 cmd   = "diff -aiu %s %s" % (name1, name2)
 try:
     workDir = cdr.makeTempDir('diff')
@@ -172,7 +177,6 @@ PreviousPubVersion %d created by %s (%s) on %s<br />
 Comment: %s
 """ % (verImport, verPrev, usrName, usrFullName, prevDate, prevComment)
 
-
 cdrcgi.sendPage("""\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>
@@ -184,4 +188,5 @@ cdrcgi.sendPage("""\
   <font color='blue'><strong>%s</strong></font>
   <pre>%s</pre>
  </body>
-</html>""" % (title, title, description, cgi.escape(report)))
+</html>""" % (title, title, description,
+              cdrcgi.colorDiffs(cgi.escape(report))))
