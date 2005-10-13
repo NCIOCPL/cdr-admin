@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
 #
-# $Id: BoardManagers.py,v 1.11 2005-04-21 21:26:11 venglisc Exp $
+# $Id: BoardManagers.py,v 1.12 2005-10-13 21:33:16 venglisc Exp $
 #
 # Main menu for board managers.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.11  2005/04/21 21:26:11  venglisc
+# Added menu item for Publish Preview report. (Bug 1531)
+#
 # Revision 1.10  2005/02/23 14:38:01  bkline
 # Added link to board member mailer page.
 #
@@ -101,7 +104,6 @@ form += """\
 
 for choice in (
     ('SummaryChanges.py',          'History of Changes to Summary'),
-    ('PdqBoards.py',               'PDQ Board Listings'           ),
     ('SummaryCitations.py',        'Summaries Citations'          ),
     ('SummaryDateLastModified.py', 'Summaries Date Last Modified' ),
     ('SummariesLists.py',          'Summaries Lists'              ),
@@ -119,8 +121,9 @@ form += """\
 """
 
 for choice in (
-    ('QcReport.py',             'Board Member Information QC Report' ),
-    ('BoardRoster.py',          'Board Roster Reports'               )
+    ('QcReport.py',                'Board Member Information QC Report' ),
+    ('BoardRoster.py',             'Board Roster Reports'          ),
+    ('PdqBoards.py',               'PDQ Board Members and Topics'        )
     ):
     form += """\
     <LI><a href='%s/%s?DocType=PDQBoardMemberInfo&%s'>%s</a></LI>
