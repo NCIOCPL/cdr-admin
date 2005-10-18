@@ -1,8 +1,12 @@
 #----------------------------------------------------------------------
 #
-# $Id: DiffCTGovProtocol.py,v 1.7 2005-10-07 03:08:43 ameyer Exp $
+# $Id: DiffCTGovProtocol.py,v 1.8 2005-10-18 15:32:23 ameyer Exp $
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.7  2005/10/07 03:08:43  ameyer
+# Added colorization.
+# Using ascii instead of latin-1.  Need to go over this.
+#
 # Revision 1.6  2005/10/04 18:18:38  ameyer
 # Restructured bailouts when inside a try block to keep the bailout from
 # triggering the catch clause.
@@ -28,7 +32,7 @@
 # the first version if there are no publishable versions).
 #
 #----------------------------------------------------------------------
-import cdr, cdrcgi, cdrdb, sys, cgi, re, sys, os
+import cdr, cdrcgi, cdrdb, sys, cgi, re, sys, os, textwrap
 
 #----------------------------------------------------------------------
 # Load the fields from the form.
@@ -50,6 +54,20 @@ def cleanup(abspath):
 # Wrap long lines in the report.
 #--------------------------------------------------------------------
 def wrap(report):
+    report = report.replace("\r", "")
+    oldLines = report.split("\n")
+    newLines = []
+    for line in oldLines:
+        # Wrap, terminate, and begin each line with a space
+        newLines.append(" " + "\n ".join(textwrap.wrap(line, 90)))
+
+    # Return them into a unified string
+    return ("\n".join(newLines))
+
+#--------------------------------------------------------------------
+# Wrap long lines in the report - Obsolete?
+#--------------------------------------------------------------------
+def wrap_old(report):
     report = report.replace("\r", "")
     oldLines = report.split("\n")
     newLines = []
@@ -132,6 +150,9 @@ response = cdr.filterDoc('guest', filt, docIdStr, docVer=verImport)
 if type(response) in (type(""), type(u"")):
     cdrcgi.bail(response)
 docImport = unicode(response[0], 'utf-8')
+
+# DEBUG
+# verPrev -= 1
 
 response = cdr.filterDoc('guest', filt, docIdStr, docVer=verPrev)
 if type(response) in (type(""), type(u"")):
