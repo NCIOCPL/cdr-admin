@@ -1,11 +1,17 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.48 2005-07-01 19:29:45 venglisc Exp $
+# $Id: QcReport.py,v 1.49 2005-10-20 20:54:29 venglisc Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.48  2005/07/01 19:29:45  venglisc
+# Added new report type (repType) patbu for patient summary (bold/underline)
+# and added patrs for patient summary (redline/strikeout).  The latter is
+# identical to the repType 'pat' but has been added for consitend naming
+# between the two report types. (Bug 1744)
+#
 # Revision 1.47  2005/06/02 19:48:20  venglisc
 # Fixed code to pass a default for the displayBoard variable for patient
 # summaries. (Bug 1707)
@@ -232,8 +238,11 @@ standardWording = fields.getvalue("ShowStandardWording") or None
 displayComments = fields.getvalue("DisplayCommentElements") or None
 displayBoard    = fields.getvalue('Editorial-board') and 'editorial-board_' or ''
 displayBoard   += fields.getvalue('Advisory-board')  and 'advisory-board'   or ''
+displayAudience = fields.getvalue('Patient') and 'patient_' or ''
+displayAudience +=fields.getvalue('HP')      and 'hp'       or ''
 
-insRevLvls  = fields.getvalue("revLevels")  or None
+# insRevLvls  = fields.getvalue("revLevels")  or None
+insRevLvls  = fields.getvalue("insRevLevels")  or None
 delRevLvls  = fields.getvalue("delRevLevels")  or None
 if not insRevLvls:
     insRevLvls = fields.getvalue('publish') and 'publish|' or '' 
@@ -358,9 +367,10 @@ if docTitle and not docId:
         cdrcgi.bail('Failure looking up document title: %s' % info[1][0])
 
 #----------------------------------------------------------------------
-# Let the user pick the version for most Summary reports.
+# Let the user pick the version for most Summary or Glossary reports.
 #----------------------------------------------------------------------
-if docType == 'Summary' and repType and repType != 'pp' and not version:
+if docType == 'Summary' and repType and repType != 'pp' and not version or \
+   docType == 'GlossaryTerm' and not version:
     try:
         cursor.execute("""\
             SELECT num,
@@ -374,13 +384,13 @@ if docType == 'Summary' and repType and repType != 'pp' and not version:
         cdrcgi.bail('Failure retrieving document versions: %s' % info[1][0])
     form = """\
   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-  <INPUT TYPE='hidden' NAME='DocType' VALUE='Summary'>
+  <INPUT TYPE='hidden' NAME='DocType' VALUE='%s'>
   <INPUT TYPE='hidden' NAME='ReportType' VALUE='%s'>
   <INPUT TYPE='hidden' NAME='DocId' VALUE='CDR%010d'>
   Select document version:&nbsp;
   <SELECT NAME='DocVersion'>
    <OPTION VALUE='-1' SELECTED='1'>Current Working Version</OPTION>
-""" % (cdrcgi.SESSION, session, repType, intId)
+""" % (cdrcgi.SESSION, session, docType, repType, intId)
     for row in rows:
         form += """\
    <OPTION VALUE='%d'>[V%d %s] %s</OPTION>
@@ -395,9 +405,11 @@ if docType == 'Summary' and repType and repType != 'pp' and not version:
    <tr>
 """
     # The Board Markup does not apply to the Patient Version Summaries
+    # or the GlossaryTerm reports
     # ----------------------------------------------------------------
-    if repType != 'pat' and repType != 'patbu' and repType != 'patrs':
-        form += """\
+    if docType == 'Summary':
+        if repType != 'pat' and repType != 'patbu' and repType != 'patrs':
+            form += """\
     <td valign="top">
      <table>
       <tr>
@@ -418,6 +430,8 @@ if docType == 'Summary' and repType and repType != 'pp' and not version:
      </table>
     </td>
 """
+    # Display the check boxed for the Revision-level Markup
+    # -----------------------------------------------------
     form += """\
     <td valign="top">
      <table>
@@ -444,16 +458,50 @@ if docType == 'Summary' and repType and repType != 'pp' and not version:
     </td>
    </tr>
   </table>
+"""
+
+    # Display the check boxes for the HP or Patient version sections
+    # --------------------------------------------------------------
+    if docType == 'GlossaryTerm':
+        form += """\
+     <table>
+      <tr>
+       <td class="colheading">Display Audience Definition</td>
+      </tr>
+      <tr>
+       <td>
+        <INPUT TYPE="checkbox" NAME="HP"
+                         CHECKED='1'>&nbsp;&nbsp; Health Professional
+       </td>
+      </tr>
+      <tr>
+       <td>
+        <INPUT TYPE="checkbox" NAME="Patient"
+                         CHECKED='1'>&nbsp;&nbsp; Patient<BR>
+       </td>
+      </tr>
+    </table>
+"""
+
+    # Display the Comment display checkbox
+    # -------------------------------------
+    form += """\
   <BR>
   <INPUT TYPE='checkbox' NAME='DisplayCommentElements' CHECKED='1'>&nbsp;&nbsp;
   Display Comments?
 """
-    form += """\
+
+    # Display the Glossary appendix checkbox
+    # --------------------------------------
+    if docType == 'Summary':
+        form += """\
   <BR><BR>
   <INPUT TYPE='checkbox' NAME='Glossary'>&nbsp;&nbsp;
   Include glossary terms at end of report?<BR>
 """
 
+    # Display the checkbox to display standard wording
+    # ------------------------------------------------
     if repType == 'pat' or repType == 'patbu' or repType == 'patrs':
         form += """\
   <BR>
@@ -487,8 +535,10 @@ filters = {
         ["set:QC Summary Patient Set"],
     'Summary:patbu': # Patient
         ["set:QC Summary Patient Set (Bold/Underline)"],
-    'GlossaryTerm':         
+    'GlossaryTerm':
         ["set:QC GlossaryTerm Set"],
+    'GlossaryTerm:rs': # Redline/Strikeout
+        ["set:QC GlossaryTerm Set (Redline/Strikeout)"],
     'Citation':         
         ["set:QC Citation Set"],
     'Organization':     
@@ -983,6 +1033,12 @@ if docType.startswith('Summary'):
     if repType == 'pat' or repType == 'patrs' or repType == 'patbu':
         displayBoard += 'editorial-board_'
     filterParm.append(['displayBoard', displayBoard])
+
+if docType.startswith('GlossaryTerm'):
+    filterParm.append(['DisplayComments',
+                       displayComments and 'Y' or 'N'])
+    filterParm.append(['displayBoard', 'editorial-board_'])
+    filterParm.append(['displayAudience', displayAudience])
 
 if repType == "bu" or repType == "but":
     filterParm.append(['delRevLevels', 'Y'])
