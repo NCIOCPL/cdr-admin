@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: Filter.py,v 1.26 2005-07-28 21:46:14 venglisc Exp $
+# $Id: Filter.py,v 1.27 2005-10-28 21:05:39 venglisc Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.26  2005/07/28 21:46:14  venglisc
+# Modified to allow CDRID to be entered without the prefix 'CDR'.
+#
 # Revision 1.25  2005/05/14 00:01:45  venglisc
 # Added code to allow display of editorial and advisory board markup to
 # be displayed. (Bug 1683)
@@ -137,18 +140,22 @@ insRevLevels += fields.getvalue('insRevLevels') or '' # insRevLevels from links.
 delRevLevels  = (fields.getvalue('rsmarkup') == 'false') and 'Y' or 'N'
 displayBoard = (fields.getvalue('editorial') == 'true') and 'editorial-board_' or ''
 displayBoard += (fields.getvalue('advisory') == 'true') and 'advisory-board' or ''
+displayAudience = (fields.getvalue('glosspatient') == 'true') and 'patient_' or ''
+displayAudience += (fields.getvalue('glosshp') == 'true') and 'hp' or ''
+
 vendorOrQC = (fields.getvalue('QC') == 'true') and 'QC' or ''
 vendorOrQC += fields.getvalue('vendorOrQC') or '' # vendorOrQC from links.
 displayComments = (fields.getvalue('comments') == 'true') and 'Y' or 'N'
 displayGlossary = (fields.getvalue('glossary') == 'true') and 'Y' or 'N'
 displayStdWord  = (fields.getvalue('stdword')  == 'true') and 'Y' or 'N'
-	      # empty insRevLevels is expected.
-filterParm = [['insRevLevels', insRevLevels],
-              ['delRevLevels', delRevLevels],
-              ['DisplayComments', displayComments],
-	      ['DisplayGlossaryTermList', displayGlossary],
-	      ['ShowStandardWording', displayStdWord],
-          ['displayBoard', displayBoard]]
+          # empty insRevLevels is expected.
+filterParm = [['insRevLevels',            insRevLevels],
+              ['delRevLevels',            delRevLevels],
+              ['DisplayComments',         displayComments],
+              ['DisplayGlossaryTermList', displayGlossary],
+              ['ShowStandardWording',     displayStdWord],
+              ['displayBoard',            displayBoard],
+              ['displayAudience',         displayAudience]]
 if vendorOrQC:
     filterParm.append(['vendorOrQC', 'QC'])
 
