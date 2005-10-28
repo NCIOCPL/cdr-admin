@@ -1,4 +1,4 @@
-<!-- $Id: CdrFilter.html,v 1.7 2005-05-14 00:03:14 venglisc Exp $ -->
+<!-- $Id: CdrFilter.html,v 1.8 2005-10-28 21:08:32 venglisc Exp $ -->
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
  <HEAD>
   <TITLE>CDR Document Filtering</TITLE>
@@ -21,13 +21,15 @@
         var filt10 = document.FilterRequest.Filter10.value;
         var edt   = document.FilterRequest.editorial.checked;
         var adv   = document.FilterRequest.advisory.checked;
+        var gpt   = document.FilterRequest.glosspatient.checked;
+        var ghp   = document.FilterRequest.glosshp.checked;
         var pub   = document.FilterRequest.publish.checked;
         var app   = document.FilterRequest.approved.checked;
         var pro   = document.FilterRequest.proposed.checked;      
         var cmt   = document.FilterRequest.comments.checked;
         var gls   = document.FilterRequest.glossary.checked;
         var std   = document.FilterRequest.stdword.checked;
-	var mrk   = document.FilterRequest.rsmarkup[0].checked;
+        var mrk   = document.FilterRequest.rsmarkup[0].checked;
         var port  = document.FilterRequest.port.value;      
       //var uid   = document.FilterRequest.UserName.value;
       //var pwd   = document.FilterRequest.Password.value;
@@ -35,6 +37,8 @@
                   + "&DocVer=" + ver
                   + "&editorial=" + edt
                   + "&advisory=" + adv
+                  + "&glosspatient=" + gpt
+                  + "&glosshp=" + ghp
                   + "&publish=" + pub
                   + "&approved=" + app
                   + "&proposed=" + pro
@@ -141,6 +145,31 @@
 	    </TD>
 	    <TD width='5%'>
          <INPUT TYPE="checkbox" NAME="advisory">
+	    </TD>
+	    <TD width='25%' align='right'></TD>
+	    <TD width='5%' align='right'></TD>
+       </TR>
+      </TABLE>
+     </TD> 
+    </TR>    
+    <TR>     
+     <TD ALIGN='right' COLSPAN='1'>
+      <B>Display Gloss Def: </B>
+     </TD> 
+     <TD ALIGN='Left' COLSPAN='1'>
+      <TABLE border='0' width='100%'>
+       <TR>
+        <TD width='25%' align='right'>
+         <B>Patient</B>
+	    </TD>
+	    <TD width='5%'>
+         <INPUT TYPE="checkbox" NAME="glosspatient" CHECKED>
+	    </TD>
+	    <TD width='25%' align='right'>
+         <B>Health Professional</B>
+	    </TD>
+	    <TD width='5%'>
+         <INPUT TYPE="checkbox" NAME="glosshp" CHECKED>
 	    </TD>
 	    <TD width='25%' align='right'></TD>
 	    <TD width='5%' align='right'></TD>
