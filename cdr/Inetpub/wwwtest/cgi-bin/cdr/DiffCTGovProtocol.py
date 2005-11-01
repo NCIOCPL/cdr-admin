@@ -1,8 +1,11 @@
 #----------------------------------------------------------------------
 #
-# $Id: DiffCTGovProtocol.py,v 1.8 2005-10-18 15:32:23 ameyer Exp $
+# $Id: DiffCTGovProtocol.py,v 1.9 2005-11-01 23:23:04 ameyer Exp $
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.8  2005/10/18 15:32:23  ameyer
+# Apply textwrap module to word wrapping docs for diff.
+#
 # Revision 1.7  2005/10/07 03:08:43  ameyer
 # Added colorization.
 # Using ascii instead of latin-1.  Need to go over this.
@@ -168,7 +171,7 @@ name2 = "PreviousPubVersion"
 # doc2  = wrap(docPrev.encode('latin-1', 'replace'))
 doc1  = wrap(docImport.encode('ascii', 'replace'))
 doc2  = wrap(docPrev.encode('ascii', 'replace'))
-cmd   = "diff -aiu %s %s" % (name1, name2)
+cmd   = "diff -a -i -B -U 1 %s %s" % (name2, name1)
 try:
     workDir = cdr.makeTempDir('diff')
     os.chdir(workDir)
