@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolReports.py,v 1.20 2005-07-07 15:42:32 venglisc Exp $
+# $Id: ProtocolReports.py,v 1.21 2005-11-18 03:46:07 bkline Exp $
 #
 # Submenu for protocol reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.20  2005/07/07 15:42:32  venglisc
+# Added menu item for protocols with published results report. (Bug 1735)
+#
 # Revision 1.19  2005/06/30 21:55:39  bkline
 # Changed string for NCI Clinical Trials Statistics report.
 #
@@ -121,6 +124,8 @@ filename = time.strftime('InterimUpdateReport-%Y%m%d%H%M%S.xls')
 reports = [
            ('ApprovedNotYetActive.py',
             'Approved Not Yet Active Report', ''),
+           ('RssImportReport.py', 'COG Import/Update Statistics Report',
+            '&source=COG'),
            ('Request1687.py',
             'CTEP Orgs Without Phones', ''),
            ('LiaisonReport.py', 
@@ -136,6 +141,10 @@ reports = [
            ('HotfixReport.py',
             'Protocol Interim Update Report',
             '&filename=%s' % filename),
+           ('Request1855.py',
+            'Protocol Interventions', '&cols=2'),
+           ('Request1855.py',
+            'Protocol Interventions by Protocol Title', ''),
            ('ProtSitesWithoutPhone.py',
             'Protocol Sites Without Phone Numbers', ''),
            ('ProtocolStatusChange.py',
