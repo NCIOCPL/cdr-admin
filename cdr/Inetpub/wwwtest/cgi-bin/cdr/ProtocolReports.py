@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolReports.py,v 1.21 2005-11-18 03:46:07 bkline Exp $
+# $Id: ProtocolReports.py,v 1.22 2005-11-18 03:48:54 bkline Exp $
 #
 # Submenu for protocol reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.21  2005/11/18 03:46:07  bkline
+# Plugged in COG import report and two new OSP reports.
+#
 # Revision 1.20  2005/07/07 15:42:32  venglisc
 # Added menu item for protocols with published results report. (Bug 1735)
 #
@@ -128,6 +131,8 @@ reports = [
             '&source=COG'),
            ('Request1687.py',
             'CTEP Orgs Without Phones', ''),
+           ('CTGovEntryDate.py',
+            'CTGovProtocols vs. Early EntryDate', ''),
            ('LiaisonReport.py', 
             'NCI Liaison Office/Brussels Protocol Report', ''),
            ('NewlyPublishableTrials.py', 
