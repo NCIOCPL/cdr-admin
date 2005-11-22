@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: OSPReport.py,v 1.7 2005-11-22 13:38:18 bkline Exp $
+# $Id: OSPReport.py,v 1.8 2005-11-22 13:40:57 bkline Exp $
 #
 # Queue up report for the Office of Science Policy.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.7  2005/11/22 13:38:18  bkline
+# Added support for selecting by phase.  Removed hardwired running
+# of job on Mahler.
+#
 # Revision 1.6  2005/07/19 15:13:24  venglisc
 # Modified the dataSource passed to the connect module after the server was
 # moved behind the OTSA firewall. The hostname now has to be specified to
@@ -247,4 +251,4 @@ cdrcgi.sendPage(header + """\
   </form>
  </body>
 </html>
-""" % (cdr.DEV_HOST, cdrcgi.BASE, cdrcgi.SESSION, session, jobId))
+""" % (cdrcgi.WEBSERVER, cdrcgi.BASE, cdrcgi.SESSION, session, jobId))
