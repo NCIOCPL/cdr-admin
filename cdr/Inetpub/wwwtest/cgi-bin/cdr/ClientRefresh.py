@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: ClientRefresh.py,v 1.1 2005-11-09 00:00:16 bkline Exp $
+# $Id: ClientRefresh.py,v 1.2 2005-11-22 15:52:22 bkline Exp $
 #
 # Web service for keeping CDR client files up to date.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2005/11/09 00:00:16  bkline
+# Server to keep CDR clients up to date with the current set of client
+# files.
+#
 #----------------------------------------------------------------------
 import WebService, cdr, os, sys, xml.dom.minidom, tempfile, base64, time
 
@@ -29,13 +33,13 @@ class Ticket:
         self.host        = None
         self.author      = None
         for child in node.childNodes:
-            if child.nodeName == 'APPLICATION':
+            if child.nodeName == 'Application':
                 self.application = cdr.getTextContent(child).strip()
-            elif child.nodeName == 'TIMESTAMP':
+            elif child.nodeName == 'Timestamp':
                 self.timestamp = cdr.getTextContent(child).strip()
-            elif child.nodeName == 'HOST':
+            elif child.nodeName == 'Host':
                 self.host = cdr.getTextContent(child).strip()
-            elif child.nodeName == 'AUTHOR':
+            elif child.nodeName == 'Author':
                 self.author = cdr.getTextContent(child).strip()
 
 #----------------------------------------------------------------------
@@ -48,9 +52,9 @@ class FileWithTimestamp:
         self.name      = None
         self.timestamp = None
         for child in node.childNodes:
-            if child.nodeName == 'NAME':
+            if child.nodeName == 'Name':
                 self.name = cdr.getTextContent(child).strip()
-            elif child.nodeName == 'TIMESTAMP':
+            elif child.nodeName == 'Timestamp':
                 self.timestamp = cdr.getTextContent(child).strip()
 
 #----------------------------------------------------------------------
@@ -62,11 +66,11 @@ class Manifest:
         self.ticket  = None
         self.files   = []
         for child in node.childNodes:
-            if child.nodeName == 'TICKET':
+            if child.nodeName == 'Ticket':
                 self.ticket = Ticket(child)
-            elif child.nodeName == 'FILELIST' and includeFilelist:
+            elif child.nodeName == 'FileList' and includeFilelist:
                 for grandchild in child.childNodes:
-                    if grandchild.nodeName == 'FILE':
+                    if grandchild.nodeName == 'File':
                         self.files.append(FileWithTimestamp(grandchild))
 
 #----------------------------------------------------------------------
@@ -83,8 +87,8 @@ def loadServerManifest(includeFilelist = True):
 # client machine.  Send a response to the client indicating whether
 # the client file set has changed since the last time this client
 # checked.  The response from the server consists of an XML document
-# containing the single element VALIDATION, whose text content is
-# 'ACK' if the client's set is up to date, or 'NAK' otherwise.
+# containing the single element Current, whose text content is
+# 'Y' if the client's set is up to date, or 'N' otherwise.
 #----------------------------------------------------------------------
 def checkTicket(clientTicket):
     serverTicket = loadServerManifest(includeFilelist = False).ticket
@@ -92,32 +96,47 @@ def checkTicket(clientTicket):
     debugLog("serverTicket.host: %s" % serverTicket.host, 2)
     debugLog("clientTicket.timestamp: %s" % clientTicket.timestamp, 2)
     debugLog("serverTicket.timestamp: %s" % serverTicket.timestamp, 2)
-    ackOrNak = 'ACK'
     if clientTicket.host != serverTicket.host:
-        ackOrNak = 'NAK'
+        return WebService.Response("<Current>N</Current>")
     elif clientTicket.timestamp != serverTicket.timestamp:
-        ackOrNak = 'NAK'
-    return WebService.Response("<VALIDATION>%s</VALIDATION>" % ackOrNak)
+        return WebService.Response("<Current>N</Current>")
+    return WebService.Response("<Current>Y</Current>")
 
 #----------------------------------------------------------------------
 # Create a compressed archive containing the new and/or modified files
 # which this client needs in order to bring its set in sync with the
-# set on the server.  Store the archive on the server's disk and return
-# the name of the file to the caller.
+# set on the server.  Return the archive as an in-memory string of bytes.
+# Retains the copy of the archive on the server's disk if the debugging
+# level is 2 or more.  The dependency on the external 'zip.exe' command
+# is unfortunate, but the alternatives are even worse.  The built-in
+# Python zipfile module does not retain the exact number of seconds
+# in the files' timestamps (rounding instead to even seconds), and
+# using the more robust tar format would introduce the need to have
+# tar and bzip2 (with supporting libraries) installed on the client.
 #----------------------------------------------------------------------
 def buildZipfile(fileNames):
-    listName = tempfile.mktemp()
-    listFile = open(listName, "w")
+    baseName = tempfile.mktemp()
+    zipName  = baseName + ".zip"
+    listName = baseName + ".txt"
+    listFile = file(listName, "w")
     for name in fileNames:
         listFile.write("%s\n" % name)
     listFile.close()
-    zipName = tempfile.mktemp() + ".zip"
     os.chdir(cdr.CLIENT_FILES_DIR)
-    os.system("zip -@ %s < %s > %s.err" % (zipName, listName, zipName))
-    debugLog("error file is %s.err" % zipName)
+    result = cdr.runCommand("zip -@ %s < %s" % (zipName, listName))
+    debugLog("Creating %s" % zipName) 
+    if result.code:
+        msg = "zip failure code %d (%s)" % (result.code, result.output)
+        debugLog(msg)
+        raise msg
+    zipFile = file(zipName, 'rb')
+    zipBytes = zipFile.read()
+    zipFile.close()
     if LOG_LEVEL < 2:
         os.unlink(listName)
-    return zipName
+        os.unlink(zipName)
+        debugLog("saved zipfile as %s" % zipName)
+    return zipBytes
     
 #----------------------------------------------------------------------
 # Compare the client's copy of the manifest for CDR client files with
@@ -126,11 +145,10 @@ def buildZipfile(fileNames):
 # and the second for files which are on the client's machine, but
 # are no longer in the current set of CDR client files.  Return a
 # response to the client consisting of an XML document whose top-
-# level element is 'DELTA', with optional child elements of 'ZIPFILE'
-# (containing the name of the compressed archive which is created
-# here for new and/or changed files to be sent to the client in
-# a subsequent client-server exchange) and 'DELETE' (containing
-# one or more FILE grandchild elements, one for each client file
+# level element is 'Updates', with optional child elements of 'ZipFile'
+# (containing the base64-encoded bytes for the compressed archived of
+# new and/or changed files needed by the client) and Delete (containing
+# one or more File grandchild elements, one for each client file
 # which needs to be removed).
 #----------------------------------------------------------------------
 def makeDelta(clientManifest):
@@ -156,17 +174,18 @@ def makeDelta(clientManifest):
             name = clientFiles[key].name
             debugLog("client file %s to be deleted" % name)
             toBeDeleted.append(name)
-    lines = ["<DELTA>"]
+    lines = ["<Updates>"]
     if toBeInstalled:
         debugLog("sending %d files to be installed" % len(toBeInstalled), 2)
-        lines.append("<ZIPFILE>%s</ZIPFILE>" % buildZipfile(toBeInstalled))
+        lines.append("<ZipFile encoding='base64'>%s</ZipFile>" %
+                     base64.encodestring(buildZipfile(toBeInstalled)))
     if toBeDeleted:
         debugLog("%d files will be removed" % len(toBeDeleted), 2)
-        lines.append("<DELETE>")
+        lines.append("<Delete>")
         for name in toBeDeleted:
-            lines.append("<FILE>%s</FILE>" % name)
-        lines.append("</DELETE>")
-    lines.append("</DELTA>")
+            lines.append("<File>%s</File>" % name)
+        lines.append("</Delete>")
+    lines.append("</Updates>")
     return WebService.Response("".join(lines))
 
 #----------------------------------------------------------------------
@@ -219,12 +238,10 @@ def main():
         LOG_LEVEL = request.logLevel
         debugLog("%s request from %s" % (request.type, request.client))
         debugLog("Request body:\n%s" % request.message, 3)
-        if request.type == "TICKET":
+        if request.type == "Ticket":
             response = checkTicket(Ticket(request.doc))
-        elif request.type == "MANIFEST":
+        elif request.type == "Manifest":
             response = makeDelta(Manifest(request.doc))
-        elif request.type == "ZIPREQ":
-            response = sendZipfile(cdr.getTextContent(request.doc))
         else:
             response = WebService.ErrorResponse("Don't understand %s" %
                                                 request.type)
