@@ -1,10 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: OSPReport.py,v 1.6 2005-07-19 15:13:24 venglisc Exp $
+# $Id: OSPReport.py,v 1.7 2005-11-22 13:38:18 bkline Exp $
 #
 # Queue up report for the Office of Science Policy.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2005/07/19 15:13:24  venglisc
+# Modified the dataSource passed to the connect module after the server was
+# moved behind the OTSA firewall. The hostname now has to be specified to
+# be resolved within the firewall (without the nci.nih.gov domain).
+#
 # Revision 1.5  2005/05/26 21:33:52  venglisc
 # Modified to pre-populate the email input field with the session owners
 # email address. (Bug 1664)
@@ -32,10 +37,12 @@ import cdrbatch, cdrcgi, cgi, cdrdb, cdr, time
 fields      = cgi.FieldStorage()
 session     = cdrcgi.getSession(fields)
 request     = cdrcgi.getRequest(fields)
-email       = fields and fields.getvalue("Email")    or None
-cancer      = fields and fields.getvalue("Cancer")   or None
-begin       = fields and fields.getvalue("begin")    or None
-end         = fields and fields.getvalue("end")      or None
+email       = fields and fields.getvalue("Email")   or None
+cancer      = fields and fields.getlist("Cancer")   or None
+phases      = fields and fields.getlist("Phase")    or None
+begin       = fields and fields.getvalue("begin")   or None
+end         = fields and fields.getvalue("end")     or None
+year        = fields and fields.getvalue("year")    or 'calendar'
 title       = "CDR Administration"
 section     = "Report for Office of Science Policy"
 SUBMENU     = "Report Menu"
@@ -100,6 +107,18 @@ def listTermChoices():
 """ % (row[0], cdrcgi.unicodeToLatin1(cgi.escape(row[1])))
     return html + """\
       </select>"""
+#----------------------------------------------------------------------
+# Create picklist for phase(s).
+#----------------------------------------------------------------------
+def listPhaseChoices():
+    return """\
+      <select multiple='1' size='5' name='Phase'>
+       <option value='All' selected='1'>All Phases</option>
+       <option value='Phase I'>Phase I</option>
+       <option value='Phase II'>Phase II</option>
+       <option value='Phase III'>Phase III</option>
+       <option value='Phase IV'>Phase IV</option>
+      </select>"""
 
 #----------------------------------------------------------------------
 # Use default date range if not specified.
@@ -140,7 +159,15 @@ if not email or not cancer or request != "Submit":
      </td>
     </tr>
     <tr>
+     <td align='right'>
+      <b>Phase(s):&nbsp;</b>
+     </td>
      <td>
+%s
+     </td>
+    </tr>
+    <tr>
+     <td align='right'>
       <b>Active between:&nbsp;</b>
      </td>
      <td>
@@ -148,13 +175,24 @@ if not email or not cancer or request != "Submit":
       <input name='end' size='4' value='%s'><br>
      </td>
     </tr>
+    <tr>
+     <td align='right'>
+      <b>Year type:&nbsp;</b>
+     </td>
+     <td>
+      <input type='radio' name='year' value='calendar' checked='1'>
+      Calendar&nbsp;&nbsp;&nbsp;
+      <input type='radio' name='year' value='fiscal'>
+      Fiscal<br>
+     </td>
+    </tr>
    </table>
    <input type='hidden' name='%s' value='%s'>
   </form>
  </body>
 </html>
-""" % (cdr.getEmail(session), listTermChoices(), begin, end, 
-       cdrcgi.SESSION, session)
+""" % (cdr.getEmail(session), listTermChoices(), listPhaseChoices(),
+       begin, end, cdrcgi.SESSION, session)
     cdrcgi.sendPage(header + form)
 
 #----------------------------------------------------------------------    
@@ -166,13 +204,25 @@ args = []
 for c in cancer:
     name = "TermId%d" % (len(args) + 1)
     args.append((name, c))
+if not phases:
+    phases = []
+elif type(phases) not in (list, tuple):
+    phases = [phases]
+phaseValues = []
+for phase in phases:
+    if phase.upper().startswith('PHASE'):
+        phaseValues.append(phase)
+if len(phaseValues) == 1:
+    args.append(('Phases', "= '%s'" % phaseValues[0]))
+elif phaseValues:
+    args.append(('Phases',
+                "IN (%s)" % ", ".join(["'%s'" % p for p in phaseValues])))
 args.append(('begin', begin))
 args.append(('end', end))
+args.append(('year', year))
 
-# Have to do this on the development machine, since that's the only
-# server with Excel installed.
 batch = cdrbatch.CdrBatch(jobName = section, command = command, email = email,
-                          args = args, host = cdr.DEV_HOST)
+                          args = args)
 try:
     batch.queue()
 except Exception, e:
