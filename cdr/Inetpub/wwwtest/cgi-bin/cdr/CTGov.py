@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CTGov.py,v 1.8 2004-10-26 19:56:33 venglisc Exp $
+# $Id: CTGov.py,v 1.9 2005-11-30 06:02:09 ameyer Exp $
 #
 # Submenu for ClinicalTrials.gov activities.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.8  2004/10/26 19:56:33  venglisc
+# Corrected the anker link for the menu items.
+#
 # Revision 1.7  2004/07/13 15:40:12  venglisc
 # Modified menu item to "Mark/Remove Protocols as Duplicates".
 #
@@ -52,7 +55,7 @@ if action == cdrcgi.MAINMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if action == "Log Out": 
+if action == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
@@ -72,7 +75,7 @@ if qcFlag:
  </body>
 </html>
 """)
-    
+
 #----------------------------------------------------------------------
 # Display available report choices.
 #----------------------------------------------------------------------
@@ -95,7 +98,7 @@ form += """\
     <OL>
 """
 reports = [
-           ('EditExternMap.py', 'Update Mapping Table'), 
+           ('EditExternMap.py', 'Update Mapping Table'),
            ('CTGovMarkDuplicate.py', 'Mark/Remove Protocols as Duplicates')
           ]
 for r in reports:
@@ -125,6 +128,7 @@ reports = [
            ('ExternMapFailures.py', 'External Map Failures Report'),
            ('CTGovOutOfScope.py', 'Records Marked Out of Scope'),
            ('CTGovDupReport.py', 'Records Marked Duplicate'),
+           ('CTGovEntryDate.py', 'CTGovProtocols vs. Early EntryDate'),
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s'>%s</A></LI>\n" % (
