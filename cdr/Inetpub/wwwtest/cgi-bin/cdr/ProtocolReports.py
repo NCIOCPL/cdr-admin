@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolReports.py,v 1.22 2005-11-18 03:48:54 bkline Exp $
+# $Id: ProtocolReports.py,v 1.23 2005-12-14 00:03:59 ameyer Exp $
 #
 # Submenu for protocol reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.22  2005/11/18 03:48:54  bkline
+# Plugged in Alan's new CTGov protocols.
+#
 # Revision 1.21  2005/11/18 03:46:07  bkline
 # Plugged in COG import report and two new OSP reports.
 #
@@ -97,7 +100,7 @@ elif action == SUBMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if action == "Log Out": 
+if action == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
@@ -108,11 +111,11 @@ form = """\
     <H3>QC Reports</H3>
     <OL>
 """ % (cdrcgi.SESSION, session)
-reports = [('ProtSearch.py?', 
+reports = [('ProtSearch.py?',
             'Protocol QC Reports'),
-           ('QcReport.py?DocType=InScopeProtocol&ReportType=pp&',   
+           ('QcReport.py?DocType=InScopeProtocol&ReportType=pp&',
             'Publish Preview - InScopeProtocol'),
-           ('QcReport.py?DocType=CTGovProtocol&ReportType=pp&',   
+           ('QcReport.py?DocType=CTGovProtocol&ReportType=pp&',
             'Publish Preview - CTGovProtocol')]
 for r in reports:
     form += "<LI><A HREF='%s/%s%s=%s'>%s</LI></A>\n" % (
@@ -131,15 +134,13 @@ reports = [
             '&source=COG'),
            ('Request1687.py',
             'CTEP Orgs Without Phones', ''),
-           ('CTGovEntryDate.py',
-            'CTGovProtocols vs. Early EntryDate', ''),
-           ('LiaisonReport.py', 
+           ('LiaisonReport.py',
             'NCI Liaison Office/Brussels Protocol Report', ''),
-           ('NewlyPublishableTrials.py', 
+           ('NewlyPublishableTrials.py',
             'Newly Publishable Trials', ''),
-           ('PreferredProtOrgs.py', 
+           ('PreferredProtOrgs.py',
             'Preferred Protocol Organizations', ''),
-           ('NciClinicalTrialsStats.py', 
+           ('NciClinicalTrialsStats.py',
             'Profile of NCI Sponsored Clinical Trials', ''),
            ('TrialsCitationStats.py',
             'Protocol Citation Statistics', ''),
