@@ -1,11 +1,16 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.49 2005-10-20 20:54:29 venglisc Exp $
+# $Id: QcReport.py,v 1.50 2005-12-28 21:14:08 venglisc Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.49  2005/10/20 20:54:29  venglisc
+# Modified to include creating of GlossaryTerm Redline/Strikeout reports
+# that allow the user to limit the output to a specified audience type
+# (Health professional or Patient).  Bug 1868
+#
 # Revision 1.48  2005/07/01 19:29:45  venglisc
 # Added new report type (repType) patbu for patient summary (bold/underline)
 # and added patrs for patient summary (redline/strikeout).  The latter is
@@ -555,6 +560,8 @@ filters = {
         ["set:QC Media Set"],
     'MiscellaneousDocument':
         ["set:QC MiscellaneousDocument Set"],
+    'MiscellaneousDocument:rs':
+        ["set:QC MiscellaneousDocument Set (Redline/Strikeout)"],
     'CTGovProtocol':
         ["set:QC CTGovProtocol Set"]
 }
@@ -998,10 +1005,14 @@ if repType == "pp":
 if repType: docType += ":%s" % repType
 
 # ---------------------------------------------------------------------
-# This next line is needed to run the Media QC report from within
-# XMetaL since the repType argument is not passed by the macro
+# The next two lines are needed to run the Media and Miscellaneaous QC 
+# reports from within XMetaL since the repType argument is not passed 
+# by the macro
+# Note: The Misc. Document report should always be displayed with 
+#       markup if it exists.
 # ---------------------------------------------------------------------
-if docType == 'Media': docType += ":img"
+if docType == 'Media':                 docType += ":img"
+if docType == 'MiscellaneousDocument': docType += ":rs"
 
 if version == "-1": version = None
 if not filters.has_key(docType):
@@ -1034,11 +1045,20 @@ if docType.startswith('Summary'):
         displayBoard += 'editorial-board_'
     filterParm.append(['displayBoard', displayBoard])
 
+# Need to set the displayBoard parameter or all markup will be dropped
+# --------------------------------------------------------------------
 if docType.startswith('GlossaryTerm'):
     filterParm.append(['DisplayComments',
                        displayComments and 'Y' or 'N'])
     filterParm.append(['displayBoard', 'editorial-board_'])
     filterParm.append(['displayAudience', displayAudience])
+
+# Need to set the displayBoard and revision level parameter or all 
+# markup will be dropped
+# --------------------------------------------------------------------
+if docType.startswith('MiscellaneousDocument'):
+    filterParm.append(['insRevLevels', 'approved|'])
+    filterParm.append(['displayBoard', 'editorial-board_'])
 
 if repType == "bu" or repType == "but":
     filterParm.append(['delRevLevels', 'Y'])
