@@ -2,9 +2,14 @@
 # Compare CTgovProtocol documents from an import job with the current
 # publishable version of the the same documents.
 #
-# $Id: CTGovUpdateReport.py,v 1.1 2005-12-23 02:19:53 ameyer Exp $
+# Done for Bugzilla issue #1881
+#
+# $Id: CTGovUpdateReport.py,v 1.2 2006-01-10 20:10:15 ameyer Exp $
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2005/12/23 02:19:53  ameyer
+# Report differences between imported and current working docs.
+#
 #----------------------------------------------------------------------
 
 import time, cgi, cdr, cdrcgi, cdrdb, cdrxdiff
@@ -122,7 +127,7 @@ def genInputForm():
     """
     # Build form
     title   = "CDR Administration"
-    section = "CTGov Updates Report"
+    section = "Imported CTGovProtocols vs. CWDs"
     script  = "CTGovUpdateReport.py"
     buttons = ["Submit Request", CTGOV_MENU, cdrcgi.MAINMENU, LOGOUT]
     html    = cdrcgi.header(title, title, section, script, buttons) + \
