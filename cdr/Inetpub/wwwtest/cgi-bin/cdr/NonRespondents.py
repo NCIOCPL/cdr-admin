@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: NonRespondents.py,v 1.4 2004-02-26 21:11:01 bkline Exp $
+# $Id: NonRespondents.py,v 1.5 2006-01-10 16:27:21 bkline Exp $
 #
 # Report on mailers which haven't been responded to (other than
 # status and participant mailers).
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2004/02/26 21:11:01  bkline
+# Replaced hard-coded name of development server with macro from cdr
+# module.
+#
 # Revision 1.3  2003/07/29 12:33:25  bkline
 # Changed label (60-120) at users' request.  Plugged in hard-coded
 # web server name (Mahler).
@@ -96,11 +100,9 @@ if not docType or not age or not email:
 #----------------------------------------------------------------------
 args = (("Age", age), ("BaseDocType", docType), ("Host", cdrcgi.WEBSERVER))
 
-# Have to do this on the development machine, since that's the only
-# server with Excel installed.
 batch = cdrbatch.CdrBatch(jobName = "Mailer Non-Respondents",
                           command = command, email = email,
-                          args = args, host = cdr.DEV_HOST)
+                          args = args)
 try:
     batch.queue()
 except Exception, e:
