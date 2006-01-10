@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CTGov.py,v 1.10 2005-12-23 02:20:25 ameyer Exp $
+# $Id: CTGov.py,v 1.11 2006-01-10 20:09:44 ameyer Exp $
 #
 # Submenu for ClinicalTrials.gov activities.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.10  2005/12/23 02:20:25  ameyer
+# Added CTGovUpdateReport.
+#
 # Revision 1.9  2005/11/30 06:02:09  ameyer
 # Added CTGovEntryDate report to the menu.
 #
@@ -132,7 +135,7 @@ reports = [
            ('CTGovOutOfScope.py', 'Records Marked Out of Scope'),
            ('CTGovDupReport.py', 'Records Marked Duplicate'),
            ('CTGovEntryDate.py', 'CTGovProtocols vs. Early EntryDate'),
-           ('CTGovUpdateReport.py', 'Imported Protocols vs. CWDs'),
+           ('CTGovUpdateReport.py', 'Imported CTGovProtocols vs. CWDs'),
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s'>%s</A></LI>\n" % (
