@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolSitesInFrance.py,v 1.1 2006-01-18 22:36:13 venglisc Exp $
+# $Id: ProtocolSitesInFrance.py,v 1.2 2006-01-18 22:53:47 venglisc Exp $
 #
 # Report identifying protocol sites located in France.
-# The output format is *.xsl (Excel)
+# The output format is *.xml (Excel is able to import this)
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2006/01/18 22:36:13  venglisc
+# Initial copy of report listing protocols with sites in France. (Bug 1947)
+#
 #----------------------------------------------------------------------
 import cdrdb, sys, time, cdrcgi, ExcelWriter
 
@@ -17,9 +20,11 @@ conn = cdrdb.connect('CdrGuest')
 conn.setAutoCommit()
 cursor = conn.cursor()
 
+# Excel is able to read XML files so that's what we create here
+# -------------------------------------------------------------
 t = time.strftime("%Y%m%d%H%M%S")
 REPORTS_BASE = 'd:/cdr/tmp'
-name = '/ProtocolSitesInFrance.xsl'
+name = '/ProtocolSitesInFrance.xml'
 fullname = REPORTS_BASE + name
 
 #----------------------------------------------------------------------
