@@ -24,9 +24,12 @@
 #    3. Allow the user to submit the results, plus any overrides for
 #       permanent update.
 #
-# $Id: Request1931.py,v 1.1 2006-01-04 03:28:07 ameyer Exp $
+# $Id: Request1931.py,v 1.2 2006-01-19 23:56:09 ameyer Exp $
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2006/01/04 03:28:07  ameyer
+# Add ExpectedEnrollment elements.
+#
 #----------------------------------------------------------------------
 
 import re, cgi, xml.dom.minidom, cdr, cdrdb, cdrcgi, ModifyDocs
@@ -420,7 +423,10 @@ SELECT top %d q1.doc_id
     except cdrdb.Error, info:
         cdrcgi.bail("Error fetching document ids: %s" % str(info))
 
-    return (row[0] for row in rows)
+    docIds = []
+    for row in rows:
+        docIds.append(row[0])
+    return (docIds)
 
 def getAccrualText(session, docId):
     """
