@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: DevSA.py,v 1.4 2005-07-07 22:26:35 venglisc Exp $
+# $Id: DevSA.py,v 1.5 2006-01-19 21:12:24 ameyer Exp $
 #
 # Main menu for Developers and System Administrators.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2005/07/07 22:26:35  venglisc
+# Removed menu item to update CSS Stylesheets. (Bug 1747)
+#
 # Revision 1.3  2004/08/26 14:05:52  bkline
 # Added unblock page.
 #
@@ -57,6 +60,8 @@ items   = (('EditGroups.py',           'Manage Groups'                 ),
            ('CTGov.py',                'CTGov Protocols'               ),
            ('UnblockDoc.py',           'Unblock Documents'             ),
            ('EditExternMap.py',        'Update Mapping Table'          ),
+           ('Request1931.py',
+            'Guess ExpectedEnrollment from ProjectedAccrual'),
            ('Logout.py',               'Log Out'                       )
            )
 for item in items:
