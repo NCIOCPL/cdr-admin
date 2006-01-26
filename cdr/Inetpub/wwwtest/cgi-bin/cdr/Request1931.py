@@ -24,9 +24,14 @@
 #    3. Allow the user to submit the results, plus any overrides for
 #       permanent update.
 #
-# $Id: Request1931.py,v 1.2 2006-01-19 23:56:09 ameyer Exp $
+# $Id: Request1931.py,v 1.3 2006-01-26 22:00:23 ameyer Exp $
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2006/01/19 23:56:09  ameyer
+# Replaced a generator function "return (row[0] for row in rows" with
+# code to make the program backwards compatible with the version of
+# Python on Bach.
+#
 # Revision 1.1  2006/01/04 03:28:07  ameyer
 # Add ExpectedEnrollment elements.
 #
@@ -374,7 +379,7 @@ def createForm3(session):
         Form html.
     """
 
-    section = 'Click "More" or %s to do more documents or exit' % ADMIN
+    section = 'Click "More" or Exit to process more documents or exit'
     buttons = ["More", "Exit"]
 
     html = cdrcgi.header(TITLE, TITLE, section, SCRIPT, buttons) + \
@@ -561,11 +566,10 @@ testMode  = fields and fields.getvalue('testMode') or None
 updateNow = fields and fields.getvalue('updateXML') or None
 
 # User navigation back to main menu or to restart
-if request == ADMIN:
+if request == ADMIN or request == "Exit":
     cdrcgi.navigateTo("Admin.py", session)
 if request == "More":
     cdrcgi.navigateTo(SCRIPT, session)
-
 
 # Global for communication between Filter and Transform
 idVals = {}
@@ -598,6 +602,9 @@ if request == 'Submit Request' and formNum == "form2":
     job = ModifyDocs.Job(user, pw, Filter(), Transform(),
                          "Programmed add of ExpectedEnrollment",
                          testMode=testMode)
+    # Don't want stderr log appearing in browser output
+    job.suppressStdErrLogging()
+
     job.run()
 
     # Report to user
