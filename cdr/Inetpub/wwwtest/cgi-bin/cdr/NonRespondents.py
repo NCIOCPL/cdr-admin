@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: NonRespondents.py,v 1.5 2006-01-10 16:27:21 bkline Exp $
+# $Id: NonRespondents.py,v 1.6 2006-03-14 14:17:18 bkline Exp $
 #
 # Report on mailers which haven't been responded to (other than
 # status and participant mailers).
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2006/01/10 16:27:21  bkline
+# Took out hard-wiring of report to production server.
+#
 # Revision 1.4  2004/02/26 21:11:01  bkline
 # Replaced hard-coded name of development server with macro from cdr
 # module.
@@ -127,5 +130,4 @@ cdrcgi.sendPage(header + """\
   </form>
  </body>
 </html>
-""" % (cdr.DEV_HOST, cdrcgi.BASE, cdrcgi.SESSION, session, jobId))
-
+""" % (cdrcgi.WEBSERVER, cdrcgi.BASE, cdrcgi.SESSION, session, jobId))
