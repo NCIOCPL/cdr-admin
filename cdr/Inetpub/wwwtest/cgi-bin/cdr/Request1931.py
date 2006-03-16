@@ -24,9 +24,13 @@
 #    3. Allow the user to submit the results, plus any overrides for
 #       permanent update.
 #
-# $Id: Request1931.py,v 1.3 2006-01-26 22:00:23 ameyer Exp $
+# $Id: Request1931.py,v 1.4 2006-03-16 21:59:42 ameyer Exp $
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2006/01/26 22:00:23  ameyer
+# Suppressed ModifyDocs output to stderr.
+# Fixed button bug - no navigation for "Exit" button.
+#
 # Revision 1.2  2006/01/19 23:56:09  ameyer
 # Replaced a generator function "return (row[0] for row in rows" with
 # code to make the program backwards compatible with the version of
@@ -404,6 +408,8 @@ def getUnprocessedDocIds(numDocs):
     Select document IDs of qualified docs with no ExpectedEnrollment values.
     XXX - REQUIRES INDEX ON /InScopeProtocol/ExpectedEnrollment.
 
+    Orders them by status - putting Active first, then by id.
+
     Pass:
         Max num doc IDs to fetch.
 
@@ -415,15 +421,17 @@ def getUnprocessedDocIds(numDocs):
         cursor = conn.cursor()
         cursor.execute("""\
 SELECT top %d q1.doc_id
-  FROM query_term q1
+  FROM query_term q1, query_term q3
  WHERE q1.path = '/InScopeProtocol/ProtocolIDs/OtherID/IDType'
    AND q1.value = 'ClinicalTrials.gov ID'
    AND NOT EXISTS (
       SELECT q2.doc_id FROM query_term q2
        WHERE q2.doc_id = q1.doc_id
          AND q2.path = '/InScopeProtocol/ExpectedEnrollment')
-  ORDER BY q1.doc_id
-""" % numDocs)
+   AND q3.doc_id = q1.doc_id
+   AND q3.path = '/InScopeProtocol/ProtocolAdminInfo/CurrentProtocolStatus'
+ ORDER BY q3.value, q1.doc_id
+""" % numDocs, timeout=800)
         rows = cursor.fetchall()
     except cdrdb.Error, info:
         cdrcgi.bail("Error fetching document ids: %s" % str(info))
