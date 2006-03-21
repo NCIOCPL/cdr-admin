@@ -24,9 +24,12 @@
 #    3. Allow the user to submit the results, plus any overrides for
 #       permanent update.
 #
-# $Id: Request1931.py,v 1.4 2006-03-16 21:59:42 ameyer Exp $
+# $Id: Request1931.py,v 1.5 2006-03-21 23:44:44 ameyer Exp $
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2006/03/16 21:59:42  ameyer
+# Added 200 seconds to query timeout value per Sheri's request.
+#
 # Revision 1.3  2006/01/26 22:00:23  ameyer
 # Suppressed ModifyDocs output to stderr.
 # Fixed button bug - no navigation for "Exit" button.
@@ -195,10 +198,13 @@ class Transform:
    <!-- Copy the phase -->
    <xsl:copy-of         select = "."/>
 
-   <!-- Add the ExpectedEnrollment -->
-   <xsl:element           name = 'ExpectedEnrollment'>
-     <xsl:value-of      select = '$enroll'/>
-   </xsl:element>
+   <!-- Add the ExpectedEnrollment - only to the last ProtocolPhase -->
+   <xsl:if                test = "not(following-sibling::ProtocolPhase)">
+     <xsl:element         name = 'ExpectedEnrollment'>
+       <xsl:value-of    select = '$enroll'/>
+     </xsl:element>
+   </xsl:if>
+
  </xsl:template>
 </xsl:transform>
 """
