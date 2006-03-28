@@ -1,10 +1,17 @@
 #----------------------------------------------------------------------
 #
-# $Id: MenuHierarchy.py,v 1.2 2004-11-05 19:48:05 venglisc Exp $
+# $Id: MenuHierarchy.py,v 1.3 2006-03-28 01:22:02 bkline Exp $
 #
 # Enables users to review the entire menu hierarchy for a given menu type.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2004/11/05 19:48:05  venglisc
+# In order to sort the children of a term based on the SortOrder attribute
+# value the sortString was introduced.  The sortString is equal to the
+# TermName is the SortOrder attribute does not exist, otherwise it is the
+# SortOrder value itself.  Sort the children of a term by the sortString but
+# display the term name.
+#
 # Revision 1.1  2003/05/08 20:27:27  bkline
 # New terminology report for menu information.
 #
@@ -124,7 +131,7 @@ def loadMenuItems(menuType):
         for parentId in menuItem.parents:
             key2 = (parentId, menuItem.menuTypeName)
             if key2 not in tempIndex:
-                print "key (%d, %s) not found in tempIndex" % key2
+                #print "key (%d, %s) not found in tempIndex" % key2
                 continue
             for parentKey in tempIndex[key2]:
                 parent = menuItems[parentKey]
