@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: BoardRoster.py,v 1.6 2005-02-23 15:36:34 venglisc Exp $
+# $Id: BoardRoster.py,v 1.7 2006-03-30 16:37:49 venglisc Exp $
 #
 # Report to display the Board Roster with or without assistant
 # information.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2005/02/23 15:36:34  venglisc
+# Fixed incorrect comment indicators.  This caused the style for italics to
+# be ignored. (Bug 1527)
+#
 # Revision 1.5  2005/02/22 19:17:02  venglisc
 # Modified code to add style for suppressing display of italic information.
 # (Bug 1527)
@@ -299,7 +303,7 @@ html += """
   <hr width="50%%"><br>
   <b><u>Board Manager Information</u></b><br>
   <b>%s</b><br>
-  Cancer Information Products and Systems (CIPS)<br>
+  Office of Cancer Content Management (OCCM)<br>
   Office of Communications<br>
   National Cancer Institute<br>
   MSC-8321, Suite 3002B<br>
