@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CTGov.py,v 1.11 2006-01-10 20:09:44 ameyer Exp $
+# $Id: CTGov.py,v 1.12 2006-04-26 17:23:12 venglisc Exp $
 #
 # Submenu for ClinicalTrials.gov activities.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.11  2006/01/10 20:09:44  ameyer
+# Minor change to the wording associated with the CTGovUpdateReport.
+#
 # Revision 1.10  2005/12/23 02:20:25  ameyer
 # Added CTGovUpdateReport.
 #
@@ -128,14 +131,23 @@ form += """\
     <H3>Management Reports</H3>
     <OL>
 """
+#          ('CTGovDownloadReport.py', 'Download Statistics Report'),
+#          ('CTGovImportReport.py', 'Import Statistics Report'),
+#          ('ExternMapFailures.py', 'External Map Failures Report'),
+#          ('CTGovOutOfScope.py', 'Records Marked Out of Scope'),
+#          ('CTGovDupReport.py', 'Records Marked Duplicate'),
+#          ('CTGovEntryDate.py', 'CTGovProtocols vs. Early EntryDate'),
+#          ('CTGovUpdateReport.py', 'Imported CTGovProtocols vs. CWDs'),
+
 reports = [
-           ('CTGovDownloadReport.py', 'Download Statistics Report'),
-           ('CTGovImportReport.py', 'Import Statistics Report'),
-           ('ExternMapFailures.py', 'External Map Failures Report'),
-           ('CTGovOutOfScope.py', 'Records Marked Out of Scope'),
-           ('CTGovDupReport.py', 'Records Marked Duplicate'),
+           ('CTGovUpdateReport.py', 'CTGovProtocols Imported vs. CWDs'),
+           ('CTGovUnpublished.py', 'CTGovProtocols Unpublished with Phase'),
            ('CTGovEntryDate.py', 'CTGovProtocols vs. Early EntryDate'),
-           ('CTGovUpdateReport.py', 'Imported CTGovProtocols vs. CWDs'),
+           ('ExternMapFailures.py', 'External Map Failures Report'),
+           ('CTGovDupReport.py', 'Records Marked Duplicate'),
+           ('CTGovOutOfScope.py', 'Records Marked Out of Scope'),
+           ('CTGovDownloadReport.py', 'Statistics Report - Download'),
+           ('CTGovImportReport.py', 'Statistics Report - Import')
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s'>%s</A></LI>\n" % (
