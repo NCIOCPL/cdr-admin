@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: ClientRefresh.py,v 1.2 2005-11-22 15:52:22 bkline Exp $
+# $Id: ClientRefresh.py,v 1.3 2006-05-04 13:34:09 bkline Exp $
 #
 # Web service for keeping CDR client files up to date.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2005/11/22 15:52:22  bkline
+# Collapsed last two client-server exchanges into one; changed element
+# names to conform more closely with standard usage in the CDR.
+#
 # Revision 1.1  2005/11/09 00:00:16  bkline
 # Server to keep CDR clients up to date with the current set of client
 # files.
@@ -212,7 +216,7 @@ def sendZipfile(zipName):
 # the entry.
 #----------------------------------------------------------------------
 def debugLog(what, logLevel = 1):
-    if logLevel >= LOG_LEVEL:
+    if logLevel <= LOG_LEVEL:
         try:
             logFile = file(LOG_PATH, 'a')
             now     = time.strftime("%Y-%m-%d %H:%M:%S")
