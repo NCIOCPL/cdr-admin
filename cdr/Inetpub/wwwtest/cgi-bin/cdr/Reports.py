@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: Reports.py,v 1.21 2005-05-04 18:11:33 venglisc Exp $
+# $Id: Reports.py,v 1.22 2006-05-04 14:34:13 bkline Exp $
 #
 # Prototype for editing CDR linking tables.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.21  2005/05/04 18:11:33  venglisc
+# Added menu option for Media QC Reports. (Bug 1653)
+#
 # Revision 1.20  2004/09/20 20:31:11  venglisc
 # Added CdrDocumentation.py menu item for PDF formatted CDR documentation.
 # (Bug 1338).
@@ -101,6 +104,7 @@ reports = [
            ('GeneralReports.py',      'General Reports'),
            ('CitationReports.py',     'Citations'),
            ('CdrDocumentation.py',    'Documentation (as of 2004-09-08)'),
+           ('DrugInfoReports.py',     'Drug Information'),
            ('GeographicReports.py',   'Geographic'),
            ('GlossaryTermReports.py', 'Glossary Terms'),
            ('MailerReports.py',       'Mailers'),
