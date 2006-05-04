@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermReports.py,v 1.7 2005-04-21 21:31:35 venglisc Exp $
+# $Id: GlossaryTermReports.py,v 1.8 2006-05-04 13:44:29 bkline Exp $
 #
 # Submenu for glossary term reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.7  2005/04/21 21:31:35  venglisc
+# Added menu option to allow running Publish Preview reports. (Bug 1531)
+#
 # Revision 1.6  2004/11/27 00:01:52  bkline
 # Menu rearranged at Margaret's request (#1447).
 #
@@ -77,14 +80,21 @@ form += """\
     <OL>
 """
 reports = [
-           ('GlossaryTermLinks.py',
+           ('GlossaryTermLinks.py?',
             'Documents Linked to Glossary Term Report'),
-           ('GlossaryTermPhrases.py',
+           ('Request2010.py?',
+            'Drug Definition Report'),
+           ('GlossaryDocsModified.py?',
+            'Glossary Documents Modified Report'),
+           ('GlossaryTermPhrases.py?',
             'Glossary Term and Variant Search Report'),
-           ('GlossaryTermsByStatus.py', 'Glossary Term By Status Report')
+           ('GlossaryTermsByStatus.py?', 'Glossary Term By Status Report'),
+           ('GlossaryTermsByType.py?', 'Glossary Term By Type Report'),
+           ('GlossaryTermsByStatus.py?lang=Spanish&',
+            'Spanish Glossary Term By Status Report')
           ]
 for r in reports:
-    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI></A>\n" % (
+    form += "<LI><A HREF='%s/%s%s=%s'>%s</LI></A>\n" % (
             cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
 
 cdrcgi.sendPage(header + form + "</OL></FORM></BODY></HTML>")
