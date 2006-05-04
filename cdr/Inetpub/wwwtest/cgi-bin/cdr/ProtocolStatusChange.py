@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolStatusChange.py,v 1.4 2003-11-05 14:49:54 bkline Exp $
+# $Id: ProtocolStatusChange.py,v 1.5 2006-05-04 14:29:50 bkline Exp $
 #
 # Protocol Status Change Report
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2003/11/05 14:49:54  bkline
+# Enhancements requested in issue #918.
+#
 # Revision 1.3  2003/03/19 19:46:10  bkline
 # Added new column for protocol status (enhancement request #647).
 #
@@ -83,7 +86,7 @@ if not action:
 #----------------------------------------------------------------------
 class ProtLeadOrg:
     def __init__(self, protId, curStatus, entryDate, enteredBy, prevStatus,
-                 published, protStatus, activeStatus):
+                 published, protStatus, activeStatus, nctId):
         self.protId       = protId
         self.curStatus    = curStatus
         self.entryDate    = entryDate
@@ -92,6 +95,23 @@ class ProtLeadOrg:
         self.published    = published
         self.protStatus   = protStatus
         self.activeStatus = activeStatus
+        self.nctId        = nctId
+
+def extractNctId(dom):
+    for node in dom.documentElement.childNodes:
+        if node.nodeName == "ProtocolIDs":
+            for child in node.childNodes:
+                if child.nodeName == "OtherID":
+                    idType = None
+                    idValue = None
+                    for grandchild in child.childNodes:
+                        if grandchild.nodeName == "IDType":
+                            idType = cdr.getTextContent(grandchild)
+                        elif grandchild.nodeName == "IDString":
+                            idValue = cdr.getTextContent(grandchild)
+                    if idType == "ClinicalTrials.gov ID":
+                        return idValue
+    return None
 
 #----------------------------------------------------------------------
 # If this is a lead org which is in scope (that is, the entry date
@@ -99,7 +119,8 @@ class ProtLeadOrg:
 # by start and end) then return a ProtLeadOrg object for it.  Otherwise
 # return None.
 #----------------------------------------------------------------------
-def extractProtLeadOrg(node, start, end, published, protStatus, activeStatus):
+def extractProtLeadOrg(node, start, end, published, protStatus, activeStatus,
+                       nctId):
     protId     = None
     prevStatus = None
     curStatus  = None
@@ -134,7 +155,7 @@ def extractProtLeadOrg(node, start, end, published, protStatus, activeStatus):
                             prevStatus = s
     if curStatus and entryDate and entryDate >= start and entryDate <= end:
         return ProtLeadOrg(protId, curStatus, entryDate, enteredBy, prevStatus,
-                           published, protStatus, activeStatus)
+                           published, protStatus, activeStatus, nctId)
     return None
     
 #----------------------------------------------------------------------
@@ -196,9 +217,10 @@ try:
         protStat = ""
         if statElems:
             protStat = cdr.getTextContent(statElems[0])
+        nctId = extractNctId(dom)
         for elem in dom.getElementsByTagName("ProtocolLeadOrg"):
             protLeadOrg = extractProtLeadOrg(elem, start, end, published,
-                                             protStat, activeStatus)
+                                             protStat, activeStatus, nctId)
             if protLeadOrg:
                 #cdrcgi.bail("got one!")
                 key = (protLeadOrg.protId, id)
@@ -232,8 +254,9 @@ html = """\
   <center>
   <table border='1' cellspacing='0' cellpadding='1'>
    <tr>
-    <th>Lead Org Protocol ID</th>
     <th>DocID</th>
+    <th>Lead Org Protocol ID</th>
+    <th>NCTID</th>
     <th>Previous Org Status</th>
     <th>Current Org Status</th>
     <th>Current Protocol Status</th>
@@ -271,13 +294,15 @@ for key in keys:
     <td valign='top'>%s</td>
     <td valign='top'>%s</td>
     <td valign='top'>%s</td>
+    <td valign='top'>%s</td>
     <td valign='top' align='center'>%s</td>
     <td valign='top' align='center'>%s</td>
     <td valign='top' align='center'>%s</td>
     <td valign='top'>%s</td>
    </tr>
-""" % (protLeadOrg.protId     or "&nbsp;",
-       docId,
+""" % (docId,
+       protLeadOrg.protId     or "&nbsp;",
+       protLeadOrg.nctId      or "&nbsp;",
        protLeadOrg.prevStatus,
        protLeadOrg.curStatus  or "&nbsp;",
        protLeadOrg.protStatus or "&nbsp;",
