@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: RssImportReport.py,v 1.6 2005-09-13 21:45:36 bkline Exp $
+# $Id: RssImportReport.py,v 1.7 2006-05-04 14:36:02 bkline Exp $
 #
 # Reports on import/update of RSS protocol site information.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2005/09/13 21:45:36  bkline
+# Added status column (request #1830).
+#
 # Revision 1.5  2005/08/29 17:02:50  bkline
 # Added table for protocols which have been published, but don't have a
 # DateLastModified element.
@@ -25,20 +28,38 @@
 import cdr, cdrdb, cdrcgi, cgi, re, time
 
 #----------------------------------------------------------------------
+# Look up source if missing.
+#----------------------------------------------------------------------
+def lookupSource(jobId, cursor):
+    if not jobId:
+        return 'RSS'
+    cursor.execute("""\
+        SELECT s.name
+          FROM import_source s
+          JOIN import_job j
+            ON j.source = s.id
+         WHERE j.id = %s""" % jobId)
+    rows = cursor.fetchall()
+    if not rows:
+        cdrcgi.bail("Unable to find source for import job %s" % jobId)
+    return rows[0][0]
+
+#----------------------------------------------------------------------
 # Set the form variables.
 #----------------------------------------------------------------------
-fields   = cgi.FieldStorage()
-session  = cdrcgi.getSession(fields)
-request  = cdrcgi.getRequest(fields)
-jobId    = fields and fields.getvalue('id') or None
+fields  = cgi.FieldStorage()
+session = cdrcgi.getSession(fields)
+request = cdrcgi.getRequest(fields)
+jobId   = fields and fields.getvalue('id') or None
+conn    = cdrdb.connect('CdrGuest')
+cursor  = conn.cursor()
+source  = fields and fields.getvalue('source') or lookupSource(jobId, cursor)
 SUBMENU = "Report Menu"
 buttons = ["Submit Request", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 script  = "RssImportReport.py"
 title   = "CDR Administration"
-section = "RSS Import Report"
+section = "%s Import Report" % source
 header  = cdrcgi.header(title, title, section, script, buttons)
-conn    = cdrdb.connect('CdrGuest')
-cursor  = conn.cursor()
 
 #----------------------------------------------------------------------
 # Make sure we're logged in.
@@ -62,7 +83,7 @@ if request == "Log Out":
 #----------------------------------------------------------------------
 # Create a table for a subset of the trials.
 #----------------------------------------------------------------------
-def addTable(docs, header, rssModeCol = True):
+def addTable(docs, header, sourceUpdateModeCol = True):
     html = u"""\
   <span class='sub'>%s - %d</span>
   <br>
@@ -77,16 +98,16 @@ def addTable(docs, header, rssModeCol = True):
     <th>DocTitle</th>
     <th>Pub Ver?</th>
 """
-        if rssModeCol:
+        if sourceUpdateModeCol:
             html += u"""\
-    <th>RSS Mode?</th>
-"""
+    <th>%s Mode?</th>
+""" % source
         html += u"""\
     <th>Protocol Status</th>
    </tr>
 """
         for key in keys:
-            html += docs[key].toHtml(rssModeCol)
+            html += docs[key].toHtml(sourceUpdateModeCol)
         html += u"""\
   </table>
 """
@@ -99,14 +120,14 @@ def addTable(docs, header, rssModeCol = True):
 #----------------------------------------------------------------------
 class Doc:
     def __init__(self, cdrId, locked, pubVer, new):
-        self.cdrId      = cdrId
-        self.locked     = locked
-        self.pubVer     = pubVer
-        self.new        = new
-        self.title      = None
-        self.rssMode    = False
-        self.needDate   = False
-        self.status     = None
+        self.cdrId            = cdrId
+        self.locked           = locked
+        self.pubVer           = pubVer
+        self.new              = new
+        self.title            = None
+        self.sourceUpdateMode = False
+        self.needDate         = False
+        self.status           = None
         if cdrId:
             cursor.execute("SELECT title FROM document WHERE id = ?", cdrId)
             self.title = cursor.fetchall()[0][0]
@@ -115,9 +136,9 @@ class Doc:
                   FROM query_term
                  WHERE path = '/InScopeProtocol/ProtocolAdminInfo'
                             + '/ProtocolLeadOrg/UpdateMode'
-                   AND value = 'RSS'
-                   AND doc_id = ?""", cdrId)
-            self.rssMode = cursor.fetchall()[0][0] > 0
+                   AND value = '%s'
+                   AND doc_id = ?""" % source, cdrId)
+            self.sourceUpdateMode = cursor.fetchall()[0][0] > 0
             cursor.execute("""\
                 SELECT value
                   FROM query_term
@@ -139,17 +160,17 @@ class Doc:
                      WHERE id = ?""", cdrId)
                 if cursor.fetchall()[0][0] > 0:
                     self.needDate = True
-    def toHtml(self, rssModeCol = True):
+    def toHtml(self, sourceUpdateModeCol = True):
         html = u"""\
    <tr>
     <td>%s</td>
     <td>%s</td>
     <td>%s</td>
 """ % (self.cdrId, self.title.replace(";", "; "), self.pubVer or "N")
-        if rssModeCol:
+        if sourceUpdateModeCol:
             html += u"""\
     <td>%s</td>
-""" % (self.rssMode and "Y" or "N")
+""" % (self.sourceUpdateMode and "Y" or "N")
         html += u"""\
     <td>%s</td>
    </tr>
@@ -165,9 +186,9 @@ if not jobId:
           FROM import_job j
           JOIN import_source s
             ON s.id = j.source
-         WHERE s.name = 'RSS'
+         WHERE s.name = '%s'
            AND j.status = 'Success'
-      ORDER BY j.dt DESC""")
+      ORDER BY j.dt DESC""" % source)
     form = """\
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
    <TABLE BORDER='0'>
@@ -226,19 +247,22 @@ html = """\
  <basefont face='Arial, Helvetica, sans-serif'>
  <body>
   <center>
-   <span class='ti'>RSS Import/Update Statistics Report</span>
+   <span class='ti'>%s Import/Update Statistics Report</span>
    <br />
    <span class='sub'>Import run on %s</span>
   </center>
   <br />
   <br />
-""" % (jobDate, jobDate)
+""" % (jobDate, source, jobDate)
 cursor.execute("""\
     SELECT d.cdr_id, e.locked, e.pub_version, e.new
       FROM import_doc d
+      JOIN import_source s
+        ON s.id = d.source
       JOIN import_event e
         ON e.doc = d.id
-     WHERE e.job = ?""", jobId)
+     WHERE e.job = ?
+       AND s.name = ?""", (jobId, source))
 rows = cursor.fetchall()
 lockedDocs = {}
 newDocsPub = {}
