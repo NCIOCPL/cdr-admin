@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GetReportWorkbook.py,v 1.1 2005-11-22 13:43:18 bkline Exp $
+# $Id: GetReportWorkbook.py,v 1.2 2006-05-04 14:22:14 bkline Exp $
 #
 # Sends back Excel workbook report to client.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2005/11/22 13:43:18  bkline
+# CGI program to send back Excel workbook report to web client.
+#
 #----------------------------------------------------------------------
 import cgi, cdrcgi, os, msvcrt, sys
 
@@ -20,6 +23,6 @@ fobj.close()
 
 print """\
 Content-type: application/vnd.ms-excel
-Content-disposition: attachment;filename=%s.xls
+Content-disposition: attachment;filename=%s
 """ % name
 sys.stdout.write(book)
