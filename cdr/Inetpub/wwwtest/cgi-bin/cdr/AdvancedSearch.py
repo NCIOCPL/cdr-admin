@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: AdvancedSearch.py,v 1.6 2004-09-10 17:09:53 venglisc Exp $
+# $Id: AdvancedSearch.py,v 1.7 2006-05-04 13:27:09 bkline Exp $
 #
 # Main menu for advanced search forms.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2004/09/10 17:09:53  venglisc
+# Added style for mouse-hover background color to be consistend with the
+# change to the menus. (Bug 1331)
+#
 # Revision 1.5  2002/05/16 14:33:04  bkline
 # Changed wording of menu for Person with locations.
 #
@@ -103,6 +107,7 @@ menu    = """\
     <LI><A HREF='%s/HelpSearch.py%s'>Documentation</A></LI>
     <LI><A HREF='%s/GlossaryTermSearch.py%s'>Glossary Term</A></LI>
     <LI><A HREF='%s/MiscSearch.py%s'>Miscellaneous</A></LI>
+    <LI><A HREF='%s/MediaSearch.py%s'>Media</A></LI>
     <LI><A HREF='%s/OrgSearch2.py%s'>Organization</A></LI>
     <LI><A HREF='%s/PersonSearch.py%s'>Person</A></LI>
     <LI><A HREF='%s/PersonLocSearch.py%s'>Person (Locations in Result
@@ -114,6 +119,7 @@ menu    = """\
     </SPAN>
    </OL>
 """ % (cdrcgi.BASE, session,
+       cdrcgi.BASE, session,
        cdrcgi.BASE, session,
        cdrcgi.BASE, session,
        cdrcgi.BASE, session,
