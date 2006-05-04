@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolReports.py,v 1.23 2005-12-14 00:03:59 ameyer Exp $
+# $Id: ProtocolReports.py,v 1.24 2006-05-04 14:26:33 bkline Exp $
 #
 # Submenu for protocol reports.
 #
@@ -100,7 +100,7 @@ elif action == SUBMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if action == "Log Out":
+if action == "Log Out": 
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
@@ -111,11 +111,11 @@ form = """\
     <H3>QC Reports</H3>
     <OL>
 """ % (cdrcgi.SESSION, session)
-reports = [('ProtSearch.py?',
+reports = [('ProtSearch.py?', 
             'Protocol QC Reports'),
-           ('QcReport.py?DocType=InScopeProtocol&ReportType=pp&',
+           ('QcReport.py?DocType=InScopeProtocol&ReportType=pp&',   
             'Publish Preview - InScopeProtocol'),
-           ('QcReport.py?DocType=CTGovProtocol&ReportType=pp&',
+           ('QcReport.py?DocType=CTGovProtocol&ReportType=pp&',   
             'Publish Preview - CTGovProtocol')]
 for r in reports:
     form += "<LI><A HREF='%s/%s%s=%s'>%s</LI></A>\n" % (
@@ -134,13 +134,17 @@ reports = [
             '&source=COG'),
            ('Request1687.py',
             'CTEP Orgs Without Phones', ''),
-           ('LiaisonReport.py',
+           ('CTGovEntryDate.py',
+            'CTGovProtocols vs. Early EntryDate', ''),
+           ('Request2113.py', 
+            'NCI Cancer Centers', ''),
+           ('LiaisonReport.py', 
             'NCI Liaison Office/Brussels Protocol Report', ''),
-           ('NewlyPublishableTrials.py',
+           ('NewlyPublishableTrials.py', 
             'Newly Publishable Trials', ''),
-           ('PreferredProtOrgs.py',
+           ('PreferredProtOrgs.py', 
             'Preferred Protocol Organizations', ''),
-           ('NciClinicalTrialsStats.py',
+           ('NciClinicalTrialsStats.py', 
             'Profile of NCI Sponsored Clinical Trials', ''),
            ('TrialsCitationStats.py',
             'Protocol Citation Statistics', ''),
@@ -157,6 +161,8 @@ reports = [
             'Protocol Status Change Report', ''),
            ('BogusActiveLeadOrgs.py',
             'Protocols with Active Lead Orgs But No Active Sites', ''),
+           ('ProtProcReport.py',
+            'Protocol Processing Status Report', ''),
            ('OSPReport.py',
             'Report for Office of Science Policy', ''),
            ('RssImportReport.py', 'RSS Import/Update Statistics Report', ''),
