@@ -1,8 +1,11 @@
 #----------------------------------------------------------------------
 #
-# $Id: EmailerReview.py,v 1.3 2005-03-02 21:36:58 bkline Exp $
+# $Id: EmailerReview.py,v 1.4 2006-05-04 13:36:11 bkline Exp $
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2005/03/02 21:36:58  bkline
+# Corrected xml.minidom to xml.dom.minidom.
+#
 # Revision 1.2  2005/02/19 23:49:22  bkline
 # Added code to insert mailer_type into job table.
 #
@@ -130,6 +133,7 @@ if not jobId:
         if jobId in okJobs:
             jobs.append(jobId)
     jobs.sort()
+    jobs.reverse()
     for job in jobs:
         if job in uploadedJobs:
             jobInfo = uploadedJobs[job]
