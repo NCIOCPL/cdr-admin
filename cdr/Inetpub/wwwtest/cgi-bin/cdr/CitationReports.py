@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CitationReports.py,v 1.6 2005-08-29 16:53:14 bkline Exp $
+# $Id: CitationReports.py,v 1.7 2006-05-05 22:28:07 venglisc Exp $
 #
 # Submenu for citation reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2005/08/29 16:53:14  bkline
+# Added new report "Citations Added to Protocols".
+#
 # Revision 1.5  2004/09/17 14:06:50  venglisc
 # Fixed list items to properly teminate the anker link.
 #
@@ -82,10 +85,10 @@ form += """\
     <OL>
 """
 reports = [
-           ('CitationsAddedToProtocols.py',
-            'Citations Added to Protocols'),
-           ('ModifiedPubMedDocs.py', 'Modified PubMed Documents'),
-           ('NewCitations.py', 'New Citations Report')
+           ('CitationsAddedToProtocols.py', 'Citations Added to Protocols'),
+           ('CitationsInSummaries.py',      'Citations Linked to Summaries'),
+           ('ModifiedPubMedDocs.py',        'Modified PubMed Documents'),
+           ('NewCitations.py',              'New Citations Report')
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI></A>\n" % (
