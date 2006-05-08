@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: MediaTrackingReport.py,v 1.1 2006-05-04 14:07:43 bkline Exp $
+# $Id: MediaTrackingReport.py,v 1.2 2006-05-08 17:04:08 bkline Exp $
 #
 # We need a Media Tracking report.  This spreadsheet report will keep track of
 # the development and processing statuses of the Media documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2006/05/04 14:07:43  bkline
+# Spreadsheet report to track processing of CDR Media documents.
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrdb, cdrcgi, string, time, xml.dom.minidom, xml.sax.saxutils
 import ExcelWriter, sys
@@ -284,7 +287,7 @@ rowNum = 4
 for docId, docTitle, created in cursor.fetchall():
     mediaDoc = MediaDoc(cursor, docId, docTitle)
     rowNum = mediaDoc.addToSheet(ws, dateStyle, rowNum)
-name = 'MediaTrackingReport-%s.xml' % time.strftime("%Y%m%d%H%M%S")
+name = 'MediaTrackingReport-%s.xls' % time.strftime("%Y%m%d%H%M%S")
 print "Content-type: application/vnd.ms-excel"
 print "Content-Disposition: attachment; filename=%s" % name
 print
