@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolReports.py,v 1.24 2006-05-04 14:26:33 bkline Exp $
+# $Id: ProtocolReports.py,v 1.25 2006-05-10 16:35:06 venglisc Exp $
 #
 # Submenu for protocol reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.24  2006/05/04 14:26:33  bkline
+# Three new reports added.
+#
 # Revision 1.22  2005/11/18 03:48:54  bkline
 # Plugged in Alan's new CTGov protocols.
 #
@@ -161,6 +164,8 @@ reports = [
             'Protocol Status Change Report', ''),
            ('BogusActiveLeadOrgs.py',
             'Protocols with Active Lead Orgs But No Active Sites', ''),
+           ('ProtocolINDReport.py',
+            'Protocols with FDA IND Information (Excell)', ''),
            ('ProtProcReport.py',
             'Protocol Processing Status Report', ''),
            ('OSPReport.py',
