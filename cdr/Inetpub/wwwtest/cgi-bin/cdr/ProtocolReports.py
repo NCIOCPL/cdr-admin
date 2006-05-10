@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolReports.py,v 1.25 2006-05-10 16:35:06 venglisc Exp $
+# $Id: ProtocolReports.py,v 1.26 2006-05-10 16:36:32 venglisc Exp $
 #
 # Submenu for protocol reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.25  2006/05/10 16:35:06  venglisc
+# Added menu item for Protocols with FDA IND information report. (Bug 2028)
+#
 # Revision 1.24  2006/05/04 14:26:33  bkline
 # Three new reports added.
 #
@@ -165,7 +168,7 @@ reports = [
            ('BogusActiveLeadOrgs.py',
             'Protocols with Active Lead Orgs But No Active Sites', ''),
            ('ProtocolINDReport.py',
-            'Protocols with FDA IND Information (Excell)', ''),
+            'Protocols with FDA IND Information (Excel)', ''),
            ('ProtProcReport.py',
             'Protocol Processing Status Report', ''),
            ('OSPReport.py',
