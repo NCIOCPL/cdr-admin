@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.50 2005-12-28 21:14:08 venglisc Exp $
+# $Id: QcReport.py,v 1.51 2006-05-16 20:50:28 venglisc Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.50  2005/12/28 21:14:08  venglisc
+# Adding code to allow Miscellaneous Document QC reports to be displayed with
+# Redline/Strikeout markup. (Bug 1939)
+#
 # Revision 1.49  2005/10/20 20:54:29  venglisc
 # Modified to include creating of GlossaryTerm Redline/Strikeout reports
 # that allow the user to limit the output to a specified audience type
@@ -522,6 +526,30 @@ if docType == 'Summary' and repType and repType != 'pp' and not version or \
 # Map for finding the filters for a given document type.
 #----------------------------------------------------------------------
 filters = {
+    'Citation':         
+        ["set:QC Citation Set"],
+    'CTGovProtocol':
+        ["set:QC CTGovProtocol Set"],
+    'DrugInformationSummary':
+        ["set:QC DrugInfoSummary Set"],
+    'GlossaryTerm':
+        ["set:QC GlossaryTerm Set"],
+    'GlossaryTerm:rs': # Redline/Strikeout
+        ["set:QC GlossaryTerm Set (Redline/Strikeout)"],
+    'InScopeProtocol':  
+        ["set:QC InScopeProtocol Set"],
+    'Media:img':
+        ["set:QC Media Set"],
+    'MiscellaneousDocument':
+        ["set:QC MiscellaneousDocument Set"],
+    'MiscellaneousDocument:rs':
+        ["set:QC MiscellaneousDocument Set (Redline/Strikeout)"],
+    'Organization':     
+        ["set:QC Organization Set"],
+    'Person':           
+        ["set:QC Person Set"],
+    'PDQBoardMemberInfo':           
+        ["set:QC PDQBoardMemberInfo Set"],
     'Summary':        
         ["set:QC Summary Set"],
     'Summary:bu': # Bold/Underline
@@ -540,30 +568,8 @@ filters = {
         ["set:QC Summary Patient Set"],
     'Summary:patbu': # Patient
         ["set:QC Summary Patient Set (Bold/Underline)"],
-    'GlossaryTerm':
-        ["set:QC GlossaryTerm Set"],
-    'GlossaryTerm:rs': # Redline/Strikeout
-        ["set:QC GlossaryTerm Set (Redline/Strikeout)"],
-    'Citation':         
-        ["set:QC Citation Set"],
-    'Organization':     
-        ["set:QC Organization Set"],
-    'Person':           
-        ["set:QC Person Set"],
-    'PDQBoardMemberInfo':           
-        ["set:QC PDQBoardMemberInfo Set"],
-    'InScopeProtocol':  
-        ["set:QC InScopeProtocol Set"],
     'Term':             
-        ["set:QC Term Set"],
-    'Media:img':
-        ["set:QC Media Set"],
-    'MiscellaneousDocument':
-        ["set:QC MiscellaneousDocument Set"],
-    'MiscellaneousDocument:rs':
-        ["set:QC MiscellaneousDocument Set (Redline/Strikeout)"],
-    'CTGovProtocol':
-        ["set:QC CTGovProtocol Set"]
+        ["set:QC Term Set"]
 }
 
 #----------------------------------------------------------------------
