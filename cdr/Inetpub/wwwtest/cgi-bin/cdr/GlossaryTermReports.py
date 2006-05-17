@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermReports.py,v 1.8 2006-05-04 13:44:29 bkline Exp $
+# $Id: GlossaryTermReports.py,v 1.9 2006-05-17 13:16:08 bkline Exp $
 #
 # Submenu for glossary term reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.8  2006/05/04 13:44:29  bkline
+# Changed URL formatting pattern so that it no longer includes the '?'
+# starting the parameter list; added new menu items.
+#
 # Revision 1.7  2005/04/21 21:31:35  venglisc
 # Added menu option to allow running Publish Preview reports. (Bug 1531)
 #
@@ -90,7 +94,7 @@ reports = [
             'Glossary Term and Variant Search Report'),
            ('GlossaryTermsByStatus.py?', 'Glossary Term By Status Report'),
            ('GlossaryTermsByType.py?', 'Glossary Term By Type Report'),
-           ('GlossaryTermsByStatus.py?lang=Spanish&',
+           ('SpanishGlossaryTermsByStatus.py?',
             'Spanish Glossary Term By Status Report')
           ]
 for r in reports:
