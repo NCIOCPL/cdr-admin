@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: RssDocsNoSites.py,v 1.1 2005-05-12 14:49:38 bkline Exp $
+# $Id: RssDocsNoSites.py,v 1.2 2006-05-17 01:40:32 bkline Exp $
 #
 # Report on RSS imports without sites.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2005/05/12 14:49:38  bkline
+# New report for Sheri (request #1684).
+#
 #----------------------------------------------------------------------
 import cdrdb, xml.dom.minidom, cdrcgi, cdr
 
@@ -23,31 +26,35 @@ class Doc:
         self.cdrId = cdrId
         self.primaryID = None
         self.primaryLO = None
+        self.status = None
         for node in dom.documentElement.childNodes:
             if node.nodeName == 'ProtocolIDs':
                 self.primaryID = self.getPrimaryID(node)
             elif node.nodeName == 'ProtocolAdminInfo':
-                self.primaryLO = self.getPrimaryLO(node)
+                self.getAdminInfo(node)
     def getPrimaryID(self, node):
         for child in node.childNodes:
             if child.nodeName == 'PrimaryID':
                 for grandchild in child.childNodes:
                     if grandchild.nodeName == 'IDString':
                         return cdr.getTextContent(grandchild)
-    def getPrimaryLO(self, node):
+    def getAdminInfo(self, node):
         for child in node.childNodes:
             if child.nodeName == 'ProtocolLeadOrg':
                 leadOrg = LeadOrg(child)
                 if leadOrg.role == 'Primary':
-                    return leadOrg.docId
+                    self.primaryLO =  leadOrg.docId
+            elif child.nodeName == 'CurrentProtocolStatus':
+                self.status = cdr.getTextContent(child)
     def toHtml(self):
         return u"""\
    <tr>
     <td>%d</td>
     <td>%s</td>
     <td>%s</td>
+    <td>%s</td>
    </tr>
-""" % (self.cdrId, self.primaryID, self.primaryLO)
+""" % (self.cdrId, self.primaryID, self.primaryLO, self.status or u"&nbsp;")
 
 docs   = []
 orgs   = {}
@@ -118,6 +125,7 @@ html = u"""\
     <th>CDR ID</th>
     <th>Primary ID</th>
     <th>Primary LO</th>
+    <th>Current Protocol Status</th>
    </tr>
 """
 for doc in docs:
