@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: SpanishGlossaryTermsByStatus.py,v 1.1 2006-05-17 14:17:05 bkline Exp $
+# $Id: SpanishGlossaryTermsByStatus.py,v 1.2 2006-05-18 18:40:55 bkline Exp $
 #
 # Split off from the base glossary terms by status report because new
 # requirements force the report to be performed in batch mode.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2006/05/17 14:17:05  bkline
+# Split out from base Glossary Terms By Status report because it takes
+# too long for straight CGI, and must now be run in batch mode.
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrdb, cdrcgi, string, time, cdrbatch
 
@@ -13,12 +17,12 @@ import cgi, cdr, cdrdb, cdrcgi, string, time, cdrbatch
 # Set the form variables.
 #----------------------------------------------------------------------
 fields   = cgi.FieldStorage()
-status   = fields and fields.getvalue("status") or 'Translation pending'
-session  = fields and fields.getvalue("Session") or 'guest'
+status   = fields and fields.getvalue("status")   or None #'Translation pending'
+session  = fields and fields.getvalue("Session")  or None #'guest'
 request  = cdrcgi.getRequest(fields)
-fromDate = fields and fields.getvalue('FromDate') or '2002-01-01'
-toDate   = fields and fields.getvalue('ToDate') or '2006-06-01'
-email    = fields and fields.getvalue("Email")    or '***REMOVED***'
+fromDate = fields and fields.getvalue('FromDate') or None #'2002-01-01'
+toDate   = fields and fields.getvalue('ToDate')   or None #'2006-06-01'
+email    = fields and fields.getvalue("Email")    or None
 title    = "CDR Administration"
 instr    = "Spanish Glossary Terms by Status"
 SUBMENU  = "Report Menu"
