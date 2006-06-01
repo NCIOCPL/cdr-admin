@@ -24,9 +24,13 @@
 #    3. Allow the user to submit the results, plus any overrides for
 #       permanent update.
 #
-# $Id: Request1931.py,v 1.5 2006-03-21 23:44:44 ameyer Exp $
+# $Id: Request1931.py,v 1.6 2006-06-01 21:44:31 ameyer Exp $
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2006/03/21 23:44:44  ameyer
+# When more than one ProtocolPhase exists, we now only insert an
+# ExpectedEnrollment after the last one.
+#
 # Revision 1.4  2006/03/16 21:59:42  ameyer
 # Added 200 seconds to query timeout value per Sheri's request.
 #
@@ -198,11 +202,16 @@ class Transform:
    <!-- Copy the phase -->
    <xsl:copy-of         select = "."/>
 
-   <!-- Add the ExpectedEnrollment - only to the last ProtocolPhase -->
-   <xsl:if                test = "not(following-sibling::ProtocolPhase)">
-     <xsl:element         name = 'ExpectedEnrollment'>
-       <xsl:value-of    select = '$enroll'/>
-     </xsl:element>
+   <!-- Double check to be sure ExpectedEnrollment not already here -->
+   <xsl:if                test = "not(../ExpectedEnrollment)">
+
+     <!-- Add the ExpectedEnrollment - only to the last ProtocolPhase -->
+     <xsl:if              test = "not(following-sibling::ProtocolPhase)">
+       <xsl:element       name = 'ExpectedEnrollment'>
+         <xsl:value-of  select = '$enroll'/>
+       </xsl:element>
+     </xsl:if>
+
    </xsl:if>
 
  </xsl:template>
