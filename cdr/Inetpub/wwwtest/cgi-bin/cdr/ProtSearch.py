@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtSearch.py,v 1.15 2004-04-09 12:17:32 bkline Exp $
+# $Id: ProtSearch.py,v 1.16 2006-06-06 22:10:37 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Protocol documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.15  2004/04/09 12:17:32  bkline
+# Added SecondaryID to list of CTGovProtocol elements to be searched
+# (see Sheri's comment #10 for request #1165).
+#
 # Revision 1.14  2004/04/06 18:52:37  bkline
 # Implemented enhancements for request #1165.
 #
@@ -59,6 +63,7 @@ session   = cdrcgi.getSession(fields)
 boolOp    = fields and fields.getvalue("Boolean")          or "AND"
 title     = fields and fields.getvalue("Title")            or None
 idNums    = fields and fields.getvalue("IdNums")           or None
+cdrIds    = fields and fields.getvalue("CdrIds")           or None
 submit    = fields and fields.getvalue("SubmitButton")     or None
 help      = fields and fields.getvalue("HelpButton")       or None
 dispFmt   = fields and fields.getvalue("DispFormat")       or 'fu'
@@ -121,7 +126,8 @@ def makeDoctypePicklist():
 # Display the search form.
 #----------------------------------------------------------------------
 if not submit:
-    fields = (('Title',                        'Title'),
+    fields = (('CDR ID(s)',                    'CdrIds'),
+              ('Title',                        'Title'),
               ('Protocol ID Numbers',          'IdNums'))
     extraFields = (('<br>Display Format', makeDispFormat('DispFormat')),
                    ('<br>Document Type', makeDoctypePicklist()))
@@ -154,7 +160,7 @@ def selectPaths(docType, paths):
         if path.startswith("/%s/" % docType):
             p.append(path)
     return p
-
+    
 searchFields = (cdrcgi.SearchField(title, selectPaths(docType, 
                             ("/InScopeProtocol/ProtocolTitle",
                              "/OutOfScopeProtocol/ProtocolTitle/TitleText",
@@ -179,16 +185,35 @@ searchFields = (cdrcgi.SearchField(title, selectPaths(docType,
 #----------------------------------------------------------------------
 # Construct the query.
 #----------------------------------------------------------------------
-docTypes = ("InScopeProtocol",
-            "OutOfScopeProtocol",
-            "ScientificProtocolInfo",
-            "CTGovProtocol")
-if docType != 'All':
-    docTypes = docType
-(query, strings) = cdrcgi.constructAdvancedSearchQuery(searchFields, boolOp,
-                                                       docTypes)
+if cdrIds:
+    pattern = re.compile('[^\\d]+')
+    strings = cdrIds.strip()
+    cdrIds  = []
+    for cdrId in strings.replace(',', ' ').split():
+        intId = pattern.sub('', cdrId)
+        if intId:
+            cdrIds.append(intId)
+if cdrIds:
+    query = """\
+  SELECT d.id, d.title, t.name
+    FROM document d
+    JOIN doc_type t
+      ON t.id = d.doc_type
+   WHERE d.id IN (%s)
+ORDER BY d.title""" % ",".join(cdrIds)
+    docType = 'All'
+else:        
+    docTypes = ("InScopeProtocol",
+                "OutOfScopeProtocol",
+                "ScientificProtocolInfo",
+                "CTGovProtocol")
+    if docType != 'All':
+        docTypes = docType
+    (query, strings) = cdrcgi.constructAdvancedSearchQuery(searchFields,
+                                                           boolOp, docTypes)
 if not query:
     cdrcgi.bail('No query criteria specified')
+
 #cdrcgi.bail("QUERY: [%s]" % query)
 #----------------------------------------------------------------------
 # Submit the query to the database.
