@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: MailerReports.py,v 1.9 2005-03-03 14:27:21 bkline Exp $
+# $Id: MailerReports.py,v 1.10 2006-06-06 20:26:01 bkline Exp $
 #
 # Submenu for mailer reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.9  2005/03/03 14:27:21  bkline
+# Menu changes requested by Sheri (#1572).
+#
 # Revision 1.8  2004/09/17 14:06:50  venglisc
 # Fixed list items to properly teminate the anker link.
 #
@@ -78,6 +81,8 @@ for r in reports:
             cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
 form += "<LI><A HREF='%s/RespondentReport.py'>%s</LI></A>\n" % (
             cdr.emailerCgi(), 'Web Mailer Respondents')
+form += ("<LI><A HREF='%s/RespondentReport.py?flavor=Brussels'>%s</LI></A>\n" %
+         (cdr.emailerCgi(), 'Web Mailer Respondents - NCI Liaison Office'))
 for r in [
            ('EmailerReports.py',
             'Web Mailer Updates')
