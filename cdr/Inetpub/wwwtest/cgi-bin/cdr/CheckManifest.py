@@ -10,7 +10,7 @@ def bail(why):
     cdrcgi.sendPage(u"""\
 <html>
  <head>
-  <title>Manifest Check Failure</title>
+  <title>CDR Client Manifest Check Failure</title>
  </head>
  <body>%s</body>
 </html>
@@ -107,13 +107,13 @@ if errors:
 html = [u"""\
 <html>
  <head>
-  <title>Manifest Check</title>
+  <title>CDR Client Manifest Check</title>
   <style type='text/css'>
-   body { color: blue; }
+   body { color: blue; font-family: Arial; }
   </style>
  </head>
  <body>
-  <h1>Manifest Check</h1>
+  <h1>CDR Client Manifest Check</h1>
   <h2 style='color: %s'>%s</h2>
   <table border='1' cellpadding='3' cellspacing='0'>
    <tr>
