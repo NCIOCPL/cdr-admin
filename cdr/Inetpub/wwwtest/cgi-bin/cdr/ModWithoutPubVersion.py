@@ -1,12 +1,18 @@
 #----------------------------------------------------------------------
 #
-# $Id: ModWithoutPubVersion.py,v 1.7 2003-12-24 00:09:36 venglisc Exp $
+# $Id: ModWithoutPubVersion.py,v 1.8 2006-06-19 21:30:33 bkline Exp $
 #
 # Reports on documents which have been changed since a previously 
 # publishable version without a new publishable version have been
 # created.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.7  2003/12/24 00:09:36  venglisc
+# If a record existed in the audit_trail table with a latest record that did
+# not have a status of "MODIFY DOCUMENT" or "ADD DOCUMENT" the document would
+# not be listed on the report.
+# Modified the inner select to fix this.
+#
 # Revision 1.6  2002/09/23 20:38:08  bkline
 # Fixed bug in first SQL query.
 #
@@ -27,25 +33,25 @@
 # New report on documents modified since their last publishable version.
 #
 #----------------------------------------------------------------------
-import cdr, cdrdb, cdrcgi, cgi, re, time, xml.dom.minidom
+import cdr, cdrdb, cdrcgi, cgi, re, time, xml.dom.minidom, datetime
 
 #----------------------------------------------------------------------
 # Change date from ISO format to US-centric form.
 #----------------------------------------------------------------------
 def mungeDate(d):
     if not d: return "None"
-    if len(d) < 10: return "Invalid date (%s)" % str(d)
+    d = str(d)
+    if len(d) < 10: return "Invalid date (%s)" % d
     pieces = d[:10].split('-')
-    if len(pieces) != 3: return "Invalid date (%s)" % str(d)
+    if len(pieces) != 3: return "Invalid date (%s)" % d
     try:
-        year  = int(pieces[0])
-        month = int(pieces[1])
-        date  = int(pieces[2])
-        when  = (year, month, date, 0, 0, 0, 0, 0, 0)
-        return time.strftime("%b. %d, %Y", when)
+        year     = int(pieces[0])
+        month    = int(pieces[1])
+        day      = int(pieces[2])
+        dateObj  = datetime.date(year, month, day)
+        return dateObj.strftime("%b. %d, %Y")
     except:
-        return "Invalid date (%s)" % str(d)
-
+        return "Invalid date (%s)" % d
     
 #----------------------------------------------------------------------
 # Set the form variables.
