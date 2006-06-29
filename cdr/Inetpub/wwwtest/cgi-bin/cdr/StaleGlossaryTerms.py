@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: StaleGlossaryTerms.py,v 1.1 2006-06-29 14:20:34 bkline Exp $
+# $Id: StaleGlossaryTerms.py,v 1.2 2006-06-29 14:24:00 bkline Exp $
 #
 # Glossary terms which haven't been modified since 2003-09-11.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2006/06/29 14:20:34  bkline
+# One-off report for Sheri (request #2286).
+#
 #----------------------------------------------------------------------
 import cdrdb, xml.dom.minidom, cdr, cdrcgi, cgi, sys
 
@@ -18,7 +21,7 @@ class GlossaryTerm:
         self.definition = definition
                                 
 conn = cdrdb.connect()
-cursor = conn.cursor()
+cursor = conn.cursor('CdrGuest')
 cursor.execute("CREATE TABLE #gt (id INTEGER, dt DATETIME)")
 conn.commit()
 cursor.execute("""\
