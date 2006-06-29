@@ -1,12 +1,16 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermsByStatus.py,v 1.4 2006-05-16 18:54:31 bkline Exp $
+# $Id: GlossaryTermsByStatus.py,v 1.5 2006-06-29 14:31:49 bkline Exp $
 #
 # The Glossary Terms by Status Report will server as a QC report to check
 # which glossary terms were created within a given time frame with a
 # particular status set.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2006/05/16 18:54:31  bkline
+# Stripped out Spanish version, which needs to be run in batch mode now
+# to accomodate new requirements from Sheri.
+#
 # Revision 1.3  2006/05/04 13:59:06  bkline
 # More (extensive) changes for Sheri (same issue: 1861).
 #
@@ -148,8 +152,7 @@ revisionInfo = status.upper() == 'REVISION PENDING'
 conn = cdrdb.connect('CdrGuest')
 cursor = conn.cursor()
 
-if revisionInfo:
-    cursor.execute("""\
+cursor.execute("""\
     SELECT DISTINCT s.doc_id, MAX(v.dt)
       FROM query_term s
       JOIN doc_version v
@@ -159,17 +162,6 @@ if revisionInfo:
   GROUP BY s.doc_id
     HAVING MAX(v.dt) BETWEEN '%s' AND DATEADD(s, -1, DATEADD(d, 1, '%s'))""" %
                    (fromDate, toDate), status, timeout = 300)
-else:
-    cursor.execute("""\
-    SELECT DISTINCT s.doc_id, MIN(a.dt)
-      FROM query_term s
-      JOIN audit_trail a
-        ON a.document = s.doc_id
-     WHERE s.path = '/GlossaryTerm/TermStatus'
-       AND s.value = ?
-  GROUP BY s.doc_id
-    HAVING MIN(a.dt) BETWEEN '%s' AND DATEADD(s, -1, DATEADD(d, 1, '%s'))""" %
-               (fromDate, toDate), status, timeout = 300)
 
 class GlossaryTerm:
     def __init__(self, id, node, pubNode = None):
