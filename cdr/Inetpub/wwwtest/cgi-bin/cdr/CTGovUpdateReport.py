@@ -4,15 +4,18 @@
 #
 # Done for Bugzilla issue #1881
 #
-# $Id: CTGovUpdateReport.py,v 1.2 2006-01-10 20:10:15 ameyer Exp $
+# $Id: CTGovUpdateReport.py,v 1.3 2006-07-03 20:11:51 ameyer Exp $
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2006/01/10 20:10:15  ameyer
+# Minor change to comments and screen title.
+#
 # Revision 1.1  2005/12/23 02:19:53  ameyer
 # Report differences between imported and current working docs.
 #
 #----------------------------------------------------------------------
 
-import time, cgi, cdr, cdrcgi, cdrdb, cdrxdiff
+import time, cgi, cdr, cdrcgi, cdrdb, cdrbatch, CTGovUpdateCommon
 
 # Load fields from the submitted form, if any
 fields     = cgi.FieldStorage()
@@ -20,6 +23,7 @@ request    = cdrcgi.getRequest(fields)
 session    = cdrcgi.getSession(fields)
 importJobs = fields and fields.getlist('importJobs') or None
 diffFmt    = fields and fields.getvalue('diffFmt') or None
+emails     = fields and fields.getvalue('email') or None
 
 # Custom button labels
 CTGOV_MENU = "CTGov Menu"
@@ -28,6 +32,16 @@ LOGOUT     = "Log Out"
 # Num days to look backward for import jobs
 # XXX DEBUGGING ON MAHLER REQUIRES A BIG NUMBER
 JOB_DAYS   = 240
+
+# Stuff common to both interactive and batch portions
+JOB_NAME    = CTGovUpdateCommon.JOB_NAME
+REPORT_FILE = CTGovUpdateCommon.REPORT_FILE
+REPORT_URL  = CTGovUpdateCommon.REPORT_URL
+SCRIPT      = CTGovUpdateCommon.SCRIPT
+LF          = CTGovUpdateCommon.LF
+
+# Full path to batch portion of program
+JOB_PATH    = "d:/cdr/lib/Python/" + SCRIPT
 
 #----------------------------------------------------------------------
 # Get a pair of formated dates
@@ -118,13 +132,16 @@ def genJobOptionList():
 #----------------------------------------------------------------------
 # Generate the input HTML form
 #----------------------------------------------------------------------
-def genInputForm():
+def genInputForm(usrSession):
     """
     Create an input form for display to the user.
 
     Return:
         HTML form as a string.
     """
+    # Get email address to put in form
+    emailAddr = cdr.getEmail(usrSession)
+
     # Build form
     title   = "CDR Administration"
     section = "Imported CTGovProtocols vs. CWDs"
@@ -170,23 +187,24 @@ will use the last imported version in the set for its comparison.</p>
  </tr>
 </table>
 
+<p>The report will be written to the following file.  It will
+overwrite any previous report stored there:</p>
+
+<p> &nbsp; &nbsp; <a href='%s'>%s</a>.</p>
+
+<p>If you wish to be notified when the report is ready, please
+enter one or more email addresses below.</p>
+
+<p>Email(s): <input type='text' name='email' value='%s' size='80' /></p>
+
 <input type='hidden' name='%s' value='%s' />
 </form>
 </body>
 </html>
-""" % (genJobOptionList(), cdrcgi.SESSION, session)
+""" % (genJobOptionList(), REPORT_URL, REPORT_URL, emailAddr,
+       cdrcgi.SESSION, session)
 
     return html
-
-#----------------------------------------------------------------------
-# Error reporting
-#----------------------------------------------------------------------
-def reportError(msg):
-    # Write message to default error log file
-    cdr.logwrite(msg)
-
-    # And bail out with msg to user
-    cdrcgi.bail(msg)
 
 #----------------------------------------------------------------------
 # Find imported documents
@@ -229,7 +247,8 @@ def findImportedDocs(firstJob, lastJob):
                         % firstJob)
         firstDate = cursor.fetchone()[0]
     except cdrdb.Error, info:
-        reportError("Unable to find date of first job: %s" % str(info))
+        cdrcgi.bail("Unable to find date of first job: %s" % str(info),
+                    logfile=LF)
 
     # Find date_time of the next job after the last in range
     # If none, use today's date_time
@@ -242,7 +261,8 @@ def findImportedDocs(firstJob, lastJob):
         else:
             limitDate  = time.strftime("%Y-%m-%d %H:%M:%S")
     except cdrdb.Error, info:
-        reportError("Unable to find date of job after last: %s" % str(info))
+        cdrcgi.bail("Unable to find date of job after last: %s" % str(info),
+                    logfile=LF)
 
     # Find doc IDs in the requested range
     try:
@@ -259,7 +279,8 @@ def findImportedDocs(firstJob, lastJob):
        GROUP BY d.cdr_id
             """ % (lastJob, firstJob))
     except cdrdb.Error, info:
-        reportError("Unable to select doc IDs: %s" % str(info))
+        cdrcgi.bail("Unable to select doc IDs: %s" % str(info),
+                    logfile=LF)
 
     # Find the latest version number in range for each doc
     try:
@@ -273,7 +294,8 @@ def findImportedDocs(firstJob, lastJob):
        GROUP BY v.id, t.dt""" % (firstDate, limitDate))
         docIdVer = cursor.fetchall()
     except cdrdb.Error, info:
-        reportError("Unable to select version numbers: %s" % str(info))
+        cdrcgi.bail("Unable to select version numbers: %s" % str(info),
+                    logfile=LF)
 
     cursor.close()
 
@@ -294,134 +316,61 @@ if __name__ == "__main__":
     elif request == "Log Out":
         cdrcgi.logout(session)
 
+    # If a batch job is already running, wait
+    countRunning = 0
+    try:
+        # Gets number of active Global Change jobs
+        countRunning = cdrbatch.activeCount(JOB_NAME)
+    except cdrbatch.BatchException, e:
+        cdrcgi.bail (str(e), logfile=LF)
+    if countRunning > 0:
+        cdrcgi.bail ("""
+    Another version of this report appears to be currently runninge.<br>
+    Please wait until it completes before starting another.<br>
+    See <a href='getBatchStatus.py?Session=%s&jobName=%s&jobAge=1'>
+    <u>Batch Status Report</u></a>
+    or go to the CDR Administration menu and select 'View Batch Job Status'.</p>
+    <p><p><p>""" % (session, JOB_NAME))
+
     # If no fields loaded, display the input form
     if not importJobs:
-        cdrcgi.sendPage(genInputForm())
+        cdrcgi.sendPage(genInputForm(session))
 
-    # Convert job ids to numbers for min/max check
-    jobNums = []
-    for job in importJobs:
-        jobNums.append(int(job))
+    # Do some validation
+    if diffFmt not in ('XDiff', 'UDiff'):
+        cdrcgi.bail("Internal error: Unrecognized diffFmt '%s'" % diffFmt,
+                    logfile=LF)
 
-    # Generate list of docId, verNum pairs from user selected jobs
-    idVerDt = findImportedDocs(min(jobNums), max(jobNums))
+    # Arguments passed to batch job
+    args = ( ('importJobs', importJobs), ('diffFmt', diffFmt) )
 
-    # Create an object for differencing the docs
-    diffObj = None
-    if   diffFmt == "XDiff": diffObj = cdrxdiff.XDiff()
-    elif diffFmt == "UDiff": diffObj = cdrxdiff.UDiff()
-    if not diffObj:
-        reportError("Internal error: Unrecognized diffFmt '%s'" % diffFmt)
-    # Put color info in the diff buffer, then fetch it out again
-    if diffFmt == "XDiff":
-        diffObj.showColors("newer version", "older version")
-        colors = diffObj.getDiffText()
-    else:
-        # XXX Future
-        colors = ""
+    # DEBUG
+    cdr.logwrite("type(importJobs)=%s" % type(importJobs))
+    cdr.logwrite("importJobs=%s" % str(importJobs))
+    cdr.logwrite("type(args)=%s" % type(args))
+    cdr.logwrite("args=%s" % str(args))
 
-    # Put the output into a sequence - will be converted to string at end
-    buf = []
-
-    # Output report header
-    buf.append("""
-<!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
-<html>
- <head>
-  <title>Imported CTGovProtocol vs. Current Working Documents Report</title>
-  %s
- </head>
- <body>
- <h1>Imported CTGovProtocol vs. Current Working Documents</h1>
-
-<h2>Date: %s</h2>
-
-<p>
-""" % (diffObj.getStyleHtml(), time.ctime()))
-
-    if len(importJobs) == 1:
-        buf.append(\
-            "This report compares all documents imported by job number %s" % \
-             importJobs[0][1])
-    else:
-        buf.append("""\
-This report compares the last version of each document imported
-between job number %s and job number %s
-""" % (importJobs[0][1], importJobs[-1][1]))
-
-    buf.append("""
-against the current working document for each of the documents.</p>
-
-<p>For each imported document, the report lists the:</p>
-<ul>
- <li>Document ID.</li>
- <li>Version number of the version created by the import program.</li>
- <li>Date/time imported.</li>
- <li>Date/time of last update of the current working document.</li>
- <li>A difference report or a note that no differences were found.</li>
-</ul>
-
-<p>The documents are pre-filtered before comparing them so that
-only significant fields are compared.</p>
-
-<hr />
-<center>
- %s
-</center>
-<hr />
-""" % colors)
-
-    # Counters
-    docCount  = 0   # Total docs we compare
-    diffCount = 0   # Total that were different from CWDs
-
-    # Get a connection for efficiency
+    # Create and launch the batch job
+    job = cdrbatch.CdrBatch(jobName=JOB_NAME, command=JOB_PATH,
+                            args=args, email=emails)
     try:
-        conn   = cdrdb.connect('CdrGuest')
-        cursor = conn.cursor()
-    except cdrdb.Error, info:
-        reportError("Unable to connect to DB to start run: %s" % str(info))
+        job.queue()
+    except Exception, e:
+        cdrcgi.bail("Unable to launch batch job: " + str(e), logfile=LF)
 
-    # Run the difference report
-    for (docId, docVer, docDt) in idVerDt:
-        # Header for one document
-        buf.append("""
-<br /><font size="+1">%s version: %d dated: %s vs CWD dated: %s</font><br />
-""" % \
-                    (cdr.exNormalize(docId)[0], docVer, docDt,
-                    cdr.getCWDDate(docId, conn)))
-
-        # Do the diff
-        diffText = diffObj.diff(doc1Id=docId, doc1Ver=docVer, doc2Ver=0,
-               filter=['name:Extract Significant CTGovProtocol Elements'])
-        if diffText:
-            buf.append(diffText)
-            buf.append("<br />")
-            diffCount += 1
-        else:
-            buf.append("[No significant differences]")
-        docCount += 1
-
-    # Summary and termination
-    buf.append("""
-<center>
-<hr />
-<h2>Summary</h2>
-<table border='2' cellpadding='10'>
- <tr>
-  <th align='right'>Total documents processed: </th>
-  <th>%d</th>
- </tr>
- <tr>
-  <th align='right'>Documents with differences: </th>
-  <th>%d</th>
- </tr>
-</table>
-</center>
+    # Report to user
+    title   = "CDR Administration"
+    section = "Imported CTGovProtocols vs. CWDs"
+    script  = "CTGovUpdateReport.py"
+    buttons = [CTGOV_MENU, cdrcgi.MAINMENU, LOGOUT]
+    html    = cdrcgi.header(title, title, section, script, buttons) + \
+"""
+<p>The job has been started.</p>
+<p>Output will be written to: <a href='%s'>%s</a>.</p>
+<p>If an email address was provided, email will be sent when the
+report is complete.</p>
+</form>
 </body>
 </html>
-""" % (docCount, diffCount))
-
-    # Consolidate and output the report
-    cdrcgi.sendPage("\n".join(buf))
-
+""" % (REPORT_URL, REPORT_URL)
+    cdrcgi.sendPage(html)
