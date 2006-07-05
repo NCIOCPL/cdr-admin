@@ -1,10 +1,16 @@
 #----------------------------------------------------------------------
 #
-# $Id: PubStatus.py,v 1.19 2005-07-28 23:05:08 venglisc Exp $
+# $Id: PubStatus.py,v 1.20 2006-07-05 20:21:35 venglisc Exp $
 #
 # Status of a publishing job.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.19  2005/07/28 23:05:08  venglisc
+# Modified the program to check all push jobs by default.  This eliminates
+# the problem that a push job may be submitted without having checked the
+# particular job.  Now a job needs to be unchecked if it should not be
+# processed.
+#
 # Revision 1.18  2005/03/25 17:02:40  venglisc
 # Corrected anker link to updated/removed/added section.
 # Modified table output by inserting a space after each semicolon ';' to
@@ -86,6 +92,7 @@ fromDate = fields and fields.getvalue('FromDate') or None
 toDate   = fields and fields.getvalue('ToDate') or None
 docType  = fields and fields.getvalue('docType') or None
 cgMode   = fields and fields.getvalue('cgMode') or None
+flavor   = fields and fields.getvalue('flavor') or 'full'
 docCount = int(fields and fields.getvalue('docCount') or '0')
 
 #----------------------------------------------------------------------
@@ -192,7 +199,7 @@ def addRow(row):
 #----------------------------------------------------------------------
 # Display the filter failures: docId, docVer, docType, docTitle, Message.
 #----------------------------------------------------------------------
-def dispFilterFailures():
+def dispFilterFailures(flavor = 'full'):
 
     #----------------------------------------------------------------------
     # Find some interesting information.
@@ -252,12 +259,22 @@ def dispFilterFailures():
     <td width='25%%' valign='top'><B>Message</B></td> 
     </tr>
 """ 
-    html   += addRow(row)
-    
-    row = cursor.fetchone()
-    while row:
-        html += addRow(row)
-        row   = cursor.fetchone()
+    rows = cursor.fetchall()
+
+    # The warnings have been formatted with a "class=warning"
+    # attribute for the LI element.
+    # -------------------------------------------------------
+    textPattern = re.compile('<LI class="(.*)</LI>')
+
+    for row in rows:
+        text = textPattern.search(row[4])
+ 
+        if flavor == 'full':
+            html += addRow(row)
+        elif flavor == 'warning' and text:
+            html += addRow(row)
+        elif flavor == 'error' and not text:
+            html += addRow(row)
 
     html  += "</TABLE></BODY></HTML>"       
     
@@ -1527,7 +1544,7 @@ jobId = int(jobId)
 if not dispType:
     dispJobStatus()
 elif dispType == "FilterFailure":
-    dispFilterFailures()
+    dispFilterFailures(flavor)
 elif dispType == "Setting":
     dispJobSetting()
 elif dispType == "CgWork":
