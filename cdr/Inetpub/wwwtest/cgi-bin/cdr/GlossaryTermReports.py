@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermReports.py,v 1.9 2006-05-17 13:16:08 bkline Exp $
+# $Id: GlossaryTermReports.py,v 1.10 2006-07-10 20:34:39 bkline Exp $
 #
 # Submenu for glossary term reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.9  2006/05/17 13:16:08  bkline
+# Switched Spanish Glossary Term By Status report to separate script.
+#
 # Revision 1.8  2006/05/04 13:44:29  bkline
 # Changed URL formatting pattern so that it no longer includes the '?'
 # starting the parameter list; added new menu items.
@@ -94,6 +97,7 @@ reports = [
             'Glossary Term and Variant Search Report'),
            ('GlossaryTermsByStatus.py?', 'Glossary Term By Status Report'),
            ('GlossaryTermsByType.py?', 'Glossary Term By Type Report'),
+           ('StaleGlossaryTerms.py?', 'Glossary Terms That Need Reviewed'),
            ('SpanishGlossaryTermsByStatus.py?',
             'Spanish Glossary Term By Status Report')
           ]
