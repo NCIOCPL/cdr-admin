@@ -1,15 +1,72 @@
 #----------------------------------------------------------------------
 #
-# $Id: StaleGlossaryTerms.py,v 1.2 2006-06-29 14:24:00 bkline Exp $
+# $Id: StaleGlossaryTerms.py,v 1.3 2006-07-10 20:35:23 bkline Exp $
 #
 # Glossary terms which haven't been modified since 2003-09-11.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2006/06/29 14:24:00  bkline
+# Switched to CdrGuest DB account.
+#
 # Revision 1.1  2006/06/29 14:20:34  bkline
 # One-off report for Sheri (request #2286).
 #
 #----------------------------------------------------------------------
-import cdrdb, xml.dom.minidom, cdr, cdrcgi, cgi, sys
+import cdr, cdrdb, cdrcgi, cgi, re, time, xml.dom.minidom
+
+#----------------------------------------------------------------------
+# Set the form variables.
+#----------------------------------------------------------------------
+fields   = cgi.FieldStorage()
+session  = cdrcgi.getSession(fields) or 'guest'
+request  = cdrcgi.getRequest(fields)
+fromDate = fields and fields.getvalue('FromDate') or None
+SUBMENU = "Report Menu"
+buttons = ["Submit Request", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
+script  = "StaleGlossaryTerms.py"
+title   = "CDR Administration"
+section = "Stale Glossary Terms"
+header  = cdrcgi.header(title, title, section, script, buttons)
+now     = time.localtime(time.time())
+
+#----------------------------------------------------------------------
+# Make sure we're logged in.
+#----------------------------------------------------------------------
+if not session: cdrcgi.bail('Unknown or expired CDR session.')
+
+#----------------------------------------------------------------------
+# Handle navigation requests.
+#----------------------------------------------------------------------
+if request == cdrcgi.MAINMENU:
+    cdrcgi.navigateTo("Admin.py", session)
+elif request == SUBMENU:
+    cdrcgi.navigateTo("Reports.py", session)
+
+#----------------------------------------------------------------------
+# Handle request to log out.
+#----------------------------------------------------------------------
+if request == "Log Out": 
+    cdrcgi.logout(session)
+
+#----------------------------------------------------------------------
+# If we don't have a request, put up the request form.
+#----------------------------------------------------------------------
+if not fromDate:
+    form = """\
+   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
+   <TABLE BORDER='0'>
+    <TR>
+     <TD><B>Start Date:&nbsp;</B></TD>
+     <TD><INPUT NAME='FromDate' VALUE='2003-09-12'>&nbsp;
+         (use format YYYY-MM-DD for dates, e.g. 2003-09-12)</TD>
+    </TR>
+   </TABLE>
+  </FORM>
+ </BODY>
+</HTML>
+"""
+    cdrcgi.sendPage(header + form)
+
 
 def fix(me):
     return me and cgi.escape(me) or u"&nbsp;"
@@ -20,8 +77,8 @@ class GlossaryTerm:
         self.termName   = name
         self.definition = definition
                                 
-conn = cdrdb.connect()
-cursor = conn.cursor('CdrGuest')
+conn = cdrdb.connect('CdrGuest')
+cursor = conn.cursor()
 cursor.execute("CREATE TABLE #gt (id INTEGER, dt DATETIME)")
 conn.commit()
 cursor.execute("""\
@@ -37,7 +94,7 @@ INSERT INTO #gt
       WHERE a.name IN ('ADD DOCUMENT', 'MODIFY DOCUMENT')
         AND g.name = 'GlossaryTerm'
      GROUP BY t.document
-    HAVING MAX(t.dt) < '2003-09-12'""")
+    HAVING MAX(t.dt) < ?""", fromDate) #'2003-09-12'""")
 conn.commit()
 cursor.execute("""\
          SELECT t.id, n.value, d.value
@@ -55,7 +112,7 @@ while row:
     terms.append(GlossaryTerm(row[0], row[1], row[2]))
     row = cursor.fetchone()
 terms.sort(lambda a,b: cmp(a.termName, b.termName))
-title = u'Glossary Terms Not Modified Since 2003-09-11'
+title = u'Glossary Terms Not Modified Since %s' % fromDate #2003-09-11'
 html = [u"""\
 <html>
  <head>
