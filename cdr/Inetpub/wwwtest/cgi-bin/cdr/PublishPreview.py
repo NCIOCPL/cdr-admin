@@ -1,11 +1,16 @@
 #----------------------------------------------------------------------
 #
-# $Id: PublishPreview.py,v 1.27 2005-12-08 16:01:32 venglisc Exp $
+# $Id: PublishPreview.py,v 1.28 2006-07-11 20:50:58 venglisc Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.27  2005/12/08 16:01:32  venglisc
+# Modified the program to handle an additional parameter.  With this new
+# version parameter we are able to display a specific version of a document
+# including the cwd (current working document).
+#
 # Revision 1.26  2005/04/21 21:30:06  venglisc
 # Modified to allow running GlossaryTerm Publish Preview reports. (Bug 1531)
 #
@@ -132,12 +137,14 @@ showProgress("Started...")
 
 #----------------------------------------------------------------------
 # Map for finding the filters for a given document type.
+# Need to enter (Document type : [filter set])
 #----------------------------------------------------------------------
 filterSets = {
-    'CTGovProtocol'  : ['set:Vendor CTGovProtocol Set'],
-    'GlossaryTerm'   : ['set:Vendor GlossaryTerm Set'], 
-    'InScopeProtocol': ['set:Vendor InScopeProtocol Set'],
-    'Summary'        : ['set:Vendor Summary Set']
+    'CTGovProtocol'         : ['set:Vendor CTGovProtocol Set'],
+    'DrugInformationSummary': ['set:Vendor DrugInfoSummary Set'], 
+    'GlossaryTerm'          : ['set:Vendor GlossaryTerm Set'], 
+    'InScopeProtocol'       : ['set:Vendor InScopeProtocol Set'],
+    'Summary'               : ['set:Vendor Summary Set']
 }
 
 #----------------------------------------------------------------------
@@ -216,12 +223,13 @@ except cdrdb.Error, info:
 showProgress("Fetched document type: %s..." % row[0])
 
 if not flavor:
-    if docType == "Summary":           flavor = "summary"
-    elif docType == "InScopeProtocol": flavor = "protocol_hp"
-    elif docType == "CTGovProtocol":   flavor = "CTGovProtocol_HP"
-    elif docType == "GlossaryTerm":    flavor = "glossary"
-    else: cdrcgi.bail("Publish preview only available for "
-                      "Summary, GlossaryTerm and Protocol documents")
+    if docType == "Summary":                  flavor = "summary"
+    elif docType == "DrugInformationSummary": flavor = "druginfosummary"
+    elif docType == "InScopeProtocol":        flavor = "protocol_hp"
+    elif docType == "CTGovProtocol":          flavor = "CTGovProtocol_HP"
+    elif docType == "GlossaryTerm":           flavor = "glossary"
+    else: cdrcgi.bail("Publish preview only available for Summary, "
+                      "DrugInfoSummary, GlossaryTerm and Protocol documents")
 showProgress("Using flavor: %s..." % flavor)
 
 #----------------------------------------------------------------------
