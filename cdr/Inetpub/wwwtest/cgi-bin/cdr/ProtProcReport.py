@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtProcReport.py,v 1.1 2006-05-04 15:08:52 bkline Exp $
+# $Id: ProtProcReport.py,v 1.2 2006-07-11 13:41:50 bkline Exp $
 #
 # Report of protocol processing status.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2006/05/04 15:08:52  bkline
+# Report of protocol processing status.
+#
 #----------------------------------------------------------------------
 
 import cdrbatch, cdrcgi, cgi, cdrdb, cdr, time
@@ -12,18 +15,19 @@ import cdrbatch, cdrcgi, cgi, cdrdb, cdr, time
 #----------------------------------------------------------------------
 # Set the form variables.
 #----------------------------------------------------------------------
-fields      = cgi.FieldStorage()
-session     = cdrcgi.getSession(fields) or cdrcgi.bail('not logged in to CDR')
-request     = cdrcgi.getRequest(fields)
-email       = cdr.getEmail(session)
-title       = "CDR Administration"
-section     = "Protocol Processing Status Report"
-SUBMENU     = "Report Menu"
-buttons     = [SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-script      = 'ProtProcReport.py'
-command     = 'lib/Python/CdrLongReports.py'
-header      = cdrcgi.header(title, title, section, script, buttons,
-                            stylesheet = """\
+fields       = cgi.FieldStorage()
+session      = cdrcgi.getSession(fields) or cdrcgi.bail('not logged in to CDR')
+request      = cdrcgi.getRequest(fields)
+email        = cdr.getEmail(session)
+includeTitle = fields and fields.getvalue('include-title') and True or False
+title        = "CDR Administration"
+section      = "Protocol Processing Status Report"
+SUBMENU      = "Report Menu"
+buttons      = [SUBMENU, cdrcgi.MAINMENU, "Log Out"]
+script       = 'ProtProcReport.py'
+command      = 'lib/Python/CdrLongReports.py'
+header       = cdrcgi.header(title, title, section, script, buttons,
+                             stylesheet = """\
   <style type='text/css'>
    body { font-family: Arial }
   </style>
@@ -46,13 +50,14 @@ if request == "Log Out":
 #----------------------------------------------------------------------    
 # Queue up a request for the report.
 #----------------------------------------------------------------------
+args = includeTitle and (('IncludeTitle', 'true'),) or ()
 if not email or '@' not in email:
     cdrcgi.bail("No email address for logged-in user")
 try:
-    batch = cdrbatch.CdrBatch(jobName = section, email = email, 
+    batch = cdrbatch.CdrBatch(jobName = section, email = email, args = args,
                               command = command)
 except Exception, e:
-    cdrcgi.bail(str(e))
+    cdrcgi.bail("Failure creating batch job" + str(e))
 
 #cdrcgi.bail('milepost')
 try:

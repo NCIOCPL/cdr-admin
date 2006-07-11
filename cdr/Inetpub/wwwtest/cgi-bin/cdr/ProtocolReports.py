@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolReports.py,v 1.26 2006-05-10 16:36:32 venglisc Exp $
+# $Id: ProtocolReports.py,v 1.27 2006-07-11 13:41:50 bkline Exp $
 #
 # Submenu for protocol reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.26  2006/05/10 16:36:32  venglisc
+# I can't spell MS-Excel.  That's fixed now.
+#
 # Revision 1.25  2006/05/10 16:35:06  venglisc
 # Added menu item for Protocols with FDA IND information report. (Bug 2028)
 #
@@ -171,6 +174,9 @@ reports = [
             'Protocols with FDA IND Information (Excel)', ''),
            ('ProtProcReport.py',
             'Protocol Processing Status Report', ''),
+           ('ProtProcReport.py',
+            'Protocol Processing Status Report with Protocol Title',
+            '&include-title=true'),
            ('OSPReport.py',
             'Report for Office of Science Policy', ''),
            ('RssImportReport.py', 'RSS Import/Update Statistics Report', ''),
