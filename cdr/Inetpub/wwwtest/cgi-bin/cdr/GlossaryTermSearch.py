@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermSearch.py,v 1.6 2004-10-20 21:19:58 bkline Exp $
+# $Id: GlossaryTermSearch.py,v 1.7 2006-07-11 13:42:35 bkline Exp $
 #
 # Prototype for duplicate-checking interface for GlossaryTerm documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2004/10/20 21:19:58  bkline
+# Added missing session parameters.
+#
 # Revision 1.5  2004/10/06 21:07:19  bkline
 # Fixed paths for definition text.
 #
@@ -33,6 +36,7 @@ boolOp     = fields and fields.getvalue("Boolean")          or "AND"
 name       = fields and fields.getvalue("Name")             or None
 spanish    = fields and fields.getvalue("Spanish")          or None
 definition = fields and fields.getvalue("Definition")       or None
+pron       = fields and fields.getvalue("Pronunciation")    or None
 status     = fields and fields.getvalue("Status")           or None
 audience   = fields and fields.getvalue("Audience")         or None
 submit     = fields and fields.getvalue("SubmitButton")     or None
@@ -54,6 +58,7 @@ except cdrdb.Error, info:
 #----------------------------------------------------------------------
 if not submit:
     fields = (('Term Name',                    'Name'),
+              ('Term Pronunciation',           'Pronunciation'),
               ('Spanish Name',                 'Spanish'),
               ('Term Definition',              'Definition'),
               ('Audience',                     'Audience', 
@@ -82,6 +87,8 @@ if not submit:
 #----------------------------------------------------------------------
 searchFields = (cdrcgi.SearchField(name,
                             ("/GlossaryTerm/TermName",)),
+                cdrcgi.SearchField(pron,
+                            ("/GlossaryTerm/TermPronunciation",)),
                 cdrcgi.SearchField(spanish,
                             ("/GlossaryTerm/SpanishTermName",)),
                 cdrcgi.SearchField(definition,
@@ -125,4 +132,3 @@ html = cdrcgi.advancedSearchResultsPage("Glossary Term", rows, strings,
 # Send the page back to the browser.
 #----------------------------------------------------------------------
 cdrcgi.sendPage(html)
-
