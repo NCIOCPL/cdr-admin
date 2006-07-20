@@ -1,15 +1,25 @@
 #----------------------------------------------------------------------
 #
-# $Id: DrugAgentReport2.py,v 1.2 2005-05-25 19:00:05 bkline Exp $
+# $Id: DrugAgentReport2.py,v 1.3 2006-07-20 22:49:50 ameyer Exp $
 #
 # Request #1602 (second report on Drug/Agent terms).
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2005/05/25 19:00:05  bkline
+# Added new columns requested by Sheri (request #1695).
+#
 # Revision 1.1  2005/03/24 21:15:04  bkline
 # Drug/Agent Other Names Report.
 #
 #----------------------------------------------------------------------
-import cdrdb, pyXLWriter, sys, time
+import cdrdb, cgi, pyXLWriter, sys, time
+
+# The report can now produce drug information terms filtered
+#   by protocol status as before, or unfiltered if requested.
+allDrugs = False
+fields = cgi.FieldStorage()
+if fields and fields.getvalue('alldrugs'):
+    allDrugs = True
 
 if sys.platform == "win32":
     import os, msvcrt
@@ -29,7 +39,7 @@ class Term:
         if rows:
             self.name = rows[0][0]
         cursor.execute("""\
-   SELECT DISTINCT n.value, t.value, v.value, r.value
+   SELECT DISTINCT n.value, t.value, v.value, r.value, s.value
               FROM query_term n
               JOIN query_term t
                 ON n.doc_id = t.doc_id
@@ -43,6 +53,11 @@ class Term:
                 ON r.doc_id = t.doc_id
                AND LEFT(r.node_loc, 4) = LEFT(t.node_loc, 4)
                AND r.path = '/Term/OtherName/SourceInformation/ReferenceSource'
+   LEFT OUTER JOIN query_term s
+                ON s.doc_id = t.doc_id
+               AND LEFT(s.node_loc, 12) = LEFT(v.node_loc, 12)
+               AND s.path = '/Term/OtherName/SourceInformation'
+                          + '/VocabularySource/SourceTermId'
              WHERE n.path = '/Term/OtherName/OtherTermName'
                AND t.path = '/Term/OtherName/OtherNameType'
                AND n.doc_id = ?""", id)
@@ -65,34 +80,38 @@ cursor.execute("""\
                                  FROM query_term
                                 WHERE path = '/Term/PreferredName'
                                   AND value = 'Drug/agent')""")
-cursor.execute("""
-        INSERT INTO #t1 (doc_id)
-    SELECT DISTINCT doc_id
-               FROM query_term
-              WHERE path = '/Term/SemanticType/@cdr:ref'
-                AND int_val = (SELECT doc_id
-                                 FROM query_term
-                                WHERE path = '/Term/PreferredName'
-                                  AND value = 'Drug/agent')""")
 conn.commit()
-cursor.execute("""\
-       INSERT INTO #t2
-            SELECT doc_id
-              FROM query_term
-             WHERE path = '/InScopeProtocol/ProtocolAdminInfo'
-                        + '/CurrentProtocolStatus'
-               AND value IN ('Active', 'Approved-not yet active')""")
-conn.commit()
-cursor.execute("""\
-   SELECT DISTINCT u.int_val
-              FROM query_term u
-              JOIN #t1
-                ON #t1.doc_id = u.int_val
-              JOIN #t2
-                ON #t2.doc_id = u.doc_id
-             WHERE u.path = '/InScopeProtocol/ProtocolDetail/StudyCategory'
-                           + '/Intervention/InterventionNameLink/@cdr:ref'
-          ORDER BY u.int_val""")
+
+if not allDrugs:
+    # Filter in only those terms that are used in InterventionNameLinks
+    #   in Active or Approved-not yet active protocols
+    cursor.execute("""\
+           INSERT INTO #t2
+                SELECT doc_id
+                  FROM query_term
+                 WHERE path = '/InScopeProtocol/ProtocolAdminInfo'
+                            + '/CurrentProtocolStatus'
+                   AND value IN ('Active', 'Approved-not yet active')""")
+    conn.commit()
+    cursor.execute("""\
+       SELECT DISTINCT u.int_val
+                  FROM query_term u
+                  JOIN #t1
+                    ON #t1.doc_id = u.int_val
+                  JOIN #t2
+                    ON #t2.doc_id = u.doc_id
+                 WHERE u.path = '/InScopeProtocol/ProtocolDetail/StudyCategory'
+                               + '/Intervention/InterventionNameLink/@cdr:ref'
+              ORDER BY u.int_val""")
+else:
+    # Take all drugs, regardless of usage in protocols
+    cursor.execute("""\
+       SELECT DISTINCT u.int_val
+                  FROM query_term u
+                  JOIN #t1
+                    ON #t1.doc_id = u.int_val
+              ORDER BY u.int_val""")
+
 terms = []
 for row in cursor.fetchall():
     terms.append(Term(row[0]))
@@ -100,7 +119,7 @@ t = time.strftime("%Y%m%d%H%M%S")
 terms.sort(lambda a,b: cmp(a.name, b.name))
 print "Content-type: application/vnd.ms-excel"
 print "Content-Disposition: attachment; filename=DrugAgentReport-%s.xls" % t
-print 
+print
 
 workbook = pyXLWriter.Writer(sys.stdout)
 worksheet = workbook.add_worksheet("Terms")
@@ -116,11 +135,13 @@ worksheet.set_column(1, 50)
 worksheet.set_column(2, 50)
 worksheet.set_column(3, 25)
 worksheet.set_column(4, 30)
+worksheet.set_column(5, 8)
 worksheet.write([0, 0], "CDR ID", format)
 worksheet.write([0, 1], "Preferred Name", format)
 worksheet.write([0, 2], "Other Names", format)
 worksheet.write([0, 3], "Other Name Type", format)
 worksheet.write([0, 4], "Source", format)
+worksheet.write([0, 5], "SourceID", format)
 row = 1
 
 def fix(name):
@@ -140,6 +161,8 @@ for term in terms:
                                                  " Vocabulary"))
         elif term.otherNames[i][3]:
             worksheet.write_string([row, 4], fix(term.otherNames[i][3]))
+        if term.otherNames[i][4]:
+            worksheet.write_string([row, 5], fix(term.otherNames[i][4]))
         row += 1
     if not term.otherNames:
         row += 1
