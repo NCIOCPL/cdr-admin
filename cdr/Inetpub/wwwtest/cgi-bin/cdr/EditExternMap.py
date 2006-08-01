@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditExternMap.py,v 1.8 2005-08-29 20:08:44 bkline Exp $
+# $Id: EditExternMap.py,v 1.9 2006-08-01 19:37:33 ameyer Exp $
 #
 # Allows a user to edit the table which maps strings from external
 # systems (such as ClinicalTrials.gov) to CDR document IDs.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.8  2005/08/29 20:08:44  bkline
+# Added check to make sure document type of mapped document is allowed.
+#
 # Revision 1.7  2005/07/05 12:33:34  bkline
 # Added support for new 'bogus' column in external_map table.
 #
@@ -32,26 +35,46 @@
 import cdrdb, cdrcgi, cgi, re, cdr
 
 #----------------------------------------------------------------------
+# Extract integer from string; uses all decimal digits.
+#----------------------------------------------------------------------
+def extractInt(str):
+    if type(str) == type(9):
+        return str
+    if not str or type(str) not in (type(""), type(u"")):
+        return None
+    digits = re.sub(r"[^\d]", "", str)
+    if not digits:
+        return None
+    return int(digits)
+
+#----------------------------------------------------------------------
 # Set the form variables.
 #----------------------------------------------------------------------
-fields   = cgi.FieldStorage()
-session  = cdrcgi.getSession(fields)
-request  = cdrcgi.getRequest(fields)
-usage    = fields and fields.getvalue('usage')   or None
-value    = fields and fields.getvalue('value')   or None
-pattern  = fields and fields.getvalue('pattern') or ""
-docId    = fields and fields.getvalue('docId')   or ""
-title    = "CDR Administration"
-section  = "External Map Editor"
-script   = "EditExternMap.py"
-logFile  = cdr.DEFAULT_LOGDIR + "/EditExternMap.log"
-buttons  = ["Get Values", cdrcgi.MAINMENU, "Log Out"]
-extra    = usage and ["Save Changes"] or []
-buttons  = extra + buttons
-intUsage = usage and int(usage) or None
-allUsage = not intUsage
+fields     = cgi.FieldStorage()
+session    = cdrcgi.getSession(fields)
+request    = cdrcgi.getRequest(fields)
+usage      = fields and fields.getvalue('usage')      or None
+value      = fields and fields.getvalue('value')      or None
+pattern    = fields and fields.getvalue('pattern')    or ""
+docId      = fields and fields.getvalue('docId')      or ""
+noMapped   = fields and fields.getvalue('noMapped')   or None
+noMappable = fields and fields.getvalue('noMappable') or None
+title      = "CDR Administration"
+section    = "External Map Editor"
+script     = "EditExternMap.py"
+logFile    = cdr.DEFAULT_LOGDIR + "/EditExternMap.log"
+buttons    = ["Get Values", cdrcgi.MAINMENU, "Log Out"]
+extra      = usage and ["Save Changes"] or []
+buttons    = extra + buttons
+intUsage   = usage and int(usage) or None
+allUsage   = not intUsage
+if docId:
+    docId = extractInt(docId) or ""
 if docId and not pattern:
     allUsage = 1
+if docId and (noMapped or noMappable):
+    cdrcgi.bail("If searching for a mapped document ID, you must uncheck " + \
+                "both mapping check boxes.")
 style    = """\
   <style  type='text/css'>input.r { background-color: EEEEEE }</style>
   <script type='text/javascript'>
@@ -80,7 +103,7 @@ if request == cdrcgi.MAINMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if request == "Log Out": 
+if request == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
@@ -109,19 +132,28 @@ for mapId, mapType in cursor.fetchall():
         usageTypes[mapId] = { mapType: typeNames[mapType] }
 
 #----------------------------------------------------------------------
-# Extract integer from string; uses all decimal digits.
+# Find the value corresponding to an external_map id
 #----------------------------------------------------------------------
-def extractInt(str):
-    if type(str) == type(9):
-        return str
-    if not str or type(str) not in (type(""), type(u"")):
-        return None
-    digits = re.sub(r"[^\d]", "", str)
-    if not digits:
-        return None
-    return int(digits)
+def lookupValueByMapId(mapRowId):
+    try:
+        cursor.execute("""\
+        SELECT value
+          FROM external_map
+         WHERE id = ?""", mapRowId)
+        row = cursor.fetchone()
+        if not row:
+            cdrcgi.bail("Error: unable to find value row for id %d" \
+                        "<br>Was it already deleted?"
+                        % mapRowId)
+    except Exception, info:
+        cdrcgi.bail("Database error looking up value by map row id=%d: %s" \
+                     % (mapRowId, str(info)))
 
+    return row[0]
 
+#----------------------------------------------------------------------
+# Determine whether a user is allowed to edit a specific mapping.
+#----------------------------------------------------------------------
 def allowed(key):
     cursor.execute("""\
     SELECT a.name, u.name
@@ -133,7 +165,8 @@ def allowed(key):
      WHERE m.id = ?""", key)
     rows = cursor.fetchall()
     if not rows:
-        errors.append("Failure looking up row %s in external_map table" % key)
+        errors.append("Failure looking up row %s in external_map table"
+                      "<br>Was it already deleted?" % key)
         return False
     actionName, usageName = rows[0]
     if actionName not in allowed.actions:
@@ -179,6 +212,8 @@ def typeOk(mapId, docId):
 #----------------------------------------------------------------------
 form = ""
 if request == "Save Changes":
+
+    # Get user id to associate with update to external_map
     cursor.execute("""\
     SELECT u.id, u.name
       FROM session s
@@ -190,11 +225,24 @@ if request == "Save Changes":
         cdrcgi.bail("Failure looking up user for current session")
     uid = rows[0][0]
     uName = rows[0][1]
-    pairs = {}
-    oldBogus = {}
-    newBogus = {}
+
+    # Read input to get old and new values of user updateable fields
+    # Key on all following dictionaries is external_map table id
+    # Value is as documented below.
+    pairs    = {}  # Value=Sequence of old/new CDR ID
+                   # If value=='DELETE', then delete mapping box was checked
+    oldBogus = {}  # Value bogus box initial value
+                   #   'Y' = was checked
+                   #   'N' = was checked
+    newBogus = {}  # Value Y=bogus box is now checked, Y/N
+    oldMable = {}  # Value Y=Mappable box was initially checked, Y/N
+    newMable = {}  # Value Y=Mappable box is now checked, Y/N
+
     for field in fields.keys():
+        # In parsing the input, the digits in "id-...", "old-id-..." etc.
+        #  are an external_map table id, i.e., key to above dictionaries.
         if field.startswith("id-"):
+            # key=map table id, val=cdrid of doc mapped to after user input
             key = extractInt(field)
             val = extractInt(fields[field].value)
             if not pairs.has_key(key):
@@ -202,6 +250,7 @@ if request == "Save Changes":
             elif pairs[key] != "DELETE":
                 pairs[key][1] = val
         elif field.startswith("old-id"):
+            # key=map table id, val=cdrid of doc mapped to before user input
             key = extractInt(field)
             val = extractInt(fields[field].value)
             if not pairs.has_key(key):
@@ -209,18 +258,36 @@ if request == "Save Changes":
             elif pairs[key] != "DELETE":
                 pairs[key][0] = val
         elif field.startswith("del-id"):
+            # key=map table id, value="Del map" checked by user
             key = extractInt(field)
             pairs[key] = "DELETE"
         elif field.startswith("old-bogus-"):
+            # key=map table id, value=bogus checkbox value before input
             key = extractInt(field)
             oldBogus[key] = fields[field].value
         elif field.startswith("bogus-"):
+            # key=map table id, value=bogus checkbox approved by user
             key = extractInt(field)
             newBogus[key] = "Y"
+        elif field.startswith("old-mappable-"):
+            # key=map table id, value=mappable checkbox before input
+            key = extractInt(field)
+            oldMable[key] = fields[field].value
+        elif field.startswith("mappable-"):
+            # key=map table id, value=mappable checkbox approved by uer
+            key = extractInt(field)
+            newMable[key] = "Y"
+
+    # Track changes
     numChanges = 0
     numDeletions = 0
     errors = []
+
+    # Update changes in bogus values
     for rowId, oldValue in oldBogus.items():
+        # Don't fool with it if user has also deleted the whole mapping
+        if pairs.has_key(rowId) and pairs[rowId] == "DELETE":
+            continue
         newValue = None
         if oldValue == 'Y' and rowId not in newBogus:
             newValue = 'N'
@@ -236,9 +303,39 @@ if request == "Save Changes":
                 numChanges += 1
             except Exception, e:
                 errors.append("failure setting external_map.bogus column "
-                              "to '%s' for row %d: %s" % (newValue, rowId,
-                                                          str(e)))
-                
+                              "to '%s' for row %s: %s" % (newValue,
+                                        lookupValueByMapId(rowId), str(e)))
+
+    # Update changes in mappability of a value
+    for rowId, oldValue in oldMable.items():
+        # Don't fool with it if user has also deleted the whole mapping
+        if pairs.has_key(rowId) and pairs[rowId] == "DELETE":
+            continue
+        newValue = None
+        if oldValue == 'Y' and rowId not in newMable:
+            newValue = 'N'
+        elif oldValue == 'N' and rowId in newMable:
+            newValue = 'Y'
+        if newValue:
+            # Don't allow value to become unmappable if it's already mapped
+            if newValue == 'N' and pairs.has_key(rowId) and pairs[rowId][1]:
+                errors.append("Can't make \"%s\" non-mappable if it's "
+                              "already mapped.  Must also erase CDRID." \
+                              % lookupValueByMapId(rowId))
+            else:
+                try:
+                    cursor.execute("""\
+                        UPDATE external_map
+                           SET mappable = ?
+                         WHERE id = ?""", (newValue, rowId))
+                    conn.commit()
+                    numChanges += 1
+                except Exception, e:
+                    errors.append(\
+                        "failure setting external_map.mappable column "
+                        "to '%s' for row %d: %s" % (newValue, rowId, str(e)))
+
+    # Update mappings
     for key in pairs:
         pair = pairs[key]
         if pair == "DELETE" and allowed(key):
@@ -261,54 +358,70 @@ if request == "Save Changes":
                 errors.append(error)
                 continue
             usageName, mapValue, docId = row
-            try:
-                cursor.execute("DELETE FROM external_map WHERE id = %d" % key)
-                conn.commit()
-                cdr.logwrite("row %d (usage=%s; value=%s; CdrDocId=%d) "
-                             "deleted by %s" % (key, usageName, mapValue,
-                                                docId, uName),
-                             logFile)
-                numDeletions += 1
-            except:
-                error = "Failure deleting row %d" % key
-                cdr.logwrite(error, logFile)
+
+            # As a double check, Sheri requested that a user must delete
+            #  the doc id as well as check the Del map box in order to
+            #  confirm that she really wants to delete this.
+            if fields.getvalue("id-%d" % key):
+                error = "Please erase the CDRID for \"%s\" when deleting " \
+                        "the mapping to it." % lookupValueByMapId(key)
                 errors.append(error)
+            else:
+                # Delete the whole row from the mapping table
+                try:
+                    cursor.execute("DELETE FROM external_map WHERE id = %d" \
+                                   % key)
+                    conn.commit()
+                    cdr.logwrite("row %d (usage=%s; value=%s; CdrDocId=%s) "
+                                 "deleted by %s" % (key, usageName, mapValue,
+                                                    docId, uName), logFile)
+                    numDeletions += 1
+                except Exception,info:
+                    error = "Failure deleting row %d = %s<br>%s" % \
+                             (key, mapValue, str(info))
+                    cdr.logwrite(error, logFile)
+                    errors.append(error)
         elif (pair != "DELETE" and pair[0] != pair[1] and allowed(key) and
               typeOk(key, pair[1])):
-            try:
-                cursor.execute("""\
-                UPDATE external_map
-                   SET doc_id = ?,
-                       usr = ?,
-                       last_mod = GETDATE()
-                 WHERE id = ?""", (pair[1], uid, key))
-                conn.commit()
-                numChanges += 1
-                fromVal = pair[0] or "NULL"
-                toVal   = pair[1] or "NULL"
-                cdr.logwrite("row %d changed from %s to %s by %s" % (key,
-                                                                     fromVal,
-                                                                     toVal,
-                                                                     uName),
-                             logFile)
-            except:
+            # Can't map non-mappable values
+            if pair[1] and not newMable.has_key(key):
+                errors.append(\
+                    "Can't map value to %d and have field non-mappable" % \
+                    pair[1])
+            else:
                 try:
                     cursor.execute("""\
-                    SELECT value
-                      FROM external_map
-                     WHERE id = ?""", key)
-                    row = cursor.fetchone()
-                    if not row:
-                        errors.append("Internal error: unable to find "
-                                      "value row for id %d" % key)
-                    else:
-                        question = pair[1] and " (does document exist?)" or ""
-                        errors.append("Failure setting DocId to %s "
-                                      "for value %s%s" % (pair[1] or "NULL",
-                                                          cgi.escape(row[0]),
-                                                          question))
+                    UPDATE external_map
+                       SET doc_id = ?,
+                           usr = ?,
+                           last_mod = GETDATE()
+                     WHERE id = ?""", (pair[1], uid, key))
+                    conn.commit()
+                    numChanges += 1
+                    fromVal = pair[0] or "NULL"
+                    toVal   = pair[1] or "NULL"
+                    cdr.logwrite("row %d changed from %s to %s by %s" % \
+                                 (key, fromVal, toVal, uName), logFile)
                 except:
-                    cdrcgi.bail("Database failure looking up row %s" % key)
+                    try:
+                        cursor.execute("""\
+                        SELECT value
+                          FROM external_map
+                         WHERE id = ?""", key)
+                        row = cursor.fetchone()
+                        if not row:
+                            errors.append("Internal error: unable to find "
+                                          "value row for id %d" % key)
+                        else:
+                            question = pair[1] and \
+                                       " (does document exist?)" or ""
+                            errors.append("Failure setting DocId to %s "
+                                          "for value %s%s" % \
+                                          (pair[1] or "NULL",
+                                           cgi.escape(row[0]), question))
+                    except:
+                        cdrcgi.bail("Database failure looking up row %s" % key)
+
     section += " (%d change%s saved; %d row%s deleted)" % (numChanges,
                                          numChanges != 1 and "s" or "",
                                          numDeletions,
@@ -325,13 +438,23 @@ if request == "Save Changes":
 """
 
 #----------------------------------------------------------------------
-# Show the list of usage possibilities.
+# Select a list of usage possibilities.
 #----------------------------------------------------------------------
 cursor.execute("""\
   SELECT id, name
     FROM external_map_usage
 ORDER BY name""")
 rows = cursor.fetchall()
+
+#----------------------------------------------------------------------
+# Display the table search criteria input fields
+#----------------------------------------------------------------------
+includeUnmappedChecked = ""
+if noMapped:
+    includeUnmappedChecked = " checked='1'"
+includeUnmappableChecked = ""
+if noMappable:
+    includeUnmappableChecked = " checked='1'"
 form += """\
    <table border='0'>
     <tr>
@@ -339,7 +462,7 @@ form += """\
       <b>Select a map usage:&nbsp;</b>
      </td>
      <td>
-      <select name='usage' width='60'>
+      <select name='usage'>
        <option value='0'%s>All usages</option>
 """ % (allUsage and " selected='1'" or "")
 for row in rows:
@@ -352,6 +475,7 @@ for row in rows:
 form += """\
       </select>
      </td>
+     <td>Select the kind of mapping to show, or select all kinds.</td>
     </tr>
     <tr>
      <td align='right' nowrap='1'>
@@ -360,6 +484,7 @@ form += """\
      <td>
       <input name='pattern' value="%s">
      </td>
+     <td>Find specific text values, with optional SQL %% wildcards.</td>
     </tr>
     <tr>
      <td align='right' nowrap='1'>
@@ -368,29 +493,59 @@ form += """\
      <td>
       <input name='docId' value="%s">
      </td>
+     <td>Include all values that map to this input document ID.<br />
+    Leave "Pattern for values" blank if <em>only</em> this doc ID desired.</td>
+    </tr>
+    <tr>
+     <td align='right' nowrap='1'>
+      <b>Only include unmapped values:&nbsp;</b>
+     </td>
+     <td>
+      <input type='checkbox' name='noMapped' value='1'%s>
+     </td>
+     <td>If checked, no values that already have doc IDs will appear.</td>
+    </tr>
+    <tr>
+     <td align='right' nowrap='1'>
+      <b>Also include unmappable values:&nbsp;</b>
+     </td>
+     <td>
+      <input type='checkbox' name='noMappable' value='1'%s>
+     </td>
+     <td>If checked, both mappable and unmappable values appear, else only
+     mappable values.</td>
     </tr>
    </table>
    <input type='hidden' name='%s' value='%s'>
-""" % (pattern and cgi.escape(pattern, 1) or "",
-       docId, cdrcgi.SESSION, session)
+""" % (pattern and cgi.escape(pattern, 1) or "", docId,
+       includeUnmappedChecked, includeUnmappableChecked,
+       cdrcgi.SESSION, session)
 
 #----------------------------------------------------------------------
 # Show the rows that match the selection criteria.
 #----------------------------------------------------------------------
 if request in ("Save Changes", "Get Values"):
+    # Set optional where clauses based on user input
     whereUsage = intUsage and ("AND m.usage = %d" % intUsage) or ""
+    whereNoMap = noMapped and " AND m.doc_id IS NULL" or ""
+    if noMappable:
+        whereNoMappable = ""
+    else:
+        whereNoMappable = " AND m.mappable = 'Y'"
+
+    # Construct and execute specific query for user input
     if pattern:
         cursor.execute("""\
-         SELECT m.id, m.value, m.doc_id, u.name, m.bogus
+         SELECT m.id, m.value, m.doc_id, u.name, m.bogus, m.mappable
            FROM external_map m
            JOIN external_map_usage u
              ON u.id = m.usage
           WHERE m.value LIKE ?
-            %s
-       ORDER BY m.value""" % whereUsage, pattern)
+            %s %s %s
+       ORDER BY m.value""" % (whereUsage,whereNoMap,whereNoMappable), pattern)
     elif docId:
         cursor.execute("""\
-         SELECT m.id, m.value, m.doc_id, u.name, m.bogus
+         SELECT m.id, m.value, m.doc_id, u.name, m.bogus, m.mappable
            FROM external_map m
            JOIN external_map_usage u
              ON u.id = m.usage
@@ -398,19 +553,22 @@ if request in ("Save Changes", "Get Values"):
        ORDER BY m.value""" % extractInt(docId))
     else:
         cursor.execute("""\
-         SELECT m.id, m.value, m.doc_id, u.name, m.bogus
+         SELECT m.id, m.value, m.doc_id, u.name, m.bogus, m.mappable
            FROM external_map m
            JOIN external_map_usage u
              ON u.id = m.usage
           WHERE 1 = 1
-            %s
-       ORDER BY m.value""" % whereUsage)
+            %s %s %s
+       ORDER BY m.value""" % (whereUsage, whereNoMap, whereNoMappable))
     row = cursor.fetchone()
+
+    # No hits?
     if not row:
         form += """\
   <br>
   <h4>No matching values found</h4>
 """
+    # Output table of hits
     else:
         form += """\
   <br>
@@ -420,7 +578,10 @@ if request in ("Save Changes", "Get Values"):
     <td align='center'><b>CDRID</b></td>
    </tr>
 """
+        # Output each row in the table
         while row:
+            mapId  = row[0]
+            mapVal = row[1]
             if not row[2]:
                 button = "&nbsp;"
             else:
@@ -428,29 +589,41 @@ if request in ("Save Changes", "Get Values"):
                           " onclick='viewDoc(%s)'>"
                           "View</button>" % (row[2], row[2]))
             extra = allUsage and (" [%s]" % row[3]) or ""
-            value = "%s%s" % (row[1], extra)
+            value = "%s%s" % (mapVal, extra)
             value = cgi.escape(value, 1)
             bogus = row[4] == 'Y' and " checked='1'" or ""
+            mapOk = row[5] == 'Y' and " checked='1'" or ""
             value = ("<input class='r' readonly='1' size='80' "
-                     "name='name-%d' value=\"%s\">" % (row[0], value))
-            docId = "<input size='8' name='id-%d' value='%s'>" % (row[0],
+                     "name='name-%d' value=\"%s\">" % (mapId, value))
+            docId = "<input size='8' name='id-%d' value='%s'>" % (mapId,
                                                                row[2] or "")
             form += """\
    <tr>
-    <td valign='top'>%s</a></td>
     <td valign='top'>%s</td>
-    <td>%s</td>
+    <td valign='top'>%s</td>
+    <td>%s</td>""" % (value, docId, button)
+            # Only need to delete mappings if mapped values are included
+            # Forgive the pesky double negative
+            if not noMapped:
+                form += """\
     <td nowrap='1'>
-     <input type='checkbox' name='del-id-%d'>&nbsp;Delete mapping?
-    </td>
+     <input type='checkbox' name='del-id-%d'>&nbsp;Del map?
+    </td>""" % mapId
+            form +="""\
     <td nowrap='1'>
      <input type='checkbox' name='bogus-%d'%s>&nbsp;Bogus?
     </td>
-    <input type='hidden' name='old-id-%d' value='%s'>
-    <input type='hidden' name='old-bogus-%d' value='%s'>
+    <td nowrap='1'>
+     <input type='checkbox' name='mappable-%d'%s>&nbsp;Mappable?
+    </td>
+    <td>
+     <input type='hidden' name='old-id-%d' value='%s'>
+     <input type='hidden' name='old-bogus-%d' value='%s'>
+     <input type='hidden' name='old-mappable-%d' value='%s'>
+    </td>
    </tr>
-""" % (value, docId, button, row[0], row[0], bogus, row[0], row[2] or "",
-       row[0], row[4])
+""" % (mapId, bogus, mapId, mapOk, mapId, row[2] or "",
+       mapId, row[4], mapId, row[5])
             row = cursor.fetchone()
         form += """\
   </table>
