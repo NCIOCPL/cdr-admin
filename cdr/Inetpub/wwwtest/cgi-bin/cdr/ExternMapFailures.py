@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: ExternMapFailures.py,v 1.7 2004-12-27 20:33:18 bkline Exp $
+# $Id: ExternMapFailures.py,v 1.8 2006-08-07 21:08:14 ameyer Exp $
 #
 # Report on values found in external systems (such as ClinicalTrials.gov)
 # which have not yet been mapped to CDR documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.7  2004/12/27 20:33:18  bkline
+# Cleaned up formatting of form.
+#
 # Revision 1.6  2004/12/22 16:35:40  bkline
 # Implemented modifications requested in issue #1339.
 #
@@ -29,7 +32,7 @@
 # which have not yet been mapped to CDR documents.
 #
 #----------------------------------------------------------------------
-import cdrdb, cdrcgi, time, cgi
+import cdrdb, cdrcgi, time, cgi, cdr
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -39,6 +42,7 @@ session = cdrcgi.getSession(fields)
 request = cdrcgi.getRequest(fields)
 usages  = fields and fields.getlist('usage') or []
 age     = fields and fields.getvalue('age') or 1000
+mapChek = fields and fields.getvalue('mappable') or None
 SUBMENU = "Report Menu"
 buttons = ["Submit Request", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 script  = "ExternMapFailures.py"
@@ -62,7 +66,7 @@ elif request == SUBMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if request == "Log Out": 
+if request == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
@@ -95,20 +99,23 @@ if not usages:
         form += """\
        <option value="%s">%s &nbsp;</option>
 """ % (name, name)
+    spacer= '&nbsp; ' * 5
     form += """\
       </select>
      </td>
-     <td valign='center'><b>%sView failures from past
-      <input name='age' value='30' size='3'> days</b>
+     <td><b>%sView failures from past
+      <input name='age' value='30' size='3'> days<br /><br />
+      %sInclude non-mappable values
+      <input type='checkbox' name='mappable' />
      </td>
     </tr>
    </table>
   </form>
  </body>
 </html>
-""" % ('&nbsp;' * 10)
+""" % (spacer, spacer)
     cdrcgi.sendPage(header + form)
-    
+
 #----------------------------------------------------------------------
 # Gather the report data.
 #----------------------------------------------------------------------
@@ -135,7 +142,14 @@ for usage in usages:
    <h2>%s</h2>
   </center>
 """ % usage
-    cursor.execute("""\
+
+    # in/ex/clude non-mappable values
+    if mapChek:
+        mapSelect = ""
+    else:
+        mapSelect = "AND m.mappable <> 'N'"
+
+    qry = """\
   SELECT m.value, m.last_mod
     FROM external_map m
     JOIN external_map_usage u
@@ -143,7 +157,10 @@ for usage in usages:
    WHERE doc_id IS NULL
      AND u.name = ?
      AND DATEDIFF(day, m.last_mod, GETDATE()) < ?
-ORDER BY CONVERT(CHAR(10), m.last_mod, 102) DESC, m.value""", (usage, age))
+     %s
+ORDER BY CONVERT(CHAR(10), m.last_mod, 102) DESC, m.value""" % mapSelect
+
+    cursor.execute(qry, (usage, age))
     rows = cursor.fetchall()
     if rows:
         html += """\
