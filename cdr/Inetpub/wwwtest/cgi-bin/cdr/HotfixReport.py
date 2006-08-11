@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: HotfixReport.py,v 1.8 2005-08-17 20:00:59 venglisc Exp $
+# $Id: HotfixReport.py,v 1.9 2006-08-11 16:22:13 bkline Exp $
 #
 # Report identifying previously published protocols that should be 
 # included in a hotfix.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.8  2005/08/17 20:00:59  venglisc
+# Removed the commented out sections since the new code has been approved
+# and is running in production. (Bug 1718)
+#
 # Revision 1.7  2005/08/02 20:28:02  bkline
 # Version approved by users for issue #1718.
 #
@@ -266,11 +270,11 @@ addWorksheet(workbook, titles[1], headers, widths, format, rows)
 # -------------------------------------------------------------
 cursor.execute("""\
     CREATE TABLE #publishable
-             (id INTEGER     NOT NULL,
-             ver INTEGER     NOT NULL,
-        doc_type VARCHAR(32) NOT NULL,
-          status VARCHAR(32) NOT NULL,
-        ver_date DATETIME        NULL)""")
+             (id INTEGER      NOT NULL,
+             ver INTEGER      NOT NULL,
+        doc_type VARCHAR(32)  NOT NULL,
+          status VARCHAR(255) NOT NULL,
+        ver_date DATETIME         NULL)""")
 
 cursor.execute("""\
     INSERT INTO #publishable (id, ver, doc_type, status)
