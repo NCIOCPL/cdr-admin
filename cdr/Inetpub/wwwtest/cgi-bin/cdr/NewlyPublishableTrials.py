@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: NewlyPublishableTrials.py,v 1.2 2004-07-13 17:56:36 bkline Exp $
+# $Id: NewlyPublishableTrials.py,v 1.3 2006-08-11 16:18:31 bkline Exp $
 #
 # Report identifying unpublished trials with publishable versions.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2004/07/13 17:56:36  bkline
+# Final version of new report.
+#
 # Revision 1.1  2004/06/02 17:53:00  bkline
 # Report identifying unpublished trials with publishable versions.
 #----------------------------------------------------------------------
@@ -127,12 +130,12 @@ conn.setAutoCommit()
 cursor = conn.cursor()
 cursor.execute("""\
     CREATE TABLE #publishable
-             (id INTEGER     NOT NULL,
-             ver INTEGER     NOT NULL,
-        doc_type VARCHAR(32) NOT NULL,
-          status VARCHAR(32) NOT NULL,
-        ver_date DATETIME        NULL,
-        usr_name VARCHAR(32)     NULL)""")
+             (id INTEGER      NOT NULL,
+             ver INTEGER      NOT NULL,
+        doc_type VARCHAR(32)  NOT NULL,
+          status VARCHAR(255) NOT NULL,
+        ver_date DATETIME         NULL,
+        usr_name VARCHAR(32)      NULL)""")
 show("#publishable created...")
 cursor.execute("""\
     INSERT INTO #publishable (id, ver, doc_type, status)
