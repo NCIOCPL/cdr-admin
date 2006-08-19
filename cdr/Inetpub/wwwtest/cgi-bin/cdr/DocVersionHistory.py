@@ -1,10 +1,16 @@
 #----------------------------------------------------------------------
 #
-# $Id: DocVersionHistory.py,v 1.16 2004-07-27 16:03:16 venglisc Exp $
+# $Id: DocVersionHistory.py,v 1.17 2006-08-19 03:13:10 bkline Exp $
 #
 # Show version history of document.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.16  2004/07/27 16:03:16  venglisc
+# In the case that a blocked document never got published before the
+# report failed to extract a removal date from Cancer.gov.
+# The program has been changed to catch this error and display a message
+# to this effect.
+#
 # Revision 1.15  2004/07/13 19:20:21  venglisc
 # Added code to display information on why the removal date of a document
 # can not be displayed, i.e. blocked via full-load, not versioned yet
@@ -39,10 +45,9 @@ section  = "Document Version History"
 SUBMENU  = "Reports Menu"
 buttons  = ["Submit", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 script   = "DocVersionHistory.py"
-header   = cdrcgi.header(title, title, section, script, buttons, method = 'GET')
+header   = cdrcgi.header(title, title, section, script, buttons, method='GET')
 docId    = fields.getvalue(cdrcgi.DOCID) or None
 docTitle = fields.getvalue("DocTitle")   or None
-now      = time.localtime()
 if docId:
     digits = re.sub('[^\d]+', '', docId)
     intId  = int(digits)
@@ -100,7 +105,7 @@ if docTitle and not docId:
         cursor.execute("""\
             SELECT id
               FROM document
-             WHERE title LIKE ?""", docTitle + '%')
+             WHERE title LIKE ?""", docTitle + '%', timeout = 300)
         rows = cursor.fetchall()
         if not rows:
             cdrcgi.bail("Unable to find document with title '%s'" % docTitle)
@@ -112,393 +117,305 @@ if docTitle and not docId:
         cdrcgi.bail('Failure looking up document title: %s' % info[1][0])
 
 #----------------------------------------------------------------------
-# Get the document information we need.
+# Object for the document-level information we need.
 #----------------------------------------------------------------------
-try:
-    cursor.execute("""SELECT doc_title,
-                             doc_type,
-                             doc_status,
-                             created_by,
-                             created_date,
-                             mod_by,
-                             mod_date
-                        FROM doc_info 
-                       WHERE doc_id = ?""", intId)
-    row = cursor.fetchone()
-    if not row:
-        cdrcgi.bail("Unable to find document information for %s" % docId)
-    docTitle, docType, docStatus, createdBy, createdDate, modBy, modDate = row
-except cdrdb.Error, info:    
-        cdrcgi.bail('Unable to find document information for %s: %s' % (docId, 
-                                                                 info[1][0]))
+class Document:
+    def __init__(self, cursor, docId):
+        self.__start = time.time()
+        try:
+            cursor.execute("""\
+                SELECT doc_title,
+                   doc_type,
+                   doc_status,
+                   created_by,
+                   created_date,
+                   mod_by,
+                   mod_date
+              FROM doc_info 
+             WHERE doc_id = ?""", docId, timeout = 300)
+            row = cursor.fetchone()
+        except Exception, e:
+            cdrcgi.bail('Database error looking up CDR%s: %s' % (docId, e))
+        if not row:
+            cdrcgi.bail("Unable to find document info for CDR%s" % docId)
+        self.__docId          = docId
+        self.__cursor         = cursor
+        self.__docTitle       = row[0]
+        self.__docType        = row[1]
+        self.__docStatus      = row[2]
+        self.__createdBy      = row[3]
+        self.__createdDate    = row[4]
+        self.__modBy          = row[5]
+        self.__modDate        = row[6]
+        self.__lastPubJob     = None
+        self.__lastPubVersion = None
+        self.__removeDate     = u''
+        self.__blocked        = self.__docStatus == 'I'
+        self.__versions       = self.__loadVersions()
+        self.__versionNumbers = self.__versions.keys()
+        self.__versionNumbers.sort()
+        self.__versionNumbers.reverse()
 
-#----------------------------------------------------------------------
-# Build the report header.
-# If a document has been blocked for publication display the date that
-# the document had been removed from Cancer.gov.
-# The date itself will be selected from the database in a later query.
-# Put in a placeholder first at this point.
-# Note:  The date will only be displayed if the docStatus has been set
-#        to 'I'.
-#        Also, if a document is blocked from publication it can happen
-#        that the document version does not display a removed='Y'
-#        entry.  In this case the document was dropped due to a full
-#        data load.  
-#----------------------------------------------------------------------
-if docStatus == 'I':
-    docStatusLine = """
-   <tr>
-    <b>
-     <td valign = 'top' align='right' nowrap='1'>
-      <font size='3'>Document Status:&nbsp;</font>
-     </td>
-    <b>
-    <b>
-     <td colspan='1'>
-      <b>BLOCKED FOR PUBLICATION</b>
-     </td>
-    </b>
-    <td align='right'>
-     <b>Removal Date:&nbsp;</b>
-    </td>
-    <td>
-     <b>@@REMOVAL_DATE@@</b>
-    </td>
-   </tr>"""
-elif docStatus == 'A':
-    docStatusLine = ""
+    def __onCancerDotGov(self):
+        try:
+            self.__cursor.execute("SELECT id FROM pub_proc_cg WHERE id = ?",
+                                self.__docId)
+            rows = self.__cursor.fetchall()
+            return rows and True or False
+        except Exception, e:
+            cdrcgi.bail("Failure checking whether CDR%s is on Cancer.gov" %
+                        (self.__docId, e))
 
-html = """\
+    def __firstFullLoadAfterLastPubJob(self):
+        if not self.__lastPubJob:
+            return None
+        try:
+            self.__cursor.execute("""\
+                SELECT MIN(started)
+                  FROM pub_proc
+                 WHERE status = 'Success'
+                   AND pub_subset = 'Full-Load'
+                   AND id > ?""", self.__lastPubJob)
+            rows = self.__cursor.fetchall()
+            return rows and rows[0][0][:10] or None
+        except cdrdb.Error, e:
+            cdrcgi.bail("Failure finding full-load publication job: %s" % e)
+
+    def __loadVersions(self):
+        try:
+            self.__cursor.execute("""\
+                SELECT v.num, 
+                       v.comment,
+                       u.fullname,
+                       v.dt,
+                       v.val_status,
+                       v.publishable
+                  FROM doc_version v
+                  JOIN usr u
+                    ON u.id = v.usr
+                 WHERE v.id = ?""", self.__docId, timeout = 300)
+            versions = {}
+            for row in self.__cursor.fetchall():
+                (num, comment, user, date, status, publishable) = row
+                versions[num] = self.Version(num, comment, user, date,
+                                             status, publishable)
+        except Exception, e:
+            cdrcgi.bail("Failure extracting version information: %s" % e)
+
+        # Fold in the publication events.
+        try:
+            self.__cursor.execute("""\
+                 SELECT doc_version,
+                        started,
+                        pub_proc,
+                        removed,
+                        CASE
+                            WHEN output_dir IS NULL THEN 'C'
+                            ELSE 'V'
+                        END AS job_type
+                   FROM primary_pub_doc
+                  WHERE doc_id = ?
+               ORDER BY started""", self.__docId, timeout = 300)
+            for row in self.__cursor.fetchall():
+                (num, started, pubProcId, removed, jobType) = row
+                pubDate = started[:10]
+                versions[num].addPubEvent(pubDate, jobType, pubProcId)
+                if removed == 'Y' and self.__blocked:
+                    self.__removeDate = pubDate
+                if not self.__lastPubJob or pubProcId > self.__lastPubJob:
+                    self.__lastPubJob = pubProcId
+                if not self.__lastPubVersion or num > self.__lastPubVersion:
+                    self.__lastPubVersion = num
+            return versions
+        except Exception, e:
+            cdrcgi.bail("Failure extracting pub job information: %s" % e)
+
+    def toHtml(self):
+
+        # Build the report header.
+        now  = time.localtime()
+        html = [u"""\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>
  <head>
   <title>CDR%010d - %s</title>
-  <basefont face='Arial, Helvetica, sans-serif'>
+  <style type='text/css'>
+   body   { font-family: Arial, Helvetica, sans-serif }
+   h1     { font-size: 14pt }
+   h2     { font-size: 12pt }
+   .red   { color: red }
+   .timer { color: green; font-size: 7pt; font-style: oblique }
+  </style>
+  <!-- Report generation processing time: @@TIME@@ seconds -->
  </head>
  <body>
   <center>
-   <b>
-    <font size='4'>Document Version History Report</font>
-   </b>
-   <br />
-   <font size='4'>%s</font>
+   <h1>Document Version History Report</h1>
+   <h2>%s</h2>
   </center>
   <br />
   <br />
-  <table border = '0' width = '100%%'>
+  <table border='0' width='100%%'>
    <tr>
-    <b>
-     <td align='right' nowrap='1'>
-      <font size='3'>Document Id:&nbsp;</font>
-     </td>
-    <b>
-    <b>
-     <td nowrap='1'>
-      <font size='3'>CDR%010d</font>
-     </td>
-    <b>
-    <b>
-     <td align='right' nowrap='1'>
-      <font size='3'>Document Type:&nbsp;</font>
-     </td>
-    <b>
-    <b>
-     <td nowrap='1'>
-      <font size='3'>%s</font>
-     </td>
-    <b>
+    <th align='right' nowrap='1'>Document ID:&nbsp;</th>
+    <td nowrap='1'>CDR%010d</td>
+    <th align='right' nowrap='1'>Document Type:&nbsp;</th>
+    <td nowrap='1'>%s</td>
    </tr>
    <tr>
-    <b>
-     <td valign = 'top' align='right' nowrap='1'>
-      <font size='3'>Document Title:&nbsp;</font>
-     </td>
-    <b>
-    <b>
-     <td colspan='3'>
-      <font size='3'>%s</font>
-     </td>
-    </b>
+    <th nowrap='1' align='right' valign='top'>Document Title:&nbsp;</th>
+    <td colspan='3'>%s</td>
    </tr>
-   %s
+""" % (self.__docId, 
+       time.strftime("%m/%d/%Y", now), 
+       time.strftime("%B %d, %Y", now),
+       self.__docId,
+       self.__docType,
+       self.__docTitle)]
+
+        # If a document has been blocked for publication (doc_status is 'I' --
+        # for "Inactive") we display an extra row showing the status and the
+        # date the document was pulled from Cancer.gov (assuming it has been
+        # pulled).
+        if self.__blocked:
+
+            # Make sure we have a removal date.  Normally we will, if the
+            # document has ever been published, because when the document is
+            # blocked the next publication event sends an instruction to
+            # Cancer.gov to withdraw the document, in which case we will have
+            # picked up the removal date when we collected the information
+            # on publication events.
+            if not self.__removeDate:
+
+                # No.  Is the document still on Cancer.gov?
+                if self.__onCancerDotGov():
+
+                    # Yes, which means the document was blocked since last
+                    # published and will be removed as part of the next
+                    # publication job.  However, only a versioned document
+                    # can be removed, so we check to see if a version has
+                    # been created since the last version which got published.
+                    self.__removeDate = u"Needs versioning"
+                    if self.__versions:
+                        if self.__versionNumbers[0] > self.__lastPubVersion:
+                            self.__removeDate = u"Not yet removed"
+
+                else:
+
+                    # The document isn't on Cancer.gov.  Was it removed by
+                    # a full load (meaning the sequence of events was
+                    # publication of the document when it was active,
+                    # followed by a change of status to inactive, after
+                    # which the next publication event was a full load)?
+                    self.__removeDate = self.__firstFullLoadAfterLastPubJob()
+                    if not self.__removeDate:
+
+                        # If that didn't happen, then presumably the document
+                        # was never published.
+                        if not self.__lastPubJob:
+                            self.__removeDate = u'Never published'
+
+                        else:
+
+                            # Otherwise, we have a data corruption problem.
+                            self.__removeDate = u"CAN'T DETERMINE REMOVAL DATE"
+
+            # One way or another, we now have a string for the "removal date".
+            html.append(u"""\
    <tr>
-    <b>
-     <td align='right' nowrap='1'>
-      <font size='3'>Created By:&nbsp;</font>
-     </td>
-    <b>
-    <b>
-     <td nowrap='1'>
-      <font size='3'>%s</font>
-     </td>
-    <b>
-    <b>
-     <td align='right' nowrap='1'>
-      <font size='3'>Date:&nbsp;</font>
-     </td>
-    <b>
-    <b>
-     <td nowrap='1'>
-      <font size='3'>%s</font>
-     </td>
-    <b>
+    <th nowrap='1' valign='top' align='right'>Document Status:&nbsp;</th>
+    <td><b class='red'>BLOCKED FOR PUBLICATION</b></td>
+    <th nowrap='1' valign='top' align='right'>Removal Date:&nbsp;</th>
+    <td><b class='red'>%s</b></td>
+   </tr>
+""" % self.__removeDate)
+
+        # Finish the report header block.
+        html.append(u"""\
+   <tr>
+    <th nowrap='1' valign='top' align='right'>Created By:&nbsp;</th>
+    <td>%s</td>
+    <th nowrap='1' valign='top' align='right'>Date:&nbsp;</th>
+    <td>%s</td>
    </tr>
    <tr>
-    <b>
-     <td align='right' nowrap='1'>
-      <font size='3'>Last Updated By:&nbsp;</font>
-     </td>
-    <b>
-    <b>
-     <td nowrap='1'>
-      <font size='3'>%s</font>
-     </td>
-    <b>
-    <b>
-     <td align='right' nowrap='1'>
-      <font size='3'>Date:&nbsp;</font>
-     </td>
-    <b>
-    <b>
-     <td nowrap='1'>
-      <font size='3'>%s</font>
-     </td>
-    <b>
+    <th nowrap='1' valign='top' align='right'>Last Updated By:&nbsp;</th>
+    <td>%s</td>
+    <th nowrap='1' valign='top' align='right'>Date:&nbsp;</th>
+    <td>%s</td>
    </tr>
   </table>
   <br />
   <table border='1' width='100%%' cellspacing='0' cellpadding='2'>
    <tr>
-    <td align='center' valign='top'>
-     <b>
-      <font size='3'>VERSION #</font>
-     </b>
-    </td>
-    <td align='center' valign='top'>
-     <b>
-      <font size='3'>COMMENT</font>
-     </b>
-    </td>
-    <td align='center' valign='top'>
-     <b>
-      <font size='3'>DATE</font>
-     </b>
-    </td>
-    <td align='center' valign='top'>
-     <b>
-      <font size='3'>USER</font>
-     </b>
-    </td>
-    <td align='center' valign='top'>
-     <b>
-      <font size='3'>VALIDITY</font>
-     </b>
-    </td>
-    <td align='center' valign='top'>
-     <b>
-      <font size='3'>PUBLISHABLE?</font>
-     </b>
-    </td>
-    <td align='center' valign='top'>
-     <b>
-      <font size='3'>PUBLICATION DATE(S)</font>
-     </b>
-    </td>
+    <th>VERSION #</th>
+    <th>COMMENT</th>
+    <th>DATE</th>
+    <th>USER</th>
+    <th>VALIDITY</th>
+    <th>PUBLISHABLE?</th>
+    <th>PUBLICATION DATE(S)</th>
    </tr>
-""" % (intId, 
-       time.strftime("%m/%d/%Y", now), 
-       time.strftime("%B %d, %Y", now),
-       intId,
-       docType,
-       docTitle,
-       docStatusLine,
-       createdBy or "[Conversion]",
-       createdDate and createdDate[:10] or "2002-06-22",
-       modBy or "N/A",
-       modDate and modDate[:10] or "N/A")
+""" % (self.__createdBy or u"[Conversion]",
+       self.__createdDate and self.__createdDate[:10] or "2002-06-22",
+       self.__modBy or "N/A",
+       self.__modDate and self.__modDate[:10] or "N/A"))
 
-#----------------------------------------------------------------------
-# Object to hold info for a single version.
-#----------------------------------------------------------------------
-class DocVersion:
-    def __init__(self, row):
-        self.num            = row[0]
-        # If a version has been removed from C.gov, mark it
-        # -------------------------------------------------
-        if row[9] == 'Y':
-           removeDate = row[1][:10]
-	else:
-	   removeDate = 'Full-load removal'
-        whichJob            = row[7] and '(V-' or '(C-' 
-        whichJob           += row[8] and "%d)" % row[8] or ')'
-        self.pubDates       = row[1] and [row[1][:10] + whichJob] or []
-        self.comment        = row[2]
-        self.user           = row[3]
-        self.date           = row[4][:10]
-        self.valStatus      = row[5]
-        self.publishable    = row[6]
- 
-    def display(self):
-        return """\
-   <tr>
-    <td align = 'center' valign = 'top'>
-     <font size = '3'>%d</font>
-    </td>
-    <td valign = 'top'>
-     <font size = '3'>%s</font>
-    </td>
-    <td align = 'center' valign = 'top'>
-     <font size = '3'>%s</font>
-    </td>
-    <td valign = 'top'>
-     <font size = '3'>%s</font>
-    </td>
-    <td align = 'center' valign = 'top'>
-     <font size = '3'>%s</font>
-    </td>
-    <td align = 'center' valign = 'top'>
-     <font size = '3'>%s</font>
-    </td>
-    <td align = 'center' valign = 'top'>
-     <font size = '3'>%s</font>
-    </td>
-   </tr>
-""" % (self.num,
-       self.comment or "&nbsp;",
-       self.date,
-       self.user,
-       self.valStatus,
-       self.publishable == 'Y' and 'Y' or 'N',
-       self.pubDates and "<br>".join(self.pubDates) or "&nbsp;")
-        
-#----------------------------------------------------------------------
-# Build the report body.
-#----------------------------------------------------------------------
-try:
-    cursor.execute("""\
-         SELECT v.num, 
-                d.started,
-                v.comment,
-                u.fullname,
-                v.dt,
-                v.val_status,
-                v.publishable,
-                d.output_dir,
-                d.pub_proc,
-                d.removed
-           FROM doc_version v
-           JOIN usr u
-             ON u.id = v.usr
-LEFT OUTER JOIN primary_pub_doc d
-             ON d.doc_id = v.id
-            AND d.doc_version = v.num
-            AND d.failure is null
-          WHERE v.id = ?
-       ORDER BY v.num DESC,
-                d.started""", intId)
-
-    currentVer = None
-    row = cursor.fetchone()
-    removeDate = ''
-    while row:
-        if currentVer:
-            if currentVer.num == row[0]:
-                if row[1]:
-                    # If a version has been removed from C.gov, extract
-		    # the removal date for later display
-                    # -------------------------------------------------
-                    if row[9] == 'Y' and docStatus == 'I':
-                       removeDate = row[1][:10]
-                    whichJob = (row[7] and '(V-' or '(C-') + "%d)" % row[8]
-                    currentVer.pubDates.append(row[1][:10] + whichJob)
-            else:
-                html += currentVer.display()
-                currentVer = DocVersion(row)
-        else:
-            currentVer = DocVersion(row)
-	lastJob = row[8]
-        row = cursor.fetchone()
-    
-    # A document has been blocked but none of the document versions 
-    # indicate the removal.  This could have two reasons:
-    # a) the document has been blocked since the last publication
-    #    (and will be removed as part of the next publication)
-    #    However, only a versioned document can be removed.  We also
-    #    need to check if the document exists with a newer version
-    #    or not.
-    # b) the document got removed as part of a full load
-    # -------------------------------------------------------------
-    if docStatus == 'I' and not removeDate:
-       try:
-          cursor.execute("""\
-             SELECT * from pub_proc_cg
-	     WHERE  id = ?""", intId)
-          rowcg = cursor.fetchone()
-	  if rowcg:             # Doc currently exists on Cancer.gov
-	     try:
-	        cursor.execute("""\
-		   SELECT * 
-		   FROM  pub_proc_doc ppd, doc_version dv, 
-		         pub_proc_cg ppc, pub_proc pp
-		   WHERE ppc.pub_proc = pp.id
-		     AND ppc.id = dv.id
-		     AND ppc.id = ppd.doc_id
-		     AND dv.id  = ?
-		     AND ppc.pub_proc    = ppd.pub_proc
-		     AND ppd.doc_version = dv.num
-		     AND updated_dt < started
-		     AND NOT EXISTS (SELECT 'x'
-		                     FROM  doc_version i 
-				     WHERE i.id  = ppd.doc_id
-				     AND   i.num > ppd.doc_version
-		                    )
-		   ORDER BY ppd.pub_proc""", intId)
-		rowVer = cursor.fetchone()
-		if rowVer:
-                   removeDate = 'Needs Versioning'
-		else:
-		   removeDate = 'Not yet removed'
-             except cdrdb.Error, info:
-                cdrcgi.bail('Failure getting document version date')
-	     
-	  else:                 # Doc does not exist on Cancer.gov
-	     try:
-	        cursor.execute("""\
-		   SELECT MIN(o.id), o.started 
-		   FROM pub_proc o
-		   JOIN pub_proc i
-		     ON i.status = o.status
-		    AND i.pub_subset = o.pub_subset
-		    AND i.started < o.started
-		  WHERE o.pub_subset = 'Full-Load'
-		    AND o.status = 'Success'
-		    AND o.id > ?
-		  GROUP BY o.started""", lastJob)
-		rowcg = cursor.fetchone()
-	        removeDate = rowcg[1][:10]
-             except cdrdb.Error, info:
-		# No Version of this document ever got published
-                removeDate = 'Never Published'
-                # cdrcgi.bail('Failure getting following Full-Load date')
-
-       except cdrdb.Error, info:
-          cdrcgi.bail('Failure query pub_prog_cg')
-    if currentVer:
-        html += currentVer.display()
-
-except cdrdb.Error, info:
-    cdrcgi.bail('Failure extracting version information: %s' % info[1][0])
-
-#----------------------------------------------------------------------
-# Send it.
-#----------------------------------------------------------------------
-html += """\
+        #----------------------------------------------------------------------
+        # Build the report body using a table with one row for each version.
+        # Put the most recent versions at the top, because those are the ones
+        # we're most likely to be interested in.
+        #----------------------------------------------------------------------
+        for versionNumber in self.__versionNumbers:
+            html.append(self.__versions[versionNumber].toHtml())
+        delta = time.time() - self.__start
+        html.append(u"""\
   </table>
+  <br />
+  <span class='timer'>Report generation time: %.0f milliseconds</span>
  </body>
-</html>"""
+</html>
+""" % (delta * 1000))
+        return u"".join(html).replace(u"@@TIME@@", unicode(delta))
 
-# -------------------------------------------------------
-# Substitute the removal date once we've got is assigned.
-# -------------------------------------------------------
-html = re.sub("@@REMOVAL_DATE@@", removeDate, html)
-cdrcgi.sendPage(html)
+    #----------------------------------------------------------------------
+    # Object to hold info for a single version.
+    #----------------------------------------------------------------------
+    class Version:
+        def __init__(self, num, comment, user, date, status, publishable):
+            self.__num         = num
+            self.__comment     = comment and cgi.escape(comment) or u""
+            self.__user        = user
+            self.__date        = date[:10]
+            self.__status      = status
+            self.__publishable = publishable
+            self.__pubEvents   = []
+
+        def addPubEvent(self, jobDate, jobType, jobId):
+            self.__pubEvents.append("%s(%s-%d)" % (jobDate, jobType, jobId))
+
+        def toHtml(self):
+            return u"""\
+   <tr>
+    <td valign='top' align='center'>%d</td>
+    <td valign='top'>%s</td>
+    <td valign='top' align='center'>%s</td>
+    <td valign='top'>%s</td>
+    <td valign='top' align='center'>%s</td>
+    <td valign='top' align='center'>%s</td>
+    <td valign='top' align='center'>%s</td>
+   </tr>
+    """ % (self.__num,
+           self.__comment or u"&nbsp;",
+           self.__date,
+           self.__user,
+           self.__status,
+           self.__publishable == 'Y' and 'Y' or 'N',
+           self.__pubEvents and u"<br>".join(self.__pubEvents) or u"&nbsp;")
+
+#----------------------------------------------------------------------
+# Send out the report.
+#----------------------------------------------------------------------
+doc = Document(cursor, intId)
+html = doc.toHtml()
+cdrcgi.sendPage(doc.toHtml())
