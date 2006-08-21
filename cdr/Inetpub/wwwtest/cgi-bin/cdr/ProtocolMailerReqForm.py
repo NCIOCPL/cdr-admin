@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolMailerReqForm.py,v 1.22 2005-05-13 22:42:12 venglisc Exp $
+# $Id: ProtocolMailerReqForm.py,v 1.23 2006-08-21 16:09:31 bkline Exp $
 #
 # Request form for all protocol mailers.
 #
@@ -17,6 +17,10 @@
 # publication job for the publishing daemon to find and initiate.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.22  2005/05/13 22:42:12  venglisc
+# Modified to pre-populate the email input field with the session owners
+# email address. (Bug 1664)
+#
 # Revision 1.21  2005/03/24 21:20:16  bkline
 # Increased database query timeout thresholds.
 #
@@ -496,7 +500,8 @@ elif mailType == 'Protocol-Initial abstract':
                                            AND pd.failure IS NULL
                                             OR p.completed IS NULL))
                    GROUP BY protocol.id""" % (maxDocs, statusPath, brussels,
-                                              sourcePath, mailType))
+                                              sourcePath, mailType),
+                       timeout = 300)
         docList = cursor.fetchall()
         if not docList:
             cdrcgi.bail("No documents match the selection criteria")
@@ -521,7 +526,8 @@ elif mailType == 'Protocol-Annual abstract':
                         AND p.pub_subset IN ('Protocol-Initial abstract',
                                              'Protocol-Annual abstract',
                                              'Protocol-Annual abstract remail')
-                        AND p.pub_system = %d""" % ctrlDocId)
+                        AND p.pub_system = %d""" % ctrlDocId,
+                       timeout = 300)
 
         cursor.execute("""\
             SELECT DISTINCT TOP %d protocol.id, MAX(doc_version.num)
@@ -767,7 +773,7 @@ SELECT DISTINCT u.doc_id, MAX(u.value) -- Avoid multiple values
            JOIN #pup_update_mode p
              ON p.pup_id = o.pup_id
           WHERE o.update_mode IS NULL
-            AND p.update_mode IS NOT NULL""")
+            AND p.update_mode IS NOT NULL""", timeout = 300)
 
         # Select based on update mode.
         if paper:
@@ -781,7 +787,7 @@ SELECT DISTINCT u.doc_id, MAX(u.value) -- Avoid multiple values
 SELECT DISTINCT TOP %d prot_id, prot_ver
            FROM #lead_orgs
           WHERE update_mode %s
-       ORDER BY prot_id""" % (maxDocs, updateMode))
+       ORDER BY prot_id""" % (maxDocs, updateMode), timeout = 300)
         docList = cursor.fetchall()
     except cdrdb.Error, info:
         cdrcgi.bail("Failure retrieving document IDs: %s" % info[1][0])
