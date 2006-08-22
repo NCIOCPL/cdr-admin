@@ -1,0 +1,91 @@
+#----------------------------------------------------------------------
+#
+# $Id: ForceCtgovImport.py,v 1.1 2006-08-22 19:13:34 bkline Exp $
+#
+# Interface for forcing the import of a trial from ClinicalTrials.gov
+# when none of the search terms for the trial match the criteria for
+# our import search request.
+#
+# $Log: not supported by cvs2svn $
+#----------------------------------------------------------------------
+import cgi, cdrcgi, cdrdb
+
+#----------------------------------------------------------------------
+# Set the form variables.
+#----------------------------------------------------------------------
+fields  = cgi.FieldStorage()
+session = cdrcgi.getSession(fields)
+action  = cdrcgi.getRequest(fields)
+nctId   = fields.getvalue('nctid') or None
+title   = "CDR Administration"
+section = "Force Import of a Trial"
+SUBMENU = "CTGov Protocols"
+buttons = [SUBMENU, cdrcgi.MAINMENU, "Log Out"]
+header  = cdrcgi.header(title, title, section, "ForceCtgovImport.py", buttons)
+extra   = u""
+
+#----------------------------------------------------------------------
+# Handle navigation requests.
+#----------------------------------------------------------------------
+if action == cdrcgi.MAINMENU:
+    cdrcgi.navigateTo("Admin.py", session)
+elif action == SUBMENU:
+    cdrcgi.navigateTo("CTGov.py", session)
+
+#----------------------------------------------------------------------
+# Handle request to log out.
+#----------------------------------------------------------------------
+if action == "Log Out": 
+    cdrcgi.logout(session)
+
+#----------------------------------------------------------------------
+# Construct a string describing the result of the last action.
+#----------------------------------------------------------------------
+def describeResult(result, nctId, color):
+    return u"<span style='color: %s'><b>%s %s</b></span><br><br>" % (color,
+                                                                     nctId,
+                                                                     result)
+
+#----------------------------------------------------------------------
+# If we have an ID, process it.
+#----------------------------------------------------------------------
+if nctId:
+    conn = cdrdb.connect()
+    cursor = conn.cursor()
+    cursor.execute("SELECT force FROM ctgov_import WHERE nlm_id = ?", nctId)
+    rows = cursor.fetchall()
+    if not rows:
+        nyr = 'not yet reviewed'
+        cursor.execute("""\
+            SELECT id
+              FROM ctgov_disposition
+             WHERE name = '%s'""" % nyr)
+        rows = cursor.fetchall()
+        if not rows:
+            cdrcgi.bail("Unable to find code for disposition '%s'" % nyr)
+        disposition = rows[0][0]
+        cursor.execute("""\
+            INSERT INTO ctgov_import (nlm_id, disposition, dt, force)
+                 VALUES (?, ?, GETDATE(), 'Y')""", (nctId, disposition))
+        conn.commit()
+        extra = describeResult(u"added to table and marked for forced import",
+                               nctId, u"green")
+    elif rows[0][0] != 'Y':
+        cursor.execute("""\
+            UPDATE ctgov_import
+               SET force = 'Y'
+             WHERE nlm_id = ?""", nctId)
+        conn.commit()
+        extra = describeResult(u"marked for forced import", nctId, u"green")
+    else:
+        extra = describeResult(u"already marked for forced import", nctId,
+                               u"red")
+
+form = u"""\
+    <input type='hidden' name='%s' value='%s'>
+    %s
+    <b>NCT ID:&nbsp;</b>
+    <input name='nctid'>&nbsp;
+    <input type='submit' value='Mark Trial for Forced Input'>
+""" % (cdrcgi.SESSION, session, extra)
+cdrcgi.sendPage(header + form + "</OL></FORM></BODY></HTML>")
