@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PubStatus.py,v 1.21 2006-08-24 14:16:49 venglisc Exp $
+# $Id: PubStatus.py,v 1.22 2006-08-24 15:35:24 venglisc Exp $
 #
 # Status of a publishing job.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.21  2006/08/24 14:16:49  venglisc
+# Added default else: block to catch invalid entry of 'flavor'.
+#
 # Revision 1.20  2006/07/05 20:21:35  venglisc
 # Modified program to add three flavors of the FilterFailure report:
 # flavor = full (default), warning (full w/o errors), error (full w/o warning)
@@ -274,13 +277,19 @@ def dispFilterFailures(flavor = 'full'):
 
     for row in rows:
         text = textPattern.search(row[4])
- 
+
         if flavor == 'full':
             html += addRow(row)
-        elif flavor == 'warning' and text:
-            html += addRow(row)
-        elif flavor == 'error' and not text:
-            html += addRow(row)
+        elif flavor == 'warning':
+            # Only print the row if the pattern was found
+            # -------------------------------------------
+            if text:
+               html += addRow(row)
+        elif flavor == 'error':
+            # Only print the row if the warning pattern was not found
+            # -------------------------------------------------------
+            if not text:
+               html += addRow(row)
         else:
             cdrcgi.bail('Error: Valid values for flavor are: '
                         '"full", "warning", "error"')
