@@ -1,10 +1,16 @@
 #----------------------------------------------------------------------
 #
-# $Id: PubStatus.py,v 1.20 2006-07-05 20:21:35 venglisc Exp $
+# $Id: PubStatus.py,v 1.21 2006-08-24 14:16:49 venglisc Exp $
 #
 # Status of a publishing job.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.20  2006/07/05 20:21:35  venglisc
+# Modified program to add three flavors of the FilterFailure report:
+# flavor = full (default), warning (full w/o errors), error (full w/o warning)
+# Since the number of benign warning messages is constantly increasing this
+# will allow us to identify true problems (a.k.a. errors) quickly. (Bug 2283)
+#
 # Revision 1.19  2005/07/28 23:05:08  venglisc
 # Modified the program to check all push jobs by default.  This eliminates
 # the problem that a push job may be submitted without having checked the
@@ -275,6 +281,9 @@ def dispFilterFailures(flavor = 'full'):
             html += addRow(row)
         elif flavor == 'error' and not text:
             html += addRow(row)
+        else:
+            cdrcgi.bail('Error: Valid values for flavor are: '
+                        '"full", "warning", "error"')
 
     html  += "</TABLE></BODY></HTML>"       
     
