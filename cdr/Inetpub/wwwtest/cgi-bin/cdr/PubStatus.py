@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PubStatus.py,v 1.22 2006-08-24 15:35:24 venglisc Exp $
+# $Id: PubStatus.py,v 1.23 2006-08-28 22:06:54 venglisc Exp $
 #
 # Status of a publishing job.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.22  2006/08/24 15:35:24  venglisc
+# Minor changes to the if statement listing flavor error report.
+#
 # Revision 1.21  2006/08/24 14:16:49  venglisc
 # Added default else: block to catch invalid entry of 'flavor'.
 #
@@ -237,7 +240,7 @@ def dispFilterFailures(flavor = 'full'):
                AND (ppd.failure = 'Y' OR ppd.messages IS NOT NULL)
           ORDER BY t.name, d.title
     """, (jobId,))
-        row = cursor.fetchone()
+        rows = cursor.fetchall()
     except cdrdb.Error, info:
         cdrcgi.bail("Failure retrieving job information: %s" % info[1][0])
 
@@ -256,7 +259,7 @@ def dispFilterFailures(flavor = 'full'):
          <TD><FONT COLOR='black'>%s</FONT></TD>
         </TR>      
        </TABLE>    
-    """ % (row[5], row[6])
+    """ % (rows[0][5], rows[0][6])
 
     html   += "<BR><TABLE BORDER=1>"
     html   += """\
@@ -268,8 +271,6 @@ def dispFilterFailures(flavor = 'full'):
     <td width='25%%' valign='top'><B>Message</B></td> 
     </tr>
 """ 
-    rows = cursor.fetchall()
-
     # The warnings have been formatted with a "class=warning"
     # attribute for the LI element.
     # -------------------------------------------------------
