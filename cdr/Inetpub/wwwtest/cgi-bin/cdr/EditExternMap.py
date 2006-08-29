@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditExternMap.py,v 1.9 2006-08-01 19:37:33 ameyer Exp $
+# $Id: EditExternMap.py,v 1.10 2006-08-29 15:46:23 ameyer Exp $
 #
 # Allows a user to edit the table which maps strings from external
 # systems (such as ClinicalTrials.gov) to CDR document IDs.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.9  2006/08/01 19:37:33  ameyer
+# Added "mappable" functionality - involving many changes.
+# Also added numerous comments to the code.
+#
 # Revision 1.8  2005/08/29 20:08:44  bkline
 # Added check to make sure document type of mapped document is allowed.
 #
@@ -32,7 +36,7 @@
 # systems (such as ClinicalTrials.gov) to CDR document IDs.
 #
 #----------------------------------------------------------------------
-import cdrdb, cdrcgi, cgi, re, cdr
+import cdrdb, cdrcgi, cgi, re, cdr, time
 
 #----------------------------------------------------------------------
 # Extract integer from string; uses all decimal digits.
@@ -50,15 +54,22 @@ def extractInt(str):
 #----------------------------------------------------------------------
 # Set the form variables.
 #----------------------------------------------------------------------
+cdr.logwrite("Program initiation time=%f" % time.time())
 fields     = cgi.FieldStorage()
+cdr.logwrite("Got field storage time=%f" % time.time())
 session    = cdrcgi.getSession(fields)
+cdr.logwrite("Got session time=%f" % time.time())
 request    = cdrcgi.getRequest(fields)
-usage      = fields and fields.getvalue('usage')      or None
-value      = fields and fields.getvalue('value')      or None
-pattern    = fields and fields.getvalue('pattern')    or ""
-docId      = fields and fields.getvalue('docId')      or ""
-noMapped   = fields and fields.getvalue('noMapped')   or None
-noMappable = fields and fields.getvalue('noMappable') or None
+cdr.logwrite("Got request time=%f" % time.time())
+usage      = fields.getvalue('usage')      or None
+value      = fields.getvalue('value')      or None
+pattern    = fields.getvalue('pattern')    or ""
+docId      = fields.getvalue('docId')      or ""
+alphaStart = fields.getvalue('alphaStart') or ""
+maxRowStr  = fields.getvalue('maxRows')    or "250"
+noMapped   = fields.getvalue('noMapped')   or None
+noMappable = fields.getvalue('noMappable') or None
+cdr.logwrite("Got 6 more fields time=%f" % time.time())
 title      = "CDR Administration"
 section    = "External Map Editor"
 script     = "EditExternMap.py"
@@ -67,6 +78,7 @@ buttons    = ["Get Values", cdrcgi.MAINMENU, "Log Out"]
 extra      = usage and ["Save Changes"] or []
 buttons    = extra + buttons
 intUsage   = usage and int(usage) or None
+maxRows    = int(maxRowStr)
 allUsage   = not intUsage
 if docId:
     docId = extractInt(docId) or ""
@@ -75,6 +87,7 @@ if docId and not pattern:
 if docId and (noMapped or noMappable):
     cdrcgi.bail("If searching for a mapped document ID, you must uncheck " + \
                 "both mapping check boxes.")
+cdr.logwrite("End of program initiation time=%f" % time.time())
 style    = """\
   <style  type='text/css'>input.r { background-color: EEEEEE }</style>
   <script type='text/javascript'>
@@ -212,6 +225,7 @@ def typeOk(mapId, docId):
 #----------------------------------------------------------------------
 form = ""
 if request == "Save Changes":
+    cdr.logwrite("Begin reading form vars for save time=%f" % time.time())
 
     # Get user id to associate with update to external_map
     cursor.execute("""\
@@ -277,6 +291,7 @@ if request == "Save Changes":
             # key=map table id, value=mappable checkbox approved by uer
             key = extractInt(field)
             newMable[key] = "Y"
+    cdr.logwrite("End reading form vars for save time=%f" % time.time())
 
     # Track changes
     numChanges = 0
@@ -498,6 +513,29 @@ form += """\
     </tr>
     <tr>
      <td align='right' nowrap='1'>
+      <b>Alphabetical start:&nbsp;</b>
+     </td>
+     <td>
+      <input name='alphaStart' value="%s">
+     </td>
+     <td>Start listing values beginning with this alphabetical string.<br />
+    Use this as an alternative to searching for a Pattern or Document ID.<br />
+    It is ignored if Pattern or Document ID are specified.</td>
+    </tr>
+    <tr>
+     <td align='right' nowrap='1'>
+      <b>Max values to retrieve:&nbsp;</b>
+     </td>
+     <td>
+      <input name='maxRows' value="%d">
+     </td>
+     <td>Return a maximum of this many rows of values.<br />
+    Enter a number bigger than the max values in the database<br />
+    if you want no limit on retrievals.</td>
+    </tr>
+    <tr>
+    <tr>
+     <td align='right' nowrap='1'>
       <b>Only include unmapped values:&nbsp;</b>
      </td>
      <td>
@@ -517,8 +555,8 @@ form += """\
     </tr>
    </table>
    <input type='hidden' name='%s' value='%s'>
-""" % (pattern and cgi.escape(pattern, 1) or "", docId,
-       includeUnmappedChecked, includeUnmappableChecked,
+""" % (pattern and cgi.escape(pattern, 1) or "", docId, alphaStart,
+       maxRows, includeUnmappedChecked, includeUnmappableChecked,
        cdrcgi.SESSION, session)
 
 #----------------------------------------------------------------------
@@ -533,35 +571,48 @@ if request in ("Save Changes", "Get Values"):
     else:
         whereNoMappable = " AND m.mappable = 'Y'"
 
+    cdr.logwrite("SQL initiation time=%f" % time.time())
     # Construct and execute specific query for user input
     if pattern:
         cursor.execute("""\
-         SELECT m.id, m.value, m.doc_id, u.name, m.bogus, m.mappable
+         SELECT top %d m.id, m.value, m.doc_id, u.name, m.bogus, m.mappable
            FROM external_map m
            JOIN external_map_usage u
              ON u.id = m.usage
           WHERE m.value LIKE ?
             %s %s %s
-       ORDER BY m.value""" % (whereUsage,whereNoMap,whereNoMappable), pattern)
+       ORDER BY m.value""" % (maxRows,whereUsage,whereNoMap,whereNoMappable),
+                              pattern)
     elif docId:
         cursor.execute("""\
-         SELECT m.id, m.value, m.doc_id, u.name, m.bogus, m.mappable
+         SELECT top %d m.id, m.value, m.doc_id, u.name, m.bogus, m.mappable
            FROM external_map m
            JOIN external_map_usage u
              ON u.id = m.usage
           WHERE m.doc_id = %d
-       ORDER BY m.value""" % extractInt(docId))
+       ORDER BY m.value""" % (maxRows, extractInt(docId)))
+    elif alphaStart:
+        cursor.execute("""\
+         SELECT top %d m.id, m.value, m.doc_id, u.name, m.bogus, m.mappable
+           FROM external_map m
+           JOIN external_map_usage u
+             ON u.id = m.usage
+          WHERE m.value >= ?
+            %s %s %s
+       ORDER BY m.value""" % (maxRows,whereUsage,whereNoMap,whereNoMappable),
+                              alphaStart)
     else:
         cursor.execute("""\
-         SELECT m.id, m.value, m.doc_id, u.name, m.bogus, m.mappable
+         SELECT top %d m.id, m.value, m.doc_id, u.name, m.bogus, m.mappable
            FROM external_map m
            JOIN external_map_usage u
              ON u.id = m.usage
           WHERE 1 = 1
             %s %s %s
-       ORDER BY m.value""" % (whereUsage, whereNoMap, whereNoMappable))
+       ORDER BY m.value""" % (maxRows,whereUsage,whereNoMap,whereNoMappable))
     row = cursor.fetchone()
 
+    cdr.logwrite("SQL completion time=%f" % time.time())
     # No hits?
     if not row:
         form += """\
@@ -572,13 +623,14 @@ if request in ("Save Changes", "Get Values"):
     else:
         form += """\
   <br>
-  <table border='0' cellspacing='1' cellpadding='1'>
+  <table border='1' cellspacing='1' cellpadding='1'>
    <tr>
     <td align='center'><b>Variant String</b></td>
     <td align='center'><b>CDRID</b></td>
    </tr>
 """
-        # Output each row in the table
+        # Produce each row in the table
+        formPieces = []
         while row:
             mapId  = row[0]
             mapVal = row[1]
@@ -593,23 +645,23 @@ if request in ("Save Changes", "Get Values"):
             value = cgi.escape(value, 1)
             bogus = row[4] == 'Y' and " checked='1'" or ""
             mapOk = row[5] == 'Y' and " checked='1'" or ""
-            value = ("<input class='r' readonly='1' size='80' "
-                     "name='name-%d' value=\"%s\">" % (mapId, value))
+            # value = ("<input class='r' readonly='1' size='80' "
+            #         "name='name-%d' value=\"%s\">" % (mapId, value))
             docId = "<input size='8' name='id-%d' value='%s'>" % (mapId,
                                                                row[2] or "")
-            form += """\
+            formPieces.append("""\
    <tr>
     <td valign='top'>%s</td>
     <td valign='top'>%s</td>
-    <td>%s</td>""" % (value, docId, button)
+    <td>%s</td>""" % (value, docId, button))
             # Only need to delete mappings if mapped values are included
             # Forgive the pesky double negative
             if not noMapped:
-                form += """\
+                formPieces.append("""\
     <td nowrap='1'>
      <input type='checkbox' name='del-id-%d'>&nbsp;Del map?
-    </td>""" % mapId
-            form +="""\
+    </td>""" % mapId)
+            formPieces.append("""\
     <td nowrap='1'>
      <input type='checkbox' name='bogus-%d'%s>&nbsp;Bogus?
     </td>
@@ -623,13 +675,14 @@ if request in ("Save Changes", "Get Values"):
     </td>
    </tr>
 """ % (mapId, bogus, mapId, mapOk, mapId, row[2] or "",
-       mapId, row[4], mapId, row[5])
+       mapId, row[4], mapId, row[5]))
             row = cursor.fetchone()
-        form += """\
+        # Put form together
+        form = form + u"".join(formPieces) + """\
   </table>
-"""
-cdrcgi.sendPage(header + form + """\
   </form>
  </body>
 </html>
-""")
+"""
+cdr.logwrite("Form completion time=%f" % time.time())
+cdrcgi.sendPage(header + form)
