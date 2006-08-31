@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolReports.py,v 1.27 2006-07-11 13:41:50 bkline Exp $
+# $Id: ProtocolReports.py,v 1.28 2006-08-31 14:39:39 venglisc Exp $
 #
 # Submenu for protocol reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.27  2006/07/11 13:41:50  bkline
+# Added flavor showing title.
+#
 # Revision 1.26  2006/05/10 16:36:32  venglisc
 # I can't spell MS-Excel.  That's fixed now.
 #
@@ -168,8 +171,8 @@ reports = [
             'Protocol Sites Without Phone Numbers', ''),
            ('ProtocolStatusChange.py',
             'Protocol Status Change Report', ''),
-           ('BogusActiveLeadOrgs.py',
-            'Protocols with Active Lead Orgs But No Active Sites', ''),
+           ('ProtocolActiveNoSites.py',
+            'Protocols with Active Status But No Active Sites', ''),
            ('ProtocolINDReport.py',
             'Protocols with FDA IND Information (Excel)', ''),
            ('ProtProcReport.py',
