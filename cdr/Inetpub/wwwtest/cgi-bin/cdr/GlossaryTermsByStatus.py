@@ -1,12 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermsByStatus.py,v 1.5 2006-06-29 14:31:49 bkline Exp $
+# $Id: GlossaryTermsByStatus.py,v 1.6 2006-09-12 14:17:49 bkline Exp $
 #
 # The Glossary Terms by Status Report will server as a QC report to check
 # which glossary terms were created within a given time frame with a
 # particular status set.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2006/06/29 14:31:49  bkline
+# Selection logic modified at Sheri's request (#2281).
+#
 # Revision 1.4  2006/05/16 18:54:31  bkline
 # Stripped out Spanish version, which needs to be run in batch mode now
 # to accomodate new requirements from Sheri.
@@ -168,7 +171,9 @@ class GlossaryTerm:
         self.id = id
         self.name = None
         self.pronunciation = None
+        self.pronunciationResource = None
         self.definitions = []
+        self.definitionResources = []
         self.source = None
         self.pubPronunciation = None
         self.pubDefinitions = []
@@ -180,11 +185,15 @@ class GlossaryTerm:
                 self.name = getNodeContent(child)
             elif child.nodeName == "TermPronunciation":
                 self.pronunciation = getNodeContent(child)
+            elif child.nodeName == "PronunciationResource":
+                self.pronunciationResource = getNodeContent(child)
             elif child.nodeName == "TermDefinition":
                 for grandchild in child.childNodes:
                     if grandchild.nodeName == "DefinitionText":
                         self.definitions.append(getNodeContent(grandchild))
-                        break
+                    if grandchild.nodeName == "DefinitionResource":
+                        resource = getNodeContent(grandchild)
+                        self.definitionResources.append(resource)
             elif child.nodeName == "TermSource":
                 self.source = getNodeContent(child)
             elif child.nodeName == "TermType":
@@ -247,8 +256,10 @@ if revisionInfo:
     <th>Term</th>
     <th>Last Pub Ver Pronunciation</th>
     <th>Revised Pronunciation</th>
+    <th>Pronunciation Resource</th>
     <th>Last Pub Ver Definition</th>
     <th>Revised Definition</th>
+    <th>Definition Resource</th>
     <th>Definition Source</th>
     <th>Term Type</th>
     <th>Status Date</th>
@@ -260,7 +271,9 @@ else:
     <th>CDR ID</th>
     <th>Term</th>
     <th>Pronunciation</th>
+    <th>Pronunciation Resource</th>
     <th>Definition</th>
+    <th>Definition Resource</th>
     <th>Definition Source</th>
     <th>Term Type</th>
     <th>Status Date</th>
@@ -279,13 +292,17 @@ for term in terms:
     <td>%s</td>
     <td>%s</td>
     <td>%s</td>
+    <td>%s</td>
+    <td>%s</td>
    </tr>
 """ % (term.id,
        fix(term.name),
        fix(term.pubPronunciation),
        fix(term.pronunciation),
+       fix(term.pronunciationResource),
        fixList(term.pubDefinitions),
        fixList(term.definitions),
+       fixList(term.definitionResources),
        fix(term.source),
        fixList(term.types),
        term.statusDate and term.statusDate[:10] or u"&nbsp;")
@@ -299,11 +316,15 @@ for term in terms:
     <td>%s</td>
     <td>%s</td>
     <td>%s</td>
+    <td>%s</td>
+    <td>%s</td>
    </tr>
 """ % (term.id,
        fix(term.name),
        fix(term.pronunciation),
+       fix(term.pronunciationResource),
        fixList(term.definitions),
+       fixList(term.definitionResources),
        fix(term.source),
        fixList(term.types),
        term.statusDate and term.statusDate[:10] or u"&nbsp;")
