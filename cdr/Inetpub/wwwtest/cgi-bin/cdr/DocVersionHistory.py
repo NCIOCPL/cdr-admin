@@ -1,10 +1,16 @@
 #----------------------------------------------------------------------
 #
-# $Id: DocVersionHistory.py,v 1.17 2006-08-19 03:13:10 bkline Exp $
+# $Id: DocVersionHistory.py,v 1.18 2006-09-18 20:06:25 bkline Exp $
 #
 # Show version history of document.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.17  2006/08/19 03:13:10  bkline
+# Drastic overhaul of the report to improve performance (the report was
+# timing out for documents with many versions).  The report now takes
+# an average of 94 milliseconds to process on Mahler for the document
+# with the most versions (CDR67126 with 522 versions).
+#
 # Revision 1.16  2004/07/27 16:03:16  venglisc
 # In the case that a blocked document never got published before the
 # report failed to extract a removal date from Cancer.gov.
@@ -138,6 +144,7 @@ class Document:
             cdrcgi.bail('Database error looking up CDR%s: %s' % (docId, e))
         if not row:
             cdrcgi.bail("Unable to find document info for CDR%s" % docId)
+        self.__t1             = time.time() - self.__start
         self.__docId          = docId
         self.__cursor         = cursor
         self.__docTitle       = row[0]
@@ -183,6 +190,7 @@ class Document:
 
     def __loadVersions(self):
         try:
+            t = time.time()
             self.__cursor.execute("""\
                 SELECT v.num, 
                        v.comment,
@@ -195,8 +203,9 @@ class Document:
                     ON u.id = v.usr
                  WHERE v.id = ?""", self.__docId, timeout = 300)
             versions = {}
-            for row in self.__cursor.fetchall():
-                (num, comment, user, date, status, publishable) = row
+            rows = self.__cursor.fetchall()
+            self.__t2 = time.time() - t
+            for num, comment, user, date, status, publishable in rows:
                 versions[num] = self.Version(num, comment, user, date,
                                              status, publishable)
         except Exception, e:
@@ -210,7 +219,7 @@ class Document:
                         pub_proc,
                         removed,
                         CASE
-                            WHEN output_dir IS NULL THEN 'C'
+                            WHEN output_dir IS NULL OR output_dir = '' THEN 'C'
                             ELSE 'V'
                         END AS job_type
                    FROM primary_pub_doc
@@ -376,7 +385,9 @@ class Document:
  </body>
 </html>
 """ % (delta * 1000))
-        return u"".join(html).replace(u"@@TIME@@", unicode(delta))
+        timings = (u"query 1: %f query 2: %f; total time: %f" %
+                   (self.__t1, self.__t2, delta))
+        return u"".join(html).replace(u"@@TIME@@", timings)
 
     #----------------------------------------------------------------------
     # Object to hold info for a single version.
