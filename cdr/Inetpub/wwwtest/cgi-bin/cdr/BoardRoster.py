@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: BoardRoster.py,v 1.7 2006-03-30 16:37:49 venglisc Exp $
+# $Id: BoardRoster.py,v 1.8 2006-09-27 23:16:09 venglisc Exp $
 #
 # Report to display the Board Roster with or without assistant
 # information.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.7  2006/03/30 16:37:49  venglisc
+# Changed address to replace CIPS with OCCM. (Bug 2031)
+#
 # Revision 1.6  2005/02/23 15:36:34  venglisc
 # Fixed incorrect comment indicators.  This caused the style for italics to
 # be ignored. (Bug 1527)
@@ -306,7 +309,7 @@ html += """
   Office of Cancer Content Management (OCCM)<br>
   Office of Communications<br>
   National Cancer Institute<br>
-  MSC-8321, Suite 3002B<br>
+  MSC-8321, Suite 300A<br>
   6116 Executive Blvd.<br>
   Bethesda, MD 20892-8321<br><br>
   <table border="0" width="100%%" cellspacing="0" cellpadding="0">
