@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: NewlyPublishedTrials2.py,v 1.1 2006-09-28 11:56:43 bkline Exp $
+# $Id: NewlyPublishedTrials2.py,v 1.2 2006-09-28 15:11:20 bkline Exp $
 #
 # "We need a newly published trials report which lists InScope Protocol
 # and CTGov trials that have published versions, but do not have a
@@ -16,6 +16,9 @@
 # over two years ago.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2006/09/28 11:56:43  bkline
+# Request #2443.
+#
 #----------------------------------------------------------------------
 import cdrdb, pyXLWriter, sys, time, cdrcgi, cgi
 
@@ -255,26 +258,11 @@ cursor.execute("""\
        AND e.pub_subset LIKE 'Push_Documents_To_Cancer.Gov%%'
        AND e.pub_subset NOT LIKE '%%-Remove'
   GROUP BY d.id, t.name
-    HAVING MIN(e.completed) BETWEEN '%s' AND '%s'""" % (startDate, endDate),
+    HAVING MIN(e.completed) BETWEEN '%s' AND '%s 23:59:59'""" % (startDate,
+                                                                 endDate),
                timeout = 300)
 conn.commit()
 show("#trials table filled")
-
-#----------------------------------------------------------------------
-# Now prune away the ones which have more than one publication.
-#----------------------------------------------------------------------
-cursor.execute("""\
-    DELETE FROM #trials
-          WHERE pub_job < (SELECT MAX(e.id)
-                             FROM pub_event e
-                             JOIN published_doc d
-                               ON d.pub_proc = e.id
-                            WHERE d.doc_id = #trials.id
-                              AND e.pub_subset LIKE 'Push_Documents_To_Cancer%'
-                              AND e.pub_subset NOT LIKE '%-Remove')""",
-               timeout = 300)
-conn.commit()
-show("#trials table pruned")
 
 #----------------------------------------------------------------------
 # Next we create objects for each of the protocols in the report.
