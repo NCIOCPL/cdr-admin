@@ -1,8 +1,11 @@
 #----------------------------------------------------------------------
 #
-# $Id: OutcomeMeasuresCodingReport.py,v 1.1 2006-05-04 15:05:00 bkline Exp $
+# $Id: OutcomeMeasuresCodingReport.py,v 1.2 2006-09-28 12:04:16 bkline Exp $
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2006/05/04 15:05:00  bkline
+# New report for compliance with ICMJE requirements.
+#
 #----------------------------------------------------------------------
 
 import cdrbatch, cdrcgi, cgi, cdr
@@ -13,7 +16,8 @@ import cdrbatch, cdrcgi, cgi, cdr
 fields      = cgi.FieldStorage()
 session     = cdrcgi.getSession(fields)
 request     = cdrcgi.getRequest(fields)
-email       = fields and fields.getvalue("Email")   or None
+email       = fields and fields.getvalue("Email")       or None
+onlyMissing = fields and fields.getvalue('onlyMissing') or 'N'
 title       = "CDR Administration"
 section     = "Outcome Measures Coding Report"
 SUBMENU     = "Report Menu"
@@ -70,16 +74,17 @@ if not email or request != "Submit":
     </tr>
    </table>
    <input type='hidden' name='%s' value='%s'>
+   <input type='hidden' name='onlyMissing' value='%s'>
   </form>
  </body>
 </html>
-""" % (cdr.getEmail(session) or "&nbsp;", cdrcgi.SESSION, session)
+""" % (cdr.getEmail(session) or "&nbsp;", cdrcgi.SESSION, session, onlyMissing)
     cdrcgi.sendPage(header + form)
 
 #----------------------------------------------------------------------    
 # If we get here, we're ready to queue up a request for the report.
 #----------------------------------------------------------------------
-args = []
+args = [('only-missing', onlyMissing)]
 batch = cdrbatch.CdrBatch(jobName = section, command = command, email = email,
                           args = args)
 try:
