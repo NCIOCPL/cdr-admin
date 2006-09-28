@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: CdrDocumentation.py,v 1.3 2006-09-28 23:09:43 ameyer Exp $
+# $Id: CdrDocumentation.py,v 1.4 2006-09-28 23:12:45 ameyer Exp $
 #
 # Prototype for CDR reporting/formatting web wrapper.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2006/09/28 23:09:43  ameyer
+# Added links for HTML versions of current docs.
+# Updated date on PDF.
+#
 # Revision 1.2  2004/10/07 19:34:37  venglisc
 # Fixed the problem of the navigational buttons not working properly.
 # (Bug 1338)
@@ -50,7 +54,7 @@ cgiLoc  = "cgi-bin/cdr"
 usrdocs = [['CdrUserGuide.pdf',  'User Guide'],
            ['CdrSystemDocs.pdf', 'System Documentation'],
 	       ['CdrOpsManual.pdf',  'Operation Manual']]
-usrhtml = [['Help.py', 'User Guild'],
+usrhtml = [['Help.py', 'User Guide'],
            ['Help.py?flavor=System%', 'System Documentation'],
            ['Help.py?flavor=Operating%Instructions', 'Operation Manual']]
 
