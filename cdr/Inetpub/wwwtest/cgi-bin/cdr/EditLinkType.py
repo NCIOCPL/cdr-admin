@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditLinkType.py,v 1.4 2002-02-21 20:09:47 ameyer Exp $
+# $Id: EditLinkType.py,v 1.5 2006-10-06 02:43:46 ameyer Exp $
 #
 # Prototype for editing a CDR link type.
 #
@@ -8,6 +8,9 @@
 # to read the values on the form.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2002/02/21 20:09:47  ameyer
+# Replaced cgi.parse() with safer cgi.FieldStorage for url parameters.
+#
 # Revision 1.3  2002/02/21 15:22:02  bkline
 # Added navigation buttons.
 #
@@ -25,13 +28,19 @@ import cgi, cdr, cdrcgi, re, string, sys
 #----------------------------------------------------------------------
 # Get the form variables.
 #----------------------------------------------------------------------
-fields  = cgi.FieldStorage()
-session = cdrcgi.getSession(fields)
-request = cdrcgi.getRequest(fields)
-name    = fields and fields.getvalue("name") or None
-linkForm= fields and fields.getvalue("linkform") or None
-extra   = ""
-SUBMENU = "Link Menu"
+fields      = cgi.FieldStorage()
+session     = cdrcgi.getSession(fields)
+request     = cdrcgi.getRequest(fields)
+name        = fields and fields.getvalue("name") or None
+linkChkType = fields and fields.getvalue("linkChkType") or None
+linkForm    = fields and fields.getvalue("linkform") or None
+extra       = ""
+SUBMENU     = "Link Menu"
+
+# Target doc link type prompts and corresponding codes
+LINKCHKTYPES = (('Published version', 'P'),
+                ('Any version', 'V'),
+                ('Current working document', 'C'))
 
 #----------------------------------------------------------------------
 # If no linkForm, this is first time through, setup subsequent action.
@@ -99,9 +108,11 @@ def getArrayFields(baseNames):
 #----------------------------------------------------------------------
 if request == "Save Changes":
     linkTypeName = fields and fields.getvalue("name") or ""
+    # linkChkType  = fields and fields.getvalue("linkChkType") or ""
     linkType     = cdr.LinkType(linkTypeName)
     comment      = fields.getvalue("comment")
     if comment: linkType.comment = comment
+    if linkChkType: linkType.linkChkType = linkChkType
 
     # So much for the easy fields; now get the multi-occurence values.
     arrayFields = getArrayFields(("src_sel", "src_dt", "src_elem",
@@ -315,6 +326,29 @@ for i in range(3):
             dtList("", "dst_dt", rowNum))
     rowNum += 1
 
+#----------------------------------------------------------------------
+# Show selection of link target version type
+#----------------------------------------------------------------------
+optCnt = len(LINKCHKTYPES)
+selectedOption = ['','','']
+for opt in range(optCnt):
+    if linkType.linkChkType == LINKCHKTYPES[opt][1]:
+        selectedOption[opt] = " selected='1'"
+
+form += """
+    <TR>
+     <TD ALIGN='right' NOWRAP><B>Link Target Is:</B></TD>
+     <TD>
+      <SELECT NAME='linkChkType'>
+"""
+for opt in range(optCnt):
+    form += "<OPTION VALUE=%s%s>%s</OPTION>" % \
+             (LINKCHKTYPES[opt][1], selectedOption[opt], LINKCHKTYPES[opt][0])
+form += """
+      </SELECT>
+     </TD>
+    </TR>
+"""
 #----------------------------------------------------------------------
 # List the properties attached to this link type.
 #----------------------------------------------------------------------
