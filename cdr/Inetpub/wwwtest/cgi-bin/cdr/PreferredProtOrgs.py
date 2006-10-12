@@ -1,8 +1,11 @@
 #----------------------------------------------------------------------
 #
-# $Id: PreferredProtOrgs.py,v 1.1 2003-11-10 18:04:47 bkline Exp $
+# $Id: PreferredProtOrgs.py,v 1.2 2006-10-12 19:49:32 bkline Exp $
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2003/11/10 18:04:47  bkline
+# Preferred Protocol Organizations report.
+#
 #----------------------------------------------------------------------
 import cdr, cdrdb, cdrcgi
 
@@ -54,7 +57,7 @@ while row:
         linkingOrg = Org(linkingId, linkingName)
         orgs[linkingId] = linkingOrg
     else:
-        linkingOrg = orgs[linkingOrg]
+        linkingOrg = orgs[linkingId]
     if not orgs.has_key(targetId):
         targetOrg = Org(targetId, targetName)
         orgs[targetId] = targetOrg
