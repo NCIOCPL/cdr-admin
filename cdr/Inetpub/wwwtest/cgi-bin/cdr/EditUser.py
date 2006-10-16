@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditUser.py,v 1.3 2002-10-10 19:16:53 bkline Exp $
+# $Id: EditUser.py,v 1.4 2006-10-16 17:59:28 bkline Exp $
 #
 # Prototype for editing a CDR user.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2002/10/10 19:16:53  bkline
+# Changed user deletion to navigate back to EditUsers.py.
+#
 # Revision 1.2  2002/02/21 15:22:03  bkline
 # Added navigation buttons.
 #
@@ -57,6 +60,9 @@ if request == "Delete User":
     cdrcgi.navigateTo("EditUsers.py", session)
     #cdrcgi.mainMenu(session, "User %s Deleted Successfully" % usrName)
 
+def fixVal(v):
+    return v and cgi.escape(v, True) or "None"
+
 #----------------------------------------------------------------------
 # Handle request to store changes to the user.
 #----------------------------------------------------------------------
@@ -108,34 +114,35 @@ form = """\
 <TABLE>
 <TR>
 <TD ALIGN='right' NOWRAP><B>User Id:</B></TD>
-<TD><INPUT NAME='name' VALUE='%s' SIZE='80'><TD>
+<TD><INPUT NAME='name' value="%s" SIZE='80'><TD>
 </TR>
 <TR>
 <TD ALIGN='right' NOWRAP><B>Password:</B></TD>
-<TD><INPUT NAME='password' VALUE='%s' SIZE='80'><TD>
+<TD><INPUT NAME='password' value="%s" SIZE='80'><TD>
 </TR>
 <TR>
 <TD ALIGN='right' NOWRAP><B>Full Name:</B></TD>
-<TD><INPUT NAME='fullname' VALUE='%s' SIZE='80'><TD>
+<TD><INPUT NAME='fullname' value="%s" SIZE='80'><TD>
 </TR>
 <TR>
 <TD ALIGN='right' NOWRAP><B>Office:</B></TD>
-<TD><INPUT NAME='office' VALUE='%s' SIZE='80'><TD>
+<TD><INPUT NAME='office' value="%s" SIZE='80'><TD>
 </TR>
 <TR>
 <TD ALIGN='right' NOWRAP><B>Email:</B></TD>
-<TD><INPUT NAME='email' VALUE='%s' SIZE='80'><TD>
+<TD><INPUT NAME='email' value="%s" SIZE='80'><TD>
 </TR>
 <TR>
 <TD ALIGN='right' NOWRAP><B>Phone:</B></TD>
-<TD><INPUT NAME='phone' VALUE='%s' SIZE='80'><TD>
+<TD><INPUT NAME='phone' value="%s" SIZE='80'><TD>
 </TR>
 <TR>
 <TD ALIGN='right' NOWRAP VALIGN='top'><B>Groups:</B></TD>
 """ % (user.name, 
        request == "Save Changes" and "\n<H4>(Successfully Updated)</H4>" or "",
-       user.name, user.password, 
-       user.fullname, user.office, user.email, user.phone)
+       fixVal(user.name), fixVal(user.password),
+       fixVal(user.fullname), fixVal(user.office),
+       fixVal(user.email), fixVal(user.phone))
 
 #----------------------------------------------------------------------
 # List the groups to which the user can be assigned.
@@ -153,7 +160,7 @@ for group in groups:
                                             session)
     form += """\
 <TD><INPUT TYPE='checkbox' 
-           VALUE='%s' 
+           value="%s" 
            %sNAME='groups'><A HREF="%s">%s</A></INPUT></TD>
 """ % (group, flag, url, group)
     nGroups += 1
@@ -175,7 +182,7 @@ form += """\
 # Add the session key and send back the form.
 #----------------------------------------------------------------------
 form += """\
-<INPUT TYPE='hidden' NAME='%s' VALUE='%s' >
-<INPUT TYPE='hidden' NAME='usr' VALUE='%s' >
+<INPUT TYPE='hidden' NAME='%s' value="%s" >
+<INPUT TYPE='hidden' NAME='usr' value="%s" >
 """ % (cdrcgi.SESSION, session, user.name)
 cdrcgi.sendPage(header + form + "</FORM></BODY></HTML>")
