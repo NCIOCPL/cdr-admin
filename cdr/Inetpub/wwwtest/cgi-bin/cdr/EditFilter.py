@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditFilter.py,v 1.18 2006-10-18 17:41:54 venglisc Exp $
+# $Id: EditFilter.py,v 1.19 2006-10-18 22:53:29 venglisc Exp $
 #
 # Prototype for editing CDR filter documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.18  2006/10/18 17:41:54  venglisc
+# Added an extra check to ensure that a filter that is being renamed is
+# indeed a filter document on BACH. (Bug 2561)
+#
 # Revision 1.17  2005/07/19 15:13:24  venglisc
 # Modified the dataSource passed to the connect module after the server was
 # moved behind the OTSA firewall. The hostname now has to be specified to
@@ -290,10 +294,14 @@ def getProdId(docId, doc, session):
 
         row = prodCursor.fetchone()
         if not row:
-            cdrcgi.bail("Cannot find document on Bach with ID %s" % bachid)
+            cdrcgi.bail("%s%s %s" %
+                         ('ERROR: Changes saved locally but cannot ',
+                          'find document on Bach with ID', bachid))
         elif row[0] != 'Filter':
-            cdrcgi.bail("Cannot find filter on Bach with ID %s (%s)" % (bachid, 
-                                                                        row[0]))
+            cdrcgi.bail("%s%s %s (%s)" %
+                         ('ERROR: Changes saved locally but cannot ',
+                          'find filter on Bach with ID',
+                          bachid, row[0]))
         return "CDR%010d" % id
 
     try:
