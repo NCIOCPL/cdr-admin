@@ -1,10 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditFilter.py,v 1.17 2005-07-19 15:13:24 venglisc Exp $
+# $Id: EditFilter.py,v 1.18 2006-10-18 17:41:54 venglisc Exp $
 #
 # Prototype for editing CDR filter documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.17  2005/07/19 15:13:24  venglisc
+# Modified the dataSource passed to the connect module after the server was
+# moved behind the OTSA firewall. The hostname now has to be specified to
+# be resolved within the firewall (without the nci.nih.gov domain).
+#
 # Revision 1.16  2003/12/30 22:49:14  venglisc
 # Added text explaining usage of bachid field.
 #
@@ -270,7 +275,27 @@ def cvsCleanup(abspath, cvsroot = None):
 def getProdId(docId, doc, session):
     if bachid:
         id = int(re.sub(r'[^\d]+', '', bachid))
+
+        # Make sure the docId provided when renaming a filter title
+        # is indeed a filter document on BACH
+        # ---------------------------------------------------------
+        conn = cdrdb.connect('CdrGuest', dataSource = cdr.PROD_NAME)
+        prodCursor = conn.cursor()
+        prodCursor.execute("""\
+            SELECT t.name
+              FROM doc_type t
+              JOIN document d
+                ON t.id = d.doc_type
+             WHERE d.id = ?""", id)
+
+        row = prodCursor.fetchone()
+        if not row:
+            cdrcgi.bail("Cannot find document on Bach with ID %s" % bachid)
+        elif row[0] != 'Filter':
+            cdrcgi.bail("Cannot find filter on Bach with ID %s (%s)" % (bachid, 
+                                                                        row[0]))
         return "CDR%010d" % id
+
     try:
         # Find out what the title is.
         id = int(re.sub(r'[^\d]+', '', docId))
