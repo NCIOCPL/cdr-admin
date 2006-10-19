@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PubStatus.py,v 1.23 2006-08-28 22:06:54 venglisc Exp $
+# $Id: PubStatus.py,v 1.24 2006-10-19 22:51:56 ameyer Exp $
 #
 # Status of a publishing job.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.23  2006/08/28 22:06:54  venglisc
+# Fixed problem causing the first row of the report to be dropped. (Bug 2453)
+#
 # Revision 1.22  2006/08/24 15:35:24  venglisc
 # Minor changes to the if statement listing flavor error report.
 #
@@ -92,6 +95,9 @@
 #----------------------------------------------------------------------
 import cgi, cdr, cdrdb, cdrcgi, re, string, time
 
+# Logfile is same as that used in cdrpub.py
+LOG = "d:/cdr/log/publish.log"
+
 #----------------------------------------------------------------------
 # Set the form variables.
 #----------------------------------------------------------------------
@@ -114,7 +120,7 @@ def dispJobStatus():
 
     #----------------------------------------------------------------------
     # Find some interesting information.
-    #----------------------------------------------------------------------   
+    #----------------------------------------------------------------------
     try:
         conn = cdrdb.connect('CdrGuest')
         cursor = conn.cursor()
@@ -140,7 +146,7 @@ def dispJobStatus():
     except cdrdb.Error, info:
         cdrcgi.bail("Failure retrieving job information: %s" % info[1][0])
 
-    title   = "CDR Publishing Job Status" 
+    title   = "CDR Publishing Job Status"
     instr   = "Job Number %d" % jobId
     setting = """[<A style="text-decoration: underline;" href=
                 "pubstatus.py?id=%d&type=Setting">Job settings
@@ -148,7 +154,7 @@ def dispJobStatus():
     buttons = []
     header  = cdrcgi.header(title, title, instr, None, buttons)
     html    = """\
-       <TABLE>       
+       <TABLE>
         <TR>
          <TD ALIGN='right' NOWRAP><B>Publishing System: &nbsp;</B></TD>
          <TD><FONT COLOR='black'>%s</FONT></TD>
@@ -185,7 +191,7 @@ def dispJobStatus():
       </FORM>
      </BODY>
     </HTML>
-    """ % (pubSystem, subset, setting, name, 
+    """ % (pubSystem, subset, setting, name,
            (no_output == 'Y' and "None") or dir or "None",
            started, completed and completed or "No", status, messages)
     cdrcgi.sendPage(header + html)
@@ -193,18 +199,18 @@ def dispJobStatus():
 #----------------------------------------------------------------------
 # Add a table row for an published documents.
 #----------------------------------------------------------------------
-def addRow(row):  
-    # Replacing the ";" for the document title since this caused the 
-    # table formatting to be off due to too words that couldn't be 
+def addRow(row):
+    # Replacing the ";" for the document title since this caused the
+    # table formatting to be off due to too words that couldn't be
     # wrapped within the given column width.
     # --------------------------------------------------------------
     return """\
    <tr>
-    <td valign='top'><FONT COLOR='black'>%d</FONT></td>   
-    <td valign='top'><FONT COLOR='black'>%d</FONT></td>   
+    <td valign='top'><FONT COLOR='black'>%d</FONT></td>
+    <td valign='top'><FONT COLOR='black'>%d</FONT></td>
     <td valign='top'><FONT COLOR='black'>%s</FONT></td>
     <td valign='top'><FONT COLOR='black'>%s</FONT></td>
-    <td valign='top'><FONT COLOR='black'>%s</FONT></td>   
+    <td valign='top'><FONT COLOR='black'>%s</FONT></td>
    </tr>
 """ % (row[0], row[1], row[2], string.replace(row[3], ";", "; "), row[4])
 
@@ -215,7 +221,7 @@ def dispFilterFailures(flavor = 'full'):
 
     #----------------------------------------------------------------------
     # Find some interesting information.
-    #----------------------------------------------------------------------  
+    #----------------------------------------------------------------------
     try:
         conn = cdrdb.connect('CdrGuest')
         cursor = conn.cursor()
@@ -226,10 +232,10 @@ def dispFilterFailures(flavor = 'full'):
                    d.title,
                    ppd.messages,
                    pp.pub_subset,
-                   u.name                   
+                   u.name
               FROM pub_proc_doc ppd
               JOIN document d
-                ON ppd.doc_id = d.id             
+                ON ppd.doc_id = d.id
               JOIN pub_proc pp
                 ON ppd.pub_proc = pp.id
               JOIN usr u
@@ -249,7 +255,7 @@ def dispFilterFailures(flavor = 'full'):
     buttons = []
     header  = cdrcgi.header(title, title, instr, None, buttons)
     html    = """\
-       <TABLE>        
+       <TABLE>
         <TR>
          <TD ALIGN='right' NOWRAP><B>System Subset: &nbsp;</B></TD>
          <TD><FONT COLOR='black'>%s</FONT></TD>
@@ -257,20 +263,20 @@ def dispFilterFailures(flavor = 'full'):
         <TR>
          <TD ALIGN='right' NOWRAP><B>User Name: &nbsp;</B></TD>
          <TD><FONT COLOR='black'>%s</FONT></TD>
-        </TR>      
-       </TABLE>    
+        </TR>
+       </TABLE>
     """ % (rows[0][5], rows[0][6])
 
     html   += "<BR><TABLE BORDER=1>"
     html   += """\
-   <tr>    
-    <td width='10%%' valign='top'><B>Id</B></td>   
-    <td width='5%%'  valign='top'><B>Ver</B></td>   
+   <tr>
+    <td width='10%%' valign='top'><B>Id</B></td>
+    <td width='5%%'  valign='top'><B>Ver</B></td>
     <td width='15%%' valign='top'><B>Type</B></td>
     <td width='50%%' valign='top'><B>Title</B></td>
-    <td width='25%%' valign='top'><B>Message</B></td> 
+    <td width='25%%' valign='top'><B>Message</B></td>
     </tr>
-""" 
+"""
     # The warnings have been formatted with a "class=warning"
     # attribute for the LI element.
     # -------------------------------------------------------
@@ -295,8 +301,8 @@ def dispFilterFailures(flavor = 'full'):
             cdrcgi.bail('Error: Valid values for flavor are: '
                         '"full", "warning", "error"')
 
-    html  += "</TABLE></BODY></HTML>"       
-    
+    html  += "</TABLE></BODY></HTML>"
+
     cdrcgi.sendPage(header + html.encode('utf8'))
 
 #----------------------------------------------------------------------
@@ -306,21 +312,21 @@ def dispJobSetting():
 
     #----------------------------------------------------------------------
     # Find some interesting information.
-    #----------------------------------------------------------------------  
+    #----------------------------------------------------------------------
     try:
         conn = cdrdb.connect('CdrGuest')
         cursor = conn.cursor()
         cursor.execute("""\
             SELECT ppp.parm_name,
-                   ppp.parm_value,                  
+                   ppp.parm_value,
                    pp.pub_subset,
-                   u.name                   
-              FROM pub_proc_parm ppp                        
+                   u.name
+              FROM pub_proc_parm ppp
               JOIN pub_proc pp
                 ON ppp.pub_proc = pp.id
               JOIN usr u
-                ON u.id = pp.usr              
-             WHERE ppp.pub_proc = ?             
+                ON u.id = pp.usr
+             WHERE ppp.pub_proc = ?
           ORDER BY ppp.parm_name
     """, (jobId,))
         row = cursor.fetchone()
@@ -332,7 +338,7 @@ def dispJobSetting():
     buttons = []
     header  = cdrcgi.header(title, title, instr, None, buttons)
     html    = """\
-               <TABLE>        
+               <TABLE>
                 <TR>
                  <TD ALIGN='right' NOWRAP><B>System Subset: &nbsp;</B></TD>
                  <TD><FONT COLOR='black'>%s</FONT></TD>
@@ -340,28 +346,28 @@ def dispJobSetting():
                 <TR>
                  <TD ALIGN='right' NOWRAP><B>User Name: &nbsp;</B></TD>
                  <TD><FONT COLOR='black'>%s</FONT></TD>
-                </TR>      
-               </TABLE>    
+                </TR>
+               </TABLE>
               """ % (row[2], row[3])
 
     html   += "<BR><TABLE BORDER=1>"
     html   += """\
-               <tr>    
-                <td valign='top'><B>ParamName</B></td>   
-                <td valign='top'><B>ParamValue</B></td>  
+               <tr>
+                <td valign='top'><B>ParamName</B></td>
+                <td valign='top'><B>ParamValue</B></td>
                 </tr>
-              """ 
-    ROW     = "<tr><td>%s</td><td>%s</td></tr>\n"  
-   
+              """
+    ROW     = "<tr><td>%s</td><td>%s</td></tr>\n"
+
     html   += ROW % (row[0], row[1])
-    
+
     row = cursor.fetchone()
     while row:
         html += ROW % (row[0], row[1])
         row   = cursor.fetchone()
 
-    html  += "</TABLE></BODY></HTML>"       
-    
+    html  += "</TABLE></BODY></HTML>"
+
     cdrcgi.sendPage(header + html)
 
 #----------------------------------------------------------------------
@@ -375,26 +381,26 @@ def dispJobControl():
     cursor = conn.cursor()
 
     # Check session validity first by getting user name.
-    try:        
+    try:
         cursor.execute("""\
-            SELECT TOP 1 u.name                  
-              FROM usr u       
+            SELECT TOP 1 u.name
+              FROM usr u
               JOIN session s
-                ON s.usr = u.id                          
-             WHERE s.name = ? 
+                ON s.usr = u.id
+             WHERE s.name = ?
                        """, (session,))
         row = cursor.fetchone()
         if row and row[0]:
             name = row and row[0]
         else:
-            cdrcgi.bail("Invalid session, failure getting user name")          
+            cdrcgi.bail("Invalid session, failure getting user name")
     except cdrdb.Error, info:
         cdrcgi.bail("Failure getting user name: %s" % info[1][0])
 
     # Get a list of jobs to be killed or resumed.
     jobs = fields and fields.getvalue("Jobs") or []
     if jobs and type(jobs) != type([]):
-        jobs = [jobs]        
+        jobs = [jobs]
 
     # Kill or resume?
     action = fields and fields.getvalue("Kill") or \
@@ -405,7 +411,7 @@ def dispJobControl():
     cgJobDesc = "<CgJobDesc>%s</CgJobDesc>" % cgJobDesc
     if action == "Resume checked jobs":
         jobChecked = int(jobs[0])
-        try:            
+        try:
             cursor.execute("""
                 SELECT messages
                   FROM pub_proc
@@ -419,46 +425,50 @@ def dispJobControl():
                 UPDATE pub_proc
                    SET messages  = ?
                  WHERE id        = ?""", (msg, jobChecked))
+            cdr.logwrite('%s updated pub_proc messages with "%s"' % \
+                         (name, msg), LOG)
         except cdrdb.Error, info:
-            msg = 'Failure updating message: %s' % info[1][0]           
+            msg = 'Failure updating message: %s' % info[1][0]
             raise StandardError(msg)
 
-    # Go ahead and kill or resume!    
+    # Go ahead and kill or resume!
     msg = ""
-    if action and jobs:            
+    if action and jobs:
         msg += " [Jobs just "
         if action == "Kill checked jobs":
             msg += "killed:"
             status = "Failure"
         else:
-            msg += "resumed:"  
-            status = "In process" 
-        for job in jobs: 
-            msg += "%s, " % job          
-            try:        
+            msg += "resumed:"
+            status = "In process"
+        for job in jobs:
+            msg += "%s, " % job
+            try:
                 cursor.execute("""\
-                    UPDATE pub_proc                  
-                       SET status = ?                    
-                     WHERE id = ? 
+                    UPDATE pub_proc
+                       SET status = ?
+                     WHERE id = ?
                                """, (status, job))
+                cdr.logwrite('%s updated pub_proc status to "%s"' % \
+                             (name, status), LOG)
             except cdrdb.Error, info:
                 cdrcgi.bail("Failure killing or resuming: %s" % info[1][0])
         msg = msg[:-2] + "]"
 
     # Get jobs waiting for user approval.
-    try:        
+    try:
         cursor.execute("""\
-            SELECT pp.id,                       
-                   pp.pub_subset,                   
+            SELECT pp.id,
+                   pp.pub_subset,
                    pp.started,
-                   pp.status                                 
-              FROM pub_proc pp 
+                   pp.status
+              FROM pub_proc pp
               JOIN usr u
-                ON u.id = pp.usr                        
+                ON u.id = pp.usr
               JOIN session s
                 ON s.usr = u.id
              WHERE s.name = ?
-               AND pp.status = 'Waiting user approval'    
+               AND pp.status = 'Waiting user approval'
           ORDER BY pp.started
                        """, (session,))
         rows = cursor.fetchall()
@@ -470,8 +480,8 @@ def dispJobControl():
     instr   = "User Name %s" % name
     buttons = []
     header  = cdrcgi.header(title, title, instr, script, buttons)
-        
-    HEADER1 = """             
+
+    HEADER1 = """
                <BR><FONT COLOR="NAVY">
                     <b>Jobs waiting for user approval%s<b>
                    </FONT>
@@ -480,20 +490,20 @@ def dispJobControl():
     HEADER2 = """
                 <tr><td>
                 <table border="1">
-                <tr>    
-                <td valign='top'></td>   
-                <td valign='top'><B>JobId</B></td>  
-                <td valign='top'><B>JobName</B></td>                 
-                <td valign='top'><B>Started</B></td>  
-                <td valign='top'><B>Status</B></td>  
-                </tr> 
+                <tr>
+                <td valign='top'></td>
+                <td valign='top'><B>JobId</B></td>
+                <td valign='top'><B>JobName</B></td>
+                <td valign='top'><B>Started</B></td>
+                <td valign='top'><B>Status</B></td>
+                </tr>
               """
     ROW     = """<tr><td><INPUT TYPE='CHECKBOX' NAME='Jobs' VALUE='%d' CHECKED></td>
                      <td><FONT COLOR='black'>%d</FONT></td>
                      <td><FONT COLOR='black'>%s</FONT></td>
                      <td><FONT COLOR='black'>%s</FONT></td>
                      <td><FONT COLOR='black'>%s</FONT></td></tr>
-              """  
+              """
 
     if not len(rows):
         html = "User <i>%s</i>: There are no (more) push jobs waiting for approval." % name
@@ -503,7 +513,7 @@ def dispJobControl():
             <INPUT TYPE='HIDDEN' NAME='Session' VALUE='%s'>
             <INPUT TYPE='HIDDEN' NAME='type' VALUE='Manage'>
                 """ % (jobId, session)
-     
+
         html += HEADER1
         html += """
                 <tr>
@@ -530,16 +540,16 @@ def dispJobControl():
         html += "the following description</FONT>"
         html += "<TEXTAREA NAME='CgJobDesc' ROWS='5' COLS='80'>"
         html += "Enter a brief job description for Cancer.gov.</TEXTAREA>"
-               
-    html  += "</BODY></HTML>"       
-    
+
+    html  += "</BODY></HTML>"
+
     cdrcgi.sendPage(header + html)
 
 #----------------------------------------------------------------------
 # Display the pub_proc_cg_work table info.
 #----------------------------------------------------------------------
 def dispCgWork():
-    
+
     title   = "CDR Document Pushing Information"
     instr   = "Job Number %d" % jobId
     buttons = []
@@ -549,28 +559,28 @@ def dispCgWork():
     cursor = conn.cursor()
 
     # Is there any documents in PPCW?
-    try:      
+    try:
         cursor.execute("""\
-            SELECT count(*)              
-              FROM pub_proc_cg_work ppcw              
+            SELECT count(*)
+              FROM pub_proc_cg_work ppcw
                        """)
         numRows = cursor.fetchone()
         if numRows and numRows[0] == 0:
             cdrcgi.bail("No rows in pub_proc_cg_work. No docs to be pushed.")
     except cdrdb.Error, info:
         cdrcgi.bail("Failure getting row count in PPCW: %s." % info[1][0])
-    
+
     #----------------------------------------------------------------------
     # Find vendor and push jobs.
-    #----------------------------------------------------------------------  
-    try:      
+    #----------------------------------------------------------------------
+    try:
         cursor.execute("""\
-            SELECT ppv.pub_subset, ppp.pub_subset               
-              FROM pub_proc_cg_work ppcw 
+            SELECT ppv.pub_subset, ppp.pub_subset
+              FROM pub_proc_cg_work ppcw
               JOIN pub_proc ppv
                 ON ppv.id = ppcw.vendor_job
               JOIN pub_proc ppp
-                ON ppp.id = ppcw.cg_job             
+                ON ppp.id = ppcw.cg_job
                        """)
         (vendor, push) = cursor.fetchone()
     except cdrdb.Error, info:
@@ -578,12 +588,12 @@ def dispCgWork():
 
     #----------------------------------------------------------------------
     # Find number of removed documents.
-    #----------------------------------------------------------------------  
-    try:      
+    #----------------------------------------------------------------------
+    try:
         cursor.execute("""\
-            SELECT count(ppcw.id) 
-              FROM pub_proc_cg_work ppcw 
-             WHERE ppcw.xml IS NULL             
+            SELECT count(ppcw.id)
+              FROM pub_proc_cg_work ppcw
+             WHERE ppcw.xml IS NULL
                        """)
         oneRow = cursor.fetchone()
         nRemoved = 0
@@ -594,15 +604,15 @@ def dispCgWork():
 
     #----------------------------------------------------------------------
     # Find removed document information.
-    #----------------------------------------------------------------------  
-    try:      
+    #----------------------------------------------------------------------
+    try:
         numDocs = (nRemoved > 500) and 500 or nRemoved or 1
         cursor.execute("""\
-            SELECT TOP %d ppcw.id, ppcw.doc_type, d.title               
-              FROM pub_proc_cg_work ppcw 
+            SELECT TOP %d ppcw.id, ppcw.doc_type, d.title
+              FROM pub_proc_cg_work ppcw
               JOIN document d
                 ON d.id = ppcw.id
-             WHERE ppcw.xml IS NULL             
+             WHERE ppcw.xml IS NULL
           ORDER BY ppcw.doc_type, d.title
                        """ % numDocs)
         rowsRemoved = cursor.fetchall()
@@ -611,14 +621,14 @@ def dispCgWork():
 
     #----------------------------------------------------------------------
     # Find number of updated documents.
-    #----------------------------------------------------------------------  
-    try:      
+    #----------------------------------------------------------------------
+    try:
         cursor.execute("""\
             SELECT count(*)
-              FROM pub_proc_cg_work ppcw 
+              FROM pub_proc_cg_work ppcw
               JOIN pub_proc_cg ppc
                 ON ppcw.id = ppc.id
-             WHERE NOT ppcw.xml IS NULL             
+             WHERE NOT ppcw.xml IS NULL
                        """)
         oneRow = cursor.fetchone()
         nUpdated = 0
@@ -629,17 +639,17 @@ def dispCgWork():
 
     #----------------------------------------------------------------------
     # Find updated document information.
-    #----------------------------------------------------------------------  
-    try:      
-        numDocs = (nUpdated> 500) and 500 or nUpdated or 1 
+    #----------------------------------------------------------------------
+    try:
+        numDocs = (nUpdated> 500) and 500 or nUpdated or 1
         cursor.execute("""\
-            SELECT TOP %d ppcw.id, ppcw.doc_type, d.title               
-              FROM pub_proc_cg_work ppcw 
+            SELECT TOP %d ppcw.id, ppcw.doc_type, d.title
+              FROM pub_proc_cg_work ppcw
               JOIN document d
                 ON d.id = ppcw.id
               JOIN pub_proc_cg ppc
                 ON ppcw.id = ppc.id
-             WHERE NOT ppcw.xml IS NULL             
+             WHERE NOT ppcw.xml IS NULL
           ORDER BY ppcw.doc_type, d.title
                        """ % numDocs)
         rowsUpdated = cursor.fetchall()
@@ -648,19 +658,19 @@ def dispCgWork():
 
     #----------------------------------------------------------------------
     # Find number of added documents.
-    #----------------------------------------------------------------------  
-    try:      
+    #----------------------------------------------------------------------
+    try:
         cursor.execute("""\
             SELECT count(*)
-              FROM pub_proc_cg_work ppcw 
+              FROM pub_proc_cg_work ppcw
               JOIN document d
                 ON d.id = ppcw.id
-             WHERE NOT ppcw.xml IS NULL   
+             WHERE NOT ppcw.xml IS NULL
                AND NOT EXISTS (
-                       SELECT * 
+                       SELECT *
                          FROM pub_proc_cg ppc
                         WHERE ppc.id = ppcw.id
-                              )         
+                              )
                        """)
         oneRow = cursor.fetchone()
         nAdded = 0
@@ -671,20 +681,20 @@ def dispCgWork():
 
     #----------------------------------------------------------------------
     # Find added document information.
-    #----------------------------------------------------------------------  
-    try:      
+    #----------------------------------------------------------------------
+    try:
         numDocs = (nAdded> 500) and 500 or nAdded or 1
         cursor.execute("""\
-            SELECT TOP %d ppcw.id, ppcw.doc_type, d.title               
-              FROM pub_proc_cg_work ppcw 
+            SELECT TOP %d ppcw.id, ppcw.doc_type, d.title
+              FROM pub_proc_cg_work ppcw
               JOIN document d
                 ON d.id = ppcw.id
-             WHERE NOT ppcw.xml IS NULL   
+             WHERE NOT ppcw.xml IS NULL
                AND NOT EXISTS (
-                       SELECT * 
+                       SELECT *
                          FROM pub_proc_cg ppc
                         WHERE ppc.id = ppcw.id
-                              )         
+                              )
           ORDER BY ppcw.doc_type, d.title
                        """ % numDocs)
         rowsAdded = cursor.fetchall()
@@ -698,7 +708,7 @@ def dispCgWork():
     lAdded   = nAdded and LINK % ('Added', nAdded) or '%d' % nAdded
 
     html    = """\
-        <TABLE>   
+        <TABLE>
            <TR>
              <TD ALIGN='right' NOWRAP><B>Vendor Job Name: &nbsp;</B></TD>
              <TD>%s</TD>
@@ -706,7 +716,7 @@ def dispCgWork():
             <TR>
              <TD ALIGN='right' NOWRAP><B>Pushing Job Name: &nbsp;</B></TD>
              <TD>%s</TD>
-            </TR>      
+            </TR>
             <TR>
              <TD ALIGN='right' NOWRAP><B>Removed Documents: &nbsp;</B></TD>
              <TD>%s</TD>
@@ -714,62 +724,62 @@ def dispCgWork():
             <TR>
              <TD ALIGN='right' NOWRAP><B>Updated Documents: &nbsp;</B></TD>
              <TD>%s</TD>
-            </TR> 
+            </TR>
             <TR>
              <TD ALIGN='right' NOWRAP><B>Added Documents: &nbsp;</B></TD>
              <TD>%s</TD>
-            </TR>        
-           </TABLE>    
+            </TR>
+           </TABLE>
               """ % (vendor, push, lRemoved, lUpdated, lAdded)
 
     HEADER  = """\
                <BR><FONT COLOR="RED">Documents %s (Top 500):</FONT><BR><BR>
                <a NAME='%s'></a>
                <TABLE BORDER=1>
-                <tr>    
-                <td valign='top'><B>DocId</B></td>   
-                <td valign='top'><B>DocType</B></td>  
-                <td valign='top'><B>DocTitle</B></td>  
+                <tr>
+                <td valign='top'><B>DocId</B></td>
+                <td valign='top'><B>DocType</B></td>
+                <td valign='top'><B>DocTitle</B></td>
                 </tr>
-              """ 
+              """
     ROW     = """<tr><td><FONT COLOR='black'>%s</FONT></td>
                      <td><FONT COLOR='black'>%s</FONT></td>
-                     <td><FONT COLOR='black'>%s</FONT></td></tr>"""  
+                     <td><FONT COLOR='black'>%s</FONT></td></tr>"""
 
-    # Inserting a space after ';' to allow line breaks between 
+    # Inserting a space after ';' to allow line breaks between
     # protocol numbers in HTML output.        VE, 2005-03-25
     # --------------------------------------------------------
-    if nRemoved:       
-        html   += HEADER % ('Removed', 'Removed') 
+    if nRemoved:
+        html   += HEADER % ('Removed', 'Removed')
         for row in rowsRemoved:
             html += ROW % (row[0], row[1], string.replace(row[2], ';', '; '))
         html  += "</TABLE></BODY>"
     if nUpdated:
-        html   += HEADER % ('Updated', 'Updated') 
+        html   += HEADER % ('Updated', 'Updated')
         for row in rowsUpdated:
             html += ROW % (row[0], row[1], string.replace(row[2], ';', '; '))
         html  += "</TABLE></BODY>"
     if nAdded:
-        html   += HEADER % ('Added', 'Added')  
+        html   += HEADER % ('Added', 'Added')
         for row in rowsAdded:
-            html += ROW % (row[0], row[1], string.replace(row[2], ';', '; '))  
-        html  += "</TABLE></BODY>"      
-    
-    html  += "</HTML>"  
-    
+            html += ROW % (row[0], row[1], string.replace(row[2], ';', '; '))
+        html  += "</TABLE></BODY>"
+
+    html  += "</HTML>"
+
     cdrcgi.sendPage(header + html)
 
 #----------------------------------------------------------------------
 # Show a period to pick publishing jobs.
 #----------------------------------------------------------------------
 def selectPubDates():
-    
+
     title   = "CDR Administration"
     instr   = "Publishing Job Activities"
     buttons = ["Submit Request", "Report Menu", cdrcgi.MAINMENU, "Log Out"]
     script  = "PubStatus.py"
     header  = cdrcgi.header(title, title, instr, script, buttons)
-   
+
     now         = time.localtime(time.time())
     toDate      = time.strftime("%Y-%m-%d", now)
     then        = list(now)
@@ -800,7 +810,7 @@ def selectPubDates():
 # Show all publishing jobs within the period.
 #----------------------------------------------------------------------
 def dispJobsByDates():
-    
+
     title   = "CDR Administration"
     instr   = "Publishing Job Summary"
     buttons = ["Report Menu", cdrcgi.MAINMENU, "Log Out"]
@@ -810,7 +820,7 @@ def dispJobsByDates():
     conn   = cdrdb.connect("CdrGuest")
     cursor = conn.cursor()
 
-    form = """  
+    form = """
        <center>
        <b>
         <font size='4'>Publishing Job Report</font>
@@ -821,19 +831,19 @@ def dispJobsByDates():
        </b>
       </center>
       <br />
-      <br /> 
-      <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>          
+      <br />
+      <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
            """ % (fromDate, toDate, cdrcgi.SESSION, session)
-       
+
     #----------------------------------------------------------------------
     # Extract the job information from the database.
     #----------------------------------------------------------------------
     try:
         cursor.execute("""\
-                SELECT pp.id, pp.pub_subset, pp.started, 
+                SELECT pp.id, pp.pub_subset, pp.started,
 		               pp.completed, count(pp.id) AS numDocs
-                  FROM pub_proc pp, pub_proc_doc ppd              
-                 WHERE pp.started >= '%s' 
+                  FROM pub_proc pp, pub_proc_doc ppd
+                 WHERE pp.started >= '%s'
                    AND pp.completed <= DATEADD(s, -1, DATEADD(d, 1, '%s'))
                    AND pp.status = 'Success'
                    AND pp.id = ppd.pub_proc
@@ -849,7 +859,7 @@ def dispJobsByDates():
               ORDER BY pp.id DESC
                        """ % (fromDate, toDate)
                       )
-      
+
         row        = cursor.fetchone()
         if not row:
             cdrcgi.sendPage(header + """
@@ -881,8 +891,8 @@ def dispJobsByDates():
                 </tr>
                 """
         while row:
-            id, name, started, completed, count = row 
-            
+            id, name, started, completed, count = row
+
             form += """
                 <tr>
                     <td nowrap='1'><b>
@@ -904,17 +914,17 @@ def dispJobsByDates():
                     <td nowrap='1'><b>
                     <font size='2' color='black'>%d</font>
                     </b></td>
-                </tr> 
-                    """ % (id, cdrcgi.SESSION, session, id, 
+                </tr>
+                    """ % (id, cdrcgi.SESSION, session, id,
                            id, cdrcgi.SESSION, session, name,
                            started, completed, count)
-                     
+
             row = cursor.fetchone()
 
         form += "</table>"
     except cdrdb.Error, info:
         cdrcgi.bail('Failure executing query: %s' % info[1][0])
-  
+
     cdrcgi.sendPage(header + form + "</BODY></HTML>")
 
 #------------------------------------------------------------------
@@ -924,7 +934,7 @@ def dispJobsByDates():
 # transparent.
 #------------------------------------------------------------------
 def createTemporaryPubInfoTables(cursor, conn, latestFullLoad, cgJob):
-    
+
     #------------------------------------------------------------------
     # What was the last Cancer.gov push job for each document?
     # This will be before the current job, but no earlier than
@@ -989,9 +999,9 @@ def createTemporaryPubInfoTables(cursor, conn, latestFullLoad, cgJob):
         conn.commit()
     except cdrdb.Error, info:
         cdrcgi.bail("Failure getting IDs for removed docs: %s" % info[1][0])
-        
+
     #------------------------------------------------------------------
-    # Get the document IDs for the documents that were sent to 
+    # Get the document IDs for the documents that were sent to
     # Cancer.gov by the current job (that is, the ones that we
     # didn't pick up by the previous query).
     #------------------------------------------------------------------
@@ -1057,8 +1067,8 @@ def createTemporaryPubInfoTables(cursor, conn, latestFullLoad, cgJob):
 #----------------------------------------------------------------------
 # Report what has been added, removed, and updated in this job.
 #----------------------------------------------------------------------
-def dispJobReport():    
-    
+def dispJobReport():
+
     title   = "CDR Administration"
     instr   = "Publishing Job Summary"
     buttons = ["Report Menu", cdrcgi.MAINMENU, "Log Out"]
@@ -1070,37 +1080,37 @@ def dispJobReport():
 
 
     #----------------------------------------------------------------------
-    # Get subset name. 
+    # Get subset name.
     #----------------------------------------------------------------------
-    subSet = "" 
-    try:      
+    subSet = ""
+    try:
         cursor.execute("""\
-                SELECT pp.pub_subset               
+                SELECT pp.pub_subset
                   FROM pub_proc pp
-                 WHERE id = %d   
-                   AND pp.status = 'Success' 
+                 WHERE id = %d
+                   AND pp.status = 'Success'
                    AND pp.pub_system IN (
                            SELECT d.id
                              FROM document d, doc_type t
                             WHERE d.doc_type = t.id
                               AND t.name = 'PublishingSystem'
-                              AND d.title = 'Primary' 
-                                        )          
-                       """ % jobId                      
+                              AND d.title = 'Primary'
+                                        )
+                       """ % jobId
                       )
         row = cursor.fetchone()
         if row and row[0]:
-            subSet = row[0] 
+            subSet = row[0]
         else:
             cdrcgi.bail("Job%d is not a successful publishing job." % jobId)
-                        
+
     except cdrdb.Error, info:
         cdrcgi.bail("Failure in query for Job%d: %s." % (jobId, info[1][0]))
 
     #----------------------------------------------------------------------
     # If subSet is for a Vendor job, find the CG job.
-    # If subSet is for a CG job, find the vendor job.    
-    #---------------------------------------------------------------------- 
+    # If subSet is for a CG job, find the vendor job.
+    #----------------------------------------------------------------------
     pushJobName = "Push_Documents_To_Cancer.Gov_"
     cg_job = subSet.find(pushJobName) != -1 and jobId or 0
     vendor_job = cg_job == 0 and jobId or 0
@@ -1110,15 +1120,15 @@ def dispJobReport():
     if cg_job:
         cg_job_name = subSet
         vendor_job_name = subSet[len(pushJobName):]
-        try:      
+        try:
             cursor.execute("""\
-                SELECT id               
-                  FROM pub_proc 
+                SELECT id
+                  FROM pub_proc
                  WHERE status = 'Success'
                    AND pub_subset = ?
-                   AND id < ? 
+                   AND id < ?
               ORDER BY id DESC
-                           """, 
+                           """,
                            (vendor_job_name, cg_job)
                           )
             row = cursor.fetchone()
@@ -1126,21 +1136,21 @@ def dispJobReport():
                 vendor_job = row[0]
             else:
                 cdrcgi.bail("No Vendor job for CG Job%d." % jobId)
-                
+
         except cdrdb.Error, info:
             cdrcgi.bail("No Vendor job for CG Job%d: %s" % (jobId, info[1][0]))
     else:
         cg_job_name = pushJobName + subSet
         vendor_job_name = subSet
-        try:      
+        try:
             cursor.execute("""\
-                SELECT id               
-                  FROM pub_proc 
+                SELECT id
+                  FROM pub_proc
                  WHERE status = 'Success'
                    AND pub_subset = ?
-                   AND id > ? 
+                   AND id > ?
               ORDER BY id
-                           """, 
+                           """,
                            (cg_job_name, vendor_job)
                           )
             row = cursor.fetchone()
@@ -1148,38 +1158,38 @@ def dispJobReport():
                 cg_job = row[0]
             else:
                 cdrcgi.bail("No CG job for Vendor Job%d." % jobId)
-                
+
         except cdrdb.Error, info:
             cdrcgi.bail("No CG job for Vendor Job%d: %s." % (
                     jobId, info[1][0]))
 
-    # Get the latest Full Load.   
-    try:      
+    # Get the latest Full Load.
+    try:
         cursor.execute("""\
-            SELECT MAX(id)          
-              FROM pub_proc            
+            SELECT MAX(id)
+              FROM pub_proc
              WHERE status = 'Success'
                AND pub_subset = ?
-               AND id <= ?                                 
-                       """, 
+               AND id <= ?
+                       """,
                        (pushJobName + 'Full-Load', cg_job)
                       )
         row = cursor.fetchone()
         if row and row[0]:
             latestFullLoad = row[0]
         else:
-            cdrcgi.bail("No latest full load for job %s." % cg_job)            
+            cdrcgi.bail("No latest full load for job %s." % cg_job)
     except cdrdb.Error, info:
         cdrcgi.bail("Failure getting latest full load for job %s: %s." % (
-            cg_job, info[1][0]))        
+            cg_job, info[1][0]))
 
     # See comments for this function.
     createTemporaryPubInfoTables(cursor, conn, latestFullLoad, cg_job)
-    
+
     # How many documents are published in vendor job?
-    try:      
+    try:
         cursor.execute("""\
-            SELECT t.name, count(t.name)       
+            SELECT t.name, count(t.name)
               FROM pub_proc_doc ppd, document d, doc_type t
              WHERE ppd.failure IS NULL
                AND ppd.doc_id = d.id
@@ -1189,8 +1199,8 @@ def dispJobReport():
         rowsPublished = cursor.fetchall()
         numPublished = 0
         for row in rowsPublished:
-            numPublished += row[1]  
-                 
+            numPublished += row[1]
+
     except cdrdb.Error, info:
         cdrcgi.bail("Failure getting vendor_count for %d: %s." % (
                     vendor_job, info[1][0]))
@@ -1198,40 +1208,40 @@ def dispJobReport():
     #------------------------------------------------------------------
     # Get the counts (by doc type) of documents removed from Cancer.gov.
     #------------------------------------------------------------------
-    try:      
+    try:
         cursor.execute("""
-            SELECT t.name, count(t.name)       
+            SELECT t.name, count(t.name)
               FROM doc_type t
               JOIN document d
                 ON d.doc_type = t.id
               JOIN #removed_docs r
                 ON r.doc_id = d.id
           GROUP BY t.name""")
-        rowsRemoved = cursor.fetchall()       
+        rowsRemoved = cursor.fetchall()
         numRemoved = 0
         for row in rowsRemoved:
-            numRemoved += row[1]        
-       
+            numRemoved += row[1]
+
     except cdrdb.Error, info:
         cdrcgi.bail("Failure getting removed doc counts for job %d: %s." % (
                     cg_job, info[1][0]))
-    
+
     #------------------------------------------------------------------
     # Get the counts (by doc type) of documents updated on Cancer.gov.
     #------------------------------------------------------------------
-    try:      
+    try:
         cursor.execute("""\
-            SELECT t.name, count(t.name)       
+            SELECT t.name, count(t.name)
               FROM doc_type t
               JOIN document d
                 ON d.doc_type = t.id
               JOIN #changed_docs c
                 ON c.doc_id = d.id
           GROUP BY t.name""")
-        rowsUpdated = cursor.fetchall() 
+        rowsUpdated = cursor.fetchall()
         numUpdated = 0
         for row in rowsUpdated:
-            numUpdated += row[1]        
+            numUpdated += row[1]
     except cdrdb.Error, info:
         cdrcgi.bail("Failure getting updated doc counts for job %d: %s." % (
             cg_job, info[1][0]))
@@ -1240,9 +1250,9 @@ def dispJobReport():
     # Get the counts (by doc type) of all documents sent to Cancer.gov
     # that they didn't already have.
     #------------------------------------------------------------------
-    try:      
+    try:
         cursor.execute("""\
-            SELECT t.name, count(t.name)       
+            SELECT t.name, count(t.name)
               FROM doc_type t
               JOIN document d
                 ON d.doc_type = t.id
@@ -1258,16 +1268,16 @@ def dispJobReport():
                     "by job %d: %s" % (cg_job, info[1][0]))
 
     #------------------------------------------------------------------
-    # Get the list of document types. 
+    # Get the list of document types.
     # We need this so that we are able to display doc types even if
     # there is no entry/count in the document table. The output of this
     # query serves as the row label for the statistics Report output.
     # We do this by selecting all known doc types from the last Export
-    # job and combine the result with all new doc types from the 
-    # current job (in case a new doc type gets introduces with a 
-    # hotfix). 
+    # job and combine the result with all new doc types from the
+    # current job (in case a new doc type gets introduces with a
+    # hotfix).
     #------------------------------------------------------------------
-    try:      
+    try:
         cursor.execute("""\
             SELECT DISTINCT t.name
               FROM doc_type t
@@ -1301,15 +1311,15 @@ def dispJobReport():
     #------------------------------------------------------------------
     # Build the report HTML.
     #------------------------------------------------------------------
-    form = """  
+    form = """
        <center>
        <b>
         <font size='4'>Publishing Job Pair Summary</font>
-       </b>         
+       </b>
            """
     form += """
         <BR><BR>
-        <TABLE ALIGN='center'>   
+        <TABLE ALIGN='center'>
            <TR>
              <TD ALIGN='right' NOWRAP><B>Vendor Job: &nbsp;</B></TD>
              <TD>%s (Job%d)</TD>
@@ -1317,7 +1327,7 @@ def dispJobReport():
             <TR>
              <TD ALIGN='right' NOWRAP><B>Pushing Job: &nbsp;</B></TD>
              <TD>%s (Job%d)</TD>
-            </TR> 
+            </TR>
             <TR>
              <TD ALIGN='right' NOWRAP><B>Published Documents: &nbsp;</B></TD>
              <TD>%d</TD>
@@ -1329,25 +1339,25 @@ def dispJobReport():
             <TR>
              <TD ALIGN='right' NOWRAP><B>Updated Documents: &nbsp;</B></TD>
              <TD>%d</TD>
-            </TR>       
+            </TR>
             <TR>
              <TD ALIGN='right' NOWRAP><B>Removed Documents: &nbsp;</B></TD>
              <TD>%d</TD>
             </TR>
-        </TABLE>    
-              """ % (vendor_job_name, vendor_job, cg_job_name, cg_job, 
+        </TABLE>
+              """ % (vendor_job_name, vendor_job, cg_job_name, cg_job,
                      numPublished, numAdded, numUpdated, numRemoved)
 
     form += """
         <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
         <BR>
-        <TABLE WIDTH="50%%" ALIGN='center' BORDER='1'>   
+        <TABLE WIDTH="50%%" ALIGN='center' BORDER='1'>
            <TR>
              <TD              ALIGN='center'><B>DocType</B></TD>
              <TD WIDTH="18%%" ALIGN='center'><B>Published</B></TD>
              <TD WIDTH="18%%" ALIGN='center'><B>Added</B></TD>
              <TD WIDTH="18%%" ALIGN='center'><B>Updated</B></TD>
-             <TD WIDTH="18%%" ALIGN='center'><B>Removed</B></TD>            
+             <TD WIDTH="18%%" ALIGN='center'><B>Removed</B></TD>
            </TR>
            """ % (cdrcgi.SESSION, session)
     ROW = """<TR>
@@ -1355,13 +1365,13 @@ def dispJobReport():
              <TD ALIGN='right' NOWRAP>%d</TD>
              <TD ALIGN='right' NOWRAP>%s</TD>
              <TD ALIGN='right' NOWRAP>%s</TD>
-             <TD ALIGN='right' NOWRAP>%s</TD>      
+             <TD ALIGN='right' NOWRAP>%s</TD>
            </TR>
           """
     LINK = "<A STYLE='text-decoration: underline;' "
     LINK += "HREF='PubStatus.py?id=%d&type=RepDetail&docType=%s"
     LINK += "&docCount=%d&cgMode=%s&%s=%s'>%d</A>"
-           
+
     for type in docTypes:
         nPublished = 0
         nAdded = 0
@@ -1384,17 +1394,17 @@ def dispJobReport():
                 nRemoved = row[1]
                 break
         form += ROW % (
-            type, 
+            type,
             nPublished,
-            nAdded and LINK % (cg_job, type, nAdded, 'Added', 
+            nAdded and LINK % (cg_job, type, nAdded, 'Added',
                                cdrcgi.SESSION, session, nAdded) or "0",
             nUpdated and LINK % (cg_job, type, nUpdated, 'Updated',
                                  cdrcgi.SESSION, session, nUpdated) or "0",
             nRemoved and LINK % (cg_job, type, nRemoved, 'Removed',
                                  cdrcgi.SESSION, session, nRemoved) or "0"
                       )
-        
-    form += "</TABLE>"   
+
+    form += "</TABLE>"
 
     cdrcgi.sendPage(header + form + "</BODY></HTML>")
 
@@ -1402,8 +1412,8 @@ def dispJobReport():
 #----------------------------------------------------------------------
 # Report what has been added, removed, or updated in each doc type.
 #----------------------------------------------------------------------
-def dispJobRepDetail():    
-    
+def dispJobRepDetail():
+
     title   = "CDR Administration"
     instr   = "Publishing Job Detail"
     buttons = ["Report Menu", cdrcgi.MAINMENU, "Log Out"]
@@ -1414,55 +1424,55 @@ def dispJobRepDetail():
     cursor = conn.cursor()
     pushJobName = "Push_Documents_To_Cancer.Gov_"
 
-    # Get the latest Full Load.       
-    try:      
+    # Get the latest Full Load.
+    try:
         cursor.execute("""\
-            SELECT MAX(id)          
-              FROM pub_proc            
+            SELECT MAX(id)
+              FROM pub_proc
              WHERE status = 'Success'
                AND pub_subset = ?
-               AND id <= ?                                 
-                       """, 
+               AND id <= ?
+                       """,
                        (pushJobName + 'Full-Load', jobId)
                       )
         row = cursor.fetchone()
         if row and row[0]:
             latestFullLoad = row[0]
         else:
-            cdrcgi.bail("No latest full load for job %s." % jobId)            
+            cdrcgi.bail("No latest full load for job %s." % jobId)
     except cdrdb.Error, info:
         cdrcgi.bail("Failure getting latest full load for job %s: %s." % (
-            jobId, info[1][0])) 
+            jobId, info[1][0]))
 
     if cgMode in ('Updated', 'Added'):
         createTemporaryPubInfoTables(cursor, conn, latestFullLoad, jobId)
-    
+
     # What documents are removed by cg job?
     if cgMode == 'Removed':
-        try:      
+        try:
             cursor.execute("""
-                SELECT TOP 500 ppd.doc_id, ppd.doc_version, d.title       
+                SELECT TOP 500 ppd.doc_id, ppd.doc_version, d.title
                   FROM pub_proc_doc ppd, document d, doc_type t
                  WHERE ppd.failure IS NULL
                    AND ppd.doc_id = d.id
-                   AND ppd.removed = 'Y'  
+                   AND ppd.removed = 'Y'
                    AND d.doc_type = t.id
-                   AND t.name = ?                            
+                   AND t.name = ?
                    AND ppd.pub_proc = ?
-              ORDER BY d.title                   
+              ORDER BY d.title
                            """, (docType, jobId)
                           )
-            rows = cursor.fetchall() 
-       
+            rows = cursor.fetchall()
+
         except cdrdb.Error, info:
             cdrcgi.bail("Failure getting removed for %d: %s." % (
                         jobId, info[1][0]))
-    
-    # What documents are updated by cg job?      
+
+    # What documents are updated by cg job?
     elif cgMode == 'Updated':
-        try:      
+        try:
             cursor.execute("""\
-                SELECT TOP 500 p.doc_id, p.doc_version, d.title       
+                SELECT TOP 500 p.doc_id, p.doc_version, d.title
                   FROM pub_proc_doc p
                   JOIN #changed_docs c
                     ON c.doc_id = p.doc_id
@@ -1473,17 +1483,17 @@ def dispJobRepDetail():
                  WHERE t.name = ?
                    AND p.pub_proc = ?
               ORDER BY d.title""", (docType, jobId))
-            rows = cursor.fetchall()                  
-        
+            rows = cursor.fetchall()
+
         except cdrdb.Error, info:
             cdrcgi.bail("Failure getting updated for job %d: %s." % (
                 jobId, info[1][0]))
 
-    # What documents are newly added by cg job?  
+    # What documents are newly added by cg job?
     elif cgMode == 'Added':
-        try:      
+        try:
             cursor.execute("""\
-                SELECT TOP 500 p.doc_id, p.doc_version, d.title       
+                SELECT TOP 500 p.doc_id, p.doc_version, d.title
                   FROM pub_proc_doc p
                   JOIN #new_docs n
                     ON n.doc_id = p.doc_id
@@ -1495,31 +1505,31 @@ def dispJobRepDetail():
                    AND p.pub_proc = ?
               ORDER BY d.title""", (docType, jobId))
             rows = cursor.fetchall()
-                              
+
         except cdrdb.Error, info:
             cdrcgi.bail("Failure getting added for job %d: %s." % (
                 jobId, info[1][0]))
 
-    form = """  
+    form = """
        <center>
        <b>
         <font size='4'>Documents Pushed to Cancer.gov</font>
         <br><br>
-        <font size='3'>Job ID: %d</font>  
+        <font size='3'>Job ID: %d</font>
         <br>
-        <font size='3'>%s</font>  
-       </b> 
-       </center>     
+        <font size='3'>%s</font>
+       </b>
+       </center>
            """ % (jobId, docType)
 
     form += """
         <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
         <BR>
         <TABLE ALIGN='center'><TR><TD>
-        <b><font size='3'>%s %d documents %s</font></b>  
+        <b><font size='3'>%s %d documents %s</font></b>
         </TD></TR>
         <TR><TD>
-        <TABLE ALIGN='center' BORDER='1'>   
+        <TABLE ALIGN='center' BORDER='1'>
            <TR>
              <TD ALIGN='center' NOWRAP><B>DocId</B></TD>
              <TD ALIGN='center' NOWRAP><B>DocVersion</B></TD>
@@ -1533,11 +1543,11 @@ def dispJobRepDetail():
              <TD ALIGN='left'>%s</TD>
            </TR>
           """
-           
-    for row in rows:        
+
+    for row in rows:
         form += ROW % (row[0], row[1], row[2])
-     
-    form += "</TABLE></TD></TR></TABLE>"   
+
+    form += "</TABLE></TD></TR></TABLE>"
 
     cdrcgi.sendPage(header + form + "</BODY></HTML>")
 
@@ -1548,11 +1558,11 @@ if request == cdrcgi.MAINMENU:
     cdrcgi.navigateTo("Admin.py", session)
 elif request == "Report Menu":
     cdrcgi.navigateTo("Reports.py", session)
-elif request == "Log Out": 
+elif request == "Log Out":
     cdrcgi.logout(session)
 
 if session and not dispType:
-    if not fromDate or not toDate: 
+    if not fromDate or not toDate:
         selectPubDates()
     else:
         dispJobsByDates()
@@ -1570,12 +1580,12 @@ elif dispType == "CgWork":
     dispCgWork()
 elif dispType == "Manage":
     if not session:
-        cdrcgi.bail("A session ID must be provided for this page.")    
+        cdrcgi.bail("A session ID must be provided for this page.")
     dispJobControl()
-elif dispType == "Report":    
+elif dispType == "Report":
     dispJobReport()
-elif dispType == "RepDetail":    
+elif dispType == "RepDetail":
     dispJobRepDetail()
 else:
     cdrcgi.bail("Display type: %s not supported." % dispType)
-    
+
