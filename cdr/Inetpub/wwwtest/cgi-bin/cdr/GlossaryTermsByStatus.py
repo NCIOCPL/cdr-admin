@@ -1,12 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermsByStatus.py,v 1.6 2006-09-12 14:17:49 bkline Exp $
+# $Id: GlossaryTermsByStatus.py,v 1.7 2006-10-26 17:47:53 bkline Exp $
 #
 # The Glossary Terms by Status Report will server as a QC report to check
 # which glossary terms were created within a given time frame with a
 # particular status set.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2006/09/12 14:17:49  bkline
+# Added columns Pronunciation Resource and Definition Resource.
+#
 # Revision 1.5  2006/06/29 14:31:49  bkline
 # Selection logic modified at Sheri's request (#2281).
 #
@@ -53,10 +56,24 @@ elif request == "Log Out":
     cdrcgi.logout(session)
 
 def getOptions():
-    return """\
-       <OPTION VALUE='Approved'>Approved</OPTION>
-       <OPTION VALUE='Pending'>Pending</OPTION>
-       <OPTION VALUE='Revision pending'>Revision pending</OPTION>"""
+    vvList = None
+    try:
+        docType = cdr.getDoctype('guest', 'GlossaryTerm')
+        vvLists = docType.vvLists
+        for v in vvLists:
+            if v[0] == 'TermStatus':
+                vvList = v[1]
+                break
+    except:
+        pass
+    if not vvList:
+        cdrcgi.bail("Unable to find valid values for glossary term status")
+    html = []
+    for vv in vvList:
+        html.append(u"""\
+       <option value="%s">%s</option>""" % (cgi.escape(vv, True),
+                                            cgi.escape(vv)))
+    return u"\n".join(html)
 
 #----------------------------------------------------------------------
 # As the user for the report parameters.

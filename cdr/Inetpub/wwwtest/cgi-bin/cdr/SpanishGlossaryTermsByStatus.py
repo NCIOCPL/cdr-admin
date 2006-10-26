@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: SpanishGlossaryTermsByStatus.py,v 1.2 2006-05-18 18:40:55 bkline Exp $
+# $Id: SpanishGlossaryTermsByStatus.py,v 1.3 2006-10-26 17:47:53 bkline Exp $
 #
 # Split off from the base glossary terms by status report because new
 # requirements force the report to be performed in batch mode.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2006/05/18 18:40:55  bkline
+# Removed default values used for debugging.
+#
 # Revision 1.1  2006/05/17 14:17:05  bkline
 # Split out from base Glossary Terms By Status report because it takes
 # too long for straight CGI, and must now be run in batch mode.
@@ -40,6 +43,26 @@ elif request == "Report Menu":
     cdrcgi.navigateTo("Reports.py", session)
 elif request == "Log Out": 
     cdrcgi.logout(session)
+
+def getOptions():
+    vvList = None
+    try:
+        docType = cdr.getDoctype('guest', 'GlossaryTerm')
+        vvLists = docType.vvLists
+        for v in vvLists:
+            if v[0] == 'DefinitionStatus':
+                vvList = v[1]
+                break
+    except:
+        pass
+    if not vvList:
+        cdrcgi.bail("Unable to find valid values for definition status")
+    html = []
+    for vv in vvList:
+        html.append(u"""\
+       <option value="%s">%s</option>""" % (cgi.escape(vv, True),
+                                            cgi.escape(vv)))
+    return u"\n".join(html)
 
 #----------------------------------------------------------------------
 # As the user for the report parameters.
@@ -85,11 +108,8 @@ if not fromDate or not toDate or not status or not email:
      <TD ALIGN='right'><B>Term Status:&nbsp;</TD>
      <TD>
       <SELECT NAME='status' %s>
-       <OPTION VALUE=''>Select One</OPTION>
-       <OPTION VALUE='Translation approved'>Translation approved</OPTION>
-       <OPTION VALUE='Translation pending'>Translation pending</OPTION>
-       <OPTION VALUE='Translation revision pending'>Translation
-            revision pending</OPTION>
+       <option value=''>Select One</option>
+%s
       </SELECT>
      </TD>
     </TR>
@@ -106,7 +126,7 @@ if not fromDate or not toDate or not status or not email:
  </BODY>
 </HTML>
 """ % (cdrcgi.SESSION, session, fromDate, style, toDate, style, style,
-       cdr.getEmail(session) or '', style)
+       getOptions(), cdr.getEmail(session) or '', style)
     cdrcgi.sendPage(header + form)
 
 #----------------------------------------------------------------------    
