@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: PublishPreview.py,v 1.28 2006-07-11 20:50:58 venglisc Exp $
+# $Id: PublishPreview.py,v 1.29 2006-11-02 00:16:01 venglisc Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
@@ -137,7 +137,6 @@ showProgress("Started...")
 
 #----------------------------------------------------------------------
 # Map for finding the filters for a given document type.
-# Need to enter (Document type : [filter set])
 #----------------------------------------------------------------------
 filterSets = {
     'CTGovProtocol'         : ['set:Vendor CTGovProtocol Set'],
@@ -224,7 +223,7 @@ showProgress("Fetched document type: %s..." % row[0])
 
 if not flavor:
     if docType == "Summary":                  flavor = "summary"
-    elif docType == "DrugInformationSummary": flavor = "druginfosummary"
+    elif docType == "DrugInformationSummary": flavor = "DrugInformationSummary"
     elif docType == "InScopeProtocol":        flavor = "protocol_hp"
     elif docType == "CTGovProtocol":          flavor = "CTGovProtocol_HP"
     elif docType == "GlossaryTerm":           flavor = "glossary"
