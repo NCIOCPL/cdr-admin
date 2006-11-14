@@ -1,12 +1,16 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermsByStatus.py,v 1.7 2006-10-26 17:47:53 bkline Exp $
+# $Id: GlossaryTermsByStatus.py,v 1.8 2006-11-14 21:51:28 bkline Exp $
 #
 # The Glossary Terms by Status Report will server as a QC report to check
 # which glossary terms were created within a given time frame with a
 # particular status set.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.7  2006/10/26 17:47:53  bkline
+# Switched to using the schema for construction of the status
+# picklists (request #2617).
+#
 # Revision 1.6  2006/09/12 14:17:49  bkline
 # Added columns Pronunciation Resource and Definition Resource.
 #
@@ -173,14 +177,14 @@ conn = cdrdb.connect('CdrGuest')
 cursor = conn.cursor()
 
 cursor.execute("""\
-    SELECT DISTINCT s.doc_id, MAX(v.dt)
+    SELECT DISTINCT s.doc_id
       FROM query_term s
-      JOIN doc_version v
-        ON v.id = s.doc_id
+      JOIN query_term d
+        ON d.doc_id = s.doc_id
      WHERE s.path = '/GlossaryTerm/TermStatus'
+       AND d.path = '/GlossaryTerm/StatusDate'
        AND s.value = ?
-  GROUP BY s.doc_id
-    HAVING MAX(v.dt) BETWEEN '%s' AND DATEADD(s, -1, DATEADD(d, 1, '%s'))""" %
+       AND d.value BETWEEN '%s' AND DATEADD(s, -1, DATEADD(d, 1, '%s'))""" %
                    (fromDate, toDate), status, timeout = 300)
 
 class GlossaryTerm:
