@@ -1,12 +1,16 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermsByStatus.py,v 1.8 2006-11-14 21:51:28 bkline Exp $
+# $Id: GlossaryTermsByStatus.py,v 1.9 2006-11-14 22:01:23 bkline Exp $
 #
 # The Glossary Terms by Status Report will server as a QC report to check
 # which glossary terms were created within a given time frame with a
 # particular status set.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.8  2006/11/14 21:51:28  bkline
+# Switched to selecting by StatusDate instead of date of last version
+# (see request #2618).
+#
 # Revision 1.7  2006/10/26 17:47:53  bkline
 # Switched to using the schema for construction of the status
 # picklists (request #2617).
@@ -192,7 +196,7 @@ class GlossaryTerm:
         self.id = id
         self.name = None
         self.pronunciation = None
-        self.pronunciationResource = None
+        self.pronunciationResources = []
         self.definitions = []
         self.definitionResources = []
         self.source = None
@@ -207,7 +211,7 @@ class GlossaryTerm:
             elif child.nodeName == "TermPronunciation":
                 self.pronunciation = getNodeContent(child)
             elif child.nodeName == "PronunciationResource":
-                self.pronunciationResource = getNodeContent(child)
+                self.pronunciationResources.append(getNodeContent(child))
             elif child.nodeName == "TermDefinition":
                 for grandchild in child.childNodes:
                     if grandchild.nodeName == "DefinitionText":
@@ -320,7 +324,7 @@ for term in terms:
        fix(term.name),
        fix(term.pubPronunciation),
        fix(term.pronunciation),
-       fix(term.pronunciationResource),
+       fixList(term.pronunciationResources),
        fixList(term.pubDefinitions),
        fixList(term.definitions),
        fixList(term.definitionResources),
@@ -343,7 +347,7 @@ for term in terms:
 """ % (term.id,
        fix(term.name),
        fix(term.pronunciation),
-       fix(term.pronunciationResource),
+       fixList(term.pronunciationResources),
        fixList(term.definitions),
        fixList(term.definitionResources),
        fix(term.source),
