@@ -2,8 +2,13 @@
 #
 # Publishing CGI script.
 #
-# $Id: publishing.py,v 1.24 2004-01-21 22:42:40 venglisc Exp $
+# $Id: publishing.py,v 1.25 2006-11-21 15:58:40 venglisc Exp $
 # $Log: not supported by cvs2svn $
+# Revision 1.24  2004/01/21 22:42:40  venglisc
+# Created a new screen for the Hot-Fix process allowing the user to
+# copy/paste CDR IDs instead entering manually.  Also allowing user to pick
+# between entering CDR IDs and loading IDs.
+#
 # Revision 1.23  2003/06/19 19:37:08  bkline
 # Bumped up the number of rows for document IDs from 10 to 24.
 #
@@ -141,7 +146,7 @@ class Display:
         for r in publishes:
             if r[3][0:7] == "Mailers":
                 continue            
-            if "FRANCK" !=  string.upper(socket.gethostname()):
+            if "BACH" ==  string.upper(socket.gethostname()):
                 if r[3][0:12] == "QcFilterSets":
                     continue
             form += "<LI><A href='%s/%s?%s=%s&ctrlId=%s&version=%s'>%s</A>\
