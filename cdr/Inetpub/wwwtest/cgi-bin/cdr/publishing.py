@@ -2,8 +2,12 @@
 #
 # Publishing CGI script.
 #
-# $Id: publishing.py,v 1.25 2006-11-21 15:58:40 venglisc Exp $
+# $Id: publishing.py,v 1.26 2006-11-24 20:56:04 venglisc Exp $
 # $Log: not supported by cvs2svn $
+# Revision 1.25  2006/11/21 15:58:40  venglisc
+# Modified to allow QCFilterSets to be run not just on MAHLER (but not on
+# BACH. (Bug 2533)
+#
 # Revision 1.24  2004/01/21 22:42:40  venglisc
 # Created a new screen for the Hot-Fix process allowing the user to
 # copy/paste CDR IDs instead entering manually.  Also allowing user to pick
@@ -180,7 +184,7 @@ class Display:
             subsets.append(deep)
         if type(subsets) == type(""): cdrcgi.bail(subsets)    
 
-        form  = "<H4>Publishing Subsets of System: %s</H4>\n" % sysName
+        form  = "<H4>Publishing Subsets of System:<BR/>%s</H4>\n" % sysName
         form += "<OL>\n"
 
         for r in subsets:
@@ -208,7 +212,9 @@ class Display:
         form += HIDDEN % ('idMethod', idMethod)  
         
         form += """
-<H4>User Selected Documents and Parameters for Subset: %s</H4>
+<H4>User Selected Documents and Parameters for Subset:
+<BR/>
+%s</H4>
 """ % SubSet 
         form += "<OL>\n"
         
@@ -219,48 +225,40 @@ class Display:
             # -------------------------------------------------------------
             # cdrcgi.bail("IDMethod: %s" % idMethod)
             if idMethod == 'enter':
-                form += """
-<LI>
- <H5>Enter publishable document Id/Version [e.g.,190930 or 190930/3]: </H5>
-</LI>
+                form += """ <LI>
+  <B>Enter publishable document Id/Version [e.g.,190930 or 190930/3]:</B>
+  <BR/>
+  <TABLE BORDER='1'>
 """
-                form += "<TABLE BORDER='1'>"
         
                 # This is up to userselect element in the control document.
                 # Will revisit this.
                 docIdList = ""
                 for r in range(4):
-                    form += "<TR>"
+                    form += "   <TR>\n"
                     for i in range(5):
                         id = 10 * r + i
                         docIdList += ",CdrDoc%d" % id
-                        form += """
- <TD>
-  <INPUT NAME='CdrDoc%d' TYPE='TEXT' SIZE='10'>
- </TD>""" % id
-                    form += """
-</TR>
-"""
+                        form += """    <TD>
+     <INPUT NAME='CdrDoc%d' TYPE='TEXT' SIZE='10'>
+    </TD>
+""" % id
+                    form += "   </TR>\n"
                 if not Redirected: 
                     form += HIDDEN % ('DocIds', docIdList)
 
-                form += "</TABLE></LI><BR>\n"
+                form += "  </TABLE>\n  <P/>\n </LI>"
 
             else:
                 # ---------------------------------------------------------
                 # Enter the CDR IDs by copy/pasting from e-mail to operator
                 # ---------------------------------------------------------
-                form += """
-<LI>
- <H5>Paste in all CDR IDs</H5>
-</LI>
-"""
-                form += "<TABLE BORDER='1'>"
-                form +="""
-<TEXTAREA NAME='DocIds' rows="10" cols="40"></TEXTAREA>
-"""
-                form += "</TABLE></LI><BR>\n"
-
+                form += """  <LI>
+   <B>Paste in all CDR IDs</B>
+   <BR/>
+   <TEXTAREA NAME='DocIds' rows="10" cols="40"></TEXTAREA>
+   <P/>
+  </LI>"""
 
         # Subset parameters exist.
         if Param:
@@ -273,9 +271,22 @@ class Display:
                 deep = copy.deepcopy(param)
                 params.append(deep) 
 
-            form += "<LI><H5>Modify default parameter values if applicable:"
-            form += "</H5><TABLE BORDER='1'><TR><TD><B>Name</B></TD><TD><B>"               
-            form += "Default Value</B></TD><TD><B>Current Value</B></TD></TR>\n"
+            form += """
+  <LI>
+   <B>Modify default parameter values if applicable</B>
+            
+   <TABLE BORDER='1'>
+    <TR>
+     <TD>
+      <B>Name</B>
+     </TD>
+     <TD>
+      <B>Default Value</B>
+     </TD>
+     <TD>
+      <B>Current Value</B>
+     </TD>
+    </TR>"""
         
             paramList = ""
             for r in params:
@@ -285,33 +296,50 @@ class Display:
                         self.__addFooter("The value of parameter PubType,\
                              %s, is not supported. <BR>Please modify \
                             the control document or the source code." % r[2])
-                    form += """<TR><TD>%s</TD><TD>%s</TD><TD><INPUT \
-                        NAME='%s' VALUE='%s' READONLY></TD></TR>\n""" % (
-                        r[1], r[2], r[1], r[2])
+                    form += """
+    <TR>
+     <TD>%s</TD>
+     <TD>%s</TD>
+     <TD><INPUT NAME='%s' VALUE='%s' READONLY></TD>
+    </TR>\n""" % (r[1], r[2], r[1], r[2])
                 elif r[1] == "SubSetName" or r[1] == "GroupEmailAddrs":
-                    form += """<TR><TD>%s</TD><TD>%s</TD><TD><INPUT \
-                        NAME='%s' VALUE='%s' READONLY></TD></TR>\n""" % (
-                        r[1], r[2], r[1], r[2])
+                    form += """
+    <TR>
+     <TD>%s</TD>
+     <TD>%s</TD>
+     <TD><INPUT NAME='%s' VALUE='%s' READONLY></TD>
+    </TR>
+""" % (r[1], r[2], r[1], r[2])
                 elif r[2] == "Yes" or r[2] == "No":
-               
                     # Create a picklist for parameter name/value pairs.
                     YesNo = (r[2] == "No") and "Yes" or "No"
-                    pickList = "<SELECT NAME='%s'>\n<OPTION>%s</OPTION>"
-                    pickList += "\n<OPTION>%s</OPTION>\n</SELECT>" 
-                    form += "<TR><TD>%s</TD><TD>%s</TD><TD>%s</TD></TR>\n" % (
-                        r[1], r[2], pickList % (r[1], r[2], YesNo))
+                    pickList = """
+      <SELECT NAME='%s'>
+       <OPTION>%s</OPTION>
+       <OPTION>%s</OPTION>
+      </SELECT>
+     """ 
+                    form += """
+    <TR>
+     <TD>%s</TD>
+     <TD>%s</TD>
+     <TD>%s</TD>
+    </TR>
+""" % (r[1], r[2], pickList % (r[1], r[2], YesNo))
                 else:
-                    form += """<TR><TD>%s</TD><TD>%s</TD><TD><INPUT \
-                        NAME='%s' VALUE='%s'></TD></TR>\n""" % (r[1], r[2], 
-                        r[1], r[2])
+                    form += """
+    <TR>
+     <TD>%s</TD>
+     <TD>%s</TD>
+     <TD><INPUT NAME='%s' VALUE='%s'></TD>
+    </TR>
+""" % (r[1], r[2], r[1], r[2])
             if not Redirected:
                 form += HIDDEN % ('Params', paramList)
         
-            form += "</TABLE></LI><BR>\n"
+            form += "</TABLE><P/>\n"
             
-        form += "<LI><INPUT NAME='Confirm' TYPE='SUBMIT' "
-        form += "VALUE='Confirm Publishing This SubSet'></LI>"
-        form += "<BR><BR>\n"
+        form += "<INPUT NAME='Confirm' TYPE='SUBMIT' VALUE='Next >'></LI>"
         
         form += HIDDEN % (cdrcgi.SESSION, session)   
         self.__addFooter(form)
@@ -353,20 +381,43 @@ class Display:
         form += HIDDEN % ('Documents', docIdValues)    
 
         # Display message.
-        form += "<H4>Publishing System Confirmation</H4>\n"  
+        form += """<H4>Publishing System Confirmation
+        <BR/>%s</H4>""" % fields.getvalue('SubSet')
+
         addresses = grpEmailAddr and (grpEmailAddr + ";") or ""
         addresses += self.__getUsrAddr()
-        form += """Email notification of completion?
-        <input type="checkbox" checked name="Email" value="y">&nbsp;&nbsp;
-        <BR> Email to [use comma or semicolon between addresses]: &nbsp
-        <input type="text" size="100" name="EmailAddr" 
-        value="%s"><br><br>Messages only [no document files
-        created]?<input type="checkbox" name="NoOutput" value="Y"><br>
-        <br>""" % addresses
-        form += "<p>Do you want to publish the subset: %s? <BR><BR>\n" \
-             % fields.getvalue('SubSet')
-        # form += "of system %s?</p>\n" % fields.getvalue('PubSys')
-        form += """<input type="submit" name="Publish" value="Yes">"""      
+        form += """<table>
+        <tr>
+          <td>
+            <input type="checkbox" checked name="Email" value="y">
+          </td>
+          <td>
+            Email notification of completion?
+          </td>
+        </tr>
+        <tr>
+          <td>
+            &nbsp;
+          </td>
+          <td>
+            Email to [use comma or semicolon between addresses]:<BR/>
+            <input type="text" size="60" name="EmailAddr" value="%s">
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <input type="checkbox" name="NoOutput" value="Y">
+          </td>
+          <td>
+            Messages only [no DB document files created]?
+          </td>
+        <tr>
+        </table>
+
+        <P/>""" % addresses
+
+        form += """Publish this subset?&nbsp;&nbsp;
+        <input type="submit" name="Publish" value="OK">"""
          
         form += HIDDEN % (cdrcgi.SESSION, session)           
         cdrcgi.sendPage(header + form + "</FORM></BODY></HTML>")
@@ -380,7 +431,7 @@ class Display:
     
         systemName = self.__getPubSubsets(ctrlDocId, version)[0][0]
 
-        form = "<H4>Publishing SubSet: %s</H4>\n" % subsetName     
+        form = "<H4>Publishing SubSet:<BR/>%s</H4>\n" % subsetName     
            
         # Get publishing job ID.  
         if subsetName == 'Hotfix-Remove':     
@@ -415,10 +466,9 @@ class Display:
         if fields.has_key('Doc'):
             form += HIDDEN % ('Doc', fields.getvalue('Doc'))  
         
-        form += """
-<H4>User Selected Documents and Parameters for Subset: %s</H4>
-""" % SubSet 
-        form += "<OL>\n"
+        form += """<H4>User Selected Documents and Parameters for Subset:
+<BR/>
+%s</H4>""" % SubSet 
         
         # UserSelect is allowed.
         form += """
@@ -428,10 +478,8 @@ class Display:
 """
 
         form += "<BR>\n"
-            
         form += "<INPUT NAME='Load' TYPE='SUBMIT' "
-        form += "VALUE='Click to Enter CDR IDs'>"
-        form += "<BR><BR>\n"
+        form += "VALUE='Next >'>"
         
         form += HIDDEN % (cdrcgi.SESSION, session)   
         self.__addFooter(form)
