@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CiatCipsStaff.py,v 1.3 2004-11-01 21:27:00 venglisc Exp $
+# $Id: CiatCipsStaff.py,v 1.4 2006-11-29 16:18:43 bkline Exp $
 #
 # Main menu for CIAT/CIPS staff.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2004/11/01 21:27:00  venglisc
+# Added menu item to ftp images from CIPSFTP.  Alphabetized list. (Bug 1365)
+#
 # Revision 1.2  2004/08/10 15:39:26  bkline
 # Plugged in new menu items for editing the external mapping values.
 #
@@ -42,6 +45,7 @@ items   = (('AdvancedSearch.py', 'Advanced Search'      ),
            ('Mailers.py',        'Mailers'              ),
            ('MergeProt.py',      'Protocol Merge'       ),
            ('Reports.py',        'Reports'              ),
+           ('CtsSubmittedTrials.py', 'Submitted Trials Review' ),
            ('EditExternMap.py',  'Update Mapping Table' )
            )
 #items   = (('AdvancedSearch.py', 'Advanced Search'      ),
