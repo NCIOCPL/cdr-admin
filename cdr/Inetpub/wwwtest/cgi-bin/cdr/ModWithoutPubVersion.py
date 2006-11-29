@@ -1,12 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: ModWithoutPubVersion.py,v 1.8 2006-06-19 21:30:33 bkline Exp $
+# $Id: ModWithoutPubVersion.py,v 1.9 2006-11-29 16:07:55 bkline Exp $
 #
 # Reports on documents which have been changed since a previously 
 # publishable version without a new publishable version have been
 # created.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.8  2006/06/19 21:30:33  bkline
+# Python upgrade broke mungeDate() function.  Installed workaround.
+#
 # Revision 1.7  2003/12/24 00:09:36  venglisc
 # If a record existed in the audit_trail table with a latest record that did
 # not have a status of "MODIFY DOCUMENT" or "ADD DOCUMENT" the document would
@@ -166,6 +169,7 @@ try:
               JOIN action
                 ON action.id = a.action
              WHERE a.dt BETWEEN '%s' AND DATEADD(s, -1, DATEADD(d, 1, '%s'))
+               AND d.active_status = 'A'
                AND u.name LIKE '%s'
                AND action.name IN ('ADD DOCUMENT', 'MODIFY DOCUMENT')
                AND a.dt = (SELECT MAX(dt)
@@ -174,7 +178,7 @@ try:
                                ON action.id = a.action
                             WHERE document = d.id
                               AND action.name IN ('ADD DOCUMENT', 
-                                                    'MODIFY DOCUMENT'))
+                                                  'MODIFY DOCUMENT'))
                %s""" % (fromDate, toDate, modUser, dtQual), timeout = 120)
     cursor.execute("""\
             SELECT v.id              doc_id, 
