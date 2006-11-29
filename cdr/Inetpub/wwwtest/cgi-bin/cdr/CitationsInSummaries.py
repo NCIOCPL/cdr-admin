@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: CitationsInSummaries.py,v 1.1 2006-05-05 22:30:42 venglisc Exp $
+# $Id: CitationsInSummaries.py,v 1.2 2006-11-29 16:21:24 bkline Exp $
 #
 # Report listing all citations linked by a summary document.
 # The output format is *.xml (Excel is able to import this)
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2006/05/05 22:30:42  venglisc
+# Initial copy of report listing Citation documents that are linked to a
+# summary. (Bug 2040)
+#
 #
 #----------------------------------------------------------------------
 import cdrdb, sys, time, cdrcgi, ExcelWriter
@@ -78,7 +82,7 @@ for row in rows:
     exRow = ws.addRow(rowNum, style1, 40)
     url = ("http://bach.nci.nih.gov/cgi-bin/cdr/"
            "QcReport.py?Session=guest&DocId=%d" % row[0])
-    exRow.addCell(1, row[0], href = url, style = style4)
+    exRow.addCell(1, " %s" % row[0], href = url, style = style4)
     exRow.addCell(2, row[1], style = style2)
 
 t = time.strftime("%Y%m%d%H%M%S")                                               
@@ -86,7 +90,7 @@ print "Content-type: application/vnd.ms-excel"
 print "Content-Disposition: attachment; filename=CitationsInSummaries-%s.xls" % t    
 print                
 
-wb.write(sys.stdout)
+wb.write(sys.stdout, True)
 
 # # Save the Report
 # # ---------------
