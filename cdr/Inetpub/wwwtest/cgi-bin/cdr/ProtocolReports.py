@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolReports.py,v 1.28 2006-08-31 14:39:39 venglisc Exp $
+# $Id: ProtocolReports.py,v 1.29 2006-11-29 16:04:36 bkline Exp $
 #
 # Submenu for protocol reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.28  2006/08/31 14:39:39  venglisc
+# Replaced report 'Active Lead Orgs without Active Sites' with the new report
+# 'Active Status without Sites'. (Bug 2379)
+#
 # Revision 1.27  2006/07/11 13:41:50  bkline
 # Added flavor showing title.
 #
@@ -154,6 +158,8 @@ reports = [
             'NCI Liaison Office/Brussels Protocol Report', ''),
            ('NewlyPublishableTrials.py', 
             'Newly Publishable Trials', ''),
+           ('NewlyPublishedTrials2.py', 
+            'Newly Published Trials', ''),
            ('PreferredProtOrgs.py', 
             'Preferred Protocol Organizations', ''),
            ('NciClinicalTrialsStats.py', 
@@ -175,6 +181,8 @@ reports = [
             'Protocols with Active Status But No Active Sites', ''),
            ('ProtocolINDReport.py',
             'Protocols with FDA IND Information (Excel)', ''),
+           ('OutcomeMeasuresCodingReport.py',
+            'Protocols without Outcomes', '&onlyMissing=Y'),
            ('ProtProcReport.py',
             'Protocol Processing Status Report', ''),
            ('ProtProcReport.py',
