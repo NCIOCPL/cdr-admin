@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: CTGov.py,v 1.12 2006-04-26 17:23:12 venglisc Exp $
+# $Id: CTGov.py,v 1.13 2006-11-29 16:16:08 bkline Exp $
 #
 # Submenu for ClinicalTrials.gov activities.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.12  2006/04/26 17:23:12  venglisc
+# Adding new menu item for Unpublished CTGovProtocol by Phase report.
+# Sorting the menu items alphabetically. (Bug 2048)
+#
 # Revision 1.11  2006/01/10 20:09:44  ameyer
 # Minor change to the wording associated with the CTGovUpdateReport.
 #
@@ -94,11 +98,12 @@ form = """\
     <OL>
 """ % (cdrcgi.SESSION, session)
 reports = [
-           ('CTGovImport.py?which=new', 'Review New Protocols'),
-           ('CTGovImport.py?which=cips', 'Review Protocols Sent to CIPS')
+           ('ForceCtgovImport.py?', 'Force CTGov Import'),
+           ('CTGovImport.py?which=new&', 'Review New Protocols'),
+           ('CTGovImport.py?which=cips&', 'Review Protocols Sent to CIPS')
           ]
 for r in reports:
-    form += "<LI><A HREF='%s/%s&%s=%s'>%s</A></LI>\n" % (
+    form += "<LI><A HREF='%s/%s%s=%s'>%s</A></LI>\n" % (
             cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
 
 form += """\
