@@ -1,12 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: ForceCtgovImport.py,v 1.1 2006-08-22 19:13:34 bkline Exp $
+# $Id: ForceCtgovImport.py,v 1.2 2006-11-29 16:14:44 bkline Exp $
 #
 # Interface for forcing the import of a trial from ClinicalTrials.gov
 # when none of the search terms for the trial match the criteria for
 # our import search request.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2006/08/22 19:13:34  bkline
+# New administrative script for marking a CTGov trial for forced import.
+#
 #----------------------------------------------------------------------
 import cgi, cdrcgi, cdrdb
 
@@ -47,34 +50,40 @@ def describeResult(result, nctId, color):
                                                                      result)
 
 #----------------------------------------------------------------------
+# Get the disposition code for 'import requested'.
+#----------------------------------------------------------------------
+def getImportRequestedCode(cursor):
+    cursor.execute("""\
+        SELECT id
+          FROM ctgov_disposition
+         WHERE name = 'import requested'""")
+    rows = cursor.fetchall()
+    if not rows:
+        cdrcgi.bail("Failure fetching disposition code for 'import requested'")
+    return rows[0][0]
+
+#----------------------------------------------------------------------
 # If we have an ID, process it.
 #----------------------------------------------------------------------
 if nctId:
     conn = cdrdb.connect()
     cursor = conn.cursor()
+    dispositionCode = getImportRequestedCode(cursor)
     cursor.execute("SELECT force FROM ctgov_import WHERE nlm_id = ?", nctId)
     rows = cursor.fetchall()
     if not rows:
-        nyr = 'not yet reviewed'
-        cursor.execute("""\
-            SELECT id
-              FROM ctgov_disposition
-             WHERE name = '%s'""" % nyr)
-        rows = cursor.fetchall()
-        if not rows:
-            cdrcgi.bail("Unable to find code for disposition '%s'" % nyr)
-        disposition = rows[0][0]
         cursor.execute("""\
             INSERT INTO ctgov_import (nlm_id, disposition, dt, force)
-                 VALUES (?, ?, GETDATE(), 'Y')""", (nctId, disposition))
+                 VALUES (?, ?, GETDATE(), 'Y')""", (nctId, dispositionCode))
         conn.commit()
         extra = describeResult(u"added to table and marked for forced import",
                                nctId, u"green")
     elif rows[0][0] != 'Y':
         cursor.execute("""\
             UPDATE ctgov_import
-               SET force = 'Y'
-             WHERE nlm_id = ?""", nctId)
+               SET force = 'Y',
+                   disposition = %d
+             WHERE nlm_id = ?""" % dispositionCode, nctId)
         conn.commit()
         extra = describeResult(u"marked for forced import", nctId, u"green")
     else:
