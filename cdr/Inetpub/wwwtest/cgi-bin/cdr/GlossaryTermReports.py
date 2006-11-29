@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermReports.py,v 1.10 2006-07-10 20:34:39 bkline Exp $
+# $Id: GlossaryTermReports.py,v 1.11 2006-11-29 15:45:32 bkline Exp $
 #
 # Submenu for glossary term reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.10  2006/07/10 20:34:39  bkline
+# Added new report on stale glossary terms.
+#
 # Revision 1.9  2006/05/17 13:16:08  bkline
 # Switched Spanish Glossary Term By Status report to separate script.
 #
@@ -83,9 +86,14 @@ for r in reports:
 
 form += """\
     </OL>
+    <H3>Management Reports</H3>
+    <OL>
+     <LI><A HREF='%s/PronunciationByWordStem.py?%s=%s'>%s</LI></A>
+    </OL>
     <H3>Other Reports</H3>
     <OL>
-"""
+""" % (cdrcgi.BASE, cdrcgi.SESSION, session,
+       "Pronunciation by Term Stem Report")
 reports = [
            ('GlossaryTermLinks.py?',
             'Documents Linked to Glossary Term Report'),
