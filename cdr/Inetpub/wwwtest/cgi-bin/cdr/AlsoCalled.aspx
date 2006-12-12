@@ -1,10 +1,13 @@
 <%--
   ======================================================================
-  $Id: AlsoCalled.aspx,v 1.1 2006-12-12 03:04:17 bkline Exp $
+  $Id: AlsoCalled.aspx,v 1.2 2006-12-12 03:12:26 bkline Exp $
 
   Report for Margaret showing related glossary terms (see request #2565).
 
   $Log: not supported by cvs2svn $
+  Revision 1.1  2006/12/12 03:04:17  bkline
+  Second report for request #2685.
+
   ======================================================================
   --%>
 <%@ Page Language='C#' Debug='True' %>
@@ -145,7 +148,7 @@
                 int docId = (int)reader[0];
                 string def = (string)reader[1];
                 GlossaryTerm term = (GlossaryTerm)docIds[docId];
-                int n = term.extractOtherNames(def);
+                int n = term.extractOtherNames(def.Trim());
                 if (maxOtherNames < n)
                     maxOtherNames = n;
             }
