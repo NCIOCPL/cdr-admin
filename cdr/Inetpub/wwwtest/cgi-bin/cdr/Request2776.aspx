@@ -1,10 +1,13 @@
 <%--
   =====================================================================
-    $Id: Request2776.aspx,v 1.1 2006-12-08 23:08:39 bkline Exp $
+    $Id: Request2776.aspx,v 1.2 2006-12-12 14:49:45 bkline Exp $
 
     Report for Sheri on CTSU persons with no links from protocols.
 
     $Log: not supported by cvs2svn $
+    Revision 1.1  2006/12/08 23:08:39  bkline
+    New report for Sheri (see Bugzilla request #2776).
+
   =====================================================================
   --%>
 <%@ Page Language='C#' %>
@@ -13,8 +16,6 @@
 
 <script runat='server'>
     void Page_Load(Object source, EventArgs e) {
-        SqlConnection conn = CdrClient.dbConnect("CdrGuest");
-try {
         string[] queries = new string[] {
             "CREATE TABLE #all_prots (id INT)",
             "CREATE TABLE #active_prots (id INT)",
@@ -35,14 +36,6 @@ try {
                      AND value IN ('Active',
                                    'Approved-not yet active',
                                    'Temporarily closed')",
-/*
-            @"INSERT INTO #all_persons 
-                   SELECT d.id
-                     FROM document d
-                     JOIN doc_type t
-                       ON t.id = d.doc_type
-                    WHERE t.name = 'Person'",
-*/
             @"INSERT INTO #ctsu_persons 
           SELECT DISTINCT m.doc_id
                      FROM external_map m
@@ -64,41 +57,35 @@ try {
                      JOIN #ctsu_persons p
                        ON p.id = q.int_val"
         };
-        foreach (string query in queries) {
-            SqlCommand c = new SqlCommand(query, conn);
-            c.CommandTimeout = 300;
-            c.ExecuteNonQuery();
-        }
-        string[] tables = new string[] {
-            "#persons_in_prots",
-            "#persons_in_active_prots"
-        };
-        for (int i = 0; i < 2; ++i) {
-            string query = String.Format(@"
-                SELECT d.id AS doc_id, d.title AS doc_title
-                  FROM document d
-                  JOIN #ctsu_persons p
-                    ON p.id = d.id
-                 WHERE d.id NOT IN (SELECT id FROM {0})
-              ORDER BY d.id", tables[i]);
-            SqlCommand cmd = new SqlCommand(query, conn);
-            cmd.CommandTimeout = 300;
-            SqlDataAdapter da = new SqlDataAdapter(cmd);
-            DataSet ds = new DataSet();
-            da.Fill(ds);
-            if (i == 0) {
-                grid1.DataSource = ds;
-                grid1.DataBind();
+        string[] tables = { "#persons_in_prots", "#persons_in_active_prots" };
+        DataGrid[] dataGrids = { grid1, grid2 };
+        SqlConnection conn = CdrClient.dbConnect("CdrGuest");
+        try {
+            foreach (string query in queries) {
+                SqlCommand c = new SqlCommand(query, conn);
+                c.CommandTimeout = 300;
+                c.ExecuteNonQuery();
             }
-            else {
-                grid2.DataSource = ds;
-                grid2.DataBind();
+            for (int i = 0; i < dataGrids.Length; ++i) {
+                string query = String.Format(@"
+                    SELECT d.id AS doc_id, d.title AS doc_title
+                      FROM document d
+                      JOIN #ctsu_persons p
+                        ON p.id = d.id
+                     WHERE d.id NOT IN (SELECT id FROM {0})
+                  ORDER BY d.id", tables[i]);
+                SqlCommand cmd = new SqlCommand(query, conn);
+                cmd.CommandTimeout = 300;
+                SqlDataAdapter da = new SqlDataAdapter(cmd);
+                DataSet ds = new DataSet();
+                da.Fill(ds);
+                dataGrids[i].DataSource = ds;
+                dataGrids[i].DataBind();
             }
         }
-}
-finally {
-        conn.Close();
-}
+        finally {
+            conn.Close();
+        }
     }
 </script>
 <html>
