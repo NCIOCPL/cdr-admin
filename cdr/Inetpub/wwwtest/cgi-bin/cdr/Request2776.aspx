@@ -1,10 +1,14 @@
 <%--
   =====================================================================
-    $Id: Request2776.aspx,v 1.3 2006-12-12 19:25:26 bkline Exp $
+    $Id: Request2776.aspx,v 1.4 2006-12-12 19:26:45 bkline Exp $
 
     Report for Sheri on CTSU persons with no links from protocols.
 
     $Log: not supported by cvs2svn $
+    Revision 1.3  2006/12/12 19:25:26  bkline
+    Completely rewritten (Sheri didn't really say what she wanted the first
+    time).
+
     Revision 1.2  2006/12/12 14:49:45  bkline
     Syntax cleanup.
 
@@ -74,68 +78,6 @@
                        ON u.id = m.usage
                     WHERE u.name = 'CTSU_Person_ID'
                       AND m.doc_id IS NULL"
-/*
-            "CREATE TABLE #all_prots (id INT)",
-            "CREATE TABLE #active_prots (id INT)",
-            "CREATE TABLE #ctsu_persons (id NVARCHAR(356))",
-            "CREATE TABLE #persons_in_prots (id NVARCHAR(356))",
-            "CREATE TABLE #persons_in_active_prots (id NVARCHAR(356))",
-            @"INSERT INTO #all_prots
-                   SELECT d.id
-                     FROM document d
-                     JOIN doc_type t
-                       ON t.id = d.doc_type
-                    WHERE t.name = 'InScopeProtocol'",
-            @"INSERT INTO #active_prots
-          SELECT DISTINCT doc_id
-                     FROM query_term
-                    WHERE path = '/InScopeProtocol/ProtocolAdminInfo'
-                               + '/CurrentProtocolStatus'
-                      AND value IN ('Active',
-                                    'Approved-not yet active',
-                                    'Temporarily closed')",
-            @"INSERT INTO #ctsu_persons 
-          SELECT DISTINCT m.value
-                     FROM external_map m
-                     JOIN external_map_usage u
-                       ON u.id = m.usage
-                    WHERE u.name = 'CTSU_Person_ID'
-                      AND m.doc_id IS NULL",
-            @"INSERT INTO #persons_in_prots
-          SELECT DISTINCT i.value
-                     FROM query_term i
-                     JOIN query_term t
-                       ON t.doc_id = i.doc_id
-                      AND LEFT(t.node_loc, 20) = LEFT(i.node_loc, 20)
-                     JOIN #all_prots p
-                       ON p.id = i.doc_id
-                     JOIN #ctsu_persons c
-                       ON c.id = i.value
-                    WHERE i.path = '/InScopeProtocol/ProtocolAdminInfo'
-                                 + '/ExternalSites/ExternalSite'
-                                 + '/ExternalSitePI/ExternalID'
-                      AND t.path = '/InScopeProtocol/ProtocolAdminInfo'
-                                 + '/ExternalSites/ExternalSite'
-                                 + '/ExternalSitePI/ExternalID/@Type'
-                      AND t.value = 'CTSU_person_id'",
-            @"INSERT INTO #persons_in_active_prots
-          SELECT DISTINCT i.value
-                     FROM query_term i
-                     JOIN query_term t
-                       ON t.doc_id = i.doc_id
-                      AND LEFT(t.node_loc, 20) = LEFT(i.node_loc, 20)
-                     JOIN #active_prots p
-                       ON p.id = i.doc_id
-                     JOIN #ctsu_persons c
-                       ON c.id = i.value
-                    WHERE i.path = '/InScopeProtocol/ProtocolAdminInfo'
-                                 + '/ExternalSites/ExternalSite'
-                                 + '/ExternalSitePI/ExternalID'
-                      AND t.path = '/InScopeProtocol/ProtocolAdminInfo'
-                                 + '/ExternalSites/ExternalSite'
-                                 + '/ExternalSitePI/ExternalID/@Type'
-                      AND t.value = 'CTSU_person_id'",
-*/
         };
         string[] tables = { "#persons_in_prots", "#persons_in_active_prots" };
         HtmlTable[] reportTables = { tbl1, tbl2 };
@@ -147,13 +89,6 @@
                 c.ExecuteNonQuery();
             }
             for (int i = 0; i < reportTables.Length; ++i) {
-/*
-                string query = String.Format(@"
-                    SELECT id
-                      FROM #ctsu_persons
-select id from #ctsu_persons where id not in (select distinct person from #ctsu_active_prot_persons)
-select id from #ctsu_persons where id not in (select distinct person from #ctsu_prot_persons)
-*/
                 string query = String.Format(@"
                     SELECT id
                       FROM #ctsu_persons
