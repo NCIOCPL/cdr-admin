@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: Reports.py,v 1.23 2006-09-28 23:08:52 ameyer Exp $
+# $Id: Reports.py,v 1.24 2007-01-05 23:23:11 venglisc Exp $
 #
 # Prototype for editing CDR linking tables.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.23  2006/09/28 23:08:52  ameyer
+# Changed date and message for Documentation link.
+#
 # Revision 1.22  2006/05/04 14:34:13  bkline
 # Added Drug information reports.
 #
@@ -104,19 +107,20 @@ if action == "Log Out":
 form = "<INPUT TYPE='hidden' NAME='%s' VALUE='%s'><OL>\n" % (cdrcgi.SESSION,
                                                              session)
 reports = [
-       ('GeneralReports.py',      'General Reports'),
-       ('CitationReports.py',     'Citations'),
-       ('CdrDocumentation.py',    'Documentation (PDF generated 2006-09-28)'),
-       ('DrugInfoReports.py',     'Drug Information'),
-       ('GeographicReports.py',   'Geographic'),
-       ('GlossaryTermReports.py', 'Glossary Terms'),
-       ('MailerReports.py',       'Mailers'),
-       ('MediaReports.py',        'Media'),
-       ('PubStatus.py',           'Publishing'),
-       ('PersonAndOrgReports.py', 'Persons and Organizations'),
-       ('ProtocolReports.py',     'Protocols'),
-       ('SummaryAndMiscReports.py','Summaries and Miscellaneous Documents'),
-       ('TerminologyReports.py',  'Terminology')
+           ('GeneralReports.py',      'General Reports'),
+           ('CitationReports.py',     'Citations'),
+           ('CdrDocumentation.py',    'Documentation (as of 2004-09-08)'),
+           ('DrugInfoReports.py',     'Drug Information'),
+           ('GeographicReports.py',   'Geographic'),
+           ('GlossaryTermReports.py', 'Glossary Terms'),
+           ('MailerReports.py',       'Mailers'),
+           ('MediaReports.py',        'Media'),
+           ('PublishReports.py',      'Publishing'),
+           ('PersonAndOrgReports.py', 'Persons and Organizations'),
+           ('ProtocolReports.py',     'Protocols'),
+           ('SummaryAndMiscReports.py', 
+                                      'Summaries and Miscellaneous Documents'),
+           ('TerminologyReports.py',  'Terminology')
           ]
 
 for r in reports:
