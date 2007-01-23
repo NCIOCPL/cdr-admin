@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryChanges.py,v 1.2 2003-11-05 14:50:28 bkline Exp $
+# $Id: SummaryChanges.py,v 1.3 2007-01-23 22:09:39 bkline Exp $
 #
 # Report of history of changes to a single summary.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2003/11/05 14:50:28  bkline
+# Added font style information for HTML body element.
+#
 # Revision 1.1  2003/08/29 18:14:39  bkline
 # Report on changes made to a specified summary in the last 1 or 2 years.
 #
@@ -30,7 +33,10 @@ dateRange = fields.getvalue("DateRange")  or None
 if docId:
     digits = re.sub('[^\d]+', '', docId)
     docId  = int(digits)
-numYears = dateRange and int(dateRange) or 2
+try:
+    numYears = dateRange and int(dateRange) or 2
+except:
+    cdrcgi.bail("Invalid date range: %s" % dateRange)
 
 #----------------------------------------------------------------------
 # Load common style information from repository.
@@ -117,10 +123,7 @@ if not docId and not docTitle:
    </TR>
    <TR>
     <TD ALIGN='right'>Date Range:&nbsp;</TD>
-    <TD>
-     <INPUT TYPE='radio' NAME='DateRange' VALUE='1' CHECKED='1'>1 Year<BR>
-     <INPUT TYPE='radio' NAME='DateRange' VALUE='2'>2 Years
-    </TD>
+    <TD><INPUT NAME='DateRange' VALUE='2' SIZE='2'></TD>
    </TR>
   </TABLE>
 """ % (cdrcgi.SESSION, session)
