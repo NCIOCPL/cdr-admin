@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolReports.py,v 1.29 2006-11-29 16:04:36 bkline Exp $
+# $Id: ProtocolReports.py,v 1.30 2007-01-25 16:49:17 bkline Exp $
 #
 # Submenu for protocol reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.29  2006/11/29 16:04:36  bkline
+# Plugged in two new reports (for requests #2443 and #2513).
+#
 # Revision 1.28  2006/08/31 14:39:39  venglisc
 # Replaced report 'Active Lead Orgs without Active Sites' with the new report
 # 'Active Status without Sites'. (Bug 2379)
@@ -156,6 +159,8 @@ reports = [
             'NCI Cancer Centers', ''),
            ('LiaisonReport.py', 
             'NCI Liaison Office/Brussels Protocol Report', ''),
+           ('Request2862.py', 
+            'NCI Liaison Office Trial Contacts for Abstract Review', ''),
            ('NewlyPublishableTrials.py', 
             'Newly Publishable Trials', ''),
            ('NewlyPublishedTrials2.py', 
