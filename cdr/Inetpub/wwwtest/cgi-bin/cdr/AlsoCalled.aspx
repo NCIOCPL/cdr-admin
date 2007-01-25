@@ -1,10 +1,13 @@
 <%--
   ======================================================================
-  $Id: AlsoCalled.aspx,v 1.2 2006-12-12 03:12:26 bkline Exp $
+  $Id: AlsoCalled.aspx,v 1.3 2007-01-25 16:48:50 bkline Exp $
 
   Report for Margaret showing related glossary terms (see request #2565).
 
   $Log: not supported by cvs2svn $
+  Revision 1.2  2006/12/12 03:12:26  bkline
+  One more tweak to eliminate spurious whitespace.
+
   Revision 1.1  2006/12/12 03:04:17  bkline
   Second report for request #2685.
 
@@ -108,10 +111,11 @@
         }
     }
     void Page_Load(Object source, EventArgs args) {
-        Hashtable docIds = new Hashtable();
-        SortedList terms = new SortedList();
-        ArrayList dups = new ArrayList();
-        SqlConnection conn = CdrClient.dbConnect("CdrGuest");
+        DateTime      start  = DateTime.Now;
+        Hashtable     docIds = new Hashtable();
+        SortedList    terms  = new SortedList();
+        ArrayList     dups   = new ArrayList();
+        SqlConnection conn   = CdrClient.dbConnect("CdrGuest");
         try {
             SqlCommand cmd = new SqlCommand(@"
                     SELECT doc_id, value
@@ -160,6 +164,7 @@
                 cell.InnerText = "Also Called " + (i + 1).ToString();
                 headers.Cells.Add(cell);
             }
+            int count = 0;
             foreach (GlossaryTerm term in terms.GetValueList()) {
                 if (!term.done) {
                     foreach (string name in term.otherNames) {
@@ -167,8 +172,15 @@
                             ((GlossaryTerm)terms[name.ToUpper()]).done = true;
                     }
                     term.addRow(reportTable, maxOtherNames + 2);
+                    count++;
                 }
             }
+            h2.InnerText = String.Format("Terms With Aliases ({0} Concepts)",
+                                         count);
+            DateTime finish = DateTime.Now;
+            TimeSpan delta = finish.Subtract(start);
+            int ms = (int)delta.TotalMilliseconds;
+            timing.InnerText = String.Format("Processing time: {0} ms.", ms);
         }
         finally {
             conn.Close();
@@ -183,6 +195,7 @@
    h1   { font-size: 14pt; }
    h2   { font-size: 12pt; }
    #dupTable td { color: red; }
+   #timing {font-size: 7pt; color: green; }
   </style>
  </head>
  <body>
@@ -198,7 +211,7 @@
    </tr>
   </table>
   <br />
-  <h2>Terms With Aliases</h2>
+  <h2 runat='server' id='h2'>Terms With Aliases</h2>
   <table id='reportTable' runat='server'
          border='1' cellpadding='3' cellspacing='0'>
    <tr id='headers'>
@@ -206,5 +219,7 @@
     <th>Glossary Term</th>
    </tr>
   </table>
+  <br />
+  <span id='timing' runat='server' />
  </body>
 </html>
