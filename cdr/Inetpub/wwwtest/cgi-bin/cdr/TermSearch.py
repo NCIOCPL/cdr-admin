@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: TermSearch.py,v 1.7 2005-09-09 20:11:20 bkline Exp $
+# $Id: TermSearch.py,v 1.8 2007-02-01 13:32:13 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Term documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.7  2005/09/09 20:11:20  bkline
+# More fixes to mapping strings.
+#
 # Revision 1.6  2005/09/01 11:50:53  bkline
 # Corrected values incorrectly set in the mapping spec document.
 #
@@ -24,7 +27,7 @@
 # Initial revision
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, cdrdb, xml.dom.minidom, xml.sax.saxutils
+import cgi, cdr, cdrcgi, re, cdrdb, xml.dom.minidom, urllib, time
 
 #----------------------------------------------------------------------
 # Get the form variables.
@@ -67,7 +70,7 @@ if srchThes and False:
 # Prepare string for living in an XML document.
 #----------------------------------------------------------------------
 def fix(s):
-    return s and xml.sax.saxutils.escape(s) or u''
+    return s and cgi.escape(s) or u''
 
 def extractError(node):
     return node.toxml()
@@ -202,16 +205,39 @@ class Concept:
 # Retrieve a concept document from the NCI Thesaurus.
 #----------------------------------------------------------------------
 def fetchConcept(code):
-    cmd = ("java -classpath d:/cdr/lib;d:/usr/lib/evs-client.jar;"
-           "d:/usr/lib/log4j.jar "
-           "RetrieveConceptFromEvs %s" % code)
-    result = cdr.runCommand(cmd)
-    if result.code:
-        cdrcgi.bail("Failure fetching concept: %s" %
-                    (result.output or "unknown failure"))
+    #cmd = ("java -classpath d:/cdr/lib;d:/usr/lib/evs-client.jar;"
+    #       "d:/usr/lib/log4j.jar "
+    #       "RetrieveConceptFromEvs %s" % code)
+    #result = cdr.runCommand(cmd)
+    #if result.code:
+    #    cdrcgi.bail("Failure fetching concept: %s" %
+    #                (result.output or "unknown failure"))
+    url = ("http://cabio-qa.nci.nih.gov/cacore32/GetXML?"
+           "query=DescLogicConcept&DescLogicConcept[@code=%s]" % code)
+    tries = 3
+    code = code.strip()
+    while tries:
+        try:
+            urlObj = urllib.urlopen(url)
+            docXml = urlObj.read()
+            break
+        except Exception, e:
+            tries -= 1
+            if not tries:
+                cdrcgi.bail("EVS server unavailable: %s" % e)
+    filt = ["name:EVS Concept Filter"]
+    result = cdr.filterDoc('guest', filt, doc = docXml)
+    if type(result) in (str, unicode):
+        now = time.strftime("%Y%m%d%H%M%S")
+        f = open("d:/tmp/ConceptDoc-%s-%s.xml" % (code, now), "wb")
+        f.write(docXml)
+        f.close()
+        cdrcgi.bail("Error in EVS response: %s" % result)
+    docXml = result[0]
     try:
-        dom = xml.dom.minidom.parseString(result.output)
-        open("d:/tmp/ConceptDocs.xml", "a").write(result.output)
+        #docXml = result.output
+        #open("d:/tmp/ConceptDocs.xml", "a").write(docXml)
+        dom = xml.dom.minidom.parseString(docXml)
         return Concept(dom.documentElement)
     except Exception, e:
         cdrcgi.bail("Failure parsing concept: %s" % str(e))
