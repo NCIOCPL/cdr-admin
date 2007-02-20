@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PubStatus.py,v 1.24 2006-10-19 22:51:56 ameyer Exp $
+# $Id: PubStatus.py,v 1.25 2007-02-20 23:57:15 venglisc Exp $
 #
 # Status of a publishing job.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.24  2006/10/19 22:51:56  ameyer
+# Added logging of updates of the pub_proc table to publish.log.
+#
 # Revision 1.23  2006/08/28 22:06:54  venglisc
 # Fixed problem causing the first row of the report to be dropped. (Bug 2453)
 #
@@ -537,7 +540,7 @@ def dispJobControl():
             html += ROW % (row[0], row[0], row[1], row[2], row[3])
         html += "</TABLE></td></tr></table>"
         html += "<BR><FONT COLOR='NAVY'>Resume checked job(s) with "
-        html += "the following description</FONT>"
+        html += "the following description</FONT><br/>"
         html += "<TEXTAREA NAME='CgJobDesc' ROWS='5' COLS='80'>"
         html += "Enter a brief job description for Cancer.gov.</TEXTAREA>"
 
