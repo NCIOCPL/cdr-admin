@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryMetaData.py,v 1.3 2005-07-19 22:02:28 ameyer Exp $
+# $Id: SummaryMetaData.py,v 1.4 2007-02-21 17:16:52 venglisc Exp $
 #
 # Report on the metadata for one or more summaries.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2005/07/19 22:02:28  ameyer
+# Modified the logic to report that data is missing rather than just
+# blow up when processing invalid records.
+#
 # Revision 1.2  2005/06/28 20:47:48  venglisc
 # Added two new MetaData elements (SummaryDescription, SummaryURL) to the QC
 # report. (Bug 1724)
@@ -40,7 +44,10 @@ rptHead     = """\
  <head>
   <title>Summary Metadata Report</title>
   <style type='text/css'>
-   body { font-family: Arial }
+   body     { font-family: Arial }
+   tr.odd   { background-color: #F7F7F7; }
+   tr.even  { background-color: #FFFFFF; }
+   tr.head  { background-color: #E2E2E2; }
   </style>
  </head>"""
 
@@ -106,7 +113,8 @@ SELECT DISTINCT board.id, board.title
             semi = row[1].find(';')
             if semi != -1: boardTitle = trim(row[1][:semi])
             else:          boardTitle = trim(row[1])
-            picklist += "<option>[CDR%010d] %s</option>" % (row[0], boardTitle)
+            #picklist += "<option>%s</option>" % (boardTitle)
+            picklist += "<option>[CDR%d] %s</option>" % (row[0], boardTitle)
     except cdrdb.Error, info:
         cdrcgi.bail('Database query failure: %s' % info[1][0])
     return picklist + "</select>"
@@ -292,7 +300,7 @@ class Summary:
         sortedKeys.sort()
         for key in sortedKeys:
             sections.append(SummarySection(titles.get(
-                key, "[Missing Section Title]"),
+                key, "[No Section Title]"),
                                            diagnoses.get(key, "&nbsp;"),
                                            sectionTypes.get(key, "&nbsp;")))
         return sections
@@ -365,18 +373,32 @@ class Summary:
         html += """\
     </td>
    </tr>
+   <tr>
+    <td align='right' valign='top'>
+     <b>CDR-ID:&nbsp;</b>
+    </td>
+    <td>%s</td>
+   </tr>
   </table>
   <br>
-  <table border='1' cellpadding='2' cellspacing='0' width = '100%'>
-   <tr>
-    <th width = '50%'>Section Title</th>
-    <th width = '20%'>Diagnosis</th>
-    <th width = '30%'>Section Type</th>
+  <table border='1' cellpadding='2' cellspacing='0' width = '100%%'>
+   <tr class='head'>
+    <th width = '50%%'>Section Title</th>
+    <th width = '20%%'>Diagnosis</th>
+    <th width = '30%%'>Section Type</th>
    </tr>
-"""
+""" % ('CDR' + str(self.id))
+        count = 0
         for section in self.sections:
+            count += 1
+            if count % 2 == 0:
+                html += """\
+   <tr class='odd'>"""
+            else:
+                html += """\
+   <tr class='even'>"""
+   
             html += """\
-   <tr>
     <td valign='top'>%s</td>
     <td valign='top'>%s</td>
     <td valign='top'>%s</td>
@@ -525,6 +547,8 @@ if board and audience and language:
                          ON d.id = b.doc_id
                        JOIN query_term l
                          ON l.doc_id = a.doc_id
+                       JOIN doc_version dv
+                         ON dv.id = d.id
                       WHERE a.path = '/Summary/SummaryMetaData/SummaryAudience'
                         AND l.path = '/Summary/SummaryMetaData/SummaryLanguage'
                         AND b.path = '/Summary/SummaryMetaData/PDQBoard/Board'
@@ -532,6 +556,8 @@ if board and audience and language:
                         AND a.value = ?
                         AND b.int_val = ?
                         AND l.value = ?
+                        AND d.active_status = 'A'
+                        AND dv.publishable = 'Y'
                    ORDER BY d.title""", (audience, boardId, language))
         rows = cursor.fetchall()
     except Exception, info:
