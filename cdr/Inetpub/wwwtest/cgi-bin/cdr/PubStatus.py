@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PubStatus.py,v 1.25 2007-02-20 23:57:15 venglisc Exp $
+# $Id: PubStatus.py,v 1.26 2007-02-21 00:39:10 ameyer Exp $
 #
 # Status of a publishing job.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.25  2007/02/20 23:57:15  venglisc
+# Added line break to correct display of text area.
+#
 # Revision 1.24  2006/10/19 22:51:56  ameyer
 # Added logging of updates of the pub_proc table to publish.log.
 #
@@ -99,7 +102,8 @@
 import cgi, cdr, cdrdb, cdrcgi, re, string, time
 
 # Logfile is same as that used in cdrpub.py
-LOG = "d:/cdr/log/publish.log"
+LOG         = "d:/cdr/log/publish.log"
+WAIT_STATUS = "Waiting user approval"
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -409,6 +413,28 @@ def dispJobControl():
     action = fields and fields.getvalue("Kill") or \
              fields and fields.getvalue("Resume") or ""
 
+    # Check to be sure that jobs are still in wait state.
+    # This guards against using the back button, post refresh, or
+    #   second tab or window to accidentally resume or kill a job
+    #   that was already processed.
+    if action and jobs:
+        jobsOkay = True
+        for job in jobs:
+            jobNum = int(job)
+            try:
+                cursor.execute("""
+                    SELECT status
+                      FROM pub_proc
+                     WHERE id = %d""" % jobNum)
+            except cdrdb.Error, info:
+                cdrcgi.bail("Failure checking job status: %s" % info[1][0])
+
+            jobStatus = cursor.fetchone()[0]
+            if jobStatus != WAIT_STATUS:
+                cdrcgi.bail("""
+Job %d is no longer "%s".  Did you accidentally press Back or Refresh?""" % \
+                (jobNum, WAIT_STATUS))
+
     # CG job description sent to GateKeeper.
     cgJobDesc = fields and fields.getvalue("CgJobDesc") or ""
     cgJobDesc = "<CgJobDesc>%s</CgJobDesc>" % cgJobDesc
@@ -471,9 +497,9 @@ def dispJobControl():
               JOIN session s
                 ON s.usr = u.id
              WHERE s.name = ?
-               AND pp.status = 'Waiting user approval'
+               AND pp.status = ?
           ORDER BY pp.started
-                       """, (session,))
+                       """, (session, WAIT_STATUS))
         rows = cursor.fetchall()
     except cdrdb.Error, info:
         cdrcgi.bail("Failure getting pending job: %s" % info[1][0])
