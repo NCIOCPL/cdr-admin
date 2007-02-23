@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.51 2006-05-16 20:50:28 venglisc Exp $
+# $Id: QcReport.py,v 1.52 2007-02-23 22:48:51 venglisc Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.51  2006/05/16 20:50:28  venglisc
+# Adding filter set for DrugInfoSummary documents. (Bug 2053)
+#
 # Revision 1.50  2005/12/28 21:14:08  venglisc
 # Adding code to allow Miscellaneous Document QC reports to be displayed with
 # Redline/Strikeout markup. (Bug 1939)
@@ -244,7 +247,8 @@ docTitle = fields.getvalue("DocTitle")   or None
 version  = fields.getvalue("DocVersion") or None
 glossary = fields.getvalue("Glossary")   or None
 standardWording = fields.getvalue("ShowStandardWording") or None
-displayComments = fields.getvalue("DisplayCommentElements") or None
+displayInternComments = fields.getvalue("DisplayInternalComments") or None
+displayExternComments = fields.getvalue("DisplayExternalComments") or None
 displayBoard    = fields.getvalue('Editorial-board') and 'editorial-board_' or ''
 displayBoard   += fields.getvalue('Advisory-board')  and 'advisory-board'   or ''
 displayAudience = fields.getvalue('Patient') and 'patient_' or ''
@@ -264,6 +268,20 @@ if not docId and not docType:
 if docId:
     digits = re.sub('[^\d]+', '', docId)
     intId  = int(digits)
+
+# ---------------------------------------------------------------
+# Passing a single parameter to the filter to decide if only the 
+# internal, external, all, or none of the comments should be
+# displayed.
+# ---------------------------------------------------------------
+if not displayInternComments and not displayExternComments:
+    displayComments = 'N'  # No comments
+elif displayInternComments and not displayExternComments:
+    displayComments = 'I'  # Internal comments only
+elif not displayInternComments and displayExternComments:
+    displayComments = 'E'  # External comments only (default)
+else:
+    displayComments = 'A'  # All comments
 
 #----------------------------------------------------------------------
 # Handle navigation requests.
@@ -427,7 +445,7 @@ if docType == 'Summary' and repType and repType != 'pp' and not version or \
        <td>
         <INPUT TYPE    = "checkbox" 
                NAME    = "Editorial-board"
-               CHECKED = '1'>&nbsp;&nbsp; Editorial board markup
+               CHECKED>&nbsp;&nbsp; Editorial board markup
        </td>
       </tr>
       <tr>
@@ -493,11 +511,29 @@ if docType == 'Summary' and repType and repType != 'pp' and not version or \
 """
 
     # Display the Comment display checkbox
-    # -------------------------------------
-    form += """\
-  <BR>
-  <INPUT TYPE='checkbox' NAME='DisplayCommentElements' CHECKED='1'>&nbsp;&nbsp;
-  Display Comments?
+    # Summaries display the External Comments by default
+    # --------------------------------------------------
+    if docType == 'Summary':
+        form += """\
+     <table>
+      <tr>
+       <td class="colheading">Display Comments and Responses</td>
+      </tr>
+      <tr>
+       <td>
+        <INPUT TYPE    = "checkbox" 
+               NAME    = "DisplayInternalComments"
+                            >&nbsp;&nbsp; Display Internal Comments
+       </td>
+      </tr>
+      <tr>
+       <td>
+        <INPUT TYPE    = "checkbox" 
+               NAME    = "DisplayExternalComments"
+               CHECKED = '1'>&nbsp;&nbsp; Display External Comments
+       </td>
+      </tr>
+     </table>
 """
 
     # Display the Glossary appendix checkbox
@@ -1045,8 +1081,7 @@ if insRevLvls:
 # Patient Summaries are displayed like editorial board markup
 # -----------------------------------------------------------
 if docType.startswith('Summary'):
-    filterParm.append(['DisplayComments',
-                       displayComments and 'Y' or 'N'])
+    filterParm.append(['DisplayComments', displayComments ])
     if repType == 'pat' or repType == 'patrs' or repType == 'patbu':
         displayBoard += 'editorial-board_'
     filterParm.append(['displayBoard', displayBoard])
@@ -1054,8 +1089,8 @@ if docType.startswith('Summary'):
 # Need to set the displayBoard parameter or all markup will be dropped
 # --------------------------------------------------------------------
 if docType.startswith('GlossaryTerm'):
-    filterParm.append(['DisplayComments',
-                       displayComments and 'Y' or 'N'])
+    filterParm.append(['DisplayComments', displayComments ])
+                       # displayComments and 'Y' or 'N'])
     filterParm.append(['displayBoard', 'editorial-board_'])
     filterParm.append(['displayAudience', displayAudience])
 
