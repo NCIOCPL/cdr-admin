@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: GetSchema.py,v 1.1 2006-05-04 14:57:04 bkline Exp $
+# $Id: GetSchema.py,v 1.2 2007-02-27 18:16:14 bkline Exp $
 #
 # Gets a schema document from the repository and returns it as a plain
 # text file.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2006/05/04 14:57:04  bkline
+# Show schema as text.
+#
 #----------------------------------------------------------------------
 import cgi, cdrdb, cdrcgi, sys
 
@@ -25,8 +28,10 @@ if id:
         cdrcgi.bail("Can't retrieve XML for document %s" % id)
     sys.stdout.write("""\
 Content-type: text/plain
+Content-disposition: attachment;filename=%s
 
-%s""" % rows[0][1].encode('utf-8'))
+%s""" % (rows[0][0],
+         rows[0][1].encode('utf-8').replace('\r', '')))
     sys.exit(0)
 
 cursor.execute("""\
