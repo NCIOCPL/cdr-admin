@@ -1,8 +1,11 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermsByType.py,v 1.1 2006-05-04 15:00:22 bkline Exp $
+# $Id: GlossaryTermsByType.py,v 1.2 2007-03-22 17:54:04 bkline Exp $
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2006/05/04 15:00:22  bkline
+# New Glossary Term report.
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrdb, cdrcgi, string, time, xml.dom.minidom, xml.sax.saxutils
 
@@ -10,8 +13,9 @@ import cgi, cdr, cdrdb, cdrcgi, string, time, xml.dom.minidom, xml.sax.saxutils
 # Set the form variables.
 #----------------------------------------------------------------------
 fields   = cgi.FieldStorage()
-types    = fields and fields.getlist("type") or []
-session  = fields and fields.getvalue("Session") or None
+types    = fields.getlist("type") or []
+session  = fields.getvalue("Session") or None
+audience = fields.getvalue("audience") or "All"
 request  = cdrcgi.getRequest(fields)
 title    = "CDR Administration"
 instr    = "Glossary Terms by Type"
@@ -49,10 +53,19 @@ if not types:
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
    <TABLE BORDER='0'>
     <TR>
-     <TD><B>Glossary Term Type:&nbsp;</B></TD>
+     <TD align='right'><B>Glossary Term Type:&nbsp;</B></TD>
      <TD>
       <SELECT NAME='type' MULTIPLE='1'>
 %s      </SELECT>
+     </TD>
+    <TR>
+     <TD align='right'><B>Audience:&nbsp;</B></TD>
+     <TD>
+      <SELECT NAME='audience'>
+       <option value='Both' selected='1'>Both</option>
+       <option value='Health professional'>Health professional</option>
+       <option value='Patient'>Patient</option>
+      </SELECT>
      </TD>
     </TR>
    </TABLE>
@@ -217,9 +230,13 @@ def addTypeBlock(cursor, termType, html):
         terms.append(GlossaryTerm(row[0], dom.documentElement))
         terms.sort(lambda a,b: cmp(a.name, b.name))
     for term in terms:
-        if not term.definitions:
+        if not term.definitions and audience == 'Both':
             term.definitions.append(Definition(None, None))
         for definition in term.definitions:
+            if audience != 'Both' and definition.audience:
+                if audience != definition.audience:
+                    continue
+
             html.append(u"""\
    <tr>
     <td>%d</td>
