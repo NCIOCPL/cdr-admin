@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: CTGovImport.py,v 1.6 2004-02-23 15:31:20 bkline Exp $
+# $Id: CTGovImport.py,v 1.7 2007-03-22 17:53:13 bkline Exp $
 #
 # User interface for selecting Protocols to be imported from
 # ClinicalTrials.gov.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2004/02/23 15:31:20  bkline
+# Added check to make sure there are errors before we start to report them.
+#
 # Revision 1.5  2004/02/16 23:40:57  bkline
 # Rewrote interface to allow user to specify the CDR document ID for
 # duplicate trials (enhancement request #1104).
@@ -30,10 +33,7 @@ import cdr, cdrbatch, cgi, cdrcgi, cdrdb, time
 # Parse form variables
 fields   = cgi.FieldStorage()
 session  = cdrcgi.getSession(fields)
-skipCur  = fields and fields.getvalue("skipCur") or ""
-skipNext = fields and fields.getvalue("skipNext") or ""
-nextPage = fields and fields.getvalue("Next") or ""
-apply    = fields and fields.getvalue("Apply") or ""
+submit   = fields and fields.getvalue("Apply") or ""
 which    = fields and fields.getvalue("which") or "new"
 numRows  = fields and fields.getvalue("numRows") or "0"
 
@@ -41,11 +41,24 @@ if fields and fields.getvalue ("cancel", None):
     # Cancel button pressed.  Return user to admin screen
     cdrcgi.navigateTo ("Admin.py", session)
 
-if not session and 0:
+if not session and False:
     cdrcgi.bail ("Unknown or expired CDR session.")
 
+# One of these for each CT.gov trial document.
+class CTGovProtocol:
+    def __init__(self, nlmId, title, received, phase):
+        self.nlmId    = nlmId
+        self.title    = title
+        self.received = str(received)[:10]
+        self.phase    = phase
+    def __cmp__(self, other):
+        diff = cmp(self.received, other.received)
+        if diff:
+            return diff
+        return cmp(other.phase, self.phase)
+
 # If new request or no input parms, we need to output a form
-def showList(skipPast, cursor, errors = None):
+def showList(cursor, errors = None):
 
     # Handle new docs and those waiting for CIPS feedback differently.
     if which == 'new':
@@ -57,8 +70,10 @@ def showList(skipPast, cursor, errors = None):
         
     # Construct display headers in standard format
     timeStr = str(time.time()).replace(".", "")
-    timeStr = ''.join([timeStr[-1 - i] for i in xrange(len(timeStr))])
-    html = cdrcgi.header ("CDR Import from ClinicalTrials.gov",
+    chars   = [c for c in timeStr]
+    chars.reverse()
+    timeStr = ''.join(chars)
+    html = [cdrcgi.header ("CDR Import from ClinicalTrials.gov",
                           "Import CTGov Documents",
                           subtitle,
                           "CTGovImport.py",
@@ -74,100 +89,102 @@ def showList(skipPast, cursor, errors = None):
     -->
   </script>
   <style type='text/css'>
+   body { font-family: Arial; }
+   h3   { font-size: 13pt; }
    .err { font-family: Arial; color: red; font-size: 14pt; font-weight: bold; }
   </style>
-""" % timeStr)
+""" % timeStr)]
     # Add saved session
-    html += """
-    <input type='hidden' name='%s' value='%s' />
-    <input type='hidden' name='which' value='%s' />
-""" % (cdrcgi.SESSION, session, which)
+    html.append(u"""
+   <input type='hidden' name='%s' value='%s' />
+   <input type='hidden' name='which' value='%s' />
+""" % (cdrcgi.SESSION, session, which))
 
     if errors:
         for error in errors:
-            html += u"""\
-    <span class='err'>%s</span><br>
-""" % error
-        html += u"""\
-    <br>
-"""
-    where = ""
-    if skipPast:
-        where = "WHERE c.nlm_id < '%s'" % skipPast
+            html.append(u"""\
+   <span class='err'>%s</span><br>
+""" % error)
+        html.append(u"""\
+   <br />
+""")
     try:
         cursor.execute("""\
-    SELECT TOP 20 c.nlm_id, c.title, d.name
+    SELECT c.nlm_id, c.title, c.downloaded, c.phase
       FROM ctgov_import c
       JOIN ctgov_disposition d
         ON d.id = c.disposition
-     %s
-       AND d.name = '%s'
-  ORDER BY c.nlm_id DESC""" % (where, disposition))
+       AND d.name = '%s'""" % disposition)
         rows = cursor.fetchall()
-
-        #------------------------------------------------------------
-        # If we ran out of rows before the end, get the last 20 rows.
-        #------------------------------------------------------------
-        if len(rows) < 20:
-            cursor.execute("""\
-    SELECT TOP 20 c.nlm_id, c.title, d.name
-      FROM ctgov_import c
-      JOIN ctgov_disposition d
-        ON d.id = c.disposition
-       AND d.name = '%s'
-  ORDER BY c.nlm_id""" % disposition)
-            rows = cursor.fetchall()
-            if rows:
-                rows.reverse()
+        
     except Exception, info:
         cdrcgi.bail("Failure retrieving documents for review: %s" % str(info))
 
     if not rows:
         cdrcgi.bail("No documents awaiting review")
-    html += "<input type='hidden' name='numRows' value='%d'>\n" % len(rows)
-    html += "<input type='hidden' name='skipCur' value='%s'>\n" % skipPast
-    html += "<input type='hidden' name='skipNext' value='%s'>\n" % rows[-1][0]
+    protocols = []
+    for row in rows:
+        protocol = CTGovProtocol(row[0], row[1], row[2], row[3])
+        protocols.append(protocol)
+    protocols.sort()
+    
+    html.append(u"""
+   <input type='hidden' name='numRows' value='%d'>
+   <h3>Trials to be reviewed: %d</h3>
+   <table border='1' cellspacing='0' cellpadding='2'>
+""" % (len(rows), len(rows)))
 
     n = 0
-    if which == 'new':
-        values = ('Import', 'Out of scope', 'Duplicate',
-                  'Reviewed - Need CIPS Feedback')
-    else:
-        values = ('Import', 'Out of scope', 'Duplicate')
-    html += "<span style='font-family: arial'>\n"
-    for row in rows:
-        href = 'javascript:openWindow("%s")' % row[0]
-        html += "<b><a href='%s'>%s</a></b> <i>%s</i><br>\n" % (href, #base,
-                                                                  #row[0],
-                                                                  row[0],
-                                                       cgi.escape(row[1]))
-        html += "<input type='hidden' name='id-%d' value='%s'>\n" % (n, row[0])
-        checked = ""#" checked='1'"
-        for i in range(len(values)):
-            checked = (values[i] == 'Reviewed - Need CIPS Feedback' and
-                       row[2] == 'reviewed - need CIPS feedback' and
-                       " checked='1'" or "")
-            html += ("&nbsp;&nbsp;<input type='radio' name='disp-%d'"
-                     "value='%d'%s>&nbsp;%s\n" % (n, i + 1, checked,
-                                                  values[i]))
-            if values[i] == 'Duplicate':
-                html += "of CDR ID <input name='cdrid-%d'>&nbsp;" % n
-        html += "<br><br>\n"
+    for protocol in protocols:
+        href = u'javascript:openWindow("%s")' % protocol.nlmId
+        inputFields = u"""
+      <input type='hidden' name='id-%d' value='%s'>
+      <input type='radio' name='disp-%d' value='1'>&nbsp;
+      Import&nbsp;&nbsp;
+      <input type='radio' name='disp-%d' value='2'>&nbsp;
+      Out of scope<br />
+      <input type='radio' name='disp-%d' value='3'>&nbsp;
+      Duplicate of CDR ID <input name='cdrid-%d'>
+""" % (n, protocol.nlmId, n, n, n, n)
+        if which == 'new':
+            inputFields += u"""\
+      <br />
+      <input type='radio' name='disp-%d' value='4'>&nbsp;
+      Reviewed - Need CIPS Feedback
+""" % n
+        html.append(u"""\
+    <tr>
+     <td><b><a href='%s'>%s</a></b></td>
+     <td><i>%s</i></td>
+     <td>%s</td>
+     <td>%s</td>
+     <td width='300'>
+%s
+     </td>
+    </tr>
+""" % (href, protocol.nlmId, cgi.escape(protocol.title),
+       protocol.phase or u"No phase specified",
+       protocol.received, inputFields))
         n += 1
 
-    html += "</span><center><input type='submit' name='Apply' value='Apply' />"
-    html += "&nbsp;&nbsp;<input type='submit' name='Next' value='Next' /></center>"
-
+    html.append(u"""\
+   </table>
+   <br />
+   <center><input type='submit' name='Apply' value='Apply' />
+  </form>
+ </body>
+</html>
+""")
     # Display the page and exit
-    cdrcgi.sendPage (html + "</form></body></html>")
+    cdrcgi.sendPage(u"".join(html))
 
 def applyChoices(cursor, conn):
     n = int(numRows)
     errors = []
     for i in range(n):
-        id    = fields and fields.getvalue("id-%d" % i) or ""
-        disp  = fields and fields.getvalue("disp-%d" % i) or ""
-        cdrId = fields and fields.getvalue("cdrid-%d" % i) or ""
+        id    = fields.getvalue("id-%d" % i) or ""
+        disp  = fields.getvalue("disp-%d" % i) or ""
+        cdrId = fields.getvalue("cdrid-%d" % i) or ""
         #cdrcgi.bail("i=%d id=%s disp=%s" % (i, id, disp))
         if not disp:
             disp = "not yet reviewed"
@@ -214,10 +231,5 @@ def applyChoices(cursor, conn):
     return errors
 conn = cdrdb.connect()
 cursor = conn.cursor()
-if nextPage:
-    showList(skipNext, cursor)
-elif apply:
-    errors = applyChoices(cursor, conn)
-    showList(skipCur, cursor, errors)
-else:
-    showList("", cursor)
+errors = applyChoices(cursor, conn)
+showList(cursor, errors)
