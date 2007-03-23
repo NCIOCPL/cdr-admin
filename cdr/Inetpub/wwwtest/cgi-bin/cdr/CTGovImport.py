@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: CTGovImport.py,v 1.7 2007-03-22 17:53:13 bkline Exp $
+# $Id: CTGovImport.py,v 1.8 2007-03-23 16:40:29 bkline Exp $
 #
 # User interface for selecting Protocols to be imported from
 # ClinicalTrials.gov.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.7  2007/03/22 17:53:13  bkline
+# Changes for Sheri (see Bugzilla request #3015).
+#
 # Revision 1.6  2004/02/23 15:31:20  bkline
 # Added check to make sure there are errors before we start to report them.
 #
@@ -65,7 +68,7 @@ def showList(cursor, errors = None):
         subtitle = "Review and select new documents for import"
         disposition = 'not yet reviewed'
     else:
-        subtitle = "Review and select documents awaiting CIPS feedback"
+        subtitle = "Review and select documents awaiting OCCM feedback"
         disposition = 'reviewed - need CIPS feedback'
         
     # Construct display headers in standard format
@@ -150,7 +153,7 @@ def showList(cursor, errors = None):
             inputFields += u"""\
       <br />
       <input type='radio' name='disp-%d' value='4'>&nbsp;
-      Reviewed - Need CIPS Feedback
+      Reviewed - Need OCCM Feedback
 """ % n
         html.append(u"""\
     <tr>
