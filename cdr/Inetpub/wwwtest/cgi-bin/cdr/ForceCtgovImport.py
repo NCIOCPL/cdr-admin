@@ -1,12 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: ForceCtgovImport.py,v 1.2 2006-11-29 16:14:44 bkline Exp $
+# $Id: ForceCtgovImport.py,v 1.3 2007-04-02 15:25:47 bkline Exp $
 #
 # Interface for forcing the import of a trial from ClinicalTrials.gov
 # when none of the search terms for the trial match the criteria for
 # our import search request.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2006/11/29 16:14:44  bkline
+# Fixed code for setting disposition.
+#
 # Revision 1.1  2006/08/22 19:13:34  bkline
 # New administrative script for marking a CTGov trial for forced import.
 #
@@ -82,7 +85,8 @@ if nctId:
         cursor.execute("""\
             UPDATE ctgov_import
                SET force = 'Y',
-                   disposition = %d
+                   disposition = %d,
+                   cdr_id = NULL
              WHERE nlm_id = ?""" % dispositionCode, nctId)
         conn.commit()
         extra = describeResult(u"marked for forced import", nctId, u"green")
