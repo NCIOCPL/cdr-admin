@@ -1,0 +1,64 @@
+<!-- $Id: -->
+<!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
+ <HEAD>
+  <TITLE>CDR Administration</TITLE>
+ </HEAD>
+ <BASEFONT FACE='Arial, Helvetica, sans-serif'>
+ <LINK REL='STYLESHEET' 
+       HREF='/stylesheets/dataform.css'>
+ <BODY BACKGROUND='/images/back.jpg' 
+       BGCOLOR='lightgrey'>
+  <FORM ACTION='/cgi-bin/cdr/Admin.py' 
+        METHOD='POST'>
+   <TABLE WIDTH='100%' 
+          CELLSPACING='0' 
+          CELLPADDING='0' 
+          BORDER='0'>
+    <TR>
+     <TH NOWRAP BGCOLOR='silver' 
+         ALIGN='left' 
+         BACKGROUND='/images/nav1.jpg'>
+      <FONT SIZE='6' 
+            COLOR='white'>&nbsp;CDR Administration
+      </FONT>
+     </TH>
+     <TD BGCOLOR='silver'
+         VALIGN='middle'
+         ALIGN='right'
+         WIDTH='100%'
+         BACKGROUND='/images/nav1.jpg'>
+      <INPUT TYPE='submit' 
+             VALUE='Log In'>&nbsp;
+     </TD>
+    </TR>
+    <TR>
+     <TD BGCOLOR='#FFFFCC' COLSPAN='3'>
+      <FONT SIZE='-1' 
+            COLOR='navy'>&nbsp;Login Screen<BR>
+      </FONT>
+     </TD>
+    </TR>
+   </TABLE>
+   <BR>
+   <BR>
+   <TABLE CELLSPACING='0' 
+          CELLPADDING='0' 
+          BORDER='0'>
+    <TR>
+     <TD ALIGN='right'>
+      <B>CDR User ID:&nbsp;</B>
+     </TD>
+     <TD><INPUT NAME='UserName'></TD>
+    </TR>
+    <TR>
+     <TD ALIGN='right'>
+      <B>CDR Password:&nbsp;</B>
+     </TD>
+     <TD><INPUT NAME='Password' 
+                TYPE='password'>
+     </TD>
+    </TR>
+   </TABLE>
+  </FORM>
+ </BODY>
+</HTML>
