@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryMailerReqForm.py,v 1.6 2005-05-13 22:41:04 venglisc Exp $
+# $Id: SummaryMailerReqForm.py,v 1.7 2007-04-06 14:58:01 bkline Exp $
 #
 # Request form for generating PDQ Editorial Board Members Mailing.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2005/05/13 22:41:04  venglisc
+# Modified to pre-populate the email input field with the session owners
+# email address. (Bug 1664)
+#
 # Revision 1.5  2002/11/13 20:35:25  bkline
 # Ready for user testing.
 #
@@ -21,7 +25,7 @@
 # Initial revision
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrdb, cdrpub, cdrcgi, re, string, cdrmailcommon, sys
+import cgi, cdr, cdrdb, cdrcgi, cdrmailcommon, sys
 
 #----------------------------------------------------------------------
 # Set the form variables.
