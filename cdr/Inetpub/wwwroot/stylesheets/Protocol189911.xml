@@ -1,0 +1,465 @@
+      <Protocol xmlns:cdr='cips.nci.nih.gov/cdr'>
+       <ProtTitle>Phase II Study of Neoadjuvant Cisplatin, Fluorouracil, and Docetaxel, Followed By Surgical Resection, Followed By Adjuvant Intraperitoneal Floxuridine and Leucovorin Calcium in Patients With Locally Advanced Adenocarcinoma of the Stomach or Gastroesophageal Junction (Summary Last Modified 07/2000)</ProtTitle>
+       <ProtType>clinical trial</ProtType>
+       <ProtLowAge>0</ProtLowAge>
+       <ProtHighAge>120</ProtHighAge>
+       <ProtAgeCrit>Any age</ProtAgeCrit>
+       <ProtStatus>protocol is active</ProtStatus>
+       <ProtStatusDate>2000-02-22T00:00:00.0</ProtStatusDate>
+       <ProtEntryDate>2000-06-05T00:00:00.0</ProtEntryDate>
+       <ProtEntryUser>JMORRIS</ProtEntryUser>
+       <ProtChangeUser>DELIAS</ProtChangeUser>
+       <ProtChangeDate>2000-06-15T00:00:00.0</ProtChangeDate>
+       <ProtOrigTitle>A Phase II Trial of Neoadjuvant Cisplatin-Fluorouracil-Docetaxel Chemotherapy, Surgery, and Intraperitoneal (IP) Floxuridine (FUdR) Plus Leucovorin in Patients With Locally Advanced Gastric Cancer</ProtOrigTitle>
+       <ProtShortTitle>Combination Chemotherapy Followed by Surgery and Intraperitoneal Chemotherapy in Treating Patients With Locally Advanced Stomach Cancer</ProtShortTitle>
+       <ProtId>
+        <ProtIdString>MSKCC-99066</ProtIdString>
+        <ProtIdType>primary ID</ProtIdType>
+       </ProtId>
+       <ProtId>
+        <ProtIdString>NCI-G00-1813</ProtIdString>
+        <ProtIdType>NCI alternate ID</ProtIdType>
+        <ProtIdCode>G</ProtIdCode>
+       </ProtId>
+       <ProtOrg>
+        <ProtOrgName cdr:ref='CDR0000023033'>Memorial Sloan-Kettering Cancer Center</ProtOrgName>
+        <ProtOrgRole>lead organization</ProtOrgRole>
+        <ProtOrgScheduleType>normal</ProtOrgScheduleType>
+        <ProtOrgEntryDate>2000-06-05T00:00:00.0</ProtOrgEntryDate>
+        <ProtOrgEntryUser>JMORRIS</ProtOrgEntryUser>
+        <ProtOrgStatus>protocol is active</ProtOrgStatus>
+        <ProtOrgStatusDate>2000-02-22T00:00:00.0</ProtOrgStatusDate>
+        <ProtOrgType>institutional</ProtOrgType>
+        <ProtOrgProtId>MSKCC-99066</ProtOrgProtId>
+        <ProtOrgPerson>
+         <ProtOrgPersonName cdr:ref='CDR0000070538'>David Paul Kelsen</ProtOrgPersonName>
+         <ProtOrgPersonRole>protocol chairman</ProtOrgPersonRole>
+         <ProtOrgPersonEntryDate>2000-06-05T00:00:00.0</ProtOrgPersonEntryDate>
+         <ProtOrgPersonEntryUser>JMORRIS</ProtOrgPersonEntryUser>
+        </ProtOrgPerson>
+        <ProtOrgPerson>
+         <ProtOrgPersonName cdr:ref='CDR0000105088'>Elinor Miller</ProtOrgPersonName>
+         <ProtOrgPersonRole>protocol update person</ProtOrgPersonRole>
+         <ProtOrgPersonEntryDate>2000-06-05T11:26:55.0</ProtOrgPersonEntryDate>
+         <ProtOrgPersonEntryUser>JMORRIS</ProtOrgPersonEntryUser>
+        </ProtOrgPerson>
+        <ProtOrgStat>
+         <ProtOrgStatValue>protocol is active</ProtOrgStatValue>
+         <ProtOrgStatDate>2000-02-22T00:00:00.0</ProtOrgStatDate>
+         <ProtOrgStatEntryDate>2000-06-05T00:00:00.0</ProtOrgStatEntryDate>
+         <ProtOrgStatEntryUser>JMORRIS</ProtOrgStatEntryUser>
+        </ProtOrgStat>
+       </ProtOrg>
+       <ProtOrg>
+        <ProtOrgName cdr:ref='CDR0000023033'>Memorial Sloan-Kettering Cancer Center</ProtOrgName>
+        <ProtOrgRole>participant organization</ProtOrgRole>
+        <ProtOrgScheduleType>none</ProtOrgScheduleType>
+        <ProtOrgEntryDate>2000-06-05T00:00:00.0</ProtOrgEntryDate>
+        <ProtOrgEntryUser>JMORRIS</ProtOrgEntryUser>
+        <ProtOrgStatus>protocol has no status</ProtOrgStatus>
+        <ProtOrgParent cdr:ref='CDR0000023033'>Memorial Sloan-Kettering Cancer Center</ProtOrgParent>
+        <ProtOrgPerson>
+         <ProtOrgPersonName cdr:ref='CDR0000089862'>Murray F. Brennan</ProtOrgPersonName>
+         <ProtOrgPersonRole>principal investigator</ProtOrgPersonRole>
+         <ProtOrgPersonEntryDate>2000-06-05T00:00:00.0</ProtOrgPersonEntryDate>
+         <ProtOrgPersonEntryUser>JMORRIS</ProtOrgPersonEntryUser>
+        </ProtOrgPerson>
+        <ProtOrgPerson>
+         <ProtOrgPersonName cdr:ref='CDR0000070538'>David Paul Kelsen</ProtOrgPersonName>
+         <ProtOrgPersonRole>principal investigator</ProtOrgPersonRole>
+         <ProtOrgPersonEntryDate>2000-06-05T00:00:00.0</ProtOrgPersonEntryDate>
+         <ProtOrgPersonEntryUser>JMORRIS</ProtOrgPersonEntryUser>
+        </ProtOrgPerson>
+        <ProtOrgPerson>
+         <ProtOrgPersonName cdr:ref='CDR0000079310'>Martin S. Karpeh</ProtOrgPersonName>
+         <ProtOrgPersonRole>principal investigator</ProtOrgPersonRole>
+         <ProtOrgPersonEntryDate>2000-06-05T00:00:00.0</ProtOrgPersonEntryDate>
+         <ProtOrgPersonEntryUser>JMORRIS</ProtOrgPersonEntryUser>
+        </ProtOrgPerson>
+        <ProtOrgPerson>
+         <ProtOrgPersonName cdr:ref='CDR0000106050'>Peter V. Danenberg</ProtOrgPersonName>
+         <ProtOrgPersonRole>principal investigator</ProtOrgPersonRole>
+         <ProtOrgPersonEntryDate>2000-06-05T00:00:00.0</ProtOrgPersonEntryDate>
+         <ProtOrgPersonEntryUser>JMORRIS</ProtOrgPersonEntryUser>
+        </ProtOrgPerson>
+       </ProtOrg>
+       <ProtProcStatus>
+        <ProtProcStatusValue>summary not ready for release</ProtProcStatusValue>
+        <ProtProcStatusDate>2000-06-05T00:00:00.0</ProtProcStatusDate>
+        <ProtProcEntryDate>2000-06-05T00:00:00.0</ProtProcEntryDate>
+        <ProtProcEntryUser>JMORRIS</ProtProcEntryUser>
+       </ProtProcStatus>
+       <ProtProcStatus>
+        <ProtProcStatusValue>logged in</ProtProcStatusValue>
+        <ProtProcStatusDate>2000-06-05T00:00:00.0</ProtProcStatusDate>
+        <ProtProcEntryDate>2000-06-05T00:00:00.0</ProtProcEntryDate>
+        <ProtProcEntryUser>JMORRIS</ProtProcEntryUser>
+       </ProtProcStatus>
+       <ProtProcStatus>
+        <ProtProcStatusValue>summary not ready for release</ProtProcStatusValue>
+        <ProtProcStatusDate>2000-06-05T11:26:32.0</ProtProcStatusDate>
+        <ProtProcEntryDate>2000-06-05T11:26:32.0</ProtProcEntryDate>
+        <ProtProcEntryUser>JMORRIS</ProtProcEntryUser>
+        <ProtProcChangeDate>2000-06-05T11:26:32.0</ProtProcChangeDate>
+        <ProtProcChangeUser>JMORRIS</ProtProcChangeUser>
+       </ProtProcStatus>
+       <ProtProcStatus>
+        <ProtProcStatusValue>summary ready for release</ProtProcStatusValue>
+        <ProtProcStatusDate>2000-06-15T00:00:00.0</ProtProcStatusDate>
+        <ProtProcEntryDate>2000-06-15T00:00:00.0</ProtProcEntryDate>
+        <ProtProcEntryUser>DELIAS</ProtProcEntryUser>
+        <ProtProcChangeDate>2000-06-15T00:00:00.0</ProtProcChangeDate>
+        <ProtProcChangeUser>DELIAS</ProtProcChangeUser>
+       </ProtProcStatus>
+       <ProtProcStatus>
+        <ProtProcStatusValue>summary ready for release</ProtProcStatusValue>
+        <ProtProcStatusDate>2000-06-15T16:13:52.0</ProtProcStatusDate>
+        <ProtProcEntryDate>2000-06-15T16:13:52.0</ProtProcEntryDate>
+        <ProtProcEntryUser>DELIAS</ProtProcEntryUser>
+        <ProtProcChangeDate>2000-06-15T16:13:52.0</ProtProcChangeDate>
+        <ProtProcChangeUser>DELIAS</ProtProcChangeUser>
+       </ProtProcStatus>
+       <ProtProcStatus>
+        <ProtProcStatusValue>summary ready for release</ProtProcStatusValue>
+        <ProtProcStatusDate>2000-06-15T16:13:54.0</ProtProcStatusDate>
+        <ProtProcEntryDate>2000-06-15T16:13:54.0</ProtProcEntryDate>
+        <ProtProcEntryUser>DELIAS</ProtProcEntryUser>
+        <ProtProcChangeDate>2000-06-15T16:13:54.0</ProtProcChangeDate>
+        <ProtProcChangeUser>DELIAS</ProtProcChangeUser>
+       </ProtProcStatus>
+       <ProtProcStatus>
+        <ProtProcStatusValue>patient abstract written</ProtProcStatusValue>
+        <ProtProcStatusDate>2000-07-17T12:27:45.0</ProtProcStatusDate>
+        <ProtProcEntryDate>2000-07-17T12:27:45.0</ProtProcEntryDate>
+        <ProtProcEntryUser>AJAMISON</ProtProcEntryUser>
+       </ProtProcStatus>
+       <ProtProduct>
+        <ProtProductType>Cancer Information Product</ProtProductType>
+        <ProtProductScope>in scope</ProtProductScope>
+        <ProtProductIncludeFlag>Y</ProtProductIncludeFlag>
+        <ProtProductReleaseDate>2000-07-01T00:00:00.0</ProtProductReleaseDate>
+        <ProtProductNewDate>2000-07-01T00:00:00.0</ProtProductNewDate>
+       </ProtProduct>
+       <ProtProduct>
+        <ProtProductType>Rare Disease Information Product</ProtProductType>
+        <ProtProductScope>in scope</ProtProductScope>
+        <ProtProductIncludeFlag>Y</ProtProductIncludeFlag>
+        <ProtProductReleaseDate>2000-07-01T00:00:00.0</ProtProductReleaseDate>
+        <ProtProductNewDate>2000-07-01T00:00:00.0</ProtProductNewDate>
+       </ProtProduct>
+       <ProtSponsor>NCI-sponsored</ProtSponsor>
+       <ProtSponsor>NCI-sponsored trial in cancer center</ProtSponsor>
+       <ProtStat>
+        <ProtStatValue>protocol is active</ProtStatValue>
+        <ProtStatDate>2000-02-22T00:00:00.0</ProtStatDate>
+        <ProtStatEntryDate>2000-06-05T11:27:39.0</ProtStatEntryDate>
+        <ProtStatEntryUser>JMORRIS</ProtStatEntryUser>
+        <ProtStatChangeDate>2000-06-05T11:27:41.0</ProtStatChangeDate>
+        <ProtStatChangeUser>JMORRIS</ProtStatChangeUser>
+       </ProtStat>
+       <ProtStat>
+        <ProtStatValue>protocol has no status</ProtStatValue>
+        <ProtStatDate>2000-06-05T00:00:00.0</ProtStatDate>
+        <ProtStatEntryDate>2000-06-05T00:00:00.0</ProtStatEntryDate>
+        <ProtStatEntryUser>JMORRIS</ProtStatEntryUser>
+       </ProtStat>
+       <ProtTerm>
+        <ProtTermName cdr:ref='CDR0000187653'>cisplatin/docetaxel/fluorouracil</ProtTermName>
+        <ProtTermType>drug</ProtTermType>
+        <ProtTermProduct>Cancer Information Product</ProtTermProduct>
+       </ProtTerm>
+       <ProtTerm>
+        <ProtTermName cdr:ref='CDR0000187136'>docetaxel</ProtTermName>
+        <ProtTermType>drug</ProtTermType>
+        <ProtTermProduct>Cancer Information Product</ProtTermProduct>
+       </ProtTerm>
+       <ProtTerm>
+        <ProtTermName cdr:ref='CDR0000183425'>floxuridine/leucovorin calcium</ProtTermName>
+        <ProtTermType>drug</ProtTermType>
+        <ProtTermProduct>Cancer Information Product</ProtTermProduct>
+       </ProtTerm>
+       <ProtTerm>
+        <ProtTermName cdr:ref='CDR0000183026'>floxuridine</ProtTermName>
+        <ProtTermType>drug</ProtTermType>
+        <ProtTermProduct>Cancer Information Product</ProtTermProduct>
+       </ProtTerm>
+       <ProtTerm>
+        <ProtTermName cdr:ref='CDR0000187911'>fluorouracil</ProtTermName>
+        <ProtTermType>drug</ProtTermType>
+        <ProtTermProduct>Cancer Information Product</ProtTermProduct>
+       </ProtTerm>
+       <ProtTerm>
+        <ProtTermName cdr:ref='CDR0000182351'>leucovorin calcium</ProtTermName>
+        <ProtTermType>drug</ProtTermType>
+        <ProtTermProduct>Cancer Information Product</ProtTermProduct>
+       </ProtTerm>
+       <ProtTerm>
+        <ProtTermName cdr:ref='CDR0000182290'>cisplatin</ProtTermName>
+        <ProtTermType>drug</ProtTermType>
+        <ProtTermProduct>Cancer Information Product</ProtTermProduct>
+       </ProtTerm>
+       <ProtTerm>
+        <ProtTermName cdr:ref='CDR0000185530'>neoadjuvant study</ProtTermName>
+        <ProtTermType>protocol phase</ProtTermType>
+        <ProtTermProduct>Cancer Information Product</ProtTermProduct>
+       </ProtTerm>
+       <ProtTerm>
+        <ProtTermName cdr:ref='CDR0000182539'>adjuvant study</ProtTermName>
+        <ProtTermType>protocol phase</ProtTermType>
+        <ProtTermProduct>Cancer Information Product</ProtTermProduct>
+       </ProtTerm>
+       <ProtTerm>
+        <ProtTermName cdr:ref='CDR0000182531'>phase II study</ProtTermName>
+        <ProtTermType>protocol phase</ProtTermType>
+        <ProtTermProduct>Cancer Information Product</ProtTermProduct>
+       </ProtTerm>
+       <ProtTerm>
+        <ProtTermName cdr:ref='CDR0000186112'>conventional surgery</ProtTermName>
+        <ProtTermType>modality</ProtTermType>
+        <ProtTermProduct>Cancer Information Product</ProtTermProduct>
+       </ProtTerm>
+       <ProtTerm>
+        <ProtTermName cdr:ref='CDR0000185865'>quality-of-life assessment</ProtTermName>
+        <ProtTermType>modality</ProtTermType>
+        <ProtTermProduct>Cancer Information Product</ProtTermProduct>
+       </ProtTerm>
+       <ProtTerm>
+        <ProtTermName cdr:ref='CDR0000185820'>intraperitoneal therapy</ProtTermName>
+        <ProtTermType>modality</ProtTermType>
+        <ProtTermProduct>Cancer Information Product</ProtTermProduct>
+       </ProtTerm>
+       <ProtTerm>
+        <ProtTermName cdr:ref='CDR0000182288'>chemotherapy</ProtTermName>
+        <ProtTermType>modality</ProtTermType>
+        <ProtTermProduct>Cancer Information Product</ProtTermProduct>
+       </ProtTerm>
+       <ProtTerm>
+        <ProtTermName cdr:ref='CDR0000185867'>quality of life</ProtTermName>
+        <ProtTermType>diagnosis</ProtTermType>
+        <ProtTermProduct>Cancer Information Product</ProtTermProduct>
+       </ProtTerm>
+       <ProtTerm>
+        <ProtTermName cdr:ref='CDR0000183669'>adenocarcinoma of the esophagus</ProtTermName>
+        <ProtTermType>diagnosis</ProtTermType>
+        <ProtTermProduct>Cancer Information Product</ProtTermProduct>
+       </ProtTerm>
+       <ProtTerm>
+        <ProtTermName cdr:ref='CDR0000182435'>adenocarcinoma of the stomach</ProtTermName>
+        <ProtTermType>diagnosis</ProtTermType>
+        <ProtTermProduct>Cancer Information Product</ProtTermProduct>
+       </ProtTerm>
+       <ProtTerm>
+        <ProtTermName cdr:ref='CDR0000182259'>stage III esophageal cancer</ProtTermName>
+        <ProtTermType>diagnosis</ProtTermType>
+        <ProtTermProduct>Cancer Information Product</ProtTermProduct>
+       </ProtTerm>
+       <ProtTerm>
+        <ProtTermName cdr:ref='CDR0000182258'>stage II esophageal cancer</ProtTermName>
+        <ProtTermType>diagnosis</ProtTermType>
+        <ProtTermProduct>Cancer Information Product</ProtTermProduct>
+       </ProtTerm>
+       <ProtTerm>
+        <ProtTermName cdr:ref='CDR0000182212'>stage IV gastric cancer</ProtTermName>
+        <ProtTermType>diagnosis</ProtTermType>
+        <ProtTermProduct>Cancer Information Product</ProtTermProduct>
+       </ProtTerm>
+       <ProtTerm>
+        <ProtTermName cdr:ref='CDR0000182211'>stage III gastric cancer</ProtTermName>
+        <ProtTermType>diagnosis</ProtTermType>
+        <ProtTermProduct>Cancer Information Product</ProtTermProduct>
+       </ProtTerm>
+       <ProtTerm>
+        <ProtTermName cdr:ref='CDR0000182210'>stage II gastric cancer</ProtTermName>
+        <ProtTermType>diagnosis</ProtTermType>
+        <ProtTermProduct>Cancer Information Product</ProtTermProduct>
+       </ProtTerm>
+       <ProtTerm>
+        <ProtTermName cdr:ref='CDR0000187136'>docetaxel</ProtTermName>
+        <ProtTermType>drug</ProtTermType>
+        <ProtTermProduct>Rare Disease Information Product</ProtTermProduct>
+       </ProtTerm>
+       <ProtTerm>
+        <ProtTermName cdr:ref='CDR0000183026'>floxuridine</ProtTermName>
+        <ProtTermType>drug</ProtTermType>
+        <ProtTermProduct>Rare Disease Information Product</ProtTermProduct>
+       </ProtTerm>
+       <ProtTerm>
+        <ProtTermName cdr:ref='CDR0000187911'>fluorouracil</ProtTermName>
+        <ProtTermType>drug</ProtTermType>
+        <ProtTermProduct>Rare Disease Information Product</ProtTermProduct>
+       </ProtTerm>
+       <ProtTerm>
+        <ProtTermName cdr:ref='CDR0000182351'>leucovorin calcium</ProtTermName>
+        <ProtTermType>drug</ProtTermType>
+        <ProtTermProduct>Rare Disease Information Product</ProtTermProduct>
+       </ProtTerm>
+       <ProtTerm>
+        <ProtTermName cdr:ref='CDR0000182290'>cisplatin</ProtTermName>
+        <ProtTermType>drug</ProtTermType>
+        <ProtTermProduct>Rare Disease Information Product</ProtTermProduct>
+       </ProtTerm>
+       <ProtTerm>
+        <ProtTermName cdr:ref='CDR0000185530'>neoadjuvant study</ProtTermName>
+        <ProtTermType>protocol phase</ProtTermType>
+        <ProtTermProduct>Rare Disease Information Product</ProtTermProduct>
+       </ProtTerm>
+       <ProtTerm>
+        <ProtTermName cdr:ref='CDR0000182539'>adjuvant study</ProtTermName>
+        <ProtTermType>protocol phase</ProtTermType>
+        <ProtTermProduct>Rare Disease Information Product</ProtTermProduct>
+       </ProtTerm>
+       <ProtTerm>
+        <ProtTermName cdr:ref='CDR0000182531'>phase II study</ProtTermName>
+        <ProtTermType>protocol phase</ProtTermType>
+        <ProtTermProduct>Rare Disease Information Product</ProtTermProduct>
+       </ProtTerm>
+       <ProtTerm>
+        <ProtTermName cdr:ref='CDR0000186429'>quality-of-life assessment/intervention</ProtTermName>
+        <ProtTermType>modality</ProtTermType>
+        <ProtTermProduct>Rare Disease Information Product</ProtTermProduct>
+       </ProtTerm>
+       <ProtTerm>
+        <ProtTermName cdr:ref='CDR0000186413'>antineoplastic chemotherapy</ProtTermName>
+        <ProtTermType>modality</ProtTermType>
+        <ProtTermProduct>Rare Disease Information Product</ProtTermProduct>
+       </ProtTerm>
+       <ProtTerm>
+        <ProtTermName cdr:ref='CDR0000186112'>conventional surgery</ProtTermName>
+        <ProtTermType>modality</ProtTermType>
+        <ProtTermProduct>Rare Disease Information Product</ProtTermProduct>
+       </ProtTerm>
+       <ProtTerm>
+        <ProtTermName cdr:ref='CDR0000185820'>intraperitoneal therapy</ProtTermName>
+        <ProtTermType>modality</ProtTermType>
+        <ProtTermProduct>Rare Disease Information Product</ProtTermProduct>
+       </ProtTerm>
+       <ProtTerm>
+        <ProtTermName cdr:ref='CDR0000185867'>quality of life</ProtTermName>
+        <ProtTermType>diagnosis</ProtTermType>
+        <ProtTermProduct>Rare Disease Information Product</ProtTermProduct>
+       </ProtTerm>
+       <ProtTerm>
+        <ProtTermName cdr:ref='CDR0000182259'>stage III esophageal cancer</ProtTermName>
+        <ProtTermType>diagnosis</ProtTermType>
+        <ProtTermProduct>Rare Disease Information Product</ProtTermProduct>
+       </ProtTerm>
+       <ProtTerm>
+        <ProtTermName cdr:ref='CDR0000182258'>stage II esophageal cancer</ProtTermName>
+        <ProtTermType>diagnosis</ProtTermType>
+        <ProtTermProduct>Rare Disease Information Product</ProtTermProduct>
+       </ProtTerm>
+       <ProtTerm>
+        <ProtTermName cdr:ref='CDR0000182212'>stage IV gastric cancer</ProtTermName>
+        <ProtTermType>diagnosis</ProtTermType>
+        <ProtTermProduct>Rare Disease Information Product</ProtTermProduct>
+       </ProtTerm>
+       <ProtTerm>
+        <ProtTermName cdr:ref='CDR0000182211'>stage III gastric cancer</ProtTermName>
+        <ProtTermType>diagnosis</ProtTermType>
+        <ProtTermProduct>Rare Disease Information Product</ProtTermProduct>
+       </ProtTerm>
+       <ProtTerm>
+        <ProtTermName cdr:ref='CDR0000182210'>stage II gastric cancer</ProtTermName>
+        <ProtTermType>diagnosis</ProtTermType>
+        <ProtTermProduct>Rare Disease Information Product</ProtTermProduct>
+       </ProtTerm>
+       <ProtPatAbstr>
+        <ProtPatAbstrText>
+*** MISSING FILE FOR pro15254.htm ***</ProtPatAbstrText>
+        <ProtPatAbstrStat>on-line</ProtPatAbstrStat>
+        <ProtPatAbstrStatDate>2000-07-17T12:27:45.0</ProtPatAbstrStatDate>
+        <ProtPatAbstrEntryDate>2000-07-17T12:27:45.0</ProtPatAbstrEntryDate>
+        <ProtPatAbstrEntryUser>AJAMISON</ProtPatAbstrEntryUser>
+       </ProtPatAbstr>
+       <ProtDosageForms>
+        <ProtDosageFormsStat>on-line</ProtDosageFormsStat>
+        <ProtDosageFormsStatDate>2000-06-05T00:00:00.0</ProtDosageFormsStatDate>
+        <ProtDosageFormsEntryDate>2000-06-08T07:13:57.0</ProtDosageFormsEntryDate>
+        <ProtDosageFormsEntryUser>SCHRISTE</ProtDosageFormsEntryUser>
+        <ProtDosageFormsChangeDate>2000-06-08T00:00:00.0</ProtDosageFormsChangeDate>
+        <ProtDosageFormsChangeUser>SCHRISTE</ProtDosageFormsChangeUser>
+       </ProtDosageForms>
+       <ProtDosageSchedule>
+        <ProtDosageScheduleStat>on-line</ProtDosageScheduleStat>
+        <ProtDosageScheduleStatDate>2000-06-05T00:00:00.0</ProtDosageScheduleStatDate>
+        <ProtDosageScheduleEntryDate>2000-06-08T07:13:57.0</ProtDosageScheduleEntryDate>
+        <ProtDosageScheduleEntryUser>SCHRISTE</ProtDosageScheduleEntryUser>
+        <ProtDosageScheduleChangeDate>2000-06-08T00:00:00.0</ProtDosageScheduleChangeDate>
+        <ProtDosageScheduleChangeUser>SCHRISTE</ProtDosageScheduleChangeUser>
+       </ProtDosageSchedule>
+       <ProtEndPoints>
+        <ProtEndPointsStat>on-line</ProtEndPointsStat>
+        <ProtEndPointsStatDate>2000-06-05T00:00:00.0</ProtEndPointsStatDate>
+        <ProtEndPointsEntryDate>2000-06-08T07:13:57.0</ProtEndPointsEntryDate>
+        <ProtEndPointsEntryUser>SCHRISTE</ProtEndPointsEntryUser>
+        <ProtEndPointsChangeDate>2000-06-08T00:00:00.0</ProtEndPointsChangeDate>
+        <ProtEndPointsChangeUser>SCHRISTE</ProtEndPointsChangeUser>
+       </ProtEndPoints>
+       <ProtEntryCriteria>
+        <ProtEntryCriteriaStat>on-line</ProtEntryCriteriaStat>
+        <ProtEntryCriteriaStatDate>2000-06-05T00:00:00.0</ProtEntryCriteriaStatDate>
+        <ProtEntryCriteriaEntryDate>2000-06-08T07:13:57.0</ProtEntryCriteriaEntryDate>
+        <ProtEntryCriteriaEntryUser>SCHRISTE</ProtEntryCriteriaEntryUser>
+        <ProtEntryCriteriaChangeDate>2000-06-08T00:00:00.0</ProtEntryCriteriaChangeDate>
+        <ProtEntryCriteriaChangeUser>SCHRISTE</ProtEntryCriteriaChangeUser>
+       </ProtEntryCriteria>
+       <ProtObjectives>
+        <ProtObjectivesStat>on-line</ProtObjectivesStat>
+        <ProtObjectivesStatDate>2000-06-05T00:00:00.0</ProtObjectivesStatDate>
+        <ProtObjectivesEntryDate>2000-06-08T07:13:57.0</ProtObjectivesEntryDate>
+        <ProtObjectivesEntryUser>SCHRISTE</ProtObjectivesEntryUser>
+        <ProtObjectivesChangeDate>2000-06-08T00:00:00.0</ProtObjectivesChangeDate>
+        <ProtObjectivesChangeUser>SCHRISTE</ProtObjectivesChangeUser>
+       </ProtObjectives>
+       <ProtOutline>
+        <ProtOutlineStat>on-line</ProtOutlineStat>
+        <ProtOutlineStatDate>2000-06-05T00:00:00.0</ProtOutlineStatDate>
+        <ProtOutlineEntryDate>2000-06-08T07:13:57.0</ProtOutlineEntryDate>
+        <ProtOutlineEntryUser>SCHRISTE</ProtOutlineEntryUser>
+        <ProtOutlineChangeDate>2000-06-08T00:00:00.0</ProtOutlineChangeDate>
+        <ProtOutlineChangeUser>SCHRISTE</ProtOutlineChangeUser>
+       </ProtOutline>
+       <ProtProjAccrual>
+        <ProtProjAccrualStat>on-line</ProtProjAccrualStat>
+        <ProtProjAccrualStatDate>2000-06-05T00:00:00.0</ProtProjAccrualStatDate>
+        <ProtProjAccrualEntryDate>2000-06-08T07:13:57.0</ProtProjAccrualEntryDate>
+        <ProtProjAccrualEntryUser>SCHRISTE</ProtProjAccrualEntryUser>
+        <ProtProjAccrualChangeDate>2000-06-08T00:00:00.0</ProtProjAccrualChangeDate>
+        <ProtProjAccrualChangeUser>SCHRISTE</ProtProjAccrualChangeUser>
+       </ProtProjAccrual>
+       <ProtStudyParms>
+        <ProtStudyParmsStat>on-line</ProtStudyParmsStat>
+        <ProtStudyParmsStatDate>2000-06-05T00:00:00.0</ProtStudyParmsStatDate>
+        <ProtStudyParmsEntryDate>2000-06-08T07:13:57.0</ProtStudyParmsEntryDate>
+        <ProtStudyParmsEntryUser>SCHRISTE</ProtStudyParmsEntryUser>
+        <ProtStudyParmsChangeDate>2000-06-08T00:00:00.0</ProtStudyParmsChangeDate>
+        <ProtStudyParmsChangeUser>SCHRISTE</ProtStudyParmsChangeUser>
+       </ProtStudyParms>
+       <ProtStratification>
+        <ProtStratificationStat>on-line</ProtStratificationStat>
+        <ProtStratificationStatDate>2000-06-05T00:00:00.0</ProtStratificationStatDate>
+        <ProtStratificationEntryDate>2000-06-08T07:13:57.0</ProtStratificationEntryDate>
+        <ProtStratificationEntryUser>SCHRISTE</ProtStratificationEntryUser>
+        <ProtStratificationChangeDate>2000-06-08T00:00:00.0</ProtStratificationChangeDate>
+        <ProtStratificationChangeUser>SCHRISTE</ProtStratificationChangeUser>
+       </ProtStratification>
+       <ProtWarning>
+        <ProtWarningStat>on-line</ProtWarningStat>
+        <ProtWarningStatDate>2000-06-05T00:00:00.0</ProtWarningStatDate>
+        <ProtWarningEntryDate>2000-06-08T07:13:57.0</ProtWarningEntryDate>
+        <ProtWarningEntryUser>SCHRISTE</ProtWarningEntryUser>
+        <ProtWarningChangeDate>2000-06-08T00:00:00.0</ProtWarningChangeDate>
+        <ProtWarningChangeUser>SCHRISTE</ProtWarningChangeUser>
+       </ProtWarning>
+       <ProtProdType>
+        <ProtProdTypeProduct>Cancer Information Product</ProtProdTypeProduct>
+        <ProtProdTypeCategory>Information Category</ProtProdTypeCategory>
+        <ProtProdTypeName>treatment</ProtProdTypeName>
+       </ProtProdType>
+       <ProtProdType>
+        <ProtProdTypeProduct>Rare Disease Information Product</ProtProdTypeProduct>
+        <ProtProdTypeCategory>Information Category</ProtProdTypeCategory>
+        <ProtProdTypeName>treatment</ProtProdTypeName>
+       </ProtProdType>
+       <PdqKey>15254</PdqKey>
+      </Protocol>

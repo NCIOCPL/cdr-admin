@@ -1,0 +1,5 @@
+BODY { text-align: left; background: white; color: black; }
+H1   { color: green; }
+H2   { color: blue; font: "Times New Roman"; }
+H3   { color: teal; }
+Gloss { color: red; }

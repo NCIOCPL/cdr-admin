@@ -1,0 +1,101 @@
+  BODY { 
+		text-align: left;
+		color: Teal;
+		}
+
+  P { 
+		font: 14pt "Times New Roman;
+		color: Teal;
+		background: transparent;
+		}
+
+
+
+  H1 {
+		font: 30pt "Arial";
+		color: Teal;
+		font-weight: bold;
+		background: transparent;
+		}
+
+  H2 {
+		font: 20pt "Arial";
+		color: Black;
+		font-weight: bold;
+		background: transparent;
+		}
+
+  H3 {
+		font: 18pt "Arial";
+		color: Teal;
+		font-weight: bold;
+		background: transparent;
+		}
+
+  H4 {
+		font: 14pt "Arial";
+		color: Black;
+		font-weight: bold;
+		background: transparent;
+		}
+
+  H5 {
+		font: 10pt "Times New Roman";
+		color: Black;
+		font-weight: bold;
+		background: transparent;
+		}
+
+  TH {
+		font: 18pt "Arial";
+		color: teal;
+		font-weight: bold;
+		}
+
+  TD {	
+    	font: 10pt "Arial";
+		color: teal;
+		}
+
+  LI { 
+		/* display: list-item; */
+		font: 12pt "Times New Roman";
+		}	
+
+  DL {	
+		display: list-item;
+
+		}
+
+  DT {
+		text-align: left;
+		font: 11pt "Arial";
+		font-weight: bold;
+		color: Black;
+		}
+
+  DD {
+		text-align: left;
+		font: 12pt "Times New Roman";
+		color: black;
+		}
+
+  B, STRONG { 
+		font-weight: bold
+		} 
+  I, CITE, EM, VAR, ADDRESS, BLOCKQUOTE { 
+		font-style: italic 
+		}
+  PRE, TT, CODE, KBD, SAMP { 
+		font-family: monospace 
+		}
+
+  A:LINK {
+		color: MediumVioletRed;
+		text-decoration: none;
+		}
+
+  A:VISITED {
+		color: MidnightBlue;
+		text-decoration: none;
+		}

@@ -1,0 +1,330 @@
+<CdrDoc Type='Protocol' Id='CDR0000106085'>
+<CdrDocCtl>
+<DocValStatus readonly="yes">U</DocValStatus>
+<DocValDate readonly="yes">1900-01-01T00:00:00.000</DocValDate>
+<DocTitle>Phase III Adjuvant Postoperative Radiotherapy in the Treatment of Grade I Soft Tissue Sarcomas and Benign, Nonmetastasizing Highly Invasive Soft Tissue Tumors (Summary Last Modified 06/1999)</DocTitle></CdrDocCtl>
+<CdrDocXml><![CDATA[
+      <Protocol xmlns:cdr='cips.nci.nih.gov/cdr'>
+       <ProtTitle>Phase III Adjuvant Postoperative Radiotherapy in the Treatment of Grade I Soft Tissue Sarcomas and Benign, Nonmetastasizing Highly Invasive Soft Tissue Tumors (Summary Last Modified 06/1999)</ProtTitle>
+       <ProtType>clinical trial</ProtType>
+       <ProtLowAge>18</ProtLowAge>
+       <ProtHighAge>120</ProtHighAge>
+       <ProtAgeCrit>18 and over</ProtAgeCrit>
+       <ProtStatus>protocol is closed</ProtStatus>
+       <ProtStatusDate>1999-03-22T00:00:00.0</ProtStatusDate>
+       <ProtEntryDate>1984-03-01T00:00:00.0</ProtEntryDate>
+       <ProtEntryUser>PDQDBA</ProtEntryUser>
+       <ProtChangeUser>DHODGES</ProtChangeUser>
+       <ProtChangeDate>1999-05-06T00:00:00.0</ProtChangeDate>
+       <ProtShortTitle>Radiation Therapy Following Surgery in Treating Patients With Soft Tissue Tumors</ProtShortTitle>
+       <ProtId>
+        <ProtIdString>NCI-83-C-0227A</ProtIdString>
+        <ProtIdType>primary ID</ProtIdType>
+        <ProtIdComments>A,ICIC,1/30/95</ProtIdComments>
+       </ProtId>
+       <ProtId>
+        <ProtIdString>NCI-T84-0258N</ProtIdString>
+        <ProtIdType>NCI alternate ID</ProtIdType>
+       </ProtId>
+       <ProtOrg>
+        <ProtOrgName cdr:ref='CDR0000023111'>Division of Clinical Sciences</ProtOrgName>
+        <ProtOrgRole>lead organization</ProtOrgRole>
+        <ProtOrgScheduleType>normal</ProtOrgScheduleType>
+        <ProtOrgEntryDate>1997-08-18T11:23:58.0</ProtOrgEntryDate>
+        <ProtOrgEntryUser>PDQDBA</ProtOrgEntryUser>
+        <ProtOrgStatus>protocol is closed</ProtOrgStatus>
+        <ProtOrgStatusDate>1999-03-22T00:00:00.0</ProtOrgStatusDate>
+        <ProtOrgType>institutional</ProtOrgType>
+        <ProtOrgProtId>NCI-83-C-0227A</ProtOrgProtId>
+        <ProtOrgPerson>
+         <ProtOrgPersonName cdr:ref='CDR0000100307'>Sharon A. Mavroukakis</ProtOrgPersonName>
+         <ProtOrgPersonRole>protocol update person</ProtOrgPersonRole>
+         <ProtOrgPersonEntryDate>1997-08-18T11:34:17.0</ProtOrgPersonEntryDate>
+         <ProtOrgPersonEntryUser>PDQDBA</ProtOrgPersonEntryUser>
+        </ProtOrgPerson>
+        <ProtOrgPerson>
+         <ProtOrgPersonName cdr:ref='CDR0000076796'>James Chung-Yin Yang</ProtOrgPersonName>
+         <ProtOrgPersonRole>protocol chairman</ProtOrgPersonRole>
+         <ProtOrgPersonEntryDate>1997-08-18T11:34:17.0</ProtOrgPersonEntryDate>
+         <ProtOrgPersonEntryUser>PDQDBA</ProtOrgPersonEntryUser>
+        </ProtOrgPerson>
+        <ProtOrgStat>
+         <ProtOrgStatValue>protocol is active</ProtOrgStatValue>
+         <ProtOrgStatDate>1984-03-01T00:00:00.0</ProtOrgStatDate>
+         <ProtOrgStatEntryDate>1997-08-18T01:54:13.0</ProtOrgStatEntryDate>
+         <ProtOrgStatEntryUser>PDQDBA</ProtOrgStatEntryUser>
+        </ProtOrgStat>
+        <ProtOrgStat>
+         <ProtOrgStatValue>protocol is closed</ProtOrgStatValue>
+         <ProtOrgStatDate>1999-03-22T00:00:00.0</ProtOrgStatDate>
+         <ProtOrgStatEntryDate>1999-05-06T00:00:00.0</ProtOrgStatEntryDate>
+         <ProtOrgStatEntryUser>DHODGES</ProtOrgStatEntryUser>
+         <ProtOrgStatComments>C-per 3/99 SR; 6/99 dh.</ProtOrgStatComments>
+        </ProtOrgStat>
+       </ProtOrg>
+       <ProtOrg>
+        <ProtOrgName cdr:ref='CDR0000023246'>Surgery Branch</ProtOrgName>
+        <ProtOrgRole>participant organization</ProtOrgRole>
+        <ProtOrgScheduleType>none</ProtOrgScheduleType>
+        <ProtOrgEntryDate>1997-08-18T11:23:58.0</ProtOrgEntryDate>
+        <ProtOrgEntryUser>PDQDBA</ProtOrgEntryUser>
+        <ProtOrgStatus>protocol has no status</ProtOrgStatus>
+        <ProtOrgParent cdr:ref='CDR0000023111'>Division of Clinical Sciences</ProtOrgParent>
+        <ProtOrgPerson>
+         <ProtOrgPersonName cdr:ref='CDR0000076796'>James Chung-Yin Yang</ProtOrgPersonName>
+         <ProtOrgPersonRole>principal investigator</ProtOrgPersonRole>
+         <ProtOrgPersonEntryDate>1997-08-18T11:34:17.0</ProtOrgPersonEntryDate>
+         <ProtOrgPersonEntryUser>PDQDBA</ProtOrgPersonEntryUser>
+        </ProtOrgPerson>
+       </ProtOrg>
+       <ProtProcStatus>
+        <ProtProcStatusValue>logged in</ProtProcStatusValue>
+        <ProtProcStatusDate>1984-05-01T00:00:00.0</ProtProcStatusDate>
+        <ProtProcEntryDate>1984-05-01T00:00:00.0</ProtProcEntryDate>
+        <ProtProcEntryUser>IPL</ProtProcEntryUser>
+       </ProtProcStatus>
+       <ProtProcStatus>
+        <ProtProcStatusValue>loaded from CPAT tape</ProtProcStatusValue>
+        <ProtProcStatusDate>1991-12-19T00:00:00.0</ProtProcStatusDate>
+        <ProtProcEntryDate>1991-12-19T00:00:00.0</ProtProcEntryDate>
+        <ProtProcEntryUser>IPL</ProtProcEntryUser>
+       </ProtProcStatus>
+       <ProtProcStatus>
+        <ProtProcStatusValue>abstract removed from web</ProtProcStatusValue>
+        <ProtProcStatusDate>1999-05-06T14:10:52.0</ProtProcStatusDate>
+        <ProtProcEntryDate>1999-05-06T14:10:52.0</ProtProcEntryDate>
+        <ProtProcEntryUser>DHODGES</ProtProcEntryUser>
+       </ProtProcStatus>
+       <ProtProcStatus>
+        <ProtProcStatusValue>patient abstract written</ProtProcStatusValue>
+        <ProtProcStatusDate>1999-07-09T17:55:54.0</ProtProcStatusDate>
+        <ProtProcEntryDate>1997-11-21T00:00:00.0</ProtProcEntryDate>
+        <ProtProcEntryUser>celbon</ProtProcEntryUser>
+        <ProtProcChangeDate>1999-07-09T17:55:54.0</ProtProcChangeDate>
+        <ProtProcChangeUser>AJAMISON</ProtProcChangeUser>
+       </ProtProcStatus>
+       <ProtProduct>
+        <ProtProductType>Cancer Information Product</ProtProductType>
+        <ProtProductScope>in scope</ProtProductScope>
+        <ProtProductIncludeFlag>Y</ProtProductIncludeFlag>
+       </ProtProduct>
+       <ProtSponsor>NCI-sponsored</ProtSponsor>
+       <ProtSponsor>NCI CTEP-approved</ProtSponsor>
+       <ProtStat>
+        <ProtStatValue>protocol is active</ProtStatValue>
+        <ProtStatDate>1984-03-01T00:00:00.0</ProtStatDate>
+        <ProtStatEntryDate>1997-08-18T10:57:30.0</ProtStatEntryDate>
+        <ProtStatEntryUser>PDQDBA</ProtStatEntryUser>
+       </ProtStat>
+       <ProtStat>
+        <ProtStatValue>protocol is closed</ProtStatValue>
+        <ProtStatDate>1999-03-22T00:00:00.0</ProtStatDate>
+        <ProtStatEntryDate>1999-05-06T14:10:52.0</ProtStatEntryDate>
+        <ProtStatEntryUser>DHODGES</ProtStatEntryUser>
+        <ProtStatChangeDate>1999-05-06T14:11:30.0</ProtStatChangeDate>
+        <ProtStatChangeUser>DHODGES</ProtStatChangeUser>
+       </ProtStat>
+       <ProtTerm>
+        <ProtTermName cdr:ref='CDR0000182539'>adjuvant study</ProtTermName>
+        <ProtTermType>protocol phase</ProtTermType>
+        <ProtTermProduct>Cancer Information Product</ProtTermProduct>
+       </ProtTerm>
+       <ProtTerm>
+        <ProtTermName cdr:ref='CDR0000182530'>phase III study</ProtTermName>
+        <ProtTermType>protocol phase</ProtTermType>
+        <ProtTermProduct>Cancer Information Product</ProtTermProduct>
+       </ProtTerm>
+       <ProtTerm>
+        <ProtTermName cdr:ref='CDR0000187108'>radiation therapy</ProtTermName>
+        <ProtTermType>modality</ProtTermType>
+        <ProtTermProduct>Cancer Information Product</ProtTermProduct>
+       </ProtTerm>
+       <ProtTerm>
+        <ProtTermName cdr:ref='CDR0000182394'>stage I adult soft tissue sarcoma</ProtTermName>
+        <ProtTermType>diagnosis</ProtTermType>
+        <ProtTermProduct>Cancer Information Product</ProtTermProduct>
+       </ProtTerm>
+       <ProtPatAbstr>
+        <ProtPatAbstrText>
+         <ProtPatAbstrTextRationale><Gloss cdr:href='CDR0000187108'>Radiation therapy</Gloss> uses high-energy <Gloss cdr:href='CDR0000187541'>x-rays</Gloss> to damage tumor cells and may be an effective treatment for <Gloss cdr:href='CDR0000187476'>soft tissue</Gloss> tumors. Radiation therapy combined with surgery may kill more tumor cells. It is not yet known if radiation therapy following surgery is more effective than surgery alone in treating patients with soft tissue tumors.</ProtPatAbstrTextRationale>
+         <ProtPatAbstrTextPurpose><Gloss cdr:href='CDR0000187450'>Randomized</Gloss> <Gloss cdr:href='CDR0000187423'>phase III trial</Gloss> to determine if radiation therapy following surgery is effective in treating patients who have soft tissue tumors.</ProtPatAbstrTextPurpose>
+         <ProtPatAbstrTextElig>
+          <ProtPatAbstrTextEligCrit>At least 18 years old</ProtPatAbstrTextEligCrit>
+          <ProtPatAbstrTextEligCrit>No previous <Gloss cdr:href='CDR0000182288'>chemotherapy</Gloss> or radiation therapy for <Gloss cdr:href='CDR0000186989'>sarcoma</Gloss></ProtPatAbstrTextEligCrit>
+          <ProtPatAbstrTextEligCrit>No more than 4 months since surgery</ProtPatAbstrTextEligCrit>
+         </ProtPatAbstrTextElig>
+         <ProtPatAbstrTextTreatment>Following surgery, patients will be randomized to one of two groups. Patients in group one will receive radiation therapy for 7 weeks. Patients in group two will not receive further therapy, but will be <Gloss cdr:href='CDR0000187681'>observed</Gloss>.</ProtPatAbstrTextTreatment>
+        </ProtPatAbstrText>
+        <ProtPatAbstrStat>on-line</ProtPatAbstrStat>
+        <ProtPatAbstrStatDate>1999-07-09T17:55:54.0</ProtPatAbstrStatDate>
+        <ProtPatAbstrEntryDate>1998-07-16T09:58:50.0</ProtPatAbstrEntryDate>
+        <ProtPatAbstrEntryUser>PDQDBA</ProtPatAbstrEntryUser>
+        <ProtPatAbstrChangeDate>1999-07-09T17:55:54.0</ProtPatAbstrChangeDate>
+        <ProtPatAbstrChangeUser>AJAMISON</ProtPatAbstrChangeUser>
+       </ProtPatAbstr>
+       <ProtDosageForms>
+        <ProtDosageFormsText>Not applicable.</ProtDosageFormsText>
+        <ProtDosageFormsStat>on-line</ProtDosageFormsStat>
+        <ProtDosageFormsStatDate>1996-07-12T10:03:59.0</ProtDosageFormsStatDate>
+        <ProtDosageFormsEntryDate>1996-07-12T10:03:59.0</ProtDosageFormsEntryDate>
+        <ProtDosageFormsEntryUser>PDQDBA</ProtDosageFormsEntryUser>
+        <ProtDosageFormsChangeUser>bholohan</ProtDosageFormsChangeUser>
+       </ProtDosageForms>
+       <ProtDosageSchedule>
+        <ProtDosageScheduleText>Arm I:  4,500 rads over 5 weeks at 180 rads/day to the involved area with an additional 1,000-2,000 rads to the tumor bed using a shrinking field technique during the sixth and/or seventh week.  Treatment is to begin postoperatively as soon as wound healing has occurred.
+
+Arm II:  Observation only.</ProtDosageScheduleText>
+        <ProtDosageScheduleStat>on-line</ProtDosageScheduleStat>
+        <ProtDosageScheduleStatDate>1996-07-12T10:03:59.0</ProtDosageScheduleStatDate>
+        <ProtDosageScheduleEntryDate>1996-07-12T10:03:59.0</ProtDosageScheduleEntryDate>
+        <ProtDosageScheduleEntryUser>PDQDBA</ProtDosageScheduleEntryUser>
+        <ProtDosageScheduleChangeUser>bholohan</ProtDosageScheduleChangeUser>
+       </ProtDosageSchedule>
+       <ProtEndPoints>
+        <ProtEndPointsText>Local recurrence rate, disease-free survival, overall survival.</ProtEndPointsText>
+        <ProtEndPointsStat>on-line</ProtEndPointsStat>
+        <ProtEndPointsStatDate>1996-07-12T10:03:59.0</ProtEndPointsStatDate>
+        <ProtEndPointsEntryDate>1996-07-12T10:03:59.0</ProtEndPointsEntryDate>
+        <ProtEndPointsEntryUser>PDQDBA</ProtEndPointsEntryUser>
+        <ProtEndPointsChangeUser>bholohan</ProtEndPointsChangeUser>
+       </ProtEndPoints>
+       <ProtEntryCriteria>
+        <ProtEntryCriteriaText>--Disease Characteristics--
+
+Biopsy-proven grade I soft tissue sarcoma or one of the following benign but
+highly invasive soft tissue tumors:
+  Extra-abdominal fibromatosis (desmoid, aggressive fibromatosis)
+  Dermatofibrosarcoma protuberans
+  Leiomyoma of deep soft tissue
+  Diffuse giant cell tumor of tendon sheath (proliferative synovitis)
+
+No clinical evidence of metastases in regional nodes or more distant sites
+
+No primary intraperitoneal or retroperitoneal tumors
+
+Resection of all gross tumor at the time of surgical excision required
+(margins may be pathologically positive or negative)
+
+No von Recklinghausen's disease
+
+--Prior/Concurrent Therapy--
+
+Biologic therapy:
+  Not specified
+
+Chemotherapy:
+  No prior chemotherapy for sarcoma
+
+Endocrine therapy:
+  Not specified
+
+Radiotherapy:
+  No prior radiotherapy for sarcoma
+
+Surgery:
+  No more than 4 months since definitive surgery for primary lesion or
+     recurrence
+  No prior amputation
+
+--Patient Characteristics--
+
+Age:
+  18 and over
+
+Performance status:
+  Not specified
+
+Hematopoietic:
+  Not specified
+
+Hepatic:
+  No cirrhosis
+
+Renal:
+  No evidence of severe renal impairment
+
+Cardiovascular:
+  No ischemic heart disease
+
+Other:
+  Not prior malignancy except basal cell carcinoma
+  No serious infection
+  No active bleeding disorder
+  No severe concomitant disease</ProtEntryCriteriaText>
+        <ProtEntryCriteriaStat>on-line</ProtEntryCriteriaStat>
+        <ProtEntryCriteriaStatDate>1996-07-12T10:03:59.0</ProtEntryCriteriaStatDate>
+        <ProtEntryCriteriaEntryDate>1996-07-12T10:03:59.0</ProtEntryCriteriaEntryDate>
+        <ProtEntryCriteriaEntryUser>PDQDBA</ProtEntryCriteriaEntryUser>
+        <ProtEntryCriteriaChangeUser>bholohan</ProtEntryCriteriaChangeUser>
+       </ProtEntryCriteria>
+       <ProtObjectives>
+        <ProtObjectivesText>I.  Evaluate the efficacy of postoperative radiotherapy in preventing local recurrence in patients with grade I sarcomas or highly invasive nonmetastasizing soft tissue tumors.</ProtObjectivesText>
+        <ProtObjectivesStat>on-line</ProtObjectivesStat>
+        <ProtObjectivesStatDate>1996-07-12T10:03:59.0</ProtObjectivesStatDate>
+        <ProtObjectivesEntryDate>1996-07-12T10:03:59.0</ProtObjectivesEntryDate>
+        <ProtObjectivesEntryUser>PDQDBA</ProtObjectivesEntryUser>
+        <ProtObjectivesChangeUser>bholohan</ProtObjectivesChangeUser>
+       </ProtObjectives>
+       <ProtOutline>
+        <ProtOutlineText>Randomized study.  Patients undergo surgical excision of all gross disease and then are randomized to Arm I or Arm II.
+
+Arm I:  Radiotherapy.  Involved-field irradiation.
+
+Arm II:  No further treatment.</ProtOutlineText>
+        <ProtOutlineStat>on-line</ProtOutlineStat>
+        <ProtOutlineStatDate>1996-07-12T10:03:59.0</ProtOutlineStatDate>
+        <ProtOutlineEntryDate>1996-07-12T10:03:59.0</ProtOutlineEntryDate>
+        <ProtOutlineEntryUser>PDQDBA</ProtOutlineEntryUser>
+        <ProtOutlineChangeUser>bholohan</ProtOutlineChangeUser>
+       </ProtOutline>
+       <ProtProjAccrual>
+        <ProtProjAccrualText>150 patients will be entered.</ProtProjAccrualText>
+        <ProtProjAccrualStat>on-line</ProtProjAccrualStat>
+        <ProtProjAccrualStatDate>1996-07-12T10:03:59.0</ProtProjAccrualStatDate>
+        <ProtProjAccrualEntryDate>1996-07-12T10:03:59.0</ProtProjAccrualEntryDate>
+        <ProtProjAccrualEntryUser>PDQDBA</ProtProjAccrualEntryUser>
+        <ProtProjAccrualChangeUser>bholohan</ProtProjAccrualChangeUser>
+       </ProtProjAccrual>
+       <ProtStudyParms>
+        <ProtStudyParmsText>Hemogram, chem-21, chest x-ray, full lung tomograms, CT of involved area, bone scan.</ProtStudyParmsText>
+        <ProtStudyParmsStat>on-line</ProtStudyParmsStat>
+        <ProtStudyParmsStatDate>1996-07-12T10:03:59.0</ProtStudyParmsStatDate>
+        <ProtStudyParmsEntryDate>1996-07-12T10:03:59.0</ProtStudyParmsEntryDate>
+        <ProtStudyParmsEntryUser>PDQDBA</ProtStudyParmsEntryUser>
+        <ProtStudyParmsChangeUser>bholohan</ProtStudyParmsChangeUser>
+       </ProtStudyParms>
+       <ProtStratification>
+        <ProtStratificationText>Tumor type (soft tissue sarcoma vs. benign invasive soft tissue tumor), surgical pathology (positive vs. negative surgical margins), location of primary tumor (extremity vs. head, neck, or trunk), tumor status (primary vs. recurrent tumor).</ProtStratificationText>
+        <ProtStratificationStat>on-line</ProtStratificationStat>
+        <ProtStratificationStatDate>1996-07-12T10:03:59.0</ProtStratificationStatDate>
+        <ProtStratificationEntryDate>1996-07-12T10:03:59.0</ProtStratificationEntryDate>
+        <ProtStratificationEntryUser>PDQDBA</ProtStratificationEntryUser>
+        <ProtStratificationChangeUser>bholohan</ProtStratificationChangeUser>
+       </ProtStratification>
+       <ProtWarning>
+        <ProtWarningText>The purpose of most clinical trials listed in this database is to test new
+cancer treatments, or new methods of diagnosing, screening for or preventing
+cancer.  Because all potentially harmful side effects are not known before
+a trial is conducted,  dose and schedule modifications may be required for
+participants if they develop side effects from the treatment or test.  The
+therapy or test described in this clinical trial is intended for use by
+clinical oncologists in carefully structured settings, and may not prove to
+be more effective than standard treatment.  A responsible investigator
+associated with this clinical trial should be consulted before using this
+protocol.</ProtWarningText>
+        <ProtWarningStat>on-line</ProtWarningStat>
+        <ProtWarningStatDate>1996-07-12T10:03:59.0</ProtWarningStatDate>
+        <ProtWarningEntryDate>1996-07-12T10:03:59.0</ProtWarningEntryDate>
+        <ProtWarningEntryUser>PDQDBA</ProtWarningEntryUser>
+        <ProtWarningChangeUser>bholohan</ProtWarningChangeUser>
+       </ProtWarning>
+       <ProtProdType>
+        <ProtProdTypeProduct>Cancer Information Product</ProtProdTypeProduct>
+        <ProtProdTypeCategory>Information Category</ProtProdTypeCategory>
+        <ProtProdTypeName>treatment</ProtProdTypeName>
+       </ProtProdType>
+       <PdqKey>69</PdqKey>
+      </Protocol>
+     ]]>
+</CdrDocXml>
+</CdrDoc>

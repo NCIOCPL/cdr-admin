@@ -1,0 +1,31 @@
+/*
+ * $Id: bevt.css,v 1.1.1.1 2007-04-07 04:07:21 bkline Exp $
+ */
+:link      { color: #FFCA10; }
+:active    { color: #FFCA10; }
+:visited   { color: #FFCA10; }
+body       { background-color: #385B93; color: white; margin: 0px; }
+.field     { font-size: 7pt; font-family: Tahoma; width: 30px; height: 11px;
+             border-style: solid; border-width: 0px;
+             padding-left: 2px; padding-right: 2px;
+             padding-top: 0px; padding-bottom: 0px; z-index: 50; }
+.countries { font-size: 8pt; font-family: Arial; width: 142px;
+             border-style: solid; border-width: 1px;
+             padding-top: 0px; padding-bottom: 0px }
+             /* Change width from 25px to 28px */
+.rfield    { font-size: 8pt; font-family: Tahoma; width: 28px; height: 16px;
+             border-style: solid; border-width: 1px;
+             padding-left: 2px; padding-right: 2px;
+             padding-top: 0px; padding-bottom: 0px; z-index: 50; }
+             /* Change width from 32px to 38px */
+.tfield    { font-size: 9pt; font-family: Tahoma; width: 38px; height: 18px;
+             border-style: solid; border-width: 1px;
+             padding-left: 2px; padding-right: 2px;
+             padding-top: 0px; padding-bottom: 0px; z-index: 50; }
+.oldind    { font-size: 7pt; font-family: Tahoma; position: absolute;
+             width: 26px; height: 11px; z-index: 101; color: white; }
+.newind    { font-size: 7pt; font-family: Tahoma; position: absolute;
+             width: 26px; height: 11px; z-index: 101; color: #00FF00; }
+.score     { position: absolute; width: 155px; height: 42px; z-index: 1;
+             left: 303px; top: 134px; text-align: center; font-weight: 700;
+             color: #93393C; font-family: "Arial Narrow"; font-size: 18pt; }

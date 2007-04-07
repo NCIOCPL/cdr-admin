@@ -1,0 +1,79 @@
+body {
+    background: #f8f8f8; font-family: Arial, Helvetica, sans-serif;
+    margin: 8px; 
+}
+h1 {
+    font-size: 16pt; color: maroon;
+}
+h2 {
+    font-size: 14pt;
+}
+h3 {
+    font-size: 12pt;
+}
+#banner {
+    margin: 0; padding: 0;
+}
+#bannerTop {
+    background: #993365; position: relative; 
+    width: 100%; margin: 0; padding: 0;
+}
+#bannerTitle {
+    padding: 2px 0 2px 7px; margin: 0;
+    font-size: 32px; color: white; font-weight: bold;
+}
+#bannerButtons {
+    position: absolute; top: 0; right: 0; 
+    margin: 8px; padding: 0;
+}
+#bannerButtons input {
+    margin: 1px 1px;
+}
+#bannerSubtitle {
+    width: 100%; margin: 0; padding: 2px 0 3px 7px;
+    background: #ffc;
+    font-size: 10pt; color: navy; font-weight: normal;
+}
+#timing {
+    font-size: 7pt; color: green;
+}
+#formTable {
+    margin: 30px;
+    width: 650px;
+}
+#formTable th {
+    font-size: 10pt; text-align: right; padding-right: 5px;
+    font-family: Arial, sans-serif;
+    /* font-family: "Lucida Grande", Verdana, Arial, sans-serif; */
+    font-weight: normal; color: navy
+}
+#formTable td {
+    font-size: 10pt;
+}
+#formTable input, #formTable select {
+    background: #fafafa;
+    border: 1px navy solid;
+    font-size: 10pt;
+    font-family: Arial, sans-serif; 
+    /* font-family: "Lucida Grande", Verdana, Arial, sans-serif; */
+    width: 250px;
+    color: #222;
+}
+#formTable input {
+    padding-left: 3px;
+}
+
+#formTable th.form-instructions {
+    font-weight: bold;
+    text-align: left;
+    padding-bottom: 15px;
+    color: #222;
+}
+#warning {
+    color: red;
+    font-size: 10pt;
+}
+#report th { color: navy; }
+#report th, #report td {
+    font-size: 10pt;
+}

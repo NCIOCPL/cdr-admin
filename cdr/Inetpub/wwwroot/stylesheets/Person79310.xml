@@ -1,0 +1,101 @@
+<CdrDoc Type='Person' Id='CDR0000079310'>
+<CdrDocCtl>
+<DocValStatus readonly="yes">U</DocValStatus>
+<DocTitle>Karpeh, Martin S.</DocTitle></CdrDocCtl>
+<CdrDocXml><![CDATA[
+      <Person xmlns:cdr='cips.nci.nih.gov/cdr'>
+       <PersonSurname>Karpeh</PersonSurname>
+       <PersonType>physician</PersonType>
+       <PersonStatus>person is active</PersonStatus>
+       <PersonRetiredFlag>N</PersonRetiredFlag>
+       <PersonDeceasedFlag>N</PersonDeceasedFlag>
+       <PersonGivenName>Martin S.</PersonGivenName>
+       <PersonInitials>MS</PersonInitials>
+       <PersonTrackMailerFlag>N</PersonTrackMailerFlag>
+       <PersonDoesNotTreatFlag>N</PersonDoesNotTreatFlag>
+       <PersonContactAtHomeFlag>N</PersonContactAtHomeFlag>
+       <PersonChangeDate>1993-11-17T00:00:00.0</PersonChangeDate>
+       <PersonComments>11/93 asb.  No longer at 3/18931 Office of ..., also e-mail address m-karpeh@.mskcc.org per 11/95 mm 12/95 asb.  Per 11/95 mm, ACS and RTOG added 12/95 aav.  Fax # changed from 794-5852 per 11/96 mm; 12/96 aoo.  Added email address and claimed membership in ASCO, but not verified per 11/97 mm 1/98 tc.</PersonComments>
+       <PersonReviewFlag>N</PersonReviewFlag>
+       <PersonAlternateType>
+        <PersonAlternateTypeName>physician</PersonAlternateTypeName>
+        <PersonAlternateTypeCategory>person type</PersonAlternateTypeCategory>
+       </PersonAlternateType>
+       <PersonAlternateType>
+        <PersonAlternateTypeName>Cancer Information Product</PersonAlternateTypeName>
+        <PersonAlternateTypeCategory>Information Product</PersonAlternateTypeCategory>
+       </PersonAlternateType>
+       <PersonMedicalSpecialty>
+        <PersonMedicalSpecialtyTerm cdr:ref='CDR0000182355'>surgical oncology</PersonMedicalSpecialtyTerm>
+        <PersonMedicalSpecialtyType>medical specialty</PersonMedicalSpecialtyType>
+       </PersonMedicalSpecialty>
+       <PersonMedicalSpecialty>
+        <PersonMedicalSpecialtyTerm cdr:ref='CDR0000182358'>surgery</PersonMedicalSpecialtyTerm>
+        <PersonMedicalSpecialtyType>medical specialty</PersonMedicalSpecialtyType>
+       </PersonMedicalSpecialty>
+       <PersonStat>
+        <PersonStatName>person is active</PersonStatName>
+        <PersonStatProduct>Rare Disease Information Product</PersonStatProduct>
+        <PersonStatChangeDate>2000-07-19T00:00:00.0</PersonStatChangeDate>
+        <PersonStatChangeReason>Per RDS Related</PersonStatChangeReason>
+       </PersonStat>
+       <PersonStat>
+        <PersonStatName>person is active</PersonStatName>
+        <PersonStatProduct>Rare Disease Information Product</PersonStatProduct>
+        <PersonStatChangeDate>2000-06-19T00:00:00.0</PersonStatChangeDate>
+        <PersonStatChangeReason>Per RDS Related</PersonStatChangeReason>
+       </PersonStat>
+       <PersonProfessionalSuffix>M.D.</PersonProfessionalSuffix>
+       <PersonProfessionalSuffix>F.A.C.S.</PersonProfessionalSuffix>
+       <PersonAffil>
+        <PersonAffilOrg cdr:ref='CDR0000023247'>Society of Surgical Oncology</PersonAffilOrg>
+        <PersonAffilType>membership</PersonAffilType>
+        <PersonAffilRole cdr:ref='CDR0000179040'>active member</PersonAffilRole>
+        <PersonAffilIncludeOrgPhone>N</PersonAffilIncludeOrgPhone>
+        <PersonAffilOrgAddressUsage>inherit none</PersonAffilOrgAddressUsage>
+       </PersonAffil>
+       <PersonAffil>
+        <PersonAffilOrg cdr:ref='CDR0000023033'>Memorial Sloan-Kettering Cancer Center</PersonAffilOrg>
+        <PersonAffilType>primary contact</PersonAffilType>
+        <PersonAffilEmail>
+         <PersonAffilEmailAddress>karpehm@mskcc.org</PersonAffilEmailAddress>
+         <PersonAffilEmailType>public email</PersonAffilEmailType>
+        </PersonAffilEmail>
+        <PersonAffilPhone>
+         <PersonAffilPhoneNumber>212-639-8056</PersonAffilPhoneNumber>
+         <PersonAffilPhoneType>voice</PersonAffilPhoneType>
+        </PersonAffilPhone>
+        <PersonAffilPhone>
+         <PersonAffilPhoneNumber>212-794-5847</PersonAffilPhoneNumber>
+         <PersonAffilPhoneType>facsimile</PersonAffilPhoneType>
+        </PersonAffilPhone>
+        <PersonAffilIncludeOrgPhone>N</PersonAffilIncludeOrgPhone>
+        <PersonAffilOrgAddressUsage>inherit inheritable address lines</PersonAffilOrgAddressUsage>
+       </PersonAffil>
+       <PersonAffil>
+        <PersonAffilOrg cdr:ref='CDR0000023521'>American College of Surgeons</PersonAffilOrg>
+        <PersonAffilType>membership</PersonAffilType>
+        <PersonAffilRole cdr:ref='CDR0000179074'>active fellow</PersonAffilRole>
+        <PersonAffilIncludeOrgPhone>N</PersonAffilIncludeOrgPhone>
+        <PersonAffilOrgAddressUsage>inherit none</PersonAffilOrgAddressUsage>
+       </PersonAffil>
+       <PersonAffil>
+        <PersonAffilOrg cdr:ref='CDR0000023063'>Radiation Therapy Oncology Group</PersonAffilOrg>
+        <PersonAffilType>membership</PersonAffilType>
+        <PersonAffilRole cdr:ref='CDR0000179040'>active member</PersonAffilRole>
+        <PersonAffilIncludeOrgPhone>N</PersonAffilIncludeOrgPhone>
+        <PersonAffilOrgAddressUsage>inherit none</PersonAffilOrgAddressUsage>
+       </PersonAffil>
+       <PersonAffil>
+        <PersonAffilOrg cdr:ref='CDR0000023132'>American Society of Clinical Oncology</PersonAffilOrg>
+        <PersonAffilType>membership</PersonAffilType>
+        <PersonAffilRole cdr:ref='CDR0000179040'>active member</PersonAffilRole>
+        <PersonAffilIncludeOrgPhone>N</PersonAffilIncludeOrgPhone>
+        <PersonAffilOrgAddressUsage>inherit none</PersonAffilOrgAddressUsage>
+       </PersonAffil>
+       <PdqKey>39688</PdqKey>
+       <PdqUpdateDate>1993-11-17T00:00:00.0</PdqUpdateDate>
+      </Person>
+     ]]>
+</CdrDocXml>
+</CdrDoc>

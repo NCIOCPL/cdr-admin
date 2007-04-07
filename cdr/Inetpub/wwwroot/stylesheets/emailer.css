@@ -1,0 +1,16 @@
+.text {
+	font-family: geneva, "MS Sans Serif", Arial;
+	font-size: 0.9em;
+	font-style: normal;
+	font-weight: normal;
+	color: #333366;
+
+}
+.textbold {
+	font-family: geneva, "MS Sans Serif", Arial;
+	font-size: 0.9em;
+	font-style: normal;
+	font-weight: bold;
+	color: #333366;
+
+}

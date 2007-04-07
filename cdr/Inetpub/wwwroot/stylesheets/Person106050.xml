@@ -1,0 +1,45 @@
+<CdrDoc Type='Person' Id='CDR0000106050'>
+<CdrDocCtl>
+<DocValStatus readonly="yes">U</DocValStatus>
+<DocTitle>Danenberg, Peter V.</DocTitle></CdrDocCtl>
+<CdrDocXml><![CDATA[
+      <Person xmlns:cdr='cips.nci.nih.gov/cdr'>
+       <PersonSurname>Danenberg</PersonSurname>
+       <PersonType>person</PersonType>
+       <PersonRetiredFlag>N</PersonRetiredFlag>
+       <PersonDeceasedFlag>N</PersonDeceasedFlag>
+       <PersonGivenName>Peter V.</PersonGivenName>
+       <PersonInitials>PV</PersonInitials>
+       <PersonDoesNotTreatFlag>Y</PersonDoesNotTreatFlag>
+       <PersonContactAtHomeFlag>N</PersonContactAtHomeFlag>
+       <PersonComments>New per MSKCC-99081; 3/00 jmc. Added spec addr and middle initial per MSKCC-99066; 6/00 jmc.</PersonComments>
+       <PersonReviewFlag>N</PersonReviewFlag>
+       <PersonAlternateType>
+        <PersonAlternateTypeName>person</PersonAlternateTypeName>
+        <PersonAlternateTypeCategory>person type</PersonAlternateTypeCategory>
+       </PersonAlternateType>
+       <PersonStat>
+        <PersonStatName>person is active</PersonStatName>
+        <PersonStatProduct>Rare Disease Information Product</PersonStatProduct>
+        <PersonStatChangeDate>2000-07-19T00:00:00.0</PersonStatChangeDate>
+        <PersonStatChangeReason>Per RDS Related</PersonStatChangeReason>
+       </PersonStat>
+       <PersonStat>
+        <PersonStatName>person is active</PersonStatName>
+        <PersonStatProduct>Rare Disease Information Product</PersonStatProduct>
+        <PersonStatChangeDate>2000-04-17T00:00:00.0</PersonStatChangeDate>
+        <PersonStatChangeReason>Per RDS Related</PersonStatChangeReason>
+       </PersonStat>
+       <PersonProfessionalSuffix>Ph.D.</PersonProfessionalSuffix>
+       <PersonAffil>
+        <PersonAffilOrg cdr:ref='CDR0000023024'>USC/Norris Comprehensive Cancer Center</PersonAffilOrg>
+        <PersonAffilType>primary contact</PersonAffilType>
+        <PersonAffilAddrLine>1303 North Mission Road</PersonAffilAddrLine>
+        <PersonAffilIncludeOrgPhone>N</PersonAffilIncludeOrgPhone>
+        <PersonAffilOrgAddressUsage>inherit none</PersonAffilOrgAddressUsage>
+       </PersonAffil>
+       <PdqKey>53615</PdqKey>
+      </Person>
+     ]]>
+</CdrDocXml>
+</CdrDoc>
