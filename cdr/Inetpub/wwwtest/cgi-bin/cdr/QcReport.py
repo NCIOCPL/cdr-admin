@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.52 2007-02-23 22:48:51 venglisc Exp $
+# $Id: QcReport.py,v 1.53 2007-04-09 20:47:45 venglisc Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.52  2007/02/23 22:48:51  venglisc
+# Modifications to display comments as internal and external comments within
+# the summaries. (Bug 2920)
+#
 # Revision 1.51  2006/05/16 20:50:28  venglisc
 # Adding filter set for DrugInfoSummary documents. (Bug 2053)
 #
@@ -1075,8 +1079,17 @@ if not filters.has_key(docType):
     cdrcgi.sendPage(cdrcgi.unicodeToLatin1(html))
 
 filterParm = []
+
+# Setting the markup display level based on the selected check
+# boxes.
+# The DrugInfoSummaries are displayed without having to select the
+# display type, therefore we need to set the revision level manually
+# ------------------------------------------------------------------
 if insRevLvls:
     filterParm = [['insRevLevels', insRevLvls]]
+else:
+    if docType == 'DrugInformationSummary':
+        filterParm = [['insRevLevels', 'publish|approved|proposed']]
 
 # Patient Summaries are displayed like editorial board markup
 # -----------------------------------------------------------
