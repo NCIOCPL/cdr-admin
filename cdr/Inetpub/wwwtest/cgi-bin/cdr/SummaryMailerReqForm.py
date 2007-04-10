@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryMailerReqForm.py,v 1.7 2007-04-06 14:58:01 bkline Exp $
+# $Id: SummaryMailerReqForm.py,v 1.8 2007-04-10 13:07:34 kidderc Exp $
 #
 # Request form for generating PDQ Editorial Board Members Mailing.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.7  2007/04/06 14:58:01  bkline
+# Removed unused modules from import statement in preparate for turning
+# over enhancement of this script to Charlie Kidder.
+#
 # Revision 1.6  2005/05/13 22:41:04  venglisc
 # Modified to pre-populate the email input field with the session owners
 # email address. (Bug 1664)
@@ -37,6 +41,8 @@ board     = fields and fields.getvalue("Board") or None
 email     = fields and fields.getvalue("Email") or None
 boardType = fields and fields.getvalue("BoardType") or "Editorial"
 maxMails  = fields and fields.getvalue("maxMails") or 'No limit'
+summary   = fields and fields.getvalue("Summary") or None
+person    = fields and fields.getvalue("Person") or None
 title     = "CDR Administration"
 section   = "PDQ %s Board Members Mailer Request Form" % boardType
 SUBMENU   = "Mailer Menu"
@@ -84,9 +90,10 @@ except cdrdb.Error, info:
 #----------------------------------------------------------------------
 if request == "Submit":
 
+    sWhere = ''
     # Reality check.
     if not board:
-        cdrcgi.bail('Board not selected')
+        cdrcgi.bail('You must select a board or specify a specific member')
 
     # Find the publishing system control document.
     try:
@@ -109,6 +116,9 @@ if request == "Submit":
     ctrlDocId = rows[0][0]
 
     # Find the documents to be published.
+    if ( summary and (len(summary) > 0) ):
+      sWhere = ' AND d.id = %s ' % summary
+		
     try:
         cursor.execute("""\
             SELECT DISTINCT TOP %d d.id, MAX(v.num)
@@ -121,12 +131,13 @@ if request == "Submit":
                          ON a.doc_id = d.id
                       WHERE d.active_status = 'A'
                         AND v.publishable = 'Y'
+                        %s                   
                         AND q.value = ?
                         AND q.path = '/Summary/SummaryMetaData/PDQBoard'
                                    + '/Board/@cdr:ref'
                         AND a.path = '/Summary/SummaryMetaData/SummaryAudience'
                         AND a.value = 'Health professionals'
-                   GROUP BY d.id""" % maxDocs, (board,))
+                   GROUP BY d.id""" %  (maxDocs,sWhere), (board,))
         docList = cursor.fetchall()
     except cdrdb.Error, info:
         cdrcgi.bail("Failure retrieving document IDs: %s" % info[1][0])
@@ -144,7 +155,10 @@ if request == "Submit":
 
     # Drop the job into the queue.
     subset = 'Summary-PDQ %s Board' % boardType
-    parms = (('Board', board),)
+    if (person):
+        parms = (('Board', board),('Person', person))
+    else:
+        parms = (('Board', board),)
     result = cdr.publish(credentials = session, pubSystem = 'Mailers',
                          pubSubset = subset, docList = docs,
                          allowNonPub = 'Y', email = email, parms = parms)
@@ -256,6 +270,16 @@ form = """\
    </ul>
    <h3>Select board name</h3>
    %s
+   <br><br><br>
+   <b>
+    Specify a specific summary to email instead of all summaries (if blank, will email all summaries):&nbsp;
+   </b>
+   <input type='text' name='Summary' size='12' value='' />
+   <br><br><br>
+   <b>
+    Specify a specific member to email instead of all members (if blank, will email to all members):&nbsp;
+   </b>
+   <input type='text' name='Person' size='12' value='' />
    <br><br><br>
    <b>
     Limit maximum number of documents for which mailers will be 
