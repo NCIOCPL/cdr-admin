@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryMailerReqForm.py,v 1.8 2007-04-10 13:07:34 kidderc Exp $
+# $Id: SummaryMailerReqForm.py,v 1.9 2007-04-12 12:44:29 kidderc Exp $
 #
 # Request form for generating PDQ Editorial Board Members Mailing.
 #
@@ -118,9 +118,8 @@ if request == "Submit":
     # Find the documents to be published.
     if ( summary and (len(summary) > 0) ):
       sWhere = ' AND d.id = %s ' % summary
-		
-    try:
-        cursor.execute("""\
+      
+    sQuery = """\
             SELECT DISTINCT TOP %d d.id, MAX(v.num)
                        FROM doc_version v
                        JOIN document d
@@ -137,7 +136,10 @@ if request == "Submit":
                                    + '/Board/@cdr:ref'
                         AND a.path = '/Summary/SummaryMetaData/SummaryAudience'
                         AND a.value = 'Health professionals'
-                   GROUP BY d.id""" %  (maxDocs,sWhere), (board,))
+                   GROUP BY d.id""" %  (maxDocs,sWhere)
+		
+    try:
+        cursor.execute(sQuery,(board,))
         docList = cursor.fetchall()
     except cdrdb.Error, info:
         cdrcgi.bail("Failure retrieving document IDs: %s" % info[1][0])
@@ -150,15 +152,17 @@ if request == "Submit":
     # Compose the docList results into a format that cdr.publish() wants
     #   e.g., id=25, version=3, then form: "CDR0000000025/3"
     docs = []
+    
     for doc in docList:
-        docs.append("CDR%010d/%d" % (doc[0], doc[1]))
-
+        sDoc = "CDR%010d/%d" % (doc[0], doc[1])
+        docs.append(sDoc)
+        
     # Drop the job into the queue.
     subset = 'Summary-PDQ %s Board' % boardType
     if (person):
         parms = (('Board', board),('Person', person))
     else:
-        parms = (('Board', board),)
+        parms = (('Board', board),('Person', ''))
     result = cdr.publish(credentials = session, pubSystem = 'Mailers',
                          pubSubset = subset, docList = docs,
                          allowNonPub = 'Y', email = email, parms = parms)
