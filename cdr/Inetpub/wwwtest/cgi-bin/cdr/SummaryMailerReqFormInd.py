@@ -8,6 +8,7 @@ session   = cdrcgi.getSession(fields)
 request   = cdrcgi.getRequest(fields)
 type     = fields and fields.getvalue("Type") or None
 board     = fields and fields.getvalue("Board") or None
+boardname     = fields and fields.getvalue("BoardName") or None
 email     = fields and fields.getvalue("EMail") or None
 members   = fields and fields.getvalue("Members") or None
 check     = fields and fields.getlist("check") or []
@@ -45,35 +46,147 @@ try:
 except cdrdb.Error, info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
     
-class MailtToList:
+class SummaryWithVer:
+    def __init__(self, Id, Ver):
+        self.summaryId = Id
+        self.ver = Ver
+    
+class MailToList:
     def __init__(self, memberId):
         self.memberId = memberId
-        self.summary = []
+        self.summaries = []
     
 #----------------------------------------------------------------------
 # Submit request if we have one.
 #----------------------------------------------------------------------
 Mailers = {}
 if request == "Submit":
-#    if check and check.count() > 1:
-#        cdrcgi.bail(check)
-#        for checkItem in check:
-#            strItem = "%s" % item
-#        splitTxt = str.split("-")
-#        if (splitTxt.count() > 1) :
-#            if ( type == "Member" ):
-#                memberID = splitTxt[0]
-#                summaryID = splitTxt[1]
-#            else:
-#                memberID = splitTxt[1]
-#                summaryID = splitTxt[0]
-#            if memberId not in Mailers:
-#                Mailers[memberId] = MailToList(memberId)
-#            member = Mailers[memberId]
-#            if summaryID not in member.summary
-#                 member.summary.append(summaryID)
-				 
-     cdrcgi.bail("To do")			 
+    try:
+        # package up the checked mailers, grouped by member    
+        for checkItem in check:
+            strItem = "%s" % checkItem
+            if (strItem.count("-") > 0 ):
+                splitTxt = strItem.split("-")
+                if ( type == "Member" ):
+                    memberID = splitTxt[0]
+                    summaryID = splitTxt[1]
+                else:
+                    memberID = splitTxt[1]
+                    summaryID = splitTxt[0]
+                if memberID not in Mailers:
+                    Mailers[memberID] = MailToList(memberID)
+                member = Mailers[memberID]
+                if summaryID not in member.summaries:
+                    summary = SummaryWithVer(summaryID,"1")
+                    member.summaries.append(summary)
+    except Exception, e:
+           cdrcgi.bail("oops: %s" % e)
+    
+    try:
+        sIn = ""
+        for memberID in Mailers:
+            member = Mailers[memberID]
+            for summary in member.summaries:
+                sIn += summary.summaryId
+                sIn += ","
+        sIn = sIn[0:len(sIn)-1]
+    except Exception, e:
+           cdrcgi.bail("oops: %s" % e)
+
+    # Get the latest version number for each document
+    sBoard = ""
+    sQuery = """\
+            SELECT DISTINCT d.id, MAX(v.num)
+                       FROM doc_version v
+                       JOIN document d
+                         ON d.id = v.id
+                       JOIN query_term q
+                         ON q.doc_id = d.id
+                       JOIN query_term a
+                         ON a.doc_id = d.id
+                      WHERE d.active_status = 'A'
+                        AND v.publishable = 'Y'
+                        AND q.path = '/Summary/SummaryMetaData/PDQBoard'
+                                   + '/Board/@cdr:ref'
+                        AND a.path = '/Summary/SummaryMetaData/SummaryAudience'
+                        AND a.value = 'Health professionals'
+                        AND d.id in (%s)
+                    GROUP BY d.id""" % sIn
+
+    try:
+        sBoard = """CDR%010d""" % (int(board),)
+        cursor = conn.cursor()
+        cursor.execute(sQuery,timeout = 300)
+        docList = cursor.fetchall()
+    except cdrdb.Error, info:
+        cdrcgi.bail("Failure retrieving document IDs: %s<br>Query = %s" % (info[1][0],sQuery))
+
+    # Check to make sure we have at least one mailer to send out.
+    docCount = len(docList)
+    if docCount == 0:
+        cdrcgi.bail ("No documents found")
+
+    docs = []
+    for doc in docList:
+        sDoc = "CDR%010d/%d" % (doc[0], doc[1])
+        docs.append(sDoc)
+        for memberID in Mailers:
+            member = Mailers[memberID]
+            for summary in member.summaries:
+                if (int(summary.summaryId) == int(doc[0])):
+                    summary.ver = doc[1]
+
+    # Compose the docList results into a format that cdr.publish() wants
+    #   e.g., id=25, version=3, then form: "CDR0000000025/3"
+    sPerson = ""
+    for memberID in Mailers:
+        member = Mailers[memberID]
+        sPerson += "%d" % int(member.memberId)
+        sPerson += " ["
+        for summary in member.summaries:
+            #sPerson += "CDR%010d/%d " % (int(summary.summaryId), int(summary.ver))
+            sPerson += "%d/%d " % (int(summary.summaryId), int(summary.ver))
+        sPerson = sPerson[0:len(sPerson)-1]
+        sPerson += "] "
+        
+    # Drop the job into the queue.
+    subset = 'Summary-PDQ Editorial Board'
+    parms = (('Board', sBoard),('Person', sPerson))
+    result = cdr.publish(credentials = session, pubSystem = 'Mailers',
+                         pubSubset = subset, docList = docs,
+                         allowNonPub = 'Y', email = email, parms = parms)
+
+    # cdr.publish returns a tuple of job id + messages
+    # If serious error, job id = None
+    if not result[0] or int(result[0]) < 0:
+        cdrcgi.bail("Unable to initiate publishing job:<br>%s<br>Person = %s, len(Person) = %d" % (result[1],sPerson,len(sPerson)))
+
+    jobId = int(result[0])
+
+    # Log what happened
+    msgs = ["Started directory mailer job - id = %d" % jobId,
+            "                      Mailer type = %s" % subset,
+            "          Number of docs selected = %d" % docCount]
+    if docCount > 0:
+        msgs.append ("                        First doc = %s" % docs[0])
+    if docCount > 1:
+        msgs.append ("                       Second doc = %s" % docs[1])
+    cdr.logwrite (msgs, cdrmailcommon.LOGFILE)
+
+    # Tell user how to get status
+    section   = "%s Board Mailer Request Form" % boardname
+    header = cdrcgi.header(title, title, section, None, [])
+    cdrcgi.sendPage(header + """\
+    <H3>Job Number %d Submitted</H3>
+    <B>
+     <FONT COLOR='black'>Use
+      <A HREF='%s/PubStatus.py?id=%d'>this link</A> to view job status.
+     </FONT>
+    </B>
+   </FORM>
+  </BODY>
+ </HTML>
+""" % (jobId, cdrcgi.BASE, jobId))    
 
 class Member:
     def __init__(self, id, docTitle):
@@ -92,6 +205,7 @@ class Summary:
     def __init__(self, id, docTitle):
         self.members = []
         self.id = id
+        self.ver = 0
         self.name = docTitle
         delim = docTitle.find(';')
         if delim != -1:
@@ -345,8 +459,12 @@ form = """\
    <h2>%s</h2>
    %s
    <input type='hidden' name='%s' value='%s'>
+   <input type='hidden' name='Type' value='%s'>
+   <input type='hidden' name='Board' value='%s'>
+   <input type='hidden' name='EMail' value='%s'>
+   <input type='hidden' name='BoardName' value='%s'>
   </form>
  </body>
 </html>
-""" % (section, buildTable(selMembers,selSummaries),cdrcgi.SESSION, session)
+""" % (section, buildTable(selMembers,selSummaries),cdrcgi.SESSION, session,type,board,email,boardname)
 cdrcgi.sendPage(header + form)
