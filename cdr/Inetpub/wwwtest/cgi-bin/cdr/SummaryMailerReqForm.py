@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryMailerReqForm.py,v 1.11 2007-04-20 18:31:47 kidderc Exp $
+# $Id: SummaryMailerReqForm.py,v 1.12 2007-04-20 19:16:52 kidderc Exp $
 #
 # Request form for generating PDQ Editorial Board Members Mailing.
 #
@@ -631,7 +631,7 @@ form = """\
       <select id='member' name='member' style='width:500px' multiple size=10>
       </select>
      </td>
-     <td>&nbsp;</td>
+     <td><p>&nbsp;Use Ctrl+'Click' to select multiple rows</p></td>
     </tr>
     <tr>
      <th align='right'>Email Address:&nbsp;</th>

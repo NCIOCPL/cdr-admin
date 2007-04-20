@@ -328,7 +328,7 @@ else:
             AND audience.value = 'Health professionals'  
             AND summary.path = '/Summary/SummaryTitle'
             AND summary.doc_id in (select id from document where active_status = 'A') 
-          WHERE summary_board.int_val = %s""" % board
+          WHERE summary_board.int_val = %s order by board_member.title""" % board
     else:
         sQuery = """\
           SELECT DISTINCT board_member.id,board_member.title,summary.doc_id, summary.value
@@ -349,7 +349,7 @@ else:
             AND audience.value = 'Health professionals'  
             AND summary.path = '/Summary/SummaryTitle'
             AND summary.doc_id in (%s) 
-          WHERE summary_board.int_val = %s""" % (members,board)
+          WHERE summary_board.int_val = %s order by board_member.title""" % (members,board)
           
     cursor.execute(sQuery)
     rows = cursor.fetchall()
@@ -370,11 +370,11 @@ else:
     #cdrcgi.bail("session = %s board = %s type = %s email = %s members = %s" % (session,board,type,email,members))
     
 def buildIndividualTable(id,name,members):
-    html = """&nbsp;&nbsp;<input type="checkbox" name="check" value="%d" CHECKED onclick="radioClick(this);">""" % id
+    html = """&nbsp;&nbsp;&nbsp;&nbsp;<input type="checkbox" name="check" value="%d" CHECKED onclick="radioClick(this);">""" % id
     html += "<b>" + name + "</b><br>"
     
     for member in members:
-       html += """&nbsp;&nbsp;&nbsp;&nbsp;<input type="checkbox" name="check" value="%d-%d" CHECKED>%s</input><br>""" % (id,member.id,member.name)
+       html += """&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<input type="checkbox" name="check" value="%d-%d" CHECKED>%s</input><br>""" % (id,member.id,member.name)
         
     return html
 
