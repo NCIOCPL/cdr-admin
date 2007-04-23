@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: Request3109.py,v 1.1 2007-04-23 12:39:38 bkline Exp $
+# $Id: Request3109.py,v 1.2 2007-04-23 12:42:02 bkline Exp $
 #
 # "We have a request from Oregeon Health Sciences University Cancer Center
 # for a report in Excel format that lists OHSUCC trials that we have in PDQ.
@@ -40,6 +40,9 @@
 # Cancer.gov yet?"]
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2007/04/23 12:39:38  bkline
+# Organization Protocols Spreadsheet report.
+#
 #----------------------------------------------------------------------
 
 import cgi, cdrdb, cdrcgi, sys, cdr, ExcelWriter, time
@@ -361,7 +364,7 @@ addSheet(wb, styles, siteOrgProtocols, "Site (Active)", True)
 addSheet(wb, styles, [p for p in leadOrgProtocols if not p.protocol.active],
          "Lead Org (Not Active)")
 now = time.strftime("%Y%m%d%H%M%S")
-filename = "Request3109-%s.xls" % now
+filename = "OrganizationProtocolsSpreadsheet-%s.xls" % now
 if not debugging:
     print "Content-type: application/vnd.ms-excel"
     print "Content-Disposition: attachment; filename=%s" % filename
