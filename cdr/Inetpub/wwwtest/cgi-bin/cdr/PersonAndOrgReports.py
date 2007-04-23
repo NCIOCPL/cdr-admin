@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PersonAndOrgReports.py,v 1.12 2005-04-13 20:13:25 venglisc Exp $
+# $Id: PersonAndOrgReports.py,v 1.13 2007-04-23 12:36:21 bkline Exp $
 #
 # Submenu for person and organization reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.12  2005/04/13 20:13:25  venglisc
+# Added menu option for Member of AdHoc Group report.  (Bug 1630)
+#
 # Revision 1.11  2004/11/03 20:14:37  venglisc
 # Added Organization Affiliations report ad Organization Acronym report as
 # new menu items. (Bug 1378, 1380)
@@ -100,6 +103,8 @@ reports = [
             'Member Of Adhoc Group Report'),
 	       ('OrgAffiliations.py',
 	        'Organization Affiliations Report'),
+           ('Request3109.py', 
+            'Organization Protocols Spreadsheet'),
            ('OrgProtocolReview.py', 
             'Organization Protocol Review'),
 	       ('OrgProtocolAcronym.py',
