@@ -1,8 +1,11 @@
 #----------------------------------------------------------------------
 #
-# $Id: DrugInfoReports.py,v 1.1 2006-05-16 20:45:24 venglisc Exp $
+# $Id: DrugInfoReports.py,v 1.2 2007-04-27 22:51:54 venglisc Exp $
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2006/05/16 20:45:24  venglisc
+# Initila copy of DrugInfoSummary reports menu (Bug 2053).
+#
 # Inintial version of Drug Information Reports Menu page of the 
 # Admin interface. (Bug 2053)
 #
@@ -44,7 +47,9 @@ form = """
     <OL>                                                                        
 """ % (cdrcgi.SESSION, session)                                                 
 reports = [('QcReport.py?DocType=DrugInformationSummary', 
-                              'Drug Information QC Report')] 
+            'Drug Information QC Report'),
+           ('QcReport.py?DocType=DrugInformationSummary&ReportType=pp&',
+           'Publish Preview')] 
 
 for r in reports:
     form += "<LI><A HREF='%s/%s&%s=%s'>%s</LI></A>\n" % (
