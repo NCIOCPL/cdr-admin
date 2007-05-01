@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummariesLists.py,v 1.4 2004-03-30 23:09:24 venglisc Exp $
+# $Id: SummariesLists.py,v 1.5 2007-05-01 23:56:23 venglisc Exp $
 #
 # Report on lists of summaries.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2004/03/30 23:09:24  venglisc
+# Fixed a problem that dropped the first summary of every summary type.
+#
 # Revision 1.3  2004/01/13 23:51:18  venglisc
 # Added comments to the code.  Removed query_s since it is now handled with
 # one query for both, English and Spanish requests.
@@ -38,24 +41,24 @@ buttons   = (SUBMENU, cdrcgi.MAINMENU)
 
 # Functions to replace sevaral repeated HTML snippets
 # ===================================================
-def boardHeader(header):
+def boardHeader(board_type):
     """Return the HTML code to display the Summary Board Header"""
     html = """\
   </DL>
-  <U><FONT size="+1">%s</FONT></U>
+  <U><FONT size="+1">%s (%d)</FONT></U>
   <DL>
-""" % board_type
+""" % (board_type, boardCount[board_type])
     return html
 
-def boardHeaderWithID(header):
+def boardHeaderWithID(board_type):
     """Return the HTML code to display the Summary Board Header with ID"""
     html = """\
   </TABLE>
   <P/>
 
-  <U><FONT size="+1">%s</FONT></U><P/>
+  <U><FONT size="+1">%s (%d)</FONT></U><P/>
   <TABLE width = "100%%"> 
-""" % header
+""" % (board_type, boardCount[board_type])
     return html
 
 def summaryRow(summary):
@@ -258,7 +261,7 @@ for i in range(len(groups)):
   elif groups[i] == 'Spanish Adult Treatment' and lang == 'Spanish':
       boardPick += """'CDR0000028327', 'CDR0000035049', """
   elif groups[i] == 'Complementary and Alternative Medicine':
-      boardPick += """'CDR0000256158', """
+      boardPick += """'CDR0000256158', 'CDR0000423294', """
   elif groups[i] == 'Genetics':
       boardPick += """'CDR0000032120', 'CDR0000257061', """
   elif groups[i] == 'Screening and Prevention':
@@ -283,6 +286,7 @@ q_case = """\
             WHEN board.value = 'CDR0000032120'  THEN 'Cancer Genetics'
             WHEN board.value = 'CDR0000257061'  THEN 'Cancer Genetics'
             WHEN board.value = 'CDR0000256158'  THEN 'Complementary and Alternative Medicine'
+            WHEN board.value = 'CDR0000423294'  THEN 'Complementary and Alternative Medicine'
             WHEN board.value = 'CDR0000028557'  THEN 'Pediatric Treatment'
             WHEN board.value = 'CDR0000028558'  THEN 'Pediatric Treatment'
             WHEN board.value = 'CDR0000028536'  THEN 'Screening and Prevention'
@@ -412,7 +416,16 @@ except cdrdb.Error, info:
 if not rows:
     cdrcgi.bail('No Records Found for Selection: %s ' % lang+"; "+audience+"; "+groups[0] )
 
-#cdrcgi.bail("Result: [%s]" % rows)
+#cdrcgi.bail("Result: %s" % rows[75])
+# Counting the number of summaries per board
+# ------------------------------------------
+boardCount = {}
+for board in rows:
+    if boardCount.has_key(board[5]):
+        boardCount[board[5]] += 1
+    else:
+        boardCount[board[5]]  = 1
+
 #----------------------------------------------------------------------
 # Create the results page.
 #----------------------------------------------------------------------
@@ -457,9 +470,9 @@ board_type = rows[0][5]
 # ------------------------------------------------------------------------
 if showId == 'N':
     report += """\
-  <U><FONT size="+1">%s</FONT></U>
+  <U><FONT size="+1">%s (%d)</FONT></U>
   <DL>
-""" % board_type
+""" % (board_type, boardCount[board_type])
 
     for row in rows:
         # If we encounter a new board_type we need to create a new
@@ -488,9 +501,9 @@ if showId == 'N':
 # ------------------------------------------------------------------------
 else:
     report += """\
-  <U><FONT size="+1">%s</FONT></U><P/>
+  <U><FONT size="+1">%s (%d)</FONT></U><P/>
   <TABLE width = "100%%">
-""" % board_type
+""" % (board_type, boardCount[board_type])
 
     for row in rows:
         # If we encounter a new board_type we need to create a new
