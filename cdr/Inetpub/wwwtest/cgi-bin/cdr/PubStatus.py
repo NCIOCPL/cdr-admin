@@ -1,10 +1,16 @@
 #----------------------------------------------------------------------
 #
-# $Id: PubStatus.py,v 1.26 2007-02-21 00:39:10 ameyer Exp $
+# $Id: PubStatus.py,v 1.27 2007-05-01 21:29:14 venglisc Exp $
 #
 # Status of a publishing job.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.26  2007/02/21 00:39:10  ameyer
+# If the request specifies jobs to be resumed or killed, we now check
+# to be sure the job was still in a Waiting state before proceeding.  This
+# prevents errors caused by use of the back, or refresh buttons or by use
+# of multiple tabs or windows.
+#
 # Revision 1.25  2007/02/20 23:57:15  venglisc
 # Added line break to correct display of text area.
 #
@@ -261,6 +267,8 @@ def dispFilterFailures(flavor = 'full'):
     instr   = "Job Number %d" % jobId
     buttons = []
     header  = cdrcgi.header(title, title, instr, None, buttons)
+    if not rows:
+        cdrcgi.bail("Job%s finished without Failure" % jobId)
     html    = """\
        <TABLE>
         <TR>
