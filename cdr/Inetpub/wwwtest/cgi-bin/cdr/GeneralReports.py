@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GeneralReports.py,v 1.15 2005-08-17 20:08:19 venglisc Exp $
+# $Id: GeneralReports.py,v 1.16 2007-05-04 23:42:24 venglisc Exp $
 #
 # Submenu for general reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.15  2005/08/17 20:08:19  venglisc
+# Added new menu option to display table names and columns.
+#
 # Revision 1.14  2005/08/17 19:14:24  venglisc
 # Added new menu item under for the CdrFilter.html UI.
 #
@@ -112,6 +115,8 @@ reports = [
             'Global Change Test Results'),
            ('LinkedDocs.py', 
             'Linked Documents'),
+           ('MediaLinks.py', 
+            'Linked Media Documents'),
            ('NewDocsWithPubStatus.py', 
             'List of New Documents with Publication Status'),
            ('NewDocReport.py', 
