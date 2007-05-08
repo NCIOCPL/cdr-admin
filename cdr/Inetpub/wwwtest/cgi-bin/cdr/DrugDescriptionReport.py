@@ -58,14 +58,14 @@ def buildIndividualDrugTable(id,name,description,summary):
     html += "<tr>"
     html += "<td width = 10%></td>"
     html += "<td width = 10%><h3>CDRID</h3></td>"
-    html += """<td><h4>%s</h4></td>""" %id
+    html += """<td  valign='top'><h4>%s</h4></td>""" %id
     html += "<td width = 10%></td>"
     html += "</tr>"
     
     html += "<tr>"
     html += "<td></td>"
-    html += "<td><h3>Drug Name</h3></td>"
-    html += """<td><h4>%s</h4></td>""" % name
+    html += "<td  valign='top'><h3>Drug Name</h3></td>"
+    html += """<td  valign='top'><h4>%s</h4></td>""" % name
     html += "<td></td>"
     html += "</tr>"
 
@@ -73,8 +73,8 @@ def buildIndividualDrugTable(id,name,description,summary):
 
     html += "<tr>"
     html += "<td></td>"
-    html += "<td><h3>Description</h3></td>"
-    html += """<td><h4>%s</h4></td>""" % description
+    html += "<td  valign='top'><h3>Description</h3></td>"
+    html += """<td  valign='top'><h4>%s</h4></td>""" % description
     html += "<td></td>"
     html += "</tr>"
 
@@ -82,8 +82,8 @@ def buildIndividualDrugTable(id,name,description,summary):
 
     html += "<tr>"
     html += "<td></td>"
-    html += "<td><h3>Summary</h3></td>"
-    html += """<td><h4>%s</h4></td>""" % summary
+    html += "<td  valign='top'><h3>Summary</h3></td>"
+    html += """<td  valign='top'><h4>%s</h4></td>""" % summary
     html += "<td></td>"
     html += "</tr>"    
 
@@ -189,7 +189,7 @@ AND d.id = %s
             drugInfo[key] = drugInf
 
     now = time.localtime(time.time())
-    Date   = time.strftime("%m/%d/%y", now)
+    Date   = time.strftime("%b %d, %Y %I:%M%p", now)
 
     form = """\
 <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
