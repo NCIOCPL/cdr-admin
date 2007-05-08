@@ -167,9 +167,6 @@ AND d.id = %s
 
         for xml in rows:
             s = "%s" % xml
-            f = open('d:\\tmp\\exml.txt','wt')
-            f.write(s)
-            f.close()
             splitTxt = s.split("<Description>");
             splitTxt2 = splitTxt[1].split("</Description>");
             drugInf.description = splitTxt2[0]
@@ -295,13 +292,19 @@ style       = "style='width: 200px'"
 drugStartDisplay = "none"
 dateStartDisplay = "none"
 typeStartDisplay = "none"
+drugStartChecked = ""
+dateStartChecked = ""
+typeStartChecked = ""
 
 if selectByType == 'Drug':
     drugStartDisplay = "block"
+    drugStartChecked = "checked"
 elif selectByType == 'Date':
     dateStartDisplay = "block"
+    dateStartChecked = "checked"
 else:
     typeStartDisplay = "block"
+    typeStartChecked = "checked"
 
 form = """\
 <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
@@ -322,30 +325,43 @@ form = """\
    .error { color: red; }
   </style>
   <script language='JavaScript'>
+
+   function bodyLoad()
+   {
+       radioClicked('Drug')
+   }
    
    function radioClicked(whichOne)
    {
        var elemDrugControls = document.getElementById('DrugControls');
        var elemDateControls = document.getElementById('DateControls');
        var elemTypeControls = document.getElementById('TypeControls');
+
+       var elemDrugCheck = document.getElementById('DrugCheck');
+       var elemDateCheck = document.getElementById('DateCheck');
+       var elemTypeCheck = document.getElementById('TypeCheck');
+
+       elemDrugControls.style.display = "none";
+       elemDateControls.style.display = "none";
+       elemTypeControls.style.display = "none";
+       elemDrugCheck.checked=0
+       elemDateCheck.checked=0
+       elemTypeCheck.checked=1
        
        if (whichOne == 'Drug')
        {
            elemDrugControls.style.display = "block";
-           elemDateControls.style.display = "none";
-           elemTypeControls.style.display = "none";
+           elemDrugCheck.checked=1
        }
        else if (whichOne == 'Date')
        {
-           elemDrugControls.style.display = "none";
            elemDateControls.style.display = "block";
-           elemTypeControls.style.display = "none";
+           elemDateCheck.checked=1
        }
        else
        {
-           elemDrugControls.style.display = "none";
-           elemDateControls.style.display = "none";
            elemTypeControls.style.display = "block";
+           elemTypeCheck.checked=1
        }
    }
        
@@ -355,9 +371,9 @@ form = """\
      Select how you want to filter for drugs: 
      </p>
      <h4>
-    <input type="radio" name="SelectByType" value="Drug" checked=1 onClick="radioClicked('Drug')">By Drug Name</input><br>
-    <input type="radio" name="SelectByType" value="Date" onClick="radioClicked('Date')">By Date of Last Published Version</input><br>
-    <input type="radio" name="SelectByType" value="ReferenceType" onClick="radioClicked('ReferenceType')">By Drug Reference Type</input><br>
+    <input type="radio" name="SelectByType" id="DrugCheck" value="Drug" %s onClick="radioClicked('Drug')">By Drug Name</input><br>
+    <input type="radio" name="SelectByType" id="DateCheck" value="Date" %s onClick="radioClicked('Date')">By Date of Last Published Version</input><br>
+    <input type="radio" name="SelectByType" id="TypeCheck" value="ReferenceType" %s onClick="radioClicked('ReferenceType')">By Drug Reference Type</input><br>
     </h4>
     <div id = 'DrugControls' display='%s'><br><br>
      <p>
@@ -397,8 +413,8 @@ form = """\
     </h4>
     </div>
     </form>
-""" % (cdrcgi.SESSION, session,drugStartDisplay,makeDrugList(drugs),dateStartDisplay,fromDate, style, toDate, style, typeStartDisplay)
-    
+""" % (cdrcgi.SESSION, session,drugStartChecked,dateStartChecked,typeStartChecked,drugStartDisplay,makeDrugList(drugs),dateStartDisplay,fromDate, style, toDate, style, typeStartDisplay)
+header = header.replace("<BODY BGCOLOR='EEEEEE'>","<BODY BGCOLOR='EEEEEE' onLoad='bodyLoad()'>")
 cdrcgi.sendPage(header + form + """\
  </BODY>
 </HTML>
