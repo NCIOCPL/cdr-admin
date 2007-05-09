@@ -2,8 +2,11 @@
 #
 # Publishing CGI script.
 #
-# $Id: publishing.py,v 1.26 2006-11-24 20:56:04 venglisc Exp $
+# $Id: publishing.py,v 1.27 2007-05-09 18:32:28 venglisc Exp $
 # $Log: not supported by cvs2svn $
+# Revision 1.26  2006/11/24 20:56:04  venglisc
+# Minor modifications to the publishing UI.
+#
 # Revision 1.25  2006/11/21 15:58:40  venglisc
 # Modified to allow QCFilterSets to be run not just on MAHLER (but not on
 # BACH. (Bug 2533)
@@ -89,7 +92,7 @@
 #
 #
 #----------------------------------------------------------------------
-import cgi, cdrcgi, string, copy, urllib, cdr, cdr2cg, xml.dom.minidom
+import cgi, cdrcgi, string, copy, urllib, cdr, cdr2gk, xml.dom.minidom
 import socket, re
 from win32com.client import Dispatch
 import pythoncom
@@ -188,10 +191,13 @@ class Display:
         form += "<OL>\n"
 
         for r in subsets:
-            form += """<LI><A 
-                href='%s/%s?%s=%s&ctrlId=%s&version=%s&SubSet=%s&%s'>
-                %s</A></LI>\n""" % (cdrcgi.BASE, r[0], cdrcgi.SESSION, 
-                session, ctrlId, version, urllib.quote_plus(r[1]), r[3], r[2])
+            if not r[1].endswith('Republish-Export'):
+                form += """<LI><A 
+                    href='%s/%s?%s=%s&ctrlId=%s&version=%s&SubSet=%s&%s'>
+                    %s</A></LI>\n""" % (cdrcgi.BASE, r[0], cdrcgi.SESSION, 
+                                        session, ctrlId, version, 
+                                        urllib.quote_plus(r[1]), r[3], r[2])
+
 
         form += HIDDEN % (cdrcgi.SESSION, session)   
         self.__addFooter(form)
@@ -292,7 +298,7 @@ class Display:
             for r in params:
                 paramList += ",%s" % r[1]
                 if r[1] == "PubType":
-                    if not cdr2cg.PUBTYPES.has_key(r[2]):
+                    if not cdr.PUBTYPES.has_key(r[2]):
                         self.__addFooter("The value of parameter PubType,\
                              %s, is not supported. <BR>Please modify \
                             the control document or the source code." % r[2])
