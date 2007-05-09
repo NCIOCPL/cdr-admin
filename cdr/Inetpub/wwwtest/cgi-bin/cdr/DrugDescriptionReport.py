@@ -102,6 +102,29 @@ def MakeDrugDescriptions(drugInfo):
         html += "<br><hr width=80% align=center /><br>"
 
     return html;
+
+def VerifyDate(fieldName,date):
+    dateSplit = date.split("-")
+    if  len(dateSplit) is not 3:
+        cdrcgi.bail('invalid %s<br><br>Make sure format is YYYY-MM-DD' % fieldName)
+    VerifyDateValue(fieldName,"Year",dateSplit[0],4,1900,2099)
+    VerifyDateValue(fieldName,"Month",dateSplit[1],2,1,12)
+    VerifyDateValue(fieldName,"Day",dateSplit[2],2,1,31)
+
+def VerifyDateValue(fieldName,fieldItem,dateItem,length,minValue,maxValue):
+    if not dateItem.isdigit():
+        cdrcgi.bail('invalid %s<br><br>%s must not contains non numbers' % (fieldName,fieldItem))
+    if len(dateItem) is not length:
+        cdrcgi.bail('invalid %s<br><br>%s must be %d numbers long' % (fieldName,fieldItem,length))
+
+    intVal = int(dateItem)
+    if intVal < minValue:
+        cdrcgi.bail('invalid %s<br><br>%s must be >= %d' % (fieldName,fieldItem,minValue))
+    if intVal > maxValue:
+        cdrcgi.bail('invalid %s<br><br>%s must be <= %d' % (fieldName,fieldItem,maxValue))
+
+    return intVal
+
     
 if action == "Submit":
     filters = {'DrugInformationSummary':["set:QC DrugInfoSummary Set"]}
@@ -118,6 +141,8 @@ if action == "Submit":
             sIn = sIn[0:len(sIn)-1]
             sIn += ") "
     elif selectByType == 'Date':
+        VerifyDate("On or After Date",fromDate)
+        VerifyDate("On or Before Date",toDate)
         sDate = """HAVING MAX(a.dt) BETWEEN '%s' AND '%s'""" % (fromDate,toDate)
     else:
         sReference = """ AND d.id in (select doc_id from query_term
