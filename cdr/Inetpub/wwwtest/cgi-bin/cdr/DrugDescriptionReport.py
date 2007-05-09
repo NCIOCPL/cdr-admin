@@ -16,9 +16,10 @@ title    = "CDR Administration"
 section  = "QC Report"
 SUBMENU  = "Reports Menu"
 buttons  = ["Submit", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
+if action == "Submit":
+    buttons  = ["Back",SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 header   = cdrcgi.header(title, title, "Drug Description Report",
                          "DrugDescriptionReport.py", buttons, method = 'GET')
-
 #----------------------------------------------------------------------
 # Handle navigation requests.
 #----------------------------------------------------------------------
@@ -191,8 +192,18 @@ AND d.id = %s
     now = time.localtime(time.time())
     Date   = time.strftime("%b %d, %Y %I:%M%p", now)
 
+    sDrug = ""
+    for dr in drug:
+        sDrug += "<INPUT TYPE='hidden' NAME='Drug' VALUE='" + dr + """'>
+"""
+
     form = """\
 <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
+<INPUT TYPE='hidden' NAME='SelectByType' VALUE='%s'>
+<INPUT TYPE='hidden' NAME='FromDate' VALUE='%s'>
+<INPUT TYPE='hidden' NAME='ToDate' VALUE='%s'>
+<INPUT TYPE='hidden' NAME='DrugReferenceType' VALUE='%s'>
+%s
 <style type='text/css'>
    ul { margin-left: 20pt }
    h2 { font-size: 15pt; font-family:Arial; color:black; font-weight:bold}
@@ -217,7 +228,7 @@ AND d.id = %s
 %s
 </div>
 </form>
-""" % (cdrcgi.SESSION, session,Date,MakeDrugDescriptions(drugInfo))
+""" % (cdrcgi.SESSION, session,selectByType,fromDate,toDate,drugReferenceType,sDrug,Date,MakeDrugDescriptions(drugInfo))
     
     cdrcgi.sendPage(header + form + """\
  </BODY>
@@ -263,15 +274,26 @@ for id, docTitle in rows:
 def makeDrugList(drugs):
     keys = drugs.keys()
     keys.sort(lambda a,b: cmp(drugs[a].name, drugs[b].name))
+    if not drug or 'All' in drug:
+        selected = "selected"
+    else:
+        selected=""
+    
     html = u"""\
       <select id='Drug' name='Drug' style='width:600px' multiple size=12>
-      <option value='All' selected=1>All Drugs   (Select this to report on all the below drugs)</option>
-"""
+      <option value='All' %s>All Drugs   (Select this to report on all the below drugs)</option>
+""" % selected
+
     for key in keys:
-        drug = drugs[key]
+        thisDrug = drugs[key]
+        sDrugId = "%s" % thisDrug.id        
+        if sDrugId in drug:
+            selected="selected"
+        else:
+            selected=""
         html += """\
-       <option value='%d'>%s &nbsp;</option>
-""" % (drug.id, drug.name)
+       <option value='%d' %s>%s &nbsp;</option>
+""" % (thisDrug.id, selected,thisDrug.name)
     return html + """\
       </select>
 """
@@ -295,6 +317,9 @@ typeStartDisplay = "none"
 drugStartChecked = ""
 dateStartChecked = ""
 typeStartChecked = ""
+nciChecked = ""
+nlmChecked = ""
+fdaChecked = ""
 
 if selectByType == 'Drug':
     drugStartDisplay = "block"
@@ -305,6 +330,13 @@ elif selectByType == 'Date':
 else:
     typeStartDisplay = "block"
     typeStartChecked = "checked"
+
+if drugReferenceType == "NCI":
+    nciChecked = "checked"
+elif drugReferenceType == "NLM":
+    nlmChecked = "checked"
+else:
+    fdaChecked = "checked"
 
 form = """\
 <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
@@ -326,11 +358,6 @@ form = """\
   </style>
   <script language='JavaScript'>
 
-   function bodyLoad()
-   {
-       radioClicked('Drug')
-   }
-   
    function radioClicked(whichOne)
    {
        var elemDrugControls = document.getElementById('DrugControls');
@@ -375,7 +402,7 @@ form = """\
     <input type="radio" name="SelectByType" id="DateCheck" value="Date" %s onClick="radioClicked('Date')">By Date of Last Published Version</input><br>
     <input type="radio" name="SelectByType" id="TypeCheck" value="ReferenceType" %s onClick="radioClicked('ReferenceType')">By Drug Reference Type</input><br>
     </h4>
-    <div id = 'DrugControls' display='%s'><br><br>
+    <div id = 'DrugControls' style="display:%s"><br><br>
      <p>
      Select the Drug(s) from the list below. Use Ctrl+'Click' to select more than one. 
      </p>
@@ -407,14 +434,14 @@ form = """\
      Select The Drug Reference Type:
      </p>
      <h4>
-    <input type="radio" name="DrugReferenceType" value="NCI" checked=1 id="NCIRadio">NCI</input><br>
-    <input type="radio" name="DrugReferenceType" value="FDA" id="FDARadio">FDA</input><br>
-    <input type="radio" name="DrugReferenceType" value="NLM" id="NLMRadio">NLM</input><br>
+    <input type="radio" name="DrugReferenceType" value="NCI" %s id="NCIRadio">NCI</input><br>
+    <input type="radio" name="DrugReferenceType" value="FDA" %s id="FDARadio">FDA</input><br>
+    <input type="radio" name="DrugReferenceType" value="NLM" %s id="NLMRadio">NLM</input><br>
     </h4>
     </div>
     </form>
-""" % (cdrcgi.SESSION, session,drugStartChecked,dateStartChecked,typeStartChecked,drugStartDisplay,makeDrugList(drugs),dateStartDisplay,fromDate, style, toDate, style, typeStartDisplay)
-header = header.replace("<BODY BGCOLOR='EEEEEE'>","<BODY BGCOLOR='EEEEEE' onLoad='bodyLoad()'>")
+""" % (cdrcgi.SESSION, session,drugStartChecked,dateStartChecked,typeStartChecked,drugStartDisplay,makeDrugList(drugs),dateStartDisplay,fromDate, style, toDate, style, typeStartDisplay,nciChecked,fdaChecked,nlmChecked)
+#header = header.replace("<BODY BGCOLOR='EEEEEE'>","<BODY BGCOLOR='EEEEEE' onLoad='bodyLoad()'>")
 cdrcgi.sendPage(header + form + """\
  </BODY>
 </HTML>
