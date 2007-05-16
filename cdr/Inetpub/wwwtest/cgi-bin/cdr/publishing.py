@@ -2,8 +2,14 @@
 #
 # Publishing CGI script.
 #
-# $Id: publishing.py,v 1.27 2007-05-09 18:32:28 venglisc Exp $
+# $Id: publishing.py,v 1.28 2007-05-16 12:37:38 bkline Exp $
 # $Log: not supported by cvs2svn $
+# Revision 1.27  2007/05/09 18:32:28  venglisc
+# Definition of PUBTYPES moved from cdr2cg to cdr module.  Importing cdr2gk
+# instead of cdr2cg now.
+# Suppressing the Republish menu from displaying.  There exists a separate
+# menu for this pubType.
+#
 # Revision 1.26  2006/11/24 20:56:04  venglisc
 # Minor modifications to the publishing UI.
 #
@@ -307,7 +313,7 @@ class Display:
      <TD>%s</TD>
      <TD>%s</TD>
      <TD><INPUT NAME='%s' VALUE='%s' READONLY></TD>
-    </TR>\n""" % (r[1], r[2], r[1], r[2])
+    </TR>\n""" % (r[1], r[2] or "&nbsp;", r[1], r[2])
                 elif r[1] == "SubSetName" or r[1] == "GroupEmailAddrs":
                     form += """
     <TR>
@@ -315,8 +321,8 @@ class Display:
      <TD>%s</TD>
      <TD><INPUT NAME='%s' VALUE='%s' READONLY></TD>
     </TR>
-""" % (r[1], r[2], r[1], r[2])
-                elif r[2] == "Yes" or r[2] == "No":
+""" % (r[1], r[2] or "&nbsp;", r[1], r[2])
+                elif r[2] in ("Yes", "No"):
                     # Create a picklist for parameter name/value pairs.
                     YesNo = (r[2] == "No") and "Yes" or "No"
                     pickList = """
