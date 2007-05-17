@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryMailerReqForm.py,v 1.12 2007-04-20 19:16:52 kidderc Exp $
+# $Id: SummaryMailerReqForm.py,v 1.13 2007-05-17 17:01:25 kidderc Exp $
 #
 # Request form for generating PDQ Editorial Board Members Mailing.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.12  2007/04/20 19:16:52  kidderc
+# 3132. Minor cosmetic changes.
+#
 # Revision 1.9  2007/04/12 12:44:29  kidderc
 # 3132. Add ability to send mailers based on person or document.
 #
@@ -361,11 +364,15 @@ cursor.execute("""\
                          + '/BoardName/@cdr:ref'
                 AND v.val_status = 'V'
                 AND d.active_status = 'A'
+                AND q.doc_id in (select doc_id from query_term 
+                    where path = '/PDQBoardMemberInfo/BoardMembershipDetails/CurrentMember' 
+                    and value = 'Yes')
                 AND q.int_val in ( (select DISTINCT ind.id FROM document ind
                        JOIN query_term inq
                          ON inq.doc_id = ind.id
                       WHERE inq.path = '/Organization/OrganizationType'
                         AND inq.value = 'PDQ %s Board') )""" % boardType)
+
                                                 
 rows = cursor.fetchall()
 for memberId, boardId, docTitle in rows:
@@ -460,11 +467,13 @@ def makeBoardObjects():
         innerComma = ''
      # add summaries
         for summary in board.summaries:
+            summary.name = cdrcgi.unicodeToJavaScriptCompatible(summary.name)            
             objects += """%s
            new Option('%s', '%s')""" % (innerComma,
                                         summary.name.replace("'", "\\'"),
                                         summary.id)
             innerComma = ','
+                    
         innerComma = ''
         objects += """])"""
         outerComma = ','
