@@ -1,8 +1,12 @@
 #----------------------------------------------------------------------
 #
-# $Id: MediaReports.py,v 1.3 2006-05-08 18:18:40 bkline Exp $
+# $Id: MediaReports.py,v 1.4 2007-05-18 20:18:29 venglisc Exp $
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2006/05/08 18:18:40  bkline
+# Added Media Tracking Report, and some rewording (at Margaret's request);
+# see request 2135.
+#
 # Revision 1.2  2006/05/04 14:04:56  bkline
 # Added MediaSearcy.py.
 #
@@ -45,20 +49,33 @@ if action == "Log Out":
 session = "%s=%s" % (cdrcgi.SESSION, session)
 #    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
 form = """\
-    <H3>QC Reports</H3>
-    <OL>
+   <H3>QC Reports</H3>
+   <OL>
     <LI><a href='MediaSearch.py?%s'>Advanced Search</a></LI>
 """ % session
+
 for choice in (
-    ('img',  'Media Doc QC Report'   ),
-    ):
+               ('img',  'Media Doc QC Report'   ),
+              ):
     form += """\
     <LI><a href='%s/QcReport.py?DocType=Media&ReportType=%s&%s'>%s</a></LI>
 """ % (cdrcgi.BASE, choice[0], session, choice[1])
-form += "</OL>\n<H3>Management Reports</H3><OL>\n"
+form += """\
+   </OL>
+
+   <H3>Management Reports</H3>
+   <OL>"""
+
 for choice in(
-    ('MediaTrackingReport.py', 'Media Tracking Report'),
-    ):
-    form += "<LI><a href='%s/%s?%s'>%s</a></LI>\n" % (cdrcgi.BASE, choice[0],
-                                                      session, choice[1])
-cdrcgi.sendPage(header + form + "</OL></FORM></BODY></HTML>")
+              ('MediaTrackingReport.py', 'Media Tracking Report'),
+              ('MediaLinks.py',          'Linked Media Documents'),
+             ):
+    form += """
+    <LI><a href='%s/%s?%s'>%s</a></LI>""" % (cdrcgi.BASE, choice[0],
+                                              session, choice[1])
+footer = """
+   </OL>
+  </FORM>
+ </BODY>
+</HTML>"""
+cdrcgi.sendPage(header + form + footer)
