@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GeneralReports.py,v 1.16 2007-05-04 23:42:24 venglisc Exp $
+# $Id: GeneralReports.py,v 1.17 2007-05-18 20:29:11 venglisc Exp $
 #
 # Submenu for general reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.16  2007/05/04 23:42:24  venglisc
+# Added new menu item for Linked Media Documents.
+#
 # Revision 1.15  2005/08/17 20:08:19  venglisc
 # Added new menu option to display table names and columns.
 #
@@ -84,8 +87,10 @@ if action == "Log Out":
 #----------------------------------------------------------------------
 # Display available report choices.
 #----------------------------------------------------------------------
-form = "<INPUT TYPE='hidden' NAME='%s' VALUE='%s'><OL>\n" % (cdrcgi.SESSION,
-                                                             session)
+form = """\
+   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
+   <OL>""" % (cdrcgi.SESSION, session)
+
 reports = [
            ('AdHocQuery.py', 
             'Ad-Hoc Reports'),
@@ -131,10 +136,18 @@ reports = [
 
 for r in reports:
     if r[0] != 'CdrFilter':
-       form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI>\n" % (
-            cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
+       form += """
+    <LI><A HREF='%s/%s?%s=%s'>%s</LI>""" % (cdrcgi.BASE, r[0], 
+                                            cdrcgi.SESSION, 
+                                            session, r[1])
     else:
-       form += "<LI><A HREF='/cdrFilter.html'>%s</LI>\n" % (
-            r[1])
+       form += """
+    <LI><A HREF='/cdrFilter.html'>%s</LI>""" % (r[1])
 
-cdrcgi.sendPage(header + form + "</OL></FORM></BODY></HTML>")
+footer = """
+   </OL>
+  </FORM>
+ </BODY>
+</HTML>"""
+
+cdrcgi.sendPage(header + form + footer)
