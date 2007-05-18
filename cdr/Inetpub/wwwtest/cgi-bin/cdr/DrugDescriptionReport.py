@@ -1,4 +1,4 @@
-import cgi, cdr, cdrcgi, cdrdb, re, sys, time
+import cgi, cdr, cdrcgi, cdrdb, re, sys, time, xml.dom.minidom
 
 #----------------------------------------------------------------------
 # Get the parameters from the request.
@@ -125,6 +125,14 @@ def VerifyDateValue(fieldName,fieldItem,dateItem,length,minValue,maxValue):
 
     return intVal
 
+def getAllNodeText(node):
+    s = ""
+    if node.nodeType == node.TEXT_NODE:
+        s += node.data
+    for childNode in node.childNodes:
+        s += getAllNodeText(childNode)
+    return s
+
     
 if action == "Submit":
     filters = {'DrugInformationSummary':["set:QC DrugInfoSummary Set"]}
@@ -191,28 +199,17 @@ AND d.id = %s
         except cdrdb.Error, info:
             cdrcgi.bail("Failure retrieving document XML: %s" % info[1][0])
 
-        for xml in rows:
-            s = "%s" % xml
-            splitTxt = s.split("<Description>");
-            splitTxt2 = splitTxt[1].split("</Description>");
-            drugInf.description = splitTxt2[0]
-
-            splitTxt = s.split("<SummarySection");
-            iCnt = 0
-            s = splitTxt[1]
-            for c in s:
-                if c == '>':
-                    s = s[iCnt+1:len(s)]
-                    break
-                else:
-                    iCnt = iCnt + 1
-                    
-            splitTxt = s.split("</SummarySection>");
-            s = splitTxt[0]
-            s = s.replace("\\n","")
-            s = s.replace("\\'","'")
-            drugInf.summary = s
-            drugInfo[key] = drugInf
+        #cdrcgi.bail(rows[0][0].encode('utf-8'))
+        dom = xml.dom.minidom.parseString(rows[0][0].encode('utf-8'))
+        # Get the Description
+        element = dom.getElementsByTagName('Description')
+        drugInf.description = cdr.getTextContent(element[0])
+        # Get the Summary
+        s = ""
+        for node in dom.documentElement.childNodes:
+            if node.nodeName == "SummarySection":
+                s += getAllNodeText(node)
+        drugInf.summary = s
 
     now = time.localtime(time.time())
     Date   = time.strftime("%b %d, %Y %I:%M%p", now)
