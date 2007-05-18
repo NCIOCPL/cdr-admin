@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: MediaLinks.py,v 1.1 2007-05-18 21:19:45 venglisc Exp $
+# $Id: MediaLinks.py,v 1.2 2007-05-18 21:34:55 venglisc Exp $
 #
 # Report listing all document that link to Media documents
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2007/05/18 21:19:45  venglisc
+# Initial version of MediaLinks report listing Summaries and/or Glossaries
+# that are linking to a Media document. (Bug 3226)
+#
 #
 #----------------------------------------------------------------------
 import cdr, cdrdb, cdrcgi, cgi, re, time
@@ -102,34 +106,30 @@ if not docTypes:
 now = time.strftime("%Y-%m-%d %H:%M:%S")
 html = """\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
-<html>
- <head>
-  <title>Links to Media Report</title>
-  <basefont face='Arial, Helvetica, sans-serif'>
-  <link type='text/css' rel='stylesheet' href='/stylesheets/dataform.css'>
-   <style type='text/css'>
+<HTML>
+ <HEAD>
+  <TITLE>Links to Media Report</TITLE>
+  <BASEFONT face='Arial, Helvetica, sans-serif'>
+  <LINK type='text/css' rel='stylesheet' href='/stylesheets/dataform.css'>
+   <STYLE type='text/css'>
    TD.header      { font-weight: bold;
                     font-size: medium;
                     align: center; }
    TD.text        { font-size: medium; }
-   TR.odd         { background-color: #F7F7F7; }
-   TR.even        { background-color: #FFFFFF; }
-   TR.head        { background-color: #E2E2E2; }
    .tableheading  { font-weight: bold;
                     font-size: large; }
    .time          { font-weight: bold;
                     font-size: medium; }
-   </style>
- </head>
- <body>
-  <center>
-   <span class='tableheading'>Documents with Links to Media Report</span>
-   <br />
-   <span class='time'>%s</span>
-  </center>
-  <br />
-  <br />
-  <table>
+   </STYLE>
+ </HEAD>
+ <BODY>
+  <CENTER>
+   <SPAN class='tableheading'>Documents with Links to Media Report</SPAN>
+   <BR>
+   <SPAN class='time'>%s</SPAN>
+  </CENTER>
+  <P>
+  <TABLE>
 """ % now
    
 #----------------------------------------------------------------------
@@ -172,13 +172,13 @@ for docType in docTypes:
     # -------------------------------------------------------
     curDocType = docType
     html += """\
-  <tr>
-   <td><span class='tableheading'>%s (%s)</span>
-  <table border='1' width='100%%' cellspacing='0' cellpadding='2'>
-   <tr class='head'>
-    <td  class='header' valign='top'>CDR ID</td>
-    <td class='header' valign='top'>DocTitle</td>
-   </tr>
+   <TR>
+    <TD><SPAN class='tableheading'>%s (%s)</SPAN>
+     <TABLE border='1' width='100%%' cellspacing='0' cellpadding='2'>
+      <TR class='head'>
+       <TD  class='header' valign='top'>CDR ID</TD>
+       <TD class='header' valign='top'>DocTitle</TD>
+      </TR>
 """ % (docType, len(rows))
 
     # Make is easier to read the table rows by using alternate colors
@@ -188,35 +188,35 @@ for docType in docTypes:
         count += 1
         if count % 2 == 0:
             html += """\
-   <tr class='even'>
+      <TR class='even'>
 """
         else:
             html += """\
-   <tr class='odd'>
+      <TR class='odd'>
 """
         # Here is the data returned from the SQL query
         # List the rows
         # --------------------------------------------
         html += """\
-    <td class='text' align='right'>%d</td>
-    <td class='text'>%s</td>
-   </tr>
+       <TD class='text' align='right'>%d</TD>
+       <TD class='text'>%s</TD>
+      </TR>
 """ % (row[0], row[1])
 
     # Done with the document type.  Pick up the next one.
     # ---------------------------------------------------
     if curDocType:
         html += """\
-  </table>
-  <br/>
-  </td>
-  </tr>
+     </TABLE>
+     <BR>
+    </TD>
+   </TR>
 """
 
 cdrcgi.sendPage(html + """\
- </table>
- <br />
- %s
- </body>
-</html>
+  </TABLE>
+  <BR>
+  %s
+ </BODY>
+</HTML>
 """ % cdrcgi.getFullUserName(session, conn))
