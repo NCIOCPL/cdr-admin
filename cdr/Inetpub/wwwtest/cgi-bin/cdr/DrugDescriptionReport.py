@@ -128,14 +128,23 @@ def VerifyDateValue(fieldName,fieldItem,dateItem,length,minValue,maxValue):
 def getAllNodeText(node):
     s = ""
     if node.nodeType == node.TEXT_NODE:
-        s += node.data
+        if node.parentNode.nodeName not in ["Deletion"]:
+            s += node.data
     for childNode in node.childNodes:
         s += getAllNodeText(childNode)
     return s
 
+def getAllSummaryText(node):
+    s = ""
+    if node.nodeName == "SummarySection":
+        s += getAllNodeText(node)
+    elif node.nodeName == "Insertion":
+        for childNode in node.childNodes:
+            s += getAllSummaryText(childNode)
+    return s
+
     
 if action == "Submit":
-    filters = {'DrugInformationSummary':["set:QC DrugInfoSummary Set"]}
     sIn = ""
     sReference = ""
     sDate = ""
@@ -203,13 +212,16 @@ AND d.id = %s
         dom = xml.dom.minidom.parseString(rows[0][0].encode('utf-8'))
         # Get the Description
         element = dom.getElementsByTagName('Description')
-        drugInf.description = cdr.getTextContent(element[0])
+        drugInf.description = getAllNodeText(element[0])
         # Get the Summary
-        s = ""
+        sSummary = ""
+        sDescription = ""
         for node in dom.documentElement.childNodes:
-            if node.nodeName == "SummarySection":
-                s += getAllNodeText(node)
-        drugInf.summary = s
+            s = getAllSummaryText(node)
+            if len(sSummary) > 0 and len(s) > 0:
+                sSummary += "<br><br>"
+            sSummary += s
+        drugInf.summary = sSummary
 
     now = time.localtime(time.time())
     Date   = time.strftime("%b %d, %Y %I:%M%p", now)
