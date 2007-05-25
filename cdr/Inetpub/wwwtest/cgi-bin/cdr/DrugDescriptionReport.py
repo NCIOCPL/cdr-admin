@@ -127,11 +127,14 @@ def VerifyDateValue(fieldName,fieldItem,dateItem,length,minValue,maxValue):
 
 def getAllNodeText(node):
     s = ""
+    if node.nodeName in ["Para"]:
+        s += "<br><br>"
     if node.nodeType == node.TEXT_NODE:
         if node.parentNode.nodeName not in ["Deletion"]:
             s += node.data
     for childNode in node.childNodes:
         s += getAllNodeText(childNode)
+    s.strip()
     return s
 
 def getAllSummaryText(node):
@@ -141,6 +144,7 @@ def getAllSummaryText(node):
     elif node.nodeName == "Insertion":
         for childNode in node.childNodes:
             s += getAllSummaryText(childNode)
+    s.strip()
     return s
 
     
@@ -208,19 +212,21 @@ AND d.id = %s
         except cdrdb.Error, info:
             cdrcgi.bail("Failure retrieving document XML: %s" % info[1][0])
 
-        #cdrcgi.bail(rows[0][0].encode('utf-8'))
         dom = xml.dom.minidom.parseString(rows[0][0].encode('utf-8'))
         # Get the Description
         element = dom.getElementsByTagName('Description')
         drugInf.description = getAllNodeText(element[0])
         # Get the Summary
         sSummary = ""
-        sDescription = ""
         for node in dom.documentElement.childNodes:
-            s = getAllSummaryText(node)
-            if len(sSummary) > 0 and len(s) > 0:
+            s = getAllSummaryText(node).strip()
+            if len(sSummary) > 0 and len(s) > 0 and not sSummary.endswith("<br><br>"):
                 sSummary += "<br><br>"
             sSummary += s
+        sSummary = sSummary.strip()
+        if sSummary.startswith("<br><br>"):
+            sSummary = sSummary[8:len(sSummary)-1]
+        sSummary = sSummary.replace("<br><br><br><br>","<br><br>")
         drugInf.summary = sSummary
 
     now = time.localtime(time.time())
