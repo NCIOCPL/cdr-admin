@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryMailerReqForm.py,v 1.13 2007-05-17 17:01:25 kidderc Exp $
+# $Id: SummaryMailerReqForm.py,v 1.14 2007-05-25 13:49:46 kidderc Exp $
 #
 # Request form for generating PDQ Editorial Board Members Mailing.
 #
@@ -353,25 +353,47 @@ members = {}
 summaries = {}
 cursor = conn.cursor()
 
+#cursor.execute("""\
+#    SELECT DISTINCT q.doc_id, q.int_val, d.title
+#               FROM query_term q
+#               JOIN document d
+#                 ON q.doc_id = d.id
+#               JOIN doc_version v
+#                 ON v.id = d.id
+#              WHERE path = '/PDQBoardMemberInfo/BoardMembershipDetails'
+#                         + '/BoardName/@cdr:ref'
+#                AND v.val_status = 'V'
+#                AND d.active_status = 'A'
+#                AND q.doc_id in (select doc_id from query_term 
+#                    where path = '/PDQBoardMemberInfo/BoardMembershipDetails/CurrentMember' 
+#                    and value = 'Yes')
+#                AND q.int_val in ( (select DISTINCT ind.id FROM document ind
+#                       JOIN query_term inq
+#                         ON inq.doc_id = ind.id
+#                      WHERE inq.path = '/Organization/OrganizationType'
+#                        AND inq.value = 'PDQ %s Board') )""" % boardType)
+
 cursor.execute("""\
-    SELECT DISTINCT q.doc_id, q.int_val, d.title
-               FROM query_term q
-               JOIN document d
-                 ON q.doc_id = d.id
+SELECT DISTINCT b.doc_id, b.int_val, d.title
+               FROM document d
                JOIN doc_version v
                  ON v.id = d.id
-              WHERE path = '/PDQBoardMemberInfo/BoardMembershipDetails'
-                         + '/BoardName/@cdr:ref'
+               JOIN query_term c
+                 ON c.doc_id = v.id
+               JOIN query_term b
+                 ON b.doc_id = c.doc_id
+                AND LEFT(b.node_loc, 4) = LEFT(c.node_loc, 4)
+               JOIN query_term t
+                 ON t.doc_id = b.int_val
+              WHERE d.active_status = 'A'
                 AND v.val_status = 'V'
-                AND d.active_status = 'A'
-                AND q.doc_id in (select doc_id from query_term 
-                    where path = '/PDQBoardMemberInfo/BoardMembershipDetails/CurrentMember' 
-                    and value = 'Yes')
-                AND q.int_val in ( (select DISTINCT ind.id FROM document ind
-                       JOIN query_term inq
-                         ON inq.doc_id = ind.id
-                      WHERE inq.path = '/Organization/OrganizationType'
-                        AND inq.value = 'PDQ %s Board') )""" % boardType)
+                AND c.path = '/PDQBoardMemberInfo/BoardMembershipDetails'
+                           + '/CurrentMember'
+                AND c.value = 'Yes'
+                AND b.path = '/PDQBoardMemberInfo/BoardMembershipDetails'
+                           + '/BoardName/@cdr:ref'
+                AND t.path = '/Organization/OrganizationType'
+                AND t.value = 'PDQ %s Board'""" % boardType)
 
                                                 
 rows = cursor.fetchall()
