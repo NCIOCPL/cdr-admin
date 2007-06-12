@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolReports.py,v 1.30 2007-01-25 16:49:17 bkline Exp $
+# $Id: ProtocolReports.py,v 1.31 2007-06-12 16:53:10 kidderc Exp $
 #
 # Submenu for protocol reports.
 #
@@ -165,6 +165,8 @@ reports = [
             'Newly Publishable Trials', ''),
            ('NewlyPublishedTrials2.py', 
             'Newly Published Trials', ''),
+           ('RssImportReport.py', 'Oncore Import/Update Statistics Report',
+            '&source=Oncore'),
            ('PreferredProtOrgs.py', 
             'Preferred Protocol Organizations', ''),
            ('NciClinicalTrialsStats.py', 
@@ -202,4 +204,18 @@ for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s%s'>%s</LI></A>\n" % (
             cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[2], r[1])
 
+form += """\
+    </OL>
+    <H3>Other Reports</H3>
+    <OL>
+"""
+
+reports = [
+           ('WarehouseBoxNumberReport.py',
+            'Warehouse Box Number Report', ''),
+          ]
+for r in reports:
+    form += "<LI><A HREF='%s/%s?%s=%s%s'>%s</LI></A>\n" % (
+            cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[2], r[1])
+    
 cdrcgi.sendPage(header + form + "</OL></FORM></BODY></HTML>")
