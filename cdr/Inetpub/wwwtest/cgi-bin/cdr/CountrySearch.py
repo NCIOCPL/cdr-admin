@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CountrySearch.py,v 1.2 2002-02-28 15:54:41 bkline Exp $
+# $Id: CountrySearch.py,v 1.3 2007-06-12 19:10:02 venglisc Exp $
 #
 # Duplicate-checking interface for Country documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/02/28 15:54:41  bkline
+# Modified display filter title.
+#
 # Revision 1.1  2002/02/14 19:36:35  bkline
 # Broken out from original GeographicEntity search pages.
 #
@@ -86,7 +89,7 @@ except cdrdb.Error, info:
 # Create the results page.
 #----------------------------------------------------------------------
 html = cdrcgi.advancedSearchResultsPage("Country", rows, strings, 
-                                        'name:Country Advanced Search Display')
+                                        'name:Country QC Report Filter')
 
 #----------------------------------------------------------------------
 # Send the page back to the browser.
