@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: TerminologyReports.py,v 1.9 2005-03-24 21:19:58 bkline Exp $
+# $Id: TerminologyReports.py,v 1.10 2007-06-13 11:26:49 kidderc Exp $
 #
 # Submenu for terminology reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.9  2005/03/24 21:19:58  bkline
+# Plugged in Drug/Agent Other Names Report.
+#
 # Revision 1.8  2004/09/17 14:06:50  venglisc
 # Fixed list items to properly teminate the anker link.
 #
@@ -90,7 +93,8 @@ reports = [
            ('InterventionAndProcedureTerms.py',
             'Intervention/Procedure Terms', ''),
            ('DrugAgentReport.py', 'Drug/Agent Report', ''),
-           ('DrugAgentReport2.py', 'Drug/Agent Other Names Report', '')
+           ('DrugAgentReport2.py', 'Drug/Agent Other Names Report', ''),
+           ('SemanticTypeReport.py', 'Semantic Type Report', '')
             
           ]
 for r in reports:
