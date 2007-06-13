@@ -93,16 +93,27 @@ except cdrdb.Error, info:
 #----------------------------------------------------------------------
 # Fetch the documents for the given Warehouse Box Number
 #----------------------------------------------------------------------
+#sQuery = """
+#SELECT d.id, d.title 
+#FROM query_term q
+#JOIN document d
+#ON d.id = q.doc_id
+#WHERE q.path = '/InScopeProtocol/RelatedDocuments/WarehouseBoxNumber'
+#and d.active_status = 'A'
+#and q.int_val = %s
+#and q.doc_id in (select doc_id from query_term where
+#path = '/InScopeProtocol/ProtocolAdminInfo/CurrentProtocolStatus'
+#and value ='Active')
+#""" % warehouseBoxNumber
+
 sQuery = """
 SELECT d.id, d.title 
 FROM query_term q
 JOIN document d
 ON d.id = q.doc_id
 WHERE q.path = '/InScopeProtocol/RelatedDocuments/WarehouseBoxNumber'
+and d.active_status = 'A'
 and q.int_val = %s
-and q.doc_id in (select doc_id from query_term where
-path = '/InScopeProtocol/ProtocolAdminInfo/CurrentProtocolStatus'
-and value ='Active')
 """ % warehouseBoxNumber
 
 try:
@@ -123,13 +134,20 @@ header   = cdrcgi.header(title, title, getSectionTitle(),
             "WarehouseBoxNumberReport.py", buttons, method = 'GET')
 
 if not len(documents):
+    #sQuery = """
+    #SELECT distinct(int_val) 
+    #FROM query_term q
+    #WHERE q.path = '/InScopeProtocol/RelatedDocuments/WarehouseBoxNumber'
+    #and q.doc_id in (select doc_id from query_term where
+    #path = '/InScopeProtocol/ProtocolAdminInfo/CurrentProtocolStatus'
+    #and value ='Active')
+    #order by int_val
+    #"""
+    
     sQuery = """
     SELECT distinct(int_val) 
     FROM query_term q
     WHERE q.path = '/InScopeProtocol/RelatedDocuments/WarehouseBoxNumber'
-    and q.doc_id in (select doc_id from query_term where
-    path = '/InScopeProtocol/ProtocolAdminInfo/CurrentProtocolStatus'
-    and value ='Active')
     order by int_val
     """
     try:
