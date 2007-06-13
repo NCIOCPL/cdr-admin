@@ -177,7 +177,7 @@ else:
         <td align='left'>&nbsp;%s&nbsp;</td>
        </tr>
        <tr>
-        <td align='right'>&nbsp;Total Number of Active Trials:&nbsp;</td>
+        <td align='right'>&nbsp;Total Number of Trials:&nbsp;</td>
         <td align='left'>&nbsp;%s&nbsp;</td>
        </tr>
       </table><br>
