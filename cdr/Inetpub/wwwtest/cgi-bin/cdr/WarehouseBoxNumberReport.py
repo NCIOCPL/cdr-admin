@@ -112,7 +112,6 @@ FROM query_term q
 JOIN document d
 ON d.id = q.doc_id
 WHERE q.path = '/InScopeProtocol/RelatedDocuments/WarehouseBoxNumber'
-and d.active_status = 'A'
 and q.int_val = %s
 """ % warehouseBoxNumber
 
@@ -148,7 +147,6 @@ if not len(documents):
     SELECT distinct(int_val) 
     FROM query_term q
     WHERE q.path = '/InScopeProtocol/RelatedDocuments/WarehouseBoxNumber'
-    and q.doc_id in (select id from document where active_status = 'A')
     order by int_val
     """
     try:
