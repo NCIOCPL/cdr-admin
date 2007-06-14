@@ -1,8 +1,5 @@
-import cgi, cdr, cdrcgi, cdrdb, re, sys, pyXLWriter, time
+import cgi, cdr, cdrcgi, cdrdb, re, sys, time, ExcelWriter
 
-#----------------------------------------------------------------------
-# Dynamically create the title of the menu section (request #809).
-#----------------------------------------------------------------------
 def getSectionTitle():
     return "Semantic Type Report"
 
@@ -125,26 +122,24 @@ documents = {}
 #----------------------------------------------------------------------
 # Get the documents
 #----------------------------------------------------------------------
-sQuery="""select distinct(d.id), d.title, status.value
-FROM Document d
-JOIN query_term status
-ON status.doc_id = d.id
-JOIN query_term q
-ON q.doc_id = d.id
-WHERE q.path = '/InScopeProtocol/Eligibility/Diagnosis/@cdr:ref' and
-status.path = '/InScopeProtocol/ProtocolAdminInfo/CurrentProtocolStatus' and
-d.active_status = 'A' and
-q.int_val in
-(select d.id
-FROM document d
-JOIN query_term semantic
-ON d.id = semantic.doc_id
-WHERE semantic.path = '/Term/SemanticType/@cdr:ref' 
-and semantic.int_val = %s)
+sQuery="""\
+SELECT DISTINCT d.id, d.title, status.value
+  FROM document d
+  JOIN query_term status
+    ON status.doc_id = d.id
+  JOIN query_term q
+    ON q.doc_id = d.id
+ WHERE q.path LIKE '/InScopeProtocol/%%/@cdr:ref'
+   AND status.path = '/InScopeProtocol/ProtocolAdminInfo/CurrentProtocolStatus'
+   AND d.active_status = 'A'
+   AND q.int_val IN (SELECT doc_id
+                       FROM query_term
+                      WHERE path = '/Term/SemanticType/@cdr:ref' 
+                        AND int_val = %s)
 """ % semanticType
 
 try:
-    cursor.execute(sQuery)
+    cursor.execute(sQuery, timeout=300)
     rows = cursor.fetchall()
 except cdrdb.Error, info:
     cdrcgi.bail('Database query failure: %s' % info[1][0])
@@ -155,49 +150,82 @@ for id, title, status in rows:
 #----------------------------------------------------------------------
 # Write the excel file
 #----------------------------------------------------------------------
-def fix(name):
-    return (name.replace(u'\u2120', u'(SM)')
-                .replace(u'\u2122', u'(TM)')
-                .encode('latin-1', 'ignore'))
 title = semanticTypes[int(semanticType)].title
 t = time.strftime("%Y%m%d%H%M%S")
-print "Content-type: application/vnd.ms-excel"
-print "Content-Disposition: attachment; filename=SemanticTypeReport-%s.xls" % t
-print
-workbook = pyXLWriter.Writer(sys.stdout)
 
-sTmpTitle = title[:31]
-worksheet = workbook.add_worksheet(fix(sTmpTitle.replace("/","-")))
+# Create the spreadsheet and define default style, etc.
+# -----------------------------------------------------
+wb      = ExcelWriter.Workbook()
+b       = ExcelWriter.Border()
+borders = ExcelWriter.Borders(b, b, b, b)
 
-format = workbook.add_format()
-format.set_bold();
-format.set_color('white')
-format.set_bg_color('blue')
-format.set_align('center')
-format.set_text_wrap(wrap=1);
+dataFont    = ExcelWriter.Font(name = 'Arial', size = 10)
+dataAlign   = ExcelWriter.Alignment('Left', 'Top', wrap = True)
+dataStyle  = wb.addStyle(alignment = dataAlign, font = dataFont)
 
-worksheet.set_column(0, 15)
-worksheet.set_column(1, 80)
-worksheet.set_column(2, 20)
-worksheet.write([0, 1], "Semantic Type Report", format)
+activeProtocolFont    = ExcelWriter.Font(name = 'Arial', color="#008800", size = 10)
+activeProtocolAlign   = ExcelWriter.Alignment('Left', 'Top', wrap = True)
+activeProtocolStyle  = wb.addStyle(alignment = activeProtocolAlign, font = activeProtocolFont)
+
+headerFont    = ExcelWriter.Font(name = 'Arial', size = 10, color="#FFFFFF", bold = True)
+headerInterior     = ExcelWriter.Interior("#0000FF", "Solid")
+headerAlign   = ExcelWriter.Alignment('Center', 'Top', wrap = True)
+headerStyle  = wb.addStyle(alignment = headerAlign, font = headerFont, interior=headerInterior)
+
+columnTitleFont    = ExcelWriter.Font(name = 'Arial', size = 10, color="#FFFFFF", bold = True)
+columnTitleInterior     = ExcelWriter.Interior("#000088", "Solid")
+columnTitleAlign   = ExcelWriter.Alignment('Center', 'Top', wrap = True)
+columnTitleStyle  = wb.addStyle(alignment = columnTitleAlign, font = columnTitleFont,interior=columnTitleInterior)
+
+sTmp = title[:31]
+ws      = wb.addWorksheet(sTmp.replace('/','-'), style=dataStyle, height=45, frozenRows = 5)
+    
+# Set the colum width
+# -------------------
+ws.addCol( 1, 100)
+ws.addCol( 2, 550)
+ws.addCol( 3, 140)
+
+# Create the top rows
+# ---------------------
+exRow = ws.addRow(1,height=15)
+exRow.addCell(2, 'Semantic Type Report', style = headerStyle)
+
 sTmp = "Semantic Type : %s" % title
-worksheet.write([1, 1], sTmp, format)
-sTmp = "Total Number of Trials: %d" % len(documents)
-worksheet.write([2, 1], sTmp, format)
-row = 5
-worksheet.write([row, 0], "CDR ID", format)
-worksheet.write([row, 1], "Title", format)
-worksheet.write([row, 2], "Current Protocol Status", format)
-row += 1
+exRow = ws.addRow(2,height=15)
+exRow.addCell(2, sTmp, style = headerStyle)
 
+sTmp = "Total Number of Trials: %d" % len(documents)
+exRow = ws.addRow(3,height=15)
+exRow.addCell(2, sTmp, style = headerStyle)
+
+# Create the Header row
+# ---------------------
+exRow = ws.addRow(5, style=columnTitleStyle,height=15)
+exRow.addCell(1, 'CDR-ID')
+exRow.addCell(2, 'Title')
+exRow.addCell(3, 'Current Protocol Status')
+
+# Write the data
+# ---------------------
+rowNum = 5
 keys = documents.keys()
 keys.sort(lambda a,b: cmp(documents[a].id, documents[b].id))
-format = workbook.add_format()
-format.set_text_wrap(wrap=1);
 for key in keys:
+    rowNum += 1
+    exRow = ws.addRow(rowNum, dataStyle)
     doc = documents[key]
-    worksheet.write([row, 0], doc.id,format)
-    worksheet.write_string([row, 1], fix(doc.title),format)
-    worksheet.write_string([row, 2], fix(doc.status),format)
-    row += 1
-workbook.close()
+    if doc.status == 'Active':
+        exRow.addCell(1, doc.id, style = activeProtocolStyle)
+        exRow.addCell(2, doc.title, style = activeProtocolStyle)
+        exRow.addCell(3, doc.status, style = activeProtocolStyle)
+    else:
+        exRow.addCell(1, doc.id, style = dataStyle)
+        exRow.addCell(2, doc.title, style = dataStyle)
+        exRow.addCell(3, doc.status, style = dataStyle)
+
+print "Content-type: application/vnd.ms-excel"                                  
+print "Content-Disposition: attachment; filename=CitationsInSummaries-%s.xls" % t    
+print                
+
+wb.write(sys.stdout, True)    
