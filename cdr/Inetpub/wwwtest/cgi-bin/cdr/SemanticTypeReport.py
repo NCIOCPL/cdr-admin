@@ -225,7 +225,7 @@ for key in keys:
         exRow.addCell(3, doc.status, style = dataStyle)
 
 print "Content-type: application/vnd.ms-excel"                                  
-print "Content-Disposition: attachment; filename=CitationsInSummaries-%s.xls" % t    
+print "Content-Disposition: attachment; filename=SemanticTypeReport-%s.xls" % t    
 print                
 
 wb.write(sys.stdout, True)    
