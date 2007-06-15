@@ -71,7 +71,36 @@ try:
             done = 1
         conn.commit()
 
-        # add the non semantic types
+        # add the non semantic types who don't have Semantic type documents as parents
+        cursor.execute("""\
+            INSERT INTO #terms
+                 SELECT p.doc_id, p.int_val, 0
+                   FROM query_term p
+                   JOIN #terms t
+                     ON t.id = p.int_val
+                  WHERE p.path = '/Term/SemanticType/@cdr:ref'
+                    AND NOT EXISTS (SELECT *
+                                      FROM #terms
+                                     WHERE id = p.doc_id
+                                       AND parent = p.int_val)
+                    AND p.doc_id IN (SELECT doc_id
+                                           FROM query_term
+                                          WHERE path = '/Term/TermType'
+                                                     + '/TermTypeName'
+                                            AND value <> 'Semantic type'
+                                            AND value <> 'Obsolete term')
+                    AND p.int_val IN (SELECT doc_id
+                                           FROM query_term
+                                          WHERE path = '/Term/TermType'
+                                                     + '/TermTypeName'
+                                            AND value <> 'Obsolete term')
+                                            """)
+
+        if not cursor.rowcount:
+            done = 1
+        conn.commit()        
+
+        # add the non semantic types who don't have Semantic type documents as parents
         cursor.execute("""\
             INSERT INTO #terms
                  SELECT p.doc_id, p.int_val, 0
@@ -99,7 +128,7 @@ try:
 
         if not cursor.rowcount:
             done = 1
-        conn.commit()     
+        conn.commit()
 
         
     cursor.execute("""\
@@ -207,11 +236,11 @@ html ="""\
 
   <!-- TreeView source file -->
   <script src = "http://yui.yahooapis.com/2.2.2/build/treeview/treeview-min.js" ></script>
-  <table><tr><td width="50%">
+  <table><tr><td width="60%">
   <h1>Term Hierarchy Tree</h1></td><td align="right">"""
 
 if SemanticTerms == 'True':
-    html += """<a href="TermHierarchyTree.py?SemanticTerms=False">Show the terms that don't have any semantic types. WARNING: TAKES A LONG TIME.</a>"""
+    html += """<a href="TermHierarchyTree.py?SemanticTerms=False">Show the terms that don't have any semantic types.</a>"""
 else:
     html += """<a href="TermHierarchyTree.py">Show the terms that have semantic types.</a>"""
     
