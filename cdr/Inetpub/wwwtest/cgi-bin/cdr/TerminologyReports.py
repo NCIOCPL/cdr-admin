@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: TerminologyReports.py,v 1.10 2007-06-13 11:26:49 kidderc Exp $
+# $Id: TerminologyReports.py,v 1.11 2007-06-15 04:03:21 ameyer Exp $
 #
 # Submenu for terminology reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.10  2007/06/13 11:26:49  kidderc
+# 3309. Add a Semantic Type Report.
+#
 # Revision 1.9  2005/03/24 21:19:58  bkline
 # Plugged in Drug/Agent Other Names Report.
 #
@@ -58,7 +61,7 @@ elif action == SUBMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if action == "Log Out": 
+if action == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
@@ -94,8 +97,9 @@ reports = [
             'Intervention/Procedure Terms', ''),
            ('DrugAgentReport.py', 'Drug/Agent Report', ''),
            ('DrugAgentReport2.py', 'Drug/Agent Other Names Report', ''),
+           ('DrugReviewReport.py', 'Drug Review Report', ''),
            ('SemanticTypeReport.py', 'Semantic Type Report', '')
-            
+
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s%s'>%s</LI></A>\n" % (
