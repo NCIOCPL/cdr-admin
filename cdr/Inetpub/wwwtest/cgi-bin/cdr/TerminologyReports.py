@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: TerminologyReports.py,v 1.11 2007-06-15 04:03:21 ameyer Exp $
+# $Id: TerminologyReports.py,v 1.12 2007-06-15 17:55:07 kidderc Exp $
 #
 # Submenu for terminology reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.11  2007/06/15 04:03:21  ameyer
+# Added menu item for Drug Review Report.
+#
 # Revision 1.10  2007/06/13 11:26:49  kidderc
 # 3309. Add a Semantic Type Report.
 #
@@ -98,7 +101,8 @@ reports = [
            ('DrugAgentReport.py', 'Drug/Agent Report', ''),
            ('DrugAgentReport2.py', 'Drug/Agent Other Names Report', ''),
            ('DrugReviewReport.py', 'Drug Review Report', ''),
-           ('SemanticTypeReport.py', 'Semantic Type Report', '')
+           ('SemanticTypeReport.py', 'Semantic Type Report', ''),
+           ('TermHierarchyTree.py', 'Term Hierarchy Tree', '')
 
           ]
 for r in reports:
