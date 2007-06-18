@@ -260,4 +260,4 @@ print "Content-type: application/vnd.ms-excel"
 print "Content-Disposition: attachment; filename=SemanticTypeReport-%s.xls" % t    
 print                
 
-wb.write(sys.stdout, True)    
+wb.write(sys.stdout, asXls = True, big = True)
