@@ -42,6 +42,22 @@ except cdrdb.Error, info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
 
 #----------------------------------------------------------------------
+# Class for storing protocolTypes
+#----------------------------------------------------------------------
+class ProtocolType:
+    def __init__(self, docType,title,statusTerm):
+        self.docType = docType
+        self.title = title
+        self.statusTerm = statusTerm
+
+#----------------------------------------------------------------------
+# Populate the protocolTypes
+#----------------------------------------------------------------------
+protocolTypes = {}
+protocolTypes[18] = ProtocolType(18,'InScopeProtocol','/InScopeProtocol/ProtocolAdminInfo/CurrentProtocolStatus')
+protocolTypes[34] = ProtocolType(34,'CTGovProtocol','/CTGovProtocol/OverallStatus')
+
+#----------------------------------------------------------------------
 # Class for storing the document information
 #----------------------------------------------------------------------
 class SemanticType:
@@ -112,40 +128,44 @@ if not semanticType:
     """)
 
 class Documents:
-    def __init__(self, id, title,status):
+    def __init__(self, id, title,status,docType):
         self.id = "CDR%010d" % id
         self.title = title
         self.status = status
+        self.docType = docType
         
 documents = {}
 
 #----------------------------------------------------------------------
 # Get the documents
 #----------------------------------------------------------------------
-sQuery="""\
-SELECT DISTINCT d.id, d.title, status.value
-  FROM document d
-  JOIN query_term status
-    ON status.doc_id = d.id
-  JOIN query_term q
-    ON q.doc_id = d.id
- WHERE q.path LIKE '/InScopeProtocol/%%/@cdr:ref'
-   AND status.path = '/InScopeProtocol/ProtocolAdminInfo/CurrentProtocolStatus'
-   AND d.active_status = 'A'
-   AND q.int_val IN (SELECT doc_id
-                       FROM query_term
-                      WHERE path = '/Term/SemanticType/@cdr:ref' 
-                        AND int_val = %s)
-""" % semanticType
+keys = protocolTypes.keys()
+for key in keys:
+    protocolType = protocolTypes[key]
+    sQuery="""\
+    SELECT DISTINCT d.id, d.title, status.value
+      FROM document d
+      JOIN query_term status
+        ON status.doc_id = d.id
+      JOIN query_term q
+        ON q.doc_id = d.id
+     WHERE q.path LIKE '/%s/%%/@cdr:ref'
+       AND status.path = '%s'
+       AND d.active_status = 'A'
+       AND q.int_val IN (SELECT doc_id
+                           FROM query_term
+                          WHERE path = '/Term/SemanticType/@cdr:ref' 
+                            AND int_val = %s)
+    """ % (protocolType.title,protocolType.statusTerm,semanticType)
 
-try:
-    cursor.execute(sQuery, timeout=300)
-    rows = cursor.fetchall()
-except cdrdb.Error, info:
-    cdrcgi.bail('Database query failure: %s' % info[1][0])
-for id, title, status in rows:
-    if id not in documents:
-        documents[id] = Documents(id,title,status)
+    try:
+        cursor.execute(sQuery, timeout=300)
+        rows = cursor.fetchall()
+    except cdrdb.Error, info:
+        cdrcgi.bail('Database query failure: %s' % info[1][0])
+    for id, title, status in rows:
+        if id not in documents:
+            documents[id] = Documents(id,title,status,protocolType.docType)
 
 #----------------------------------------------------------------------
 # Write the excel file
@@ -177,52 +197,64 @@ columnTitleInterior     = ExcelWriter.Interior("#000088", "Solid")
 columnTitleAlign   = ExcelWriter.Alignment('Center', 'Top', wrap = True)
 columnTitleStyle  = wb.addStyle(alignment = columnTitleAlign, font = columnTitleFont,interior=columnTitleInterior)
 
-sTmp = title[:31]
-ws      = wb.addWorksheet(sTmp.replace('/','-'), style=dataStyle, height=45, frozenRows = 5)
+protKeys = protocolTypes.keys()
+for protKey in protKeys:
+    protocolType = protocolTypes[protKey]
+
+    numDocs = 0
+    keys = documents.keys()
+    for key in keys:
+        doc = documents[key]
+        if ( doc.docType == protocolType.docType ):
+            numDocs += 1
     
-# Set the colum width
-# -------------------
-ws.addCol( 1, 100)
-ws.addCol( 2, 550)
-ws.addCol( 3, 140)
+    sTmp = protocolType.title[:31]
+    ws = wb.addWorksheet(sTmp.replace('/','-'), style=dataStyle, height=45, frozenRows = 5)
+        
+    # Set the colum width
+    # -------------------
+    ws.addCol( 1, 100)
+    ws.addCol( 2, 550)
+    ws.addCol( 3, 140)
 
-# Create the top rows
-# ---------------------
-exRow = ws.addRow(1,height=15)
-exRow.addCell(2, 'Semantic Type Report', style = headerStyle)
+    # Create the top rows
+    # ---------------------
+    exRow = ws.addRow(1,height=15)
+    exRow.addCell(2, 'Semantic Type Report', style = headerStyle)
 
-sTmp = "Semantic Type : %s" % title
-exRow = ws.addRow(2,height=15)
-exRow.addCell(2, sTmp, style = headerStyle)
+    sTmp = "Semantic Type : %s" % title
+    exRow = ws.addRow(2,height=15)
+    exRow.addCell(2, sTmp, style = headerStyle)
 
-sTmp = "Total Number of Trials: %d" % len(documents)
-exRow = ws.addRow(3,height=15)
-exRow.addCell(2, sTmp, style = headerStyle)
+    sTmp = "Total Number of Trials: %d" % numDocs
+    exRow = ws.addRow(3,height=15)
+    exRow.addCell(2, sTmp, style = headerStyle)
 
-# Create the Header row
-# ---------------------
-exRow = ws.addRow(5, style=columnTitleStyle,height=15)
-exRow.addCell(1, 'CDR-ID')
-exRow.addCell(2, 'Title')
-exRow.addCell(3, 'Current Protocol Status')
+    # Create the Header row
+    # ---------------------
+    exRow = ws.addRow(5, style=columnTitleStyle,height=15)
+    exRow.addCell(1, 'CDR-ID')
+    exRow.addCell(2, 'Title')
+    exRow.addCell(3, 'Current Protocol Status')
 
-# Write the data
-# ---------------------
-rowNum = 5
-keys = documents.keys()
-keys.sort(lambda a,b: cmp(documents[a].id, documents[b].id))
-for key in keys:
-    rowNum += 1
-    exRow = ws.addRow(rowNum, dataStyle)
-    doc = documents[key]
-    if doc.status == 'Active':
-        exRow.addCell(1, doc.id, style = activeProtocolStyle)
-        exRow.addCell(2, doc.title, style = activeProtocolStyle)
-        exRow.addCell(3, doc.status, style = activeProtocolStyle)
-    else:
-        exRow.addCell(1, doc.id, style = dataStyle)
-        exRow.addCell(2, doc.title, style = dataStyle)
-        exRow.addCell(3, doc.status, style = dataStyle)
+    # Write the data
+    # ---------------------
+    rowNum = 5
+    keys = documents.keys()
+    keys.sort(lambda a,b: cmp(documents[a].id, documents[b].id))
+    for key in keys:
+        doc = documents[key]
+        if ( doc.docType == protocolType.docType ):
+            rowNum += 1
+            exRow = ws.addRow(rowNum, dataStyle)
+            if doc.status == 'Active':
+                exRow.addCell(1, doc.id, style = activeProtocolStyle)
+                exRow.addCell(2, doc.title, style = activeProtocolStyle)
+                exRow.addCell(3, doc.status, style = activeProtocolStyle)
+            else:
+                exRow.addCell(1, doc.id, style = dataStyle)
+                exRow.addCell(2, doc.title, style = dataStyle)
+                exRow.addCell(3, doc.status, style = dataStyle)
 
 print "Content-type: application/vnd.ms-excel"                                  
 print "Content-Disposition: attachment; filename=SemanticTypeReport-%s.xls" % t    
