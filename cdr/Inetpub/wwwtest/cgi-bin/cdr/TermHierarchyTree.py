@@ -2,7 +2,29 @@
 import cdrcgi, cdrdb, cgi
 
 fields = cgi.FieldStorage()
+session  = cdrcgi.getSession(fields) or cdrcgi.bail("Not logged in")
+action   = cdrcgi.getRequest(fields)
 SemanticTerms = fields and fields.getvalue("SemanticTerms") or "True"
+title    = "CDR Administration"
+section  = "Term Hierarchy Tree"
+SUBMENU  = "Reports Menu"
+buttons  = [SUBMENU, cdrcgi.MAINMENU, "Log Out"]
+header   = cdrcgi.header(title, title, section,
+                         "TermHierarchyTree.py", buttons, method = 'GET')
+
+#----------------------------------------------------------------------
+# Handle navigation requests.
+#----------------------------------------------------------------------
+if action == cdrcgi.MAINMENU:
+    cdrcgi.navigateTo("Admin.py", session)
+elif action == SUBMENU:
+    cdrcgi.navigateTo("Reports.py", session)
+
+#----------------------------------------------------------------------
+# Handle request to log out.
+#----------------------------------------------------------------------
+if action == "Log Out": 
+    cdrcgi.logout(session)
 
 class Term:
     def __init__(self, name, id, isSemantic):
@@ -195,37 +217,49 @@ def addTerms(terms,SemanticTerms):
 # add a term to the hierarchy list
 def addTerm(t,parent):
     html=""
+    cbText=""
 
     if t.children:
-        html += """ <li class="parent hide" onclick="Toggle(event,this);"> %s <ul>""" % (cdrcgi.unicodeToLatin1(t.name))
+        for child in t.children:
+            if not child.children:
+                cbText += "%s " % child.id
+        html += """ <li class="parent hide" onclick="Toggle(event,this);">+&nbsp;%s""" % cdrcgi.unicodeToLatin1(t.name)
+        if len(cbText) > 0:
+            html += """<a color="red" onclick="Send2Clipboard('%s');" href=#">&nbsp(copy)</a>""" % cbText
+        html += """<ul>""" 
+        
         t.children.sort(lambda a,b: cmp(a.uname, b.uname))
         for child in t.children:
             html += addTerm(child,t)
         html += """</ul></li>"""
     else:
-        html += """ <li class="leaf"> %s </li>
-        """ % cdrcgi.unicodeToLatin1(t.name)
+        html += """ <li class="leaf">&nbsp;&nbsp;%s</li>""" % cdrcgi.unicodeToLatin1(t.name)
 
     return html
 
-# generate HTML, uses a javascript tree control form yahoo.
+# generate HTML
 html ="""\
 <html>
- <head>
+<input type='hidden' name='%s' value='%s'>"""  % (cdrcgi.SESSION, session)
+
+html += """<head>
  <title>Term Hierarchy Tree</title>
  <style type="text/css">
-	ul.treeview li {
-		font-family="arial";
-		padding-left: 20px;
+     ul.treeview li {
+        font-family="courier new";
+        padding-left: 6px;
+        list-style-type: none;
 	}
 
 	ul.treeview li.leaf {
-		color: blue;
+		color: Teal;
+		cursor: default;
+		list-style-type: none;
 	}
 
-	ul.treeview li.parent {
-		color: red;
-		cursor:pointer;
+	ul.treeview li.parent{
+		color: Navy;
+		cursor: pointer;
 	}
 	ul.treeview li.show ul {
 		display: block;
@@ -234,10 +268,23 @@ html ="""\
 	ul.treeview li.hide ul {
 		display: none;
 	}
-	
   </style> 
   
   <script type="text/javascript">
+    function Send2Clipboard(s) 
+    {
+        if( window.clipboardData ) 
+        { 
+            clipboardData.setData("text", s);
+            alert("Data Copied to ClipBoard"); 
+        } 
+        else 
+        { 
+            alert("Internet Explorer is required."); 
+        } 
+    } 
+
+    
 	function Toggle(e, item)
     {
         e = (e) ? e : ((window.event) ? window.event : "")
@@ -247,10 +294,18 @@ html ="""\
 
             if (tg == item) 
             {
-                if (item.className == "parent hide")
+                if (item.className == "parent hide"){
                     item.className = "parent show";
-                else
+                    var old = item.innerHTML;
+                    old = old.replace("+","-");
+                    item.innerHTML = old;
+                }
+                else{
                     item.className = "parent hide";
+                    var old = item.innerHTML;
+                    old = old.replace("-","+");
+                    item.innerHTML = old;
+                }
             }
             else
                 return;               
@@ -263,9 +318,9 @@ html ="""\
   <h1>Term Hierarchy Tree</h1></td><td align="right">"""
 
 if SemanticTerms == 'True':
-    html += """<a href="TermHierarchyTree.py?SemanticTerms=False">Show the terms that don't have any semantic types.</a>"""
+    html += """<a href="TermHierarchyTree.py?%s=%s&SemanticTerms=False">Show the terms that don't have any semantic types.</a>""" % (cdrcgi.SESSION, session)
 else:
-    html += """<a href="TermHierarchyTree.py">Show the terms that have semantic types.</a>"""
+    html += """<a href="TermHierarchyTree.py?%s=%s">Show the terms that have semantic types.</a>""" % (cdrcgi.SESSION, session)
     
 html +="""</td></tr></table>
 
@@ -276,5 +331,5 @@ html +="""</td></tr></table>
 </ul>
  </body>
 </html>"""
-cdrcgi.sendPage(html)
+cdrcgi.sendPage(header + html)
 
