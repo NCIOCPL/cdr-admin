@@ -42,7 +42,7 @@ try:
     
     done = 0
     while not done:
-        # add the semantic types
+        # add the semantic type parent rows
         cursor.execute("""\
             INSERT INTO #terms
                  SELECT p.doc_id, p.int_val, 1
@@ -66,41 +66,8 @@ try:
                                                      + '/TermTypeName'
                                             AND value = 'Semantic type')
                                             """)
-        
-        if not cursor.rowcount:
-            done = 1
-        conn.commit()
 
-        # add the non semantic types who don't have Semantic type documents as parents
-        cursor.execute("""\
-            INSERT INTO #terms
-                 SELECT p.doc_id, p.int_val, 0
-                   FROM query_term p
-                   JOIN #terms t
-                     ON t.id = p.int_val
-                  WHERE p.path = '/Term/SemanticType/@cdr:ref'
-                    AND NOT EXISTS (SELECT *
-                                      FROM #terms
-                                     WHERE id = p.doc_id
-                                       AND parent = p.int_val)
-                    AND p.doc_id IN (SELECT doc_id
-                                           FROM query_term
-                                          WHERE path = '/Term/TermType'
-                                                     + '/TermTypeName'
-                                            AND value <> 'Semantic type'
-                                            AND value <> 'Obsolete term')
-                    AND p.int_val IN (SELECT doc_id
-                                           FROM query_term
-                                          WHERE path = '/Term/TermType'
-                                                     + '/TermTypeName'
-                                            AND value <> 'Obsolete term')
-                                            """)
-
-        if not cursor.rowcount:
-            done = 1
-        conn.commit()        
-
-        # add the non semantic types who don't have Semantic type documents as parents
+        #add the non-semantic type parent rows
         cursor.execute("""\
             INSERT INTO #terms
                  SELECT p.doc_id, p.int_val, 0
@@ -123,13 +90,39 @@ try:
                                            FROM query_term
                                           WHERE path = '/Term/TermType'
                                                      + '/TermTypeName'
+                                            AND value <> 'Semantic type'
                                             AND value <> 'Obsolete term')
                                             """)
-
+        
+        if not cursor.rowcount:
+            done = 1
+        conn.commit()
+        
+        # all non-semantic rows that don't have parents will be assigned to a semantic term.
+        cursor.execute("""\
+            INSERT INTO #terms
+                 SELECT p.doc_id, p.int_val, 0
+                   FROM query_term p
+                  WHERE NOT EXISTS (SELECT *
+                                      FROM #terms
+                                     WHERE id = p.doc_id
+                                       AND parent = p.int_val)
+                    AND p.doc_id IN (SELECT id from #terms
+                                      WHERE parent is null and boolSemanticType = 0)
+                    AND p.doc_id NOT IN (SELECT id from #terms
+                                      WHERE parent is not null)
+                    AND p.int_val IN (SELECT doc_id
+                                           FROM query_term
+                                          WHERE path = '/Term/TermType'
+                                                     + '/TermTypeName'
+                                            AND value = 'Semantic type')
+                                            """)
+        
         if not cursor.rowcount:
             done = 1
         conn.commit()
 
+        
         
     cursor.execute("""\
         SELECT d.id, n.value, d.parent, d.boolSemanticType
@@ -203,22 +196,16 @@ def addTerms(terms,SemanticTerms):
 def addTerm(t,parent):
     html=""
 
-    if not t.parents:
-        html += """        
-var myobj%s = { label: "%s", id:"treeRoot%s" };
-var tmpNode%s = new YAHOO.widget.TextNode(myobj%s, root, false);""" % (t.id,cgi.escape(cdrcgi.unicodeToLatin1(t.name)),
-                                                                       t.id,t.id,t.id)
-    else:
-        html += """        
-var myobj%s = { label: "%s", id:"treeNode%s" };
-var tmpNode%s = new YAHOO.widget.TextNode(myobj%s, tmpNode%s, false);""" % (t.id,cgi.escape(cdrcgi.unicodeToLatin1(t.name)),
-                                                                          t.id,t.id,t.id,parent.id)
-
-    #if t.aliases or t.children:
     if t.children:
+        html += """ <li class="parent hide" onclick="Toggle(event,this);"> %s <ul>""" % (cdrcgi.unicodeToLatin1(t.name))
         t.children.sort(lambda a,b: cmp(a.uname, b.uname))
         for child in t.children:
             html += addTerm(child,t)
+        html += """</ul></li>"""
+    else:
+        html += """ <li class="leaf"> %s </li>
+        """ % cdrcgi.unicodeToLatin1(t.name)
+
     return html
 
 # generate HTML, uses a javascript tree control form yahoo.
@@ -226,16 +213,52 @@ html ="""\
 <html>
  <head>
  <title>Term Hierarchy Tree</title>
- <!-- Required CSS --> 
-  <link type="text/css" rel="stylesheet" href="http://yui.yahooapis.com/2.2.2/build/treeview/assets/tree.css"> 
+ <style type="text/css">
+	ul.treeview li {
+		font-family="arial";
+		padding-left: 20px;
+	}
+
+	ul.treeview li.leaf {
+		color: blue;
+	}
+
+	ul.treeview li.parent {
+		color: red;
+		cursor:pointer;
+	}
+	ul.treeview li.show ul {
+		display: block;
+	}
+
+	ul.treeview li.hide ul {
+		display: none;
+	}
+	
+  </style> 
+  
+  <script type="text/javascript">
+	function Toggle(e, item)
+    {
+        e = (e) ? e : ((window.event) ? window.event : "")
+        if (e) 
+        {
+            var tg = (window.event) ? e.srcElement : e.target;
+
+            if (tg == item) 
+            {
+                if (item.className == "parent hide")
+                    item.className = "parent show";
+                else
+                    item.className = "parent hide";
+            }
+            else
+                return;               
+        }                                                           
+    }
+	</script>
  </head>
  <body>
- <!-- Dependency source files -->
-  <script src = "http://yui.yahooapis.com/2.2.2/build/yahoo/yahoo-min.js" ></script>
-  <script src = "http://yui.yahooapis.com/2.2.2/build/event/event-min.js" ></script>
-
-  <!-- TreeView source file -->
-  <script src = "http://yui.yahooapis.com/2.2.2/build/treeview/treeview-min.js" ></script>
   <table><tr><td width="60%">
   <h1>Term Hierarchy Tree</h1></td><td align="right">"""
 
@@ -244,22 +267,13 @@ if SemanticTerms == 'True':
 else:
     html += """<a href="TermHierarchyTree.py">Show the terms that have semantic types.</a>"""
     
-html +="""</td></tr></table><div id="treeDiv"></div>
-  <script type="text/javascript">
+html +="""</td></tr></table>
 
-  var tree;
-  function treeInit() {
-   tree = new YAHOO.widget.TreeView("treeDiv");
+  <ul class="treeview">
 
-   var root = tree.getRoot();  
 """ + addTerms(terms,SemanticTerms) + """\
 
-tree.draw();
-}
-
-YAHOO.util.Event.addListener(window, "load", treeInit);
-
- </script>
+</ul>
  </body>
 </html>"""
 cdrcgi.sendPage(html)
