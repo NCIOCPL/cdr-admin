@@ -223,10 +223,10 @@ def addTerm(t,parent):
         for child in t.children:
             if not child.children:
                 cbText += "%s " % child.id
-        html += """ <li class="parent hide" onclick="Toggle(event,this);">+&nbsp;%s""" % cdrcgi.unicodeToLatin1(t.name)
+        html += """ <li class="parent hide" onclick="Toggle(event,this);"><span>+</span>&nbsp;%s""" % cdrcgi.unicodeToLatin1(t.name)
         if len(cbText) > 0:
-            html += """<a color="red" onclick="Send2Clipboard('%s');" href=#">&nbsp(copy)</a>""" % cbText
-        html += """<ul>""" 
+            html += """<a STYLE="font-size: 8pt; color: rgb(200, 100, 100)" onclick="Send2Clipboard('%s');" href=#">&nbsp(copy)</a>""" % cbText
+        html += """<ul>"""
         
         t.children.sort(lambda a,b: cmp(a.uname, b.uname))
         for child in t.children:
@@ -246,7 +246,7 @@ html += """<head>
  <title>Term Hierarchy Tree</title>
  <style type="text/css">
      ul.treeview li {
-        font-family="courier new";
+        font-family: courier,serif;
         padding-left: 6px;
         list-style-type: none;
 	}
@@ -271,21 +271,33 @@ html += """<head>
   </style> 
   
   <script type="text/javascript">
+    function onload()
+    {
+        // Don't show the clipboard edit box if using IE
+        if( window.clipboardData )
+        {
+            var CDRIDTextField = document.getElementById("CopiedCDRIDs");
+            CDRIDTextField.style.display="none";
+        }
+    }
+  
     function Send2Clipboard(s) 
     {
         if( window.clipboardData ) 
         { 
             clipboardData.setData("text", s);
-            alert("Data Copied to ClipBoard"); 
-        } 
-        else 
-        { 
-            alert("Internet Explorer is required."); 
+            alert("Data has been copied to the clipboard."); 
+        }
+        else
+        {
+            var myTextField = document.getElementById("CopiedCDRIDsEditBox");
+            myTextField.value = s;
+            myTextField.select();
+            alert("CDRID's have been copied to the edit box at the bottom of this page. You can type Ctrl+C now to copy to the clipboard.");
         } 
     } 
-
     
-	function Toggle(e, item)
+    function Toggle(e, item)
     {
         e = (e) ? e : ((window.event) ? window.event : "")
         if (e) 
@@ -294,17 +306,32 @@ html += """<head>
 
             if (tg == item) 
             {
-                if (item.className == "parent hide"){
+                if (item.className == "parent hide")
+                {
                     item.className = "parent show";
-                    var old = item.innerHTML;
-                    old = old.replace("+","-");
-                    item.innerHTML = old;
+                    // loop through and find first span tag
+                    // instead of search and replace on innerHTML
+                    // because it's much faster
+                    for (i=0; i<item.childNodes.length; i++)
+                    {
+                        if (item.childNodes[i].tagName.toUpperCase() == "SPAN")
+                        {
+                            item.childNodes[i].innerHTML = "-";
+                            break;
+                        }        
+                    }
                 }
-                else{
+                else
+                {
                     item.className = "parent hide";
-                    var old = item.innerHTML;
-                    old = old.replace("-","+");
-                    item.innerHTML = old;
+                    for (i=0; i<item.childNodes.length; i++)
+                    {
+                        if (item.childNodes[i].tagName.toUpperCase() == "SPAN")
+                        {
+                            item.childNodes[i].innerHTML = "+";
+                            break;
+                        }        
+                    }
                 }
             }
             else
@@ -318,9 +345,9 @@ html += """<head>
   <h1>Term Hierarchy Tree</h1></td><td align="right">"""
 
 if SemanticTerms == 'True':
-    html += """<a href="TermHierarchyTree.py?%s=%s&SemanticTerms=False">Show the terms that don't have any semantic types.</a>""" % (cdrcgi.SESSION, session)
+    html += """<a STYLE="font-size: 10pt; color: rgb(50, 100, 150)" href="TermHierarchyTree.py?%s=%s&SemanticTerms=False">Click Here to show the terms that don't have any semantic types.</a>""" % (cdrcgi.SESSION, session)
 else:
-    html += """<a href="TermHierarchyTree.py?%s=%s">Show the terms that have semantic types.</a>""" % (cdrcgi.SESSION, session)
+    html += """<a STYLE="font-size: 10pt; color: rgb(50, 100, 150)" href="TermHierarchyTree.py?%s=%s">Click here to show the terms that have semantic types.</a>""" % (cdrcgi.SESSION, session)
     
 html +="""</td></tr></table>
 
@@ -329,7 +356,11 @@ html +="""</td></tr></table>
 """ + addTerms(terms,SemanticTerms) + """\
 
 </ul>
+<p id ="CopiedCDRIDs" STYLE="font-size: 10pt; color: rgb(200, 100, 100)">Here are the copied CDRID's. Highlight the list and type Ctrl+C to copy to the clipboard:<br>
+<input type="text" id = "CopiedCDRIDsEditBox" name="CopiedCDRIDsEditBox" value="" STYLE="width: 100%;"/>
+</p>
  </body>
 </html>"""
+header = header.replace("<BODY","""<BODY onload="onload();" """)
 cdrcgi.sendPage(header + html)
 
