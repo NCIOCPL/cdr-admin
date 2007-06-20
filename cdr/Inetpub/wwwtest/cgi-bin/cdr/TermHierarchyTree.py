@@ -26,6 +26,10 @@ elif action == SUBMENU:
 if action == "Log Out": 
     cdrcgi.logout(session)
 
+class CDRID:
+    def __init__(self, id):
+        self.id = id
+
 class Term:
     def __init__(self, name, id, isSemantic):
         self.name = name
@@ -214,15 +218,25 @@ def addTerms(terms,SemanticTerms):
         
     return html
 
+def addLeafIDsToList(t,cdrids):
+    for child in t.children:
+        if not child.children:
+            if child.id not in cdrids:
+                cdrids[child.id] = CDRID(child.id)
+        else:
+            addLeafIDsToList(child,cdrids)
+    return
+
 # add a term to the hierarchy list
 def addTerm(t,parent):
     html=""
     cbText=""
 
     if t.children:
-        for child in t.children:
-            if not child.children:
-                cbText += "%s " % child.id
+        cdrids = {}
+        addLeafIDsToList(t,cdrids)
+        for id in cdrids:
+            cbText += "%d " % id
         html += """ <li class="parent hide" onclick="Toggle(event,this);"><span>+</span>&nbsp;%s""" % cdrcgi.unicodeToLatin1(t.name)
         if len(cbText) > 0:
             html += """<a STYLE="font-size: 8pt; color: rgb(200, 100, 100)" onclick="Send2Clipboard('%s');" href=#">&nbsp(copy)</a>""" % cbText
