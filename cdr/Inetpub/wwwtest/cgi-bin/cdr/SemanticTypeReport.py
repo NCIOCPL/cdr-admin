@@ -183,7 +183,8 @@ dataFont    = ExcelWriter.Font(name = 'Arial', size = 10)
 dataAlign   = ExcelWriter.Alignment('Left', 'Top', wrap = True)
 dataStyle  = wb.addStyle(alignment = dataAlign, font = dataFont)
 
-activeProtocolFont    = ExcelWriter.Font(name = 'Arial', color="#008800", size = 10)
+#activeProtocolFont    = ExcelWriter.Font(name = 'Arial', color="#008800", size = 10)
+activeProtocolFont    = ExcelWriter.Font(name = 'Arial', size = 10)
 activeProtocolAlign   = ExcelWriter.Alignment('Left', 'Top', wrap = True)
 activeProtocolStyle  = wb.addStyle(alignment = activeProtocolAlign, font = activeProtocolFont)
 
@@ -241,7 +242,8 @@ for protKey in protKeys:
     # ---------------------
     rowNum = 5
     keys = documents.keys()
-    keys.sort(lambda a,b: cmp(documents[a].id, documents[b].id))
+    #sort by status,id
+    keys.sort(lambda a,b: cmp(documents[a].status, documents[b].status) or cmp(documents[a].id, documents[b].id))
     for key in keys:
         doc = documents[key]
         if ( doc.docType == protocolType.docType ):
