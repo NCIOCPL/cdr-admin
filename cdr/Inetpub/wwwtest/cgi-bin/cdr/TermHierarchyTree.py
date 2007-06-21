@@ -256,9 +256,7 @@ def addTerm(t,parent):
         cdrids = {}
         addLeafIDsToList(t,cdrids)
         cbText = u" ".join([`id` for id in cdrids])
-        #for id in cdrids:
-        #    cbText += "%d " % id
-        html.append(u""" <li class="parent %s" onclick="Toggle(event,this);"><span>%s</span>&nbsp;%s""" % (t.showMode,t.sign,cdrcgi.unicodeToLatin1(t.name)))
+        html.append(u""" <li id="%s" class="parent %s" onclick="clickOnName(event,this);"><span onclick="clickOnSign(event, '%s')">%s</span>&nbsp;%s""" % (t.id,t.showMode,t.id,t.sign,cdrcgi.unicodeToLatin1(t.name)))
         if len(cbText) > 0:
             html.append(u"""<a STYLE="font-size: 8pt; color: rgb(200, 100, 100)" onclick="Send2Clipboard('%s');" href=#">&nbsp(copy)</a>""" % cbText)
         html.append(u"""<ul>""")
@@ -339,9 +337,9 @@ html.append(u"""<head>
             myTextField.select();
             alert("CDRID's have been copied to the edit box at the bottom of this page. You can type Ctrl+C now to copy to the clipboard.");
         } 
-    } 
-    
-    function Toggle(e, item)
+    }
+
+    function clickOnName(e, item)
     {
         e = (e) ? e : ((window.event) ? window.event : "")
         if (e) 
@@ -380,6 +378,49 @@ html.append(u"""<head>
             }
             else
                 return;               
+        }                                                           
+    }    
+    
+    function clickOnSign(e, id)
+    {
+        var item = document.getElementById(id);
+        e = (e) ? e : ((window.event) ? window.event : "")
+        if (e) 
+        {
+            var tg = (window.event) ? e.srcElement : e.target;
+
+            //if (tg == item) 
+            //{
+                if (item.className == "parent hide")
+                {
+                    item.className = "parent show";
+                    // loop through and find first span tag
+                    // instead of search and replace on innerHTML
+                    // because it's much faster
+                    for (i=0; i<item.childNodes.length; i++)
+                    {
+                        if (item.childNodes[i].tagName.toUpperCase() == "SPAN")
+                        {
+                            item.childNodes[i].innerHTML = "-";
+                            break;
+                        }        
+                    }
+                }
+                else
+                {
+                    item.className = "parent hide";
+                    for (i=0; i<item.childNodes.length; i++)
+                    {
+                        if (item.childNodes[i].tagName.toUpperCase() == "SPAN")
+                        {
+                            item.childNodes[i].innerHTML = "+";
+                            break;
+                        }        
+                    }
+                }
+            //}
+            //else
+            //    return;               
         }                                                           
     }
 	</script>
