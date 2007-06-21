@@ -12,8 +12,8 @@ SUBMENU  = "Reports Menu"
 buttons  = [SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 header   = cdrcgi.header(title, title, section,
                          "TermHierarchyTree.py", buttons, method = 'GET')
-
-cdrid = int(cdrid)
+if cdrid:
+    cdrid = int(cdrid)
 
 #----------------------------------------------------------------------
 # Handle navigation requests.
