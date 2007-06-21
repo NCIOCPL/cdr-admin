@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: TerminologyReports.py,v 1.12 2007-06-15 17:55:07 kidderc Exp $
+# $Id: TerminologyReports.py,v 1.13 2007-06-21 19:41:52 kidderc Exp $
 #
 # Submenu for terminology reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.12  2007/06/15 17:55:07  kidderc
+# 3316 added Term Hierarchy Report.
+#
 # Revision 1.11  2007/06/15 04:03:21  ameyer
 # Added menu item for Drug Review Report.
 #
@@ -102,8 +105,8 @@ reports = [
            ('DrugAgentReport2.py', 'Drug/Agent Other Names Report', ''),
            ('DrugReviewReport.py', 'Drug Review Report', ''),
            ('SemanticTypeReport.py', 'Semantic Type Report', ''),
-           ('TermHierarchyTree.py', 'Term Hierarchy Tree', '')
-
+           ('TermHierarchyTree.py', 'Term Hierarchy Tree', ''),
+           ('TermHierarchyTree.py', 'Terms with No Parent Term and Not a Semantic Type', '&SemanticTerms=False')
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s%s'>%s</LI></A>\n" % (
