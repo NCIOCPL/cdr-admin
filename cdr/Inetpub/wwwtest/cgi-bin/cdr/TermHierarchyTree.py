@@ -5,12 +5,15 @@ fields = cgi.FieldStorage()
 session  = cdrcgi.getSession(fields) or cdrcgi.bail("Not logged in")
 action   = cdrcgi.getRequest(fields)
 SemanticTerms = fields and fields.getvalue("SemanticTerms") or "True"
+cdrid = fields and fields.getvalue("CDRID") or None
 title    = "CDR Administration"
 section  = "Term Hierarchy Tree"
 SUBMENU  = "Reports Menu"
 buttons  = [SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 header   = cdrcgi.header(title, title, section,
                          "TermHierarchyTree.py", buttons, method = 'GET')
+
+cdrid = int(cdrid)
 
 #----------------------------------------------------------------------
 # Handle navigation requests.
@@ -39,6 +42,9 @@ class Term:
         self.children = []
         self.parents = []
         self.uname = name.upper()
+        self.showMode = "hide"
+        self.sign = "+"
+        self.selectedTerm = "False"
 
 conn = cdrdb.connect('CdrGuest')
 cursor = conn.cursor()
@@ -147,8 +153,6 @@ try:
         if not cursor.rowcount:
             done = 1
         conn.commit()
-
-        
         
     cursor.execute("""\
         SELECT d.id, n.value, d.parent, d.boolSemanticType
@@ -194,6 +198,15 @@ for id in terms:
         except:
             cdrcgi.bail("No object for parent %s" % str(parent))
 
+def expandUp(t):
+    for id in t.parents:
+        term = terms[id]
+        term.showMode = "show"
+        term.sign = "-"
+        if term.parents:
+            expandUp(term)
+    return
+
 # add all terms that don't have parents
 def addTerms(terms,SemanticTerms):
     html=""
@@ -210,6 +223,12 @@ def addTerms(terms,SemanticTerms):
             else:
                 if not term.parents and not term.isSemantic:
                     parentTerm.children.append(term)
+            if cdrid:
+                if cdrid == id:
+                    term.selectedTerm = "True"
+                    # expand the tree upward
+                    if term.parents:
+                        expandUp(term)
                                 
     parentTerm.children.sort(lambda a,b: cmp(a.uname, b.uname))
     
@@ -237,7 +256,7 @@ def addTerm(t,parent):
         addLeafIDsToList(t,cdrids)
         for id in cdrids:
             cbText += "%d " % id
-        html += """ <li class="parent hide" onclick="Toggle(event,this);"><span>+</span>&nbsp;%s""" % cdrcgi.unicodeToLatin1(t.name)
+        html += """ <li class="parent %s" onclick="Toggle(event,this);"><span>%s</span>&nbsp;%s""" % (t.showMode,t.sign,cdrcgi.unicodeToLatin1(t.name))
         if len(cbText) > 0:
             html += """<a STYLE="font-size: 8pt; color: rgb(200, 100, 100)" onclick="Send2Clipboard('%s');" href=#">&nbsp(copy)</a>""" % cbText
         html += """<ul>"""
@@ -247,7 +266,10 @@ def addTerm(t,parent):
             html += addTerm(child,t)
         html += """</ul></li>"""
     else:
-        html += """ <li class="leaf">&nbsp;&nbsp;%s</li>""" % cdrcgi.unicodeToLatin1(t.name)
+        html += """ <li class="leaf"""
+        if t.selectedTerm == "True":
+            html += """ selected"""
+        html += """">&nbsp;&nbsp;%s</li>""" % cdrcgi.unicodeToLatin1(t.name)
 
     return html
 
@@ -270,6 +292,10 @@ html += """<head>
 		cursor: default;
 		list-style-type: none;
 	}
+
+    ul.treeview li.leaf.selected {
+		font-style: italic;
+	}	
 
 	ul.treeview li.parent{
 		color: Navy;
