@@ -209,7 +209,7 @@ def expandUp(t):
 
 # add all terms that don't have parents
 def addTerms(terms,SemanticTerms):
-    html=""
+    html = [u""""""]
     
     # create a dummy partent node so we can sort the top node
     parentTerm = terms[-1] = Term("",-1,0)
@@ -233,8 +233,9 @@ def addTerms(terms,SemanticTerms):
     parentTerm.children.sort(lambda a,b: cmp(a.uname, b.uname))
     
     for rootTerm in parentTerm.children:
-        html += addTerm(rootTerm,rootTerm)
-        
+        html.append(addTerm(rootTerm,rootTerm))
+
+    html = u"".join(html)        
     return html
 
 def addLeafIDsToList(t,cdrids):
@@ -248,37 +249,40 @@ def addLeafIDsToList(t,cdrids):
 
 # add a term to the hierarchy list
 def addTerm(t,parent):
-    html=""
+    html = [u""""""]
     cbText=""
 
     if t.children:
         cdrids = {}
         addLeafIDsToList(t,cdrids)
-        for id in cdrids:
-            cbText += "%d " % id
-        html += """ <li class="parent %s" onclick="Toggle(event,this);"><span>%s</span>&nbsp;%s""" % (t.showMode,t.sign,cdrcgi.unicodeToLatin1(t.name))
+        cbText = u" ".join([`id` for id in cdrids])
+        #for id in cdrids:
+        #    cbText += "%d " % id
+        html.append(u""" <li class="parent %s" onclick="Toggle(event,this);"><span>%s</span>&nbsp;%s""" % (t.showMode,t.sign,cdrcgi.unicodeToLatin1(t.name)))
         if len(cbText) > 0:
-            html += """<a STYLE="font-size: 8pt; color: rgb(200, 100, 100)" onclick="Send2Clipboard('%s');" href=#">&nbsp(copy)</a>""" % cbText
-        html += """<ul>"""
+            html.append(u"""<a STYLE="font-size: 8pt; color: rgb(200, 100, 100)" onclick="Send2Clipboard('%s');" href=#">&nbsp(copy)</a>""" % cbText)
+        html.append(u"""<ul>""")
         
         t.children.sort(lambda a,b: cmp(a.uname, b.uname))
         for child in t.children:
-            html += addTerm(child,t)
-        html += """</ul></li>"""
+            html.append(addTerm(child,t))
+        html.append(u"""</ul></li>""")
     else:
-        html += """ <li class="leaf"""
+        html.append(u""" <li class="leaf""")
         if t.selectedTerm == "True":
-            html += """ selected"""
-        html += """">&nbsp;&nbsp;%s</li>""" % cdrcgi.unicodeToLatin1(t.name)
+            html.append(u""" selected""")
+        html.append(u"""">&nbsp;&nbsp;%s</li>""" % cdrcgi.unicodeToLatin1(t.name))
 
+    html = u"".join(html)
     return html
 
-# generate HTML
-html ="""\
-<html>
-<input type='hidden' name='%s' value='%s'>"""  % (cdrcgi.SESSION, session)
 
-html += """<head>
+# generate HTML
+html =[u"""\
+<html>
+<input type='hidden' name='%s' value='%s'>""" % (cdrcgi.SESSION, session)]
+
+html.append(u"""<head>
  <title>Term Hierarchy Tree</title>
  <style type="text/css">
      ul.treeview li {
@@ -382,25 +386,29 @@ html += """<head>
  </head>
  <body>
   <table><tr><td width="60%">
-  <h1>Term Hierarchy Tree</h1></td><td align="right">"""
+  <h1>Term Hierarchy Tree</h1></td><td align="right">""")
 
 if SemanticTerms == 'True':
-    html += """<a STYLE="font-size: 10pt; color: rgb(50, 100, 150)" href="TermHierarchyTree.py?%s=%s&SemanticTerms=False">Click Here to show the terms that don't have any semantic types.</a>""" % (cdrcgi.SESSION, session)
+    html.append(u"""<a STYLE="font-size: 10pt; color: rgb(50, 100, 150)" href="TermHierarchyTree.py?%s=%s&SemanticTerms=False">Click Here to show the terms that don't have any semantic types.</a>""" % (cdrcgi.SESSION, session))
 else:
-    html += """<a STYLE="font-size: 10pt; color: rgb(50, 100, 150)" href="TermHierarchyTree.py?%s=%s">Click here to show the terms that have semantic types.</a>""" % (cdrcgi.SESSION, session)
+    html.append(u"""<a STYLE="font-size: 10pt; color: rgb(50, 100, 150)" href="TermHierarchyTree.py?%s=%s">Click here to show the terms that have semantic types.</a>""" % (cdrcgi.SESSION, session))
     
-html +="""</td></tr></table>
+html.append(u"""</td></tr></table>
 
   <ul class="treeview">
 
-""" + addTerms(terms,SemanticTerms) + """\
+""")
 
+html.append(addTerms(terms,SemanticTerms))
+
+html.append(u"""\
 </ul>
 <p id ="CopiedCDRIDs" STYLE="font-size: 10pt; color: rgb(200, 100, 100)">Here are the copied CDRID's. Highlight the list and type Ctrl+C to copy to the clipboard:<br>
 <input type="text" id = "CopiedCDRIDsEditBox" name="CopiedCDRIDsEditBox" value="" STYLE="width: 100%;"/>
 </p>
  </body>
-</html>"""
+</html>""")
+html = u"".join(html)
 header = header.replace("<BODY","""<BODY onload="onload();" """)
 cdrcgi.sendPage(header + html)
 
