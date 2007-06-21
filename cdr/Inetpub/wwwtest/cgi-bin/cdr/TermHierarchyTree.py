@@ -315,12 +315,8 @@ html.append(u"""<head>
   <script type="text/javascript">
     function onload()
     {
-        // Don't show the clipboard edit box if using IE
-        if( window.clipboardData )
-        {
-            var CDRIDTextField = document.getElementById("CopiedCDRIDs");
-            CDRIDTextField.style.display="none";
-        }
+        var CDRIDTextField = document.getElementById("CopiedCDRIDs");
+        CDRIDTextField.style.display="none";
     }
   
     function Send2Clipboard(s) 
@@ -332,6 +328,8 @@ html.append(u"""<head>
         }
         else
         {
+            var CDRIDTextField = document.getElementById("CopiedCDRIDs");
+            CDRIDTextField.style.display="block";
             var myTextField = document.getElementById("CopiedCDRIDsEditBox");
             myTextField.value = s;
             myTextField.select();
@@ -427,17 +425,9 @@ html.append(u"""<head>
  </head>
  <body>
   <table><tr><td width="60%">
-  <h1>Term Hierarchy Tree</h1></td><td align="right">""")
-
-if SemanticTerms == 'True':
-    html.append(u"""<a STYLE="font-size: 10pt; color: rgb(50, 100, 150)" href="TermHierarchyTree.py?%s=%s&SemanticTerms=False">Click Here to show the terms that don't have any semantic types.</a>""" % (cdrcgi.SESSION, session))
-else:
-    html.append(u"""<a STYLE="font-size: 10pt; color: rgb(50, 100, 150)" href="TermHierarchyTree.py?%s=%s">Click here to show the terms that have semantic types.</a>""" % (cdrcgi.SESSION, session))
-    
-html.append(u"""</td></tr></table>
-
+  <h1>Term Hierarchy Tree</h1></td><td align="right">
+  </td></tr></table>
   <ul class="treeview">
-
 """)
 
 html.append(addTerms(terms,SemanticTerms))
@@ -445,7 +435,7 @@ html.append(addTerms(terms,SemanticTerms))
 html.append(u"""\
 </ul>
 <p id ="CopiedCDRIDs" STYLE="font-size: 10pt; color: rgb(200, 100, 100)">Here are the copied CDRID's. Highlight the list and type Ctrl+C to copy to the clipboard:<br>
-<input type="text" id = "CopiedCDRIDsEditBox" name="CopiedCDRIDsEditBox" value="" STYLE="width: 100%;"/>
+<textarea WRAP=VIRTUAL id = "CopiedCDRIDsEditBox" name="CopiedCDRIDsEditBox" value="" wrap="virtual" STYLE="width: 80%; height:300px"></textarea>
 </p>
  </body>
 </html>""")
