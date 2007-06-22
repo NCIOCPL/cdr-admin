@@ -61,7 +61,11 @@ try:
              SELECT doc_id, NULL, 1
                FROM query_term
               WHERE path = '/Term/TermType/TermTypeName'
-                AND value = 'Semantic type'""")
+                AND value = 'Semantic type'
+                AND doc_id not in(
+                                  SELECT doc_id from query_term
+                                   WHERE path = '/Term/TermType/TermTypeName'
+                                     AND value = 'Obsolete term')""")
     conn.commit()
 
     # populate with all the non-semantic terms
@@ -71,7 +75,10 @@ try:
                FROM query_term
               WHERE path = '/Term/TermType/TermTypeName'
                 AND value <> 'Semantic type'
-                AND value <> 'Obsolete term'""")
+                AND doc_id not in(
+                                  SELECT doc_id from query_term
+                                   WHERE path = '/Term/TermType/TermTypeName'
+                                     AND value = 'Obsolete term')""")
     conn.commit()    
     
     done = 0
@@ -93,12 +100,20 @@ try:
                                            FROM query_term
                                           WHERE path = '/Term/TermType'
                                                      + '/TermTypeName'
-                                            AND value = 'Semantic type')
+                                            AND value = 'Semantic type'
+                                            AND doc_id not in(
+                                                              SELECT doc_id from query_term
+                                                               WHERE path = '/Term/TermType/TermTypeName'
+                                                                 AND value = 'Obsolete term'))
                     AND p.int_val IN (SELECT doc_id
                                            FROM query_term
                                           WHERE path = '/Term/TermType'
                                                      + '/TermTypeName'
-                                            AND value = 'Semantic type')
+                                            AND value = 'Semantic type'
+                                            AND doc_id not in(
+                                                              SELECT doc_id from query_term
+                                                               WHERE path = '/Term/TermType/TermTypeName'
+                                                                 AND value = 'Obsolete term'))
                                             """)
 
         #add the non-semantic type parent rows
@@ -119,13 +134,19 @@ try:
                                           WHERE path = '/Term/TermType'
                                                      + '/TermTypeName'
                                             AND value <> 'Semantic type'
-                                            AND value <> 'Obsolete term')
+                                            AND doc_id not in(
+                                                              SELECT doc_id from query_term
+                                                               WHERE path = '/Term/TermType/TermTypeName'
+                                                                 AND value = 'Obsolete term'))
                     AND p.int_val IN (SELECT doc_id
                                            FROM query_term
                                           WHERE path = '/Term/TermType'
                                                      + '/TermTypeName'
                                             AND value <> 'Semantic type'
-                                            AND value <> 'Obsolete term')
+                                            AND doc_id not in(
+                                                              SELECT doc_id from query_term
+                                                               WHERE path = '/Term/TermType/TermTypeName'
+                                                                 AND value = 'Obsolete term'))
                                             """)
         
         if not cursor.rowcount:
@@ -149,7 +170,11 @@ try:
                                            FROM query_term
                                           WHERE path = '/Term/TermType'
                                                      + '/TermTypeName'
-                                            AND value = 'Semantic type')
+                                            AND value = 'Semantic type'
+                                            AND doc_id not in(
+                                                              SELECT doc_id from query_term
+                                                               WHERE path = '/Term/TermType/TermTypeName'
+                                                                 AND value = 'Obsolete term'))
                                             """)
         
         if not cursor.rowcount:
