@@ -318,13 +318,7 @@ html.append(u"""
   </style> 
   
   <script type="text/javascript">
-    function onload()
-    {
-        var CDRIDTextField = document.getElementById("CopiedCDRIDs");
-        CDRIDTextField.style.display="none";
-    }
-  
-    function Send2Clipboard(s) 
+      function Send2Clipboard(s) 
     {
         if( window.clipboardData ) 
         { 
@@ -441,12 +435,12 @@ html.append(addTerms(terms,SemanticTerms))
 
 html.append(u"""\
 </ul>
-<p id ="CopiedCDRIDs" STYLE="font-size: 10pt; color: rgb(200, 100, 100)">Here are the copied CDRID's. Highlight the list and type Ctrl+C to copy to the clipboard:<br>
+<p id ="CopiedCDRIDs" STYLE="font-size: 10pt; color: rgb(200, 100, 100); display: none;">Here are the copied CDRID's. Highlight the list and type Ctrl+C to copy to the clipboard:<br>
 <textarea WRAP=VIRTUAL id = "CopiedCDRIDsEditBox" name="CopiedCDRIDsEditBox" value="" wrap="virtual" STYLE="width: 80%; height:300px"></textarea>
 </p>
  </body>
 </html>""")
 html = u"".join(html)
-header = header.replace("<BODY","""<BODY onload="onload();" """)
+#header = header.replace("<BODY","""<BODY onload="onload();" """)
 cdrcgi.sendPage(header + html)
 
