@@ -252,12 +252,14 @@ def addLeafIDsToList(t,cdrids):
 # add a term to the hierarchy list
 def addTerm(t,parent):
     html = [u""""""]
-    cbText=""
+    cbText= [u""""""]
 
     if t.children:
         cdrids = {}
         addLeafIDsToList(t,cdrids)
-        cbText = u" ".join([`id` for id in cdrids])
+        cbText.append("%s:" % t.id)
+        cbText.append(u" ".join([`id` for id in cdrids]))
+        cbText = u"".join(cbText)
         html.append(u""" <li id="%s" class="parent %s" onclick="clickOnName(event,this);"><span onclick="clickOnSign(event, '%s')">%s</span>&nbsp;%s""" % (t.id,t.showMode,t.id,t.sign,cdrcgi.unicodeToLatin1(t.name)))
         if len(cbText) > 0:
             html.append(u"""<a STYLE="font-size: 8pt; color: rgb(200, 100, 100)" onclick="Send2Clipboard('%s');" href=#">&nbsp(copy)</a>""" % cbText)
