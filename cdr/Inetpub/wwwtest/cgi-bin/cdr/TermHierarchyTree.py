@@ -8,6 +8,8 @@ SemanticTerms = fields and fields.getvalue("SemanticTerms") or "True"
 cdrid = fields and fields.getvalue("CDRID") or None
 title    = "CDR Administration"
 section  = "Term Hierarchy Tree"
+if SemanticTerms == "False":
+    section = "Terms with No Parent Term and Not a Semantic Type"
 SUBMENU  = "Reports Menu"
 buttons  = [SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 header   = cdrcgi.header(title, title, section,
@@ -278,10 +280,11 @@ def addTerm(t,parent):
 # generate HTML
 html =[u"""\
 <html>
-<input type='hidden' name='%s' value='%s'>""" % (cdrcgi.SESSION, session)]
+<input type='hidden' name='%s' value='%s'>
+<head>
+<title>%s</title>""" % (cdrcgi.SESSION, session, section)]
 
-html.append(u"""<head>
- <title>Term Hierarchy Tree</title>
+html.append(u"""
  <style type="text/css">
      ul.treeview li {
         font-family: courier,serif;
@@ -424,11 +427,13 @@ html.append(u"""<head>
 	</script>
  </head>
  <body>
-  <table><tr><td width="60%">
-  <h1>Term Hierarchy Tree</h1></td><td align="right">
+  <table><tr><td width="60%">""")
+  
+html.append(u"""\
+<h1>%s</h1></td><td align="right">
   </td></tr></table>
   <ul class="treeview">
-""")
+""" % section) 
 
 html.append(addTerms(terms,SemanticTerms))
 
