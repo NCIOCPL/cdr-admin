@@ -133,6 +133,7 @@ class Documents:
         self.title = title
         self.status = status
         self.docType = docType
+        self.terms = []
         
 documents = {}
 
@@ -143,19 +144,23 @@ keys = protocolTypes.keys()
 for key in keys:
     protocolType = protocolTypes[key]
     sQuery="""\
-    SELECT DISTINCT d.id, d.title, status.value
+    SELECT d.id, d.title, status.value, term.value
       FROM document d
       JOIN query_term status
         ON status.doc_id = d.id
       JOIN query_term q
         ON q.doc_id = d.id
+      JOIN query_term term
+        ON term.doc_id = q.int_val
      WHERE q.path LIKE '/%s/%%/@cdr:ref'
        AND status.path = '%s'
        AND d.active_status = 'A'
+       AND term.path = '/Term/PreferredName'
        AND q.int_val IN (SELECT doc_id
                            FROM query_term
                           WHERE path = '/Term/SemanticType/@cdr:ref' 
                             AND int_val = %s)
+ ORDER BY d.id, term.value
     """ % (protocolType.title,protocolType.statusTerm,semanticType)
 
     try:
@@ -163,9 +168,11 @@ for key in keys:
         rows = cursor.fetchall()
     except cdrdb.Error, info:
         cdrcgi.bail('Database query failure: %s' % info[1][0])
-    for id, title, status in rows:
+    for id, title, status, term in rows:
         if id not in documents:
             documents[id] = Documents(id,title,status,protocolType.docType)
+        doc = documents[id]
+        doc.terms.append(term)
 
 #----------------------------------------------------------------------
 # Write the excel file
@@ -183,11 +190,6 @@ dataFont    = ExcelWriter.Font(name = 'Arial', size = 10)
 dataAlign   = ExcelWriter.Alignment('Left', 'Top', wrap = True)
 dataStyle  = wb.addStyle(alignment = dataAlign, font = dataFont)
 
-#activeProtocolFont    = ExcelWriter.Font(name = 'Arial', color="#008800", size = 10)
-activeProtocolFont    = ExcelWriter.Font(name = 'Arial', size = 10)
-activeProtocolAlign   = ExcelWriter.Alignment('Left', 'Top', wrap = True)
-activeProtocolStyle  = wb.addStyle(alignment = activeProtocolAlign, font = activeProtocolFont)
-
 headerFont    = ExcelWriter.Font(name = 'Arial', size = 10, color="#FFFFFF", bold = True)
 headerInterior     = ExcelWriter.Interior("#0000FF", "Solid")
 headerAlign   = ExcelWriter.Alignment('Center', 'Top', wrap = True)
@@ -201,42 +203,51 @@ columnTitleStyle  = wb.addStyle(alignment = columnTitleAlign, font = columnTitle
 protKeys = protocolTypes.keys()
 for protKey in protKeys:
     protocolType = protocolTypes[protKey]
-
+    
+    sTmp = protocolType.title[:31]
+    ws = wb.addWorksheet(sTmp.replace('/','-'), style=dataStyle, height=45, frozenRows = 5)
+    
     numDocs = 0
+    # Determine the width of column 3
+    #---------------------------------
+    colThreeWidth = 220
+    charWidth = 4.5
     keys = documents.keys()
     for key in keys:
         doc = documents[key]
         if ( doc.docType == protocolType.docType ):
             numDocs += 1
-    
-    sTmp = protocolType.title[:31]
-    ws = wb.addWorksheet(sTmp.replace('/','-'), style=dataStyle, height=45, frozenRows = 5)
+            for term in doc.terms:
+                if colThreeWidth < charWidth*len(term):
+                    colThreeWidth = charWidth*len(term)
         
     # Set the colum width
     # -------------------
     ws.addCol( 1, 100)
-    ws.addCol( 2, 550)
-    ws.addCol( 3, 140)
+    ws.addCol( 2, 450)
+    ws.addCol( 3, colThreeWidth)
+    ws.addCol( 4, 140)
 
     # Create the top rows
     # ---------------------
     exRow = ws.addRow(1,height=15)
-    exRow.addCell(2, 'Semantic Type Report', style = headerStyle)
+    exRow.addCell(2, 'Semantic Type Report', style = headerStyle, mergeAcross=1)
 
     sTmp = "Semantic Type : %s" % title
     exRow = ws.addRow(2,height=15)
-    exRow.addCell(2, sTmp, style = headerStyle)
+    exRow.addCell(2, sTmp, style = headerStyle, mergeAcross=1)
 
     sTmp = "Total Number of Trials: %d" % numDocs
     exRow = ws.addRow(3,height=15)
-    exRow.addCell(2, sTmp, style = headerStyle)
+    exRow.addCell(2, sTmp, style = headerStyle, mergeAcross=1)
 
     # Create the Header row
     # ---------------------
     exRow = ws.addRow(5, style=columnTitleStyle,height=15)
     exRow.addCell(1, 'CDR-ID')
     exRow.addCell(2, 'Title')
-    exRow.addCell(3, 'Current Protocol Status')
+    exRow.addCell(3, 'Term(s)')
+    exRow.addCell(4, 'Current Protocol Status')
 
     # Write the data
     # ---------------------
@@ -248,15 +259,21 @@ for protKey in protKeys:
         doc = documents[key]
         if ( doc.docType == protocolType.docType ):
             rowNum += 1
-            exRow = ws.addRow(rowNum, dataStyle)
-            if doc.status == 'Active':
-                exRow.addCell(1, doc.id, style = activeProtocolStyle)
-                exRow.addCell(2, doc.title, style = activeProtocolStyle)
-                exRow.addCell(3, doc.status, style = activeProtocolStyle)
-            else:
-                exRow.addCell(1, doc.id, style = dataStyle)
-                exRow.addCell(2, doc.title, style = dataStyle)
-                exRow.addCell(3, doc.status, style = dataStyle)
+            rowHeight = 45
+            # if there are more than 3 terms,
+            # set the row height based on the number of terms
+            if len(doc.terms) > 3:
+                rowHeight = 14 * len(doc.terms)
+            exRow = ws.addRow(rowNum, style = dataStyle,height=rowHeight)
+            exRow.addCell(1, doc.id, style = dataStyle)
+            exRow.addCell(2, doc.title, style = dataStyle)
+            strTerm=""
+            for term in doc.terms:
+                if len(strTerm) > 0:
+                    strTerm += '\n'
+                strTerm += term
+            exRow.addCell(3, strTerm, style = dataStyle)
+            exRow.addCell(4, doc.status, style = dataStyle)
 
 print "Content-type: application/vnd.ms-excel"                                  
 print "Content-Disposition: attachment; filename=SemanticTypeReport-%s.xls" % t    
