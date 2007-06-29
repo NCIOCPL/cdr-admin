@@ -177,6 +177,10 @@ for key in keys:
 #----------------------------------------------------------------------
 # Write the excel file
 #----------------------------------------------------------------------
+if sys.platform == "win32":
+    import os, msvcrt
+    msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
+
 title = semanticTypes[int(semanticType)].title
 t = time.strftime("%Y%m%d%H%M%S")
 
