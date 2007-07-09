@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PersonAndOrgReports.py,v 1.13 2007-04-23 12:36:21 bkline Exp $
+# $Id: PersonAndOrgReports.py,v 1.14 2007-07-09 13:30:49 kidderc Exp $
 #
 # Submenu for person and organization reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.13  2007/04/23 12:36:21  bkline
+# Plugged in new Organization Protocols Spreadsheet report.
+#
 # Revision 1.12  2005/04/13 20:13:25  venglisc
 # Added menu option for Member of AdHoc Group report.  (Bug 1630)
 #
@@ -109,6 +112,8 @@ reports = [
             'Organization Protocol Review'),
 	       ('OrgProtocolAcronym.py',
 	        'Organizations Protocol Acronym Report'),
+           ('OrgsWithoutCTOs.py', 
+            """Organizations (without CTO's) Linked to Protocols"""),
            ('PersonProtocolReview.py', 
             'Person Protocol Review'),
            ('PersonsAtOrg.py', 
