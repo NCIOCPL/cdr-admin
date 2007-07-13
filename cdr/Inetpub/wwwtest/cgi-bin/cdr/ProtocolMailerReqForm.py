@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolMailerReqForm.py,v 1.23 2006-08-21 16:09:31 bkline Exp $
+# $Id: ProtocolMailerReqForm.py,v 1.24 2007-07-13 14:54:12 bkline Exp $
 #
 # Request form for all protocol mailers.
 #
@@ -17,6 +17,9 @@
 # publication job for the publishing daemon to find and initiate.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.23  2006/08/21 16:09:31  bkline
+# Bumped up timeout for initial abstract mailer query.
+#
 # Revision 1.22  2005/05/13 22:42:12  venglisc
 # Modified to pre-populate the email input field with the session owners
 # email address. (Bug 1664)
@@ -97,6 +100,7 @@
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string, cdrdb, cdrpubcgi, cdrmailcommon, sys
+import textwrap, time
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -143,6 +147,10 @@ header      = cdrcgi.header(title, title, section, script, buttons,
     function emOn() {
         document.forms[0].electronic.checked = true;
         document.forms[0].paper.checked = true;
+    }
+    function emOnly() {
+        document.forms[0].electronic.checked = true;
+        document.forms[0].paper.checked = false;
     }
    // -->
   </script>
@@ -236,7 +244,10 @@ if not request:
     <span class='r'>Initial Status/Participant Check</span><br>
    <input type='radio' name='userPick' class='r' value='ProtQuarterlyStatPart'
           onClick='emOn()'>
-    <span class='r'>Quarterly Status/Participant Check</span>
+    <span class='r'>Quarterly Status/Participant Check</span><br>
+   <input type='radio' name='userPick' class='r' value='PubNotif'
+          onClick='emOnly()'>
+    <span class='r'>Publication Notification Email</span>
    <br><br><br>
    <input id='paper' type="checkbox" name="paper" />&nbsp;
    <span class='r'>Paper Mailers</span><br>
@@ -317,7 +328,9 @@ elif userPick  == 'ProtQuarterlyStatPart':
     orgMailType = 'Protocol-Initial status/participant check'
 if not electronic and not paper:
     cdrcgi.bail("Neither paper nor electronic mailers selected")
-if electronic and userPick not in statPartTypes:
+if userPick == 'PubNotif' and paper:
+    cdrcgi.bail("Publication notification only available as email")
+if electronic and userPick not in statPartTypes and userPick != 'PubNotif':
     cdrcgi.bail("Only paper mailers supported for protocol abstracts")
 if leadOrg:
     if not docId:
@@ -340,6 +353,342 @@ try:
     conn.setAutoCommit (1)
 except cdrdb.Error, info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
+
+#----------------------------------------------------------------------
+# Send out a publication notification email message.
+#----------------------------------------------------------------------
+class PubNotificationProtocol:
+
+    # Class-level values.
+    wrapper = textwrap.TextWrapper()
+    sender = 'cdr@' + cdrcgi.WEBSERVER
+    subject = 'PDQ Publication Notification'
+
+    class Recip:
+
+        # Class hash for caching email addresses by fragment link value.
+        addresses = {}
+
+        # Constructor for nested Recip class.
+        def __init__(self, fragLink, cursor):
+
+            # Shorthand for this class object.
+            PNPRecip = PubNotificationProtocol.Recip
+
+            # Initialize members.
+            self.docId, self.fragId = cdr.exNormalize(fragLink)[1:]
+            self.trackingDocId = None
+            self.email = PNPRecip.addresses.get(fragLink)
+            if fragLink not in PNPRecip.addresses:
+                cursor.execute("""\
+                    SELECT e.value
+                      FROM query_term e
+                      JOIN query_term i
+                        ON e.doc_id = i.doc_id
+                       AND LEFT(e.node_loc, 8) = LEFT(i.node_loc, 8)
+                     WHERE e.path LIKE '/Person/PersonLocations/%Email'
+                       AND i.path LIKE '/Person/PersonLocations/%/@cdr:id'
+                       AND i.value = ?
+                       AND e.doc_id = ?""", (self.fragId, self.docId))
+                rows = cursor.fetchall()
+                if rows:
+                    PNPRecip.addresses[fragLink] = rows[0][0]
+                else:
+                    cursor.execute("""\
+                        SELECT o.value
+                          FROM query_term o
+                          JOIN query_term i
+                            ON o.doc_id = i.doc_id
+                           AND LEFT(o.node_loc, 8) = LEFT(i.node_loc, 8)
+                         WHERE o.path = '/Person/PersonLocations'
+                                      + '/OtherPracticeLocation'
+                                      + '/OrganizationLocation/@cdr:ref'
+                           AND i.path = '/Person/PersonLocations'
+                                      + '/OtherPracticeLocation/@cdr:id'
+                           AND i.value = ?
+                           AND o.doc_id = ?""", (self.fragId, self.docId))
+                    rows = cursor.fetchall()
+                    if rows:
+                        docId, fragId = cdr.exNormalize(rows[0][0])[1:]
+                        cursor.execute("""\
+                            SELECT e.value
+                              FROM query_term e
+                              JOIN query_term i
+                                ON e.doc_id = i.doc_id
+                               AND LEFT(e.node_loc, 8) = LEFT(i.node_loc, 8)
+                             WHERE e.path LIKE '/Organization' +
+                                               '/OrganizationLocations' +
+                                               '/OrganizationLocation' +
+                                               '/Location/%Email%'
+                               AND i.path = '/Organization'
+                                          + '/OrganizationLocations'
+                                          + '/OrganizationLocation'
+                                          + '/Location/@cdr:id'
+                               AND i.value = ?
+                               AND e.doc_id = ?""", (fragId, docId))
+                        rows = cursor.fetchall()
+                        if rows:
+                            PNPRecip.addresses[fragLink] = rows[0][0]
+            self.email = PNPRecip.addresses.get(fragLink)
+
+    def __init__(self, docId, nctId, cursor):
+        self.docId      = docId
+        self.nctId      = nctId 
+        self.primaryId  = u'[NO PRIMARY ID]'
+        self.title      = u'[NO ORIGINAL TITLE]'
+        self.originalId = u'[NO ORIGINAL ID]'
+        self.recips     = {}
+        cursor.execute("""\
+            SELECT value
+              FROM query_term
+             WHERE path = '/InScopeProtocol/ProtocolIDs/PrimaryID/IDString'
+               AND doc_id = ?""", docId)
+        rows = cursor.fetchall()
+        if rows:
+            self.primaryId = rows[0][0]
+        cursor.execute("""\
+            SELECT i.value
+              FROM query_term i
+              JOIN query_term t
+                ON i.doc_id = t.doc_id
+               AND LEFT(i.node_loc, 8) = LEFT(t.node_loc, 8)
+             WHERE i.path = '/InScopeProtocol/ProtocolIDs/OtherID/IDString'
+               AND t.path = '/InScopeProtocol/ProtocolIDs/OtherID/IDType'
+               AND t.value = 'Institutional/Original'
+               AND i.doc_id = ?""", docId)
+        rows = cursor.fetchall()
+        if rows:
+            self.originalId = rows[0][0]
+        cursor.execute("""\
+            SELECT o.value
+              FROM query_term o
+              JOIN query_term t
+                ON o.doc_id = t.doc_id
+               AND LEFT(o.node_loc, 4) = LEFT(t.node_loc, 4)
+             WHERE o.path = '/InScopeProtocol/ProtocolTitle'
+               AND t.path = '/InScopeProtocol/ProtocolTitle/@Type'
+               AND t.value = 'Original'
+               AND o.doc_id = ?""", docId)
+        rows = cursor.fetchall()
+        if rows:
+            self.title = rows[0][0]
+        cursor.execute("""\
+            SELECT p.value
+              FROM query_term p
+              JOIN query_term r
+                ON p.doc_id = r.doc_id
+               AND LEFT(p.node_loc, 12) = LEFT(r.node_loc, 12)
+             WHERE p.path = '/InScopeProtocol/ProtocolAdminInfo'
+                          + '/ProtocolLeadOrg/LeadOrgPersonnel/Person'
+                          + '/@cdr:ref'
+               AND r.path = '/InScopeProtocol/ProtocolAdminInfo'
+                          + '/ProtocolLeadOrg/LeadOrgPersonnel/PersonRole'
+               AND r.value = 'Update person'
+               AND p.doc_id = ?""", docId)
+        rows = cursor.fetchall()
+        if rows:
+            recip = PubNotificationProtocol.Recip(rows[0][0], cursor)
+            if recip.email:
+                self.recips[recip.email.lower()] = recip
+        cursor.execute("""\
+            SELECT p.value
+              FROM query_term p
+              JOIN query_term i
+                ON p.doc_id = i.doc_id
+               AND LEFT(p.node_loc, 12) = LEFT(i.node_loc, 12)
+              JOIN query_term a
+                ON a.doc_id = p.doc_id
+             WHERE p.path = '/InScopeProtocol/ProtocolAdminInfo'
+                          + '/ProtocolLeadOrg/LeadOrgPersonnel/Person'
+                          + '/@cdr:ref'
+               AND i.path = '/InScopeProtocol/ProtocolAdminInfo'
+                          + '/ProtocolLeadOrg/LeadOrgPersonnel/@cdr:id'
+               AND a.path = '/InScopeProtocol/ProtocolAdminInfo'
+                          + '/ProtocolLeadOrg/MailAbstractTo'
+               AND a.value = i.value
+               AND p.doc_id = ?""", docId)
+        rows = cursor.fetchall()
+        if rows:
+            recip = PubNotificationProtocol.Recip(rows[0][0], cursor)
+            if recip.email:
+                self.recips[recip.email.lower()] = recip
+
+def sendPubNotificationEmail(docId, nctId, cursor, conn):
+    p = PubNotificationProtocol(docId, nctId, cursor)
+    if not p.recips:
+        raise Exception("no recipient email addresses found")
+    addresses = [r.email for r in p.recips.values()]
+    url = (u"http://www.cancer.gov/clinicaltrials/"
+           u"view_clinicaltrials.aspx?version=healthprofessional&"
+           u"cdrid=%d" % docId)
+    line = (u'Thank you for registering your trial "%s", "%s" with PDQ.  '
+            u'Your trial has been assigned a PDQ ID of "%s" and a '
+            u'ClinicalTrials.gov registration number of "%s".  '
+            u'Your trial can be viewed on Cancer.gov by clicking '
+            u'on the link provided or searching PDQ using the PDQ ID.'
+            % (p.originalId, p.title, p.primaryId, p.nctId))
+    body = u"""\
+[SENT TO YOU FOR TESTING, INSTEAD OF TO %s]
+
+%s
+
+%s
+
+If you have additional trials to submit, please use the new NCI
+Clinical Trial Submission Portal at
+
+           http://pdqupdate.cancer.gov/submission.  
+
+PDQ Protocol Coordinator 
+Office of Cancer Content Management
+""" % (", ".join(addresses), PubNotificationProtocol.wrapper.fill(line), url)
+    try:
+        cdr.sendMail(PubNotificationProtocol.sender,
+                     #('***REMOVED***', '***REMOVED***'),
+                     #('bkline@speakeasy.net', '***REMOVED***'),
+                     #['bkline@speakeasy.net'],
+                     ['***REMOVED***', '***REMOVED***'],
+                     #p.addresses,
+                     PubNotificationProtocol.subject,
+                     body.encode('ascii', 'replace'))
+    #for email in p.addresses:
+    except Exception, e:
+        raise Exception("failure sending email notice to %s: %s" %
+                        (", ".join(p.addresses), e))
+    mailerMode, mailerType = 'Email', 'Publication notification email'
+    sent = time.strftime('%Y-%m-%dT%M:%H:%S')
+    for recip in p.recips.values():
+        address = u"""\
+   <MailerAddress>
+    <Email>%s</Email>
+   </MailerAddress>
+""" % recip.email
+        try:
+            tId = cdrmailcommon.recordMailer(session, docId, recip.docId,
+                                             mailerMode, mailerType, sent,
+                                             address)
+            recip.trackingDocId = tId
+        except Exception, e:
+            raise Exception("Failure recording mailer to %s for CDR%d: %s" %
+                            (recip.email, docId, e))
+    return p
+
+#----------------------------------------------------------------------
+# Send out publication notification emails if so requested.
+#----------------------------------------------------------------------
+if userPick == 'PubNotif':
+
+    cursor = conn.cursor()
+
+    # Gather the NCT IDs.
+    cursor.execute("""\
+        SELECT i.doc_id, i.value
+          FROM query_term i
+          JOIN query_term t
+            ON i.doc_id = t.doc_id
+           AND LEFT(i.node_loc, 8) = LEFT(t.node_loc, 8)
+         WHERE i.path = '/InScopeProtocol/ProtocolIDs/OtherID/IDString'
+           AND t.path = '/InScopeProtocol/ProtocolIDs/OtherID/IDType'
+           AND t.value = 'ClinicalTrials.gov ID'""", timeout = 300)
+    rows = cursor.fetchall()
+    nctIds = {}
+    for cdrId, nctId in rows:
+        nctIds[cdrId] = nctId
+
+    if docId:
+        docIds = [docId]
+    else:
+        cursor.execute("""\
+            SELECT d.doc_id, MIN(p.completed)
+              FROM pub_proc_doc d
+              JOIN pub_proc p
+                ON p.id = d.pub_proc
+              JOIN document doc
+                ON d.doc_id = doc.id
+              JOIN doc_type t
+                ON doc.doc_type = t.id
+             WHERE t.name = 'InScopeProtocol'
+               AND doc.active_status = 'A'
+               AND p.pub_subset LIKE 'Push_Documents_To_Cancer.Gov%'
+               AND p.status = 'SUCCESS'
+               AND (d.failure IS NULL OR d.failure <> 'Y')
+               AND d.removed = 'N'
+               AND d.doc_id NOT IN (SELECT md.int_val
+                                      FROM query_term md
+                                      JOIN query_term mt
+                                        ON md.doc_id = mt.doc_id
+                                     WHERE md.path = '/Mailer/Document'
+                                                   + '/@cdr:ref'
+                                       AND mt.path = '/Mailer/Type'
+                                       AND mt.value = 'Publication '
+                                                    + 'notification email')
+          GROUP BY d.doc_id
+         HAVING MIN(p.completed) >= '2007-06-01'
+          ORDER BY MIN(p.completed), d.doc_id""", timeout = 300)
+        docIds = []
+        for row in cursor.fetchall():
+            if len(docIds) >= maxDocs:
+                break
+            docId = row[0]
+            if docId in nctIds:
+                docIds.append(docId)
+    #if not docIds:
+    #    cdrcgi.bail("No matching protocols found")
+    print """\
+Content-type: text/html
+
+<html>
+ <head>
+  <title>Publication Notification Emails</title>
+  <style type='text/css'>
+   body { font-family: 'Arial'; font-size: 10pt; }
+   h1   { font-size: 14pt; color: blue; }
+   th   { font-size: 12pt; color: maroon; }
+   td   { font-size: 10pt; color: green; }
+   .err { color: red; font-weight: bold; }
+  </style>
+ </head>
+ <body>
+  <h1>Publication Notification Emails</h1>
+  <table border='1' cellpadding='2' cellspacing='0'>
+   <tr>
+    <th>CDR ID</th>
+    <th>Primary ID</th>
+    <th>NCT ID</th>
+    <th>Recipients</th>
+    <th>Mailer Tracking Docs</th>
+   </tr>"""
+    for docId in docIds:
+        nctId = nctIds.get(docId)
+        if not nctId:
+            print """\
+   <tr>
+    <td colspan='5' class='err'>CDR%d has no NCT ID</td>
+   </tr>""" % docId
+        else:
+            try:
+                p = sendPubNotificationEmail(docId, nctId, cursor, conn)
+                recips = p.recips.values()
+                print """\
+   <tr>
+    <td>%d</td>
+    <td>%s</td>
+    <td>%s</td>
+    <td>%s</td>
+    <td>%s</td>
+   </tr>""" % (docId, p.primaryId, nctId,
+               "; ".join(r.email for r in recips),
+               ", ".join([`r.trackingDocId` for r in recips]))
+            except Exception, e:
+                print """\
+   <tr>
+    <td colspan='5' class='err'>CDR%d: %s</td>
+   </tr>""" % (docId, e)
+    print """\
+  </table>
+ </body>
+</table>"""
+    sys.exit(0)
 
 #----------------------------------------------------------------------
 # Find the publishing system control document.
