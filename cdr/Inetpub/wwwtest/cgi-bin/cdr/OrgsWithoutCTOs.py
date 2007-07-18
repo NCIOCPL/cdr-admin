@@ -125,7 +125,7 @@ def makeOrganizationTable(organizations):
 # display the report
 #--------------------------------------------------
 now     = time.localtime(time.time())
-sDate   = time.strftime("%b %d, %Y %I:%M%p", now)
+sDate   = time.strftime("%b %d, %Y", now)
 
 form = """\
 <style type='text/css'>
