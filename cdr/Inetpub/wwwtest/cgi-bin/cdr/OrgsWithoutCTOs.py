@@ -30,7 +30,7 @@ elif request == SUBMENU:
 # Handle request to log out.
 #----------------------------------------------------------------------
 if request == "Log Out": 
-    cdrcgi.logout(session)           
+    cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
 # Class for storing the organization information
@@ -45,6 +45,7 @@ class Organization:
         self.websiteHTML = website.replace(';',';<wbr>').replace('?','?<wbr>').replace("""/""","""/<wbr>""")
 
 organizations = {}
+docIDsToInclude = []
 
 #----------------------------------------------------------------------
 # Connect to the CDR database.
@@ -58,6 +59,27 @@ except cdrdb.Error, info:
 #--------------------------------------------------
 # Fetch the data
 #--------------------------------------------------
+sQuery ="""SELECT distinct(q.int_val)
+             FROM query_term q
+             JOIN query_term protocol_status
+               ON protocol_status.doc_id = q.doc_id 
+            WHERE q.path = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg/LeadOrganizationID/@cdr:ref'
+              AND protocol_status.path = '/InScopeProtocol/ProtocolAdminInfo/CurrentProtocolStatus'
+              AND protocol_status.value in ('Active','Approved-not yet active','Temporarily closed')
+              AND q.int_val not in( SELECT distinct(doc_id)
+                                      FROM query_term 
+                                     WHERE path like '/Organization/OrganizationLocations/ClinicalTrialsOfficeContact/%%')
+"""
+
+try:
+    cursor.execute(sQuery,timeout=300)
+    rows = cursor.fetchall()
+except cdrdb.Error, info:
+    cdrcgi.bail('Database query failure: %s' % info[1][0])
+
+for row in rows:
+    docIDsToInclude.append(row[0])
+    
 sQuery ="""SELECT d.id, d.title, phone.value, website.value
              FROM document d
              JOIN query_term status
@@ -75,26 +97,18 @@ sQuery ="""SELECT d.id, d.title, phone.value, website.value
               AND phone.path = '/Organization/OrganizationLocations/OrganizationLocation/Location/Phone'
               AND website.path = '/Organization/OrganizationLocations/OrganizationLocation/Location/WebSite/@cdr:xref'
               AND d.doc_type = 22
-              AND d.id not in ( SELECT distinct(doc_id)
-                                  FROM query_term 
-                                 WHERE path like '/Organization/OrganizationLocations/ClinicalTrialsOfficeContact/%%')
-              AND d.id in ( SELECT distinct(q.int_val)
-                              FROM query_term q
-                              JOIN query_term protocol_status
-                                ON protocol_status.doc_id = q.doc_id 
-                             WHERE q.path = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg/LeadOrganizationID/@cdr:ref'
-                               AND protocol_status.path = '/InScopeProtocol/ProtocolAdminInfo/CurrentProtocolStatus'
-                               AND protocol_status.value in ('Active','Approved-not yet active','Temporarily closed'))
     """
 
 try:
-    cursor.execute(sQuery,timeout=800)
+    cursor.execute(sQuery,timeout=300)
     rows = cursor.fetchall()
 except cdrdb.Error, info:
     cdrcgi.bail('Database query failure: %s' % info[1][0])
+
 for id, name, phone, website in rows:
     if id not in organizations:
-        organizations[id] = Organization(id,name,phone,website)
+        if id in docIDsToInclude:
+            organizations[id] = Organization(id,name,phone,website)
 
 #----------------------------------------------------------------------
 # Make the list of organizations
