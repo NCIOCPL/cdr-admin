@@ -88,7 +88,7 @@ sQuery ="""SELECT d.id, d.title, phone.value, website.value
     """
 
 try:
-    cursor.execute(sQuery,timeout=300)
+    cursor.execute(sQuery,timeout=800)
     rows = cursor.fetchall()
 except cdrdb.Error, info:
     cdrcgi.bail('Database query failure: %s' % info[1][0])
