@@ -42,7 +42,7 @@ class Organization:
         self.name = splitName[0]
         self.phone = phone
         self.websiteURL = website
-        self.websiteHTML = website.replace(';',';<wbr>').replace('?','?<wbr>').replace("""/""","""/<wbr>""")
+        self.websiteHTML = website.replace(';',';<wbr>').replace("""%""","""%<wbr>""").replace('?','?<wbr>').replace('+','+<wbr>').replace('&','&<wbr>').replace("""/""","""/<wbr>""")
 
 organizations = {}
 docIDsToInclude = []
@@ -63,7 +63,7 @@ sQuery ="""SELECT distinct(q.int_val)
              FROM query_term q
              JOIN query_term protocol_status
                ON protocol_status.doc_id = q.doc_id 
-            WHERE q.path = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg/LeadOrganizationID/@cdr:ref'
+            WHERE q.path = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg/ProtocolSites/OrgSite/OrgSiteID/@cdr:ref'
               AND protocol_status.path = '/InScopeProtocol/ProtocolAdminInfo/CurrentProtocolStatus'
               AND protocol_status.value in ('Active','Approved-not yet active','Temporarily closed')
               AND q.int_val not in( SELECT distinct(doc_id)
@@ -124,11 +124,11 @@ def makeOrganizationTable(organizations):
         html += """\
         <TR style='background-color: %s;'>
          <TD>%s</TD>
-         <TD>%s</TD>
+         <TD><a href ='%s'>%s</a></TD>
          <TD>%s</TD>
          <TD><a href ='%s'>%s</a></TD>
         </TR>
-""" % (BGColor,organization.id, organization.name,organization.phone,organization.websiteURL,organization.websiteHTML)
+""" % (BGColor,organization.id,organization.websiteURL,organization.name,organization.phone,organization.websiteURL,organization.websiteHTML)
         if BGColor == 'white':
             BGColor = 'Gainsboro'
         else:
