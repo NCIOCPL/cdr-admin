@@ -63,7 +63,8 @@ sQuery ="""SELECT distinct(q.int_val)
              FROM query_term q
              JOIN query_term protocol_status
                ON protocol_status.doc_id = q.doc_id 
-            WHERE q.path = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg/ProtocolSites/OrgSite/OrgSiteID/@cdr:ref'
+            WHERE (q.path = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg/ProtocolSites/OrgSite/OrgSiteID/@cdr:ref' 
+               OR q.path = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg/LeadOrganizationID/@cdr:ref')
               AND protocol_status.path = '/InScopeProtocol/ProtocolAdminInfo/CurrentProtocolStatus'
               AND protocol_status.value in ('Active','Approved-not yet active','Temporarily closed')
               AND q.int_val not in( SELECT distinct(doc_id)
