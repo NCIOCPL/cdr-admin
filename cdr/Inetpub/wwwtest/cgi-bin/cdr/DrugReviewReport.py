@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------
-# $Id: DrugReviewReport.py,v 1.1 2007-06-15 04:04:09 ameyer Exp $
+# $Id: DrugReviewReport.py,v 1.2 2007-07-25 03:27:53 ameyer Exp $
 #
 # Produce an Excel spreadsheet showing problematic drug terms, divided
 # into three categories:
@@ -15,11 +15,22 @@
 # and the software then produces the Excel format report.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2007/06/15 04:04:09  ameyer
+# Initial version.  Only two of three worksheets so far implemented.
+#
 #
 #----------------------------------------------------------------------
 
 import sys, cgi, cgitb, time, xml.sax, xml.sax.handler, os, os.path
 import cdr, cdrcgi, cdrdb, ExcelWriter
+
+# Global list of head node numbers of blocks of elements with an
+#   included ReviewStatus element = 'Problematic'
+# See class ProblematicHandler for details.
+g_problemBlockSet = None
+
+def logMsg(msg):
+    cdr.logwrite(msg, "d:/cdr/Log/drr.log")
 
 cgitb.enable()
 
@@ -161,10 +172,8 @@ class ColControl:
             width    - Width in numeric Excel "points".
             funcs    - Sequence of functions with following interface:
                         Pass:
-                            Current ColControl
-                            Current text content
-                            Current attributes from sax parse
-                            Current worksheet
+                            Document handler, providing access to almost
+                            everything.
                         Return:
                             Modified or unmodifed text.
                        Func can do whatever it needs to do.
@@ -176,15 +185,89 @@ class ColControl:
         self.funcs    = funcs
         self.style    = None
 
+#------------------------------------------------------------------
+# Track where we are for the parsers
+#------------------------------------------------------------------
+class PathStack:
+    """
+    Keeps track of where we are and how we got here (ancestry).
+    Maintains several data structures:
+        Stack of paths of element names.
+        Stack of relative node numbers, where each next node is
+            the next number
+    """
+    def __init__(self):
+        """
+        Start with empty stacks.
+        """
+        self.fullPath = []
+        self.nextNodeNum = 0
+        self.nodeNumStack = []
+
+    def pathPush(self, elemName):
+        """
+        Add a name to the path.
+
+        Pass:
+            elemName - plain element name, no path prefix, no namespace.
+
+        Return:
+            Full path as a string.
+        """
+        # Add to stack of element names
+        fullPath = self.pathGet() + '/' + elemName
+        self.fullPath.append(fullPath)
+
+        # Add to stack of node numbers
+        self.nodeNumStack.append(self.nextNodeNum)
+        self.nextNodeNum += 1
+
+        return fullPath
+
+    def pathPop(self):
+        """
+        Remove an item from the top of the fullPath stack, returning it.
+        """
+        self.nodeNumStack.pop()
+        return self.fullPath.pop()
+
+    def pathGet(self):
+        """
+        Return the current path, but without popping it off the stack.
+        Return empty string if stack is empty.
+        """
+        pathLen = len(self.fullPath)
+        if pathLen > 0:
+            return self.fullPath[len(self.fullPath)-1]
+        return ""
+
+    def getNodeNum(self, ancestor):
+        """
+        Return the node number of an element in the pathStack.
+
+        Pass:
+            ancestor - 0 = Get current node's node number
+                       1 = Get parent node's number
+                       2 = Get grandparent node's number
+                       etc.
+        Or -1 if None
+        """
+        numStackLen = len(self.nodeNumStack)
+        if numStackLen > ancestor:
+            return self.nodeNumStack[numStackLen - (ancestor+1)]
+        return -1
+
 class DocHandler(xml.sax.handler.ContentHandler):
     """
     Sax parser content handler for Term documents.
     """
-    def __init__(self, ws, ctlHash, docId, dt, dtCol):
+    def __init__(self, docXml, ws, ctlHash, docId, dt, dtCol):
         """
         Content handler constructor.
 
         Pass:
+            docXml  - Reference to the full XML string, used in
+                      findProblematicFields function.
             ws      - ExcelWriter.Worksheet, already initialized.
             ctlHash - Dictionary of path -> ColControl for all
                       elements (xpaths) that have some processing.
@@ -192,11 +275,22 @@ class DocHandler(xml.sax.handler.ContentHandler):
             dt      - Create/import date, written to dtCol column.
             dtCol   - Column number, origin 1, for create/import date.
         """
-        self.ws      = ws
-        self.ctlHash = ctlHash
-        self.docId   = docId
-        self.dt      = dt[0:10]
-        self.dtCol   = dtCol
+        global g_problemBlockSet
+
+        self.docXml      = docXml
+        self.ws          = ws
+        self.ctlHash     = ctlHash
+        self.docId       = docId
+        self.dt          = dt[0:10]
+        self.dtCol       = dtCol
+        self.pathStack   = None
+
+        # If the global problem block set exists, pre-parse the doc
+        #   finding all of the fields with ReviewStatus='Problematic'
+        # This will populate the global with a set of nodes of fields
+        #   and parents of fields with Problematic ReviewStatus.
+        if g_problemBlockSet != None:
+            xml.sax.parseString(docXml, ProblematicHandler())
 
     def startDocument(self):
         """
@@ -209,7 +303,7 @@ class DocHandler(xml.sax.handler.ContentHandler):
         self.curCtl  = None
 
         # Stack of full xpaths to current node push at start, pop at end
-        self.fullPath  = []
+        self.pathStack = PathStack()
 
         # Many paths are ignored, curPath has content only if we're
         #   working on one that should not be ignored
@@ -221,16 +315,6 @@ class DocHandler(xml.sax.handler.ContentHandler):
         # Tracking count of OtherName elements
         # 2nd and subsequent OtherName element starts a new row
         self.otherNameCount = 0
-
-        # Tracking review status
-        # There are several of them in the doc, need to know the current
-        #   one, if it's problematic
-        self.reviewStatus = None
-
-        # Tracking last element
-        # Need to know if /Term/Comment follows PreferredName or some
-        #   other element
-        self.lastElement = None
 
         # Next spreadsheet row we're working on
         self.ssRow = G_wsRow
@@ -247,16 +331,10 @@ class DocHandler(xml.sax.handler.ContentHandler):
         When encountering a field.
         """
         global dataStyle
+        global g_problemBlockSet
 
-        # Construct full path to this field
-        fullPath = self.pathPush(name)
-
-        # Here's the hack for adding OtherName rows
-        if fullPath == "/Term/OtherName":
-            self.otherNameCount += 1
-            if self.otherNameCount > 1:
-                self.ssRow += 1
-                self.curRow = self.ws.addRow(self.ssRow, dataStyle)
+        # Construct full path to this field and maintain path stack
+        fullPath = self.pathStack.pathPush(name)
 
         # Is it of interest?
         if self.ctlHash.has_key(fullPath):
@@ -264,8 +342,18 @@ class DocHandler(xml.sax.handler.ContentHandler):
             self.colCtls.append(self.curCtl)
             self.curPath = fullPath
 
-            # XXX Do I always want attrs?  Maybe yes, maybe no
+            # Save attributes
             self.attrs = attrs
+
+        # Here's the hack for adding OtherName rows
+        if fullPath == "/Term/OtherName":
+            self.otherNameCount += 1
+            if self.otherNameCount > 1:
+                # And the hack for problematic fields
+                nodeNum = self.pathStack.getNodeNum(0)
+                if g_problemBlockSet==None or nodeNum in g_problemBlockSet:
+                    self.ssRow += 1
+                    self.curRow = self.ws.addRow(self.ssRow, dataStyle)
 
     def characters(self, content):
         """
@@ -281,7 +369,7 @@ class DocHandler(xml.sax.handler.ContentHandler):
         # If there is a current field of interest
         if self.curCtl:
             # If this is the end of that field
-            if self.curPath == self.pathGet():
+            if self.curPath == self.pathStack.pathGet():
 
                 # Execute any fancy routines
                 for func in self.curCtl.funcs:
@@ -299,7 +387,7 @@ class DocHandler(xml.sax.handler.ContentHandler):
                 self.text = ""
 
         # Whether we did anything with it or not, we're done with this field
-        self.pathPop()
+        self.pathStack.pathPop()
 
     def endDocument(self):
         """
@@ -309,38 +397,75 @@ class DocHandler(xml.sax.handler.ContentHandler):
         global G_wsRow
         G_wsRow = self.ssRow + 1
 
-    #------------------------------------------------------------------
-    # path stack helpers
-    #------------------------------------------------------------------
-    def pathPush(self, elemName):
-        """
-        Add a name to the path.
 
-        Pass:
-            elemName - plain element name, no path prefix, no namespace.
+#----------------------------------------------------------------------
+# Pre-parser parser - functions and sax parser
+#
+# See coments under ProblematicHandler for explanation.
+#
+# Functions used there are also used in the DocHandler, primary
+# parser class.
+#----------------------------------------------------------------------
+class ProblematicHandler(xml.sax.handler.ContentHandler):
+    """
+    Another sax parser.
 
-        Return:
-            Full path as a string.
-        """
-        fullPath = self.pathGet() + '/' + elemName
-        self.fullPath.append(fullPath)
-        return fullPath
+    The third worksheet requires that we only display blocks of
+    information of certain types when one of the elements in that
+    block, with the name ReviewStatus, has the content 'Problematic'.
 
-    def pathPop(self):
-        """
-        Remove an item from the top of the fullPath stack, returning it.
-        """
-        return self.fullPath.pop()
+    The ReviewStatus elements typically come _after_ the elements
+    they control.  So there is a look ahead problem that is easy
+    to solve in a dom based solution but not a sax solution.
 
-    def pathGet(self):
-        """
-        Return the current path, but without popping it off the stack.
-        Return empty string if stack is empty.
-        """
-        pathLen = len(self.fullPath)
-        if pathLen > 0:
-            return self.fullPath[len(self.fullPath)-1]
-        return ""
+    Since I made the wrong choice at the beginning - using sax
+    instead of the more flexible dom, I've decided to live with it
+    and just parse the docs for worksheet 3 twice, once to find out
+    which blocks have a ReviewStatus='Problematic' and once to
+    do the rest of the processing.  The performance penalty is
+    negligible since the number of docs affected is small and their
+    size is small.
+
+    Communication is via a global.  The set g_problemBlockSet will
+    contain identifying numbers for every block that has a
+    ReviewStatus='Problematic".  The numbers are node numbers for
+    the head node for the block - managed identically in both parsing
+    passes.
+
+    Alas, once you go far enough down the road of a mistake, the
+    best choice is sometimes to go farther.
+    """
+    def startDocument(self):
+        # Clear the global set of problematic head nodes
+        global g_problemBlockSet
+        g_problemBlockSet = set()
+
+        # Stack of full xpaths to current node push at start, pop at end
+        # Must work just like DocHandler
+        self.pathStack = PathStack()
+
+    def startElement(self, name, attrs):
+        # Stack maintenance
+        self.pathStack.pathPush(name)
+
+        # New text for this element
+        self.text = ''
+
+    def characters(self, content):
+        # Cumulate text
+        self.text += content
+
+    def endElement(self, name):
+        global g_problemBlockSet
+
+        # If we have a problematic review status, save the node number
+        #   of the parent of the current node
+        if name == 'ReviewStatus':
+            if self.text == 'Problematic':
+                g_problemBlockSet.add(self.pathStack.getNodeNum(1))
+
+        # Stack maintenance
+        self.pathStack.pathPop()
 
 def addCols(sheet, colList):
     """
@@ -350,9 +475,10 @@ def addCols(sheet, colList):
         sheet   - Worksheet to add to.
         colList - Sequence of columns
     """
-    # First column gets special label styling
-    for col in colList:
-        sheet.addCol(col.index, col.width)
+    if None:  # Unused for now
+        # First column gets special label styling
+        for col in colList:
+            sheet.addCol(col.index, col.width)
 
 
 def addWorksheet(session, wb, title, colList, qry, dateCol):
@@ -432,7 +558,7 @@ def addWorksheet(session, wb, title, colList, qry, dateCol):
         docXml = cdr.getCDATA(cdr.getDoc(session, docId))
         if not docXml:
             # Found a bad doc in database
-            cdr.logwrite("DrugReviewReport.py can't get docXml for docId=%d" \
+            logMsg("DrugReviewReport.py can't get docXml for docId=%d" \
                          % docId)
             continue
         docCount += 1
@@ -446,20 +572,43 @@ def addWorksheet(session, wb, title, colList, qry, dateCol):
 
         # Parse and process the document
         # Parse uses and updates G_wsRow, tracking spreadsheet rows
-        xml.sax.parseString(docXml, DocHandler(ws, colHash, docId, docDate,
-                                               dateCol))
+        xml.sax.parseString(docXml, DocHandler(docXml, ws, colHash, docId,
+                                               docDate, dateCol))
 
 
-def chkReviewStatus(handler):
+# Front ends, passing parameters
+def chkReviewStatus1(handler):
+    return chkReviewStatus(handler, 1)
+
+def chkReviewStatus3(handler):
+    return chkReviewStatus(handler, 3)
+
+def chkReviewStatus(handler, ancestor):
     """
-    Called when we get a ReviewStatus.
-    Saves info that enables us to determine if the block we are working
-    on is 'Problematic'.
+    Called when we get a field that is only to be displayed if
+    a ReviewStatus in the same block is set to 'Problematic'.
+
+    Checks g_problemBlockSet to see if this node or its parent
+    is involved with a problematic review status.  The global
+    is set in a pre-pass parse.
+
+    Uses relative node numbers, not element names.  That way we
+    can distinguish specific occurrences of fields.
+
+    Pass:
+        handler  - DocHandler instance
+        ancestor - How far up the tree do we look?
+
+    Returns:
+        Contents of field, if problematic
+        Null string if field is not problematic
     """
-    if handler.text == 'Problematic':
-        handler.problematic = handler.fullPath
-    else:
-        handler.problematic = None
+    global g_problemBlockSet
+
+    # Is the current node in the set?
+    if handler.pathStack.getNodeNum(ancestor) in g_problemBlockSet:
+       return handler.text
+    return ""
 
 
 def addComment(handler):
@@ -467,11 +616,10 @@ def addComment(handler):
     Call this function if a comment is received.
     It adds text to an already existing cell in the worksheet.
     """
-    # Only add the comment if it has an attribute CommentAudience="External"
+    # Only add the comment if it has an attribute audience="External"
     #DBG if True:
-    # XXX My test data doesn't have this attr.
-    if handler.attrs.has_key("CommentAudience"):
-        if handler.attrs.getValue("CommentAudience") == "External":
+    if handler.attrs.has_key("audience"):
+        if handler.attrs.getValue("audience") == "External":
 
             # Get current value in the ColControl.index cell
             cell = handler.curRow.getCell(handler.curCtl.index)
@@ -494,6 +642,7 @@ def addComment(handler):
 
             # Don't do anything else with comment
             return ""
+
 
 #----------------------------------------------------------------------
 # Main
@@ -535,10 +684,10 @@ wsCols = (
        7, 45),
     ColControl("Definition", u"/Term/Definition/DefinitionText", 8, 210),
     ColControl("Date Created", None, 9, 65),
-    ColControl(None, u"/Term/Comment", 1, 0, (addComment,)),
-    ColControl(None, u"/Term/ReviewStatus", 1, 0, (chkReviewStatus,)),
-    ColControl(None, u"/Term/OtherName/ReviewStatus", 1,0,(chkReviewStatus,)),
-    ColControl(None, u"/Term/Definition/ReviewStatus", 1,0,(chkReviewStatus,)),
+
+    # Special functions
+    ColControl(None, u"/Term/Comment", 2, 100, (addComment,)),
+    ColControl(None, u"/Term/Definition/Comment", 8, 210, (addComment,)),
 )
 
 qry = """
@@ -559,6 +708,7 @@ SELECT a.document, a.dt
 """ % (drugAgentDocId, startDate, endDate)
 
 # cdrcgi.bail("here")
+g_problemBlockSet = None
 ws = addWorksheet(session, wb, "New Drugs from NCI Thesaurus", wsCols,
                   qry, 9)
 
@@ -571,9 +721,9 @@ wsCols = (
     ColControl("Other Names", u"/Term/OtherName/OtherTermName", 3, 140),
     ColControl("Other Name Type", u"/Term/OtherName/OtherNameType", 4, 105),
     ColControl("Date Created", None, 5, 65),
-    ColControl(None, u"/Term/Comment", 1, 0, (addComment,)),
-    ColControl(None, u"/Term/ReviewStatus", 1, 0, (chkReviewStatus,)),
-    ColControl(None, u"/Term/OtherName/ReviewStatus", 1,0,(chkReviewStatus,)),
+
+    # Special functions
+    ColControl(None, u"/Term/Comment", 2, 100, (addComment,)),
 )
 
 qry = """
@@ -595,7 +745,65 @@ SELECT a.document, a.dt
  GROUP BY a.document, a.dt
 """ % (drugAgentDocId, startDate, endDate)
 
+g_problemBlockSet = None
 ws = addWorksheet(session, wb, "New Drugs from the CDR", wsCols, qry, 5)
+
+#----------------------------------------------------------------------
+# Worksheet 3: Drugs to be Reviewed
+#----------------------------------------------------------------------
+wsCols = (
+    ColControl("CDR ID", None, 1, 45),
+    ColControl("Preferred Name", u"/Term/PreferredName", 2, 100),
+    ColControl("Other Names", u"/Term/OtherName/OtherTermName", 3, 88,
+        (chkReviewStatus1,)),
+    ColControl("Other Name Type", u"/Term/OtherName/OtherNameType", 4, 105,
+        (chkReviewStatus1,)),
+    ColControl("Source",
+        u"/Term/OtherName/SourceInformation/VocabularySource/SourceCode",
+        5, 90, (chkReviewStatus3,)),
+    ColControl("TType",
+        u"/Term/OtherName/SourceInformation/VocabularySource/SourceTermType",
+        6, 70, (chkReviewStatus3,)),
+    ColControl("SourceID",
+        u"/Term/OtherName/SourceInformation/VocabularySource/SourceTermId",
+        7, 45, (chkReviewStatus3,)),
+    ColControl("Definition", u"/Term/Definition/DefinitionText", 8, 210,
+        (chkReviewStatus1,)),
+    ColControl("Date Created", None, 9, 65),
+
+    # Special functions
+    ColControl(None, u"/Term/Comment", 2, 100, (addComment,)),
+)
+
+qry = """
+SELECT a.document, a.dt
+  FROM audit_trail a
+  JOIN query_term q1
+    ON q1.doc_id = a.document
+  JOIN query_term q2
+    ON q2.doc_id = a.document
+ WHERE q1.path = '/Term/SemanticType/@cdr:ref'
+   AND q1.int_val = %d
+   AND a.action = 1
+   AND (
+       q2.path = '/Term/OtherName/ReviewStatus'
+      OR
+       q2.path = '/Term/Definition/ReviewStatus'
+      OR
+       q2.path = '/Term/ReviewStatus'
+       )
+   AND q2.value = 'Problematic'
+  AND a.dt > '%s'
+  AND a.dt < '%s'
+ GROUP BY a.document, a.dt
+""" % (drugAgentDocId, startDate, endDate)
+
+g_problemBlockSet = set()
+ws = addWorksheet(session, wb, "Drugs to be Reviewed", wsCols, qry, 9)
+
+# cdrcgi.bail("here")
+#ws = addWorksheet(session, wb, "New Drugs from NCI Thesaurus", wsCols,
+#                  qry, 9)
 
 # DEBUG
 #DBG fname = "d:/cdr/log/DrugTerm.xls"
