@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolMailerReqForm.py,v 1.24 2007-07-13 14:54:12 bkline Exp $
+# $Id: ProtocolMailerReqForm.py,v 1.25 2007-07-26 21:34:58 bkline Exp $
 #
 # Request form for all protocol mailers.
 #
@@ -17,6 +17,9 @@
 # publication job for the publishing daemon to find and initiate.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.24  2007/07/13 14:54:12  bkline
+# Implemented new mailer for publication notification (request #3326).
+#
 # Revision 1.23  2006/08/21 16:09:31  bkline
 # Bumped up timeout for initial abstract mailer query.
 #
@@ -537,7 +540,7 @@ def sendPubNotificationEmail(docId, nctId, cursor, conn):
 If you have additional trials to submit, please use the new NCI
 Clinical Trial Submission Portal at
 
-           http://pdqupdate.cancer.gov/submission.  
+http://pdqupdate.cancer.gov/submission.  
 
 PDQ Protocol Coordinator 
 Office of Cancer Content Management
@@ -650,6 +653,7 @@ Content-type: text/html
  </head>
  <body>
   <h1>Publication Notification Emails</h1>
+  <i>Publication Notification Emails have been sent to:</i>
   <table border='1' cellpadding='2' cellspacing='0'>
    <tr>
     <th>CDR ID</th>
