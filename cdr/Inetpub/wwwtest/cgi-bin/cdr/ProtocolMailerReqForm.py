@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolMailerReqForm.py,v 1.25 2007-07-26 21:34:58 bkline Exp $
+# $Id: ProtocolMailerReqForm.py,v 1.26 2007-07-27 17:35:56 bkline Exp $
 #
 # Request form for all protocol mailers.
 #
@@ -17,6 +17,9 @@
 # publication job for the publishing daemon to find and initiate.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.25  2007/07/26 21:34:58  bkline
+# Final tweaks for Sheri on pub notification email.
+#
 # Revision 1.24  2007/07/13 14:54:12  bkline
 # Implemented new mailer for publication notification (request #3326).
 #
@@ -364,7 +367,7 @@ class PubNotificationProtocol:
 
     # Class-level values.
     wrapper = textwrap.TextWrapper()
-    sender = 'cdr@' + cdrcgi.WEBSERVER
+    sender = 'PDQUpdate@cancer.gov'
     subject = 'PDQ Publication Notification'
 
     class Recip:
@@ -530,10 +533,15 @@ def sendPubNotificationEmail(docId, nctId, cursor, conn):
             u'Your trial can be viewed on Cancer.gov by clicking '
             u'on the link provided or searching PDQ using the PDQ ID.'
             % (p.originalId, p.title, p.primaryId, p.nctId))
-    body = u"""\
+    top = u""
+    if not cdr.isProdHost():
+        top = u"""\
 [SENT TO YOU FOR TESTING, INSTEAD OF TO %s]
 
-%s
+""" % ", ".join(addresses)
+        addresses = ['***REMOVED***']
+    body = u"""\
+%s%s
 
 %s
 
@@ -544,20 +552,14 @@ http://pdqupdate.cancer.gov/submission.
 
 PDQ Protocol Coordinator 
 Office of Cancer Content Management
-""" % (", ".join(addresses), PubNotificationProtocol.wrapper.fill(line), url)
+""" % (top, PubNotificationProtocol.wrapper.fill(line), url)
     try:
-        cdr.sendMail(PubNotificationProtocol.sender,
-                     #('***REMOVED***', '***REMOVED***'),
-                     #('bkline@speakeasy.net', '***REMOVED***'),
-                     #['bkline@speakeasy.net'],
-                     ['***REMOVED***', '***REMOVED***'],
-                     #p.addresses,
+        cdr.sendMail(PubNotificationProtocol.sender, addresses,
                      PubNotificationProtocol.subject,
-                     body.encode('ascii', 'replace'))
-    #for email in p.addresses:
+                     body.encode('latin-1', 'replace'))
     except Exception, e:
         raise Exception("failure sending email notice to %s: %s" %
-                        (", ".join(p.addresses), e))
+                        (", ".join(addresses), e))
     mailerMode, mailerType = 'Email', 'Publication notification email'
     sent = time.strftime('%Y-%m-%dT%M:%H:%S')
     for recip in p.recips.values():
@@ -599,7 +601,7 @@ if userPick == 'PubNotif':
         nctIds[cdrId] = nctId
 
     if docId:
-        docIds = [docId]
+        docIds = [cdr.exNormalize(docId)[1]]
     else:
         cursor.execute("""\
             SELECT d.doc_id, MIN(p.completed)
@@ -626,7 +628,7 @@ if userPick == 'PubNotif':
                                        AND mt.value = 'Publication '
                                                     + 'notification email')
           GROUP BY d.doc_id
-         HAVING MIN(p.completed) >= '2007-06-01'
+         HAVING MIN(p.completed) >= '2007-05-01'
           ORDER BY MIN(p.completed), d.doc_id""", timeout = 300)
         docIds = []
         for row in cursor.fetchall():
@@ -648,12 +650,13 @@ Content-type: text/html
    h1   { font-size: 14pt; color: blue; }
    th   { font-size: 12pt; color: maroon; }
    td   { font-size: 10pt; color: green; }
+   b    { font-size: 10pt; color: maroon; }
    .err { color: red; font-weight: bold; }
   </style>
  </head>
  <body>
   <h1>Publication Notification Emails</h1>
-  <i>Publication Notification Emails have been sent to:</i>
+  <b>Publication Notification Emails have been sent to:</b><br /><br />
   <table border='1' cellpadding='2' cellspacing='0'>
    <tr>
     <th>CDR ID</th>
