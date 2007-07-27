@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------
-# $Id: DrugReviewReport.py,v 1.2 2007-07-25 03:27:53 ameyer Exp $
+# $Id: DrugReviewReport.py,v 1.3 2007-07-27 02:19:13 ameyer Exp $
 #
 # Produce an Excel spreadsheet showing problematic drug terms, divided
 # into three categories:
@@ -15,6 +15,9 @@
 # and the software then produces the Excel format report.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2007/07/25 03:27:53  ameyer
+# This version appears to meet all requirements.
+#
 # Revision 1.1  2007/06/15 04:04:09  ameyer
 # Initial version.  Only two of three worksheets so far implemented.
 #
@@ -544,7 +547,7 @@ def addWorksheet(session, wb, title, colList, qry, dateCol):
     # If no rows, tell user
     if len(rows) == 0:
         errRow = ws.addRow(3, style=errorStyle)
-        errRow.addCell(1, "NO DOCUMENTS FOUND")
+        errRow.addCell(2, "NO DOCUMENTS FOUND")
 
         # We're done with this worksheet
         return
@@ -555,11 +558,12 @@ def addWorksheet(session, wb, title, colList, qry, dateCol):
         (docId, docDate) = row
 
         # Fetch the XML for this ID
-        docXml = cdr.getCDATA(cdr.getDoc(session, docId))
+        dXml = cdr.getDoc(session, docId)
+        docXml = cdr.getCDATA(dXml)
         if not docXml:
             # Found a bad doc in database
-            logMsg("DrugReviewReport.py can't get docXml for docId=%d" \
-                         % docId)
+            logMsg("DrugReviewReport.py can't get docXml for docId=%d\n%s" \
+                         % (docId, dXml))
             continue
         docCount += 1
 
@@ -801,10 +805,6 @@ SELECT a.document, a.dt
 g_problemBlockSet = set()
 ws = addWorksheet(session, wb, "Drugs to be Reviewed", wsCols, qry, 9)
 
-# cdrcgi.bail("here")
-#ws = addWorksheet(session, wb, "New Drugs from NCI Thesaurus", wsCols,
-#                  qry, 9)
-
 # DEBUG
 #DBG fname = "d:/cdr/log/DrugTerm.xls"
 #DBG if os.path.exists(fname):
@@ -813,7 +813,8 @@ ws = addWorksheet(session, wb, "Drugs to be Reviewed", wsCols, qry, 9)
 #DBG wb.write(fp, False)
 #DBG fp.close()
 #DBG cdr.logout(session)
+#DBG cdrcgi.bail("All done")
 print "Content-type: application/vnd.ms-excel"
 print "Content-Disposition: attachment; filename=DrugReviewReport.xls"
 print
-wb.write(sys.stdout, True)
+wb.write(sys.stdout, False)
