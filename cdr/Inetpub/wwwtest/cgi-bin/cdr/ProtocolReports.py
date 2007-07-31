@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolReports.py,v 1.31 2007-06-12 16:53:10 kidderc Exp $
+# $Id: ProtocolReports.py,v 1.32 2007-07-31 12:12:52 bkline Exp $
 #
 # Submenu for protocol reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.31  2007/06/12 16:53:10  kidderc
+# 3306. Create a Warehouse Box Number Report.
+#
 # Revision 1.29  2006/11/29 16:04:36  bkline
 # Plugged in two new reports (for requests #2443 and #2513).
 #
@@ -161,6 +164,8 @@ reports = [
             'NCI Liaison Office/Brussels Protocol Report', ''),
            ('Request2862.py', 
             'NCI Liaison Office Trial Contacts for Abstract Review', ''),
+           ('RssImportReport.py', 'NCIC Import/Update Statistics Report',
+            '&source=NCIC'),
            ('NewlyPublishableTrials.py', 
             'Newly Publishable Trials', ''),
            ('NewlyPublishedTrials2.py', 
