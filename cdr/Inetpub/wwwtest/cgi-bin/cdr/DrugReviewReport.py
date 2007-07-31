@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------
-# $Id: DrugReviewReport.py,v 1.3 2007-07-27 02:19:13 ameyer Exp $
+# $Id: DrugReviewReport.py,v 1.4 2007-07-31 14:18:32 ameyer Exp $
 #
 # Produce an Excel spreadsheet showing problematic drug terms, divided
 # into three categories:
@@ -15,6 +15,10 @@
 # and the software then produces the Excel format report.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2007/07/27 02:19:13  ameyer
+# Added some logging.
+# Switched to output in XML (wb.write...False).
+#
 # Revision 1.2  2007/07/25 03:27:53  ameyer
 # This version appears to meet all requirements.
 #
@@ -814,7 +818,10 @@ ws = addWorksheet(session, wb, "Drugs to be Reviewed", wsCols, qry, 9)
 #DBG fp.close()
 #DBG cdr.logout(session)
 #DBG cdrcgi.bail("All done")
+if sys.platform == "win32":
+    import os, msvcrt
+    msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
 print "Content-type: application/vnd.ms-excel"
 print "Content-Disposition: attachment; filename=DrugReviewReport.xls"
 print
-wb.write(sys.stdout, False)
+wb.write(sys.stdout, True)
