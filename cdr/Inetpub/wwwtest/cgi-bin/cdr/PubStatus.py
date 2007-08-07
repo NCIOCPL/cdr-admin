@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PubStatus.py,v 1.27 2007-05-01 21:29:14 venglisc Exp $
+# $Id: PubStatus.py,v 1.28 2007-08-07 20:08:39 ameyer Exp $
 #
 # Status of a publishing job.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.27  2007/05/01 21:29:14  venglisc
+# Test Message.
+#
 # Revision 1.26  2007/02/21 00:39:10  ameyer
 # If the request specifies jobs to be resumed or killed, we now check
 # to be sure the job was still in a Waiting state before proceeding.  This
@@ -440,7 +443,9 @@ def dispJobControl():
             jobStatus = cursor.fetchone()[0]
             if jobStatus != WAIT_STATUS:
                 cdrcgi.bail("""
-Job %d is no longer "%s".  Did you accidentally press Back or Refresh?""" % \
+You tried to resubmit job %d, but it is no longer "%s"<br>
+Did you accidentally press Back or Refresh?<br>
+Please access from the main publishing menu""" % \
                 (jobNum, WAIT_STATUS))
 
     # CG job description sent to GateKeeper.
