@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------
-# $Id: DrugReviewReport.py,v 1.4 2007-07-31 14:18:32 ameyer Exp $
+# $Id: DrugReviewReport.py,v 1.5 2007-08-09 14:24:33 ameyer Exp $
 #
 # Produce an Excel spreadsheet showing problematic drug terms, divided
 # into three categories:
@@ -15,6 +15,9 @@
 # and the software then produces the Excel format report.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2007/07/31 14:18:32  ameyer
+# Added code to tell Windows to set output to binary mode for Excel97 format.
+#
 # Revision 1.3  2007/07/27 02:19:13  ameyer
 # Added some logging.
 # Switched to output in XML (wb.write...False).
@@ -781,6 +784,7 @@ wsCols = (
 
     # Special functions
     ColControl(None, u"/Term/Comment", 2, 100, (addComment,)),
+    ColControl(None, u"/Term/Definition/Comment", 8, 210, (addComment,))
 )
 
 qry = """
