@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GateKeeperStatus.py,v 1.1 2007-05-24 20:08:09 bkline Exp $
+# $Id: GateKeeperStatus.py,v 1.2 2007-08-09 15:58:41 venglisc Exp $
 #
 # Web interface for requesting status from the new Cancer.gov GateKeeper.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2007/05/24 20:08:09  bkline
+# User interface for status report SOAP methods at Cancer.gov's GateKeeper.
+#
 #----------------------------------------------------------------------
 import cdr2gk, cgi, xml.sax.saxutils, cdrcgi, cdr, cdrdb, re, sys
 
@@ -14,6 +17,7 @@ jobId   = fields.getvalue('jobId') # or '102056'
 host    = fields.getvalue('targetHost') or 'gkdev.cancer.gov'
 logging = fields.getvalue('debugLogging')
 action  = fields.getvalue('action') # or 'yes!'
+flavor  = fields.getvalue('flavor') or 'full'
 
 cdr2gk.host = host
 cdr2gk.debuglevel = logging and True or False
@@ -91,6 +95,24 @@ def showForm(extra = u""):
 </html>
 """ % (title, title, extra)
     cdrcgi.sendPage(html)
+
+def addRow(doc):
+    return(u"""\
+   <tr>
+    <td>%s</td>
+    <td>%s</td>
+    <td>%s</td>
+    <td>%s</td>
+    <td>%s</td>
+    <td>%s</td>
+    <td>%s</td>
+    <td>%s</td>
+   </tr>
+""" % (doc.packetNumber or "&nbsp;", doc.group or "&nbsp;",
+       doc.cdrId or "&nbsp;", doc.pubType or "&nbsp;",
+       doc.docType or "&nbsp;", doc.status or "&nbsp;",
+       doc.dependentStatus or "&nbsp;", doc.location or "&nbsp;"))
+
 
 def makeError(error, exception):
     if logging:
@@ -177,21 +199,22 @@ if jobId:
        details.initiated, details.completion, details.target,
        details.expectedCount, details.actualCount)]
     for doc in details.docs:
-        html.append(u"""\
-   <tr>
-    <td>%s</td>
-    <td>%s</td>
-    <td>%s</td>
-    <td>%s</td>
-    <td>%s</td>
-    <td>%s</td>
-    <td>%s</td>
-    <td>%s</td>
-   </tr>
-""" % (doc.packetNumber or "&nbsp;", doc.group or "&nbsp;",
-       doc.cdrId or "&nbsp;", doc.pubType or "&nbsp;",
-       doc.docType or "&nbsp;", doc.status or "&nbsp;",
-       doc.dependentStatus or "&nbsp;", doc.location or "&nbsp;"))
+        if flavor == 'full':
+            html.append(addRow(doc))
+        elif flavor == 'error':
+            if doc.status == 'Error' or doc.dependentStatus == 'Error':
+                html.append(addRow(doc))
+        elif flavor == 'warning':
+            if doc.status == 'Warning' or doc.dependentStatus == 'Warning':
+                html.append(addRow(doc))
+        elif flavor == 'all':
+            if (doc.status == 'Warning' or doc.dependentStatus == 'Warning'
+                or doc.status == 'Error' or doc.dependentStatus == 'Error'):
+                html.append(addRow(doc))
+        else:
+            cdrcgi.bail('Invalid flavor: %s <br/>' % flavor +
+                        'Valid values: full, error, warning, all')
+        
     html.append(u"""\
   </table>
  </body>
@@ -267,6 +290,8 @@ Content-type: text/html
  </body>
 </html>"""
     sys.exit(0)
+
+
 
 def extractFaultString(exceptionObject):
     exceptionString = unicode(exceptionObject)
