@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolMailerReqForm.py,v 1.26 2007-07-27 17:35:56 bkline Exp $
+# $Id: ProtocolMailerReqForm.py,v 1.27 2007-08-13 19:51:35 bkline Exp $
 #
 # Request form for all protocol mailers.
 #
@@ -17,6 +17,9 @@
 # publication job for the publishing daemon to find and initiate.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.26  2007/07/27 17:35:56  bkline
+# Changed emailer sender address to PDQUpdate@cancer.gov at Sheri's request.
+#
 # Revision 1.25  2007/07/26 21:34:58  bkline
 # Final tweaks for Sheri on pub notification email.
 #
@@ -367,8 +370,9 @@ class PubNotificationProtocol:
 
     # Class-level values.
     wrapper = textwrap.TextWrapper()
-    sender = 'PDQUpdate@cancer.gov'
-    subject = 'PDQ Publication Notification'
+    sender  = 'PDQUpdate@cancer.gov'
+    subject = (u'NCI\u2019s PDQ Cancer Clinical Trials Registry Registration '
+               u'Notification')
 
     class Recip:
 
@@ -524,39 +528,45 @@ def sendPubNotificationEmail(docId, nctId, cursor, conn):
     if not p.recips:
         raise Exception("no recipient email addresses found")
     addresses = [r.email for r in p.recips.values()]
-    url = (u"http://www.cancer.gov/clinicaltrials/"
-           u"view_clinicaltrials.aspx?version=healthprofessional&"
-           u"cdrid=%d" % docId)
-    line = (u'Thank you for registering your trial "%s", "%s" with PDQ.  '
-            u'Your trial has been assigned a PDQ ID of "%s" and a '
-            u'ClinicalTrials.gov registration number of "%s".  '
-            u'Your trial can be viewed on Cancer.gov by clicking '
-            u'on the link provided or searching PDQ using the PDQ ID.'
-            % (p.originalId, p.title, p.primaryId, p.nctId))
+    url = u"http://www.cancer.gov/clinicaltrials/%s" % p.primaryId
+    line = (u'Thank you for registering your trial "%s", "%s" with '
+            u'NCI\'s PDQ\u00ae Cancer Clinical Trials Registry.  '
+            u'Your trial has been assigned a PDQ ID of "%s" and can '
+            u'be viewed on the NCI Web site by clicking on the link below:'
+            % (p.originalId, p.title, p.primaryId))
     top = u""
     if not cdr.isProdHost():
         top = u"""\
 [SENT TO YOU FOR TESTING, INSTEAD OF TO %s]
 
 """ % ", ".join(addresses)
-        addresses = ['***REMOVED***']
+        addresses = ['***REMOVED***', '***REMOVED***']
     body = u"""\
 %s%s
 
 %s
+
+Your trial has also been registered in the National Library of
+Medicine\u2019s ClinicaTrials.gov Web site as \u201c%s.\u201d
+
+Please email us at pdqupdate@cancer.gov with any changes including
+changes in status and site information. We will also be contacting
+you periodically to verify the information and look forward to your
+cooperation.
 
 If you have additional trials to submit, please use the new NCI
 Clinical Trial Submission Portal at
 
 http://pdqupdate.cancer.gov/submission.  
 
-PDQ Protocol Coordinator 
-Office of Cancer Content Management
-""" % (top, PubNotificationProtocol.wrapper.fill(line), url)
+Protocol Coordinator
+NCI\u2019s PDQ Cancer Clinical Trials Registry
+Office of Communications and Education
+National Cancer Institute
+""" % (top, PubNotificationProtocol.wrapper.fill(line), url, p.nctId)
     try:
         cdr.sendMail(PubNotificationProtocol.sender, addresses,
-                     PubNotificationProtocol.subject,
-                     body.encode('latin-1', 'replace'))
+                     PubNotificationProtocol.subject, body, mime = True)
     except Exception, e:
         raise Exception("failure sending email notice to %s: %s" %
                         (", ".join(addresses), e))
