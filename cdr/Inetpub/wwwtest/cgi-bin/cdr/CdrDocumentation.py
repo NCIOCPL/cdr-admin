@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CdrDocumentation.py,v 1.4 2006-09-28 23:12:45 ameyer Exp $
+# $Id: CdrDocumentation.py,v 1.5 2007-08-22 21:42:28 venglisc Exp $
 #
 # Prototype for CDR reporting/formatting web wrapper.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2006/09/28 23:12:45  ameyer
+# Fixed spelling error.
+#
 # Revision 1.3  2006/09/28 23:09:43  ameyer
 # Added links for HTML versions of current docs.
 # Updated date on PDF.
@@ -61,7 +64,7 @@ usrhtml = [['Help.py', 'User Guide'],
 
 form    = """\
   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-  <h3>CDR Documentation (PDF) as of 2006-09-28</h3>
+  <h3>CDR Documentation (PDF) as of 2007-08-22</h3>
   <ol>
 """ % (cdrcgi.SESSION, session)
 
