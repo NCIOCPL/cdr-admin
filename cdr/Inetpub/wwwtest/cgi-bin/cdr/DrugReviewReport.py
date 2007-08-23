@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------
-# $Id: DrugReviewReport.py,v 1.5 2007-08-09 14:24:33 ameyer Exp $
+# $Id: DrugReviewReport.py,v 1.6 2007-08-23 19:36:31 ameyer Exp $
 #
 # Produce an Excel spreadsheet showing problematic drug terms, divided
 # into three categories:
@@ -15,6 +15,9 @@
 # and the software then produces the Excel format report.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2007/08/09 14:24:33  ameyer
+# Fixed failure to add comments on 3rd worksheet DefinitionText.
+#
 # Revision 1.4  2007/07/31 14:18:32  ameyer
 # Added code to tell Windows to set output to binary mode for Excel97 format.
 #
@@ -681,9 +684,9 @@ except cdrdb.Error, info:
 #----------------------------------------------------------------------
 wsCols = (
     ColControl("CDR ID", None, 1, 45),
-    ColControl("Preferred Name", u"/Term/PreferredName", 2, 100),
-    ColControl("Other Names", u"/Term/OtherName/OtherTermName", 3, 88),
-    ColControl("Other Name Type", u"/Term/OtherName/OtherNameType", 4, 105),
+    ColControl("Preferred Name", u"/Term/PreferredName", 2, 105),
+    ColControl("Other Names", u"/Term/OtherName/OtherTermName", 3, 105),
+    ColControl("Other Name Type", u"/Term/OtherName/OtherNameType", 4, 80),
     ColControl("Source",
         u"/Term/OtherName/SourceInformation/VocabularySource/SourceCode",
         5, 90),
@@ -697,7 +700,8 @@ wsCols = (
     ColControl("Date Created", None, 9, 65),
 
     # Special functions
-    ColControl(None, u"/Term/Comment", 2, 100, (addComment,)),
+    ColControl(None, u"/Term/Comment", 2, 105, (addComment,)),
+    ColControl(None, u"/Term/OtherName/Comment", 3, 105, (addComment,)),
     ColControl(None, u"/Term/Definition/Comment", 8, 210, (addComment,)),
 )
 
@@ -730,11 +734,12 @@ wsCols = (
     ColControl("CDR ID", None, 1, 45),
     ColControl("Preferred Name", u"/Term/PreferredName", 2, 140),
     ColControl("Other Names", u"/Term/OtherName/OtherTermName", 3, 140),
-    ColControl("Other Name Type", u"/Term/OtherName/OtherNameType", 4, 105),
+    ColControl("Other Name Type", u"/Term/OtherName/OtherNameType", 4, 80),
     ColControl("Date Created", None, 5, 65),
 
     # Special functions
-    ColControl(None, u"/Term/Comment", 2, 100, (addComment,)),
+    ColControl(None, u"/Term/Comment", 2, 140, (addComment,)),
+    ColControl(None, u"/Term/OtherName/Comment", 3, 140, (addComment,)),
 )
 
 qry = """
@@ -764,10 +769,10 @@ ws = addWorksheet(session, wb, "New Drugs from the CDR", wsCols, qry, 5)
 #----------------------------------------------------------------------
 wsCols = (
     ColControl("CDR ID", None, 1, 45),
-    ColControl("Preferred Name", u"/Term/PreferredName", 2, 100),
-    ColControl("Other Names", u"/Term/OtherName/OtherTermName", 3, 88,
+    ColControl("Preferred Name", u"/Term/PreferredName", 2, 105),
+    ColControl("Other Names", u"/Term/OtherName/OtherTermName", 3, 105,
         (chkReviewStatus1,)),
-    ColControl("Other Name Type", u"/Term/OtherName/OtherNameType", 4, 105,
+    ColControl("Other Name Type", u"/Term/OtherName/OtherNameType", 4, 80,
         (chkReviewStatus1,)),
     ColControl("Source",
         u"/Term/OtherName/SourceInformation/VocabularySource/SourceCode",
@@ -783,7 +788,8 @@ wsCols = (
     ColControl("Date Created", None, 9, 65),
 
     # Special functions
-    ColControl(None, u"/Term/Comment", 2, 100, (addComment,)),
+    ColControl(None, u"/Term/Comment", 2, 105, (addComment,)),
+    ColControl(None, u"/Term/OtherName/Comment", 3, 105, (addComment,)),
     ColControl(None, u"/Term/Definition/Comment", 8, 210, (addComment,))
 )
 
