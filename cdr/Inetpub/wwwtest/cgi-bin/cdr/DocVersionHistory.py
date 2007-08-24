@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: DocVersionHistory.py,v 1.18 2006-09-18 20:06:25 bkline Exp $
+# $Id: DocVersionHistory.py,v 1.19 2007-08-24 13:42:35 bkline Exp $
 #
 # Show version history of document.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.18  2006/09/18 20:06:25  bkline
+# Tweaked timing code and query for publication job type.
+#
 # Revision 1.17  2006/08/19 03:13:10  bkline
 # Drastic overhaul of the report to improve performance (the report was
 # timing out for documents with many versions).  The report now takes
@@ -184,8 +187,8 @@ class Document:
                    AND pub_subset = 'Full-Load'
                    AND id > ?""", self.__lastPubJob)
             rows = self.__cursor.fetchall()
-            return rows and rows[0][0][:10] or None
-        except cdrdb.Error, e:
+            return rows and rows[0][0] and rows[0][0][:10] or None
+        except Exception, e:
             cdrcgi.bail("Failure finding full-load publication job: %s" % e)
 
     def __loadVersions(self):
