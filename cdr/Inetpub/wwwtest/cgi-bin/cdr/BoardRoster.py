@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: BoardRoster.py,v 1.8 2006-09-27 23:16:09 venglisc Exp $
+# $Id: BoardRoster.py,v 1.9 2007-08-27 20:57:52 bkline Exp $
 #
 # Report to display the Board Roster with or without assistant
 # information.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.8  2006/09/27 23:16:09  venglisc
+# Changing Suite number of Board Manager address. (Bug 2530)
+#
 # Revision 1.7  2006/03/30 16:37:49  venglisc
 # Changed address to replace CIPS with OCCM. (Bug 2031)
 #
@@ -307,7 +310,7 @@ html += """
   <b><u>Board Manager Information</u></b><br>
   <b>%s</b><br>
   Office of Cancer Content Management (OCCM)<br>
-  Office of Communications<br>
+  Office of Communications and Education<br>
   National Cancer Institute<br>
   MSC-8321, Suite 300A<br>
   6116 Executive Blvd.<br>
