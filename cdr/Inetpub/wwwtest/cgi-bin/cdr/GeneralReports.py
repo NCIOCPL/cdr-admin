@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GeneralReports.py,v 1.17 2007-05-18 20:29:11 venglisc Exp $
+# $Id: GeneralReports.py,v 1.18 2007-08-27 17:13:39 bkline Exp $
 #
 # Submenu for general reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.17  2007/05/18 20:29:11  venglisc
+# Minor HTML formatting changes.
+#
 # Revision 1.16  2007/05/04 23:42:24  venglisc
 # Added new menu item for Linked Media Documents.
 #
@@ -118,6 +121,8 @@ reports = [
             'Filter Document'),
            ('ShowGlobalChangeTestResults.py',
             'Global Change Test Results'),
+           ('InvalidDocs.py', 
+            'Invalid Documents'),
            ('LinkedDocs.py', 
             'Linked Documents'),
            ('MediaLinks.py', 
