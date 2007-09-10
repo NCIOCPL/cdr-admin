@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: DocVersionHistory.py,v 1.19 2007-08-24 13:42:35 bkline Exp $
+# $Id: DocVersionHistory.py,v 1.20 2007-09-10 22:25:24 venglisc Exp $
 #
 # Show version history of document.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.19  2007/08/24 13:42:35  bkline
+# Fixed bug trying to subscript the value in a NULL database column.
+#
 # Revision 1.18  2006/09/18 20:06:25  bkline
 # Tweaked timing code and query for publication job type.
 #
@@ -231,7 +234,7 @@ class Document:
             for row in self.__cursor.fetchall():
                 (num, started, pubProcId, removed, jobType) = row
                 pubDate = started[:10]
-                versions[num].addPubEvent(pubDate, jobType, pubProcId)
+                versions[num].addPubEvent(pubDate, jobType, pubProcId, removed)
                 if removed == 'Y' and self.__blocked:
                     self.__removeDate = pubDate
                 if not self.__lastPubJob or pubProcId > self.__lastPubJob:
@@ -405,8 +408,11 @@ class Document:
             self.__publishable = publishable
             self.__pubEvents   = []
 
-        def addPubEvent(self, jobDate, jobType, jobId):
-            self.__pubEvents.append("%s(%s-%d)" % (jobDate, jobType, jobId))
+        def addPubEvent(self, jobDate, jobType, jobId, removed):
+            if removed == 'Y':
+                self.__pubEvents.append("<span class='red'>%s(%s-%d)R</span>" % (jobDate, jobType, jobId))
+            else:
+                self.__pubEvents.append("%s(%s-%d)" % (jobDate, jobType, jobId))
 
         def toHtml(self):
             return u"""\
