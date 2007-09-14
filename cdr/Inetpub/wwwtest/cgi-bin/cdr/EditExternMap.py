@@ -1,11 +1,16 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditExternMap.py,v 1.10 2006-08-29 15:46:23 ameyer Exp $
+# $Id: EditExternMap.py,v 1.11 2007-09-14 01:55:00 ameyer Exp $
 #
 # Allows a user to edit the table which maps strings from external
 # systems (such as ClinicalTrials.gov) to CDR document IDs.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.10  2006/08/29 15:46:23  ameyer
+# Changes to improve performance, including some changes to forms
+# and introduction of retrieval limiting logic enabling a user to
+# control how many map values are retrieved in a batch.
+#
 # Revision 1.9  2006/08/01 19:37:33  ameyer
 # Added "mappable" functionality - involving many changes.
 # Also added numerous comments to the code.
@@ -307,6 +312,15 @@ if request == "Save Changes":
         if oldValue == 'Y' and rowId not in newBogus:
             newValue = 'N'
         elif oldValue == 'N' and rowId in newBogus:
+            # Make sure that bogus'd value is not mapped
+            if pairs.has_key(rowId):
+                mapToId = pairs[rowId][1]
+                if mapToId:
+                    errors.append(
+                     'Value "%s" is mapped to docId %s.  '
+                     'Must remove mapping before marking it as bogus' %
+                     (lookupValueByMapId(rowId), mapToId))
+                    continue
             newValue = 'Y'
         if newValue:
             try:
