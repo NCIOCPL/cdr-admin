@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------
-# $Id: DrugReviewReport.py,v 1.6 2007-08-23 19:36:31 ameyer Exp $
+# $Id: DrugReviewReport.py,v 1.7 2007-09-20 15:07:47 ameyer Exp $
 #
 # Produce an Excel spreadsheet showing problematic drug terms, divided
 # into three categories:
@@ -15,6 +15,10 @@
 # and the software then produces the Excel format report.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2007/08/23 19:36:31  ameyer
+# Added comment display of /Term/OtherTerm/Comment.  Adjusted fields
+# widths to better accomodate comment display.
+#
 # Revision 1.5  2007/08/09 14:24:33  ameyer
 # Fixed failure to add comments on 3rd worksheet DefinitionText.
 #
@@ -697,7 +701,7 @@ wsCols = (
        u"/Term/OtherName/SourceInformation/VocabularySource/SourceTermId",
        7, 45),
     ColControl("Definition", u"/Term/Definition/DefinitionText", 8, 210),
-    ColControl("Date Created", None, 9, 65),
+    ColControl("Last Modified", None, 9, 65),
 
     # Special functions
     ColControl(None, u"/Term/Comment", 2, 105, (addComment,)),
@@ -706,20 +710,20 @@ wsCols = (
 )
 
 qry = """
-SELECT a.document, a.dt
-  FROM audit_trail a
-  JOIN query_term q1
-    ON q1.doc_id = a.document
+SELECT q3.doc_id, q3.value
+  FROM query_term q1
   JOIN query_term q2
-    ON q2.doc_id = a.document
+    ON q1.doc_id = q2.doc_id
+  JOIN query_term q3
+    ON q1.doc_id = q3.doc_id
  WHERE q1.path = '/Term/SemanticType/@cdr:ref'
    AND q1.int_val = %d
-   AND a.action = 1
    AND q2.path = '/Term/OtherName/SourceInformation/VocabularySource/SourceCode'
    AND q2.value = 'NCI Thesaurus'
-  AND a.dt > '%s'
-  AND a.dt < '%s'
- GROUP BY a.document, a.dt
+   AND q3.path = '/Term/DateLastModified'
+   AND q3.value >= '%s'
+   AND q3.value <= '%s'
+ GROUP BY q3.doc_id, q3.value
 """ % (drugAgentDocId, startDate, endDate)
 
 # cdrcgi.bail("here")
@@ -735,7 +739,7 @@ wsCols = (
     ColControl("Preferred Name", u"/Term/PreferredName", 2, 140),
     ColControl("Other Names", u"/Term/OtherName/OtherTermName", 3, 140),
     ColControl("Other Name Type", u"/Term/OtherName/OtherNameType", 4, 80),
-    ColControl("Date Created", None, 5, 65),
+    ColControl("Last Modified", None, 5, 65),
 
     # Special functions
     ColControl(None, u"/Term/Comment", 2, 140, (addComment,)),
@@ -743,22 +747,24 @@ wsCols = (
 )
 
 qry = """
-SELECT a.document, a.dt
-  FROM audit_trail a
-  JOIN query_term q1
-    ON q1.doc_id = a.document
+SELECT q2.doc_id, q2.value
+  FROM query_term q1
+  JOIN query_term q2
+    ON q1.doc_id = q2.doc_id
+  JOIN query_term q3
+    ON q1.doc_id = q3.doc_id
  WHERE q1.path = '/Term/SemanticType/@cdr:ref'
    AND q1.int_val = %d
-   AND a.action = 1
-   AND a.dt > '%s'
-   AND a.dt < '%s'
-   AND a.document NOT IN (
+   AND q2.path = '/Term/DateLastModified'
+   AND q2.value >= '%s'
+   AND q2.value <= '%s'
+   AND q2.doc_id NOT IN (
     SELECT doc_id
       FROM query_term
      WHERE path='/Term/OtherName/SourceInformation/VocabularySource/SourceCode'
        AND value = 'NCI Thesaurus'
     )
- GROUP BY a.document, a.dt
+ GROUP BY q2.doc_id, q2.value
 """ % (drugAgentDocId, startDate, endDate)
 
 g_problemBlockSet = None
@@ -785,7 +791,7 @@ wsCols = (
         7, 45, (chkReviewStatus3,)),
     ColControl("Definition", u"/Term/Definition/DefinitionText", 8, 210,
         (chkReviewStatus1,)),
-    ColControl("Date Created", None, 9, 65),
+    ColControl("Last Modified", None, 9, 65),
 
     # Special functions
     ColControl(None, u"/Term/Comment", 2, 105, (addComment,)),
@@ -794,15 +800,14 @@ wsCols = (
 )
 
 qry = """
-SELECT a.document, a.dt
-  FROM audit_trail a
-  JOIN query_term q1
-    ON q1.doc_id = a.document
+SELECT q3.doc_id, q3.value
+  FROM query_term q1
   JOIN query_term q2
-    ON q2.doc_id = a.document
+    ON q1.doc_id = q2.doc_id
+  JOIN query_term q3
+    ON q1.doc_id = q3.doc_id
  WHERE q1.path = '/Term/SemanticType/@cdr:ref'
    AND q1.int_val = %d
-   AND a.action = 1
    AND (
        q2.path = '/Term/OtherName/ReviewStatus'
       OR
@@ -811,9 +816,10 @@ SELECT a.document, a.dt
        q2.path = '/Term/ReviewStatus'
        )
    AND q2.value = 'Problematic'
-  AND a.dt > '%s'
-  AND a.dt < '%s'
- GROUP BY a.document, a.dt
+   AND q3.path = '/Term/DateLastModified'
+   AND q3.value > '%s'
+   AND q3.value < '%s'
+ GROUP BY q3.doc_id, q3.value
 """ % (drugAgentDocId, startDate, endDate)
 
 g_problemBlockSet = set()
