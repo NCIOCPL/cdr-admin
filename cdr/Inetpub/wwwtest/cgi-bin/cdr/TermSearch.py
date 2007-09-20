@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: TermSearch.py,v 1.8 2007-02-01 13:32:13 bkline Exp $
+# $Id: TermSearch.py,v 1.9 2007-09-20 21:18:30 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Term documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.8  2007/02/01 13:32:13  bkline
+# Replaced Java program for retrieving Concept document from NCIT with
+# HTTP API.
+#
 # Revision 1.7  2005/09/09 20:11:20  bkline
 # More fixes to mapping strings.
 #
@@ -27,7 +31,7 @@
 # Initial revision
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, cdrdb, xml.dom.minidom, urllib, time
+import cgi, cdr, cdrcgi, re, cdrdb, xml.dom.minidom, httplib, time
 
 #----------------------------------------------------------------------
 # Get the form variables.
@@ -212,15 +216,47 @@ def fetchConcept(code):
     #if result.code:
     #    cdrcgi.bail("Failure fetching concept: %s" %
     #                (result.output or "unknown failure"))
+    code  = code.strip()
+    host  = "cabio-qa.nci.nih.gov"
+    host  = "cabio.nci.nih.gov" # temporary fix while cabio-qa is broken
+    port  = httplib.HTTP_PORT
+    parms = "?query=DescLogicConcept&DescLogicConcept[@code=%s]" % code
     url = ("http://cabio-qa.nci.nih.gov/cacore32/GetXML?"
            "query=DescLogicConcept&DescLogicConcept[@code=%s]" % code)
+    url   = "/cacore32/GetXML%s" % parms
     tries = 3
-    code = code.strip()
     while tries:
         try:
-            urlObj = urllib.urlopen(url)
-            docXml = urlObj.read()
-            break
+            conn = httplib.HTTPConnection(host, port)
+
+            # Submit the request and get the headers for the response.
+            conn.request("GET", url)
+            response = conn.getresponse()
+
+            # Skip past any "Continue" responses.
+            while response.status == httplib.CONTINUE:
+                response.msg = None
+                response.begin()
+
+            # Check for failure.
+            if response.status != httplib.OK:
+                try:
+                    page = response.read()
+                    now  = time.strftime("%Y%m%d%H%M%S")
+                    name = cdr.DEFAULT_LOGDIR + "/ncit-%s-%s.html" % (code, now)
+                    f = open(name, "wb")
+                    f.write(page)
+                    f.close()
+                except:
+                    pass
+                cdrcgi.bail("Failure retrieving concept %s; "
+                            "HTTP response %s: %s" % (code, response.status,
+                                                      response.reason))
+
+            # We can stop trying now, we got it.
+            docXml = response.read()
+            tries = 0
+
         except Exception, e:
             tries -= 1
             if not tries:
@@ -235,8 +271,6 @@ def fetchConcept(code):
         cdrcgi.bail("Error in EVS response: %s" % result)
     docXml = result[0]
     try:
-        #docXml = result.output
-        #open("d:/tmp/ConceptDocs.xml", "a").write(docXml)
         dom = xml.dom.minidom.parseString(docXml)
         return Concept(dom.documentElement)
     except Exception, e:
