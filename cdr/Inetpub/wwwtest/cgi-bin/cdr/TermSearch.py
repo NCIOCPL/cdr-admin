@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: TermSearch.py,v 1.9 2007-09-20 21:18:30 bkline Exp $
+# $Id: TermSearch.py,v 1.10 2007-10-01 16:15:41 kidderc Exp $
 #
 # Prototype for duplicate-checking interface for Term documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.9  2007/09/20 21:18:30  bkline
+# Switched to httplib and public server (qa server is broken indefinitely).
+#
 # Revision 1.8  2007/02/01 13:32:13  bkline
 # Replaced Java program for retrieving Concept document from NCIT with
 # HTTP API.
@@ -49,7 +52,7 @@ help        = fields and fields.getvalue("HelpButton")      or None
 srchThes    = fields and fields.getvalue("SearchThesaurus") or None
 conceptCode = fields and fields.getvalue("ConceptCode")     or None
 subtitle    = "Term"
-replaceId   = None
+updateCDRID   = fields and fields.getvalue("UpdateCDRID")     or None
 valErrors   = None
 
 if help: 
@@ -142,6 +145,33 @@ class Definition:
  </Definition>
 """ % fix(self.text or u'')
 
+    def toNode(self,dom):
+        node = dom.createElement('Definition')
+        
+        child = dom.createElement('DefinitionText')
+        text = dom.createTextNode(self.text)
+        child.appendChild(text)        
+        node.appendChild(child)
+
+        child = dom.createElement('DefinitionType')
+        text = dom.createTextNode('Health professional')
+        child.appendChild(text)        
+        node.appendChild(child)
+
+        child = dom.createElement('DefinitionSource')
+        child2 = dom.createElement('DefinitionSourceName')
+        text = dom.createTextNode('NCI Thesaurus')
+        child2.appendChild(text)
+        child.appendChild(child2)
+        node.appendChild(child)
+
+        child = dom.createElement('ReviewStatus')
+        text = dom.createTextNode('Reviewed')
+        child.appendChild(text)
+        node.appendChild(child)     
+        
+        return node
+
 #----------------------------------------------------------------------
 # Object for an articulated synonym from the NCI thesaurus.
 #----------------------------------------------------------------------
@@ -155,6 +185,7 @@ class FullSynonym:
         match = FullSynonym.pattern.search(value)
         self.termName   = None
         self.termGroup  = None
+        self.mappedTermGroup  = None
         self.termSource = None
         self.sourceCode = None
         if match:
@@ -162,6 +193,66 @@ class FullSynonym:
             self.termGroup  = match.group(4)
             self.termSource = match.group(6)
             self.sourceCode = match.group(8)
+            self.mappedTermGroup = mapType(self.termGroup)
+
+    def toNode(self,dom):
+        termName = self.termName
+        mappedTermGroup = self.mappedTermGroup
+        termGroup = self.termGroup
+        sourceCode = self.sourceCode
+
+        if self.termGroup == 'PT':
+            mappedTermGroup = 'Lexical variant'
+            sourceCode = conceptCode
+        
+        node = dom.createElement('OtherName')
+        
+        child = dom.createElement('OtherTermName')
+        text = dom.createTextNode(termName)
+        child.appendChild(text)
+        node.appendChild(child)
+
+        child = dom.createElement('OtherNameType')
+        text = dom.createTextNode(mappedTermGroup)
+        child.appendChild(text)        
+        node.appendChild(child)
+
+        child = dom.createElement('SourceInformation')
+        child2 = dom.createElement('VocabularySource')
+        
+        child3 = dom.createElement('SourceCode')        
+        text = dom.createTextNode('NCI Thesaurus')
+        child3.appendChild(text)
+        child2.appendChild(child3)
+
+        child3 = dom.createElement('SourceTermType')
+        text = dom.createTextNode(termGroup)
+        child3.appendChild(text)
+        child2.appendChild(child3)
+
+        if sourceCode is not None:
+            child3 = dom.createElement('SourceTermId')
+            text = dom.createTextNode(sourceCode)
+            child3.appendChild(text)
+            child2.appendChild(child3)
+        
+        child.appendChild(child2)
+        node.appendChild(child)
+
+        child = dom.createElement('ReviewStatus')
+        text = dom.createTextNode('Unreviewed')
+        child.appendChild(text)
+        node.appendChild(child)     
+        
+        return node            
+
+#----------------------------------------------------------------------
+# Object for the other name element in the document
+#----------------------------------------------------------------------
+class OtherName:
+    def __init__(self, termName, nameType):
+        self.termName   = termName
+        self.nameType   = nameType
 
 #----------------------------------------------------------------------
 # Object for a NCI Thesaurus concept.
@@ -378,6 +469,83 @@ def findExistingConcept(code):
         cdrcgi.bail('Failure checking for existing document: %s' % info[1][0])
 
 #----------------------------------------------------------------------
+# Get the preferred name for the cdr document
+#----------------------------------------------------------------------
+def getPreferredName(dom):
+    docElem = dom.documentElement
+    for node in docElem.childNodes:
+        if node.nodeType == xml.dom.minidom.Node.ELEMENT_NODE:
+            if node.nodeName == 'PreferredName':
+                for n in node.childNodes:
+                    if n.nodeType == xml.dom.minidom.Node.TEXT_NODE:
+                        return n.nodeValue
+
+    return ""
+
+#----------------------------------------------------------------------
+# Get the semantic type text for the cdr document
+#----------------------------------------------------------------------
+def getSemanticType(dom):
+    docElem = dom.documentElement
+    for node in docElem.childNodes:
+        if node.nodeType == xml.dom.minidom.Node.ELEMENT_NODE:
+            if node.nodeName == 'SemanticType':
+                for n in node.childNodes:
+                    if n.nodeType == xml.dom.minidom.Node.TEXT_NODE:
+                        return n.nodeValue
+
+    return ""
+
+#----------------------------------------------------------------------
+# update the definition
+#----------------------------------------------------------------------
+def updateDefinition(dom,definition):
+    docElem = dom.documentElement
+    for node in docElem.childNodes:
+        if node.nodeType == xml.dom.minidom.Node.ELEMENT_NODE:
+            if node.nodeName == 'Definition':
+                for n in node.childNodes:
+                    if n.nodeType == xml.dom.minidom.Node.ELEMENT_NODE:
+                        if n.nodeName == 'DefinitionText':
+                            for nn in n.childNodes:
+                                if nn.nodeType == xml.dom.minidom.Node.TEXT_NODE:
+                                    nn.nodeValue = definition.text
+                                    return
+                                
+    # definition not found, need to add it
+    docElem.appendChild(definition.toNode(dom));
+
+#----------------------------------------------------------------------
+# update the definition
+#----------------------------------------------------------------------
+def addOtherName(dom,fullSyn):
+    docElem = dom.documentElement
+    docElem.appendChild(fullSyn.toNode(dom));
+
+#----------------------------------------------------------------------
+# getOtherNames
+#----------------------------------------------------------------------
+def getOtherNames(dom):
+    otherNames = []
+    docElem = dom.documentElement
+    for node in docElem.childNodes:
+        if node.nodeType == xml.dom.minidom.Node.ELEMENT_NODE:
+            if node.nodeName == 'OtherName':
+                for n in node.childNodes:
+                    if n.nodeType == xml.dom.minidom.Node.ELEMENT_NODE:
+                        if n.nodeName == 'OtherTermName':
+                            for nn in n.childNodes:
+                                if nn.nodeType == xml.dom.minidom.Node.TEXT_NODE:
+                                    termName = nn.nodeValue
+                        elif n.nodeName == 'OtherNameType':
+                            for nn in n.childNodes:
+                                if nn.nodeType == xml.dom.minidom.Node.TEXT_NODE:
+                                    nameType = nn.nodeValue
+                                    otherNames.append(OtherName(termName, nameType))
+                                
+    return otherNames
+
+#----------------------------------------------------------------------
 # Connect to the CDR database.
 #----------------------------------------------------------------------
 try:
@@ -386,75 +554,105 @@ except cdrdb.Error, info:
     cdrcgi.bail('Failure connecting to CDR: %s' % info[1][0])
 
 #----------------------------------------------------------------------
-# Import a citation document from PubMed.
+# Import a citation document from NCI Thesaurus.
 #----------------------------------------------------------------------
 if impReq:
     if not conceptCode:
         cdrcgi.bail("No concept code provided")
     if not session:
         cdrcgi.bail("User not logged in")
-    if replaceId: # Not used; cloned from citation import program
-        oldDoc = cdr.getDoc(session, replaceId, 'Y')
+    if updateCDRID:
+        oldDoc = cdr.getDoc(session, updateCDRID, 'Y')
         if oldDoc.startswith("<Errors"):
-            cdrcgi.bail("Unable to retrieve %s" % replaceId)
-        if not getPubmedArticle(oldDoc):
-            cdrcgi.bail("Document %s is not a PubMed Citation" % replaceId)
+            cdrcgi.bail("Unable to retrieve %s" % updateCDRID)
+        oldDoc = cdr.getDoc(session, updateCDRID, 'Y',getObject=1)
+        #CK if not getPubmedArticle(oldDoc):
+        #CK    cdrcgi.bail("Document %s is not a PubMed Citation" % updateCDRID)
     else:
         docId = findExistingConcept(conceptCode)
         if docId:
             cdrcgi.bail("Concept has already been imported as CDR%010d" %
                         docId)
     concept = fetchConcept(conceptCode)
-    #cdrcgi.bail("Under construction...")
-    doc = u"""\
-<Term xmlns:cdr='cips.nci.nih.gov/cdr'>
- <PreferredName>%s</PreferredName>
-""" % fix(concept.preferredName)
-    for syn in concept.fullSyn:
-        if syn.termSource == 'NCI':
-            code = syn.termGroup == 'PT' and conceptCode or None
-            termType = mapType(syn.termGroup)
-            doc += makeOtherName(syn.termName, termType, syn.termGroup,
-                                 code)
-    for indCode in concept.indCodes:
-        doc += makeOtherName(indCode, 'IND code', 'IND_Code')
-    for nscCode in concept.nscCodes:
-        doc += makeOtherName(nscCode, 'NSC code', 'NSC_Code')
-    for casCode in concept.casCodes:
-        doc += makeOtherName(casCode, 'CAS Registry name', 'CAS_Registry')
-    for definition in concept.definitions:
-        if definition.source == 'NCI':
-            doc += definition.toXml()
-    doc += u"""\
- <TermType>
-  <TermTypeName>Index term</TermTypeName>
- </TermType>
- <TermStatus>Unreviewed</TermStatus>
-</Term>
-"""
-    if not replaceId:
+
+    if updateCDRID:
+        dom = xml.dom.minidom.parseString(oldDoc.xml)
+        # check the semantic type
+        semanticType = getSemanticType(dom)
+        if (semanticType != """Drug/agent"""):
+            cdrcgi.bail("""Semantic Type is '%s'. The imporing only works for Drug/agent""" % semanticType )
+        # check to see if the preferred names match
+        preferredName = getPreferredName(dom)
+        if ( preferredName.upper() != concept.preferredName.upper() ):
+            cdrcgi.bail("Preferred names do not match (%s and %s)" % (preferredName.upper(),concept.preferredName.upper()) )
+        # update the definition, if there is one.
+        for definition in concept.definitions:
+            if definition.source == 'NCI':
+                updateDefinition(dom,definition)
+                break
+
+        # fetch the other names
+        otherNames = getOtherNames(dom)
+        for syn in concept.fullSyn:
+            bfound = 0
+            for otherName in otherNames:
+                if syn.termName == otherName.termName:
+                    if syn.mappedTermGroup == otherName.nameType:
+                        bfound = 1
+                        
+            # Other Name not found, add it
+            if bfound == 0:                
+                addOtherName(dom,syn)
+
+        oldDoc.xml = dom.toxml()      
+            
+        resp = cdr.repDoc(session, doc = oldDoc, val = 'Y', showWarnings = 1)
+        if not resp[0]:
+            cdrcgi.bail("Failure adding concept %s: %s" % (updateCDRID, cdr.checkErr(resp[1]) ) )
+                        
+        subtitle = "Citation %s updated" % resp[0]
+
+    else:
+        doc = u"""\
+            <Term xmlns:cdr='cips.nci.nih.gov/cdr'>
+           <PreferredName>%s</PreferredName>
+           """ % fix(concept.preferredName)
+        for syn in concept.fullSyn:
+            if syn.termSource == 'NCI':
+                code = syn.termGroup == 'PT' and conceptCode or None
+                termType = mapType(syn.termGroup)
+                doc += makeOtherName(syn.termName, termType, syn.termGroup,
+                                     code)
+        for indCode in concept.indCodes:
+            doc += makeOtherName(indCode, 'IND code', 'IND_Code')
+        for nscCode in concept.nscCodes:
+            doc += makeOtherName(nscCode, 'NSC code', 'NSC_Code')
+        for casCode in concept.casCodes:
+            doc += makeOtherName(casCode, 'CAS Registry name', 'CAS_Registry')
+        for definition in concept.definitions:
+            if definition.source == 'NCI':
+                doc += definition.toXml()
+        doc += u"""\
+     <TermType>
+      <TermTypeName>Index term</TermTypeName>
+     </TermType>
+     <TermStatus>Unreviewed</TermStatus>
+    </Term>
+    """
         wrapper = u"""\
-<CdrDoc Type='Term' Id=''>
- <CdrDocCtl>
-  <DocType>Term</DocType>
-  <DocTitle>%s</DocTitle>
- </CdrDocCtl>
- <CdrDocXml><![CDATA[%%s]]></CdrDocXml>
-</CdrDoc>
-""" % fix(concept.preferredName)
+    <CdrDoc Type='Term' Id=''>
+     <CdrDocCtl>
+      <DocType>Term</DocType>
+      <DocTitle>%s</DocTitle>
+     </CdrDocCtl>
+     <CdrDocXml><![CDATA[%%s]]></CdrDocXml>
+    </CdrDoc>
+    """ % fix(concept.preferredName)
         doc = (wrapper % doc).encode('utf-8')
         resp = cdr.addDoc(session, doc = doc, val = 'Y', showWarnings = 1)
-    else: # dead code; cloned from citation import program
-        doc = replacePubmedArticle(oldDoc, article)
-        resp = cdr.repDoc(session, doc = doc, val = 'Y', showWarnings = 1)
-    if not resp[0]:
-        cdrcgi.bail("Failure adding concept %s: %s" % (title,
-                                                       cdr.checkErr(resp[1])))
-    cdr.unlock(session, resp[0])
-    if not replaceId:
         subtitle = "Concept added as %s" % resp[0]
-    else: # not used
-        subtitle = "Citation %s updated %s" % (resp[0], pubVerNote)
+
+    cdr.unlock(session, resp[0])    
     # FALL THROUGH TO FORM DISPLAY
 
 #----------------------------------------------------------------------
@@ -511,18 +709,16 @@ if not submit:
        <INPUT      NAME        = "ConceptCode">
       </TD>
      </TR>
-<!--
      <TR>
       <TD ALIGN='right'>
        <SPAN       CLASS       = "Page">
-        &nbsp;CDR ID of Document to Replace (Optional):&nbsp;&nbsp;
+        &nbsp;CDR ID of Document to Update (Optional):&nbsp;&nbsp;
        </SPAN>
       </TD>
       <TD>
-       <INPUT      NAME        = "ReplaceID">
+       <INPUT      NAME        = "UpdateCDRID">
       </TD>
      </TR>
--->
      <TR>
       <TD>&nbsp;</TD>
       <TD>
