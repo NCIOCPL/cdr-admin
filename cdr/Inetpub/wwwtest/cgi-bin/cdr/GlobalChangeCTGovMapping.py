@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------
-# $Id: GlobalChangeCTGovMapping.py,v 1.1 2007-09-19 04:44:23 ameyer Exp $
+# $Id: GlobalChangeCTGovMapping.py,v 1.2 2007-10-03 04:15:47 ameyer Exp $
 #
 # Search CTGovProtocol documents for values that can be mapped
 # using the external_map table.  Map them if any are found.
@@ -11,6 +11,9 @@
 # via cdrbatch.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2007/09/19 04:44:23  ameyer
+# Initial version.
+#
 #----------------------------------------------------------------------
 import cgitb; cgitb.enable()
 
@@ -40,11 +43,11 @@ elif request == "Log Out":
     cdrcgi.logout(session)
 
 # Running for real, or in test mode (None = bug)
-testMode = None
+runMode = None
 if request == "Test":
-    testMode = "test"
+    runMode = "test"
 elif request == "Submit":
-    testMode = "run"
+    runMode = "run"
 
 # Authorization?
 if not cdr.canDo (session, "MAKE GLOBAL CHANGES", "CTGovProtocol"):
@@ -62,8 +65,12 @@ else:
     checkedOtherJobs = "no"
     headerPrompt = "Confirm continuation in spite of other batch jobs"
 
+# Today's date is default end date
+today = time.strftime("%Y-%m-%d", time.localtime())
+
 # Get user input
 startDate = fields.getvalue("startDate") or None
+endDate   = fields.getvalue("endDate") or today
 emailList = fields.getvalue("email") or None
 
 # Check parameters
@@ -72,16 +79,22 @@ if startDate:
     if not startTm:
         cdrcgi.bail ("Please enter start date in YYYY-MM-DD format")
 
+    endTm = cdr.strptime(endDate, "%Y-%m-%d")
+    if not endTm:
+        cdrcgi.bail (
+          "Please enter end date in YYYY-MM-DD or leave blank for today")
+
     if not emailList:
         cdrcgi.bail ("Please enter at least one email address")
 
-    if not testMode:
+    if not runMode:
         cdrcgi.bail ("BUG - Shouldn't be here unless Submit or Test clicked")
 
     # If we got here, we're ready to go
     args = (("startDt", startDate),
+            ("endDt", endDate),
             (cdrcgi.SESSION, session),
-            ("testMode", testMode))
+            ("runMode", runMode))
     newJob = cdrbatch.CdrBatch(jobName=JOB_NAME,
                 command="lib/Python/GlobalChangeCTGovMappingBatch.py",
                 args=args,
@@ -196,6 +209,12 @@ else:
     <td><input type='text' name='startDate' value='%s' /></td>
   </tr>
   <tr>
+    <td align='right'>
+       Date as YYYY-MM-DD for newest document change to examine:
+    </td>
+    <td><input type='text' name='endDate' value='%s' /></td>
+  </tr>
+  <tr>
     <td align='right'>Email addresses, separated by spaces or commas:</td>
     <td><input type='text' name='email' value='%s' /></td>
   </tr>
@@ -205,7 +224,8 @@ else:
 <input type='submit' name='%s' value="Test" /> &nbsp;
 <input type='submit' name='%s' value="Cancel" />
 </center>
-""" % (defaultDate, defaultEmail, cdrcgi.REQUEST,cdrcgi.REQUEST,cdrcgi.REQUEST)
+""" % (defaultDate, today, defaultEmail, cdrcgi.REQUEST,
+       cdrcgi.REQUEST, cdrcgi.REQUEST)
 
 # This appears after either form
 html += """
