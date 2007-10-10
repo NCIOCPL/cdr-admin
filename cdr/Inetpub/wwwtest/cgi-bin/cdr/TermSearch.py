@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: TermSearch.py,v 1.11 2007-10-10 13:28:05 kidderc Exp $
+# $Id: TermSearch.py,v 1.12 2007-10-10 19:10:26 kidderc Exp $
 #
 # Prototype for duplicate-checking interface for Term documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.11  2007/10/10 13:28:05  kidderc
+# Bug 3037
+#
 # Revision 1.10  2007/10/01 16:15:41  kidderc
 # Bug 3037.
 #
@@ -54,8 +57,9 @@ impReq      = fields and fields.getvalue("ImportButton")    or None
 help        = fields and fields.getvalue("HelpButton")      or None
 srchThes    = fields and fields.getvalue("SearchThesaurus") or None
 conceptCode = fields and fields.getvalue("ConceptCode")     or None
+ckPrefNm    = fields and fields.getvalue("CkPrefNm")        or None
 subtitle    = "Term"
-updateCDRID   = fields and fields.getvalue("UpdateCDRID")     or None
+updateCDRID = fields and fields.getvalue("UpdateCDRID")     or None
 valErrors   = None
 
 #----FOR DEBUGGING -------------------
@@ -66,6 +70,9 @@ valErrors   = None
 
 #updateCDRID = '37779'
 #conceptCode = 'C2237'
+
+#updateCDRID = '38150'
+#conceptCode = 'C2608'
 
 #updateCDRID = '38188'
 #conceptCode = 'C2614'
@@ -621,9 +628,13 @@ if impReq:
         if (semanticType != """Drug/agent"""):
             cdrcgi.bail("""Semantic Type is '%s'. The imporing only works for Drug/agent""" % semanticType )
         # check to see if the preferred names match
-        preferredName = getPreferredName(dom)
-        if ( preferredName.upper().rstrip(' ').lstrip(' ') != concept.preferredName.upper().rstrip(' ').lstrip(' ') ):
-            cdrcgi.bail("""Preferred names do not match ('%s' and '%s')""" % (preferredName.upper(),concept.preferredName.upper()) )
+        # if they don't return error message to ajax call.
+        if ckPrefNm:
+            preferredName = getPreferredName(dom)
+            if ( preferredName.upper().rstrip(' ').lstrip(' ') != concept.preferredName.upper().rstrip(' ').lstrip(' ') ):
+                cdrcgi.sendPage("""Preferred names do not match ('%s' and '%s') Do you wish to continue?""" % (preferredName.upper(),concept.preferredName.upper()) )
+            else:
+                cdrcgi.sendPage("")
         # update the definition, if there is one.
         for definition in concept.definitions:
             if definition.source == 'NCI':
@@ -742,6 +753,72 @@ if not submit:
          newWindow = window.open('%s', 'SearchThesaurus');
      }
     // -->
+    var myRequest = getXMLHttpRequest();
+    var retval = true;
+
+    function $(id)
+    {
+        return document.getElementById(id);
+    }
+    
+    function getXMLHttpRequest()
+    {
+        var request = false;
+        try
+        {
+            request = new XMLHttpRequest();
+        }
+        catch(err1)
+        {
+            try
+            {
+                request = new ActiveXObject("msxml2.XMLHTTP");
+            }
+            catch(err2)
+            {
+                try
+                {
+                    request = new ActiveXObject("Microsoft.XMLHTTP");
+                }
+                catch(err3)
+                {
+                    request = false;
+                }
+            }
+        }
+        return request;
+    }
+
+    function callAjax(e)
+    {
+        updateCDRID = $('UpdateCDRID').value;
+        conceptCode = $('ConceptCode').value;
+        session = $('Session').value;
+        url = '%s/TermSearch.py?Session=' + session +
+          '&ImportButton=1&CkPrefNm=1&UpdateCDRID=' + updateCDRID + '&ConceptCode=' + conceptCode;
+        myRequest.open("GET",url,false);
+        myRequest.onreadystatechange = handleAjaxResponse;
+        myRequest.send(null);
+        return retval;
+    }
+
+    function handleAjaxResponse()
+    {
+        if ( myRequest.readyState == 4 )
+        {
+            if ( myRequest.status == 200 )
+            {
+                if ( myRequest.responseText.length > 10 )
+                {
+                     retval = true;
+                     if (!confirm(myRequest.responseText))
+                     {
+                        retval = false;
+                     }
+                }
+            }
+        }
+    }
    </SCRIPT>
    <CENTER>
     <TABLE>
@@ -752,7 +829,8 @@ if not submit:
        </SPAN>
       </TD>
       <TD>
-       <INPUT      NAME        = "ConceptCode">
+       <INPUT      NAME        = "ConceptCode"
+                   ID          = "ConceptCode">
       </TD>
      </TR>
      <TR>
@@ -762,7 +840,8 @@ if not submit:
        </SPAN>
       </TD>
       <TD>
-       <INPUT      NAME        = "UpdateCDRID">
+       <INPUT      NAME        = "UpdateCDRID"
+                   ID          = "UpdateCDRID">
       </TD>
      </TR>
      <TR>
@@ -770,7 +849,8 @@ if not submit:
       <TD>
        <INPUT      TYPE        = "submit"
                    NAME        = "ImportButton"
-                   VALUE       = "Import">
+                   VALUE       = "Import"
+                   ONCLICK     = "return callAjax();">
       </TD>
      </TR>
     </TABLE>
@@ -778,7 +858,7 @@ if not submit:
   </FORM>
  </BODY>
 </HTML>
-""" % thesaurusSearchUrl
+""" % (thesaurusSearchUrl,cdrcgi.BASE)
     cdrcgi.sendPage(page)
 
 #----------------------------------------------------------------------
