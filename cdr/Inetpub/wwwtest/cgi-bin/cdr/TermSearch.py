@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: TermSearch.py,v 1.10 2007-10-01 16:15:41 kidderc Exp $
+# $Id: TermSearch.py,v 1.11 2007-10-10 13:28:05 kidderc Exp $
 #
 # Prototype for duplicate-checking interface for Term documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.10  2007/10/01 16:15:41  kidderc
+# Bug 3037.
+#
 # Revision 1.9  2007/09/20 21:18:30  bkline
 # Switched to httplib and public server (qa server is broken indefinitely).
 #
@@ -54,6 +57,21 @@ conceptCode = fields and fields.getvalue("ConceptCode")     or None
 subtitle    = "Term"
 updateCDRID   = fields and fields.getvalue("UpdateCDRID")     or None
 valErrors   = None
+
+#----FOR DEBUGGING -------------------
+#impReq = 1
+
+#updateCDRID = '37776'
+#conceptCode = 'C2203'
+
+#updateCDRID = '37779'
+#conceptCode = 'C2237'
+
+#updateCDRID = '38188'
+#conceptCode = 'C2614'
+
+#session = '470B7D06-33F817-248-WD7ABA70S9QF'
+#-----------------------------------
 
 if help: 
     cdrcgi.bail("Sorry, help for this interface has not yet "
@@ -520,6 +538,11 @@ def updateDefinition(dom,definition):
 #----------------------------------------------------------------------
 def addOtherName(dom,fullSyn):
     docElem = dom.documentElement
+    for node in docElem.childNodes:
+        if node.nodeName == 'OtherName':    
+            docElem.insertBefore(fullSyn.toNode(dom),node);
+            return;
+        
     docElem.appendChild(fullSyn.toNode(dom));
 
 #----------------------------------------------------------------------
@@ -541,6 +564,8 @@ def getOtherNames(dom):
                             for nn in n.childNodes:
                                 if nn.nodeType == xml.dom.minidom.Node.TEXT_NODE:
                                     nameType = nn.nodeValue
+                                    if (nameType == 'Lexical variant'):
+                                        nameType = 'Synonym'
                                     otherNames.append(OtherName(termName, nameType))
                                 
     return otherNames
@@ -562,12 +587,26 @@ if impReq:
     if not session:
         cdrcgi.bail("User not logged in")
     if updateCDRID:
-        oldDoc = cdr.getDoc(session, updateCDRID, 'Y')
+        docId = cdr.normalize(updateCDRID)
+        oldDoc = cdr.getDoc(session, docId, 'Y')
+        #---- FOR DEBUGGING ---------
+        #print 'oldDoc'
+        #print oldDoc
+        #----------------------------
         if oldDoc.startswith("<Errors"):
             cdrcgi.bail("Unable to retrieve %s" % updateCDRID)
-        oldDoc = cdr.getDoc(session, updateCDRID, 'Y',getObject=1)
+        oldDoc = cdr.getDoc(session, docId, 'Y',getObject=1)
         #CK if not getPubmedArticle(oldDoc):
         #CK    cdrcgi.bail("Document %s is not a PubMed Citation" % updateCDRID)
+
+        #---- FOR DEBUGGING ---------
+        #print 'str(oldDoc) before'
+        #print str(oldDoc)
+        #resp = cdr.repDoc(session, doc = str(oldDoc), val = 'Y', showWarnings = 1)
+        #if not resp[0]:
+        #    cdrcgi.bail("Failure adding concept %s: %s" % (updateCDRID, cdr.checkErr(resp[1]) ) )
+        #--------------------------------
+            
     else:
         docId = findExistingConcept(conceptCode)
         if docId:
@@ -583,8 +622,8 @@ if impReq:
             cdrcgi.bail("""Semantic Type is '%s'. The imporing only works for Drug/agent""" % semanticType )
         # check to see if the preferred names match
         preferredName = getPreferredName(dom)
-        if ( preferredName.upper() != concept.preferredName.upper() ):
-            cdrcgi.bail("Preferred names do not match (%s and %s)" % (preferredName.upper(),concept.preferredName.upper()) )
+        if ( preferredName.upper().rstrip(' ').lstrip(' ') != concept.preferredName.upper().rstrip(' ').lstrip(' ') ):
+            cdrcgi.bail("""Preferred names do not match ('%s' and '%s')""" % (preferredName.upper(),concept.preferredName.upper()) )
         # update the definition, if there is one.
         for definition in concept.definitions:
             if definition.source == 'NCI':
@@ -604,9 +643,16 @@ if impReq:
             if bfound == 0:                
                 addOtherName(dom,syn)
 
-        oldDoc.xml = dom.toxml()      
+        oldDoc.xml = dom.toxml()
+
+        #----FOR DEBUGGING -------------------
+        #print 'dom.toxml()'
+        #print dom.toxml()
+        #print 'str(oldDoc) after'
+        #cdrcgi.bail(str(oldDoc));
+        #-------------------------------------      
             
-        resp = cdr.repDoc(session, doc = oldDoc, val = 'Y', showWarnings = 1)
+        resp = cdr.repDoc(session, doc = str(oldDoc), val = 'Y', showWarnings = 1)
         if not resp[0]:
             cdrcgi.bail("Failure adding concept %s: %s" % (updateCDRID, cdr.checkErr(resp[1]) ) )
                         
