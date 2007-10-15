@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: TermSearch.py,v 1.13 2007-10-11 16:22:36 kidderc Exp $
+# $Id: TermSearch.py,v 1.14 2007-10-15 15:54:52 kidderc Exp $
 #
 # Prototype for duplicate-checking interface for Term documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.13  2007/10/11 16:22:36  kidderc
+# Moved much of functionality into NCIThes.py. A library module.
+#
 # Revision 1.12  2007/10/10 19:10:26  kidderc
 # Added ajax functionality for prompting if preferred names do not match.
 #
@@ -195,7 +198,7 @@ if ckPrefNm:
                 NCIPrefName = NCIThes.getNCITPreferredName(conceptCode)
                 CDRPrefName = NCIThes.getCDRPreferredName(session,updateCDRID)
                 if ( CDRPrefName.upper().rstrip(' ').lstrip(' ') != NCIPrefName.upper().rstrip(' ').lstrip(' ') ):
-                    cdrcgi.sendPage("""Preferred names do not match (CDR: '%s' and NCIT: '%s') Do you wish to continue?""" % (CDRPrefName.upper(),NCIPrefName.upper()) )
+                    cdrcgi.sendPage("""Impost cannot be completed since preferred names do not match. (CDR: '%s' and NCIT: '%s')""" % (CDRPrefName.upper(),NCIPrefName.upper()) )
                 else:
                     cdrcgi.sendPage("")
 
@@ -296,6 +299,7 @@ if not submit:
 
     function callAjax(e)
     {
+        retval = true;
         updateCDRID = $('UpdateCDRID').value;
         conceptCode = $('ConceptCode').value;
         
@@ -322,11 +326,8 @@ if not submit:
             {
                 if ( myRequest.responseText.length > 10 )
                 {
-                     retval = true;
-                     if (!confirm(myRequest.responseText))
-                     {
-                        retval = false;
-                     }
+                  alert(myRequest.responseText);
+                  retval = false;
                 }
             }
         }
