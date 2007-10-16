@@ -422,6 +422,7 @@ td.cdrTableOdd
     font-family: Verdana, Tahoma, sans-serif;
     font-size: 8pt;
     text-align: top;
+    color: #220;
     background: #FFE;
 }
 a:link 
@@ -483,14 +484,10 @@ a.selected:hover
   </style>
   
    <input type='hidden' name='%s' value='%s'>
-   <table border='0'>
-    <tr>
-     <td colspan='3'>
-      %s<br><br>
-     </td>
-    </tr>
-   </table>
-   <table border = '0'>
+    <p style="text-align: center; font-family: Verdana, Tahoma, sans-serif; font-size: 12pt; font-weight: bold; color: #553;">
+    Summaries with Protocol Links/Refs Report</br>
+    <div style="text-align: center; font-family: Verdana, Tahoma, sans-serif; font-size: 11pt; font-weight: normal; color: #553;">%s</div>
+    </p>
    
    <table>
    <tr>
