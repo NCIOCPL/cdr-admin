@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryAndMiscReports.py,v 1.18 2005-04-12 19:21:09 venglisc Exp $
+# $Id: SummaryAndMiscReports.py,v 1.19 2007-10-16 18:44:07 kidderc Exp $
 #
 # Submenu for summary and miscellanous document reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.18  2005/04/12 19:21:09  venglisc
+# Added Publish Preview menu option. (Bug 1531)
+#
 # Revision 1.17  2005/03/24 21:12:36  bkline
 # Plugged in Changes to Summaries report.
 #
@@ -132,6 +135,8 @@ reports = [
            ('SummariesLists.py?',          'Summaries Lists'),
            ('SummaryMetaData.py?',         'Summaries Metadata'),
            ('SummariesTocReport.py?',      'Summaries TOC Lists'),
+           ('SummariesWithProtocolLinks.py?',      'Summaries with Protocols Links/Refs Report'),
+           ('SummariesWithNonJournalArticleCitations.py?',      'Summaries with Non-Journal Article Citations Report'),
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s%s=%s'>%s</A></LI>\n" % (
