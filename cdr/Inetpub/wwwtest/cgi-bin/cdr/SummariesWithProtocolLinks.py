@@ -44,16 +44,16 @@ class dataRow:
         self.linkcdrid = cdr.normalize(protCDRID)
         self.status = status
         self.protocolLink = ''
-        self.protocolRef = ''
+        self.fullProtocolLink = ''
         self.text = ''
+        self.refTextStart = 0
+        self.refTextSize = 0
     
     def addProtocolLink(self,parentElem):
         self.text = ''
         self.addText(parentElem,0)
-        if self.ref == 'LINK':
-            self.protocolLink = self.text
-        else:
-            self.protocolRef = self.text
+        self.fullProtocolLink = self.text
+        self.protocolLink = self.reduceTo(self.fullProtocolLink,200)
 
     def addText(self,parentElem,bInLink):
         binlink = 0
@@ -65,20 +65,44 @@ class dataRow:
                             if name == 'cdr:ref':
                                 if value == self.linkcdrid:
                                     binlink = 1
-                                    self.text += "<a href = %s/QcReport.py?DocId=%s&Session=%s>" % (cdrcgi.BASE,self.linkcdrid,session)
+                                    href = "<a href = %s/QcReport.py?DocId=%s&Session=%s>" % (cdrcgi.BASE,self.linkcdrid,session)
+                                    self.refTextStart = len(self.text)
+                                    self.refTextSize = len(href)
+                                    self.text += href
                         elif self.ref == 'REF':
                             if name == 'cdr:href':
                                 if value == self.linkcdrid:
                                     binlink = 1
-                                    self.text += "<a href = %s/QcReport.py?DocId=%s&Session=%s>" % (cdrcgi.BASE,self.linkcdrid,session)
+                                    href = "<a href = %s/QcReport.py?DocId=%s&Session=%s>" % (cdrcgi.BASE,self.linkcdrid,session)
+                                    self.refTextStart = len(self.text)
+                                    self.refTextSize = len(href)
+                                    self.text += href
                                 
             if parentChildNode.nodeType == xml.dom.minidom.Node.TEXT_NODE:
                 self.text += parentChildNode.nodeValue + " "
                 if bInLink == 1:
                     bInLink = 0
+                    self.refTextSize += len(parentChildNode.nodeValue)
                     self.text += "</a>"
             self.addText(parentChildNode,binlink)
             binlink = 0
+
+    def reduceTo(self,text,count):
+        startIndex = self.refTextStart - count
+        if startIndex < 0:
+            startIndex = 0;
+        endIndex = self.refTextStart + self.refTextSize + count
+        if endIndex > len(text) - 1:
+            endIndex = len(text) - 1
+
+        returnText = ''
+        if startIndex > 0:
+           returnText = '...'
+        returnText += text[startIndex:endIndex]
+        if endIndex < len(text) - 1:
+            returnText += '...'
+
+        return returnText
 #----------------------------------------------------------------------
 # If the user only picked one summary group, put it into a list so we
 # can deal with the same data structure whether one or more were
@@ -250,7 +274,8 @@ def getQuerySegment(lang,ref):
 
     query.append(ref)
     
-    query.append(u"""' as ref, qt.int_val as protCDRID, qstatus.value as status
+    query.append(u"""' as ref, qt.int_val as protCDRID, qstatus.value as status,secTitle.node_loc as TitleNodeLoc,
+      len(secTitle.node_loc) as TitleNodeLocLen,qt.node_loc as LinkNodeLoc 
       FROM query_term qt
       JOIN query_term title ON qt.doc_id = title.doc_id
       JOIN query_term qstatus ON qt.int_val = qstatus.doc_id
@@ -312,7 +337,7 @@ def getQuerySegment(lang,ref):
 # Put all the pieces together for the SELECT statement
 # -------------------------------------------------------------
 
-query = getQuerySegment(lang,'LINK') + " UNION " + getQuerySegment(lang,'REF') + " ORDER BY cdrid,status"
+query = getQuerySegment(lang,'LINK') + " UNION " + getQuerySegment(lang,'REF') + " ORDER BY cdrid,status,LinkNodeLoc,TitleNodeLocLen desc"
 
 #cdrcgi.bail(query)
 
@@ -331,12 +356,28 @@ def checkElement(cdrid,node,parentElem,ref):
                     if ref == 'LINK':
                         if name == 'cdr:ref':
                             if value == Linkcdrid:
+                                if node.childNodes:
+                                    for nodeChild in node.childNodes:
+                                        if nodeChild == xml.dom.minidom.Node.TEXT_NODE:
+                                            if len(nodeChild.Value) == 0:
+                                                nodeChild.Value = 'Protocol Link'
+                                else:
+                                    textNode = dom.createTextNode('Protocol Link')
+                                    node.appendChild(textNode)
                                 dataRow.addProtocolLink(parentElem)
                     elif ref == 'REF':
                         if name == 'cdr:href':
                             if value == Linkcdrid:
+                                if node.childNodes:
+                                    for nodeChild in node.childNodes:
+                                        if nodeChild == xml.dom.minidom.Node.TEXT_NODE:
+                                            if len(nodeChild.Value) == 0:
+                                                nodeChild.Value = 'Protocol Ref'
+                                else:
+                                    textNode = dom.createTextNode('Protocol Ref')
+                                    node.appendChild(textNode)
                                 dataRow.addProtocolLink(parentElem)
-    return                    
+    return
 
 def checkChildren(cdrid,parentElem):
     for node in parentElem.childNodes:
@@ -370,10 +411,14 @@ except cdrdb.Error, info:
 if not rows:
     cdrcgi.bail('No Records Found for Selection')
 
-for cdrid,summaryTitle,summarySecTitle,ref,protCDRID,status in rows:
-    dataRows.append(dataRow(cdrid,summaryTitle,summarySecTitle,ref,protCDRID,status))
-    if cdrid not in cdrids:
-        cdrids.append(cdrid)
+LastLinkNodeLoc = ''
+
+for cdrid,summaryTitle,summarySecTitle,ref,protCDRID,status,TitleNodeLoc,TitleNodeLocLen,LinkNodeLoc in rows:
+    if LinkNodeLoc != LastLinkNodeLoc:
+        dataRows.append(dataRow(cdrid,summaryTitle,summarySecTitle,ref,protCDRID,status))
+        if cdrid not in cdrids:
+            cdrids.append(cdrid)
+    LastLinkNodeLoc = LinkNodeLoc
 
 for cdrid in cdrids:
     docId = cdr.normalize(cdrid)
@@ -494,8 +539,7 @@ a.selected:hover
    <th  class="cdrTable">cdrid</th>
    <th  class="cdrTable">Summary Title</th>
    <th  class="cdrTable">Summary Sec Title</th>
-   <th  class="cdrTable">Protocol Link</th>
-   <th  class="cdrTable">Protocol Ref</th>
+   <th  class="cdrTable">Protocol Link/Ref</th>
    <th  class="cdrTable">CDRID</th>
    <th  class="cdrTable">Status</th>
    </tr>
@@ -505,12 +549,7 @@ for dataRow in dataRows:
     form.append(u"<tr>")
     form.append(u"""<td class="%s">%s</td><td class="%s">%s</td><td class="%s">%s</td>"""
                 %(cssClass,dataRow.cdrid,cssClass,dataRow.summaryTitle,cssClass,dataRow.summarySecTitle))
-    if dataRow.ref == 'LINK':
-        form.append(u"""<td class="%s">%s</td><td class="%s"></td>"""
-                    % (cssClass,dataRow.protocolLink,cssClass))
-    else:
-        form.append(u"""<td class="%s"></td><td class="%s">%s</td>"""
-                    % (cssClass,cssClass,dataRow.protocolRef))
+    form.append(u"""<td class="%s"><b>%s :</b> %s</td>""" % (cssClass,dataRow.ref,dataRow.protocolLink))
     form.append(u"""<td class="%s">%s</td><td class="%s">%s</td>""" % (cssClass,dataRow.protCDRID,cssClass,dataRow.status))
     form.append(u"</tr>")
     if cssClass == 'cdrTableEven':
