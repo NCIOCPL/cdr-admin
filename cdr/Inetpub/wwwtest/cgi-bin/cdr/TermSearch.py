@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: TermSearch.py,v 1.14 2007-10-15 15:54:52 kidderc Exp $
+# $Id: TermSearch.py,v 1.15 2007-10-19 12:59:35 kidderc Exp $
 #
 # Prototype for duplicate-checking interface for Term documents.
 #
@@ -198,7 +198,7 @@ if ckPrefNm:
                 NCIPrefName = NCIThes.getNCITPreferredName(conceptCode)
                 CDRPrefName = NCIThes.getCDRPreferredName(session,updateCDRID)
                 if ( CDRPrefName.upper().rstrip(' ').lstrip(' ') != NCIPrefName.upper().rstrip(' ').lstrip(' ') ):
-                    cdrcgi.sendPage("""Impost cannot be completed since preferred names do not match. (CDR: '%s' and NCIT: '%s')""" % (CDRPrefName.upper(),NCIPrefName.upper()) )
+                    cdrcgi.sendPage("""Import cannot be completed since preferred names do not match. (CDR: '%s' and NCIT: '%s')""" % (CDRPrefName.upper(),NCIPrefName.upper()) )
                 else:
                     cdrcgi.sendPage("")
 
@@ -211,7 +211,7 @@ if impReq:
     if not session:
         cdrcgi.bail("User not logged in")
     if updateCDRID:
-        result = NCIThes.updateTerm(session,updateCDRID,conceptCode)
+        result = NCIThes.updateTerm(session,updateCDRID,conceptCode,doUpdate=1)
     else:
         result = NCIThes.addNewTerm(session,conceptCode)
 
