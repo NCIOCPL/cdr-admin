@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CiatCipsStaff.py,v 1.5 2007-06-14 20:08:54 bkline Exp $
+# $Id: CiatCipsStaff.py,v 1.6 2007-10-22 16:02:15 bkline Exp $
 #
 # Main menu for CIAT/CIPS staff.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2007/06/14 20:08:54  bkline
+# Plugged in command to upload GENETICSPROFESSIONAL documents.
+#
 # Revision 1.4  2006/11/29 16:18:43  bkline
 # Added new command for reviewing new CTS trials.
 #
@@ -40,17 +43,18 @@ buttons = []
 html    = cdrcgi.header(title, title, section, "", buttons) + """\
    <ol>
 """
-items   = (('AdvancedSearch.py', 'Advanced Search'      ),
-           ('getBatchStatus.py', 'Batch Job Status'     ),
-           ('CTGov.py',          'CTGov Protocols'      ),
-           ('GlobalChange.py',   'Global Changes'       ),
-	   ('FtpImages.py',      'Images Download'      ),
-           ('Mailers.py',        'Mailers'              ),
-           ('MergeProt.py',      'Protocol Merge'       ),
-           ('Reports.py',        'Reports'              ),
-           ('CtsSubmittedTrials.py', 'Submitted Trials Review' ),
-           ('EditExternMap.py',  'Update Mapping Table' ),
-           ('UploadGPSet.py',    'Upload GENETICSPROFESSIONAL Document Set')
+items   = (('AdvancedSearch.py', 'Advanced Search',       ''               ),
+           ('getBatchStatus.py', 'Batch Job Status',      ''               ),
+           ('CTGov.py',          'CTGov Protocols',       ''               ),
+           ('GlobalChange.py',   'Global Changes',        ''               ),
+           ('FtpImages.py',      'Images Download',       ''               ),
+           ('Mailers.py',        'Mailers',               ''               ),
+           ('CtsSubmittedTrials.py', 'New Oncore Trials', '&source=Oncore' ),
+           ('MergeProt.py',      'Protocol Merge',        ''               ),
+           ('Reports.py',        'Reports',               ''               ),
+           ('CtsSubmittedTrials.py', 'Submitted Trials Review', '' ),
+           ('EditExternMap.py',  'Update Mapping Table', '' ),
+           ('UploadGPSet.py',    'Upload GENETICSPROFESSIONAL Document Set', '')
            )
 #items   = (('AdvancedSearch.py', 'Advanced Search'      ),
 #           ('Reports.py',        'Reports'              ),
@@ -63,8 +67,8 @@ items   = (('AdvancedSearch.py', 'Advanced Search'      ),
 #           )
 for item in items:
     html += """\
-    <li><a href='%s/%s%s'>%s</a></li>
-""" % (cdrcgi.BASE, item[0], session, item[1])
+    <li><a href='%s/%s%s%s'>%s</a></li>
+""" % (cdrcgi.BASE, item[0], session, item[2], item[1])
 
 cdrcgi.sendPage(html + """\
    </ol>
