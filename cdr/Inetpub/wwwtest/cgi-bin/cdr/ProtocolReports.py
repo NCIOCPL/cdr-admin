@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolReports.py,v 1.32 2007-07-31 12:12:52 bkline Exp $
+# $Id: ProtocolReports.py,v 1.33 2007-10-22 15:58:10 bkline Exp $
 #
 # Submenu for protocol reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.32  2007/07/31 12:12:52  bkline
+# Added NCIC import report.
+#
 # Revision 1.31  2007/06/12 16:53:10  kidderc
 # 3306. Create a Warehouse Box Number Report.
 #
@@ -128,99 +131,116 @@ if action == "Log Out":
 #----------------------------------------------------------------------
 # Display available report choices.
 #----------------------------------------------------------------------
-form = """\
+form = ["""\
     <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
+<!--
     <H3>QC Reports</H3>
     <OL>
-""" % (cdrcgi.SESSION, session)
-reports = [('ProtSearch.py?', 
+""" % (cdrcgi.SESSION, session)]
+reports = (('ProtSearch.py?', 
             'Protocol QC Reports'),
            ('QcReport.py?DocType=InScopeProtocol&ReportType=pp&',   
             'Publish Preview - InScopeProtocol'),
            ('QcReport.py?DocType=CTGovProtocol&ReportType=pp&',   
-            'Publish Preview - CTGovProtocol')]
+            'Publish Preview - CTGovProtocol'))
 for r in reports:
-    form += "<LI><A HREF='%s/%s%s=%s'>%s</LI></A>\n" % (
-            cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
+    form.append("<LI><A HREF='%s/%s%s=%s'>%s</LI></A>\n" %
+                (cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1]))
 
-form += """\
+form.append("""\
     </OL>
+-->
     <H3>Management Reports</H3>
     <OL>
-"""
+""")
+for r in (('ApprovedNotYetActive.py',
+           'Approved Not Yet Active Report', ''),
+          ('Request1687.py',
+           'CTEP Orgs Without Phones', ''),
+          ('CTGovEntryDate.py',
+           'CTGovProtocols vs. Early EntryDate', ''),
+          ('Request2113.py', 
+           'NCI Cancer Centers', ''),
+          ('LiaisonReport.py', 
+           'NCI Liaison Office/Brussels Protocol Report', ''),
+          ('Request2862.py', 
+           'NCI Liaison Office Trial Contacts for Abstract Review', ''),
+          ('PreferredProtOrgs.py', 
+           'Preferred Protocol Organizations', ''),
+          ('NciClinicalTrialsStats.py', 
+           'Profile of NCI Sponsored Clinical Trials', ''),
+          ('TrialsCitationStats.py',
+           'Protocol Citation Statistics', ''),
+          ('Request1855.py',
+           'Protocol Interventions', '&cols=2'),
+          ('Request1855.py',
+           'Protocol Interventions by Protocol Title', ''),
+          ('ProtSitesWithoutPhone.py',
+           'Protocol Sites Without Phone Numbers', ''),
+          ('ProtocolActiveNoSites.py',
+           'Protocols with Active Status But No Active Sites', ''),
+          ('ProtocolINDReport.py',
+           'Protocols with FDA IND Information (Excel)', ''),
+          ('OutcomeMeasuresCodingReport.py',
+           'Protocols without Outcomes', '&onlyMissing=Y')):
+    form.append("<LI><A HREF='%s/%s?%s=%s%s'>%s</A></LI>\n" %
+                (cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[2], r[1]))
+form.append("""\
+    </OL>
+    <H3>Processing/Publishing Reports</H3>
+    <OL>
+""")
 filename = time.strftime('InterimUpdateReport-%Y%m%d%H%M%S.xls')
-reports = [
-           ('ApprovedNotYetActive.py',
-            'Approved Not Yet Active Report', ''),
-           ('RssImportReport.py', 'COG Import/Update Statistics Report',
-            '&source=COG'),
-           ('Request1687.py',
-            'CTEP Orgs Without Phones', ''),
-           ('CTGovEntryDate.py',
-            'CTGovProtocols vs. Early EntryDate', ''),
-           ('Request2113.py', 
-            'NCI Cancer Centers', ''),
-           ('LiaisonReport.py', 
-            'NCI Liaison Office/Brussels Protocol Report', ''),
-           ('Request2862.py', 
-            'NCI Liaison Office Trial Contacts for Abstract Review', ''),
-           ('RssImportReport.py', 'NCIC Import/Update Statistics Report',
-            '&source=NCIC'),
-           ('NewlyPublishableTrials.py', 
-            'Newly Publishable Trials', ''),
-           ('NewlyPublishedTrials2.py', 
-            'Newly Published Trials', ''),
-           ('RssImportReport.py', 'Oncore Import/Update Statistics Report',
-            '&source=Oncore'),
-           ('PreferredProtOrgs.py', 
-            'Preferred Protocol Organizations', ''),
-           ('NciClinicalTrialsStats.py', 
-            'Profile of NCI Sponsored Clinical Trials', ''),
-           ('TrialsCitationStats.py',
-            'Protocol Citation Statistics', ''),
-           ('HotfixReport.py',
-            'Protocol Interim Update Report',
-            '&filename=%s' % filename),
-           ('Request1855.py',
-            'Protocol Interventions', '&cols=2'),
-           ('Request1855.py',
-            'Protocol Interventions by Protocol Title', ''),
-           ('ProtSitesWithoutPhone.py',
-            'Protocol Sites Without Phone Numbers', ''),
-           ('ProtocolStatusChange.py',
-            'Protocol Status Change Report', ''),
-           ('ProtocolActiveNoSites.py',
-            'Protocols with Active Status But No Active Sites', ''),
-           ('ProtocolINDReport.py',
-            'Protocols with FDA IND Information (Excel)', ''),
-           ('OutcomeMeasuresCodingReport.py',
-            'Protocols without Outcomes', '&onlyMissing=Y'),
-           ('ProtProcReport.py',
-            'Protocol Processing Status Report', ''),
-           ('ProtProcReport.py',
-            'Protocol Processing Status Report with Protocol Title',
-            '&include-title=true'),
-           ('OSPReport.py',
-            'Report for Office of Science Policy', ''),
-           ('RssImportReport.py', 'RSS Import/Update Statistics Report', ''),
-           ('RssDocsNoSites.py', 'RSS Imports With No External Sites', '')
-          ]
-for r in reports:
-    form += "<LI><A HREF='%s/%s?%s=%s%s'>%s</LI></A>\n" % (
-            cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[2], r[1])
+for r in (('NewlyPublishableTrials.py', 
+           'Newly Publishable Trials', ''),
+          ('NewlyPublishedTrials2.py', 
+           'Newly Published Trials', ''),
+          ('HotfixReport.py',
+           'Protocol Interim Update Report',
+           '&filename=%s' % filename),
+          ('ProtocolStatusChange.py',
+           'Protocol Status Change Report', ''),
+          ('ProtProcReport.py',
+           'Protocol Processing Status Report', ''),
+          ('ProtProcReport.py',
+           'Protocol Processing Status Report with Protocol Title',
+           '&include-title=true'),
+          ('Request3654.py', 'Scientific Protocol Tracking Report', '')):
+    form.append("<LI><A HREF='%s/%s?%s=%s%s'>%s</A></LI>\n" %
+                (cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[2], r[1]))
 
-form += """\
+form.append("""\
+    </OL>
+    <H3>Data Import Reports</H3>
+    <OL>
+""")
+for r in (('RssImportReport.py', 'COG Import/Update Statistics Report',
+           '&source=COG'),
+          ('RssImportReport.py', 'NCIC Import/Update Statistics Report',
+           '&source=NCIC'),
+          ('RssImportReport.py', 'Oncore Import/Update Statistics Report',
+           '&source=Oncore'),
+          ('Request3472.py', 'PDQ Submission Portal Statistics Summary Report',
+           '')):
+    form.append("<LI><A HREF='%s/%s?%s=%s%s'>%s</A></LI>\n" %
+                (cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[2], r[1]))
+title = "PDQ Submission Portal Submission Details Report"
+host  = cdr.emailerHost()
+form.append("<LI><A HREF='http://%s/u/showcts.py'>%s</A></LI>\n" %
+            (host, title))
+for r in (('RssImportReport.py', 'RSS Import/Update Statistics Report', ''),
+          ('RssDocsNoSites.py', 'RSS Imports With No External Sites', '')):
+    form.append("<LI><A HREF='%s/%s?%s=%s%s'>%s</A></LI>\n" %
+                (cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[2], r[1]))
+form.append("""\
     </OL>
     <H3>Other Reports</H3>
     <OL>
-"""
+""")
 
-reports = [
-           ('WarehouseBoxNumberReport.py',
-            'Warehouse Box Number Report', ''),
-          ]
-for r in reports:
-    form += "<LI><A HREF='%s/%s?%s=%s%s'>%s</LI></A>\n" % (
-            cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[2], r[1])
-    
-cdrcgi.sendPage(header + form + "</OL></FORM></BODY></HTML>")
+for r in (('WarehouseBoxNumberReport.py', 'Warehouse Box Number Report', ''),
+          ('OSPReport.py', 'Report for Office of Science Policy', '')):
+    form.append("<LI><A HREF='%s/%s?%s=%s%s'>%s</A></LI>\n" %
+                (cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[2], r[1]))
+
+cdrcgi.sendPage(header + ''.join(form) + "</OL></FORM></BODY></HTML>")
