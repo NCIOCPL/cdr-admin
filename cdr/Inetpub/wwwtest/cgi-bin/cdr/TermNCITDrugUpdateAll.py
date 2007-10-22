@@ -99,6 +99,9 @@ if getThingsToUpdate:
     cdrcgi.sendPage(json)
 
 if parm_concept and parm_doc_id:
+    #f = open("d:\\cdr\\output\\debug.txt","a")
+    #f.write("""inputs: %s   %s\n\n""" % (parm_concept,parm_doc_id))
+    #f.close()
     if doUpdate == 1:
         result = NCIThes.updateTerm(session,parm_doc_id,parm_concept,doUpdate=1)
     else:
@@ -117,10 +120,11 @@ if parm_concept and parm_doc_id:
     json += """['Col2href','%s'],""" % col2href
     json += """['Col2val','%s'],""" % col2val
     json += """['Col3','%s']]""" % col3
-    f = open("d:\\cdr\\output\\debug.txt","a")
-    f.write(json)
-    f.write("\n\n\n")
-    f.close()
+
+    #f = open("d:\\cdr\\output\\debug.txt","a")
+    #f.write(json)
+    #f.write("\n\n\n")
+    #f.close()
     cdrcgi.sendPage(json)
 
 #----------------------------------------------------------------------
@@ -212,6 +216,20 @@ a.selected:hover
     text-decoration: underline;
     font-weight: bold;
 }
+ul.errorview li {
+    list-style-type: none;
+}
+ul li.errorviewheading {
+    list-style-type: none;
+    color:red;
+    font-weight: bold;
+}
+ul li.errorline {
+    list-style-type: none;
+    color:blue;
+    font-weight: normal;
+}
+
 </style>
 <script language='JavaScript' src='/js/scriptaculous/prototype.js'></script>
 <script language='JavaScript' src='/js/scriptaculous/scriptaculous.js'></script>
@@ -221,21 +239,35 @@ var ajaxResponse = '';
 var rowNum = 0;
 var totalCount = 0;
 var className = 'cdrTableEven';
-var errorOccurred = false;
 var beginBlock = 0;
 var endBlock = 0;
-var blockSize = 10;
+var blockSize = 2;
 var pairs;
 var numErrorMsgs = 0;
+var doRealUpdate = 0;
 
 Event.observe(window, 'load', function(){
     new Effect.Highlight(statusTxt);
 });
 
 function checkUpdate(){
-    errorOccurred = false;
-    row=0;
-    numErrorMsgs = 0
+    doRealUpdate = 0;
+    runThroughList();
+}
+
+function doUpdateForReal(){
+    if (confirm('Continue with the update?')){
+        doRealUpdate = 1;
+        runThroughList();
+    }
+}
+
+function runThroughList(){
+    initializeTable();
+    rowNum = 0;
+    numErrorMsgs = 0;
+    beginBlock = 0;
+    endBlock = 0;
     updateStatus('Getting a list of document IDs and concept pairs.');
     getListOfThingsToUpdate();
     pairs = eval("(" + ajaxResponse + ")");
@@ -244,6 +276,7 @@ function checkUpdate(){
     $('resultTable').style.visibility='visible';
     $('spinImage').style.visibility='visible';
     $('checkUpdateButton').style.visibility='hidden';
+    $('doRealUpdateButton').style.visibility='hidden';
     
     endBlock = beginBlock + blockSize;
     if ( endBlock > totalCount )
@@ -252,13 +285,21 @@ function checkUpdate(){
     runNextBlock();
 }
 
+function initializeTable(){
+    var tableElem = $('resultTable');
+    tableElem.removeChild($('resultTable').getElementsByTagName('TBODY')[0]);
+    var tbody = document.createElement("TBODY");
+    tableElem.appendChild(tbody);
+    createTableHeading();
+}
+
 function runNextBlock(){
     for (var i=beginBlock; i<endBlock; i++)
         doUpdate(pairs[i][0],pairs[i][1]);
 }
 
 function doUpdate(doc_id,concept){
-    url = "%s/TermNCITDrugUpdateAll.py?DoUpdate=0&Doc_id=" + doc_id + "&Concept=" + concept + "&random=%s&Session=%s";
+    url = "%s/TermNCITDrugUpdateAll.py?DoUpdate=" + doRealUpdate + "&Doc_id=" + doc_id + "&Concept=" + concept + "&random=%s&Session=%s";
     doAjaxForRow(url);
 }
 
@@ -289,17 +330,47 @@ function handleAjaxResponseForRow(resultObj){
 }
 
 function handleAjaxFailure(resultObj){
-    numErrorMsgs++;
-    if (errorOccurred == false)
-        alert('Ajax Failure' + resultObj.responseText);
-    errorOccurred = true;
+    addError('Ajax Failure');
 }
 
 function handleAjaxException(instance,ex){
+    addError('Exception: ' + ex.name + ' ' + ex.message);
+}
+
+function addError(txt){
+    $('errorList').style.visibility='visible';
     numErrorMsgs++;
-    if (errorOccurred == false)
-        alert('Exception: ' + ex.name + ' ' + ex.message);
-    errorOccurred = true;
+    var li = document.createElement("LI");
+    li.className = 'errorline';
+    li.appendChild(document.createTextNode(txt));
+    $('errorList').appendChild(li);
+    if (rowNum + numErrorMsgs == endBlock-1)
+    {
+        beginBlock = endBlock;
+        endBlock = beginBlock + blockSize;
+        if ( endBlock > totalCount )
+            endBlock = totalCount
+        runNextBlock();
+    }
+}
+
+function createTableHeading(){
+    var tr = document.createElement("TR");
+    var th1 = document.createElement("TH");
+    var th2 = document.createElement("TH");
+    var th3 = document.createElement("TH");
+    th1.className = "cdrTable";
+    th2.className = "cdrTable";
+    th3.className = "cdrTable";
+    th1.appendChild(document.createTextNode('Doc ID'));
+    th2.appendChild(document.createTextNode('NCIT Concept'));
+    th3.appendChild(document.createTextNode('Results'));
+    tr.appendChild(th1);
+    tr.appendChild(th2);
+    tr.appendChild(th3);
+
+    var tbodyElem = $('resultTable').getElementsByTagName('TBODY')[0];
+    tbodyElem.appendChild(tr);
 }
 
 function AddDataRow(jsonText){
@@ -311,6 +382,8 @@ function AddDataRow(jsonText){
         className = 'cdrTableEven';
 
     stsTxt = 'Updated row ' + rowNum + ' of ' + totalCount;
+    if ( numErrorMsgs > 0 )
+        StsTxt += ' (Num Errors: ' + numErrorMsgs + ')'
     updateStatus(stsTxt);
     
     var tbodyElem = $('resultTable').getElementsByTagName('TBODY')[0];
@@ -320,9 +393,6 @@ function AddDataRow(jsonText){
     var td2 = document.createElement("TD");
     var td2a = document.createElement("A");
     var td3 = document.createElement("TD");
-    //td1.setAttribute((document.all ? 'className' : 'class'),className);
-    //td2.setAttribute((document.all ? 'className' : 'class'),className);
-    //td3.setAttribute((document.all ? 'className' : 'class'),className);
     td1.className = className;
     td2.className = className;
     td3.className = className;
@@ -333,7 +403,7 @@ function AddDataRow(jsonText){
         else if ( elemPairs[i][0] == 'Col1val' )
             td1a.appendChild(document.createTextNode(elemPairs[i][1]));
         else if ( elemPairs[i][0] == 'Col2href' )
-            td2a.setAttribute('href',pairs[i][1]);
+            td2a.setAttribute('href',elemPairs[i][1]);
         else if ( elemPairs[i][0] == 'Col2val' )
             td2a.appendChild(document.createTextNode(elemPairs[i][1]));
         else if ( elemPairs[i][0] == 'Col3' )
@@ -354,6 +424,7 @@ function AddDataRow(jsonText){
     {
         updateStatus('Done. Updated ' + rowNum + ' of ' + totalCount + ' (' + numErrorMsgs + ' errors)');
         $('checkUpdateButton').style.visibility='visible';
+        $('doRealUpdateButton').style.visibility='visible';
         $('spinImage').style.visibility='hidden';
     }
     else if (rowNum + numErrorMsgs == endBlock-1)
@@ -383,7 +454,8 @@ form   = """\
 </td>
 <td width = 95%%>
    <p id = 'statusTxt' align = center>
-   Press the check update button to see what will be updated.
+   Press the 'Check Update' button to see what will be updated.<br>
+   Press the 'Do Data Update...' button to update the data in the database.
    </p>
 </td>
 </tr>
@@ -391,15 +463,17 @@ form   = """\
 <td></td>
 <td align=center>
    <button id='checkUpdateButton' onClick='checkUpdate();return false;'>Check Update</button>
+   &nbsp;&nbsp;&nbsp;&nbsp;
+   <button id='doRealUpdateButton' onClick='doUpdateForReal();return false;'>Do Data Update...</button>
 </td>
 </tr>
 
+<ul class ="errorview" id='errorList' style="visibility:hidden">
+<li class="errorviewheading">Errors:</li>
+</ul>
+<br>
+
 <table id='resultTable' style="visibility:hidden">
-   <tr>
-   <th  class="cdrTable">Doc ID</th>
-   <th  class="cdrTable">NCIT Concept</th>
-   <th  class="cdrTable">Results</th>
-   </tr>
 </table>
    
   </form>
