@@ -241,7 +241,7 @@ var totalCount = 0;
 var className = 'cdrTableEven';
 var beginBlock = 0;
 var endBlock = 0;
-var blockSize = 2;
+var blockSize = 1;
 var pairs;
 var numErrorMsgs = 0;
 var doRealUpdate = 0;
@@ -344,7 +344,7 @@ function addError(txt){
     li.className = 'errorline';
     li.appendChild(document.createTextNode(txt));
     $('errorList').appendChild(li);
-    if (rowNum + numErrorMsgs == endBlock-1)
+    if (rowNum + numErrorMsgs == endBlock)
     {
         beginBlock = endBlock;
         endBlock = beginBlock + blockSize;
@@ -427,7 +427,7 @@ function AddDataRow(jsonText){
         $('doRealUpdateButton').style.visibility='visible';
         $('spinImage').style.visibility='hidden';
     }
-    else if (rowNum + numErrorMsgs == endBlock-1)
+    else if (rowNum + numErrorMsgs == endBlock)
     {
         beginBlock = endBlock;
         endBlock = beginBlock + blockSize;
@@ -468,6 +468,7 @@ form   = """\
 </td>
 </tr>
 
+<br>
 <ul class ="errorview" id='errorList' style="visibility:hidden">
 <li class="errorviewheading">Errors:</li>
 </ul>
