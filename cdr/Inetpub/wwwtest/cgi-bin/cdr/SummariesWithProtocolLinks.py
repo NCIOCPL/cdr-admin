@@ -31,7 +31,7 @@ buttons   = (SUBMENU, cdrcgi.MAINMENU)
 #groups.append('Adult Treatment')
 #statuses.append('Closed')
 #statuses.append('Active')
-#session   = '4713A376-6D965A-248-VRORIB5JL0KP'
+#session   = '471E026A-F07F08-248-3IN0OE6DH8XL'
 #---------------------------
 
 class dataRow:
@@ -347,54 +347,63 @@ if not query:
 dataRows = []
 cdrids = []
 
-def checkElement(cdrid,node,parentElem,ref):
+def checkElement(cdrid,node,parentElem,ref,lastSECTitle):
     for dataRow in dataRows:
         if dataRow.cdrid == cdrid:
-            Linkcdrid = cdr.normalize(dataRow.protCDRID)
-            if node.attributes.length > 0:
-                for (name,value) in node.attributes.items():
-                    if ref == 'LINK':
-                        if name == 'cdr:ref':
-                            if value == Linkcdrid:
-                                if node.childNodes:
-                                    for nodeChild in node.childNodes:
-                                        if nodeChild == xml.dom.minidom.Node.TEXT_NODE:
-                                            if len(nodeChild.Value) == 0:
-                                                nodeChild.Value = 'Protocol Link'
-                                else:
-                                    textNode = dom.createTextNode('Protocol Link')
-                                    node.appendChild(textNode)
-                                dataRow.addProtocolLink(parentElem)
-                    elif ref == 'REF':
-                        if name == 'cdr:href':
-                            if value == Linkcdrid:
-                                if node.childNodes:
-                                    for nodeChild in node.childNodes:
-                                        if nodeChild == xml.dom.minidom.Node.TEXT_NODE:
-                                            if len(nodeChild.Value) == 0:
-                                                nodeChild.Value = 'Protocol Ref'
-                                else:
-                                    textNode = dom.createTextNode('Protocol Ref')
-                                    node.appendChild(textNode)
-                                dataRow.addProtocolLink(parentElem)
+            if dataRow.summarySecTitle == lastSECTitle:
+                Linkcdrid = cdr.normalize(dataRow.protCDRID)
+                if node.attributes.length > 0:
+                    for (name,value) in node.attributes.items():
+                        if ref == 'LINK':
+                            if name == 'cdr:ref':
+                                if value == Linkcdrid:
+                                    if node.childNodes:
+                                        for nodeChild in node.childNodes:
+                                            if nodeChild == xml.dom.minidom.Node.TEXT_NODE:
+                                                if len(nodeChild.Value) == 0:
+                                                    nodeChild.Value = 'Protocol Link'
+                                    else:
+                                        textNode = dom.createTextNode('Protocol Link')
+                                        node.appendChild(textNode)
+                                    if len(dataRow.protocolLink) == 0:
+                                        dataRow.addProtocolLink(parentElem)
+                                        return
+                        elif ref == 'REF':
+                            if name == 'cdr:href':
+                                if value == Linkcdrid:
+                                    if node.childNodes:
+                                        for nodeChild in node.childNodes:
+                                            if nodeChild == xml.dom.minidom.Node.TEXT_NODE:
+                                                if len(nodeChild.Value) == 0:
+                                                    nodeChild.Value = 'Protocol Ref'
+                                    else:
+                                        textNode = dom.createTextNode('Protocol Ref')
+                                        node.appendChild(textNode)
+                                    if len(dataRow.protocolLink) == 0:
+                                        dataRow.addProtocolLink(parentElem)
+                                        return
     return
 
-def checkChildren(cdrid,parentElem):
+def checkChildren(cdrid,parentElem,lastSECTitle):
     for node in parentElem.childNodes:
         nodeValue = node.nodeValue
         nodeName = node.nodeName
         if node.nodeType == xml.dom.minidom.Node.ELEMENT_NODE:
             if nodeName == 'ProtocolLink':
-                checkElement(cdrid,node,parentElem,'LINK')
+                checkElement(cdrid,node,parentElem,'LINK',lastSECTitle)
             elif nodeName == 'ProtocolRef':
-                checkElement(cdrid,node,parentElem,'REF')
+                checkElement(cdrid,node,parentElem,'REF',lastSECTitle)
+            elif nodeName == 'Title':
+                for chNode in node.childNodes:
+                    if chNode.nodeType == xml.dom.minidom.Node.TEXT_NODE:
+                        lastSECTitle = chNode.nodeValue
             
-        checkChildren(cdrid,node)
+        checkChildren(cdrid,node,lastSECTitle)
     return
 
 def updateRefs(cdrid,dom):
     docElem = dom.documentElement
-    checkChildren(cdrid,docElem)
+    checkChildren(cdrid,docElem,'')
     return
 
 #----------------------------------------------------------------------
@@ -425,8 +434,11 @@ for cdrid in cdrids:
     doc = cdr.getDoc(session, docId, checkout = 'N')
     if doc.startswith("<Errors"):
         cdrcgi.bail("<error>Unable to retrieve %s : %s" % cdrid,doc)
-    doc = cdr.getDoc(session, docId, checkout = 'N', getObject=1)
-    dom = xml.dom.minidom.parseString(doc.xml)
+    #doc = cdr.getDoc(session, docId, checkout = 'N', getObject=1)
+    filter = ['name:Revision Markup Filter']
+    doc = cdr.filterDoc(session,filter,docId=docId)
+    #dom = xml.dom.minidom.parseString(doc.xml)
+    dom = xml.dom.minidom.parseString(doc[0])
     updateRefs(cdrid,dom)
 
 cursor.close()
