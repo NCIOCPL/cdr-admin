@@ -15,12 +15,12 @@ session   = cdrcgi.getSession(fields)
 #boolOp    = fields and fields.getvalue("Boolean")          or "AND"
 lang      = fields and fields.getvalue("lang")             or None
 groups    = fields and fields.getvalue("grp")              or []
-statuses    = fields and fields.getvalue("status")         or []
+types    = fields and fields.getvalue("type")         or []
 submit    = fields and fields.getvalue("SubmitButton")     or None
 request   = cdrcgi.getRequest(fields)
 title     = "CDR Administration"
-instr     = "Summaries With Protocol Links/Refs Report"
-script    = "SummariesWithProtocolLinks.py"
+instr     = "Summaries With Non-Journal Article Citations Report"
+script    = "SummariesWithNonJournalArticleCitations.py"
 SUBMENU   = "Report Menu"
 buttons   = (SUBMENU, cdrcgi.MAINMENU)
 
@@ -29,56 +29,25 @@ buttons   = (SUBMENU, cdrcgi.MAINMENU)
 #---------------------------
 #lang = 'English'
 #groups.append('Adult Treatment')
-#statuses.append('Closed')
-#statuses.append('Active')
+#types.append('Book')
+#types.append('Book chapter')
 #session   = '4713A376-6D965A-248-VRORIB5JL0KP'
 #---------------------------
 
 class dataRow:
-    def __init__(self,cdrid,summaryTitle,summarySecTitle,ref,protCDRID,status):
+    def __init__(self,cdrid,summaryTitle,summarySecTitle,citationType,citCDRID,citationTitle):
         self.cdrid = cdrid
         self.summaryTitle = summaryTitle
         self.summarySecTitle = summarySecTitle
-        self.ref = ref
-        self.protCDRID = protCDRID
-        self.linkcdrid = cdr.normalize(protCDRID)
-        self.status = status
-        self.protocolLink = ''
-        self.protocolRef = ''
-        self.text = ''
+        self.citationType = citationType
+        self.citCDRID = citCDRID
+        self.linkcdrid = cdr.normalize(citCDRID)
+        self.citationTitle = citationTitle
+        self.pubDetails = 'pub Details'
     
-    def addProtocolLink(self,parentElem):
-        self.text = ''
-        self.addText(parentElem,0)
-        if self.ref == 'LINK':
-            self.protocolLink = self.text
-        else:
-            self.protocolRef = self.text
+    def addPubDetails(self,pubDetails):
+        self.pubDetails = pubDetails
 
-    def addText(self,parentElem,bInLink):
-        binlink = 0
-        for parentChildNode in parentElem.childNodes:
-            if parentChildNode.nodeType == xml.dom.minidom.Node.ELEMENT_NODE:
-                if parentChildNode.attributes.length > 0:
-                    for (name,value) in parentChildNode.attributes.items():
-                        if self.ref == 'LINK':
-                            if name == 'cdr:ref':
-                                if value == self.linkcdrid:
-                                    binlink = 1
-                                    self.text += "<a href = %s/QcReport.py?DocId=%s&Session=%s>" % (cdrcgi.BASE,self.linkcdrid,session)
-                        elif self.ref == 'REF':
-                            if name == 'cdr:href':
-                                if value == self.linkcdrid:
-                                    binlink = 1
-                                    self.text += "<a href = %s/QcReport.py?DocId=%s&Session=%s>" % (cdrcgi.BASE,self.linkcdrid,session)
-                                
-            if parentChildNode.nodeType == xml.dom.minidom.Node.TEXT_NODE:
-                self.text += parentChildNode.nodeValue + " "
-                if bInLink == 1:
-                    bInLink = 0
-                    self.text += "</a>"
-            self.addText(parentChildNode,binlink)
-            binlink = 0
 #----------------------------------------------------------------------
 # If the user only picked one summary group, put it into a list so we
 # can deal with the same data structure whether one or more were
@@ -86,8 +55,8 @@ class dataRow:
 #----------------------------------------------------------------------
 if type(groups) in (type(""), type(u"")):
     groups = [groups]
-if type(statuses) in (type(""), type(u"")):
-    statuses = [statuses]
+if type(types) in (type(""), type(u"")):
+    types = [types]
 
 #----------------------------------------------------------------------
 # Handle navigation requests.
@@ -174,28 +143,36 @@ if not lang:
 
     <tr>
      <td colspan=2>
-      <b>Select Trial Status: (one or more)</b>
+      <b>Select Citation Type: (one or more)</b>
      </td>
     </tr>
     <tr>
      <td></td>
      <td>
-      <input type='checkbox' name='status' value='All Status' CHECKED>
-       <b>All Status</b><br>
-      <input type='checkbox' name='status' value='Active'>
-       <b>Active</b><br>
-      <input type='checkbox' name='status' value='Approved-not yet active'>
-       <b>Approved-not yet active</b><br>
-      <input type='checkbox' name='status' value='Temporarily closed'>
-       <b>Temporarily closed</b><br>
-       <input type='checkbox' name='status' value='Closed'>
-       <b>Closed</b><br>
-       <input type='checkbox' name='status' value='Completed'>
-       <b>Completed</b><br>
-       <input type='checkbox' name='status' value='Withdrawn'>
-       <b>Withdrawn</b><br>
-       <input type='checkbox' name='status' value='Withdrawn from PDQ'>
-       <b>Withdrawn from PDQ</b><br>
+      <input type='checkbox' name='type' value='All Types' CHECKED>
+       <b>All Types</b><br>
+      <input type='checkbox' name='type' value='Book'>
+       <b>Book</b><br>
+      <input type='checkbox' name='type' value='Book [Internet]'>
+       <b>Book [Internet]</b><br>
+      <input type='checkbox' name='type' value='Book chapter'>
+       <b>Book chapter</b><br>
+       <input type='checkbox' name='type' value='Book chapter [Internet]'>
+       <b>Book chapter [Internet]</b><br>
+       <input type='checkbox' name='type' value='Abstract'>
+       <b>Abstract</b><br>
+       <input type='checkbox' name='type' value='Abstract [Internet]'>
+       <b>Abstract [Internet]</b><br>
+       <input type='checkbox' name='type' value='Database'>
+       <b>Database</b><br>
+       <input type='checkbox' name='type' value='Database entry'>
+       <b>Database entry</b><br>
+       <input type='checkbox' name='type' value='Internet'>
+       <b>Internet</b><br>
+       <input type='checkbox' name='type' value='Meeting Paper'>
+       <b>Meeting Paper</b><br>
+       <input type='checkbox' name='type' value='Meeting Paper [Internet]'>
+       <b>Meeting Paper [Internet]</b><br>
      </td>
     </tr>    
    </table>
@@ -238,22 +215,20 @@ for i in range(len(groups)):
   else:
       boardPick += """'""" + groups[i] + """', """
 
-statusPick=''
-for i in range(len(statuses)):
-    statusPick += "'" + statuses[i] + "',"
+typesPick=''
+for i in range(len(types)):
+    typesPick += "'" + types[i] + "',"
 
 #------------------------------------
 # build the query
 #------------------------------------
-def getQuerySegment(lang,ref):
-    query = [u"""SELECT qt.doc_id as cdrid, title.value as summaryTitle, secTitle.value as summarySecTitle,'"""]
-
-    query.append(ref)
-    
-    query.append(u"""' as ref, qt.int_val as protCDRID, qstatus.value as status
+def getQuery(lang):
+    query = [u"""SELECT distinct qt.doc_id as cdrid, title.value as summaryTitle, secTitle.value as summarySecTitle,"""]
+    query.append(u"""qcitationtype.value as citationType, qt.int_val as citCDRID, qcitationtitle.value as citationTitle
       FROM query_term qt
       JOIN query_term title ON qt.doc_id = title.doc_id
-      JOIN query_term qstatus ON qt.int_val = qstatus.doc_id
+      JOIN query_term qcitationtype ON qt.int_val = qcitationtype.doc_id
+      JOIN query_term qcitationtitle ON qt.int_val = qcitationtitle.doc_id
       JOIN query_term secTitle ON qt.doc_id = secTitle.doc_id
       JOIN query_term lang ON qt.doc_id = lang.doc_id """)
     
@@ -262,17 +237,16 @@ def getQuerySegment(lang,ref):
     else:
         query.append(u""" JOIN query_term qtrans ON qtrans.doc_id = qt.doc_id
                      JOIN query_term board ON qtrans.int_val = board.doc_id """)
-    if ref == 'LINK':
-        query.append(u""" WHERE qt.path like '/summary/%ProtocolLink/@cdr:ref' """)
-    else:
-        query.append(u""" WHERE qt.path like '/summary/%ProtocolRef/@cdr:href' """)
+    
+    query.append(u""" WHERE qt.path like '%CitationLink/@cdr:ref' """)
 
     if lang == 'Spanish':
         query.append(u""" AND qtrans.path = '/Summary/TranslationOf/@cdr:ref' """)
 
     query.append(u"""\
     AND title.path = '/Summary/SummaryTitle'
-    AND qstatus.path = '/InScopeProtocol/ProtocolAdminInfo/CurrentProtocolStatus' 
+    AND qcitationtype.path = '/Citation/PDQCitation/CitationType'
+    AND qcitationtitle.path = '/Citation/PDQCitation/CitationTitle' 
     AND secTitle.path like '/Summary/%SummarySection/Title' 
     AND LEFT(secTitle.node_loc,len(secTitle.node_loc)-4) =  LEFT(qt.node_loc,len(secTitle.node_loc)-4) 
     AND board.path = '/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref' """)
@@ -283,10 +257,12 @@ def getQuerySegment(lang,ref):
         query.append(boardPick[:-2])
         query.append(u""") """)
 
-    if statusPick.find("All Status") == -1:
-        query.append(u""" AND qstatus.value in (""")
-        query.append(statusPick[:-1])
+    if typesPick.find("All Types") == -1:
+        query.append(u""" AND qcitationtype.value in (""")
+        query.append(typesPick[:-1])
         query.append(u""") """)
+    else:
+        query.append(u""" AND qcitationtype.value not like 'Journal%' AND qcitationtype.value not like 'Proceeding%'""")
     
     query.append(u"""
     AND lang.path = '/Summary/SummaryMetaData/SummaryLanguage'
@@ -307,54 +283,48 @@ def getQuerySegment(lang,ref):
 
     query = u"".join(query)
     return query
+
+dataRows = []
+citcdrids = []
+
+def getPubDetails(citcdrid,dom):
+    pubDetails = ''
+    docElem = dom.documentElement
+    
+    elems = docElem.getElementsByTagName('CollectiveName')
+    for elem in elems:
+        for child in elem.childNodes:
+            if child.nodeType == xml.dom.minidom.Node.TEXT_NODE:
+                pubDetails += child.nodeValue
+                pubDetails += ':'
+    elems = docElem.getElementsByTagName('CitationTitle')
+    for elem in elems:
+        for child in elem.childNodes:
+            if child.nodeType == xml.dom.minidom.Node.TEXT_NODE:
+                pubDetails += child.nodeValue
+                pubDetails += '.'
+    elems = docElem.getElementsByTagName('PublicationInformation')
+    for elem in elems:
+        for child in elem.childNodes:
+            if child.nodeType == xml.dom.minidom.Node.TEXT_NODE:
+                pubDetails += child.nodeValue
+                pubDetails += '.'
+
+    for datarow in dataRows:
+        if datarow.citCDRID == citcdrid:
+            datarow.addPubDetails(pubDetails)
+    return
       
 # -------------------------------------------------------------
 # Put all the pieces together for the SELECT statement
 # -------------------------------------------------------------
 
-query = getQuerySegment(lang,'LINK') + " UNION " + getQuerySegment(lang,'REF') + " ORDER BY cdrid,status"
+query = getQuery(lang) + " ORDER BY cdrid"
 
 #cdrcgi.bail(query)
 
 if not query:
     cdrcgi.bail('No query criteria specified')
-
-dataRows = []
-cdrids = []
-
-def checkElement(cdrid,node,parentElem,ref):
-    for dataRow in dataRows:
-        if dataRow.cdrid == cdrid:
-            Linkcdrid = cdr.normalize(dataRow.protCDRID)
-            if node.attributes.length > 0:
-                for (name,value) in node.attributes.items():
-                    if ref == 'LINK':
-                        if name == 'cdr:ref':
-                            if value == Linkcdrid:
-                                dataRow.addProtocolLink(parentElem)
-                    elif ref == 'REF':
-                        if name == 'cdr:href':
-                            if value == Linkcdrid:
-                                dataRow.addProtocolLink(parentElem)
-    return                    
-
-def checkChildren(cdrid,parentElem):
-    for node in parentElem.childNodes:
-        nodeValue = node.nodeValue
-        nodeName = node.nodeName
-        if node.nodeType == xml.dom.minidom.Node.ELEMENT_NODE:
-            if nodeName == 'ProtocolLink':
-                checkElement(cdrid,node,parentElem,'LINK')
-            elif nodeName == 'ProtocolRef':
-                checkElement(cdrid,node,parentElem,'REF')
-            
-        checkChildren(cdrid,node)
-    return
-
-def updateRefs(cdrid,dom):
-    docElem = dom.documentElement
-    checkChildren(cdrid,docElem)
-    return
 
 #----------------------------------------------------------------------
 # Submit the query to the database.
@@ -370,19 +340,19 @@ except cdrdb.Error, info:
 if not rows:
     cdrcgi.bail('No Records Found for Selection')
 
-for cdrid,summaryTitle,summarySecTitle,ref,protCDRID,status in rows:
-    dataRows.append(dataRow(cdrid,summaryTitle,summarySecTitle,ref,protCDRID,status))
-    if cdrid not in cdrids:
-        cdrids.append(cdrid)
+for cdrid,summaryTitle,summarySecTitle,citationType,citCDRID,citationTitle in rows:
+    dataRows.append(dataRow(cdrid,summaryTitle,summarySecTitle,citationType,citCDRID,citationTitle))
+    if citCDRID not in citcdrids:
+        citcdrids.append(citCDRID)
 
-for cdrid in cdrids:
-    docId = cdr.normalize(cdrid)
-    doc = cdr.getDoc(session, docId, checkout = 'N')
+for citcdrid in citcdrids:
+    citdocId = cdr.normalize(citcdrid)
+    doc = cdr.getDoc(session, citdocId, checkout = 'N')
     if doc.startswith("<Errors"):
         cdrcgi.bail("<error>Unable to retrieve %s : %s" % cdrid,doc)
-    doc = cdr.getDoc(session, docId, checkout = 'N', getObject=1)
+    doc = cdr.getDoc(session, citdocId, checkout = 'N', getObject=1)
     dom = xml.dom.minidom.parseString(doc.xml)
-    updateRefs(cdrid,dom)
+    getPubDetails(citcdrid,dom)
 
 cursor.close()
 cursor = None
@@ -485,7 +455,7 @@ a.selected:hover
   
    <input type='hidden' name='%s' value='%s'>
     <p style="text-align: center; font-family: Verdana, Tahoma, sans-serif; font-size: 12pt; font-weight: bold; color: #553;">
-    Summaries with Protocol Links/Refs Report</br>
+    Summaries with Non-Journal Article Citations Report</br>
     <div style="text-align: center; font-family: Verdana, Tahoma, sans-serif; font-size: 11pt; font-weight: normal; color: #553;">%s</div>
     </p>
    
@@ -494,10 +464,10 @@ a.selected:hover
    <th  class="cdrTable">cdrid</th>
    <th  class="cdrTable">Summary Title</th>
    <th  class="cdrTable">Summary Sec Title</th>
-   <th  class="cdrTable">Protocol Link</th>
-   <th  class="cdrTable">Protocol Ref</th>
-   <th  class="cdrTable">CDRID</th>
-   <th  class="cdrTable">Status</th>
+   <th  class="cdrTable">Citation Type</th>
+   <th  class="cdrTable">Citation CDRID</th>
+   <th  class="cdrTable">Doc Title</th>
+   <th  class="cdrTable">Publication Details/Other Publication Info</th>
    </tr>
    """ % (cdrcgi.SESSION, session, dateString)]
 cssClass = 'cdrTableEven'
@@ -505,13 +475,8 @@ for dataRow in dataRows:
     form.append(u"<tr>")
     form.append(u"""<td class="%s">%s</td><td class="%s">%s</td><td class="%s">%s</td>"""
                 %(cssClass,dataRow.cdrid,cssClass,dataRow.summaryTitle,cssClass,dataRow.summarySecTitle))
-    if dataRow.ref == 'LINK':
-        form.append(u"""<td class="%s">%s</td><td class="%s"></td>"""
-                    % (cssClass,dataRow.protocolLink,cssClass))
-    else:
-        form.append(u"""<td class="%s"></td><td class="%s">%s</td>"""
-                    % (cssClass,cssClass,dataRow.protocolRef))
-    form.append(u"""<td class="%s">%s</td><td class="%s">%s</td>""" % (cssClass,dataRow.protCDRID,cssClass,dataRow.status))
+    form.append(u"""<td class="%s">%s</td><td class="%s">%s</td><td class="%s">%s</td><td class="%s">%s</td>"""
+                % (cssClass,dataRow.citationType,cssClass,dataRow.citCDRID,cssClass,dataRow.citationTitle,cssClass,dataRow.pubDetails))
     form.append(u"</tr>")
     if cssClass == 'cdrTableEven':
         cssClass = 'cdrTableOdd'
