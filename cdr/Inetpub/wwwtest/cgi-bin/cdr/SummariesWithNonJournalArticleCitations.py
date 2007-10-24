@@ -439,12 +439,12 @@ def getPubDetails(citcdrid,dom):
             if child.nodeType == xml.dom.minidom.Node.TEXT_NODE:
                 pubDetails += child.nodeValue
                 pubDetails += ':'
-    elems = docElem.getElementsByTagName('CitationTitle')
-    for elem in elems:
-        for child in elem.childNodes:
-            if child.nodeType == xml.dom.minidom.Node.TEXT_NODE:
-                pubDetails += child.nodeValue
-                pubDetails += '.'
+    #elems = docElem.getElementsByTagName('CitationTitle')
+    #for elem in elems:
+    #    for child in elem.childNodes:
+    #        if child.nodeType == xml.dom.minidom.Node.TEXT_NODE:
+    #            pubDetails += child.nodeValue
+    #            pubDetails += '.'
     elems = docElem.getElementsByTagName('PublicationInformation')
     for elem in elems:
         for child in elem.childNodes:
