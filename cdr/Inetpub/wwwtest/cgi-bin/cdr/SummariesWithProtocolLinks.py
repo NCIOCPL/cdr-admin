@@ -12,7 +12,6 @@ import cgi, cdr, cdrcgi, re, string, cdrdb, time, xml.dom.minidom
 #----------------------------------------------------------------------
 fields    = cgi.FieldStorage()
 session   = cdrcgi.getSession(fields)
-#boolOp    = fields and fields.getvalue("Boolean")          or "AND"
 lang      = fields and fields.getvalue("lang")             or None
 groups    = fields and fields.getvalue("grp")              or []
 statuses    = fields and fields.getvalue("status")         or []
@@ -31,7 +30,7 @@ buttons   = (SUBMENU, cdrcgi.MAINMENU)
 #groups.append('Adult Treatment')
 #statuses.append('Closed')
 #statuses.append('Active')
-#session   = '471E026A-F07F08-248-3IN0OE6DH8XL'
+#session   = '471F2BE9-7A98C6-248-1RFI84EWTK9Z'
 #---------------------------
 
 class dataRow:
@@ -65,7 +64,7 @@ class dataRow:
                             if name == 'cdr:ref':
                                 if value == self.linkcdrid:
                                     binlink = 1
-                                    href = "<a href = %s/QcReport.py?DocId=%s&Session=%s>" % (cdrcgi.BASE,self.linkcdrid,session)
+                                    href = "<a target='_blank' href = %s/QcReport.py?DocId=%s&Session=%s>" % (cdrcgi.BASE,self.linkcdrid,session)
                                     self.refTextStart = len(self.text)
                                     self.refTextSize = len(href)
                                     self.text += href
@@ -73,7 +72,7 @@ class dataRow:
                             if name == 'cdr:href':
                                 if value == self.linkcdrid:
                                     binlink = 1
-                                    href = "<a href = %s/QcReport.py?DocId=%s&Session=%s>" % (cdrcgi.BASE,self.linkcdrid,session)
+                                    href = "<a target='_blank' href = %s/QcReport.py?DocId=%s&Session=%s>" % (cdrcgi.BASE,self.linkcdrid,session)
                                     self.refTextStart = len(self.text)
                                     self.refTextSize = len(href)
                                     self.text += href
@@ -385,6 +384,7 @@ def checkElement(cdrid,node,parentElem,ref,lastSECTitle):
     return
 
 def checkChildren(cdrid,parentElem,lastSECTitle):
+    parentNodeName = parentElem.nodeName
     for node in parentElem.childNodes:
         nodeValue = node.nodeValue
         nodeName = node.nodeName
@@ -394,9 +394,10 @@ def checkChildren(cdrid,parentElem,lastSECTitle):
             elif nodeName == 'ProtocolRef':
                 checkElement(cdrid,node,parentElem,'REF',lastSECTitle)
             elif nodeName == 'Title':
-                for chNode in node.childNodes:
-                    if chNode.nodeType == xml.dom.minidom.Node.TEXT_NODE:
-                        lastSECTitle = chNode.nodeValue
+                if parentNodeName == 'SummarySection':
+                    for chNode in node.childNodes:
+                        if chNode.nodeType == xml.dom.minidom.Node.TEXT_NODE:
+                            lastSECTitle = chNode.nodeValue
             
         checkChildren(cdrid,node,lastSECTitle)
     return
@@ -434,10 +435,8 @@ for cdrid in cdrids:
     doc = cdr.getDoc(session, docId, checkout = 'N')
     if doc.startswith("<Errors"):
         cdrcgi.bail("<error>Unable to retrieve %s : %s" % cdrid,doc)
-    #doc = cdr.getDoc(session, docId, checkout = 'N', getObject=1)
     filter = ['name:Revision Markup Filter']
     doc = cdr.filterDoc(session,filter,docId=docId)
-    #dom = xml.dom.minidom.parseString(doc.xml)
     dom = xml.dom.minidom.parseString(doc[0])
     updateRefs(cdrid,dom)
 
