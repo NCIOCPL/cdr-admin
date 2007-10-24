@@ -75,11 +75,153 @@ dateString = time.strftime("%B %d, %Y")
 # If we don't have a request, put up the form.
 #----------------------------------------------------------------------
 if not lang:
+    jscript = """
+<style type="text/css">
+</style>
+
+<script language='JavaScript' src='/js/scriptaculous/prototype.js'></script>
+<script language='JavaScript' src='/js/scriptaculous/scriptaculous.js'></script>
+<script type="text/javascript">
+
+Event.observe(window, 'load', function(){
+    checkAllEnglish(0);
+    checkAllSpanish(0);
+    checkAllTypes(0);
+    disableAllEnglish(1);
+    disableAllSpanish(1);
+    disableAllTypes(1);
+    $('All English').disabled = 0;
+    $('All English').checked = 1;
+    $('All Types').disabled = 0;
+    $('All Types').checked = 1;
+    $('English').checked = 1;
+});
+
+function checkAllEnglish(checked){
+    $('All English').checked = checked;
+    $('Adult Treatment').checked = checked;
+    $('Genetics').checked = checked;
+    $('Complementary and Alternative Medicine').checked = checked;
+    $('Pediatric Treatment').checked = checked;
+    $('Screening and Prevention').checked = checked;
+    $('Supportive Care').checked = checked;    
+}
+
+function disableAllEnglish(disabled){
+    $('All English').disabled = disabled;
+    $('Adult Treatment').disabled = disabled;
+    $('Genetics').disabled = disabled;
+    $('Complementary and Alternative Medicine').disabled = disabled;
+    $('Pediatric Treatment').disabled = disabled;
+    $('Screening and Prevention').disabled = disabled;
+    $('Supportive Care').disabled = disabled;
+}
+
+function disableAllSpanish(disabled){
+    $('All Spanish').disabled = disabled;
+    $('Spanish Adult Treatment').disabled = disabled;
+    $('Spanish Pediatric Treatment').disabled = disabled;
+    $('Spanish Supportive Care').disabled = disabled;
+}
+
+function checkAllSpanish(checked){
+    $('All Spanish').checked = checked;
+    $('Spanish Adult Treatment').checked = checked;
+    $('Spanish Pediatric Treatment').checked = checked;
+    $('Spanish Supportive Care').checked = checked;
+}
+
+function disableAllTypes(disabled){
+    $('All Types').disabled = disabled;
+    $('Book').disabled = disabled;
+    $('Book [Internet]').disabled = disabled;
+    $('Book chapter').disabled = disabled;
+    $('Book chapter [Internet]').disabled = disabled;
+    $('Abstract').disabled = disabled;
+    $('Abstract [Internet]').disabled = disabled;
+    $('Database').disabled = disabled;
+    $('Database entry').disabled = disabled;
+    $('Internet').disabled = disabled;
+    $('Meeting Paper').disabled = disabled;
+    $('Meeting Paper [Internet]').disabled = disabled;
+}
+
+function checkAllTypes(checked){
+    $('All Types').checked = checked;
+    $('Book').checked = checked;
+    $('Book [Internet]').checked = checked;
+    $('Book chapter').checked = checked;
+    $('Book chapter [Internet]').checked = checked;
+    $('Abstract').checked = checked;
+    $('Abstract [Internet]').checked = checked;
+    $('Database').checked = checked;
+    $('Database entry').checked = checked;
+    $('Internet').checked = checked;
+    $('Meeting Paper').checked = checked;
+    $('Meeting Paper [Internet]').checked = checked;
+}
+
+function langClicked(lang){
+    disableAllEnglish(1);
+    disableAllSpanish(1);
+    checkAllEnglish(0);
+    checkAllSpanish(0);
+    if (lang == 'English'){
+        $('All English').disabled = 0;
+        $('All English').checked = 1;
+    }
+    else{
+        $('All Spanish').disabled = 0;
+        $('All Spanish').checked = 1;
+    }
+}
+
+function allEnglishClicked(){
+    elem = $('All English')
+    if (elem.checked){
+        disableAllEnglish(1);
+        elem.disabled = false;
+        checkAllEnglish(0);
+        elem.checked = 1;
+    }else{
+        disableAllEnglish(0);
+        elem.checked = 0;
+    }
+}
+
+function allSpanishClicked(){
+    elem = $('All Spanish')
+    if (elem.checked){
+        disableAllSpanish(1);
+        elem.disabled = false;
+        checkAllSpanish(0);
+        elem.checked = 1;
+    }else{
+        disableAllSpanish(0);
+        elem.checked = 0;
+    }
+}
+
+function allTypesClicked(){
+    elem = $('All Types')
+    if (elem.checked){
+        disableAllTypes(1);
+        elem.disabled = false;
+        checkAllTypes(0);
+        elem.checked = 1;
+    }else{
+        disableAllTypes(0);
+        elem.checked = 0;
+    }
+}
+
+</script>
+"""
     header = cdrcgi.header(title, title, instr, script,
                            ("Submit",
                             SUBMENU,
                             cdrcgi.MAINMENU),
-                           numBreaks = 1)
+                           numBreaks = 1,stylesheet = jscript)
     form   = """\
    <input type='hidden' name='%s' value='%s'>
    <table border='0'>
@@ -90,10 +232,10 @@ if not lang:
     </tr>
    </table>
  
-   <table border = '0'>
-    <tr>
+    <table>
+   <tr>
      <td width=100>
-      <input name='lang' type='radio' value='English' CHECKED><b>English</b>
+      <input id='English' name='lang' type='radio' value='English' onClick="langClicked('English');" CHECKED><b>English</b></input>
      </td>
      <td>
       <b>Select PDQ Summaries: (one or more)</b>
@@ -102,26 +244,26 @@ if not lang:
     <tr>
      <td></td>
      <td>
-      <input type='checkbox' name='grp' value='All English' CHECKED>
-       <b>All English</b><br>
-      <input type='checkbox' name='grp' value='Adult Treatment'>
-       <b>Adult Treatment</b><br>
-      <input type='checkbox' name='grp' value='Genetics'>
-       <b>Cancer Genetics</b><br>
-      <input type='checkbox' name='grp'
+      <input type='checkbox' id='All English' name='grp' value='All English' onClick="allEnglishClicked();" CHECKED>
+       <b>All English</b></input><br>
+      <input type='checkbox' id='Adult Treatment' name='grp' value='Adult Treatment'>
+       <b>Adult Treatment</b></input><br>
+      <input type='checkbox' id='Genetics' name='grp' value='Genetics'>
+       <b>Cancer Genetics</b></input><br>
+      <input type='checkbox' name='grp' id='Complementary and Alternative Medicine'
              value='Complementary and Alternative Medicine'>
-       <b>Complementary and Alternative Medicine</b><br>
-      <input type='checkbox' name='grp' value='Pediatric Treatment'>
-       <b>Pediatric Treatment</b><br>
-      <input type='checkbox' name='grp' value='Screening and Prevention'>
-       <b>Screening and Prevention</b><br>
-      <input type='checkbox' name='grp' value='Supportive Care'>
-       <b>Supportive Care</b><br><br>
+       <b>Complementary and Alternative Medicine</b></input><br>
+      <input type='checkbox' id='Pediatric Treatment' name='grp' value='Pediatric Treatment'>
+       <b>Pediatric Treatment</b></input><br>
+      <input type='checkbox' id='Screening and Prevention' name='grp' value='Screening and Prevention'>
+       <b>Screening and Prevention</b></input><br>
+      <input type='checkbox' id='Supportive Care' name='grp' value='Supportive Care'>
+       <b>Supportive Care</b><br></input><br>
      </td>
     </tr>
     <tr>
      <td width=100>
-      <input name='lang' type='radio' value='Spanish'><b>Spanish</b>
+      <input id='Spanish' name='lang' type='radio' value='Spanish' onClick="langClicked('Spanish');"><b>Spanish</b></input>
      </td>
      <td>
       <b>Select PDQ Summaries: (one or more)</b>
@@ -130,14 +272,14 @@ if not lang:
     <tr>
      <td></td>
      <td>
-      <input type='checkbox' name='grp' value='All Spanish'>
-       <b>All Spanish</b><br>
-      <input type='checkbox' name='grp' value='Spanish Adult Treatment'>
-       <b>Adult Treatment</b><br>
-      <input type='checkbox' name='grp' value='Spanish Pediatric Treatment'>
-       <b>Pediatric Treatment</b><br>
-      <input type='checkbox' name='grp' value='Spanish Supportive Care'>
-       <b>Supportive Care</b><br><br>
+      <input type='checkbox' id='All Spanish' name='grp' value='All Spanish' onClick="allSpanishClicked();">
+       <b>All Spanish</b></input><br>
+      <input type='checkbox' id='Spanish Adult Treatment' name='grp' value='Spanish Adult Treatment'>
+       <b>Adult Treatment</b></input><br>
+      <input type='checkbox' id='Spanish Pediatric Treatment' name='grp' value='Spanish Pediatric Treatment'>
+       <b>Pediatric Treatment</b></input><br>
+      <input type='checkbox' id='Spanish Supportive Care' name='grp' value='Spanish Supportive Care'>
+       <b>Supportive Care</b></input><br><br>
      </td>
     </tr>
 
@@ -149,29 +291,29 @@ if not lang:
     <tr>
      <td></td>
      <td>
-      <input type='checkbox' name='type' value='All Types' CHECKED>
+      <input id='All Types' type='checkbox' name='type' value='All Types' onClick="allTypesClicked();" CHECKED>
        <b>All Types</b><br>
-      <input type='checkbox' name='type' value='Book'>
+      <input id='Book' type='checkbox' name='type' value='Book'>
        <b>Book</b><br>
-      <input type='checkbox' name='type' value='Book [Internet]'>
+      <input id='Book [Internet]' type='checkbox' name='type' value='Book [Internet]'>
        <b>Book [Internet]</b><br>
-      <input type='checkbox' name='type' value='Book chapter'>
+      <input id='Book chapter' type='checkbox' name='type' value='Book chapter'>
        <b>Book chapter</b><br>
-       <input type='checkbox' name='type' value='Book chapter [Internet]'>
+       <input id='Book chapter [Internet]' type='checkbox' name='type' value='Book chapter [Internet]'>
        <b>Book chapter [Internet]</b><br>
-       <input type='checkbox' name='type' value='Abstract'>
+       <input id='Abstract' type='checkbox' name='type' value='Abstract'>
        <b>Abstract</b><br>
-       <input type='checkbox' name='type' value='Abstract [Internet]'>
+       <input id='Abstract [Internet]' type='checkbox' name='type' value='Abstract [Internet]'>
        <b>Abstract [Internet]</b><br>
-       <input type='checkbox' name='type' value='Database'>
+       <input id='Database' type='checkbox' name='type' value='Database'>
        <b>Database</b><br>
-       <input type='checkbox' name='type' value='Database entry'>
+       <input id='Database entry' type='checkbox' name='type' value='Database entry'>
        <b>Database entry</b><br>
-       <input type='checkbox' name='type' value='Internet'>
+       <input id='Internet' type='checkbox' name='type' value='Internet'>
        <b>Internet</b><br>
-       <input type='checkbox' name='type' value='Meeting Paper'>
+       <input id='Meeting Paper' type='checkbox' name='type' value='Meeting Paper'>
        <b>Meeting Paper</b><br>
-       <input type='checkbox' name='type' value='Meeting Paper [Internet]'>
+       <input id='Meeting Paper [Internet]' type='checkbox' name='type' value='Meeting Paper [Internet]'>
        <b>Meeting Paper [Internet]</b><br>
      </td>
     </tr>    
