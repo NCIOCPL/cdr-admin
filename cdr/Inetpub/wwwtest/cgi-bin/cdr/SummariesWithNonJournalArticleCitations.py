@@ -109,6 +109,38 @@ Event.observe(window, 'load', function(){
     $('English').checked = 1;
 });
 
+function isEnglishItemChecked(){
+    return ($('All English').checked ||
+    $('Adult Treatment').checked ||
+    $('Genetics').checked ||
+    $('Complementary and Alternative Medicine').checked  ||
+    $('Pediatric Treatment').checked ||
+    $('Screening and Prevention').checked ||
+    $('Supportive Care').checked);
+}
+
+function isSpanishItemChecked(){
+    return($('All Spanish').checked ||
+    $('Spanish Adult Treatment').checked ||
+    $('Spanish Pediatric Treatment').checked ||
+    $('Spanish Supportive Care').checked);
+}
+
+function isTypeItemChecked(){
+    return($('All Types').checked ||
+    $('Book').checked ||
+    $('Book [Internet]').checked ||
+    $('Book chapter').checked ||
+    $('Book chapter [Internet]').checked ||
+    $('Abstract').checked ||
+    $('Abstract [Internet]').checked ||
+    $('Database').checked ||
+    $('Database entry').checked ||
+    $('Internet').checked ||
+    $('Meeting Paper').checked ||
+    $('Meeting Paper [Internet]').checked);
+}
+
 function checkAllEnglish(checked){
     $('All English').checked = checked;
     $('Adult Treatment').checked = checked;
@@ -146,6 +178,8 @@ function englishItemClicked(){
     $('English').checked = 1;
     $('Spanish').checked = 0;
     checkAllSpanish(0);
+    if (!isEnglishItemChecked())
+        $('All English').checked = 1;
 }
 
 function spanishItemClicked(){
@@ -153,10 +187,14 @@ function spanishItemClicked(){
     $('Spanish').checked = 1;
     $('English').checked = 0;
     checkAllEnglish(0);
+    if (!isSpanishItemChecked())
+        $('All Spanish').checked = 1;
 }
 
 function citationItemClicked(){
     $('All Types').checked = 0;
+    if (!isTypeItemChecked())
+        $('All Types').checked = 1;
 }
 
 function langClicked(lang){

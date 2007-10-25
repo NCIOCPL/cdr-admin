@@ -131,6 +131,22 @@ dateString = time.strftime("%B %d, %Y")
 if not lang:
     jscript = """
 <style type="text/css">
+body {
+    background-color: #f8f8f8;
+    font-family: sans-serif;
+    font-size: 11pt;
+    }
+legend  {
+    font-weight: bold;
+    color: teal;
+    font-family: sans-serif;
+    }
+fieldset {
+    width: 500px;
+    margin-left: auto;
+    margin-right: auto;
+    display: block;
+    }
 </style>
 
 <script language='JavaScript' src='/js/scriptaculous/prototype.js'></script>
@@ -138,19 +154,41 @@ if not lang:
 <script type="text/javascript">
 
 Event.observe(window, 'load', function(){
-    //alert('onload');
     checkAllEnglish(0);
     checkAllSpanish(0);
     checkAllStatus(0);
-    disableAllEnglish(1);
-    disableAllSpanish(1);
-    disableAllStatus(1);
-    $('All English').disabled = 0;
     $('All English').checked = 1;
-    $('All Status').disabled = 0;
     $('All Status').checked = 1;
     $('English').checked = 1;
 });
+
+function isEnglishItemChecked(){
+    return ($('All English').checked ||
+    $('Adult Treatment').checked ||
+    $('Genetics').checked ||
+    $('Complementary and Alternative Medicine').checked  ||
+    $('Pediatric Treatment').checked ||
+    $('Screening and Prevention').checked ||
+    $('Supportive Care').checked);
+}
+
+function isSpanishItemChecked(){
+    return($('All Spanish').checked ||
+    $('Spanish Adult Treatment').checked ||
+    $('Spanish Pediatric Treatment').checked ||
+    $('Spanish Supportive Care').checked);
+}
+
+function isStatusItemChecked(){
+    return($('All Status').checked ||
+    $('Active').checked ||
+    $('Approved-not yet active').checked ||
+    $('Temporarily closed').checked ||
+    $('Closed').checked ||
+    $('Completed').checked ||
+    $('Withdrawn').checked ||
+    $('Withdrawn from PDQ').checked);
+}
 
 function checkAllEnglish(checked){
     $('All English').checked = checked;
@@ -162,39 +200,11 @@ function checkAllEnglish(checked){
     $('Supportive Care').checked = checked;    
 }
 
-function disableAllEnglish(disabled){
-    $('All English').disabled = disabled;
-    $('Adult Treatment').disabled = disabled;
-    $('Genetics').disabled = disabled;
-    $('Complementary and Alternative Medicine').disabled = disabled;
-    $('Pediatric Treatment').disabled = disabled;
-    $('Screening and Prevention').disabled = disabled;
-    $('Supportive Care').disabled = disabled;
-}
-
-function disableAllSpanish(disabled){
-    $('All Spanish').disabled = disabled;
-    $('Spanish Adult Treatment').disabled = disabled;
-    $('Spanish Pediatric Treatment').disabled = disabled;
-    $('Spanish Supportive Care').disabled = disabled;
-}
-
 function checkAllSpanish(checked){
     $('All Spanish').checked = checked;
     $('Spanish Adult Treatment').checked = checked;
     $('Spanish Pediatric Treatment').checked = checked;
     $('Spanish Supportive Care').checked = checked;
-}
-
-function disableAllStatus(disabled){
-    $('All Status').disabled = disabled;
-    $('Active').disabled = disabled;
-    $('Approved-not yet active').disabled = disabled;
-    $('Temporarily closed').disabled = disabled;
-    $('Closed').disabled = disabled;
-    $('Completed').disabled = disabled;
-    $('Withdrawn').disabled = disabled;
-    $('Withdrawn from PDQ').disabled = disabled;
 }
 
 function checkAllStatus(checked){
@@ -208,9 +218,31 @@ function checkAllStatus(checked){
     $('Withdrawn from PDQ').checked = checked;
 }
 
+function englishItemClicked(){
+    $('All English').checked = 0;
+    $('English').checked = 1;
+    $('Spanish').checked = 0;
+    checkAllSpanish(0);
+    if (!isEnglishItemChecked())
+        $('All English').checked = 1;
+}
+
+function spanishItemClicked(){
+    $('All Spanish').checked = 0;
+    $('Spanish').checked = 1;
+    $('English').checked = 0;
+    checkAllEnglish(0);
+    if (!isSpanishItemChecked())
+        $('All Spanish').checked = 1;
+}
+
+function statusItemClicked(){
+    $('All Status').checked = 0;
+    if (!isStatusItemChecked())
+        $('All Status').checked = 1;
+}
+
 function langClicked(lang){
-    disableAllEnglish(1);
-    disableAllSpanish(1);
     checkAllEnglish(0);
     checkAllSpanish(0);
     if (lang == 'English'){
@@ -224,42 +256,22 @@ function langClicked(lang){
 }
 
 function allEnglishClicked(){
-    elem = $('All English')
-    if (elem.checked){
-        disableAllEnglish(1);
-        elem.disabled = false;
-        checkAllEnglish(0);
-        elem.checked = 1;
-    }else{
-        disableAllEnglish(0);
-        elem.checked = 0;
-    }
+    checkAllEnglish(0);
+    checkAllSpanish(0);
+    $('English').checked = 1;
+    $('All English').checked = 1;
 }
 
 function allSpanishClicked(){
-    elem = $('All Spanish')
-    if (elem.checked){
-        disableAllSpanish(1);
-        elem.disabled = false;
-        checkAllSpanish(0);
-        elem.checked = 1;
-    }else{
-        disableAllSpanish(0);
-        elem.checked = 0;
-    }
+    checkAllEnglish(0);
+    checkAllSpanish(0);
+    $('Spanish').checked = 1;
+    $('All Spanish').checked = 1;
 }
 
 function allStatusClicked(){
-    elem = $('All Status')
-    if (elem.checked){
-        disableAllStatus(1);
-        elem.disabled = false;
-        checkAllStatus(0);
-        elem.checked = 1;
-    }else{
-        disableAllStatus(0);
-        elem.checked = 0;
-    }
+    checkAllStatus(0);
+    $('All Status').checked = 1;
 }
 
 </script>
@@ -279,8 +291,10 @@ function allStatusClicked(){
     </tr>
    </table>
  
-   <table border = '0'>
-    <tr>
+   <fieldset>
+    <legend>Select Language and PDQ Summaries</legend>
+    <table>
+   <tr>
      <td width=100>
       <input id='English' name='lang' type='radio' value='English' onClick="langClicked('English');" CHECKED><b>English</b></input>
      </td>
@@ -293,21 +307,26 @@ function allStatusClicked(){
      <td>
       <input type='checkbox' id='All English' name='grp' value='All English' onClick="allEnglishClicked();" CHECKED>
        <b>All English</b></input><br>
-      <input type='checkbox' id='Adult Treatment' name='grp' value='Adult Treatment'>
+      <input type='checkbox' id='Adult Treatment' name='grp' value='Adult Treatment' onClick="englishItemClicked();">
        <b>Adult Treatment</b></input><br>
-      <input type='checkbox' id='Genetics' name='grp' value='Genetics'>
+      <input type='checkbox' id='Genetics' name='grp' value='Genetics' onClick="englishItemClicked();">
        <b>Cancer Genetics</b></input><br>
-      <input type='checkbox' name='grp' id='Complementary and Alternative Medicine'
+      <input type='checkbox' name='grp' id='Complementary and Alternative Medicine' onClick="englishItemClicked();"
              value='Complementary and Alternative Medicine'>
        <b>Complementary and Alternative Medicine</b></input><br>
-      <input type='checkbox' id='Pediatric Treatment' name='grp' value='Pediatric Treatment'>
+      <input type='checkbox' id='Pediatric Treatment' name='grp' value='Pediatric Treatment' onClick="englishItemClicked();">
        <b>Pediatric Treatment</b></input><br>
-      <input type='checkbox' id='Screening and Prevention' name='grp' value='Screening and Prevention'>
+      <input type='checkbox' id='Screening and Prevention' name='grp' value='Screening and Prevention' onClick="englishItemClicked();">
        <b>Screening and Prevention</b></input><br>
-      <input type='checkbox' id='Supportive Care' name='grp' value='Supportive Care'>
+      <input type='checkbox' id='Supportive Care' name='grp' value='Supportive Care' onClick="englishItemClicked();">
        <b>Supportive Care</b><br></input><br>
      </td>
     </tr>
+    </table>
+    </fieldset>
+
+    <fieldset>
+    <table>
     <tr>
      <td width=100>
       <input id='Spanish' name='lang' type='radio' value='Spanish' onClick="langClicked('Spanish');"><b>Spanish</b></input>
@@ -321,42 +340,44 @@ function allStatusClicked(){
      <td>
       <input type='checkbox' id='All Spanish' name='grp' value='All Spanish' onClick="allSpanishClicked();">
        <b>All Spanish</b></input><br>
-      <input type='checkbox' id='Spanish Adult Treatment' name='grp' value='Spanish Adult Treatment'>
+      <input type='checkbox' id='Spanish Adult Treatment' name='grp' value='Spanish Adult Treatment' onClick="spanishItemClicked();">
        <b>Adult Treatment</b></input><br>
-      <input type='checkbox' id='Spanish Pediatric Treatment' name='grp' value='Spanish Pediatric Treatment'>
+      <input type='checkbox' id='Spanish Pediatric Treatment' name='grp' value='Spanish Pediatric Treatment' onClick="spanishItemClicked();">
        <b>Pediatric Treatment</b></input><br>
-      <input type='checkbox' id='Spanish Supportive Care' name='grp' value='Spanish Supportive Care'>
+      <input type='checkbox' id='Spanish Supportive Care' name='grp' value='Spanish Supportive Care' onClick="spanishItemClicked();">
        <b>Supportive Care</b></input><br><br>
      </td>
     </tr>
+    </table>
+    </fieldset>
 
-    <tr>
-     <td colspan=2>
-      <b>Select Trial Status: (one or more)</b>
-     </td>
-    </tr>
+    </br>
+    <fieldset>
+    <legend>Select Trial Status: (one or more)</legend>
+    <table>
     <tr>
      <td></td>
      <td>
       <input type='checkbox' id='All Status' name='status' value='All Status' onClick="allStatusClicked();" CHECKED>
        <b>All Status</b></input><br>
-      <input type='checkbox' id='Active' name='status' value='Active'>
+      <input type='checkbox' id='Active' name='status' value='Active' onClick="statusItemClicked();">
        <b>Active</b></input><br>
-      <input type='checkbox' id='Approved-not yet active' name='status' value='Approved-not yet active'>
+      <input type='checkbox' id='Approved-not yet active' name='status' value='Approved-not yet active' onClick="statusItemClicked();">
        <b>Approved-not yet active</b><br>
-      <input type='checkbox' id='Temporarily closed' name='status' value='Temporarily closed'>
+      <input type='checkbox' id='Temporarily closed' name='status' value='Temporarily closed' onClick="statusItemClicked();">
        <b>Temporarily closed</b></input><br>
-       <input type='checkbox' id='Closed' name='status' value='Closed'>
+       <input type='checkbox' id='Closed' name='status' value='Closed' onClick="statusItemClicked();">
        <b>Closed</b></input><br>
-       <input type='checkbox' id='Completed' name='status' value='Completed'>
+       <input type='checkbox' id='Completed' name='status' value='Completed' onClick="statusItemClicked();">
        <b>Completed</b></input><br>
-       <input type='checkbox' id='Withdrawn' name='status' value='Withdrawn'>
+       <input type='checkbox' id='Withdrawn' name='status' value='Withdrawn' onClick="statusItemClicked();">
        <b>Withdrawn</b></input><br>
-       <input type='checkbox' id='Withdrawn from PDQ' name='status' value='Withdrawn from PDQ'>
+       <input type='checkbox' id='Withdrawn from PDQ' name='status' value='Withdrawn from PDQ' onClick="statusItemClicked();">
        <b>Withdrawn from PDQ</b></input><br>
      </td>
     </tr>    
    </table>
+   </fieldset>
 
   </form>
  </body>
