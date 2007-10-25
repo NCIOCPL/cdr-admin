@@ -78,6 +78,22 @@ dateString = time.strftime("%B %d, %Y")
 if not lang:
     jscript = """
 <style type="text/css">
+body {
+    background-color: #f8f8f8;
+    font-family: sans-serif;
+    font-size: 11pt;
+    }
+legend  {
+    font-weight: bold;
+    color: teal;
+    font-family: sans-serif;
+    }
+fieldset {
+    width: 500px;
+    margin-left: auto;
+    margin-right: auto;
+    display: block;
+    }
 </style>
 
 <script language='JavaScript' src='/js/scriptaculous/prototype.js'></script>
@@ -88,12 +104,7 @@ Event.observe(window, 'load', function(){
     checkAllEnglish(0);
     checkAllSpanish(0);
     checkAllTypes(0);
-    disableAllEnglish(1);
-    disableAllSpanish(1);
-    disableAllTypes(1);
-    $('All English').disabled = 0;
     $('All English').checked = 1;
-    $('All Types').disabled = 0;
     $('All Types').checked = 1;
     $('English').checked = 1;
 });
@@ -108,43 +119,11 @@ function checkAllEnglish(checked){
     $('Supportive Care').checked = checked;    
 }
 
-function disableAllEnglish(disabled){
-    $('All English').disabled = disabled;
-    $('Adult Treatment').disabled = disabled;
-    $('Genetics').disabled = disabled;
-    $('Complementary and Alternative Medicine').disabled = disabled;
-    $('Pediatric Treatment').disabled = disabled;
-    $('Screening and Prevention').disabled = disabled;
-    $('Supportive Care').disabled = disabled;
-}
-
-function disableAllSpanish(disabled){
-    $('All Spanish').disabled = disabled;
-    $('Spanish Adult Treatment').disabled = disabled;
-    $('Spanish Pediatric Treatment').disabled = disabled;
-    $('Spanish Supportive Care').disabled = disabled;
-}
-
 function checkAllSpanish(checked){
     $('All Spanish').checked = checked;
     $('Spanish Adult Treatment').checked = checked;
     $('Spanish Pediatric Treatment').checked = checked;
     $('Spanish Supportive Care').checked = checked;
-}
-
-function disableAllTypes(disabled){
-    $('All Types').disabled = disabled;
-    $('Book').disabled = disabled;
-    $('Book [Internet]').disabled = disabled;
-    $('Book chapter').disabled = disabled;
-    $('Book chapter [Internet]').disabled = disabled;
-    $('Abstract').disabled = disabled;
-    $('Abstract [Internet]').disabled = disabled;
-    $('Database').disabled = disabled;
-    $('Database entry').disabled = disabled;
-    $('Internet').disabled = disabled;
-    $('Meeting Paper').disabled = disabled;
-    $('Meeting Paper [Internet]').disabled = disabled;
 }
 
 function checkAllTypes(checked){
@@ -162,9 +141,25 @@ function checkAllTypes(checked){
     $('Meeting Paper [Internet]').checked = checked;
 }
 
+function englishItemClicked(){
+    $('All English').checked = 0;
+    $('English').checked = 1;
+    $('Spanish').checked = 0;
+    checkAllSpanish(0);
+}
+
+function spanishItemClicked(){
+    $('All Spanish').checked = 0;
+    $('Spanish').checked = 1;
+    $('English').checked = 0;
+    checkAllEnglish(0);
+}
+
+function citationItemClicked(){
+    $('All Types').checked = 0;
+}
+
 function langClicked(lang){
-    disableAllEnglish(1);
-    disableAllSpanish(1);
     checkAllEnglish(0);
     checkAllSpanish(0);
     if (lang == 'English'){
@@ -178,42 +173,22 @@ function langClicked(lang){
 }
 
 function allEnglishClicked(){
-    elem = $('All English')
-    if (elem.checked){
-        disableAllEnglish(1);
-        elem.disabled = false;
-        checkAllEnglish(0);
-        elem.checked = 1;
-    }else{
-        disableAllEnglish(0);
-        elem.checked = 0;
-    }
+    checkAllEnglish(0);
+    checkAllSpanish(0);
+    $('English').checked = 1;
+    $('All English').checked = 1;
 }
 
 function allSpanishClicked(){
-    elem = $('All Spanish')
-    if (elem.checked){
-        disableAllSpanish(1);
-        elem.disabled = false;
-        checkAllSpanish(0);
-        elem.checked = 1;
-    }else{
-        disableAllSpanish(0);
-        elem.checked = 0;
-    }
+    checkAllEnglish(0);
+    checkAllSpanish(0);
+    $('Spanish').checked = 1;
+    $('All Spanish').checked = 1;
 }
 
 function allTypesClicked(){
-    elem = $('All Types')
-    if (elem.checked){
-        disableAllTypes(1);
-        elem.disabled = false;
-        checkAllTypes(0);
-        elem.checked = 1;
-    }else{
-        disableAllTypes(0);
-        elem.checked = 0;
-    }
+    checkAllTypes(0);
+    $('All Types').checked = 1;
 }
 
 </script>
@@ -233,6 +208,8 @@ function allTypesClicked(){
     </tr>
    </table>
  
+    <fieldset>
+    <legend>Select Language and PDQ Summaries</legend>
     <table>
    <tr>
      <td width=100>
@@ -247,21 +224,26 @@ function allTypesClicked(){
      <td>
       <input type='checkbox' id='All English' name='grp' value='All English' onClick="allEnglishClicked();" CHECKED>
        <b>All English</b></input><br>
-      <input type='checkbox' id='Adult Treatment' name='grp' value='Adult Treatment'>
+      <input type='checkbox' id='Adult Treatment' name='grp' value='Adult Treatment' onClick="englishItemClicked();">
        <b>Adult Treatment</b></input><br>
-      <input type='checkbox' id='Genetics' name='grp' value='Genetics'>
+      <input type='checkbox' id='Genetics' name='grp' value='Genetics' onClick="englishItemClicked();">
        <b>Cancer Genetics</b></input><br>
-      <input type='checkbox' name='grp' id='Complementary and Alternative Medicine'
+      <input type='checkbox' name='grp' id='Complementary and Alternative Medicine' onClick="englishItemClicked();"
              value='Complementary and Alternative Medicine'>
        <b>Complementary and Alternative Medicine</b></input><br>
-      <input type='checkbox' id='Pediatric Treatment' name='grp' value='Pediatric Treatment'>
+      <input type='checkbox' id='Pediatric Treatment' name='grp' value='Pediatric Treatment' onClick="englishItemClicked();">
        <b>Pediatric Treatment</b></input><br>
-      <input type='checkbox' id='Screening and Prevention' name='grp' value='Screening and Prevention'>
+      <input type='checkbox' id='Screening and Prevention' name='grp' value='Screening and Prevention' onClick="englishItemClicked();">
        <b>Screening and Prevention</b></input><br>
-      <input type='checkbox' id='Supportive Care' name='grp' value='Supportive Care'>
+      <input type='checkbox' id='Supportive Care' name='grp' value='Supportive Care' onClick="englishItemClicked();">
        <b>Supportive Care</b><br></input><br>
      </td>
     </tr>
+    </table>
+    </fieldset>
+
+    <fieldset>
+    <table>
     <tr>
      <td width=100>
       <input id='Spanish' name='lang' type='radio' value='Spanish' onClick="langClicked('Spanish');"><b>Spanish</b></input>
@@ -275,50 +257,52 @@ function allTypesClicked(){
      <td>
       <input type='checkbox' id='All Spanish' name='grp' value='All Spanish' onClick="allSpanishClicked();">
        <b>All Spanish</b></input><br>
-      <input type='checkbox' id='Spanish Adult Treatment' name='grp' value='Spanish Adult Treatment'>
+      <input type='checkbox' id='Spanish Adult Treatment' name='grp' value='Spanish Adult Treatment' onClick="spanishItemClicked();">
        <b>Adult Treatment</b></input><br>
-      <input type='checkbox' id='Spanish Pediatric Treatment' name='grp' value='Spanish Pediatric Treatment'>
+      <input type='checkbox' id='Spanish Pediatric Treatment' name='grp' value='Spanish Pediatric Treatment' onClick="spanishItemClicked();">
        <b>Pediatric Treatment</b></input><br>
-      <input type='checkbox' id='Spanish Supportive Care' name='grp' value='Spanish Supportive Care'>
+      <input type='checkbox' id='Spanish Supportive Care' name='grp' value='Spanish Supportive Care' onClick="spanishItemClicked();">
        <b>Supportive Care</b></input><br><br>
      </td>
     </tr>
+    </table>
+    </fieldset>
 
-    <tr>
-     <td colspan=2>
-      <b>Select Citation Type: (one or more)</b>
-     </td>
-    </tr>
+</br>
+    <fieldset>
+    <legend>Select Citation Type: (one or more)</legend>
+    <table>
     <tr>
      <td></td>
      <td>
       <input id='All Types' type='checkbox' name='type' value='All Types' onClick="allTypesClicked();" CHECKED>
        <b>All Types</b><br>
-      <input id='Book' type='checkbox' name='type' value='Book'>
+      <input id='Book' type='checkbox' name='type' value='Book' onClick="citationItemClicked();">
        <b>Book</b><br>
-      <input id='Book [Internet]' type='checkbox' name='type' value='Book [Internet]'>
+      <input id='Book [Internet]' type='checkbox' name='type' value='Book [Internet]' onClick="citationItemClicked();">
        <b>Book [Internet]</b><br>
-      <input id='Book chapter' type='checkbox' name='type' value='Book chapter'>
+      <input id='Book chapter' type='checkbox' name='type' value='Book chapter' onClick="citationItemClicked();">
        <b>Book chapter</b><br>
-       <input id='Book chapter [Internet]' type='checkbox' name='type' value='Book chapter [Internet]'>
+       <input id='Book chapter [Internet]' type='checkbox' name='type' value='Book chapter [Internet]' onClick="citationItemClicked();">
        <b>Book chapter [Internet]</b><br>
-       <input id='Abstract' type='checkbox' name='type' value='Abstract'>
+       <input id='Abstract' type='checkbox' name='type' value='Abstract' onClick="citationItemClicked();">
        <b>Abstract</b><br>
-       <input id='Abstract [Internet]' type='checkbox' name='type' value='Abstract [Internet]'>
+       <input id='Abstract [Internet]' type='checkbox' name='type' value='Abstract [Internet]' onClick="citationItemClicked();">
        <b>Abstract [Internet]</b><br>
-       <input id='Database' type='checkbox' name='type' value='Database'>
+       <input id='Database' type='checkbox' name='type' value='Database' onClick="citationItemClicked();">
        <b>Database</b><br>
-       <input id='Database entry' type='checkbox' name='type' value='Database entry'>
+       <input id='Database entry' type='checkbox' name='type' value='Database entry' onClick="citationItemClicked();">
        <b>Database entry</b><br>
-       <input id='Internet' type='checkbox' name='type' value='Internet'>
+       <input id='Internet' type='checkbox' name='type' value='Internet' onClick="citationItemClicked();">
        <b>Internet</b><br>
-       <input id='Meeting Paper' type='checkbox' name='type' value='Meeting Paper'>
+       <input id='Meeting Paper' type='checkbox' name='type' value='Meeting Paper' onClick="citationItemClicked();">
        <b>Meeting Paper</b><br>
-       <input id='Meeting Paper [Internet]' type='checkbox' name='type' value='Meeting Paper [Internet]'>
+       <input id='Meeting Paper [Internet]' type='checkbox' name='type' value='Meeting Paper [Internet]' onClick="citationItemClicked();">
        <b>Meeting Paper [Internet]</b><br>
      </td>
     </tr>    
    </table>
+   </fieldset>
 
   </form>
  </body>
