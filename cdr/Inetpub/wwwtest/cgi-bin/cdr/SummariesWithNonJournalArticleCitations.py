@@ -29,9 +29,10 @@ buttons   = (SUBMENU, cdrcgi.MAINMENU)
 #---------------------------
 #lang = 'English'
 #groups.append('Adult Treatment')
-#types.append('Book')
+#groups.append('All English')
+#types.append('All Types')
 #types.append('Book chapter')
-#session   = '4713A376-6D965A-248-VRORIB5JL0KP'
+#session   = '4720787A-8DADE2-248-85OFI8XFV1G1'
 #---------------------------
 
 class dataRow:
@@ -43,7 +44,7 @@ class dataRow:
         self.citCDRID = citCDRID
         self.linkcdrid = cdr.normalize(citCDRID)
         self.citationTitle = citationTitle
-        self.pubDetails = 'pub Details'
+        self.pubDetails = ''
     
     def addPubDetails(self,pubDetails):
         self.pubDetails = pubDetails
@@ -429,34 +430,6 @@ def getQuery(lang):
 dataRows = []
 citcdrids = []
 
-def getPubDetails(citcdrid,dom):
-    pubDetails = ''
-    docElem = dom.documentElement
-    
-    elems = docElem.getElementsByTagName('CollectiveName')
-    for elem in elems:
-        for child in elem.childNodes:
-            if child.nodeType == xml.dom.minidom.Node.TEXT_NODE:
-                pubDetails += child.nodeValue
-                pubDetails += ':'
-    #elems = docElem.getElementsByTagName('CitationTitle')
-    #for elem in elems:
-    #    for child in elem.childNodes:
-    #        if child.nodeType == xml.dom.minidom.Node.TEXT_NODE:
-    #            pubDetails += child.nodeValue
-    #            pubDetails += '.'
-    elems = docElem.getElementsByTagName('PublicationInformation')
-    for elem in elems:
-        for child in elem.childNodes:
-            if child.nodeType == xml.dom.minidom.Node.TEXT_NODE:
-                pubDetails += child.nodeValue
-                pubDetails += '.'
-
-    for datarow in dataRows:
-        if datarow.citCDRID == citcdrid:
-            datarow.addPubDetails(pubDetails)
-    return
-      
 # -------------------------------------------------------------
 # Put all the pieces together for the SELECT statement
 # -------------------------------------------------------------
@@ -489,12 +462,21 @@ for cdrid,summaryTitle,summarySecTitle,citationType,citCDRID,citationTitle in ro
 
 for citcdrid in citcdrids:
     citdocId = cdr.normalize(citcdrid)
-    doc = cdr.getDoc(session, citdocId, checkout = 'N')
-    if doc.startswith("<Errors"):
-        cdrcgi.bail("<error>Unable to retrieve %s : %s" % cdrid,doc)
-    doc = cdr.getDoc(session, citdocId, checkout = 'N', getObject=1)
-    dom = xml.dom.minidom.parseString(doc.xml)
-    getPubDetails(citcdrid,dom)
+    filter = ['set:Denormalization Citation Set',
+              'name:Copy XML for Citation QC Report']
+    doc = cdr.filterDoc(session,filter,docId=citdocId)
+    filterResult = doc[0]
+    dom = xml.dom.minidom.parseString(filterResult)
+    docElem = dom.documentElement
+    elems = docElem.getElementsByTagName('FormattedReference')
+    for elem in elems:
+        for child in elem.childNodes:
+            if child.nodeType == xml.dom.minidom.Node.TEXT_NODE:
+                formattedReference = child.nodeValue
+    
+    for datarow in dataRows:
+        if datarow.citCDRID == citcdrid:
+            datarow.addPubDetails(formattedReference)
 
 cursor.close()
 cursor = None
@@ -617,8 +599,10 @@ for dataRow in dataRows:
     form.append(u"<tr>")
     form.append(u"""<td class="%s">%s</td><td class="%s">%s</td><td class="%s">%s</td>"""
                 %(cssClass,dataRow.cdrid,cssClass,dataRow.summaryTitle,cssClass,dataRow.summarySecTitle))
-    form.append(u"""<td class="%s">%s</td><td class="%s">%s</td><td class="%s">%s</td><td class="%s">%s</td>"""
-                % (cssClass,dataRow.citationType,cssClass,dataRow.citCDRID,cssClass,dataRow.citationTitle,cssClass,dataRow.pubDetails))
+    form.append(u"""<td class="%s">%s</td><td class="%s">%s</td><td class="%s">%s</td>"""
+                % (cssClass,dataRow.citationType,cssClass,dataRow.citCDRID,cssClass,dataRow.citationTitle))
+    form.append(u"""<td class="%s">%s</td>"""
+                % (cssClass,dataRow.pubDetails))
     form.append(u"</tr>")
     if cssClass == 'cdrTableEven':
         cssClass = 'cdrTableOdd'
