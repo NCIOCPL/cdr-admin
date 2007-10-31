@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: GetSchema.py,v 1.2 2007-02-27 18:16:14 bkline Exp $
+# $Id: GetSchema.py,v 1.3 2007-10-31 16:07:19 bkline Exp $
 #
 # Gets a schema document from the repository and returns it as a plain
 # text file.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2007/02/27 18:16:14  bkline
+# Added Content-disposition header.
+#
 # Revision 1.1  2006/05/04 14:57:04  bkline
 # Show schema as text.
 #
@@ -27,11 +30,16 @@ if id:
     if not rows:
         cdrcgi.bail("Can't retrieve XML for document %s" % id)
     sys.stdout.write("""\
-Content-type: text/plain
-Content-disposition: attachment;filename=%s
+Content-type: text/html; charset: utf-8
 
-%s""" % (rows[0][0],
-         rows[0][1].encode('utf-8').replace('\r', '')))
+<html>
+ <body>
+  <h1>%s</h1>
+  <pre>%s</pre>
+ </body>
+</html>
+""" % (rows[0][0],
+       cgi.escape(rows[0][1]).encode('utf-8')))
     sys.exit(0)
 
 cursor.execute("""\
