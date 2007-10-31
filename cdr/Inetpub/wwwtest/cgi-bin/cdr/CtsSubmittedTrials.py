@@ -1,20 +1,17 @@
 #----------------------------------------------------------------------
 #
-# $Id: CtsSubmittedTrials.py,v 1.1 2007-08-17 18:17:45 bkline Exp $
+# $Id: CtsSubmittedTrials.py,v 1.2 2007-10-31 17:46:55 bkline Exp $
 #
 # CDR-side interface for reviewing CTS trials.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2007/08/17 18:17:45  bkline
+# Original production version for reviewing/importing CTS trials.
+#
 #----------------------------------------------------------------------
 import cgi, cdrcgi, urllib, xml.dom.minidom, cdr, re
 
-# XXX !!! When this goes into production, the following test needs to be
-#         changed from "not cdr.isDevHost()" to "cdr.isProdHost()" so that
-#         tests from Franck no longer connect to the production CTS
-#         server.  The most straightforward way to do this is:
 CTS_HOST = cdr.emailerHost()
-#CTS_HOST = not cdr.isDevHost() and cdr.EMAILER_PROD or cdr.EMAILER_DEV
-# XXX Switch made.
 
 def makeFailureMessage(what):
     return makeExtra(cgi.escape(what), "fail")
@@ -28,20 +25,21 @@ def makeExtra(what, outcome):
 """ % (outcome, what)
 
 class SupplementaryInfoDoc:
-    def __init__(self, docType, docId, docName):
-        #print "SupplementaryInfoDoc(%s, %s, %s)" % (docType, docId, docName)
+    def __init__(self, docType, docId, docName, mimeType = None):
+        global source
+        #source        = docType.lower() == 'oncore' and 'Oncore' or 'CTS'
         mimeKey       = docName[-5:].lower()
         if mimeKey   != ".html":
             mimeKey   = mimeKey[1:]
-        #print mimeKey
         self.filename = docName
-        self.title    = u"%s document for CTS trial" % docType
-        self.blob     = SupplementaryInfoDoc.__getBlob(docId, docType)
-        self.desc     = u"supplementary document added in CTS system"
+        self.title    = u"%s document for %s trial" % (docType, source)
+        self.blob     = SupplementaryInfoDoc.__getBlob(docId, docType, source)
+        self.desc     = u"supplementary document added in %s system" % source
         self.category = u'Supporting documents'
-        self.mimeType = {
+        self.mimeType = mimeType or {
             ".doc":  u"application/msword",
             ".txt":  u"text/plain",
+            ".rtf":  u"text/rtf",
             ".htm":  u"text/html",
             ".zip":  u"application/zip",
             ".pdf":  u"application/pdf",
@@ -50,24 +48,30 @@ class SupplementaryInfoDoc:
             ".ppd":  u"application/vnd.ms-powerpoint",
             ".html": u"text/html"
             }.get(mimeKey, "")
-        #print self.mimeType
         if docType == 'sites':
             self.category = u"Participant site list"
         elif docType == 'protocol':
             self.category = u"Protocol source document"
     @staticmethod
-    def __getBlob(docId, docType):
-        docId = (docType == 'sites' and 's' or 'd') + docId
-        #print docId
+    def __getBlob(docId, docType, source):
+        if source.lower() == 'oncore':
+            docId = "o%s" % docId
+        elif docType == 'sites':
+            docId = "s%s" % docId
+        else:
+            docId = "d%s" % docId
         url = 'http://%s/u/cts-get-doc.py?id=%s' % (CTS_HOST, docId)
         f = urllib.urlopen(url)
         return f.read()
         
 def addSupplementaryInfoDoc(match):
-    docType, docId, docName = match.group(1).split('|')
-    #print docType, docId, docName
-    suppDoc = SupplementaryInfoDoc(docType, docId, docName)
-    #print suppDoc.mimeType, suppDoc.blob
+    pieces = unicode(match.group(1), 'utf-8').split('|')
+    if len(pieces) == 3:
+        docType, docId, docName = pieces
+        mimeType = None
+    elif len(pieces) == 4:
+        docType, docId, docName, mimeType = pieces
+    suppDoc = SupplementaryInfoDoc(docType, docId, docName, mimeType)
     cdrDoc = cdr.Doc((u"""\
 <SupplementaryInfo xmlns:cdr="cips.nci.nih.gov/cdr">
  <Title>%s</Title>
@@ -83,9 +87,6 @@ def addSupplementaryInfoDoc(match):
                      ctrl = { "DocType": "SupplementaryInfo" },
                      encoding = 'utf-8')
     cdrDoc = str(cdrDoc)
-    #fp = file('d:/tmp/cts-supp-info-%s-%s.xml' % (docType, docId), 'wb')
-    #fp.write(cdrDoc)
-    #fp.close()
     resp = cdr.addDoc(session, doc = cdrDoc, val = 'N', showWarnings = 1)
     if not resp[0]:
         raise Exception(cdr.checkErr(resp[1]))
@@ -96,21 +97,21 @@ def addSupplementaryInfoDoc(match):
     docId = cdr.exNormalize(resp[0])[1]
     return "cdr:ref='CDR%010d'" % docId
 
-def markDuplicate(publicId, primaryId, session):
-    f = urllib.urlopen('http://%s/u/cts-mark-trial-duplicate.py?id=%s' %
-                       (CTS_HOST, publicId))
+def markDuplicate(publicId, primaryId, session, source):
+    f = urllib.urlopen('http://%s/u/cts-mark-trial-duplicate.py?id=%s'
+                       '&source=%s' % (CTS_HOST, publicId, source))
     doc = f.read()
     if "TRIAL MARKED AS DUPLICATE" not in doc:
         return makeFailureMessage(u"%s: %s" % (primaryId, doc))
     return makeSuccessMessage(u"%s successfully marked as duplicate" %
                               primaryId)
     
-def importDoc(publicId, primaryId, session):
+def importDoc(publicId, primaryId, session, source):
     if not session:
         return makeFailureMessage(u"You aren't logged in")
     pattern = re.compile("@@SUPPINFO@@(.+?)@@SUPPINFO@@")
-    f = urllib.urlopen('http://%s/u/cts-create-cdr-doc.py?id=%s' %
-                       (CTS_HOST, publicId))
+    f = urllib.urlopen('http://%s/u/cts-create-cdr-doc.py?id=%s&source=%s' %
+                       (CTS_HOST, publicId, source))
     doc = f.read()
     match = re.search("<FAULT[^>]*>(.*)</FAULT>", doc, re.DOTALL)
     if match:
@@ -145,8 +146,10 @@ def importDoc(publicId, primaryId, session):
     if doc.startswith("<Errors"):
         return makeFailureMessage(u"Unable to retrieve %s" % resp[0])
     cdr.repDoc(session, doc = doc, val = 'N', ver = 'Y', checkIn = 'Y')
-    f = urllib.urlopen('http://%s/u/cts-mark-trial-imported.py?id=%s' %
-                       (CTS_HOST, publicId))
+    cdrId = cdr.exNormalize(resp[0])[1]
+    f = urllib.urlopen('http://%s/u/cts-mark-trial-imported.py'
+                       '?id=%s&source=%s&cdr-id=%d' % (CTS_HOST, publicId,
+                                                       source, cdrId))
     doc = f.read()
     if "TRIAL MARKED AS IMPORTED" not in doc:
         return makeFailureMessage(u"Protocol %s added as %s but unable to "
@@ -215,7 +218,9 @@ class Trial:
             protocolTitle = protocolTitle[:60] + u"..."
         created = self.created[:10]
         submitted = self.submitted[:10]
-        if self.pup:
+        if source == 'Oncore':
+            name = 'Oncore'
+        elif self.pup:
             name = u" ".join([self.pup.forename, self.pup.surname]).strip()
             name = cgi.escape(name)
             if self.pup.email:
@@ -224,8 +229,8 @@ class Trial:
                 name += " (%s)" % email
         else:
             name = u"[Anonymous]"
-        url = (u"<a href='ShowCtsTrial.py?id=%s'"
-               u" target='_new'>%s</a>" % (self.publicId, protocolId))
+        url = (u"<a href='ShowCtsTrial.py?id=%s&source=%s'"
+               u" target='_new'>%s</a>" % (self.publicId, source, protocolId))
         params = '"%s", "%s"' % (self.publicId, protocolId.replace('"', '\\"'))
         importCommand = (u"<a href='javascript:importTrial(%s)'>Import</a>" %
                          params)
@@ -250,21 +255,19 @@ class Trial:
        importCommand, markDuplicate, sendLetter)
 
 fields      = cgi.FieldStorage()
-session     = cdrcgi.getSession(fields) or "guest"
+session     = cdrcgi.getSession(fields)    or "guest"
 importDocId = fields.getvalue('importDoc') or None
 duplicate   = fields.getvalue('duplicate') or None
 primaryId   = fields.getvalue('primaryId') or None
+source      = fields.getvalue('source')    or 'CTS'
 extra       = u""
 if importDocId:
-    extra = importDoc(importDocId, primaryId, session)
+    extra = importDoc(importDocId, primaryId, session, source)
 elif duplicate:
-    extra = markDuplicate(duplicate, primaryId, session)
+    extra = markDuplicate(duplicate, primaryId, session, source)
 
-url = 'http://%s/u/cts-submitted-trials.py' % CTS_HOST
-#cdrcgi.bail(url)
+url = 'http://%s/u/cts-submitted-trials.py?source=%s' % (CTS_HOST, source)
 f = urllib.urlopen(url)
-#d = unicode(f.read(), 'utf-8')
-#cdrcgi.sendPage(d, 'xml')
 dom = xml.dom.minidom.parse(f)
 
 
@@ -324,6 +327,7 @@ html = [u"""\
    <input type='hidden' name='primaryId' value='' />
    <input type='hidden' name='duplicate' value='' />
    <input type='hidden' name='Session' value='%s' />
+   <input type='hidden' name='source' value='%s' />
   </form>
   <h1 style='color: maroon'>Submitted Trials</h1>%s
   <table>
@@ -335,7 +339,7 @@ html = [u"""\
     <th>Submitter</th>
     <th colspan='2'>Actions</th>
    </tr>
-""" % (u"\n".join(js), session or '', extra)]
+""" % (u"\n".join(js), session or '', source, extra)]
 for trial in trials:
     html.append(trial.toHtml(classes[counter % 2]))
     counter += 1
