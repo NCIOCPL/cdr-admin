@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: RssImportReport.py,v 1.7 2006-05-04 14:36:02 bkline Exp $
+# $Id: RssImportReport.py,v 1.8 2007-10-31 17:42:14 bkline Exp $
 #
 # Reports on import/update of RSS protocol site information.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.7  2006/05/04 14:36:02  bkline
+# Extended report to handle other RSS-like sources.
+#
 # Revision 1.6  2005/09/13 21:45:36  bkline
 # Added status column (request #1830).
 #
@@ -91,7 +94,17 @@ def addTable(docs, header, sourceUpdateModeCol = True):
     if docs:
         keys = docs.keys()
         keys.sort()
-        html += u"""\
+        if source in ('Oncore', 'NCIC'):
+            html += u"""\
+  <table border='1' cellspacing='0' cellpadding='2'>
+   <tr>
+    <th>CDR DocId</th>
+    <th>Primary ID</th>
+    <th>Other IDs</th>
+    <th>Pub Ver?</th>
+"""
+        else:
+            html += u"""\
   <table border='1' cellspacing='0' cellpadding='2'>
    <tr>
     <th>CDR DocId</th>
@@ -128,6 +141,8 @@ class Doc:
         self.sourceUpdateMode = False
         self.needDate         = False
         self.status           = None
+        self.primaryId        = None
+        self.otherIds         = ()
         if cdrId:
             cursor.execute("SELECT title FROM document WHERE id = ?", cdrId)
             self.title = cursor.fetchall()[0][0]
@@ -160,8 +175,47 @@ class Doc:
                      WHERE id = ?""", cdrId)
                 if cursor.fetchall()[0][0] > 0:
                     self.needDate = True
+            if source in ('Oncore', 'NCIC'):
+                cursor.execute("""\
+                    SELECT value
+                      FROM query_term
+                     WHERE path = '/InScopeProtocol/ProtocolIDs'
+                                + '/PrimaryID/IDString'
+                       AND doc_id = ?""", cdrId)
+                rows = cursor.fetchall()
+                if rows:
+                    self.primaryId = rows[0][0]
+                cursor.execute("""\
+                    SELECT t.value, i.value
+                      FROM query_term t
+                      JOIN query_term i
+                        ON t.doc_id = i.doc_id
+                       AND LEFT(t.node_loc, 8) = LEFT(i.node_loc, 8)
+                     WHERE t.path = '/InScopeProtocol/ProtocolIDs'
+                                  + '/OtherID/IDType'
+                       AND i.path = '/InScopeProtocol/ProtocolIDs'
+                                  + '/OtherID/IDString'
+                       AND t.doc_id = ?""", cdrId)
+                self.otherIds = cursor.fetchall()
+
     def toHtml(self, sourceUpdateModeCol = True):
-        html = u"""\
+        if source in ('Oncore', 'NCIC'):
+            primaryId = (self.primaryId and cgi.escape(self.primaryId)
+                         or u"&nbsp;")
+            otherIds = (self.otherIds and
+                        u"; ".join([u"<b>%s</b> - %s" % (cgi.escape(o[0]),
+                                                         cgi.escape(o[1]))
+                                    for o in self.otherIds])
+                        or u"&nbsp;")
+            html = u"""\
+   <tr>
+    <td>%s</td>
+    <td>%s</td>
+    <td>%s</td>
+    <td>%s</td>
+""" % (self.cdrId, primaryId, otherIds, self.pubVer or "N")
+        else:
+            html = u"""\
    <tr>
     <td>%s</td>
     <td>%s</td>
