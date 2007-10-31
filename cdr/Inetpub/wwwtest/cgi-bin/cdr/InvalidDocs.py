@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: InvalidDocs.py,v 1.1 2007-08-27 17:13:03 bkline Exp $
+# $Id: InvalidDocs.py,v 1.2 2007-10-31 16:12:58 bkline Exp $
 #
 # Reports on invalid or blocked CDR documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2007/08/27 17:13:03  bkline
+# Report for Sheri on invalid and blocked documents (#3533).
+#
 #----------------------------------------------------------------------
 import cdrdb, cdrcgi, cgi
 
@@ -111,7 +114,8 @@ if docType:
    </tr>
 """ % dict(docTypes).get(docType))
     for row in rows:
-        html.append(u"""\
+        if row[3] != 'I':
+            html.append(u"""\
    <tr>
     <td>%d</td>
     <td>%s</td>
