@@ -1,14 +1,11 @@
 #----------------------------------------------------------------------
 #
-# $Id: Request2862.py,v 1.2 2007-04-10 12:45:55 bkline Exp $
+# $Id: Request2862.py,v 1.3 2007-10-31 17:43:09 bkline Exp $
 #
 # "We need a report that will display Liaison Office trials and the Lead
 # organization contact information for the Liaison office to use."
 #
 # $Log: not supported by cvs2svn $
-# Revision 1.1  2007/01/25 16:49:56  bkline
-# New report for Brussels (protocol abstract spreadsheet report).
-#
 #----------------------------------------------------------------------
 
 import cdrdb, cdrdocobject, sys, cdr, xml.dom.minidom, ExcelWriter, time
@@ -24,7 +21,7 @@ EORTC    = 'CDR0000029246'
 FNCLCC   = 'CDR0000030236'
 PUPS     = '(360795, 479054)'
 BRUSSELS = 'NCI Liaison Office-Brussels'
-TITLE    = 'NCI Liaison Office Trial Contacts for Abstract Review'
+TITLE    =  'NCI Liaison Office Trial Contacts for Abstract Review'
 
 conn = cdrdb.connect('CdrGuest')
 cursor = conn.cursor()
@@ -182,6 +179,12 @@ class Person:
                         if loc.getAttribute('cdr:id') == cipsContact:
                             self.phone = getElementText(loc, 'Phone') or ""
                             self.email = getElementText(loc, 'Email') or ""
+                            if not self.phone:
+                                self.phone = getElementText(child,
+                                                     'SpecificPhone') or ""
+                            if not self.email:
+                                self.email = getElementText(child,
+                                                     'SpecificEmail') or ""
     @classmethod
     def getPerson(cls, docId, cursor):
         if docId not in cls.__persons:
