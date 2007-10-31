@@ -1,10 +1,14 @@
 <%--
   =====================================================================
-    $Id: Request2565.aspx,v 1.2 2007-01-23 22:11:35 bkline Exp $
+    $Id: Request2565.aspx,v 1.3 2007-10-31 17:43:45 bkline Exp $
 
     Second Glossary Term Report for Margaret (request #2565).
 
     $Log: not supported by cvs2svn $
+    Revision 1.2  2007/01/23 22:11:35  bkline
+    Sheri didn't like previous version; wants special handling for markup;
+    changes to combinations of search elements (at her request).
+
     Revision 1.1  2006/12/18 01:53:50  bkline
     Report for Margaret to support preparation of GlossaryTerm documents
     for refactoring.
@@ -442,7 +446,7 @@
         Cdr.Client.addCgiFormInstructions(formTable, instructions);
         Cdr.Client.addCgiTextField(formTable, "docId", "CDR ID:", "", "");
         Cdr.Client.addCgiTextField(formTable, "term", "Term Name:", "", "");
-        Cdr.Client.DocType dt = new Cdr.Client.DocType("GlossaryTerm");
+        Cdr.DocType dt = new Cdr.DocType("GlossaryTerm");
         string[] termTypes = dt.ValidValueLists["TermType"].Values;
         string[] termStatuses = dt.ValidValueLists["TermStatus"].Values;
         Cdr.Client.addCgiPicklist(formTable, "type", "Term Type:",
@@ -487,7 +491,7 @@
      * <returns>List of CDR document IDs</returns>
      */
     private ArrayList lookupDocId(string idString, SqlConnection conn) {
-        Cdr.Client.CdrDocId docId = new Cdr.Client.CdrDocId(idString);
+        Cdr.DocID docId = new Cdr.DocID(idString);
         SqlCommand cmd = new SqlCommand(@"
                 SELECT doc_id
                   FROM query_term
@@ -495,7 +499,7 @@
                    AND path = '/GlossaryTerm/TermDefinition/DefinitionText'
                    AND value LIKE '%Also called%'", conn);
         cmd.Parameters.Add("@docId", SqlDbType.Int);
-        cmd.Parameters[0].Value = docId.idInteger;
+        cmd.Parameters[0].Value = docId.BaseID;
         return extractQueryResults(cmd);
     }
 

@@ -1,10 +1,13 @@
 <%--
   =====================================================================
-    $Id: Request2776.aspx,v 1.4 2006-12-12 19:26:45 bkline Exp $
+    $Id: Request2776.aspx,v 1.5 2007-10-31 17:43:45 bkline Exp $
 
     Report for Sheri on CTSU persons with no links from protocols.
 
     $Log: not supported by cvs2svn $
+    Revision 1.4  2006/12/12 19:26:45  bkline
+    Removed old dead code.
+
     Revision 1.3  2006/12/12 19:25:26  bkline
     Completely rewritten (Sheri didn't really say what she wanted the first
     time).
@@ -17,7 +20,7 @@
 
   =====================================================================
   --%>
-<%@ Page Language='C#' Debug='True' %>
+<%@ Page Language='C#' %>
 <%@ Import Namespace='System.Data' %>
 <%@ Import Namespace='System.Data.SqlClient' %>
 
@@ -81,7 +84,7 @@
         };
         string[] tables = { "#persons_in_prots", "#persons_in_active_prots" };
         HtmlTable[] reportTables = { tbl1, tbl2 };
-        SqlConnection conn = CdrClient.dbConnect("CdrGuest");
+        SqlConnection conn = Cdr.Client.dbConnect("CdrGuest");
         try {
             foreach (string query in queries) {
                 SqlCommand c = new SqlCommand(query, conn);
@@ -100,7 +103,7 @@
                 while (reader.Read()) {
                     string id = (string)reader[0];
                     object[] values = { id };
-                    CdrClient.addHtmlTableRow(reportTables[i], values);
+                    Cdr.Client.addHtmlTableRow(reportTables[i], values);
                 }
                 reader.Close();
             }
