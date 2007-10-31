@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: UnchangedDocs.py,v 1.4 2004-02-17 19:55:02 venglisc Exp $
+# $Id: UnchangedDocs.py,v 1.5 2007-10-31 21:11:42 bkline Exp $
 #
 # Reports on documents unchanged for a specified number of days.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2004/02/17 19:55:02  venglisc
+# Modified the header title.
+#
 # Revision 1.3  2002/04/24 20:37:10  bkline
 # Changed "Title" label to "DocTitle" at Eileen's request (issue #161).
 #
@@ -99,7 +102,7 @@ if request:
     instr   = "Document type: %s" % type
     buttons = (SUBMENU, cdrcgi.MAINMENU)
     header  = cdrcgi.header(title, title, instr, "UnchangedDocs.py", buttons)
-    html    = """\
+    html    = [u"""\
 <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
 <TABLE BORDER='0' WIDTH='100%%' CELLSPACING='1' CELLPADDING='1'>
  <TR BGCOLOR='silver' VALIGN='top'>
@@ -107,12 +110,12 @@ if request:
   <TD ALIGN='center'><FONT SIZE='-1'><B>DocTitle</B></FONT></TD>
   <TD ALIGN='center'><FONT SIZE='-1'><B>Last Change</B></FONT></TD>
  </TR>
-""" % (cdrcgi.SESSION, session)
+""" % (cdrcgi.SESSION, session)]
     for row in rows:
-        title = row[1].encode('latin-1')
-        shortTitle = title[:100] 
-        if len(title) > 100: shortTitle += " ..."
-        html += """\
+        title = row[1]
+        shortTitle = title[:100]
+        if len(title) > 100: shortTitle += u" ..."
+        html.append(u"""\
  <TR>
   <TD BGCOLOR='white' VALIGN='top' ALIGN='center'><FONT SIZE='-1'>CDR%010d</FONT></TD>
   <TD BGCOLOR='white' ALIGN='left'><FONT SIZE='-1'>%s</FONT></TD>
@@ -120,8 +123,9 @@ if request:
  </TR>
 """ % (row[0],
        shortTitle,
-       row[2][:10])
-    cdrcgi.sendPage(header + html + "</TABLE></FORM></BODY></HTML>")
+       row[2][:10]))
+    html.append(u"</TABLE></FORM></BODY></HTML>")
+    cdrcgi.sendPage(header + u"".join(html))
 
 #----------------------------------------------------------------------
 # Put out the form if we don't have a request.

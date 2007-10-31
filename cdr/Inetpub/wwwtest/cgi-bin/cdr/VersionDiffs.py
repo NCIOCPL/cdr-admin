@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: VersionDiffs.py,v 1.3 2002-12-05 19:09:41 bkline Exp $
+# $Id: VersionDiffs.py,v 1.4 2007-10-31 21:11:42 bkline Exp $
 #
 # Compare two versions of a document.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2002/12/05 19:09:41  bkline
+# Added ability to compare doc between two servers.
+#
 # Revision 1.2  2002/09/13 11:48:22  bkline
 # Added filter to normalize document XML before comparison.
 #
@@ -132,15 +135,17 @@ if not doc1[0]: cdrcgi.bail(doc1[1])
 if not doc2[0]: cdrcgi.bail(doc2[1])
 fn1 = "%d-%s-%s.xml" % (docId, version1, server1)
 fn2 = "%d-%s-%s.xml" % (docId, version2, server2)
-open(fn1, "w").write(unicode(doc1[0], 'utf-8').encode('latin-1', 'replace'))
-open(fn2, "w").write(unicode(doc2[0], 'utf-8').encode('latin-1', 'replace'))
+open(fn1, "w").write(doc1[0])
+open(fn2, "w").write(doc2[0])
 result = runCommand("diff -au %s %s" % (fn1, fn2))
 report = cgi.escape(result.output)
 cleanup(workDir)
 title = "Differences between versions %s and %s for CDR%010d" % (version1,
                                                                  version2,
                                                                  docId)
-cdrcgi.sendPage("""\
+print """\
+Content-type: text/html; enctype=utf-8
+
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>
  <head>
@@ -150,4 +155,4 @@ cdrcgi.sendPage("""\
   <h3>%s</h3>
   <pre>%s</pre>
  </body>
-</html>""" % (title, title, report))
+</html>""" % (title, title, report)

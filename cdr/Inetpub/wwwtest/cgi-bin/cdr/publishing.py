@@ -2,8 +2,11 @@
 #
 # Publishing CGI script.
 #
-# $Id: publishing.py,v 1.28 2007-05-16 12:37:38 bkline Exp $
+# $Id: publishing.py,v 1.29 2007-10-31 21:11:42 bkline Exp $
 # $Log: not supported by cvs2svn $
+# Revision 1.28  2007/05/16 12:37:38  bkline
+# Added non-breaking space when default paramater value is empty.
+#
 # Revision 1.27  2007/05/09 18:32:28  venglisc
 # Definition of PUBTYPES moved from cdr2cg to cdr module.  Importing cdr2gk
 # instead of cdr2cg now.
@@ -553,7 +556,7 @@ class Display:
             tuple[0] = rs.Fields("title").Value
             tuple[1] = rs.Fields("id").Value
             tuple[2] = rs.Fields("num").Value
-            docElem = rs.Fields("xml").Value.encode('latin-1')
+            docElem = rs.Fields("xml").Value.encode('utf-8')
 
             docElem = xml.dom.minidom.parseString(docElem).documentElement
             for node in docElem.childNodes:
@@ -590,7 +593,7 @@ class Display:
         rs = self.__execSQL(sql)
 
         while not rs.EOF:
-            docElem = rs.Fields("xml").Value.encode('latin-1')
+            docElem = rs.Fields("xml").Value.encode('utf-8')
 
             docElem = xml.dom.minidom.parseString(docElem).documentElement
             for node in docElem.childNodes:
@@ -668,7 +671,7 @@ class Display:
         rs = self.__execSQL(sql)
 
         while not rs.EOF:
-            docElem = rs.Fields("xml").Value.encode('latin-1')
+            docElem = rs.Fields("xml").Value.encode('utf-8')
             rs.MoveNext()
         rs.Close()
         rs = None
