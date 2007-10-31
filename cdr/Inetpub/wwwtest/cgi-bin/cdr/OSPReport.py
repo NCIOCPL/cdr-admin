@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: OSPReport.py,v 1.8 2005-11-22 13:40:57 bkline Exp $
+# $Id: OSPReport.py,v 1.9 2007-10-31 17:27:44 bkline Exp $
 #
 # Queue up report for the Office of Science Policy.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.8  2005/11/22 13:40:57  bkline
+# Replaced cdr.DEV_HOST with cdrcgi.WEBSERVER in url for report.
+#
 # Revision 1.7  2005/11/22 13:38:18  bkline
 # Added support for selecting by phase.  Removed hardwired running
 # of job on Mahler.
@@ -204,26 +207,16 @@ if not email or not cancer or request != "Submit":
 #----------------------------------------------------------------------
 if type(cancer) not in (type([]), type(())):
     cancer = [cancer]
-args = []
-for c in cancer:
-    name = "TermId%d" % (len(args) + 1)
-    args.append((name, c))
 if not phases:
     phases = []
 elif type(phases) not in (list, tuple):
     phases = [phases]
-phaseValues = []
-for phase in phases:
-    if phase.upper().startswith('PHASE'):
-        phaseValues.append(phase)
-if len(phaseValues) == 1:
-    args.append(('Phases', "= '%s'" % phaseValues[0]))
-elif phaseValues:
-    args.append(('Phases',
-                "IN (%s)" % ", ".join(["'%s'" % p for p in phaseValues])))
-args.append(('begin', begin))
-args.append(('end', end))
-args.append(('year', year))
+phases = ";".join([p for p in phases if p.upper().startswith('PHASE')])
+args = (('term-ids', ";".join(cancer)),
+        ('phases', phases),
+        ('first-year', begin),
+        ('last-year', end),
+        ('year-type', year))
 
 batch = cdrbatch.CdrBatch(jobName = section, command = command, email = email,
                           args = args)
