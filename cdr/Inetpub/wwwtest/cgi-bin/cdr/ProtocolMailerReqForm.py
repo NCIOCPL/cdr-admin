@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolMailerReqForm.py,v 1.27 2007-08-13 19:51:35 bkline Exp $
+# $Id: ProtocolMailerReqForm.py,v 1.28 2007-10-31 17:30:18 bkline Exp $
 #
 # Request form for all protocol mailers.
 #
@@ -17,6 +17,10 @@
 # publication job for the publishing daemon to find and initiate.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.27  2007/08/13 19:51:35  bkline
+# More tweaks to the wording of the publication notification emailer;
+# added support for non-ASCII characters in the email message.
+#
 # Revision 1.26  2007/07/27 17:35:56  bkline
 # Changed emailer sender address to PDQUpdate@cancer.gov at Sheri's request.
 #
@@ -371,8 +375,8 @@ class PubNotificationProtocol:
     # Class-level values.
     wrapper = textwrap.TextWrapper()
     sender  = 'PDQUpdate@cancer.gov'
-    subject = (u'NCI\u2019s PDQ Cancer Clinical Trials Registry Registration '
-               u'Notification')
+    subject = (u"NCI's PDQ Cancer Clinical Trials Registry Registration "
+               u"Notification")
 
     class Recip:
 
@@ -547,22 +551,21 @@ def sendPubNotificationEmail(docId, nctId, cursor, conn):
 %s
 
 Your trial has also been registered in the National Library of
-Medicine\u2019s ClinicaTrials.gov Web site as \u201c%s.\u201d
+Medicine's ClinicalTrials.gov Web site as "%s."
 
-Please email us at pdqupdate@cancer.gov with any changes including
-changes in status and site information. We will also be contacting
-you periodically to verify the information and look forward to your
-cooperation.
+We will be contacting you periodically to verify the information and
+look forward to your cooperation.
 
 If you have additional trials to submit, please use the new NCI
 Clinical Trial Submission Portal at
 
-http://pdqupdate.cancer.gov/submission.  
+http://pdqupdate.cancer.gov/submission.
 
 Protocol Coordinator
-NCI\u2019s PDQ Cancer Clinical Trials Registry
+NCI's PDQ\u00ae Cancer Clinical Trials Registry
 Office of Communications and Education
 National Cancer Institute
+Email: pdqupdate@cancer.gov
 """ % (top, PubNotificationProtocol.wrapper.fill(line), url, p.nctId)
     try:
         cdr.sendMail(PubNotificationProtocol.sender, addresses,
@@ -638,7 +641,7 @@ if userPick == 'PubNotif':
                                        AND mt.value = 'Publication '
                                                     + 'notification email')
           GROUP BY d.doc_id
-         HAVING MIN(p.completed) >= '2007-05-01'
+         HAVING MIN(p.completed) >= '2007-09-01'
           ORDER BY MIN(p.completed), d.doc_id""", timeout = 300)
         docIds = []
         for row in cursor.fetchall():
