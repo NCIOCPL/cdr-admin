@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermReports.py,v 1.11 2006-11-29 15:45:32 bkline Exp $
+# $Id: GlossaryTermReports.py,v 1.12 2007-10-31 16:09:04 bkline Exp $
 #
 # Submenu for glossary term reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.11  2006/11/29 15:45:32  bkline
+# Plugged in new glossary word stem report.
+#
 # Revision 1.10  2006/07/10 20:34:39  bkline
 # Added new report on stale glossary terms.
 #
@@ -105,6 +108,7 @@ reports = [
             'Glossary Term and Variant Search Report'),
            ('GlossaryTermsByStatus.py?', 'Glossary Term By Status Report'),
            ('GlossaryTermsByType.py?', 'Glossary Term By Type Report'),
+           ('Request2565.aspx?', 'Glossary Term Concept Reports'),
            ('StaleGlossaryTerms.py?', 'Glossary Terms That Need Reviewed'),
            ('SpanishGlossaryTermsByStatus.py?',
             'Spanish Glossary Term By Status Report')
