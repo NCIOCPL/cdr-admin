@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: UnchangedDocs.py,v 1.5 2007-10-31 21:11:42 bkline Exp $
+# $Id: UnchangedDocs.py,v 1.6 2007-10-31 21:13:48 bkline Exp $
 #
 # Reports on documents unchanged for a specified number of days.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2007/10/31 21:11:42  bkline
+# Fixed handling of Unicode.
+#
 # Revision 1.4  2004/02/17 19:55:02  venglisc
 # Modified the header title.
 #
@@ -93,7 +96,7 @@ if request:
  ORDER BY MAX(a.dt), d.id
 """ % (maxRows, days)
     try:
-        cursor.execute(query)
+        cursor.execute(query, timeout = 600)
         rows = cursor.fetchall()
     except cdrdb.Error, info:
         cdrcgi.bail('Database query failure: %s' % info[1][0])
