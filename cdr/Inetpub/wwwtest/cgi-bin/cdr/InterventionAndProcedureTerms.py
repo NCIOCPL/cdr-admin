@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: InterventionAndProcedureTerms.py,v 1.1 2002-12-11 13:02:25 bkline Exp $
+# $Id: InterventionAndProcedureTerms.py,v 1.2 2007-10-31 16:10:09 bkline Exp $
 #
 # Hierarchical report (in thesaurus-like format) of index terms
 # whose semantic types are some form of Intervention/procedure.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2002/12/11 13:02:25  bkline
+# Hierarchical report on intervention/procedure index terms.
+#
 #----------------------------------------------------------------------
 import cdrcgi, cdrdb, cgi
 
@@ -34,7 +37,8 @@ try:
                    INTO #intervention_semantic_types
                    FROM query_term
                   WHERE path = '/Term/PreferredName'
-                    AND value = 'Intervention/procedure'""")
+                    AND value IN ('Intervention/procedure',
+                                  'Intervention or procedure')""")
     conn.commit()
     done = 0
     while not done:
@@ -44,8 +48,11 @@ try:
                    FROM query_term q
                    JOIN #intervention_semantic_types ist
                      ON ist.doc_id = q.int_val
+                   JOIN document d
+                     ON d.id = q.doc_id
                   WHERE q.doc_id NOT IN (SELECT doc_id
                                            FROM #intervention_semantic_types)
+                    AND d.active_status = 'A'
                     AND q.path = '/Term/TermRelationship/ParentTerm'
                                + '/TermId/@cdr:ref'""")
         if not cursor.rowcount:
@@ -78,7 +85,10 @@ try:
             ON it.int_val = ist.doc_id
           JOIN query_term pname
             ON pname.doc_id = it.doc_id
+          JOIN document d
+            ON d.id = it.doc_id
          WHERE it.path = '/Term/SemanticType/@cdr:ref'
+           AND d.active_status = 'A'
            AND pname.path = '/Term/PreferredName'""")
     conn.commit()
 
@@ -96,8 +106,11 @@ try:
                    FROM #index_terms it
                    JOIN query_term pid
                      ON pid.doc_id = it.IndexTermId
+                   JOIN document d
+                     ON d.id = pid.int_val
                   WHERE pid.path = '/Term/TermRelationship/ParentTerm'
-                                 + '/TermId/@cdr:ref'""")
+                                 + '/TermId/@cdr:ref'
+                    AND d.active_status = 'A'""")
     for row in cursor.fetchall():
         termId, parentId = row
         if indexTerms.has_key(parentId):
@@ -125,8 +138,8 @@ def termSorter(a, b):
 
 def addSemanticType(st):
     html = """\
-    <li class = 'st'>%s</li>
-""" % cgi.escape(st.name)
+    <li class = '%s'>%s</li>
+""" % ((st.parent == patriarch) and 'st' or 't', cgi.escape(st.name))
     if st.children or st.terms:
         html += "<ul>\n"
         keys = st.children.keys()
