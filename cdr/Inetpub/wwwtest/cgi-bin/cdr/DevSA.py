@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: DevSA.py,v 1.5 2006-01-19 21:12:24 ameyer Exp $
+# $Id: DevSA.py,v 1.6 2007-10-31 16:03:33 bkline Exp $
 #
 # Main menu for Developers and System Administrators.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2006/01/19 21:12:24  ameyer
+# Added ProjectedAccrual processing to menu.  May remove it later.
+#
 # Revision 1.4  2005/07/07 22:26:35  venglisc
 # Removed menu item to update CSS Stylesheets. (Bug 1747)
 #
@@ -50,6 +53,7 @@ items   = (('EditGroups.py',           'Manage Groups'                 ),
            ('EditFilters.py',          'Manage Filters'                ),
            ('EditFilterSets.py',       'Manage Filter Sets'            ),
            ('Publishing.py',           'Publishing'                    ),
+           ('Republish.py',            'Re-Publishing'                 ),
            ('Reports.py',              'Reports'                       ),
            ('Mailers.py',              'Mailers'                       ),
            ('MergeProt.py',            'Protocol Merge'                ),
