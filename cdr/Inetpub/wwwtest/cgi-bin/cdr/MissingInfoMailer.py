@@ -1,13 +1,17 @@
 #----------------------------------------------------------------------
 #
-# $Id: MissingInfoMailer.py,v 1.1 2007-07-26 12:00:12 bkline Exp $
+# $Id: MissingInfoMailer.py,v 1.2 2007-10-31 16:16:54 bkline Exp $
 #
 # Program to send out a mailer for missing protocol information.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2007/07/26 12:00:12  bkline
+# New script to send out an email message asking for protocol information
+# which has been omitted.
+#
 #----------------------------------------------------------------------
 import cdr, cdrdb, cgi, cdrcgi, textwrap, xml.dom.minidom, xml.sax.saxutils
-import time, cdrmailcommon
+import time, cdrmailcommon, sys
 
 # Collect parameters.
 fields  = cgi.FieldStorage()
@@ -44,8 +48,8 @@ def checkForPreviousEmails(cursor, docId):
     mailerIds = [row[0] for row in cursor.fetchall()]
     if mailerIds:
         mailerIds = "; ".join([("CDR%d" % mailerId) for mailerId in mailerIds])
-        msg = "Already sent missing info emailers %s for CDR%d" % (mailerIds,
-                                                                   docId)
+        msg = "Already sent missing info emailer(s) %s for CDR%d" % (mailerIds,
+                                                                     docId)
         cdrcgi.bail(msg)
 conn = cdrdb.connect('CdrGuest')
 cursor = conn.cursor()
@@ -58,26 +62,32 @@ if body and email and recipId:
     sent       = time.strftime('%Y-%m-%dT%M:%H:%S')
     mailerMode = 'Email'
     mailerType = 'Missing information email'
-    recip      = ['***REMOVED***']
-    #recip      = ('bkline@speakeasy.net', '***REMOVED***')
-    #recip      = ['***REMOVED***', '***REMOVED***']
-    #recip      = [email]
-    address    = u"""\
+    addresses  = email.split(';')
+    recip      = addresses
+    recipIds   = recipId.split(';')
+    if not cdr.isProdHost():
+        recip  = ['***REMOVED***', '***REMOVED***']
+    try:
+        cdr.sendMail(sender, recip, subject, body, mime = True)
+    except Exception, e:
+        cdrcgi.bail("Failure sending email to %s: %s" % (email, e))
+    i = 0
+    trackerIds = []
+    for address in addresses:
+        addressElement = u"""\
    <MailerAddress>
     <Email>%s</Email>
    </MailerAddress>
-""" % email
-    try:
-        cdr.sendMail(sender, recip, subject, body)
-    except Exception, e:
-        cdrcgi.bail("Failure sending email to %s: %s" % (email, e))
-
-    try:
-        trackerId = cdrmailcommon.recordMailer(session, docId, int(recipId),
-                                               mailerMode, mailerType, sent,
-                                               address)
-    except Exception, e:
-        cdrcgi.bail("Failure recording email to %s: %s" % (email, e))
+""" % address
+        try:
+            trackerId = cdrmailcommon.recordMailer(session, docId,
+                                                   int(recipIds[i]),
+                                                   mailerMode, mailerType,
+                                                   sent, addressElement)
+            trackerIds.append("CDR%d" % trackerId)
+            i += 1
+        except Exception, e:
+            cdrcgi.bail("Failure recording email to %s: %s" % (email, e))
     cdrcgi.sendPage(u"""\
 <html>
  <head>
@@ -87,22 +97,98 @@ if body and email and recipId:
   </style>
  </head>
  <body>
-  Emailer CDR%d successfully sent to %s
+  Emailer(s) %s successfully sent to %s
  </body>
 </html>
-""" % (trackerId, email))
+""" % (u", ".join(trackerIds), u", ".join(addresses)))
 
 # Collect the information we need.
 class Protocol:
+
+    class LeadOrgPerson:
+        def __init__(self, node):
+            self.role    = None
+            self.cdrId   = None
+            self.fragId  = None
+            self.address = None
+            self.nodeId  = node.getAttribute("cdr:id")
+            for child in node.childNodes:
+                if child.nodeName == "PersonRole":
+                    self.role = cdr.getTextContent(child)
+                elif child.nodeName == "Person":
+                    personId = child.getAttribute('cdr:ref')
+                    self.cdrId, self.fragId = cdr.exNormalize(personId)[1:]
+
+        def wanted(self, mailAbstractTo, leadOrgRole):
+
+            # If this is the person we send the abstract mailers to,
+            # send this mailer to the person as well.
+            if self.nodeId == mailAbstractTo:
+                return True
+
+            # Send to PUP at primary lead org.
+            return self.role == "Update person" and leadOrgRole == "Primary"
+
+        def findEmailAddress(self, cursor):
+            cursor.execute("""\
+                SELECT e.value
+                  FROM query_term e
+                  JOIN query_term i
+                    ON e.doc_id = i.doc_id
+                   AND LEFT(e.node_loc, 8) = LEFT(i.node_loc, 8)
+                 WHERE e.path LIKE '/Person/PersonLocations/%Email'
+                   AND i.path LIKE '/Person/PersonLocations/%/@cdr:id'
+                   AND i.value = ?
+                   AND e.doc_id = ?""", (self.fragId, self.cdrId))
+            rows = cursor.fetchall()
+            if rows:
+                self.address = rows[0][0]
+                return self.address
+            cursor.execute("""\
+                SELECT o.value
+                  FROM query_term o
+                  JOIN query_term i
+                    ON o.doc_id = i.doc_id
+                   AND LEFT(o.node_loc, 8) = LEFT(i.node_loc, 8)
+                 WHERE o.path = '/Person/PersonLocations'
+                              + '/OtherPracticeLocation'
+                              + '/OrganizationLocation/@cdr:ref'
+                   AND i.path = '/Person/PersonLocations'
+                              + '/OtherPracticeLocation/@cdr:id'
+                   AND i.value = ?
+                   AND o.doc_id = ?""", (self.fragId, self.cdrId))
+            rows = cursor.fetchall()
+            if not rows:
+                return None
+            docId, fragId = cdr.exNormalize(rows[0][0])[1:]
+            cursor.execute("""\
+                SELECT e.value
+                  FROM query_term e
+                  JOIN query_term i
+                    ON e.doc_id = i.doc_id
+                   AND LEFT(e.node_loc, 8) = LEFT(i.node_loc, 8)
+                 WHERE e.path LIKE '/Organization' +
+                                   '/OrganizationLocations' +
+                                   '/OrganizationLocation' +
+                                   '/Location/%Email%'
+                   AND i.path = '/Organization'
+                              + '/OrganizationLocations'
+                              + '/OrganizationLocation'
+                              + '/Location/@cdr:id'
+                   AND i.value = ?
+                   AND e.doc_id = ?""", (fragId, docId))
+            rows = cursor.fetchall()
+            self.address = rows and rows[0][0] or None
+            return self.address
+
     def __init__(self, docId, cursor):
         self.docId       = docId
-        self.primaryId   = u"[NO PRIMARY ID FOUND]"
-        self.originalId  = u"[NO ORIGINAL ID FOUND]"
+        self.primaryId   = None
+        self.originalId  = None
         self.missingInfo = []
+        self.recips      = {}
         self.received    = u"[NO DATE OF RECEIPT FOUND]"
         self.title       = u"[NO ORIGINAL TITLE FOUND]"
-        self.recip       = None
-        self.recipId     = None
         versions         = cdr.lastVersions(session, "CDR%010d" % docId)
         lastVersion      = versions[0]
         if lastVersion == -1:
@@ -125,24 +211,19 @@ class Protocol:
         if not nodes:
             cdrcgi.bail("CDR%d has no MailAbstractTo element" % docId)
         mailAbstractTo = cdr.getTextContent(nodes[0])
-        personId = None
-        for node in dom.getElementsByTagName('LeadOrgPersonnel'):
-            if node.getAttribute("cdr:id") == mailAbstractTo:
-                for child in node.childNodes:
-                    if child.nodeName == 'Person':
-                        personId = child.getAttribute('cdr:ref')
-                        self.recipId, fragId = cdr.exNormalize(personId)[1:]
-                        self.recip = Protocol.findEmailAddress(cursor,
-                                                               self.recipId,
-                                                               fragId)
-                        break
-        if not self.recipId:
-            cdrcgi.bail("Unable to find lead org person for "
-                        "MailAbstractTo value %s" % mailAbstractTo)
-        if not self.recip:
-            cdrcgi.bail("Unable to find email address for %s" % personId)
         for node in dom.documentElement.childNodes:
-            if node.nodeName == "ProtocolIDs":
+            if node.nodeName == "ProtocolAdminInfo":
+                for child in node.childNodes:
+                    if child.nodeName == "ProtocolLeadOrg":
+                        orgRole = Protocol.getOrgRole(child)
+                        for grandchild in child.childNodes:
+                            if grandchild.nodeName == "LeadOrgPersonnel":
+                                person = Protocol.LeadOrgPerson(grandchild)
+                                if person.cdrId not in self.recips:
+                                    if person.wanted(mailAbstractTo, orgRole):
+                                        if person.findEmailAddress(cursor):
+                                            self.recips[person.cdrId] = person
+            elif node.nodeName == "ProtocolIDs":
                 for child in node.childNodes:
                     if child.nodeName == "PrimaryID":
                         for grandchild in child.childNodes:
@@ -180,57 +261,17 @@ class Protocol:
                                 received = received.strip()
                                 if received:
                                     self.received = received
-                                
+        if not self.recips:
+            cdrcgi.bail("Unable to find suitable recipient for mailer")
+        if not self.originalId:
+            self.originalId = self.primaryId or u"[NO ORIGINAL ID FOUND]"
+        if not self.primaryId:
+            self.primaryId = u"[NO PRIMARY ID FOUND]"
+
     @staticmethod
-    def findEmailAddress(cursor, docId, fragId):
-        cursor.execute("""\
-            SELECT e.value
-              FROM query_term e
-              JOIN query_term i
-                ON e.doc_id = i.doc_id
-               AND LEFT(e.node_loc, 8) = LEFT(i.node_loc, 8)
-             WHERE e.path LIKE '/Person/PersonLocations/%Email'
-               AND i.path LIKE '/Person/PersonLocations/%/@cdr:id'
-               AND i.value = ?
-               AND e.doc_id = ?""", (fragId, docId))
-        rows = cursor.fetchall()
-        if rows:
-            return rows[0][0]
-        cursor.execute("""\
-            SELECT o.value
-              FROM query_term o
-              JOIN query_term i
-                ON o.doc_id = i.doc_id
-               AND LEFT(o.node_loc, 8) = LEFT(i.node_loc, 8)
-             WHERE o.path = '/Person/PersonLocations'
-                          + '/OtherPracticeLocation'
-                          + '/OrganizationLocation/@cdr:ref'
-               AND i.path = '/Person/PersonLocations'
-                          + '/OtherPracticeLocation/@cdr:id'
-               AND i.value = ?
-               AND o.doc_id = ?""", (fragId, docId))
-        rows = cursor.fetchall()
-        if not rows:
-            return None
-        docId, fragId = cdr.exNormalize(rows[0][0])[1:]
-        cursor.execute("""\
-            SELECT e.value
-              FROM query_term e
-              JOIN query_term i
-                ON e.doc_id = i.doc_id
-               AND LEFT(e.node_loc, 8) = LEFT(i.node_loc, 8)
-             WHERE e.path LIKE '/Organization' +
-                               '/OrganizationLocations' +
-                               '/OrganizationLocation' +
-                               '/Location/%Email%'
-               AND i.path = '/Organization'
-                          + '/OrganizationLocations'
-                          + '/OrganizationLocation'
-                          + '/Location/@cdr:id'
-               AND i.value = ?
-               AND e.doc_id = ?""", (fragId, docId))
-        rows = cursor.fetchall()
-        return rows and rows[0][0] or None
+    def getOrgRole(node):
+        for child in node.getElementsByTagName('LeadOrgRole'):
+            return cdr.getTextContent(child).strip()
 
 protocol = Protocol(docId, cursor)
 if not protocol.missingInfo:
@@ -241,8 +282,8 @@ wrapper = textwrap.TextWrapper()
 paras = []
 para = (u'Your protocol "%s," "%s," was received for inclusion in the '
         u'National Cancer Institute\'s PDQ database on %s.  The protocol '
-        u'has been assigned the PDA Primary ID of: %s.  Please reference this '
-        u'protocol number in all future communications' %
+        u'has been assigned the PDQ Primary ID of: %s.  Please reference this '
+        u'protocol number in all future communications.' %
         (protocol.originalId, protocol.title, protocol.received,
          protocol.primaryId))
 paras = [wrapper.fill(para)]
@@ -259,7 +300,7 @@ para = wrapper.fill('At this time, your submission is not complete.  Before '
 for mi in protocol.missingInfo:
     para += "\n  * %s" %mi
 para += "\n" + wrapper.fill('This information can be emailed to '
-                            'pdqupdate@cancer.gov or faxed to us at '
+                            'PDQUpdate@cancer.gov or faxed to us at '
                             '301-402-6728.')
 paras.append(para)
 paras.append(wrapper.fill('If you have any questions, please call the PDQ '
@@ -274,9 +315,19 @@ http://pdqupdate.cancer.gov/submission""")
 body = u"\n\n".join(paras) + u"\n"
 
 # Show it to the user for her approval.
-html = """\
+keys = protocol.recips.keys()
+keys.sort()
+addresses = []
+recipIds  = []
+for key in keys:
+    addresses.append(protocol.recips[key].address)
+    recipIds.append(`key`)
+html = u"""\
+Content-type: text/html; charset=utf-8
+
 <html>
  <head>
+  <meta http-equiv='Content-Type' content='text/html;charset=utf-8' />
   <title>Emailer for Missing Required Protocol Information</title>
   <style type='text/css'>
    body { font-family: arial; }
@@ -299,7 +350,7 @@ html = """\
   </form>
  </body>
 </html>
-""" % (docId, protocol.recip, cgi.escape(body), cdrcgi.SESSION, session,
+""" % (docId, u", ".join(addresses), cgi.escape(body), cdrcgi.SESSION, session,
        docId, xml.sax.saxutils.quoteattr(body),
-       protocol.recip, protocol.recipId)
-cdrcgi.sendPage(html.encode('latin-1', 'replace'))
+       u";".join(addresses), u";".join(recipIds))
+sys.stdout.write(html.encode('utf-8'))
