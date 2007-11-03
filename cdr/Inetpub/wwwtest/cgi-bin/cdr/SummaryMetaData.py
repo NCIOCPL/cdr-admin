@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryMetaData.py,v 1.5 2007-11-03 14:15:07 bkline Exp $
+# $Id: SummaryMetaData.py,v 1.6 2007-11-03 14:36:36 bkline Exp $
 #
 # Report on the metadata for one or more summaries.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2007/11/03 14:15:07  bkline
+# Unicode encoding cleanup (issue #3716).
+#
 # Revision 1.4  2007/02/21 17:16:52  venglisc
 # Modified query to only display publishable documents.  Modified CSS
 # and added CDR-ID to display. (Bug 2905)
@@ -325,7 +328,7 @@ class Summary:
 
     def getHtml(self, extras):
         html = """\
-  <table border='0' cellpadding='2' cellspacing='0'>
+  <table border='1' cellpadding='2' cellspacing='0'>
 """
         if extras:
             for board in self.boards:
