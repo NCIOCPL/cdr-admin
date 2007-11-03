@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditFilterSets.py,v 1.4 2004-05-11 17:33:18 bkline Exp $
+# $Id: EditFilterSets.py,v 1.5 2007-11-03 14:15:07 bkline Exp $
 #
 # Menu of existing filter sets.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2004/05/11 17:33:18  bkline
+# Plugged in ShowFilterSets.py.
+#
 # Revision 1.3  2002/11/14 14:05:42  bkline
 # Reduced font sizes for report.
 #
@@ -62,19 +65,19 @@ elif request == "Report":
 """)
     sets = cdr.getFilterSets('guest')
     setDict = {}
-    report = ""
+    report = u""
     for set in sets:
         filterSet = cdr.getFilterSet('guest', set.name)
         setDict[set.name] = filterSet
     keys = setDict.keys()
     keys.sort()
     for key in keys:
-        report += "<h2>%s</h2><ul>\n" % cgi.escape(key)
+        report += u"<h2>%s</h2><ul>\n" % cgi.escape(key)
         for member in setDict[key].members:
-            report += "<li>%s %s</li>\n" % (type(member.id) == type(9) and
+            report += u"<li>%s %s</li>\n" % (type(member.id) == type(9) and
                     "[S]" or "[F]", cgi.escape(member.name))
-        report += "</ul>\n"
-    cdrcgi.sendPage(header + report + "</form></body></html>")
+        report += u"</ul>\n"
+    cdrcgi.sendPage(header + report + u"</form></body></html>")
 
 #----------------------------------------------------------------------
 # Handle request for creating a new filter set.
@@ -110,7 +113,7 @@ try:
 except cdrdb.Error, info:
     cdrcgi.bail("Database failure retrieving filter sets: %s" % info[1][0])
 
-form = """\
+form = u"""\
    <h2>CDR Filter Sets</h2>
    <script language='JavaScript'>
     function showTip(tip) {
@@ -123,7 +126,7 @@ for row in rows:
     name1 = urllib.quote_plus(row[0])
     name2 = cgi.escape(row[0], 1)
     desc  = cgi.escape(row[1], 1).replace("'", "&apos;")
-    form += """\
+    form += u"""\
     <li>
      <a href="%s/EditFilterSet.py?%s=%s&Request=Edit&setName=%s"
         onMouseOver="window.status='%s'; return true">%s</a>
@@ -133,11 +136,11 @@ for row in rows:
 #----------------------------------------------------------------------
 # Send back the form.
 #----------------------------------------------------------------------
-form += """\
+form += u"""\
    </ul>
    <input type='hidden' name='%s' value='%s'>
   </form>
  </body>
 </html>
 """ % (cdrcgi.SESSION, session)
-cdrcgi.sendPage(header + cdrcgi.unicodeToLatin1(form))
+cdrcgi.sendPage(header + form)

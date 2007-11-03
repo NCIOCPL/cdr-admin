@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: TermTreeB2.py,v 1.1 2001-12-01 18:11:44 bkline Exp $
+# $Id: TermTreeB2.py,v 1.2 2007-11-03 14:15:07 bkline Exp $
 #
 # Second prototype for CDR Terminology tree viewer.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2001/12/01 18:11:44  bkline
+# Initial revision
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string, cdrdb
 
@@ -30,7 +33,7 @@ subtree = fields and fields.getvalue("subtree") or ""
 #----------------------------------------------------------------------
 # Emit the top of the page.
 #----------------------------------------------------------------------
-html = """\
+html = u"""\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <HTML>
  <HEAD>
@@ -89,7 +92,7 @@ SELECT DISTINCT child, num_grandchildren, title
         cursor.execute(query)
         children = []
         for row in cursor.fetchall():
-            children.append((`row[0]`, row[1], row[2].encode('latin-1')))
+            children.append((`row[0]`, row[1], row[2]))
     except cdrdb.Error, info:
         cdrcgi.bail('Failure fetching query data: %s' % info[1][0])
     return children
@@ -107,15 +110,19 @@ def showNodes(nodes, level, parentPath):
         else:
             image = PLUS
             path  = parentPath + pathSep + node[0]
-        html += "\240" * (1 + 4 * level)
+        html += u"\240" * (1 + 4 * level)
         if image == BLANK:
-            html += "<IMG SRC='%s' BORDER='0'>" % image
+            html += u"<IMG SRC='%s' BORDER='0'>" % image
         else:
-         	html += "<A HREF='%s?path=%s&subtree=%s' ><IMG SRC='%s' BORDER='0'></A>" % (SCRIPT, path,subtree, image)
- 
-        html += "\n<A HREF='#' onclick=\"changeFrames(\'%s?Filter=CDR210817&DocId=%s\','%s?docID=%s')\" >" % (FILTER,node[0],SCRIPTL,node[0])
+         	html += (u"<A HREF='%s?path=%s&subtree=%s' >"
+                     u"<IMG SRC='%s' BORDER='0'></A>" %
+                     (SCRIPT, path, subtree, image))
 
-        html += "\n<FONT COLOR='blue'>%s</FONT></A><BR>\n" % node[2]
+        html += (u"\n<A HREF='#' onclick=\"changeFrames(\'%s?"
+                 u"Filter=CDR210817&DocId=%s\','%s?docID=%s')\" >" %
+                 (FILTER, node[0], SCRIPTL, node[0]))
+
+        html += u"\n<FONT COLOR='blue'>%s</FONT></A><BR>\n" % node[2]
         if image == MINUS:
             showNodes(getChildren(node[0]), level + 1, 
                     parentPath + pathSep + node[0])
@@ -129,7 +136,7 @@ showNodes(topNodes, 0, "")
 #----------------------------------------------------------------------
 # Send the page back to the browser.
 #----------------------------------------------------------------------
-cdrcgi.sendPage(html + " </BODY>\n</HTML>\n")
+cdrcgi.sendPage(html + u" </BODY>\n</HTML>\n")
 
 
 

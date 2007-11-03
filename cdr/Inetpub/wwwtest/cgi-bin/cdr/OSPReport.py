@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: OSPReport.py,v 1.9 2007-10-31 17:27:44 bkline Exp $
+# $Id: OSPReport.py,v 1.10 2007-11-03 14:15:07 bkline Exp $
 #
 # Queue up report for the Office of Science Policy.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.9  2007/10/31 17:27:44  bkline
+# Cleanup of report parameters.
+#
 # Revision 1.8  2005/11/22 13:40:57  bkline
 # Replaced cdr.DEV_HOST with cdrcgi.WEBSERVER in url for report.
 #
@@ -105,20 +108,20 @@ def listTermChoices():
     except Exception, e:
         cdrcgi.bail("Database failure extracting cancer term choices: %s"
                     % str(e))
-    html = """\
+    html = u"""\
       <select multiple='1' size='10' name='Cancer'>
 """
     for row in rows:
-        html += """\
+        html += u"""\
        <option value='%d'>%s</option>
-""" % (row[0], cdrcgi.unicodeToLatin1(cgi.escape(row[1])))
-    return html + """\
+""" % (row[0], cgi.escape(row[1]))
+    return html + u"""\
       </select>"""
 #----------------------------------------------------------------------
 # Create picklist for phase(s).
 #----------------------------------------------------------------------
 def listPhaseChoices():
-    return """\
+    return u"""\
       <select multiple='1' size='5' name='Phase'>
        <option value='All' selected='1'>All Phases</option>
        <option value='Phase I'>Phase I</option>
@@ -139,7 +142,7 @@ if not begin or not end:
 # Put up the form if we don't have a request yet.
 #----------------------------------------------------------------------
 if not email or not cancer or request != "Submit":
-    form = """\
+    form = u"""\
    <p>
     Please select at least one cancer type for the report.
     This report requires a few minutes to complete.
@@ -233,7 +236,7 @@ header      = cdrcgi.header(title, title, section, script, buttons,
    body { font-family: Arial }
   </style>
  """)
-cdrcgi.sendPage(header + """\
+cdrcgi.sendPage(header + u"""\
    <h4>Report has been queued for background processing</h4>
    <p>
     To monitor the status of the job, click this

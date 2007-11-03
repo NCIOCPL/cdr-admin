@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: ExternMapFailures.py,v 1.8 2006-08-07 21:08:14 ameyer Exp $
+# $Id: ExternMapFailures.py,v 1.9 2007-11-03 14:15:07 bkline Exp $
 #
 # Report on values found in external systems (such as ClinicalTrials.gov)
 # which have not yet been mapped to CDR documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.8  2006/08/07 21:08:14  ameyer
+# Supporting new mappable column in external_map table.
+#
 # Revision 1.7  2004/12/27 20:33:18  bkline
 # Cleaned up formatting of form.
 #
@@ -119,7 +122,7 @@ if not usages:
 #----------------------------------------------------------------------
 # Gather the report data.
 #----------------------------------------------------------------------
-html = """\
+html = u"""\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>
  <head>
@@ -135,7 +138,7 @@ html = """\
   </center>
 """ % time.strftime("%B %d, %Y")
 for usage in usages:
-    html += """
+    html += u"""
   <br>
   <br>
   <center>
@@ -163,7 +166,7 @@ ORDER BY CONVERT(CHAR(10), m.last_mod, 102) DESC, m.value""" % mapSelect
     cursor.execute(qry, (usage, age))
     rows = cursor.fetchall()
     if rows:
-        html += """\
+        html += u"""\
   <table border='1' cellpadding='2' cellspacing='0' width='100%'>
    <tr>
     <th>Value</th>
@@ -171,19 +174,19 @@ ORDER BY CONVERT(CHAR(10), m.last_mod, 102) DESC, m.value""" % mapSelect
    </tr>
 """
         for value, recorded in rows:
-            html += """\
+            html += u"""\
    <tr>
     <td>%s</td>
     <td nowrap = '1' align='center' valign='top'>%s</td>
    </tr>
-""" % (cdrcgi.unicodeToLatin1(value), recorded[:10])
-        html += """\
+""" % (cgi.escape(value), recorded[:10])
+        html += u"""\
   </table>
 """
     else:
-        html += """
+        html += u"""
   <i>No recent unmapped values found.</i>
 """
-cdrcgi.sendPage(html + """\
+cdrcgi.sendPage(html + u"""\
  </body>
 </html>""")

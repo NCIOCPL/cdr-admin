@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PubStatsByDate.py,v 1.1 2007-01-05 23:27:33 venglisc Exp $
+# $Id: PubStatsByDate.py,v 1.2 2007-11-03 14:15:07 bkline Exp $
 #
 # Report to list updated document by document type.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2007/01/05 23:27:33  venglisc
+# Initial copy of publishing report by date.  (Bug 2111)
+#
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string, cdrdb, time
@@ -537,4 +540,4 @@ footer = """\
 #----------------------------------------------------------------------
 # Send the page back to the browser.
 #----------------------------------------------------------------------
-cdrcgi.sendPage(cdrcgi.unicodeToLatin1(header + report + footer))
+cdrcgi.sendPage(header + report + footer)

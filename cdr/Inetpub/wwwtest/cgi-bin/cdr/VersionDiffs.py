@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: VersionDiffs.py,v 1.4 2007-10-31 21:11:42 bkline Exp $
+# $Id: VersionDiffs.py,v 1.5 2007-11-03 14:15:07 bkline Exp $
 #
 # Compare two versions of a document.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2007/10/31 21:11:42  bkline
+# Fixed handling of Unicode.
+#
 # Revision 1.3  2002/12/05 19:09:41  bkline
 # Added ability to compare doc between two servers.
 #
@@ -144,7 +147,7 @@ title = "Differences between versions %s and %s for CDR%010d" % (version1,
                                                                  version2,
                                                                  docId)
 print """\
-Content-type: text/html; enctype=utf-8
+Content-type: text/html; charset=utf-8
 
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>

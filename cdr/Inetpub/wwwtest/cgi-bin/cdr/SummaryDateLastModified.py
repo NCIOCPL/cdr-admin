@@ -1,12 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryDateLastModified.py,v 1.8 2007-10-31 17:41:52 bkline Exp $
+# $Id: SummaryDateLastModified.py,v 1.9 2007-11-03 14:15:07 bkline Exp $
 #
 # Report listing specified set of Cancer Information Summaries, the date
 # they were last modified as entered by a user, and the date the last
 # Modify action was taken.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.8  2007/10/31 17:41:52  bkline
+# Extensively rewritten for request #3635.
+#
 # Revision 1.7  2005/07/14 09:49:41  bkline
 # Changed to ignore UNLOCK rows in the audit table.
 #
@@ -504,16 +507,6 @@ collectSummaries(sqlSelect, sqlFrom, sqlJoin, sqlWhere,
                  cursor, 'Spanish', sst, reportType)
 if not Summary.summaries:
     cdrcgi.bail("No summaries match report criteria")
-
-#----------------------------------------------------------------------
-# Prepare string for insertion into worksheet cell.
-#----------------------------------------------------------------------
-def fix(s):
-    if not s:
-        return ""
-    if type(s) == unicode:
-        return s.replace(u"\u2019", "'").encode('latin-1', 'replace')
-    return str(s)
 
 #----------------------------------------------------------------------
 # Map audience name to abbreviation.

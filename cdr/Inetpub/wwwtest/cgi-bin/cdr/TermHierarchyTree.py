@@ -153,7 +153,8 @@ try:
             done = 1
         conn.commit()
         
-        # all non-semantic rows that don't have parents will be assigned to a semantic term.
+        # all non-semantic rows that don't have parents will be assigned to
+        # a semantic term.
         cursor.execute("""\
             INSERT INTO #terms
                  SELECT p.doc_id, p.int_val, 0
@@ -236,7 +237,7 @@ def expandUp(t):
 
 # add all terms that don't have parents
 def addTerms(terms,SemanticTerms):
-    html = [u""""""]
+    html = [u""]
     
     # create a dummy partent node so we can sort the top node
     parentTerm = terms[-1] = Term("",-1,0)
@@ -276,29 +277,34 @@ def addLeafIDsToList(t,cdrids):
 
 # add a term to the hierarchy list
 def addTerm(t,parent):
-    html = [u""""""]
-    cbText= [u""""""]
+    html = [u""]
+    cbText= [u""]
 
     if t.children:
         cdrids = {}
         addLeafIDsToList(t,cdrids)
-        cbText.append("%s:" % t.id)
+        cbText.append(u"%s:" % t.id)
         cbText.append(u" ".join([`id` for id in cdrids]))
         cbText = u"".join(cbText)
-        html.append(u""" <li id="%s" class="parent %s" onclick="clickOnName(event,this);"><span onclick="clickOnSign(event, '%s')">%s</span>&nbsp;%s""" % (t.id,t.showMode,t.id,t.sign,cdrcgi.unicodeToLatin1(t.name)))
+        html.append(u"""\
+   <li id="%s" class="parent %s" onclick="clickOnName(event,this);"
+   ><span onclick="clickOnSign(event, '%s')">%s</span>&nbsp;%s""" %
+                    (t.id, t.showMode, t.id, t.sign, t.name))
         if len(cbText) > 0:
-            html.append(u"""<a STYLE="font-size: 8pt; color: rgb(200, 100, 100)" onclick="Send2Clipboard('%s');" href=#">&nbsp(copy)</a>""" % cbText)
-        html.append(u"""<ul>""")
+            html.append(u"""\
+   <a style="font-size: 8pt; color: rgb(200, 100, 100)"
+      onclick="Send2Clipboard('%s');" href='#'>&nbsp(copy)</a>""" % cbText)
+        html.append(u"<ul>")
         
         t.children.sort(lambda a,b: cmp(a.uname, b.uname))
         for child in t.children:
-            html.append(addTerm(child,t))
-        html.append(u"""</ul></li>""")
+            html.append(addTerm(child, t))
+        html.append(u"</ul></li>")
     else:
-        html.append(u""" <li class="leaf""")
+        html.append(u" <li class='leaf'")
         if t.selectedTerm == "True":
-            html.append(u""" selected""")
-        html.append(u"""">&nbsp;&nbsp;%s</li>""" % cdrcgi.unicodeToLatin1(t.name))
+            html.append(u" selected")
+        html.append(u">&nbsp;&nbsp;%s</li>" % t.name)
 
     html = u"".join(html)
     return html
@@ -311,7 +317,7 @@ html =[u"""\
 <head>
 <title>%s</title>""" % (cdrcgi.SESSION, session, section)]
 
-html.append(u"""
+html.append(u"""\
  <style type="text/css">
      ul.treeview li {
         font-family: courier,serif;

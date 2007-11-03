@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: PersonLocSearch.py,v 1.8 2003-08-25 20:20:18 bkline Exp $
+# $Id: PersonLocSearch.py,v 1.9 2007-11-03 14:15:07 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Person documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.8  2003/08/25 20:20:18  bkline
+# Added support for showing home addresses on the picklist; eliminated
+# encoding problem.
+#
 # Revision 1.7  2002/06/26 20:05:25  bkline
 # Modified advanced Person search forms to use QcReport.py for doc display.
 #
@@ -160,8 +164,8 @@ for i in range(len(rows)):
 #----------------------------------------------------------------------
 # Send the page back to the browser.
 #----------------------------------------------------------------------
-cdrcgi.sendPage(cdrcgi.unicodeToLatin1(html + """\
+cdrcgi.sendPage(html + u"""\
   </TABLE>
  </BODY>
 </HTML>
-"""))
+""")

@@ -1,10 +1,18 @@
 #----------------------------------------------------------------------
 #
-# $Id: PdqBoards.py,v 1.7 2004-01-07 15:48:04 venglisc Exp $
+# $Id: PdqBoards.py,v 1.8 2007-11-03 14:15:07 bkline Exp $
 #
 # Report on PDQ Board members and topics.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.7  2004/01/07 15:48:04  venglisc
+# Modified the PDQ Board Listings user interface to being able and select
+# to display the reports (Order by Topic, Order by Member) with and without
+# the CDR IDs.
+# The reports only show the names and board names (removed location info)
+# and the board picklist doesn't display the CDR IDs of the boards anymore.
+# (Bug 1006, 1007)
+#
 # Revision 1.6  2003/07/29 12:38:55  bkline
 # Removed unnecessary test for non-breaking space in audience string.
 #
@@ -131,7 +139,7 @@ if not boardInfo:
     header   = cdrcgi.header(title, title, instr, script, ("Submit",
                                                            SUBMENU,
                                                            cdrcgi.MAINMENU))
-    form     = """\
+    form     = u"""\
       <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
       <TABLE>
        <TR>
@@ -172,7 +180,7 @@ if not boardInfo:
     </HTML>
 """ % (cdrcgi.SESSION, session, getBoardPicklist(boardList), getAudiencePicklist())
 
-    cdrcgi.sendPage(cdrcgi.unicodeToLatin1(header + form))
+    cdrcgi.sendPage(header + form)
 
 #----------------------------------------------------------------------
 # Build date string for header.
@@ -315,7 +323,7 @@ SELECT DISTINCT board_member.id, board_member.title,
 """
     except cdrdb.Error, info:
         cdrcgi.bail('Database query failure: %s' % info[1][0])
-    cdrcgi.sendPage(cdrcgi.unicodeToLatin1(header + report))
+    cdrcgi.sendPage(header + report)
 
 #----------------------------------------------------------------------
 # Show the members of the board, with associated topics.

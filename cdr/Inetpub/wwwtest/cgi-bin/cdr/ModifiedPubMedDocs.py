@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ModifiedPubMedDocs.py,v 1.4 2004-02-17 19:38:18 venglisc Exp $
+# $Id: ModifiedPubMedDocs.py,v 1.5 2007-11-03 14:15:07 bkline Exp $
 #
 # Reports on documents unchanged for a specified number of days.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2004/02/17 19:38:18  venglisc
+# Modified Report header display.
+#
 # Revision 1.3  2002/04/24 20:36:03  bkline
 # Changed "Title" label to "DocTitle" as requested by Eileen (issue #161).
 #
@@ -71,11 +74,11 @@ try:
 except cdrdb.Error, info:
     cdrcgi.bail('Database query failure: %s' % info[1][0])
 
-title   = "CDR Administration"
-instr   = "Modified PubMed Documents"
+title   = u"CDR Administration"
+instr   = u"Modified PubMed Documents"
 buttons = (SUBMENU, cdrcgi.MAINMENU)
-header  = cdrcgi.header(title, title, instr, "ModifiedPubMedDocs.py", buttons)
-html    = """\
+header  = cdrcgi.header(title, title, instr, u"ModifiedPubMedDocs.py", buttons)
+html    = u"""\
 <b>Number of modified documents: %d<b>
 <TABLE BORDER='0' WIDTH='100%%' CELLSPACING='1' CELLPADDING='1'>
  <TR BGCOLOR='silver' VALIGN='top'>
@@ -85,13 +88,13 @@ html    = """\
 """ % len(rows)
 for row in rows:
     docId = "CDR%010d" % row[0]
-    title = row[1].encode('latin-1')
+    title = row[1]
     shortTitle = title[:100] 
     if len(title) > 100: shortTitle += " ..."
-    html += """\
+    html += u"""\
 <TR>
   <TD BGCOLOR='white' VALIGN='top' ALIGN='center'>
-   <A HREF=%s?DocId=%s&Filter=%s">
+   <A HREF='%s?DocId=%s&Filter=%s'>
     <FONT SIZE='-1'>%s</FONT>
    </A>
   </TD>
@@ -102,7 +105,7 @@ for row in rows:
        'name:Citation QC Report',
        docId,
        shortTitle)
-cdrcgi.sendPage(header + html + """\
+cdrcgi.sendPage(header + html + u"""\
    </TABLE>
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
   </FORM>

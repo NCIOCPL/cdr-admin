@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
-# $Id: OrgAffiliations.py,v 1.1 2004-11-03 20:59:26 venglisc Exp $
+# $Id: OrgAffiliations.py,v 1.2 2007-11-03 14:15:07 bkline Exp $
 #
 # Creates a report listing Organizations and Protocol Acronym IDs
 # sorted by either the Org or the Acronym.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2004/11/03 20:59:26  venglisc
+# Initial version of report (Bug 1380).
+#
 #----------------------------------------------------------------------
 import cdrdb, cdrcgi, cgi, time, string
 
@@ -55,7 +58,7 @@ except cdrdb.Error, info:
 #----------------------------------------------------------------------
 if not orgAffil:
     header = cdrcgi.header(title, title, section, script, buttons)
-    form   = """\
+    form   = u"""\
     <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
     <H3>Organization Affiliations Report</H3>
     <TABLE border='0'>
@@ -105,7 +108,7 @@ if orgAffil:
                      'ACCC':'Association of Community Cancer Centers', 
                      'ACS':'American College of Surgeons Commission on Cancer'}
       
-   html = """\
+   html = u"""\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>
  <head>
@@ -181,7 +184,7 @@ if orgAffil:
    #----------------------------------------------------------------------
    # Put together the body of the report.
    #----------------------------------------------------------------------
-   html += """\
+   html += u"""\
   <table border='1' width='100%' cellspacing='0' cellpadding='5'>
    <tr>
     <td align='center' valign='bottom'>
@@ -206,7 +209,7 @@ if orgAffil:
    # Put the output in rows in a table
    # ---------------------------------------------------------------------
    for row in rows:
-      html += """\
+      html += u"""\
    <tr>
     <td align = 'right' valign='top'>%s</td>
     <td>%s</td>
@@ -216,9 +219,9 @@ if orgAffil:
    </tr>
 """ % (row[0], row[1], row[2], row[3], row[4])
 
-   html += """\
+   html += u"""\
   </table>
  </body>
 </html>
 """
-   cdrcgi.sendPage(cdrcgi.unicodeToLatin1(html))
+   cdrcgi.sendPage(html)

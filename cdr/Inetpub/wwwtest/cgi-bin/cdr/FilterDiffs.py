@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: FilterDiffs.py,v 1.1 2002-09-11 21:11:57 bkline Exp $
+# $Id: FilterDiffs.py,v 1.2 2007-11-03 14:15:07 bkline Exp $
 #
 # Compare filters between two servers.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2002/09/11 21:11:57  bkline
+# New report to compare all filters between two specified servers.
+#
 #----------------------------------------------------------------------
 
 import cdr, cdrdb, cgi, cdrcgi, os, tempfile, re
@@ -83,7 +86,7 @@ def getFilters(tmpDir, server):
                           .replace("*", "@@STAR@@")
             xml = row[1].replace("\r", "")
             filename = "%s/@@MARK@@%s@@MARK@@" % (server, title)
-            open(filename, "w").write(xml.encode('latin-1', 'replace'))
+            open(filename, "w").write(xml.encode('utf-8'))
         except:
             cleanup(tmpDir)
             cdrcgi.bail("Failure writing %s" % filename);
@@ -141,7 +144,9 @@ for i in range(len(lines)):
 report = cgi.escape(unEncode("\n".join(lines)))
 cleanup(workDir)
 
-html = """\
+print """\
+Content-type: text/html; charset: utf-8
+
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>
  <head>
@@ -152,4 +157,3 @@ html = """\
   <pre>%s</pre>
  </body>
 </html>""" % (server1, server2, report)
-cdrcgi.sendPage(html)

@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: InactivePersonsOrgs.py,v 1.1 2002-07-16 15:39:36 bkline Exp $
+# $Id: InactivePersonsOrgs.py,v 1.2 2007-11-03 14:15:07 bkline Exp $
 #
 # Report on inactive persons and organizations linked to protocols.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2002/07/16 15:39:36  bkline
+# New report on inactive persons and orgs.
+#
 #----------------------------------------------------------------------
 import cdr, cdrdb, cdrcgi, cgi, re, time
 
@@ -44,7 +47,7 @@ if request == "Log Out":
 #----------------------------------------------------------------------
 # Start the page.
 #----------------------------------------------------------------------
-html = """\
+html = u"""\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>
  <head>
@@ -147,7 +150,7 @@ except cdrdb.Error, info:
 # Make sure we have some documents to report on.
 #----------------------------------------------------------------------
 if not orgRows and not personRows:
-    cdrcgi.sendPage(html + """\
+    cdrcgi.sendPage(html + u"""\
   <span class='t2'>No documents found to report.</span>
  </body>
 </html>
@@ -157,7 +160,7 @@ if not orgRows and not personRows:
 # Common code for generating a table for inactive persons or organizations.
 #----------------------------------------------------------------------
 def showTable(title, rows):
-    html = """\
+    html = u"""\
   <span class='t2'>%s</span>
   <br />
   <br />
@@ -173,7 +176,7 @@ def showTable(title, rows):
         semicolon = row[3].find(';')
         if semicolon == -1: protId = row[3]
         else:               protId = row[3][:semicolon]
-        html += """\
+        html += u"""\
    <tr>
     <td>CDR%010d</td>
     <td>%s</td>
@@ -181,7 +184,7 @@ def showTable(title, rows):
     <td>%s</td>
    </tr>
 """ % (row[0], row[1], row[2], protId)
-    return html + """\
+    return html + u"""\
   </table>
   <br />
   <br />
@@ -192,7 +195,7 @@ if personRows:
 if orgRows:
     html += showTable("ORGANIZATIONS", orgRows)
 
-cdrcgi.sendPage(cdrcgi.unicodeToLatin1(html + """\
+cdrcgi.sendPage(html + u"""\
  </body>
 </html>
-"""))
+""")

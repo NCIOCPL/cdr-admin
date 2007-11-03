@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: LiaisonReport.py,v 1.5 2005-09-02 14:15:13 bkline Exp $
+# $Id: LiaisonReport.py,v 1.6 2007-11-03 14:15:07 bkline Exp $
 #
 # NCI Liaison Office/Brussels Protocol Report.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2005/09/02 14:15:13  bkline
+# Increased timeouts.
+#
 # Revision 1.4  2003/08/25 20:13:49  bkline
 # Added new column for protocol original title.
 #
@@ -124,7 +127,7 @@ def getOriginalTitle(id):
  </xsl:template>
 </xsl:transform>
 """
-    response = cdr.filterDoc('guest', xslScript, id, inline = 1)
+    response = cdr.filterDoc('guest', xslScript, id, inline = True)
     if type(response) in (type(""), type(u"")):
         cdrcgi.bail("Failure extracting protocol original "
                     "title for CDR%010d: %s" % (id, response))
@@ -133,7 +136,7 @@ def getOriginalTitle(id):
 #----------------------------------------------------------------------
 # Start the page.
 #----------------------------------------------------------------------
-html = """\
+html = u"""\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>
  <head>
@@ -243,7 +246,7 @@ if not protocols:
 #----------------------------------------------------------------------
 # Start the table.
 #----------------------------------------------------------------------
-html += """\
+html += u"""\
   <table border='1' cellspacing='0' cellpadding='2' width='100%%'>
    <tr>
     <th>CDR Doc ID</th>
@@ -268,7 +271,7 @@ keys.sort(protSorter)
 for key in keys:
     protocol = protocols[key]
     otherIds = ", ".join(protocol.otherIds)
-    html += """\
+    html += u"""\
    <tr>
     <td align='top'>%d</td>
     <td align='top'>%s</td>
@@ -287,7 +290,7 @@ for key in keys:
 #----------------------------------------------------------------------
 # Display the report.
 #----------------------------------------------------------------------
-cdrcgi.sendPage(cdrcgi.unicodeToLatin1(html + """\
+cdrcgi.sendPage(html + u"""\
   </table>
  </body>
 </html>

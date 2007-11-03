@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditFilterSet.py,v 1.2 2002-11-14 13:54:21 bkline Exp $
+# $Id: EditFilterSet.py,v 1.3 2007-11-03 14:15:07 bkline Exp $
 #
 # Form for editing named CDR filter sets.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2002/11/14 13:54:21  bkline
+# Plugged in blockChange() for titles of existing filter sets.
+#
 # Revision 1.1  2002/11/13 20:38:25  bkline
 # New script for maintaining a named CDR filter set.
 #
@@ -58,51 +61,51 @@ elif request == SUBMENU:
 # Get the CDR filters and wrap them in <option> elements.
 #----------------------------------------------------------------------
 def getFilters():
-    html = ""
+    html = u""
     filters = cdr.getFilters('guest')
     for filter in filters:
         if len(filter.name) and filter.name[0] != '[':
             id   = int(re.sub(r'[^\d]', '', filter.id))
-            name = cgi.escape(filter.name.encode('latin-1'))[:60]
-            html += "<option value='%d'>%s</option>\n" % (id, name)
+            name = cgi.escape(filter.name[:60])
+            html += u"<option value='%d'>%s</option>\n" % (id, name)
     for filter in filters:
         if len(filter.name) and filter.name[0] == '[':
             id   = int(re.sub(r'[^\d]', '', filter.id))
-            name = cgi.escape(filter.name.encode('latin-1'))[:60]
-            html += "<option value='%d'>%s</option>\n" % (id, name)
+            name = cgi.escape(filter.name[:60])
+            html += u"<option value='%d'>%s</option>\n" % (id, name)
     return html 
 
 #----------------------------------------------------------------------
 # Get the CDR filter sets and wrap them in <option> elements.
 #----------------------------------------------------------------------
 def getFilterSets():
-    html = ""
+    html = u""
     filterSets = cdr.getFilterSets('guest')
     for filterSet in filterSets:
         id   = filterSet.id
-        name = cgi.escape(filterSet.name.encode('latin-1'))[:60]
-        html += "<option value='%d'>%s</option>\n" % (id, name)
+        name = cgi.escape(filterSet.name[:60])
+        html += u"<option value='%d'>%s</option>\n" % (id, name)
     return html 
 
 #----------------------------------------------------------------------
 # Create the initial <option/> elements for the set's members.
 #----------------------------------------------------------------------
 def getSetMemberHtml(members = None):
-    html = ""
+    html = u""
     if not members:
-        html = "<option value='0'>%s</option>" % cgi.escape(noMembers, 1)
+        html = u"<option value='0'>%s</option>" % cgi.escape(noMembers, 1)
     else:
         for member in members:
             id = member.id
             name = cgi.escape(member.name)
             if type(id) == type(9):
-                name = "[S]%s" % name
-                value = "S%d" % id
+                name = u"[S]%s" % name
+                value = u"S%d" % id
             else:
-                name = "[F]%s" % name
+                name = u"[F]%s" % name
                 id = int(re.sub(r'[^\d]', '', id))
-                value = "F%d" % id
-            html += '<option value="%s">%s</option>\n' % (value, name)
+                value = u"F%d" % id
+            html += u'<option value="%s">%s</option>\n' % (value, name)
     return html
 
 #----------------------------------------------------------------------
@@ -129,13 +132,13 @@ def makeDelFunction():
         cdrcgi.bail("Database failure finding nested memberships: %s" % 
                 info[1][0])
     if rows:
-        body = """\
+        body = u"""\
         alert("Filter set cannot be deleted; it is used as a member of:"""
         for row in rows:
             body += '\\n"\n            + "%s' % cgi.escape(row[0])
         return body + '");\n';
     else:
-        return """\
+        return u"""\
         response = confirm("Are you sure you want to delete %s?");
         if (response) {
             var frm = document.forms[0];
@@ -156,7 +159,7 @@ def bail(str, args):
 # Display the CDR document form.
 #----------------------------------------------------------------------
 def showForm(isNew, members = None):
-    html = """\
+    html = u"""\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>
  <head>
@@ -385,7 +388,7 @@ def showForm(isNew, members = None):
        session,
        isNew,
        setName and cgi.escape(setName, 1) or '')
-    cdrcgi.sendPage(html.encode('latin-1', 'replace'))
+    cdrcgi.sendPage(html)
 
 #----------------------------------------------------------------------
 # Edit an existing filter set.

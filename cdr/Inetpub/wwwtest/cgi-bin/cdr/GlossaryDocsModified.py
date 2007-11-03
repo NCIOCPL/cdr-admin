@@ -1,12 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryDocsModified.py,v 1.1 2006-05-04 14:58:32 bkline Exp $
+# $Id: GlossaryDocsModified.py,v 1.2 2007-11-03 14:15:07 bkline Exp $
 #
 # "The Glossary Documents Modified Report will serve as a QC report to
 # verify which documents were changed within a given time frame, which
 # will help with Spanish Glossary term processing."
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2006/05/04 14:58:32  bkline
+# Show which glossary documents were modified in a given time range.
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, cdrdb, time, ExcelWriter, xml.dom.minidom, sys
 
@@ -61,10 +64,6 @@ if not startDate or not endDate:
     </HTML>
 """ % (cdrcgi.SESSION, session)
     cdrcgi.sendPage(header + form)
-
-def fix(title):
-    return title.encode('latin-1', 'replace')
-    #return title.split(';')[0].encode('latin-1', 'replace')
 
 #----------------------------------------------------------------------
 # Set up a database connection and cursor.

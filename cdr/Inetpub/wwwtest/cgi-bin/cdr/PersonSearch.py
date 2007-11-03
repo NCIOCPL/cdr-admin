@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PersonSearch.py,v 1.9 2003-02-13 13:36:20 bkline Exp $
+# $Id: PersonSearch.py,v 1.10 2007-11-03 14:15:07 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Person documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.9  2003/02/13 13:36:20  bkline
+# Fixed path to address components for private practice locations.
+#
 # Revision 1.8  2002/11/14 13:53:41  bkline
 # Adjusted paths to match schema changes.
 #
@@ -167,4 +170,4 @@ html = cdrcgi.advancedSearchResultsPage("Person", rows, strings, None, session)
 #----------------------------------------------------------------------
 # Send the page back to the browser.
 #----------------------------------------------------------------------
-cdrcgi.sendPage(cdrcgi.unicodeToLatin1(html))
+cdrcgi.sendPage(html)

@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: OrgProtocolAcronym.py,v 1.2 2004-11-03 20:12:20 venglisc Exp $
+# $Id: OrgProtocolAcronym.py,v 1.3 2007-11-03 14:15:07 bkline Exp $
 #
 # Creates a report listing Organizations and Protocol Acronym IDs
 # sorted by either the Org or the Acronym.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2004/11/03 20:12:20  venglisc
+# Corrected title and added the sort to the title (Bug 1378).
+#
 # Revision 1.1  2004/10/28 20:20:00  venglisc
 # Initial version of Org with Protocol Acronym Report.
 #
@@ -59,7 +62,7 @@ except cdrdb.Error, info:
 #----------------------------------------------------------------------
 if not sortField:
     header = cdrcgi.header(title, title, section, script, buttons)
-    form   = """\
+    form   = u"""\
     <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
     <H3>Organizations with Protocol Acronym Report</H3>
     <TABLE>
@@ -88,7 +91,7 @@ if not sortField:
 if sortField:
    sortString = ['Organization', 'Acronym']
       
-   html = """\
+   html = u"""\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>
  <head>
@@ -124,7 +127,7 @@ if sortField:
    #----------------------------------------------------------------------
    # Put together the body of the report.
    #----------------------------------------------------------------------
-   html += """\
+   html += u"""\
   <table border='1' width='100%' cellspacing='0' cellpadding='5'>
    <tr>
     <td align='center' valign='top'>
@@ -143,7 +146,7 @@ if sortField:
    # Put the output in rows in a table
    # ---------------------------------------------------------------------
    for row in rows:
-      html += """\
+      html += u"""\
    <tr>
     <td align = 'right' valign='top'>%s</td>
     <td>%s</td>
@@ -151,9 +154,9 @@ if sortField:
    </tr>
 """ % (row[0], row[1], row[2])
 
-   html += """\
+   html += u"""\
   </table>
  </body>
 </html>
 """
-   cdrcgi.sendPage(cdrcgi.unicodeToLatin1(html))
+   cdrcgi.sendPage(html)

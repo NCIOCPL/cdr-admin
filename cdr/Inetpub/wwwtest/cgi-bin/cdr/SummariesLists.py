@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummariesLists.py,v 1.5 2007-05-01 23:56:23 venglisc Exp $
+# $Id: SummariesLists.py,v 1.6 2007-11-03 14:15:07 bkline Exp $
 #
 # Report on lists of summaries.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2007/05/01 23:56:23  venglisc
+# Added a count of summaries per board and corrected the display of the
+# newish CAM Advisory Board. (Bug 3204)
+#
 # Revision 1.4  2004/03/30 23:09:24  venglisc
 # Fixed a problem that dropped the first summary of every summary type.
 #
@@ -534,4 +538,4 @@ footer = """\
 #----------------------------------------------------------------------
 # Send the page back to the browser.
 #----------------------------------------------------------------------
-cdrcgi.sendPage(cdrcgi.unicodeToLatin1(header + report + footer))
+cdrcgi.sendPage(header + report + footer)

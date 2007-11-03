@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: LinkedDocs.py,v 1.5 2005-02-17 22:48:45 venglisc Exp $
+# $Id: LinkedDocs.py,v 1.6 2007-11-03 14:15:07 bkline Exp $
 #
 # Reports on documents which link to a specified document.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2005/02/17 22:48:45  venglisc
+# Added CDR-ID to header of report and changed display of header from
+# using H4 tags to using table and CSS format (Bug 1532).
+#
 # Revision 1.4  2002/06/24 17:15:45  bkline
 # Fixed encoding problems.
 #
@@ -88,17 +92,17 @@ SELECT DISTINCT name
 # Create a picklist for document types.
 #----------------------------------------------------------------------
 def makeList(fieldName, docTypes):
-    picklist = "<SELECT NAME='%s'><OPTION SELECTED>Any Type</OPTION>" \
+    picklist = u"<SELECT NAME='%s'><OPTION SELECTED>Any Type</OPTION>" \
         % fieldName
     for docType in docTypes:
-        picklist += "<OPTION>%s</OPTION>" % docType[0]
-    return picklist + "</SELECT>"
+        picklist += u"<OPTION>%s</OPTION>" % docType[0]
+    return picklist + u"</SELECT>"
 
 #----------------------------------------------------------------------
 # Get the user name and format it for display at the bottom of the page.
 #----------------------------------------------------------------------
 def getUser():
-    if not session: return ""
+    if not session: return u""
     try:
         cursor.execute("""
 SELECT DISTINCT u.fullname
@@ -107,9 +111,9 @@ SELECT DISTINCT u.fullname
              ON s.usr = u.id
           WHERE s.name = ?""", session)
         uName = cursor.fetchone()[0]
-        if not uName: return ""
-        return "<BR><I><FONT SIZE='-1'>%s</FONT></I><BR>" % uName
-    except: return ""
+        if not uName: return u""
+        return u"<BR><I><FONT SIZE='-1'>%s</FONT></I><BR>" % uName
+    except: return u""
 #----------------------------------------------------------------------
 # If we have a document ID, produce a report.
 #----------------------------------------------------------------------
@@ -147,10 +151,10 @@ SELECT DISTINCT d.id, d.title, t.name, n.source_elem, n.target_frag
         cdrcgi.bail('Database query failure: %s' % info[1][0])
 
     # Build the report and show it.
-    title2 = "%s for %s Document CDR%d %s" % (title, targetDocInfo[1], 
+    title2 = u"%s for %s Document CDR%d %s" % (title, targetDocInfo[1], 
             docId, makeDate())
     html = cdrcgi.header(title2, title, instr, script, buttons)
-    report = """\
+    report = u"""\
     <table>
      <tr>
       <td class="docLabel" align="right">Document Type:</td>
@@ -181,10 +185,10 @@ SELECT DISTINCT d.id, d.title, t.name, n.source_elem, n.target_frag
         linkingFragId      = row[4]
         if linkingDocType != prevDocType:
             if prevDocType:
-                report += """\
+                report += u"""\
   </TABLE>"""
             prevDocType = linkingDocType
-            report += """\
+            report += u"""\
   <BR><B>%s</B><BR><BR>
   <TABLE CELLSPACING='0' CELLPADDING='2' BORDER='1'>
    <TR>
@@ -193,7 +197,7 @@ SELECT DISTINCT d.id, d.title, t.name, n.source_elem, n.target_frag
     <TD><B>ElementName</B></TD>
     <TD><B>FragmentID</B></TD>
    </TR>""" % linkingDocType
-        report += """\
+        report += u"""\
    <TR>
     <TD VALIGN='top'>CDR%010d</TD>
     <TD VALIGN='top'>%s</TD>
@@ -203,17 +207,17 @@ SELECT DISTINCT d.id, d.title, t.name, n.source_elem, n.target_frag
                linkingFragId or "&nbsp;")
         row = cursor.fetchone()
     if prevDocType:
-        html += report + """\
+        html += report + u"""\
   </TABLE>"""
     else:
-        html += """\
+        html += u"""\
   <H3>No Documents Currently Link to CDR%010d</H3>""" % docId
-    html += """\
+    html += u"""\
   </FORM>
   %s
  </BODY>
 </HTML>""" % getUser()
-    cdrcgi.sendPage(cdrcgi.unicodeToLatin1(html))
+    cdrcgi.sendPage(html)
 
 #----------------------------------------------------------------------
 # Search for linked document by title, if so requested.
@@ -243,7 +247,7 @@ SELECT d.id, d.title
         # Check to make sure we got at least one row.
         if not row:
             cdrcgi.bail("No documents match '%s'" % docTitle)
-        form     = """\
+        form     = u"""\
    <BR>
    <B>Linking Document Type:&nbsp;</B>
    %s
@@ -251,7 +255,7 @@ SELECT d.id, d.title
    <TABLE CELLSPACING='4' CELLPADDING='0' BORDER='0'>""" % makeList(
         "LinkingDocType", docTypes)
         while row:
-            form += """\
+            form += u"""\
     <TR>
      <TD VALIGN='top'>
       <INPUT TYPE='radio' NAME='DocId' VALUE='%d'>
@@ -260,7 +264,7 @@ SELECT d.id, d.title
      <TD>%s</TD>
     </TR>""" % (row[0], row[0], row[1])
             row = cursor.fetchone()
-        form += """\
+        form += u"""\
    </TABLE>
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
   </FORM>
@@ -277,7 +281,7 @@ header   = cdrcgi.header(title, title, instr, script, ("Submit",
                                                        SUBMENU,
                                                        cdrcgi.MAINMENU))
 docTypes = getDocTypes()
-form     = """\
+form     = u"""\
    <H3>Report On Specific Document ID</H3>
    <TABLE CELLSPACING='1' CELLPADDING='1' BORDER='0'>
     <TR>
@@ -307,4 +311,4 @@ form     = """\
 """ % (makeList("LinkingDocType", docTypes), 
        makeList("DocType", docTypes),
        cdrcgi.SESSION, session and session or '')
-cdrcgi.sendPage(cdrcgi.unicodeToLatin1(header + form))
+cdrcgi.sendPage(header + form)

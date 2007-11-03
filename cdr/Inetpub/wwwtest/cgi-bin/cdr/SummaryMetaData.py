@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryMetaData.py,v 1.4 2007-02-21 17:16:52 venglisc Exp $
+# $Id: SummaryMetaData.py,v 1.5 2007-11-03 14:15:07 bkline Exp $
 #
 # Report on the metadata for one or more summaries.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2007/02/21 17:16:52  venglisc
+# Modified query to only display publishable documents.  Modified CSS
+# and added CDR-ID to display. (Bug 2905)
+#
 # Revision 1.3  2005/07/19 22:02:28  ameyer
 # Modified the logic to report that data is missing rather than just
 # blow up when processing invalid records.
@@ -25,14 +29,14 @@ import cdr, cgi, cdrcgi, cdrdb, re
 fields      = cgi.FieldStorage()
 session     = cdrcgi.getSession(fields)
 request     = cdrcgi.getRequest(fields)
-docId       = fields and fields.getvalue('id')          or None #"62864"
-docTitle    = fields and fields.getvalue('title')       or None
-board       = fields and fields.getvalue('board')       or None
-audience    = fields and fields.getvalue('audience')    or None
-language    = fields and fields.getvalue('language')    or None
-description = fields and fields.getvalue('description') or None
-urltext     = fields and fields.getvalue('urltext')     or None
-url         = fields and fields.getvalue('url')         or None
+docId       = fields.getvalue('id')          or None #"62864"
+docTitle    = fields.getvalue('title')       or None
+board       = fields.getvalue('board')       or None
+audience    = fields.getvalue('audience')    or None
+language    = fields.getvalue('language')    or None
+description = fields.getvalue('description') or None
+urltext     = fields.getvalue('urltext')     or None
+url         = fields.getvalue('url')         or None
 trimPat     = re.compile("[\s;]+$")
 SUBMENU     = "Report Menu"
 buttons     = ["Submit Request", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
@@ -138,10 +142,11 @@ def getLanguages():
     return picklist + "</select>"
 
 class SummarySection:
-    def __init__(self, title, diagnoses, types):
-        self.title     = title
-        self.diagnoses = diagnoses
-        self.types     = types
+    def __init__(self, title, diagnoses, types, searchAttr = False):
+        self.title      = title
+        self.diagnoses  = diagnoses
+        self.types      = types
+        self.searchAttr = searchAttr
 
 class Summary:
     def __init__(self, id, cursor):
@@ -250,7 +255,8 @@ class Summary:
         titles       = {}
         diagnoses    = {}
         sectionTypes = {}
-        keys         = {}
+        searchAttrs  = {}
+        keys         = set()
         self.cursor.execute("""\
             SELECT diag_name.value, diagnosis.node_loc
               FROM query_term diag_name
@@ -262,9 +268,9 @@ class Summary:
                AND diagnosis.doc_id = ?
           ORDER BY diagnosis.node_loc""", self.id)
         for row in self.cursor.fetchall():
-            diagName  = row[0]
-            key       = row[1][:-8]
-            keys[key] = 1
+            diagName = row[0]
+            key      = row[1][:-8]
+            keys.add(key)
             if diagnoses.has_key(key):
                 diagnoses[key] += ("; %s" % diagName)
             else:
@@ -276,9 +282,9 @@ class Summary:
                            + '/SectionType'
                AND doc_id = ?""", self.id)
         for row in self.cursor.fetchall():
-            typeName  = row[0]
-            key       = row[1][:-8]
-            keys[key] = 1
+            typeName = row[0]
+            key      = row[1][:-8]
+            keys.add(key)
             if sectionTypes.has_key(key):
                 sectionTypes[key] += ("; %s" % typeName)
             else:
@@ -289,20 +295,32 @@ class Summary:
             WHERE path LIKE '/Summary/%SummarySection/Title'
               AND doc_id = ?""", self.id)
         for row in self.cursor.fetchall():
-            title     = row[0]
-            key       = row[1][:-4]
-            keys[key] = 1
+            title = row[0]
+            key   = row[1][:-4]
+            keys.add(key)
             if titles.has_key(key):
                 titles[key] += ("; %s" % title)
             else:
                 titles[key] = title
-        sortedKeys = keys.keys()
+        self.cursor.execute("""\
+            SELECT value, node_loc
+              FROM query_term
+             WHERE path LIKE '/Summary/%SummarySection/@TrialSearchString'
+               AND doc_id = ?""", self.id)
+        for row in self.cursor.fetchall():
+            flag = row[0]
+            key  = row[1]
+            if flag == 'No':
+                keys.add(key)
+                searchAttrs[key] = True
+        sortedKeys = list(keys)
         sortedKeys.sort()
         for key in sortedKeys:
-            sections.append(SummarySection(titles.get(
-                key, "[No Section Title]"),
+            sections.append(SummarySection(titles.get(key,
+                                                      "[No Section Title]"),
                                            diagnoses.get(key, "&nbsp;"),
-                                           sectionTypes.get(key, "&nbsp;")))
+                                           sectionTypes.get(key, "&nbsp;"),
+                                           searchAttrs.get(key, False)))
         return sections
 
     def getHtml(self, extras):
@@ -381,15 +399,23 @@ class Summary:
    </tr>
   </table>
   <br>
-  <table border='1' cellpadding='2' cellspacing='0' width = '100%%'>
+  <table border='0' cellpadding='2' cellspacing='0' width = '100%%'>
    <tr class='head'>
-    <th width = '50%%'>Section Title</th>
+    <th width = '40%%'>Section Title</th>
     <th width = '20%%'>Diagnosis</th>
-    <th width = '30%%'>Section Type</th>
+    <th width = '15%%'>SS No Attribute</th>
+    <th width = '25%%'>Section Type</th>
    </tr>
 """ % ('CDR' + str(self.id))
         count = 0
         for section in self.sections:
+            checkMark = u"&nbsp;"
+            if section.searchAttr:
+                #checkMark = u"\u2714"
+                #checkMark = u"\u2611"
+                #checkMark = u"\u2713"
+                # Unicode characters work in Firefox, but not in IE.
+                checkMark = u"<img src='/images/checkmark.gif' alt='yes' />"
             count += 1
             if count % 2 == 0:
                 html += """\
@@ -401,9 +427,10 @@ class Summary:
             html += """\
     <td valign='top'>%s</td>
     <td valign='top'>%s</td>
+    <td valign='top' align='center'>%s</td>
     <td valign='top'>%s</td>
    </tr>
-""" % (section.title, section.diagnoses, section.types)
+""" % (section.title, section.diagnoses, checkMark, section.types)
         return html + """\
   </table>
   <br><br>
@@ -432,16 +459,16 @@ def missCheck(result):
         If no result passed,
             return an error message of the proper type.
     """
-    noData = "[ <font color='red'>Missing</font> ]"
+    noData = "[ <span style='color: red'>Missing</span> ]"
 
     # Return is based on type of result passed
-    if (type(result) == type('')) or (type(result) == type(u'')):
+    if type(result) in (str, unicode):
         # Simple string
         if result:
             return result
         return noData
 
-    if type(result) == type([]):
+    if type(result) in (list, tuple):
         if len(result):
             # cursor.fetchall() result, a list of lists (list of rows)
             if type(result[0]) == type([]):

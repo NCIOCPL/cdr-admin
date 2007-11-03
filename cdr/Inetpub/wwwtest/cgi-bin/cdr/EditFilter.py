@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditFilter.py,v 1.19 2006-10-18 22:53:29 venglisc Exp $
+# $Id: EditFilter.py,v 1.20 2007-11-03 14:15:07 bkline Exp $
 #
 # Prototype for editing CDR filter documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.19  2006/10/18 22:53:29  venglisc
+# Modified error message. (Bug 2561)
+#
 # Revision 1.18  2006/10/18 17:41:54  venglisc
 # Added an extra check to ensure that a filter that is being renamed is
 # indeed a filter document on BACH. (Bug 2561)
@@ -135,7 +138,7 @@ def debugLog(what):
 def showForm(doc, subBanner, buttons):
     hdr = cdrcgi.header(title, banner, subBanner, "EditFilter.py", buttons,
                         numBreaks = 1)
-    html = hdr + """\
+    html = hdr + u"""\
    <input name='version' type='checkbox'%s>
    Create new version for Save, Checkin or Clone? 
    <table border=0>
@@ -214,14 +217,6 @@ def getFilterXml(title, server = 'localhost'):
                     (cgi.escape(title), server))
         return rows[0][0].replace('\r', '')
                 
-        """
-        doc = rows[0][0].encode('utf-8')
-        doc = cdr.filterDoc('guest', filters, doc = doc, host = 'mahler')
-        if not doc[0]:
-            cdrcgi.bail("Failure filtering '%s' %s" %
-                    (cgi.escape(title), doc[1]))
-        return unicode(doc[0], 'utf-8').replace('\r', '')
-        """
     except Exception, info:
         cdrcgi.bail("Failure retrieving '%s' from %s: %s" %
                     (cgi.escape(title), server, str(info)))
@@ -570,10 +565,10 @@ elif request == 'Compare With':
     except StandardError, args:
         cdrcgi.bail("%s: %s" % (args[0], args[1]))
     f1 = open(name1, "w")
-    f1.write(doc1.encode('latin-1', 'replace'))
+    f1.write(doc1.encode('utf-8'))
     f1.close()
     f2 = open(name2, "w")
-    f2.write(doc2.encode('latin-1', 'replace'))
+    f2.write(doc2.encode('utf-8'))
     f2.close()
     result = cdr.runCommand(cmd)
     cleanup(workDir)
@@ -582,7 +577,9 @@ elif request == 'Compare With':
         title = "Differences between %s and %s" % (name1, name2)
     else:
         title = "%s and %s are identical" % (name1, name2)
-    cdrcgi.sendPage("""\
+    print """\
+Content-type: text/html; charset: utf-8
+
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>
  <head>

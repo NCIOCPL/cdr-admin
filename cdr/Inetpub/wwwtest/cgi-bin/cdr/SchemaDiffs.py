@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: SchemaDiffs.py,v 1.1 2006-05-04 15:14:54 bkline Exp $
+# $Id: SchemaDiffs.py,v 1.2 2007-11-03 14:15:07 bkline Exp $
 #
 # Compare schemas between two servers.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2006/05/04 15:14:54  bkline
+# Compare schemas between two servers.
+#
 #----------------------------------------------------------------------
 
 import cdr, cdrdb, cgi, cdrcgi, os, tempfile, re
@@ -83,7 +86,7 @@ def getSchemas(tmpDir, server):
                           .replace("*", "@@STAR@@")
             xml = row[1].replace("\r", "")
             filename = "%s/@@MARK@@%s@@MARK@@" % (server, title)
-            open(filename, "w").write(xml.encode('latin-1', 'replace'))
+            open(filename, "w").write(xml.encode('utf-8'))
         except:
             cleanup(tmpDir)
             cdrcgi.bail("Failure writing %s" % filename);
@@ -141,7 +144,9 @@ for i in range(len(lines)):
 report = cgi.escape(unEncode("\n".join(lines)))
 cleanup(workDir)
 
-html = """\
+print """\
+Content-type: text/html; charset=utf-8
+
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>
  <head>
@@ -152,4 +157,3 @@ html = """\
   <pre>%s</pre>
  </body>
 </html>""" % (server1, server2, report)
-cdrcgi.sendPage(html)

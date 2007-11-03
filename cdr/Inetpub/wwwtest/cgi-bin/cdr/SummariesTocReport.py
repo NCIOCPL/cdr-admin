@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummariesTocReport.py,v 1.2 2004-08-16 20:03:24 venglisc Exp $
+# $Id: SummariesTocReport.py,v 1.3 2007-11-03 14:15:07 bkline Exp $
 #
 # Report on lists of summaries.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2004/08/16 20:03:24  venglisc
+# Added CSS to display the TOC levels indented.  Added help message.
+# (Bug 1231)
+#
 # Revision 1.1  2004/07/13 20:11:36  venglisc
 # Initial version of program to display a list of Summary Section Titles by
 # summary board (Bug 1231).
@@ -472,4 +476,4 @@ footer = """\
 #----------------------------------------------------------------------
 # Send the page back to the browser.
 #----------------------------------------------------------------------
-cdrcgi.sendPage(cdrcgi.unicodeToLatin1(header + report + footer))
+cdrcgi.sendPage(header + report + footer)

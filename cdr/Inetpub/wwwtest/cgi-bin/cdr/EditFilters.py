@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditFilters.py,v 1.4 2003-02-25 20:04:49 pzhang Exp $
+# $Id: EditFilters.py,v 1.5 2007-11-03 14:15:07 bkline Exp $
 #
 # Menu of existing filters.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2003/02/25 20:04:49  pzhang
+# Showed edit feature only on Dev machine (MAHLER now).
+# Sorted filter list by DocId or DocTitle.
+#
 # Revision 1.3  2002/11/08 13:40:52  bkline
 # Added new report to show all top-level param for XSL/T filters.
 #
@@ -114,8 +118,8 @@ try:
 except cdrdb.Error, info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
 
-sortReq = "<A HREF='%s/EditFilters.py?%s=%s&OrderBy=%s'>%s</A>"
-form = """\
+sortReq = u"<A HREF='%s/EditFilters.py?%s=%s&OrderBy=%s'>%s</A>"
+form = u"""\
    <INPUT TYPE='submit' NAME='%s' VALUE='Compare Filters'>&nbsp;&nbsp;
    between
    <INPUT NAME='s1' VALUE='bach'>&nbsp;
@@ -133,12 +137,12 @@ form = """\
        sortReq % (cdrcgi.BASE, cdrcgi.SESSION, session, "", "DocTitle")
       )
 
-DevEdit = """
+DevEdit = u"""
           <A HREF='%s/EditFilter.py?%s=%s&Request=Load&DocId=CDR%010d'>Edit</A>
           """ 
 
 for row in rows:
-    form += """\
+    form += u"""\
     <TR>
      <TD>CDR%010d</TD>
      <TD NOALIGN='1'>
@@ -156,11 +160,11 @@ for row in rows:
 #----------------------------------------------------------------------
 # Send back the form.
 #----------------------------------------------------------------------
-form += """\
+form += u"""\
    </TABLE>
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
   </FORM>
  </BODY>
 </HTML>
 """ % (cdrcgi.SESSION, session)
-cdrcgi.sendPage(header + cdrcgi.unicodeToLatin1(form))
+cdrcgi.sendPage(header + cdrcgi.form)
