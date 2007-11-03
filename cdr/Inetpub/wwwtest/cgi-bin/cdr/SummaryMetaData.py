@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryMetaData.py,v 1.6 2007-11-03 14:36:36 bkline Exp $
+# $Id: SummaryMetaData.py,v 1.7 2007-11-03 14:40:15 bkline Exp $
 #
 # Report on the metadata for one or more summaries.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2007/11/03 14:36:36  bkline
+# Restored table borders at Margaret's request.
+#
 # Revision 1.5  2007/11/03 14:15:07  bkline
 # Unicode encoding cleanup (issue #3716).
 #
@@ -328,7 +331,7 @@ class Summary:
 
     def getHtml(self, extras):
         html = """\
-  <table border='1' cellpadding='2' cellspacing='0'>
+  <table border='0' cellpadding='2' cellspacing='0'>
 """
         if extras:
             for board in self.boards:
@@ -402,7 +405,7 @@ class Summary:
    </tr>
   </table>
   <br>
-  <table border='0' cellpadding='2' cellspacing='0' width = '100%%'>
+  <table border='1' cellpadding='2' cellspacing='0' width = '100%%'>
    <tr class='head'>
     <th width = '40%%'>Section Title</th>
     <th width = '20%%'>Diagnosis</th>
