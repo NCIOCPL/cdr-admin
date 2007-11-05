@@ -1,12 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryDateLastModified.py,v 1.10 2007-11-05 15:08:42 bkline Exp $
+# $Id: SummaryDateLastModified.py,v 1.11 2007-11-05 17:33:52 bkline Exp $
 #
 # Report listing specified set of Cancer Information Summaries, the date
 # they were last modified as entered by a user, and the date the last
 # Modify action was taken.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.10  2007/11/05 15:08:42  bkline
+# Cosmetic modifications for Margaret.
+#
 # Revision 1.9  2007/11/03 14:15:07  bkline
 # Unicode encoding cleanup (issue #3716).
 #
@@ -66,7 +69,7 @@ header      = cdrcgi.header(title, title, section, script, buttons,
     legend  { font-weight: bold; color: teal; font-family: sans-serif; }
     fieldset { width: 500px; margin-left: auto; margin-right: auto;
                display: block; }
-    .CdrDateField { width: 80px; }
+    .CdrDateField { width: 100px; }
    </style>
    <script language='JavaScript'>
     function clearSysDates() {
