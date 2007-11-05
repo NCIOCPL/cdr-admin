@@ -31,12 +31,12 @@ buttons   = (SUBMENU, cdrcgi.MAINMENU)
 #groups.append('Adult Treatment')
 #groups.append('All English')
 #types.append('All Types')
-#types.append('Book chapter')
-#session   = '4720787A-8DADE2-248-85OFI8XFV1G1'
+#types.append('Internet')
+#session   = '472F1902-706FCE-248-I179PKDICJPG'
 #---------------------------
 
 class dataRow:
-    def __init__(self,cdrid,summaryTitle,summarySecTitle,citationType,citCDRID,citationTitle):
+    def __init__(self,cdrid,summaryTitle,summarySecTitle,citationType,citCDRID,citationTitle,internetWebSite):
         self.cdrid = cdrid
         self.summaryTitle = summaryTitle
         self.summarySecTitle = summarySecTitle
@@ -45,6 +45,7 @@ class dataRow:
         self.linkcdrid = cdr.normalize(citCDRID)
         self.citationTitle = citationTitle
         self.pubDetails = ''
+        self.internetWebSite = internetWebSite
     
     def addPubDetails(self,pubDetails):
         self.pubDetails = pubDetails
@@ -449,6 +450,17 @@ def getQuery(lang):
     query = u"".join(query)
     return query
 
+def getInternetWebSite(dom):
+    docElem = dom.documentElement
+    externalRefs = docElem.getElementsByTagName('ExternalRef')
+    for externalRef in externalRefs:
+        for childNode in externalRef.childNodes:
+            if childNode.nodeType == xml.dom.minidom.Node.TEXT_NODE:
+                if childNode.nodeValue.strip().startswith('Available online'):
+                    return externalRef.attributes['cdr:xref'].value
+
+    return ''
+
 dataRows = []
 citcdrids = []
 
@@ -478,9 +490,12 @@ if not rows:
     cdrcgi.bail('No Records Found for Selection')
 
 for cdrid,summaryTitle,summarySecTitle,citationType,citCDRID,citationTitle in rows:
-    dataRows.append(dataRow(cdrid,summaryTitle,summarySecTitle,citationType,citCDRID,citationTitle))
+    dataRows.append(dataRow(cdrid,summaryTitle,summarySecTitle,citationType,citCDRID,citationTitle,''))
     if citCDRID not in citcdrids:
         citcdrids.append(citCDRID)
+
+cursor.close()
+cursor = None
 
 for citcdrid in citcdrids:
     citdocId = cdr.normalize(citcdrid)
@@ -496,12 +511,23 @@ for citcdrid in citcdrids:
             if child.nodeType == xml.dom.minidom.Node.TEXT_NODE:
                 formattedReference = child.nodeValue
     
-    for datarow in dataRows:
-        if datarow.citCDRID == citcdrid:
-            datarow.addPubDetails(formattedReference)
+    for dataRow in dataRows:
+        if dataRow.citCDRID == citcdrid:
+            dataRow.addPubDetails(formattedReference)
 
-cursor.close()
-cursor = None
+for dataRow in dataRows:
+    if dataRow.citationType.find('Internet') >= 0:
+        if dataRow.internetWebSite == '':
+            docId = cdr.normalize(dataRow.citCDRID)
+            doc = cdr.getDoc(session, docId, 'N',getObject=1)
+            if doc.xml.startswith("<Errors"):
+                continue
+            dom = xml.dom.minidom.parseString(doc.xml)
+            internetWebSite = getInternetWebSite(dom)
+            for dataRow2 in dataRows:
+                if dataRow2.citCDRID == dataRow.citCDRID:
+                    dataRow2.internetWebSite = internetWebSite
+            
 
 # out put the results table
 header = cdrcgi.header(title, title, instr, script,
@@ -509,6 +535,7 @@ header = cdrcgi.header(title, title, instr, script,
                             SUBMENU,
                             cdrcgi.MAINMENU),
                            numBreaks = 1)
+
 form   = [u"""\
  <style type="text/css">
 table
@@ -543,26 +570,26 @@ td.cdrTableOdd
 }
 a:link 
 {
-    color: red; 
+    color: blue; 
     text-decoration: none;
     font-weight: bold;
 } /* unvisited link */
 a:active 
 {
-    color: red; 
+    color: blue; 
     text-decoration: none;
     font-weight: bold;
 }
 a:visited 
 {
-    color: red;
+    color: blue;
     text-decoration: none;
     font-weight: bold;
 } /* visited link */
 a:hover 
 {
     color: white; 
-    background-color:red; 
+    background-color:blue; 
     text-decoration: underline;
     font-weight: bold;
 } /* mouse over link */
@@ -623,8 +650,15 @@ for dataRow in dataRows:
                 %(cssClass,dataRow.cdrid,cssClass,dataRow.summaryTitle,cssClass,dataRow.summarySecTitle))
     form.append(u"""<td class="%s">%s</td><td class="%s">%s</td><td class="%s">%s</td>"""
                 % (cssClass,dataRow.citationType,cssClass,dataRow.citCDRID,cssClass,dataRow.citationTitle))
+    details = dataRow.pubDetails
+    if len(dataRow.internetWebSite) > 0:
+        details += '<a href='
+        details += dataRow.internetWebSite
+        details += """ target='_blank'> """
+        details += dataRow.internetWebSite
+        details += '</a>'
     form.append(u"""<td class="%s">%s</td>"""
-                % (cssClass,dataRow.pubDetails))
+                % (cssClass,details))
     form.append(u"</tr>")
     if cssClass == 'cdrTableEven':
         cssClass = 'cdrTableOdd'
