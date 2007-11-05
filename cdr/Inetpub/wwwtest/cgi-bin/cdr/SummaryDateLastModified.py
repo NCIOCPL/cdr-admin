@@ -1,12 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryDateLastModified.py,v 1.9 2007-11-03 14:15:07 bkline Exp $
+# $Id: SummaryDateLastModified.py,v 1.10 2007-11-05 15:08:42 bkline Exp $
 #
 # Report listing specified set of Cancer Information Summaries, the date
 # they were last modified as entered by a user, and the date the last
 # Modify action was taken.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.9  2007/11/03 14:15:07  bkline
+# Unicode encoding cleanup (issue #3716).
+#
 # Revision 1.8  2007/10/31 17:41:52  bkline
 # Extensively rewritten for request #3635.
 #
@@ -61,9 +64,9 @@ header      = cdrcgi.header(title, title, section, script, buttons,
     body { background-color: #f8f8f8; font-family: sans-serif;
            font-size: 11pt; }
     legend  { font-weight: bold; color: teal; font-family: sans-serif; }
-    fieldset { width: 400px; margin-left: auto; margin-right: auto;
+    fieldset { width: 500px; margin-left: auto; margin-right: auto;
                display: block; }
-    .CdrDateField { width: 12ex; }
+    .CdrDateField { width: 80px; }
    </style>
    <script language='JavaScript'>
     function clearSysDates() {
@@ -293,19 +296,19 @@ if not audience or not (est or sst) or ((not uStartDate or not uEndDate) and
 %s
    <fieldset class='dates'>
     <legend>Report by Date Last Modified (User)</legend>
-    &nbsp; &nbsp; Start Date:
+    <label for='ustart'>Start Date:</label>
     <input name='UserStartDate' value='%s' class='CdrDateField'
-           id='ustart' onchange='javascript:clearSysDates()' />
-    &nbsp; End Date:
+           id='ustart' onchange='javascript:clearSysDates()' /> &nbsp;
+    <label for='uend'>End Date:</label>
     <input name='UserEndDate' value='%s' class='CdrDateField'
            id='uend' onchange='javascript:clearSysDates()' />
    </fieldset>
    <fieldset class='dates'>
     <legend>Report by Date Last Modified (System)</legend>
-    &nbsp; &nbsp; Start Date:
+    <label for='sstart'>Start Date:</label>
     <input name='SysStartDate' class='CdrDateField'
-           id='sstart' onchange='javascript:clearUserDates()' />
-    &nbsp; End Date:
+           id='sstart' onchange='javascript:clearUserDates()' /> &nbsp;
+    <label for='send'>End Date:</label>
     <input name='SysEndDate' class='CdrDateField'
            id='send' onchange='javascript:clearUserDates()' />
    </fieldset>
