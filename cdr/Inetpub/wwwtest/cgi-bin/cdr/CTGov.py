@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CTGov.py,v 1.13 2006-11-29 16:16:08 bkline Exp $
+# $Id: CTGov.py,v 1.14 2007-11-06 23:07:05 ameyer Exp $
 #
 # Submenu for ClinicalTrials.gov activities.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.13  2006/11/29 16:16:08  bkline
+# Plugged in command to force import from CT.gov.
+#
 # Revision 1.12  2006/04/26 17:23:12  venglisc
 # Adding new menu item for Unpublished CTGovProtocol by Phase report.
 # Sorting the menu items alphabetically. (Bug 2048)
@@ -113,7 +116,9 @@ form += """\
 """
 reports = [
            ('EditExternMap.py', 'Update Mapping Table'),
-           ('CTGovMarkDuplicate.py', 'Mark/Remove Protocols as Duplicates')
+           ('CTGovMarkDuplicate.py', 'Mark/Remove Protocols as Duplicates'),
+           ('GlobalChangeCTGovMapping.py',
+            'Global Change Protocols to Find Mappings')
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s'>%s</A></LI>\n" % (
