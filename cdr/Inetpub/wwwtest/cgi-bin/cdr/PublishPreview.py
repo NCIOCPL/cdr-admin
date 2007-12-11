@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: PublishPreview.py,v 1.29 2006-11-02 00:16:01 venglisc Exp $
+# $Id: PublishPreview.py,v 1.30 2007-12-11 19:10:16 venglisc Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.29  2006/11/02 00:16:01  venglisc
+# Adjusted the doctype passed to Cancer.gov to what they had implemented.
+# (Bug 2310)
+#
 # Revision 1.27  2005/12/08 16:01:32  venglisc
 # Modified the program to handle an additional parameter.  With this new
 # version parameter we are able to display a specific version of a document
@@ -92,7 +96,7 @@
 # Initial revision
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, cdrdb, re, cdr2cg, sys, time
+import cgi, cdr, cdrcgi, cdrdb, re, cdr2gk, sys, time
 
 #----------------------------------------------------------------------
 # Get the parameters from the request.
@@ -124,7 +128,7 @@ else:
 # Point to a different host if requested.
 #----------------------------------------------------------------------
 if cgHost:
-    cdr2cg.host = cgHost
+    cdr2gk.host = cgHost
 
 #----------------------------------------------------------------------
 # Debugging output.
@@ -222,11 +226,11 @@ except cdrdb.Error, info:
 showProgress("Fetched document type: %s..." % row[0])
 
 if not flavor:
-    if docType == "Summary":                  flavor = "summary"
-    elif docType == "DrugInformationSummary": flavor = "DrugInformationSummary"
-    elif docType == "InScopeProtocol":        flavor = "protocol_hp"
-    elif docType == "CTGovProtocol":          flavor = "CTGovProtocol_HP"
-    elif docType == "GlossaryTerm":           flavor = "glossary"
+    if docType == "Summary":                  flavor = "Summary"
+    elif docType == "DrugInformationSummary": flavor = "DrugInfoSummary"
+    elif docType == "InScopeProtocol":        flavor = "Protocol"
+    elif docType == "CTGovProtocol":          flavor = "CTGovProtocol"
+    elif docType == "GlossaryTerm":           flavor = "GlossaryTerm"
     else: cdrcgi.bail("Publish preview only available for Summary, "
                       "DrugInfoSummary, GlossaryTerm and Protocol documents")
 showProgress("Using flavor: %s..." % flavor)
@@ -249,10 +253,10 @@ showProgress("Doctype declaration stripped...")
 #cdrcgi.bail("flavor=%s doc=%s" % (flavor, doc))
 try:
     if dbgLog:
-        cdr2cg.debuglevel = 1
+        cdr2gk.debuglevel = 1
         showProgress("Debug logging turned on...")
     showProgress("Submitting request to Cancer.gov...")
-    resp = cdr2cg.pubPreview(doc, flavor)
+    resp = cdr2gk.pubPreview(doc, flavor)
     showProgress("Response received from Cancer.gov...")
 except:
     cdrcgi.bail("Preview formatting failure")
@@ -264,18 +268,6 @@ except:
 # Show it.
 #----------------------------------------------------------------------
 showProgress("Done...")
-cdrcgi.sendPage("""\
-<html>
- <head>
-  <title>Publish Preview for CDR%d</title>
-  <link rel='stylesheet'
-        href='http://%s/stylesheets/nci.css'
-        type='text/css'>
-  <link rel='stylesheet'
-        href='http://%s/stylesheets/nci_general_browsers.css'
-        type='text/css'>
- </head>
- <body>
-  %s
- </body>
-</html>""" % (intId, ssHost, ssHost, resp.xmlResult))
+pattern3 = re.compile("<title>CDR Preview", re.DOTALL)
+html = pattern3.sub("<title>Publish Preview: CDR%s" % intId, resp.xmlResult)
+cdrcgi.sendPage("%s" % html)
