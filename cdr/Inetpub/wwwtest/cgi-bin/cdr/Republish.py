@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: Republish.py,v 1.1 2007-05-16 16:03:38 bkline Exp $
+# $Id: Republish.py,v 1.2 2007-12-13 21:02:44 venglisc Exp $
 #
 # User interface for requesting republication of documents to be
 # sent to Cancer.gov.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2007/05/16 16:03:38  bkline
+# User interface for resending documents to Cancer.gov.
+#
 #----------------------------------------------------------------------
 import cdr, cdrdb, cdrcgi, cgi, RepublishDocs
 
@@ -80,7 +83,7 @@ def makeDoctypePicklist():
       ORDER BY t.name""")
     html = ["""\
       <select name='DocType' class='field'>
-       <option value='' selected='1'>&nbsp;</option>
+       <option value='' selected>&nbsp;</option>
 """]
     for row in cursor.fetchall():
         # Skip types we no longer push to Cancer.gov
@@ -99,13 +102,13 @@ def makeDoctypePicklist():
 def showForm(extra):
     form = """\
    <h1>Re-publish CDR Documents to Cancer.gov</h1>
-   <br />
+   <br>
    <p>
     This page can be used to request re-publishing of CDR documents
     which have already been sent to Cancer.gov, in a way which
     bypasses the optimization which normally prevents sending of
     an unchanged document to the Cancer.gov GateKeeper program.
-    <br /><br />
+    <br><br>
     You may enter one or more CDR <b>Document IDs</b>, and/or one or
     more publishing <b>Job IDs</b>.  Separate multiple ID values with
     spaces.  You may also select a <b>Document Type</b>.
@@ -122,66 +125,66 @@ def showForm(extra):
     one or more job IDs you can indicate that only documents from
     those jobs marked as '<i>Failed</i>' are to be included.
     If no job IDs are entered, this flag is ignored.
-    <br /><br />
+    <br><br>
     An export job will be created for generating the
     output suitable for publishing.  This job, if successful,
     will in turn create a second job for pushing the
     exported jobs to the GateKeeper at Cancer.gov.
-    <br /><br />
+    <br><br>
     You may optionally add an <b>Email Address</b> to which
     status notifications for the progress of the new publishing
     jobs will be sent, with links to pages with additional
     information about the status for the jobs.
-    <br /><br />
+    <br><br>
     Specify the fully qualified domain name or IP address for
     the GateKeeper host to which the republishing job is to be
     directed if it is not the default host for the CDR server
     from which the request originates.
    </p>
-   <br />
+   <br>
    <input type='hidden' name='%s' value='%s'>%s
    <table border='0'>
     <tr>
-     <th align='right'>Document IDs:&nbsp;</td>
-     <td><input name='DocList' class='field'/></td>
+     <th align='right'>Document IDs:&nbsp;</th>
+     <td><input name='DocList' class='field'></td>
     </tr>
     <tr>
-     <th align='right'>Job IDs:&nbsp;</td>
-     <td><input name='JobList' class='field'/></td>
+     <th align='right'>Job IDs:&nbsp;</th>
+     <td><input name='JobList' class='field'></td>
     </tr>
     <tr>
-     <th align='right'>Document Type:&nbsp;</td>
+     <th align='right'>Document Type:&nbsp;</th>
      <td>
 %s
      </td>
     </tr>
     <tr>
-     <th align='right'>Email Address:&nbsp;</td>
-     <td><input name='Email' class='field'/></td>
+     <th align='right'>Email Address:&nbsp;</th>
+     <td><input name='Email' class='field'></td>
     </tr>
     <tr>
-     <th align='right'>GateKeeper Host:&nbsp;</td>
-     <td><input name='GKHost' class='field'/></td>
+     <th align='right'>GateKeeper Host:&nbsp;</th>
+     <td><input name='GKHost' class='field'></td>
     </tr>
     <tr>
      <td>&nbsp;</td>
      <td>
-      <br />
-      <input type='checkbox' name='AllType' />
+      <br>
+      <input type='checkbox' name='AllType' >
       Include all documents for type
      </td>
     </tr>
     <tr>
      <td>&nbsp;</td>
      <td>
-      <input type='checkbox' name='NewDocs' checked='1' />
+      <input type='checkbox' name='NewDocs' checked>
       Include linked documents not on Cancer.gov
      </td>
     </tr>
     <tr>
      <td>&nbsp;</td>
      <td>
-      <input type='checkbox' name='FailedOnly' checked='1' />
+      <input type='checkbox' name='FailedOnly' checked>
       Only include failed documents from specified publishing jobs
      </td>
     </tr>
@@ -203,9 +206,9 @@ if (docList or jobList or docType):
         jobId   = cr.republish(newDocs, docList, jobList, docType, allType,
                                failed, email, gkHost)
         extra = """
-   <p>Export job %d created successfully</p><br />""" % jobId
+   <p>Export job %d created successfully</p><br>""" % jobId
     except Exception, e:
         extra = """
-   <p class='error'>Failure: %s</p><br />""" % e
+   <p class='error'>Failure: %s</p><br>""" % e
 
 showForm(extra)
