@@ -1,13 +1,19 @@
 <!-- $Id: -->
-<!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
+<!DOCTYPE HTML PUBLIC '-//W3C//DTD HTML 4.01 Transitional//EN'
+                      'http://www.w3.org/TR/html4/loose.dtd'>
+<HTML>
  <HEAD>
   <TITLE>CDR Administration</TITLE>
+  <meta http-equiv='Content-Type' content='text/html;charset=utf-8'>
+  <LINK rel='shortcut icon' href='/favicon.ico'>
+  <LINK type='text/css' REL='STYLESHEET' HREF='/stylesheets/dataform.css'>
+  <style type='text/css'>
+    body      { background-color: #EFEFEF; }
+    *.banner  { background-color: silver;
+                background-image: url(/images/nav1.jpg); }
+  </style>
  </HEAD>
- <BASEFONT FACE='Arial, Helvetica, sans-serif'>
- <LINK REL='STYLESHEET' 
-       HREF='/stylesheets/dataform.css'>
- <BODY BACKGROUND='/images/back.jpg' 
-       BGCOLOR='lightgrey'>
+ <Body>
   <FORM ACTION='/cgi-bin/cdr/Admin.py' 
         METHOD='POST'>
    <TABLE WIDTH='100%' 
@@ -15,18 +21,16 @@
           CELLPADDING='0' 
           BORDER='0'>
     <TR>
-     <TH NOWRAP BGCOLOR='silver' 
-         ALIGN='left' 
-         BACKGROUND='/images/nav1.jpg'>
+     <TH class='banner' NOWRAP
+         ALIGN='left'>
       <FONT SIZE='6' 
             COLOR='white'>&nbsp;CDR Administration
       </FONT>
      </TH>
-     <TD BGCOLOR='silver'
+     <TD class='banner'
          VALIGN='middle'
          ALIGN='right'
-         WIDTH='100%'
-         BACKGROUND='/images/nav1.jpg'>
+         WIDTH='100%'>
       <INPUT TYPE='submit' 
              VALUE='Log In'>&nbsp;
      </TD>
