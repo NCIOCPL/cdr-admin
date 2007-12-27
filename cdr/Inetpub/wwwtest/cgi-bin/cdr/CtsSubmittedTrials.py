@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CtsSubmittedTrials.py,v 1.2 2007-10-31 17:46:55 bkline Exp $
+# $Id: CtsSubmittedTrials.py,v 1.3 2007-12-27 20:26:40 bkline Exp $
 #
 # CDR-side interface for reviewing CTS trials.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2007/10/31 17:46:55  bkline
+# Modifications to support Oncore trials.
+#
 # Revision 1.1  2007/08/17 18:17:45  bkline
 # Original production version for reviewing/importing CTS trials.
 #
@@ -141,7 +144,9 @@ def importDoc(publicId, primaryId, session, source):
     url = 'Filter.py?DocId=%s&Filter=set:%s' % (resp[0], filterSet)
     link = "<a href='%s' target='_new'>%s</a>" % (url, resp[0])
 #http://mahler.nci.nih.gov/cgi-bin/cdr/Filter.py?DocId=CDR0000467066&Filter=set:QC%20InScopeProtocol%20Admin%20Set&Session=454C1C5A-81318D-002-RMOWQTCA60D5
-    extra = u"Protocol %s imported as %s" % (primaryId, link)
+    extra = u"Protocol %s imported as %s" % (primaryId,
+                                             source == 'CTS' and link
+                                             or resp[0])
     doc = cdr.getDoc(session, resp[0], 'Y')
     if doc.startswith("<Errors"):
         return makeFailureMessage(u"Unable to retrieve %s" % resp[0])
