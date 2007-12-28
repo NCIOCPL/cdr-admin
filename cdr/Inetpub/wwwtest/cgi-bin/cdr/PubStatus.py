@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PubStatus.py,v 1.28 2007-08-07 20:08:39 ameyer Exp $
+# $Id: PubStatus.py,v 1.29 2007-12-28 22:41:29 venglisc Exp $
 #
 # Status of a publishing job.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.28  2007/08/07 20:08:39  ameyer
+# Upgraded an error message.  No changes to logic.
+#
 # Revision 1.27  2007/05/01 21:29:14  venglisc
 # Test Message.
 #
@@ -128,6 +131,9 @@ docType  = fields and fields.getvalue('docType') or None
 cgMode   = fields and fields.getvalue('cgMode') or None
 flavor   = fields and fields.getvalue('flavor') or 'full'
 docCount = int(fields and fields.getvalue('docCount') or '0')
+
+# Number of documents to be displayed on Pushing Information Report
+TOPDOCS  = 5000
 
 #----------------------------------------------------------------------
 # Display the publishing overall job status.
@@ -648,7 +654,7 @@ def dispCgWork():
     # Find removed document information.
     #----------------------------------------------------------------------
     try:
-        numDocs = (nRemoved > 500) and 500 or nRemoved or 1
+        numDocs = (nRemoved > TOPDOCS) and TOPDOCS or nRemoved or 1
         cursor.execute("""\
             SELECT TOP %d ppcw.id, ppcw.doc_type, d.title
               FROM pub_proc_cg_work ppcw
@@ -683,7 +689,7 @@ def dispCgWork():
     # Find updated document information.
     #----------------------------------------------------------------------
     try:
-        numDocs = (nUpdated> 500) and 500 or nUpdated or 1
+        numDocs = (nUpdated > TOPDOCS) and TOPDOCS or nUpdated or 1
         cursor.execute("""\
             SELECT TOP %d ppcw.id, ppcw.doc_type, d.title
               FROM pub_proc_cg_work ppcw
@@ -725,7 +731,7 @@ def dispCgWork():
     # Find added document information.
     #----------------------------------------------------------------------
     try:
-        numDocs = (nAdded> 500) and 500 or nAdded or 1
+        numDocs = (nAdded > TOPDOCS) and TOPDOCS or nAdded or 1
         cursor.execute("""\
             SELECT TOP %d ppcw.id, ppcw.doc_type, d.title
               FROM pub_proc_cg_work ppcw
@@ -744,7 +750,7 @@ def dispCgWork():
         cdrcgi.bail("Failure getting added info from PPCW.")
 
     # Create links when appropriate.
-    LINK     = "<A href='#%s'>%d</A>"
+    LINK     = "<A style='text-decoration: underline;' href='#%s'>%d</A>"
     lRemoved = nRemoved and LINK % ('Removed', nRemoved) or '%d' % nRemoved
     lUpdated = nUpdated and LINK % ('Updated', nUpdated) or '%d' % nUpdated
     lAdded   = nAdded and LINK % ('Added', nAdded) or '%d' % nAdded
@@ -775,7 +781,7 @@ def dispCgWork():
               """ % (vendor, push, lRemoved, lUpdated, lAdded)
 
     HEADER  = """\
-               <BR><FONT COLOR="RED">Documents %s (Top 500):</FONT><BR><BR>
+               <BR><FONT COLOR="RED"><b>Documents %s</b> %s</FONT><BR><BR>
                <a NAME='%s'></a>
                <TABLE BORDER=1>
                 <tr>
@@ -791,19 +797,26 @@ def dispCgWork():
     # Inserting a space after ';' to allow line breaks between
     # protocol numbers in HTML output.        VE, 2005-03-25
     # --------------------------------------------------------
+    listCount = ""
     if nRemoved:
-        html   += HEADER % ('Removed', 'Removed')
+        if nRemoved > TOPDOCS:
+            listCount = "(Top %s only)" % TOPDOCS
+        html   += HEADER % ('Removed', listCount, 'Removed')
         for row in rowsRemoved:
             html += ROW % (row[0], row[1], string.replace(row[2], ';', '; '))
         html  += "</TABLE></BODY>"
-    if nUpdated:
-        html   += HEADER % ('Updated', 'Updated')
-        for row in rowsUpdated:
+    if nAdded:
+        if nAdded > TOPDOCS:
+            listCount = "(Top %s only)" % TOPDOCS
+        html   += HEADER % ('Added', listCount, 'Added')
+        for row in rowsAdded:
             html += ROW % (row[0], row[1], string.replace(row[2], ';', '; '))
         html  += "</TABLE></BODY>"
-    if nAdded:
-        html   += HEADER % ('Added', 'Added')
-        for row in rowsAdded:
+    if nUpdated:
+        if nUpdated > TOPDOCS:
+            listCount = "(Top %s only)" % TOPDOCS
+        html   += HEADER % ('Updated', listCount, 'Updated')
+        for row in rowsUpdated:
             html += ROW % (row[0], row[1], string.replace(row[2], ';', '; '))
         html  += "</TABLE></BODY>"
 
@@ -883,11 +896,11 @@ def dispJobsByDates():
     try:
         cursor.execute("""\
                 SELECT pp.id, pp.pub_subset, pp.started,
-		               pp.completed, count(pp.id) AS numDocs
+		               pp.completed, count(pp.id) AS numDocs, pp.status
                   FROM pub_proc pp, pub_proc_doc ppd
                  WHERE pp.started >= '%s'
                    AND pp.completed <= DATEADD(s, -1, DATEADD(d, 1, '%s'))
-                   AND pp.status = 'Success'
+                   AND pp.status in ('Success','Verifying')
                    AND pp.id = ppd.pub_proc
                    AND ppd.failure IS NULL
                    AND pp.pub_system IN (
@@ -897,7 +910,8 @@ def dispJobsByDates():
                               AND t.name = 'PublishingSystem'
                               AND d.title = 'Primary'
                                      )
-              GROUP BY pp.id, pp.pub_subset, pp.started, pp.completed
+              GROUP BY pp.id, pp.pub_subset, pp.started, pp.completed,
+                       pp.status
               ORDER BY pp.id DESC
                        """ % (fromDate, toDate)
                       )
@@ -913,6 +927,10 @@ def dispJobsByDates():
                                    """)
 
         form += """
+            <font size='2'>
+             <B>Note:</b> A 
+              <span style="background-color: #FF7F50;">Colored row</span> 
+                did not complete loading to the Cancer.gov live site</font>
             <table border='1' cellspacing='0' cellpadding='2' width='100%%'>
                 <tr>
                     <td nowrap='1'><b>
@@ -933,10 +951,16 @@ def dispJobsByDates():
                 </tr>
                 """
         while row:
-            id, name, started, completed, count = row
+            id, name, started, completed, count, curStatus = row
+
+            # Indicate that a job is still being loaded on Cancer.gov
+            # by setting a different background color
+            if curStatus == 'Verifying':
+                form += '<tr style="background-color: #FF7F50;">'
+            else:
+                form += '<tr>'
 
             form += """
-                <tr>
                     <td nowrap='1'><b>
                     <a style="text-decoration: underline;"
                        href="PubStatus.py?id=%d&type=Report&%s=%s">
@@ -1130,7 +1154,7 @@ def dispJobReport():
                 SELECT pp.pub_subset
                   FROM pub_proc pp
                  WHERE id = %d
-                   AND pp.status = 'Success'
+                   AND pp.status in ('Success', 'Verifying')
                    AND pp.pub_system IN (
                            SELECT d.id
                              FROM document d, doc_type t
