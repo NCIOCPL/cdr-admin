@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: PublishPreview.py,v 1.30 2007-12-11 19:10:16 venglisc Exp $
+# $Id: PublishPreview.py,v 1.31 2008-01-09 17:53:20 venglisc Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.30  2007/12/11 19:10:16  venglisc
+# Changes for new PublishPreview using the new gatekeeper code (Bug 2002)
+#
 # Revision 1.29  2006/11/02 00:16:01  venglisc
 # Adjusted the doctype passed to Cancer.gov to what they had implemented.
 # (Bug 2310)
@@ -97,6 +100,8 @@
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, cdrdb, re, cdr2gk, sys, time
+# Interim fix to allow Protocol Patient publish preview
+import cdr2cg
 
 #----------------------------------------------------------------------
 # Get the parameters from the request.
@@ -129,6 +134,9 @@ else:
 #----------------------------------------------------------------------
 if cgHost:
     cdr2gk.host = cgHost
+    # Temporary fix for Protocol_Patient PP
+    if flavor == 'Protocol_Patient':
+        cdr2cg.host = cgHost
 
 #----------------------------------------------------------------------
 # Debugging output.
@@ -225,6 +233,14 @@ except cdrdb.Error, info:
                                                                  info[1][0]))
 showProgress("Fetched document type: %s..." % row[0])
 
+# Note: The values for flavor listed here are not the only values possible.
+#       These values are the default values but XMetaL macros may pass
+#       additional values for the flavor attribute. 
+#       Currently, the additional values are implemented:
+#         Protocol_Patient
+#         Summary_Patient       (unused)
+#         CTGovProtocol_Patient (unused)
+# -------------------------------------------------------------------------
 if not flavor:
     if docType == "Summary":                  flavor = "Summary"
     elif docType == "DrugInformationSummary": flavor = "DrugInfoSummary"
@@ -256,7 +272,11 @@ try:
         cdr2gk.debuglevel = 1
         showProgress("Debug logging turned on...")
     showProgress("Submitting request to Cancer.gov...")
-    resp = cdr2gk.pubPreview(doc, flavor)
+    # Temp fix to make Protocol_Patient PP work
+    if flavor == 'Protocol_Patient':
+        resp = cdr2cg.pubPreview(doc, flavor)
+    else:
+        resp = cdr2gk.pubPreview(doc, flavor)
     showProgress("Response received from Cancer.gov...")
 except:
     cdrcgi.bail("Preview formatting failure")
