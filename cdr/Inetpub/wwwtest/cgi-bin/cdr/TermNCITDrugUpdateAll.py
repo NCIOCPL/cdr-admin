@@ -147,8 +147,8 @@ form   = """\
 </td>
 <td width = 95%%>
    <p id = 'statusTxt' align = center>
-   Select 'Check Update' to see what will be updated.<br>
-   Select 'Do Data Update...' to update the data in the database.<br><br>
+   Select 'Submit Test' to see what will be updated.<br>
+   Select 'Submit Update' to update the data in the database.<br><br>
    </p>
 </td>
 </tr>
@@ -156,9 +156,9 @@ form   = """\
 <tr>
 <td></td>
 <td align=center>
-   <input type='radio' value='CheckUpdate' name='Radio' CHECKED>Check Update
+   <input type='radio' value='CheckUpdate' name='Radio' CHECKED>Submit Test
    &nbsp;&nbsp;&nbsp;&nbsp;
-   <input type='radio' value='DoDataUpdate' name='Radio'>Do Data Update
+   <input type='radio' value='DoDataUpdate' name='Radio'>Submit Update
 </td>
 </tr>
 </table>
