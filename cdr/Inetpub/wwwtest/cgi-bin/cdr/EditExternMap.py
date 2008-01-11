@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditExternMap.py,v 1.11 2007-09-14 01:55:00 ameyer Exp $
+# $Id: EditExternMap.py,v 1.12 2008-01-11 04:38:40 ameyer Exp $
 #
 # Allows a user to edit the table which maps strings from external
 # systems (such as ClinicalTrials.gov) to CDR document IDs.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.11  2007/09/14 01:55:00  ameyer
+# Make sure that bogus'd value is not mapped.
+#
 # Revision 1.10  2006/08/29 15:46:23  ameyer
 # Changes to improve performance, including some changes to forms
 # and introduction of retrieval limiting logic enabling a user to
@@ -501,7 +504,20 @@ for row in rows:
     form += """\
        <option value='%d'%s>%s</option>
 """ % (row[0], selected, cgi.escape(row[1]))
-form += """\
+
+
+# Encoding for non-English patterns
+if type(form) is not unicode:
+    form = unicode(form)
+
+# Use this one if the page received input in utf-8
+pattern = unicode(pattern, 'utf-8')
+
+# Use this one if the page received input in Latin-1
+# Bob's latest cdrcgi.header() function is now using utf-8 encoding
+# pattern = unicode(pattern, 'latin-1')
+
+form += u"""\
       </select>
      </td>
      <td>Select the kind of mapping to show, or select all kinds.</td>
@@ -572,6 +588,9 @@ form += """\
 """ % (pattern and cgi.escape(pattern, 1) or "", docId, alphaStart,
        maxRows, includeUnmappedChecked, includeUnmappableChecked,
        cdrcgi.SESSION, session)
+# Back to standard form for web browser
+# See comments above on utf-8 vs latin-1
+# form = form.encode('latin_1')
 
 #----------------------------------------------------------------------
 # Show the rows that match the selection criteria.
