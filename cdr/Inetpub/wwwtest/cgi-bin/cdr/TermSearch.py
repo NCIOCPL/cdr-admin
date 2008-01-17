@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: TermSearch.py,v 1.15 2007-10-19 12:59:35 kidderc Exp $
+# $Id: TermSearch.py,v 1.16 2008-01-17 17:02:51 kidderc Exp $
 #
 # Prototype for duplicate-checking interface for Term documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.15  2007/10/19 12:59:35  kidderc
+# Added improved feedback when updating drom NCIT.
+#
 # Revision 1.13  2007/10/11 16:22:36  kidderc
 # Moved much of functionality into NCIThes.py. A library module.
 #
@@ -64,12 +67,27 @@ help        = fields and fields.getvalue("HelpButton")      or None
 srchThes    = fields and fields.getvalue("SearchThesaurus") or None
 conceptCode = fields and fields.getvalue("ConceptCode")     or None
 ckPrefNm    = fields and fields.getvalue("CkPrefNm")        or None
+updateDefinition    = fields and fields.getvalue("UpdateDefinition")        or None
+importTerms    = fields and fields.getvalue("ImportTerms")        or None
 subtitle    = "Term"
 updateCDRID = fields and fields.getvalue("UpdateCDRID")     or None
 valErrors   = None
 
+if importTerms:
+    importTerms = int(importTerms)
+else:
+    importTerms = 0
+    
+if updateDefinition:
+    updateDefinition = int(updateDefinition)
+else:
+    updateDefinition = 0
+
 #----FOR DEBUGGING -------------------
+#session = '472F1902-706FCE-248-I179PKDICJPG'
 #impReq = 1
+#updateDefinition = 1
+#importTerms = 1
 #ckPrefNm = 1
 
 #updateCDRID = '37776'
@@ -92,8 +110,6 @@ valErrors   = None
 
 #updateCDRID = '38325'
 #conceptCode = 'C1795'
-
-#session = '470CFB1D-6BFA7B-248-LNIB7AEB0MB6'
 #-----------------------------------
 
 if help: 
@@ -211,9 +227,9 @@ if impReq:
     if not session:
         cdrcgi.bail("User not logged in")
     if updateCDRID:
-        result = NCIThes.updateTerm(session,updateCDRID,conceptCode,doUpdate=1)
+        result = NCIThes.updateTerm(session,updateCDRID,conceptCode,doUpdate=1,doUpdateDefinition=updateDefinition,doImportTerms=importTerms)
     else:
-        result = NCIThes.addNewTerm(session,conceptCode)
+        result = NCIThes.addNewTerm(session,conceptCode,updateDefinition=updateDefinition,importTerms=importTerms)
 
     if result.startswith("<error>"):
         cdrcgi.bail(result)        
@@ -349,13 +365,29 @@ if not submit:
      <TR>
       <TD ALIGN='right'>
        <SPAN       CLASS       = "Page">
-        &nbsp;CDR ID of Document to Update (Optional):&nbsp;&nbsp;
+        &nbsp;CDR ID of Document to Update:&nbsp;&nbsp;
        </SPAN>
       </TD>
       <TD>
        <INPUT      NAME        = "UpdateCDRID"
                    ID          = "UpdateCDRID">
       </TD>
+     </TR>
+     <TR>
+         <TD>
+         </TD>
+         <TD>
+         <input type='checkbox' id='UpdateDefinition' name='UpdateDefinition' value='1' CHECKED>
+           Update Definition</input><br>
+         </TD>
+    </TR>
+    <TR>
+       <TD>
+       </TD>
+         <TD>
+         <input type='checkbox' id='ImportTerms' name='ImportTerms' value='1' CHECKED>
+           Import Terms</input><br>
+         </TD>
      </TR>
      <TR>
       <TD>&nbsp;</TD>
