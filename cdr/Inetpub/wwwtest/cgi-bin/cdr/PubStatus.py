@@ -1,10 +1,17 @@
 #----------------------------------------------------------------------
 #
-# $Id: PubStatus.py,v 1.29 2007-12-28 22:41:29 venglisc Exp $
+# $Id: PubStatus.py,v 1.30 2008-01-17 16:03:36 venglisc Exp $
 #
 # Status of a publishing job.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.29  2007/12/28 22:41:29  venglisc
+# During the new Gatekeeper test phase we needed to be able to review
+# pushed documents even though the push job's status was 'Verifying' instead
+# of 'Success'.
+# Additional minor formatting (CSS) changes and we increased the number of
+# documents to be displayed.
+#
 # Revision 1.28  2007/08/07 20:08:39  ameyer
 # Upgraded an error message.  No changes to logic.
 #
@@ -606,6 +613,28 @@ def dispCgWork():
     conn = cdrdb.connect('CdrGuest')
     cursor = conn.cursor()
 
+    ###
+    # The pub_proc_cg_work table only holds the data from the last
+    # push job.  If the user is trying to get the information from 
+    # a previous push job display a notification that this is not
+    # the data he/she is looking for.
+    # -------------------------------------------------------------
+    try:
+        cursor.execute("""\
+             SELECT max(id)
+               FROM pub_proc
+              WHERE pub_system = 178
+                AND pub_subset like 'Push_Documents_to_Cancer.gov_%'
+                       """)
+        lastPushJob = cursor.fetchone()
+        if lastPushJob and lastPushJob[0] > jobId:
+            cdrcgi.bail("Sorry, but another push job (Job%s) already removed \
+                         the data you're looking for!" % lastPushJob[0])
+    except cdrdb.Error, info:
+        cdrcgi.bail("Failure getting latest push job ID: %s" % info[1][0])
+
+    ###
+
     # Is there any documents in PPCW?
     try:
         cursor.execute("""\
@@ -781,8 +810,9 @@ def dispCgWork():
               """ % (vendor, push, lRemoved, lUpdated, lAdded)
 
     HEADER  = """\
-               <BR><FONT COLOR="RED"><b>Documents %s</b> %s</FONT><BR><BR>
+               <BR><FONT COLOR="RED"><b>Documents %s</b> %s</FONT><BR>
                <a NAME='%s'></a>
+               %s
                <TABLE BORDER=1>
                 <tr>
                 <td valign='top'><B>DocId</B></td>
@@ -794,28 +824,54 @@ def dispCgWork():
                      <td><FONT COLOR='black'>%s</FONT></td>
                      <td><FONT COLOR='black'>%s</FONT></td></tr>"""
 
+    # Only if the push job hasn't finished yet will we be able to 
+    # display the newly added documents.  Once the job finished the 
+    # comparison between pub_proc_cg and pub_proc_cg_work will give
+    # incorrect results and new documents will be listed as updated
+    # once.  We want to warn the user about this fact.
+    # -------------------------------------------------------------
+    try:
+        cursor.execute("""\
+             SELECT status
+               FROM pub_proc
+              WHERE pub_system = 178
+                AND pub_subset like 'Push_Documents_to_Cancer.gov_%'
+                AND id = ?
+                       """, jobId)
+        jobStatus = cursor.fetchone()[0]
+    except cdrdb.Error, info:
+        cdrcgi.bail("Failure getting latest push job ID: %s" % info[1][0])
+
     # Inserting a space after ';' to allow line breaks between
     # protocol numbers in HTML output.        VE, 2005-03-25
     # --------------------------------------------------------
     listCount = ""
+    DISCLAIMER = "<br>"
     if nRemoved:
         if nRemoved > TOPDOCS:
             listCount = "(Top %s only)" % TOPDOCS
-        html   += HEADER % ('Removed', listCount, 'Removed')
+        html   += HEADER % ('Removed', listCount, 'Removed', DISCLAIMER)
         for row in rowsRemoved:
             html += ROW % (row[0], row[1], string.replace(row[2], ';', '; '))
         html  += "</TABLE></BODY>"
+
     if nAdded:
         if nAdded > TOPDOCS:
             listCount = "(Top %s only)" % TOPDOCS
-        html   += HEADER % ('Added', listCount, 'Added')
+        html   += HEADER % ('Added', listCount, 'Added', DISCLAIMER)
         for row in rowsAdded:
             html += ROW % (row[0], row[1], string.replace(row[2], ';', '; '))
         html  += "</TABLE></BODY>"
+
     if nUpdated:
+        if jobStatus in ['Verifying', 'Success']:
+            DISCLAIMER = """\
+            <b>Note:</b> The push job already finished. Any newly 
+            added documents are now displayed as updates.<br><br>"""
         if nUpdated > TOPDOCS:
             listCount = "(Top %s only)" % TOPDOCS
-        html   += HEADER % ('Updated', listCount, 'Updated')
+        html   += HEADER % ('Updated', listCount, 'Updated', DISCLAIMER)
+
         for row in rowsUpdated:
             html += ROW % (row[0], row[1], string.replace(row[2], ';', '; '))
         html  += "</TABLE></BODY>"
