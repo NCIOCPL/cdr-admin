@@ -1,0 +1,26 @@
+   /* html  { xbackground-color: gold; }
+    * div  { xmargin: 5px; 
+    *         xbackground-color: green; 
+    *         }
+    * table { xmargin:  5px; 
+    *         xbackground-color: yellow; }
+    * table table 
+    *       { xmargin:   5px; 
+    *         xbackground-color: red; }
+    * table table table 
+    *       { xmargin:   5px; 
+    *         xbackground-color: blue; } 
+
+    * table table table table 
+    *       { xmargin:   5px; 
+    *         width: 565px; 
+    *         xbackground-color: white; }
+    * table table table td[align="right"] { 
+    *         text-align: left; 
+    *         xbackground-color: fuchsia; }
+    * img   { display: none; }
+    */
+
+   body  { zoom: 89%; }   /* IE specific to handle IE6 cut-off problem
+                           * when printing document.
+                           */
