@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: PublishPreview.py,v 1.31 2008-01-09 17:53:20 venglisc Exp $
+# $Id: PublishPreview.py,v 1.32 2008-01-23 20:59:53 venglisc Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.31  2008/01/09 17:53:20  venglisc
+# Made modifications to temporarily allow protocol patient publish preview
+# to work by accessing the old gatekeeper (using cdr2cg.py). (Bug 2002)
+#
 # Revision 1.30  2007/12/11 19:10:16  venglisc
 # Changes for new PublishPreview using the new gatekeeper code (Bug 2002)
 #
@@ -277,6 +281,7 @@ try:
         resp = cdr2cg.pubPreview(doc, flavor)
     else:
         resp = cdr2gk.pubPreview(doc, flavor)
+    #resp = cdr2gk.pubPreview(doc, flavor)
     showProgress("Response received from Cancer.gov...")
 except:
     cdrcgi.bail("Preview formatting failure")
@@ -288,6 +293,15 @@ except:
 # Show it.
 #----------------------------------------------------------------------
 showProgress("Done...")
-pattern3 = re.compile("<title>CDR Preview", re.DOTALL)
-html = pattern3.sub("<title>Publish Preview: CDR%s" % intId, resp.xmlResult)
+
+# The output from Cancer.gov is modified to add the CDR-ID to the title
+# We are also adding a style to work around a IE6 bug that causes the 
+# document printed to be cut of on the right by shifting the entire
+# document to the left
+# ---------------------------------------------------------------------
+pattern3 = re.compile('<title>CDR Preview', re.DOTALL)
+pattern4 = re.compile('</head>', re.DOTALL)
+
+html = pattern3.sub('<title>Publish Preview: CDR%s' % intId, resp.xmlResult)
+html = pattern4.sub('\n<!--[if IE 6]>\n<link rel="stylesheet" type="text/css" media="print" href="/stylesheets/ppprint.css">\n<![endif]-->\n</head>\n', html)
 cdrcgi.sendPage("%s" % html)
