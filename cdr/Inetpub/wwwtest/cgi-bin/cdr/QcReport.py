@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.53 2007-04-09 20:47:45 venglisc Exp $
+# $Id: QcReport.py,v 1.54 2008-01-23 22:59:57 venglisc Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.53  2007/04/09 20:47:45  venglisc
+# Modified to allow insertion/deletion markup for DrugInfoSummaries.
+# (Bug 3067)
+#
 # Revision 1.52  2007/02/23 22:48:51  venglisc
 # Modifications to display comments as internal and external comments within
 # the summaries. (Bug 2920)
@@ -576,6 +580,10 @@ filters = {
         ["set:QC GlossaryTerm Set"],
     'GlossaryTerm:rs': # Redline/Strikeout
         ["set:QC GlossaryTerm Set (Redline/Strikeout)"],
+    'GlossaryTermConcept':
+        ["name:Glossary Term Concept QC Report Filter"],
+    'GlossaryTermName':
+        ["name:Glossary Term Name QC Report Filter"],
     'InScopeProtocol':  
         ["set:QC InScopeProtocol Set"],
     'Media:img':
