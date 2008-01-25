@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: TerminologyReports.py,v 1.13 2007-06-21 19:41:52 kidderc Exp $
+# $Id: TerminologyReports.py,v 1.14 2008-01-25 17:49:44 kidderc Exp $
 #
 # Submenu for terminology reports.
 #
@@ -80,7 +80,9 @@ form = """\
 """ % (cdrcgi.SESSION, session)
 reports = [
            ('TermUsage.py', 'Term Usage'),
-           ('TermSearch.py', 'Terminology QC Report')
+           ('TermSearch.py', 'Terminology QC Report'),
+           ('TermNCITDrugUpdateAll.py', 'Update all Drug/Agent Terms from NCI Thesaurus'),
+           ('TermNCITDiseaseUpdateAll.py', 'Update all Disease Terms from NCI Thesaurus')
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI></A>\n" % (
@@ -100,7 +102,9 @@ reports = [
             'Cancer Diagnosis Hierarchy (Without Alternate Names)',
             '&flavor=short'),
            ('InterventionAndProcedureTerms.py',
-            'Intervention/Procedure Terms', ''),
+            'Intervention or Procedure Terms', '&IncludeAlternateNames=True'),
+           ('InterventionAndProcedureTerms.py',
+            'Intervention or Procedure Terms (without Alternate Names)', '&IncludeAlternateNames=False'),
            ('DrugAgentReport.py', 'Drug/Agent Report', ''),
            ('DrugAgentReport2.py', 'Drug/Agent Other Names Report', ''),
            ('DrugReviewReport.py', 'Drug Review Report', ''),
