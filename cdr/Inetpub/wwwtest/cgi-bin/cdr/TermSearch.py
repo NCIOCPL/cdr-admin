@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: TermSearch.py,v 1.16 2008-01-17 17:02:51 kidderc Exp $
+# $Id: TermSearch.py,v 1.17 2008-01-29 11:41:26 kidderc Exp $
 #
 # Prototype for duplicate-checking interface for Term documents.
 #
@@ -372,6 +372,14 @@ if not submit:
        <INPUT      NAME        = "UpdateCDRID"
                    ID          = "UpdateCDRID">
       </TD>
+     </TR>
+     <TR>
+         <TD>
+             <SPAN STYLE="font-size: 10pt; font-family:
+                Arial; font-weight: Normal">
+             (Concept Code also required to Update)
+             </SPAN>
+         </TD>
      </TR>
      <TR>
          <TD>
