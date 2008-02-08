@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PublishReports.py,v 1.1 2007-01-05 23:18:40 venglisc Exp $
+# $Id: PublishReports.py,v 1.2 2008-02-08 20:56:59 venglisc Exp $
 #
 # Submenu for publishing reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2007/01/05 23:18:40  venglisc
+# New publishing reports menu file. (Bug 2111)
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
 
@@ -45,7 +48,9 @@ reports = [
            ('PubStatus.py',
             'Publishing Job Activities'),
            ('PubStatsByDate.py',
-            'Publishing Job Statistics')
+            'Publishing Job Statistics'),
+           ('CountByDoctype.py',
+            'Published Document Count (Latest Export Job - runs >4 min)')
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI></A>\n" % (
