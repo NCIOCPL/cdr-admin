@@ -1,11 +1,16 @@
 #----------------------------------------------------------------------
 #
-# $Id: PublishPreview.py,v 1.32 2008-01-23 20:59:53 venglisc Exp $
+# $Id: PublishPreview.py,v 1.33 2008-02-19 22:53:44 venglisc Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.32  2008/01/23 20:59:53  venglisc
+# Removing previous changes in order to move to production the IE6 fix
+# for publish preview to shrink a page when printed so that its right
+# border isn't cut off. (Bug 2002)
+#
 # Revision 1.31  2008/01/09 17:53:20  venglisc
 # Made modifications to temporarily allow protocol patient publish preview
 # to work by accessing the old gatekeeper (using cdr2cg.py). (Bug 2002)
@@ -105,7 +110,7 @@
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, cdrdb, re, cdr2gk, sys, time
 # Interim fix to allow Protocol Patient publish preview
-import cdr2cg
+##import cdr2cg
 
 #----------------------------------------------------------------------
 # Get the parameters from the request.
@@ -139,8 +144,8 @@ else:
 if cgHost:
     cdr2gk.host = cgHost
     # Temporary fix for Protocol_Patient PP
-    if flavor == 'Protocol_Patient':
-        cdr2cg.host = cgHost
+    ##if flavor == 'Protocol_Patient':
+    ##    cdr2cg.host = cgHost
 
 #----------------------------------------------------------------------
 # Debugging output.
@@ -248,7 +253,7 @@ showProgress("Fetched document type: %s..." % row[0])
 if not flavor:
     if docType == "Summary":                  flavor = "Summary"
     elif docType == "DrugInformationSummary": flavor = "DrugInfoSummary"
-    elif docType == "InScopeProtocol":        flavor = "Protocol"
+    elif docType == "InScopeProtocol":        flavor = "Protocol_HP"
     elif docType == "CTGovProtocol":          flavor = "CTGovProtocol"
     elif docType == "GlossaryTerm":           flavor = "GlossaryTerm"
     else: cdrcgi.bail("Publish preview only available for Summary, "
@@ -277,11 +282,11 @@ try:
         showProgress("Debug logging turned on...")
     showProgress("Submitting request to Cancer.gov...")
     # Temp fix to make Protocol_Patient PP work
-    if flavor == 'Protocol_Patient':
-        resp = cdr2cg.pubPreview(doc, flavor)
-    else:
-        resp = cdr2gk.pubPreview(doc, flavor)
-    #resp = cdr2gk.pubPreview(doc, flavor)
+    ##if flavor == 'Protocol_Patient':
+    ##    resp = cdr2cg.pubPreview(doc, flavor)
+    ##else:
+    ##    resp = cdr2gk.pubPreview(doc, flavor)
+    resp = cdr2gk.pubPreview(doc, flavor)
     showProgress("Response received from Cancer.gov...")
 except:
     cdrcgi.bail("Preview formatting failure")
