@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: Request1855.py,v 1.1 2005-10-27 13:51:21 bkline Exp $
+# $Id: Request1855.py,v 1.2 2008-02-21 21:29:41 bkline Exp $
 #
 # "I would like to get a list of unique InterventionType and InterventionName 
 # pairs for InscopeProtocols along with the Original Protocol Title. Please 
@@ -8,6 +8,9 @@
 # Combination.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2005/10/27 13:51:21  bkline
+# Reports on protocol by intervention.
+#
 #----------------------------------------------------------------------
 import cdrdb, cdrcgi, xml.sax.saxutils, sys, cgi
 
@@ -120,9 +123,9 @@ while row:
 cursor.execute("""\
 SELECT DISTINCT n.doc_id, n.value
            FROM query_term n
-           JOIN #t
-             ON n.doc_id = #t.t
-          WHERE n.path = '/Term/PreferredName'""", timeout = 300)
+          WHERE (n.doc_id IN (SELECT DISTINCT t FROM #t)
+             OR n.doc_id IN (SELECT DISTINCT i FROM #t))
+            AND n.path = '/Term/PreferredName'""", timeout = 300)
 row = cursor.fetchone()
 while row:
     tNames[row[0]] = row[1]
@@ -132,9 +135,12 @@ cursor.execute("SELECT * FROM #t")
 rows = []
 for row in cursor.fetchall():
     if nCols == 3:
-        rows.append((tNames[row[2]], tNames[row[1]], oTitles[row[0]]))
+        rows.append((tNames.get(row[2], "CAN'T FIND NAME FOR CDR%d" % row[2]),
+                     tNames.get(row[1], "CAN'T FIND NAME FOR CDR%d" % row[1]),
+                     oTitles[row[0]]))
     else:
-        rows.append((tNames[row[1]], tNames[row[0]]))
+        rows.append((tNames.get(row[1], "CAN'T FIND NAME FOR CDR%d" % row[1]),
+                     tNames.get(row[0], "CAN'T FIND NAME FOR CDR%d" % row[0])))
 rows.sort()
 #sys.stderr.write("%d report rows\n" % len(rows))
 if nCols == 3:
