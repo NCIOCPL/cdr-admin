@@ -1,17 +1,31 @@
 #----------------------------------------------------------------------
 #
-# $Id: MediaTrackingReport.py,v 1.2 2006-05-08 17:04:08 bkline Exp $
+# $Id: MediaTrackingReport.py,v 1.3 2008-02-22 20:28:15 venglisc Exp $
 #
 # We need a Media Tracking report.  This spreadsheet report will keep track of
 # the development and processing statuses of the Media documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2006/05/08 17:04:08  bkline
+# Changed file extension to wrong string (.xls) to work around IE bug.
+#
 # Revision 1.1  2006/05/04 14:07:43  bkline
 # Spreadsheet report to track processing of CDR Media documents.
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrdb, cdrcgi, string, time, xml.dom.minidom, xml.sax.saxutils
 import ExcelWriter, sys
+
+# ---------------------------------------------------------------------
+# Select the available diagnosis terms
+# ---------------------------------------------------------------------
+def getDiagnoses():
+    cursor.execute("""\
+      SELECT DISTINCT value
+        FROM query_term
+       WHERE path = '/Media/MediaContent/Diagnoses/Diagnosis'
+       ORDER BY value""")
+    return cursor.fetchall() 
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -20,6 +34,7 @@ fields   = cgi.FieldStorage()
 session  = fields and fields.getvalue("Session") or None
 fromDate = fields and fields.getvalue('FromDate') or None
 toDate   = fields and fields.getvalue('ToDate') or None
+diagnosis= fields and fields.getlist('Diagnosis') or None
 request  = cdrcgi.getRequest(fields)
 title    = "CDR Administration"
 instr    = "Media Tracking Report"
@@ -37,10 +52,16 @@ elif request == "Report Menu":
 elif request == "Log Out": 
     cdrcgi.logout(session)
 
+# ---------------------------------------------------------------------
+# Create Database connection
+# ---------------------------------------------------------------------
+conn = cdrdb.connect('CdrGuest')
+cursor = conn.cursor()
+
 #----------------------------------------------------------------------
 # Ask the user for the report parameters.
 #----------------------------------------------------------------------
-if not fromDate or not toDate:
+if not fromDate or not toDate or not diagnosis:
     now         = time.localtime(time.time())
     toDateNew   = time.strftime("%Y-%m-%d", now)
     then        = list(now)
@@ -50,6 +71,10 @@ if not fromDate or not toDate:
     fromDateNew = time.strftime("%Y-%m-%d", then)
     toDate      = toDate or toDateNew
     fromDate    = fromDate or fromDateNew
+
+    diagnoses   = getDiagnoses()
+    diagnoses[0]= [u'All']
+
     form        = """\
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
    <TABLE BORDER='0'>
@@ -62,11 +87,26 @@ if not fromDate or not toDate:
      <TD><B>End Date:&nbsp;</B></TD>
      <TD><INPUT NAME='ToDate' VALUE='%s'>&nbsp;</TD>
     </TR>
+    <TR>
+     <TD><B>Diagnosis:</B></TD>
+     <TD>
+      <SELECT NAME="Diagnosis" SIZE="10" MULTIPLE>
+""" % (cdrcgi.SESSION, session, fromDate, toDate)
+
+    for value in diagnoses:
+        form   += """\
+       <OPTION>%s</OPTION>
+""" % value[0]
+
+    form       += """\
+      </SELECT>
+     </TD>
+    </TR>
    </TABLE>
   </FORM>
  </BODY>
 </HTML>
-""" % (cdrcgi.SESSION, session, fromDate, toDate)
+"""
     cdrcgi.sendPage(header + form)
 
 #----------------------------------------------------------------------
@@ -147,6 +187,7 @@ class MediaDoc:
         self.docTitle = docTitle
         self.title = None
         self.sourceFilename = None
+        self.diagnoses = []
         self.summaries = []
         self.glossaryTerms = []
         self.statuses = []
@@ -182,6 +223,13 @@ class MediaDoc:
                             if grandchild.nodeName == 'SourceFilename':
                                 value = cdr.getTextContent(grandchild)
                                 self.sourceFilename = value.strip() or None
+            elif node.nodeName == 'MediaContent':
+                for child in node.childNodes:
+                    if child.nodeName == 'Diagnoses':
+                        for grandchild in child.childNodes:
+                            if grandchild.nodeName == 'Diagnosis':
+                                value = cdr.getTextContent(grandchild)
+                                self.diagnoses.append(value.strip()) or None
 
     def addToSheet(self, sheet, dateStyle, rowNum):
         summaries = []
@@ -192,14 +240,21 @@ class MediaDoc:
         for t in self.glossaryTerms:
             if t.termName:
                 glossaryTerms.append(t.termName)
+        diagnoses = []
+        for d in self.diagnoses:
+            diagnoses.append(d)
         flag = self.lastVersionPublishable and u'Y' or u'N'
         row = sheet.addRow(rowNum)
         mergeDown = len(self.statuses) - 1
         if mergeDown < 1:
             mergeDown = None
+        if self.sourceFilename:
+            titleCell = u'%s (%s)' % (self.title or u'', self.sourceFilename)
+        else:
+            titleCell = self.title or u''
         row.addCell(1, self.docId, 'Number', mergeDown = mergeDown)
-        row.addCell(2, self.title or u'', mergeDown = mergeDown)
-        row.addCell(3, self.sourceFilename or u'', mergeDown = mergeDown)
+        row.addCell(2, titleCell, mergeDown = mergeDown)
+        row.addCell(3, u', '.join(diagnoses), mergeDown = mergeDown)
         row.addCell(4, u', '.join(summaries), mergeDown = mergeDown)
         row.addCell(5, u', '.join(glossaryTerms), mergeDown = mergeDown)
         row.addCell(9, flag, mergeDown = mergeDown)
@@ -219,20 +274,31 @@ class MediaDoc:
 #----------------------------------------------------------------------
 # Create/display the report.
 #----------------------------------------------------------------------
-conn = cdrdb.connect('CdrGuest')
-cursor = conn.cursor()
+# If 'All' has been selected we need to submit the SQL statement 
+# without diagnosis filter.  Preparing the filter.
+# ---------------------------------------------------------------------
+if diagnosis[0] == 'All':
+    sqlDiagnosis = u''
+else:
+    sqlDiagnosis = u'AND q.value in (%s)' % \
+                     u','.join(["'%s'" % d for d in diagnosis])
+
 cursor.execute("""\
-    SELECT d.id, d.title, MIN(a.dt)
-      FROM document d
-      JOIN doc_type t
-        ON t.id = d.doc_type
-      JOIN audit_trail a
-        ON a.document = d.id
-     WHERE t.name = 'Media'
-  GROUP BY d.id, d.title
-    HAVING MIN(a.dt) BETWEEN '%s' AND DATEADD(s, -1, DATEADD(d, 1, '%s'))
-  ORDER BY d.title""" %
-               (fromDate, toDate), timeout = 300)
+         SELECT d.id, d.title, MAX(v.dt)
+           FROM document d
+           JOIN doc_type t
+             ON t.id = d.doc_type
+           JOIN doc_version v
+             ON v.id = d.id
+LEFT OUTER JOIN query_term q
+             ON d.id = q.doc_id
+            AND q.path = '/Media/MediaContent/Diagnoses/Diagnosis'
+          WHERE t.name = 'Media'
+             %s
+       GROUP BY d.id, d.title
+         HAVING MAX(v.dt) BETWEEN '%s' AND DATEADD(s, -1, DATEADD(d, 1, '%s'))
+       ORDER BY d.title
+""" % (sqlDiagnosis, fromDate, toDate), timeout = 300)
 
 #----------------------------------------------------------------------
 # Set up the spreadsheet.
@@ -272,8 +338,8 @@ row.addCell(1, subtitle, mergeAcross = 9, style = h2Style)
 row      = ws.addRow(3, thStyle, 27)
 headings = (
     'CDRID',
-    'Title',
-    'Sourcefile Name',
+    'Title (Sourcefile Name)',
+    'Diagnosis',
     'Proposed Summaries',
     'Proposed Glossary Terms',
     'Processing Status',
