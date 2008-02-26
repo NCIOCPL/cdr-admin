@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PubStatus.py,v 1.30 2008-01-17 16:03:36 venglisc Exp $
+# $Id: PubStatus.py,v 1.31 2008-02-26 23:47:24 venglisc Exp $
 #
 # Status of a publishing job.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.30  2008/01/17 16:03:36  venglisc
+# Modifying pushing information after completed job (Bug 3736)
+#
 # Revision 1.29  2007/12/28 22:41:29  venglisc
 # During the new Gatekeeper test phase we needed to be able to review
 # pushed documents even though the push job's status was 'Verifying' instead
@@ -235,11 +238,11 @@ def addRow(row):
     # --------------------------------------------------------------
     return """\
    <tr>
-    <td valign='top'><FONT COLOR='black'>%d</FONT></td>
-    <td valign='top'><FONT COLOR='black'>%d</FONT></td>
-    <td valign='top'><FONT COLOR='black'>%s</FONT></td>
-    <td valign='top'><FONT COLOR='black'>%s</FONT></td>
-    <td valign='top'><FONT COLOR='black'>%s</FONT></td>
+    <td valign='top'>%d</td>
+    <td valign='top'>%d</td>
+    <td valign='top'>%s</td>
+    <td valign='top'>%s</td>
+    <td valign='top'>%s</td>
    </tr>
 """ % (row[0], row[1], row[2], string.replace(row[3], ";", "; "), row[4])
 
@@ -289,11 +292,11 @@ def dispFilterFailures(flavor = 'full'):
        <TABLE>
         <TR>
          <TD ALIGN='right' NOWRAP><B>System Subset: &nbsp;</B></TD>
-         <TD><FONT COLOR='black'>%s</FONT></TD>
+         <TD>%s</TD>
         </TR>
         <TR>
          <TD ALIGN='right' NOWRAP><B>User Name: &nbsp;</B></TD>
-         <TD><FONT COLOR='black'>%s</FONT></TD>
+         <TD>%s</TD>
         </TR>
        </TABLE>
     """ % (rows[0][5], rows[0][6])
@@ -304,8 +307,8 @@ def dispFilterFailures(flavor = 'full'):
     <td width='10%%' valign='top'><B>Id</B></td>
     <td width='5%%'  valign='top'><B>Ver</B></td>
     <td width='15%%' valign='top'><B>Type</B></td>
-    <td width='50%%' valign='top'><B>Title</B></td>
-    <td width='25%%' valign='top'><B>Message</B></td>
+    <td width='40%%' valign='top'><B>Title</B></td>
+    <td width='35%%' valign='top'><B>Message</B></td>
     </tr>
 """
     # The warnings have been formatted with a "class=warning"
@@ -332,7 +335,7 @@ def dispFilterFailures(flavor = 'full'):
             cdrcgi.bail('Error: Valid values for flavor are: '
                         '"full", "warning", "error"')
 
-    html  += "</TABLE></BODY></HTML>"
+    html  += "</TABLE></FORM></BODY></HTML>"
 
     cdrcgi.sendPage(header + html.encode('utf8'))
 
