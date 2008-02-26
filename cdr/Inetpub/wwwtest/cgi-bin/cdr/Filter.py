@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: Filter.py,v 1.27 2005-10-28 21:05:39 venglisc Exp $
+# $Id: Filter.py,v 1.28 2008-02-26 23:32:14 venglisc Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.27  2005/10/28 21:05:39  venglisc
+# Added displayAudience variable to allow GlossaryTerm RS reports to
+# be displayed with only Patient or HP term definitions. (Bug 1883)
+#
 # Revision 1.26  2005/07/28 21:46:14  venglisc
 # Modified to allow CDRID to be entered without the prefix 'CDR'.
 #
@@ -278,16 +282,16 @@ if type(doc) == type(()):
 # Add a table row for an error or warning.
 #----------------------------------------------------------------------
 def addRow(type, line):
+    # Adding Type (Error/Warning), CDR-ID, Line#, Message
     line = line.split(":", 3)
     html = """\
    <tr>
     <td valign='top'>%s</td>
     <td valign='top'>%s</td>
-    <td valign='top' align='right'>%s</td>
-    <td valign='top' align='right'>%s</td>
+    <td valign='top'>%s</td>
     <td valign='top'>%s</td>
    </tr>
-""" % (type, line[0], line[1], line[2], line[3])
+""" % (type, line[0], line[1], line[2])
     return html
 
 #----------------------------------------------------------------------
@@ -298,16 +302,21 @@ if valFlag:
     idNum  = string.atoi(digits)
     errObj = cdrpub.validateDoc(doc, idNum)
     html = """\
+<!DOCTYPE HTML PUBLIC '-//W3C//DTD HTML 4.01 Transitional//EN'
+                      'http://www.w3.org/TR/html4/loose.dtd'>
 <html>
  <head>
-  <title>Validation results for CDR%010d</title>
+  <title>Validation results for CDR%d</title>
+  <meta http-equiv='Content-Type' content='text/html;charset=utf-8'>
+  <link rel='shortcut icon' href='/favicon.ico'>
+  <LINK TYPE='text/css' REL='STYLESHEET' HREF='/stylesheets/dataform.css'>
  </head>
  <body>
- <h2>Validation results for CDR%010d</h2>
+ <h2>Validation results for CDR%d</h2>
 """ % (idNum, idNum)
-    if not errObj.Warnings and not errObj.Errors and not filterWarning:
+    if not errObj and not filterWarning:
         html += """\
- <h3>Document comes out clean: no errors, no warnings!</h3>
+ <h3>Document is valid: no errors, no warnings!</h3>
 """
     else:
         html += """\
@@ -316,16 +325,16 @@ if valFlag:
     <th>Type</th>
     <th>Document</th>
     <th>Line</th>
-    <th>Position</th>
     <th>Message</th>
    </tr>
 """
         if filterWarning:
-            html += addRow('Warning', '%d.xml:0:0:%s' % (idNum, filterWarning))
-        for warning in errObj.Warnings:
-            html += addRow('Warning', warning)
-        for error in errObj.Errors:
-            html += addRow('Error', error)
+            html += addRow('Warning', '%d:0:0:%s' % (idNum, filterWarning))
+        for error in errObj:
+            html += addRow(error.level_name, '%d:%s:%s' % (idNum, 
+                                                         error.line,
+                                                         error.message))
+        html += " </table> "
     cdrcgi.sendPage(cdrcgi.unicodeToLatin1(html + """\
  </body>
 </html>
