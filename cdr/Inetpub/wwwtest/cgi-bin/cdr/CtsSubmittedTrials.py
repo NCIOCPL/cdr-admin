@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CtsSubmittedTrials.py,v 1.3 2007-12-27 20:26:40 bkline Exp $
+# $Id: CtsSubmittedTrials.py,v 1.4 2008-03-05 19:26:03 bkline Exp $
 #
 # CDR-side interface for reviewing CTS trials.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2007/12/27 20:26:40  bkline
+# Disabled link to QC page for CTS trials.
+#
 # Revision 1.2  2007/10/31 17:46:55  bkline
 # Modifications to support Oncore trials.
 #
@@ -12,9 +15,17 @@
 # Original production version for reviewing/importing CTS trials.
 #
 #----------------------------------------------------------------------
-import cgi, cdrcgi, urllib, xml.dom.minidom, cdr, re
+import cgi, cdrcgi, urllib, xml.dom.minidom, cdr, re, sys
 
 CTS_HOST = cdr.emailerHost()
+
+def sendPage(page, textType = 'html'):
+    output = u"""\
+Content-type: text/%s; charset=utf-8
+
+%s""" % (textType, page)
+    print output.encode('utf-8')
+    sys.exit(0)
 
 def makeFailureMessage(what):
     return makeExtra(cgi.escape(what), "fail")
@@ -214,7 +225,9 @@ class Trial:
                 u'<font face="Verdana" style="font-size:7pt" color="#003E9B">'
                 u'%s</font></td></tr></table>\';' %
                 (self.primaryKey, cgi.escape(self.primaryId),
-                 cgi.escape(self.title).replace("'", "\\'")))
+                 cgi.escape(self.title).replace("'", "\\'")
+                                       .replace("\r", "")
+                                       .replace("\n", " ")))
     def toHtml(self, styleClass):
         protocolId = self.primaryId or u"[No Protocol ID]"
         protocolId = cgi.escape(protocolId)
@@ -266,6 +279,8 @@ duplicate   = fields.getvalue('duplicate') or None
 primaryId   = fields.getvalue('primaryId') or None
 source      = fields.getvalue('source')    or 'CTS'
 extra       = u""
+if primaryId:
+    primaryId = unicode(primaryId, 'utf-8')
 if importDocId:
     extra = importDoc(importDocId, primaryId, session, source)
 elif duplicate:
@@ -355,4 +370,4 @@ html.append(u"""\
  </body>
 </html>
 """)
-cdrcgi.sendPage(u"".join(html))
+sendPage(u"".join(html))
