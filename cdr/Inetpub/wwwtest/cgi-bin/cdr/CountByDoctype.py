@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: CountByDoctype.py,v 1.1 2008-02-08 21:51:10 venglisc Exp $
+# $Id: CountByDoctype.py,v 1.2 2008-03-06 20:40:48 venglisc Exp $
 #
 # Report to list updated document by document type.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2008/02/08 21:51:10  venglisc
+# Inintial copy of report listing documents (and protocols) published
+# in the latest export job. (Bug 3912)
+#
 # Revision 1.1  2007/01/05 23:27:33  venglisc
 # Initial copy of publishing report by date.  (Bug 2111)
 #
@@ -280,7 +284,7 @@ report += """
 inScopeCount = getInScopeCount(jobID[0])
 inScopeKeys = inScopeCount.keys()
 inScopeKeys.sort()
-print ""
+#print ""
 
 report += """
    <div class="center">
@@ -342,7 +346,7 @@ report += """
 ctgovCount = getCTGovCount(jobID[0])
 ctgovKeys = ctgovCount.keys()
 ctgovKeys.sort()
-print ""
+#print ""
 
 report += """
    <div class="center">
