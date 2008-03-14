@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolMailerReqForm.py,v 1.28 2007-10-31 17:30:18 bkline Exp $
+# $Id: ProtocolMailerReqForm.py,v 1.29 2008-03-14 16:37:14 bkline Exp $
 #
 # Request form for all protocol mailers.
 #
@@ -17,6 +17,9 @@
 # publication job for the publishing daemon to find and initiate.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.28  2007/10/31 17:30:18  bkline
+# More tweaks to wording for publication mailer; adjusted cutoff date.
+#
 # Revision 1.27  2007/08/13 19:51:35  bkline
 # More tweaks to the wording of the publication notification emailer;
 # added support for non-ASCII characters in the email message.
@@ -689,7 +692,7 @@ Content-type: text/html
             try:
                 p = sendPubNotificationEmail(docId, nctId, cursor, conn)
                 recips = p.recips.values()
-                print """\
+                print (u"""\
    <tr>
     <td>%d</td>
     <td>%s</td>
@@ -698,7 +701,7 @@ Content-type: text/html
     <td>%s</td>
    </tr>""" % (docId, p.primaryId, nctId,
                "; ".join(r.email for r in recips),
-               ", ".join([`r.trackingDocId` for r in recips]))
+               ", ".join([`r.trackingDocId` for r in recips]))).encode('utf-8')
             except Exception, e:
                 print """\
    <tr>
