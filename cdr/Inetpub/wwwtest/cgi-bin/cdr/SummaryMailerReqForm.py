@@ -1,10 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryMailerReqForm.py,v 1.14 2007-05-25 13:49:46 kidderc Exp $
+# $Id: SummaryMailerReqForm.py,v 1.15 2008-03-21 15:40:20 kidderc Exp $
 #
 # Request form for generating PDQ Editorial Board Members Mailing.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.14  2007/05/25 13:49:46  kidderc
+# 3132. Fixed problem with board members who are Current members of a board
+# and not current members of another board showing up for the board that
+# they are not current members of.
+#
 # Revision 1.12  2007/04/20 19:16:52  kidderc
 # 3132. Minor cosmetic changes.
 #
@@ -343,9 +348,9 @@ class BoardSummary:
         delim = docTitle.find(';')
         if delim != -1:
             self.name = docTitle[:delim]
-        delim = self.name.find('(')
-        if delim != -1:
-            self.name = self.name[:delim]
+        #delim = self.name.find('(')
+        #if delim != -1:
+        #    self.name = self.name[:delim]
         self.name = self.name.strip()
 
 boards = {}
