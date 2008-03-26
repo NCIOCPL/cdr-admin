@@ -1,11 +1,16 @@
 #----------------------------------------------------------------------
 #
-# $Id: PublishPreview.py,v 1.33 2008-02-19 22:53:44 venglisc Exp $
+# $Id: PublishPreview.py,v 1.34 2008-03-26 20:43:57 venglisc Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.33  2008/02/19 22:53:44  venglisc
+# Reverting the work around allowing protocol patient publish preview
+# documents to be displayed properly.  These are now correctly handled
+# as part of the publish preview code. (Bug 2002)
+#
 # Revision 1.32  2008/01/23 20:59:53  venglisc
 # Removing previous changes in order to move to production the IE6 fix
 # for publish preview to shrink a page when printed so that its right
@@ -303,10 +308,38 @@ showProgress("Done...")
 # We are also adding a style to work around a IE6 bug that causes the 
 # document printed to be cut of on the right by shifting the entire
 # document to the left
+# We also need to modify the image links so that they are pulled from 
+# the CDR server.
 # ---------------------------------------------------------------------
-pattern3 = re.compile('<title>CDR Preview', re.DOTALL)
-pattern4 = re.compile('</head>', re.DOTALL)
 
+# Include the CDR-ID of the document to the HTML title
+# ----------------------------------------------------
+pattern3 = re.compile('<title>CDR Preview', re.DOTALL)
 html = pattern3.sub('<title>Publish Preview: CDR%s' % intId, resp.xmlResult)
+
+# Fix the print out so that it's not cut off in IE6
+# -------------------------------------------------
+pattern4 = re.compile('</head>', re.DOTALL)
 html = pattern4.sub('\n<!--[if IE 6]>\n<link rel="stylesheet" type="text/css" media="print" href="/stylesheets/ppprint.css">\n<![endif]-->\n</head>\n', html)
+
+# Make the SummaryRef elements clickable within the document
+# ----------------------------------------------------------
+pattern5 = re.compile('<a class="SummaryRef" href=".*?#Section_(.*?)"')
+html = pattern5.sub('<a class="SummaryRef" href="#Section_\g<1>"', html)
+
+# Replace the image links for the popup boxes to point to our CDR repository
+# --------------------------------------------------------------------------
+if html.find('gatekeeper2.cancer.gov/CDRPreviewWS') == -1:
+    pp_host = cdr.DEV_HOST
+else:
+    pp_host = cdr.PROD_HOST
+
+pattern6 = re.compile('imageName=http://(.*?)/images/cdr/live/CDR(.*?)-(.*?)\.jpg')
+html = pattern6.sub('imageName=http://%s/cgi-bin/cdr/GetCdrImage.py?id=\g<2>-\g<3>.jpg' % pp_host, html)
+
+# Replace the image for the popup boxes to point to our CDR repository
+# --------------------------------------------------------------------
+pattern7 = re.compile('src="http://(.*?)/images/cdr/live/CDR(.*?)-(.*?)\.jpg"')
+html = pattern7.sub('src="http://%s/cgi-bin/cdr/GetCdrImage.py?id=CDR\g<2>-\g<3>.jpg' % pp_host, html)
+
 cdrcgi.sendPage("%s" % html)
