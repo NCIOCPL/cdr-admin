@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: CtsSubmittedTrials.py,v 1.4 2008-03-05 19:26:03 bkline Exp $
+# $Id: CtsSubmittedTrials.py,v 1.5 2008-04-17 18:41:59 bkline Exp $
 #
 # CDR-side interface for reviewing CTS trials.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2008/03/05 19:26:03  bkline
+# Workaround for protocol titles in which the submitter has embedded
+# newlines for some reason.
+#
 # Revision 1.3  2007/12/27 20:26:40  bkline
 # Disabled link to QC page for CTS trials.
 #
@@ -15,7 +19,7 @@
 # Original production version for reviewing/importing CTS trials.
 #
 #----------------------------------------------------------------------
-import cgi, cdrcgi, urllib, xml.dom.minidom, cdr, re, sys
+import cgi, cdrcgi, urllib, xml.dom.minidom, cdr, re, sys, cdrdb
 
 CTS_HOST = cdr.emailerHost()
 
@@ -111,9 +115,29 @@ def addSupplementaryInfoDoc(match):
     docId = cdr.exNormalize(resp[0])[1]
     return "cdr:ref='CDR%010d'" % docId
 
-def markDuplicate(publicId, primaryId, session, source):
+def markDuplicate(publicId, primaryId, session, source, duplicateOf = ""):
+    if source == 'Oncore':
+        try:
+            dupId = re.sub("[^\\d]+", "", duplicateOf)
+        except:
+            return makeFailureMessage(u"%s: %s is not a protocol document" %
+                                      (primaryId, duplicateOf))
+        cursor = cdrdb.connect('CdrGuest').cursor()
+        cursor.execute("""\
+            SELECT t.name
+              FROM doc_type t
+              JOIN document d
+                ON t.id = d.doc_type
+             WHERE d.id = ?""", dupId)
+        rows = cursor.fetchall()
+        if not rows or rows[0][0] not in ('InScopeProtocol',
+                                          'OutOfScopeProtocol',
+                                          'CTGovProtocol'):
+            return makeFailureMessage(u"%s: %s is not a protocol document" %
+                                      (primaryId, duplicateOf))
     f = urllib.urlopen('http://%s/u/cts-mark-trial-duplicate.py?id=%s'
-                       '&source=%s' % (CTS_HOST, publicId, source))
+                       '&source=%s&duplicateOf=%s' % (CTS_HOST, publicId,
+                                                      source, dupId))
     doc = f.read()
     if "TRIAL MARKED AS DUPLICATE" not in doc:
         return makeFailureMessage(u"%s: %s" % (primaryId, doc))
@@ -276,6 +300,7 @@ fields      = cgi.FieldStorage()
 session     = cdrcgi.getSession(fields)    or "guest"
 importDocId = fields.getvalue('importDoc') or None
 duplicate   = fields.getvalue('duplicate') or None
+duplicateOf = fields.getvalue('duplicateOf') or ""
 primaryId   = fields.getvalue('primaryId') or None
 source      = fields.getvalue('source')    or 'CTS'
 extra       = u""
@@ -284,7 +309,7 @@ if primaryId:
 if importDocId:
     extra = importDoc(importDocId, primaryId, session, source)
 elif duplicate:
-    extra = markDuplicate(duplicate, primaryId, session, source)
+    extra = markDuplicate(duplicate, primaryId, session, source, duplicateOf)
 
 url = 'http://%s/u/cts-submitted-trials.py?source=%s' % (CTS_HOST, source)
 f = urllib.urlopen(url)
@@ -329,13 +354,22 @@ html = [u"""\
         }
     }
     function markDup(whichTrial, primaryId) {
-        if (window.confirm("Mark " + primaryId + " as Duplicate?")) {
-            var form = document.forms[0];
-            form.duplicate.value = whichTrial;
-            form.primaryId.value = primaryId;
-            form.importDoc.value = '';
-            form.submit();
+        var form = document.forms[0];
+        var source = form.source.value;
+        if (source == 'Oncore') {
+            var dup = prompt("Please enter CDR ID of duplicated document");
+            if (!dup)
+                return;
+            form.duplicateOf.value = dup;
         }
+        else {
+            if (!window.confirm("Mark " + primaryId + " as Duplicate?"))
+                return;
+        }
+        form.duplicate.value = whichTrial;
+        form.primaryId.value = primaryId;
+        form.importDoc.value = '';
+        form.submit();
     }
     function sendLetter() { window.alert('Not yet implemented'); }
    -->
@@ -346,6 +380,7 @@ html = [u"""\
    <input type='hidden' name='importDoc' value='' />
    <input type='hidden' name='primaryId' value='' />
    <input type='hidden' name='duplicate' value='' />
+   <input type='hidden' name='duplicateOf' value='' />
    <input type='hidden' name='Session' value='%s' />
    <input type='hidden' name='source' value='%s' />
   </form>
