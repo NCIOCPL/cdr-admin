@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CiatCipsStaff.py,v 1.6 2007-10-22 16:02:15 bkline Exp $
+# $Id: CiatCipsStaff.py,v 1.7 2008-04-17 18:55:40 bkline Exp $
 #
 # Main menu for CIAT/CIPS staff.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2007/10/22 16:02:15  bkline
+# Added Oncore report.
+#
 # Revision 1.5  2007/06/14 20:08:54  bkline
 # Plugged in command to upload GENETICSPROFESSIONAL documents.
 #
@@ -49,22 +52,12 @@ items   = (('AdvancedSearch.py', 'Advanced Search',       ''               ),
            ('GlobalChange.py',   'Global Changes',        ''               ),
            ('FtpImages.py',      'Images Download',       ''               ),
            ('Mailers.py',        'Mailers',               ''               ),
-           ('CtsSubmittedTrials.py', 'New Oncore Trials', '&source=Oncore' ),
+           ('NewTrialsSubmission.py', 'New Trials Submission', '' ),
            ('MergeProt.py',      'Protocol Merge',        ''               ),
            ('Reports.py',        'Reports',               ''               ),
-           ('CtsSubmittedTrials.py', 'Submitted Trials Review', '' ),
            ('EditExternMap.py',  'Update Mapping Table', '' ),
            ('UploadGPSet.py',    'Upload GENETICSPROFESSIONAL Document Set', '')
            )
-#items   = (('AdvancedSearch.py', 'Advanced Search'      ),
-#           ('Reports.py',        'Reports'              ),
-#           ('MergeProt.py',      'Protocol Merge'       ),
-#           ('CTGov.py',          'CTGov Protocols'      ),
-#           ('EditExternMap.py',  'Update Mapping Table' ),
-#           ('Mailers.py',        'Mailers'              ),
-#           ('GlobalChange.py',   'Global Changes'       ),
-#           ('getBatchStatus.py', 'Batch Job Status'     )
-#           )
 for item in items:
     html += """\
     <li><a href='%s/%s%s%s'>%s</a></li>
