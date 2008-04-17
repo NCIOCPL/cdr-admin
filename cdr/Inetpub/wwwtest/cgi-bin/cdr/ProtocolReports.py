@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolReports.py,v 1.33 2007-10-22 15:58:10 bkline Exp $
+# $Id: ProtocolReports.py,v 1.34 2008-04-17 18:43:25 bkline Exp $
 #
 # Submenu for protocol reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.33  2007/10/22 15:58:10  bkline
+# Restructuring for Sheri (request 3700).
+#
 # Revision 1.32  2007/07/31 12:12:52  bkline
 # Added NCIC import report.
 #
@@ -165,6 +168,8 @@ for r in (('ApprovedNotYetActive.py',
            'NCI Liaison Office/Brussels Protocol Report', ''),
           ('Request2862.py', 
            'NCI Liaison Office Trial Contacts for Abstract Review', ''),
+          ('Request3935.py',
+           "Non-Drug/Agent Protocol Interventions", ''),
           ('PreferredProtOrgs.py', 
            'Preferred Protocol Organizations', ''),
           ('NciClinicalTrialsStats.py', 
