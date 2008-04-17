@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: Request1855.py,v 1.2 2008-02-21 21:29:41 bkline Exp $
+# $Id: Request1855.py,v 1.3 2008-04-17 19:17:36 bkline Exp $
 #
 # "I would like to get a list of unique InterventionType and InterventionName 
 # pairs for InscopeProtocols along with the Original Protocol Title. Please 
@@ -8,6 +8,10 @@
 # Combination.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2008/02/21 21:29:41  bkline
+# Added some protection against data problems (e.g., links to deleted
+# documents).
+#
 # Revision 1.1  2005/10/27 13:51:21  bkline
 # Reports on protocol by intervention.
 #
@@ -37,7 +41,7 @@ SELECT DISTINCT t.doc_id
              ON t.int_val = s.doc_id
           WHERE s.path = '/Term/PreferredName'
             AND s.value = 'Drug/agent combination'
-            AND t.path = '/Term/SemanticType/@cdr:ref'""", timeout = 300)
+            AND t.path = '/Term/SemanticType/@cdr:ref'""", timeout = 600)
 conn.commit()
 #sys.stderr.write("%d #drug_combo rows\n" % cursor.rowcount)
 if nCols == 3:
@@ -55,7 +59,7 @@ SELECT DISTINCT i.doc_id, i.int_val, t.int_val
             AND i.path = '/InScopeProtocol/ProtocolDetail/StudyCategory'
                        + '/Intervention/InterventionNameLink/@cdr:ref'
             AND i.int_val NOT IN (SELECT id FROM #drug_combo)""",
-                                  timeout = 300)
+                                  timeout = 600)
     conn.commit()
     #sys.stderr.write("%d #t rows\n" % cursor.rowcount)
     cursor.execute("""\
@@ -68,7 +72,7 @@ LEFT OUTER JOIN query_term t
              ON o.doc_id = t.doc_id
             AND t.path = '/InScopeProtocol/ProtocolTitle/@Type'
             AND t.value = 'Original'
-            AND LEFT(o.node_loc, 8) = LEFT(t.node_loc, 8)""", timeout = 300)
+            AND LEFT(o.node_loc, 8) = LEFT(t.node_loc, 8)""", timeout = 600)
     oTitles = {}
     row = cursor.fetchone()
     while row:
@@ -105,7 +109,7 @@ SELECT DISTINCT i.int_val, t.int_val
             AND i.path = '/InScopeProtocol/ProtocolDetail/StudyCategory'
                        + '/Intervention/InterventionNameLink/@cdr:ref'
             AND i.int_val NOT IN (SELECT id FROM #drug_combo)""",
-                                  timeout = 300)
+                                  timeout = 600)
     conn.commit()
     #sys.stderr.write("%d #t rows\n" % cursor.rowcount)
 
@@ -114,7 +118,7 @@ SELECT DISTINCT n.doc_id, n.value
            FROM query_term n
            JOIN #t
              ON n.doc_id = #t.i
-          WHERE n.path = '/Term/PreferredName'""", timeout = 300)
+          WHERE n.path = '/Term/PreferredName'""", timeout = 600)
 tNames = {}
 row = cursor.fetchone()
 while row:
@@ -125,7 +129,7 @@ SELECT DISTINCT n.doc_id, n.value
            FROM query_term n
           WHERE (n.doc_id IN (SELECT DISTINCT t FROM #t)
              OR n.doc_id IN (SELECT DISTINCT i FROM #t))
-            AND n.path = '/Term/PreferredName'""", timeout = 300)
+            AND n.path = '/Term/PreferredName'""", timeout = 600)
 row = cursor.fetchone()
 while row:
     tNames[row[0]] = row[1]
