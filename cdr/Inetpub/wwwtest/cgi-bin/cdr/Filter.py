@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: Filter.py,v 1.28 2008-02-26 23:32:14 venglisc Exp $
+# $Id: Filter.py,v 1.29 2008-04-22 17:57:44 venglisc Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.28  2008/02/26 23:32:14  venglisc
+# Modifications to use Lxml as our validator instead of pyXML.
+# Minor modifications to make HTML output valid.  (Bug 3923)
+#
 # Revision 1.27  2005/10/28 21:05:39  venglisc
 # Added displayAudience variable to allow GlossaryTerm RS reports to
 # be displayed with only Patient or HP term definitions. (Bug 1883)
@@ -149,10 +153,26 @@ displayAudience += (fields.getvalue('glosshp') == 'true') and 'hp' or ''
 
 vendorOrQC = (fields.getvalue('QC') == 'true') and 'QC' or ''
 vendorOrQC += fields.getvalue('vendorOrQC') or '' # vendorOrQC from links.
-displayComments = (fields.getvalue('comments') == 'true') and 'Y' or 'N'
-displayGlossary = (fields.getvalue('glossary') == 'true') and 'Y' or 'N'
-displayStdWord  = (fields.getvalue('stdword')  == 'true') and 'Y' or 'N'
+displayIComments = (fields.getvalue('internal') == 'true') and 'Y' or None
+displayEComments = (fields.getvalue('external') == 'true') and 'Y' or None
+displayGlossary  = (fields.getvalue('glossary') == 'true') and 'Y' or 'N'
+displayStdWord   = (fields.getvalue('stdword')  == 'true') and 'Y' or 'N'
           # empty insRevLevels is expected.
+
+# ---------------------------------------------------------------
+# Passing a single parameter to the filter to decide if only the 
+# internal, external, all, or none of the comments should be
+# displayed.
+# ---------------------------------------------------------------
+if not displayIComments and not displayEComments:
+    displayComments = 'N'  # No comments
+elif displayIComments and not displayEComments:
+    displayComments = 'I'  # Internal comments only
+elif not displayIComments and displayEComments:
+    displayComments = 'E'  # External comments only (default)
+else:
+    displayComments = 'A'  # All comments
+
 filterParm = [['insRevLevels',            insRevLevels],
               ['delRevLevels',            delRevLevels],
               ['DisplayComments',         displayComments],
