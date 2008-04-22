@@ -1,6 +1,6 @@
 <!DOCTYPE HTML PUBLIC '-//W3C//DTD HTML 4.01 Transitional//EN'
                       'http://www.w3.org/TR/html4/loose.dtd'>
-<!-- $Id: CdrFilter.html,v 1.9 2007-12-13 22:08:07 venglisc Exp $ -->
+<!-- $Id: CdrFilter.html,v 1.10 2008-04-22 17:52:34 venglisc Exp $ -->
 <HTML>
  <HEAD>
   <TITLE>CDR Document Filtering</TITLE>
@@ -8,66 +8,68 @@
   <link rel='shortcut icon' href='/favicon.ico'>
   <LINK TYPE='text/css' REL='STYLESHEET' HREF='/stylesheets/dataform.css'>
   <style type='text/css'>
-    body      { background-color: #EFEFEF; }
+    body      { background-color: #DFDFDF; }
     *.banner  { background-color: silver;
                 background-image: url(/images/nav1.jpg); }
   </style>
   <SCRIPT TYPE='text/javascript' LANGUAGE='JavaScript'>
    <!--
     function filterDoc(doValidate) {
-        var base  = "/cgi-bin/cdr/Filter.py";  
-        var doc   = document.FilterRequest.DocId.value;
-        var ver   = document.FilterRequest.DocVer.value;
-        var filt  = document.FilterRequest.Filter.value;
-        var filt1 = document.FilterRequest.Filter1.value;
-        var filt2 = document.FilterRequest.Filter2.value;
-        var filt3 = document.FilterRequest.Filter3.value;
-        var filt4 = document.FilterRequest.Filter4.value;
-        var filt5 = document.FilterRequest.Filter5.value;
-        var filt6 = document.FilterRequest.Filter6.value;
-        var filt7 = document.FilterRequest.Filter7.value;
-        var filt8 = document.FilterRequest.Filter8.value;
-        var filt9 = document.FilterRequest.Filter9.value;
+        var base   = "/cgi-bin/cdr/Filter.py";  
+        var doc    = document.FilterRequest.DocId.value;
+        var ver    = document.FilterRequest.DocVer.value;
+        var filt   = document.FilterRequest.Filter.value;
+        var filt1  = document.FilterRequest.Filter1.value;
+        var filt2  = document.FilterRequest.Filter2.value;
+        var filt3  = document.FilterRequest.Filter3.value;
+        var filt4  = document.FilterRequest.Filter4.value;
+        var filt5  = document.FilterRequest.Filter5.value;
+        var filt6  = document.FilterRequest.Filter6.value;
+        var filt7  = document.FilterRequest.Filter7.value;
+        var filt8  = document.FilterRequest.Filter8.value;
+        var filt9  = document.FilterRequest.Filter9.value;
         var filt10 = document.FilterRequest.Filter10.value;
-        var edt   = document.FilterRequest.editorial.checked;
-        var adv   = document.FilterRequest.advisory.checked;
-        var gpt   = document.FilterRequest.glosspatient.checked;
-        var ghp   = document.FilterRequest.glosshp.checked;
-        var pub   = document.FilterRequest.publish.checked;
-        var app   = document.FilterRequest.approved.checked;
-        var pro   = document.FilterRequest.proposed.checked;      
-        var cmt   = document.FilterRequest.comments.checked;
-        var gls   = document.FilterRequest.glossary.checked;
-        var std   = document.FilterRequest.stdword.checked;
-        var mrk   = document.FilterRequest.rsmarkup[0].checked;
-        var port  = document.FilterRequest.port.value;      
-      //var uid   = document.FilterRequest.UserName.value;
-      //var pwd   = document.FilterRequest.Password.value;
-        var url   = base + "?DocId=" + doc
-                  + "&DocVer=" + ver
-                  + "&editorial=" + edt
-                  + "&advisory=" + adv
-                  + "&glosspatient=" + gpt
-                  + "&glosshp=" + ghp
-                  + "&publish=" + pub
-                  + "&approved=" + app
-                  + "&proposed=" + pro
-                  + "&comments=" + cmt
-		          + "&rsmarkup=" + mrk
-                  + "&glossary=" + gls
-                  + "&stdword=" + std               
-                  + "&port=" + port               
-                  + "&Filter=" + filt
-                  + "&Filter1=" + filt1
-                  + "&Filter2=" + filt2
-                  + "&Filter3=" + filt3
-                  + "&Filter4=" + filt4
-                  + "&Filter5=" + filt5
-                  + "&Filter6=" + filt6
-                  + "&Filter7=" + filt7
-                  + "&Filter8=" + filt8
-                  + "&Filter9=" + filt9
-                  + "&Filter10=" + filt10
+        var edt    = document.FilterRequest.editorial.checked;
+        var adv    = document.FilterRequest.advisory.checked;
+        var gpt    = document.FilterRequest.glosspatient.checked;
+        var ghp    = document.FilterRequest.glosshp.checked;
+        var pub    = document.FilterRequest.publish.checked;
+        var app    = document.FilterRequest.approved.checked;
+        var pro    = document.FilterRequest.proposed.checked;      
+        var icmt   = document.FilterRequest.internal.checked;
+        var ecmt   = document.FilterRequest.external.checked;
+        var gls    = document.FilterRequest.glossary.checked;
+        var std    = document.FilterRequest.stdword.checked;
+        var mrk    = document.FilterRequest.rsmarkup[0].checked;
+        var port   = document.FilterRequest.port.value;      
+      //var uid    = document.FilterRequest.UserName.value;
+      //var pwd    = document.FilterRequest.Password.value;
+        var url    = base + "?DocId=" + doc
+                   + "&DocVer=" + ver
+                   + "&editorial=" + edt
+                   + "&advisory=" + adv
+                   + "&glosspatient=" + gpt
+                   + "&glosshp=" + ghp
+                   + "&publish=" + pub
+                   + "&approved=" + app
+                   + "&proposed=" + pro
+                   + "&internal=" + icmt
+                   + "&external=" + ecmt
+		           + "&rsmarkup=" + mrk
+                   + "&glossary=" + gls
+                   + "&stdword=" + std               
+                   + "&port=" + port               
+                   + "&Filter=" + filt
+                   + "&Filter1=" + filt1
+                   + "&Filter2=" + filt2
+                   + "&Filter3=" + filt3
+                   + "&Filter4=" + filt4
+                   + "&Filter5=" + filt5
+                   + "&Filter6=" + filt6
+                   + "&Filter7=" + filt7
+                   + "&Filter8=" + filt8
+                   + "&Filter9=" + filt9
+                   + "&Filter10=" + filt10
       //          + "&UserName=" + uid + "&Password=" + pwd
             ;
         if (doValidate == 1) {
@@ -88,8 +90,7 @@
    -->
   </SCRIPT>
  </HEAD>
- <BODY class='banner'
-       BGCOLOR='lightgrey'>
+ <BODY>
   <FORM ACTION='/cgi-bin/cdr/Filter.py' 
         METHOD='POST' 
         NAME='FilterRequest'>
@@ -213,17 +214,36 @@
     </TR>    
     <TR>
      <TD ALIGN='right' COLSPAN='1'>
-      <B>Include: </B>
+      <B>Comments: </B>
      </TD>
      <TD>
       <TABLE border='0' width='100%'>
        <TR>
         <TD width='25%' align='right'>
-	     <B>Comments</B>
+	     <B>Internal</B>
 	    </TD>
         <TD width='5%'>
-         <INPUT TYPE="checkbox" NAME="comments" CHECKED>
+         <INPUT TYPE="checkbox" NAME="internal" CHECKED>
 	    </TD>
+        <TD width='25%' align='right'>
+	     <B>External</B>
+	    </TD>
+        <TD width='5%'>
+         <INPUT TYPE="checkbox" NAME="external" CHECKED>
+	    </TD>
+	    <TD width='25%' align='right'></TD>
+	    <TD width='5%' align='right'></TD>
+       </TR>
+      </TABLE>
+     </TD>
+    </TR>
+    <TR>
+     <TD ALIGN='right' COLSPAN='1'>
+      <B>Include: </B>
+     </TD>
+     <TD>
+      <TABLE border='0' width='100%'>
+       <TR>
         <TD width='25%' align='right'>
 	     <B>GlossTerms</B>
 	    </TD>
@@ -236,6 +256,8 @@
         <TD width='5%'>
          <INPUT TYPE="checkbox" NAME="stdword">
 	    </TD>
+	    <TD width='25%' align='right'></TD>
+	    <TD width='5%' align='right'></TD>
        </TR>
       </TABLE>
      </TD>
