@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: NewlyPublishedTrials2.py,v 1.2 2006-09-28 15:11:20 bkline Exp $
+# $Id: NewlyPublishedTrials2.py,v 1.3 2008-04-23 12:33:56 bkline Exp $
 #
 # "We need a newly published trials report which lists InScope Protocol
 # and CTGov trials that have published versions, but do not have a
@@ -16,6 +16,9 @@
 # over two years ago.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2006/09/28 15:11:20  bkline
+# Logic modified at Sheri's request (see comment #10 of issue #2443).
+#
 # Revision 1.1  2006/09/28 11:56:43  bkline
 # Request #2443.
 #
@@ -95,6 +98,7 @@ class Protocol:
         self.studyCats          = set()
         self.specialCats        = set()
         self.sourceNames        = set()
+        self.submissionComplete = set()
 
 inScope    = {}
 ctGov      = {}
@@ -182,6 +186,7 @@ def addWorksheet(workbook, title, headers, widths, prots):
         prot.studyCats   = createSortedList(prot.studyCats)
         prot.specialCats = createSortedList(prot.specialCats)
         prot.sourceNames = createSortedList(prot.sourceNames)
+        prot.submissionComplete = createSortedList(prot.submissionComplete)
     def sorter(a, b):
         result = cmp(prots[a].studyCats, prots[b].studyCats)
         if result:
@@ -211,6 +216,9 @@ def addWorksheet(workbook, title, headers, widths, prots):
                 worksheet.write([r, c], fixList(prot.sourceNames), lformat)
                 c += 1
                 worksheet.write([r, c], fixString(prot.reviewApprovalType),
+                                lformat)
+                c += 1
+                worksheet.write([r, c], fixList(prot.submissionComplete),
                                 lformat)
                 c += 1
             worksheet.write([r, c], prot.date and prot.date[:10] or "",
@@ -378,6 +386,21 @@ for docId, value in cursor.fetchall():
 show("protocol source names added")
 
 #----------------------------------------------------------------------
+# New column requested by Sheri (#4057).
+#----------------------------------------------------------------------
+cursor.execute("""\
+    SELECT q.doc_id, q.value
+      FROM query_term q
+      JOIN #trials t
+        ON t.id = q.doc_id
+     WHERE q.path = '/InScopeProtocol/ProtocolSources/ProtocolSource'
+                  + '/DateSubmissionComplete'""", timeout = 300)
+for docId, value in cursor.fetchall():
+    date = value.strip()
+    prots[docId].submissionComplete.add(date)
+show("submission completion dates added")
+
+#----------------------------------------------------------------------
 # Create the report.
 #----------------------------------------------------------------------
 t = time.strftime("%Y%m%d%H%M%S")
@@ -413,12 +436,12 @@ titles  = ('InScope', 'CTGov')
 headers = (
     ('DocID', 'ProtocolID','Study Category', 'Special Category',
      'Current\nProtocol\nStatus', 'Source', 'Approval',
-     'Date\nPublished', 'User'),
+     'Date\nSubmission\nComplete', 'Date\nPublished', 'User'),
     ('DocID', 'OrgStudyID', 'Study Category', 'Overall\nStatus',
      'Date Published', 'User')
     )
 widths  = (
-    (9.71, 25.29, 18.43, 18.43, 18.43, 18.43, 18.43, 18, 12),
+    (9.71, 25.29, 18.43, 18.43, 18.43, 18.43, 18.43, 18, 18, 12),
     (9.71, 25.29, 18.43, 18.43, 18, 12)
     )
 addTotalsSheet(workbook, prots, inScope, ctGov)
