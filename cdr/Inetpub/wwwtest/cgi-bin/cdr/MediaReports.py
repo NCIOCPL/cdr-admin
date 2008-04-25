@@ -1,8 +1,11 @@
 #----------------------------------------------------------------------
 #
-# $Id: MediaReports.py,v 1.4 2007-05-18 20:18:29 venglisc Exp $
+# $Id: MediaReports.py,v 1.5 2008-04-25 02:26:09 ameyer Exp $
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2007/05/18 20:18:29  venglisc
+# Added new menu item for Linked Media Documents report. (Bug 3226)
+#
 # Revision 1.3  2006/05/08 18:18:40  bkline
 # Added Media Tracking Report, and some rewording (at Margaret's request);
 # see request 2135.
@@ -40,7 +43,7 @@ elif action == SUBMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if action == "Log Out": 
+if action == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
@@ -68,6 +71,7 @@ form += """\
 
 for choice in(
               ('MediaTrackingReport.py', 'Media Tracking Report'),
+              ('MediaCaptionContent.py', 'Media Caption and Content Report'),
               ('MediaLinks.py',          'Linked Media Documents'),
              ):
     form += """
