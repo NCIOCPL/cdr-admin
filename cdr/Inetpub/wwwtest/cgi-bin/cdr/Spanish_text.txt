@@ -1,0 +1,8 @@
+Consultar el Registro de Ensayos Clínicos sobre Cáncer del PDQ del NCI
+(NCI's PDQ Cancer Clinical Trials Registry) para acceder a los ensayos
+clínicos que se realizan actualmente en los Estados Unidos y que aceptan
+pacientes de cáncer de X.  La lista de ensayos clínicos se puede reducir si
+se especifican la localidad, el medicamento, el procedimiento y otros
+criterios.  Nota: los resultados obtenidos solo estarán disponibles en
+inglés.
+
