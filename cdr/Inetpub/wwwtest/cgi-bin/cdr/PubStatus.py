@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: PubStatus.py,v 1.31 2008-02-26 23:47:24 venglisc Exp $
+# $Id: PubStatus.py,v 1.32 2008-04-28 16:48:59 venglisc Exp $
 #
 # Status of a publishing job.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.31  2008/02/26 23:47:24  venglisc
+# Minor modifications to FilterFailure output to make HTML valid and display
+# validation messages. (Bug 3923)
+#
 # Revision 1.30  2008/01/17 16:03:36  venglisc
 # Modifying pushing information after completed job (Bug 3736)
 #
@@ -236,7 +240,7 @@ def addRow(row):
     # table formatting to be off due to too words that couldn't be
     # wrapped within the given column width.
     # --------------------------------------------------------------
-    return """\
+    return u"""\
    <tr>
     <td valign='top'>%d</td>
     <td valign='top'>%d</td>
@@ -282,13 +286,13 @@ def dispFilterFailures(flavor = 'full'):
     except cdrdb.Error, info:
         cdrcgi.bail("Failure retrieving job information: %s" % info[1][0])
 
-    title   = "CDR Publishing Filter Failures"
-    instr   = "Job Number %d" % jobId
+    title   = u'CDR Publishing Filter Failures'
+    instr   = u'Job Number %d' % jobId
     buttons = []
     header  = cdrcgi.header(title, title, instr, None, buttons)
     if not rows:
         cdrcgi.bail("Job%s finished without Failure" % jobId)
-    html    = """\
+    html    = u"""\
        <TABLE>
         <TR>
          <TD ALIGN='right' NOWRAP><B>System Subset: &nbsp;</B></TD>
@@ -301,8 +305,8 @@ def dispFilterFailures(flavor = 'full'):
        </TABLE>
     """ % (rows[0][5], rows[0][6])
 
-    html   += "<BR><TABLE BORDER=1>"
-    html   += """\
+    html   += u"<BR><TABLE BORDER=1>"
+    html   += u"""\
    <tr>
     <td width='10%%' valign='top'><B>Id</B></td>
     <td width='5%%'  valign='top'><B>Ver</B></td>
@@ -314,7 +318,9 @@ def dispFilterFailures(flavor = 'full'):
     # The warnings have been formatted with a "class=warning"
     # attribute for the LI element.
     # -------------------------------------------------------
-    textPattern = re.compile('<LI class="(.*)</LI>')
+    textPattern = re.compile(u'<LI class="(.*)</LI>')
+    textPattern2 = re.compile(u'<Messages><message>')
+    textPattern3 = re.compile(u'</message></Messages>')
 
     for row in rows:
         text = textPattern.search(row[4])
@@ -335,9 +341,12 @@ def dispFilterFailures(flavor = 'full'):
             cdrcgi.bail('Error: Valid values for flavor are: '
                         '"full", "warning", "error"')
 
-    html  += "</TABLE></FORM></BODY></HTML>"
+    html  += u'</TABLE></FORM></BODY></HTML>'
+    html   = textPattern2.sub(u'<UL style="padding: 0px; margin: 0px; margin-left: 20px">', 
+                                       html)
+    html   = textPattern3.sub(u'</UL>', html)
 
-    cdrcgi.sendPage(header + html.encode('utf8'))
+    cdrcgi.sendPage(header + html)
 
 #----------------------------------------------------------------------
 # Display the job parameters.
