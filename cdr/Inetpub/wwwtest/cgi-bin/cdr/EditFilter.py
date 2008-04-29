@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditFilter.py,v 1.20 2007-11-03 14:15:07 bkline Exp $
+# $Id: EditFilter.py,v 1.21 2008-04-29 19:57:34 ameyer Exp $
 #
 # Prototype for editing CDR filter documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.20  2007/11/03 14:15:07  bkline
+# Unicode encoding cleanup (issue #3716).
+#
 # Revision 1.19  2006/10/18 22:53:29  venglisc
 # Modified error message. (Bug 2561)
 #
@@ -131,7 +134,7 @@ def debugLog(what):
             f.close()
         except Exception, info:
             cdrcgi.bail("Failure writing to %s: %s" % (logName, str(info)))
-    
+
 #----------------------------------------------------------------------
 # Display the CDR document form.
 #----------------------------------------------------------------------
@@ -140,7 +143,7 @@ def showForm(doc, subBanner, buttons):
                         numBreaks = 1)
     html = hdr + u"""\
    <input name='version' type='checkbox'%s>
-   Create new version for Save, Checkin or Clone? 
+   Create new version for Save, Checkin or Clone?
    <table border=0>
     <tr>
      <td align='right' nowrap=1>CVS user ID:&nbsp;</td>
@@ -159,7 +162,7 @@ def showForm(doc, subBanner, buttons):
      <td><input name='bachid'> Must be specified until Filter is migrated!</td>
     </tr>
    </table>
-    (Fill in CVS user ID, password, and comment if you are 
+    (Fill in CVS user ID, password, and comment if you are
      creating a new version.)
    <br>
    <br>
@@ -216,11 +219,11 @@ def getFilterXml(title, server = 'localhost'):
             cdrcgi.bail("Ambiguous filter document title '%s' on %s" %
                     (cgi.escape(title), server))
         return rows[0][0].replace('\r', '')
-                
+
     except Exception, info:
         cdrcgi.bail("Failure retrieving '%s' from %s: %s" %
                     (cgi.escape(title), server, str(info)))
-                              
+
 #----------------------------------------------------------------------
 # Remove the document ID attribute so we can save the doc under a new ID.
 #----------------------------------------------------------------------
@@ -350,8 +353,8 @@ def getProdId(docId, doc, session):
         if session.find("<Err") != -1:
             cdrcgi.bail("Failure logging onto production server: %s" %
                     prodSession)
-        doc = cdrcgi.encode(stripId(doc))
-        docId = cdr.addDoc(prodSession, doc = doc, reason = reason, 
+        doc = stripId(doc)
+        docId = cdr.addDoc(prodSession, doc = doc, reason = reason,
                 host = cdr.PROD_NAME)
         if docId.find("<Err") != -1:
             cdr.logout(prodSession, host = cdr.PROD_NAME)
@@ -421,7 +424,7 @@ def doCvs(docId, doc, cvsid, cvspw, cvscomment, session):
         if res.code is not None:
             debugLog("checkout failure: code=%d output=%s" % (res.code,
                                                               res.output))
-            
+
             # Is failure because document is new to CVS?
             # XXX Fragile, but the best we can do, I think.
             if res.output.find("cannot find module") == -1:
@@ -469,7 +472,7 @@ def doCvs(docId, doc, cvsid, cvspw, cvscomment, session):
                                                                 res.output)
 
         else:
-            
+
             # Move into the working directory.
             debugLog("moving to filt subdirectory")
             try:
@@ -494,7 +497,7 @@ def doCvs(docId, doc, cvsid, cvspw, cvscomment, session):
         if not errorMessage:
             debugLog("checking the revision into CVS")
             cmd = runCommand('cvs %s commit -m"%s" %s.xml' %
-                             (cvsroot, 
+                             (cvsroot,
                               cvscomment.replace('\r', '')
                               .replace('\n', ' ')
                               .replace('"', "'"),
@@ -514,7 +517,7 @@ def doCvs(docId, doc, cvsid, cvspw, cvscomment, session):
     if errorMessage:
         debugLog(errorMessage)
         cdrcgi.bail(errorMessage)
-    
+
 #----------------------------------------------------------------------
 # Load an existing document.
 #----------------------------------------------------------------------
@@ -577,9 +580,7 @@ elif request == 'Compare With':
         title = "Differences between %s and %s" % (name1, name2)
     else:
         title = "%s and %s are identical" % (name1, name2)
-    print """\
-Content-type: text/html; charset: utf-8
-
+    cdrcgi.sendPage("""\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>
  <head>
@@ -602,8 +603,7 @@ elif request == 'Clone':
     if not fields.has_key("Doc"):
         cdrcgi.bail("No document to save")
     doc = stripId(fields["Doc"].value)
-    docId = cdr.addDoc(session, doc=cdrcgi.encode(doc), 
-                                ver=version and 'Y' or 'N')
+    docId = cdr.addDoc(session, doc=doc, ver=version and 'Y' or 'N')
     if docId.find("<Errors>") >= 0:
         cdrcgi.bail(docId, banner)
     else:
@@ -630,11 +630,9 @@ elif request in ('Save', 'Checkin'):
     checkIn = request == 'Checkin' and 'Y' or 'N'
     ver = version and 'Y' or 'N'
     if re.search("<CdrDoc[^>]*\sId='[^']*'", doc, re.DOTALL):
-        docId = cdr.repDoc(session, doc=cdrcgi.encode(doc), checkIn = checkIn,
-                           ver = ver)
+        docId = cdr.repDoc(session, doc=doc, checkIn = checkIn, ver = ver)
     else:
-        docId = cdr.addDoc(session, doc=cdrcgi.encode(doc), checkIn = checkIn,
-                           ver = ver)
+        docId = cdr.addDoc(session, doc=doc, checkIn = checkIn, ver = ver)
     if docId.find("<Errors>") >= 0:
         cdrcgi.bail(docId, banner)
     else:
@@ -647,7 +645,7 @@ elif request in ('Save', 'Checkin'):
         if request == 'Save':
             buttons = ("Load", "Save", "Checkin", "Clone")
         else:
-            buttons = ("Load", "Clone")     
+            buttons = ("Load", "Clone")
         showForm(cgi.escape(doc), "Editing existing document", buttons)
 
 #----------------------------------------------------------------------
