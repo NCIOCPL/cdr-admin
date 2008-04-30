@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: EmailerReview.py,v 1.4 2006-05-04 13:36:11 bkline Exp $
+# $Id: EmailerReview.py,v 1.5 2008-04-30 15:33:43 bkline Exp $
 #
 # $Log: not supported by cvs2svn $
 # Revision 1.3  2005/03/02 21:36:58  bkline
@@ -300,9 +300,9 @@ for i in range(len(recipients)):
         recip, reported, failed = emailerBatches[i]
         if failed:
             extra = (" <span style='color:red; font-weight:bold'>"
-                     "(Marked RTS %s)</span>" % failed[:10])
+                     "(Marked RTS %s)</span>" % str(failed)[:10])
         elif reported:
-            extra = " (Tracking updated %s)" % reported[:10]
+            extra = " (Tracking updated %s)" % str(reported)[:10]
         else:
             extra = ("&nbsp;&nbsp;&nbsp;"
                      "<button onclick='javascript:markAsRts(%s)'>"
