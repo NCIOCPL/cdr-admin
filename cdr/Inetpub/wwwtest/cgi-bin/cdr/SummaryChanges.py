@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryChanges.py,v 1.3 2007-01-23 22:09:39 bkline Exp $
+# $Id: SummaryChanges.py,v 1.4 2008-05-13 21:50:10 bkline Exp $
 #
 # Report of history of changes to a single summary.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2007/01/23 22:09:39  bkline
+# Allowing unlimited history viewing (not just past two years).
+#
 # Revision 1.2  2003/11/05 14:50:28  bkline
 # Added font style information for HTML body element.
 #
@@ -192,6 +195,8 @@ for row in cursor.fetchall():
     resp = cdr.filterDoc('guest', [#'set:Denormalization Summary Set',
                                    'name:Summary Changes Report'], docId,
                          docVer = "%d" % row[0])
+    if type(resp) in (str, unicode):
+        cdrcgi.bail(resp)
     if resp[0].strip():
         if not lastSection or resp[0] != lastSection:
             lastSection = resp[0]
