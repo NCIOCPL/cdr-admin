@@ -1,8 +1,11 @@
 #----------------------------------------------------------------------
 #
-# $Id: DiffCTGovProtocol.py,v 1.9 2005-11-01 23:23:04 ameyer Exp $
+# $Id: DiffCTGovProtocol.py,v 1.10 2008-06-03 21:58:55 bkline Exp $
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.9  2005/11/01 23:23:04  ameyer
+# Changed order of documents in the diff.  Adjusted flags.
+#
 # Revision 1.8  2005/10/18 15:32:23  ameyer
 # Apply textwrap module to word wrapping docs for diff.
 #
@@ -175,7 +178,7 @@ cmd   = "diff -a -i -B -U 1 %s %s" % (name2, name1)
 try:
     workDir = cdr.makeTempDir('diff')
     os.chdir(workDir)
-except StandardError, args:
+except Exception, args:
     cdrcgi.bail(str(args))
 f1 = open(name1, "w")
 f1.write(doc1)

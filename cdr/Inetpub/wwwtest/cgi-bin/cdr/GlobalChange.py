@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------
-# $Id: GlobalChange.py,v 1.21 2005-04-12 16:05:21 ameyer Exp $
+# $Id: GlobalChange.py,v 1.22 2008-06-03 21:58:55 bkline Exp $
 #
 # Perform global changes on XML records in the database.
 #
@@ -14,6 +14,9 @@
 # present the next one - to the end.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.21  2005/04/12 16:05:21  ameyer
+# Added form fields for deleting org sites.
+#
 # Revision 1.20  2004/09/22 00:16:16  ameyer
 # Removed a debugging logwrite that used a lot of space in the log.
 #
@@ -257,7 +260,7 @@ for fd in ('docType', 'email', 'specificPhone', 'specificRole',
         if fd[-2:] == "Id":
             try:
                 fdVal = cdr.exNormalize (fdVal)[0]
-            except StandardError, e:
+            except Exception, e:
                 cdrcgi.bail ("Error normalizing id: %s: %s" % \
                              (str(fdVal), str(e)), logfile=LF)
 

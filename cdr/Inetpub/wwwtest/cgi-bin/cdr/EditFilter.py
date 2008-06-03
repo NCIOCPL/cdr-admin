@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditFilter.py,v 1.21 2008-04-29 19:57:34 ameyer Exp $
+# $Id: EditFilter.py,v 1.22 2008-06-03 21:58:55 bkline Exp $
 #
 # Prototype for editing CDR filter documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.21  2008/04/29 19:57:34  ameyer
+# Some additional utf-8 fixes.
+#
 # Revision 1.20  2007/11/03 14:15:07  bkline
 # Unicode encoding cleanup (issue #3716).
 #
@@ -565,7 +568,7 @@ elif request == 'Compare With':
     cmd = "diff -au %s %s" % (name1, name2)
     try:
         workDir = cdr.makeTempDir('diff')
-    except StandardError, args:
+    except Exception, args:
         cdrcgi.bail("%s: %s" % (args[0], args[1]))
     f1 = open(name1, "w")
     f1.write(doc1.encode('utf-8'))

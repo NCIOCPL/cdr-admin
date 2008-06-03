@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryMetaData.py,v 1.7 2007-11-03 14:40:15 bkline Exp $
+# $Id: SummaryMetaData.py,v 1.8 2008-06-03 21:58:56 bkline Exp $
 #
 # Report on the metadata for one or more summaries.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.7  2007/11/03 14:40:15  bkline
+# Restored table borders for the right tables this time.
+#
 # Revision 1.6  2007/11/03 14:36:36  bkline
 # Restored table borders at Margaret's request.
 #
@@ -486,7 +489,7 @@ def missCheck(result):
             return result
         return [noData]
 
-    raise StandardError("""
+    raise Exception("""\
 Unexpected data type passed to missCheck():
     type = %s
     data = %s""" % (str(type(result)), str(result)))

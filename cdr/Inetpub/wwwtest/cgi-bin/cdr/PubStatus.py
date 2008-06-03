@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: PubStatus.py,v 1.32 2008-04-28 16:48:59 venglisc Exp $
+# $Id: PubStatus.py,v 1.33 2008-06-03 21:58:56 bkline Exp $
 #
 # Status of a publishing job.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.32  2008/04/28 16:48:59  venglisc
+# Changed the formatting to display errors in red and changed strings to
+# Unicode strings. (Bug 3923)
+#
 # Revision 1.31  2008/02/26 23:47:24  venglisc
 # Minor modifications to FilterFailure output to make HTML valid and display
 # validation messages. (Bug 3923)
@@ -496,7 +500,7 @@ Please access from the main publishing menu""" % \
                          (name, msg), LOG)
         except cdrdb.Error, info:
             msg = 'Failure updating message: %s' % info[1][0]
-            raise StandardError(msg)
+            raise Exception(msg)
 
     # Go ahead and kill or resume!
     msg = ""
@@ -1722,4 +1726,3 @@ elif dispType == "RepDetail":
     dispJobRepDetail()
 else:
     cdrcgi.bail("Display type: %s not supported." % dispType)
-

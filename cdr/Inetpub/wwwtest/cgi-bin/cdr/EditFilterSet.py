@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditFilterSet.py,v 1.3 2007-11-03 14:15:07 bkline Exp $
+# $Id: EditFilterSet.py,v 1.4 2008-06-03 21:58:55 bkline Exp $
 #
 # Form for editing named CDR filter sets.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2007/11/03 14:15:07  bkline
+# Unicode encoding cleanup (issue #3716).
+#
 # Revision 1.2  2002/11/14 13:54:21  bkline
 # Plugged in blockChange() for titles of existing filter sets.
 #
@@ -411,7 +414,7 @@ if request == 'New':
 if doWhat == 'Delete':
     try:
         cdr.delFilterSet(session, setName)
-    except StandardError, args:
+    except Exception, args:
         cdrcgi.bail("Failure deleting filter set", extra = args)
     except:
         cdrcgi.bail("Unknown failure deleting filter set")
@@ -434,7 +437,7 @@ if doWhat == 'Save':
         newSet = cdr.FilterSet(newName, setDesc, setNotes, setMemberList)
         try:
             cdr.addFilterSet(session, newSet)
-        except StandardError, args:
+        except Exception, args:
             cdrcgi.bail("Failure adding new filter set", extra = args)
         except:
             cdrcgi.bail("Unknown failure adding new filter set")
@@ -443,7 +446,7 @@ if doWhat == 'Save':
         oldSet = cdr.FilterSet(setName, setDesc, setNotes, setMemberList)
         try:
             cdr.repFilterSet(session, oldSet)
-        except StandardError, args:
+        except Exception, args:
             bail("Failure storing changes to filter set", args)
         except:
             cdrcgi.bail("Unknown failure storing changes to filter set")
