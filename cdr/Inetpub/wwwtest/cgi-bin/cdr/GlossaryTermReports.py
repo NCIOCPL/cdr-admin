@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermReports.py,v 1.12 2007-10-31 16:09:04 bkline Exp $
+# $Id: GlossaryTermReports.py,v 1.13 2008-06-12 19:10:34 venglisc Exp $
 #
 # Submenu for glossary term reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.12  2007/10/31 16:09:04  bkline
+# Added Glossary Term Concept reports.
+#
 # Revision 1.11  2006/11/29 15:45:32  bkline
 # Plugged in new glossary word stem report.
 #
@@ -80,6 +83,8 @@ form = """\
 reports = [
            ('GlossaryTermSearch.py?', 
             'Glossary Term QC Report'),
+           ('GlossaryConceptFull.py?', 
+            'Glossary Concept QC Report - Full'),
            ('QcReport.py?DocType=GlossaryTerm&ReportType=pp&', 
             'Publish Preview'),
           ]
