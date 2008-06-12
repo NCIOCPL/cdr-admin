@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryConceptFull.py,v 1.1 2008-04-23 20:43:39 venglisc Exp $
+# $Id: GlossaryConceptFull.py,v 1.2 2008-06-12 19:04:01 venglisc Exp $
 #
 # Glossary Term Concept report
 # This report takes a concept and displays all of the Term Name 
@@ -13,13 +13,20 @@ import cgi, cdr, cdrcgi, cdrdb, re, sys, time, xml.dom.minidom
 
 # Setting the labels used for each element displayed
 # --------------------------------------------------
-LABEL = { 'DateLastModified'   :'Date Last Modified',
-          'DateLastReviewed'   :'Date Last Reviewed',
-          'DefinitionResource' :'Definition Resource',
-          'DefinitionStatus'   :'Definition Status',
-          'Dictionary'         :'Dictionary',
-          'StatusDate'         :'Status Date',
-          'TranslationResource':'Translation Resource' }
+LABEL = { 'DateLastModified'      :'Date Last Modified',
+          'DateLastReviewed'      :'Date Last Reviewed',
+          'DefinitionResource'    :'Definition Resource',
+          'DefinitionStatus'      :'Definition Status',
+          'Dictionary'            :'Dictionary',
+          'MediaLink'             :'Media Link',
+          'NCIThesaurusID'        :'NCI Thesaurus ID',
+          'PDQTerm'               :'PDQ Term',
+          'RelatedExternalRef'    :'Related External Ref',
+          'RelatedDrugSummaryRef' :'Related Drug Summary Ref',
+          'RelatedSummaryRef'     :'Related Summary Ref',
+          'StatusDate'            :'Status Date',
+          'TermType'              :'Term Type',
+          'TranslationResource'   :'Translation Resource' }
 
 
 #----------------------------------------------------------------------
@@ -72,6 +79,43 @@ def addSingleRow(data, label):
 
 
 #----------------------------------------------------------------------
+# Create a single row for the Media link such that the media is being 
+# displayed.
+# We're creating a small DOM that we can parse in order to extract the 
+# CDR-ID of the media document.
+#----------------------------------------------------------------------
+def addMediaRow(data, label):
+    #cdrcgi.bail(data[label])
+    htmlRow = ''
+    for row in data['MediaLink']:
+        mediaString = '''
+        <Root xmlns:cdr="cips.nci.nih.gov/cdr">
+        %s
+        </Root>''' % row
+        dom = xml.dom.minidom.parseString(mediaString)
+        docElem = dom.documentElement
+
+        for node in docElem.childNodes:
+            if node.nodeName == 'MediaLink':
+                for child in node.childNodes:
+                    if child.nodeName == 'MediaID':
+                        mediaValue = str(cdr.getTextContent(child).strip())
+                        mediaID = child.getAttribute('cdr:ref')
+        dom.unlink()
+        htmlRow += """
+   <tr>
+    <td width="30%%" valign="top">
+     <b>%s</b>
+    </td>
+    <td width="70%%">%s  <br>
+     <img src="http://bach.nci.nih.gov/cgi-bin/cdr/GetCdrImage.py?id=%s-300.jpg">
+    </td>
+   </tr>
+""" % (LABEL[label], mediaValue, mediaID)
+    
+    return htmlRow
+
+#----------------------------------------------------------------------
 # Same as addSingleRow() but the label is only displayed for the first
 # row.
 #----------------------------------------------------------------------
@@ -93,6 +137,49 @@ def addMultipleRow(data, label):
     </td>
     <td width="70%%">%s</td>
    </tr>""" % (iLabel, value)
+    
+    return htmlRows
+
+
+#----------------------------------------------------------------------
+# Same as addMultipleRow() but we are also adding a single attribute
+#----------------------------------------------------------------------
+def addAttributeRow(data, label, indent = False):
+    # Adding row for Date Last Reviewed 
+    if data.has_key(label):
+        iRow = -1
+        htmlRows = ""
+        for value, attribute in data[label]:
+            try:
+                attrValue = ('<a href="/cgi-bin/cdr/QcReport.py?' + 
+                             'Session=guest&amp;DocId=%d">CDR%d</a>') % (
+                                              cdr.exNormalize(attribute)[1], 
+                                              cdr.exNormalize(attribute)[1])
+            except:
+                attrValue = '<a href="%s">%s</a>' % (attribute, attribute)
+
+            iRow += 1
+            if iRow == 0:
+                iLabel = LABEL[label]
+            else:
+                iLabel = ''
+            if not indent:
+                htmlRows += """
+   <tr>
+    <td width="30%%">
+     <b>%s</b>
+    </td>
+    <td width="70%%">%s (%s)</td>
+   </tr>""" % (iLabel, value, attrValue)
+            else:
+                htmlRows += """
+   <tr>
+    <td width="3%%"> </td>
+    <td width="27%%">
+     <b>%s</b>
+    </td>
+    <td width="70%%">%s (%s)</td>
+   </tr>""" % (iLabel, value, attrValue)
     
     return htmlRows
 
@@ -177,7 +264,7 @@ def displayComment(commentList):
 #----------------------------------------------------------------------
 # Get the parameters from the request.
 #----------------------------------------------------------------------
-repTitle = "CDR QC Report"
+repTitle = "CDR QC Glossary Concept Report"
 fields   = cgi.FieldStorage() or cdrcgi.bail("No Request Found", repTitle)
 session  = cdrcgi.getSession(fields) or cdrcgi.bail("Not logged in")
 action   = cdrcgi.getRequest(fields)
@@ -259,17 +346,18 @@ except cdrdb.Error, info:
 def getAllTermNames(docId, docType = 'GlossaryTermConcept'):
     try:
         query = """\
-          select qt.doc_id, dt1.name, qt.int_val, dt.name
-            from query_term qt
-            join document d
-              on d.id = qt.int_val
-            JOIN doc_type dt
-              ON d.doc_type = dt.id
+          SELECT qt.doc_id, dt1.name, qt.int_val, dt.name,
+                 d1.active_status
+            FROM query_term qt
+            JOIN document d
+              ON d.id = qt.int_val
+            join doc_type dt
+              on d.doc_type = dt.id
             JOIN document d1
               ON d1.id = qt.doc_id
             JOIN doc_type dt1
               ON d1.doc_type = dt1.id
-           where path = '/GlossaryTermName/GlossaryTermConcept/@cdr:ref'
+           WHERE path = '/GlossaryTermName/GlossaryTermConcept/@cdr:ref'
              AND dt1.name = 'GlossaryTermName'
              AND dt.name  = 'GlossaryTermConcept'
              AND qt.int_val = """
@@ -302,6 +390,91 @@ def getAllTermNames(docId, docType = 'GlossaryTermConcept'):
 
     return allTermNames
 
+
+
+#----------------------------------------------------------------------
+# Getting the status of the GlossaryTermNames so that we can 
+# identify blocked terms.
+#----------------------------------------------------------------------
+def getTermNameStatus(termList):
+    termNameIds = ','.join("%s" % id for id in termList)
+
+    try:
+        cursor.execute("""SELECT id, active_status
+                          FROM document
+                         WHERE id in (%s)""" % termNameIds)
+        rows = cursor.fetchall()
+
+    except cdrdb.Error, info:
+        cdrcgi.bail("Error selecting term name status: %s" % info[1][0])
+
+    statusList = {}
+    for id, status in rows:
+        statusList[id] = str(status)
+
+    return statusList
+
+
+#----------------------------------------------------------------------
+# Passing a CDR-ID
+# This function returns an HTML snippet in case a MediaLink element
+# exists that's being shared between English and Spanish definitions.
+#----------------------------------------------------------------------
+def getSharedInfo(docId):
+    try:
+        cursor.execute("SELECT xml FROM document WHERE id = ?", docId)
+        row = cursor.fetchone()
+        dom = xml.dom.minidom.parseString(row[0].encode('utf-8'))
+        docElem = dom.documentElement
+
+        sharedElements = ['MediaLink', 'TermType', 'PDQTerm',
+                          'NCIThesaurusID', 'RelatedDrugSummaryRef',
+                          'RelatedExternalRef', 'RelatedSummaryRef']
+        sharedContent = {}
+        for sharedElement in sharedElements:
+            sharedContent[sharedElement] = []
+
+        #cdrcgi.bail(docElem.childNodes[2].childNodes[1].toxml())
+        for node in docElem.childNodes:
+            if node.nodeName == 'MediaLink':
+                sharedContent['MediaLink'].append(node.toxml())
+            if node.nodeName == 'TermType':
+                sharedContent['TermType'].append(
+                                       cdr.getTextContent(node).strip())
+
+            # For related information we add a list [value, attribute]
+            # for each entry resulting in 
+            #   {'RelatedExternalRef:[[val1, attr1], [val2, attr2], ...], ...}
+            # ----------------------------------------------------------------
+            if node.nodeName == 'RelatedInformation':
+                for child in node.childNodes:
+                    if child.nodeName == 'RelatedDrugSummaryRef':
+                        sharedContent['RelatedDrugSummaryRef'].append(
+                                      [cdr.getTextContent(child).strip(),
+                                       child.getAttribute('cdr:href').strip()])
+                    if child.nodeName == 'RelatedExternalRef':
+                        sharedContent['RelatedExternalRef'].append(
+                                      [cdr.getTextContent(child).strip(),
+                                       child.getAttribute('cdr:xref').strip()])
+                    if child.nodeName == 'RelatedSummaryRef':
+                        #cdrcgi.bail(child.getAttribute('cdr:href'))
+                        sharedContent['RelatedSummaryRef'].append(
+                                      [cdr.getTextContent(child).strip(),
+                                       child.getAttribute('cdr:href').strip()])
+
+            if node.nodeName == 'PDQTerm':
+                sharedContent['PDQTerm'].append(
+                                      [cdr.getTextContent(node).strip(),
+                                       node.getAttribute('cdr:ref').strip()])
+            if node.nodeName == 'NCIThesaurusID':
+                sharedContent['NCIThesaurusID'].append(
+                                       cdr.getTextContent(node).strip())
+
+    except cdrdb.Error, info:
+        cdrcgi.bail("Error extracting shared Info: %s" % info[1][0])
+
+    #cdrcgi.bail(sharedContent)
+    return sharedContent
 
 #----------------------------------------------------------------------
 # We're selecting the information from the GTC document to be 
@@ -350,10 +523,24 @@ def getConcept(docId):
                     # We need to preserve the inline markup of the 
                     # definition text.
                     # -----------------------------------------------------
-                    if child.nodeName == 'DefinitionText':
+                    if (child.nodeName == 'DefinitionText'):
                         definition = child
                         concept['%s-%s' % (language, audience)].update(
-                          {'DefinitionText':definition.toxml()})
+                          {child.nodeName:definition.toxml()})
+                    #     {'DefinitionText':definition.toxml()})
+
+                    # Same as above but the MediaLink element is multiply
+                    # occurring.
+                    # -----------------------------------------------------
+                    if (child.nodeName == 'MediaLink'):
+                        if child.previousSibling.nodeName != 'MediaLink':
+                            definition = child
+                            concept['%s-%s' % (language, audience)].update(
+                              {child.nodeName:[definition.toxml()]})
+                        else:
+                            definition = child
+                            concept['%s-%s' % (language, audience)][
+                               'MediaLink'].append(definition.toxml())
 
                     # Adding all values that are multiply occuring
                     # Creating entry 'key':[listitem, listitem, ...]
@@ -490,50 +677,7 @@ if docId:
 # documents
 # ---------------------------------------------------------------------
 termNames = getAllTermNames(intId, docType)
-
-### #----------------------------------------------------------------------
-### # Let the user pick the version for most Summary or Glossary reports.
-### #----------------------------------------------------------------------
-### if docType == 'GlossaryTerm' and not version:
-###     try:
-###         cursor.execute("""\
-###             SELECT num,
-###                    comment,
-###                    dt
-###               FROM doc_version
-###              WHERE id = ?
-###           ORDER BY num DESC""", intId)
-###         rows = cursor.fetchall()
-###     except cdrdb.Error, info:
-###         cdrcgi.bail('Failure retrieving document versions: %s' % info[1][0])
-###     form = """\
-###   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-###   <INPUT TYPE='hidden' NAME='DocType' VALUE='%s'>
-###   <INPUT TYPE='hidden' NAME='ReportType' VALUE='%s'>
-###   <INPUT TYPE='hidden' NAME='DocId' VALUE='CDR%010d'>
-###   Select document version:&nbsp;
-###   <SELECT NAME='DocVersion'>
-###    <OPTION VALUE='-1' SELECTED='1'>Current Working Version</OPTION>
-### """ % (cdrcgi.SESSION, session, docType, repType, intId)
-###     for row in rows:
-###         form += """\
-###    <OPTION VALUE='%d'>[V%d %s] %s</OPTION>
-### """ % (row[0], row[0], row[2][:10], row[1] or "[No comment]")
-###         selected = ""
-###     form += "</SELECT>"
-###     form += """
-###   <BR><BR>
-###   Select Insertion/Deletion markup to be displayed in the report (one or more):
-###   <BR>
-###   <table width="60%" border="0">
-###    <tr>
-### """
-### 
-###     cdrcgi.sendPage(header + form + """  
-###  </BODY>
-### </HTML>
-### """)
-
+# cdrcgi.bail(termNames)
 
 # -------------------------------------------------------------------
 # Create the HTML header, style sheet, etc.
@@ -560,6 +704,8 @@ html = """\
                    font-weight: bold; }
    .term-error   { color: red;
                    font-weight: bold; }
+   .blocked      { color: red;
+                   font-weight: bold; }
    .attribute    { font-weight: normal; 
                    font-style: italic; 
                    background-color: #FFFFFF; }
@@ -585,6 +731,14 @@ html += '  <span class="big">CDR%s</span>' % intId
 # Get the concept information to be displayed 
 # -----------------------------------------------------------
 conceptInfo = getConcept(termNames['GlossaryTermConcept'])
+
+# We need to mark the term names that have been blocked.  For 
+# this we need to go back to the database, which could have
+# been done more intelligently, but the request to display
+# blocked GTNs came after the program was nearly completed.
+# -----------------------------------------------------------
+termNameStatus = getTermNameStatus(termNames['GlossaryTermName'])
+#cdrcgi.bail(conceptInfo)
 
 # Get the term name (for spanish and english) for each of the 
 # related GlossaryTermName document and create a dictionary
@@ -641,9 +795,20 @@ for lang in languages:
                 html += """\
    <tr><td>&nbsp;</td><td>&nbsp;</td></tr>
    <tr class="name">
-    <td width="30%%">Name</td>
+    <td width="30%%">Name</td>"""
+
+                # Display the blocked term names in red and don't 
+                # bother displaying the term definition
+                # -----------------------------------------------
+                if termNameStatus[id] == 'A':
+                    html += """\
     <td width="70%%">%s (CDR%s)</td>
    </tr>""" % (termData[lang], id)
+                else:
+                    html += """\
+    <td class="blocked" width="70%%">BLOCKED - %s (CDR%s)</td>
+   </tr>""" % (termData[lang], id)
+                    continue
 
             # Resolve the PlaceHolder elements and create an HTML
             # table row from the resulting data
@@ -664,7 +829,7 @@ for lang in languages:
         html += """
   </table>
   <p/>
-  <table border="1" width="100%%" cellspacing="0" cellpadding="0">"""
+  <table border="0" width="100%%" cellspacing="0" cellpadding="0">"""
   
         # Adding the Term Concept information at the end of each 
         # language/audience section
@@ -682,6 +847,11 @@ for lang in languages:
                 html += addMultipleRow(conceptInfo['%s-%s' % (lang, aud)],
                                     'TranslationResource')
 
+            # Adding row for MediaLink
+            if conceptInfo['%s-%s' % (lang, aud)].has_key('MediaLink'):
+                #cdrcgi.bail(conceptInfo['%s-%s' % (lang, aud)]['MediaLink'])
+                html += addMediaRow(conceptInfo['%s-%s' % (lang, aud)],
+                                    'MediaLink')
             # Adding row for Dictionary
             if conceptInfo['%s-%s' % (lang, aud)].has_key('Dictionary'):
                 html += addMultipleRow(conceptInfo['%s-%s' % (lang, aud)],
@@ -715,6 +885,62 @@ for lang in languages:
         html += """
   </table>
 """
+    if lang == 'en':
+        sharedXml  = getSharedInfo(termNames['GlossaryTermConcept'])
+        mediaHtml = addMediaRow(sharedXml, 'MediaLink')
+
+        html += """
+  <p />
+  <table border="0" width="100%%" cellspacing="0" cellpadding="0">
+  %s
+  </table>
+""" % mediaHtml
+
+# Create the table rows for the elements that include an attribute
+# ----------------------------------------------------------------
+relDSRHtml   = addAttributeRow(sharedXml, 'RelatedDrugSummaryRef', indent=True)
+relSRHtml    = addAttributeRow(sharedXml, 'RelatedSummaryRef',     indent=True)
+relERHtml    = addAttributeRow(sharedXml, 'RelatedExternalRef',    indent=True)
+pdqTermHtml  = addAttributeRow(sharedXml, 'PDQTerm')
+
+# Create the table rows for the elements without attribute
+# --------------------------------------------------------
+termTypeHtml = addMultipleRow(sharedXml, 'TermType')
+nciThesHtml  = addMultipleRow(sharedXml, 'NCIThesaurusID')
+
+# Adding Term information to HTML document
+# ----------------------------------------
+html += """
+  <p />
+  <table border="0" width="100%%" cellspacing="0" cellpadding="0">
+  %s
+  </table>
+""" % (termTypeHtml)
+
+# Adding the related information to HTML document
+# -----------------------------------------------
+if relDSRHtml or relSRHtml or relERHtml:
+    html += """
+  <table border="0" width="100%%" cellspacing="0" cellpadding="0">
+   <tr>
+    <td colspan="2">
+     <b>Related Information</b>
+    </td>
+   </tr>
+  %s
+  %s
+  %s
+  </table>
+""" % (relDSRHtml, relSRHtml, relERHtml)
+
+# Adding PDQTerm and Thesaurus information to HTML document
+# ---------------------------------------------------------
+html += """
+  <table border="0" width="100%%" cellspacing="0" cellpadding="0">
+  %s
+  %s
+  </table>
+""" % (pdqTermHtml, nciThesHtml)
 
 #----------------------------------------------------------------------
 # Send it.
