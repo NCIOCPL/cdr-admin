@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolINDReport.py,v 1.1 2006-05-10 17:39:52 venglisc Exp $
+# $Id: ProtocolINDReport.py,v 1.2 2008-06-12 18:38:04 venglisc Exp $
 #
 # Report to list protocol information for trials with an IND number
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2006/05/10 17:39:52  venglisc
+# Initial copy of program to create a Protocol Report with IND Information.
+# (Bug 2028)
+#
 #
 #----------------------------------------------------------------------
 import cdrdb, sys, time, cdrcgi, ExcelWriter
@@ -16,6 +20,28 @@ if sys.platform == "win32":
 conn = cdrdb.connect('CdrGuest')
 conn.setAutoCommit()
 cursor = conn.cursor()
+
+# -------------------------------------------------------------
+# Module to populate the Protocol Source column in the 
+# spreadsheet.  Multiple source values are concatenated with a
+# semi-colon.
+# -------------------------------------------------------------
+def getProtSource(id = 0):
+    allSources = ''
+    
+    cursor.execute("""\
+        SELECT value 
+          FROM query_term
+         WHERE doc_id = ?
+           AND path = '/InScopeProtocol/ProtocolSources' +
+                      '/ProtocolSource/SourceName'
+        """, id)
+
+    rows = cursor.fetchall()
+    
+    allSources = '; '.join(row[0] for row in rows)
+    return allSources
+
 
 # Excel is able to read XML files so that's what we create here
 # -------------------------------------------------------------
@@ -30,15 +56,16 @@ fullname = REPORT_BASE + filename
 # ------------------------------------------------------------------
 cursor.execute("""\
     CREATE TABLE #t0
-             (doc_id     INTEGER      NOT NULL,
-              primary_id VARCHAR(100) NOT NULL,
-              ctgov_id   VARCHAR(100) NULL,
-              otitle     VARCHAR(500) NOT NULL,
-              hptitle    VARCHAR(500) NOT NULL,
-              ind_num    VARCHAR(50)  NOT NULL,
-              ind_sn     VARCHAR(50)  NULL,
-              pub_date   CHAR(10)     NULL,
-              pub_status VARCHAR(50)  NULL)""")
+             (doc_id      INTEGER      NOT NULL,
+              primary_id  VARCHAR(100) NOT NULL,
+              ctgov_id    VARCHAR(100) NULL,
+              otitle      VARCHAR(500) NOT NULL,
+              hptitle     VARCHAR(500) NOT NULL,
+              ind_num     VARCHAR(50)  NOT NULL,
+              ind_sn      VARCHAR(50)  NULL,
+              pub_date    CHAR(10)     NULL,
+              pub_status  VARCHAR(50)  NULL,
+              prot_status VARCHAR(50)  NOT NULL)""")
 
 # Into this temp table we are inserting everything except for the current
 # document status (coming from the document table) and the date the 
@@ -48,7 +75,7 @@ cursor.execute("""\
     INSERT INTO #t0
 SELECT q.doc_id CDRID, pid.value ProtID, ct.value CTGovID, 
        q.value OTitle, tt.value HPTitle, 
-       q2.value IND#,  isn.value ISN, NULL, NULL
+       q2.value IND#,  isn.value ISN, NULL, NULL, s.value CurStatus
   FROM query_term q
   JOIN query_term q1
     ON q.doc_id = q1.doc_id
@@ -80,8 +107,11 @@ SELECT q.doc_id CDRID, pid.value ProtID, ct.value CTGovID,
    AND ctt.path = '/InScopeProtocol/ProtocolIDs/OtherID/IDType'
    AND ctt.value= 'ClinicalTrials.gov ID'
    AND left(ct.node_loc, 8) = left(ctt.node_loc, 8)
+  JOIN query_term s
+    ON q.doc_id = s.doc_id
+   AND s.path   = '/InScopeProtocol/ProtocolAdminInfo/CurrentProtocolStatus'
  WHERE q.path = '/InScopeProtocol/ProtocolTitle'
---   AND q.doc_id = 63881
+--   AND q.doc_id = 67889
   """, timeout = 300)
 
 #-----------------------------------------------------------------------
@@ -153,7 +183,9 @@ ws.addCol( 5, 550)
 ws.addCol( 6, 70)
 ws.addCol( 7, 50)
 ws.addCol( 8, 70)
-ws.addCol( 9, 50)
+ws.addCol( 9, 60)
+ws.addCol(10, 70)
+ws.addCol(11, 100)
 
 # Create the Header row
 # ---------------------
@@ -166,7 +198,9 @@ exRow.addCell(5, 'HP Title')
 exRow.addCell(6, 'IND Num')
 exRow.addCell(7, 'IND SN')
 exRow.addCell(8, 'Pub Date')
-exRow.addCell(9, 'Status')
+exRow.addCell(9, 'Doc Status')
+exRow.addCell(10, 'Protocol Status')
+exRow.addCell(11, 'Protocol Source')
 
 # Add the protocol data one record at a time beginning after 
 # the header row
@@ -178,15 +212,19 @@ for row in rows:
     url = ("http://www.cancer.gov/clinicaltrials/"
            "view_clinicaltrials.aspx?version=healthprofessional&"
            "cdrid=%d" % row[0])
-    exRow.addCell(1, row[0], href = url, style = style4)
-    exRow.addCell(2, row[1], style = style2)
-    exRow.addCell(3, row[2], style = style2)
-    exRow.addCell(4, row[3], style = style2)
-    exRow.addCell(5, row[4], style = style2)
-    exRow.addCell(6, row[5], style = style2)
-    exRow.addCell(7, row[6], style = style2)
-    exRow.addCell(8, row[7], style = style2)
-    exRow.addCell(9, row[8], style = style2)
+    exRow.addCell( 1, row[0], href = url, style = style4)
+    exRow.addCell( 2, row[1], style = style2)
+    exRow.addCell( 3, row[2], style = style2)
+    exRow.addCell( 4, row[3], style = style2)
+    exRow.addCell( 5, row[4], style = style2)
+    exRow.addCell( 6, row[5], style = style2)
+    exRow.addCell( 7, row[6], style = style2)
+    exRow.addCell( 8, row[7], style = style2)
+    exRow.addCell( 9, row[8], style = style2)
+    exRow.addCell(10, row[9], style = style2)
+
+    protSource = getProtSource(row[0])
+    exRow.addCell(11, protSource, style = style2)
 
 print "Content-type: application/vnd.ms-excel"
 print "Content-Disposition: attachment; filename=%s" % filename
