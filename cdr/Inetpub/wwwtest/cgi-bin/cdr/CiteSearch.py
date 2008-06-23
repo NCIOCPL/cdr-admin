@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CiteSearch.py,v 1.14 2004-05-11 21:31:15 bkline Exp $
+# $Id: CiteSearch.py,v 1.15 2008-06-23 20:14:49 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Citation documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.14  2004/05/11 21:31:15  bkline
+# Modified path for year in response to request #1184.
+#
 # Revision 1.13  2003/11/26 20:53:21  venglisc
 # Replaced the Citation QC Report filter to run the QC Citation filter set
 # instead.
@@ -98,10 +101,11 @@ except cdrdb.Error, info:
 #----------------------------------------------------------------------
 # Parse out the errors for display.
 #----------------------------------------------------------------------
-def formatErrors(str):
+def formatErrors(errorsString):
     result = ""
-    for error in re.findall("<Err>(.*?)</Err>", str):
-        result += (cgi.escape("%s") % error) + "<br>\n"
+    for error in cdr.getErrors(errorsString, errorsExpected = False,
+                               asSequence = True):
+        result += (cgi.escape("%s") % error) + "<br />\n"
     return result
     
 #----------------------------------------------------------------------
@@ -210,21 +214,22 @@ if impReq:
         doc = replacePubmedArticle(oldDoc, article)
         resp = cdr.repDoc(session, doc = doc, val = 'Y', showWarnings = 1)
     if not resp[0]:
-        cdrcgi.bail("Failure adding PubMed citation %s: %s" % (
-                    title, cdr.checkErr(resp[1])))
-    if not resp[1]:
+        cdrcgi.bail("Failure adding PubMed citation %s: %s" %
+                    (title, cdr.checkErr(resp[1])))
+    if resp[1]:
+        valErrors = formatErrors(resp[1])
+    if valErrors:
+        pubVerNote = "(with validation errors)"
+    else:
         doc = cdr.getDoc(session, resp[0], 'Y')
         if doc.startswith("<Errors"):
             cdrcgi.bail("Unable to retrieve %s" % resp[0])
         resp2 = cdr.repDoc(session, doc = doc, val = 'Y', ver = 'Y',
                           checkIn = 'Y', showWarnings = 1)
         if not resp2[0]:
-            cdrcgi.bail("Failure creating publishable version for %s" %
-                    resp[0], resp2[1])
+            cdrcgi.bail("Failure creating publishable version for %s:<br />%s" %
+                        (resp[0], formatErrors(resp2[1])))
         pubVerNote = "(with publishable version)"
-    else:
-        pubVerNote = "(with validation errors)"
-        valErrors = formatErrors(resp[1])
     if not replaceID:
         subtitle = "Citation added as %s %s" % (resp[0], pubVerNote)
     else:
