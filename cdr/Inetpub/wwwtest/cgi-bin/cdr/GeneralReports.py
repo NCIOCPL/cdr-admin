@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GeneralReports.py,v 1.18 2007-08-27 17:13:39 bkline Exp $
+# $Id: GeneralReports.py,v 1.19 2008-07-11 20:15:32 bkline Exp $
 #
 # Submenu for general reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.18  2007/08/27 17:13:39  bkline
+# Added report for invalid documents.
+#
 # Revision 1.17  2007/05/18 20:29:11  venglisc
 # Minor HTML formatting changes.
 #
@@ -95,7 +98,7 @@ form = """\
    <OL>""" % (cdrcgi.SESSION, session)
 
 reports = [
-           ('AdHocQuery.py', 
+           ('CdrQueries.py', 
             'Ad-Hoc Reports'),
            ('CheckedOutDocs.py', 
             'Checked Out Documents'),
