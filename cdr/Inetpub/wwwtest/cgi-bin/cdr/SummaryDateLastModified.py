@@ -1,12 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryDateLastModified.py,v 1.11 2007-11-05 17:33:52 bkline Exp $
+# $Id: SummaryDateLastModified.py,v 1.12 2008-07-18 15:07:27 venglisc Exp $
 #
 # Report listing specified set of Cancer Information Summaries, the date
 # they were last modified as entered by a user, and the date the last
 # Modify action was taken.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.11  2007/11/05 17:33:52  bkline
+# Another cosmetic adjustment.
+#
 # Revision 1.10  2007/11/05 15:08:42  bkline
 # Cosmetic modifications for Margaret.
 #
@@ -407,7 +410,7 @@ sqlJoin = """\
                JOIN query_term la
                  ON la.doc_id = su.doc_id
     LEFT OUTER JOIN query_term lm
-                 ON lm.doc_id = au.doc_id
+                 ON lm.doc_id = su.doc_id
 """
 sqlWhere = """\
               WHERE su.path = '/Summary/SummaryTitle'
