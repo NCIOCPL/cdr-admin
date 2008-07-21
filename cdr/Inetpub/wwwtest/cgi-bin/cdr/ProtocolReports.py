@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolReports.py,v 1.35 2008-07-21 17:26:18 bkline Exp $
+# $Id: ProtocolReports.py,v 1.36 2008-07-21 20:20:40 bkline Exp $
 #
 # Submenu for protocol reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.35  2008/07/21 17:26:18  bkline
+# Added CTEP reports.
+#
 # Revision 1.34  2008/04/17 18:43:25  bkline
 # Added Non-Drug/Agent Protocol Interventions report.
 #
@@ -232,12 +235,24 @@ for r in (('RssImportReport.py', 'COG Import/Update Statistics Report',
            '&output=xls'),
           ('RssImportReport.py', 'NCIC Import/Update Statistics Report',
            '&source=NCIC'),
-          ('RssImportReport.py', 'Oncore Import/Update Statistics Report',
-           '&source=Oncore'),
-          ('Request3472.py', 'PDQ Submission Portal Statistics Summary Report',
-           '')):
+          ('RssImportReport.py', '',
+           '&source=Oncore')):
     form.append("<LI><A HREF='%s/%s?%s=%s%s'>%s</A></LI>\n" %
                 (cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[2], r[1]))
+form.append("""\
+    <li><a href='%s/oncore-id-mappings'
+        >Oncore ID Mappings</a></li>
+    <li><a href='%s/RssImportReport.py?%s=%s&source=Oncore'
+        >Oncore Import/Update Statistics Report</a></li>
+    <li><a href='%s/OncoreTrialsWithoutNctIds.py?all=true'
+        >Oncore Submissions With No NCT ID - Full List</a></li>
+    <li><a href='%s/OncoreTrialsWithoutNctIds.py'
+        >Oncore Submissions With No NCT ID - Disposition Needed</a></li>
+    <li><a href='%s/Request3472.py?%s=%s'
+        >PDQ Submission Portal Statistics Summary Report</a></li>
+""" % (cdr.emailerCgi(), cdrcgi.BASE, cdrcgi.SESSION, session,
+       cdr.emailerCgi(), cdr.emailerCgi(),
+       cdrcgi.BASE, cdrcgi.SESSION, session))
 title = "PDQ Submission Portal Submission Details Report"
 host  = cdr.emailerHost()
 form.append("<LI><A HREF='http://%s/u/showcts.py'>%s</A></LI>\n" %
