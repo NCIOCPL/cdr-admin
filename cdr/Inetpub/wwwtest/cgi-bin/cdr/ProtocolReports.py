@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolReports.py,v 1.34 2008-04-17 18:43:25 bkline Exp $
+# $Id: ProtocolReports.py,v 1.35 2008-07-21 17:26:18 bkline Exp $
 #
 # Submenu for protocol reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.34  2008/04/17 18:43:25  bkline
+# Added Non-Drug/Agent Protocol Interventions report.
+#
 # Revision 1.33  2007/10/22 15:58:10  bkline
 # Restructuring for Sheri (request 3700).
 #
@@ -221,6 +224,12 @@ form.append("""\
 """)
 for r in (('RssImportReport.py', 'COG Import/Update Statistics Report',
            '&source=COG'),
+          ('Request4064.py',
+           'CTEP Institutions with Address Information (XML)',
+           '&output=xml'),
+          ('Request4064.py',
+           'CTEP Institutions with Address Information (Excel)',
+           '&output=xls'),
           ('RssImportReport.py', 'NCIC Import/Update Statistics Report',
            '&source=NCIC'),
           ('RssImportReport.py', 'Oncore Import/Update Statistics Report',
