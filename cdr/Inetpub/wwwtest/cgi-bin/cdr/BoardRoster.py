@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: BoardRoster.py,v 1.9 2007-08-27 20:57:52 bkline Exp $
+# $Id: BoardRoster.py,v 1.10 2008-07-22 17:07:28 venglisc Exp $
 #
 # Report to display the Board Roster with or without assistant
 # information.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.9  2007/08/27 20:57:52  bkline
+# Change in address string at Sheri's request (#3553).
+#
 # Revision 1.8  2006/09/27 23:16:09  venglisc
 # Changing Suite number of Board Manager address. (Bug 2530)
 #
@@ -34,24 +37,39 @@
 # Initial Version to create the PDQ Board Member Roster report.
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, cdrdb, time
+import cgi, cdr, cdrcgi, cdrdb, re, time
 
 #----------------------------------------------------------------------
 # Set the form variables.
 #----------------------------------------------------------------------
-fields    = cgi.FieldStorage()
-boardId   = fields and fields.getvalue("board") or None
-otherInfo = fields and fields.getvalue("oinfo") or 'No'
-assistant = fields and fields.getvalue("ainfo") or 'No'
-session   = cdrcgi.getSession(fields)
-request   = cdrcgi.getRequest(fields)
-title     = "PDQ Board Roster Report"
-instr     = "Report on PDQ Board Roster"
-script    = "BoardRoster.py"
-SUBMENU   = "Report Menu"
-buttons   = (SUBMENU, cdrcgi.MAINMENU)
-header    = cdrcgi.header(title, title, instr, script, buttons)
-boardId   = boardId and int(boardId) or None
+fields     = cgi.FieldStorage()
+boardId    = fields and fields.getvalue("board") or None
+otherInfo  = fields and fields.getvalue("oinfo") or 'No'
+assistant  = fields and fields.getvalue("ainfo") or 'No'
+phone      = fields and fields.getvalue("pinfo") or 'No'
+fax        = fields and fields.getvalue("finfo") or 'No'
+cdrid      = fields and fields.getvalue("cinfo") or 'No'
+email      = fields and fields.getvalue("einfo") or 'No'
+flavor     = fields and fields.getvalue("sheet") or 'full'
+session    = cdrcgi.getSession(fields)
+request    = cdrcgi.getRequest(fields)
+title      = "PDQ Board Roster Report"
+instr      = "Report on PDQ Board Roster"
+script     = "BoardRoster.py"
+SUBMENU    = "Report Menu"
+buttons    = (SUBMENU, cdrcgi.MAINMENU)
+header     = cdrcgi.header(title, title, instr, script, buttons)
+boardId    = boardId and int(boardId) or None
+dateString = time.strftime("%B %d, %Y")
+
+filterType= {'summary':'name:PDQBoardMember Roster Summary',
+             'full'   :'name:PDQBoardMember Roster'}
+allRows   = []
+
+# We can only run one report at a time: Full or Summary
+# -----------------------------------------------------
+if flavor == 'summary' and (otherInfo == 'Yes' or assistant == 'Yes'):
+    cdrcgi.bail("Please uncheck the 'Summary' sheet to run 'Full' report")
 
 #----------------------------------------------------------------------
 # Handle navigation requests.
@@ -137,12 +155,95 @@ SELECT path, value
     return cursor.fetchall()
 
 #----------------------------------------------------------------------
+# Extract the relevant information from the HTML snippet (which is
+# created using the filter modules)
+# The phone, fax, email information has been wrapped with the 
+# respective elements in the filter for the summary sheet flavor
+#----------------------------------------------------------------------
+def extractSheetInfo(boardInfo):
+    #cdrcgi.bail(boardInfo)
+    myName  = boardInfo.split('<b>')[1].split('</b>')[0]
+    #myTitle = boardInfo.split('<br>')[1]
+    if boardInfo.find('<Phone>') > -1:
+        try:
+            myPhone = boardInfo.split('<Phone>')[1].split('</Phone>')[0]
+        except:
+            cdrcgi.bail(boardInfo)
+    else:
+        myPhone = ''
+
+    if boardInfo.find('<Email>') > -1:
+        try:
+            myEmail = boardInfo.split('<Email>')[1].split('</Email>')[0]
+        except:
+            cdrcgi.bail(boardInfo)
+    else:
+        myEmail = ''
+
+    if boardInfo.find('<Fax>') > -1:
+        try:
+            myFax   = boardInfo.split('<Fax>')[1].split('</Fax>')[0]
+        except:
+            cdrcgi.bail(boardInfo)
+    else:
+        myFax   = ''
+    
+    return [myName, myPhone, myFax, myEmail]
+
+
+#----------------------------------------------------------------------
+# Once the information for all board members has been collected create
+# the HTML table to be displayed
+#----------------------------------------------------------------------
+def makeSheet(rows):
+    #cdrcgi.bail(rows)
+    # Create the table and table headings
+    # ===================================
+    html = """
+       <table border="1" cellspacing="1" cellpadding="5">
+        <tr class="theader">"""
+    for k, v in [('Name','Yes'), ('Phone',phone), ('Fax',fax), 
+              ('Email',email), ('CDR-ID',cdrid)]:
+        if v == 'Yes':
+            html += """
+         <th class="thcell">%s</th>""" % k
+
+    html += """
+        </tr>"""
+
+    # Populate the table with data rows
+    # =================================
+    for row in rows:
+       html += """
+        <tr>
+         <td class="name">%s</td>""" % row[0]
+       if phone == 'Yes':
+           html += """
+         <td class="phone">%s</td>""" % row[1]
+       if fax   == 'Yes':
+           html += """
+         <td class="fax">%s</td>""" % row[2]
+       if email == 'Yes':
+           html += """
+         <td class="email">
+          <a href="mailto:%s">%s</a>
+         </td>""" % (row[3], row[3])
+       if cdrid == 'Yes':
+           html += """
+         <td class="cdrid">%s</td>
+        </tr>""" % row[4]
+
+    html += """
+       </table>"""
+    return html
+
+#----------------------------------------------------------------------
 # If we don't have a request, put up the form.
 #----------------------------------------------------------------------
 if not boardId:
     form   = """\
       <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-      <TABLE>
+      <TABLE border='0'>
        <TR>
         <TD ALIGN='right'><B>PDQ Board:&nbsp;</B></TD>
         <TD>%s</TD>
@@ -159,10 +260,49 @@ if not boardId:
         <TD>
          <INPUT TYPE='checkbox' NAME='ainfo'>
          Show Assistant Information
+         <div style="height: 10px"> </div>
+        </TD>
+       </TR>
+       <TR style="margin-top: 24px">
+        <TD ALIGN='right'> </TD>
+        <TD style="background-color: #BEBEBE">
+         <div style="height: 10px"> </div>
+         <INPUT TYPE='checkbox' NAME='sheet'>
+         Show Summary Sheet
+         <table>
+          <tr>
+           <td><span style="margin-left: 20px"> </span></td>
+           <td>
+            <input type='checkbox' name='pinfo' CHECKED>
+            Display Phone
+           </td>
+          </tr>
+          <tr>
+           <td> </td>
+           <td>
+            <input type='checkbox' name='finfo'>
+            Display Fax
+           </td>
+          </tr>
+          <tr>
+           <td> </td>
+           <td>
+            <input type='checkbox' name='einfo'>
+            Display Email
+           </td>
+          </tr>
+          <tr>
+           <td> </td>
+           <td>
+            <input type='checkbox' name='cinfo'>
+            Display CDR-ID
+           </td>
+          </tr>
+         </table>
         </TD>
        </TR>
        </TABLE>
-       <SCRIPT language='JavaScript'>
+       <SCRIPT language='JavaScript' type="text/javascript">
         <!--
          function report() {
              var form = document.forms[0];
@@ -172,6 +312,11 @@ if not boardId:
              else {
                  form.oinfo.value = form.oinfo.checked ? 'Yes' : 'No';
                  form.ainfo.value = form.ainfo.checked ? 'Yes' : 'No';
+                 form.sheet.value = form.sheet.checked ? 'summary' : 'full';
+                 form.pinfo.value = form.pinfo.checked ? 'Yes' : 'No';
+                 form.einfo.value = form.einfo.checked ? 'Yes' : 'No';
+                 form.cinfo.value = form.cinfo.checked ? 'Yes' : 'No';
+                 form.finfo.value = form.finfo.checked ? 'Yes' : 'No';
                  form.method      = 'GET';
                  form.submit();
              }
@@ -260,10 +405,12 @@ except cdrdb.Error, info:
 # Create the HTML Output Page
 # ---------------------------------------------------------------
 html = """\
-<!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
+<!DOCTYPE HTML PUBLIC '-//W3C//DTD HTML 4.01 Transitional//EN'
+                      'http://www.w3.org/TR/html4/loose.dtd'>
 <HTML>
  <HEAD>
   <TITLE>PDQ Board Member Roster Report - %s</title>
+  <META http-equiv='Content-Type' content='text/html; charset=UTF-8'>
   <STYLE type='text/css'>
    H1       { font-family: Arial, sans-serif; font-size: 16pt;
               text-align: center; font-weight: bold; }
@@ -280,20 +427,24 @@ html = """\
    I        { font-family: Arial, sans-serif; font-size: 12pt; 
               font-style: normal; }
    SPAN.SectionRef { text-decoration: underline; font-weight: bold; }
+
+   .theader { background-color: #CFCFCF; }
+   .name    { font-weight: bold; }
+   #main    { font-family: Arial, Helvetica, sans-serif;
+              font-size: 12pt; }
   </STYLE>
  </HEAD>  
- <BASEFONT FACE="Arial, Helvetica, sans-serif">
-  <BODY>   
+ <BODY id="main">   
   <CENTER>
-   <H1>%s</H1>
+   <H1>%s<br><span style="font-size: 12pt">%s</span></H1>
   </CENTER>
-""" % (boardName, boardName)   
+""" % (boardName, boardName, dateString)   
 
 for boardMember in boardMembers:
     response = cdr.filterDoc('guest',
                              ['set:Denormalization PDQBoardMemberInfo Set',
                               'name:Copy XML for Person 2',
-                              'name:PDQBoardMember Roster'],
+                              filterType[flavor]],
                              boardMember.id,
                              parm = [['otherInfo', otherInfo],
                                      ['assistant', assistant],
@@ -301,12 +452,29 @@ for boardMember in boardMembers:
                                       boardMember.isEic and 'Yes' or 'No']])
     if type(response) in (str, unicode):
         cdrcgi.bail("%s: %s" % (boardMember.id, response))
-    html += response[0]
+
+    # If we run the full report we just attach the resulting HTML 
+    # snippets to the previous output.  
+    # For the summary sheet we still need to extract the relevant
+    # information from the HTML snippet
+    # -----------------------------------------------------------
+    if flavor == 'full':
+        html += response[0]
+    else:
+        row = extractSheetInfo(response[0])
+        row = row + [boardMember.id]
+        allRows.append(row)
+ 
+# Create the HTML table for the summary sheet
+# -------------------------------------------
+if flavor == 'summary':
+    out  = makeSheet(allRows)
+    html += out
 
 boardManagerInfo = getBoardManagerInfo(boardId)
 
 html += """
-  <hr width="50%%"><br>
+  <br>
   <b><u>Board Manager Information</u></b><br>
   <b>%s</b><br>
   Office of Cancer Content Management (OCCM)<br>
@@ -331,7 +499,13 @@ html += """
   </table>
  </BODY>   
 </HTML>    
-""" % (boardManagerInfo[0][1], boardManagerInfo[2][1],
-       boardManagerInfo[1][1], boardManagerInfo[1][1])
+""" % (boardManagerInfo and boardManagerInfo[0][1] or 'No Board Manager', 
+       boardManagerInfo and boardManagerInfo[2][1] or 'TBD',
+       boardManagerInfo and boardManagerInfo[1][1] or 'TBD', 
+       boardManagerInfo and boardManagerInfo[1][1] or 'TBD')
 
-cdrcgi.sendPage(html)
+# The users don't want to display the country if it's the US.
+# Since the address is build by a common address module we're
+# better off removing it in the final HTML output
+# ------------------------------------------------------------
+cdrcgi.sendPage(html.replace('U.S.A.<br>', ''))
