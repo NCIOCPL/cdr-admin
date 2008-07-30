@@ -1,12 +1,16 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryDateLastModified.py,v 1.12 2008-07-18 15:07:27 venglisc Exp $
+# $Id: SummaryDateLastModified.py,v 1.13 2008-07-30 17:00:23 venglisc Exp $
 #
 # Report listing specified set of Cancer Information Summaries, the date
 # they were last modified as entered by a user, and the date the last
 # Modify action was taken.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.12  2008/07/18 15:07:27  venglisc
+# Fixed SQL query to pick up the documents DateLastModified instead of
+# (for the Spanish document) the DLM of the English summary. (Bug 4214)
+#
 # Revision 1.11  2007/11/05 17:33:52  bkline
 # Another cosmetic adjustment.
 #
@@ -62,6 +66,7 @@ buttons     = ["Submit", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 script      = "SummaryDateLastModified.py"
 title       = "CDR Administration"
 section     = "Summary Date Last Modified"
+today       = time.strftime('%Y-%m-%d')
 header      = cdrcgi.header(title, title, section, script, buttons,
                             stylesheet = """\
    <link type='text/css' rel='stylesheet' href='/stylesheets/CdrCalendar.css'>
@@ -558,6 +563,11 @@ class Styles:
         #align       = ExcelWriter.Alignment('Center', 'Top', True)
         self.url    = wb.addStyle(alignment = align, font = font)
 
+        # Create the style for the date.
+        font        = ExcelWriter.Font(name = 'Arial', size = 10, bold = True)
+        align       = ExcelWriter.Alignment('Left', 'Bottom', True)
+        self.date   = wb.addStyle(alignment = align, font = font)
+
 #----------------------------------------------------------------------
 # Create the workbook.
 #----------------------------------------------------------------------
@@ -588,7 +598,9 @@ row = sheet.addRow(1, styles.title)#, 15.75)
 row.addCell(1, bodyTitle, mergeAcross = 4 + extraCols)
 row = sheet.addRow(2, styles.title)#, 15.75)
 row.addCell(1, subtitle, mergeAcross = 4 + extraCols)
-rowNum = 4
+row = sheet.addRow(3, styles.date)#, 15.75)
+row.addCell(1, 'Date: ' + str(today), mergeAcross = 2)
+rowNum = 5
 
 #----------------------------------------------------------------------
 # Add rows for one section of the report.
