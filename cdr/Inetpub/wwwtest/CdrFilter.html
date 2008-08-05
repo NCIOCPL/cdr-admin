@@ -1,6 +1,6 @@
 <!DOCTYPE HTML PUBLIC '-//W3C//DTD HTML 4.01 Transitional//EN'
                       'http://www.w3.org/TR/html4/loose.dtd'>
-<!-- $Id: CdrFilter.html,v 1.10 2008-04-22 17:52:34 venglisc Exp $ -->
+<!-- $Id: CdrFilter.html,v 1.11 2008-08-05 14:21:15 venglisc Exp $ -->
 <HTML>
  <HEAD>
   <TITLE>CDR Document Filtering</TITLE>
@@ -42,6 +42,7 @@
         var std    = document.FilterRequest.stdword.checked;
         var mrk    = document.FilterRequest.rsmarkup[0].checked;
         var port   = document.FilterRequest.port.value;      
+        var newdtd = document.FilterRequest.newdtd.value;      
       //var uid    = document.FilterRequest.UserName.value;
       //var pwd    = document.FilterRequest.Password.value;
         var url    = base + "?DocId=" + doc
@@ -57,8 +58,9 @@
                    + "&external=" + ecmt
 		           + "&rsmarkup=" + mrk
                    + "&glossary=" + gls
-                   + "&stdword=" + std               
-                   + "&port=" + port               
+                   + "&stdword=" + std
+                   + "&port=" + port 
+                   + "&newdtd=" + newdtd 
                    + "&Filter=" + filt
                    + "&Filter1=" + filt1
                    + "&Filter2=" + filt2
@@ -288,8 +290,10 @@
      </TD>
      <TD><INPUT NAME='DocVer' 
                 VALUE='lastp' SIZE = '10'>
-      <B>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Port&nbsp;</B>
-      <INPUT NAME='port' VALUE='' SIZE='10'>
+      <B>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Port&nbsp;</B>
+      <INPUT NAME='port' VALUE='' SIZE='5'>
+      <B>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DTD&nbsp;</B>
+      <INPUT NAME='newdtd' value='pdqCG.dtd' size='14'>
      </TD>
     </TR>
     <TR>
