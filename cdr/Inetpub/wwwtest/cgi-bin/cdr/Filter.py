@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: Filter.py,v 1.29 2008-04-22 17:57:44 venglisc Exp $
+# $Id: Filter.py,v 1.30 2008-08-05 14:23:41 venglisc Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.29  2008/04/22 17:57:44  venglisc
+# Modified script to allow display of internal/external comments (Bug 2920).
+#
 # Revision 1.28  2008/02/26 23:32:14  venglisc
 # Modifications to use Lxml as our validator instead of pyXML.
 # Minor modifications to make HTML output valid.  (Bug 3923)
@@ -111,6 +114,10 @@ fields  = cgi.FieldStorage() or cdrcgi.bail("No Request Found", title)
 session = 'guest'
 cdrPort = fields.getvalue('port') or cdr.getPubPort()
 cdrPort = int(cdrPort)
+PDQDTD  = fields.getvalue('newdtd') or cdr.DEFAULT_DTD 
+if not PDQDTD == cdr.DEFAULT_DTD:
+    PDQDTD = cdr.PDQDTDPATH + '\\' + PDQDTD
+
 docId   = fields.getvalue(cdrcgi.DOCID) or cdrcgi.bail("No Document", title)
 docVer  = fields.getvalue('DocVer') or 0
 docVers = cdr.lastVersions('guest', cdr.normalize(docId), port = cdrPort)
@@ -320,7 +327,7 @@ def addRow(type, line):
 if valFlag:
     digits = re.sub('[^\d]', '', docId)
     idNum  = string.atoi(digits)
-    errObj = cdrpub.validateDoc(doc, idNum)
+    errObj = cdrpub.validateDoc(doc, idNum, dtd = PDQDTD)
     html = """\
 <!DOCTYPE HTML PUBLIC '-//W3C//DTD HTML 4.01 Transitional//EN'
                       'http://www.w3.org/TR/html4/loose.dtd'>
