@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: BoardRoster.py,v 1.10 2008-07-22 17:07:28 venglisc Exp $
+# $Id: BoardRoster.py,v 1.11 2008-08-08 22:27:36 venglisc Exp $
 #
 # Report to display the Board Roster with or without assistant
 # information.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.10  2008/07/22 17:07:28  venglisc
+# Added another option to create a summary sheet for the board managers to
+# display only the name, phone, email, fax, CDR-ID. (Bug 4204)
+#
 # Revision 1.9  2007/08/27 20:57:52  bkline
 # Change in address string at Sheri's request (#3553).
 #
@@ -50,6 +54,7 @@ phone      = fields and fields.getvalue("pinfo") or 'No'
 fax        = fields and fields.getvalue("finfo") or 'No'
 cdrid      = fields and fields.getvalue("cinfo") or 'No'
 email      = fields and fields.getvalue("einfo") or 'No'
+startDate  = fields and fields.getvalue("dinfo") or 'No'
 flavor     = fields and fields.getvalue("sheet") or 'full'
 session    = cdrcgi.getSession(fields)
 request    = cdrcgi.getRequest(fields)
@@ -57,8 +62,39 @@ title      = "PDQ Board Roster Report"
 instr      = "Report on PDQ Board Roster"
 script     = "BoardRoster.py"
 SUBMENU    = "Report Menu"
-buttons    = (SUBMENU, cdrcgi.MAINMENU)
-header     = cdrcgi.header(title, title, instr, script, buttons)
+buttons    = ("Submit", SUBMENU, cdrcgi.MAINMENU)
+header     = cdrcgi.header(title, title, instr, script, buttons, 
+                           stylesheet = """
+    <script type='text/javascript'>
+     function doSummarySheet() {
+         if (document.getElementById('summary').checked == true)
+             document.getElementById('summary').checked == false;
+         else
+             document.getElementById('summary').checked == true;
+
+         document.getElementById('contact').checked = false;
+         document.getElementById('assistant').checked = false;
+         var form = document.forms[0];
+         {
+             form.einfo.value = form.einfo.checked ? 'Yes' : 'No';
+             form.sheet.value = form.sheet.checked ? 'summary' : 'full';
+             form.pinfo.value = form.pinfo.checked ? 'Yes' : 'No';
+             form.cinfo.value = form.cinfo.checked ? 'Yes' : 'No';
+             form.dinfo.value = form.dinfo.checked ? 'Yes' : 'No';
+             form.finfo.value = form.finfo.checked ? 'Yes' : 'No';
+         }
+     }
+     function doFullReport() {
+         document.getElementById('summary').checked = false;
+         var form = document.forms[0];
+         {
+             form.oinfo.value = form.oinfo.checked ? 'Yes' : 'No';
+             form.ainfo.value = form.ainfo.checked ? 'Yes' : 'No';
+             form.sheet.value = form.sheet.checked ? 'summary' : 'full';
+         }
+     }
+    </script>
+""")
 boardId    = boardId and int(boardId) or None
 dateString = time.strftime("%B %d, %Y")
 
@@ -69,7 +105,7 @@ allRows   = []
 # We can only run one report at a time: Full or Summary
 # -----------------------------------------------------
 if flavor == 'summary' and (otherInfo == 'Yes' or assistant == 'Yes'):
-    cdrcgi.bail("Please uncheck the 'Summary' sheet to run 'Full' report")
+    cdrcgi.bail("Please uncheck 'Create Summary Sheet' to run 'Full' report")
 
 #----------------------------------------------------------------------
 # Handle navigation requests.
@@ -199,12 +235,14 @@ def makeSheet(rows):
     #cdrcgi.bail(rows)
     # Create the table and table headings
     # ===================================
+    rowCount = 0
     html = """
-       <table border="1" cellspacing="1" cellpadding="5">
         <tr class="theader">"""
     for k, v in [('Name','Yes'), ('Phone',phone), ('Fax',fax), 
-              ('Email',email), ('CDR-ID',cdrid)]:
+              ('Email',email), ('CDR-ID',cdrid), 
+              ('Start Date', startDate)]:
         if v == 'Yes':
+            rowCount += 1
             html += """
          <th class="thcell">%s</th>""" % k
 
@@ -230,12 +268,14 @@ def makeSheet(rows):
          </td>""" % (row[3], row[3])
        if cdrid == 'Yes':
            html += """
-         <td class="cdrid">%s</td>
-        </tr>""" % row[4]
+         <td class="cdrid">%s</td>""" % row[4]
+       if startDate == 'Yes':
+           html += """
+         <td class="cdrid">%s</td>""" % row[5]
+       html += """
+        </tr>"""
 
-    html += """
-       </table>"""
-    return html
+    return (html, rowCount)
 
 #----------------------------------------------------------------------
 # If we don't have a request, put up the form.
@@ -251,14 +291,16 @@ if not boardId:
        <TR>
         <TD ALIGN='right'> </TD>
         <TD>
-         <INPUT TYPE='checkbox' NAME='oinfo'>
+         <INPUT TYPE='checkbox' NAME='oinfo' id='contact'
+                onclick='jacascript:doFullReport()'>
          Show All Contact Information
         </TD>
        </TR>
        <TR>
         <TD ALIGN='right'> </TD>
         <TD>
-         <INPUT TYPE='checkbox' NAME='ainfo'>
+         <INPUT TYPE='checkbox' NAME='ainfo' id='assistant'
+                onclick='javascript:doFullReport()'>
          Show Assistant Information
          <div style="height: 10px"> </div>
         </TD>
@@ -267,70 +309,85 @@ if not boardId:
         <TD ALIGN='right'> </TD>
         <TD style="background-color: #BEBEBE">
          <div style="height: 10px"> </div>
-         <INPUT TYPE='checkbox' NAME='sheet'>
-         Show Summary Sheet
+         <INPUT TYPE='checkbox' NAME='sheet' id='summary'
+                onclick='javascript:doSummarySheet()'>
+          <strong >Create Summary Sheet</strong>
          <table>
+          <tr>
+           <th><span style="margin-left: 20px"> </span></th>
+           <th style="font-size: 10pt">Include Columns
           <tr>
            <td><span style="margin-left: 20px"> </span></td>
            <td>
-            <input type='checkbox' name='pinfo' CHECKED>
-            Display Phone
+            <input type='checkbox' name='pinfo' 
+                   onclick='javascript:doSummarySheet()' id='E1' CHECKED>
+            Phone
            </td>
           </tr>
           <tr>
            <td> </td>
            <td>
-            <input type='checkbox' name='finfo'>
-            Display Fax
+            <input type='checkbox' name='finfo' 
+                   onclick='javascript:doSummarySheet()' id='E2'>
+            Fax
            </td>
           </tr>
           <tr>
            <td> </td>
            <td>
-            <input type='checkbox' name='einfo'>
-            Display Email
+            <input type='checkbox' name='einfo' 
+                   onclick='javascript:doSummarySheet()' id='E3'>
+            Email
            </td>
           </tr>
           <tr>
            <td> </td>
            <td>
-            <input type='checkbox' name='cinfo'>
-            Display CDR-ID
+            <input type='checkbox' name='cinfo' 
+                   onclick='javascript:doSummarySheet()' id='E4'>
+            CDR-ID
+           </td>
+          </tr>
+          <tr>
+           <td> </td>
+           <td>
+            <input type='checkbox' name='dinfo' 
+                   onclick='javascript:doSummarySheet()' id='E5'>
+            StartDate
            </td>
           </tr>
          </table>
         </TD>
        </TR>
        </TABLE>
-       <SCRIPT language='JavaScript' type="text/javascript">
-        <!--
-         function report() {
-             var form = document.forms[0];
-             if (!form.board.value) {
-                 alert('Select a board first!');
-             }
-             else {
-                 form.oinfo.value = form.oinfo.checked ? 'Yes' : 'No';
-                 form.ainfo.value = form.ainfo.checked ? 'Yes' : 'No';
-                 form.sheet.value = form.sheet.checked ? 'summary' : 'full';
-                 form.pinfo.value = form.pinfo.checked ? 'Yes' : 'No';
-                 form.einfo.value = form.einfo.checked ? 'Yes' : 'No';
-                 form.cinfo.value = form.cinfo.checked ? 'Yes' : 'No';
-                 form.finfo.value = form.finfo.checked ? 'Yes' : 'No';
-                 form.method      = 'GET';
-                 form.submit();
-             }
-         }
-        // -->
-       </SCRIPT>
-       <BR>
-       <INPUT type='button' onclick='javascript:report()' value='Report'>
       </FORM>
      </BODY>
     </HTML>
 """ % (cdrcgi.SESSION, session, getBoardPicklist())
     cdrcgi.sendPage(cdrcgi.unicodeToLatin1(header + form))
 
+###       <SCRIPT language='JavaScript' type="text/javascript">
+###        <!--
+###         function report() {
+###             var form = document.forms[0];
+###             if (!form.board.value) {
+###                 alert('Select a board first!');
+###             }
+###             else {
+###                 form.oinfo.value = form.oinfo.checked ? 'Yes' : 'No';
+###                 form.ainfo.value = form.ainfo.checked ? 'Yes' : 'No';
+###                 form.sheet.value = form.sheet.checked ? 'summary' : 'full';
+###                 form.pinfo.value = form.pinfo.checked ? 'Yes' : 'No';
+###                 form.einfo.value = form.einfo.checked ? 'Yes' : 'No';
+###                 form.cinfo.value = form.cinfo.checked ? 'Yes' : 'No';
+###                 form.dinfo.value = form.dinfo.checked ? 'Yes' : 'No';
+###                 form.finfo.value = form.finfo.checked ? 'Yes' : 'No';
+###                 form.method      = 'GET';
+###                 form.submit();
+###             }
+###         }
+###        // -->
+###       </SCRIPT>
 #----------------------------------------------------------------------
 # Get the board's name from its ID.
 #----------------------------------------------------------------------
@@ -341,11 +398,14 @@ boardName = getBoardName(boardId)
 #----------------------------------------------------------------------
 class BoardMember:
     now = time.strftime("%Y-%m-%d")
-    def __init__(self, docId, start, finish, name):
-        self.id    = docId
-        self.name  = cleanTitle(name)
-        self.isEic = (start and start <= BoardMember.now and
-                      (not finish or finish > BoardMember.now))
+    def __init__(self, docId, eic_start, eic_finish, term_start, name):
+        self.id        = docId
+        self.name      = cleanTitle(name)
+        self.isEic     = (eic_start and eic_start <= BoardMember.now and
+                          (not eic_finish or eic_finish > BoardMember.now))
+        self.eicSdate  = eic_start
+        self.eicEdate  = eic_finish
+        self.termSdate = term_start
     def __cmp__(self, other):
         if self.isEic == other.isEic:
             return cmp(self.name.upper(), other.name.upper())
@@ -365,7 +425,8 @@ class BoardMember:
 #----------------------------------------------------------------------
 try:
     cursor.execute("""\
- SELECT DISTINCT member.doc_id, start.value, finish.value, person_doc.title
+ SELECT DISTINCT member.doc_id, eic_start.value, eic_finish.value, 
+                 term_start.value, person_doc.title
             FROM query_term member
             JOIN query_term curmemb
               ON curmemb.doc_id = member.doc_id
@@ -374,16 +435,21 @@ try:
               ON person.doc_id = member.doc_id
             JOIN document person_doc
               ON person_doc.id = person.doc_id
- LEFT OUTER JOIN query_term start
-              ON start.doc_id = member.doc_id
-             AND LEFT(start.node_loc, 4) = LEFT(member.node_loc, 4)
-             AND start.path   = '/PDQBoardMemberInfo/BoardMembershipDetails'
+ LEFT OUTER JOIN query_term eic_start
+              ON eic_start.doc_id = member.doc_id
+             AND LEFT(eic_start.node_loc, 4) = LEFT(member.node_loc, 4)
+             AND eic_start.path   = '/PDQBoardMemberInfo/BoardMembershipDetails'
                               + '/EditorInChief/TermStartDate'
- LEFT OUTER JOIN query_term finish
-              ON finish.doc_id = member.doc_id  
-             AND LEFT(finish.node_loc, 4) = LEFT(member.node_loc, 4)
-             AND finish.path  = '/PDQBoardMemberInfo/BoardMembershipDetails'
+ LEFT OUTER JOIN query_term eic_finish
+              ON eic_finish.doc_id = member.doc_id  
+             AND LEFT(eic_finish.node_loc, 4) = LEFT(member.node_loc, 4)
+             AND eic_finish.path  = '/PDQBoardMemberInfo/BoardMembershipDetails'
                               + '/EditorInChief/TermEndDate'
+ LEFT OUTER JOIN query_term term_start
+              ON term_start.doc_id = member.doc_id
+             AND LEFT(term_start.node_loc, 4) = LEFT(member.node_loc, 4)
+             AND term_start.path = '/PDQBoardMemberInfo/BoardMembershipDetails'
+                              + '/TermStartDate'
            WHERE member.path  = '/PDQBoardMemberInfo/BoardMembershipDetails'
                               + '/BoardName/@cdr:ref'
              AND curmemb.path = '/PDQBoardMemberInfo/BoardMembershipDetails'
@@ -394,8 +460,9 @@ try:
              AND member.int_val = ?""", boardId, timeout = 300)
     rows = cursor.fetchall()
     boardMembers = []
-    for docId, start, finish, name in rows:
-        boardMembers.append(BoardMember(docId, start, finish, name))
+    for docId, eic_start, eic_finish, term_start, name in rows:
+        boardMembers.append(BoardMember(docId, eic_start, eic_finish, 
+                                               term_start, name))
     boardMembers.sort()
 
 except cdrdb.Error, info:
@@ -412,13 +479,25 @@ html = """\
   <TITLE>PDQ Board Member Roster Report - %s</title>
   <META http-equiv='Content-Type' content='text/html; charset=UTF-8'>
   <STYLE type='text/css'>
-   H1       { font-family: Arial, sans-serif; font-size: 16pt;
-              text-align: center; font-weight: bold; }
-   H2       { font-family: Arial, sans-serif; font-size: 14pt;
-              text-align: center; font-weight: bold; }
-   TD.hdg   { font-family: Arial, sans-serif; font-size: 16pt;
+   H1       { font-family: Arial, sans-serif; 
+              font-size: 16pt;
+              text-align: center; 
               font-weight: bold; }
-   P        { font-family: Arial, sans-serif; font-size: 12pt; }
+   H2       { font-family: Arial, sans-serif; 
+              font-size: 14pt;
+              text-align: center; 
+              font-weight: bold; }
+   P        { font-family: Arial, sans-serif; 
+              font-size: 12pt; }
+   #summary td, #summary th
+            { border: 1px solid black; }
+   #hdg     { font-family: Arial, sans-serif; 
+              font-size: 16pt;
+              font-weight: bold; 
+              text-align: center; 
+              padding-bottom: 20px;
+              border: 0px; }
+   #summary { border: 0px; }
 
    /* The Board Member Roster information is created via a global */
    /* template for Persons.  The italic display used for the QC   */
@@ -434,11 +513,13 @@ html = """\
               font-size: 12pt; }
   </STYLE>
  </HEAD>  
- <BODY id="main">   
-  <CENTER>
+ <BODY id="main">
+""" % boardName
+
+if flavor == 'full':
+    html += """
    <H1>%s<br><span style="font-size: 12pt">%s</span></H1>
-  </CENTER>
-""" % (boardName, boardName, dateString)   
+""" % (boardName, dateString)   
 
 for boardMember in boardMembers:
     response = cdr.filterDoc('guest',
@@ -462,14 +543,23 @@ for boardMember in boardMembers:
         html += response[0]
     else:
         row = extractSheetInfo(response[0])
-        row = row + [boardMember.id]
+        row = row + [boardMember.id] + [boardMember.termSdate]
         allRows.append(row)
  
 # Create the HTML table for the summary sheet
 # -------------------------------------------
 if flavor == 'summary':
     out  = makeSheet(allRows)
-    html += out
+    html += """\
+       <table id="summary" cellspacing="1" cellpadding="5">
+        <tr>
+         <td id="hdg" colspan="%d">%s<br>
+           <span style="font-size: 12pt">%s</span>
+         </td>
+        </tr>
+        %s
+       </table>
+""" % (out[1], boardName, dateString, out[0])   
 
 boardManagerInfo = getBoardManagerInfo(boardId)
 
