@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolReports.py,v 1.36 2008-07-21 20:20:40 bkline Exp $
+# $Id: ProtocolReports.py,v 1.37 2008-08-13 19:52:59 bkline Exp $
 #
 # Submenu for protocol reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.36  2008/07/21 20:20:40  bkline
+# Added new Oncore reports at Kim's request (#4141).
+#
 # Revision 1.35  2008/07/21 17:26:18  bkline
 # Added CTEP reports.
 #
@@ -192,6 +195,8 @@ for r in (('ApprovedNotYetActive.py',
            'Protocols with Active Status But No Active Sites', ''),
           ('ProtocolINDReport.py',
            'Protocols with FDA IND Information (Excel)', ''),
+          ('Request4176.py',
+           'Protocols with Regulatory Info Block', ''),
           ('OutcomeMeasuresCodingReport.py',
            'Protocols without Outcomes', '&onlyMissing=Y')):
     form.append("<LI><A HREF='%s/%s?%s=%s%s'>%s</A></LI>\n" %
@@ -234,9 +239,7 @@ for r in (('RssImportReport.py', 'COG Import/Update Statistics Report',
            'CTEP Institutions with Address Information (Excel)',
            '&output=xls'),
           ('RssImportReport.py', 'NCIC Import/Update Statistics Report',
-           '&source=NCIC'),
-          ('RssImportReport.py', '',
-           '&source=Oncore')):
+           '&source=NCIC')):
     form.append("<LI><A HREF='%s/%s?%s=%s%s'>%s</A></LI>\n" %
                 (cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[2], r[1]))
 form.append("""\
