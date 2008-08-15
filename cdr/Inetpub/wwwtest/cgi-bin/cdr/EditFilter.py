@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditFilter.py,v 1.22 2008-06-03 21:58:55 bkline Exp $
+# $Id: EditFilter.py,v 1.23 2008-08-15 04:03:34 ameyer Exp $
 #
 # Prototype for editing CDR filter documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.22  2008/06/03 21:58:55  bkline
+# Replaced StandardError (going away at some point) with Exception objects.
+#
 # Revision 1.21  2008/04/29 19:57:34  ameyer
 # Some additional utf-8 fixes.
 #
@@ -353,7 +356,7 @@ def getProdId(docId, doc, session):
         uid, pwd = rows[0]
         reason = "Migrating new filter from development server"
         prodSession = cdr.login(uid, pwd, host = cdr.PROD_NAME)
-        if session.find("<Err") != -1:
+        if prodSession.find("<Err") != -1:
             cdrcgi.bail("Failure logging onto production server: %s" %
                     prodSession)
         doc = stripId(doc)
