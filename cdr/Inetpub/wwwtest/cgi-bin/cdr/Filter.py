@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: Filter.py,v 1.30 2008-08-05 14:23:41 venglisc Exp $
+# $Id: Filter.py,v 1.31 2008-08-18 16:25:07 venglisc Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.30  2008/08/05 14:23:41  venglisc
+# Modified program to allow passing of DTD file for validation. (Bug 4123)
+#
 # Revision 1.29  2008/04/22 17:57:44  venglisc
 # Modified script to allow display of internal/external comments (Bug 2920).
 #
@@ -356,7 +359,7 @@ if valFlag:
    </tr>
 """
         if filterWarning:
-            html += addRow('Warning', '%d:0:0:%s' % (idNum, filterWarning))
+            html += addRow('Warning', '%d:N/A:%s' % (idNum, filterWarning))
         for error in errObj:
             html += addRow(error.level_name, '%d:%s:%s' % (idNum, 
                                                          error.line,
