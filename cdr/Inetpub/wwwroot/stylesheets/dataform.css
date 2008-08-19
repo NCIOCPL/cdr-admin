@@ -1,133 +1,160 @@
   BODY { 
-		text-align: left;
-		color: Navy;
-		}
+        text-align: left;
+        color: Navy;
+        }
 
   .warning { 
-		font: 10pt "Arial";
-		}	
+        font: 10pt "Arial";
+        }	
 
   P { 
-		font: 14pt "Arial";
-		color: Navy;
-		background: transparent;
-		}
+        font: 14pt "Arial";
+        color: Navy;
+        background: transparent;
+        }
 
   H1 {
-		font: 30pt "Arial";
-		color: Navy;
-		font-weight: bold;
-		background: transparent;
-		}
+        font: 30pt "Arial";
+        color: Navy;
+        font-weight: bold;
+        background: transparent;
+        }
 
   H2 {
-		font: 20pt "Arial";
-		color: Navy;
-		font-weight: bold;
-		background: transparent;
-		}
+        font: 20pt "Arial";
+        color: Navy;
+        font-weight: bold;
+        background: transparent;
+        }
 
   H3 {
-		font: 16pt "Arial";
-		color: Navy;
-		font-weight: bold;
-		background: transparent;
-		}
+        font: 16pt "Arial";
+        color: Navy;
+        font-weight: bold;
+        background: transparent;
+        }
 
   H4 {
-		font: 14pt "Arial";
-		color: Navy;
-		font-weight: bold;
-		background: transparent;
-		}
+        font: 14pt "Arial";
+        color: Navy;
+        font-weight: bold;
+        background: transparent;
+        }
 
   H5 {
-		font: 10pt "Arial";
-		color: Navy;
-		font-weight: bold;
-		background: transparent;
-		}
+        font: 10pt "Arial";
+        color: Navy;
+        font-weight: bold;
+        background: transparent;
+        }
 
   TH {
-		font: 18pt "Arial";
-		color: Navy;
-		font-weight: bold;
-		}
+        font: 18pt "Arial";
+        color: Navy;
+        font-weight: bold;
+        }
 
   TD {	
-    	        font: 10pt "Arial";
-		color: Navy;
-		}
-
+        font: 10pt "Arial";
+        color: Navy;
+        }
   TD.docLabel {
-		font: 14pt "Arial";
-		color: Navy;
-		font-weight: bold;
-		background: transparent;
-		}
-
+        font: 14pt "Arial";
+        color: Navy;
+        font-weight: bold;
+        background: transparent;
+        }
   TD.docValue {
-		font: 12pt "Arial";
-		color: Navy;
-		font-weight: bold;
-		background: transparent;
-		}
+        font: 12pt "Arial";
+        color: Navy;
+        font-weight: bold;
+        background: transparent;
+        }
+  TR.odd { 
+        background-color: #F7F7F7; 
+        }
+  TR.even { 
+        background-color: #FFFFFF; 
+        }
+  TR.head { 
+        background-color: #E2E2E2; 
+        }
+
+  TR.rowitem:hover {
+        background: #DDDDDD; 
+        }
+  TD.cellitem:hover {
+        background: #DDDDDD;
+        }
 
   .colheading {
         color: Navy; 
-		font-weight: bold;
+        font-weight: bold;
         text-decoration: underline; 
-		}
+        }
 
   LI { 
-		font: 12pt "Arial";
-		font-weight: bold;
-		}	
+        font: 12pt "Arial";
+        font-weight: bold;
+        }	
 
   DL {	
 
-		}
+        }
 
   DT {
-		text-align: left;
-		font: 11pt "Arial";
-		font-weight: bold;
-		color: Navy;
-		}
+        text-align: left;
+        font: 11pt "Arial";
+        font-weight: bold;
+        color: Navy;
+        }
 
   DD {
-		text-align: left;
-		font: 12pt "Arial";
-		color: Navy;
-		}
+        text-align: left;
+        font: 12pt "Arial";
+        color: Navy;
+        }
+
+  FIELDSET {
+        width: 500px;
+        margin-left: auto;
+        margin-right: auto;
+        display: block;
+        }
+
+  LEGEND {
+        font-weight: bold;
+        color: teal;
+        font-family: sans-serif;
+        }
 
   B, STRONG { 
-		font-weight: bold
-		} 
+        font-weight: bold
+        } 
   I, CITE, EM, VAR, ADDRESS, BLOCKQUOTE { 
-		font-style: italic 
-		}
+        font-style: italic 
+        }
   PRE, TT, CODE, KBD, SAMP { 
-		font-family: monospace 
-		}
+        font-family: monospace 
+        }
 
 /* Display visited and non-visited links identically without */
 /* underlining the link.  Change color under mouse of link.  */
 /* ========================================================= */
    A:link       { 
-	        color: Navy;
-		text-decoration: none;
-	        background: transparent }
+        color: Navy;
+        text-decoration: none;
+        background: transparent }
    A:visited    {
-		color: Navy;
-		text-decoration: none;
-	        background: transparent }
+        color: Navy;
+        text-decoration: none;
+        background: transparent }
    A:active     { 
-		color: Navy;
-		text-decoration: none;
-	        background: transparent }
+        color: Navy;
+        text-decoration: none;
+        background: transparent }
    A:hover      { 
-	        color: Navy;
-	        text-decoration: none;
-	        background: #FFFFCC }
+        color: Navy;
+        text-decoration: none;
+        background: #FFFFCC }
 
