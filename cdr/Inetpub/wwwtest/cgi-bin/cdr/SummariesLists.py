@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummariesLists.py,v 1.6 2007-11-03 14:15:07 bkline Exp $
+# $Id: SummariesLists.py,v 1.7 2008-08-19 18:45:30 venglisc Exp $
 #
 # Report on lists of summaries.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2007/11/03 14:15:07  bkline
+# Unicode encoding cleanup (issue #3716).
+#
 # Revision 1.5  2007/05/01 23:56:23  venglisc
 # Added a count of summaries per board and corrected the display of the
 # newish CAM Advisory Board. (Bug 3204)
@@ -23,7 +26,7 @@
 # New report for CDR requests #1010/1011.
 #
 #----------------------------------------------------------------------
-import cgi, cdrcgi, time, cdrdb
+import cdr, cgi, cdrcgi, time, cdrdb
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -43,68 +46,87 @@ script    = "SummariesLists.py"
 SUBMENU   = "Report Menu"
 buttons   = (SUBMENU, cdrcgi.MAINMENU)
 
+
+# ---------------------------------------------------
 # Functions to replace sevaral repeated HTML snippets
-# ===================================================
+# ---------------------------------------------------
 def boardHeader(board_type):
     """Return the HTML code to display the Summary Board Header"""
     html = """\
   </DL>
-  <U><FONT size="+1">%s (%d)</FONT></U>
+  <span class="sectionHdr">%s (%d)</span>
   <DL>
 """ % (board_type, boardCount[board_type])
     return html
 
+
+# ---------------------------------------------------
+# 
+# ---------------------------------------------------
 def boardHeaderWithID(board_type):
     """Return the HTML code to display the Summary Board Header with ID"""
     html = """\
   </TABLE>
-  <P/>
 
-  <U><FONT size="+1">%s (%d)</FONT></U><P/>
+  <span class="sectionHdr">%s (%d)</span>
   <TABLE width = "100%%"> 
 """ % (board_type, boardCount[board_type])
     return html
 
+
+# ------------------------------------------------
+# Create the table row for the English list output
+# ------------------------------------------------
 def summaryRow(summary):
     """Return the HTML code to display a Summary row"""
     html = """\
-   <LI>%s</LI>
+   <LI class="report">%s</LI>
 """ % (row[1])
     return html
 
+
+# -------------------------------------------------
+# Create the table row for the English table output
+# -------------------------------------------------
 def summaryRowWithID(id, summary):
     """Return the HTML code to display a Summary row with ID"""
     html = """\
    <TR>
-    <TD width = "10%%" align = "right" valign = "top">%s</TD>
-    <TD width = "2%%"></TD>
-    <TD>%s</TD>
+    <TD class="report cdrid" width = "8%%">%s</TD>
+    <TD class="report">%s</TD>
    </TR>
 """ % (id, summary)
     return html
 
-def summaryRowSpan(summary, translation):
+
+# ------------------------------------------------
+# Create the table row for the Spanish list output
+# ------------------------------------------------
+def summaryRowES(summary, translation):
     """Return the HTML code to display a Spanish Summary"""
     html = """\
-   <LI>%s</LI>
-   <LI class="none">&nbsp;&nbsp;&nbsp;(%s)</LI>
+   <LI class="report">%s</LI>
+   <LI class="report">&nbsp;&nbsp;&nbsp;(%s)<div class="es"> </div></LI>
 """ % (row[1], row[4])
     return html
 
-def summaryRowSpanWithID(id, summary, translation):
+
+# -------------------------------------------------
+# Create the table row for the Spanish table output
+# -------------------------------------------------
+def summaryRowESWithID(id, summary, translation):
     """Return the HTML code to display a Spanish Summary row with ID"""
     html = """\
    <TR>
-    <TD width = "10%%" align = "right" valign = "top">%s</TD>
-    <TD width = "2%%"></TD>
-    <TD>%s<BR/>
+    <TD class="report cdrid" width = "8%%">%s</TD>
+    <TD class="report">%s<BR/>
      (%s)
     </TD>
    </TR>
 """ % (id, summary, translation)
     return html
 
-#----------------------------------------------------------------------
+
 # If the user only picked one summary group, put it into a list so we
 # can deal with the same data structure whether one or more were
 # selected.
@@ -112,7 +134,6 @@ def summaryRowSpanWithID(id, summary, translation):
 if type(groups) in (type(""), type(u"")):
     groups = [groups]
 
-#----------------------------------------------------------------------
 # Handle navigation requests.
 #----------------------------------------------------------------------
 if request == cdrcgi.MAINMENU:
@@ -138,106 +159,132 @@ dateString = time.strftime("%B %d, %Y")
 # If we don't have a request, put up the form.
 #----------------------------------------------------------------------
 if not lang:
-    header = cdrcgi.header(title, title, instr, script,
+    header = cdrcgi.header(title, title, instr + ' - ' + dateString, 
+                           script,
                            ("Submit",
                             SUBMENU,
                             cdrcgi.MAINMENU),
-                           numBreaks = 1)
+                           numBreaks = 1,
+                           stylesheet = """
+   <STYLE type="text/css">
+    TD      { font-size:  12pt; }
+    LI.none { list-style-type: none }
+    DL      { margin-left: 0; padding-left: 0 }
+   </STYLE>
+   <script language='JavaScript'>
+    function someEnglish() {
+        document.getElementById('allEn').checked = false;
+    }
+    function someSpanish() {
+        document.getElementById('allEs').checked = false;
+    }
+    function allEnglish(widget, n) {
+        for (var i = 1; i <= n; ++i)
+            document.getElementById('E' + i).checked = false;
+    }
+    function allSpanish(widget, n) {
+        for (var i = 1; i <= n; ++i)
+            document.getElementById('S' + i).checked = false;
+    }
+   </script>
+
+"""                           )
     form   = """\
    <input type='hidden' name='%s' value='%s'>
-   <table border='0'>
-    <tr>
-     <td colspan='3'>
-      %s<br><br>
-     </td>
-    </tr>
-   </table>
  
-   <table>
-    <tr>
-     <td width='160'>
-      <input name='audience' type='radio' value='Health Professional' CHECKED>
-      <b>Health Professional</b>
-     </td>
-     <td width='160'>
-      <input name='showId' type='radio' value='Y'><b>With CDR ID</b>
-     </td>
-    </tr>
-    <tr>
-     <td>
-      <input name='audience' type='radio' value='Patient'>
-       <b>Patient</b>
-     </td>
-     <td>
-      <input name='showId' type='radio' value='N' CHECKED><b>Without CDR ID</b>
-     </td>
-    </tr>
-   </table>
+   <fieldset>
+    <legend>&nbsp;Select Summary Audience&nbsp;</legend>
+    <input name='audience' type='radio' id="byHp"
+           value='Health Professional' CHECKED>
+    <label for="byHp">Health Professional</label>
+    <br>
+    <input name='audience' type='radio' id="byPat"
+           value='Patient'>
+    <label for="byPat">Patient</label>
+   </fieldset>
+   <fieldset>
+    <legend>&nbsp;Display CDR-ID?&nbsp;</legend>
+    <input name='showId' type='radio' id="idNo"
+           value='N' CHECKED>
+    <label for="idNo">Without CDR-ID</label>
+    <br>
+    <input name='showId' type='radio' id="idYes"
+           value='Y'>
+    <label for="idYes">With CDR-ID</label>
+   </fieldset>
 
-   <table>
-    <tr>
-     <td width="320">
-      <hr width="50%%"/>
-     </td>
-    </tr>
-   </table>
-
+   <fieldset>
+    <legend>&nbsp;Select Summary Language and Summary Type&nbsp;</legend>
    <table border = '0'>
     <tr>
      <td width=100>
-      <input name='lang' type='radio' value='English' CHECKED><b>English</b>
+      <input name='lang' type='radio' id="en" value='English' CHECKED>
+      <label for="en">English</label>
      </td>
      <td valign='top'>
-      <b>Select PDQ Summaries: (one or more)</b>
+      Select PDQ Summaries: (one or more)
      </td>
     </tr>
     <tr>
      <td></td>
      <td>
-      <input type='checkbox' name='grp' value='All English' CHECKED>
-       <b>All English</b><br>
-      <input type='checkbox' name='grp' value='Adult Treatment'>
-       <b>Adult Treatment</b><br>
-      <input type='checkbox' name='grp' value='Genetics'>
-       <b>Cancer Genetics</b><br>
+      <input type='checkbox' name='grp' value='All English' 
+             onclick="javascript:allEnglish(this, 6)" id="allEn" CHECKED>
+       <label id="allEn">All English</label><br>
+      <input type='checkbox' name='grp' value='Adult Treatment'
+             onclick="javascript:someEnglish()" id="E1">
+       <label id="E1">Adult Treatment</label><br>
+      <input type='checkbox' name='grp' value='Genetics'
+             onclick="javascript:someEnglish()" id="E2">
+       <label id="E2">Cancer Genetics</label><br>
       <input type='checkbox' name='grp'
-             value='Complementary and Alternative Medicine'>
-       <b>Complementary and Alternative Medicine</b><br>
-      <input type='checkbox' name='grp' value='Pediatric Treatment'>
-       <b>Pediatric Treatment</b><br>
-      <input type='checkbox' name='grp' value='Screening and Prevention'>
-       <b>Screening and Prevention</b><br>
-      <input type='checkbox' name='grp' value='Supportive Care'>
-       <b>Supportive Care</b><br><br>
+             value='Complementary and Alternative Medicine'
+                    onclick="javascript:someEnglish()" id="E3">
+       <label id="E3">Complementary and Alternative Medicine</b><br>
+      <input type='checkbox' name='grp' value='Pediatric Treatment'
+             onclick="javascript:someEnglish()" id="E4">
+       <label id="E4">Pediatric Treatment</label><br>
+      <input type='checkbox' name='grp' value='Screening and Prevention'
+             onclick="javascript:someEnglish()" id="E5">
+       <label id="E5">Screening and Prevention</label><br>
+      <input type='checkbox' name='grp' value='Supportive Care'
+             onclick="javascript:someEnglish()" id="E6">
+       <label id="E6">Supportive and Palliative Care</label><br><br>
      </td>
     </tr>
     <tr>
      <td width=100>
-      <input name='lang' type='radio' value='Spanish'><b>Spanish</b>
+      <input name='lang' type='radio' id="es" value='Spanish'>
+      <label for="es">Spanish</label>
      </td>
      <td valign='top'>
-      <b>Select PDQ Summaries: (one or more)</b>
+      Select PDQ Summaries: (one or more)
      </td>
     </tr>
     <tr>
      <td></td>
      <td>
-      <input type='checkbox' name='grp' value='All Spanish'>
-       <b>All Spanish</b><br>
-      <input type='checkbox' name='grp' value='Spanish Adult Treatment'>
-       <b>Adult Treatment</b><br>
-      <input type='checkbox' name='grp' value='Spanish Pediatric Treatment'>
-       <b>Pediatric Treatment</b><br>
-      <input type='checkbox' name='grp' value='Spanish Supportive Care'>
-       <b>Supportive Care</b><br>
+      <input type='checkbox' name='grp' value='All Spanish' 
+             onclick="javascript:allSpanish(this, 3)" id="allEs" CHECKED>
+       <label id="allEs">All Spanish</label><br>
+      <input type='checkbox' name='grp' value='Spanish Adult Treatment'
+             onclick="javascript:someSpanish()" id="S1" >
+       <label id="S1">Adult Treatment</label><br>
+      <input type='checkbox' name='grp' value='Spanish Pediatric Treatment'
+             onclick="javascript:someSpanish()" id="S2" >
+       <label id="S2">Pediatric Treatment</label><br>
+      <input type='checkbox' name='grp' value='Spanish Supportive Care'
+             onclick="javascript:someSpanish()" id="S3" >
+       <label id="S3">Supportive and Palliative Care</label><br>
      </td>
     </tr>
    </table>
+   </fieldset>
 
   </form>
  </body>
 </html>
-""" % (cdrcgi.SESSION, session, dateString)
+""" % (cdrcgi.SESSION, session)
     cdrcgi.sendPage(header + form)
 
 #----------------------------------------------------------------------
@@ -281,26 +328,36 @@ for i in range(len(groups)):
   else:
       boardPick += """'""" + groups[i] + """', """
 
-# --------------------------------------------------------------
 # Define the Headings under which the summaries should be listed
 # --------------------------------------------------------------
 q_case = """\
-       CASE WHEN board.value = 'CDR0000028327'  THEN 'Adult Treatment'
-            WHEN board.value = 'CDR0000035049'  THEN 'Adult Treatment'
-            WHEN board.value = 'CDR0000032120'  THEN 'Cancer Genetics'
-            WHEN board.value = 'CDR0000257061'  THEN 'Cancer Genetics'
-            WHEN board.value = 'CDR0000256158'  THEN 'Complementary and Alternative Medicine'
-            WHEN board.value = 'CDR0000423294'  THEN 'Complementary and Alternative Medicine'
-            WHEN board.value = 'CDR0000028557'  THEN 'Pediatric Treatment'
-            WHEN board.value = 'CDR0000028558'  THEN 'Pediatric Treatment'
-            WHEN board.value = 'CDR0000028536'  THEN 'Screening and Prevention'
-            WHEN board.value = 'CDR0000028537'  THEN 'Screening and Prevention'
-            WHEN board.value = 'CDR0000028579'  THEN 'Supportive Care'
-            WHEN board.value = 'CDR0000029837'  THEN 'Supportive Care'
+       CASE WHEN board.value = 'CDR0000028327'  
+                 THEN 'Adult Treatment'
+            WHEN board.value = 'CDR0000035049'  
+                 THEN 'Adult Treatment'
+            WHEN board.value = 'CDR0000032120'  
+                 THEN 'Cancer Genetics'
+            WHEN board.value = 'CDR0000257061'  
+                 THEN 'Cancer Genetics'
+            WHEN board.value = 'CDR0000256158'  
+                 THEN 'Complementary and Alternative Medicine'
+            WHEN board.value = 'CDR0000423294'  
+                 THEN 'Complementary and Alternative Medicine'
+            WHEN board.value = 'CDR0000028557'  
+                 THEN 'Pediatric Treatment'
+            WHEN board.value = 'CDR0000028558'  
+                 THEN 'Pediatric Treatment'
+            WHEN board.value = 'CDR0000028536'  
+                 THEN 'Screening and Prevention'
+            WHEN board.value = 'CDR0000028537'  
+                 THEN 'Screening and Prevention'
+            WHEN board.value = 'CDR0000028579'  
+                 THEN 'Supportive and Palliative Care'
+            WHEN board.value = 'CDR0000029837'  
+                 THEN 'Supportive and Palliative Care'
             ELSE board.value END
 """
 
-# ------------------------------------------------------------------------
 # Create the selection criteria for the summary language (English/Spanish)
 # ------------------------------------------------------------------------
 q_lang = """\
@@ -308,7 +365,6 @@ AND    lang.path = '/Summary/SummaryMetaData/SummaryLanguage'
 AND    lang.value = '%s'
 """ % lang
 
-# ---------------------------------------------------------------------
 # Define the selection criteria parts that are different for English or
 # Spanish documents:
 # q_fields:  Fields to be selected, i.e. the Spanish version needs to 
@@ -358,7 +414,6 @@ AND   qt.path          = '/Summary/TranslationOf/@cdr:ref'
 AND    board.value in (%s)
 """ % boardPick[:-2]
 
-# ---------------------------------------------------
 # Create selection criteria for HP or Patient version
 # ---------------------------------------------------
 if audience == 'Patient':
@@ -370,7 +425,6 @@ else:
 AND audience.value = 'Health professionals'
 """
 
-# -------------------------------------------------------------
 # Put all the pieces together for the SELECT statement
 # -------------------------------------------------------------
 query = """\
@@ -404,7 +458,6 @@ ORDER BY 6, 2
 if not query:
     cdrcgi.bail('No query criteria specified')   
 
-#----------------------------------------------------------------------
 # Submit the query to the database.
 #----------------------------------------------------------------------
 try:
@@ -430,17 +483,31 @@ for board in rows:
     else:
         boardCount[board[5]]  = 1
 
-#----------------------------------------------------------------------
 # Create the results page.
 #----------------------------------------------------------------------
 instr     = '%s Summaries List -- %s.' % (lang, dateString)
-header    = cdrcgi.header(title, title, instr, script, buttons, 
+header    = cdrcgi.rptHeader(title, instr, 
                           stylesheet = """\
    <STYLE type="text/css">
-    P       { font-family:  Arial };
-    LI,TD   { font:  11pt Arial }
-    LI.none { list-style-type: none }
-    DL      { margin-left: 0; padding-left: 0 }
+    DL             { margin-left:    0; 
+                     padding-left:   0;
+                     margin-top:    10px;
+                     margin-bottom: 30px; }
+    TABLE          { margin-top:    10px; 
+                     margin-bottom: 30px; } 
+
+    *.date         { font-size: 12pt; }
+    *.sectionHdr   { font-size: 12pt;
+                     font-weight: bold;
+                     text-decoration: underline; }
+    td.report      { font-size: 11pt;
+                     padding-right: 15px; 
+                     vertical-align: top; }
+    *.cdrid        { text-align: right }
+    LI             { list-style-type: none }
+    li.report      { font-size: 11pt;
+                     font-weight: normal; }
+    div.es          { height: 10px; }
    </STYLE>
 """)
 
@@ -448,17 +515,23 @@ header    = cdrcgi.header(title, title, instr, script, buttons,
 # Display the Report Title
 # -------------------------
 if lang == 'English':
-    report    = """\
-   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-  </FORM>
-  <H3>PDQ %s Summaries</H3>
-""" % (cdrcgi.SESSION, session, audience)
+    hdrLang = ''
 else:
-    report    = """\
+    hdrLang = lang
+
+report    = """\
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
   </FORM>
-  <H3>PDQ %s %s Summaries</H3>
-""" % (cdrcgi.SESSION, session, lang, audience)
+  <H3>PDQ %s %s Summaries<br>
+  <span class="date">(%s)</span>
+  </H3>
+""" % (cdrcgi.SESSION, session, hdrLang, audience, dateString)
+#else:
+#    report    = """\
+#   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
+#  </FORM>
+#  <H3>PDQ %s %s Summaries</H3>
+#""" % (cdrcgi.SESSION, session, lang, audience)
 
 board_type = rows[0][5]
 
@@ -474,7 +547,7 @@ board_type = rows[0][5]
 # ------------------------------------------------------------------------
 if showId == 'N':
     report += """\
-  <U><FONT size="+1">%s (%d)</FONT></U>
+  <span class="sectionHdr">%s (%d)</span>
   <DL>
 """ % (board_type, boardCount[board_type])
 
@@ -486,7 +559,7 @@ if showId == 'N':
             if lang == 'English':
                 report += summaryRow(row[1])
             else:
-                report += summaryRowSpan(row[1], row[4])
+                report += summaryRowES(row[1], row[4])
 
         # For the Treatment Summary Type we need to check if this is an 
         # adult or pediatric summary
@@ -497,7 +570,7 @@ if showId == 'N':
             if lang == 'English':
                 report += summaryRow(row[1])
             else:
-                report += summaryRowSpan(row[1], row[4])
+                report += summaryRowES(row[1], row[4])
 # ------------------------------------------------------------------------
 # Display data including CDR ID
 # English and Spanish data to be displayed identically except that the 
@@ -505,7 +578,7 @@ if showId == 'N':
 # ------------------------------------------------------------------------
 else:
     report += """\
-  <U><FONT size="+1">%s (%d)</FONT></U><P/>
+  <span class="sectionHdr">%s (%d)</span>
   <TABLE width = "100%%">
 """ % (board_type, boardCount[board_type])
 
@@ -517,14 +590,14 @@ else:
             if lang == 'English':
                 report += summaryRowWithID(row[0], row[1])
             else:
-                report += summaryRowSpanWithID(row[0], row[1], row[4])
+                report += summaryRowESWithID(row[0], row[1], row[4])
         else:
             board_type = row[5]
             report += boardHeaderWithID(board_type)
             if lang == 'English':
                 report += summaryRowWithID(row[0], row[1])
             else:
-                report += summaryRowSpanWithID(row[0], row[1], row[4])
+                report += summaryRowESWithID(row[0], row[1], row[4])
 
     report += """
   </TABLE>
@@ -535,7 +608,6 @@ footer = """\
 </HTML> 
 """     
 
-#----------------------------------------------------------------------
 # Send the page back to the browser.
 #----------------------------------------------------------------------
 cdrcgi.sendPage(header + report + footer)
