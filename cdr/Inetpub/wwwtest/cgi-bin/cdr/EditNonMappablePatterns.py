@@ -5,9 +5,12 @@
 # expressions (in SQL "LIKE" format) for CTGov Facility values that
 # cannot be mapped.
 #
-# $Id: EditNonMappablePatterns.py,v 1.1 2008-07-23 05:08:56 ameyer Exp $
+# $Id: EditNonMappablePatterns.py,v 1.2 2008-08-20 03:52:04 ameyer Exp $
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2008/07/23 05:08:56  ameyer
+# Initial version.
+#
 #----------------------------------------------------------------------
 import cgitb; cgitb.enable()
 
@@ -46,6 +49,7 @@ def showInitialScreen(session):
         cursor = conn.cursor()
         cursor.execute(qry)
         rows = cursor.fetchall()
+        cursor.close()
     except cdrdb.Error, info:
         cdrcgi.bail("Database error fetching patterns: %s" % str(info))
 
@@ -61,11 +65,14 @@ def showInitialScreen(session):
         alert("Please enter a pattern string in the input box to Add or View");
     }
     else {
-        var url="EditNonMappablePatterns.py?%s=" +
-                 document.getElementById("session").value +
-                 "&newAction=" + addOrView + "&newPattern=" +
-                 document.getElementById("newPattern").value;
-        location.href=url;
+        document.forms[0].Request.value = addOrView;
+        document.forms[0].newAction.value = addOrView;
+        document.forms[0].submit();
+        // var url="EditNonMappablePatterns.py?%s=" +
+        //          document.getElementById("session").value +
+        //          "&newAction=" + addOrView + "&newPattern=" +
+        //          document.getElementById("newPattern").value;
+        // location.href=url;
     }
  }
 </script>
@@ -102,6 +109,7 @@ To remove one, click the "<em>Del</em>" link for that pattern or the
     html += """
 </table>
 <input type="hidden" id="session" name="%s" value="%s" />
+<input type="hidden" name="newAction" />
 </form>
 </body>
 </html>
@@ -130,6 +138,26 @@ def checkPattern(action, session, patternId=None, pattern=None):
     """
     global MAINTITLE, SCRIPT
 
+    # Does pattern duplicate an existing one?
+    if action == "addNew":
+        try:
+            qry = """
+              SELECT count(*)
+                FROM external_map_nomap_pattern
+               WHERE pattern = ?
+            """
+            conn = cdrdb.connect("CdrGuest")
+            cursor = conn.cursor()
+            cursor.execute(qry, (pattern,))
+            row = cursor.fetchone()
+            cursor.close()
+        except cdrdb.Error, info:
+            cdrcgi.bail("Database error checking for pattern duplicate: %s" %
+                        str(info))
+        if row[0] > 0:
+            cdrcgi.bail('The pattern: "%s" is already in the database' %
+                         pattern)
+
     # Convert patternId if supplied
     if patternId:
         qry = """
@@ -142,6 +170,7 @@ def checkPattern(action, session, patternId=None, pattern=None):
             cursor = conn.cursor()
             cursor.execute(qry, (patternId,))
             row = cursor.fetchone()
+            cursor.close()
         except cdrdb.Error, info:
             cdrcgi.bail("Database error fetching pattern for id=%s: %s" % \
                         (patternId, str(info)))
@@ -159,19 +188,20 @@ def checkPattern(action, session, patternId=None, pattern=None):
           ON m.usage = u.id
        WHERE u.name = 'CT.gov Facilities'
          AND value LIKE ?
-    ORDER BY m.mappable DESC, m.value ASC
+    ORDER BY m.mappable DESC, m.doc_id DESC, m.value ASC
      """ % MAX_DISPLAY_VALUES
     try:
         conn = cdrdb.connect("CdrGuest")
         cursor = conn.cursor()
         cursor.execute(qry, (pattern,))
         rows = cursor.fetchall()
+        cursor.close()
     except cdrdb.Error, info:
         cdrcgi.bail("Database error fetching values for pattern=%s: %s" % \
                     (pattern, str(info)))
 
     valueCount = len(rows)
-    cdr.logwrite("Found %d hits" % valueCount)
+    # cdr.logwrite("Found %d hits" % valueCount)
 
     # Were any of the values already mapped
     mappedCount   = 0
@@ -185,7 +215,7 @@ def checkPattern(action, session, patternId=None, pattern=None):
 
     # Buttons depend on requested action.
     buttons = []
-    cdr.logwrite("checkPattern: action=%s" % action)
+    # cdr.logwrite("checkPattern: action=%s" % action)
     if action == "addNew":
         buttons.append("Confirm Add")
     if action == "delOld":
@@ -235,8 +265,6 @@ been mapped</p>
 <p>[Click the browser Back button to return to the pattern selection screen
 with no changes to the list of unmappable patterns.]</p>
 """
-    cdr.logwrite("valueCount=%d, mappableCount=%d, mappedCount=%d" %
-                 (valueCount, mappableCount, mappedCount))
     if mappableCount:
         html += showValues(rows, 0, mappableCount)
 
@@ -250,11 +278,12 @@ with no changes to the list of unmappable patterns.]</p>
         html += '<input type="hidden" name="oldId" value="%s" />\n' % oldId
     if newPattern:
         html += '<input type="hidden" name="newPattern" value="%s" />\n' % \
-                newPattern
+                cgi.escape(newPattern, True)
 
     # Termination
     html += """
 <input type="hidden" name="%s" value="%s" />
+<input type="hidden" name="newAction" />
 </form>
 </body>
 </html>
@@ -278,8 +307,6 @@ def showValues(rows, firstRow, count):
     Return:
         String of HTML.
     """
-    cdr.logwrite("showValues called with rowcount=%d, firstRow=%d, count=%d" %
-                 (len(rows), firstRow, count))
 
     # if firstRow has a docId, this is a table of mapped values
     showIds = ""
@@ -316,8 +343,6 @@ def showValues(rows, firstRow, count):
  </tr>
 """ % (docId, row[2], row[3], row[0]))
 
-    cdr.logwrite("Done loop, rowx=%d" % rowx)
-
     # Flatten to string
     html += "".join(htmlSeq) + "\n</table>\n"
 
@@ -334,37 +359,31 @@ def updateDB(session, oldId=None, newPattern=None):
     Return:
         No return, send confirmation to client.
     """
-    if newPattern:
-        cdr.logwrite("newPattern found, value=%s, type=%s" % (newPattern,
-                     type(newPattern)))
-    try:
-        conn = cdrdb.connect()
-        cursor = conn.cursor()
-    except cdrdb.Error, info:
-        cdrcgi.bail("Unable to connect to database for update: %s" % \
-                     str(info))
-
     # Define update
     if newPattern:
-        qry = """
+        try:
+            conn = cdrdb.connect()
+            cursor = conn.cursor()
+            cursor.execute("""\
           INSERT INTO external_map_nomap_pattern (pattern)
-               VALUES ('%s')
-        """ % newPattern
-        cdr.logwrite("Will execute insert qry: %s" % qry)
+               VALUES (?)
+            """, (newPattern,))
+            conn.commit()
+            cursor.close()
+        except cdrdb.Error, info:
+            cdrcgi.bail("Error inserting new pattern: %s" % str(info))
     else:
-        qry = """
+        try:
+            conn = cdrdb.connect()
+            cursor = conn.cursor()
+            cursor.execute("""\
           DELETE FROM external_map_nomap_pattern
-           WHERE id = %d
-        """ % int(oldId)
-        cdr.logwrite("Will execute delete qry: %s" % qry)
-
-    # Update
-    try:
-        cursor.execute(qry)
-        conn.commit()
-        cdr.logwrite("Executed: %s" % qry)
-    except cdrdb.Error, info:
-        cdrcgi.bail("Error updating database: %s" % str(info))
+           WHERE id = ?
+            """, (int(oldId),))
+            conn.commit()
+            cursor.close()
+        except cdrdb.Error, info:
+            cdrcgi.bail("Error deleting old pattern: %s" % str(info))
 
     # Tell user
     buttons = ("Another", cdrcgi.MAINMENU, "Log Out")
@@ -375,6 +394,7 @@ def updateDB(session, oldId=None, newPattern=None):
 <p>The update is complete, click "Another" above to perform another
 pattern update</p>
 <input type="hidden" name="%s" value="%s" />
+<input type="hidden" name="newAction" />
 </form>
 </body>
 </html>
@@ -397,8 +417,7 @@ if not session:
     cdrcgi.bail ("Unknown or expired CDR session.", logfile=LF)
 
 # User authorized?
-if not cdr.canDo (session, "MAKE GLOBAL CHANGES", "CTGovProtocol"):
-    cdrcgi.bail("session=%s" % session)
+if not cdr.canDo (session, "EDIT CTGOV MAP"):
     cdrcgi.bail (
     "Sorry, user not authorized to change external_map non-mappable patterns",
                  logfile=LF)
@@ -418,8 +437,8 @@ oldId      = fields.getvalue("oldId", None)
 newPattern = fields.getvalue("newPattern", None)
 newAction  = fields.getvalue("newAction", None)
 
-cdr.logwrite("Top: oldId=%s, newPattern=%s, newAction=%s" %
-              (oldId, newPattern, newAction))
+# cdr.logwrite("Top: oldId=%s, newPattern=%s, newAction=%s" %
+#               (oldId, newPattern, newAction))
 
 # Is this the first time we're in the function?
 if not request and not newAction:
