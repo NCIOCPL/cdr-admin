@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: Request4176.py,v 1.2 2008-08-21 15:06:56 bkline Exp $
+# $Id: Request4176.py,v 1.3 2008-08-21 15:08:26 bkline Exp $
 #
 # "Once we implement the regulatory information block, I would like  report
 # that we can run periodically or is generated weekly that lists the
@@ -12,6 +12,12 @@
 #    FDA IND info (if it exists)"
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2008/08/21 15:06:56  bkline
+# Rewritten; Sheri wants a spreadsheet now instead of a web-based
+# report, and the users have changed the schema in a way that
+# invalidated original logic for finding the RegulatoryInformation
+# blocks.
+#
 # Revision 1.1  2008/08/21 13:28:03  bkline
 # Report on trials with regulatory information, implemented in
 # accordance with original requirements.
@@ -82,7 +88,7 @@ class Protocol:
                     self.indNumber = cdr.getTextContent(child)
                 elif child.nodeName == 'INDSubmissionDate':
                     self.indSubmissionDate = cdr.getTextContent(child)
-                elif child.nodeName == 'indSerialNumber':
+                elif child.nodeName == 'INDSerialNumber':
                     self.indSerialNumber = cdr.getTextContent(child)
 
 cursor = cdrdb.connect('CdrGuest').cursor()
