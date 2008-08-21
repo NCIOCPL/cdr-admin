@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: Request4176.py,v 1.1 2008-08-21 13:28:03 bkline Exp $
+# $Id: Request4176.py,v 1.2 2008-08-21 15:06:56 bkline Exp $
 #
 # "Once we implement the regulatory information block, I would like  report
 # that we can run periodically or is generated weekly that lists the
@@ -12,8 +12,12 @@
 #    FDA IND info (if it exists)"
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2008/08/21 13:28:03  bkline
+# Report on trials with regulatory information, implemented in
+# accordance with original requirements.
+#
 #----------------------------------------------------------------------
-import cdrdb, xml.dom.minidom, cdr, cgi, cdrcgi
+import cdrdb, xml.dom.minidom, cdr, cgi, cdrcgi, ExcelWriter, time, sys
 
 class Protocol:
     def __init__(self, docId, cursor):
@@ -85,98 +89,62 @@ cursor = cdrdb.connect('CdrGuest').cursor()
 cursor.execute("""\
     SELECT DISTINCT doc_id
       FROM query_term
-     WHERE path LIKE '/InScopeProtocol/RegulatoryInformation' +
-                     '/ResponsibleParty/Responsible[PO]%on/[PO]%on/@cdr:ref'
+     WHERE path LIKE '/InScopeProtocol/RegulatoryInformation/FDARegulated'
   ORDER BY doc_id""")
 docIds = [row[0] for row in cursor.fetchall()]
-html = [u"""\
-<html>
- <head>
-  <title>Protocols with Regulatory Info Block</title>
-  <style type='text/css'>
-   body { font-family: Arial, sans-serif; }
-   h1   { font-size: 1.2em; color: maroon; }
-   .line { clear: both; }
-   .label { float: left; text-align: right; width: 200px;
-            color: blue; font-weight: bold;  }
-   .value { margin-left: 220px; }
-   .doc { border-top: solid blue 1px; clear: left; }
-  </style>
- </head>
- <body>
-  <h1>Protocols with Regulatory Info Block</h1>
-"""]
+book = ExcelWriter.Workbook()
+sheet = book.addWorksheet("Request4176")
+font = ExcelWriter.Font(bold = True)
+style = book.addStyle(font = font)
+sheet.addCol(1, 50)
+sheet.addCol(2, 200)
+sheet.addCol(3, 75)
+sheet.addCol(4, 80)
+sheet.addCol(5, 60)
+sheet.addCol(6, 120)
+sheet.addCol(7, 200)
+sheet.addCol(8, 100)
+sheet.addCol(9, 100)
+sheet.addCol(10, 125)
+sheet.addCol(11, 100)
+row = sheet.addRow(1, style)
+row.addCell(1, u"CDR ID", style)
+row.addCell(2, u"Protocol Title", style)
+row.addCell(3, u"Phase(s)", style)
+row.addCell(4, u"FDA Regulated", style)
+row.addCell(5, u"Section 801", style)
+row.addCell(6, u"IND Submission Date", style)
+row.addCell(7, u"Responsible Party", style)
+row.addCell(8, u"IND Grantor", style)
+row.addCell(9, u"IND Number", style)
+row.addCell(10, u"IND Submission Date", style)
+row.addCell(11, u"IND Serial Number", style)
+align = ExcelWriter.Alignment('Left', 'Top', wrap = True)
+style = book.addStyle(alignment = align)
+rowNum = 2
 for docId in docIds:
     protocol = Protocol(docId, cursor)
-    html.append(u"""\
-  <div class='doc'>
-   <div class='line'>
-    <div class='label'>Document ID</div>
-    <div class='value'>CDR%s</div>
-   </div>
-   <div class='line'>
-    <div class='label'>Protocol Title</div>
-    <div class='value'>%s</div>
-   </div>
-""" % (docId, cgi.escape(protocol.title)))
-    for phase in protocol.phases:
-        html.append(u"""\
-   <div class='line'>
-    <div class='label'>Phase</div>
-    <div class='value'>%s</div>
-   </div>
-""" % cgi.escape(phase))
-    fdaRegulated = section801 = delayedPosting = responsibleParty = u""
+    row = sheet.addRow(rowNum, style)
+    rowNum += 1
+    row.addCell(1, docId)
+    row.addCell(2, protocol.title)
+    row.addCell(3, u", ".join(protocol.phases))
     if protocol.regInfo:
-        fdaRegulated = cgi.escape(protocol.regInfo.fdaRegulated)
-        section801 = cgi.escape(protocol.regInfo.section801)
-        delayedPosting = cgi.escape(protocol.regInfo.delayedPosting)
-        responsibleParty = cgi.escape(protocol.regInfo.responsibleParty)
-    html.append(u"""\
-   <div class='line'>
-    <div class='label'>FDA Regulated</div>
-    <div class='value'>%s</div>
-   </div>
-   <div class='line'>
-    <div class='label'>Section 801</div>
-    <div class='value'>%s</div>
-   </div>
-   <div class='line'>
-    <div class='label'>IND Submission Date</div>
-    <div class='value'>%s</div>
-   </div>
-   <div class='line'>
-    <div class='label'>Responsible Party</div>
-    <div class='value'>%s</div>
-   </div>
-""" % (fdaRegulated, section801, delayedPosting, responsibleParty))
+        row.addCell(4, protocol.regInfo.fdaRegulated)
+        row.addCell(5, protocol.regInfo.section801)
+        row.addCell(6, protocol.regInfo.delayedPosting)
+        row.addCell(7, protocol.regInfo.responsibleParty)
     if protocol.fdaIndInfo:
-        html.append(u"""\
-   <div class='line'>
-    <div class='label'>IND Grantor</div>
-    <div class='value'>%s</div>
-   </div>
-   <div class='line'>
-    <div class='label'>IND Number</div>
-    <div class='value'>%s</div>
-   </div>
-   <div class='line'>
-    <div class='label'>IND Submission Date</div>
-    <div class='value'>%s</div>
-   </div>
-   <div class='line'>
-    <div class='label'>IND Serial Number</div>
-    <div class='value'>%s</div>
-   </div>
-""" % (cgi.escape(protocol.fdaIndInfo.indGrantor),
-       cgi.escape(protocol.fdaIndInfo.indNumber),
-       cgi.escape(protocol.fdaIndInfo.indSubmissionDate),
-       cgi.escape(protocol.fdaIndInfo.indSerialNumber)))
-    html.append(u"""\
-  </div>
-""")
-html.append(u"""\
- </body>
-</html>""")
-html = u"".join(html)
-cdrcgi.sendPage(html)
+        row.addCell(8, protocol.fdaIndInfo.indGrantor)
+        row.addCell(9, protocol.fdaIndInfo.indNumber)
+        row.addCell(10, protocol.fdaIndInfo.indSubmissionDate)
+        row.addCell(11, protocol.fdaIndInfo.indSerialNumber)
+if sys.platform == "win32":
+    import os, msvcrt
+    msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
+now = time.strftime("%Y%m%d%H%M%S")
+name = "Request4176-%s.xls" % now
+print "Content-type: application/vnd.ms-excel"
+print "Content-Disposition: attachment; filename=%s" % name
+print
+book.write(sys.stdout, True)
