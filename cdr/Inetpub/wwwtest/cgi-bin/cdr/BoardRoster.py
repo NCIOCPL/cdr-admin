@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: BoardRoster.py,v 1.11 2008-08-08 22:27:36 venglisc Exp $
+# $Id: BoardRoster.py,v 1.12 2008-08-22 19:24:25 venglisc Exp $
 #
 # Report to display the Board Roster with or without assistant
 # information.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.11  2008/08/08 22:27:36  venglisc
+# Added TermStartDate as column to summary sheet. (Bug 4236)
+#
 # Revision 1.10  2008/07/22 17:07:28  venglisc
 # Added another option to create a summary sheet for the board managers to
 # display only the name, phone, email, fax, CDR-ID. (Bug 4204)
@@ -64,13 +67,25 @@ script     = "BoardRoster.py"
 SUBMENU    = "Report Menu"
 buttons    = ("Submit", SUBMENU, cdrcgi.MAINMENU)
 header     = cdrcgi.header(title, title, instr, script, buttons, 
+                           method = 'GET', 
                            stylesheet = """
     <script type='text/javascript'>
-     function doSummarySheet() {
-         if (document.getElementById('summary').checked == true)
-             document.getElementById('summary').checked == false;
+     function doSummarySheet(box) {
+         if (box == 'summary')
+             {
+             if (document.getElementById('summary').checked == true)
+                 {
+                 document.getElementById('summary').checked = true;
+                 }
+             else
+                 {
+                 document.getElementById('summary').checked = false;
+                 }
+             }
          else
-             document.getElementById('summary').checked == true;
+             {
+             document.getElementById('summary').checked = true;
+             }
 
          document.getElementById('contact').checked = false;
          document.getElementById('assistant').checked = false;
@@ -154,7 +169,7 @@ def cleanTitle(title):
 #     ID based on the board selected in the first call.
 #----------------------------------------------------------------------
 def getBoardPicklist():
-    picklist = "<SELECT NAME='board'>\n"
+    picklist = "<SELECT NAME='board' onchange='javascript:doSummarySheet('summary')'>\n"
     sel      = " SELECTED"
     try:
         cursor.execute("""\
@@ -228,11 +243,50 @@ def extractSheetInfo(boardInfo):
 
 
 #----------------------------------------------------------------------
+# Add the specific information to the boardInfo records
+#----------------------------------------------------------------------
+def addSpecificContactInfo(boardIds, boardInfo):
+    newBoardInfo = []
+    try:
+        cursor.execute("""\
+SELECT q.doc_id, q.value as SpPhone, f.value as SpFax, e.value as SpEmail
+  FROM query_term q
+LEFT OUTER JOIN query_term f
+    ON q.doc_id = f.doc_id
+   AND f.path = '/PDQBoardMemberInfo/BoardMemberContact' +
+                '/SpecificBoardMemberContact/BoardContactFax'
+LEFT OUTER JOIN query_term e
+    ON q.doc_id = e.doc_id
+   AND e.path = '/PDQBoardMemberInfo/BoardMemberContact/' +
+                'SpecificBoardMemberContact/BoardContactEmail'
+ WHERE q.doc_id IN (%s)
+   AND q.path = '/PDQBoardMemberInfo/BoardMemberContact' +
+                '/SpecificBoardMemberContact/BoardContactPhone'
+ ORDER BY q.path""" % ','.join(["'%d'" % id for id in boardIds]))
+    except cdrdb.Error, info:
+        cdrcgi.bail('Database query failure for SpecificInfo: %s' % info[1][0]+
+                    '<br>Board has No Board Members')
+
+    rows = cursor.fetchall()
+
+    # Add the specific info to the boardInfo records
+    # ----------------------------------------------
+    for member in boardInfo:
+        memCount = len(member)
+        for cdrId, phone, fax, email in rows:
+            if member[4] == cdrId:
+                member = member + [phone or None, fax or None, email or None]
+        if memCount == len(member):
+            member = member + [None, None, None]
+        newBoardInfo.append(member)
+    return newBoardInfo
+
+
+#----------------------------------------------------------------------
 # Once the information for all board members has been collected create
 # the HTML table to be displayed
 #----------------------------------------------------------------------
 def makeSheet(rows):
-    #cdrcgi.bail(rows)
     # Create the table and table headings
     # ===================================
     rowCount = 0
@@ -251,21 +305,47 @@ def makeSheet(rows):
 
     # Populate the table with data rows
     # =================================
+    #for row in name, phone, fax, email, cdrid, termStardDate, spPhone, ...
     for row in rows:
        html += """
         <tr>
          <td class="name">%s</td>""" % row[0]
        if phone == 'Yes':
            html += """
-         <td class="phone">%s</td>""" % row[1]
+         <td class="phone">%s""" % row[1]
+           if row[1] and row[6]:
+               html += "<br>%s</td>" % row[6]
+           elif not row[1] and row[6]:
+               html += "%s</td>" % row[6]
+           else:
+               html += "</td>"
+
        if fax   == 'Yes':
            html += """
-         <td class="fax">%s</td>""" % row[2]
+         <td class="fax">%s""" % row[2]
+           if row[2] and row[7]:
+               html += "<br>%s</td>" % row[7]
+           elif not row[2] and row[7]:
+               html += "%s</td>" % row[7]
+           else:
+               html += "</td>"
+
        if email == 'Yes':
            html += """
          <td class="email">
           <a href="mailto:%s">%s</a>
-         </td>""" % (row[3], row[3])
+         """ % (row[3], row[3])
+           if row[3] and row[8]:
+               html += """<br>
+          <a href="mailto:%s">%s</a>
+         """ % (row[8], row[8])
+           elif not row[3] and row[8]:
+               html += """
+          <a href="mailto:%s">%s</a>
+         </td>""" % (row[8], row[8])
+           else:
+               html += "</td>"
+
        if cdrid == 'Yes':
            html += """
          <td class="cdrid">%s</td>""" % row[4]
@@ -310,7 +390,7 @@ if not boardId:
         <TD style="background-color: #BEBEBE">
          <div style="height: 10px"> </div>
          <INPUT TYPE='checkbox' NAME='sheet' id='summary'
-                onclick='javascript:doSummarySheet()'>
+                onclick='javascript:doSummarySheet("summary")'>
           <strong >Create Summary Sheet</strong>
          <table>
           <tr>
@@ -366,28 +446,6 @@ if not boardId:
 """ % (cdrcgi.SESSION, session, getBoardPicklist())
     cdrcgi.sendPage(cdrcgi.unicodeToLatin1(header + form))
 
-###       <SCRIPT language='JavaScript' type="text/javascript">
-###        <!--
-###         function report() {
-###             var form = document.forms[0];
-###             if (!form.board.value) {
-###                 alert('Select a board first!');
-###             }
-###             else {
-###                 form.oinfo.value = form.oinfo.checked ? 'Yes' : 'No';
-###                 form.ainfo.value = form.ainfo.checked ? 'Yes' : 'No';
-###                 form.sheet.value = form.sheet.checked ? 'summary' : 'full';
-###                 form.pinfo.value = form.pinfo.checked ? 'Yes' : 'No';
-###                 form.einfo.value = form.einfo.checked ? 'Yes' : 'No';
-###                 form.cinfo.value = form.cinfo.checked ? 'Yes' : 'No';
-###                 form.dinfo.value = form.dinfo.checked ? 'Yes' : 'No';
-###                 form.finfo.value = form.finfo.checked ? 'Yes' : 'No';
-###                 form.method      = 'GET';
-###                 form.submit();
-###             }
-###         }
-###        // -->
-###       </SCRIPT>
 #----------------------------------------------------------------------
 # Get the board's name from its ID.
 #----------------------------------------------------------------------
@@ -460,9 +518,11 @@ try:
              AND member.int_val = ?""", boardId, timeout = 300)
     rows = cursor.fetchall()
     boardMembers = []
+    boardIds     = []
     for docId, eic_start, eic_finish, term_start, name in rows:
         boardMembers.append(BoardMember(docId, eic_start, eic_finish, 
                                                term_start, name))
+        boardIds.append(docId)
     boardMembers.sort()
 
 except cdrdb.Error, info:
@@ -508,7 +568,10 @@ html = """\
    SPAN.SectionRef { text-decoration: underline; font-weight: bold; }
 
    .theader { background-color: #CFCFCF; }
-   .name    { font-weight: bold; }
+   .name    { font-weight: bold; 
+              vertical-align: top; }
+   .phone, .email, .fax, .cdrid
+            { vertical-align: top; }
    #main    { font-family: Arial, Helvetica, sans-serif;
               font-size: 12pt; }
   </STYLE>
@@ -521,6 +584,7 @@ if flavor == 'full':
    <H1>%s<br><span style="font-size: 12pt">%s</span></H1>
 """ % (boardName, dateString)   
 
+count = 0
 for boardMember in boardMembers:
     response = cdr.filterDoc('guest',
                              ['set:Denormalization PDQBoardMemberInfo Set',
@@ -538,9 +602,18 @@ for boardMember in boardMembers:
     # snippets to the previous output.  
     # For the summary sheet we still need to extract the relevant
     # information from the HTML snippet
+    #
+    # We need to wrap each person in a table in order to prevent
+    # page breaks within address blocks after the convertion to 
+    # MS-Word.
     # -----------------------------------------------------------
     if flavor == 'full':
-        html += response[0]
+        html += """
+        <table width='100%%'>
+         <tr>
+          <td>%s<td>
+         </tr>
+        </table>""" % response[0]
     else:
         row = extractSheetInfo(response[0])
         row = row + [boardMember.id] + [boardMember.termSdate]
@@ -549,9 +622,10 @@ for boardMember in boardMembers:
 # Create the HTML table for the summary sheet
 # -------------------------------------------
 if flavor == 'summary':
+    allRows = addSpecificContactInfo(boardIds, allRows)
     out  = makeSheet(allRows)
     html += """\
-       <table id="summary" cellspacing="1" cellpadding="5">
+       <table id="summary" cellspacing="0" cellpadding="5">
         <tr>
          <td id="hdg" colspan="%d">%s<br>
            <span style="font-size: 12pt">%s</span>
@@ -565,26 +639,32 @@ boardManagerInfo = getBoardManagerInfo(boardId)
 
 html += """
   <br>
-  <b><u>Board Manager Information</u></b><br>
-  <b>%s</b><br>
-  Office of Cancer Content Management (OCCM)<br>
-  Office of Communications and Education<br>
-  National Cancer Institute<br>
-  MSC-8321, Suite 300A<br>
-  6116 Executive Blvd.<br>
-  Bethesda, MD 20892-8321<br><br>
-  <table border="0" width="100%%" cellspacing="0" cellpadding="0">
+  <table width='100%%'>
    <tr>
-    <td width="35%%">Phone</td>
-    <td width="65%%">%s</td>
-   </tr>
-   <tr>
-    <td>Fax</td>
-    <td>301-480-8105</td>
-   </tr>
-   <tr>
-    <td>Email</td>
-    <td><a href="mailto:%s">%s</a></td>
+    <td>
+     <b><u>Board Manager Information</u></b><br>
+     <b>%s</b><br>
+     Office of Cancer Content Management (OCCM)<br>
+     Office of Communications and Education<br>
+     National Cancer Institute<br>
+     MSC-8321, Suite 300A<br>
+     6116 Executive Blvd.<br>
+     Bethesda, MD 20892-8321<br><br>
+     <table border="0" width="100%%" cellspacing="0" cellpadding="0">
+      <tr>
+       <td width="35%%">Phone</td>
+       <td width="65%%">%s</td>
+      </tr>
+      <tr>
+       <td>Fax</td>
+       <td>301-480-8105</td>
+      </tr>
+      <tr>
+       <td>Email</td>
+       <td><a href="mailto:%s">%s</a></td>
+      </tr>
+     </table>
+       </td>
    </tr>
   </table>
  </BODY>   
