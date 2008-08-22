@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
 #
-# $Id: BoardManagers.py,v 1.13 2007-11-05 13:10:25 kidderc Exp $
+# $Id: BoardManagers.py,v 1.14 2008-08-22 19:40:04 venglisc Exp $
 #
 # Main menu for board managers.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.13  2007/11/05 13:10:25  kidderc
+# 3672,3666 added two items to menu under Management Reports.
+#
 # Revision 1.12  2005/10/13 21:33:16  venglisc
 # Modified title of one menu item and moved another. (Bug 1853)
 #
@@ -106,6 +109,7 @@ form += """\
 """
 
 for choice in (
+    ('BoardMeetingDates.py',       'Board Meeting Dates'          ),
     ('SummaryChanges.py',          'History of Changes to Summary'),
     ('SummaryCitations.py',        'Summaries Citations'          ),
     ('SummaryDateLastModified.py', 'Summaries Date Last Modified' ),
