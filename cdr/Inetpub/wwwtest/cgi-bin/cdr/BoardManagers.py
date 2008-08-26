@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
 #
-# $Id: BoardManagers.py,v 1.14 2008-08-22 19:40:04 venglisc Exp $
+# $Id: BoardManagers.py,v 1.15 2008-08-26 21:16:18 venglisc Exp $
 #
 # Main menu for board managers.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.14  2008/08/22 19:40:04  venglisc
+# Adding new menu option for Board Meeting Dates. (Bug 4205)
+#
 # Revision 1.13  2007/11/05 13:10:25  kidderc
 # 3672,3666 added two items to menu under Management Reports.
 #
@@ -110,14 +113,17 @@ form += """\
 
 for choice in (
     ('BoardMeetingDates.py',       'Board Meeting Dates'          ),
+    ('ChangesToSummaries.py',      'Changes to Summaries'         ),
     ('SummaryChanges.py',          'History of Changes to Summary'),
     ('SummaryCitations.py',        'Summaries Citations'          ),
     ('SummaryDateLastModified.py', 'Summaries Date Last Modified' ),
     ('SummariesLists.py',          'Summaries Lists'              ),
     ('SummaryMetaData.py',         'Summaries Metadata'           ),
     ('SummariesTocReport.py',      'Summaries TOC Lists'          ),
-    ('SummariesWithProtocolLinks.py',      'Summaries with Protocols Links/Refs Report'),
-    ('SummariesWithNonJournalArticleCitations.py',      'Summaries with Non-Journal Article Citations Report')
+    ('SummariesWithProtocolLinks.py',      
+                      'Summaries with Protocols Links/Refs Report'),
+    ('SummariesWithNonJournalArticleCitations.py',      
+             'Summaries with Non-Journal Article Citations Report')
     ):
     form += """\
     <LI><a href='%s/%s?%s'>%s</a></LI>
