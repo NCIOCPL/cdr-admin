@@ -5,9 +5,14 @@
 # expressions (in SQL "LIKE" format) for CTGov Facility values that
 # cannot be mapped.
 #
-# $Id: EditNonMappablePatterns.py,v 1.3 2008-08-22 04:00:57 ameyer Exp $
+# $Id: EditNonMappablePatterns.py,v 1.4 2008-08-26 19:31:58 ameyer Exp $
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2008/08/22 04:00:57  ameyer
+# Added ability to review all existing external_map strings and make any
+# non-mappable that match the patterns.
+# Also made a number of user interface tweaks.
+#
 # Revision 1.2  2008/08/20 03:52:04  ameyer
 # Numerous changes, had to replace simple URL link with javascript.
 #
@@ -60,7 +65,8 @@ def showInitialScreen(session):
 
     # Construct the form
     buttons = (cdrcgi.MAINMENU, "Log Out")
-    html = cdrcgi.header(MAINTITLE, MAINTITLE, "Add, delete, or view pattern",
+    html = u""
+    html += cdrcgi.header(MAINTITLE, MAINTITLE, "Add, delete, or view pattern",
                          script=SCRIPT, buttons=buttons, stylesheet="""\
 <script type="text/javascript">
  function sendPattern(addOrView) {
@@ -154,7 +160,6 @@ def propagatePatterns(session, runMode):
         runMode - 'test' = just report results.
                   'run'  = update the database and report results.
     """
-    cdr.logwrite("Applying patterns")
     # DEBUG runMode = "test"
     # Instantiate an object that does everything
     try:
@@ -183,9 +188,9 @@ def showNomapReport(noMapObj, runMode):
         noMapObj - ExternalMapPatternCheck object.
         runMode  - 'test' or 'run'
     """
-    cdr.logwrite("Showing report for Applying patterns")
     buttons = (cdrcgi.MAINMENU, "Log Out")
-    html = cdrcgi.header(MAINTITLE, MAINTITLE, "Results of ApplyPatterns",
+    html = u""
+    html += cdrcgi.header(MAINTITLE, MAINTITLE, "Results of ApplyPatterns",
                          script=SCRIPT, buttons=buttons)
 
     # Get summary counts
@@ -369,7 +374,8 @@ def checkPattern(action, session, patternId=None, pattern=None):
     buttons += [cdrcgi.MAINMENU, "Log Out"]
 
     # Construct the form
-    html = cdrcgi.header(MAINTITLE, MAINTITLE, "View values matching pattern",
+    html = u""
+    html += cdrcgi.header(MAINTITLE, MAINTITLE, "View values matching pattern",
                          script=SCRIPT, buttons=buttons)
 
     # Show the pattern string
@@ -434,7 +440,6 @@ with no changes to the list of unmappable patterns.]</p>
 </body>
 </html>
 """ % (cdrcgi.SESSION, session)
-
     cdrcgi.sendPage(html)
 
 def showValues(rows, firstRow, count):
@@ -456,7 +461,7 @@ def showValues(rows, firstRow, count):
 
     # if firstRow has a docId, this is a table of mapped values
     showIds = ""
-    html    = ""
+    html    = u""
     if rows[firstRow][3] == 'Y':
         html += "\n<h3>%d Mappable values</h3>\n" % count
         showIds = "\n  <td>DocID</td\n"
@@ -467,7 +472,7 @@ def showValues(rows, firstRow, count):
  <tr>%s
   <td>Bogus</td>
   <td>Mpbl</td>
-  <td>Value from tde external map table</td>
+  <td>Value from the external map table</td>
  </tr>
 """ % showIds
 
@@ -490,7 +495,7 @@ def showValues(rows, firstRow, count):
 """ % (docId, row[2], row[3], row[0]))
 
     # Flatten to string
-    html += "".join(htmlSeq) + "\n</table>\n"
+    html += u"".join(htmlSeq) + "\n</table>\n"
 
     return html
 
@@ -533,7 +538,8 @@ def updateDB(session, oldId=None, newPattern=None):
 
     # Tell user
     buttons = ("Continue", cdrcgi.MAINMENU, "Log Out")
-    html = cdrcgi.header(MAINTITLE, MAINTITLE, "Update completed",
+    html = u""
+    html += cdrcgi.header(MAINTITLE, MAINTITLE, "Update completed",
                          script=SCRIPT, buttons=buttons)
 
     html += """
@@ -584,8 +590,7 @@ newPattern    = fields.getvalue("newPattern", None)
 newAction     = fields.getvalue("newAction", None)
 applyPatterns = fields.getvalue("applyPatterns", None)
 
-cdr.logwrite("request=%s oldId=%s newPattern=%s applyPatterns=%s newAction=%s" %
-(request, oldId, newPattern, applyPatterns, newAction))
+# cdr.logwrite("request=%s oldId=%s newPattern=%s applyPatterns=%s newAction=%s" % (request, oldId, newPattern, applyPatterns, newAction))
 
 # Is this the first time we're in the function?
 if not (request or newAction or applyPatterns):
