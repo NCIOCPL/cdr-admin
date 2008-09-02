@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------
-# $Id: EditDocType.py,v 1.3 2002-02-21 15:22:02 bkline Exp $
+# $Id: EditDocType.py,v 1.4 2008-09-02 19:36:35 bkline Exp $
 #
 # Prototype for editing CDR document types.
 #----------------------------------------------------------------------
@@ -85,6 +85,7 @@ html = """\
 <HTML>
  <HEAD>
   <TITLE>CDR Document Types</TITLE>
+  <META http-equiv='Content-Type' content='text/html;charset=utf-8'>
  </HEAD>
  <BASEFONT FACE="Arial, Helvetica, sans-serif">
  <LINK REL=STYLESHEET HREF=/stylesheets/dataform2.css>
@@ -206,4 +207,4 @@ if session:
 #----------------------------------------------------------------------
 # All done.
 #----------------------------------------------------------------------
-cdrcgi.sendPage(html)
+cdrcgi.sendPage(unicode(html, 'utf-8'))
