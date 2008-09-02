@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolReports.py,v 1.37 2008-08-13 19:52:59 bkline Exp $
+# $Id: ProtocolReports.py,v 1.38 2008-09-02 20:09:10 bkline Exp $
 #
 # Submenu for protocol reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.37  2008/08/13 19:52:59  bkline
+# Fixed typo (leftover from cut/paste of oncore report); added report
+# of Protocols with Regulatory Info Block.
+#
 # Revision 1.36  2008/07/21 20:20:40  bkline
 # Added new Oncore reports at Kim's request (#4141).
 #
@@ -191,6 +195,8 @@ for r in (('ApprovedNotYetActive.py',
            'Protocol Interventions by Protocol Title', ''),
           ('ProtSitesWithoutPhone.py',
            'Protocol Sites Without Phone Numbers', ''),
+          ('ProtocolsLinkedToTerms.py',
+           'Protocols Linked to Terms', ''),
           ('ProtocolActiveNoSites.py',
            'Protocols with Active Status But No Active Sites', ''),
           ('ProtocolINDReport.py',
