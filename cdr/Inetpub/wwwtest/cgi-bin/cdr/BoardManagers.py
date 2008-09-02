@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
 #
-# $Id: BoardManagers.py,v 1.15 2008-08-26 21:16:18 venglisc Exp $
+# $Id: BoardManagers.py,v 1.16 2008-09-02 18:54:55 bkline Exp $
 #
 # Main menu for board managers.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.15  2008/08/26 21:16:18  venglisc
+# Added new menu item Changes to Summaries (Bug 4243)
+#
 # Revision 1.14  2008/08/22 19:40:04  venglisc
 # Adding new menu option for Board Meeting Dates. (Bug 4205)
 #
@@ -154,7 +157,12 @@ cdrcgi.sendPage(header + form + """\
    <OL>
     <LI><a href='%s/BoardMemberMailerReqForm.py?%s'>PDQ&reg; Board
      Member Correspondence Mailers</a></LI>
+    <LI><A HREF='%s/SummaryMailerReport.py?flavor=4259&%s'
+        >Summary Mailer History Report</A></LI>
+    <LI><A HREF='%s/SummaryMailerReport.py?flavor=4258&%s'
+        >Summary Mailer Report</A></LI>
    </OL>
   </FORM>
  </BODY>
-</HTML>""" % (cdrcgi.BASE, session, cdrcgi.BASE, session))
+</HTML>""" % (cdrcgi.BASE, session, cdrcgi.BASE, session,
+              cdrcgi.BASE, session, cdrcgi.BASE, session))
