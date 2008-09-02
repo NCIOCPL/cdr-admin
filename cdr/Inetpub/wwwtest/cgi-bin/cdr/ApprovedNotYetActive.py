@@ -1,15 +1,40 @@
 #----------------------------------------------------------------------
 #
-# $Id: ApprovedNotYetActive.py,v 1.2 2003-02-26 13:52:25 bkline Exp $
+# $Id: ApprovedNotYetActive.py,v 1.3 2008-09-02 18:51:57 bkline Exp $
 #
 # Approved Not Yet Active Protocols Verification Report
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2003/02/26 13:52:25  bkline
+# Issue 611: "Please modify this report to include an additional
+# criteria -- Only include protocols that have a publishable version."
+# Lakshmi, 2003-02-25.
+#
 # Revision 1.1  2003/01/22 23:28:30  bkline
 # New report for issue #560.
 #
 #----------------------------------------------------------------------
-import cdr, cdrdb, cdrcgi, cgi, time, xml.dom.minidom
+import cdr, cdrdb, cdrcgi, cgi, time, xml.dom.minidom, ExcelWriter
+
+#----------------------------------------------------------------------
+# Get the protocol's original title.
+#----------------------------------------------------------------------
+protTitles = {}
+def lookupOriginalTitle(cursor, docId):
+    if docId not in protTitles:
+        cursor.execute("""\
+            SELECT pt.value
+              FROM query_term pt
+              JOIN query_term tt
+                ON tt.doc_id = pt.doc_id
+               AND LEFT(pt.node_loc, 4) = LEFT(tt.node_loc, 4)
+             WHERE pt.path = '/InScopeProtocol/ProtocolTitle'
+               AND tt.path = '/InScopeProtocol/ProtocolTitle/@Type'
+               AND tt.value = 'Original'
+               AND tt.doc_id = ?""", docId, timeout = 300)
+        rows = cursor.fetchall()
+        protTitles[docId] = rows and rows[0][0] or u""
+    return protTitles[docId]
 
 #----------------------------------------------------------------------
 # Protocol object.
@@ -121,76 +146,82 @@ for row in rows:
                 pup.protocols.append(protocol)
 
 #----------------------------------------------------------------------
-# Start the page.
+# Start the report.
 #----------------------------------------------------------------------
-today = time.strftime("%B %d, %Y")
-html = """\
-<!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
-<html>
- <head>
-  <title>Approved Not Yet Active Protocols Verification Report - %s</title>
-  <style type='text/css'>
-   th,h1,h2 { font-family: Arial, sans-serif; font-size: 11pt;
-              text-align: center; font-weight: bold; }
-   td       { font-family: Arial, sans-serif; font-size: 10pt;
-              text-align: left; }
-  </style>
- </head>
- <body>
-  <h1>Approved Not Yet Active Protocols Verification Report</h1>
-  <h2>%s</h2>
-  <br><br>
-  <table border='1' cellspacing='0' cellpadding='1'>
-   <tr>
-    <th>UpdatePerson</th>
-    <th>Email</th>
-    <th>Phone</th>
-    <th>LeadOrganization</th>
-    <th nowrap='1'>Lead Org ProtocolID</th>
-    <th nowrap='1'>CDR DocId</th>
-    <th nowrap='1'>Status Change?</th>
-   </tr>
-""" % (today, today)
+#today = time.strftime("%B %d, %Y")
+today = time.strftime("%Y-%m-%d")
+try:
+    import msvcrt, os, sys
+    msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
+except:
+    pass
+book = ExcelWriter.Workbook()
+sheet = book.addWorksheet("ANYA Protocols")
+stamp = time.strftime("%Y%m%d%H%M%D")
+font = ExcelWriter.Font(size = 12, bold = True)
+align = ExcelWriter.Alignment('Center', 'Bottom', wrap = True)
+style = book.addStyle(font = font, alignment = align)
+row = sheet.addRow(1, style)
+title = "Approved Not Yet Active Protocols Verification Report"
+row.addCell(1, title, mergeAcross = 7)
+row = sheet.addRow(2, style)
+row.addCell(1, today, mergeAcross = 7)
+sheet.addCol(1, 100)
+sheet.addCol(2, 200)
+sheet.addCol(3, 100)
+sheet.addCol(4, 400)
+sheet.addCol(5, 200)
+sheet.addCol(6, 100)
+sheet.addCol(7, 100)
+sheet.addCol(8, 400)
+row = sheet.addRow(4, style)
+row.addCell(1, u"UpdatePerson")
+row.addCell(2, u"Email")
+row.addCell(3, u"Phone")
+row.addCell(4, u"LeadOrganization")
+row.addCell(5, u"Lead Org ProtocolID")
+row.addCell(6, u"CDR DocId")
+row.addCell(7, u"Status Change?")
+row.addCell(8, u"Protocol Title")
+align = ExcelWriter.Alignment('Left', 'Top', wrap = True)
+style = book.addStyle(alignment = align)
 
 #----------------------------------------------------------------------
 # Loop through the update persons, in surname order.
 #----------------------------------------------------------------------
 keys = pups.keys()
 keys.sort()
+rowNumber = 5
 for key in keys:
     pup = pups[key]
-    if pup.email:
-        pup.email = "<a href='mailto:%s'>%s</a>" % (pup.email, pup.email)
     pup.protocols.sort(lambda a,b: cmp(a.orgProtId, b.orgProtId))
-    orgProtIds = ""
-    docIds     = ""
-    sep        = ""
-    for prot in pup.protocols:
-        orgProtIds += "%s%s" % (sep, prot.orgProtId)
-        docIds     += "%sCDR%010d" % (sep, prot.id)
-        sep = "<br>"
-    html += """\
-   <tr>
-    <td valign='top'>%s</td>
-    <td valign='top'>%s</td>
-    <td valign='top' nowrap='1'>%s</td>
-    <td valign='top'>%s</td>
-    <td valign='top'>%s</td>
-    <td valign='top'>%s</td>
-    <td>&nbsp;</td>
-   </tr>
-""" % (pup.name    or "&nbsp;",
-       pup.email   or "&nbsp;",
-       pup.phone   or "&nbsp;",
-       pup.leadOrg or "&nbsp;",
-       orgProtIds  or "&nbsp;",
-       docIds      or "&nbsp;")
+    mergeDown = 0
+    if len(pup.protocols) > 1:
+        mergeDown = len(pup.protocols) - 1
+    row = sheet.addRow(rowNumber, style)
+    row.addCell(1, pup.name or u"")
+    if pup.email:
+        row.addCell(2, pup.email, href = 'mailto:%s' % pup.email)
+    row.addCell(3, pup.phone or u"")
+    row.addCell(4, pup.leadOrg or u"")
+    if pup.protocols:
+        protTitle = lookupOriginalTitle(curs, pup.protocols[0].id)
+        row.addCell(5, pup.protocols[0].orgProtId)
+        row.addCell(6, u"CDR%010d" % pup.protocols[0].id)
+        row.addCell(8, protTitle)
+    for p in pup.protocols[1:]:
+        rowNumber += 1
+        row = sheet.addRow(rowNumber, style)
+        protTitle = lookupOriginalTitle(curs, p.id)
+        row.addCell(5, p.orgProtId)
+        row.addCell(6, u"CDR%010d" % p.id)
+        row.addCell(8, protTitle)
+    rowNumber += 1
 
 #----------------------------------------------------------------------
-# Show the report.
+# Send the report.
 #----------------------------------------------------------------------
-cdrcgi.sendPage(html + """\
-  </table>
- </body>
-</html>
-""")
+print "Content-type: application/vnd.ms-excel"
+print "Content-Disposition: attachment; filename=anya-%s.xls" % stamp
+print
+book.write(sys.stdout, True)
