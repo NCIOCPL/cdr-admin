@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryAndMiscReports.py,v 1.19 2007-10-16 18:44:07 kidderc Exp $
+# $Id: SummaryAndMiscReports.py,v 1.20 2008-09-02 20:12:08 bkline Exp $
 #
 # Submenu for summary and miscellanous document reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.19  2007/10/16 18:44:07  kidderc
+# 3666. Add Summaries with Non-Journal Article Citations report
+#
 # Revision 1.18  2005/04/12 19:21:09  venglisc
 # Added Publish Preview menu option. (Bug 1531)
 #
@@ -156,12 +159,16 @@ for choice in (
     form += """\
     <LI><A href='%s/%s?DocType=PDQBoardMemberInfo&Session=%s'>%s</A></LI>
 """ % (cdrcgi.BASE, choice[0], session, choice[1])
-    
+session = "%s=%s" % (cdrcgi.SESSION, session)
 form += """\
    </OL>
    <H2>Miscellaneous Document QC Report</H2>
    <OL>
     <LI><A HREF='%s/MiscSearch.py?%s'>Miscellaneous Documents</A></LI>
-""" % (cdrcgi.BASE, session)
+    <LI><A HREF='%s/SummaryMailerReport.py?flavor=4259&%s'
+        >Summary Mailer History Report</A></LI>
+    <LI><A HREF='%s/SummaryMailerReport.py?flavor=4258&%s'
+        >Summary Mailer Report</A></LI>
+""" % (cdrcgi.BASE, session, cdrcgi.BASE, session, cdrcgi.BASE, session)
 
 cdrcgi.sendPage(header + form + "</OL></FORM></BODY></HTML>")
