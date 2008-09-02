@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditFilters.py,v 1.5 2007-11-03 14:15:07 bkline Exp $
+# $Id: EditFilters.py,v 1.6 2008-09-02 20:20:59 bkline Exp $
 #
 # Menu of existing filters.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2007/11/03 14:15:07  bkline
+# Unicode encoding cleanup (issue #3716).
+#
 # Revision 1.4  2003/02/25 20:04:49  pzhang
 # Showed edit feature only on Dev machine (MAHLER now).
 # Sorted filter list by DocId or DocTitle.
@@ -167,4 +170,4 @@ form += u"""\
  </BODY>
 </HTML>
 """ % (cdrcgi.SESSION, session)
-cdrcgi.sendPage(header + cdrcgi.form)
+cdrcgi.sendPage(header + form)
