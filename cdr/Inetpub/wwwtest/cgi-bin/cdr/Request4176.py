@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: Request4176.py,v 1.3 2008-08-21 15:08:26 bkline Exp $
+# $Id: Request4176.py,v 1.4 2008-09-02 18:58:13 bkline Exp $
 #
 # "Once we implement the regulatory information block, I would like  report
 # that we can run periodically or is generated weekly that lists the
@@ -12,6 +12,9 @@
 #    FDA IND info (if it exists)"
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2008/08/21 15:08:26  bkline
+# Fixed typo in element name.
+#
 # Revision 1.2  2008/08/21 15:06:56  bkline
 # Rewritten; Sheri wants a spreadsheet now instead of a web-based
 # report, and the users have changed the schema in a way that
@@ -31,6 +34,7 @@ class Protocol:
         self.regInfo = None
         self.title = None
         self.phases = []
+        self.sources = []
         self.fdaIndInfo = None
         cursor.execute("SELECT xml FROM document WHERE id = ?", docId)
         docXml = cursor.fetchall()[0][0]
@@ -39,6 +43,14 @@ class Protocol:
             if node.nodeName == 'ProtocolTitle':
                 if node.getAttribute('Type') == 'Original':
                     self.title = cdr.getTextContent(node)
+            elif node.nodeName == 'ProtocolSources':
+                for child in node.childNodes:
+                    if child.nodeName == 'ProtocolSource':
+                        for grandchild in child.childNodes:
+                            if grandchild.nodeName == 'SourceName':
+                                source = cdr.getTextContent(grandchild).strip()
+                                if source:
+                                    self.sources.append(source)
             elif node.nodeName == 'ProtocolPhase':
                 self.phases.append(cdr.getTextContent(node))
             elif node.nodeName == 'RegulatoryInformation':
@@ -104,27 +116,29 @@ font = ExcelWriter.Font(bold = True)
 style = book.addStyle(font = font)
 sheet.addCol(1, 50)
 sheet.addCol(2, 200)
-sheet.addCol(3, 75)
-sheet.addCol(4, 80)
-sheet.addCol(5, 60)
-sheet.addCol(6, 120)
-sheet.addCol(7, 200)
-sheet.addCol(8, 100)
+sheet.addCol(3, 150)
+sheet.addCol(4, 75)
+sheet.addCol(5, 80)
+sheet.addCol(6, 60)
+sheet.addCol(7, 120)
+sheet.addCol(8, 200)
 sheet.addCol(9, 100)
-sheet.addCol(10, 125)
-sheet.addCol(11, 100)
+sheet.addCol(10, 100)
+sheet.addCol(11, 125)
+sheet.addCol(12, 100)
 row = sheet.addRow(1, style)
 row.addCell(1, u"CDR ID", style)
 row.addCell(2, u"Protocol Title", style)
-row.addCell(3, u"Phase(s)", style)
-row.addCell(4, u"FDA Regulated", style)
-row.addCell(5, u"Section 801", style)
-row.addCell(6, u"IND Submission Date", style)
-row.addCell(7, u"Responsible Party", style)
-row.addCell(8, u"IND Grantor", style)
-row.addCell(9, u"IND Number", style)
-row.addCell(10, u"IND Submission Date", style)
-row.addCell(11, u"IND Serial Number", style)
+row.addCell(3, u"Source(s)", style)
+row.addCell(4, u"Phase(s)", style)
+row.addCell(5, u"FDA Regulated", style)
+row.addCell(6, u"Section 801", style)
+row.addCell(7, u"Delayed Posting", style)
+row.addCell(8, u"Responsible Party", style)
+row.addCell(9, u"IND Grantor", style)
+row.addCell(10, u"IND Number", style)
+row.addCell(11, u"IND Submission Date", style)
+row.addCell(12, u"IND Serial Number", style)
 align = ExcelWriter.Alignment('Left', 'Top', wrap = True)
 style = book.addStyle(alignment = align)
 rowNum = 2
@@ -134,17 +148,18 @@ for docId in docIds:
     rowNum += 1
     row.addCell(1, docId)
     row.addCell(2, protocol.title)
-    row.addCell(3, u", ".join(protocol.phases))
+    row.addCell(3, u", ".join(protocol.sources))
+    row.addCell(4, u", ".join(protocol.phases))
     if protocol.regInfo:
-        row.addCell(4, protocol.regInfo.fdaRegulated)
-        row.addCell(5, protocol.regInfo.section801)
-        row.addCell(6, protocol.regInfo.delayedPosting)
-        row.addCell(7, protocol.regInfo.responsibleParty)
+        row.addCell(5, protocol.regInfo.fdaRegulated)
+        row.addCell(6, protocol.regInfo.section801)
+        row.addCell(7, protocol.regInfo.delayedPosting)
+        row.addCell(8, protocol.regInfo.responsibleParty)
     if protocol.fdaIndInfo:
-        row.addCell(8, protocol.fdaIndInfo.indGrantor)
-        row.addCell(9, protocol.fdaIndInfo.indNumber)
-        row.addCell(10, protocol.fdaIndInfo.indSubmissionDate)
-        row.addCell(11, protocol.fdaIndInfo.indSerialNumber)
+        row.addCell(9, protocol.fdaIndInfo.indGrantor)
+        row.addCell(10, protocol.fdaIndInfo.indNumber)
+        row.addCell(11, protocol.fdaIndInfo.indSubmissionDate)
+        row.addCell(12, protocol.fdaIndInfo.indSerialNumber)
 if sys.platform == "win32":
     import os, msvcrt
     msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
