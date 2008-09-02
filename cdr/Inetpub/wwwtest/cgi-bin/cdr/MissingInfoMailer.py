@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: MissingInfoMailer.py,v 1.2 2007-10-31 16:16:54 bkline Exp $
+# $Id: MissingInfoMailer.py,v 1.3 2008-09-02 20:00:23 bkline Exp $
 #
 # Program to send out a mailer for missing protocol information.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2007/10/31 16:16:54  bkline
+# Final modifications before being placed in production.
+#
 # Revision 1.1  2007/07/26 12:00:12  bkline
 # New script to send out an email message asking for protocol information
 # which has been omitted.
@@ -287,29 +290,48 @@ para = (u'Your protocol "%s," "%s," was received for inclusion in the '
         (protocol.originalId, protocol.title, protocol.received,
          protocol.primaryId))
 paras = [wrapper.fill(para)]
-para = ('Your submission will publish to Cancer.gov within three weeks of '
-        'receipt of a complete submission.  When the trial is published, you '
-        'will receive a confirmation email with your trial registration '
-        'numbers, including the NCT ID number.  Shortly after publication, '
-        'and annually thereafter, you will also be sent a copy of the '
-        'abstract and key retrieval terms for your review.')
+para = (u'Your submission will publish to Cancer.gov within three weeks of '
+        u'receipt of a complete submission.  When the trial is published, you '
+        u'will receive a confirmation email with your trial registration '
+        u'numbers, including the NCT ID number.  Shortly after publication, '
+        u'and annually thereafter, you will also be sent a copy of the '
+        u'abstract and key retrieval terms for your review.')
 paras.append(wrapper.fill(para))
-para = wrapper.fill('At this time, your submission is not complete.  Before '
-                    'we can list your trial in the PDQ Database on '
-                    'Cancer.gov, we will need the following documentation:')
+para = wrapper.fill(u'At this time, your submission is not complete.  Before '
+                    u'we can list your trial in the PDQ Database on '
+                    u'Cancer.gov, we will need the following documentation:')
 for mi in protocol.missingInfo:
-    para += "\n  * %s" %mi
-para += "\n" + wrapper.fill('This information can be emailed to '
-                            'PDQUpdate@cancer.gov or faxed to us at '
-                            '301-402-6728.')
+    para += u"\n  * %s" % mi
 paras.append(para)
-paras.append(wrapper.fill('If you have any questions, please call the PDQ '
-                          'Protocol Coordinator at 301-496-7406 or send an '
-                          'e-mail to PDQUpdate@cancer.gov.'))
-paras.append("""\
+if 'Responsible party' in protocol.missingInfo:
+    paras.append(u"""\
+Responsible Party: The entity responsible for registering is the
+"responsible party."
+
+Responsible party is defined as:
+
+(1) the sponsor of the clinical trial (as defined in 21 C.F.R. 50.3)
+    [http://sturly.com/resppartystatute],
+
+    or
+
+(2) the principal investigator of such clinical trial if so designated
+    by a sponsor, grantee, contractor, or awardee (provided that "the
+    principal investigator is responsible for conducting the trial, has
+    access to and control over the data from the clinical trial, has
+    the right to publish the results of the trial, and has the ability
+    to meet all of the requirements" for submitting information under
+    the law.)""")
+paras.append(wrapper.fill(u'This information can be emailed to '
+                          u'PDQUpdate@cancer.gov or faxed to us at '
+                          u'301-402-6728.'))
+paras.append(wrapper.fill(u'If you have any questions, please call the PDQ '
+                          u'Protocol Coordinator at 301-496-7406 or send an '
+                          u'e-mail to PDQUpdate@cancer.gov.'))
+paras.append(u"""\
 PDQ Protocol Coordinator
 Office of Cancer Content Management""")
-paras.append("""\
+paras.append(u"""\
 Submitting new trials to PDQ?  Try our new online submission portal:
 http://pdqupdate.cancer.gov/submission""")
 body = u"\n\n".join(paras) + u"\n"
