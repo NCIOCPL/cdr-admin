@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: CtsSubmittedTrials.py,v 1.5 2008-04-17 18:41:59 bkline Exp $
+# $Id: CtsSubmittedTrials.py,v 1.6 2008-09-02 19:32:44 bkline Exp $
 #
 # CDR-side interface for reviewing CTS trials.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2008/04/17 18:41:59  bkline
+# Added interface for specifying CDR document of which Oncore trial
+# is a duplicate.
+#
 # Revision 1.4  2008/03/05 19:26:03  bkline
 # Workaround for protocol titles in which the submitter has embedded
 # newlines for some reason.
@@ -116,6 +120,7 @@ def addSupplementaryInfoDoc(match):
     return "cdr:ref='CDR%010d'" % docId
 
 def markDuplicate(publicId, primaryId, session, source, duplicateOf = ""):
+    dupId = ""
     if source == 'Oncore':
         try:
             dupId = re.sub("[^\\d]+", "", duplicateOf)
