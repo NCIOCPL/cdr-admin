@@ -1,37 +1,42 @@
 #----------------------------------------------------------------------
 #
-# $Id: InterventionAndProcedureTerms.py,v 1.2 2007-10-31 16:10:09 bkline Exp $
+# $Id: InterventionAndProcedureTerms.py,v 1.3 2008-09-02 19:54:18 bkline Exp $
 #
 # Hierarchical report (in thesaurus-like format) of index terms
 # whose semantic types are some form of Intervention/procedure.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2007/10/31 16:10:09  bkline
+# Modifications for request #3693.
+#
 # Revision 1.1  2002/12/11 13:02:25  bkline
 # Hierarchical report on intervention/procedure index terms.
 #
 #----------------------------------------------------------------------
 import cdrcgi, cdrdb, cgi
 
-class SemanticType:
-    def __init__(self, name, parent):
-        self.name = name
-        self.parent = parent
-        self.children = {}
-        self.terms = {}
-        self.uname = name.upper()
+fields = cgi.FieldStorage()
+session  = cdrcgi.getSession(fields) or cdrcgi.bail("Not logged in")
+IncludeAlternateNames = fields and fields.getvalue("IncludeAlternateNames") or "True"
 
-class IndexTerm:
-    def __init__(self, name):
+#debug code
+#IncludeAlternateNames = "False"
+
+class Term:
+    def __init__(self, name, id, top):
         self.name = name
-        self.aliases = {}
-        self.children = {}
         self.parents = {}
+        self.children = {}
         self.uname = name.upper()
+        self.aliases = {}
+        self.id = id
+        self.top = top
 
 patriarch = None
 conn = cdrdb.connect('CdrGuest')
 cursor = conn.cursor()
 try:
+    # get the root element
     cursor.execute("""\
         SELECT DISTINCT doc_id, 0 parent_id
                    INTO #intervention_semantic_types
@@ -42,6 +47,7 @@ try:
     conn.commit()
     done = 0
     while not done:
+        #get the top level items off the root (The green items)
         cursor.execute("""\
             INSERT INTO #intervention_semantic_types(doc_id, parent_id)
                  SELECT q.doc_id, q.int_val
@@ -58,23 +64,34 @@ try:
         if not cursor.rowcount:
             done = 1
         conn.commit()
+    # get the preferred names for the root node and all top level nodes off the root
     cursor.execute("""\
         SELECT ist.doc_id, ist.parent_id, pname.value
           FROM #intervention_semantic_types ist
           JOIN query_term pname
             ON pname.doc_id = ist.doc_id
-         WHERE pname.path = '/Term/PreferredName'""")
-    semanticTypes = {}
+         WHERE pname.path = '/Term/PreferredName'
+      ORDER BY ist.parent_id asc""")
+    #semanticTypes = {}
+    terms = {}
     for row in cursor.fetchall():
         id, parent, name = row
-        semanticTypes[id] = SemanticType(name, parent)
+        top = 0
         if not parent:
             patriarch = id
-    for key in semanticTypes.keys():
-        semanticType = semanticTypes[key]
-        if semanticType.parent:
-            semanticTypes[semanticType.parent].children[key] = 1
+        elif parent == patriarch:
+            top = 1
+        terms[id] = Term(name,id,top)
+        if parent:
+            terms[id].parents[parent] = 1
+    for key in terms.keys():
+        term = terms[key]
+        if term.parents:
+            for parentKey in term.parents.keys():
+                terms[parentKey].children[key] = 1
 
+    # Get all the terms including the top level terms off the root.
+    # Not including the roo term
     cursor.execute("""\
         SELECT ist.doc_id SemanticTypeId, 
                it.doc_id IndexTermId, 
@@ -93,13 +110,13 @@ try:
     conn.commit()
 
     cursor.execute("""SELECT * FROM #index_terms""")
-    indexTerms = {}
+    #indexTerms = {}
     for row in cursor.fetchall():
         typeId, termId, name = row
-        if not indexTerms.has_key(termId):
-            indexTerms[termId] = IndexTerm(name)
-        semanticTypes[typeId].terms[termId] = 1
+        if not terms.has_key(termId):
+            terms[termId] = Term(name,termId, 0)
 
+    # Get all the parent/child relationships
     cursor.execute("""\
         SELECT DISTINCT it.IndexTermId,
                         pid.int_val
@@ -113,10 +130,11 @@ try:
                     AND d.active_status = 'A'""")
     for row in cursor.fetchall():
         termId, parentId = row
-        if indexTerms.has_key(parentId):
-            indexTerms[parentId].children[termId] = 1
-            indexTerms[termId].parents[parentId] = 1
-
+        if terms.has_key(parentId):
+            terms[parentId].children[termId] = 1
+            terms[termId].parents[parentId] = 1
+ 
+    #get the other term names
     cursor.execute("""\
         SELECT qt.doc_id, qt.value
           FROM query_term qt
@@ -125,59 +143,44 @@ try:
          WHERE qt.path = '/Term/OtherName/OtherTermName'""")
     for row in cursor.fetchall():
         id, name = row
-        indexTerms[id].aliases[name] = 1
+        terms[id].aliases[name] = 1
+        
 except:
     raise
     cdrcgi.bail("Database failure reading terminology information")
 
-def semanticTypeSorter(a, b):
-    return cmp(semanticTypes[a].uname, semanticTypes[b].uname)
+def sorter(a, b):
+    return cmp(terms[a].uname, terms[b].uname)
 
-def termSorter(a, b):
-    return cmp(indexTerms[a].uname, indexTerms[b].uname)
-
-def addSemanticType(st):
+def addTerm(t):
+    classname = 't'
+    if t.top:
+        classname = 'st'
     html = """\
     <li class = '%s'>%s</li>
-""" % ((st.parent == patriarch) and 'st' or 't', cgi.escape(st.name))
-    if st.children or st.terms:
+""" % (classname, cgi.escape(t.name))
+
+    if t.children or (t.aliases and IncludeAlternateNames == "True"):
         html += "<ul>\n"
-        keys = st.children.keys()
-        keys.sort(semanticTypeSorter)
-        for key in keys:
-            html += addSemanticType(semanticTypes[key])
-        keys = st.terms.keys()
-        keys.sort(termSorter)
-        for key in keys:
-            t = indexTerms[key]
-            topLevel = 1
-            for pKey in t.parents.keys():
-                if st.terms.has_key(pKey):
-                    topLevel = 0
-                    break
-            if topLevel:
-                html += addTerm(indexTerms[key], st)
+        if t.aliases and IncludeAlternateNames == "True":
+            keys = t.aliases.keys()
+            keys.sort()
+            for key in keys:
+                html += "<li class = 'a'>x %s</li>\n" % cgi.escape(key)
+        if t.children:
+            keys = t.children.keys()
+            keys.sort(sorter)
+            for key in keys:
+                html += addTerm(terms[key])
         html += "</ul>\n"
+
     return html
 
-def addTerm(t, st):
-    html = """\
-    <li class = 't'>%s</li>
-""" % cgi.escape(t.name)
-    if t.aliases or t.children:
-        html += "<ul>\n"
-        keys = t.aliases.keys()
-        keys.sort()
-        for key in keys:
-            html += "<li class = 'a'>x %s</li>\n" % cgi.escape(key)
-        keys = t.children.keys()
-        keys.sort(termSorter)
-        for key in keys:
-            if st.terms.has_key(key):
-                html += addTerm(indexTerms[key], st)
-        html += "</ul>\n"
-    return html
-
+altTitleExtension = ""
+if IncludeAlternateNames == "False":
+    altNameDisplay = "none"
+    altTitleExtension = "(without Alternate Names)"
+    
 html = """\
 <html>
  <head>
@@ -189,15 +192,15 @@ html = """\
           font-family: serif; font-variant: small-caps; }
    li.t { color: blue; font-size: 14; list-style: none; font-weight: normal;
           font-family: Arial, Helvetica, sans-serif; font-variant: normal }
-   li.a { color: #FF2222; font-size: 12;  list-style: none; 
-          font-variant: normal;
-          font-family: Arial, Helvetica, sans-serif; font-style: italic }
+   li.a { color: #FF2222; font-size: 12;  list-style: none;
+          font-weight: normal; font-variant: normal;
+          font-family: Arial, Helvetica, sans-serif; font-style: italic}
   </style>
  </head>
  <body>
-  <h1>CDR Intervention/Procedure Index Terms</h1>
+  <h1>CDR Intervention or Procedure Index Terms %s</h1>
   <ul>
-""" + addSemanticType(semanticTypes[patriarch]) + """\
+""" % altTitleExtension + addTerm(terms[patriarch]) + """\
   </ul>
  </body>
 </html>"""
