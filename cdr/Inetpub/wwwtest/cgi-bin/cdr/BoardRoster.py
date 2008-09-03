@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: BoardRoster.py,v 1.12 2008-08-22 19:24:25 venglisc Exp $
+# $Id: BoardRoster.py,v 1.13 2008-09-03 18:02:17 venglisc Exp $
 #
 # Report to display the Board Roster with or without assistant
 # information.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.12  2008/08/22 19:24:25  venglisc
+# Formatting changes to summary sheet and full report. (Bug 4236)
+#
 # Revision 1.11  2008/08/08 22:27:36  venglisc
 # Added TermStartDate as column to summary sheet. (Bug 4236)
 #
@@ -169,7 +172,7 @@ def cleanTitle(title):
 #     ID based on the board selected in the first call.
 #----------------------------------------------------------------------
 def getBoardPicklist():
-    picklist = "<SELECT NAME='board' onchange='javascript:doSummarySheet('summary')'>\n"
+    picklist = "<SELECT NAME='board' onchange='javascript:doSummarySheet(\"summary\")'>\n"
     sel      = " SELECTED"
     try:
         cursor.execute("""\
