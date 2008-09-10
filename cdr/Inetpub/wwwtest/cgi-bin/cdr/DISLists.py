@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: DISLists.py,v 1.1 2008-09-10 17:30:49 venglisc Exp $
+# $Id: DISLists.py,v 1.2 2008-09-10 17:51:06 venglisc Exp $
 #
 # Report on lists of drug information summaries.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2008/09/10 17:30:49  venglisc
+# Initial version of DrugInformationSummaries List report (Bug 4250).
+#
 #----------------------------------------------------------------------
 import cdr, cgi, cdrcgi, time, cdrdb
 
@@ -255,6 +258,7 @@ report    = """\
 singleHdDone = combiHdDone = False
 singleReport = combiReport = ''
 singleAll    = combiAll    = ''
+combiHeader  = ''
 
 if showId == 'N':
     for row in rows:
