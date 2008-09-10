@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: DrugInfoReports.py,v 1.3 2007-05-07 19:41:22 kidderc Exp $
+# $Id: DrugInfoReports.py,v 1.4 2008-09-10 17:31:44 venglisc Exp $
 #
 # $Log: not supported by cvs2svn $
 # Revision 1.2  2007/04/27 22:51:54  venglisc
@@ -61,8 +61,8 @@ for r in QCReports:
 form += """</OL><H3>Other Reports</H3><OL>"""
 
 OtherReports = [
-           ('DrugDescriptionReport.py?',
-           'Drug Description Report')]
+           ('DrugDescriptionReport.py?', 'Drug Description Report'),
+           ('DISLists.py?',              'Drug Information Summaries Lists')]
 
 for r in OtherReports:
     form += "<LI><A HREF='%s/%s&%s=%s'>%s</LI></A>\n" % (
