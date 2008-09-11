@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: Request4275.py,v 1.1 2008-09-11 18:45:44 bkline Exp $
+# $Id: Request4275.py,v 1.2 2008-09-11 20:50:13 bkline Exp $
 #
 # "We would like a new Mailer report so we can track responses easier.
 #
@@ -25,6 +25,9 @@
 #  Changes Category"
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2008/09/11 18:45:44  bkline
+# New report for Sheri on detailed mailer information.
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrdb, cdrcgi, time, sys, ExcelWriter, lxml.etree as etree
 
@@ -256,7 +259,7 @@ def createForm(cursor):
      <td>%s</td>
     </tr>
     <tr>
-     <th align='right'>Change Category: </th>
+     <th align='right'>Changes Category: </th>
      <td>%s</td>
     </tr>
     <tr>
@@ -282,7 +285,7 @@ def createForm(cursor):
 def addColumnHeaders(book, sheet):
     font  = ExcelWriter.Font(size = 12, bold = True)
     style = book.addStyle(font = font)
-    row   = sheet.addRow(1)
+    row   = sheet.addRow(1, style)
     sheet.addCol(1,  70)
     sheet.addCol(2, 150)
     sheet.addCol(3, 200)
