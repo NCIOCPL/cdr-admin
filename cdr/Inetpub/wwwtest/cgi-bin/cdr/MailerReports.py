@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: MailerReports.py,v 1.10 2006-06-06 20:26:01 bkline Exp $
+# $Id: MailerReports.py,v 1.11 2008-09-16 13:37:03 bkline Exp $
 #
 # Submenu for mailer reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.10  2006/06/06 20:26:01  bkline
+# Added new flavor of emailer respondents reports for Brussels trials.
+#
 # Revision 1.9  2005/03/03 14:27:21  bkline
 # Menu changes requested by Sheri (#1572).
 #
@@ -71,6 +74,7 @@ reports = [
             'Mailer Check-In Count'),
            ('MailerHistory.py', 
             'Mailer History'),
+           ('Request4275.py', 'Mailers Received - Detailed'),
            ('NonRespondents.py', 
             'Non-Respondents'),
            ('PreMailerProtReport.py',
