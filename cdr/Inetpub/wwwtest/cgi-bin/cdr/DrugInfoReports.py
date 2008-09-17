@@ -1,8 +1,11 @@
 #----------------------------------------------------------------------
 #
-# $Id: DrugInfoReports.py,v 1.4 2008-09-10 17:31:44 venglisc Exp $
+# $Id: DrugInfoReports.py,v 1.5 2008-09-17 20:42:32 bkline Exp $
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2008/09/10 17:31:44  venglisc
+# Adding new menu option for DrugInfo Lists report (Bug 4250).
+#
 # Revision 1.2  2007/04/27 22:51:54  venglisc
 # Adding new menu item for Publish Preview.
 #
@@ -49,10 +52,11 @@ form = """
     <H3>QC Reports</H3>
     <OL>                                                                        
 """ % (cdrcgi.SESSION, session)                                                 
-QCReports = [('QcReport.py?DocType=DrugInformationSummary', 
-            'Drug Information QC Report'),
-           ('QcReport.py?DocType=DrugInformationSummary&ReportType=pp&',
-           'Publish Preview')]
+QCReports = (('DISSearch.py?type=advanced', 'Advanced Search'),
+             ('QcReport.py?DocType=DrugInformationSummary', 
+              'Drug Information QC Report'),
+             ('QcReport.py?DocType=DrugInformationSummary&ReportType=pp&',
+              'Publish Preview'))
 
 for r in QCReports:
     form += "<LI><A HREF='%s/%s&%s=%s'>%s</LI></A>\n" % (

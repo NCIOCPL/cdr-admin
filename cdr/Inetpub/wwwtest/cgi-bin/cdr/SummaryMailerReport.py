@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryMailerReport.py,v 1.1 2008-09-02 19:00:02 bkline Exp $
+# $Id: SummaryMailerReport.py,v 1.2 2008-09-17 20:42:32 bkline Exp $
 #
 # [Request 4258:]
 #
@@ -29,6 +29,9 @@
 # Request form for generating RTF letters to board members."
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2008/09/02 19:00:02  bkline
+# New reports for Margaret (#4258 and #4259).
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrdb, cdrcgi, time
 
@@ -301,7 +304,7 @@ class Mailer:
             self.sent = e.text[:10]
         for r in tree.findall('Response'):
             for e in r.findall('Received'):
-                self.response = e.text[:10]
+                self.response = e.text and e.text[:10] or u""
             for e in r.findall('ChangesCategory'):
                 if e.text:
                     change = e.text.strip()
