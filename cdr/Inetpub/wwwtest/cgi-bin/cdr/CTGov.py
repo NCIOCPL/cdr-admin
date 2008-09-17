@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CTGov.py,v 1.14 2007-11-06 23:07:05 ameyer Exp $
+# $Id: CTGov.py,v 1.15 2008-09-17 03:20:02 ameyer Exp $
 #
 # Submenu for ClinicalTrials.gov activities.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.14  2007/11/06 23:07:05  ameyer
+# Added menu entry for GlobalChangeCTGovMapping.py.
+#
 # Revision 1.13  2006/11/29 16:16:08  bkline
 # Plugged in command to force import from CT.gov.
 #
@@ -118,7 +121,9 @@ reports = [
            ('EditExternMap.py', 'Update Mapping Table'),
            ('CTGovMarkDuplicate.py', 'Mark/Remove Protocols as Duplicates'),
            ('GlobalChangeCTGovMapping.py',
-            'Global Change Protocols to Find Mappings')
+            'Global Change Protocols to Find Mappings'),
+           ('EditNonMappablePatterns.py',
+            'Update List of Non-mappable Patterns')
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s'>%s</A></LI>\n" % (
