@@ -9,9 +9,12 @@
 #
 # Requirements and design are described in Bugzilla issue #3561.
 #
-# $Id: ReplaceDocWithNewDoc.py,v 1.1 2008-09-19 02:37:37 ameyer Exp $
+# $Id: ReplaceDocWithNewDoc.py,v 1.2 2008-09-24 03:20:13 ameyer Exp $
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2008/09/19 02:37:37  ameyer
+# Initial version.
+#
 #----------------------------------------------------------------------
 
 import cgi, cgitb, cdr, cdrcgi, cdrdb
@@ -213,7 +216,7 @@ SELECT DISTINCT t.name, d.id, d.title, n.source_elem, n.target_frag
   <td>%s</td>
   <td>%s</td>
  </tr>
-""" % row
+""" % (row[0], row[1], row[2], row[3], row[4])
 
     html += "</table>\n"
 
@@ -298,7 +301,13 @@ def removeWillReplace(session, docXml):
 LF      = "ReplaceDocWithNewDoc.log"
 TITLE   = "Replace Old Document with New One"
 SCRIPT  = "ReplaceDocWithNewDoc.py"
-BUTTONS = (cdrcgi.MAINMENU, "Log Out")
+
+# Action button constants
+MENUBAR_BUTTONS = (cdrcgi.MAINMENU, "Log Out")
+START_SUBMIT    = "Submit"                          # Start screen submit
+START_CANCEL    = "Cancel"                          # Start screen cancel
+CONFIRM_SUBMIT  = "Proceed to Replace Document"     # Submission confirmed
+CONFIRM_CANCEL  = "Cancel Document Replacement"     # Submission cancelled
 
 # HTML containing a description of what will be done
 DESCRIPTIVE_HTML = """
@@ -363,11 +372,11 @@ DOCUMENT_ID_FORM = """
  <p />
  <table border='0'>
   <tr>
-   <td><input type='submit' name='submit' value='Submit' /></td>
-   <td><input type='submit' name='cancel' value='Cancel' /></td>
+   <td><input type='submit' name='%s' value='%s' /></td>
+   <td><input type='submit' name='%s' value='%s' /></td>
   <tr>
  </table>
-"""
+""" % (cdrcgi.REQUEST, START_SUBMIT, cdrcgi.REQUEST, START_CANCEL)
 
 fields = cgi.FieldStorage()
 if not fields:
@@ -378,7 +387,6 @@ session   = cdrcgi.getSession(fields)
 request   = cdrcgi.getRequest(fields)
 oldDocId  = fields.getvalue("oldDocId") or None
 newDocId  = fields.getvalue("newDocId") or None
-confirmed = fields.getvalue("confirmed") or None
 
 # Normalize doc IDs to standard CDR0000000000 format
 if oldDocId:
@@ -387,7 +395,7 @@ if newDocId:
     newDocIdStr = cdr.exNormalize(newDocId)[0]
 
 # Navigation away from form?
-if request == cdrcgi.MAINMENU:
+if request in (cdrcgi.MAINMENU, START_CANCEL):
     cdrcgi.navigateTo("Admin.py", session)
 if request == "Log Out":
     cdrcgi.logout(session)
@@ -406,13 +414,14 @@ endPage = """
 </HTML>
 """ % (cdrcgi.SESSION, session)
 
+log("Before check, request=%s" % request)
 # If first time through, or if insufficient data, put up initial form
-if not oldDocId or not newDocId:
+if not oldDocId or not newDocId or request == CONFIRM_CANCEL:
 
     # Send the initial explanation and input form
     log("Putting up initial input form")
     html = cdrcgi.header(TITLE, TITLE, 'Initial screen',
-                         script=SCRIPT, buttons=BUTTONS) + \
+                         script=SCRIPT, buttons=MENUBAR_BUTTONS) + \
            DESCRIPTIVE_HTML + DOCUMENT_ID_FORM + endPage
     cdrcgi.sendPage(html)
 
@@ -474,10 +483,11 @@ if refDocId != cdr.exNormalize(oldDocIdStr)[0]:
 ####################################################################
 # If we've passed all validation, but user hasn't confirmed yet,
 #   give him what he needs to confirm
-if not confirmed:
+if request != CONFIRM_SUBMIT:
+
     # Prepare to send another screen
     html = cdrcgi.header(TITLE, "Confirmation required", '', script=SCRIPT,
-           buttons=BUTTONS) + "\n"
+           buttons=MENUBAR_BUTTONS) + "\n"
 
     # Validate new doc
     result  = cdr.valDoc(session, newDocType, docId=newDocId)
@@ -514,6 +524,7 @@ if not confirmed:
 """ % (oldDocIdStr, oldDocTitle, newDocIdStr, newDocTitle)
 
     html += """
+<hr />
 <h3>Validation Report:</h3>
 """
     if errList:
@@ -538,11 +549,12 @@ version.</p>
 
     # Check links to fragments in the old document
     html += """
+<hr />
 <h3>Linked Fragments Report:</h3>
 """
     linkHtml = getFragmentLinks(oldDocId)
     if linkHtml:
-        html = """
+        html += """
 <p>There are links from other documents to specific fragments in the
 old document.  These are listed below.</p>
 
@@ -578,16 +590,15 @@ version.</p>
 <center>
 <table border='0' cellpadding='10'>
  <tr>
-  <td><input type='submit' name='confirmed'
-             value='Proceed to Replace Document' /></td>
-  <td><input type='submit' name='cancel'
-             value='Cancel Document Replacement' /></td>
+  <td><input type='submit' name='%s' value='%s' /></td>
+  <td><input type='submit' name='%s' value='%s' /></td>
  </tr>
 </table>
 <input type='hidden' name='newDocId' value='%s' />
 <input type='hidden' name='oldDocId' value='%s' />
 </center>
-""" % (newDocId, oldDocId)
+""" % (cdrcgi.REQUEST, CONFIRM_SUBMIT, cdrcgi.REQUEST, CONFIRM_CANCEL,
+       newDocId, oldDocId)
 
     html += endPage
 
@@ -675,7 +686,7 @@ msgs += "<p>Processing is complete.</p>"
 
 log("Reporting final confirmation to user")
 html = cdrcgi.header(TITLE, "Processing complete", 'Final confirmation',
-                     script=SCRIPT, buttons=BUTTONS)
+                     script=SCRIPT, buttons=MENUBAR_BUTTONS)
 html += msgs
 html += endPage
 
