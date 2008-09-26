@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CiatCipsStaff.py,v 1.7 2008-04-17 18:55:40 bkline Exp $
+# $Id: CiatCipsStaff.py,v 1.8 2008-09-26 00:19:06 ameyer Exp $
 #
 # Main menu for CIAT/CIPS staff.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.7  2008/04/17 18:55:40  bkline
+# Re-arrangement of CIAT menus at Sheri's request (#4009).
+#
 # Revision 1.6  2007/10/22 16:02:15  bkline
 # Added Oncore report.
 #
@@ -56,6 +59,8 @@ items   = (('AdvancedSearch.py', 'Advanced Search',       ''               ),
            ('MergeProt.py',      'Protocol Merge',        ''               ),
            ('Reports.py',        'Reports',               ''               ),
            ('EditExternMap.py',  'Update Mapping Table', '' ),
+           ('ReplaceCWDwithVersion.py','Replace CWD with Older Version', ''),
+           ('ReplaceDocWithNewDoc.py', 'Replace Doc with New Doc',       ''),
            ('UploadGPSet.py',    'Upload GENETICSPROFESSIONAL Document Set', '')
            )
 for item in items:
