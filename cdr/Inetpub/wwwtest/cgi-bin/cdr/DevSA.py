@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: DevSA.py,v 1.7 2008-07-04 02:57:21 ameyer Exp $
+# $Id: DevSA.py,v 1.8 2008-09-26 00:20:53 ameyer Exp $
 #
 # Main menu for Developers and System Administrators.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.7  2008/07/04 02:57:21  ameyer
+# Added menu entries for saving old version as CWD, replacing Summary.
+#
 # Revision 1.6  2007/10/31 16:03:33  bkline
 # Added republish command.
 #
@@ -70,7 +73,6 @@ items   = (('EditGroups.py',           'Manage Groups'                 ),
            ('Request1931.py',
             'Guess ExpectedEnrollment from ProjectedAccrual'),
            ('ReplaceCWDwithVersion.py','Replace CWD with Older Version'),
-           ('ReplaceDocWithNewDoc.py', 'Replace Doc with New Doc'      ),
            ('Logout.py',               'Log Out'                       )
            )
 for item in items:
