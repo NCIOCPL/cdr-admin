@@ -80,7 +80,6 @@ if not lang:
     jscript = """
 <style type="text/css">
 body {
-    background-color: #f8f8f8;
     font-family: sans-serif;
     font-size: 11pt;
     }
@@ -232,27 +231,22 @@ function allTypesClicked(){
 
 </script>
 """
-    header = cdrcgi.header(title, title, instr, script,
+    header = cdrcgi.header(title, title, instr + ' - ' + dateString, 
+                           script,
                            ("Submit",
                             SUBMENU,
                             cdrcgi.MAINMENU),
                            numBreaks = 1,stylesheet = jscript)
     form   = """\
    <input type='hidden' name='%s' value='%s'>
-   <table border='0'>
-    <tr>
-     <td colspan='3'>
-      %s<br><br>
-     </td>
-    </tr>
-   </table>
  
     <fieldset>
-    <legend>Select Language and PDQ Summaries</legend>
+    <legend>&nbsp;Select Language and PDQ Summaries&nbsp;</legend>
     <table>
    <tr>
      <td width=100>
-      <input id='English' name='lang' type='radio' value='English' onClick="langClicked('English');" CHECKED><b>English</b></input>
+      <input id='English' name='lang' type='radio' value='English' 
+       onClick="langClicked('English');" CHECKED><b>English</b></input>
      </td>
      <td>
       <b>Select PDQ Summaries: (one or more)</b>
@@ -261,21 +255,29 @@ function allTypesClicked(){
     <tr>
      <td></td>
      <td>
-      <input type='checkbox' id='All English' name='grp' value='All English' onClick="allEnglishClicked();" CHECKED>
+      <input type='checkbox' id='All English' name='grp' value='All English' 
+       onClick="allEnglishClicked();" CHECKED>
        <b>All English</b></input><br>
-      <input type='checkbox' id='Adult Treatment' name='grp' value='Adult Treatment' onClick="englishItemClicked();">
+      <input type='checkbox' id='Adult Treatment' name='grp' 
+       value='Adult Treatment' onClick="englishItemClicked();">
        <b>Adult Treatment</b></input><br>
-      <input type='checkbox' id='Genetics' name='grp' value='Genetics' onClick="englishItemClicked();">
+      <input type='checkbox' id='Genetics' name='grp' value='Genetics' 
+       onClick="englishItemClicked();">
        <b>Cancer Genetics</b></input><br>
-      <input type='checkbox' name='grp' id='Complementary and Alternative Medicine' onClick="englishItemClicked();"
-             value='Complementary and Alternative Medicine'>
+      <input type='checkbox' name='grp' 
+       id='Complementary and Alternative Medicine' 
+       onClick="englishItemClicked();"
+       value='Complementary and Alternative Medicine'>
        <b>Complementary and Alternative Medicine</b></input><br>
-      <input type='checkbox' id='Pediatric Treatment' name='grp' value='Pediatric Treatment' onClick="englishItemClicked();">
+      <input type='checkbox' id='Pediatric Treatment' name='grp' 
+       value='Pediatric Treatment' onClick="englishItemClicked();">
        <b>Pediatric Treatment</b></input><br>
-      <input type='checkbox' id='Screening and Prevention' name='grp' value='Screening and Prevention' onClick="englishItemClicked();">
+      <input type='checkbox' id='Screening and Prevention' name='grp' 
+       value='Screening and Prevention' onClick="englishItemClicked();">
        <b>Screening and Prevention</b></input><br>
-      <input type='checkbox' id='Supportive Care' name='grp' value='Supportive Care' onClick="englishItemClicked();">
-       <b>Supportive Care</b><br></input><br>
+      <input type='checkbox' id='Supportive Care' name='grp' 
+       value='Supportive Care' onClick="englishItemClicked();">
+       <b>Supportive and Palliative Care</b><br></input>
      </td>
     </tr>
     </table>
@@ -285,7 +287,8 @@ function allTypesClicked(){
     <table>
     <tr>
      <td width=100>
-      <input id='Spanish' name='lang' type='radio' value='Spanish' onClick="langClicked('Spanish');"><b>Spanish</b></input>
+      <input id='Spanish' name='lang' type='radio' value='Spanish' 
+       onClick="langClicked('Spanish');"><b>Spanish</b></input>
      </td>
      <td>
       <b>Select PDQ Summaries: (one or more)</b>
@@ -294,49 +297,65 @@ function allTypesClicked(){
     <tr>
      <td></td>
      <td>
-      <input type='checkbox' id='All Spanish' name='grp' value='All Spanish' onClick="allSpanishClicked();">
+      <input type='checkbox' id='All Spanish' name='grp' value='All Spanish' 
+       onClick="allSpanishClicked();">
        <b>All Spanish</b></input><br>
-      <input type='checkbox' id='Spanish Adult Treatment' name='grp' value='Spanish Adult Treatment' onClick="spanishItemClicked();">
+      <input type='checkbox' id='Spanish Adult Treatment' name='grp' 
+       value='Spanish Adult Treatment' onClick="spanishItemClicked();">
        <b>Adult Treatment</b></input><br>
-      <input type='checkbox' id='Spanish Pediatric Treatment' name='grp' value='Spanish Pediatric Treatment' onClick="spanishItemClicked();">
+      <input type='checkbox' id='Spanish Pediatric Treatment' name='grp' 
+       value='Spanish Pediatric Treatment' onClick="spanishItemClicked();">
        <b>Pediatric Treatment</b></input><br>
-      <input type='checkbox' id='Spanish Supportive Care' name='grp' value='Spanish Supportive Care' onClick="spanishItemClicked();">
-       <b>Supportive Care</b></input><br><br>
+      <input type='checkbox' id='Spanish Supportive Care' name='grp' 
+       value='Spanish Supportive Care' onClick="spanishItemClicked();">
+       <b>Supportive and Palliative Care</b></input><br>
      </td>
     </tr>
     </table>
     </fieldset>
 
-</br>
+<br>
     <fieldset>
-    <legend>Select Citation Type: (one or more)</legend>
+    <legend>&nbsp;Select Citation Type: (one or more)&nbsp;</legend>
     <table>
     <tr>
-     <td></td>
+     <td width=100></td>
      <td>
-      <input id='All Types' type='checkbox' name='type' value='All Types' onClick="allTypesClicked();" CHECKED>
+      <input id='All Types' type='checkbox' name='type' value='All Types' 
+       onClick="allTypesClicked();" CHECKED>
        <b>All Types</b><br>
-      <input id='Book' type='checkbox' name='type' value='Book' onClick="citationItemClicked();">
+      <input id='Book' type='checkbox' name='type' value='Book' 
+       onClick="citationItemClicked();">
        <b>Book</b><br>
-      <input id='Book [Internet]' type='checkbox' name='type' value='Book [Internet]' onClick="citationItemClicked();">
+      <input id='Book [Internet]' type='checkbox' name='type' 
+       value='Book [Internet]' onClick="citationItemClicked();">
        <b>Book [Internet]</b><br>
-      <input id='Book chapter' type='checkbox' name='type' value='Book chapter' onClick="citationItemClicked();">
+      <input id='Book chapter' type='checkbox' name='type' value='Book chapter' 
+       onClick="citationItemClicked();">
        <b>Book chapter</b><br>
-       <input id='Book chapter [Internet]' type='checkbox' name='type' value='Book chapter [Internet]' onClick="citationItemClicked();">
+       <input id='Book chapter [Internet]' type='checkbox' name='type' 
+        value='Book chapter [Internet]' onClick="citationItemClicked();">
        <b>Book chapter [Internet]</b><br>
-       <input id='Abstract' type='checkbox' name='type' value='Abstract' onClick="citationItemClicked();">
+       <input id='Abstract' type='checkbox' name='type' value='Abstract' 
+        onClick="citationItemClicked();">
        <b>Abstract</b><br>
-       <input id='Abstract [Internet]' type='checkbox' name='type' value='Abstract [Internet]' onClick="citationItemClicked();">
+       <input id='Abstract [Internet]' type='checkbox' name='type' 
+        value='Abstract [Internet]' onClick="citationItemClicked();">
        <b>Abstract [Internet]</b><br>
-       <input id='Database' type='checkbox' name='type' value='Database' onClick="citationItemClicked();">
+       <input id='Database' type='checkbox' name='type' value='Database' 
+        onClick="citationItemClicked();">
        <b>Database</b><br>
-       <input id='Database entry' type='checkbox' name='type' value='Database entry' onClick="citationItemClicked();">
+       <input id='Database entry' type='checkbox' name='type' 
+        value='Database entry' onClick="citationItemClicked();">
        <b>Database entry</b><br>
-       <input id='Internet' type='checkbox' name='type' value='Internet' onClick="citationItemClicked();">
+       <input id='Internet' type='checkbox' name='type' value='Internet' 
+        onClick="citationItemClicked();">
        <b>Internet</b><br>
-       <input id='Meeting Paper' type='checkbox' name='type' value='Meeting Paper' onClick="citationItemClicked();">
+       <input id='Meeting Paper' type='checkbox' name='type' 
+        value='Meeting Paper' onClick="citationItemClicked();">
        <b>Meeting Paper</b><br>
-       <input id='Meeting Paper [Internet]' type='checkbox' name='type' value='Meeting Paper [Internet]' onClick="citationItemClicked();">
+       <input id='Meeting Paper [Internet]' type='checkbox' name='type' 
+        value='Meeting Paper [Internet]' onClick="citationItemClicked();">
        <b>Meeting Paper [Internet]</b><br>
      </td>
     </tr>    
@@ -346,7 +365,7 @@ function allTypesClicked(){
   </form>
  </body>
 </html>
-""" % (cdrcgi.SESSION, session, dateString)
+""" % (cdrcgi.SESSION, session)
     cdrcgi.sendPage(header + form)
 
 #----------------------------------------------------------------------
@@ -530,11 +549,7 @@ for dataRow in dataRows:
             
 
 # out put the results table
-header = cdrcgi.header(title, title, instr, script,
-                           ("Submit",
-                            SUBMENU,
-                            cdrcgi.MAINMENU),
-                           numBreaks = 1)
+header = cdrcgi.rptHeader(title, instr)
 
 form   = [u"""\
  <style type="text/css">
@@ -628,8 +643,8 @@ a.selected:hover
   
    <input type='hidden' name='%s' value='%s'>
     <p style="text-align: center; font-family: Verdana, Tahoma, sans-serif; font-size: 12pt; font-weight: bold; color: #553;">
-    Summaries with Non-Journal Article Citations Report</br>
-    <div style="text-align: center; font-family: Verdana, Tahoma, sans-serif; font-size: 11pt; font-weight: normal; color: #553;">%s</div>
+    Summaries with Non-Journal Article Citations Report<br>
+    <span style="text-align: center; font-family: Verdana, Tahoma, sans-serif; font-size: 11pt; font-weight: normal; color: #553;">%s</span>
     </p>
    
    <table>
