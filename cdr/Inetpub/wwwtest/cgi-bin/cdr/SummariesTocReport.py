@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummariesTocReport.py,v 1.4 2008-09-29 17:46:41 venglisc Exp $
+# $Id: SummariesTocReport.py,v 1.5 2008-09-29 17:48:21 venglisc Exp $
 #
 # Report on lists of summaries.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2008/09/29 17:46:41  venglisc
+# Modified Supportive Care board name. (Bug 4207)
+# Also modified user interface to use fieldsets.
+#
 # Revision 1.3  2007/11/03 14:15:07  bkline
 # Unicode encoding cleanup (issue #3716).
 #
@@ -36,7 +40,7 @@ submit    = fields and fields.getvalue("SubmitButton")     or None
 request   = cdrcgi.getRequest(fields)
 title     = "CDR Administration"
 instr     = "Summaries TOC Lists"
-script    = "SummariesTocReport_new.py"
+script    = "SummariesTocReport.py"
 SUBMENU   = "Report Menu"
 buttons   = (SUBMENU, cdrcgi.MAINMENU)
 
