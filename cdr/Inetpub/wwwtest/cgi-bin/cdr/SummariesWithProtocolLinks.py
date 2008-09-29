@@ -132,7 +132,6 @@ if not lang:
     jscript = """
 <style type="text/css">
 body {
-    background-color: #f8f8f8;
     font-family: sans-serif;
     font-size: 11pt;
     }
@@ -276,23 +275,17 @@ function allStatusClicked(){
 
 </script>
 """
-    header = cdrcgi.header(title, title, instr, script,
+    header = cdrcgi.header(title, title, instr + ' - ' + dateString, 
+                           script,
                            ("Submit",
                             SUBMENU,
                             cdrcgi.MAINMENU),
                            numBreaks = 1,stylesheet = jscript)
     form   = """\
    <input type='hidden' name='%s' value='%s'>
-   <table border='0'>
-    <tr>
-     <td colspan='3'>
-      %s<br><br>
-     </td>
-    </tr>
-   </table>
  
    <fieldset>
-    <legend>Select Language and PDQ Summaries</legend>
+    <legend>&nbsp;Select Language and PDQ Summaries&nbsp;</legend>
     <table>
    <tr>
      <td width=100>
@@ -305,21 +298,28 @@ function allStatusClicked(){
     <tr>
      <td></td>
      <td>
-      <input type='checkbox' id='All English' name='grp' value='All English' onClick="allEnglishClicked();" CHECKED>
+      <input type='checkbox' id='All English' name='grp' 
+       value='All English' onClick="allEnglishClicked();" CHECKED>
        <b>All English</b></input><br>
-      <input type='checkbox' id='Adult Treatment' name='grp' value='Adult Treatment' onClick="englishItemClicked();">
+      <input type='checkbox' id='Adult Treatment' name='grp' 
+       value='Adult Treatment' onClick="englishItemClicked();">
        <b>Adult Treatment</b></input><br>
-      <input type='checkbox' id='Genetics' name='grp' value='Genetics' onClick="englishItemClicked();">
+      <input type='checkbox' id='Genetics' name='grp' 
+       value='Genetics' onClick="englishItemClicked();">
        <b>Cancer Genetics</b></input><br>
-      <input type='checkbox' name='grp' id='Complementary and Alternative Medicine' onClick="englishItemClicked();"
-             value='Complementary and Alternative Medicine'>
+      <input type='checkbox' name='grp' 
+       id='Complementary and Alternative Medicine' onClick="englishItemClicked();"
+       value='Complementary and Alternative Medicine'>
        <b>Complementary and Alternative Medicine</b></input><br>
-      <input type='checkbox' id='Pediatric Treatment' name='grp' value='Pediatric Treatment' onClick="englishItemClicked();">
+      <input type='checkbox' id='Pediatric Treatment' name='grp' 
+       value='Pediatric Treatment' onClick="englishItemClicked();">
        <b>Pediatric Treatment</b></input><br>
-      <input type='checkbox' id='Screening and Prevention' name='grp' value='Screening and Prevention' onClick="englishItemClicked();">
+      <input type='checkbox' id='Screening and Prevention' name='grp' 
+       value='Screening and Prevention' onClick="englishItemClicked();">
        <b>Screening and Prevention</b></input><br>
-      <input type='checkbox' id='Supportive Care' name='grp' value='Supportive Care' onClick="englishItemClicked();">
-       <b>Supportive Care</b><br></input><br>
+      <input type='checkbox' id='Supportive Care' name='grp' 
+       value='Supportive Care' onClick="englishItemClicked();">
+       <b>Supportive and Palliative Care</b><br></input>
      </td>
     </tr>
     </table>
@@ -329,7 +329,8 @@ function allStatusClicked(){
     <table>
     <tr>
      <td width=100>
-      <input id='Spanish' name='lang' type='radio' value='Spanish' onClick="langClicked('Spanish');"><b>Spanish</b></input>
+      <input id='Spanish' name='lang' type='radio' 
+       value='Spanish' onClick="langClicked('Spanish');"><b>Spanish</b></input>
      </td>
      <td>
       <b>Select PDQ Summaries: (one or more)</b>
@@ -338,41 +339,53 @@ function allStatusClicked(){
     <tr>
      <td></td>
      <td>
-      <input type='checkbox' id='All Spanish' name='grp' value='All Spanish' onClick="allSpanishClicked();">
+      <input type='checkbox' id='All Spanish' name='grp' 
+       value='All Spanish' onClick="allSpanishClicked();">
        <b>All Spanish</b></input><br>
-      <input type='checkbox' id='Spanish Adult Treatment' name='grp' value='Spanish Adult Treatment' onClick="spanishItemClicked();">
+      <input type='checkbox' id='Spanish Adult Treatment' name='grp' 
+       value='Spanish Adult Treatment' onClick="spanishItemClicked();">
        <b>Adult Treatment</b></input><br>
-      <input type='checkbox' id='Spanish Pediatric Treatment' name='grp' value='Spanish Pediatric Treatment' onClick="spanishItemClicked();">
+      <input type='checkbox' id='Spanish Pediatric Treatment' name='grp' 
+       value='Spanish Pediatric Treatment' onClick="spanishItemClicked();">
        <b>Pediatric Treatment</b></input><br>
-      <input type='checkbox' id='Spanish Supportive Care' name='grp' value='Spanish Supportive Care' onClick="spanishItemClicked();">
-       <b>Supportive Care</b></input><br><br>
+      <input type='checkbox' id='Spanish Supportive Care' name='grp' 
+       value='Spanish Supportive Care' onClick="spanishItemClicked();">
+       <b>Supportive and Palliative Care</b></input><br>
      </td>
     </tr>
     </table>
     </fieldset>
 
-    </br>
+    <br>
     <fieldset>
-    <legend>Select Trial Status: (one or more)</legend>
+    <legend>&nbsp;Select Trial Status: (one or more)&nbsp;</legend>
     <table>
     <tr>
-     <td></td>
+     <td width=100></td>
      <td>
-      <input type='checkbox' id='All Status' name='status' value='All Status' onClick="allStatusClicked();" CHECKED>
+      <input type='checkbox' id='All Status' name='status' 
+       value='All Status' onClick="allStatusClicked();" CHECKED>
        <b>All Status</b></input><br>
-      <input type='checkbox' id='Active' name='status' value='Active' onClick="statusItemClicked();">
+      <input type='checkbox' id='Active' name='status' 
+       value='Active' onClick="statusItemClicked();">
        <b>Active</b></input><br>
-      <input type='checkbox' id='Approved-not yet active' name='status' value='Approved-not yet active' onClick="statusItemClicked();">
+      <input type='checkbox' id='Approved-not yet active' name='status' 
+       value='Approved-not yet active' onClick="statusItemClicked();">
        <b>Approved-not yet active</b><br>
-      <input type='checkbox' id='Temporarily closed' name='status' value='Temporarily closed' onClick="statusItemClicked();">
+      <input type='checkbox' id='Temporarily closed' name='status' 
+       value='Temporarily closed' onClick="statusItemClicked();">
        <b>Temporarily closed</b></input><br>
-       <input type='checkbox' id='Closed' name='status' value='Closed' onClick="statusItemClicked();">
+       <input type='checkbox' id='Closed' name='status' 
+        value='Closed' onClick="statusItemClicked();">
        <b>Closed</b></input><br>
-       <input type='checkbox' id='Completed' name='status' value='Completed' onClick="statusItemClicked();">
+       <input type='checkbox' id='Completed' name='status' 
+        value='Completed' onClick="statusItemClicked();">
        <b>Completed</b></input><br>
-       <input type='checkbox' id='Withdrawn' name='status' value='Withdrawn' onClick="statusItemClicked();">
+       <input type='checkbox' id='Withdrawn' name='status' 
+        value='Withdrawn' onClick="statusItemClicked();">
        <b>Withdrawn</b></input><br>
-       <input type='checkbox' id='Withdrawn from PDQ' name='status' value='Withdrawn from PDQ' onClick="statusItemClicked();">
+       <input type='checkbox' id='Withdrawn from PDQ' name='status' 
+        value='Withdrawn from PDQ' onClick="statusItemClicked();">
        <b>Withdrawn from PDQ</b></input><br>
      </td>
     </tr>    
@@ -382,7 +395,7 @@ function allStatusClicked(){
   </form>
  </body>
 </html>
-""" % (cdrcgi.SESSION, session, dateString)
+""" % (cdrcgi.SESSION, session)
     cdrcgi.sendPage(header + form)
 
 #----------------------------------------------------------------------
@@ -590,7 +603,7 @@ for cdrid in cdrids:
     docId = cdr.normalize(cdrid)
     doc = cdr.getDoc(session, docId, checkout = 'N')
     if doc.startswith("<Errors"):
-        cdrcgi.bail("<error>Unable to retrieve %s : %s" % cdrid,doc)
+        cdrcgi.bail("<error>Unable to retrieve %s : %s" % (cdrid, doc))
     filter = ['name:Revision Markup Filter']
     doc = cdr.filterDoc(session,filter,docId=docId)
     dom = xml.dom.minidom.parseString(doc[0])
@@ -600,11 +613,7 @@ cursor.close()
 cursor = None
 
 # out put the results table
-header = cdrcgi.header(title, title, instr, script,
-                           ("Submit",
-                            SUBMENU,
-                            cdrcgi.MAINMENU),
-                           numBreaks = 1)
+header = cdrcgi.rptHeader(title, instr) 
 form   = [u"""\
  <style type="text/css">
 table
@@ -697,8 +706,8 @@ a.selected:hover
   
    <input type='hidden' name='%s' value='%s'>
     <p style="text-align: center; font-family: Verdana, Tahoma, sans-serif; font-size: 12pt; font-weight: bold; color: #553;">
-    Summaries with Protocol Links/Refs Report</br>
-    <div style="text-align: center; font-family: Verdana, Tahoma, sans-serif; font-size: 11pt; font-weight: normal; color: #553;">%s</div>
+    Summaries with Protocol Links/Refs Report<br>
+    <span style="text-align: center; font-family: Verdana, Tahoma, sans-serif; font-size: 11pt; font-weight: normal; color: #553;">%s</span>
     </p>
    
    <table>
