@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummariesTocReport.py,v 1.3 2007-11-03 14:15:07 bkline Exp $
+# $Id: SummariesTocReport.py,v 1.4 2008-09-29 17:46:41 venglisc Exp $
 #
 # Report on lists of summaries.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2007/11/03 14:15:07  bkline
+# Unicode encoding cleanup (issue #3716).
+#
 # Revision 1.2  2004/08/16 20:03:24  venglisc
 # Added CSS to display the TOC levels indented.  Added help message.
 # (Bug 1231)
@@ -33,7 +36,7 @@ submit    = fields and fields.getvalue("SubmitButton")     or None
 request   = cdrcgi.getRequest(fields)
 title     = "CDR Administration"
 instr     = "Summaries TOC Lists"
-script    = "SummariesTocReport.py"
+script    = "SummariesTocReport_new.py"
 SUBMENU   = "Report Menu"
 buttons   = (SUBMENU, cdrcgi.MAINMENU)
 
@@ -89,127 +92,138 @@ dateString = time.strftime("%B %d, %Y")
 # If we don't have a request, put up the form.
 #----------------------------------------------------------------------
 if not lang:
-    header = cdrcgi.header(title, title, instr, script,
+    header = cdrcgi.header(title, title, instr + ' - ' + dateString, 
+                           script,
                            ("Submit",
                             SUBMENU,
                             cdrcgi.MAINMENU),
-                           numBreaks = 1)
+                           numBreaks = 1,
+                           stylesheet = """
+   <STYLE type="text/css">
+    TD      { font-size:  12pt; }
+    LI.none { list-style-type: none }
+    DL      { margin-left: 0; padding-left: 0 }
+   </STYLE>
+   <script language='JavaScript'>
+    function someEnglish() {
+        document.getElementById('allEn').checked = false;
+    }
+    function someSpanish() {
+        document.getElementById('allEs').checked = false;
+    }
+    function allEnglish(widget, n) {
+        for (var i = 1; i <= n; ++i)
+            document.getElementById('E' + i).checked = false;
+    }
+    function allSpanish(widget, n) {
+        for (var i = 1; i <= n; ++i)
+            document.getElementById('S' + i).checked = false;
+    }
+   </script>
+
+"""                           )
+
     form   = """\
    <input type='hidden' name='%s' value='%s'>
-   <table border='0'>
-    <tr>
-     <td colspan='3'>
-      %s<br><br>
-     </td>
-    </tr>
-   </table>
  
-   <table border="0">
-    <tr>
-     <td>
-      <table border="0">
-       <tr>
-        <td nowrap>
-         <input name='audience' type='radio' value='Health Professional' CHECKED>
-         <b>Health Professional</b>
-        </td>
-        <td nowrap>
-         <input name='showId' type='radio' value='Y'>
-	 <b>With CDR ID</b>
-        </td>
-       </tr>
-       <tr>
-        <td nowrap>
-         <input name='audience' type='radio' value='Patient'>
-          <b>Patient</b>
-        </td>
-        <td nowrap>
-         <input name='showId' type='radio' value='N' CHECKED>
-	 <b>Without CDR ID</b>
-        </td>
-       </tr>
-      </table>
-     </td>
-     <td valign='center'>
-      <table border="0">
-       <tr>
-        <td>
-         <input name='tocLevel' type='text' size='1' value='3' CHECKED>
-	</td>
-	<td>
-         <b>TOC Levels Displayed</b> 
-        </td>
-        <td>(QC Report uses "3"; <br>leave blank to see all levels)</td>
-       </tr>
-      </table>
-     </td>
-    </tr>
-   </table>
+   <fieldset>
+    <legend>&nbsp;Select Summary Audience&nbsp;</legend>
+    <input name='audience' type='radio' id="byHp"
+           value='Health Professional' CHECKED>
+    <label for="byHp">Health Professional</label>
+    <br>
+    <input name='audience' type='radio' id="byPat"
+           value='Patient'>
+    <label for="byPat">Patient</label>
+   </fieldset>
+   <fieldset>
+    <legend>&nbsp;Display CDR-ID?&nbsp;</legend>
+    <input name='showId' type='radio' id="idNo"
+           value='N' CHECKED>
+    <label for="idNo">Without CDR-ID</label>
+    <br>
+    <input name='showId' type='radio' id="idYes"
+           value='Y'>
+    <label for="idYes">With CDR-ID</label>
+   </fieldset>
+   <fieldset>
+    <legend>&nbsp;TOC Levels?&nbsp;</legend>
+    <input name='tocLevel' type='text' size='1' value='3' CHECKED>
+    (QC Report uses "3" - leave blank to see all levels)
+   </fieldset>
 
-   <table>
-    <tr>
-     <td width="320">
-      <hr width="50%%"/>
-     </td>
-    </tr>
-   </table>
-
+   <fieldset>
+    <legend>&nbsp;Select Summary Language and Summary Type&nbsp;</legend>
    <table border = '0'>
     <tr>
      <td width=100>
-      <input name='lang' type='radio' value='English' CHECKED><b>English</b>
+      <input name='lang' type='radio' id="en" value='English' CHECKED>
+      <label for="en">English</label>
      </td>
      <td valign='top'>
-      <b>Select PDQ Summaries: (one or more)</b>
+      Select PDQ Summaries: (one or more)
      </td>
     </tr>
     <tr>
      <td></td>
      <td>
-      <input type='checkbox' name='grp' value='All English' CHECKED>
-       <b>All English</b><br>
-      <input type='checkbox' name='grp' value='Adult Treatment'>
-       <b>Adult Treatment</b><br>
-      <input type='checkbox' name='grp' value='Genetics'>
-       <b>Cancer Genetics</b><br>
+      <input type='checkbox' name='grp' value='All English' 
+             onclick="javascript:allEnglish(this, 6)" id="allEn" CHECKED>
+       <label id="allEn">All English</label><br>
+      <input type='checkbox' name='grp' value='Adult Treatment'
+             onclick="javascript:someEnglish()" id="E1">
+       <label id="E1">Adult Treatment</label><br>
+      <input type='checkbox' name='grp' value='Genetics'
+             onclick="javascript:someEnglish()" id="E2">
+       <label id="E2">Cancer Genetics</label><br>
       <input type='checkbox' name='grp'
-             value='Complementary and Alternative Medicine'>
-       <b>Complementary and Alternative Medicine</b><br>
-      <input type='checkbox' name='grp' value='Pediatric Treatment'>
-       <b>Pediatric Treatment</b><br>
-      <input type='checkbox' name='grp' value='Screening and Prevention'>
-       <b>Screening and Prevention</b><br>
-      <input type='checkbox' name='grp' value='Supportive Care'>
-       <b>Supportive Care</b><br><br>
+             value='Complementary and Alternative Medicine'
+                    onclick="javascript:someEnglish()" id="E3">
+       <label id="E3">Complementary and Alternative Medicine</b><br>
+      <input type='checkbox' name='grp' value='Pediatric Treatment'
+             onclick="javascript:someEnglish()" id="E4">
+       <label id="E4">Pediatric Treatment</label><br>
+      <input type='checkbox' name='grp' value='Screening and Prevention'
+             onclick="javascript:someEnglish()" id="E5">
+       <label id="E5">Screening and Prevention</label><br>
+      <input type='checkbox' name='grp' value='Supportive Care'
+             onclick="javascript:someEnglish()" id="E6">
+       <label id="E6">Supportive and Palliative Care</label><br><br>
      </td>
     </tr>
     <tr>
      <td width=100>
-      <input name='lang' type='radio' value='Spanish'><b>Spanish</b>
+      <input name='lang' type='radio' id="es" value='Spanish'>
+      <label for="es">Spanish</label>
      </td>
      <td valign='top'>
-      <b>Select PDQ Summaries: (one or more)</b>
+      Select PDQ Summaries: (one or more)
      </td>
     </tr>
     <tr>
      <td></td>
      <td>
-      <input type='checkbox' name='grp' value='All Spanish'>
-       <b>All Spanish</b><br>
-      <input type='checkbox' name='grp' value='Spanish Adult Treatment'>
-       <b>Adult Treatment</b><br>
-      <input type='checkbox' name='grp' value='Spanish Pediatric Treatment'>
-       <b>Pediatric Treatment</b><br>
-      <input type='checkbox' name='grp' value='Spanish Supportive Care'>
-       <b>Supportive Care</b><br>
+      <input type='checkbox' name='grp' value='All Spanish' 
+             onclick="javascript:allSpanish(this, 3)" id="allEs" CHECKED>
+       <label id="allEs">All Spanish</label><br>
+      <input type='checkbox' name='grp' value='Spanish Adult Treatment'
+             onclick="javascript:someSpanish()" id="S1" >
+       <label id="S1">Adult Treatment</label><br>
+      <input type='checkbox' name='grp' value='Spanish Pediatric Treatment'
+             onclick="javascript:someSpanish()" id="S2" >
+       <label id="S2">Pediatric Treatment</label><br>
+      <input type='checkbox' name='grp' value='Spanish Supportive Care'
+             onclick="javascript:someSpanish()" id="S3" >
+       <label id="S3">Supportive and Palliative Care</label><br>
      </td>
     </tr>
    </table>
+   </fieldset>
 
   </form>
  </body>
 </html>
-""" % (cdrcgi.SESSION, session, dateString)
+""" % (cdrcgi.SESSION, session)
     cdrcgi.sendPage(header + form)
 
 #----------------------------------------------------------------------
@@ -396,7 +410,7 @@ if not rows:
 # Create the results page.
 #----------------------------------------------------------------------
 instr     = 'Section Titles for %s Summaries -- %s.' % (lang, dateString)
-header    = cdrcgi.header(title, title, instr, script, buttons, 
+header    = cdrcgi.rptHeader(title, instr,
                           stylesheet = """\
    <STYLE type="text/css">
     UL             { margin: 0pt; }
@@ -404,15 +418,25 @@ header    = cdrcgi.header(title, title, instr, script, buttons,
     UL UL UL       { margin-left: 30pt; }
     UL UL UL UL    { margin-left: 30pt; }
     UL UL UL UL UL { margin-left: 30pt; }
-    LI      { font-style: normal;
-	      font-family: Arial;
-              font-weight: normal; 
-	      font-size: 12pt;
-              list-style-type: none; }
-    H5      { font-weight: bold;
-	      font-family: Arial;
-              font-size: 13pt; 
-	      margin: 0pt; }
+    LI             { font-style: normal;
+                     font-family: Arial;
+                     font-weight: normal; 
+                     font-size: 12pt;
+                     list-style-type: none; }
+    H5             { font-weight: bold;
+                     font-family: Arial;
+                     font-size: 13pt; 
+                     margin: 0pt; }
+    *.ehdr         { font-size: 18pt;
+                     font-weight: bold;
+                     text-align: center; 
+                     width: 420px; }
+    *.shdr         { font-size: 18pt;
+                     font-weight: bold;
+                     text-align: center; 
+                     width: 540px; }
+    *.hdrDate      { font-size: 12pt;
+                     font-weight: bold; }
    </STYLE>
 """)
 
@@ -423,14 +447,18 @@ if lang == 'English':
     report    = """\
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
   </FORM>
-  <H3>PDQ %s Summaries</H3>
-""" % (cdrcgi.SESSION, session, audience)
+  <div class="ehdr">PDQ %s Summaries<br>
+  <span class="hdrDate">%s</span>
+  </div>
+""" % (cdrcgi.SESSION, session, audience, dateString)
 else:
     report    = """\
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
   </FORM>
-  <H3>PDQ %s %s Summaries</H3>
-""" % (cdrcgi.SESSION, session, lang, audience)
+  <div class="shdr">PDQ %s %s Summaries<br>
+  <span class="hdrDate">%s</span>
+  </div>
+""" % (cdrcgi.SESSION, session, lang, audience, dateString)
 
 board_type = rows[0][5]
 
