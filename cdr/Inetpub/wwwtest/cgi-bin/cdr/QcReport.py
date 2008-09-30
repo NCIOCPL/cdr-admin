@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.54 2008-01-23 22:59:57 venglisc Exp $
+# $Id: QcReport.py,v 1.55 2008-09-30 20:44:46 venglisc Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.54  2008/01/23 22:59:57  venglisc
+# Added filter sets for GlossaryTermName and GlossaryTermConcept to run
+# QC reports. (Bug 3699)
+#
 # Revision 1.53  2007/04/09 20:47:45  venglisc
 # Modified to allow insertion/deletion markup for DrugInfoSummaries.
 # (Bug 3067)
@@ -405,7 +409,8 @@ if docTitle and not docId:
 # Let the user pick the version for most Summary or Glossary reports.
 #----------------------------------------------------------------------
 if docType == 'Summary' and repType and repType != 'pp' and not version or \
-   docType == 'GlossaryTerm' and not version:
+   docType == 'GlossaryTerm' and not version or \
+   docType == 'DIS' and not version:
     try:
         cursor.execute("""\
             SELECT num,
@@ -420,12 +425,20 @@ if docType == 'Summary' and repType and repType != 'pp' and not version or \
     form = """\
   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
   <INPUT TYPE='hidden' NAME='DocType' VALUE='%s'>
-  <INPUT TYPE='hidden' NAME='ReportType' VALUE='%s'>
   <INPUT TYPE='hidden' NAME='DocId' VALUE='CDR%010d'>
+""" % (cdrcgi.SESSION, session, docType, intId)
+
+    if docType != 'DIS':
+        form += """\
+  <INPUT TYPE='hidden' NAME='ReportType' VALUE='%s'>
+""" % (repType)
+
+    form += """\
   Select document version:&nbsp;
   <SELECT NAME='DocVersion'>
    <OPTION VALUE='-1' SELECTED='1'>Current Working Version</OPTION>
-""" % (cdrcgi.SESSION, session, docType, repType, intId)
+"""
+
     for row in rows:
         form += """\
    <OPTION VALUE='%d'>[V%d %s] %s</OPTION>
@@ -575,6 +588,8 @@ filters = {
     'CTGovProtocol':
         ["set:QC CTGovProtocol Set"],
     'DrugInformationSummary':
+        ["set:QC DrugInfoSummary Set"],
+    'DIS':
         ["set:QC DrugInfoSummary Set"],
     'GlossaryTerm':
         ["set:QC GlossaryTerm Set"],
@@ -1069,6 +1084,7 @@ if docType == 'Media':                 docType += ":img"
 if docType == 'MiscellaneousDocument': docType += ":rs"
 
 if version == "-1": version = None
+
 if not filters.has_key(docType):
     # cdrcgi.bail(filters)
     doc = cdr.getDoc(session, docId, version = version or "Current",
