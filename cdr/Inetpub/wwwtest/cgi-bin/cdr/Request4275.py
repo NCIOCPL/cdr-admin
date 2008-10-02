@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: Request4275.py,v 1.3 2008-09-15 19:13:22 bkline Exp $
+# $Id: Request4275.py,v 1.4 2008-10-02 12:16:55 bkline Exp $
 #
 # "We would like a new Mailer report so we can track responses easier.
 #
@@ -25,6 +25,9 @@
 #  Changes Category"
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2008/09/15 19:13:22  bkline
+# More tweaks requested by Sheri.
+#
 # Revision 1.2  2008/09/11 20:50:13  bkline
 # Tweaks requested by Sheri after the fact.
 #
@@ -191,16 +194,17 @@ class Mailer:
                         href = href, mergeDown = mergeDown)
         row.addCell(4, self.address or u" ", mergeDown = mergeDown)
         if self.document:
+            row.addCell(5, self.document.docId, mergeDown = mergeDown)
             href = self.urlBase % self.document.docId
-            row.addCell(5, self.document.docTitle, style = urlStyle,
+            row.addCell(6, self.document.docTitle, style = urlStyle,
                         href = href, mergeDown = mergeDown)
-        row.addCell(6, self.response, mergeDown = mergeDown)
+        row.addCell(7, self.response, mergeDown = mergeDown)
         if self.changes:
-            row.addCell(7, self.changes[0])
+            row.addCell(8, self.changes[0])
             for c in self.changes[1:]:
                 row = sheet.addRow(nextRow, style)
                 nextRow += 1
-                row.addCell(7, c)
+                row.addCell(8, c)
         return nextRow
 
 #----------------------------------------------------------------------
@@ -298,9 +302,10 @@ def addColumnHeaders(book, sheet, startDate, endDate, total):
     sheet.addCol(2, 150)
     sheet.addCol(3, 200)
     sheet.addCol(4, 200)
-    sheet.addCol(5, 300)
-    sheet.addCol(6,  70)
-    sheet.addCol(7, 200)
+    sheet.addCol(5,  70)
+    sheet.addCol(6, 300)
+    sheet.addCol(7,  70)
+    sheet.addCol(8, 200)
     row = sheet.addRow(1, style)
     row.addCell(1, u"Mailers Received - Detailed", mergeAcross = 6)
     row = sheet.addRow(2, style)
@@ -312,14 +317,16 @@ def addColumnHeaders(book, sheet, startDate, endDate, total):
     row.addCell(2, u"Mailer Type")
     row.addCell(3, u"Recipient")
     row.addCell(4, u"Address")
-    row.addCell(5, u"Document")
-    row.addCell(6, u"Date Received")
-    row.addCell(7, u"Changes Category")
+    row.addCell(5, u"CDR ID")
+    row.addCell(6, u"Document")
+    row.addCell(7, u"Date Received")
+    row.addCell(8, u"Changes Category")
 
 #----------------------------------------------------------------------
 # Generate the Mailer Tracking Report.
 #----------------------------------------------------------------------
 def createReport(cursor, mailerType, changeCategory, startDate, endDate):
+    userEndDate = endDate
     try:
         endDate = str(cdr.calculateDateByOffset(1, endDate[:10]))
     except:
@@ -347,7 +354,7 @@ def createReport(cursor, mailerType, changeCategory, startDate, endDate):
     mailerIds = [row[0] for row in cursor.fetchall()]
     book = ExcelWriter.Workbook()
     sheet = book.addWorksheet('Mailers')
-    addColumnHeaders(book, sheet, startDate, endDate, len(mailerIds))
+    addColumnHeaders(book, sheet, startDate, userEndDate, len(mailerIds))
     alignment = ExcelWriter.Alignment('Left', 'Top', True)
     font = ExcelWriter.Font('blue', True)
     style = book.addStyle(alignment = alignment)
