@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummariesTocReport.py,v 1.5 2008-09-29 17:48:21 venglisc Exp $
+# $Id: SummariesTocReport.py,v 1.6 2008-10-03 15:50:33 venglisc Exp $
 #
 # Report on lists of summaries.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2008/09/29 17:48:21  venglisc
+# Fixing typo left over from testing.
+#
 # Revision 1.4  2008/09/29 17:46:41  venglisc
 # Modified Supportive Care board name. (Bug 4207)
 # Also modified user interface to use fieldsets.
@@ -255,7 +258,7 @@ for i in range(len(groups)):
   elif groups[i] == 'Spanish Adult Treatment' and lang == 'Spanish':
       boardPick += """'CDR0000028327', 'CDR0000035049', """
   elif groups[i] == 'Complementary and Alternative Medicine':
-      boardPick += """'CDR0000256158', """
+      boardPick += """'CDR0000256158', 'CDR0000423294', """
   elif groups[i] == 'Genetics':
       boardPick += """'CDR0000032120', 'CDR0000257061', """
   elif groups[i] == 'Screening and Prevention':
@@ -280,12 +283,13 @@ q_case = """\
             WHEN board.value = 'CDR0000032120'  THEN 'Cancer Genetics'
             WHEN board.value = 'CDR0000257061'  THEN 'Cancer Genetics'
             WHEN board.value = 'CDR0000256158'  THEN 'Complementary and Alternative Medicine'
+            WHEN board.value = 'CDR0000423294'  THEN 'Complementary and Alternative Medicine'
             WHEN board.value = 'CDR0000028557'  THEN 'Pediatric Treatment'
             WHEN board.value = 'CDR0000028558'  THEN 'Pediatric Treatment'
             WHEN board.value = 'CDR0000028536'  THEN 'Screening and Prevention'
             WHEN board.value = 'CDR0000028537'  THEN 'Screening and Prevention'
-            WHEN board.value = 'CDR0000028579'  THEN 'Supportive Care'
-            WHEN board.value = 'CDR0000029837'  THEN 'Supportive Care'
+            WHEN board.value = 'CDR0000028579'  THEN 'Supportive and Palliative Care'
+            WHEN board.value = 'CDR0000029837'  THEN 'Supportive and Palliative Care'
             ELSE board.value END
 """
 
