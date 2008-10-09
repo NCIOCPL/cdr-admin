@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermReports.py,v 1.13 2008-06-12 19:10:34 venglisc Exp $
+# $Id: GlossaryTermReports.py,v 1.14 2008-10-09 21:00:45 bkline Exp $
 #
 # Submenu for glossary term reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.13  2008/06/12 19:10:34  venglisc
+# Adding new menu item for GlossaryTermFull report. (Bug 3948)
+#
 # Revision 1.12  2007/10/31 16:09:04  bkline
 # Added Glossary Term Concept reports.
 #
@@ -114,6 +117,10 @@ reports = [
            ('GlossaryTermsByStatus.py?', 'Glossary Term By Status Report'),
            ('GlossaryTermsByType.py?', 'Glossary Term By Type Report'),
            ('Request2565.aspx?', 'Glossary Term Concept Reports'),
+           ('GlossaryConceptDocsModified.py?', 
+           'Glossary Term Concept - Ducmnets Modified'),
+           ('GlossaryNameDocsModified.py?', 
+           'Glossary Term Name - Ducmnets Modified'),
            ('StaleGlossaryTerms.py?', 'Glossary Terms That Need Reviewed'),
            ('SpanishGlossaryTermsByStatus.py?',
             'Spanish Glossary Term By Status Report')
