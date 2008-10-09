@@ -9,9 +9,12 @@
 #
 # Requirements and design are described in Bugzilla issue #3561.
 #
-# $Id: ReplaceDocWithNewDoc.py,v 1.2 2008-09-24 03:20:13 ameyer Exp $
+# $Id: ReplaceDocWithNewDoc.py,v 1.3 2008-10-09 13:57:37 ameyer Exp $
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2008/09/24 03:20:13  ameyer
+# Bug fixes.  Slight user interface improvements.  Slight code cleanup.
+#
 # Revision 1.1  2008/09/19 02:37:37  ameyer
 # Initial version.
 #
@@ -332,9 +335,9 @@ proceed:</p>
 
 <h3>Operation</h3>
 <p>A user first enters the CDR document ID for the old (replaced) and
-new (replacement) documents in the form below.  The program then checks
-to see if the first three conditions above are met.  If they are, the
-program will report to the user:</p>
+new (replacement) documents in the form below and clicks "Submit".
+The program then checks to see if the first three conditions above are met.
+If they are, the program will report to the user:</p>
 <ul>
  <li>The titles of the respective old and new documents.</li>
  <li>The validation status of the new document.</li>
@@ -362,11 +365,13 @@ DOCUMENT_ID_FORM = """
 <h3>Document Identifiers</h3>
  <table border='0'>
   <tr>
+   <td align='right'><strong>Old CDR ID </strong></td>
    <td><input type='text' size='12' name='oldDocId' /></td>
-   <td>Old CDR ID (keep this ID but replace the doc with the new one)</td>
+   <td>(keep this ID but replace the doc with the new one)</td>
   </tr><tr>
+   <td align='right'><strong>New CDR ID </strong></td>
    <td><input type='text' size='12' name='newDocId' /></td>
-   <td>New CDR ID (keep this doc but store it with the old ID)</td>
+   <td>(keep this doc but store it with the old ID)</td>
   </tr>
  </table>
  <p />
@@ -579,7 +584,7 @@ publishing job.</p>
 must be resolved.  The new document can replace the old one without
 breaking any links.</p>
 
-<p>The new document will be saved as a <strong>publishable</strong>
+<p>The new document will be saved as a <strong>non-publishable</strong>
 version.</p>
 """
 
