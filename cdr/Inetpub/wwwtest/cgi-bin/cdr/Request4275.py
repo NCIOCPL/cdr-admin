@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: Request4275.py,v 1.4 2008-10-02 12:16:55 bkline Exp $
+# $Id: Request4275.py,v 1.5 2008-10-17 15:14:36 bkline Exp $
 #
 # "We would like a new Mailer report so we can track responses easier.
 #
@@ -25,6 +25,9 @@
 #  Changes Category"
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2008/10/02 12:16:55  bkline
+# Modifications requtested by William (#4304).
+#
 # Revision 1.3  2008/09/15 19:13:22  bkline
 # More tweaks requested by Sheri.
 #
@@ -316,7 +319,7 @@ def addColumnHeaders(book, sheet, startDate, endDate, total):
     row.addCell(1, u"DocID")
     row.addCell(2, u"Mailer Type")
     row.addCell(3, u"Recipient")
-    row.addCell(4, u"Address")
+    row.addCell(4, u"Email Address")
     row.addCell(5, u"CDR ID")
     row.addCell(6, u"Document")
     row.addCell(7, u"Date Received")
@@ -326,11 +329,6 @@ def addColumnHeaders(book, sheet, startDate, endDate, total):
 # Generate the Mailer Tracking Report.
 #----------------------------------------------------------------------
 def createReport(cursor, mailerType, changeCategory, startDate, endDate):
-    userEndDate = endDate
-    try:
-        endDate = str(cdr.calculateDateByOffset(1, endDate[:10]))
-    except:
-        cdrcgi.bail("Invalid end date: '%s'" % endDate)
     where = ("WHERE r.value BETWEEN ? and ? "
              "AND r.path = '/Mailer/Response/Received'")
     join = ""
@@ -354,7 +352,7 @@ def createReport(cursor, mailerType, changeCategory, startDate, endDate):
     mailerIds = [row[0] for row in cursor.fetchall()]
     book = ExcelWriter.Workbook()
     sheet = book.addWorksheet('Mailers')
-    addColumnHeaders(book, sheet, startDate, userEndDate, len(mailerIds))
+    addColumnHeaders(book, sheet, startDate, endDate, len(mailerIds))
     alignment = ExcelWriter.Alignment('Left', 'Top', True)
     font = ExcelWriter.Font('blue', True)
     style = book.addStyle(alignment = alignment)
