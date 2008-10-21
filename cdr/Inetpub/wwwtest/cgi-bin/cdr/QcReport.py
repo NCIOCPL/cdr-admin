@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.56 2008-09-30 21:10:36 venglisc Exp $
+# $Id: QcReport.py,v 1.57 2008-10-21 20:24:10 venglisc Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.56  2008/09/30 21:10:36  venglisc
+# Limiting display of version comment to first 150 characters. (Bug 4248)
+#
 # Revision 1.55  2008/09/30 20:44:46  venglisc
 # Modifications to call an intermediate page for DrugInfoSummaries. (Bug 4248)
 #
@@ -442,10 +445,13 @@ if docType == 'Summary' and repType and repType != 'pp' and not version or \
    <OPTION VALUE='-1' SELECTED='1'>Current Working Version</OPTION>
 """
 
+    # Limit display of version comment to 150 chars (if exists)
+    # ---------------------------------------------------------
     for row in rows:
         form += """\
    <OPTION VALUE='%d'>[V%d %s] %s</OPTION>
-""" % (row[0], row[0], row[2][:10], str(row[1])[:150] or "[No comment]")
+""" % (row[0], row[0], row[2][:10], 
+       not row[1] and "[No comment]" or row[1][:150])
         selected = ""
     form += "</SELECT>"
     form += """
