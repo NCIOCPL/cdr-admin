@@ -1,12 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryConceptFull.py,v 1.2 2008-06-12 19:04:01 venglisc Exp $
+# $Id: GlossaryConceptFull.py,v 1.3 2008-10-27 16:32:32 venglisc Exp $
 #
 # Glossary Term Concept report
 # This report takes a concept and displays all of the Term Name 
 # definitions that are linked to this concept document
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2008/06/12 19:04:01  venglisc
+# Final version of the Glossary Concept Full report. (Bug 3948)
+#
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, cdrdb, re, sys, time, xml.dom.minidom
@@ -26,6 +29,7 @@ LABEL = { 'DateLastModified'      :'Date Last Modified',
           'RelatedSummaryRef'     :'Related Summary Ref',
           'StatusDate'            :'Status Date',
           'TermType'              :'Term Type',
+          'TranslatedStatus'      :'Translated Status',
           'TranslationResource'   :'Translation Resource' }
 
 
@@ -491,7 +495,7 @@ def getConcept(docId):
         concept = {}
         for node in docElem.childNodes:
             if node.nodeName == 'TermDefinition' or \
-               node.nodeName == 'SpanishTermDefinition':
+               node.nodeName == 'TranslatedTermDefinition':
                 if node.nodeName == 'TermDefinition': 
                     language = 'en'
                 else:
@@ -515,7 +519,8 @@ def getConcept(docId):
                     # -----------------------------------------------------
                     for element in ['DefinitionStatus', 
                                     'StatusDate', 'DateLastReviewed',
-                                    'DateLastModified']:
+                                    'DateLastModified', 'TranslatedStatus',
+                                    'TranslatedStatusDate']:
                         if child.nodeName == element:
                             concept['%s-%s' % (language, audience)].update(
                               {element:str(cdr.getTextContent(child).strip())})
@@ -598,9 +603,9 @@ def getNameDefinition(docId):
         termName[docId] = {}
         i = -1
         for node in docElem.childNodes:
-            if node.nodeName == 'TermName':
+            if node.nodeName in ('TermName', 'TranslatedName'):
                 i += 1
-                language = node.getAttribute('language')
+                language = node.getAttribute('language') or 'en'
                 
                 for child in node.childNodes:
                     if child.nodeName == 'TermNameString':
@@ -738,7 +743,7 @@ conceptInfo = getConcept(termNames['GlossaryTermConcept'])
 # blocked GTNs came after the program was nearly completed.
 # -----------------------------------------------------------
 termNameStatus = getTermNameStatus(termNames['GlossaryTermName'])
-#cdrcgi.bail(conceptInfo)
+#cdrcgi.bail(termNames)
 
 # Get the term name (for spanish and english) for each of the 
 # related GlossaryTermName document and create a dictionary
@@ -749,7 +754,7 @@ for termId in termNames['GlossaryTermName']:
     termInfo = getNameDefinition(termId)
     allTermsInfo.update(termInfo)
 
-# cdrcgi.bail(allTermsInfo)
+#cdrcgi.bail(allTermsInfo)
 # -----------------------------------------------------------------
 # Display the GlossaryTermName Information
 # -----------------------------------------------------------------
@@ -861,6 +866,10 @@ for lang in languages:
             if conceptInfo['%s-%s' % (lang, aud)].has_key('DefinitionStatus'):
                 html += addSingleRow(conceptInfo['%s-%s' % (lang, aud)],
                                     'DefinitionStatus')
+            # Adding row for Definition Status
+            if conceptInfo['%s-%s' % (lang, aud)].has_key('TranslatedStatus'):
+                html += addSingleRow(conceptInfo['%s-%s' % (lang, aud)],
+                                    'TranslatedStatus')
             # Adding row for Status Date
             if conceptInfo['%s-%s' % (lang, aud)].has_key('StatusDate'):
                 html += addSingleRow(conceptInfo['%s-%s' % (lang, aud)],
