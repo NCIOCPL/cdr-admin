@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: NciClinicalTrialsStats.py,v 1.3 2005-06-30 21:56:30 bkline Exp $
+# $Id: NciClinicalTrialsStats.py,v 1.4 2008-10-29 20:38:19 bkline Exp $
 #
 # "We want to create a new report to be added to the Protocols Menu
 # in the CDR, to respond to requests for Clinical Trial Statistics."
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2005/06/30 21:56:30  bkline
+# Modifications requested by Sheri in request #1748.
+#
 # Revision 1.2  2005/06/09 18:37:41  bkline
 # Cosmetic mods requested by Lakshmi.
 #
@@ -23,10 +26,10 @@ def showTotal(label, total):
 htmlStrings = [u"""\
 <html>
  <head>
-  <title>Profile of NCI Sponsored Clinical Trials</title>
+  <title>Profile of Active and Approved NCI Sponsored Clinical Trials</title>
  </head>
  <body>
-  <h3>Profile of NCI Sponsored Clinical Trials</h3>
+  <h3>Profile of Active and Approved NCI Sponsored Clinical Trials</h3>
   <h4>%s</h4>
   <pre>""" % time.strftime("%Y-%m-%d")]
 conn = cdrdb.connect('CdrGuest')
