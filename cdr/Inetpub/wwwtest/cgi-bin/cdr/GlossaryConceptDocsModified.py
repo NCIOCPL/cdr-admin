@@ -1,12 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryConceptDocsModified.py,v 1.1 2008-10-14 12:51:55 bkline Exp $
+# $Id: GlossaryConceptDocsModified.py,v 1.2 2008-10-30 12:39:16 bkline Exp $
 #
 # "The Glossary Term Concept - Documents Modified Report will serve as a
 # QC report to verify which documents were changed within a given time
 # frame. The report will be separated into English and Spanish.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2008/10/14 12:51:55  bkline
+# New "documents modified" reports for restructured glossary documents.
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, cdrdb, time, ExcelWriter, sys, lxml.etree as etree
 
@@ -77,6 +80,10 @@ if not startDate or not endDate or not language or not audience:
       Health professional
       <INPUT TYPE='radio' NAME='audience' VALUE='Health professional' />
      </TD>
+    </TR>
+    <TR>
+     <TD COLSPAN='2'><I>The required language and audience choices
+      determine which comments will be included in the report.</I></TD>
     </TR>
    </TABLE>
   </FORM>
