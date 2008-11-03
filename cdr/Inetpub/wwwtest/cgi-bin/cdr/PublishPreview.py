@@ -1,11 +1,16 @@
 #----------------------------------------------------------------------
 #
-# $Id: PublishPreview.py,v 1.35 2008-03-31 20:59:20 venglisc Exp $
+# $Id: PublishPreview.py,v 1.36 2008-11-03 19:06:53 venglisc Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.35  2008/03/31 20:59:20  venglisc
+# The HTML returned by Cancer.gov is not completely consistent for different
+# document types.  I adjusted the regular expressions to accomodate the
+# differences between the Summary and Glossary documents. (Bug 3973)
+#
 # Revision 1.34  2008/03/26 20:43:57  venglisc
 # Added some regular expression replacement strings to allow some links to
 # properly work within the PP document and to change the target of the
@@ -173,6 +178,7 @@ filterSets = {
     'CTGovProtocol'         : ['set:Vendor CTGovProtocol Set'],
     'DrugInformationSummary': ['set:Vendor DrugInfoSummary Set'], 
     'GlossaryTerm'          : ['set:Vendor GlossaryTerm Set'], 
+    'GlossaryTermName'      : ['set:Vendor GlossaryTerm Set'],
     'InScopeProtocol'       : ['set:Vendor InScopeProtocol Set'],
     'Summary'               : ['set:Vendor Summary Set']
 }
@@ -250,7 +256,7 @@ try:
 except cdrdb.Error, info:    
         cdrcgi.bail('Failure finding specified version for %s: %s' % (docId, 
                                                                  info[1][0]))
-showProgress("Fetched document type: %s..." % row[0])
+showProgress("Fetched document version: %s..." % row[0])
 
 # Note: The values for flavor listed here are not the only values possible.
 #       These values are the default values but XMetaL macros may pass
@@ -266,8 +272,9 @@ if not flavor:
     elif docType == "InScopeProtocol":        flavor = "Protocol_HP"
     elif docType == "CTGovProtocol":          flavor = "CTGovProtocol"
     elif docType == "GlossaryTerm":           flavor = "GlossaryTerm"
+    elif docType == "GlossaryTermName":       flavor = "GlossaryTerm"
     else: cdrcgi.bail("Publish preview only available for Summary, "
-                      "DrugInfoSummary, GlossaryTerm and Protocol documents")
+                      "DrugInfoSummary, Glossary and Protocol documents")
 showProgress("Using flavor: %s..." % flavor)
 
 #----------------------------------------------------------------------
@@ -277,6 +284,8 @@ if not filterSets.has_key(docType):
     cdrcgi.bail("Don't have filters set up for %s documents yet" % docType)
 doc = cdr.filterDoc(session, filterSets[docType], docId = docId, 
                     docVer = docVer)
+#print docId, docVer, flavor, docType
+#print '*****************************************'
 if type(doc) == type(()):
     doc = doc[0]
 showProgress("Document filtering complete...")
@@ -296,10 +305,14 @@ try:
     ##    resp = cdr2cg.pubPreview(doc, flavor)
     ##else:
     ##    resp = cdr2gk.pubPreview(doc, flavor)
+    #print '*** Before', doc
     resp = cdr2gk.pubPreview(doc, flavor)
+    #print '*** After'
     showProgress("Response received from Cancer.gov...")
 except:
-    cdrcgi.bail("Preview formatting failure")
+    print dir(resp)
+    print 
+    cdrcgi.bail("Cancer.gov returned invalid HTML")
 
 #doc = cdrcgi.decode(doc)
 #doc = re.sub("@@DOCID@@", docId, doc)
