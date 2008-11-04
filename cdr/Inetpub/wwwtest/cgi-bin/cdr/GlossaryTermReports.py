@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermReports.py,v 1.15 2008-10-09 21:05:54 bkline Exp $
+# $Id: GlossaryTermReports.py,v 1.16 2008-11-04 21:15:32 venglisc Exp $
 #
 # Submenu for glossary term reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.15  2008/10/09 21:05:54  bkline
+# Fixed typos in previous version.
+#
 # Revision 1.14  2008/10/09 21:00:45  bkline
 # Added new documents modified reports.
 #
@@ -91,7 +94,7 @@ reports = [
             'Glossary Term QC Report'),
            ('GlossaryConceptFull.py?', 
             'Glossary Concept QC Report - Full'),
-           ('QcReport.py?DocType=GlossaryTerm&ReportType=pp&', 
+           ('QcReport.py?DocType=GlossaryTermName&ReportType=pp&', 
             'Publish Preview'),
           ]
 for r in reports:
