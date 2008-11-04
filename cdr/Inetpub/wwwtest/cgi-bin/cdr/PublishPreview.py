@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: PublishPreview.py,v 1.36 2008-11-03 19:06:53 venglisc Exp $
+# $Id: PublishPreview.py,v 1.37 2008-11-04 21:13:58 venglisc Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.36  2008/11/03 19:06:53  venglisc
+# Modifications to allow GlossaryTermName documents to be PublishPreviewed
+# in addition to GlossaryTerm documents. (Bug 3491)
+#
 # Revision 1.35  2008/03/31 20:59:20  venglisc
 # The HTML returned by Cancer.gov is not completely consistent for different
 # document types.  I adjusted the regular expressions to accomodate the
@@ -275,6 +279,7 @@ if not flavor:
     elif docType == "GlossaryTermName":       flavor = "GlossaryTerm"
     else: cdrcgi.bail("Publish preview only available for Summary, "
                       "DrugInfoSummary, Glossary and Protocol documents")
+showProgress("DocumentType: %s..." % docType)
 showProgress("Using flavor: %s..." % flavor)
 
 #----------------------------------------------------------------------
