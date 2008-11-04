@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.57 2008-10-21 20:24:10 venglisc Exp $
+# $Id: QcReport.py,v 1.58 2008-11-04 21:12:30 venglisc Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.57  2008/10/21 20:24:10  venglisc
+# The user interface failed if no comment existed for a version. (Bug 4329)
+#
 # Revision 1.56  2008/09/30 21:10:36  venglisc
 # Limiting display of version comment to first 150 characters. (Bug 4248)
 #
@@ -330,6 +333,7 @@ if not docId and not docTitle:
                     'Document CDR ID']
 
     if repType:
+        extra += "\n  "
         extra += "<INPUT TYPE='hidden' NAME='ReportType' VALUE='%s'>" % repType
     form = """\
   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
@@ -414,8 +418,10 @@ if docTitle and not docId:
 #----------------------------------------------------------------------
 # Let the user pick the version for most Summary or Glossary reports.
 #----------------------------------------------------------------------
-if docType == 'Summary' and repType and repType != 'pp' and not version or \
-   docType == 'GlossaryTerm' and not version or \
+if docType == 'Summary'          and repType and repType != 'pp' and not version\
+   or \
+   docType == 'GlossaryTermName' and repType and repType != 'pp' and not version\
+   or \
    docType == 'DIS' and not version:
     try:
         cursor.execute("""\
@@ -519,7 +525,7 @@ if docType == 'Summary' and repType and repType != 'pp' and not version or \
 
     # Display the check boxes for the HP or Patient version sections
     # --------------------------------------------------------------
-    if docType == 'GlossaryTerm':
+    if docType == 'GlossaryTermName':
         form += """\
      <table>
       <tr>
