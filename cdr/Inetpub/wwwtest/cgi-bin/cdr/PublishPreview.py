@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: PublishPreview.py,v 1.37 2008-11-04 21:13:58 venglisc Exp $
+# $Id: PublishPreview.py,v 1.38 2008-11-06 15:10:14 venglisc Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.37  2008/11/04 21:13:58  venglisc
+# Minor change to display document type.
+#
 # Revision 1.36  2008/11/03 19:06:53  venglisc
 # Modifications to allow GlossaryTermName documents to be PublishPreviewed
 # in addition to GlossaryTerm documents. (Bug 3491)
@@ -353,7 +356,7 @@ html = pattern5.sub('<a class="SummaryRef" href="#Section_\g<1>"', html)
 
 # Replace the image links for the popup boxes to point to our CDR repository
 # --------------------------------------------------------------------------
-if html.find('gatekeeper2.cancer.gov/CDRPreviewWS') == -1:
+if html.find('gatekeeper.cancer.gov/CDRPreviewWS') == -1:
     pp_host = cdr.DEV_HOST
 else:
     pp_host = cdr.PROD_HOST
