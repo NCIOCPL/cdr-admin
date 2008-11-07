@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.58 2008-11-04 21:12:30 venglisc Exp $
+# $Id: QcReport.py,v 1.59 2008-11-07 17:13:27 venglisc Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.58  2008/11/04 21:12:30  venglisc
+# Minor changes to allow GlossaryTermName publish preview reports to be
+# submitted from the Admin interface.
+#
 # Revision 1.57  2008/10/21 20:24:10  venglisc
 # The user interface failed if no comment existed for a version. (Bug 4329)
 #
@@ -421,6 +425,8 @@ if docTitle and not docId:
 if docType == 'Summary'          and repType and repType != 'pp' and not version\
    or \
    docType == 'GlossaryTermName' and repType and repType != 'pp' and not version\
+   or \
+   docType == 'GlossaryTerm'     and repType and repType != 'pp' and not version\
    or \
    docType == 'DIS' and not version:
     try:
