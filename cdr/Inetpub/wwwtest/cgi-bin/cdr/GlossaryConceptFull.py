@@ -1,12 +1,16 @@
 #----------------------------------------------------------------------
+# coding=latin-1
 #
-# $Id: GlossaryConceptFull.py,v 1.3 2008-10-27 16:32:32 venglisc Exp $
+# $Id: GlossaryConceptFull.py,v 1.4 2008-11-17 19:47:54 venglisc Exp $
 #
 # Glossary Term Concept report
 # This report takes a concept and displays all of the Term Name 
 # definitions that are linked to this concept document
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2008/10/27 16:32:32  venglisc
+# Changing element names from Spanish... to Translated... (Bug 3948)
+#
 # Revision 1.2  2008/06/12 19:04:01  venglisc
 # Final version of the Glossary Concept Full report. (Bug 3948)
 #
@@ -196,8 +200,12 @@ def addAttributeRow(data, label, indent = False):
 def resolvePlaceHolder(language, termData, definitionText):
      # Create the Glossary Definition
      tmpdoc  = u"\n<GlossaryTermDef xmlns:cdr = 'cips.nci.nih.gov/cdr'>\n"  
-     tmpdoc += u" <TermNameString>" + termData[language] \
-                                    + u"</TermNameString>\n"
+     tmpdoc += u" <TermNameString>" + \
+               termData.get(language, u"@S@%s (en inglés)@E@" % termData['en'])\
+                  + u"</TermNameString>\n"
+     #tmpdoc += u" <TermNameString>" + \
+     #          termData.get(language, "*** No '%s' definition ***" % language)\
+     #             + u"</TermNameString>\n"
      tmpdoc += u" %s\n" % definitionText['DefinitionText']
 
      # Add the ReplacementText from the GlossaryTermName documents
@@ -605,12 +613,33 @@ def getNameDefinition(docId):
         for node in docElem.childNodes:
             if node.nodeName in ('TermName', 'TranslatedName'):
                 i += 1
-                language = node.getAttribute('language') or 'en'
+                language  = node.getAttribute('language') or 'en'
+                alternate = node.getAttribute('NameType') or None
                 
-                for child in node.childNodes:
-                    if child.nodeName == 'TermNameString':
-                        termName[docId].update(
-                           {language:cdr.getTextContent(child).strip()})
+                # We need to find the primary translation string
+                # and also store additional alternate strings to 
+                # be displayed together.  These are stored as 
+                # 'enx':[one, two], 'esx':[uno, duo], ...
+                # Note:  We need to escape possible '&' characters
+                #        in the TermNameString
+                # ------------------------------------------------
+                if not alternate:
+                    for child in node.childNodes:
+                        if child.nodeName == 'TermNameString':
+                            termName[docId].update(
+                               {language:cgi.escape(
+                                         cdr.getTextContent(child).strip())})
+                else:
+                    for child in node.childNodes:
+                        if child.nodeName == 'TermNameString':
+                            if termName[docId].has_key(language + 'x'):
+                                termName[docId][language + 'x'].append(
+                                             cdr.getTextContent(child).strip())
+                            else:
+                                termName[docId].update(
+                                          {language + 'x':
+                                          [cdr.getTextContent(child).strip()]})
+
             if node.nodeName == 'ReplacementText':
                 if termName[docId].has_key('ReplacementText'):
                     rText = node
@@ -709,7 +738,8 @@ html = """\
                    font-weight: bold; }
    .term-error   { color: red;
                    font-weight: bold; }
-   .blocked      { color: red;
+   .blocked, .special
+                 { color: red;
                    font-weight: bold; }
    .attribute    { font-weight: normal; 
                    font-style: italic; 
@@ -754,7 +784,7 @@ for termId in termNames['GlossaryTermName']:
     termInfo = getNameDefinition(termId)
     allTermsInfo.update(termInfo)
 
-#cdrcgi.bail(allTermsInfo)
+# cdrcgi.bail(allTermsInfo)
 # -----------------------------------------------------------------
 # Display the GlossaryTermName Information
 # -----------------------------------------------------------------
@@ -779,9 +809,9 @@ for la in lang_aud:
     if la.split('-')[1] not in set(audiences):
         audiences.append(la.split('-')[1])
 
-#cdrcgi.bail(conceptInfo.keys())
 sections  = {'en':'English', 'es':'Spanish'}
 
+#cdrcgi.bail(allTermsInfo)
 for lang in languages:
     for aud in audiences:
         if '%s-%s' % (lang, aud) not in lang_aud: continue
@@ -796,24 +826,47 @@ for lang in languages:
         # Adding Term Name and Term Definition for language/audience
         # ----------------------------------------------------------
         for id, termData in allTermsInfo.iteritems():
+            # Only if there doesn't exists a translation for an English
+            # term would the Spanish term be missing.  In this case
+            # (the 'else' block) we'll display the English term instead
+            # ---------------------------------------------------------
             if termData.has_key(lang):
                 html += """\
    <tr><td>&nbsp;</td><td>&nbsp;</td></tr>
    <tr class="name">
     <td width="30%%">Name</td>"""
 
+                # Display the term names and add any existing alternate
+                # term names that exist for the non-English language
+                # -----------------------------------------------------
+                if termNameStatus[id] == 'A':
+                    html += """\
+    <td width="70%%">%s (CDR%s)""" % (termData[lang], id)
+
+                    if termData.has_key(lang + 'x'):
+                        html += " &nbsp;[alternate: %s]" % (
+                                ', '.join([x for x in termData[lang + 'x']]))
+
+                    html += """</td>
+   </tr>"""
                 # Display the blocked term names in red and don't 
                 # bother displaying the term definition
                 # -----------------------------------------------
-                if termNameStatus[id] == 'A':
-                    html += """\
-    <td width="70%%">%s (CDR%s)</td>
-   </tr>""" % (termData[lang], id)
                 else:
                     html += """\
     <td class="blocked" width="70%%">BLOCKED - %s (CDR%s)</td>
    </tr>""" % (termData[lang], id)
                     continue
+
+            else:
+                html += """\
+   <tr><td>&nbsp;</td><td>&nbsp;</td></tr>
+   <tr class="name">
+    <td width="30%%">Name</td>"""
+                html += u"""\
+    <td width="70%%">
+     <span class='special'>%s (en inglés)</span> (CDR%s)""" % (
+                                                        termData['en'], id)
 
             # Resolve the PlaceHolder elements and create an HTML
             # table row from the resulting data
@@ -829,6 +882,13 @@ for lang in languages:
                 for text in replaceList:
                     definitionRow = definitionRow.replace(text, text.upper())
                 definitionRow = definitionRow.replace('@@', '')
+
+                # If there was a term without Spanish name display it
+                # in red to stand out.
+                # ----------------------------------------------------
+                definitionRow = definitionRow.replace('@S@', 
+                                             '<span class="special">', 1)
+                definitionRow = definitionRow.replace('@E@', '</span>') 
                 html += definitionRow
 
         html += """
