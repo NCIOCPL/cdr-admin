@@ -1,13 +1,16 @@
 #----------------------------------------------------------------------
 # coding=latin-1
 #
-# $Id: GlossaryConceptFull.py,v 1.4 2008-11-17 19:47:54 venglisc Exp $
+# $Id: GlossaryConceptFull.py,v 1.5 2008-11-18 18:44:25 venglisc Exp $
 #
 # Glossary Term Concept report
 # This report takes a concept and displays all of the Term Name 
 # definitions that are linked to this concept document
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2008/11/17 19:47:54  venglisc
+# Modified display of blocked and none-existing GlossaryTermNames. (Bug 3948)
+#
 # Revision 1.3  2008/10/27 16:32:32  venglisc
 # Changing element names from Spanish... to Translated... (Bug 3948)
 #
@@ -744,6 +747,8 @@ html = """\
    .attribute    { font-weight: normal; 
                    font-style: italic; 
                    background-color: #FFFFFF; }
+   .insertapproved { color: red; }
+   .deleteapproved { text-decoration: line-through; }
   </STYLE>
  </HEAD>
  <BODY>
