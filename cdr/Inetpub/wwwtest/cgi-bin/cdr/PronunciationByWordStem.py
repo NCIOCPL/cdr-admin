@@ -1,12 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: PronunciationByWordStem.py,v 1.1 2006-11-29 15:44:36 bkline Exp $
+# $Id: PronunciationByWordStem.py,v 1.2 2008-11-19 21:30:26 bkline Exp $
 #
 # "The Glossary Terms by Status Report will list terms and their
 # pronunciations by the user requesting a specific word stem from
 # the Glossary Term name or Term Pronunciation." (request 2643)
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2006/11/29 15:44:36  bkline
+# New report for request #2643.
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrdb, cdrcgi, string, time, xml.dom.minidom, xml.sax.saxutils
 
@@ -106,6 +109,12 @@ def getNodeContent(node, pieces = None):
                 getNodeContent(child, pieces)
     return u"".join(pieces)
 
+class Comment:
+    def __init__(self, node):
+        self.text = getNodeContent(node)
+        self.user = node.getAttribute('user')
+        self.date = node.getAttribute('date')
+
 class GlossaryTerm:
     def __init__(self, id, node):
         self.id = id
@@ -115,13 +124,16 @@ class GlossaryTerm:
         self.comment = None
         for child in node.childNodes:
             if child.nodeName == "TermName":
-                self.name = getNodeContent(child)
-            elif child.nodeName == "TermPronunciation":
-                self.pronunciation = getNodeContent(child)
-            elif child.nodeName == "PronunciationResource":
-                self.pronunciationResources.append(getNodeContent(child))
-            elif child.nodeName == "Comment":
-                self.comment = getNodeContent(child)
+                for grandchild in child.childNodes:
+                    if grandchild.nodeName == 'TermNameString':
+                        self.name = getNodeContent(grandchild)
+                    elif grandchild.nodeName == "TermPronunciation":
+                        self.pronunciation = getNodeContent(grandchild)
+                    elif grandchild.nodeName == "PronunciationResource":
+                        resource = getNodeContent(grandchild)
+                        self.pronunciationResources.append(resource)
+                    elif grandchild.nodeName == "Comment" and not self.comment:
+                        self.comment = Comment(grandchild)
 
 #----------------------------------------------------------------------
 # Create/display the report.
@@ -138,19 +150,19 @@ if nameVal and pronVal:
     cursor.execute("""\
 SELECT DISTINCT doc_id
            FROM query_term
-          WHERE path = '/GlossaryTerm/TermName'
+          WHERE path = '/GlossaryTermName/TermName/TermNameString'
             AND value LIKE ?
-             OR path = '/GlossaryTerm/TermPronunciation'
+             OR path = '/GlossaryTermName/TermName/TermPronunciation'
             AND value LIKE ?""", (nameVal, pronVal))
 else:
     val   = nameVal or pronVal
-    elem  = nameVal and 'Name' or 'Pronunciation'
+    elem  = nameVal and 'NameString' or 'Pronunciation'
     stems = u"%s Stem: %s" % (elem,
                               nameVal and cgi.escape(name) or cgi.escape(pron))
     cursor.execute("""\
 SELECT DISTINCT doc_id
            FROM query_term
-          WHERE path = '/GlossaryTerm/Term%s'
+          WHERE path = '/GlossaryTermName/TermName/Term%s'
             AND value LIKE ?""" % elem, val)
 rows = cursor.fetchall()
 terms = []
@@ -194,6 +206,14 @@ html = [u"""\
    </tr>
 """ % stems]
 for term in terms:
+    comment = u"&nbsp;"
+    if term.comment:
+        user = date = u""
+        if term.comment.user:
+            user = u"[user=%s] " % term.comment.user
+        if term.comment.date:
+            date = u"[date=%s] " % term.comment.date
+        comment = user + date + fix(term.comment.text)
     html.append(u"""\
    <tr>
     <td>%d</td>
@@ -206,7 +226,7 @@ for term in terms:
        fix(term.name),
        fix(term.pronunciation),
        fixList(term.pronunciationResources),
-       fix(term.comment)))
+       comment))
 html.append(u"""\
   </table>
  </body>
