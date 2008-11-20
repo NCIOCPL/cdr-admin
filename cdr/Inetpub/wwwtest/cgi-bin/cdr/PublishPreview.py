@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: PublishPreview.py,v 1.38 2008-11-06 15:10:14 venglisc Exp $
+# $Id: PublishPreview.py,v 1.39 2008-11-20 22:44:44 venglisc Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.38  2008/11/06 15:10:14  venglisc
+# Changing server name after Gatekeeper upgrade.
+#
 # Revision 1.37  2008/11/04 21:13:58  venglisc
 # Minor change to display document type.
 #
@@ -302,25 +305,16 @@ pattern2 = re.compile("<!DOCTYPE[^>]+>", re.DOTALL)
 doc = pattern1.sub("", doc)
 doc = pattern2.sub("", doc)
 showProgress("Doctype declaration stripped...")
-#cdrcgi.bail("flavor=%s doc=%s" % (flavor, doc))
+
 try:
     if dbgLog:
         cdr2gk.debuglevel = 1
         showProgress("Debug logging turned on...")
     showProgress("Submitting request to Cancer.gov...")
-    # Temp fix to make Protocol_Patient PP work
-    ##if flavor == 'Protocol_Patient':
-    ##    resp = cdr2cg.pubPreview(doc, flavor)
-    ##else:
-    ##    resp = cdr2gk.pubPreview(doc, flavor)
-    #print '*** Before', doc
     resp = cdr2gk.pubPreview(doc, flavor)
-    #print '*** After'
     showProgress("Response received from Cancer.gov...")
 except:
-    print dir(resp)
-    print 
-    cdrcgi.bail("Cancer.gov returned invalid HTML")
+    cdrcgi.bail(str(cdr2gk.pubPreview(doc, flavor)))
 
 #doc = cdrcgi.decode(doc)
 #doc = re.sub("@@DOCID@@", docId, doc)
