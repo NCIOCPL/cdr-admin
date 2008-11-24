@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermReports.py,v 1.17 2008-11-06 18:50:09 bkline Exp $
+# $Id: GlossaryTermReports.py,v 1.18 2008-11-24 14:49:10 bkline Exp $
 #
 # Submenu for glossary term reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.17  2008/11/06 18:50:09  bkline
+# Added report for newly published glossary terms.
+#
 # Revision 1.16  2008/11/04 21:15:32  venglisc
 # Modified to run publish preview report for new document structure.
 #
@@ -125,6 +128,10 @@ reports = [
             'Glossary Term and Variant Search Report'),
            ('GlossaryTermsByStatus.py?', 'Glossary Term By Status Report'),
            ('GlossaryTermsByType.py?', 'Glossary Term By Type Report'),
+           ('Request4344.py?report=4342&',
+            'Glossary Term Concept by English Definition Status Report'),
+           ('Request4344.py?report=4344&',
+            'Glossary Term Concept by Spanish Definition Status Report'),
            ('Request2565.aspx?', 'Glossary Term Concept Reports'),
            ('GlossaryConceptDocsModified.py?', 
            'Glossary Term Concept - Documents Modified'),
