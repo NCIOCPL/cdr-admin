@@ -1,8 +1,123 @@
-import cdrdb, re
+#----------------------------------------------------------------------
+#
+# $Id: GetGlossifierTerms.py,v 1.2 2008-11-24 14:53:30 bkline Exp $
+#
+# Program to extract glossary terms for glossifier service invoked by
+# Cancer.gov.
+#
+# $Log: not supported by cvs2svn $
+#----------------------------------------------------------------------
+import cdrdb, re, cdr, socket
 
-# XXX CHANGE query_term TO query_term_pub ONCE CONVERSION PROCESSING FINISHED.
-# XXX CHANGE document c to pub_proc_cg c BELOW (SEE XXX COMMENT).
+#----------------------------------------------------------------------
+# Send a report on duplicate name+language+dictionary mappings.
+#----------------------------------------------------------------------
+def reportDuplicate(name, docIds, language, dictionary):
+    recips = cdr.getEmailList('GlossaryDupGroup') or ['***REMOVED***']
+    server = socket.gethostname().split('.')[0].upper()
+    sender = "CDR@%s.NCI.NIH.GOV" % server
+    subject = "DUPLICATE GLOSSARY TERM NAME MAPPINGS ON %s" % server
+    body = [u"The string '%s' " % name.upper(),
+            u"is mapped on %s to the following CDR GlossaryTermName" % server,
+            u"documents for language '%s' " % language,
+            u"and dictionary '%s'; " % dictionary,
+            u"mappings for any phrase+language+dictionary ",
+            u"combination (ignoring case) must be unique.  Please correct ",
+            u"the data so that this requirement is met.  You may need to ",
+            u"look at the External Map Table for Glossary Terms to find ",
+            u"some of the mappings.\n\n"]
+    for docId in docIds:
+        body.append(u"CDR%010d\n" % docId)
+    cdr.sendMail(sender, recips, subject, u"".join(body), False, True)
 
+def reportDuplicates(allDups):
+    recips = cdr.getEmailList('GlossaryDupGroup') or ['***REMOVED***']
+    server = socket.gethostname().split('.')[0]
+    sender = "cdr@%s.nci.nih.gov" % server.lower()
+    subject = "DUPLICATE GLOSSARY TERM NAME MAPPINGS ON %s" % server.upper()
+    body = [u"The following %d sets of duplicate glossary " % len(allDups),
+            u"mappings were found in the CDR on %s.  " % server.upper(),
+            u"Mappings for any phrase + language + dictionary must be ",
+            u"unique.  Please correct the data so that this requirements is ",
+            u"met.  You may need to look at the External Map Table for ",
+            u"Glossary Terms to find some of the mappings.\n"]
+    keys = allDups.keys()
+    keys.sort()
+    for key in keys:
+        name, language, dictionary = key
+        body.append(u"\n%s (language='%s' dictionary='%s')\n" %
+                    (name.upper(), language, dictionary))
+        for docId in allDups[key]:
+            body.append(u"\tCDR%010d\n" % docId)
+    cdr.sendMail(sender, recips, subject, u"".join(body), False, True)
+
+#----------------------------------------------------------------------
+# See if we've already seen this name+language+dictionary combo.
+# If so, we record it in a map ('duplicates') whose key is a tuple
+# of language and dictionary and whose value is a sequence of
+# CDR document IDs to which the name is mapped for this language
+# and dictionary.
+#----------------------------------------------------------------------
+def checkForDuplicate(docId, key, keys, duplicates):
+    if key in keys:
+        if key in duplicates:
+            duplicates[key].append(docId)
+        else:
+            duplicates[key] = [keys[key], docId]
+    else:
+        keys[key] = docId
+    
+#----------------------------------------------------------------------
+# Make sure we don't have any duplicate name+language+dictionary
+# combinations.  If we find any, we report them, and we replace
+# the mappings to eliminate them from what we use to provide Cancer.gov
+# with glossification services.
+#----------------------------------------------------------------------
+def checkForDuplicates(name, names, allDups):
+    duplicates = {}
+    keys = {}
+    mappings = names[name]
+    for docId in mappings:
+        gtnDoc = mappings[docId]
+        for language in gtnDoc:
+            for dictionary in gtnDoc[language]:
+                checkForDuplicate(docId, (language, dictionary), keys,
+                                  duplicates)
+            if not dictionaries:
+                checkForDuplicate(docId, (language, None), keys, duplicates)
+    if duplicates:
+        for key in duplicates:
+            if name.lower() != 'tpa':
+                language, dictionary = key
+                allDups[(name, language, dictionary)] = duplicates[key]
+                # reportDuplicate(name, duplicates[key], language, dictionary)
+        newMap = {}
+        for docId in mappings:
+            gtnDoc = mappings[docId]
+            for language in gtnDoc:
+                for dictionary in gtnDoc[language]:
+                    if (language, dictionary) not in duplicates:
+                        if docId not in newMap:
+                            newMap[docId] = {}
+                        if language not in newMap[docId]:
+                            newMap[docId][language] = set()
+                        newMap[docId][language].add(dictionary)
+                if not gtnDoc[language]:
+                    if (language, None) not in duplicates:
+                        if docId not in newMap:
+                            newMap[docId] = {}
+                        if language not in newMap[docId]:
+                            newMap[docId][language] = set()
+        if newMap:
+            names[name] = newMap
+        else:
+            del names[name]
+        
+#----------------------------------------------------------------------
+# Convert whitespace sequences to single space, and typesetting single
+# quote to apostrophe (CG team didn't want to map typesetting double
+# quote marks).
+#----------------------------------------------------------------------
 def normalize(me):
     if not me:
         return u""
@@ -47,8 +162,6 @@ for docId, language, dictionary in cursor.fetchall():
         if docId not in dictionaries[language]:
             dictionaries[language][docId] = set()
         dictionaries[language][docId].add(dictionary)
-#for language in dictionaries:
-#    print language, len(dictionaries[language])
 
 #----------------------------------------------------------------------
 # Create a lookup table to find a concept given the name's document ID.
@@ -136,11 +249,7 @@ for docId, name, language in cursor.fetchall():
             terms[language][docId] = [term]
         else:
             terms[language][docId].append(term)
-#for language in terms:
-#    print language, len(terms[language])
-###    #print terms[language].keys()
 names = {}
-WHITESPACE = re.compile(u"\\s+")
 for language in terms:
     langTerms = terms[language]
     for docId in langTerms:
@@ -154,6 +263,12 @@ for language in terms:
                 names[name][docId][language] = set()
             if term.dictionaries:
                 names[name][docId][language].update(term.dictionaries)
+keys = names.keys()
+allDups = {}
+for key in keys:
+    checkForDuplicates(key, names, allDups)
+if allDups:
+    reportDuplicates(allDups)
 print """\
 Content-type: text/plain
 
