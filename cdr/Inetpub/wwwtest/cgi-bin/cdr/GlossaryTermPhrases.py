@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermPhrases.py,v 1.4 2004-08-31 12:55:17 bkline Exp $
+# $Id: GlossaryTermPhrases.py,v 1.5 2008-11-24 14:50:24 bkline Exp $
 #
 # Report on phrases matching specified glossary term.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2004/08/31 12:55:17  bkline
+# Modified logic to allow invocation from XMetaL without knowing which
+# document types to search yet.
+#
 # Revision 1.3  2004/08/26 14:08:58  bkline
 # Added missing hidden field for trials.
 #
@@ -131,7 +135,7 @@ def putUpSelection(rows):
 # Get the document ID.
 #----------------------------------------------------------------------
 if id:
-    digits = re.sub('[^\d]', '', id)
+    digits = re.sub('[^\d]+', '', id)
     id     = int(digits)
 else:
     try:
@@ -143,15 +147,15 @@ else:
                            FROM document d
                            JOIN doc_type t
                              ON t.id = d.doc_type
-                          WHERE t.name = 'GlossaryTerm'
+                          WHERE t.name = 'GlossaryTermName'
                             AND d.title LIKE ?""", namePattern,
                        timeout = 300)
         rows = cursor.fetchall()
     except cdrdb.Error, info:
-        cdrcgi.bail("Failure looking up GlossaryTerm name '%s': %s" % (name,
-                                                                 info[1][0]))
+        cdrcgi.bail("Failure looking up GlossaryTermName '%s': %s" %
+                    (name, info[1][0]))
     if len(rows) > 1: putUpSelection(rows)
-    if len(rows) < 1: cdrcgi.bail("Unknown GlossaryTerm '%s'" % name)
+    if len(rows) < 1: cdrcgi.bail("Unknown GlossaryTermName '%s'" % name)
     id = rows[0][0]
 
 #----------------------------------------------------------------------    
