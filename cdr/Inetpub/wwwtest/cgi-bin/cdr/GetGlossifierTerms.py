@@ -1,13 +1,18 @@
 #----------------------------------------------------------------------
 #
-# $Id: GetGlossifierTerms.py,v 1.2 2008-11-24 14:53:30 bkline Exp $
+# $Id: GetGlossifierTerms.py,v 1.3 2008-11-25 21:08:25 bkline Exp $
 #
 # Program to extract glossary terms for glossifier service invoked by
 # Cancer.gov.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2008/11/24 14:53:30  bkline
+# Rewritten to use new GlossaryTermName documents.
+#
 #----------------------------------------------------------------------
-import cdrdb, re, cdr, socket
+import cdrdb, re, cdr, socket, sys
+
+DEBUG = len(sys.argv) > 1 and sys.argv[1] == '--debug' or False
 
 #----------------------------------------------------------------------
 # Send a report on duplicate name+language+dictionary mappings.
@@ -136,10 +141,13 @@ cursor.execute("""\
       FROM query_term_pub
      WHERE path = '/GlossaryTermConcept/TermDefinition/Dictionary'""")
 dictionaries = { 'en': {} }
-for docId, dictionary in cursor.fetchall():
+rows = cursor.fetchall()
+for docId, dictionary in rows:
     if docId not in dictionaries['en']:
         dictionaries['en'][docId] = set()
     dictionaries['en'][docId].add(dictionary.strip())
+if DEBUG:
+    sys.stderr.write("%d spanish definitions examined\n" % len(rows))
 
 #----------------------------------------------------------------------
 # Get the dictionaries for the translated definitions.
@@ -153,7 +161,8 @@ cursor.execute("""\
      WHERE l.path = '/GlossaryTermConcept/TranslatedTermDefinition/@language'
        AND d.path = '/GlossaryTermConcept/TranslatedTermDefinition/Dictionary'
 """)
-for docId, language, dictionary in cursor.fetchall():
+rows = cursor.fetchall()
+for docId, language, dictionary in rows:
     language = language and language.strip() or None
     dictionary = dictionary and dictionary.strip() or None
     if language and dictionary:
@@ -162,6 +171,8 @@ for docId, language, dictionary in cursor.fetchall():
         if docId not in dictionaries[language]:
             dictionaries[language][docId] = set()
         dictionaries[language][docId].add(dictionary)
+if DEBUG:
+    sys.stderr.write("%d spanish definitions examined\n" % len(rows))
 
 #----------------------------------------------------------------------
 # Create a lookup table to find a concept given the name's document ID.
@@ -171,8 +182,11 @@ cursor.execute("""\
     SELECT doc_id, int_val
       FROM query_term_pub
      WHERE path = '/GlossaryTermName/GlossaryTermConcept/@cdr:ref'""")
-for nameId, conceptId in cursor.fetchall():
+rows = cursor.fetchall()
+for nameId, conceptId in rows:
     conceptIndex[nameId] = conceptId
+if DEBUG:
+    sys.stderr.write("%d links to concept documents\n" % len(rows))
 
 #----------------------------------------------------------------------
 # An object of this class holds information about a glossary term name
@@ -197,12 +211,16 @@ cursor.execute("""\
       JOIN query_term_pub s
         ON s.doc_id = n.doc_id
      WHERE n.path = '/GlossaryTermName/TermName/TermNameString'
+       AND s.path = '/GlossaryTermName/TermNameStatus'
        AND s.value <> 'Rejected'""")
-for docId, name in cursor.fetchall():
+rows = cursor.fetchall()
+for docId, name in rows:
     if docId in conceptIndex:
         conceptId = conceptIndex[docId]
         dictionarySet = dictionaries['en'].get(conceptId, None)
         terms['en'][docId] = [Term(docId, name, 'en', dictionarySet)]
+if DEBUG:
+    sys.stderr.write("%d english term names\n" % len(rows))
 
 #----------------------------------------------------------------------
 # Get the variant English names from the external string mapping table.
@@ -213,30 +231,42 @@ cursor.execute("""\
       JOIN external_map_usage u
         ON u.id = m.usage
      WHERE u.name = 'GlossaryTerm Phrases'""")
-for docId, name in cursor.fetchall():
+rows = cursor.fetchall()
+for docId, name in rows:
     if docId in terms['en']:
         conceptId = conceptIndex[docId]
         dictionarySet = dictionaries[language].get(conceptId, None)
         term = Term(docId, name, 'en', dictionarySet)
         terms['en'][docId].append(term)
+if DEBUG:
+    sys.stderr.write("%d english variant names\n" % len(rows))
 
 #----------------------------------------------------------------------
 # Collect the translated names.
 #----------------------------------------------------------------------
 cursor.execute("""\
-    SELECT n.doc_id, n.value, l.value
-      FROM query_term_pub n
-      JOIN query_term_pub l
-        ON n.doc_id = l.doc_id
-       AND LEFT(n.node_loc, 4) = LEFT(l.node_loc, 4)
-      JOIN query_term_pub s
-        ON s.doc_id = n.doc_id
-       AND LEFT(n.node_loc, 4) = LEFT(s.node_loc, 4)
-     WHERE n.path = '/GlossaryTermName/TranslatedName/TermNameString'
-       AND l.path = '/GlossaryTermName/TranslatedName/@language'
-       AND s.path = '/GlossaryTermName/TranslatedName/TranslatedNameStatus'
-       AND s.value <> 'Rejected'""")
-for docId, name, language in cursor.fetchall():
+         SELECT n.doc_id, n.value, l.value
+           FROM query_term_pub n
+           JOIN query_term_pub l
+             ON n.doc_id = l.doc_id
+            AND LEFT(n.node_loc, 4) = LEFT(l.node_loc, 4)
+           JOIN query_term_pub s
+             ON s.doc_id = n.doc_id
+            AND LEFT(n.node_loc, 4) = LEFT(s.node_loc, 4)
+LEFT OUTER JOIN query_term_pub e
+             ON e.doc_id = n.doc_id
+            AND LEFT(n.node_loc, 4) = LEFT(e.node_loc, 4)
+            AND e.path = '/GlossaryTermName/TranslatedName'
+                       + '/@ExcludeFromGlossifier'
+          WHERE n.path = '/GlossaryTermName/TranslatedName/TermNameString'
+            AND l.path = '/GlossaryTermName/TranslatedName/@language'
+            AND s.path = '/GlossaryTermName/TranslatedName/TranslatedNameStatus'
+            AND s.value <> 'Rejected'
+            AND (e.value IS NULL OR e.value <> 'Yes')""")
+rows = cursor.fetchall()
+if DEBUG:
+    sys.stderr.write("%d Spanish names names\n" % len(rows))
+for docId, name, language in rows:
     if docId in terms['en']:
         if language not in terms:
             terms[language] = {}
