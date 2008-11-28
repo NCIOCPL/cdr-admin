@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: BoardMeetingDates.py,v 1.2 2008-10-15 16:52:53 venglisc Exp $
+# $Id: BoardMeetingDates.py,v 1.3 2008-11-28 15:08:23 bkline Exp $
 #
 # Report listing the Board meetings by date or board.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2008/10/15 16:52:53  venglisc
+# Added code to include WebEx attribute on the reports. (Bug 4205)
+#
 # Revision 1.1  2008/08/22 19:45:23  venglisc
 # Initial copy of Board Meeting Dates report. (Bug 4205)
 #
@@ -17,7 +20,7 @@ import cdr, cdrdb, cdrcgi, cgi, re, time, ExcelWriter, sys
 fields     = cgi.FieldStorage()
 session    = cdrcgi.getSession(fields)
 request    = cdrcgi.getRequest(fields)
-boardPick  = fields.getlist ('boardpick')           or []
+boardPick  = fields.getlist ('boardpick') or []
 flavor     = fields.getvalue('Report')    or 'ByBoard'
 startDate  = fields.getvalue('StartDate') or None
 endDate    = fields.getvalue('EndDate')   or None
@@ -101,86 +104,82 @@ except cdrdb.Error, info:
 
 
 #----------------------------------------------------------------------
-# Create list of boards with all meeting dates
-# Returns a dictionary of the format
-#    {CDR-ID:[BoardName, [Date1, Date2, Date3, ...], Time]}
-# which holds all information necessary for the two reports.
+# Build a sequence of Board objects, which holds all the information
+# needed for the two reports.  Sequence is sorted by board name.
 #----------------------------------------------------------------------
-def getScheduleInformation(cursor):
+class Board:
+    def __init__(self, cdrId, name):
+        self.cdrId = cdrId
+        self.name = name.replace(' Editorial Board', '')
+        self.meetings = []
+        if self.name.startswith('PDQ '):
+            self.name = self.name[4:]
+    def __cmp__(self, other):
+        diff = cmp(self.name, other.name)
+        if diff:
+            return diff
+        return cmp(self.cdrId, other.cdrId)
+class Meeting:
+    def __init__(self, meetingDate, meetingTime, board, webEx = False):
+        self.date = meetingDate
+        self.time = meetingTime
+        self.board = board
+        self.webEx = webEx
+        try:
+            y, m, d = [int(piece) for piece in meetingDate.split('-')]
+            normalizedDate = normalizeDate(y, m, d)
+            self.englishDate = time.strftime("%B %d, %Y", normalizedDate)
+            self.dayOfWeek = time.strftime("%A", normalizedDate)
+        except Exception, e:
+            # cdrcgi.bail("%s: %s" % (date, e))
+            self.prettyDate = self.dayOfWeek = "???"
+    def __cmp__(self, other):
+        diff = cmp(self.date, other.date)
+        if diff:
+            return diff
+        return cmp(self.board.name, other.board.name)
+def collectBoardMeetingInfo(cursor):
     cursor.execute("""\
-    SELECT distinct d.id,
-           n.value  AS BoardName,
-           t.value  AS BoardType,
-           y.value  AS myYear,
-           dd.value AS myDate,
-           tt.value AS myTime,
-           w.value  AS webEx
-      FROM query_term n
-      JOIN query_term t
-        ON t.doc_id = n.doc_id
-      JOIN document d
-        ON n.doc_id = d.id
-      JOIN query_term y
-        ON y.doc_id = d.id
-      JOIN query_term dd
-        ON dd.doc_id = d.id
-      JOIN query_term tt
-        ON tt.doc_id = d.id
+SELECT DISTINCT a.id, n.value, d.value, t.value, w.value
+           FROM active_doc a
+           JOIN query_term n
+             ON n.doc_id = a.id
+           JOIN query_term o
+             ON o.doc_id = a.id
+           JOIN query_term d
+             ON d.doc_id = a.id
+           JOIN query_term t
+             ON t.doc_id = d.doc_id
+            AND LEFT(t.node_loc, 12) = LEFT(d.node_loc, 12)
 LEFT OUTER JOIN query_term w
-        ON w.doc_id = d.id
-       AND w.path  = '/Organization/PDQBoardInformation' +
-                     '/BoardMeetingDates/MeetingDate/@WebEx'
-       AND SUBSTRING(w.node_loc, 1, 12) = SUBSTRING(dd.node_loc, 1, 12)
-     WHERE t.value in ('PDQ Advisory Board', 'PDQ Editorial Board')
-       AND t.path  = '/Organization/OrganizationType'
-       AND n.path  = '/Organization/OrganizationNameInformation' +
-                     '/OfficialName/Name'
-       AND y.path  = '/Organization/PDQBoardInformation' +
-                     '/BoardMeetingDates/Year'
-       AND dd.path = '/Organization/PDQBoardInformation' +
-                     '/BoardMeetingDates/MeetingDate'
-       AND tt.path = '/Organization/PDQBoardInformation' +
-                     '/BoardMeetingDates/DayTime'
-       AND SUBSTRING(dd.node_loc, 1, 8) = SUBSTRING(y.node_loc, 1, 8)
-       AND SUBSTRING(tt.node_loc, 1, 8) = SUBSTRING(y.node_loc, 1, 8)
-       AND d.doc_type = 22
-       AND active_status = 'A'
-     ORDER BY n.value
-                   """, timeout = 600)
-    rows = cursor.fetchall()
-    boardInfo = {}
-    for cdrId, boardName, boardType, myYear, myDate, myTime, webEx in rows:
-        if not boardInfo.has_key(cdrId):
-             boardInfo[cdrId] = [boardName.replace(' Editorial Board', '')]
-             boardInfo[cdrId].append([])
-             boardInfo[cdrId].append(myTime)
-
-        boardInfo[cdrId][1].append([myDate, webEx])
-
-    return boardInfo
-
+             ON w.doc_id = d.doc_id
+            AND LEFT(w.node_loc, 12) = LEFT(d.node_loc, 12)
+            AND w.path = '/Organization/PDQBoardInformation/BoardMeetings' +
+                         '/BoardMeeting/MeetingDate/@WebEx'
+          WHERE o.value IN ('PDQ Advisory Board', 'PDQ Editorial Board')
+            AND o.path = '/Organization/OrganizationType'
+            AND n.path = '/Organization/OrganizationNameInformation' +
+                         '/OfficialName/Name'
+            AND d.path = '/Organization/PDQBoardInformation/BoardMeetings' +
+                         '/BoardMeeting/MeetingDate'
+            AND t.path = '/Organization/PDQBoardInformation/BoardMeetings' +
+                         '/BoardMeeting/MeetingTime'""", timeout = 600)
+    boards = {}
+    for cdrId, boardName, meetingDate, meetingTime, webEx in cursor.fetchall():
+        board = boards.get(cdrId)
+        if not board:
+            board = Board(cdrId, boardName)
+            boards[cdrId] = board
+        board.meetings.append(Meeting(meetingDate, meetingTime, board, webEx))
+    boards = boards.values()
+    boards.sort()
+    return boards
 
 #----------------------------------------------------------------------
-# Create list of all board names with all meeting dates
+# Generate fields for selecting which boards should be included in the
+# report.
 #----------------------------------------------------------------------
-def getBoardNames(boardInfo):
-    boardNames = []
-
-    # Store the values are [Name, CDR-id] so we can easily
-    # sort the list alphabetically
-    # -----------------------------------------------------
-    for cdrId in boardInfo.keys():
-        if boardInfo[cdrId][0].startswith('PDQ '):
-            boardInfo[cdrId][0] = boardInfo[cdrId][0][4:]
-        boardNames.append([boardInfo[cdrId][0], cdrId, boardInfo[cdrId][2]])
-
-    return boardNames
-
-
-#----------------------------------------------------------------------
-# Generate picklist for Summary type.
-#----------------------------------------------------------------------
-def displayBoardPicklist(allBoards):
+def makeBoardSelectionFields(boards):
     html = [u"""\
     <fieldset>
      <legend> Select Board Names </legend>
@@ -189,42 +188,19 @@ def displayBoardPicklist(allBoards):
             class='choice'
             onclick='javascript:allBoards(this, %d)'
             value='all'> All <br>
-""" % len(allBoards)]
+""" % len(boards)]
     i = 1
-    #for docId, docTitle, bType, bYear, bDate, bTime in rows:
-    for docTitle, docId, time in allBoards:
-        if docTitle.startswith('PDQ '):
-            docTitle = docTitle[4:]
-        edBoard = docTitle.find(' Editorial Board;')
-        if edBoard != -1:
-            docTitle = docTitle[:edBoard]
+    for board in boards:
         html.append(u"""\
      &nbsp;
      <input name='boardpick' type='checkbox' value='%d' class='choice'
             onclick='javascript:someBoards()' id='E%d'> %s <br>
-""" % (docId, i, cgi.escape(docTitle)))
+""" % (board.cdrId, i, cgi.escape(board.name)))
         i += 1
     html.append(u"""\
     </fieldset>
 """)
     return u"".join(html)
-
-
-#----------------------------------------------------------------------
-# Generate picklist for Summary type.
-#----------------------------------------------------------------------
-def getMeetingsByDate(boardInfo):
-    newList = []
-    for boardId in boardInfo.keys():
-        # cdrcgi.bail(boardInfo[boardId])
-        for date, webEx in boardInfo[boardId][1]:
-            newList.append([date, boardInfo[boardId][0],
-                            boardId, boardInfo[boardId][2],
-                            webEx])
-    newList.sort()
-    #cdrcgi.bail(newList)
-    return newList
-
 
 #----------------------------------------------------------------------
 # Normalize a year, month, day tuple into a standard date-time value.
@@ -232,26 +208,10 @@ def getMeetingsByDate(boardInfo):
 def normalizeDate(y, m, d):
     return time.localtime(time.mktime((y, m, d, 0, 0, 0, 0, 0, -1)))
 
-
-#----------------------------------------------------------------------
-# Convert an ISO date 'YYYY-mm-dd' into a date of the format
-# weekday, Month Day Year
-#----------------------------------------------------------------------
-def prettyDate(date):
-    newDate  = time.strptime(date, "%Y-%m-%d")
-    fullDate = time.strftime("%A, %B %d, %Y", newDate)
-    weekDay  = time.strftime("%B %d, %Y", newDate)
-    calDay   = time.strftime("%A", newDate)
-    fullDateShort = time.strftime("%a, %B %d, %Y", newDate)
-    calDayShort   = time.strftime("%a", newDate)
-
-    return (fullDate, weekDay, calDay, fullDateShort, calDayShort)
-
-
 #----------------------------------------------------------------------
 # Generate a pair of dates suitable for seeding the user date fields.
 #----------------------------------------------------------------------
-def genDateValues():
+def getDefaultDates():
     import time
     yr, mo, da, ho, mi, se, wd, yd, ds = time.localtime()
     startYear = normalizeDate(yr, 1, 1)
@@ -262,15 +222,13 @@ def genDateValues():
 # ---------------------------------------------------------------------
 # *** Main starts here ***
 # ---------------------------------------------------------------------
-boardInfo  = getScheduleInformation(cursor)
-boardNames = getBoardNames(boardInfo)
-boardNames.sort()
+boards = collectBoardMeetingInfo(cursor)
 
 #----------------------------------------------------------------------
 # Put up the menu if we don't have selection criteria yet.
 #----------------------------------------------------------------------
-if not boardPick or (not startDate or not endDate):
-    startDate, endDate = genDateValues()
+if not (boardPick and startDate and endDate):
+    startDate, endDate = getDefaultDates()
     form = """\
    <input type='hidden' name='%s' value='%s'>
    <fieldset class='rtype'>
@@ -295,7 +253,7 @@ if not boardPick or (not startDate or not endDate):
    </fieldset>
   </form>
 """ % (cdrcgi.SESSION, session,
-       displayBoardPicklist(boardNames), startDate, endDate)
+       makeBoardSelectionFields(boards), startDate, endDate)
     cdrcgi.sendPage(header + form + """\
  </body>
 </html>
@@ -305,7 +263,7 @@ if not boardPick or (not startDate or not endDate):
 # Create the report and display dates by Board
 # --------------------------------------------
 if flavor == 'ByBoard':
-    html = """\
+    html = ["""\
  <table>
   <tr>
    <td class="title">
@@ -315,38 +273,39 @@ if flavor == 'ByBoard':
   </tr>
  </table>
  <p></p>
-""" % (startDate, endDate)
+""" % (startDate, endDate)]
 
     # Display data by board
     # ---------------------
-    for boardName, boardId, boardTime in boardNames:
-         #cdrcgi.bail(boardName)
-         if str(boardId) in boardPick or boardPick[0] == 'all':
-             html += """
+    for board in boards:
+         if str(board.cdrId) in boardPick or boardPick[0] == 'all':
+             html.append("""
  <table>
   <tr>
-   <td class="board">%s (%s)</td>
+   <td class="board">%s</td>
   </tr>
-""" % (boardName, boardTime)
-             boardInfo[boardId][1].sort()
-             for date, webEx in boardInfo[boardId][1]:
-                 if date >= startDate and date <= endDate:
-                     html += """\
+""" % cgi.escape(board.name))
+             board.meetings.sort()
+             for meeting in board.meetings:
+                 if meeting.date >= startDate and meeting.date <= endDate:
+                     html.append("""\
   <tr>
-   <td class="dates">%s %s</td>
+   <td class="dates">%s %s %s</td>
   </tr>
-""" % (prettyDate(date)[3], webEx and ' (WebEx)' or '')
+""" % (meeting.date, meeting.time or "", meeting.webEx and ' (WebEx)' or ''))
 
-             html += """\
+             html.append("""\
  </table>
  <p></p>
-"""
-# Create the report and display dates by Board
-# --------------------------------------------
+""")
+    html = "".join(html)
+
+# Show the meeting information arranged by meeting dates.
+# -------------------------------------------------------
 else:
     # First we're displaying the title and create the table layout
     # ------------------------------------------------------------
-    html = """\
+    html = ["""\
  <body>
   <table width="850px">
    <tr>
@@ -364,53 +323,59 @@ else:
     <th>Time</th>
     <th>WebEx</th>
     <th>Board</th>
-   </tr>""" % (startDate, endDate)
+   </tr>""" % (startDate, endDate)]
 
     # Reshuffle the boardInfo list so we can sort by date accross
     # all boards
     # -----------------------------------------------------------
-    mtgsByDate = getMeetingsByDate(boardInfo)
+    meetings = []
+    for board in boards:
+        meetings += board.meetings
+    meetings.sort()
+    # mtgsByDate = getMeetingsByDate(boardInfo)
     # cdrcgi.bail(mtgsByDate)
-    lastDate = prettyDate(startDate)[1][:3]
-    rowCount = 0
+    lastDate = startDate # prettyDate(startDate)[1][:3]
+    monthBlocks = 0
 
     # Display Data by Date
     # --------------------
-    for date, boardName, boardId, mtgTime, isWebEx in mtgsByDate:
-        if date >= startDate and date <= endDate:
-            if str(boardId) in boardPick or boardPick[0] == 'all':
+    #for date, boardName, boardId, mtgTime, isWebEx in mtgsByDate:
+    for meeting in meetings:
+        if meeting.date >= startDate and meeting.date <= endDate:
+            if str(meeting.board.cdrId) in boardPick or boardPick[0] == 'all':
                 # We want to add a space between each month
                 # Checking if we're still in the same month as the last row
                 # ---------------------------------------------------------
-                if not prettyDate(date)[1].startswith(lastDate):
-                    rowCount += 1
-                    html += """
+                if lastDate[:7] != meeting.date[:7]:
+                    # cdrcgi.bail("%s vs. %s" % (lastDate, meeting.date))
+                    monthBlocks += 1
+                    html.append("""
    <tr class="blank">
     <td>&nbsp;</td>
     <td>&nbsp;</td>
     <td>&nbsp;</td>
     <td>&nbsp;</td>
     <td>&nbsp;</td>
-   </tr>"""
+   </tr>""")
                 # Display the records in a table row format
                 # -----------------------------------------
-                if rowCount % 2 == 0: bg = 'even'
-                else:                 bg = 'odd'
-                html += """
+                bg = monthBlocks % 2 == 0 and 'even' or 'odd'
+                html.append("""
    <tr class="%s">
-    <td width="150px" class="dates">%s</td>
-    <td width="40px" class="dates">%s</td>
-    <td width="200px" class="dates">%s</td>
-    <td width="60px" class="dates">%s</td>
+    <td width="150px" class="dates" align='center'>%s</td>
+    <td width="70px" class="dates" align='center'>%s</td>
+    <td width="200px" class="dates" align='center'>%s</td>
+    <td width="60px" class="dates" align='center'>%s</td>
     <td width="330px" class="dates">%s</td>
-   </tr>""" % (bg, prettyDate(date)[1], prettyDate(date)[4],
-               mtgTime, isWebEx and 'Yes' or '', boardName)
+   </tr>""" % (bg, meeting.date, meeting.dayOfWeek, meeting.time,
+               meeting.webEx and 'Yes' or '', cgi.escape(meeting.board.name)))
 
-            lastDate = prettyDate(date)[1][:3]
+            lastDate = meeting.date
 
-    html += """
+    html.append("""
   </table>
-"""
+""")
+    html = u"".join(html)
 
 # We have everything we need.  Show it to the user
 # ------------------------------------------------
