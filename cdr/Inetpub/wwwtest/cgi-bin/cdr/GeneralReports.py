@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: GeneralReports.py,v 1.19 2008-07-11 20:15:32 bkline Exp $
+# $Id: GeneralReports.py,v 1.20 2008-12-01 22:26:38 venglisc Exp $
 #
 # Submenu for general reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.19  2008/07/11 20:15:32  bkline
+# Replaced old ad hoc query interface on menu with new one (at Lakshmi's
+# request, #4126).
+#
 # Revision 1.18  2007/08/27 17:13:39  bkline
 # Added report for invalid documents.
 #
@@ -100,6 +104,8 @@ form = """\
 reports = [
            ('CdrQueries.py', 
             'Ad-Hoc Reports'),
+           ('AdHocQuery.py',
+            'Ad-Hoc SQL'),
            ('CheckedOutDocs.py', 
             'Checked Out Documents'),
            ('CdrReport.py', 
