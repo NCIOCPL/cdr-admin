@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: MediaLinks.py,v 1.2 2007-05-18 21:34:55 venglisc Exp $
+# $Id: MediaLinks.py,v 1.3 2008-12-02 21:33:50 venglisc Exp $
 #
 # Report listing all document that link to Media documents
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2007/05/18 21:34:55  venglisc
+# Minor HTML formatting changes. (Bug 3226)
+#
 # Revision 1.1  2007/05/18 21:19:45  venglisc
 # Initial version of MediaLinks report listing Summaries and/or Glossaries
 # that are linking to a Media document. (Bug 3226)
@@ -135,8 +138,20 @@ html = """\
 #----------------------------------------------------------------------
 # Create a dictionary listing the path to use for the title information
 #----------------------------------------------------------------------
-titlePath = {'GlossaryTerm':'/GlossaryTerm/TermName',
+titlePath = {'GlossaryTerm':'/GlossaryTermName/TermName/TermNameString',
              'Summary'     :'/Summary/SummaryTitle'}
+
+innerSQL  = {"GlossaryTerm":"""SELECT DISTINCT doc_id
+                               FROM query_term_pub
+                              WHERE int_val IN 
+                                    (
+                                     SELECT doc_id
+                                       FROM query_term_pub
+                                      WHERE path LIKE '%%MediaID/@cdr:ref'
+                                    )""",
+             "Summary"     :"""SELECT DISTINCT doc_id
+                               FROM query_term_pub
+                              WHERE path LIKE '%%MediaID/@cdr:ref'"""}
 
 # ---------------------------------------------------------------------
 # If the user picked only one summary, put it into a list to we
@@ -153,16 +168,14 @@ for docType in docTypes:
         cursor = conn.cursor()
         dtQual = docType and ("doc_type = '%s'" % docType) or ""
         cursor.execute("""\
-           SELECT doc_id, value as GlossaryTerm
+           SELECT doc_id, value
              FROM  query_term_pub
-            WHERE doc_id IN 
-                  (
-                  SELECT DISTINCT doc_id
-                    FROM query_term_pub
-                   WHERE path LIKE '%%MediaID/@cdr:ref'
-                  )
-              AND path = '%s'
-            ORDER BY value""" % titlePath[docType])
+            WHERE 
+               (  doc_id IN 
+                  ( %s )
+                  AND path = '%s'
+               )
+            ORDER BY value""" % (innerSQL[docType], titlePath[docType]))
         rows = cursor.fetchall()
     except cdrdb.Error, info:
         cdrcgi.bail('Database connection failure: %s' % info[1][0])
