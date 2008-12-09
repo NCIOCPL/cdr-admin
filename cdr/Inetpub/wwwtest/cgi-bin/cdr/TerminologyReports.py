@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: TerminologyReports.py,v 1.14 2008-01-25 17:49:44 kidderc Exp $
+# $Id: TerminologyReports.py,v 1.15 2008-12-09 13:33:30 bkline Exp $
 #
 # Submenu for terminology reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.14  2008/01/25 17:49:44  kidderc
+# Added 'Intervention or Procedure Terms (without Alternate Names)' for 3840
+#
 # Revision 1.12  2007/06/15 17:55:07  kidderc
 # 3316 added Term Hierarchy Report.
 #
@@ -81,8 +84,10 @@ form = """\
 reports = [
            ('TermUsage.py', 'Term Usage'),
            ('TermSearch.py', 'Terminology QC Report'),
-           ('TermNCITDrugUpdateAll.py', 'Update all Drug/Agent Terms from NCI Thesaurus'),
-           ('TermNCITDiseaseUpdateAll.py', 'Update all Disease Terms from NCI Thesaurus')
+           ('TermNCITDrugUpdateAll.py',
+            'Update all Drug/Agent Terms from NCI Thesaurus'),
+           ('TermNCITDiseaseUpdateAll.py',
+            'Update all Disease Terms from NCI Thesaurus')
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI></A>\n" % (
@@ -104,13 +109,16 @@ reports = [
            ('InterventionAndProcedureTerms.py',
             'Intervention or Procedure Terms', '&IncludeAlternateNames=True'),
            ('InterventionAndProcedureTerms.py',
-            'Intervention or Procedure Terms (without Alternate Names)', '&IncludeAlternateNames=False'),
+            'Intervention or Procedure Terms (without Alternate Names)',
+            '&IncludeAlternateNames=False'),
            ('DrugAgentReport.py', 'Drug/Agent Report', ''),
-           ('DrugAgentReport2.py', 'Drug/Agent Other Names Report', ''),
+           ('DrugAgentReport2.py', 'Drug/Agent Report - All', '&alldrugs=true'),
            ('DrugReviewReport.py', 'Drug Review Report', ''),
            ('SemanticTypeReport.py', 'Semantic Type Report', ''),
            ('TermHierarchyTree.py', 'Term Hierarchy Tree', ''),
-           ('TermHierarchyTree.py', 'Terms with No Parent Term and Not a Semantic Type', '&SemanticTerms=False')
+           ('TermHierarchyTree.py',
+            'Terms with No Parent Term and Not a Semantic Type',
+            '&SemanticTerms=False')
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s%s'>%s</LI></A>\n" % (
