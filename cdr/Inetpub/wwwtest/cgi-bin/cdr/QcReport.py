@@ -1,11 +1,16 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.59 2008-11-07 17:13:27 venglisc Exp $
+# $Id: QcReport.py,v 1.60 2008-12-11 20:18:49 venglisc Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.59  2008/11/07 17:13:27  venglisc
+# Modified report to allow users to run the Redline/strikeout report for
+# the old GlossaryTerm documents after the switch to GlossaryTermNames.
+# (Bug 3035)
+#
 # Revision 1.58  2008/11/04 21:12:30  venglisc
 # Minor changes to allow GlossaryTermName publish preview reports to be
 # submitted from the Admin interface.
@@ -271,6 +276,7 @@ docType  = fields.getvalue("DocType")    or None
 docTitle = fields.getvalue("DocTitle")   or None
 version  = fields.getvalue("DocVersion") or None
 glossary = fields.getvalue("Glossary")   or None
+images   = fields.getvalue("Images") or None
 standardWording = fields.getvalue("ShowStandardWording") or None
 displayInternComments = fields.getvalue("DisplayInternalComments") or None
 displayExternComments = fields.getvalue("DisplayExternalComments") or None
@@ -582,19 +588,39 @@ if docType == 'Summary'          and repType and repType != 'pp' and not version
     # --------------------------------------
     if docType == 'Summary':
         form += """\
-  <BR><BR>
+  <BR>
+     <table>
+      <tr>
+       <td class="colheading">Misc Print Options</td>
+      </tr>
+      <tr>
+       <td>
   <INPUT TYPE='checkbox' NAME='Glossary'>&nbsp;&nbsp;
-  Include glossary terms at end of report?<BR>
+  Include glossary terms at end of report<BR>
+       </td>
+      </tr>
+      <tr>
+       <td>
+  <INPUT TYPE='checkbox' NAME='Images'>&nbsp;&nbsp;
+  Display images instead of placeholder<BR>
+       </td>
+      </tr>
 """
 
     # Display the checkbox to display standard wording
     # ------------------------------------------------
     if repType == 'pat' or repType == 'patbu' or repType == 'patrs':
         form += """\
-  <BR>
+      <tr>
+       <td>
   <INPUT TYPE='checkbox' NAME='ShowStandardWording'>&nbsp;&nbsp;
-  Show standard wording with mark-up?<BR>
+  Show standard wording with mark-up<BR>
+       </td>
+      </tr>
 """
+    form += """
+     </table>"""
+
     cdrcgi.sendPage(header + form + """  
  </BODY>
 </HTML>
@@ -636,17 +662,17 @@ filters = {
         ["set:QC PDQBoardMemberInfo Set"],
     'Summary':        
         ["set:QC Summary Set"],
-    'Summary:bu': # Bold/Underline
+    'Summary:bu':    # Bold/Underline
         ["set:QC Summary Set (Bold/Underline)"],
-    'Summary:rs': # Redline/Strikeout
+    'Summary:rs':    # Redline/Strikeout
         ["set:QC Summary Set"],
-    'Summary:but': # Bold/Underline
+    'Summary:but':   # Bold/Underline
         ["set:QC Summary Set (Bold/Underline) Test"],
-    'Summary:rst': # Redline/Strikeout
+    'Summary:rst':   # Redline/Strikeout
         ["set:QC Summary Set Test"],
-    'Summary:nm': # No markup
+    'Summary:nm':    # No markup
         ["set:QC Summary Set"],
-    'Summary:pat': # Patient
+    'Summary:pat':   # Patient
         ["set:QC Summary Patient Set"],
     'Summary:patrs': # Patient
         ["set:QC Summary Patient Set"],
@@ -1165,6 +1191,8 @@ if repType == "bu" or repType == "but":
 # Added GlossaryTermList to HP documents, not just patient.
 filterParm.append(['DisplayGlossaryTermList',
                        glossary and "Y" or "N"])
+filterParm.append(['DisplayImages',
+                       images and "Y" or "N"])
 
 if repType == 'pat' or repType == 'patrs' or repType == 'patbu':
     filterParm.append(['ShowStandardWording',
