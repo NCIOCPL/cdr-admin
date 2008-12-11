@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: CreateSupplementaryInfoDocument.py,v 1.1 2008-09-02 19:27:33 bkline Exp $
+# $Id: CreateSupplementaryInfoDocument.py,v 1.2 2008-12-11 14:30:47 bkline Exp $
 #
 # Service for creating a new SupplementaryInfo document in the CDR.
 #
@@ -21,10 +21,11 @@ def fail(why):
 
 def getMimeType(mimeType, fileName):
     mimeKey = fileName[-5:].lower()
-    if mimeKey != ".html":
+    if mimeKey not in (".html", ".docx"):
         mimeKey = mimeKey[1:]
     return mimeType or {
         ".doc":  "application/msword",
+        ".docx": "application/msword",
         ".txt":  "text/plain",
         ".rtf":  "text/rtf",
         ".htm":  "text/html",
