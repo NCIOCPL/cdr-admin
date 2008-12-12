@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: MediaLinks.py,v 1.3 2008-12-02 21:33:50 venglisc Exp $
+# $Id: MediaLinks.py,v 1.4 2008-12-12 21:57:48 venglisc Exp $
 #
 # Report listing all document that link to Media documents
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2008/12/02 21:33:50  venglisc
+# Modified to work with the new GlossaryTerm structure. (Bug 4394)
+#
 # Revision 1.2  2007/05/18 21:34:55  venglisc
 # Minor HTML formatting changes. (Bug 3226)
 #
@@ -31,16 +34,24 @@ section = "Documents that Link to Media Documents"
 header  = cdrcgi.header(title, title, section, script, buttons)
 now     = time.localtime(time.time())
 
+
+# ---------------------------------------------------------------------
+# Select all document types that contain a MediaLink element
+# Note: The SQL query is very slow (due to the like condition) and 
+#       needs to be tweaked.  It takes > 15 sec to return.  Until this
+#       has been improved we have to hard-code the document types.
+# ---------------------------------------------------------------------
 def getMediaDocTypes():
-    return ([['GlossaryTerm'], ['Summary']])
+    return ([['GlossaryTerm'], ['Summary'], ['GlossaryTermConcept']])
+
     try:
         conn   = cdrdb.connect()
         cursor = conn.cursor()
         cursor.execute("""\
             SELECT DISTINCT SUBSTRING(path, 2, CHARINDEX('/', path, 2) - 2)
               FROM query_term_pub
-             WHERE path like '%MediaID/@cdr:ref'
-               AND SUBSTRING(path, 2, 5) != 'Media'
+             WHERE path like '%/MediaLink/MediaID/@cdr:ref'
+            --   AND SUBSTRING(path, 2, 5) != 'Media'
              ORDER BY 1""")
         rows = cursor.fetchall()
     except cdrdb.Error, info:
@@ -48,6 +59,53 @@ def getMediaDocTypes():
 
     return (rows)
 
+
+# ---------------------------------------------------------------------
+# This function accepts a GlossaryTermConcept ID and returns all 
+# GlossaryTermNames related to this concept as follows
+#    [CDR-ID of TermName, English Term Name, Spanish Term Name].
+# ---------------------------------------------------------------------
+def getTermName(id):
+    try:
+        # conn   = cdrdb.connect()
+        # cursor = conn.cursor()
+        cursor.execute("""\
+            SELECT q.doc_id, e.value, s.value
+              FROM query_term q
+              JOIN query_term e
+                ON e.doc_id = q.doc_id
+               AND e.path = '/GlossaryTermName/TermName/TermNameString'
+   LEFT OUTER JOIN query_term s
+                ON s.doc_id = q.doc_id
+               AND s.path = '/GlossaryTermName/TranslatedName/TermNameString'
+             WHERE q.int_val = ?
+               AND q.path = '/GlossaryTermName/GlossaryTermConcept/@cdr:ref'
+             ORDER BY e.value""", id)
+        rows = cursor.fetchall()
+    except cdrdb.Error, info:
+        cdrcgi.bail('Database connection failure in getTermName: %s' % 
+                                                                 info[1][0])
+    return rows
+
+
+# ---------------------------------------------------------------------
+# Construct the cell content for the GlossaryTermConcept table to 
+# display all GlossaryTermNames of a group and the GTN CDR-ID.
+# ---------------------------------------------------------------------
+def getTermString(id):
+    termNames = getTermName(id)
+    enTermString = esTermString = ''
+
+    for cdrId, enName, esName in termNames:
+        enTermString += "%s (<a href='/cgi-bin/cdr/Filter.py?" % enName
+        enTermString += "DocId=CDR%s&amp;Filter=set:QC+" % cdrId
+        enTermString += "GlossaryTermName+with+Concept+set'>"
+        enTermString += "<span id='termLink'>CDR%s</span></a>)<br/>" % cdrId
+        enTermString += "\n       "
+        esTermString +=  "%s<br/>\n" % (esName and esName 
+                                               or '*** No Spanish Name ***')
+
+    return (enTermString, esTermString)
 
 #----------------------------------------------------------------------
 # Make sure we're logged in.
@@ -115,14 +173,20 @@ html = """\
   <BASEFONT face='Arial, Helvetica, sans-serif'>
   <LINK type='text/css' rel='stylesheet' href='/stylesheets/dataform.css'>
    <STYLE type='text/css'>
-   TD.header      { font-weight: bold;
-                    font-size: medium;
-                    align: center; }
-   TD.text        { font-size: medium; }
+   TD.idColumn    { width: 7%%; 
+                    text-align: center; }
+   TD.idHeader, TD.txtHeader
+                  { font-weight: bold;
+                    font-size: medium; }
+   TD.text        { font-size: medium; 
+                    vertical-align: top; }
    .tableheading  { font-weight: bold;
                     font-size: large; }
    .time          { font-weight: bold;
                     font-size: medium; }
+   #name          { font-size: 12pt; }
+   #termLink      { text-decoration: underline;
+                    color: blue; }
    </STYLE>
  </HEAD>
  <BODY>
@@ -138,8 +202,12 @@ html = """\
 #----------------------------------------------------------------------
 # Create a dictionary listing the path to use for the title information
 #----------------------------------------------------------------------
-titlePath = {'GlossaryTerm':'/GlossaryTermName/TermName/TermNameString',
-             'Summary'     :'/Summary/SummaryTitle'}
+titlePath = {'GlossaryTerm':
+               '/GlossaryTerm/TermName',
+             'GlossaryTermConcept': 
+               '/GlossaryTermConcept/TermDefinition/DefinitionText',
+             'Summary'     :
+               '/Summary/SummaryTitle'}
 
 innerSQL  = {"GlossaryTerm":"""SELECT DISTINCT doc_id
                                FROM query_term_pub
@@ -152,6 +220,10 @@ innerSQL  = {"GlossaryTerm":"""SELECT DISTINCT doc_id
              "Summary"     :"""SELECT DISTINCT doc_id
                                FROM query_term_pub
                               WHERE path LIKE '%%MediaID/@cdr:ref'"""}
+
+sortSQL   = {"GlossaryTerm":       "ORDER BY value",
+             "GlossaryTermConcept":"ORDER BY doc_id",
+             "Summary":            "ORDER BY value"}
 
 # ---------------------------------------------------------------------
 # If the user picked only one summary, put it into a list to we
@@ -170,12 +242,11 @@ for docType in docTypes:
         cursor.execute("""\
            SELECT doc_id, value
              FROM  query_term_pub
-            WHERE 
-               (  doc_id IN 
+            WHERE doc_id IN 
                   ( %s )
                   AND path = '%s'
-               )
-            ORDER BY value""" % (innerSQL[docType], titlePath[docType]))
+                  %s""" % (innerSQL['Summary'], titlePath[docType],
+                                 sortSQL[docType]))
         rows = cursor.fetchall()
     except cdrdb.Error, info:
         cdrcgi.bail('Database connection failure: %s' % info[1][0])
@@ -189,10 +260,21 @@ for docType in docTypes:
     <TD><SPAN class='tableheading'>%s (%s)</SPAN>
      <TABLE border='1' width='100%%' cellspacing='0' cellpadding='2'>
       <TR class='head'>
-       <TD  class='header' valign='top'>CDR ID</TD>
-       <TD class='header' valign='top'>DocTitle</TD>
-      </TR>
 """ % (docType, len(rows))
+    
+    if docType == 'GlossaryTermConcept':
+        html += """\
+       <TD class='idHeader idColumn'  valign='top'>CDR ID</TD>
+       <TD class='txtHeader' valign='top'>Term Name</TD>
+       <TD class='txtHeader' valign='top'>Spanish Term Name</TD>
+      </TR>
+"""
+    else:
+        html += """\
+       <TD class='idHeader idColumn'  valign='top'>CDR ID</TD>
+       <TD class='txtHeader' valign='top'>Doc Title</TD>
+      </TR>
+"""
 
     # Make is easier to read the table rows by using alternate colors
     # ---------------------------------------------------------------
@@ -208,9 +290,20 @@ for docType in docTypes:
       <TR class='odd'>
 """
         # Here is the data returned from the SQL query
-        # List the rows
-        # --------------------------------------------
-        html += """\
+        # For the GlossaryTermConcept we need to display all of the 
+        # GlossaryTermNames of a Concept group along with the 
+        # TermName CDR-ID.
+        # -----------------------------------------------------------
+        if docType == 'GlossaryTermConcept':
+            enName, esName = getTermString(row[0])
+            html += """\
+       <TD class='text' align='right'>%d</TD>
+       <TD class='text'>%s</TD>
+       <TD class='text'>%s</TD>
+      </TR>
+""" % (row[0], enName, esName)
+        else:
+            html += """\
        <TD class='text' align='right'>%d</TD>
        <TD class='text'>%s</TD>
       </TR>
@@ -228,8 +321,7 @@ for docType in docTypes:
 
 cdrcgi.sendPage(html + """\
   </TABLE>
-  <BR>
-  %s
+  <span id="name">%s</span>
  </BODY>
 </HTML>
 """ % cdrcgi.getFullUserName(session, conn))
