@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermSearch.py,v 1.7 2006-07-11 13:42:35 bkline Exp $
+# $Id: GlossaryTermSearch.py,v 1.8 2008-12-15 22:51:39 venglisc Exp $
 #
 # Prototype for duplicate-checking interface for GlossaryTerm documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.7  2006/07/11 13:42:35  bkline
+# Added term pronunciation to searchable fields.
+#
 # Revision 1.6  2004/10/20 21:19:58  bkline
 # Added missing session parameters.
 #
@@ -33,14 +36,19 @@ import cgi, cdr, cdrcgi, re, cdrdb
 fields     = cgi.FieldStorage()
 session    = cdrcgi.getSession(fields)
 boolOp     = fields and fields.getvalue("Boolean")          or "AND"
-name       = fields and fields.getvalue("Name")             or None
-spanish    = fields and fields.getvalue("Spanish")          or None
+nameEn     = fields and fields.getvalue("NameEn")           or None
+nameEs     = fields and fields.getvalue("NameEs")           or None
+statusEn   = fields and fields.getvalue("StatusEn")         or None
+statusEs   = fields and fields.getvalue("StatusEs")         or None
 definition = fields and fields.getvalue("Definition")       or None
-pron       = fields and fields.getvalue("Pronunciation")    or None
-status     = fields and fields.getvalue("Status")           or None
 audience   = fields and fields.getvalue("Audience")         or None
+dictionary = fields and fields.getvalue("Dictionary")       or None
 submit     = fields and fields.getvalue("SubmitButton")     or None
 help       = fields and fields.getvalue("HelpButton")       or None
+typeName   = fields and fields.getvalue("TypeName")         or None
+
+subTitle   = {'GlossaryTermName'   :'Glossary Term Name',
+              'GlossaryTermConcept': 'Glossary Term Concept'}
 
 if help: 
     cdrcgi.bail("Sorry, help for this interface has not yet been developed.")
@@ -57,25 +65,54 @@ except cdrdb.Error, info:
 # Display the search form.
 #----------------------------------------------------------------------
 if not submit:
-    fields = (('Term Name',                    'Name'),
-              ('Term Pronunciation',           'Pronunciation'),
-              ('Spanish Name',                 'Spanish'),
-              ('Term Definition',              'Definition'),
-              ('Audience',                     'Audience', 
-                                                 cdrcgi.glossaryAudienceList),
-              ('Term Status',                  'Status', 
-	                                         cdrcgi.glossaryTermStatusList))
+    fields1= (('Name [en]',           'NameEn'),
+              ('Status [en]',         'StatusEn',
+                                      cdrcgi.glossaryTermStatusList),
+              ('Name [es]',           'NameEs'),
+              ('Status [es]',         'StatusEs',
+                                      cdrcgi.glossaryTermStatusList)
+             )
+    fields2= (('Term Concept',        'Definition'),
+              ('Audience',            'Audience', 
+                                      cdrcgi.glossaryAudienceList),
+              ('Dictionary',          'Dictionary',
+                                      cdrcgi.glossaryTermDictionaryList)
+             )
+
     buttons = (('submit', 'SubmitButton', 'Search'),
                ('submit', 'HelpButton',   'Help'),
                ('reset',  'CancelButton', 'Clear'))
     page = cdrcgi.startAdvancedSearchPage(session,
                                           "Glossary Term Search Form",
                                           "GlossaryTermSearch.py",
-                                          fields,
+                                          fields1,
                                           buttons,
-                                          'Glossary Term',
+                                          'Glossary Term Name',
                                           conn)
+
+    # The constructAdvancedSearchQuery() function needs to know the 
+    # document type, so we're passing this as an extra parameter
+    # -------------------------------------------------------------
     page += """\
+   <input type='hidden' name='TypeName' value='GlossaryTermName'>
+  </FORM>\n"""
+
+    # We need to have two forms for the Glossary search, one for the
+    # Term Name and one for the Term Concept.  We're closing the 
+    # default form (above) and creating a new one here
+    # --------------------------------------------------------------
+    page += cdrcgi.addNewFormOnPage(session,
+                                          "GlossaryTermSearch.py",
+                                          fields2,
+                                          buttons,
+                                          'Glossary Term Concept',
+                                          conn)
+
+    # Again, we need to pass the document type to create the query
+    # and therefore we need to pass this additional parameter
+    # -------------------------------------------------------------
+    page += """\
+   <input type='hidden' name='TypeName' value='GlossaryTermConcept'>
   </FORM>
  </BODY>
 </HTML>
@@ -85,27 +122,29 @@ if not submit:
 #----------------------------------------------------------------------
 # Define the search fields used for the query.
 #----------------------------------------------------------------------
-searchFields = (cdrcgi.SearchField(name,
-                            ("/GlossaryTerm/TermName",)),
-                cdrcgi.SearchField(pron,
-                            ("/GlossaryTerm/TermPronunciation",)),
-                cdrcgi.SearchField(spanish,
-                            ("/GlossaryTerm/SpanishTermName",)),
+searchFields = (cdrcgi.SearchField(nameEn,
+                        ("/GlossaryTermName/TermName/TermNameString",)),
+                cdrcgi.SearchField(nameEs,
+                        ("/GlossaryTermName/TranslatedName/TermNameString",)),
+                cdrcgi.SearchField(statusEn,
+                        ("/GlossaryTermName/TermNameStatus",)),
+                cdrcgi.SearchField(statusEs,
+                        ("/GlossaryTermName/TranslatedName/TranslatedNameStatus",)),
                 cdrcgi.SearchField(definition,
-                            ("/GlossaryTerm/TermDefinition/DefinitionText",
-                             "/GlossaryTerm/SpanishTermDefinition"
-                             "/DefinitionText")),
-                cdrcgi.SearchField(status,
-                            ("/GlossaryTerm/TermStatus",
-                             "/GlossaryTerm/StatusDate")),
+                        ("/GlossaryTermConcept/TermDefinition/DefinitionText",
+                         "/GlossaryTermConcept/TranslatedTermDefinition/DefinitionText")),
                 cdrcgi.SearchField(audience,
-                            ("/GlossaryTerm/TermDefinition/Audience",)))
+                        ("/GlossaryTermConcept/TermDefinition/Audience",
+                         "/GlossaryTermConcept/TranslatedTermDefinition/Audience")),
+                cdrcgi.SearchField(dictionary,
+                        ("/GlossaryTermConcept/TermDefinition/Dictionary",
+                         "/GlossaryTermConcept/TranslatedTermDefinition/Dictionary")))
 
 #----------------------------------------------------------------------
 # Construct the query.
 #----------------------------------------------------------------------
 (query, strings) = cdrcgi.constructAdvancedSearchQuery(searchFields, boolOp, 
-                                                       "GlossaryTerm")
+                                                       typeName)
 if not query:
     cdrcgi.bail('No query criteria specified')
 #cdrcgi.bail("QUERY: [%s]" % query)
@@ -119,14 +158,15 @@ try:
     cursor.close()
     cursor = None
 except cdrdb.Error, info:
-    cdrcgi.bail('Failure retrieving GlossaryTerm documents: %s' % 
+    cdrcgi.bail('Failure retrieving GlossaryTermName documents: %s' % 
                 info[1][0])
 
 #----------------------------------------------------------------------
 # Create the results page.
 #----------------------------------------------------------------------
-html = cdrcgi.advancedSearchResultsPage("Glossary Term", rows, strings, 
-        "name:Glossary Term Advanced Search Display", session = session)
+filt = "name:Glossary Term Advanced Search Display"
+html = cdrcgi.advancedSearchResultsPage(subTitle[typeName], rows, strings, 
+                                        filt, session = session)
 
 #----------------------------------------------------------------------
 # Send the page back to the browser.
