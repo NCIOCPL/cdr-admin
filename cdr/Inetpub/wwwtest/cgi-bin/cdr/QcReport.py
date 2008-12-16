@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.60 2008-12-11 20:18:49 venglisc Exp $
+# $Id: QcReport.py,v 1.61 2008-12-16 22:10:39 ameyer Exp $
 #
-# Transform a CDR document using a QC XSL/T filter and send it back to 
+# Transform a CDR document using a QC XSL/T filter and send it back to
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.60  2008/12/11 20:18:49  venglisc
+# Modified program to allow to selectively display images or a placeholder in
+# the Summary QC reports. (Bug 4395)
+#
 # Revision 1.59  2008/11/07 17:13:27  venglisc
 # Modified report to allow users to run the Redline/strikeout report for
 # the old GlossaryTerm documents after the switch to GlossaryTermNames.
@@ -289,9 +293,9 @@ displayAudience +=fields.getvalue('HP')      and 'hp'       or ''
 insRevLvls  = fields.getvalue("insRevLevels")  or None
 delRevLvls  = fields.getvalue("delRevLevels")  or None
 if not insRevLvls:
-    insRevLvls = fields.getvalue('publish') and 'publish|' or '' 
+    insRevLvls = fields.getvalue('publish') and 'publish|' or ''
     insRevLvls += fields.getvalue('approved') and 'approved|' or ''
-    insRevLvls += fields.getvalue('proposed') and 'proposed' or '' 
+    insRevLvls += fields.getvalue('proposed') and 'proposed' or ''
 
 if not docId and not docType:
     cdrcgi.bail("No document specified", repTitle)
@@ -301,7 +305,7 @@ if docId:
     intId  = int(digits)
 
 # ---------------------------------------------------------------
-# Passing a single parameter to the filter to decide if only the 
+# Passing a single parameter to the filter to decide if only the
 # internal, external, all, or none of the comments should be
 # displayed.
 # ---------------------------------------------------------------
@@ -325,7 +329,7 @@ elif action == SUBMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if action == "Log Out": 
+if action == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
@@ -396,7 +400,7 @@ def showTitleChoices(choices):
  </BODY>
 </HTML>
 """ % (cdrcgi.SESSION, session, docType or '', repType or ''))
-                    
+
 #----------------------------------------------------------------------
 # If we have a document title but not a document ID, find the ID.
 #----------------------------------------------------------------------
@@ -468,7 +472,7 @@ if docType == 'Summary'          and repType and repType != 'pp' and not version
     for row in rows:
         form += """\
    <OPTION VALUE='%d'>[V%d %s] %s</OPTION>
-""" % (row[0], row[0], row[2][:10], 
+""" % (row[0], row[0], row[2][:10],
        not row[1] and "[No comment]" or row[1][:150])
         selected = ""
     form += "</SELECT>"
@@ -491,14 +495,14 @@ if docType == 'Summary'          and repType and repType != 'pp' and not version
        <td class="colheading">Board Markup</td>
       </tr>
        <td>
-        <INPUT TYPE    = "checkbox" 
+        <INPUT TYPE    = "checkbox"
                NAME    = "Editorial-board"
                CHECKED>&nbsp;&nbsp; Editorial board markup
        </td>
       </tr>
       <tr>
        <td>
-        <INPUT TYPE    = "checkbox" 
+        <INPUT TYPE    = "checkbox"
                NAME    = "Advisory-board">&nbsp;&nbsp; Advisory board markup
        </td>
       </tr>
@@ -569,14 +573,14 @@ if docType == 'Summary'          and repType and repType != 'pp' and not version
       </tr>
       <tr>
        <td>
-        <INPUT TYPE    = "checkbox" 
+        <INPUT TYPE    = "checkbox"
                NAME    = "DisplayInternalComments"
                             >&nbsp;&nbsp; Display Internal Comments
        </td>
       </tr>
       <tr>
        <td>
-        <INPUT TYPE    = "checkbox" 
+        <INPUT TYPE    = "checkbox"
                NAME    = "DisplayExternalComments"
                CHECKED = '1'>&nbsp;&nbsp; Display External Comments
        </td>
@@ -621,7 +625,7 @@ if docType == 'Summary'          and repType and repType != 'pp' and not version
     form += """
      </table>"""
 
-    cdrcgi.sendPage(header + form + """  
+    cdrcgi.sendPage(header + form + """
  </BODY>
 </HTML>
 """)
@@ -630,7 +634,7 @@ if docType == 'Summary'          and repType and repType != 'pp' and not version
 # Map for finding the filters for a given document type.
 #----------------------------------------------------------------------
 filters = {
-    'Citation':         
+    'Citation':
         ["set:QC Citation Set"],
     'CTGovProtocol':
         ["set:QC CTGovProtocol Set"],
@@ -646,7 +650,7 @@ filters = {
         ["name:Glossary Term Concept QC Report Filter"],
     'GlossaryTermName':
         ["name:Glossary Term Name QC Report Filter"],
-    'InScopeProtocol':  
+    'InScopeProtocol':
         ["set:QC InScopeProtocol Set"],
     'Media:img':
         ["set:QC Media Set"],
@@ -654,13 +658,13 @@ filters = {
         ["set:QC MiscellaneousDocument Set"],
     'MiscellaneousDocument:rs':
         ["set:QC MiscellaneousDocument Set (Redline/Strikeout)"],
-    'Organization':     
+    'Organization':
         ["set:QC Organization Set"],
-    'Person':           
+    'Person':
         ["set:QC Person Set"],
-    'PDQBoardMemberInfo':           
+    'PDQBoardMemberInfo':
         ["set:QC PDQBoardMemberInfo Set"],
-    'Summary':        
+    'Summary':
         ["set:QC Summary Set"],
     'Summary:bu':    # Bold/Underline
         ["set:QC Summary Set (Bold/Underline)"],
@@ -678,7 +682,7 @@ filters = {
         ["set:QC Summary Patient Set"],
     'Summary:patbu': # Patient
         ["set:QC Summary Patient Set (Bold/Underline)"],
-    'Term':             
+    'Term':
         ["set:QC Term Set"]
 }
 
@@ -697,8 +701,8 @@ if not docType:
         if not row:
             cdrcgi.bail("Unable to find document type for %s" % docId)
         docType = row[0]
-    except cdrdb.Error, info:    
-            cdrcgi.bail('Unable to find document type for %s: %s' % (docId, 
+    except cdrdb.Error, info:
+            cdrcgi.bail('Unable to find document type for %s: %s' % (docId,
                                                                  info[1][0]))
 
 #----------------------------------------------------------------------
@@ -712,7 +716,7 @@ if not docType:
 def getDocsLinkingToPerson(docId):
     counts = [0, 0, 0, 0, 0]
     statusValues = [ ('Active',
-                      'Approved-not yet active', 
+                      'Approved-not yet active',
                       'Temporarily Closed'),
                      ('Closed',
                       'Completed')
@@ -737,7 +741,7 @@ def getDocsLinkingToPerson(docId):
                AND path LIKE '/CTGovProtocol/%/@cdr:ref'""", docId)
         counts[4] = cursor.fetchall()[0][0]
 
-    except cdrdb.Error, info:    
+    except cdrdb.Error, info:
         cdrcgi.bail('Failure retrieving link counts: %s' % info[1][0])
     return counts
 
@@ -783,8 +787,8 @@ def fixMailerInfo(doc):
                         mailerTypeOfChange = "Unable to retrieve change type"
                 else:
                     mailerResponseReceived = "Response not yet received"
-    except cdrdb.Error, info:    
-        cdrcgi.bail('Failure retrieving mailer info for %s: %s' % (docId, 
+    except cdrdb.Error, info:
+        cdrcgi.bail('Failure retrieving mailer info for %s: %s' % (docId,
                                                                    info[1][0]))
     doc = re.sub("@@MAILER_DATE_SENT@@",         mailerDateSent,         doc)
     doc = re.sub("@@MAILER_RESPONSE_RECEIVED@@", mailerResponseReceived, doc)
@@ -847,7 +851,7 @@ def fixCTGovProtocol(doc):
         doc = doc.replace("@@UPDATEDDATE@@", "&nbsp;")
     #cdrcgi.bail("NPI=" + noPdqIndexing)
     return doc.replace("@@NOPDQINDEXING@@", noPdqIndexing)
-        
+
 
 #----------------------------------------------------------------------
 # Plug in pieces that XSL/T can't get to for an Organization QC report.
@@ -855,12 +859,12 @@ def fixCTGovProtocol(doc):
 def fixOrgReport(doc):
     counts = [0, 0, 0, 0]
     # -----------------------------------------------------------------
-    # Database query to count all protocols that link to this 
+    # Database query to count all protocols that link to this
     # organization split by Active and Closed protocol status.
     # -----------------------------------------------------------------
     try:
         cursor.execute("""\
-        SELECT count(prot.doc_id) AS prot_count, 
+        SELECT count(prot.doc_id) AS prot_count,
                CASE WHEN prot.value = 'Completed'               THEN 'Closed'
                     WHEN prot.value = 'Temporarily closed'      THEN 'Active'
                     WHEN prot.value = 'Approved-not yet active' THEN 'Active'
@@ -869,13 +873,13 @@ def fixOrgReport(doc):
           JOIN query_term org
             ON prot.doc_id = org.doc_id
          WHERE prot.path ='/InScopeProtocol/ProtocolAdminInfo/CurrentProtocolStatus'
-           AND prot.value in ('Active', 'Temporarily closed', 
-                              'Approved-not yet active', 'Closed', 'Completed') 
+           AND prot.value in ('Active', 'Temporarily closed',
+                              'Approved-not yet active', 'Closed', 'Completed')
            AND org.int_val = ?
            AND org.path like '%@cdr:ref'
          GROUP BY prot.value""", intId)
-    except cdrdb.Error, info:    
-        cdrcgi.bail('Failure retrieving Protocol info for %s: %s' % (intId, 
+    except cdrdb.Error, info:
+        cdrcgi.bail('Failure retrieving Protocol info for %s: %s' % (intId,
                                                                    info[1][0]))
 
     # -------------------------------------------------------
@@ -925,7 +929,7 @@ def fixOrgReport(doc):
 def fixBoardMemberReport(doc):
     counts = [0, 0]
     # -----------------------------------------------------------------
-    # Database query to get the person ID for the BoardMember     
+    # Database query to get the person ID for the BoardMember
     # -----------------------------------------------------------------
     try:
         cursor.execute("""\
@@ -934,8 +938,8 @@ SELECT int_val
  WHERE doc_id = ?
    AND path = '/PDQBoardMemberInfo/BoardMemberName/@cdr:ref'""", intId)
 
-    except cdrdb.Error, info:    
-        cdrcgi.bail('Failure retrieving Person ID for %s: %s' % (intId, 
+    except cdrdb.Error, info:
+        cdrcgi.bail('Failure retrieving Person ID for %s: %s' % (intId,
                                                                    info[1][0]))
 
     row = cursor.fetchone()
@@ -972,8 +976,8 @@ SELECT person.doc_id, summary.value, audience.value, max(ppd.pub_proc) as jobid
    AND pp.pub_subset = 'Summary-PDQ Editorial Board'
  GROUP BY summary.value, person.doc_id, audience.value""", personId)
 
-    except cdrdb.Error, info:    
-        cdrcgi.bail('Failure retrieving Summary info for CDR%s: %s' % (intId, 
+    except cdrdb.Error, info:
+        cdrcgi.bail('Failure retrieving Summary info for CDR%s: %s' % (intId,
                                                                    info[1][0]))
 
     # -------------------------------------------------------
@@ -1001,8 +1005,8 @@ SELECT person.doc_id, summary.value, audience.value, max(ppd.pub_proc) as jobid
 
     # ------------------------------------------------------------------
     # Database query to select mailer information
-    # From the previous query we know the summary IDs, person ID and 
-    # Job ID that containted these mailers.  We are using this 
+    # From the previous query we know the summary IDs, person ID and
+    # Job ID that containted these mailers.  We are using this
     # information to build this query to extract the response received
     # from the mailer docs.
     # If the person is not linked to a summary we're setting the batchId
@@ -1025,7 +1029,7 @@ SELECT mailer.doc_id, mailer.int_val, summary.value, response.value,
   FROM query_term mailer
   JOIN query_term summary
     ON mailer.doc_id = summary.doc_id
-  LEFT OUTER 
+  LEFT OUTER
   JOIN query_term response
     ON mailer.doc_id = response.doc_id
    AND response.path = '/Mailer/Response/Received'
@@ -1035,14 +1039,14 @@ SELECT mailer.doc_id, mailer.int_val, summary.value, response.value,
     ON mailer.doc_id = person.doc_id
  WHERE mailer.int_val = %d
    AND mailer.path = '/Mailer/JobId'
-   AND summary.int_val in %s 
+   AND summary.int_val in %s
    AND title.path = '/Summary/SummaryTitle'
    AND person.int_val = %s
  ORDER BY title.value""" % (batchId, summaryIds, personId)
 
     try:
        cursor.execute(query)
-    except cdrdb.Error, info:    
+    except cdrdb.Error, info:
        cdrcgi.bail('Failure retrieving Mailer info for batch ID %d: %s' % (batchId,
                                                                    info[1][0]))
 
@@ -1083,8 +1087,8 @@ SELECT completed
  WHERE id = %d""" % batchId
         cursor.execute(query)
 
-    except cdrdb.Error, info:    
-        cdrcgi.bail('Failure retrieving Mailer Date for batch %d: %s' % (batchId, 
+    except cdrdb.Error, info:
+        cdrcgi.bail('Failure retrieving Mailer Date for batch %d: %s' % (batchId,
                                                                    info[1][0]))
     row = cursor.fetchone()
     # -----------------------------------------------------------------
@@ -1121,10 +1125,10 @@ if repType == "pp":
 if repType: docType += ":%s" % repType
 
 # ---------------------------------------------------------------------
-# The next two lines are needed to run the Media and Miscellaneaous QC 
-# reports from within XMetaL since the repType argument is not passed 
+# The next two lines are needed to run the Media and Miscellaneaous QC
+# reports from within XMetaL since the repType argument is not passed
 # by the macro
-# Note: The Misc. Document report should always be displayed with 
+# Note: The Misc. Document report should always be displayed with
 #       markup if it exists.
 # ---------------------------------------------------------------------
 if docType == 'Media':                 docType += ":img"
@@ -1178,7 +1182,7 @@ if docType.startswith('GlossaryTerm'):
     filterParm.append(['displayBoard', 'editorial-board_'])
     filterParm.append(['displayAudience', displayAudience])
 
-# Need to set the displayBoard and revision level parameter or all 
+# Need to set the displayBoard and revision level parameter or all
 # markup will be dropped
 # --------------------------------------------------------------------
 if docType.startswith('MiscellaneousDocument'):
@@ -1223,14 +1227,13 @@ if type(doc) in (type(""), type(u"")):
 if type(doc) == type(()):
     doc = doc[0]
 
-doc = cdrcgi.decode(doc)
 doc = re.sub("@@DOCID@@", docId, doc)
 if docType == 'Person':
     doc = fixPersonReport(doc)
 elif docType == 'Organization':
     # -----------------------------------------------------
-    # We call the fixPersonReport for Organizations too 
-    # since Person and Orgs have the Record Info and 
+    # We call the fixPersonReport for Organizations too
+    # since Person and Orgs have the Record Info and
     # Most Recent Mailer Info in common.
     # The resulting document goes through the fixOrgReport
     # module to resolve the protocol link entries
@@ -1242,8 +1245,8 @@ elif docType == 'CTGovProtocol':
 elif docType == 'PDQBoardMemberInfo':
     doc = fixBoardMemberReport(doc)
 # cdrcgi.bail("docType = %s" % docType)
-    
+
 #----------------------------------------------------------------------
 # Send it.
 #----------------------------------------------------------------------
-cdrcgi.sendPage(doc)
+cdrcgi.sendPage(unicode(doc, 'utf-8'))
