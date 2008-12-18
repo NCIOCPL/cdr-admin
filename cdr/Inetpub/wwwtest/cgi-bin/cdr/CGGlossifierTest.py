@@ -1,19 +1,19 @@
 #----------------------------------------------------------------------
 #
-# $Id: CGGlossifierTest.py,v 1.1 2008-12-11 13:15:41 bkline Exp $
+# $Id: CGGlossifierTest.py,v 1.2 2008-12-18 15:55:42 bkline Exp $
 #
 # Minimal test interface for periodically checking to make sure no
 # bit rot has set in while we're waiting for the Cancer.gov team
 # to QC the service.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2008/12/11 13:15:41  bkline
+# Unit test for glossifier service built for Cancer.gov.
+#
 #----------------------------------------------------------------------
 import warnings, cgi, cdrcgi, re
-#with warnings.catch_warnings():
-#    warnings.simplefilter('ignore')
-#    from SOAPpy import WSDL
-#    from Glossifier_client import *
 
+# Suppress deprecation warnings: they break CGI responses.
 warnings.simplefilter('ignore')
 from SOAPpy import WSDL
 from Glossifier_client import *
@@ -31,16 +31,12 @@ class Term:
 def markUpFragment(fragment, languages, dictionaries, api):
     terms = []
     if api == 'SOAPpy':
-        #from SOAPpy import WSDL
         server = WSDL.Proxy('http://PDQUpdate.cancer.gov/u/glossify')
-        #server.soapproxy.config.dumpSOAPOut = False
-        #server.soapproxy.config.dumpSOAPIn = False
         response = server.glossify(fragment, dictionaries, languages)
         if not response or type(response) is str:
             terms = []
         elif type(response.Term) is list:
             for t in response.Term:
-                #cdrcgi.bail("%s: %s" % (type(t), t))
                 term = Term(t.docId, t.start, t.length, t.language,
                             t.firstOccurrence, t.dictionary)
                 terms.append(term)
@@ -51,7 +47,6 @@ def markUpFragment(fragment, languages, dictionaries, api):
             terms = [term]
             
     else:
-        #from Glossifier_client import *
         loc = GlossifierLocator()
         port = loc.getGlossifierSoap()
         request = glossifySoapIn()
@@ -65,7 +60,6 @@ def markUpFragment(fragment, languages, dictionaries, api):
             term = Term(t._docId, t._start, t._length, t._language,
                         t._firstOccurrence, t._dictionary)
             terms.append(term)
-    #terms.reverse()
     segments = []
     pos = 0
     langMap = { u'en': u'English', u'es': u'Spanish' }
@@ -110,29 +104,52 @@ html = u"""\
   <style type='text/css'>
    body { font-family: Arial, sans-serif; }
    h1 { font-size: 14pt; color: maroon; }
-   #result { border: 2px solid green; padding: 5px; width: 900px; }
-   textarea { width: 890px; border: 2px solid blue; padding: 5px; height: 300px}
+   th { width: 200px; text-align: right; padding-right: 10px; }
+   #result { border: 2px solid green; padding: 5px; margin-right: 100px; }
+   textarea { height: 300px; width: 800px; border: none; }
+   form fieldset { border: green 1px solid; padding: 10px;
+                   margin: 5px 0 15px; width: 500px; }
+   form fieldset legend { fontsize: 1.1em; color: green; }
   </style>
  </head>
  <body>
   <h1>Cancer.gov Glossifier Tester</h1>
   <form method='POST'>
-   <input type='submit' /><br /><br />
-   Limit to Dictionaries:<br />
-   <input type='checkbox' name='dictionaries' value='Cancer.gov' />
-   Cancer.gov<br /><br />
-   Limit to Languages:<br />
-   <input type='checkbox' name='languages' value='en' />
-   English &nbsp; &nbsp;
-   <input type='checkbox' name='languages' value='es' />
-   Spanish<br /><br />
-   Package to Use:<br />
-   <input type='radio' name='api' value='SOAPpy' />
-   SOAPpy &nbsp; &nbsp;
-   <input type='radio' name='api' value='ZSI' CHECKED />
-   ZSI<br /><br />
-   Input Fragment:<br />
-   <textarea name='fragment'>%s</textarea>
+   <fieldset>
+    <legend>Control Parameters</legend>
+    <table>
+     <tr>
+      <th>Limit to Dictionaries:</th>
+      <td>
+       <input type='checkbox' name='dictionaries' value='Cancer.gov' />
+       Cancer.gov<br />
+      </td>
+     </tr>
+     <tr>
+      <th>Limit to Languages:</th>
+      <td>
+       <input type='checkbox' name='languages' value='en' />
+       English &nbsp; &nbsp;
+       <input type='checkbox' name='languages' value='es' />
+       Spanish
+      </td>
+     </tr>
+     <tr>
+      <th>Package to Use:</th>
+      <td>
+       <input type='radio' name='api' value='SOAPpy' />
+       SOAPpy &nbsp; &nbsp;
+       <input type='radio' name='api' value='ZSI' CHECKED />
+       ZSI
+      </td>
+     </tr>
+    </table>
+   </fieldset>
+   <fieldset>
+    <legend>Input Fragment</legend>
+    <textarea name='fragment'>%s</textarea>
+   </fieldset>
+   <input type='submit' value='Submit Request' />
    <br /><br />
    %s
   </form>
