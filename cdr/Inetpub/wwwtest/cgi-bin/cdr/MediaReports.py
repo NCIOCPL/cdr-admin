@@ -1,8 +1,11 @@
 #----------------------------------------------------------------------
 #
-# $Id: MediaReports.py,v 1.5 2008-04-25 02:26:09 ameyer Exp $
+# $Id: MediaReports.py,v 1.6 2008-12-29 21:26:14 venglisc Exp $
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2008/04/25 02:26:09  ameyer
+# Added menu entry for MediaCaptionContent.py.
+#
 # Revision 1.4  2007/05/18 20:18:29  venglisc
 # Added new menu item for Linked Media Documents report. (Bug 3226)
 #
@@ -70,12 +73,15 @@ form += """\
    <OL>"""
 
 for choice in(
-              ('MediaTrackingReport.py', 'Media Tracking Report'),
-              ('MediaCaptionContent.py', 'Media Caption and Content Report'),
-              ('MediaLinks.py',          'Linked Media Documents'),
+              ('MediaLists.py?',          'Media Lists'),
+              ('MediaTrackingReport.py?', 'Media Tracking Report'),
+              ('MediaCaptionContent.py?', 'Media Caption and Content Report'),
+              ('PubStatsByDate.py?VOL=Y',      
+                                          'Media Doc Publishing Report'),
+              ('MediaLinks.py?',          'Linked Media Documents'),
              ):
     form += """
-    <LI><a href='%s/%s?%s'>%s</a></LI>""" % (cdrcgi.BASE, choice[0],
+    <LI><a href='%s/%s&%s'>%s</a></LI>""" % (cdrcgi.BASE, choice[0],
                                               session, choice[1])
 footer = """
    </OL>
