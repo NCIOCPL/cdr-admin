@@ -9,9 +9,12 @@
 #
 # Requirements and design are described in Bugzilla issue #3561.
 #
-# $Id: ReplaceDocWithNewDoc.py,v 1.3 2008-10-09 13:57:37 ameyer Exp $
+# $Id: ReplaceDocWithNewDoc.py,v 1.4 2008-12-31 19:40:02 venglisc Exp $
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2008/10/09 13:57:37  ameyer
+# Small changes to screen displays to improve messages and formatting.
+#
 # Revision 1.2  2008/09/24 03:20:13  ameyer
 # Bug fixes.  Slight user interface improvements.  Slight code cleanup.
 #
@@ -285,7 +288,29 @@ def removeWillReplace(session, docXml):
  </xsl:template>
 
  <!-- Except this -->
- <xsl:template                  match = 'WillReplace' />
+ <!--
+ ======================================================================
+ If the DateLastModified element does not exist, we'll create it here.
+ ====================================================================== -->
+ <xsl:template                  match = 'WillReplace'>
+  <xsl:if                        test = "not(../DateLastModified)">
+   <DateLastModified>
+    <xsl:value-of              select = "document(concat('cdrutil:/date/',
+                                                         '%25Y-%25m-%25#d'))"/>
+   </DateLastModified>
+  </xsl:if>
+ </xsl:template>
+
+ <!--
+ =====================================================================
+ If a DateLastModified element exists, set the date to today.
+ ===================================================================== -->
+ <xsl:template                  match = 'DateLastModified'>
+  <xsl:copy>
+   <xsl:value-of               select = "document(concat('cdrutil:/date/',
+                                                         '%25Y-%25m-%25#d'))"/>
+  </xsl:copy>
+ </xsl:template>
 
 </xsl:transform>
 """
