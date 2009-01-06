@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.61 2008-12-16 22:10:39 ameyer Exp $
+# $Id: QcReport.py,v 1.62 2009-01-06 21:38:12 ameyer Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.61  2008/12/16 22:10:39  ameyer
+# Fixed encoding so that final sendPage sends Unicode instead of UTF-8.
+#
 # Revision 1.60  2008/12/11 20:18:49  venglisc
 # Modified program to allow to selectively display images or a placeholder in
 # the Summary QC reports. (Bug 4395)
@@ -1227,6 +1230,11 @@ if type(doc) in (type(""), type(u"")):
 if type(doc) == type(()):
     doc = doc[0]
 
+# Replace all utf-8 unicode chars with &#x...; character entities
+# Allows our macro substitutions to work without ascii decode errs
+doc = cdrcgi.decode(doc)
+
+# Perform any required macro substitions
 doc = re.sub("@@DOCID@@", docId, doc)
 if docType == 'Person':
     doc = fixPersonReport(doc)
@@ -1246,7 +1254,11 @@ elif docType == 'PDQBoardMemberInfo':
     doc = fixBoardMemberReport(doc)
 # cdrcgi.bail("docType = %s" % docType)
 
+# If not already changed to unicode by a fix.. routine, change it
+if type(doc) != type(u""):
+    doc = unicode(doc, 'utf-8')
+
 #----------------------------------------------------------------------
 # Send it.
 #----------------------------------------------------------------------
-cdrcgi.sendPage(unicode(doc, 'utf-8'))
+cdrcgi.sendPage(doc)
