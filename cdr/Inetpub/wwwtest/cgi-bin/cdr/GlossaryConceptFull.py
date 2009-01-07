@@ -1,13 +1,16 @@
 #----------------------------------------------------------------------
 # coding=latin-1
 #
-# $Id: GlossaryConceptFull.py,v 1.5 2008-11-18 18:44:25 venglisc Exp $
+# $Id: GlossaryConceptFull.py,v 1.6 2009-01-07 15:43:31 venglisc Exp $
 #
 # Glossary Term Concept report
 # This report takes a concept and displays all of the Term Name 
 # definitions that are linked to this concept document
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2008/11/18 18:44:25  venglisc
+# Added CSS for insertion/deletion markup. (Bug 4375)
+#
 # Revision 1.4  2008/11/17 19:47:54  venglisc
 # Modified display of blocked and none-existing GlossaryTermNames. (Bug 3948)
 #
@@ -778,7 +781,7 @@ conceptInfo = getConcept(termNames['GlossaryTermConcept'])
 # blocked GTNs came after the program was nearly completed.
 # -----------------------------------------------------------
 termNameStatus = getTermNameStatus(termNames['GlossaryTermName'])
-#cdrcgi.bail(termNames)
+# cdrcgi.bail(termNameStatus)
 
 # Get the term name (for spanish and english) for each of the 
 # related GlossaryTermName document and create a dictionary
@@ -816,7 +819,7 @@ for la in lang_aud:
 
 sections  = {'en':'English', 'es':'Spanish'}
 
-#cdrcgi.bail(allTermsInfo)
+# cdrcgi.bail(allTermsInfo)
 for lang in languages:
     for aud in audiences:
         if '%s-%s' % (lang, aud) not in lang_aud: continue
@@ -868,10 +871,23 @@ for lang in languages:
    <tr><td>&nbsp;</td><td>&nbsp;</td></tr>
    <tr class="name">
     <td width="30%%">Name</td>"""
-                html += u"""\
+
+                # If there doesn't exist a Spanish name we'll still
+                # have to check if the document might be blocked
+                #   (termNameStatus[id] == 'I'
+                # and suppress display of the definition, if it is.
+                # --------------------------------------------------
+                if termNameStatus[id] == 'A':
+                    html += u"""\
     <td width="70%%">
      <span class='special'>%s (en inglés)</span> (CDR%s)""" % (
                                                         termData['en'], id)
+                else:
+                    html += u"""\
+    <td class="blocked" width="70%%">BLOCKED - 
+     <span class='special'>%s (en inglés)</span> (CDR%s)""" % (
+                                                        termData['en'], id)
+                    continue
 
             # Resolve the PlaceHolder elements and create an HTML
             # table row from the resulting data
