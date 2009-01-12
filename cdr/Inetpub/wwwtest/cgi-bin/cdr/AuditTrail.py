@@ -1,17 +1,21 @@
 #----------------------------------------------------------------------
 #
-# $Id: AuditTrail.py,v 1.1 2003-02-24 21:17:38 bkline Exp $
+# $Id: AuditTrail.py,v 1.2 2009-01-12 14:19:45 bkline Exp $
 #
 # Audit Trail report.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2003/02/24 21:17:38  bkline
+# New report requested by Lakshmi.
+#
 #----------------------------------------------------------------------
 #!/usr/bin/python
 
 import sys, cgi, time, cdrcgi, cdrdb, re
 
 fields = cgi.FieldStorage()
-docId  = fields and fields.getvalue("id") or ""
+docId  = fields.getvalue("id") or ""
+nRows  = fields.getvalue("rows") or "150"
 if not docId:
     cdrcgi.bail("Missing required id parameter")
 try:
@@ -23,31 +27,47 @@ try:
     conn = cdrdb.connect('CdrGuest')
 except:
     cdrcgi.bail("Unable to connect to CDR database")
-curs = conn.cursor()
+cursor = conn.cursor()
 try:
-    curs.execute("""\
+    cursor.execute("""\
       SELECT title
         FROM document
        WHERE id = ?""", id)
-    row = curs.fetchone()
+    row = cursor.fetchone()
     if not row:
         cdrcgi.bail("Can't find document %d" % id)
     title = cgi.escape(row[0])
 except:
     cdrcgi.bail("Database failure retrieving title for document %d" % id)
 try:
-    curs.execute("""\
-   SELECT TOP 50 audit_trail.dt, usr.fullname, action.name
-            FROM audit_trail
-            JOIN usr
-              ON usr.id = audit_trail.usr
-            JOIN action
-              ON action.id = audit_trail.action
-           WHERE audit_trail.document = ?
-        ORDER BY audit_trail.dt DESC""", id)
-    rows = curs.fetchall()
+    cursor.execute("""\
+        CREATE TABLE #audit
+                 (dt DATETIME,
+                 usr VARCHAR(80),
+              action VARCHAR(255))""")
+    cursor.execute("""\
+        INSERT INTO #audit
+             SELECT audit_trail.dt, usr.fullname, action.name
+               FROM audit_trail
+               JOIN usr
+                 ON usr.id = audit_trail.usr
+               JOIN action
+                 ON action.id = audit_trail.action
+              WHERE audit_trail.document = ?""", id, timeout = 300)
+    cursor.execute("""\
+        INSERT INTO #audit
+             SELECT c.dt_out, u.fullname, 'LOCK'
+               FROM checkout c
+               JOIN usr u
+                 ON u.id = c.usr
+              WHERE c.id = ?""", id, timeout = 300)
+    cursor.execute("""\
+    SELECT TOP %s CONVERT(VARCHAR(23), dt, 121), usr, action
+             FROM #audit
+         ORDER BY dt DESC""" % nRows)
+    rows = cursor.fetchall()
 except:
-    cdrcgi.bail("Failure retrieving rows from CDR Audit Trail")
+    cdrcgi.bail("Failure retrieving rows for Audit Trail")
 html = """\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>
@@ -79,10 +99,7 @@ html = """\
     </td>
    </tr>
 """ % (id, id, title)
-for row in rows:
-    when = cdrdb.strftime("%m/%d/%Y %I:%M:%S %p", row[0])
-    who  = row[1]
-    what = row[2]
+for when, who, what in rows:
     html += """\
    <tr>
     <td>
@@ -95,7 +112,7 @@ for row in rows:
      <font size='3'>%s</font>
     </td>
    </tr>
-""" % (when, who, what)
+""" % (when, who, cgi.escape(what))
 cdrcgi.sendPage(html +  """\
   </table>
  </body>
