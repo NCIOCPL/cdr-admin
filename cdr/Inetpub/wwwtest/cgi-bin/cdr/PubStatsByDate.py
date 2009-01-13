@@ -1,13 +1,19 @@
 #----------------------------------------------------------------------
 #
-# $Id: PubStatsByDate.py,v 1.2 2007-11-03 14:15:07 bkline Exp $
+# $Id: PubStatsByDate.py,v 1.3 2009-01-13 22:13:10 venglisc Exp $
 #
-# Report to list updated document by document type.
+# Report to list updated document count by document type.
+#
+# Added an option to the script (VOL=Y) to allow to pull out the 
+# media documents and create a list suitable for Visuals Online to be
+# updated.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2007/11/03 14:15:07  bkline
+# Unicode encoding cleanup (issue #3716).
+#
 # Revision 1.1  2007/01/05 23:27:33  venglisc
 # Initial copy of publishing report by date.  (Bug 2111)
-#
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string, cdrdb, time
@@ -22,21 +28,37 @@ docType   = fields and fields.getvalue("doctype")          or []
 submit    = fields and fields.getvalue("SubmitButton")     or None
 dateFrom  = fields and fields.getvalue("datefrom")         or ""
 dateTo    = fields and fields.getvalue("dateto")           or ""
+vol       = fields and fields.getvalue("VOL")              or ""
+
+# Setting the dates to prepopulate Start/End Date fields
+# ------------------------------------------------------
+now       = time.localtime(time.time())
+then      = list(now)
+then[2]  -= 7
+then      = time.localtime(time.mktime(then))
+
 if not dateFrom:
-    dateFrom = time.strftime("%Y-%m-%d")
+    dateFrom = time.strftime("%Y-%m-%d", then)
 
 if not dateTo:
-    dateTo = time.strftime("%Y-%m-%d")
+    dateTo   = time.strftime("%Y-%m-%d", now)
 
 request   = cdrcgi.getRequest(fields)
+
 title     = "CDR Administration"
-instr     = "Publishing Job Statistics by Date"
+
+if not vol:
+    instr = "Publishing Job Statistics by Date"
+else:
+    instr = "Media Doc Publishing Report"
+
 script    = "PubStatsByDate.py"
 SUBMENU   = "Report Menu"
 buttons   = (SUBMENU, cdrcgi.MAINMENU)
 
-# Functions to replace sevaral repeated HTML snippets
-# ===================================================
+# ---------------------------------------------------
+# Function to get the document types from the CDR
+# ---------------------------------------------------
 def getDocType():
     """Select all published document types"""
     query = """
@@ -57,8 +79,50 @@ def getDocType():
     except cdrdb.Error, info:
         cdrcgi.bail('Failure retrieving document types: %s' %
                     info[1][0])
+    return rows
+
+# ------------------------------------------------------------------
+# Function to get the Media information to be displayed in the table
+# from the CDR
+# We're selecting the information for the latest version of the doc.
+# ------------------------------------------------------------------
+def getMediaInfo(ids):
+    if not ids:
+        return []
+
+    query = """
+         SELECT m.doc_id, m.value, d.first_pub, dv.dt, dv.updated_dt, v.value,
+                dv.num, dv.publishable
+           FROM query_term m
+LEFT OUTER JOIN query_term v
+             ON m.doc_id = v.doc_id
+            AND v.path = '/Media/@BlockedFromVOL'
+           JOIN doc_version dv
+             ON m.doc_id = dv.id
+           JOIN document d
+             ON dv.id = d.id
+          WHERE m.path = '/Media/MediaTitle'
+            AND m.doc_id in (%s)
+            AND dv.num = (
+                          SELECT max(num)
+                            FROM doc_version x
+                           WHERE x.id = dv.id
+                         )
+          ORDER BY m.value
+""" % ', '.join(["%s" % x for x in ids])
+
+    try:
+        cursor = conn.cursor()
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        cursor.close()
+        cursor = None
+    except cdrdb.Error, info:
+        cdrcgi.bail('Failure retrieving Media info: %s' %
+                    info[1][0])
 
     return rows
+
 
 #----------------------------------------------------------------------
 # If the user only picked one document type, put it into a list so we
@@ -90,19 +154,33 @@ except cdrdb.Error, info:
 #----------------------------------------------------------------------
 dateString = time.strftime("%B %d, %Y")
 
+# ***** First Pass *****
 #----------------------------------------------------------------------
 # If we don't have a request, put up the form.
+# For the Media Doc report, however, we only need the Start/End date
+# fields to put up.
 #----------------------------------------------------------------------
 if not docType:
     header = cdrcgi.header(title, title, instr, script,
                            ("Submit",
                             SUBMENU,
                             cdrcgi.MAINMENU),
-                           numBreaks = 1)
+                           numBreaks = 1,
+                           stylesheet = """
+   <script language='JavaScript' type='text/javascript'>
+       function clearAll() {
+           document.getElementById('all').checked = false;
+       }
+       function clearOthers(widget, n) {
+           for (var i = 1; i<=n; ++i)
+               document.getElementById('D' + i).checked = false;
+       }
+   </script>
+""")
     form   = """\
    <input type='hidden' name='%s' value='%s'>
    <!-- Table containing the Date -->
-   <table border='0' width='35%%'>
+   <table border='0' width='25%%'>
     <tr>
      <td colspan='3'>
       %s<br><br>
@@ -111,10 +189,10 @@ if not docType:
    </table>
  
    <!-- Table to enter the time frame -->
-   <table border='0' width='35%%'>
+   <table border='0' >
     <tr>
      <td>
-      <table border='0' width='100%%'>
+      <table border='0'cellpadding="3">
        <tr>
         <td><b>Start Date:&nbsp;</b></td>
         <td><input name='datefrom' value='%s' size='10'></td>
@@ -125,50 +203,66 @@ if not docType:
        </tr>
       </table>
      </td>
-     <td valign="center" align="left">(format YYYY-MM-DD)</td>
+     <td valign="middle" align="left">(format YYYY-MM-DD)</td>
     </tr>
    </table>
 
    <!-- table to display a horizontal ruler -->
-   <table border='0' width='35%%'>
+   <table border='0' width='25%%'>
     <tr>
      <td width="320">
-      <hr width="50%%"/>
+      <hr width="50%%">
      </td>
     </tr>
    </table>
-
 """ % (cdrcgi.SESSION, session, dateString, dateFrom, dateTo)
 
-    docTypes = getDocType()
+    # For the Media Doc report the default docType is 'Media'
+    # -------------------------------------------------------
+    if vol:
+        html = """
+   <input type='hidden' name='doctype' value='Media'>
+   <input type='hidden' name='VOL'     value='Y'>"""
+    # For the Pub Job Statistic report we need to select the docType
+    # --------------------------------------------------------------
+    else:
+        docTypes = getDocType()
     
-    html = """<table border='0'>
-      <tr>
-       <td>
-        <input type='checkbox' name='doctype' value='All' CHECKED>
-        <b>All Document Types</b><br>
-       </td>
-      </tr>
-      <tr><td>&nbsp;... or ...</td></tr>"""
+        html = """
+   <table border='0'>
+    <tr>
+     <td>
+      <input type='checkbox' name='doctype' value='All' CHECKED
+             onclick="javascript:clearOthers(this, %d)" id="all">
+      <b>All Document Types</b><br>
+     </td>
+    </tr>
+    <tr>
+     <td>&nbsp;... or ...</td>
+    </tr>""" % (len(docTypes))
 
-    for docType in docTypes:
+        i = 0
+        for docType in docTypes:
+            i += 1
+            html += """
+    <tr>
+     <td>
+      <input type='checkbox' name='doctype' value='%s'
+             onclick="javascript:clearAll()" id=D%d>
+      <b>%s</b>
+     </td>
+    </tr>""" % (docType[0], i, docType[0]) 
         html += """
-              <tr>
-               <td>
-                <input type='checkbox' name='doctype' value='%s'>
-                <b>%s</b>
-               </td>
-              </tr> """ % (docType[0], docType[0]) 
+   </table>"""
+
     html += """
-                  </td>
-                </tr>
-              </table>
   </form>
  </body>
 </html>"""
         
     cdrcgi.sendPage(header + form + html)
 
+# ***** Second Pass *****
 # If the option 'All' has been selected in addition to individual
 # doctypes we're assuming that all doc types should be displayed
 # ---------------------------------------------------------------
@@ -177,7 +271,21 @@ if docType[0] == 'All':
 
 #----------------------------------------------------------------------
 # Creating temporary tables
+# The SQL queries for both reports Media Doc and Job Statistics are 
+# slightly different, in the first we're selecting document IDs in the 
+# other one we're selecting counts.
 #----------------------------------------------------------------------
+if vol:
+    q_select = "SELECT rbp.doc_id"
+    q_select2= "SELECT DISTINCT ppd.doc_id"
+    q_and    = "   AND dt.name = 'Media'"
+    q_group  = ""
+else:
+    q_select = "SELECT dt.name, count(*)"
+    q_select2= "SELECT dt.name, count(distinct ppd.doc_id)"
+    q_and    = ""
+    q_group  = " GROUP BY dt.name"
+
 # Create #removed table
 # ---------------------
 query = """SELECT doc_id, MAX(started) AS started 
@@ -257,16 +365,18 @@ except cdrdb.Error, info:
     cdrcgi.bail('Failure creating temp table #phoenix: %s' %
                 info[1][0])
      
-# Select count of removed documents
-# ---------------------------------
-query = """select dt.name, count(*) 
-  from #removed r
+# Select information from removed table (count or doc-ID)
+# -------------------------------------------------------
+query = """\
+ %s
+  from #removed rbp
   JOIN document d
-    ON d.id = r.doc_id
+    ON d.id = rbp.doc_id
   JOIN doc_type dt
     ON d.doc_type = dt.id
  WHERE started between '%s' and dateadd(DAY, 1, '%s')
- GROUP BY dt.name""" % (dateFrom, dateTo)
+ %s
+ %s""" % (q_select, dateFrom, dateTo, q_and, q_group)
 
 try:
     cursor = conn.cursor()
@@ -278,16 +388,18 @@ except cdrdb.Error, info:
     cdrcgi.bail('Failure selecting removed documents: %s' %
                 info[1][0])
      
-# Select count of brand new documents
-# -----------------------------------
-query = """select dt.name, count(*) 
-  from #brandnew b
+# Select information of brandnew table (count or doc_ID)
+# ------------------------------------------------------
+query = """
+%s
+  from #brandnew rbp
   JOIN document d
-    ON d.id = b.doc_id
+    ON d.id = rbp.doc_id
   JOIN doc_type dt
     ON d.doc_type = dt.id
  WHERE started between '%s' and dateadd(DAY, 1, '%s')
- GROUP BY dt.name""" % (dateFrom, dateTo)
+ %s
+ %s""" % (q_select, dateFrom, dateTo, q_and, q_group)
 
 try:
     cursor = conn.cursor()
@@ -299,16 +411,18 @@ except cdrdb.Error, info:
     cdrcgi.bail('Failure selecting brand new documents: %s' %
                 info[1][0])
      
-# Select count of re-published new documents
-# ------------------------------------------
-query = """SELECT dt.name, count(*) 
-  FROM #phoenix p
+# Select information of re-published new table (count or doc-id)
+# --------------------------------------------------------------
+query = """
+%s
+  FROM #phoenix rbp
   JOIN document d
-    ON d.id = p.doc_id
+    ON d.id = rbp.doc_id
   JOIN doc_type dt
     ON d.doc_type = dt.id
  WHERE started between '%s' and dateadd(DAY, 1, '%s')
- GROUP BY dt.name""" % (dateFrom, dateTo)
+ %s
+ %s""" % (q_select, dateFrom, dateTo, q_and, q_group)
 
 try:
     cursor = conn.cursor()
@@ -320,17 +434,18 @@ except cdrdb.Error, info:
     cdrcgi.bail('Failure selecting old new documents: %s' %
                 info[1][0])
      
-# Select count of updated documents
-# ---------------------------------
-query = """select dt.name, count(distinct ppd.doc_id) 
-  from pub_proc_doc ppd
-  join pub_proc pp
-    on pp.id = ppd.pub_proc
-  join document d
-    on d.id = ppd.doc_id
-  join doc_type dt
-    on d.doc_type = dt.id
- where pp.started between '%s' and dateadd(DAY, 1, '%s')
+# Select information of updated table (count or doc-id)
+# -----------------------------------------------------
+query = """
+%s
+  FROM pub_proc_doc ppd
+  JOIN pub_proc pp
+    ON pp.id = ppd.pub_proc
+  JOIN document d
+    ON d.id = ppd.doc_id
+  JOIN doc_type dt
+    ON d.doc_type = dt.id
+ WHERE pp.started between '%s' and dateadd(DAY, 1, '%s')
    AND pub_subset LIKE 'Push_%%'
    AND pp.status = 'Success'
    AND ppd.removed = 'N'
@@ -344,7 +459,9 @@ query = """select dt.name, count(distinct ppd.doc_id)
                     WHERE started between '%s' and dateadd(DAY, 1, '%s')
                       AND ppd.doc_id = b.doc_id
                   )
- group by dt.name""" % (dateFrom, dateTo, dateFrom, dateTo, dateFrom, dateTo)
+ %s
+ %s""" % (q_select2, dateFrom, dateTo, dateFrom, dateTo, 
+                     dateFrom, dateTo, q_and, q_group)
 
 try:
     cursor = conn.cursor()
@@ -364,35 +481,55 @@ countRemove   = {}
 countRenew    = {}
 countBrandnew = {}
 
-for update in updates:
-    countUpdate[update[0]] = update[1]
+# Collect all doc-ids in one list and get the information for the 
+# report for each of the documents from the database
+# ---------------------------------------------------------------
+if vol:
+    mediaIds = []
+    for set in (updates, removes, brandnews, renews):
+        for x in set:
+            mediaIds.append(x[0])
 
-for remove in removes:
-    countRemove[remove[0]] = remove[1]
+    mediaRecords = getMediaInfo(mediaIds)
 
-for brandnew in brandnews:
-    countBrandnew[brandnew[0]] = brandnew[1]
+# Store the row counts in a dictionary to be accessed later
+# ---------------------------------------------------------
+else:
+    for update in updates:
+        countUpdate[update[0]] = update[1]
 
-for renew in renews:
-    countRenew[renew[0]] = renew[1]
+    for remove in removes:
+        countRemove[remove[0]] = remove[1]
 
-#cdrcgi.bail("Result: [%s]" % rows)
+    for brandnew in brandnews:
+        countBrandnew[brandnew[0]] = brandnew[1]
+
+    for renew in renews:
+        countRenew[renew[0]] = renew[1]
+
 #----------------------------------------------------------------------
 # Create the results page.
 #----------------------------------------------------------------------
-instr     = 'Published Documents on Cancer.gov -- %s.' % (dateString)
+instr     = 'Published %s Documents on Cancer.gov -- %s.' % (
+                                      vol and 'Media' or '', dateString)
 header    = cdrcgi.header(title, title, instr, script, buttons, 
                           stylesheet = """\
    <STYLE type="text/css">
-    H5            { font-weight: bold;
+    H3            { font-weight: bold;
 	                font-family: Arial;
-                    font-size: 13pt; 
-	                margin: 0pt; }
+                    font-size: 16pt; 
+	                margin: 8pt; }
+    TABLE.output  { margin-left: auto;
+                    margin-right: auto; }
+    TABLE.output  TD
+                  { padding: 3px; }
     TD.header     { font-weight: bold; 
-                    align: center; }
-    TR.odd        { background-color: #F7F7F7; }
+                    text-align: center; }
+    TR.odd        { background-color: #E7E7E7; }
     TR.even       { background-color: #FFFFFF; }
-    TR.head       { background-color: #E2E2E2; }
+    TR.head       { background-color: #D2D2D2; }
+    .link         { color: blue; 
+                    text-decoration: underline; }
    </STYLE>
 """)
 
@@ -404,36 +541,76 @@ report    = """\
   </FORM>
 """ % (cdrcgi.SESSION, session)
 
-# -------------------------------------------------------------------
-# Decision if the CDR IDs are displayed along with the summary titles
-# - The report without CDR ID is displayed as a bulleted list.
-# - The report with    CDR ID is displayed in a table format.
-# -------------------------------------------------------------------
 # ------------------------------------------------------------------------
 # Display Summary Title including CDR ID
 # ------------------------------------------------------------------------
 report += """\
   <center>
-    <H3>Published Documents</H3>
-     Report includes publishing jobs started between <br/>
-     <b>%s</b> and <b>%s</b> <br/>
+    <H3>Published %s Documents</H3>
+     Report includes publishing jobs started between<br/>
+     <b>%s</b> and <b>%s</b><br/>
      <br/>
   </center>
-""" % (dateFrom, dateTo)
+""" % (vol and 'Media' or '', dateFrom, dateTo)
 
+# ***** Main part for Media Doc Published report *****
+# ----------------------------------------------------
+if vol:
+    report += """
+  <table class="output" border="1">
+   <tr class="head">
+    <td class="header">CDR-ID</td>
+    <td class="header">Media Title</td>
+    <td class="header">First Pub Date</td>
+    <td class="header">Version Date</td>
+    <td class="header">Last Version<br/>Publishable</td>
+    <td class="header">Blocked from<br/>VOL</td>
+   </tr>
+"""
+    count = 0
+    for id, title, first, verDt, audDt, volFlag, ver, \
+        publishable in mediaRecords:
+        count += 1
+        if count % 2 == 0:
+            report += '   <tr class="even">'
+        else:
+            report += '   <tr class="odd">'
+
+        report += """
+    <td class="link">
+     <a href="/cgi-bin/cdr/GetCdrImage.py?id=CDR%s.jpg">%s</a>
+    </td>
+    <td>%s</td>
+    <td>%s</td>
+    <td>%s</td>
+    <td align="center">%s</td>
+    <td align="center">%s</td>
+   </tr>
+""" % (id, id, title, first[:10], verDt[:16], publishable, volFlag and volFlag[:1] or "")
+
+
+    footer = """\
+  </table>
+ </BODY>
+</HTML> 
+"""     
+    cdrcgi.sendPage(header + report + footer)
+
+
+# ***** Main section for Job Statistics report display *****
+# ----------------------------------------------------------
 # Display the header row
 # ----------------------
 report += """
-   <table width="50%%" align="center" border="0">
+   <table class="output" width="45%%" border="0">
     <tr class="head">
-     <td class="header" align="center" width="25%%">Doc Type</td>
-     <td class="header" align="center" width="15%%">Added-Old</td>
-     <td class="header" align="center" width="15%%">Added-New</td>
-     <td class="header" align="center" width="15%%">Updated</td>
-     <td class="header" align="center" width="15%%">Removed</td>
-     <td class="header" align="center" width="15%%">Total</td>
+     <td class="header" width="25%%">Doc Type</td>
+     <td class="header" width="15%%">Added-Old</td>
+     <td class="header" width="15%%">Added-New</td>
+     <td class="header" width="15%%">Updated</td>
+     <td class="header" width="15%%">Removed</td>
+     <td class="header" width="15%%">Total</td>
     </tr>"""
-
 
 # Selecting the document types to be displayed
 # User can select to display all document types or select individual
@@ -462,6 +639,7 @@ for docType in docTypes:
     else:
         report += """
     <tr class="odd">"""
+
     report += """
      <td><b>%s</b></td>""" % docType
 
