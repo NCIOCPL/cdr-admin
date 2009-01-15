@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryProcessingStatusReport.py,v 1.1 2009-01-08 22:08:56 bkline Exp $
+# $Id: GlossaryProcessingStatusReport.py,v 1.2 2009-01-15 20:21:41 bkline Exp $
 #
 # "The Processing Status Report will display the documents (GTC and GTN)
 # that correspond with the Processing Status selected by the user."
@@ -8,6 +8,9 @@
 # Sheri says we are only to use the first processing status we find.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2009/01/08 22:08:56  bkline
+# New report (request #4421).
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrdb, cdrcgi
 etree = cdr.importEtree()
@@ -208,7 +211,11 @@ def report(status):
   <h1>%s</h1>
   <table>
    <tr>
-    <th>CDR ID of GTC</th>
+    <th colspan='3'>Glossary Term Concept</th>
+    <th colspan='3'>Glossary Term Name</th>
+   </tr>
+   <tr>
+    <th>CDR ID</th>
     <th>Processing Status</th>
     <th>Last Comment</th>
     <th>Term Names</th>
@@ -261,7 +268,7 @@ def report(status):
 #----------------------------------------------------------------------
 # Put up the request form for the report.
 #----------------------------------------------------------------------
-def showForm():
+def showForm(extra):
     docType = cdr.getDoctype('guest', 'GlossaryTermName')
     validVals = dict(docType.vvLists)
     vvList = validVals['ProcessingStatusValue']
@@ -284,7 +291,7 @@ def showForm():
        <option value='%s'>%s</option>
 """ % (statusValue, statusValue))
     form.append(u"""\
-      </select>
+      </select> %s
      </td>
     </tr>
     <tr>
@@ -296,7 +303,7 @@ def showForm():
     <tr>
      <td align='right'><b>Language:&nbsp;</b></td>
      <td>
-      English <input type='radio' name='language' value='en' />
+      English <input type='radio' name='language' value='en' checked='1'/>
       &nbsp;
       Spanish <input type='radio' name='language' value='es' />
      </td>
@@ -305,7 +312,7 @@ def showForm():
      <td align='right'><b>Audience:&nbsp;</b></td>
      <td>
       Patient
-      <input type='radio' name='audience' value='Patient' />
+      <input type='radio' name='audience' value='Patient' checked='1' />
       &nbsp;
       Health professional
       <input type='radio' name='audience' value='Health professional' />
@@ -318,10 +325,16 @@ def showForm():
    </table>
   </form>
  </body>
-</html>""")
+</html>""" % extra)
     cdrcgi.sendPage(header + u"".join(form))
 
-if status and language and audience:
-    report(status)
+#----------------------------------------------------------------------
+# Handle request to log out.
+#----------------------------------------------------------------------
+if request == "Submit Request": 
+    if status and language and audience:
+        report(status)
+    else:
+        showForm(u"<span style='color: red; font-weight: bold'>REQUIRED</span>")
 else:
-    showForm()
+    showForm(u"")
