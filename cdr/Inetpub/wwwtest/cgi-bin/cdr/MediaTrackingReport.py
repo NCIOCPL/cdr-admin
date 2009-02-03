@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: MediaTrackingReport.py,v 1.3 2008-02-22 20:28:15 venglisc Exp $
+# $Id: MediaTrackingReport.py,v 1.4 2009-02-03 22:47:17 venglisc Exp $
 #
 # We need a Media Tracking report.  This spreadsheet report will keep track of
 # the development and processing statuses of the Media documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2008/02/22 20:28:15  venglisc
+# Modifications to add Diagnosis column and use different dates to display
+# report results. (Bug 3839)
+#
 # Revision 1.2  2006/05/08 17:04:08  bkline
 # Changed file extension to wrong string (.xls) to work around IE bug.
 #
@@ -154,7 +158,7 @@ class GlossaryTerm:
             if self.docId in self.termNames:
                 self.termName = self.termNames[self.docId]
             else:
-                path = '/GlossaryTerm/TermName'
+                path = '/GlossaryTermName/TermName/TermNameString'
                 values = cdr.getQueryTermValueForId(path, self.docId, conn)
                 if values:
                     self.termName = values[0]
