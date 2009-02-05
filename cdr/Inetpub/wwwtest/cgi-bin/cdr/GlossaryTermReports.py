@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermReports.py,v 1.19 2009-01-08 21:56:26 bkline Exp $
+# $Id: GlossaryTermReports.py,v 1.20 2009-02-05 20:26:24 bkline Exp $
 #
 # Submenu for glossary term reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.19  2009/01/08 21:56:26  bkline
+# Added Processing Status Report.
+#
 # Revision 1.18  2008/11/24 14:49:10  bkline
 # Added new glossary term definition status reports.
 #
@@ -70,11 +73,17 @@ import cgi, cdr, cdrcgi, re, string
 fields  = cgi.FieldStorage()
 session = cdrcgi.getSession(fields)
 action  = cdrcgi.getRequest(fields)
+nyi     = fields.getvalue('nyi')
 title   = "CDR Administration"
 section = "Glossary Term Reports"
 SUBMENU = "Reports Menu"
 buttons = [SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-header  = cdrcgi.header(title, title, section, "Reports.py", buttons)
+header  = cdrcgi.header(title, title, section, "Reports.py", buttons,
+                        stylesheet = """\
+  <style type='text/css'>
+   li { list-style-type: none }
+  </style>
+""")
 
 #----------------------------------------------------------------------
 # Handle navigation requests.
@@ -91,64 +100,113 @@ if action == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
+# If the command behind the menu item hasn't been implemented yet, say so.
+#----------------------------------------------------------------------
+if nyi:
+    cdrcgi.bail("This menu command has not yet been implemented")
+
+#----------------------------------------------------------------------
 # Display available report choices.
 #----------------------------------------------------------------------
-form = """\
-    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-    <H3>QC Reports</H3>
-    <OL>
-""" % (cdrcgi.SESSION, session)
-reports = [
-           ('GlossaryTermSearch.py?', 
-            'Glossary Term QC Report'),
-           ('GlossaryConceptFull.py?', 
-            'Glossary Concept QC Report - Full'),
-           ('QcReport.py?DocType=GlossaryTermName&ReportType=pp&', 
-            'Publish Preview'),
-          ]
-for r in reports:
-    form += "<LI><A HREF='%s/%s%s=%s'>%s</LI></A>\n" % (
-            cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
-
-form += """\
-    </OL>
-    <H3>Management Reports</H3>
-    <OL>
-     <LI><A HREF='%s/PronunciationByWordStem.py?%s=%s'>%s</LI></A>
-    </OL>
-    <H3>Other Reports</H3>
-    <OL>
-""" % (cdrcgi.BASE, cdrcgi.SESSION, session,
-       "Pronunciation by Term Stem Report")
-reports = [
-           ('GlossaryTermLinks.py?',
-            'Documents Linked to Glossary Term Report'),
-           ('Request2010.py?',
-            'Drug Definition Report'),
-           ('GlossaryDocsModified.py?',
-            'Glossary Documents Modified Report'),
-           ('GlossaryTermPhrases.py?',
-            'Glossary Term and Variant Search Report'),
-           ('GlossaryTermsByStatus.py?', 'Glossary Term By Status Report'),
-           ('GlossaryTermsByType.py?', 'Glossary Term By Type Report'),
-           ('Request4344.py?report=4342&',
-            'Glossary Term Concept by English Definition Status Report'),
-           ('Request4344.py?report=4344&',
-            'Glossary Term Concept by Spanish Definition Status Report'),
-           ('Request2565.aspx?', 'Glossary Term Concept Reports'),
-           ('GlossaryConceptDocsModified.py?', 
-           'Glossary Term Concept - Documents Modified'),
-           ('GlossaryNameDocsModified.py?', 
-           'Glossary Term Name - Documents Modified'),
-           ('Request4333.py?', "New Published Glossary Terms"),
-           ('GlossaryProcessingStatusReport.py?',
-            "Processing Status Report"),
-           ('StaleGlossaryTerms.py?', 'Glossary Terms That Need Reviewed'),
-           ('SpanishGlossaryTermsByStatus.py?',
-            'Spanish Glossary Term By Status Report')
-          ]
-for r in reports:
-    form += "<LI><A HREF='%s/%s%s=%s'>%s</LI></A>\n" % (
-            cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
-
-cdrcgi.sendPage(header + form + "</OL></FORM></BODY></HTML>")
+form = ["""\
+   <input type='hidden' name='%s' value='%s' />
+   <h3>QC Reports</h3>
+   <ul>
+    <li>Glossary Term Name
+     <ul>
+""" % (cdrcgi.SESSION, session)]
+for r in ( # was using GlossaryTermSearch.py
+    ('GlossaryTermReports.py?nyi=1&', 'Glossary Term Name QC Report'),
+):
+    form.append("""\
+    <li><a href='%s/%s%s=%s'>%s</a></li>
+""" % (cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1]))
+form.append("""\
+     </ul>
+    </li>
+    <li>Glossary Term Concept
+     <ul>
+""")
+for r in (
+    ('GlossaryTermReports.py?nyi=1&', 'Glossary Term Concept'),
+):
+    form.append("""\
+    <li><a href='%s/%s%s=%s'>%s</a></li>
+""" % (cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1]))
+form.append("""\
+     </ul>
+    </li>
+    <li>Combined QC Reports
+     <ul>
+""")
+for r in (
+    # replace GlossaryTermSearch.py with simpler version
+    ('GlossaryTermReports.py?nyi=1&',
+     'Glossary Term Name with Concept QC Report'),
+    ('GlossaryConceptFull.py?', 'Glossary Term Concept')
+):
+    form.append("""\
+      <li><a href='%s/%s%s=%s'>%s</a></li>
+""" % (cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1]))
+form.append("""\
+     </ul>
+    </li>
+   </ul>
+   <h3>Management Reports</h3>
+   <ul>
+    <li>Glossary Term Name Reports
+     <ul>
+""")
+for r in (
+    ('GlossaryTermReports.py?nyi=1&', # needs rewrite of GlossaryTermLinks.py
+     'Documents Linked to Glossary Term Name Report'),
+    ('PronunciationByWordStem.py?',
+     'Pronunciation by Glossary Term Stem Report'),
+    ('GlossaryTermPhrases.py?', 'Glossary Term and Variant Search Report')
+):
+    form.append("""\
+      <li><a href='%s/%s%s=%s'>%s</a></li>
+""" % (cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1]))
+form.append("""\
+     </ul>
+    </li>
+    <li>Processing Reports
+     <ul>
+""")
+for r in (
+    ('GlossaryProcessingStatusReport.py?', "Processing Status Report"),
+    ('Request4344.py?report=4342&',
+     'Glossary Term Concept by English Definition Status Report'),
+    ('Request4344.py?report=4344&',
+     'Glossary Term Concept by Spanish Definition Status Report'),
+    ('GlossaryConceptDocsModified.py?', 
+     'Glossary Term Concept Documents Modified Report'),
+    ('GlossaryNameDocsModified.py?', 
+     'Glossary Term Name Documents Modified Report')
+):
+    form.append("""\
+      <li><a href='%s/%s%s=%s'>%s</a></li>
+""" % (cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1]))
+form.append("""\
+     </ul>
+    </li>
+    <li>Publication Reports
+     <ul>
+""")
+for r in (
+    ('QcReport.py?DocType=GlossaryTermName&ReportType=pp&', 'Publish Preview'),
+    ('Request4333.py?', "New Published Glossary Terms")
+):
+    form.append("""\
+      <li><a href='%s/%s%s=%s'>%s</a></li>
+""" % (cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1]))
+form.append("""\
+     </ul>
+    </li>
+   </ul>
+  </form>
+ </body>
+</html>
+""")
+form = "".join(form)
+cdrcgi.sendPage(header + form)
