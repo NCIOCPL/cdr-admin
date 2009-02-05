@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermReports.py,v 1.20 2009-02-05 20:26:24 bkline Exp $
+# $Id: GlossaryTermReports.py,v 1.21 2009-02-05 20:48:34 bkline Exp $
 #
 # Submenu for glossary term reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.20  2009/02/05 20:26:24  bkline
+# Rewritten to implement new menu structure requested by William (#4467).
+#
 # Revision 1.19  2009/01/08 21:56:26  bkline
 # Added Processing Status Report.
 #
@@ -116,7 +119,7 @@ form = ["""\
      <ul>
 """ % (cdrcgi.SESSION, session)]
 for r in ( # was using GlossaryTermSearch.py
-    ('GlossaryTermReports.py?nyi=1&', 'Glossary Term Name QC Report'),
+    ('QcReport.py?DocType=GlossaryTermName&', 'Glossary Term Name QC Report'),
 ):
     form.append("""\
     <li><a href='%s/%s%s=%s'>%s</a></li>
