@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermSearch.py,v 1.8 2008-12-15 22:51:39 venglisc Exp $
+# $Id: GlossaryTermSearch.py,v 1.9 2009-02-05 21:16:43 bkline Exp $
 #
 # Prototype for duplicate-checking interface for GlossaryTerm documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.8  2008/12/15 22:51:39  venglisc
+# Modified AdvancedSearch page due to modified GlossaryTerm document
+# structure. (Bug 4381)
+#
 # Revision 1.7  2006/07/11 13:42:35  bkline
 # Added term pronunciation to searchable fields.
 #
@@ -35,20 +39,22 @@ import cgi, cdr, cdrcgi, re, cdrdb
 #----------------------------------------------------------------------
 fields     = cgi.FieldStorage()
 session    = cdrcgi.getSession(fields)
-boolOp     = fields and fields.getvalue("Boolean")          or "AND"
-nameEn     = fields and fields.getvalue("NameEn")           or None
-nameEs     = fields and fields.getvalue("NameEs")           or None
-statusEn   = fields and fields.getvalue("StatusEn")         or None
-statusEs   = fields and fields.getvalue("StatusEs")         or None
-definition = fields and fields.getvalue("Definition")       or None
-audience   = fields and fields.getvalue("Audience")         or None
-dictionary = fields and fields.getvalue("Dictionary")       or None
-submit     = fields and fields.getvalue("SubmitButton")     or None
-help       = fields and fields.getvalue("HelpButton")       or None
-typeName   = fields and fields.getvalue("TypeName")         or None
-
-subTitle   = {'GlossaryTermName'   :'Glossary Term Name',
-              'GlossaryTermConcept': 'Glossary Term Concept'}
+boolOp     = fields.getvalue("Boolean")          or "AND"
+nameEn     = fields.getvalue("NameEn")           or None
+nameEs     = fields.getvalue("NameEs")           or None
+statusEn   = fields.getvalue("StatusEn")         or None
+statusEs   = fields.getvalue("StatusEs")         or None
+definition = fields.getvalue("Definition")       or None
+audience   = fields.getvalue("Audience")         or None
+dictionary = fields.getvalue("Dictionary")       or None
+defStatEn  = fields.getvalue("DefStatEn")        or None
+defStatEs  = fields.getvalue("DefStatEs")        or None
+submit     = fields.getvalue("SubmitButton")     or None
+help       = fields.getvalue("HelpButton")       or None
+typeName   = fields.getvalue("TypeName")         or None
+statusList = cdrcgi.glossaryTermStatusList
+subTitle   = { 'GlossaryTermName'   : 'Glossary Term Name',
+               'GlossaryTermConcept': 'Glossary Term Concept' }
 
 if help: 
     cdrcgi.bail("Sorry, help for this interface has not yet been developed.")
@@ -65,19 +71,15 @@ except cdrdb.Error, info:
 # Display the search form.
 #----------------------------------------------------------------------
 if not submit:
-    fields1= (('Name [en]',           'NameEn'),
-              ('Status [en]',         'StatusEn',
-                                      cdrcgi.glossaryTermStatusList),
-              ('Name [es]',           'NameEs'),
-              ('Status [es]',         'StatusEs',
-                                      cdrcgi.glossaryTermStatusList)
-             )
-    fields2= (('Term Concept',        'Definition'),
-              ('Audience',            'Audience', 
-                                      cdrcgi.glossaryAudienceList),
-              ('Dictionary',          'Dictionary',
-                                      cdrcgi.glossaryTermDictionaryList)
-             )
+    fields1= (('Name [en]',              'NameEn'                ),
+              ('Status [en]',            'StatusEn',   statusList),
+              ('Name [es]',              'NameEs'                ),
+              ('Status [es]',            'StatusEs',   statusList))
+    fields2= (('Term Concept',           'Definition'            ),
+              ('Audience',               'Audience',   statusList),
+              ('Dictionary',             'Dictionary', statusList),
+              ('Definition Status [en]', 'DefStatEn',  statusList),
+              ('Definition Status [es]', 'DefStatEs',  statusList))
 
     buttons = (('submit', 'SubmitButton', 'Search'),
                ('submit', 'HelpButton',   'Help'),
@@ -136,9 +138,13 @@ searchFields = (cdrcgi.SearchField(nameEn,
                 cdrcgi.SearchField(audience,
                         ("/GlossaryTermConcept/TermDefinition/Audience",
                          "/GlossaryTermConcept/TranslatedTermDefinition/Audience")),
-                cdrcgi.SearchField(dictionary,
-                        ("/GlossaryTermConcept/TermDefinition/Dictionary",
-                         "/GlossaryTermConcept/TranslatedTermDefinition/Dictionary")))
+                cdrcgi.SearchField(defStatEn,
+                                   ("/GlossaryTermConcept/TermDefinition"
+                                    "/DefinitionStatus",)),
+                cdrcgi.SearchField(defStatEs,
+                                   ("/GlossaryTermConcept"
+                                    "/TranslatedTermDefinition"
+                                    "/TranslatedStatus",)))
 
 #----------------------------------------------------------------------
 # Construct the query.
