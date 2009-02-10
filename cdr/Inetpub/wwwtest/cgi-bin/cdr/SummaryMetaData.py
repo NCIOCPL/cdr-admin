@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryMetaData.py,v 1.9 2009-02-10 18:45:31 venglisc Exp $
+# $Id: SummaryMetaData.py,v 1.10 2009-02-10 19:04:17 venglisc Exp $
 #
 # Report on the metadata for one or more summaries.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.9  2009/02/10 18:45:31  venglisc
+# Displaying top section titles bold. (Bug 4475)
+#
 # Revision 1.8  2008/06/03 21:58:56  bkline
 # Replaced StandardError (going away at some point) with Exception objects.
 #
@@ -65,6 +68,9 @@ rptHead     = """\
    tr.even     { background-color: #FFFFFF; }
    tr.head     { background-color: #E2E2E2; }
    .topsection { font-weight: bold; }
+   .midsection { font-weight: normal; 
+                 text-decoration: underline; }
+   .lowsection { font-style: italic; }
   </style>
  </head>"""
 
@@ -166,8 +172,10 @@ class SummarySection:
         self.diagnoses  = diagnoses
         self.types      = types
         self.searchAttr = searchAttr
-        self.sectionLevel   = 'othersection'
-        if len(nodeLoc) == 4: self.sectionLevel = 'topsection'
+        
+        if   len(nodeLoc) == 4: self.sectionLevel = 'topsection'
+        elif len(nodeLoc) == 8: self.sectionLevel = 'midsection'
+        else:                   self.sectionLevel = 'lowsection'
 
 class Summary:
     def __init__(self, id, cursor):
