@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryProcessingStatusReport.py,v 1.2 2009-01-15 20:21:41 bkline Exp $
+# $Id: GlossaryProcessingStatusReport.py,v 1.3 2009-02-10 21:23:36 bkline Exp $
 #
 # "The Processing Status Report will display the documents (GTC and GTN)
 # that correspond with the Processing Status selected by the user."
@@ -8,6 +8,9 @@
 # Sheri says we are only to use the first processing status we find.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2009/01/15 20:21:41  bkline
+# Changes to report requested by William.
+#
 # Revision 1.1  2009/01/08 22:08:56  bkline
 # New report (request #4421).
 #
@@ -52,12 +55,28 @@ if request == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
+# For Spanish names we need to know whether they're alternate names.
+#----------------------------------------------------------------------
+class SpanishName:
+    def __init__(self, node):
+        self.string = u""
+        self.alternate = node.get('NameType') == 'alternate'
+        for s in node.findall('TermNameString'):
+            self.string = s.text
+    def __unicode__(self):
+        name = cgi.escape(self.string)
+        if self.alternate:
+            return u"<span class='alt'>%s</span>" % name
+        return name
+
+#----------------------------------------------------------------------
 # Object representing a glossary term name.
 #----------------------------------------------------------------------
 class Name:
     def __init__(self, docId, cursor, conceptId = None):
         self.docId = docId
         self.string = u"[NO NAME]"
+        self.spanish = []
         self.status = u""
         self.comment = u""
         self.conceptId = conceptId
@@ -67,6 +86,8 @@ class Name:
         for n in tree.findall('TermName'):
             for s in n.findall('TermNameString'):
                 self.string = s.text
+        for n in tree.findall('TranslatedName'):
+            self.spanish.append(SpanishName(n))
         eName = language == 'en' and 'TermName' or 'TranslatedName'
         for n in tree.findall(eName):
             comments = n.findall('Comment')
@@ -90,7 +111,10 @@ class Name:
             rows = cursor.fetchall()
             self.conceptId = rows and rows[0][0] or u""
     def __unicode__(self):
-        return u"%s (CDR%d)" % (cgi.escape(self.string), self.docId)
+        if 'spanish' not in status.lower():
+            return u"%s (CDR%d)" % (cgi.escape(self.string), self.docId)
+        return u"%s (CDR%d)" % (u"; ".join([u"%s" % n for n in self.spanish]),
+                                self.docId)
 
 #----------------------------------------------------------------------
 # Object representing a glossary term concept.
@@ -101,7 +125,7 @@ class Concept:
         self.status = u""
         self.names = {}
         self.comment = u""
-        if cursor:
+        if self.docId:
             cursor.execute("SELECT xml FROM document WHERE id = ?", docId)
             docXml = cursor.fetchall()[0][0]
             tree = etree.XML(docXml.encode('utf-8'))
@@ -179,6 +203,8 @@ def report(status):
     # Fill in any names with the wrong statuses if we're showing everything.
     if showAll:
         for conceptId in concepts:
+            if not conceptId:
+                continue
             concept = concepts[conceptId]
             cursor.execute("""\
        SELECT DISTINCT doc_id
@@ -200,6 +226,7 @@ def report(status):
    h1 { font-size: 14pt; color: maroon; font-family: Arial, sans-serif; }
    h1 { text-align: center; }
    th { color: blue; }
+   .alt { color: red; }
    table { border-collapse: collapse; empty-cells: show; border-spacing: 0; }
    th, td { border: black solid 1px; padding: 3px; }
    body { font-family: "Times New Roman", serif; }
