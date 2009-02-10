@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermReports.py,v 1.22 2009-02-10 21:18:20 bkline Exp $
+# $Id: GlossaryTermReports.py,v 1.23 2009-02-10 22:40:45 bkline Exp $
 #
 # Submenu for glossary term reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.22  2009/02/10 21:18:20  bkline
+# Changes for issue #4467 requested by William.
+#
 # Revision 1.21  2009/02/05 20:48:34  bkline
 # Plugged in simplified interface for glossary name QC report.
 #
@@ -150,7 +153,7 @@ form.append("""\
 """)
 for r in (
     # replace GlossaryTermSearch.py with simpler version
-    ('GlossaryTermReports.py?nyi=1&',
+    ('QcReport.py?DocType=GlossaryTermName&ReportType=gtnwc&',
      'Glossary Term Name with Concept QC Report'),
     ('GlossaryConceptFull.py?', 'Glossary Term Concept - Full QC Report')
 ):

@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.63 2009-02-10 21:29:13 bkline Exp $
+# $Id: QcReport.py,v 1.64 2009-02-10 22:40:45 bkline Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.63  2009/02/10 21:29:13  bkline
+# Added ability to search for glossary term concept documents by
+# definition substring.
+#
 # Revision 1.62  2009/01/06 21:38:12  ameyer
 # Fixed my fix to a Unicode bug.  Added documentation to make clearer
 # what the sequence of encodings is.
@@ -265,6 +269,8 @@ def getSectionTitle(repType):
         return "Publish Preview Report"
     elif repType == "img":
         return "Media QC Report"
+    elif repType == "gtnwc":
+        return "Glossary Term Name With Concept Report"
     else:
         return "QC Report (Unrecognized Type)"
 
@@ -679,6 +685,8 @@ filters = {
         ["name:Glossary Term Concept QC Report Filter"],
     'GlossaryTermName':
         ["name:Glossary Term Name QC Report Filter"],
+    'GlossaryTermName:gtnwc':
+        ["set:QC GlossaryTermName with Concept Set"],
     'InScopeProtocol':
         ["set:QC InScopeProtocol Set"],
     'Media:img':
