@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.62 2009-01-06 21:38:12 ameyer Exp $
+# $Id: QcReport.py,v 1.63 2009-02-10 21:29:13 bkline Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.62  2009/01/06 21:38:12  ameyer
+# Fixed my fix to a Unicode bug.  Added documentation to make clearer
+# what the sequence of encodings is.
+#
 # Revision 1.61  2008/12/16 22:10:39  ameyer
 # Fixed encoding so that final sendPage sends Unicode instead of UTF-8.
 #
@@ -291,6 +295,7 @@ displayBoard    = fields.getvalue('Editorial-board') and 'editorial-board_' or '
 displayBoard   += fields.getvalue('Advisory-board')  and 'advisory-board'   or ''
 displayAudience = fields.getvalue('Patient') and 'patient_' or ''
 displayAudience +=fields.getvalue('HP')      and 'hp'       or ''
+glossaryDefinition = fields.getvalue('GlossaryDefinition')
 
 # insRevLvls  = fields.getvalue("revLevels")  or None
 insRevLvls  = fields.getvalue("insRevLevels")  or None
@@ -338,39 +343,44 @@ if action == "Log Out":
 #----------------------------------------------------------------------
 # If we have a document type but no doc ID or title, ask for the title.
 #----------------------------------------------------------------------
-if not docId and not docTitle:
+if not docId and not docTitle and not glossaryDefinition:
     extra = ""
+    fieldName = 'DocTitle'
     if docType:
         extra += "<INPUT TYPE='hidden' NAME='DocType' VALUE='%s'>" % docType
         if docType == 'PDQBoardMemberInfo':
            label = ['Board Member Name',
                     'Board Member CDR ID']
+        elif docType == 'GlossaryTermConcept':
+           label = ('Glossary Definition', 'CDR ID')
+           fieldName = 'GlossaryDefinition'
         else:
            label = ['Document Title',
                     'Document CDR ID']
 
     if repType:
-        extra += "\n  "
+        extra += "\n   "
         extra += "<INPUT TYPE='hidden' NAME='ReportType' VALUE='%s'>" % repType
     form = """\
-  <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-  %s
-  <TABLE>
-   <TR>
-    <TD ALIGN='right'><B>%s:&nbsp;</B><BR/>(use %% as wildcard)</TD>
-    <TD><INPUT SIZE='60' NAME='DocTitle'></TD>
-   </TR>
-   <TR>
-    <TD> </TD>
-    <TD>... or ...</TD>
-   </TR>
-   <TR>
-    <TD ALIGN='right'><B>%s:&nbsp;</B></TD>
-    <TD><INPUT SIZE='60' NAME='DocId'></TD>
-   </TR>
-  </TABLE>
-""" % (cdrcgi.SESSION, session, extra, label[0], label[1])
+   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
+   %s
+   <TABLE>
+    <TR>
+     <TD ALIGN='right'><B>%s:&nbsp;</B><BR/>(use %% as wildcard)</TD>
+     <TD><INPUT SIZE='60' NAME='%s'></TD>
+    </TR>
+    <TR>
+     <TD> </TD>
+     <TD>... or ...</TD>
+    </TR>
+    <TR>
+     <TD ALIGN='right'><B>%s:&nbsp;</B></TD>
+     <TD><INPUT SIZE='60' NAME='DocId'></TD>
+    </TR>
+   </TABLE>
+""" % (cdrcgi.SESSION, session, extra, label[0], fieldName, label[1])
     cdrcgi.sendPage(header + form + """\
+  </FORM>
  </BODY>
 </HTML>
 """)
@@ -407,9 +417,23 @@ def showTitleChoices(choices):
 #----------------------------------------------------------------------
 # If we have a document title but not a document ID, find the ID.
 #----------------------------------------------------------------------
-if docTitle and not docId:
+if (docTitle or glossaryDefinition) and not docId:
+    lookingFor = 'title'
     try:
-        if docType:
+        if docType == 'GlossaryTermConcept':
+            lookingFor = 'definition'
+            cursor.execute("""\
+                SELECT d.id, d.title
+                  FROM document d
+                  JOIN query_term q
+                    ON d.id = q.doc_id
+                 WHERE q.path IN ('/GlossaryTermConcept/TermDefinition' +
+                                  '/DefinitionText',
+                                  '/GlossaryTermConcept' +
+                                  '/TranslatedTermDefinition/DefinitionText')
+                   AND q.value LIKE ?""", u"%" + glossaryDefinition + u"%",
+                           timeout = 300)
+        elif docType:
             cursor.execute("""\
                 SELECT document.id, document.title
                   FROM document
@@ -424,13 +448,15 @@ if docTitle and not docId:
                  WHERE title LIKE ?""", docTitle + '%')
         rows = cursor.fetchall()
         if not rows:
-            cdrcgi.bail("Unable to find document with title '%s'" % docTitle)
+            cdrcgi.bail("Unable to find document with %s '%s'" % (lookingFor,
+                                                                  docTitle))
         if len(rows) > 1:
             showTitleChoices(rows)
         intId = rows[0][0]
         docId = "CDR%010d" % intId
     except cdrdb.Error, info:
-        cdrcgi.bail('Failure looking up document title: %s' % info[1][0])
+        cdrcgi.bail('Failure looking up document %s: %s' % (lookingFor,
+                                                            info[1][0]))
 
 #----------------------------------------------------------------------
 # Let the user pick the version for most Summary or Glossary reports.
