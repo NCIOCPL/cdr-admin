@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: ShowFilterSet.py,v 1.1 2003-11-10 18:12:35 bkline Exp $
+# $Id: ShowFilterSet.py,v 1.2 2009-02-10 19:32:28 bkline Exp $
 #
 # Drills down into a filter set recursively to show which filters
 # will be applied to a document when the set is invoked.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2003/11/10 18:12:35  bkline
+# Drills down into a filter set recursively to show which filters
+# will be applied to a document when the set is invoked.
+#
 #----------------------------------------------------------------------
 import cdr, cdrcgi, cgi
 
@@ -62,7 +66,7 @@ if not setName:
   <title>Show CDR Filter Set</title>
  </head>
  <body>
-  <form>
+  <form method='post' action='ShowFilterSet.py'>
   <b>Choose filter set:&nbsp;</b>
   %s
   &nbsp;

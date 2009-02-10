@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: GateKeeperStatus.py,v 1.2 2007-08-09 15:58:41 venglisc Exp $
+# $Id: GateKeeperStatus.py,v 1.3 2009-02-10 19:32:28 bkline Exp $
 #
 # Web interface for requesting status from the new Cancer.gov GateKeeper.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2007/08/09 15:58:41  venglisc
+# Added new variable to allow displaying only the records with errors or
+# warnings or both.
+#
 # Revision 1.1  2007/05/24 20:08:09  bkline
 # User interface for status report SOAP methods at Cancer.gov's GateKeeper.
 #
@@ -68,7 +72,7 @@ def showForm(extra = u""):
    will have a <i>large</i> amount of data added to the debug log.
   </p>
   <br>
-  <form method='post'>
+  <form method='post' action='GateKeeperStatus.py'>
    <table border='0' cellpadding='2' cellspacing='0'>
     <tr>
      <th align='right'>GateKeeper Host:&nbsp;</th>

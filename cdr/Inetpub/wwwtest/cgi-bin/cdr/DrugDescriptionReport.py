@@ -260,7 +260,7 @@ AND d.id = %s
    }
    .error { color: red; }
   </style>
-<form>
+<form method='post' action='DrugDescriptionReport.py'>
 <div align = 'center'>
 <h2>Drug Description Report<br>%s</h2>
 </div>
@@ -433,7 +433,7 @@ form = """\
    }
        
   </script>
-  <form>
+  <form method='post' action='DrugDescriptionReport.py'>
   <p>
      Select how you want to filter for drugs: 
      </p>

@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: MissingInfoMailer.py,v 1.3 2008-09-02 20:00:23 bkline Exp $
+# $Id: MissingInfoMailer.py,v 1.4 2009-02-10 19:32:28 bkline Exp $
 #
 # Program to send out a mailer for missing protocol information.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2008/09/02 20:00:23  bkline
+# Wording changes and Unicode cleanup.
+#
 # Revision 1.2  2007/10/31 16:16:54  bkline
 # Final modifications before being placed in production.
 #
@@ -362,7 +365,7 @@ Content-type: text/html; charset=utf-8
   <h1>Proposed Emailer for CDR%d</h1>
   <h2>To be sent to %s</h2>
   <pre>%s</pre>
-  <form method='post'>
+  <form method='post' action='MissingInfoMailer.py'>
    <input type='submit' name='Send' value='Send' />
    <input type='hidden' name='%s' value='%s' />
    <input type='hidden' name='id' value='%s' />

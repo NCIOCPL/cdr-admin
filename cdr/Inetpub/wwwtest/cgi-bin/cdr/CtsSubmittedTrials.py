@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CtsSubmittedTrials.py,v 1.6 2008-09-02 19:32:44 bkline Exp $
+# $Id: CtsSubmittedTrials.py,v 1.7 2009-02-10 19:32:28 bkline Exp $
 #
 # CDR-side interface for reviewing CTS trials.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2008/09/02 19:32:44  bkline
+# Added code to initialize dupId variable for non-Oncore document.
+#
 # Revision 1.5  2008/04/17 18:41:59  bkline
 # Added interface for specifying CDR document of which Oncore trial
 # is a duplicate.
@@ -381,7 +384,7 @@ html = [u"""\
   </script>
  </head>
  <body class='qc'>
-  <form method='post'>
+  <form method='post' action='CtsSubmittedTrials.py'>
    <input type='hidden' name='importDoc' value='' />
    <input type='hidden' name='primaryId' value='' />
    <input type='hidden' name='duplicate' value='' />

@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: tcdr2cg.py,v 1.1 2006-06-14 13:03:46 bkline Exp $
+# $Id: tcdr2cg.py,v 1.2 2009-02-10 19:32:28 bkline Exp $
 #
 # Web interface for requesting retransmission of CDR documents to the
 # Cancer.gov GateKeeper.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2006/06/14 13:03:46  bkline
+# Script for re-submitting documents to Cancer.gov's GateKeeper.
+#
 #----------------------------------------------------------------------
 import cdr2cg, cgi, xml.sax.saxutils, cdrcgi, cdr, cdrdb, re
 
@@ -218,7 +221,7 @@ html = u"""\
    CDR Servers <a href='ListPushJobs.py'>here</a>.
   </p>
   <br>
-  <form method='post'>
+  <form method='post' action='tcdr2cg.py'>
    <table border='0' cellpadding='2' cellspacing='0'>
     <tr>
      <th align='right'>CDR Server:&nbsp;</th>

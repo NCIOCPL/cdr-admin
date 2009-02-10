@@ -1,12 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: CGGlossifierTest.py,v 1.2 2008-12-18 15:55:42 bkline Exp $
+# $Id: CGGlossifierTest.py,v 1.3 2009-02-10 19:32:28 bkline Exp $
 #
 # Minimal test interface for periodically checking to make sure no
 # bit rot has set in while we're waiting for the Cancer.gov team
 # to QC the service.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2008/12/18 15:55:42  bkline
+# Code and CSS cleanup.
+#
 # Revision 1.1  2008/12/11 13:15:41  bkline
 # Unit test for glossifier service built for Cancer.gov.
 #
@@ -114,7 +117,7 @@ html = u"""\
  </head>
  <body>
   <h1>Cancer.gov Glossifier Tester</h1>
-  <form method='POST'>
+  <form method='POST' action='CGGlossifierTest.py'>
    <fieldset>
     <legend>Control Parameters</legend>
     <table>

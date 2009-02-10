@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: ShowGlobalChangeTestResults.py,v 1.3 2008-05-22 16:53:07 ameyer Exp $
+# $Id: ShowGlobalChangeTestResults.py,v 1.4 2009-02-10 19:32:28 bkline Exp $
 #
 # Web interface for showing changes which would be made by a
 # global change.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2008/05/22 16:53:07  ameyer
+# Added some sort, count, and error reporting capability.
+#
 # Revision 1.2  2005/05/26 12:19:22  bkline
 # Listed most recent runs at top; changed heading string; fixed unicode
 # display.
@@ -198,7 +201,7 @@ if directory:
   </style>
  </head>
  <body>
-<form>
+<form method='post' action='ShowGlobalChangeTestResults.py'>
  <center>
  <input type='hidden' name='reSortDir' value='%s' />
  <input type='submit' name='reSort' value='Sort By' />
