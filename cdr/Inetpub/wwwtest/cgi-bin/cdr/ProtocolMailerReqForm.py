@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolMailerReqForm.py,v 1.29 2008-03-14 16:37:14 bkline Exp $
+# $Id: ProtocolMailerReqForm.py,v 1.30 2009-02-10 21:25:33 bkline Exp $
 #
 # Request form for all protocol mailers.
 #
@@ -17,6 +17,11 @@
 # publication job for the publishing daemon to find and initiate.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.29  2008/03/14 16:37:14  bkline
+# Fixed handling of non-ASCII characters in display of primary protocol
+# IDs in table showing Publication Notification Emailers which have been
+# sent out.
+#
 # Revision 1.28  2007/10/31 17:30:18  bkline
 # More tweaks to wording for publication mailer; adjusted cutoff date.
 #
@@ -782,7 +787,7 @@ def showDocsAndRun(rows):
 #----------------------------------------------------------------------
 if docId:
     # Simple case - user submitted single document id, isolate the digits
-    digits = re.sub('[^\d]+', '', docId)
+    digits = re.sub('[^\\d]+', '', docId)
     intId  = int(digits)
 
     # Make sure the corresponding document exists in version control,
@@ -792,7 +797,7 @@ if docId:
             SELECT MAX(num)
               FROM doc_version
              WHERE id = ?
-               AND val_status = 'V'""", (intId,))
+               AND val_status = 'V'""", intId)
         row = cursor.fetchone()
         if not row or not row[0]:
             cdrcgi.bail("No valid version found for document %d" % intId)
