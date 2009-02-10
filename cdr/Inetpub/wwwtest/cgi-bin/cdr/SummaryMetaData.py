@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryMetaData.py,v 1.8 2008-06-03 21:58:56 bkline Exp $
+# $Id: SummaryMetaData.py,v 1.9 2009-02-10 18:45:31 venglisc Exp $
 #
 # Report on the metadata for one or more summaries.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.8  2008/06/03 21:58:56  bkline
+# Replaced StandardError (going away at some point) with Exception objects.
+#
 # Revision 1.7  2007/11/03 14:40:15  bkline
 # Restored table borders for the right tables this time.
 #
@@ -57,10 +60,11 @@ rptHead     = """\
  <head>
   <title>Summary Metadata Report</title>
   <style type='text/css'>
-   body     { font-family: Arial }
-   tr.odd   { background-color: #F7F7F7; }
-   tr.even  { background-color: #FFFFFF; }
-   tr.head  { background-color: #E2E2E2; }
+   body        { font-family: Arial }
+   tr.odd      { background-color: #F7F7F7; }
+   tr.even     { background-color: #FFFFFF; }
+   tr.head     { background-color: #E2E2E2; }
+   .topsection { font-weight: bold; }
   </style>
  </head>"""
 
@@ -151,11 +155,19 @@ def getLanguages():
     return picklist + "</select>"
 
 class SummarySection:
-    def __init__(self, title, diagnoses, types, searchAttr = False):
+    # Adding the nodeLoc to the class as a means of identifying which
+    # section title is a top section and setting the sectionLevel
+    # accordingly. This will be used as a class identifier for the 
+    # HTML display.
+    # ----------------------------------------------------------------
+    def __init__(self, title, diagnoses, types, nodeLoc, 
+                 searchAttr = False):
         self.title      = title
         self.diagnoses  = diagnoses
         self.types      = types
         self.searchAttr = searchAttr
+        self.sectionLevel   = 'othersection'
+        if len(nodeLoc) == 4: self.sectionLevel = 'topsection'
 
 class Summary:
     def __init__(self, id, cursor):
@@ -329,6 +341,7 @@ class Summary:
                                                       "[No Section Title]"),
                                            diagnoses.get(key, "&nbsp;"),
                                            sectionTypes.get(key, "&nbsp;"),
+                                           key,
                                            searchAttrs.get(key, False)))
         return sections
 
@@ -434,12 +447,13 @@ class Summary:
    <tr class='even'>"""
    
             html += """\
-    <td valign='top'>%s</td>
+    <td valign='top' class='%s'>%s</td>
     <td valign='top'>%s</td>
     <td valign='top' align='center'>%s</td>
     <td valign='top'>%s</td>
    </tr>
-""" % (section.title, section.diagnoses, checkMark, section.types)
+""" % (section.sectionLevel, section.title, section.diagnoses, checkMark, 
+       section.types)
         return html + """\
   </table>
   <br><br>
