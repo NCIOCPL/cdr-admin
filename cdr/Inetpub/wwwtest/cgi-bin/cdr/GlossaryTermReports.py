@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermReports.py,v 1.21 2009-02-05 20:48:34 bkline Exp $
+# $Id: GlossaryTermReports.py,v 1.22 2009-02-10 21:18:20 bkline Exp $
 #
 # Submenu for glossary term reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.21  2009/02/05 20:48:34  bkline
+# Plugged in simplified interface for glossary name QC report.
+#
 # Revision 1.20  2009/02/05 20:26:24  bkline
 # Rewritten to implement new menu structure requested by William (#4467).
 #
@@ -84,7 +87,9 @@ buttons = [SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 header  = cdrcgi.header(title, title, section, "Reports.py", buttons,
                         stylesheet = """\
   <style type='text/css'>
-   li { list-style-type: none }
+   ul > li { list-style-type: none }
+   h4 { font-style: italic; }
+   ol { margin-bottom: 1.25em; } /* workaround for IE bug */
   </style>
 """)
 
@@ -115,8 +120,8 @@ form = ["""\
    <input type='hidden' name='%s' value='%s' />
    <h3>QC Reports</h3>
    <ul>
-    <li>Glossary Term Name
-     <ul>
+    <li><h4>Glossary Term Name</h4>
+     <ol>
 """ % (cdrcgi.SESSION, session)]
 for r in ( # was using GlossaryTermSearch.py
     ('QcReport.py?DocType=GlossaryTermName&', 'Glossary Term Name QC Report'),
@@ -125,40 +130,41 @@ for r in ( # was using GlossaryTermSearch.py
     <li><a href='%s/%s%s=%s'>%s</a></li>
 """ % (cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1]))
 form.append("""\
-     </ul>
+     </ol>
     </li>
-    <li>Glossary Term Concept
-     <ul>
+    <li><h4>Glossary Term Concept</h4>
+     <ol>
 """)
 for r in (
-    ('GlossaryTermReports.py?nyi=1&', 'Glossary Term Concept'),
+    ('QcReport.py?DocType=GlossaryTermConcept&',
+     'Glossary Term Concept QC Report'),
 ):
     form.append("""\
     <li><a href='%s/%s%s=%s'>%s</a></li>
 """ % (cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1]))
 form.append("""\
-     </ul>
+     </ol>
     </li>
-    <li>Combined QC Reports
-     <ul>
+    <li><h4>Combined QC Reports</h4>
+     <ol>
 """)
 for r in (
     # replace GlossaryTermSearch.py with simpler version
     ('GlossaryTermReports.py?nyi=1&',
      'Glossary Term Name with Concept QC Report'),
-    ('GlossaryConceptFull.py?', 'Glossary Term Concept')
+    ('GlossaryConceptFull.py?', 'Glossary Term Concept - Full QC Report')
 ):
     form.append("""\
       <li><a href='%s/%s%s=%s'>%s</a></li>
 """ % (cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1]))
 form.append("""\
-     </ul>
+     </ol>
     </li>
    </ul>
    <h3>Management Reports</h3>
    <ul>
-    <li>Glossary Term Name Reports
-     <ul>
+    <li><h4>Linked or Related Document Reports</h4>
+     <ol>
 """)
 for r in (
     ('GlossaryTermReports.py?nyi=1&', # needs rewrite of GlossaryTermLinks.py
@@ -171,10 +177,10 @@ for r in (
       <li><a href='%s/%s%s=%s'>%s</a></li>
 """ % (cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1]))
 form.append("""\
-     </ul>
+     </ol>
     </li>
-    <li>Processing Reports
-     <ul>
+    <li><h4>Processing Reports</h4>
+     <ol>
 """)
 for r in (
     ('GlossaryProcessingStatusReport.py?', "Processing Status Report"),
@@ -191,10 +197,10 @@ for r in (
       <li><a href='%s/%s%s=%s'>%s</a></li>
 """ % (cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1]))
 form.append("""\
-     </ul>
+     </ol>
     </li>
-    <li>Publication Reports
-     <ul>
+    <li><h4>Publication Reports</h4>
+     <ol>
 """)
 for r in (
     ('QcReport.py?DocType=GlossaryTermName&ReportType=pp&', 'Publish Preview'),
@@ -204,7 +210,7 @@ for r in (
       <li><a href='%s/%s%s=%s'>%s</a></li>
 """ % (cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1]))
 form.append("""\
-     </ul>
+     </ol>
     </li>
    </ul>
   </form>
