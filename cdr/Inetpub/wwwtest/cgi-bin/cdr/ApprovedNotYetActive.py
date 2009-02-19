@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ApprovedNotYetActive.py,v 1.3 2008-09-02 18:51:57 bkline Exp $
+# $Id: ApprovedNotYetActive.py,v 1.4 2009-02-19 15:38:34 bkline Exp $
 #
 # Approved Not Yet Active Protocols Verification Report
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2008/09/02 18:51:57  bkline
+# Rewritten as an Excel report, with title column added (#4257).
+#
 # Revision 1.2  2003/02/26 13:52:25  bkline
 # Issue 611: "Please modify this report to include an additional
 # criteria -- Only include protocols that have a publishable version."
@@ -157,7 +160,7 @@ except:
     pass
 book = ExcelWriter.Workbook()
 sheet = book.addWorksheet("ANYA Protocols")
-stamp = time.strftime("%Y%m%d%H%M%D")
+stamp = time.strftime("%Y%m%d%H%M%S")
 font = ExcelWriter.Font(size = 12, bold = True)
 align = ExcelWriter.Alignment('Center', 'Bottom', wrap = True)
 style = book.addStyle(font = font, alignment = align)
