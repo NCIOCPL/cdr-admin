@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: Request4275.py,v 1.5 2008-10-17 15:14:36 bkline Exp $
+# $Id: Request4275.py,v 1.6 2009-02-20 04:14:40 bkline Exp $
 #
 # "We would like a new Mailer report so we can track responses easier.
 #
@@ -25,6 +25,9 @@
 #  Changes Category"
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2008/10/17 15:14:36  bkline
+# Fixed date range bug and change column name at William's request.
+#
 # Revision 1.4  2008/10/02 12:16:55  bkline
 # Modifications requtested by William (#4304).
 #
@@ -366,7 +369,7 @@ def createReport(cursor, mailerType, changeCategory, startDate, endDate):
         msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
     except:
         pass
-    stamp = time.strftime("%Y%m%d%H%M%D")
+    stamp = time.strftime("%Y%m%d%H%M%S")
     print "Content-type: application/vnd.ms-excel"
     print "Content-Disposition: attachment; filename=SummMailRep-%s.xls" % stamp
     print
