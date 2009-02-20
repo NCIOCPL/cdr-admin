@@ -1,11 +1,16 @@
 #----------------------------------------------------------------------
 #
-# $Id: PublishPreview.py,v 1.39 2008-11-20 22:44:44 venglisc Exp $
+# $Id: PublishPreview.py,v 1.40 2009-02-20 21:47:47 venglisc Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.39  2008/11/20 22:44:44  venglisc
+# Modified the code to display the exception returned by Cancer.gov if a
+# document fails to be processed.  This will help programmers to identify
+# a potential problem quickly.
+#
 # Revision 1.38  2008/11/06 15:10:14  venglisc
 # Changing server name after Gatekeeper upgrade.
 #
@@ -332,11 +337,11 @@ showProgress("Done...")
 # the CDR server.
 # ---------------------------------------------------------------------
 
+# cdrcgi.sendPage("%s" % resp.xmlResult)
 # Include the CDR-ID of the document to the HTML title
 # ----------------------------------------------------
 pattern3 = re.compile('<title>CDR Preview', re.DOTALL)
 html = pattern3.sub('<title>Publish Preview: CDR%s' % intId, resp.xmlResult)
-#cdrcgi.sendPage("%s" % html)
 
 # Fix the print out so that it's not cut off in IE6
 # -------------------------------------------------
@@ -348,34 +353,31 @@ html = pattern4.sub('\n<!--[if IE 6]>\n<link rel="stylesheet" type="text/css" me
 pattern5 = re.compile('<a class="SummaryRef" href=".*?#Section_(.*?)"')
 html = pattern5.sub('<a class="SummaryRef" href="#Section_\g<1>"', html)
 
-# Replace the image links for the popup boxes to point to our CDR repository
+# Replace the image links for the popup boxes to point to our production
+# server if running in production
 # --------------------------------------------------------------------------
-if html.find('gatekeeper.cancer.gov/CDRPreviewWS') == -1:
+if html.find('gatekeeper.cancer.gov') == -1:
     pp_host = cdr.DEV_HOST
 else:
     pp_host = cdr.PROD_HOST
 
 pattern6 = re.compile(
-       'imageName=http://(.*?)/images/cdr/live/CDR(.*?)-(.*?)\.jpg')
+       'imageName=http://mahler.nci.nih.gov/cgi-bin/cdr/GetCdrImage')
 html = pattern6.sub(
-       'imageName=http://%s/cgi-bin/cdr/GetCdrImage.py?id=CDR\g<2>-\g<3>.jpg' % 
+       'imageName=http://%s/cgi-bin/cdr/GetCdrImage' % 
        pp_host, html)
 
-#cdrcgi.sendPage("%s" % html)
-# Replace the image for the popup boxes to point to our CDR repository
-# 
-# Cancer.gov is not consistent with the HTML that's returned.
-# We need different patterns depending if we're receiving a summary or
-# a glossary document
+# We need slightly different patterns depending if we're receiving a 
+# summary or a glossary document
 # ---------------------------------------------------------------------
 if html.find('class="document-title">Dictionary of Cancer Terms') == -1:
     pattern7 = re.compile(
-               'src="http://(.*?)/images/cdr/live/CDR(.*?)-(.*?)\.jpg"')
+               'src="http://mahler.nci.nih.gov/cgi-bin/cdr/GetCdrImage')
 else:  # for Glossary PP
     pattern7 = re.compile(
-               '  src="http://(.*?)/images/cdr/live/CDR(.*?)-(.*?)\.jpg"')
+               '  src="http://mahler.nci.nih.gov/cgi-bin/cdr/GetCdrImage')
 html = pattern7.sub(
-       '  src="http://%s/cgi-bin/cdr/GetCdrImage.py?id=CDR\g<2>-\g<3>.jpg"' % 
+       '  src="http://%s/cgi-bin/cdr/GetCdrImage' % 
        pp_host, html)
 
 cdrcgi.sendPage("%s" % html)
