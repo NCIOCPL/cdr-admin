@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryMetaData.py,v 1.10 2009-02-10 19:04:17 venglisc Exp $
+# $Id: SummaryMetaData.py,v 1.11 2009-02-23 18:37:50 venglisc Exp $
 #
 # Report on the metadata for one or more summaries.
 #
@@ -69,7 +69,7 @@ rptHead     = """\
    tr.head     { background-color: #E2E2E2; }
    .topsection { font-weight: bold; }
    .midsection { font-weight: normal; 
-                 text-decoration: underline; }
+                 text-decoration: none; }
    .lowsection { font-style: italic; }
   </style>
  </head>"""
