@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermLinks.py,v 1.4 2009-02-24 16:39:33 bkline Exp $
+# $Id: GlossaryTermLinks.py,v 1.5 2009-02-24 19:34:14 bkline Exp $
 #
 # Report of documents linking to a specified glossary term.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2009/02/24 16:39:33  bkline
+# Updated Term Links report to match new glossary document structures.
+#
 # Revision 1.3  2003/06/02 14:18:42  bkline
 # Fixed problem with encoding of Unicode characters.
 #
@@ -123,6 +126,8 @@ try:
                         AND name.path   = '/GlossaryTermName/TermName'
                                         + '/TermNameString'""", id)
     rows = cursor.fetchall()
+    if not rows:
+        cdrcgi.bail("Can't find GlossaryTermName document for CDR%s" % id)
     (name, source) = rows[0]
 except cdrdb.Error, info:
     cdrcgi.bail('Failure fetching term name and source for CDR%s: %s' %
