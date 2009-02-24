@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermLinks.py,v 1.3 2003-06-02 14:18:42 bkline Exp $
+# $Id: GlossaryTermLinks.py,v 1.4 2009-02-24 16:39:33 bkline Exp $
 #
 # Report of documents linking to a specified glossary term.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2003/06/02 14:18:42  bkline
+# Fixed problem with encoding of Unicode characters.
+#
 # Revision 1.2  2002/03/20 20:08:14  bkline
 # Added description to header comment.
 #
@@ -92,7 +95,8 @@ else:
         cursor.execute("""\
                 SELECT DISTINCT doc_id
                            FROM query_term
-                          WHERE path = '/GlossaryTerm/TermName'
+                          WHERE path  = '/GlossaryTermName/TermName'
+                                      + '/TermNameString'
                             AND value = ?""", name)
         rows = cursor.fetchall()
     except cdrdb.Error, info:
@@ -111,15 +115,18 @@ try:
             SELECT DISTINCT name.value,
                             source.value
                        FROM query_term name
-                       JOIN query_term source
+            LEFT OUTER JOIN query_term source
                          ON source.doc_id = name.doc_id
+                        AND source.path = '/GlossaryTermName/TermName'
+                                        + '/TermNameSource'
                       WHERE name.doc_id = ?
-                        AND name.path = '/GlossaryTerm/TermName'
-                        AND source.path = '/GlossaryTerm/TermSource'""", id)
+                        AND name.path   = '/GlossaryTermName/TermName'
+                                        + '/TermNameString'""", id)
     rows = cursor.fetchall()
+    (name, source) = rows[0]
 except cdrdb.Error, info:
-    cdrcgi.bail('Failure fetching term name and source: %s' % info[1][0])
-(name, source) = rows[0]
+    cdrcgi.bail('Failure fetching term name and source for CDR%s: %s' %
+                (id, info[1][0]))
 
 #----------------------------------------------------------------------
 # Get the list of documents which link to this glossary term.
@@ -154,7 +161,7 @@ html = """\
  <body>
   <center>
    <b>
-    <font size='4'>Documents Linked to Glossary Terms Report</font>
+    <font size='4'>Documents Linked to Glossary Term Names Report</font>
    </b>
    <br />
    <br />
@@ -191,7 +198,7 @@ html = """\
   <br />
   <b>
    <i>
-    <font size='3'>Documents Linked to Term</font>
+    <font size='3'>Documents Linked to Term Name</font>
    </i>
   </b>
 """ % (name, time.strftime("%B %d, %Y", now), id, ellipsis, name, ellipsis, 

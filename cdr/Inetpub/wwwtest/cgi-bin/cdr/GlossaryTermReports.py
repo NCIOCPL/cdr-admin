@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermReports.py,v 1.23 2009-02-10 22:40:45 bkline Exp $
+# $Id: GlossaryTermReports.py,v 1.24 2009-02-24 16:39:34 bkline Exp $
 #
 # Submenu for glossary term reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.23  2009/02/10 22:40:45  bkline
+# Added Glossary Term Name with Concept QC Report (request #4478).
+#
 # Revision 1.22  2009/02/10 21:18:20  bkline
 # Changes for issue #4467 requested by William.
 #
@@ -170,7 +173,8 @@ form.append("""\
      <ol>
 """)
 for r in (
-    ('GlossaryTermReports.py?nyi=1&', # needs rewrite of GlossaryTermLinks.py
+    (#'GlossaryTermReports.py?nyi=1&', # needs rewrite of GlossaryTermLinks.py
+    'GlossaryTermLinks.py?',
      'Documents Linked to Glossary Term Name Report'),
     ('PronunciationByWordStem.py?',
      'Pronunciation by Glossary Term Stem Report'),
