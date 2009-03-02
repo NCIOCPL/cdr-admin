@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolsLinkedToTerms.py,v 1.1 2008-09-02 20:44:01 bkline Exp $
+# $Id: ProtocolsLinkedToTerms.py,v 1.2 2009-03-02 16:14:48 bkline Exp $
 #
 # "We would like a modified version of the Linked documents report for
 # Terms linked to Protocols.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2008/09/02 20:44:01  bkline
+# New report for Sheri on protocols linked to a specified term
+# document (#4263).
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, ExcelWriter, cdrdb, time
 
@@ -173,7 +177,7 @@ if docId:
         row.addCell(3, u"; ".join(p.categories))
         row.addCell(4, p.status)
         row.addCell(5, p.docType)
-    stamp = time.strftime("%Y%m%d%H%M%D")
+    stamp = time.strftime("%Y%m%d%H%M%S")
     print "Content-type: application/vnd.ms-excel"
     print "Content-Disposition: attachment; filename=p2t-%s.xls" % stamp
     print

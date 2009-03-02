@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: Request4333.py,v 1.1 2009-02-12 16:21:06 bkline Exp $
+# $Id: Request4333.py,v 1.2 2009-03-02 16:10:25 bkline Exp $
 #
 # "We need a New Published Glossary Terms Report which will serve as a
 # QC report to verify which new Glossary Term Name documents have been
@@ -8,6 +8,9 @@
 # report so we can track responses easier.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2009/02/12 16:21:06  bkline
+# New glossary report.
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrdb, cdrcgi, time, sys, ExcelWriter, lxml.etree as etree
 
@@ -192,7 +195,7 @@ def createReport(cursor, startDate, endDate):
         msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
     except:
         pass
-    stamp = time.strftime("%Y%m%d%H%M%D")
+    stamp = time.strftime("%Y%m%d%H%M%S")
     print "Content-type: application/vnd.ms-excel"
     print "Content-Disposition: attachment; filename=TermNames-%s.xls" % stamp
     print

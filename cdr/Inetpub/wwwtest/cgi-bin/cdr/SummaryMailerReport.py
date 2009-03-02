@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryMailerReport.py,v 1.2 2008-09-17 20:42:32 bkline Exp $
+# $Id: SummaryMailerReport.py,v 1.3 2009-03-02 16:17:50 bkline Exp $
 #
 # [Request 4258:]
 #
@@ -29,6 +29,9 @@
 # Request form for generating RTF letters to board members."
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2008/09/17 20:42:32  bkline
+# Added test to make sure e.text was not null for Received element.
+#
 # Revision 1.1  2008/09/02 19:00:02  bkline
 # New reports for Margaret (#4258 and #4259).
 #
@@ -424,7 +427,7 @@ if board:
         report4258(book, sheet, cursor, board, selectBy)
     else:
         report4259(book, sheet, cursor, board, begin, end)
-    stamp = time.strftime("%Y%m%d%H%M%D")
+    stamp = time.strftime("%Y%m%d%H%M%S")
     print "Content-type: application/vnd.ms-excel"
     print "Content-Disposition: attachment; filename=SummMailRep-%s.xls" % stamp
     print
