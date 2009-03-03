@@ -1,13 +1,17 @@
 #----------------------------------------------------------------------
 # coding=latin-1
 #
-# $Id: GlossaryConceptFull.py,v 1.6 2009-01-07 15:43:31 venglisc Exp $
+# $Id: GlossaryConceptFull.py,v 1.7 2009-03-03 15:01:16 bkline Exp $
 #
 # Glossary Term Concept report
 # This report takes a concept and displays all of the Term Name 
 # definitions that are linked to this concept document
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2009/01/07 15:43:31  venglisc
+# Fixed so that a Spanish definition isn't being displayed if the document
+# is blocked. (Bug 4425)
+#
 # Revision 1.5  2008/11/18 18:44:25  venglisc
 # Added CSS for insertion/deletion markup. (Bug 4375)
 #
@@ -42,21 +46,10 @@ LABEL = { 'DateLastModified'      :'Date Last Modified',
           'TranslatedStatus'      :'Translated Status',
           'TranslationResource'   :'Translation Resource' }
 
-
 #----------------------------------------------------------------------
-# Dynamically create the title of the menu section 
+# More than one matching term name; let the user choose one.
 #----------------------------------------------------------------------
-def getSectionTitle(repType):
-    if not repType:
-        return "Glossary QC Report - Full"
-    else:
-        return "QC Report (Unrecognized Type)"
-
-
-#----------------------------------------------------------------------
-# More than one matching title; let the user choose one.
-#----------------------------------------------------------------------
-def showTitleChoices(choices):
+def showTermNameChoices(choices):
     form = """\
    <H3>More than one matching document found; please choose one.</H3>
 """
@@ -66,20 +59,17 @@ def showTitleChoices(choices):
 """ % (choice[0], choice[0], cgi.escape(choice[1]))
     cdrcgi.sendPage(header + form + """\
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-   <INPUT TYPE='hidden' NAME='DocType' VALUE='%s'>
-   <INPUT TYPE='hidden' NAME='ReportType' VALUE='%s'>
   </FORM>
  </BODY>
 </HTML>
-""" % (cdrcgi.SESSION, session, docType or '', repType or ''))
-                    
+""" % (cdrcgi.SESSION, session))
 
 #----------------------------------------------------------------------
 # Create a single row to be displayed in an HTML table (two columns)
 #----------------------------------------------------------------------
 def addSingleRow(data, label):
     # Adding row for Date Last Reviewed 
-    if data.has_key(label):
+    if label in data:
         htmlRow = """
    <tr>
     <td>
@@ -135,7 +125,7 @@ def addMediaRow(data, label):
 #----------------------------------------------------------------------
 def addMultipleRow(data, label):
     # Adding row for Date Last Reviewed 
-    if data.has_key(label):
+    if label in data:
         iRow = -1
         htmlRows = ""
         for value in data[label]:
@@ -286,21 +276,14 @@ repTitle = "CDR QC Glossary Concept Report"
 fields   = cgi.FieldStorage() or cdrcgi.bail("No Request Found", repTitle)
 session  = cdrcgi.getSession(fields) or cdrcgi.bail("Not logged in")
 action   = cdrcgi.getRequest(fields)
+docId    = fields.getvalue("DocId")
+termName = fields.getvalue("TermName")
 title    = "CDR Administration"
-repType  = fields.getvalue("ReportType") or None
 section  = "QC Report"
 SUBMENU  = "Reports Menu"
 buttons  = ["Submit", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-header   = cdrcgi.header(title, title, getSectionTitle(repType),
+header   = cdrcgi.header(title, title, "Glossary QC Report - Full",
                          "GlossaryConceptFull.py", buttons, method = 'GET')
-docId    = fields.getvalue("DocId")      or None
-docType  = fields.getvalue("DocType")    or None
-docTitle = fields.getvalue("DocTitle")   or None
-version  = fields.getvalue("DocVersion") or None
-
-if docId:
-    digits = re.sub('[^\d]+', '', docId)
-    intId  = int(digits)
 
 #----------------------------------------------------------------------
 # Handle navigation requests.
@@ -317,32 +300,29 @@ if action == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
-# If we have a document type but no doc ID or title, ask for the title.
+# If we have no request yet, put up the form.
 #----------------------------------------------------------------------
-if not docId and not docTitle:
-    extra = ""
-    extra += "<INPUT TYPE='hidden' NAME='DocType' VALUE='%s'>" % docType
-    label = ['Glossary Title',
-              'Glossary CDR ID']
-
+if not docId and not termName:
     form = """\
   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-  %s
   <TABLE>
    <TR>
-    <TD ALIGN='right'><B>%s:&nbsp;</B><BR/>(use %% as wildcard)</TD>
-    <TD><INPUT SIZE='60' NAME='DocTitle'></TD>
+    <TD ALIGN='right'><B>Glossary Term Name:&nbsp;</B><BR />
+    (use %% as wildcard)</TD>
+    <TD><INPUT SIZE='60' NAME='TermName'></TD>
    </TR>
    <TR>
     <TD> </TD>
     <TD>... or ...</TD>
    </TR>
    <TR>
-    <TD ALIGN='right'><B>%s:&nbsp;</B></TD>
+    <TD ALIGN='right'>
+     <B>Glossary Term Name or Glossary Term Concept CDR ID:&nbsp;</B>
+    </TD>
     <TD><INPUT SIZE='60' NAME='DocId'></TD>
    </TR>
   </TABLE>
-""" % (cdrcgi.SESSION, session, extra, label[0], label[1])
+""" % (cdrcgi.SESSION, session)
     cdrcgi.sendPage(header + form + """\
  </BODY>
 </HTML>
@@ -361,54 +341,13 @@ except cdrdb.Error, info:
 # Passing a CDR-ID and the document type 
 # Returning a list with a concept ID and all linking term names
 #----------------------------------------------------------------------
-def getAllTermNames(docId, docType = 'GlossaryTermConcept'):
-    try:
-        query = """\
-          SELECT qt.doc_id, dt1.name, qt.int_val, dt.name,
-                 d1.active_status
-            FROM query_term qt
-            JOIN document d
-              ON d.id = qt.int_val
-            join doc_type dt
-              on d.doc_type = dt.id
-            JOIN document d1
-              ON d1.id = qt.doc_id
-            JOIN doc_type dt1
-              ON d1.doc_type = dt1.id
-           WHERE path = '/GlossaryTermName/GlossaryTermConcept/@cdr:ref'
-             AND dt1.name = 'GlossaryTermName'
-             AND dt.name  = 'GlossaryTermConcept'
-             AND qt.int_val = """
-        if docType == 'GlossaryTermConcept':
-            query += '%s' % docId
-        else:
-            query += """\
-               (SELECT int_val
-                  FROM query_term
-                 WHERE doc_id = %s
-                   AND path = '/GlossaryTermName' + 
-                              '/GlossaryTermConcept/@cdr:ref')""" % docId
-
-        cursor.execute(query)
-        rows = cursor.fetchall()
-        if not rows:
-            cdrcgi.bail("Unable to find document with title '%s'" % docTitle)
-        
-        allTermNames = {}
-        termNameIds = []
-        
-        for row in rows:
-            termNameIds.append(row[0])
-
-        allTermNames[row[1]] = termNameIds
-        allTermNames[row[3]] = row[2]
-
-    except cdrdb.Error, info:
-        cdrcgi.bail('Failure selecting term names: %s' % info[1][0])
-
-    return allTermNames
-
-
+def getAllTermNames(conceptId):
+    cursor.execute("""\
+        SELECT DISTINCT doc_id
+                   FROM query_term
+                  WHERE path = '/GlossaryTermName/GlossaryTermConcept/@cdr:ref'
+                    AND int_val = ?""", conceptId, timeout = 300)
+    return [row[0] for row in cursor.fetchall()]
 
 #----------------------------------------------------------------------
 # Getting the status of the GlossaryTermNames so that we can 
@@ -597,7 +536,6 @@ def getConcept(docId):
 
     return concept
 
-
 #----------------------------------------------------------------------
 # Select the information of the GTN document to be combined with the 
 # information from the GTC document.  We need the term named and the 
@@ -662,62 +600,62 @@ def getNameDefinition(docId):
 
     return termName
 
-
 #----------------------------------------------------------------------
-# If we have a document title but not a document ID, find the ID.
+# Document ID can be given for the concept or for one of its names.
 #----------------------------------------------------------------------
-if docTitle and not docId:
-    try:
-        cursor.execute("""\
-            SELECT d.id, d.title, dt.name
-              FROM document d
-              JOIN doc_type dt
-                ON dt.id = d.doc_type
-             WHERE dt.name in ('GlossaryTermName', 'GlossaryTermConcept')
-               AND d.title LIKE ?""", (docTitle + '%'))
-        rows = cursor.fetchall()
-        if not rows:
-            cdrcgi.bail("Unable to find document with title '%s'" % docTitle)
-        if len(rows) > 1:
-            showTitleChoices(rows)
-        intId   = rows[0][0]
-        docId   = "CDR%010d" % intId
-        docType = rows[0][2]
-    except cdrdb.Error, info:
-        cdrcgi.bail('Failure looking up document title: %s' % info[1][0])
-
-# ---------------------------------------------------------------------
-# If we have a document ID but not a title find the docType
-# ---------------------------------------------------------------------
 if docId:
-   try:
+    intId = cdr.exNormalize(docId)[1]
+    cursor.execute("""\
+        SELECT t.name
+          FROM document d
+          JOIN doc_type t
+            ON t.id = d.doc_type
+         WHERE d.id = ?""", intId)
+    rows = cursor.fetchall()
+    if not rows:
+        cdrcgi.bail("Unable to find document '%s'" % docId)
+    docType = rows[0][0]
+    if docType == 'GlossaryTermConcept':
+        conceptId = intId
+    elif docType == 'GlossaryTermName':
         cursor.execute("""\
-            SELECT d.id, d.title, dt.name
-              FROM document d
-              JOIN doc_type dt
-                ON dt.id = d.doc_type
-             WHERE d.id = ?""", (intId))
+            SELECT int_val
+              FROM query_term
+             WHERE path = '/GlossaryTermName/GlossaryTermConcept/@cdr:ref'
+               AND doc_id = ?""", intId)
         rows = cursor.fetchall()
         if not rows:
-            cdrcgi.bail("Unable to find CDR-ID '%s'" % docId)
-        if len(rows) > 1:
-            showTitleChoices(rows)
-        intId   = rows[0][0]
-        docId   = "CDR%010d" % intId
-        docType = rows[0][2]
-   except cdrdb.Error, info:
-       cdrcgi.bail('Failure looking up CDR-ID: %s' % info[1][0])
+            cdrcgi.bail("GlossaryTermName document %s not associated with "
+                        "any GlossaryTermConcept document" % docId)
+        else:
+            conceptId = rows[0][0]
+    else:
+        cdrcgi.bail("%s is a %s document" % (docId, docType))
 
-# ---------------------------------------------------------------------
-# If we have a GlossaryTermConcept document select all GTName documents
-# linking to this concept.
-# If we have a GlossaryTermName document find the concept and then the
-# all of the other GTName documents linking to this concept.
-# Either way we will end up with a concept document and all term name
-# documents
-# ---------------------------------------------------------------------
-termNames = getAllTermNames(intId, docType)
-# cdrcgi.bail(termNames)
+#----------------------------------------------------------------------
+# If we have a term name but not a document ID, find the ID.
+#----------------------------------------------------------------------
+else:
+    cursor.execute("""\
+        SELECT c.int_val, n.value
+          FROM query_term n
+          JOIN query_term c
+            ON c.doc_id = n.doc_id
+         WHERE n.path = '/GlossaryTermName/TermName/TermNameString'
+           AND c.path = '/GlossaryTermName/GlossaryTermConcept/@cdr:ref'
+           AND n.value LIKE ?""", termName)
+    rows = cursor.fetchall()
+    if not rows:
+        cdrcgi.bail("No term names match '%s'" % termName)
+    if len(rows) > 1:
+        showTermNameChoices(rows)
+    conceptId = rows[0][0]
+
+#----------------------------------------------------------------------
+# At this point we have a glossary term concept ID.  Find all the names
+# for this concept.
+#----------------------------------------------------------------------
+termNameIds = getAllTermNames(conceptId)
 
 # -------------------------------------------------------------------
 # Create the HTML header, style sheet, etc.
@@ -765,22 +703,22 @@ html = """\
    %s
   </b>
   </div>
-""" % (intId, time.strftime(time.ctime()))
+""" % (conceptId, time.strftime(time.ctime()))
   
 # Display the CDR-ID
 # ------------------
-html += '  <span class="big">CDR%s</span>' % intId
+html += '  <span class="big">CDR%s</span>' % conceptId
 
 # Get the concept information to be displayed 
 # -----------------------------------------------------------
-conceptInfo = getConcept(termNames['GlossaryTermConcept'])
+conceptInfo = getConcept(conceptId)
 
 # We need to mark the term names that have been blocked.  For 
 # this we need to go back to the database, which could have
 # been done more intelligently, but the request to display
 # blocked GTNs came after the program was nearly completed.
 # -----------------------------------------------------------
-termNameStatus = getTermNameStatus(termNames['GlossaryTermName'])
+termNameStatus = getTermNameStatus(termNameIds)
 # cdrcgi.bail(termNameStatus)
 
 # Get the term name (for spanish and english) for each of the 
@@ -788,8 +726,8 @@ termNameStatus = getTermNameStatus(termNames['GlossaryTermName'])
 # holding all of this information
 # -----------------------------------------------------------
 allTermsInfo = {}
-for termId in termNames['GlossaryTermName']:
-    termInfo = getNameDefinition(termId)
+for termNameId in termNameIds:
+    termInfo = getNameDefinition(termNameId)
     allTermsInfo.update(termInfo)
 
 # cdrcgi.bail(allTermsInfo)
@@ -976,7 +914,7 @@ for lang in languages:
   </table>
 """
     if lang == 'en':
-        sharedXml  = getSharedInfo(termNames['GlossaryTermConcept'])
+        sharedXml  = getSharedInfo(conceptId)
         mediaHtml = addMediaRow(sharedXml, 'MediaLink')
 
         html += """
