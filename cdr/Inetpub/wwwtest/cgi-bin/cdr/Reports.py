@@ -1,10 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: Reports.py,v 1.25 2007-03-30 15:17:53 venglisc Exp $
+# $Id: Reports.py,v 1.26 2009-03-03 22:00:36 venglisc Exp $
 #
 # Prototype for editing CDR linking tables.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.25  2007/03/30 15:17:53  venglisc
+# Removed the date from the documentation link since this menu item now
+# calls a sub-menu that already lists the date the documentation was
+# created.
+#
 # Revision 1.24  2007/01/05 23:23:11  venglisc
 # Added new menu item for Publishing. (Bug 2111)
 #
@@ -114,6 +119,7 @@ reports = [
            ('CitationReports.py',     'Citations'),
            ('CdrDocumentation.py',    'Documentation'),
            ('DrugInfoReports.py',     'Drug Information'),
+           ('GeneticsProfReports.py', 'Genetics Professional'),
            ('GeographicReports.py',   'Geographic'),
            ('GlossaryTermReports.py', 'Glossary Terms'),
            ('MailerReports.py',       'Mailers'),
