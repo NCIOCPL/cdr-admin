@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.64 2009-02-10 22:40:45 bkline Exp $
+# $Id: QcReport.py,v 1.65 2009-03-03 18:34:50 venglisc Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.64  2009/02/10 22:40:45  bkline
+# Added Glossary Term Name with Concept QC Report (request #4478).
+#
 # Revision 1.63  2009/02/10 21:29:13  bkline
 # Added ability to search for glossary term concept documents by
 # definition substring.
@@ -684,7 +687,7 @@ filters = {
     'GlossaryTermConcept':
         ["name:Glossary Term Concept QC Report Filter"],
     'GlossaryTermName':
-        ["name:Glossary Term Name QC Report Filter"],
+        ["set:QC GlossaryTermName"],
     'GlossaryTermName:gtnwc':
         ["set:QC GlossaryTermName with Concept Set"],
     'InScopeProtocol':
