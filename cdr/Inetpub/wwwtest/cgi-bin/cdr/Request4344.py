@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: Request4344.py,v 1.1 2009-02-12 16:21:06 bkline Exp $
+# $Id: Request4344.py,v 1.2 2009-03-04 22:18:51 bkline Exp $
 #
 # The Glossary Term Concept by Spanish Definition Status Report will serve
 # as a QC report for Spanish and corresponding English Definitions by Status.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2009/02/12 16:21:06  bkline
+# New glossary report.
+#
 #----------------------------------------------------------------------
 import cdrcgi, cgi, cdr, cdrdb, xml.dom.minidom
 
@@ -95,14 +98,17 @@ def getNodeContent(node, replacements = None, pieces = None):
             elif child.nodeName == 'PlaceHolder':
                 name = child.getAttribute('name')
                 if not name:
-                    raise Exception(u"PlaceHolder without name")
+                    raise Exception(u"CDR%d: PlaceHolder without name" %
+                                    currentConceptId)
                 if not replacements:
-                    raise Exception(u"No replacements supplied for "
-                                    u"placeholder '%s'" % name)
+                    raise Exception(u"CDR%d: No replacements supplied for "
+                                    u"placeholder '%s'" %
+                                    (currentConceptId, name))
                 replacementNode = replacements.get(name)
                 if not replacementNode:
-                    raise Exception(u"No replacement found for "
-                                    u"placeholder '%s'" % name)
+                    raise Exception(u"CDR%d: No replacement found for "
+                                    u"placeholder '%s'" %
+                                    (currentConceptId, name))
                 pieces.append(u"<b>")
                 if type(replacementNode) in (str, unicode):
                     pieces.append(replacementNode)
@@ -471,25 +477,27 @@ if start and end and status and audience:
                 self.repNodes['TERMNAME'] = n
                 self.repNodes['CAPPEDTERMNAME'] = capitalize(n)
             
-    conn = cdrdb.connect('CdrGuest')
-    cursor = conn.cursor()
-    translated = report == SPANISH and 'Translated' or ''
-    cursor.execute("""\
+    try:
+        conn = cdrdb.connect('CdrGuest')
+        cursor = conn.cursor()
+        translated = report == SPANISH and 'Translated' or ''
+        cursor.execute("""\
         SELECT DISTINCT doc_id
           FROM query_term
          WHERE path = '/GlossaryTermConcept/%sTermDefinition/%sStatusDate'
            AND value BETWEEN '%s' AND DATEADD(s, -1, DATEADD(d, 1, '%s'))
       ORDER BY doc_id""" % (translated, translated, start, end))
-    concepts = []
-    for row in cursor.fetchall():
-        docId = row[0]
-        concept = Concept(docId, cursor, language, start, end, audience, status)
-        if report == SPANISH:
-            if concept.spDef:
+        concepts = []
+        for row in cursor.fetchall():
+            currentConceptId = docId = row[0]
+            concept = Concept(docId, cursor, language, start, end, audience,
+                              status)
+            if report == SPANISH:
+                if concept.spDef:
+                    concepts.append(concept)
+            elif concept.enDef:
                 concepts.append(concept)
-        elif concept.enDef:
-            concepts.append(concept)
-    html = [u"""\
+        html = [u"""\
 <html>
  <head>
   <meta http-equiv='content-type' content='text/html; charset=UTF-8'>
@@ -512,57 +520,60 @@ if start and end and status and audience:
    <tr>
     <th>CDR ID of GTC</th>
 """ % (section, section)]
-    if report == SPANISH:
-        if language == 'all':
-            html.append(u"""\
+        if report == SPANISH:
+            if language == 'all':
+                html.append(u"""\
     <th>Term Name (EN)</th>
 """)
-        html.append(u"""\
+            html.append(u"""\
     <th>Term Name (ES)</th>
 """)
-        if language == 'all':
-            html.append(u"""\
+            if language == 'all':
+                html.append(u"""\
     <th>Definition (EN)</th>
 """)
-        html.append(u"""\
+            html.append(u"""\
     <th>Definition (ES)</th>
 """)
-        if resource:
-            html.append(u"""\
+            if resource:
+                html.append(u"""\
     <th>Translation Resource</th>
 """)
-    else:
-        html.append(u"""\
+        else:
+            html.append(u"""\
     <th>Term Name (Pronunciation)</th>
 """)
-        if resource:
-            html.append(u"""\
+            if resource:
+                html.append(u"""\
     <th>Pronun. Resource</th>
 """)
-        html.append(u"""\
+            html.append(u"""\
     <th>Definition</th>
 """)
-        if status == 'Revision pending':
-            html.append("""\
+            if status == 'Revision pending':
+                html.append("""\
     <th>Definition (Revision pending)</th>
 """)
-        html.append(u"""\
+            html.append(u"""\
     <th>Definition Resource</th>
 """)
-    if notes:
-        html.append(u"""\
+        if notes:
+            html.append(u"""\
     <th id='notes'>QC Notes</th>
 """)
-    html.append(u"""\
+        html.append(u"""\
    </tr>
 """)
-    for concept in concepts:
-        html.append(concept.toHtml(report, status, language, resource, notes))
-    html.append(u"""\
+        for concept in concepts:
+            html.append(concept.toHtml(report, status, language, resource,
+                                       notes))
+        html.append(u"""\
   </table>
  </body>
 </html>""")
-    cdrcgi.sendPage(u"".join(html))
+        cdrcgi.sendPage(u"".join(html))
+    except Exception, e:
+        cdrcgi.bail("Report failure: %s" % e)
 #    print """\
 #Content-type: text/html; charset=utf-8
 #"""
