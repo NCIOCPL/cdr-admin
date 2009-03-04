@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: Request4486.py,v 1.1 2009-03-03 21:58:11 bkline Exp $
+# $Id: Request4486.py,v 1.2 2009-03-04 16:23:46 bkline Exp $
 #
 # "We need a new glossary term concept by type QC report to help us ensure
-# consistency in the wording of definitions.
+# consistency in the wording of definitions."
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2009/03/03 21:58:11  bkline
+# Added new Glossary Term Concept by Type report (request #4486).
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrdb, cdrcgi, time, xml.dom.minidom
 
@@ -346,7 +349,8 @@ def makeAudiencePicklist():
 #----------------------------------------------------------------------
 def createForm(cursor):
     form = u"""\
-   <fieldset><legend>Report Criteria</legend>
+   <fieldset>
+    <legend>Report Criteria</legend>
     <input type='hidden' name='%s' value='%s' />
     <table border='0'>
      <tr>
