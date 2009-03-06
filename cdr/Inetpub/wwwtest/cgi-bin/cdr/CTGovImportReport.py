@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CTGovImportReport.py,v 1.4 2004-01-23 15:52:23 bkline Exp $
+# $Id: CTGovImportReport.py,v 1.5 2009-03-06 19:43:01 bkline Exp $
 #
 # Stats on documents imported from ClinicalTrials.gov into CDR.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2004/01/23 15:52:23  bkline
+# Added hidden Session variable to form.
+#
 # Revision 1.3  2004/01/22 00:26:31  bkline
 # Added call to cdrcgi.getSession().
 #
@@ -91,6 +94,8 @@ class Doc:
         self.cdrId       = row[5]
         self.title       = row[6]
         self.pubVFailed  = row[4] == 'F'
+        self.transferred = row[7] and row[7][:3].upper() == 'CDR'
+
 newTrials         = {}
 pubVersionCreated = {}
 needReview        = {}
@@ -100,14 +105,17 @@ pubVersionFailure = {}
 cursor.execute("SELECT dt FROM ctgov_import_job where id = %s" % job)
 dt = cursor.fetchone()[0][:19]
 cursor.execute("""\
-    SELECT e.nlm_id, e.locked, e.new, e.needs_review, e.pub_version,
-           d.id, d.title
-      FROM ctgov_import_event e
-      JOIN ctgov_import i
-        ON i.nlm_id = e.nlm_id
-      JOIN document d
-        ON d.id = i.cdr_id
-     WHERE e.job = %s""" % job)
+         SELECT e.nlm_id, e.locked, e.new, e.needs_review, e.pub_version,
+                d.id, d.title, q.value
+           FROM ctgov_import_event e
+           JOIN ctgov_import i
+             ON i.nlm_id = e.nlm_id
+           JOIN document d
+             ON d.id = i.cdr_id
+LEFT OUTER JOIN query_term q
+             ON q.doc_id = d.id
+            AND q.path = '/CTGovProtocol/IDInfo/OrgStudyID'
+          WHERE e.job = %s""" % job)
 row = cursor.fetchone()
 while row:
     doc = Doc(row)
@@ -146,12 +154,13 @@ def makeSection(docs, label):
         for nlmId in keys:
             doc = docs[nlmId]
             html += """\
-    <tr>
+    <tr class='%s'>
      <td valign='top'>%s</td>
      <td valign='top'>%d</td>
      <td valign='top'>%s</td>
     </tr>
-""" % (doc.nlmId, doc.cdrId, cgi.escape(doc.title))
+""" % (doc.transferred and 'transferred' or 'normal',
+       doc.nlmId, doc.cdrId, cgi.escape(doc.title))
         html += """\
    </table>
    <br>
@@ -167,6 +176,8 @@ html = """\
    body { font-family: Arial }
    h1   { font-size: 14pt; font-weight: bold }
    h2   { font-size: 12pt; font-weight: bold }
+   .transferred { color: red; font-weight: bold; }
+   .normal { font-weight: normal; }
   </style>
  </head>
  <body>
