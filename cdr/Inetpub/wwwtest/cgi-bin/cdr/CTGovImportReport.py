@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CTGovImportReport.py,v 1.5 2009-03-06 19:43:01 bkline Exp $
+# $Id: CTGovImportReport.py,v 1.6 2009-03-06 21:49:40 bkline Exp $
 #
 # Stats on documents imported from ClinicalTrials.gov into CDR.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2009/03/06 19:43:01  bkline
+# Added highlighting of trials which have been transferred to CT.gov.
+#
 # Revision 1.4  2004/01/23 15:52:23  bkline
 # Added hidden Session variable to form.
 #
@@ -28,6 +31,7 @@ fields    = cgi.FieldStorage()
 action    = cdrcgi.getRequest(fields)
 session   = cdrcgi.getSession(fields)
 job       = fields and fields.getvalue('job') or None
+maxJobs   = fields and fields.getvalue('max') or '30'
 title     = "CDR Administration"
 section   = "CTGov Import/Update Stats"
 SUBMENU   = "Reports Menu"
@@ -60,9 +64,9 @@ cursor = conn.cursor()
 #----------------------------------------------------------------------
 if not job:
     cursor.execute("""\
-    SELECT TOP 30 id, dt
+    SELECT TOP %s id, dt
       FROM ctgov_import_job
-  ORDER BY dt DESC""")
+  ORDER BY dt DESC""" % maxJobs)
     rows = cursor.fetchall()
     if not rows:
         cdrcgi.bail("No import jobs recorded")
