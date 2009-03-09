@@ -1,8 +1,12 @@
 #----------------------------------------------------------------------
 #
-# $Id: GeneticsProfReports.py,v 1.2 2009-03-09 16:47:46 venglisc Exp $
+# $Id: GeneticsProfReports.py,v 1.3 2009-03-09 16:55:42 venglisc Exp $
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2009/03/09 16:47:46  venglisc
+# Removed the second menu option since the functionallity is included in the
+# report of option (1). (Bug 4502)
+#
 # Revision 1.1  2009/03/09 16:44:57  venglisc
 # Initial copy of GeneticsProf menu page. (Bug 4502)
 #
@@ -48,7 +52,7 @@ QCReports = [('GeneticsProfUploadFiles.py',
               'Document Upload Statistics')]
 
 for r in QCReports:
-    form += "<LI><A HREF='%s/%s&%s=%s'>%s</LI></A>\n" % (
+    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI></A>\n" % (
             cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
 
 cdrcgi.sendPage(header + form + "</OL></FORM></BODY></HTML>")
