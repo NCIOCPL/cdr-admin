@@ -1,8 +1,12 @@
 #----------------------------------------------------------------------
 #
-# $Id: GeneticsProfUploadFiles.py,v 1.1 2009-03-09 16:49:31 venglisc Exp $
+# $Id: GeneticsProfUploadFiles.py,v 1.2 2009-03-09 17:39:12 venglisc Exp $
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2009/03/09 16:49:31  venglisc
+# Initial copy to display previously uploaded files and allow to download the
+# ZIP files. (Bug 4502)
+#
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, time, os, cdrdb, glob, sys
@@ -95,6 +99,12 @@ count = 0
 for file in gpFiles:
     count += 1
     bytes = os.path.getsize(file)
+
+    if bytes <= 1024:
+       strBytes = '%3.f Bytes' % bytes
+    else:
+       strBytes = '%3.f KB' % (bytes/1024)
+
     if count % 2 == 0:
         body += """
    <tr class="even">"""
@@ -106,11 +116,11 @@ for file in gpFiles:
     <td><a href="%s?%s=guest&ZipFile=%s">%s</a></td>
     <td>%s-%s-%s</td>
     <td>%s:%sh</td>
-    <td class="center">%s KB</td>
+    <td class="center">%s</td>
    </tr>""" % (myProg, cdrcgi.SESSION, file, file, 
                file[8:12], file[12:14], file[14:16],
                file[16:18], file[18:20],
-               str(bytes)[:3])
+               strBytes)
 
 body += u"""
   </table>
