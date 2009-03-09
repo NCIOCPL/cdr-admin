@@ -1,8 +1,11 @@
 #----------------------------------------------------------------------
 #
-# $Id: GeneticsProfReports.py,v 1.1 2009-03-09 16:44:57 venglisc Exp $
+# $Id: GeneticsProfReports.py,v 1.2 2009-03-09 16:47:46 venglisc Exp $
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2009/03/09 16:44:57  venglisc
+# Initial copy of GeneticsProf menu page. (Bug 4502)
+#
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
@@ -42,9 +45,7 @@ form = """
     <OL>                                                                        
 """ % (cdrcgi.SESSION, session)                                                 
 QCReports = [('GeneticsProfUploadFiles.py', 
-              'Document Upload Statistics'),
-             ('stub.py',
-              'Folders Uploaded')]
+              'Document Upload Statistics')]
 
 for r in QCReports:
     form += "<LI><A HREF='%s/%s&%s=%s'>%s</LI></A>\n" % (
