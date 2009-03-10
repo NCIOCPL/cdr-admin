@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.65 2009-03-03 18:34:50 venglisc Exp $
+# $Id: QcReport.py,v 1.66 2009-03-10 21:35:05 bkline Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.65  2009/03/03 18:34:50  venglisc
+# Modified program to use filter set for GlossaryTermName instead of single
+# filter.
+#
 # Revision 1.64  2009/02/10 22:40:45  bkline
 # Added Glossary Term Name with Concept QC Report (request #4478).
 #
@@ -424,9 +428,10 @@ def showTitleChoices(choices):
 """ % (cdrcgi.SESSION, session, docType or '', repType or ''))
 
 #----------------------------------------------------------------------
-# If we have a document title but not a document ID, find the ID.
+# If we have a document title (or glossary definition) but not a
+# document ID, find the ID.
 #----------------------------------------------------------------------
-if (docTitle or glossaryDefinition) and not docId:
+if not docId:
     lookingFor = 'title'
     try:
         if docType == 'GlossaryTermConcept':
@@ -468,15 +473,33 @@ if (docTitle or glossaryDefinition) and not docId:
                                                             info[1][0]))
 
 #----------------------------------------------------------------------
-# Let the user pick the version for most Summary or Glossary reports.
+# Check added at William's request.
 #----------------------------------------------------------------------
-if docType == 'Summary'          and repType and repType != 'pp' and not version\
-   or \
-   docType == 'GlossaryTermName' and repType and repType != 'pp' and not version\
-   or \
-   docType == 'GlossaryTerm'     and repType and repType != 'pp' and not version\
-   or \
-   docType == 'DIS' and not version:
+elif docType:
+    cursor.execute(u"""\
+        SELECT t.name
+          FROM doc_type t
+          JOIN document d
+            ON d.doc_type = t.id
+         WHERE d.id = ?""", intId)
+    rows = cursor.fetchall()
+    if not rows:
+        cdrcgi.bail("CDR%d not found" % intId)
+    elif rows[0][0].upper() != docType.upper():
+        cdrcgi.bail("CDR%d has document type %s" % (intId, rows[0][0]))
+    
+#----------------------------------------------------------------------
+# We now have a document ID.  Let the user pick the version for most
+# Summary or Glossary reports.
+#----------------------------------------------------------------------
+letUserPickVersion = False
+if not version:
+    if docType in ('Summary', 'GlossaryTermName'):
+        if repType and repType not in ('pp', 'gtnwc'):
+            letUserPickVersion = True
+    if docType == 'DIS':
+        letUserPickVersion = True
+if letUserPickVersion:
     try:
         cursor.execute("""\
             SELECT num,
