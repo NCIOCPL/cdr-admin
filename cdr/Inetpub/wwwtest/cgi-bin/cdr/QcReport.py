@@ -1,11 +1,18 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.66 2009-03-10 21:35:05 bkline Exp $
+# $Id: QcReport.py,v 1.67 2009-03-10 21:49:38 bkline Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.66  2009/03/10 21:35:05  bkline
+# Suppressed version choice page for "Glossary Term Name with Concept"
+# QC report at William's request (see comment #3 in issue #4478); also
+# (same comment) added code to distinguish between errors caused by
+# entering a CDR for a document of the wrong type, and errors caused by
+# entering a CDR ID for which no document can be found.
+#
 # Revision 1.65  2009/03/03 18:34:50  venglisc
 # Modified program to use filter set for GlossaryTermName instead of single
 # filter.
@@ -473,7 +480,7 @@ if not docId:
                                                             info[1][0]))
 
 #----------------------------------------------------------------------
-# Check added at William's request.
+# We have a document ID.  Check added at William's request.
 #----------------------------------------------------------------------
 elif docType:
     cursor.execute(u"""\
@@ -489,8 +496,7 @@ elif docType:
         cdrcgi.bail("CDR%d has document type %s" % (intId, rows[0][0]))
     
 #----------------------------------------------------------------------
-# We now have a document ID.  Let the user pick the version for most
-# Summary or Glossary reports.
+# Let the user pick the version for most Summary or Glossary reports.
 #----------------------------------------------------------------------
 letUserPickVersion = False
 if not version:
