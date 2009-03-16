@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditQueryTermDefs.py,v 1.4 2004-08-02 21:16:35 bkline Exp $
+# $Id: EditQueryTermDefs.py,v 1.5 2009-03-16 15:19:33 bkline Exp $
 #
 # Prototype for editing CDR query term definitions.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2004/08/02 21:16:35  bkline
+# Added ability to compare definitions between two servers.
+#
 # Revision 1.3  2002/02/21 15:22:03  bkline
 # Added navigation buttons.
 #
@@ -23,14 +26,23 @@ import cgi, cdr, cdrcgi, re, string, urllib
 #----------------------------------------------------------------------
 fields  = cgi.FieldStorage()
 session = cdrcgi.getSession(fields)
+request = fields.getvalue(cdrcgi.REQUEST)
 title   = "CDR Administration"
 section = "Manage Query Term Definitions"
 buttons = [cdrcgi.MAINMENU, "Log Out"]
-server1 = fields and fields.getvalue('server1') or None
-server2 = fields and fields.getvalue('server2') or None
+server1 = fields.getvalue('server1')
+server2 = fields.getvalue('server2')
+newPath = fields.getvalue('add')
+delete  = fields.getvalue('delete')
 script  = "EditQueryTermDefs.py"
-#script  = "DumpParams.py"
-header  = cdrcgi.header(title, title, section, script, buttons)
+header  = cdrcgi.header(title, title, section, script, buttons,
+                        stylesheet = u"""\
+<style type='text/css'>
+   .fb { width: 150px; }
+   .path { color: green; font-weight: bold; font-family: "Courier New" }
+   .path { color: navy; font-size: 1.1em; }
+   .path { color: black; }
+  </style>""")
 
 #----------------------------------------------------------------------
 # Make sure the login was successful.
@@ -38,36 +50,26 @@ header  = cdrcgi.header(title, title, section, script, buttons)
 if not session: cdrcgi.bail('Unknown or expired CDR session.')
 
 #----------------------------------------------------------------------
+# Return to the main menu if requested.
+#----------------------------------------------------------------------
+if request == cdrcgi.MAINMENU:
+    cdrcgi.navigateTo("Admin.py", session)
+
+#----------------------------------------------------------------------
+# Handle request to log out.
+#----------------------------------------------------------------------
+if request == "Log Out":
+    cdrcgi.logout(session)
+
+#----------------------------------------------------------------------
 # Process an action if the user requested one.
 #----------------------------------------------------------------------
-deleteKey  = None
-addCommand = None
-pathDict   = {}
-ruleDict   = {}
-for field in fields.keys():
-    val  = fields[field].value
-    name = fields[field].name
-    if val == "None": val = None
-    if name.startswith("path-")  : pathDict[name.split("-", 1)[1]] = val
-    if name.startswith("rule-")  : ruleDict[name.split("-", 1)[1]] = val
-    if name.startswith("delete-"): deleteKey = name.split("-", 1)[1]
-    if name == 'add'             : addCommand = name
-
-if addCommand:
-    path = pathDict.has_key("0") and pathDict["0"] or None
-    rule = ruleDict.has_key("0") and ruleDict["0"] or None
-    if not path: cdrcgi.bail("Missing required path value")
-    err = cdr.addQueryTermDef(session, path, rule)
+if delete:
+    err = cdr.delQueryTermDef(session, delete, None)
     if err: cdrcgi.bail(err)
-
-if deleteKey:
-    path = pathDict.has_key(deleteKey) and pathDict[deleteKey] or None
-    rule = ruleDict.has_key(deleteKey) and ruleDict[deleteKey] or None
-    if not path: cdrcgi.bail("Missing required path value")
-    err = cdr.delQueryTermDef(session, path, rule)
+if newPath:
+    err = cdr.addQueryTermDef(session, newPath, None)
     if err: cdrcgi.bail(err)
-request = fields.getvalue(cdrcgi.REQUEST)
-if request == "Log Out": cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
 # Compare the definitions with another server.
@@ -104,7 +106,7 @@ if request == 'Compare' and server1 and server2:
   <p>Definitions match</p>
  </body>
 </html>
-""")
+""" % (server1, server2))
     if extra1:
         html += """\
   <h2>On %s</h2>
@@ -136,83 +138,72 @@ if request == 'Compare' and server1 and server2:
 """)
 
 #----------------------------------------------------------------------
-# Return to the main menu if requested.
-#----------------------------------------------------------------------
-if request == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-
-#----------------------------------------------------------------------
 # Retrieve the lists of rules and query term definitions from the server.
 #----------------------------------------------------------------------
-rules = cdr.listQueryTermRules(session)
-if type(rules) == type(""): cdrcgi.bail(rules)
-defs  = cdr.listQueryTermDefs(session)
-if type(defs) == type(""): cdrcgi.bail(defs)
+defs = cdr.listQueryTermDefs(session)
+if type(defs) in (unicode, str): cdrcgi.bail(defs)
+defs.sort()
 
 #----------------------------------------------------------------------
-# Routines to make data entry fields.
+# Create a button for deleting a specific query term definition.
 #----------------------------------------------------------------------
-def makePathField(val, row):
-    return "<INPUT NAME='path-%d' SIZE='80' VALUE='%s'>" % (row, val)
-
-def makeRuleField(val, row):
-    selected = " SELECTED"
-    if val: selected = ""
-    field = "<SELECT NAME='rule-%d'><OPTION%s>None</OPTION>" % (row, selected)
-    for rule in rules:
-        selected = val == rule and " SELECTED" or ""
-        field += "<OPTION%s>%s</OPTION>" % (selected, rule)
-    return field + "</SELECT>"
-        
-def makeDeleteButton(row):
-    return ("<INPUT TYPE='submit' NAME='delete-%d' VALUE='Delete Definition'>"
-            % row)
-
-def makeAddButton():
-    return "<INPUT TYPE='submit' NAME='add' VALUE='Add New Definition'>"
+def makeDeleteButton(path):
+    onclick = 'javascript:delPath("%s");' % cgi.escape(path)
+    return ("<input class='fb' type='button' onclick='%s' "
+            "value='Delete Definition' />"
+            % onclick)
 
 #----------------------------------------------------------------------
 # Display the existing definitions.
 #----------------------------------------------------------------------
-row = 1
-menu = """\
-  <FORM>
-   <INPUT type='SUBMIT' name='Request' value='Compare'>
-   <INPUT name='server1' value='mahler'>
-   <B>with</B>
-   <INPUT name='server2' value='bach'>
-   <BR><BR>
-   <TABLE>
-    <TR>
-     <TH>Path</TH>
-     <TH>Rule</TH>
-     <TH>Action</TH>
-    </TR>
-    <TR>
-     <TD>%s</TD>
-     <TD>%s</TD>
-     <TD ALIGN='center'>%s</TD>
-    </TR>
-""" % (makePathField("", 0),
-       makeRuleField("", 0),
-       makeAddButton())
-for definition in defs:
-    menu += """\
-    <TR>
-     <TD>%s</TD>
-     <TD>%s</TD>
-     <TD ALIGN='center'>%s</TD>
-    </TR>
-""" % (makePathField(definition[0], row),
-       makeRuleField(definition[1], row),
-       makeDeleteButton(row))
-    row += 1
-menu += """\
-   </TABLE>
-   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-  </FORM>
- </BODY>
-<HTML>
-""" % (cdrcgi.SESSION, session)
-
-cdrcgi.sendPage(header + menu)
+form = [u"""\
+  <script type='text/javascript' language='JavaScript'>
+   function addPath() {
+       var form = document.forms[0];
+       var newPath = form.newPath.value;
+       if (!newPath) {
+           window.alert('No path given');
+           return;
+       }
+       form.add.value = newPath;
+       form.submit();
+   }
+   function delPath(p) {
+       if (!window.confirm("Delete query term definition for '" + p + "'?"))
+           return;
+       var form = document.forms[0];
+       form.delete.value = p;
+       form.submit();
+   }
+  </script>
+  <form method='post' action='EditQueryTermDefs.py'>
+   <input type='hidden' name='%s' value='%s'>
+   <input type='hidden' name='add' value=''>
+   <input type='hidden' name='delete' value=''>
+   <input class='fb' type='submit' name='Request' value='Compare'>
+   <input name='server1' value='mahler' />
+   <b>with</b>
+   <input name='server2' value='bach' />
+   <br /><br />
+   <table>
+    <tr>
+     <td><input class='fb'
+                type='button' onclick='javascript:addPath()'
+                value='Add New Definition' /></td>
+     <td><input name='newPath' size='80' value='' /></td>
+    </tr>
+""" % (cdrcgi.SESSION, session)]
+for path, rule in defs:
+    form.append(u"""\
+    <tr>
+     <td>%s</td>
+     <td class='path' nowrap='nowrap'>%s</td>
+    </tr>
+""" % (makeDeleteButton(path), cgi.escape(path)))
+form.append(u"""\
+   </table>
+  </form>
+ </body>
+<html>
+""")
+cdrcgi.sendPage(header + u"".join(form))
