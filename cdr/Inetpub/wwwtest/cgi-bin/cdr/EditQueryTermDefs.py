@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditQueryTermDefs.py,v 1.5 2009-03-16 15:19:33 bkline Exp $
+# $Id: EditQueryTermDefs.py,v 1.6 2009-03-17 21:21:55 venglisc Exp $
 #
 # Prototype for editing CDR query term definitions.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2009/03/16 15:19:33  bkline
+# Rewritten to avoid the inefficiencies causing 1/2-minute delays which
+# locked up the browser.
+#
 # Revision 1.4  2004/08/02 21:16:35  bkline
 # Added ability to compare definitions between two servers.
 #
@@ -40,9 +44,9 @@ header  = cdrcgi.header(title, title, section, script, buttons,
 <style type='text/css'>
    .fb { width: 150px; }
    .path { color: green; font-weight: bold; font-family: "Courier New" }
-   .path { color: navy; font-size: 1.1em; }
+   .path { color: navy; font-size: 1.0em; }
    .path { color: black; }
-  </style>""")
+</style>""")
 
 #----------------------------------------------------------------------
 # Make sure the login was successful.
