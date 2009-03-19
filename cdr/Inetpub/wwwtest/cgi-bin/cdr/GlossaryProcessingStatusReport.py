@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryProcessingStatusReport.py,v 1.3 2009-02-10 21:23:36 bkline Exp $
+# $Id: GlossaryProcessingStatusReport.py,v 1.4 2009-03-19 18:00:10 bkline Exp $
 #
 # "The Processing Status Report will display the documents (GTC and GTN)
 # that correspond with the Processing Status selected by the user."
@@ -8,6 +8,9 @@
 # Sheri says we are only to use the first processing status we find.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2009/02/10 21:23:36  bkline
+# More changes for request #4421 (show Spanish names in some cases).
+#
 # Revision 1.2  2009/01/15 20:21:41  bkline
 # Changes to report requested by William.
 #
@@ -158,10 +161,13 @@ class Comment:
         self.date = node.get('date') or u''
         self.user = node.get('user') or u''
     def __unicode__(self):
+        text = self.text
+        if text is None:
+            text = u"[NO TEXT ENTERED FOR COMMENT]"
         return u"[audience=%s; date=%s; user=%s] %s" % (self.audience,
                                                         self.date,
                                                         cgi.escape(self.user),
-                                                        cgi.escape(self.text))
+                                                        cgi.escape(text))
 
 #----------------------------------------------------------------------
 # Generate the report.
