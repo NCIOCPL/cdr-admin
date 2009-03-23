@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermSearch.py,v 1.9 2009-02-05 21:16:43 bkline Exp $
+# $Id: GlossaryTermSearch.py,v 1.10 2009-03-23 17:54:30 bkline Exp $
 #
 # Prototype for duplicate-checking interface for GlossaryTerm documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.9  2009/02/05 21:16:43  bkline
+# Added definition status fields at William's request (#4473).
+#
 # Revision 1.8  2008/12/15 22:51:39  venglisc
 # Modified AdvancedSearch page due to modified GlossaryTerm document
 # structure. (Bug 4381)
@@ -53,6 +56,8 @@ submit     = fields.getvalue("SubmitButton")     or None
 help       = fields.getvalue("HelpButton")       or None
 typeName   = fields.getvalue("TypeName")         or None
 statusList = cdrcgi.glossaryTermStatusList
+audiences  = cdrcgi.glossaryAudienceList
+dictionaries = cdrcgi.glossaryTermDictionaryList
 subTitle   = { 'GlossaryTermName'   : 'Glossary Term Name',
                'GlossaryTermConcept': 'Glossary Term Concept' }
 
@@ -76,8 +81,8 @@ if not submit:
               ('Name [es]',              'NameEs'                ),
               ('Status [es]',            'StatusEs',   statusList))
     fields2= (('Term Concept',           'Definition'            ),
-              ('Audience',               'Audience',   statusList),
-              ('Dictionary',             'Dictionary', statusList),
+              ('Audience',               'Audience',   audiences),
+              ('Dictionary',             'Dictionary', dictionaries),
               ('Definition Status [en]', 'DefStatEn',  statusList),
               ('Definition Status [es]', 'DefStatEs',  statusList))
 
@@ -138,6 +143,9 @@ searchFields = (cdrcgi.SearchField(nameEn,
                 cdrcgi.SearchField(audience,
                         ("/GlossaryTermConcept/TermDefinition/Audience",
                          "/GlossaryTermConcept/TranslatedTermDefinition/Audience")),
+                cdrcgi.SearchField(dictionary,
+                        ("/GlossaryTermConcept/TermDefinition/Dictionary",
+                         "/GlossaryTermConcept/TranslatedTermDefinition/Dictionary")),
                 cdrcgi.SearchField(defStatEn,
                                    ("/GlossaryTermConcept/TermDefinition"
                                     "/DefinitionStatus",)),
