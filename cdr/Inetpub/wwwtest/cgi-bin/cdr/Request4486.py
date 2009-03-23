@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: Request4486.py,v 1.2 2009-03-04 16:23:46 bkline Exp $
+# $Id: Request4486.py,v 1.3 2009-03-23 21:20:59 venglisc Exp $
 #
 # "We need a new glossary term concept by type QC report to help us ensure
 # consistency in the wording of definitions."
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2009/03/04 16:23:46  bkline
+# Cosmetic cleanup.
+#
 # Revision 1.1  2009/03/03 21:58:11  bkline
 # Added new Glossary Term Concept by Type report (request #4486).
 #
@@ -24,6 +27,7 @@ defText   = fields.getvalue("text")
 status    = fields.getvalue("stat")
 spanish   = fields.getvalue("span")
 audience  = fields.getvalue("audi")
+noInput   = fields.getvalue("dejavu")
 title     = "CDR Administration"
 language  = spanish and "ENGLISH &amp; SPANISH" or "ENGLISH"
 section   = "Glossary Term Concept by Type Report"
@@ -108,9 +112,11 @@ def breakDownDefinition(node):
 #----------------------------------------------------------------------
 class Name:
     def __init__(self, docId, spanish):
-        self.docId = docId
-        self.englishName = u""
+        self.docId        = docId
+        self.englishName  = u""
         self.replacements = {}
+        self.blocked      = False
+
         if not spanish:
             self.pronunciation = u""
         docXml = resolveRevisionMarkup(docId)
@@ -129,6 +135,11 @@ class Name:
             for node in dom.getElementsByTagName('TranslatedName'):
                 for child in node.getElementsByTagName('TermNameString'):
                     self.spanishNames.append(cdr.getTextContent(child, True))
+        
+        cursor.execute("SELECT active_status FROM document where id = ?", docId)
+        row = cursor.fetchone()
+        if row[0] == u'I': self.blocked = True
+
 
 #----------------------------------------------------------------------
 # Object to represent a placeholder in a glossary definition.
@@ -267,16 +278,27 @@ class Concept:
         else:
             if self.names:
                 name += u" (%s)" % self.names[0].pronunciation
+
+                # Need to indicate if a term has been blocked
+                # -------------------------------------------
+                termBlocked = u""
+                if self.names[0].blocked:
+                    termBlocked = u"<span class='error'>[Blocked]</span>"
+
             html.append(u"""\
-    <td>%s</td>
+    <td>%s %s</td>
     <td rowspan='%d'>%s</td>
    </tr>    
-""" % (cgi.escape(name), rowspan, enDef))
+""" % (cgi.escape(name), termBlocked, rowspan, enDef))
+            ### VE ###
             for name in self.names[1:]:
+                cdrcgi.bail(dir(name))
                 enName = u"%s (%s)" % (name.englishName, name.pronunciation)
+                if name.blocked:
+                    enName += u" [Blocked]"
                 html.append(u"""\
    <tr>
-    <td>%s</td>
+    <td>%s xxx</td>
    </tr>
 """ % cgi.escape(enName))
         i = 1
@@ -348,10 +370,19 @@ def makeAudiencePicklist():
 # Display the form for the report's parameters.
 #----------------------------------------------------------------------
 def createForm(cursor):
-    form = u"""\
+    form = ""
+    if noInput:
+        form += u"""\
+   <fieldset>
+    <legend>Input Error</legend>
+    <span class="DTDerror">No Term Name or Definition Text specified!!!</span>
+   </fieldset>"""
+
+    form += u"""\
    <fieldset>
     <legend>Report Criteria</legend>
     <input type='hidden' name='%s' value='%s' />
+    <input type='hidden' name='dejavu' value='True' />
     <table border='0'>
      <tr>
       <th align='right'>Term Type:&nbsp;</th>
@@ -456,6 +487,7 @@ SELECT DISTINCT t.doc_id
    th { color: blue; }
    .replacement  { background-color: yellow; font-weight: bold; }
    h1 { font-size: 16pt; color: maroon; text-align: center; }
+   .error { color: red; font-weight: bold; }
   </style>
  </head>
  <body>
