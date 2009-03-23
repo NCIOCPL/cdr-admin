@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.67 2009-03-10 21:49:38 bkline Exp $
+# $Id: QcReport.py,v 1.68 2009-03-23 15:48:10 venglisc Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.67  2009/03/10 21:49:38  bkline
+# Cosmetic cleanup.
+#
 # Revision 1.66  2009/03/10 21:35:05  bkline
 # Suppressed version choice page for "Glossary Term Name with Concept"
 # QC report at William's request (see comment #3 in issue #4478); also
@@ -503,7 +506,8 @@ if not version:
     if docType in ('Summary', 'GlossaryTermName'):
         if repType and repType not in ('pp', 'gtnwc'):
             letUserPickVersion = True
-    if docType == 'DIS':
+    ### if docType in ('DIS', 'DrugInformationSummary'):
+    if docType == 'DrugInformationSummary':
         letUserPickVersion = True
 if letUserPickVersion:
     try:
@@ -523,7 +527,8 @@ if letUserPickVersion:
   <INPUT TYPE='hidden' NAME='DocId' VALUE='CDR%010d'>
 """ % (cdrcgi.SESSION, session, docType, intId)
 
-    if docType != 'DIS':
+    ### if docType != 'DIS':
+    if docType != 'DrugInformationSummary':
         form += """\
   <INPUT TYPE='hidden' NAME='ReportType' VALUE='%s'>
 """ % (repType)
@@ -707,8 +712,8 @@ filters = {
         ["set:QC CTGovProtocol Set"],
     'DrugInformationSummary':
         ["set:QC DrugInfoSummary Set"],
-    'DIS':
-        ["set:QC DrugInfoSummary Set"],
+    ### 'DIS':
+    ###     ["set:QC DrugInfoSummary Set"],
     'GlossaryTerm':
         ["set:QC GlossaryTerm Set"],
     'GlossaryTerm:rs': # Redline/Strikeout
