@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermSearch.py,v 1.10 2009-03-23 17:54:30 bkline Exp $
+# $Id: GlossaryTermSearch.py,v 1.11 2009-03-24 14:45:05 bkline Exp $
 #
 # Prototype for duplicate-checking interface for GlossaryTerm documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.10  2009/03/23 17:54:30  bkline
+# Fixed field definitions.
+#
 # Revision 1.9  2009/02/05 21:16:43  bkline
 # Added definition status fields at William's request (#4473).
 #
@@ -72,6 +75,17 @@ try:
 except cdrdb.Error, info:
     cdrcgi.bail('Failure connecting to CDR: %s' % info[1][0])
 
+
+def spanishNameStatusList(conn, fName):
+    path = '/GlossaryTermName/TranslatedName/TranslatedNameStatus'
+    return cdrcgi.glossaryTermStatusList(conn, fName, path)
+def englishDefinitionStatusList(conn, fName):
+    path = '/GlossaryTermConcept/TermDefinition/DefinitionStatus'
+    return cdrcgi.glossaryTermStatusList(conn, fName, path)
+def spanishDefinitionStatusList(conn, fName):
+    path = '/GlossaryTermConcept/TranslatedTermDefinition/TranslatedStatus'
+    return cdrcgi.glossaryTermStatusList(conn, fName, path)
+
 #----------------------------------------------------------------------
 # Display the search form.
 #----------------------------------------------------------------------
@@ -79,12 +93,14 @@ if not submit:
     fields1= (('Name [en]',              'NameEn'                ),
               ('Status [en]',            'StatusEn',   statusList),
               ('Name [es]',              'NameEs'                ),
-              ('Status [es]',            'StatusEs',   statusList))
+              ('Status [es]',            'StatusEs',   spanishNameStatusList))
     fields2= (('Term Concept',           'Definition'            ),
               ('Audience',               'Audience',   audiences),
               ('Dictionary',             'Dictionary', dictionaries),
-              ('Definition Status [en]', 'DefStatEn',  statusList),
-              ('Definition Status [es]', 'DefStatEs',  statusList))
+              ('Definition Status [en]', 'DefStatEn',
+               englishDefinitionStatusList),
+              ('Definition Status [es]', 'DefStatEs',
+               spanishDefinitionStatusList))
 
     buttons = (('submit', 'SubmitButton', 'Search'),
                ('submit', 'HelpButton',   'Help'),
