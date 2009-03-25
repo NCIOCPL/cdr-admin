@@ -7,6 +7,11 @@
         font: 10pt "Arial";
         }	
 
+  *.error  {
+        color: red; 
+        font-weight: bold;
+        }
+
   P { 
         font: 14pt "Arial";
         color: Navy;
