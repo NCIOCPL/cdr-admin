@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: BoardMeetingDates.py,v 1.3 2008-11-28 15:08:23 bkline Exp $
+# $Id: BoardMeetingDates.py,v 1.4 2009-03-25 20:29:25 venglisc Exp $
 #
 # Report listing the Board meetings by date or board.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2008/11/28 15:08:23  bkline
+# Report rewritten to match new structure for board meeting information,
+# which now supports a separate meeting time for each meeting.
+#
 # Revision 1.2  2008/10/15 16:52:53  venglisc
 # Added code to include WebEx attribute on the reports. (Bug 4205)
 #
@@ -30,6 +34,7 @@ script     = "BoardMeetingDates.py"
 title      = "CDR Administration"
 section    = "PDQ Editorial Board Meetings"
 header     = cdrcgi.header(title, title, section, script, buttons,
+                            method = 'GET',
                             stylesheet = """\
    <link type='text/css' rel='stylesheet' href='/stylesheets/CdrCalendar.css'>
    <script type='text/javascript' language='JavaScript'
