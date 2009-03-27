@@ -1,11 +1,16 @@
 #----------------------------------------------------------------------
 #
-# $Id: Request4486.py,v 1.3 2009-03-23 21:20:59 venglisc Exp $
+# $Id: Request4486.py,v 1.4 2009-03-27 21:25:09 venglisc Exp $
 #
 # "We need a new glossary term concept by type QC report to help us ensure
 # consistency in the wording of definitions."
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2009/03/23 21:20:59  venglisc
+# Marking the term name if the term is blocked; displaying error message if
+# no definition text or term name has been specified on the query page.
+# (Bug 4486)
+#
 # Revision 1.2  2009/03/04 16:23:46  bkline
 # Cosmetic cleanup.
 #
@@ -187,6 +192,7 @@ class Definition:
 class Concept:
     def __init__(self, docId, cursor, audience, spanish):
         self.docId = docId
+        self.htmlBlocked = u"<span class='error'>[Blocked]</span>"
         cursor.execute("""\
             SELECT DISTINCT doc_id
                        FROM query_term
@@ -208,6 +214,7 @@ class Concept:
                 definition = Definition(node)
                 if audience in definition.audiences:
                     self.spanishDefinitions.append(definition)
+
     def toHtml(self, spanish):
         termNameRows = 0
         for name in self.names:
@@ -235,23 +242,34 @@ class Concept:
         firstEnglishName = name
         if self.definitions:
             enDef = self.definitions[0].resolve(reps, firstEnglishName)
+
+        # Processing the Terms if English and Spanish need to be displayed
+        # ----------------------------------------------------------------
         if spanish:
             spName = spDef = u""
+            termBlocked = u""
             nameRowspan = 1
             if self.names and self.names[0].spanishNames:
                 spName = self.names[0].spanishNames[0]
                 if len(self.names[0].spanishNames) > 1:
                     nameRowspan = len(self.names[0].spanishNames)
+
             firstSpanishName = spName
             if self.spanishDefinitions:
                 spDef = self.spanishDefinitions[0].resolve(reps, spName)
+
+            # Need to indicate if a term has been blocked
+            # -------------------------------------------
+            if self.names[0].blocked:
+                termBlocked = self.htmlBlocked
+
             html.append(u"""\
-    <td rowspan='%d'>%s</td>
+    <td rowspan='%d'>%s %s</td>
     <td>%s</td>
     <td rowspan='%d'>%s</td>
     <td rowspan='%d'>%s</td>
    </tr>
-""" % (nameRowspan, cgi.escape(name), cgi.escape(spName),
+""" % (nameRowspan, cgi.escape(name), termBlocked, cgi.escape(spName),
        rowspan, enDef, rowspan, spDef))
             if self.names:
                 for spName in self.names[0].spanishNames[1:]:
@@ -263,44 +281,54 @@ class Concept:
                 for name in self.names[1:]:
                     nameRowspan = len(name.spanishNames) or 1
                     spName = name.spanishNames and name.spanishNames[0] or u""
+                    if name.blocked:
+                        termBlocked = self.htmlBlocked
+
                     html.append(u"""\
    <tr>
-    <td rowspan='%d'>%s</td>
+    <td rowspan='%d'>%s %s</td>
     <td>%s</td>
    </tr>
-""" % (nameRowspan, cgi.escape(name.englishName), cgi.escape(spName)))
+""" % (nameRowspan, cgi.escape(name.englishName), termBlocked, 
+                                                  cgi.escape(spName)))
                     for spName in name.spanishNames[1:]:
                         html.append(u"""\
    <tr>
     <td>%s</td>
    </tr>
 """ % cgi.escape(spName))
+        # Processing the Terms if only English names are requested
+        # --------------------------------------------------------
         else:
+            # Processing the first name
+            # -------------------------
+            termBlocked = u""
             if self.names:
                 name += u" (%s)" % self.names[0].pronunciation
 
                 # Need to indicate if a term has been blocked
                 # -------------------------------------------
-                termBlocked = u""
                 if self.names[0].blocked:
-                    termBlocked = u"<span class='error'>[Blocked]</span>"
+                    termBlocked = self.htmlBlocked
 
             html.append(u"""\
     <td>%s %s</td>
     <td rowspan='%d'>%s</td>
    </tr>    
 """ % (cgi.escape(name), termBlocked, rowspan, enDef))
-            ### VE ###
+
+            # Processing all other names (except the first)
+            # ---------------------------------------------
             for name in self.names[1:]:
-                cdrcgi.bail(dir(name))
                 enName = u"%s (%s)" % (name.englishName, name.pronunciation)
                 if name.blocked:
-                    enName += u" [Blocked]"
+                    termBlocked = self.htmlBlocked
                 html.append(u"""\
    <tr>
-    <td>%s xxx</td>
+    <td>%s %s</td>
    </tr>
-""" % cgi.escape(enName))
+""" % (cgi.escape(enName), termBlocked))
+
         i = 1
         while i < definitionRows:
             enDef = u""
@@ -375,7 +403,7 @@ def createForm(cursor):
         form += u"""\
    <fieldset>
     <legend>Input Error</legend>
-    <span class="DTDerror">No Term Name or Definition Text specified!!!</span>
+    <span class="error">No Term Name or Definition Text specified!!!</span>
    </fieldset>"""
 
     form += u"""\
