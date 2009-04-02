@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryMetaData.py,v 1.11 2009-02-23 18:37:50 venglisc Exp $
+# $Id: SummaryMetaData.py,v 1.12 2009-04-02 21:13:26 ameyer Exp $
 #
 # Report on the metadata for one or more summaries.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.11  2009/02/23 18:37:50  venglisc
+# Minor change to the CSS. (Bug 4475)
+#
 # Revision 1.9  2009/02/10 18:45:31  venglisc
 # Displaying top section titles bold. (Bug 4475)
 #
@@ -68,11 +71,12 @@ rptHead     = """\
    tr.even     { background-color: #FFFFFF; }
    tr.head     { background-color: #E2E2E2; }
    .topsection { font-weight: bold; }
-   .midsection { font-weight: normal; 
+   .midsection { font-weight: normal;
                  text-decoration: none; }
    .lowsection { font-style: italic; }
   </style>
  </head>"""
+
 
 #----------------------------------------------------------------------
 # Make sure we're logged in.
@@ -163,16 +167,16 @@ def getLanguages():
 class SummarySection:
     # Adding the nodeLoc to the class as a means of identifying which
     # section title is a top section and setting the sectionLevel
-    # accordingly. This will be used as a class identifier for the 
+    # accordingly. This will be used as a class identifier for the
     # HTML display.
     # ----------------------------------------------------------------
-    def __init__(self, title, diagnoses, types, nodeLoc, 
+    def __init__(self, title, diagnoses, types, nodeLoc,
                  searchAttr = False):
         self.title      = title
         self.diagnoses  = diagnoses
         self.types      = types
         self.searchAttr = searchAttr
-        
+
         if   len(nodeLoc) == 4: self.sectionLevel = 'topsection'
         elif len(nodeLoc) == 8: self.sectionLevel = 'midsection'
         else:                   self.sectionLevel = 'lowsection'
@@ -453,14 +457,14 @@ class Summary:
             else:
                 html += """\
    <tr class='even'>"""
-   
+
             html += """\
     <td valign='top' class='%s'>%s</td>
     <td valign='top'>%s</td>
     <td valign='top' align='center'>%s</td>
     <td valign='top'>%s</td>
    </tr>
-""" % (section.sectionLevel, section.title, section.diagnoses, checkMark, 
+""" % (section.sectionLevel, section.title, section.diagnoses, checkMark,
        section.types)
         return html + """\
   </table>
@@ -596,27 +600,69 @@ if board and audience and language:
     boardId = int(match.group(1))
     boardTitle = match.group(2)
     try:
-        cursor.execute("""\
-            SELECT DISTINCT b.doc_id, d.title
-                       FROM query_term b
-                       JOIN query_term a
-                         ON a.doc_id = b.doc_id
-                       JOIN document d
-                         ON d.id = b.doc_id
-                       JOIN query_term l
-                         ON l.doc_id = a.doc_id
-                       JOIN doc_version dv
-                         ON dv.id = d.id
-                      WHERE a.path = '/Summary/SummaryMetaData/SummaryAudience'
-                        AND l.path = '/Summary/SummaryMetaData/SummaryLanguage'
-                        AND b.path = '/Summary/SummaryMetaData/PDQBoard/Board'
-                                   + '/@cdr:ref'
-                        AND a.value = ?
-                        AND b.int_val = ?
-                        AND l.value = ?
-                        AND d.active_status = 'A'
-                        AND dv.publishable = 'Y'
-                   ORDER BY d.title""", (audience, boardId, language))
+        # English and non-English are handled differently
+        # All boards handle English language only.  To see Spanish, we
+        #   must get all the documents for English, then find those docs
+        #   which are translations of them.
+        if language == "English":
+            cursor.execute("""
+         SELECT DISTINCT b.doc_id, d.title
+           FROM query_term b
+           JOIN query_term a
+             ON a.doc_id = b.doc_id
+           JOIN document d
+             ON d.id = b.doc_id
+           JOIN query_term l
+             ON l.doc_id = a.doc_id
+           JOIN doc_version dv
+             ON dv.id = d.id
+          WHERE a.path = '/Summary/SummaryMetaData/SummaryAudience'
+            AND b.path = '/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref'
+            AND l.path = '/Summary/SummaryMetaData/SummaryLanguage'
+            AND a.value = ?
+            AND b.int_val = ?
+            AND l.value = 'English'
+            AND d.active_status = 'A'
+            AND dv.publishable = 'Y'
+          ORDER BY d.title
+        """, (audience, boardId))
+
+        else:
+            # Find docs matching our language that are translations
+            #   of what we get from the English board
+            cursor.execute("""\
+            SELECT d.id, d.title
+              FROM document d
+              JOIN query_term qlang
+                ON d.id = qlang.doc_id
+              JOIN query_term qtrans
+                ON d.id = qtrans.doc_id
+             WHERE qlang.path = '/Summary/SummaryMetaData/SummaryLanguage'
+               AND qlang.value = '%s'
+               AND qtrans.path = '/Summary/TranslationOf/@cdr:ref'
+               AND qtrans.int_val in (
+                 SELECT DISTINCT b.doc_id
+                   FROM query_term b
+                   JOIN query_term a
+                     ON a.doc_id = b.doc_id
+                   JOIN document d
+                     ON d.id = b.doc_id
+                   JOIN query_term l
+                     ON l.doc_id = a.doc_id
+                   JOIN doc_version dv
+                     ON dv.id = d.id
+                  WHERE a.path = '/Summary/SummaryMetaData/SummaryAudience'
+                    AND b.path = '/Summary/SummaryMetaData/PDQBoard/Board' +
+                                 '/@cdr:ref'
+                    AND l.path = '/Summary/SummaryMetaData/SummaryLanguage'
+                    AND a.value = '%s'
+                    AND b.int_val = %d
+                    AND l.value = 'English'
+                    AND d.active_status = 'A'
+                    AND dv.publishable = 'Y'
+                )
+             ORDER BY d.title""" % (language, audience, boardId))
+
         rows = cursor.fetchall()
     except Exception, info:
         cdrcgi.bail("Database failure fetching summary document IDs: %s"
