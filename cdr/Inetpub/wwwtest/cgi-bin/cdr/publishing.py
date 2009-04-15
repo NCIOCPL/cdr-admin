@@ -2,8 +2,11 @@
 #
 # Publishing CGI script.
 #
-# $Id: publishing.py,v 1.29 2007-10-31 21:11:42 bkline Exp $
+# $Id: publishing.py,v 1.30 2009-04-15 20:18:19 venglisc Exp $
 # $Log: not supported by cvs2svn $
+# Revision 1.29  2007/10/31 21:11:42  bkline
+# Fixed handling of Unicode.
+#
 # Revision 1.28  2007/05/16 12:37:38  bkline
 # Added non-breaking space when default paramater value is empty.
 #
@@ -200,7 +203,7 @@ class Display:
         form += "<OL>\n"
 
         for r in subsets:
-            if not r[1].endswith('Republish-Export'):
+            if not r[1] == 'Republish-Export':
                 form += """<LI><A 
                     href='%s/%s?%s=%s&ctrlId=%s&version=%s&SubSet=%s&%s'>
                     %s</A></LI>\n""" % (cdrcgi.BASE, r[0], cdrcgi.SESSION, 
