@@ -2,9 +2,12 @@
 # Perform global change of Person SpecificPostalAddress zip codes when
 # an associated Organization zip code changes.
 #
-# $Id: GlobalChangeZipCode.py,v 1.1 2009-04-17 04:41:01 ameyer Exp $
+# $Id: GlobalChangeZipCode.py,v 1.2 2009-04-28 17:50:15 ameyer Exp $
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2009/04/17 04:41:01  ameyer
+# Initial version.
+#
 #----------------------------------------------------------------------
 
 # Useful for testing, but for production, let's keep any tracebacks
@@ -463,7 +466,8 @@ args  = (('usrId', usrId),
          ('pw', pw),
          ('orgId', parms.orgId),
          ('oldZip', parms.oldZip),
-         ('newZip', parms.newZip))
+         ('newZip', parms.newZip),
+         ('runMode', parms.runMode))
 cmd   = cdr.BASEDIR + "/Utilities/OldZipToNewGlobalBatch.py"
 
 # Start the job
