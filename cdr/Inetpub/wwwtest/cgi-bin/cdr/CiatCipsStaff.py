@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CiatCipsStaff.py,v 1.8 2008-09-26 00:19:06 ameyer Exp $
+# $Id: CiatCipsStaff.py,v 1.9 2009-04-28 17:57:26 ameyer Exp $
 #
 # Main menu for CIAT/CIPS staff.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.8  2008/09/26 00:19:06  ameyer
+# Added functions to replace doc with new doc, replace CWD with older ver.
+#
 # Revision 1.7  2008/04/17 18:55:40  bkline
 # Re-arrangement of CIAT menus at Sheri's request (#4009).
 #
@@ -52,7 +55,7 @@ html    = cdrcgi.header(title, title, section, "", buttons) + """\
 items   = (('AdvancedSearch.py', 'Advanced Search',       ''               ),
            ('getBatchStatus.py', 'Batch Job Status',      ''               ),
            ('CTGov.py',          'CTGov Protocols',       ''               ),
-           ('GlobalChange.py',   'Global Changes',        ''               ),
+           ('GlobalChange.py',   'Global Change Protocol Links', ''        ),
            ('FtpImages.py',      'Images Download',       ''               ),
            ('Mailers.py',        'Mailers',               ''               ),
            ('NewTrialsSubmission.py', 'New Trials Submission', '' ),
