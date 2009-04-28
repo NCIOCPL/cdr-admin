@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: DevSA.py,v 1.8 2008-09-26 00:20:53 ameyer Exp $
+# $Id: DevSA.py,v 1.9 2009-04-28 17:53:17 ameyer Exp $
 #
 # Main menu for Developers and System Administrators.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.8  2008/09/26 00:20:53  ameyer
+# Removed Replace Doc with New Doc.  Now in CiatCipsStaff.py menu.
+#
 # Revision 1.7  2008/07/04 02:57:21  ameyer
 # Added menu entries for saving old version as CWD, replacing Summary.
 #
@@ -63,7 +66,8 @@ items   = (('EditGroups.py',           'Manage Groups'                 ),
            ('Reports.py',              'Reports'                       ),
            ('Mailers.py',              'Mailers'                       ),
            ('MergeProt.py',            'Protocol Merge'                ),
-           ('GlobalChange.py',         'Global Changes'                ),
+           ('GlobalChange.py',         'Global Change Protocol Links'  ),
+           ('GlobalChangeZipCode.py',  'Global Change Zip Codes'       ),
            ('getBatchStatus.py',       'Batch Job Status'              ),
            ('MessageLoggedInUsers.py', 'Send Email to Users Currently '
                                        'Logged in to the CDR'          ),
