@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtSearch.py,v 1.16 2006-06-06 22:10:37 bkline Exp $
+# $Id: ProtSearch.py,v 1.17 2009-05-01 02:07:10 ameyer Exp $
 #
 # Prototype for duplicate-checking interface for Protocol documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.16  2006/06/06 22:10:37  bkline
+# Added ability to enter CDR ID directly.
+#
 # Revision 1.15  2004/04/09 12:17:32  bkline
 # Added SecondaryID to list of CTGovProtocol elements to be searched
 # (see Sheri's comment #10 for request #1165).
@@ -53,11 +56,12 @@
 # Initial revision
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, cdrdb
+import cgi, cdr, cdrcgi, re, cdrdb, os
 
 #----------------------------------------------------------------------
 # Get the form variables.
 #----------------------------------------------------------------------
+DEBUGGING = False
 fields    = cgi.FieldStorage()
 session   = cdrcgi.getSession(fields)
 boolOp    = fields and fields.getvalue("Boolean")          or "AND"
@@ -68,7 +72,7 @@ submit    = fields and fields.getvalue("SubmitButton")     or None
 help      = fields and fields.getvalue("HelpButton")       or None
 dispFmt   = fields and fields.getvalue("DispFormat")       or 'fu'
 docType   = fields and fields.getvalue("DocType")          or 'All'
-if help: 
+if help:
     cdrcgi.bail("Sorry, help for this interface has not yet been developed.")
 
 #----------------------------------------------------------------------
@@ -142,7 +146,7 @@ if not submit:
                                           'Protocol',
                                           conn,
                                           extraField = extraFields)
-    page += """\
+    page += u"""\
   </FORM>
  </BODY>
 </HTML>
@@ -160,8 +164,8 @@ def selectPaths(docType, paths):
         if path.startswith("/%s/" % docType):
             p.append(path)
     return p
-    
-searchFields = (cdrcgi.SearchField(title, selectPaths(docType, 
+
+searchFields = (cdrcgi.SearchField(title, selectPaths(docType,
                             ("/InScopeProtocol/ProtocolTitle",
                              "/OutOfScopeProtocol/ProtocolTitle/TitleText",
                              "/ScientificProtocolInfo/ProtocolTitle",
@@ -202,7 +206,7 @@ if cdrIds:
    WHERE d.id IN (%s)
 ORDER BY d.title""" % ",".join(cdrIds)
     docType = 'All'
-else:        
+else:
     docTypes = ("InScopeProtocol",
                 "OutOfScopeProtocol",
                 "ScientificProtocolInfo",
@@ -211,6 +215,10 @@ else:
         docTypes = docType
     (query, strings) = cdrcgi.constructAdvancedSearchQuery(searchFields,
                                                            boolOp, docTypes)
+    if query and DEBUGGING:
+        f = open('d:/tmp/ProtSearchQuery-%d.sql' % os.getpid(), 'wb')
+        f.write(query)
+        f.close()
 if not query:
     cdrcgi.bail('No query criteria specified')
 
@@ -225,7 +233,7 @@ try:
     cursor.close()
     cursor = None
 except cdrdb.Error, info:
-    cdrcgi.bail('Failure retrieving Protocol documents: %s' % 
+    cdrcgi.bail('Failure retrieving Protocol documents: %s' %
                 info[1][0])
 
 #----------------------------------------------------------------------
