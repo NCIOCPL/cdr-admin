@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolCitationsQcReport.py,v 1.4 2003-04-11 18:30:56 pzhang Exp $
+# $Id: ProtocolCitationsQcReport.py,v 1.5 2009-05-05 21:58:41 ameyer Exp $
 #
 # Protocol Citations QC Report.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2003/04/11 18:30:56  pzhang
+# Added Insertion/Deletion and Filter Set features.
+#
 # Revision 1.3  2002/05/08 17:41:52  bkline
 # Updated to reflect Volker's new filter names.
 #
@@ -36,13 +39,16 @@ filters = ["set:QC InScopeProtocol Citation Set"]
 #----------------------------------------------------------------------
 filterParm = [['vendorOrQC', 'QC']]
 if revLvls:
-    filterParm.append(['revLevels', revLvls]) 
+    filterParm.append(['revLevels', revLvls])
 doc = cdr.filterDoc(session, filters, docId = docId, parm = filterParm)
 if type(doc) == type(()):
     doc = doc[0]
 
 doc = cdrcgi.decode(doc)
 doc = re.sub("@@DOCID@@", docId, doc)
+
+# sendPage wants unicode
+doc = doc.decode('utf-8')
 
 #----------------------------------------------------------------------
 # Send it.
