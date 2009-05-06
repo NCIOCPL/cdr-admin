@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CiteSearch.py,v 1.15 2008-06-23 20:14:49 bkline Exp $
+# $Id: CiteSearch.py,v 1.16 2009-05-06 17:44:56 venglisc Exp $
 #
 # Prototype for duplicate-checking interface for Citation documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.15  2008/06/23 20:14:49  bkline
+# Made test for validation errors more robust.
+#
 # Revision 1.14  2004/05/11 21:31:15  bkline
 # Modified path for year in response to request #1184.
 #
@@ -302,6 +305,9 @@ if not submit:
  </BODY>
 </HTML>
 """
+    # sendPage() expects unicode: decoding page string
+    # ------------------------------------------------
+    page = page.decode('utf-8')
     cdrcgi.sendPage(page)
 
 #----------------------------------------------------------------------
