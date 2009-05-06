@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: AdvancedSearch.py,v 1.8 2008-09-18 13:57:47 bkline Exp $
+# $Id: AdvancedSearch.py,v 1.9 2009-05-06 03:21:57 ameyer Exp $
 #
 # Main menu for advanced search forms.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.8  2008/09/18 13:57:47  bkline
+# Added Drug Information Summaries search.
+#
 # Revision 1.7  2006/05/04 13:27:09  bkline
 # Added Media.
 #
@@ -36,56 +39,56 @@ import cgi, cdrcgi, urllib
 fields  = cgi.FieldStorage()
 session = cdrcgi.getSession(fields) or ""
 session = "?%s=%s" % (cdrcgi.SESSION, session)
-header  = """\
+header  = u"""\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <HTML>
  <HEAD>
   <TITLE>Advanced Search Document Type Selection</TITLE>
-  <META   HTTP-EQUIV = "Content-Type" 
+  <META   HTTP-EQUIV = "Content-Type"
              CONTENT = "text/html; charset=iso-8859-1">
   <STYLE        TYPE = "text/css">
    <!--
-    .Page { font-family: Arial, Helvetica, sans-serif; 
+    .Page { font-family: Arial, Helvetica, sans-serif;
             color: #000066 }
-    :Link { font-family: Arial, Helvetica, sans-serif; 
+    :Link { font-family: Arial, Helvetica, sans-serif;
             color: #000066;
             text-decoration: none }
-    :Link:visited { font-family: Arial, Helvetica, sans-serif; 
+    :Link:visited { font-family: Arial, Helvetica, sans-serif;
             color: #000066;
             text-decoration: none }
-    :Link:hover { font-family: Arial, Helvetica, sans-serif; 
+    :Link:hover { font-family: Arial, Helvetica, sans-serif;
             background: #FFFFCC;
             text-decoration: none }
    -->
   </STYLE>
  </HEAD>
  <BODY       BGCOLOR = "#CCCCFF">
-  <TABLE       WIDTH = "100%" 
-              BORDER = "0" 
-         CELLSPACING = "0" 
+  <TABLE       WIDTH = "100%"
+              BORDER = "0"
+         CELLSPACING = "0"
                CLASS = "Page">
-   <TR       BGCOLOR = "#6699FF"> 
-    <TD       NOWRAP 
-              HEIGHT = "26" 
+   <TR       BGCOLOR = "#6699FF">
+    <TD       NOWRAP
+              HEIGHT = "26"
              COLSPAN = "3">
-     <FONT      SIZE = "+2" 
+     <FONT      SIZE = "+2"
                CLASS = "Page">CDR Advanced Search</FONT>
     </TD>
    </TR>
-   <TR       BGCOLOR = "#FFFFCC"> 
-    <TD       NOWRAP 
+   <TR       BGCOLOR = "#FFFFCC">
+    <TD       NOWRAP
              COLSPAN = "3">
      <SPAN     CLASS = "Page">
       <FONT     SIZE = "+1">Choose a document type</FONT>
      </SPAN>
     </TD>
    </TR>
-   <TR> 
-    <TD       NOWRAP 
+   <TR>
+    <TD       NOWRAP
              COLSPAN = "3"
               HEIGHT = "20">&nbsp;</TD>
    </TR>
-   <TR> 
+   <TR>
     <TD       NOWRAP
              COLSPAN = "3"
                CLASS = "Page">
@@ -93,7 +96,7 @@ header  = """\
     </TD>
    </TR>
    <!--
-   <TR> 
+   <TR>
     <TD       NOWRAP
              COLSPAN = "3"
                CLASS = "Page">&nbsp;</TD>
