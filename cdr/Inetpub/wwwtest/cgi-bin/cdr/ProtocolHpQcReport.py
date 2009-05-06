@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolHpQcReport.py,v 1.8 2003-04-11 18:20:16 pzhang Exp $
+# $Id: ProtocolHpQcReport.py,v 1.9 2009-05-06 17:25:34 venglisc Exp $
 #
 # Protocol Health Professional QC Report.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.8  2003/04/11 18:20:16  pzhang
+# Added Insertion/Deletion and Filter Set features.
+#
 # Revision 1.7  2002/06/13 13:19:53  bkline
 # Plugged in Cheryl's new filter names.
 #
@@ -50,11 +53,15 @@ filterParm = [['vendorOrQC', 'QC']]
 if revLvls:
     filterParm.append(['revLevels', revLvls])  
 doc = cdr.filterDoc(session, filters, docId = docId, parm = filterParm)
+
 if type(doc) == type(()):
     doc = doc[0]
 
 doc = cdrcgi.decode(doc)
 doc = re.sub("@@DOCID@@", docId, doc)
+
+# sendPage wants unicode
+doc = doc.decode('utf-8')
 
 #----------------------------------------------------------------------
 # Send it.
