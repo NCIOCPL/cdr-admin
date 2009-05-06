@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: Filter.py,v 1.31 2008-08-18 16:25:07 venglisc Exp $
+# $Id: Filter.py,v 1.32 2009-05-06 18:18:22 venglisc Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.31  2008/08/18 16:25:07  venglisc
+# Fixed error that prevented a warning message to be displayed.
+#
 # Revision 1.30  2008/08/05 14:23:41  venglisc
 # Modified program to allow passing of DTD file for validation. (Bug 4123)
 #
@@ -331,7 +334,7 @@ if valFlag:
     digits = re.sub('[^\d]', '', docId)
     idNum  = string.atoi(digits)
     errObj = cdrpub.validateDoc(doc, idNum, dtd = PDQDTD)
-    html = """\
+    html = u"""\
 <!DOCTYPE HTML PUBLIC '-//W3C//DTD HTML 4.01 Transitional//EN'
                       'http://www.w3.org/TR/html4/loose.dtd'>
 <html>
@@ -345,11 +348,11 @@ if valFlag:
  <h2>Validation results for CDR%d</h2>
 """ % (idNum, idNum)
     if not errObj and not filterWarning:
-        html += """\
+        html += u"""\
  <h3>Document is valid: no errors, no warnings!</h3>
 """
     else:
-        html += """\
+        html += u"""\
   <table border='1' cellspacing='0' cellpadding='2'>
    <tr>
     <th>Type</th>
@@ -359,16 +362,16 @@ if valFlag:
    </tr>
 """
         if filterWarning:
-            html += addRow('Warning', '%d:N/A:%s' % (idNum, filterWarning))
+            html += addRow(u'Warning', u'%d:N/A:%s' % (idNum, filterWarning))
         for error in errObj:
-            html += addRow(error.level_name, '%d:%s:%s' % (idNum, 
+            html += addRow(error.level_name, u'%d:%s:%s' % (idNum, 
                                                          error.line,
                                                          error.message))
-        html += " </table> "
-    cdrcgi.sendPage(cdrcgi.unicodeToLatin1(html + """\
+        html += u" </table> "
+    cdrcgi.sendPage(html + u"""\
  </body>
 </html>
-"""))
+""")
 
 doc = cdrcgi.decode(doc)
 doc = re.sub("@@DOCID@@", docId, doc)

@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: AdHocQuery.py,v 1.5 2004-01-14 18:00:59 venglisc Exp $
+# $Id: AdHocQuery.py,v 1.6 2009-05-06 18:18:22 venglisc Exp $
 #
 # Displays result set for SQL query.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.5  2004/01/14 18:00:59  venglisc
+# Removed comment within query screen listing formerly used query in order
+# to preserve real estate.
+#
 # Revision 1.4  2003/03/21 16:48:41  pzhang
 # Added a new default query to find sample documents.
 # Commented out the old default query.
@@ -53,7 +57,7 @@ if action == "Log Out":
 # Request the query.
 #----------------------------------------------------------------------
 if not query:
-    form = """\
+    form = u"""\
     <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
     <b>Enter SQL query:</b><br>
     <textarea name='Query' rows='20' cols='80'>
@@ -74,7 +78,7 @@ SELECT TOP 10 d.id
      <br><b>Enter timeout in seconds:</b><br>
     <INPUT TYPE='text' NAME='TimeOut' VALUE='20'>
 """ % (cdrcgi.SESSION, session)
-    cdrcgi.sendPage(header + form + "</FORM></BODY></HTML>")
+    cdrcgi.sendPage(header + form + u"</FORM></BODY></HTML>")
 
 #----------------------------------------------------------------------
 # Create the report.
@@ -128,4 +132,4 @@ try:
 
 except cdrdb.Error, info:
     cdrcgi.bail('Database failure: %s' % info[1][0])
-cdrcgi.sendPage(cdrcgi.unicodeToLatin1(html))
+cdrcgi.sendPage(html)

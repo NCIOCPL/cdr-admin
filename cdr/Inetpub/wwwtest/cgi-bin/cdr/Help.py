@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: Help.py,v 1.3 2002-10-18 13:54:49 bkline Exp $
+# $Id: Help.py,v 1.4 2009-05-06 18:18:22 venglisc Exp $
 #
 # Display the table of contents for the CDR help system.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2002/10/18 13:54:49  bkline
+# Added option for system documentation TOC.
+#
 # Revision 1.2  2002/08/15 19:26:26  bkline
 # Removed hard-coded CDR login credentials.
 #
@@ -55,6 +58,7 @@ if type(response) in (type(''), type(u'')):
     cdrcgi.bail(response)
 
 #----------------------------------------------------------------------
-# Send the page back to the browser.
+# Send the page back to the browser after converting to Unicode.
 #----------------------------------------------------------------------
-cdrcgi.sendPage(response[0])
+page = response[0].decode('utf-8')
+cdrcgi.sendPage(page)
