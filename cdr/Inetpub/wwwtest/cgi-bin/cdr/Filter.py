@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: Filter.py,v 1.32 2009-05-06 18:18:22 venglisc Exp $
+# $Id: Filter.py,v 1.33 2009-05-11 17:19:35 venglisc Exp $
 #
 # Transform a CDR document using an XSL/T filter and send it back to
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.32  2009/05/06 18:18:22  venglisc
+# Converted output to unicode to match sendPage input requirements. (Bug 4560)
+#
 # Revision 1.31  2008/08/18 16:25:07  venglisc
 # Fixed error that prevented a warning message to be displayed.
 #
@@ -382,4 +385,8 @@ doc = re.sub("@@DOCID@@", docId, doc)
 textType = 'html'
 if doc.find("<?xml") != -1:
     textType = 'xml'
+
+# Converting doc since sendPage() expexts unicode.
+# ------------------------------------------------
+doc = doc.decode('utf-8')
 cdrcgi.sendPage(doc, textType)
