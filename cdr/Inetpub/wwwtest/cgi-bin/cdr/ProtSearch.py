@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtSearch.py,v 1.17 2009-05-01 02:07:10 ameyer Exp $
+# $Id: ProtSearch.py,v 1.18 2009-05-11 17:51:30 venglisc Exp $
 #
 # Prototype for duplicate-checking interface for Protocol documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.17  2009/05/01 02:07:10  ameyer
+# Forced input form sent to sendPage into unicode to silence warning.
+# Also checking in debugging code that Bob added some time ago.
+#
 # Revision 1.16  2006/06/06 22:10:37  bkline
 # Added ability to enter CDR ID directly.
 #
@@ -151,6 +155,7 @@ if not submit:
  </BODY>
 </HTML>
 """
+    page = page.decode('utf-8')
     cdrcgi.sendPage(page)
 
 #----------------------------------------------------------------------
