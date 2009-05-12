@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ShowCTGovLog.py,v 1.1 2006-05-04 15:17:37 bkline Exp $
+# $Id: ShowCTGovLog.py,v 1.2 2009-05-12 21:38:59 venglisc Exp $
 #
 # Show the contents of the log for a CTGov import job.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2006/05/04 15:17:37  bkline
+# Show the contents of a CTGov job's log.
+#
 #----------------------------------------------------------------------
 import cdrcgi, cgi
 
@@ -14,7 +17,7 @@ try:
     body = file('d:/cdr/Output/NlmExport/%s/clinical_trials.log' % job).read()
 except:
     cdrcgi.bail("Unable to read logfile for job %s" % job)
-cdrcgi.sendPage("""\
+cdrcgi.sendPage(u"""\
 <html>
  <head>
   <title>Log from CTGov Export Job %s</title>
