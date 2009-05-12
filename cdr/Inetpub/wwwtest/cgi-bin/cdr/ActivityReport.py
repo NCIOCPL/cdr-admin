@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ActivityReport.py,v 1.7 2004-07-29 20:28:19 bkline Exp $
+# $Id: ActivityReport.py,v 1.8 2009-05-12 21:50:15 venglisc Exp $
 #
 # Reports on audit trail content.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.7  2004/07/29 20:28:19  bkline
+# Added support for searching by user (request #1283).
+#
 # Revision 1.6  2002/07/18 12:38:03  bkline
 # Changed column headers from <td> to <th>.
 #
@@ -205,7 +208,10 @@ for row in rows:
        cdrcgi.unicodeToLatin1(row[6][:20]),
        row[7] and cdrcgi.unicodeToLatin1(row[7]) or "&nbsp;")
 
-cdrcgi.sendPage(html + """\
+# Converting html since sendPage() expects a unicode string.
+# ----------------------------------------------------------
+html = html.decode('utf-8')
+cdrcgi.sendPage(html + u"""\
   </table>
  </body>
 </html>
