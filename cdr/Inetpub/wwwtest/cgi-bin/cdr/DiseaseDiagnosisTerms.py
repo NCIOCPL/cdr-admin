@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: DiseaseDiagnosisTerms.py,v 1.1 2003-12-16 15:56:38 bkline Exp $
+# $Id: DiseaseDiagnosisTerms.py,v 1.2 2009-05-13 15:33:11 venglisc Exp $
 #
 # Hierarchical report (in thesaurus-like format) of terminology
 # under Disease/Diagnosis.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2003/12/16 15:56:38  bkline
+# Hierarchical report (in thesaurus-like format) of terminology
+# under Disease/Diagnosis.
+#
 #----------------------------------------------------------------------
 import cdrcgi, cdrdb, cgi
 
@@ -141,4 +145,8 @@ html = """\
   </ul>
  </body>
 </html>"""
+
+# Need to send a unicode string to sendPage()
+# -------------------------------------------
+html = html.decode('utf-8')
 cdrcgi.sendPage(html)
