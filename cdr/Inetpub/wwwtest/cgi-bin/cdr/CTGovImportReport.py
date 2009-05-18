@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CTGovImportReport.py,v 1.6 2009-03-06 21:49:40 bkline Exp $
+# $Id: CTGovImportReport.py,v 1.7 2009-05-18 15:38:09 venglisc Exp $
 #
 # Stats on documents imported from ClinicalTrials.gov into CDR.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.6  2009/03/06 21:49:40  bkline
+# Added back in maxJobs parameter from Bach version of report.
+#
 # Revision 1.5  2009/03/06 19:43:01  bkline
 # Added highlighting of trials which have been transferred to CT.gov.
 #
@@ -70,15 +73,15 @@ if not job:
     rows = cursor.fetchall()
     if not rows:
         cdrcgi.bail("No import jobs recorded")
-    form = """\
+    form = u"""\
    <b>Select import job:&nbsp;</b>
    <select name = 'job'>
 """
     for row in rows:
-        form += """\
+        form += u"""\
     <option value='%d'>%s</option>
 """ % (row[0], row[1][:19])
-    cdrcgi.sendPage(header + form + """\
+    cdrcgi.sendPage(header + form + u"""\
    </select>
    <input type='hidden' name='%s' value='%s'>
   </form>
@@ -202,6 +205,11 @@ html += makeSection(noReviewNeeded,
                     "Other updated trials that do not require review")
 html += makeSection(locked,
                     "Trials not updated because document was checked out")
-cdrcgi.sendPage(html + """\
+html += """\
  </body>
-</html>""")
+</html>"""
+
+# Converting string to Unicode before passing to sendPage()
+# ---------------------------------------------------------
+html = html.decode('utf-8')
+cdrcgi.sendPage(html)
