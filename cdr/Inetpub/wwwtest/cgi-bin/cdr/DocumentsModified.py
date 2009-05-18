@@ -1,12 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: DocumentsModified.py,v 1.1 2005-05-25 14:07:09 bkline Exp $
+# $Id: DocumentsModified.py,v 1.2 2009-05-18 15:40:31 venglisc Exp $
 #
 # "We need a simple 'Documents Modified' Report to be generated in an Excel 
 # spreadsheet, which verifies what documents were changed within a given time 
 # frame."
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2005/05/25 14:07:09  bkline
+# Report of documents modified within a specified time range.
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, cdrdb, time, pyXLWriter, sys
 
@@ -72,7 +75,7 @@ def getDoctypePicklist():
 # If we don't have the required parameters, ask for them.
 #----------------------------------------------------------------------
 if not startDate or not endDate:
-    form   = """\
+    form   = u"""\
       <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
       <TABLE>
        <TR>
@@ -93,7 +96,7 @@ if not startDate or not endDate:
      </BODY>
     </HTML>
 """ % (cdrcgi.SESSION, session, getDoctypePicklist())
-    cdrcgi.sendPage(cdrcgi.unicodeToLatin1(header + form))
+    cdrcgi.sendPage(header + form)
 
 def fix(title):
     return title.encode('latin-1', 'replace')
