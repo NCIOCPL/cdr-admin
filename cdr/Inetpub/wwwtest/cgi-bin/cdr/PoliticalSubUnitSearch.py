@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PoliticalSubUnitSearch.py,v 1.2 2003-07-29 12:42:23 bkline Exp $
+# $Id: PoliticalSubUnitSearch.py,v 1.3 2009-05-18 15:28:27 venglisc Exp $
 #
 # Duplicate-checking interface for Political SubUnit documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2003/07/29 12:42:23  bkline
+# Plugged in filter set instead of single named filter.
+#
 # Revision 1.1  2002/02/14 19:36:35  bkline
 # Broken out from original GeographicEntity search pages.
 #
@@ -51,6 +54,10 @@ if not submit:
  </BODY>
 </HTML>
 """
+    # Need to send a unicode string to sendPage()
+    # -------------------------------------------
+    page = page.decode('utf-8')
+
     cdrcgi.sendPage(page)
 
 #----------------------------------------------------------------------
