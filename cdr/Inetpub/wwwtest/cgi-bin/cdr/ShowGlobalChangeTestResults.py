@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: ShowGlobalChangeTestResults.py,v 1.4 2009-02-10 19:32:28 bkline Exp $
+# $Id: ShowGlobalChangeTestResults.py,v 1.5 2009-05-18 15:31:20 venglisc Exp $
 #
 # Web interface for showing changes which would be made by a
 # global change.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2009/02/10 19:32:28  bkline
+# Added action attribute to form element(s).
+#
 # Revision 1.3  2008/05/22 16:53:07  ameyer
 # Added some sort, count, and error reporting capability.
 #
@@ -192,7 +195,7 @@ if directory:
     docCount = len(keys)
     verCount = len(rows)
 
-    cdrcgi.sendPage("""\
+    cdrcgi.sendPage(u"""\
 <html>
  <head>
   <title>Global Change Test Results</title>
@@ -233,7 +236,7 @@ for d in dirs:
     d3 = d2[:10] + ' ' + d2[11:13] + ':' + d2[14:16] + ':' + d2[17:19]
     link = "<a href='%s?dir=%s'>%s</a><br />\n" % (script, d2, d3)
     links.append(link)
-cdrcgi.sendPage("""\
+cdrcgi.sendPage(u"""\
 <html>
  <head>
   <title>Global Change Test Results</title>
