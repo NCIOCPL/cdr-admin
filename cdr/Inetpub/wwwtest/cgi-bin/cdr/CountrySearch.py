@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: CountrySearch.py,v 1.3 2007-06-12 19:10:02 venglisc Exp $
+# $Id: CountrySearch.py,v 1.4 2009-05-18 15:44:10 venglisc Exp $
 #
 # Duplicate-checking interface for Country documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2007/06/12 19:10:02  venglisc
+# Modified to use the updated 'Country QC Report Filter' to display the
+# QC filter. (Bug 3308)
+#
 # Revision 1.2  2002/02/28 15:54:41  bkline
 # Modified display filter title.
 #
@@ -54,6 +58,9 @@ if not submit:
  </BODY>
 </HTML>
 """
+    # Converting string to Unicode before sending to sendPage()
+    # ---------------------------------------------------------
+    page = page.decode('utf-8')
     cdrcgi.sendPage(page)
 
 #----------------------------------------------------------------------
