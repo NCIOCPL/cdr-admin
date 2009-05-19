@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ApprovedNotYetActive.py,v 1.4 2009-02-19 15:38:34 bkline Exp $
+# $Id: ApprovedNotYetActive.py,v 1.5 2009-05-19 19:34:22 venglisc Exp $
 #
 # Approved Not Yet Active Protocols Verification Report
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2009/02/19 15:38:34  bkline
+# Fixed typo in format string passed to time.strftime().
+#
 # Revision 1.3  2008/09/02 18:51:57  bkline
 # Rewritten as an Excel report, with title column added (#4257).
 #
@@ -43,9 +46,10 @@ def lookupOriginalTitle(cursor, docId):
 # Protocol object.
 #----------------------------------------------------------------------
 class Protocol:
-    def __init__(self, id, orgProtId):
+    def __init__(self, id, orgProtId, updMode):
         self.id        = id
         self.orgProtId = orgProtId
+        self.updMode   = updMode or ''
 
 #----------------------------------------------------------------------
 # Protocol update person object.
@@ -107,14 +111,17 @@ for row in rows:
 
     for topNode in elem.childNodes:
         if topNode.nodeName == "LeadOrg":
-            orgName = ''
+            orgName   = ''
             orgProtId = ''
-            pList = []
+            updMode   = ''
+            pList     = []
             for node in topNode.childNodes:
                 if node.nodeName == "OrgName":
                     orgName = cdr.getTextContent(node)
                 elif node.nodeName == "OrgProtId":
                     orgProtId = cdr.getTextContent(node)
+                elif node.nodeName == "UpdateMode":
+                    updMode = cdr.getTextContent(node)
                 elif node.nodeName == "PUP":
                     givenName = ''
                     middleInitial = ''
@@ -134,7 +141,7 @@ for row in rows:
                             email = cdr.getTextContent(child)
                     pList.append((givenName, middleInitial, surname, phone,
                                   email))
-            protocol = Protocol(row[0], orgProtId)
+            protocol = Protocol(row[0], orgProtId, updMode)
             for p in pList:
                 givenName, middleInitial, surname, phone, email = p
                 name = (givenName + " " + middleInitial).strip()
@@ -166,9 +173,9 @@ align = ExcelWriter.Alignment('Center', 'Bottom', wrap = True)
 style = book.addStyle(font = font, alignment = align)
 row = sheet.addRow(1, style)
 title = "Approved Not Yet Active Protocols Verification Report"
-row.addCell(1, title, mergeAcross = 7)
+row.addCell(1, title, mergeAcross = 8)
 row = sheet.addRow(2, style)
-row.addCell(1, today, mergeAcross = 7)
+row.addCell(1, today, mergeAcross = 8)
 sheet.addCol(1, 100)
 sheet.addCol(2, 200)
 sheet.addCol(3, 100)
@@ -177,6 +184,7 @@ sheet.addCol(5, 200)
 sheet.addCol(6, 100)
 sheet.addCol(7, 100)
 sheet.addCol(8, 400)
+sheet.addCol(9,  60)
 row = sheet.addRow(4, style)
 row.addCell(1, u"UpdatePerson")
 row.addCell(2, u"Email")
@@ -186,6 +194,7 @@ row.addCell(5, u"Lead Org ProtocolID")
 row.addCell(6, u"CDR DocId")
 row.addCell(7, u"Status Change?")
 row.addCell(8, u"Protocol Title")
+row.addCell(9, u"Update Mode")
 align = ExcelWriter.Alignment('Left', 'Top', wrap = True)
 style = book.addStyle(alignment = align)
 
@@ -212,6 +221,7 @@ for key in keys:
         row.addCell(5, pup.protocols[0].orgProtId)
         row.addCell(6, u"CDR%010d" % pup.protocols[0].id)
         row.addCell(8, protTitle)
+        row.addCell(9, pup.protocols[0].updMode)
     for p in pup.protocols[1:]:
         rowNumber += 1
         row = sheet.addRow(rowNumber, style)
@@ -219,6 +229,7 @@ for key in keys:
         row.addCell(5, p.orgProtId)
         row.addCell(6, u"CDR%010d" % p.id)
         row.addCell(8, protTitle)
+        row.addCell(9, pup.protocols[0].updMode)
     rowNumber += 1
 
 #----------------------------------------------------------------------
