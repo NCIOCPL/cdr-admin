@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CTGovImportReport.py,v 1.7 2009-05-18 15:38:09 venglisc Exp $
+# $Id: CTGovImportReport.py,v 1.8 2009-05-20 16:17:40 venglisc Exp $
 #
 # Stats on documents imported from ClinicalTrials.gov into CDR.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.7  2009/05/18 15:38:09  venglisc
+# Converting string to submit to sendPage to Unicode. (Bug 4560)
+#
 # Revision 1.6  2009/03/06 21:49:40  bkline
 # Added back in maxJobs parameter from Bach version of report.
 #
@@ -211,5 +214,6 @@ html += """\
 
 # Converting string to Unicode before passing to sendPage()
 # ---------------------------------------------------------
-html = html.decode('utf-8')
+if not type(html) == type(u''):
+    html = html.decode('utf-8')
 cdrcgi.sendPage(html)
