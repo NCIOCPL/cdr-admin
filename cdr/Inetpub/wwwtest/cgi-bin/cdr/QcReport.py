@@ -1,11 +1,16 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.68 2009-03-23 15:48:10 venglisc Exp $
+# $Id: QcReport.py,v 1.69 2009-05-28 20:38:26 venglisc Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.68  2009/03/23 15:48:10  venglisc
+# Modified DocType coming in from Drug Summaries to be the CDR doctype
+# 'DrugInformationSummary' instead of 'DIS' allowing for comparison with the
+# database value.
+#
 # Revision 1.67  2009/03/10 21:49:38  bkline
 # Cosmetic cleanup.
 #
@@ -310,7 +315,8 @@ docType  = fields.getvalue("DocType")    or None
 docTitle = fields.getvalue("DocTitle")   or None
 version  = fields.getvalue("DocVersion") or None
 glossary = fields.getvalue("Glossary")   or None
-images   = fields.getvalue("Images") or None
+images   = fields.getvalue("Images")     or None
+citation = fields.getvalue("Citations")  or None
 standardWording = fields.getvalue("ShowStandardWording") or None
 displayInternComments = fields.getvalue("DisplayInternalComments") or None
 displayExternComments = fields.getvalue("DisplayExternalComments") or None
@@ -679,6 +685,12 @@ if letUserPickVersion:
        <td>
   <INPUT TYPE='checkbox' NAME='Images'>&nbsp;&nbsp;
   Display images instead of placeholder<BR>
+       </td>
+      </tr>
+      <tr>
+       <td>
+  <INPUT TYPE='checkbox' NAME='Citations' CHECKED>&nbsp;&nbsp;
+  Display the HP Reference Section<BR>
        </td>
       </tr>
 """
@@ -1271,6 +1283,8 @@ filterParm.append(['DisplayGlossaryTermList',
                        glossary and "Y" or "N"])
 filterParm.append(['DisplayImages',
                        images and "Y" or "N"])
+filterParm.append(['DisplayCitations',
+                       citation and "Y" or "N"])
 
 if repType == 'pat' or repType == 'patrs' or repType == 'patbu':
     filterParm.append(['ShowStandardWording',
