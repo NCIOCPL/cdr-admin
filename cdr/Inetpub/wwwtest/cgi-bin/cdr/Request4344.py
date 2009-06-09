@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: Request4344.py,v 1.3 2009-05-20 15:38:46 bkline Exp $
+# $Id: Request4344.py,v 1.4 2009-06-09 14:21:27 bkline Exp $
 #
 # The Glossary Term Concept by Spanish Definition Status Report will serve
 # as a QC report for Spanish and corresponding English Definitions by Status.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2009/05/20 15:38:46  bkline
+# Fix a bug which was displaying the wrong CDR ID when a definition
+# placeholder was missing.
+#
 # Revision 1.2  2009/03/04 22:18:51  bkline
 # Improved error handling.
 #
@@ -510,19 +514,24 @@ if start and end and status and audience:
    h1 { color: maroon; }
    .error { color: red; }
    .blocked { color: red; font-weight: bold; }
-   table { border-spacing: 0; border-collapse: collapse; empty-cells: show; }
-   td, th { border: black 1px solid; padding: 3px; }
-   td { vertical-align: top; }
+   #parms { margin-bottom: 20px }
+   #report { border-spacing: 0; border-collapse: collapse; empty-cells: show; }
+   #report td, #report th { border: black 1px solid; padding: 3px; }
+   #report td { vertical-align: top; }
    th { color: green; }
    #notes {width: 200px; }
   </style>
  </head>
  <body>
   <h1>%s</h1>
-  <table>
+  <table id='parms'>
+   <tr><td>Date Range</td><td>: &nbsp; &nbsp;</td><td>%s to %s</td></tr>
+   <tr><td>Status</td><td>: &nbsp; &nbsp;</td><td>%s</td></tr>
+  </table>
+  <table id='report'>
    <tr>
     <th>CDR ID of GTC</th>
-""" % (section, section)]
+""" % (section, section, start, end, status)]
         if report == SPANISH:
             if language == 'all':
                 html.append(u"""\
