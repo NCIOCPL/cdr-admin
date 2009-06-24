@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryCitations.py,v 1.2 2003-10-08 18:09:09 bkline Exp $
+# $Id: SummaryCitations.py,v 1.3 2009-06-24 17:36:40 venglisc Exp $
 #
 # Report listing all references cited in a selected version of a
 # cancer information summary.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2003/10/08 18:09:09  bkline
+# Changed element name from Reference to Citation to match change in
+# denormalization filter.
+#
 # Revision 1.1  2003/05/08 20:26:42  bkline
 # New summary reports.
 #
@@ -75,7 +79,7 @@ def report(docId, docVersion):
         if child.nodeName == "SummaryTitle":
             summaryTitle = cdr.getTextContent(child)
             break
-    refs.sort()
+    refs.sort(cmp=lambda x,y: cmp(x.lower(), y.lower()))
     prevRef = None
     digits = re.sub(r"[^\d]", "", docId)
     id = int(digits)
