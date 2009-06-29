@@ -1,10 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: DocVersionHistory.py,v 1.20 2007-09-10 22:25:24 venglisc Exp $
+# $Id: DocVersionHistory.py,v 1.21 2009-06-29 15:24:33 venglisc Exp $
 #
 # Show version history of document.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.20  2007/09/10 22:25:24  venglisc
+# Modified display to indicate a publishing event that removed the document.
+# (Bug 3539)
+#
 # Revision 1.19  2007/08/24 13:42:35  bkline
 # Fixed bug trying to subscript the value in a NULL database column.
 #
@@ -403,7 +407,7 @@ class Document:
             self.__num         = num
             self.__comment     = comment and cgi.escape(comment) or u""
             self.__user        = user
-            self.__date        = date[:10]
+            self.__date        = date[:16]
             self.__status      = status
             self.__publishable = publishable
             self.__pubEvents   = []
