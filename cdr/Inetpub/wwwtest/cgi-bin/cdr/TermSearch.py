@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: TermSearch.py,v 1.17 2008-01-29 11:41:26 kidderc Exp $
+# $Id: TermSearch.py,v 1.18 2009-06-30 17:43:40 venglisc Exp $
 #
 # Prototype for duplicate-checking interface for Term documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.17  2008/01/29 11:41:26  kidderc
+# Added help text.
+#
 # Revision 1.15  2007/10/19 12:59:35  kidderc
 # Added improved feedback when updating drom NCIT.
 #
@@ -119,15 +122,13 @@ if help:
 #----------------------------------------------------------------------
 # Redirect to Thesaurus searching if requested (in a different window).
 #----------------------------------------------------------------------
-thesaurusSearchUrl = ("http://nciterms.nci.nih.gov/NCIBrowser"
-                      "/ConceptReport.jsp?"
-                      "dictionary=PRE_NCI_Thesaurus&code=C1908")
+thesaurusSearchUrl = ("http://bioportal.nci.nih.gov/ncbo/faces/pages"
+                      "/quick_search.xhtml?_afPfm=-24c59cf2")
+                      
 if srchThes and False:
-    print ("Location:http://nciterms.nci.nih.gov"
-           #"/NCIBrowser/Connect.do"
-           #"?dictionary=PRE_NCI_Thesaurus&bookmarktag=1\n")
-           "/NCIBrowser/ConceptReport.jsp?"
-           "dictionary=PRE_NCI_Thesaurus&code=C1908")
+    print ("Location:http://bioportal.nci.nih.gov/ncbo/faces"
+           "/pages/quick_search.xhtml?_afPfm=-24c59cf2")
+           
     sys.exit(0)
 
 
@@ -248,7 +249,7 @@ if not submit:
                ('submit', 'HelpButton',   'Help'),
                ('reset',  'CancelButton', 'Clear'),
                ('button', 'javascript:searchThesaurus()',
-                          'Search NCI Thesaurus'))
+                          'Search NCI BioPortal'))
     errors = u""
     if valErrors:
         errors = u"""\
