@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtSearch.py,v 1.18 2009-05-11 17:51:30 venglisc Exp $
+# $Id: ProtSearch.py,v 1.19 2009-07-01 21:13:54 bkline Exp $
 #
 # Prototype for duplicate-checking interface for Protocol documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.18  2009/05/11 17:51:30  venglisc
+# Converted string to unicode before passing to sendPage(). (Bug 4560)
+#
 # Revision 1.17  2009/05/01 02:07:10  ameyer
 # Forced input form sent to sendPage into unicode to silence warning.
 # Also checking in debugging code that Bob added some time ago.
@@ -62,6 +65,8 @@
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, cdrdb, os
 
+STATUS_PATH = '/InScopeProtocol/ProtocolAdminInfo/CurrentProtocolStatus'
+
 #----------------------------------------------------------------------
 # Get the form variables.
 #----------------------------------------------------------------------
@@ -74,6 +79,7 @@ idNums    = fields and fields.getvalue("IdNums")           or None
 cdrIds    = fields and fields.getvalue("CdrIds")           or None
 submit    = fields and fields.getvalue("SubmitButton")     or None
 help      = fields and fields.getvalue("HelpButton")       or None
+pstat     = fields.getvalue('pstat')
 dispFmt   = fields and fields.getvalue("DispFormat")       or 'fu'
 docType   = fields and fields.getvalue("DocType")          or 'All'
 if help:
@@ -98,12 +104,14 @@ class DisplayFormat:
     def __cmp__(self, other):
         return cmp(self.pos, other.pos)
 
-fmts = {}
-fmts['fu'] = DisplayFormat(1, 'Full',     'QC InScopeProtocol Full Set')
-fmts['ad'] = DisplayFormat(2, 'Admin',    'QC InScopeProtocol Admin Set')
-fmts['hp'] = DisplayFormat(3, 'HP',       'QC InScopeProtocol HP Set')
-fmts['pa'] = DisplayFormat(4, 'Patient',  'QC InScopeProtocol Patient Set')
-fmts['ci'] = DisplayFormat(5, 'Citation', 'QC InScopeProtocol Citation Set')
+fmts = {
+    'fu': DisplayFormat(1, 'Full',     'QC InScopeProtocol Full Set'),
+    'ad': DisplayFormat(2, 'Admin',    'QC InScopeProtocol Admin Set'),
+    'hp': DisplayFormat(3, 'HP',       'QC InScopeProtocol HP Set'),
+    'pa': DisplayFormat(4, 'Patient',  'QC InScopeProtocol Patient Set'),
+    'ci': DisplayFormat(5, 'Citation', 'QC InScopeProtocol Citation Set'),
+    'ex': DisplayFormat(6, 'Excel',    None)
+}
 
 def makeDispFormat(fieldName):
     field = "<br>"
@@ -111,11 +119,13 @@ def makeDispFormat(fieldName):
     keys.sort(lambda a,b: cmp(fmts[a], fmts[b]))
     checked = " checked='1'"
     for key in keys:
-        fmt = fmts[key]
+        if key == 'ex':
+            label = "Excel Workbook Report Format"
+        else:
+            label = "Protocol %s Report Format" % fmts[key].display
         field += """
-    <input type='radio' name='%s' value='%s'%s>
-     Protocol %s QC Report Format<br>
-""" % (fieldName, key, checked, fmt.display)
+    <input type='radio' name='%s' value='%s'%s>%s<br>""" % (fieldName, key,
+                                                            checked, label)
         checked = ""
     return field
 
@@ -130,13 +140,31 @@ def makeDoctypePicklist():
        <OPTION>OutOfScopeProtocol</OPTION>
       </SELECT>
 """
+
+#----------------------------------------------------------------------
+# Generate picklist for protocol status.
+#----------------------------------------------------------------------
+def protocolStatusList(conn, fName):
+    defaultOpt = "<option value='' selected>Select a status...</option>\n"
+    query  = """\
+SELECT DISTINCT value, value
+           FROM query_term
+          WHERE path = '%s'
+       ORDER BY value""" % STATUS_PATH
+    pattern = "<option value='%s'>%s&nbsp;</option>"
+    return cdrcgi.generateHtmlPicklist(conn, fName, query, pattern,
+                                       firstOpt = defaultOpt)
+
+
 #----------------------------------------------------------------------
 # Display the search form.
 #----------------------------------------------------------------------
 if not submit:
     fields = (('CDR ID(s)',                    'CdrIds'),
               ('Title',                        'Title'),
-              ('Protocol ID Numbers',          'IdNums'))
+              ('Protocol ID Numbers',          'IdNums'),
+              ('Protocol Status',              'pstat',
+               protocolStatusList))
     extraFields = (('<br>Display Format', makeDispFormat('DispFormat')),
                    ('<br>Document Type', makeDoctypePicklist()))
     buttons = (('submit', 'SubmitButton', 'Search'),
@@ -189,7 +217,9 @@ searchFields = (cdrcgi.SearchField(title, selectPaths(docType,
                              "/ProtocolIDs/OtherID/IDString",
                              "/CTGovProtocol/IDInfo/OrgStudyID",
                              "/CTGovProtocol/IDInfo/SecondaryID",
-                             "/CTGovProtocol/IDInfo/NCTID"))))
+                             "/CTGovProtocol/IDInfo/NCTID"))),
+                cdrcgi.SearchField(pstat, selectPaths(docType,
+                                                      (STATUS_PATH,))))
 
 #----------------------------------------------------------------------
 # Construct the query.
@@ -235,15 +265,48 @@ try:
     cursor = conn.cursor()
     cursor.execute(query, timeout = 300)
     rows = cursor.fetchall()
-    cursor.close()
-    cursor = None
 except cdrdb.Error, info:
     cdrcgi.bail('Failure retrieving Protocol documents: %s' %
                 info[1][0])
 
+def getProtocolStatus(docId):
+    cursor.execute("""\
+        SELECT value
+          FROM query_term
+         WHERE path = '%s'
+           AND doc_id = ?""" % STATUS_PATH, docId)
+    rows = cursor.fetchall()
+    return rows and rows[0][0] or "None"
+
 #----------------------------------------------------------------------
 # Create the results page.
 #----------------------------------------------------------------------
+if dispFmt == 'ex':
+    import ExcelWriter, time, sys
+    try:
+        import msvcrt, os
+        msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
+    except:
+        pass
+    book = ExcelWriter.Workbook()
+    sheet = book.addWorksheet("Protocols")
+    sheet.addCol(1, 50)
+    sheet.addCol(2, 800)
+    sheet.addCol(3, 125)
+    rowNumber = 0
+    for row in rows:
+        r = sheet.addRow(rowNumber)
+        r.addCell(1, row[0])
+        r.addCell(2, row[1])
+        r.addCell(3, getProtocolStatus(row[0]))
+        rowNumber += 1
+    stamp = time.strftime("%Y%m%d%H%M%S")
+    print "Content-type: application/vnd.ms-excel"
+    print "Content-Disposition: attachment; filename=search-%s.xls" % stamp
+    print
+    book.write(sys.stdout, True)
+    sys.exit(0)
+
 filters = {
      'InScopeProtocol':'set:%s' % fmts[dispFmt].filterSet,
      'OutOfScopeProtocol':'name:Health Professional QC Content Report',
