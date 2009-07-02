@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: CTGovUnpublished.py,v 1.1 2006-04-26 17:19:59 venglisc Exp $
+# $Id: CTGovUnpublished.py,v 1.2 2009-07-02 18:47:16 venglisc Exp $
 #
 # Report of unpublished CTGov trials by Phase.
 # The query originated from the AdHoc query interface.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2006/04/26 17:19:59  venglisc
+# Initial copy of report listing unpublished CTGov protocols by phase.
+# (Bug 2048)
+#
 #
 #----------------------------------------------------------------------
 import cdr, cdrdb, time, cgi, cdrcgi
@@ -20,12 +24,15 @@ cursor = conn.cursor()
 # Gather the report data.
 #----------------------------------------------------------------------
 cursor.execute("""\
-SELECT d.id CDRID, q.value Phase, min(a.dt) DateCreated
+SELECT d.id CDRID, q.value Phase, min(a.dt) DateCreated, t.value
   FROM document d
   JOIN query_term q
     ON d.id = q.doc_id
   JOIN audit_trail a
     ON d.id = a.document
+  LEFT OUTER JOIN query_term t
+    ON d.id = t.doc_id
+   AND t.path = '/CTGovProtocol/IDInfo/OrgStudyID'
  WHERE d.doc_type = 34  -- CTGovProtocol
    AND d.active_status = 'A'
    AND q.path = '/CTGovProtocol/Phase'
@@ -33,7 +40,7 @@ SELECT d.id CDRID, q.value Phase, min(a.dt) DateCreated
                           FROM doc_version
                          WHERE publishable = 'Y'
                        )
- GROUP BY d.id, q.value
+ GROUP BY d.id, q.value, t.value
  ORDER BY q.value desc, d.id""")
 rows = cursor.fetchall()
 
@@ -46,9 +53,11 @@ html = """\
  <head>
   <title>Unpublished ClinicalTrials.gov Trials Report %s</title>
   <style type='text/css'>
-   body { font-family: Arial }
-   h1   { font-size: 14pt; font-weight: bold }
-   h2   { font-size: 12pt; font-weight: bold }
+   body         { font-family: Arial }
+   h1           { font-size: 14pt; font-weight: bold }
+   h2           { font-size: 12pt; font-weight: bold }
+   .transferred { color: red; font-weight: bold; }
+   .normal      { font-weight: normal; }
   </style>
  </head>
  <body>
@@ -71,12 +80,13 @@ for row in rows:
     phase = row[1] or "&nbsp;"
     dateCreated = row[2] and row[2][:10] or "&nbsp;"
     html += """\
-   <tr>
+   <tr class="%s">
     <td valign='top'>%s</td>
     <td valign='top'>%s</td>
     <td valign='top'>%s</td>
    </tr>
-""" % (cdrid, phase, dateCreated)
+""" % (row[3][:3] == 'CDR' and 'transferred' or 'normal',
+       cdrid, phase, dateCreated)
 
 cdrcgi.sendPage(html + """\
   </table>
