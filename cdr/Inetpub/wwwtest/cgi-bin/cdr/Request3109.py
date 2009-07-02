@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: Request3109.py,v 1.2 2007-04-23 12:42:02 bkline Exp $
+# $Id: Request3109.py,v 1.3 2009-07-02 15:07:05 venglisc Exp $
 #
 # "We have a request from Oregeon Health Sciences University Cancer Center
 # for a report in Excel format that lists OHSUCC trials that we have in PDQ.
@@ -40,6 +40,9 @@
 # Cancer.gov yet?"]
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2007/04/23 12:42:02  bkline
+# Changed filename for output at Lakshmi's request.
+#
 # Revision 1.1  2007/04/23 12:39:38  bkline
 # Organization Protocols Spreadsheet report.
 #
@@ -68,6 +71,7 @@ class Protocol:
         self.docId  = docId
         self.status = status
         self.active = status.lower() in ['active', 'approved-not yet active']
+
         cursor.execute("""\
             SELECT t.value
               FROM query_term t
@@ -80,6 +84,7 @@ class Protocol:
                AND o.value = 'Original'""", docId)
         rows = cursor.fetchall()
         self.title = rows and rows[0][0] or u"[NO ORIGINAL TITLE]"
+
         cursor.execute("""\
             SELECT value
               FROM query_term
@@ -87,6 +92,7 @@ class Protocol:
                AND doc_id = ?""", docId)
         rows = cursor.fetchall()
         self.primaryId = rows and rows[0][0] or u"[NO PRIMARY PROTOCOL ID]"
+
         cursor.execute("""\
             SELECT i.value, t.value
               FROM query_term i
@@ -104,8 +110,40 @@ class Protocol:
                 self.ctGovId = idValue
             else:
                 self.altIds.append(idValue)
+
         cursor.execute("SELECT id FROM pub_proc_cg WHERE id = ?", docId)
         self.published = cursor.fetchall() and True or False
+
+        cursor.execute("""\
+            SELECT d.value, dt.value
+              FROM query_term d
+              JOIN query_term dt
+                ON d.doc_id = dt.doc_id
+               AND dt.path  = '/InScopeProtocol/ProtocolAdminInfo' +
+                              '/CompletionDate/@DateType'
+             WHERE d.path   = '/InScopeProtocol/ProtocolAdminInfo' +
+                              '/CompletionDate'
+               AND d.doc_id = ?""", docId, timeout = 300)
+        row = cursor.fetchone()
+        self.completionDate = row and row[0] or ''
+        self.dateType       = row and row[1] or ''
+
+        cursor.execute("""\
+            SELECT c.doc_id, c.value, d.value
+              FROM query_term c
+              JOIN query_term d
+                ON c.doc_id = d.doc_id
+               AND d.path = '/InScopeProtocol/ProtocolAdminInfo'       +
+                            '/ProtocolLeadOrg/LeadOrgProtocolStatuses' +
+                            '/CurrentOrgStatus/StatusDate'
+             WHERE c.path = '/InScopeProtocol/ProtocolAdminInfo'       +
+                            '/ProtocolLeadOrg/LeadOrgProtocolStatuses' +
+                            '/CurrentOrgStatus/StatusName'
+               AND c.value in ('Closed', 'Completed')
+               AND c.doc_id = ?""", docId, timeout = 300)
+        row = cursor.fetchone()
+        self.closedDate = row and row[2] or ''
+
 
 class ProtocolOrg:
     def __init__(self, docId, status):
@@ -113,6 +151,7 @@ class ProtocolOrg:
             Protocol.protocols[docId] = Protocol(docId, status)
         self.protocol = Protocol.protocols[docId]
         self.personnel = []
+
 
 class LeadOrgProtocol(ProtocolOrg):
     def __init__(self, docId, status, nodeLoc):
@@ -289,23 +328,46 @@ for docId, status, nodeLoc in rows:
 if debugging:
     sys.stderr.write("\n%d site PIs found\n" % sitePIs)
 
-def addSheet(wb, styles, protocolOrgs, title, sites = False):
+def addSheet(wb, styles, protocolOrgs, title, sheet = 'ws2'):
+    # Note: Columns with width "0.1" are hidden in the output
+    colWidth = { 'ws1':[40, 125, 125, 100, 400,  60, 0.1, 0.1,  65, 100],
+                 'ws2':[40, 125, 125, 100, 400, 0.1, 0.1, 0.1, 100,  65],
+                 'ws3':[40, 125, 125, 100, 400,  60,  60,  60, 100,  65]}
+    colName  = { 'ws1':['PDQ UI', 'Primary Protocol ID', 
+                        'Alternate IDs', 'ClinicalTrials.gov ID', 
+                        'Original Trial Title', 'Completion Date', 
+                        '', '',
+                        'Lead Org Personnel', 'Published?'],
+                 'ws2':['PDQ UI', 'Primary Protocol ID',
+                        'Alternate IDs', 'ClinicalTrials.gov ID', 
+                        'Original Trial Title', '', 
+                        '', '',
+                        'PI', 'Published?'],
+                 'ws3':['PDQ UI', 'Primary Protocol ID', 
+                        'Alternate IDs', 'ClinicalTrials.gov ID', 
+                        'Original Trial Title', 'Completion Date', 
+                        'Date of Closure', 'Current Prot. Status',
+                        'Lead Org Personnel', 'Published?']
+                }
     ws = wb.addWorksheet(title)
     col = 1
-    for width in (40, 125, 125, 100, 400, 100, 65):
+    # The first 5 columns of the worksheets are identical
+    # ---------------------------------------------------
+    for width in colWidth[sheet]:
         ws.addCol(col, width)
         col += 1
+
     row = ws.addRow(1, styles.header)
     col = 1
-    for name in ('PDQ UI', 'Primary Protocol ID', 'Alternate IDs',
-                 'ClinicalTrials.gov ID', 'Original Trial Title',
-                 sites and 'PI' or 'Lead Org Personnel', 'Published?'):
+    for name in colName[sheet]:
         row.addCell(col, name, style = styles.header)
         col += 1
+
     rowNum = 2
     for protocolOrg in protocolOrgs:
         row = ws.addRow(rowNum)
         row.addCell(1, protocolOrg.protocol.docId, style = styles.right)
+
         if protocolOrg.protocol.published:
             published = "Yes"
             url = ("http://www.cancer.gov/clinicaltrials/"
@@ -316,13 +378,20 @@ def addSheet(wb, styles, protocolOrgs, title, sites = False):
         else:
             published = "No"
             row.addCell(2, protocolOrg.protocol.primaryId, style = styles.left)
+
         altIds = u"\n".join(protocolOrg.protocol.altIds)
         personnel = u"\n".join(protocolOrg.personnel)
         row.addCell(3, altIds, style = styles.left)
-        row.addCell(4, protocolOrg.protocol.ctGovId, style = styles.left)
-        row.addCell(5, protocolOrg.protocol.title, style = styles.left)
-        row.addCell(6, personnel, style = styles.left)
-        row.addCell(7, published, style = styles.center)
+        row.addCell(4, protocolOrg.protocol.ctGovId,    style = styles.left)
+        row.addCell(5, protocolOrg.protocol.title,      style = styles.left)
+        if protocolOrg.protocol.completionDate:
+            row.addCell(6, "%s (%s)" % (protocolOrg.protocol.completionDate,
+                                        protocolOrg.protocol.dateType), 
+                                                        style = styles.center)
+        row.addCell(7, protocolOrg.protocol.closedDate, style = styles.center)
+        row.addCell(8, protocolOrg.protocol.status,     style = styles.center)
+        row.addCell(9, personnel, style = styles.left)
+        row.addCell(10, published, style = styles.center)
         rowNum += 1
 
 class Styles:
@@ -359,10 +428,10 @@ class Styles:
 wb      = ExcelWriter.Workbook()
 styles  = Styles(wb)
 addSheet(wb, styles, [p for p in leadOrgProtocols if p.protocol.active],
-         "Lead Org (Active)")
-addSheet(wb, styles, siteOrgProtocols, "Site (Active)", True)
+         "Lead Org (Active)", 'ws1')
+addSheet(wb, styles, siteOrgProtocols, "Site (Active)")
 addSheet(wb, styles, [p for p in leadOrgProtocols if not p.protocol.active],
-         "Lead Org (Not Active)")
+         "Lead Org (Not Active)", 'ws3')
 now = time.strftime("%Y%m%d%H%M%S")
 filename = "OrganizationProtocolsSpreadsheet-%s.xls" % now
 if not debugging:
