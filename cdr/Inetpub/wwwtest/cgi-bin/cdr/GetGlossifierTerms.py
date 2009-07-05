@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: GetGlossifierTerms.py,v 1.3 2008-11-25 21:08:25 bkline Exp $
+# $Id: GetGlossifierTerms.py,v 1.4 2009-07-05 19:50:23 bkline Exp $
 #
 # Program to extract glossary terms for glossifier service invoked by
 # Cancer.gov.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2008/11/25 21:08:25  bkline
+# Added check for new ExcludeFromGlossifier attribute; fixed query errors.
+#
 # Revision 1.2  2008/11/24 14:53:30  bkline
 # Rewritten to use new GlossaryTermName documents.
 #
@@ -92,7 +95,7 @@ def checkForDuplicates(name, names, allDups):
                 checkForDuplicate(docId, (language, None), keys, duplicates)
     if duplicates:
         for key in duplicates:
-            if name.lower() != 'tpa':
+            if name.lower() not in ('tpa', 'cab'):
                 language, dictionary = key
                 allDups[(name, language, dictionary)] = duplicates[key]
                 # reportDuplicate(name, duplicates[key], language, dictionary)
