@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ShowCTGovLog.py,v 1.2 2009-05-12 21:38:59 venglisc Exp $
+# $Id: ShowCTGovLog.py,v 1.3 2009-07-20 18:30:51 bkline Exp $
 #
 # Show the contents of the log for a CTGov import job.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2009/05/12 21:38:59  venglisc
+# Modified string passed to sendPage() to be of type Unicode. (Bug 4560)
+#
 # Revision 1.1  2006/05/04 15:17:37  bkline
 # Show the contents of a CTGov job's log.
 #
@@ -29,4 +32,4 @@ cdrcgi.sendPage(u"""\
   </pre>
  </body>
 </html>
-""" % (job, job, cgi.escape(body)))
+""" % (job, job, cgi.escape(unicode(body, 'utf-8'))))
