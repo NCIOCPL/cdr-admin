@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: CiatCipsStaff.py,v 1.9 2009-04-28 17:57:26 ameyer Exp $
+# $Id: CiatCipsStaff.py,v 1.10 2009-07-22 01:25:13 ameyer Exp $
 #
 # Main menu for CIAT/CIPS staff.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.9  2009/04/28 17:57:26  ameyer
+# Renamed Global Changes label for clearer explanation of what it does.
+#
 # Revision 1.8  2008/09/26 00:19:06  ameyer
 # Added functions to replace doc with new doc, replace CWD with older ver.
 #
@@ -55,7 +58,8 @@ html    = cdrcgi.header(title, title, section, "", buttons) + """\
 items   = (('AdvancedSearch.py', 'Advanced Search',       ''               ),
            ('getBatchStatus.py', 'Batch Job Status',      ''               ),
            ('CTGov.py',          'CTGov Protocols',       ''               ),
-           ('GlobalChange.py',   'Global Change Protocol Links', ''        ),
+           ('GlobalChange.py',   'Change Protocol Links', ''               ),
+           ('GlobalChangeSimpleLink.py','Global Change Simple Links', ''   ),
            ('FtpImages.py',      'Images Download',       ''               ),
            ('Mailers.py',        'Mailers',               ''               ),
            ('NewTrialsSubmission.py', 'New Trials Submission', '' ),
