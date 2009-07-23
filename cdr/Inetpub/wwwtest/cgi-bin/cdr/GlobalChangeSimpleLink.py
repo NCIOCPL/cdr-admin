@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------
-# $Id: GlobalChangeSimpleLink.py,v 1.1 2009-07-22 01:24:20 ameyer Exp $
+# $Id: GlobalChangeSimpleLink.py,v 1.2 2009-07-23 23:45:50 ameyer Exp $
 #
 # Globally change all links (cdr:ref) of any specified type from
 # one value to another.
@@ -8,6 +8,9 @@
 # #fragment ids appended to the linking doc ID.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2009/07/22 01:24:20  ameyer
+# Initial version.
+#
 #
 #----------------------------------------------------------------------
 import cdrcgi, cdr, cdrbatch, SimpleLinkGlobalChangeBatch
@@ -18,6 +21,10 @@ import cdrcgi, cdr, cdrbatch, SimpleLinkGlobalChangeBatch
 if __name__ == "__main__":
     # Parse form variables and make everything accessible
     linkVars = SimpleLinkGlobalChangeBatch.SimpleLinkVars()
+
+    # Check authorization
+    if not cdr.canDo(linkVars.session, "GLOBAL LINK CHANGE"):
+        cdrcgi.bail("Sorry, you are not authorized to make global link changes")
 
     # Process cancel request, if any
     if linkVars.request in ('Cancel', 'Admin System'):
