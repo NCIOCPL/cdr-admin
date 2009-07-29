@@ -1,14 +1,17 @@
 #----------------------------------------------------------------------
 #
-# $Id: ContentInventory.py,v 1.1 2009-03-24 15:16:50 venglisc Exp $
+# $Id: ContentInventory.py,v 1.2 2009-07-29 16:32:23 venglisc Exp $
 #
 # Report listing all citations linked by a summary document.
 # The output format is *.xml (Excel is able to import this)
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2009/03/24 15:16:50  venglisc
+# Initial report to list summary, media, drug summary inventory. (Bug 4533)
+#
 #
 #----------------------------------------------------------------------
-import cdrdb, sys, time, cdrcgi, ExcelWriter
+import cdr, cdrdb, sys, time, cdrcgi, ExcelWriter
 
 if sys.platform == "win32":
     import os, msvcrt
@@ -32,6 +35,7 @@ fullname = REPORTS_BASE + name
 #-----------------------------------------------------------------------
 cursor.execute("""\
 SELECT DISTINCT dt.name as "DocType", d.id as "Id", t.value as "Title", 
+                u.value as "URL", 
                 ty.value as "Type", a.value as "Audience",  
                 Language = CASE l.value
                                 WHEN 'Patients' THEN 'English'
@@ -64,6 +68,12 @@ SELECT DISTINCT dt.name as "DocType", d.id as "Id", t.value as "Title",
    AND l.path IN  ('/Summary/SummaryMetaData/SummaryLanguage',
                    '/DrugInformationSummary/DrugInfoMetaData/Audience',
                    '/Media/MediaContent/Captions/MediaCaption/@language')
+  -- Get the URL (fake entry for Media to be set NULL later)
+  JOIN query_term_pub u
+    ON u.doc_id = l.doc_id
+   AND u.path in ('/Summary/SummaryMetaData/SummaryURL/@cdr:xref',
+                  '/DrugInformationSummary/DrugInfoMetaData/URL/@cdr:xref', 
+                  '/Media/MediaTitle')
  WHERE dt.name IN ('Summary', 
                    'DrugInformationSummary', 
                    'Media')
@@ -73,6 +83,12 @@ SELECT DISTINCT dt.name as "DocType", d.id as "Id", t.value as "Title",
    AND d.active_status = 'A'
  ORDER BY dt.name, d.id
 """, timeout = 300)
+
+# A media URL doesn't exist - setting it to an empty string
+# ----------------------------------------------------------
+cursor.execute("""
+           UPDATE #inventory set URL = ''
+            WHERE DocType = 'Media'""")
 
 #-----------------------------------------------------------------------
 # Select all records from the temp table and add the latest 
@@ -89,7 +105,7 @@ cursor.execute("""\
                                '/ProcessingStatusDate')
              JOIN pub_proc_cg c
                ON c.id = i.id
-            GROUP BY docType, i.id, title, type, audience, language
+            GROUP BY docType, i.id, title, url, type, audience, language
             ORDER BY i.DocType, i.Type, i.Audience
 """, timeout = 300)
 
@@ -118,10 +134,11 @@ styleH  = wb.addStyle(alignment = alignH, font = headFont)
 ws.addCol( 1, 130)
 ws.addCol( 2,  40)
 ws.addCol( 3, 300)
-ws.addCol( 4, 100)
+ws.addCol( 4, 150)
 ws.addCol( 5, 100)
-ws.addCol( 6,  55)
-ws.addCol( 7,  65)
+ws.addCol( 6, 100)
+ws.addCol( 7,  55)
+ws.addCol( 8,  65)
 
 # Create the Header row
 # ---------------------
@@ -129,10 +146,11 @@ exRow = ws.addRow(1, styleH)
 exRow.addCell(1, 'Document Type')
 exRow.addCell(2, 'CDR-ID')
 exRow.addCell(3, 'Title')
-exRow.addCell(4, 'Type')
-exRow.addCell(5, 'Audience')
-exRow.addCell(6, 'Language')
-exRow.addCell(7, 'Processing Date')
+exRow.addCell(4, 'URL')
+exRow.addCell(5, 'Type')
+exRow.addCell(6, 'Audience')
+exRow.addCell(7, 'Language')
+exRow.addCell(8, 'Date Last Modified / Last Processed')
 
 # Add the protocol data one record at a time beginning after 
 # the header row
@@ -143,11 +161,18 @@ for row in rows:
     exRow = ws.addRow(rowNum, style1, 40)
     exRow.addCell(1, row[0])
     exRow.addCell(2, row[1])
-    exRow.addCell(3, row[2])
+    
+    if row[0] == 'Media':
+        url = '%s/cgi-bin/cdr/GetCdrImage.py?id=CDR%s.jpg' % (
+                                                  cdr.getHostName()[2], row[1])
+        exRow.addCell(3, " %s" % row[2], href = url, style = style4)
+    else:
+        exRow.addCell(3, " %s" % row[2], href = row[3], style = style4)
     exRow.addCell(4, row[3])
     exRow.addCell(5, row[4])
     exRow.addCell(6, row[5])
     exRow.addCell(7, row[6])
+    exRow.addCell(8, row[7])
 
 t = time.strftime("%Y%m%d%H%M%S")                                               
 print "Content-type: application/vnd.ms-excel"                                  
