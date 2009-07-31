@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryCitations.py,v 1.3 2009-06-24 17:36:40 venglisc Exp $
+# $Id: SummaryCitations.py,v 1.4 2009-07-31 19:18:49 venglisc Exp $
 #
 # Report listing all references cited in a selected version of a
 # cancer information summary.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2009/06/24 17:36:40  venglisc
+# Changing sort order by converting first to lower case. (Bug 4598)
+#
 # Revision 1.2  2003/10/08 18:09:09  bkline
 # Changed element name from Reference to Citation to match change in
 # denormalization filter.
@@ -14,7 +17,10 @@
 # New summary reports.
 #
 #----------------------------------------------------------------------
-import xml.dom.minidom, cgi, socket, struct, re, cdr, cdrcgi, cdrdb, time
+import xml.dom.minidom, cgi, socket, struct, re, cdr, cdrcgi, cdrdb
+import locale, time
+
+locale.setlocale(locale.LC_COLLATE, "")
 
 #----------------------------------------------------------------------
 # Get the parameters from the request.
@@ -79,7 +85,8 @@ def report(docId, docVersion):
         if child.nodeName == "SummaryTitle":
             summaryTitle = cdr.getTextContent(child)
             break
-    refs.sort(cmp=lambda x,y: cmp(x.lower(), y.lower()))
+    #refs.sort(cmp=lambda x,y: cmp(x.lower(), y.lower()))
+    refs.sort(lambda x, y: locale.strcoll(x.lower(), y.lower()))
     prevRef = None
     digits = re.sub(r"[^\d]", "", docId)
     id = int(digits)
