@@ -1,13 +1,16 @@
 #----------------------------------------------------------------------
 # coding=latin-1
 #
-# $Id: GlossaryConceptFull.py,v 1.7 2009-03-03 15:01:16 bkline Exp $
+# $Id: GlossaryConceptFull.py,v 1.8 2009-07-31 18:44:38 venglisc Exp $
 #
 # Glossary Term Concept report
 # This report takes a concept and displays all of the Term Name 
 # definitions that are linked to this concept document
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.7  2009/03/03 15:01:16  bkline
+# Rewritten in response to request #4482.
+#
 # Revision 1.6  2009/01/07 15:43:31  venglisc
 # Fixed so that a Spanish definition isn't being displayed if the document
 # is blocked. (Bug 4425)
@@ -232,9 +235,6 @@ def resolvePlaceHolder(language, termData, definitionText):
      if type(doc) == type(()):
          doc = doc[0].decode('utf-8')
 
-     #doc = cdrcgi.decode(doc)
-     #doc = re.sub("@@DOCID@@", docId, doc)
-
      return doc
 
 
@@ -260,7 +260,6 @@ def displayComment(commentList):
      doc = cdr.filterDoc('guest', ['name:Glossary Term Definition Update'], 
                          doc = tmpdoc.encode('utf-8'))
 
-     #cdrcgi.bail(doc[0])
      if type(doc) in (type(""), type(u"")):
          cdrcgi.bail(doc)
      if type(doc) == type(()):
@@ -485,7 +484,6 @@ def getConcept(docId):
                         definition = child
                         concept['%s-%s' % (language, audience)].update(
                           {child.nodeName:definition.toxml()})
-                    #     {'DefinitionText':definition.toxml()})
 
                     # Same as above but the MediaLink element is multiply
                     # occurring.
@@ -507,19 +505,11 @@ def getConcept(docId):
                                    'ReplacementText', 'Comment',
                                    'TranslationResource']:
                         if child.nodeName == gcList:
-                            if child.previousSibling.nodeName != gcList:
+                            if concept['%s-%s' % (language, audience)].has_key(
+                                                                       gcList):
                                 # Comments and ReplacementText contain
                                 # attributes that need to be preserved.
                                 # -------------------------------------
-                                if gcList in ['ReplacementText', 'Comment']:
-                                    rText = child
-                                    concept['%s-%s' % (language, audience)
-                                              ].update({gcList:[rText.toxml()]})
-                                else:
-                                    concept['%s-%s' % (language, audience)
-                                              ].update({gcList:[
-                                          cdr.getTextContent(child).strip()]})
-                            else:
                                 if gcList in ['ReplacementText', 'Comment']:
                                     rText = child
                                     concept['%s-%s' % (language, audience)][
@@ -528,6 +518,15 @@ def getConcept(docId):
                                     concept['%s-%s' % (language, audience)][
                                           gcList].append(
                                           cdr.getTextContent(child).strip())
+                            else:
+                                if gcList in ['ReplacementText', 'Comment']:
+                                    rText = child
+                                    concept['%s-%s' % (language, audience)
+                                              ].update({gcList:[rText.toxml()]})
+                                else:
+                                    concept['%s-%s' % (language, audience)
+                                              ].update({gcList:[
+                                          cdr.getTextContent(child).strip()]})
 
         dom.unlink()
 
