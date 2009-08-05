@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: Request3109.py,v 1.3 2009-07-02 15:07:05 venglisc Exp $
+# $Id: Request3109.py,v 1.4 2009-08-05 16:30:59 venglisc Exp $
 #
 # "We have a request from Oregeon Health Sciences University Cancer Center
 # for a report in Excel format that lists OHSUCC trials that we have in PDQ.
@@ -40,6 +40,9 @@
 # Cancer.gov yet?"]
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.3  2009/07/02 15:07:05  venglisc
+# Added additional columns with status information to worksheets. (Bug 4604)
+#
 # Revision 1.2  2007/04/23 12:42:02  bkline
 # Changed filename for output at Lakshmi's request.
 #
@@ -84,6 +87,19 @@ class Protocol:
                AND o.value = 'Original'""", docId)
         rows = cursor.fetchall()
         self.title = rows and rows[0][0] or u"[NO ORIGINAL TITLE]"
+
+        cursor.execute("""\
+            SELECT t.value
+              FROM query_term t
+              JOIN query_term o
+                ON o.doc_id = t.doc_id
+               AND LEFT(o.node_loc, 4) = LEFT(t.node_loc, 4)
+             WHERE t.doc_id = ?
+               AND t.path = '/InScopeProtocol/ProtocolTitle'
+               AND o.path = '/InScopeProtocol/ProtocolTitle/@Type'
+               AND o.value = 'Professional'""", docId)
+        rows = cursor.fetchall()
+        self.ptitle = rows and rows[0][0] or u"[NO PROFESSIONAL TITLE]"
 
         cursor.execute("""\
             SELECT value
@@ -258,15 +274,28 @@ if not orgId:
 orgId  = cdr.exNormalize(orgId)[1]
 conn   = cdrdb.connect('CdrGuest')
 cursor = conn.cursor()
+
+# Selecting all published, non-blocked protocols listing the given
+# organization as a lead org
+# ----------------------------------------------------------------
 cursor.execute("""\
-    SELECT s.doc_id, s.value, o.node_loc
-      FROM query_term s
-      JOIN query_term o
+    SELECT s.doc_id, s.value, o.node_loc -- , l.value
+      FROM query_term_pub s
+      JOIN query_term_pub o
         ON s.doc_id = o.doc_id
+      JOIN document d
+        ON s.doc_id = d.id
+      JOIN query_term_pub l
+        ON s.doc_id = l.doc_id
+       AND l.path = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg'
+                  + '/LeadOrgRole'
+       AND left(l.node_loc, 8) = left(o.node_loc, 8)
      WHERE s.path = '/InScopeProtocol/ProtocolAdminInfo/CurrentProtocolStatus'
        AND o.path = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg'
                   + '/LeadOrganizationID/@cdr:ref'
-       AND o.int_val = ?""", orgId, timeout = 300)
+       AND o.int_val = ?
+       AND l.value = 'Primary'
+       AND d.active_status = 'A'""", orgId, timeout = 300)
 leadOrgProtocols = []
 rows = cursor.fetchall()
 if debugging:
@@ -278,17 +307,22 @@ for docId, status, nodeLoc in rows:
         i += 1
         sys.stderr.write("\rcollected %d of %d lead org prots" % (i,
                                                                   len(rows)))
+# Selecting all published, non-blocked protocols listing the given
+# organization as a protocol site
+# ----------------------------------------------------------------
 cursor.execute("""\
     SELECT s.doc_id, s.value, o.node_loc
-      FROM query_term s
-      JOIN query_term o
+      FROM query_term_pub s
+      JOIN query_term_pub o
         ON s.doc_id = o.doc_id
+      JOIN document d
+        ON s.doc_id = d.id
      WHERE s.path = '/InScopeProtocol/ProtocolAdminInfo/CurrentProtocolStatus'
        AND o.path = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg'
                   + '/ProtocolSites/OrgSite/OrgSiteID/@cdr:ref'
        AND o.int_val = ?
-       AND s.value IN ('Active', 'Approved-not yet active')""", orgId,
-               timeout = 300)
+       AND s.value IN ('Active', 'Approved-not yet active')
+       AND d.active_status = 'A'""", orgId, timeout = 300)
 if debugging:
     i = 0
     sys.stderr.write("\n")
@@ -301,18 +335,23 @@ for docId, status, nodeLoc in rows:
         i += 1
         sys.stderr.write("\rcollected %d of %d site prots" % (i, len(rows)))
 
+# Selecting all published, non-blocked protocols listing the given
+# organization as an external site
+# ----------------------------------------------------------------
 cursor.execute("""\
     SELECT s.doc_id, s.value, o.node_loc
-      FROM query_term s
-      JOIN query_term o
+      FROM query_term_pub s
+      JOIN query_term_pub o
         ON s.doc_id = o.doc_id
+      JOIN document d
+        ON s.doc_id = d.id
      WHERE s.path = '/InScopeProtocol/ProtocolAdminInfo/CurrentProtocolStatus'
        AND o.path = '/InScopeProtocol/ProtocolAdminInfo/ExternalSites'
                   + '/ExternalSite/ExternalSiteOrg'
                   + '/ExternalSiteOrgID/@cdr:ref'
        AND o.int_val = ?
-       AND s.value IN ('Active', 'Approved-not yet active')""", orgId,
-               timeout = 300)
+       AND s.value IN ('Active', 'Approved-not yet active')
+       AND d.active_status = 'A'""", orgId, timeout = 300)
 if debugging:
     i = 0
     sys.stderr.write("\n%d site PIs found\n" % sitePIs)
@@ -325,6 +364,45 @@ for docId, status, nodeLoc in rows:
         i += 1
         sys.stderr.write("\rcollected %d of %d external site org prots" % (i,
                                                                   len(rows)))
+# Selecting all published, non-blocked protocols listing the given
+# organization as a lead org
+# Since we suppressed the secondary lead orgs earlier we're 
+# adding those here.
+# ----------------------------------------------------------------
+cursor.execute("""\
+    SELECT s.doc_id, s.value, o.node_loc -- , l.value
+      FROM query_term_pub s
+      JOIN query_term_pub o
+        ON s.doc_id = o.doc_id
+      JOIN document d
+        ON s.doc_id = d.id
+      JOIN query_term_pub l
+        ON s.doc_id = l.doc_id
+       AND l.path = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg'
+                  + '/LeadOrgRole'
+       AND left(l.node_loc, 8) = left(o.node_loc, 8)
+     WHERE s.path = '/InScopeProtocol/ProtocolAdminInfo/CurrentProtocolStatus'
+       AND o.path = '/InScopeProtocol/ProtocolAdminInfo/ProtocolLeadOrg'
+                  + '/LeadOrganizationID/@cdr:ref'
+       AND o.int_val = ?
+       AND l.value <> 'Primary'
+       AND d.active_status = 'A'""", orgId, timeout = 300)
+
+if debugging:
+    i = 0
+    sys.stderr.write("\n")
+
+rows = cursor.fetchall()
+
+for docId, status, nodeLoc in rows:
+    siteOrgProtocol = SiteOrgProtocol(docId, status, nodeLoc, True)
+    siteOrgProtocols.append(siteOrgProtocol)
+
+    if debugging:
+        i += 1
+        sys.stderr.write("\rcollected %d of %d secondary site org prots" % (i,
+                                                                   len(rows)))
+
 if debugging:
     sys.stderr.write("\n%d site PIs found\n" % sitePIs)
 
@@ -335,18 +413,21 @@ def addSheet(wb, styles, protocolOrgs, title, sheet = 'ws2'):
                  'ws3':[40, 125, 125, 100, 400,  60,  60,  60, 100,  65]}
     colName  = { 'ws1':['PDQ UI', 'Primary Protocol ID', 
                         'Alternate IDs', 'ClinicalTrials.gov ID', 
-                        'Original Trial Title', 'Completion Date', 
+                        'Original Title / PDQ Title (bold)', 
+                        'Completion Date (Projected/Actual)', 
                         '', '',
                         'Lead Org Personnel', 'Published?'],
                  'ws2':['PDQ UI', 'Primary Protocol ID',
                         'Alternate IDs', 'ClinicalTrials.gov ID', 
-                        'Original Trial Title', '', 
+                        'Original Title / PDQ Title (bold)', 
+                        '', 
                         '', '',
                         'PI', 'Published?'],
                  'ws3':['PDQ UI', 'Primary Protocol ID', 
                         'Alternate IDs', 'ClinicalTrials.gov ID', 
-                        'Original Trial Title', 'Completion Date', 
-                        'Date of Closure', 'Current Prot. Status',
+                        'Original Title / PDQ Title (bold)', 
+                        'Completion Date (Projected/Actual)', 
+                        'Current Prot. Status Date', 'Current Prot. Status',
                         'Lead Org Personnel', 'Published?']
                 }
     ws = wb.addWorksheet(title)
@@ -368,6 +449,9 @@ def addSheet(wb, styles, protocolOrgs, title, sheet = 'ws2'):
         row = ws.addRow(rowNum)
         row.addCell(1, protocolOrg.protocol.docId, style = styles.right)
 
+        # Change per request (Bug 4606) 
+        # Only published protocols are being displayed
+        # ----------------------------------------------------------------
         if protocolOrg.protocol.published:
             published = "Yes"
             url = ("http://www.cancer.gov/clinicaltrials/"
@@ -383,11 +467,17 @@ def addSheet(wb, styles, protocolOrgs, title, sheet = 'ws2'):
         personnel = u"\n".join(protocolOrg.personnel)
         row.addCell(3, altIds, style = styles.left)
         row.addCell(4, protocolOrg.protocol.ctGovId,    style = styles.left)
-        row.addCell(5, protocolOrg.protocol.title,      style = styles.left)
+
+        if protocolOrg.protocol.title.upper() == 'NO ORIGINAL TITLE':
+            row.addCell(5, protocolOrg.protocol.ptitle, style = styles.leftb)
+        else:
+            row.addCell(5, protocolOrg.protocol.title,  style = styles.left)
+
         if protocolOrg.protocol.completionDate:
             row.addCell(6, "%s (%s)" % (protocolOrg.protocol.completionDate,
                                         protocolOrg.protocol.dateType), 
                                                         style = styles.center)
+
         row.addCell(7, protocolOrg.protocol.closedDate, style = styles.center)
         row.addCell(8, protocolOrg.protocol.status,     style = styles.center)
         row.addCell(9, personnel, style = styles.left)
@@ -408,6 +498,11 @@ class Styles:
         align       = ExcelWriter.Alignment('Center', 'Center', True)
         self.header = wb.addStyle(alignment = align, font = font)
 
+        # Create the style for the left-aligned, bold cells.
+        font        = ExcelWriter.Font(name = 'Arial', size = 10, bold = True)
+        align       = ExcelWriter.Alignment('Left', 'Top', True)
+        self.leftb  = wb.addStyle(alignment = align, font = font)
+        
         # Create the style for the linking cells.
         font        = ExcelWriter.Font('blue', None, 'Arial', size = 10)
         align       = ExcelWriter.Alignment('Left', 'Top', True)
