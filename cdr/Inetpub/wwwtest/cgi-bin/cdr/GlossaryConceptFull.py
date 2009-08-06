@@ -1,7 +1,7 @@
 #----------------------------------------------------------------------
 # coding=latin-1
 #
-# $Id: GlossaryConceptFull.py,v 1.8 2009-07-31 18:44:38 venglisc Exp $
+# $Id: GlossaryConceptFull.py,v 1.9 2009-08-06 18:50:08 venglisc Exp $
 #
 # Glossary Term Concept report
 # This report takes a concept and displays all of the Term Name 
@@ -199,11 +199,10 @@ def addAttributeRow(data, label, indent = False):
 def resolvePlaceHolder(language, termData, definitionText):
      # Create the Glossary Definition
      tmpdoc  = u"\n<GlossaryTermDef xmlns:cdr = 'cips.nci.nih.gov/cdr'>\n"  
-     tmpdoc += u" <TermNameString>" + \
-               termData.get(language, u"@S@%s (en inglés)@E@" % termData['en'])\
-                  + u"</TermNameString>\n"
+     tmpdoc += termData.get(language, u"@S@%s (en inglés)@E@" % termData['en'])\
+                  + u"\n"
      #tmpdoc += u" <TermNameString>" + \
-     #          termData.get(language, "*** No '%s' definition ***" % language)\
+     #         termData.get(language, u"@S@%s (en inglés)@E@" % termData['en'])\
      #             + u"</TermNameString>\n"
      tmpdoc += u" %s\n" % definitionText['DefinitionText']
 
@@ -238,20 +237,54 @@ def resolvePlaceHolder(language, termData, definitionText):
      return doc
 
 
+# #-----------------------------------------------------------------------
+# # Module to create a small XML snippet that can be submitted to a filter
+# # in order to substitute the PlaceHolder elements with the appropriate
+# # text from the ReplacementText elements.
+# #-----------------------------------------------------------------------
+# def displayComment(commentList):
+#      # Create the Glossary Definition
+#      tmpdoc  = u"\n<GlossaryTermDef xmlns:cdr = 'cips.nci.nih.gov/cdr'>\n"  
+# 
+#      # Add the CommentText and attributes
+#      for comment in commentList:
+#          tmpdoc += u"  %s\n" % comment
+# 
+#      tmpdoc += u"</GlossaryTermDef>\n"
+# 
+#      # Need to encode the unicode string to UTF-8 since that's what the 
+#      # filter module expects.  Decoding it back to unicode once the 
+#      # filtered document comes back.
+#      # --------------------------------------------------------------------
+#      doc = cdr.filterDoc('guest', ['name:Glossary Term Definition Update'], 
+#                          doc = tmpdoc.encode('utf-8'))
+# 
+#      if type(doc) in (type(""), type(u"")):
+#          cdrcgi.bail(doc)
+#      if type(doc) == type(()):
+#          doc = doc[0].decode('utf-8')
+# 
+#      return doc
+
+
 #-----------------------------------------------------------------------
 # Module to create a small XML snippet that can be submitted to a filter
 # in order to substitute the PlaceHolder elements with the appropriate
 # text from the ReplacementText elements.
 #-----------------------------------------------------------------------
-def displayComment(commentList):
-     # Create the Glossary Definition
-     tmpdoc  = u"\n<GlossaryTermDef xmlns:cdr = 'cips.nci.nih.gov/cdr'>\n"  
+def displayMarkup(xmlString, element):
+     # Create XML document to be filtered
+     if element == 'TermName':
+         tmpdoc  = u"\n<TermNameDef xmlns:cdr = 'cips.nci.nih.gov/cdr'>\n"  
+         tmpdoc += u"  %s\n" % xmlString
+         tmpdoc += u"</TermNameDef>\n"
+     elif element == 'Comment':
+         tmpdoc  = u"\n<GlossaryTermDef xmlns:cdr = 'cips.nci.nih.gov/cdr'>\n"  
+         # Add the CommentText and attributes
+         for comment in xmlString:
+             tmpdoc += u"  %s\n" % comment
+         tmpdoc += u"</GlossaryTermDef>\n"
 
-     # Add the CommentText and attributes
-     for comment in commentList:
-         tmpdoc += u"  %s\n" % comment
-
-     tmpdoc += u"</GlossaryTermDef>\n"
 
      # Need to encode the unicode string to UTF-8 since that's what the 
      # filter module expects.  Decoding it back to unicode once the 
@@ -438,6 +471,8 @@ def getSharedInfo(docId):
 # The data is stored in a dictionary.
 #----------------------------------------------------------------------
 def getConcept(docId):
+    debugCount = sNum = eNum = 0
+    debugList = []
     try:
         cursor.execute("SELECT xml FROM document WHERE id = ?", docId)
         row = cursor.fetchone()
@@ -465,6 +500,8 @@ def getConcept(docId):
                 #                          element2:[value1, value2], ...}}
                 concept.update({'%s-%s' % (language, audience):{}})
 
+                eNum += 1
+                sNum += 1
                 for child in node.childNodes:
                     # Adding all values that are not multiply occuring
                     # Creating entry 'key':value
@@ -514,6 +551,7 @@ def getConcept(docId):
                                     rText = child
                                     concept['%s-%s' % (language, audience)][
                                           gcList].append(rText.toxml())
+                                    #if sNum == 2: cdrcgi.bail(concept)
                                 else:
                                     concept['%s-%s' % (language, audience)][
                                           gcList].append(
@@ -523,6 +561,7 @@ def getConcept(docId):
                                     rText = child
                                     concept['%s-%s' % (language, audience)
                                               ].update({gcList:[rText.toxml()]})
+                                    #if eNum == 2: cdrcgi.bail(concept)
                                 else:
                                     concept['%s-%s' % (language, audience)
                                               ].update({gcList:[
@@ -565,23 +604,29 @@ def getNameDefinition(docId):
                 # 'enx':[one, two], 'esx':[uno, duo], ...
                 # Note:  We need to escape possible '&' characters
                 #        in the TermNameString
+                # New requirement:
+                #        We need to preserve insertion/deletion
+                #        markup.
                 # ------------------------------------------------
                 if not alternate:
                     for child in node.childNodes:
                         if child.nodeName == 'TermNameString':
                             termName[docId].update(
-                               {language:cgi.escape(
-                                         cdr.getTextContent(child).strip())})
+                               {language:child.toxml()})
+                #              {language:cgi.escape(
+                #                        cdr.getTextContent(child).strip())})
                 else:
                     for child in node.childNodes:
                         if child.nodeName == 'TermNameString':
                             if termName[docId].has_key(language + 'x'):
                                 termName[docId][language + 'x'].append(
-                                             cdr.getTextContent(child).strip())
+                                             child.toxml())
+                            #                cdr.getTextContent(child).strip())
                             else:
                                 termName[docId].update(
                                           {language + 'x':
-                                          [cdr.getTextContent(child).strip()]})
+                                          [child.toxml()]})
+                            #             [cdr.getTextContent(child).strip()]})
 
             if node.nodeName == 'ReplacementText':
                 if termName[docId].has_key('ReplacementText'):
@@ -729,11 +774,11 @@ for termNameId in termNameIds:
     termInfo = getNameDefinition(termNameId)
     allTermsInfo.update(termInfo)
 
-# cdrcgi.bail(allTermsInfo)
+#cdrcgi.bail(allTermsInfo)
 # -----------------------------------------------------------------
 # Display the GlossaryTermName Information
 # -----------------------------------------------------------------
-pattern   = re.compile("@@(.)@@")
+#pattern   = re.compile("@@(.)@@")
 
 # If all options should need to be printed on the QC report here
 # are the possible values
@@ -786,7 +831,8 @@ for lang in languages:
                 # -----------------------------------------------------
                 if termNameStatus[id] == 'A':
                     html += """\
-    <td width="70%%">%s (CDR%s)""" % (termData[lang], id)
+    <td width="70%%">%s (CDR%s)""" % (displayMarkup(termData[lang], 'TermName'),
+                                                                          id)
 
                     if termData.has_key(lang + 'x'):
                         html += " &nbsp;[alternate: %s]" % (
@@ -831,15 +877,33 @@ for lang in languages:
             # (The HTML output is created in the filter)
             # ----------------------------------------------------
             if conceptInfo.has_key('%s-%s' % (lang, aud)):
-                #cdrcgi.bail(termData)
                 definitionRow = resolvePlaceHolder(lang, termData, 
                                             conceptInfo['%s-%s' % (lang, aud)])
                 ### There may be a better way to do this substitution???
                 ### ####################################################
-                replaceList = re.findall('@@.@@', definitionRow)
-                for text in replaceList:
-                    definitionRow = definitionRow.replace(text, text.upper())
-                definitionRow = definitionRow.replace('@@', '')
+                # If we have a CAPPEDTERMNAME PlaceHolder the filter has
+                # enclosed the term with @@...@@ characters.  However, the
+                # term name could be marked up with insertion/deletion
+                # markup.  We need to find the first character within this
+                # string that needs to be capitalized.
+                # If the first character is a '<' this indicates the 
+                # beginning of the <span> element for markup. The first 
+                # character after the </span> should then be capitalized.
+                # --------------------------------------------------------
+                replaceList = re.findall('@@.*?@@', definitionRow)
+
+                if replaceList:
+                    for text in replaceList:
+                        m1 = re.sub('@@', '', text)
+                        m2 = re.sub('@@', '', m1)
+                        if m2[0] == '<':
+                            m3 = re.search('<.*?>.', m2)
+                            rtext = m3.group(0)[:-1] + \
+                                    m3.group(0)[-1].upper() + \
+                                    re.sub(m3.group(0), '', m2)
+                        else:
+                            rtext = m2[0].upper() + m2[1:]
+                        definitionRow = definitionRow.replace(text, rtext)
 
                 # If there was a term without Spanish name display it
                 # in red to stand out.
@@ -897,8 +961,9 @@ for lang in languages:
             # We need to process the attributes, too, so we're sending
             # the Comment node through a filter
             if conceptInfo['%s-%s' % (lang, aud)].has_key('Comment'):
-                commentRow = displayComment(
-                            conceptInfo['%s-%s' % (lang, aud)]['Comment'])
+                commentRow = displayMarkup(
+                            conceptInfo['%s-%s' % (lang, aud)]['Comment'], 
+                                                               'Comment')
                 html += commentRow
             # Adding row for Date Last Modified 
             if conceptInfo['%s-%s' % (lang, aud)].has_key('DateLastModified'):
