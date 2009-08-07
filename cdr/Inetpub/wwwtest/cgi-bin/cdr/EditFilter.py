@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditFilter.py,v 1.23 2008-08-15 04:03:34 ameyer Exp $
+# $Id: EditFilter.py,v 1.24 2009-08-07 16:39:18 venglisc Exp $
 #
 # Prototype for editing CDR filter documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.23  2008/08/15 04:03:34  ameyer
+# Fixed little bug - err check in "session" should have checked "prodSession".
+#
 # Revision 1.22  2008/06/03 21:58:55  bkline
 # Replaced StandardError (going away at some point) with Exception objects.
 #
@@ -436,6 +439,7 @@ def doCvs(docId, doc, cvsid, cvspw, cvscomment, session):
             if res.output.find("cannot find module") == -1:
                 errorMessage = "cvs checkout failure: %d: %s" % \
                         (res.code, res.output)
+                errorMessage += " [cmd='%s']" % cmd
 
             # Then use a known document to create a minimal working directory.
             if not errorMessage:
@@ -586,7 +590,7 @@ elif request == 'Compare With':
         title = "Differences between %s and %s" % (name1, name2)
     else:
         title = "%s and %s are identical" % (name1, name2)
-    cdrcgi.sendPage("""\
+    cdrcgi.sendPage(u"""\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>
  <head>
@@ -596,7 +600,7 @@ elif request == 'Compare With':
   <h3>%s</h3>
   <pre>%s</pre>
  </body>
-</html>""" % (title, title, report))
+</html>""" % (title, title, report.replace('\r', '')))
 
 #--------------------------------------------------------------------
 # Create a new document using the existing data.
