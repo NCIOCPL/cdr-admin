@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.69 2009-05-28 20:38:26 venglisc Exp $
+# $Id: QcReport.py,v 1.70 2009-08-07 17:29:43 venglisc Exp $
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to
 # the browser.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.69  2009/05/28 20:38:26  venglisc
+# Added checkbox to suppress display of Reference sections. (Bug 4562)
+#
 # Revision 1.68  2009/03/23 15:48:10  venglisc
 # Modified DocType coming in from Drug Summaries to be the CDR doctype
 # 'DrugInformationSummary' instead of 'DIS' allowing for comparison with the
@@ -1228,7 +1231,7 @@ if not filters.has_key(docType):
                      getObject = 1)
     if type(doc) in (type(""), type(u"")):
         cdrcgi.bail(doc)
-    html = """\
+    html = u"""\
 <html>
  <head>
   <title>%s</title>
@@ -1237,7 +1240,8 @@ if not filters.has_key(docType):
   <pre>%s</pre>
  </body>
 </html>""" % (doc.ctrl['DocTitle'], cgi.escape(doc.xml))
-    cdrcgi.sendPage(cdrcgi.unicodeToLatin1(html))
+    cdrcgi.sendPage(html)
+    #cdrcgi.sendPage(cdrcgi.unicodeToLatin1(html))
 
 filterParm = []
 
