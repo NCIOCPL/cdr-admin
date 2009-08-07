@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: PersonLocSearch.py,v 1.9 2007-11-03 14:15:07 bkline Exp $
+# $Id: PersonLocSearch.py,v 1.10 2009-08-07 17:43:25 venglisc Exp $
 #
 # Prototype for duplicate-checking interface for Person documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.9  2007/11/03 14:15:07  bkline
+# Unicode encoding cleanup (issue #3716).
+#
 # Revision 1.8  2003/08/25 20:20:18  bkline
 # Added support for showing home addresses on the picklist; eliminated
 # encoding problem.
@@ -74,7 +77,7 @@ if not submit:
                           buttons,
                           'Person',
                           conn)
-    page += """\
+    page += u"""\
   </FORM>
  </BODY>
 </HTML>
