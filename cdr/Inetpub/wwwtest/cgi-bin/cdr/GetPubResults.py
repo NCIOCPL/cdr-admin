@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GetPubResults.py,v 1.1 2009-08-10 16:21:28 bkline Exp $
+# $Id: GetPubResults.py,v 1.2 2009-08-10 16:28:12 bkline Exp $
 #
 # Summary list of published clinical trial results by CTEP ID.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2009/08/10 16:21:28  bkline
+# Summary list of published clinical trial results by CTEP ID.
+#
 #----------------------------------------------------------------------
 import cdr, cdrdb, cgi, re, time, os, xml.dom.minidom, sys
 
@@ -29,8 +32,8 @@ class Citation:
         if lastPub == -1:
             raise Exception('no publishable versions for citation CDR%d' % id)
         doc = cdr.getDoc('guest', id, version = lastPub, getObject = True)
-        errors = cdr.getErrors(doc, errorsExpected = False)
-        if errors:
+        if type(doc) in (str, unicode):
+            errors = cdr.getErrors(doc)
             raise Exception(errors)
         cursor.execute("""\
             SELECT dt
