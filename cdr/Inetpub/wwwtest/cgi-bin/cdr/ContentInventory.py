@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: ContentInventory.py,v 1.2 2009-07-29 16:32:23 venglisc Exp $
+# $Id: ContentInventory.py,v 1.3 2009-08-13 21:50:05 venglisc Exp $
 #
 # Report listing all citations linked by a summary document.
 # The output format is *.xml (Excel is able to import this)
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2009/07/29 16:32:23  venglisc
+# Saving latest version which apparently wasn't under CVS yet.
+#
 # Revision 1.1  2009/03/24 15:16:50  venglisc
 # Initial report to list summary, media, drug summary inventory. (Bug 4533)
 #
@@ -28,6 +31,145 @@ t = time.strftime("%Y%m%d%H%M%S")
 REPORTS_BASE = 'd:/cdr/tmp'
 name = '/ContentInventory.xml'
 fullname = REPORTS_BASE + name
+
+# ----------------------------------------------------------------------
+# Document class to identify the keywords for the individual document
+# types.  The keywords to be selected are as follows:
+#   Summary:  main topic, section diagnosis, section intervention,
+#             section type
+#   DrugInfo: approved indication
+#   Media:    label name, category element, diagnosis
+# ----------------------------------------------------------------------
+class Document:
+    def __init__(self, id, docType, cursor):
+        self.cdrId         = id
+        self.type          = docType
+        self.mainTopics    = []
+        self.sDiagnoses    = []
+        self.mDiagnoses    = []
+        self.interventions = []
+        self.sectionTypes  = []
+        self.indications   = []
+        self.labelNames    = []
+        self.categories    = []
+
+        termQuery = """
+            SELECT t.value 
+              FROM query_term d
+              JOIN query_term t
+                ON t.doc_id = d.int_val
+               AND t.path = '/Term/PreferredName'
+             WHERE d.path LIKE '%s'
+               AND d.doc_id = %d 
+             ORDER BY t.value"""
+        termPaths = {'DIS':    {'Indication':
+                                '/%%/DrugInfoMetaData' +
+                                '/ApprovedIndication/@cdr:ref'},
+                     'Summary':{'MainTopic':
+                                '/%%/SummaryMetaData/MainTopics'  +
+                                '/Term/@cdr:ref',
+                                'Diagnosis':
+                                '/Summary/%%/SectMetaData' +
+                                '/Diagnosis/@cdr:ref',
+                                'Intervention':
+                                '/Summary/%%/SectMetaData' +
+                                '/Intervention/@cdr:ref'},
+                     'Media':  {'Diagnosis':
+                                '/Media/%%/Diagnosis/@cdr:ref'}}
+
+        valueQuery = """
+            SELECT d.value 
+              FROM query_term d
+             WHERE d.path LIKE '%s'
+               AND d.doc_id = %d
+             ORDER BY d.value"""
+        valuePaths = {'Summary':{'SectType':
+                                 '/Summary/%%/SectMetaData/SectionType'},
+                      'Media'  :{'Category':
+                                 '/Media/MediaContent/Categories/Category',
+                                 'Label':
+                                 '/Media/PhysicalMedia/ImageData/LabelName'}}
+
+        if self.type == 'DrugInformationSummary':
+            # Selecting approved indication for DIS
+            # -------------------------------------
+            cursor.execute(termQuery % (termPaths['DIS']['Indication'], 
+                                        self.cdrId))
+            rows = cursor.fetchall()
+            for row in rows:
+                self.indications.append(row[0])
+        elif self.type == 'Summary':
+            # Selecting main topic for summaries
+            # ----------------------------------
+            cursor.execute(termQuery % (termPaths['Summary']['MainTopic'], 
+                                        self.cdrId))
+            rows = cursor.fetchall()
+            for row in rows:
+                self.mainTopics.append(row[0])
+
+            # Selecting section diagnosis for summaries
+            # ------------------------------ ----------
+            cursor.execute(termQuery % (termPaths['Summary']['Diagnosis'], 
+                                        self.cdrId))
+            rows = cursor.fetchall()
+            for row in rows:
+                self.sDiagnoses.append(row[0])
+
+            # Selecting section intervention for summaries
+            # --------------------------------------------
+            cursor.execute(termQuery % (termPaths['Summary']['Intervention'], 
+                                        self.cdrId))
+            rows = cursor.fetchall()
+            for row in rows:
+                self.interventions.append(row[0])
+
+            # Selecting section type for summaries
+            # ------------------------------------
+            cursor.execute(valueQuery % (valuePaths['Summary']['SectType'], 
+                                        self.cdrId))
+            rows = cursor.fetchall()
+            for row in rows:
+                self.sectionTypes.append(row[0])
+        elif self.type == 'Media':
+            # Selecting main topic for summaries
+            # ----------------------------------
+            cursor.execute(termQuery % (termPaths['Media']['Diagnosis'], 
+                                        self.cdrId))
+            rows = cursor.fetchall()
+            for row in rows:
+                self.mDiagnoses.append(row[0])
+
+            # Selecting main topic for summaries
+            # ----------------------------------
+            cursor.execute(valueQuery % (valuePaths['Media']['Category'], 
+                                        self.cdrId))
+            rows = cursor.fetchall()
+            for row in rows:
+                self.categories.append(row[0])
+
+            # Selecting main topic for summaries
+            # ----------------------------------
+            cursor.execute(valueQuery % (valuePaths['Media']['Label'], 
+                                        self.cdrId))
+            rows = cursor.fetchall()
+            for row in rows:
+                self.labelNames.append(row[0])
+
+
+
+# ----------------------------------------------------------------------
+# Function to combine all of the Document lists into a single keyword
+# list
+# ----------------------------------------------------------------------
+def combineAll(doc):
+    allKeywords = []
+
+    for attr in doc.__dict__:
+        if not attr == 'cdrId' and not attr == 'type':
+            allKeywords.extend(doc.__dict__[attr])
+
+    return allKeywords
+
 
 #-----------------------------------------------------------------------
 # Query to list the Summary, DrugSummary, and Media documents
@@ -133,12 +275,13 @@ styleH  = wb.addStyle(alignment = alignH, font = headFont)
 # -------------------
 ws.addCol( 1, 130)
 ws.addCol( 2,  40)
-ws.addCol( 3, 300)
+ws.addCol( 3, 200)
 ws.addCol( 4, 150)
-ws.addCol( 5, 100)
+ws.addCol( 5, 200)
 ws.addCol( 6, 100)
-ws.addCol( 7,  55)
-ws.addCol( 8,  65)
+ws.addCol( 7, 100)
+ws.addCol( 8,  55)
+ws.addCol( 9,  65)
 
 # Create the Header row
 # ---------------------
@@ -147,10 +290,11 @@ exRow.addCell(1, 'Document Type')
 exRow.addCell(2, 'CDR-ID')
 exRow.addCell(3, 'Title')
 exRow.addCell(4, 'URL')
-exRow.addCell(5, 'Type')
-exRow.addCell(6, 'Audience')
-exRow.addCell(7, 'Language')
-exRow.addCell(8, 'Date Last Modified / Last Processed')
+exRow.addCell(5, 'Keywords')
+exRow.addCell(6, 'Type')
+exRow.addCell(7, 'Audience')
+exRow.addCell(8, 'Language')
+exRow.addCell(9, 'Date Last Modified / Last Processed')
 
 # Add the protocol data one record at a time beginning after 
 # the header row
@@ -161,6 +305,14 @@ for row in rows:
     exRow = ws.addRow(rowNum, style1, 40)
     exRow.addCell(1, row[0])
     exRow.addCell(2, row[1])
+
+    doc = Document(row[1], row[0], cursor)
+
+    keywords = combineAll(doc)
+
+    #print keywords
+    #print ", ".join([x for x in keywords])
+    #sys.exit(1)
     
     if row[0] == 'Media':
         url = '%s/cgi-bin/cdr/GetCdrImage.py?id=CDR%s.jpg' % (
@@ -169,10 +321,11 @@ for row in rows:
     else:
         exRow.addCell(3, " %s" % row[2], href = row[3], style = style4)
     exRow.addCell(4, row[3])
-    exRow.addCell(5, row[4])
-    exRow.addCell(6, row[5])
-    exRow.addCell(7, row[6])
-    exRow.addCell(8, row[7])
+    exRow.addCell(5, ", ".join([x for x in keywords]))
+    exRow.addCell(6, row[4])
+    exRow.addCell(7, row[5])
+    exRow.addCell(8, row[6])
+    exRow.addCell(9, row[7])
 
 t = time.strftime("%Y%m%d%H%M%S")                                               
 print "Content-type: application/vnd.ms-excel"                                  
