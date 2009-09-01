@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: AdvancedSearch.py,v 1.9 2009-05-06 03:21:57 ameyer Exp $
+# $Id: AdvancedSearch.py,v 1.10 2009-09-01 21:26:41 ameyer Exp $
 #
 # Main menu for advanced search forms.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.9  2009/05/06 03:21:57  ameyer
+# Trivial change to send unicode to sendPage instead of ASCII.
+#
 # Revision 1.8  2008/09/18 13:57:47  bkline
 # Added Drug Information Summaries search.
 #
@@ -106,8 +109,7 @@ header  = u"""\
 """
 
 menu    = """\
-   <UL>
-    <SPAN CLASS='Page'>
+   <UL class='Page'>
     <LI><A HREF='%s/CiteSearch.py%s'>Citation</A></LI>
     <LI><A HREF='%s/CountrySearch.py%s'>Country</A></LI>
     <LI><A HREF='%s/DISSearch.py%s'>Drug Information Summary</A></LI>
@@ -123,8 +125,7 @@ menu    = """\
     <LI><A HREF='%s/ProtSearch.py%s'>Protocol</A></LI>
     <LI><A HREF='%s/SummarySearch.py%s'>Summary</A></LI>
     <LI><A HREF='%s/TermSearch.py%s'>Term</A></LI>
-    </SPAN>
-   </OL>
+   </UL>
 """ % (cdrcgi.BASE, session,
        cdrcgi.BASE, session,
        cdrcgi.BASE, session,
