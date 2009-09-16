@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------
-# $Id: getBatchStatus.py,v 1.1 2002-08-02 03:41:37 ameyer Exp $
+# $Id: getBatchStatus.py,v 1.2 2009-09-16 16:37:31 venglisc Exp $
 #
 # CGI program for displaying the status of batch jobs.
 #
@@ -21,6 +21,9 @@
 # both to display a form and to read its contents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2002/08/02 03:41:37  ameyer
+# Interactive viewer for status of batch jobs.
+#
 #
 #----------------------------------------------------------------------
 
@@ -150,8 +153,8 @@ if not len (statusRows):
 else:
     # Put results in a table for display
     html += """
-<table border='1'>
- <tr>
+<table border='1' cellspacing='0' cellpadding='5'>
+ <tr style='background-color: #D2D2D2;'>
   <td><b>ID</b></td>
   <td><b>Job name</b></td>
   <td><b>Started</b></td>
@@ -162,7 +165,7 @@ else:
 """
     for row in statusRows:
         html += """
- <tr>
+ <tr style='background-color:#E7E7E7;'>
   <td>%s</td>
   <td>%s</td>
   <td>%s</td>
