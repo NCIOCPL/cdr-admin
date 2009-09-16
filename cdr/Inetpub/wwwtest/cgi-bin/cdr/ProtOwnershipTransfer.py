@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtOwnershipTransfer.py,v 1.1 2009-09-16 16:42:07 venglisc Exp $
+# $Id: ProtOwnershipTransfer.py,v 1.2 2009-09-16 17:04:30 venglisc Exp $
 #
 # Report on mailers which haven't been responded to (other than
 # status and participant mailers).
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2009/09/16 16:42:07  venglisc
+# Initial copy of program to submit a batch job to create the 'Transfer of
+# Ownership' report. (Bug 4626)
+#
 # Revision 1.6  2006/03/14 14:17:18  bkline
 # Replaced development server with current server in email link.
 #
@@ -32,7 +36,7 @@ import cgi, cdr, cdrcgi, cdrdb, re, sys, time, cdrbatch
 #----------------------------------------------------------------------
 # Get the parameters from the request.
 #----------------------------------------------------------------------
-repTitle = 'dada'
+repTitle = 'Protocol Ownership Transfer'
 fields   = cgi.FieldStorage() or cdrcgi.bail("No Request Found", repTitle)
 session  = cdrcgi.getSession(fields) or cdrcgi.bail("Not logged in")
 action   = cdrcgi.getRequest(fields)
@@ -40,10 +44,10 @@ title    = "CDR Administration"
 section  = "Protocol Ownership Transfer Report"
 SUBMENU  = "Reports Menu"
 buttons  = ["Submit", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-header   = cdrcgi.header(title, title, section, "bpto.py",
+header   = cdrcgi.header(title, title, section, "ProtOwnershipTransfer.py",
                          buttons, method = 'GET')
 email    = fields and fields.getvalue("Email")      or None
-command  = 'lib/Python/CdrLongReports_ve.py'
+command  = 'lib/Python/CdrLongReports.py'
 
 #----------------------------------------------------------------------
 # Handle navigation requests.
