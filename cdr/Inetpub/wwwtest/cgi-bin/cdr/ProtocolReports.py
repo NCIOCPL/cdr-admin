@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolReports.py,v 1.38 2008-09-02 20:09:10 bkline Exp $
+# $Id: ProtocolReports.py,v 1.39 2009-09-16 16:34:19 venglisc Exp $
 #
 # Submenu for protocol reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.38  2008/09/02 20:09:10  bkline
+# Added Protocols Linked to Terms report (#4263).
+#
 # Revision 1.37  2008/08/13 19:52:59  bkline
 # Fixed typo (leftover from cut/paste of oncore report); added report
 # of Protocols with Regulatory Info Block.
@@ -195,6 +198,8 @@ for r in (('ApprovedNotYetActive.py',
            'Protocol Interventions by Protocol Title', ''),
           ('ProtSitesWithoutPhone.py',
            'Protocol Sites Without Phone Numbers', ''),
+          ('ProtOwnershipTransfer.py',
+           'Protocol Transfer of Ownership Responses', ''),
           ('ProtocolsLinkedToTerms.py',
            'Protocols Linked to Terms', ''),
           ('ProtocolActiveNoSites.py',
