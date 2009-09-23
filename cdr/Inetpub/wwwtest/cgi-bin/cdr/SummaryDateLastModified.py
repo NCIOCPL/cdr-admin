@@ -1,12 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryDateLastModified.py,v 1.13 2008-07-30 17:00:23 venglisc Exp $
+# $Id: SummaryDateLastModified.py,v 1.14 2009-09-23 12:33:27 bkline Exp $
 #
 # Report listing specified set of Cancer Information Summaries, the date
 # they were last modified as entered by a user, and the date the last
 # Modify action was taken.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.13  2008/07/30 17:00:23  venglisc
+# Added date to report. (Bug 4209)
+#
 # Revision 1.12  2008/07/18 15:07:27  venglisc
 # Fixed SQL query to pick up the documents DateLastModified instead of
 # (for the Spanish document) the DLM of the English summary. (Bug 4214)
@@ -501,9 +504,6 @@ def collectSummaries(sqlSelect, sqlFrom, sqlJoin, sqlWhere,
             sql = (sqlSelect + sqlFrom + boardJoin + sqlJoin + sqlWhere +
                    audienceFilter + boardFilter + langFilter + dateFilter)
             stamp = time.time()
-            fp = open('d:/tmp/dlm-%s-%s.sql' % (language, stamp), 'w')
-            fp.write(sql)
-            fp.close()
             cursor.execute(sql, timeout = 300)
             rows = cursor.fetchall()
             for row in rows:
