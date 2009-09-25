@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: NewDocReport.py,v 1.4 2002-04-23 22:57:01 bkline Exp $
+# $Id: NewDocReport.py,v 1.5 2009-09-25 16:21:42 venglisc Exp $
 #
 # Reports on newly created documents and their statuses.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2002/04/23 22:57:01  bkline
+# Bumped up timeout for query.
+#
 # Revision 1.3  2002/03/14 04:06:24  bkline
 # Adjusted default date range.
 #
@@ -79,7 +82,7 @@ if not fromDate or not toDate:
         form += """\
       <OPTION VALUE='%s'>%s &nbsp;</OPTION>
 """ % (docType, docType)
-    form += """\
+    form += u"""\
     </TR>
     <TR>
      <TD><B>Start Date:&nbsp;</B></TD>
@@ -250,7 +253,7 @@ for key in keys:
         col1 = "&nbsp;"
         total += counts[i]
    
-    html += """\
+    html += u"""\
    <tr>
     <td nowrap='1'>
      <b>
@@ -267,7 +270,7 @@ for key in keys:
     </td>
    </tr>
 """ % total
-cdrcgi.sendPage(html + """\
+cdrcgi.sendPage(html + u"""\
   </table>
  </body>
 </html>
