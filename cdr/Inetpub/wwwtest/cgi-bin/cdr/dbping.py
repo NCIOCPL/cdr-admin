@@ -4,9 +4,13 @@
 #
 # If error, reports to default log file (debug.log) and to web client.
 #
-# $Id: dbping.py,v 1.2 2009-03-31 21:59:18 ameyer Exp $
+# $Id: dbping.py,v 1.3 2009-09-25 03:32:49 ameyer Exp $
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2009/03/31 21:59:18  ameyer
+# Added logging of the current task list for the machine around errors.
+# Moved from debug.log to dbping.log, to concentrate relevant info.
+#
 # Revision 1.1  2008/08/07 19:39:29  ameyer
 # Version modified to include logging.
 #
@@ -42,6 +46,7 @@ def errState(errOn):
                 fp = file(ERR_STATE_FILE, "w")
                 fp.close()
             except IOError, info:
+                cdr.logwrite("Error creating state file: %s" % str(info))
                 cdr.logwrite("Error creating state file: %s" % str(info), LF)
     else:
         if oldErrState:
@@ -63,15 +68,52 @@ def saveTaskList(msg):
     Pass:
         msg - Message to associate with this invocation.
     """
-    # Execute an external program to see what's going on, capture output
-    subproc = subprocess.Popen("tasklist", stdout=subprocess.PIPE)
-    output  = subproc.stdout.read()
+    # XXX DISABLED
+    # This works when run from the command line, but not when run by IIS.
+    # It always generates an "Access is denied" exception.
+    # The problem does not appear to be the permissions on the "tasklist"
+    #  program itself, but on the underlying OS calls.  These must be common
+    #  to all task listing programs.  I couldn't find any that circumvent it.
+    # XXX DISABLED
+    return
 
-    cdr.logwrite("\n%s\n%s\n" % (msg, output), LF)
+    # Log plain message
+    cdr.logwrite(msg, LF)
+
+    # Execute an external program to see what's going on, capture output
+    # Have experimented with subprocess.Popen and os.popen to try to
+    # overcome an apparent permissions issue.  Is it on cmd.exe?
+    # subproc = subprocess.Popen("tasklist", stdout=subprocess.PIPE)
+    # output  = subproc.stdout.read()
+    subproc = None
+    output  = None
+    retcode = 0
+    try:
+        # subproc = os.popen("tasklist 2>&1")
+        # output  = subproc.read()
+        subproc = subprocess.Popen("tasklist", shell=False,
+                                    stdout=subprocess.PIPE)
+        cdr.logwrite("tasklist Popen'd", LF)
+        output  = subproc.stdout.read()
+        cdr.logwrite("tasklist read, output len = %d" % len(output), LF)
+        # retcode = subproc.close()       # os.popen method
+        retcode = subproc.returncode    # subprocess Popen method
+    except Exception, info:
+        cdr.logwrite("Exception raised during popen/read/close: %s" % info, LF)
+
+    if retcode:
+        cdr.logwrite("popen/read/close failed, return code=%d" % retcode, LF)
+
+    # Log output from command
+    if output:
+        cdr.logwrite("Output:\n%s\n" % output, LF)
+    else:
+        cdr.logwrite("No output available", LF)
 
 
 # Uncomment if we need to show it's being called
 # cdr.logwrite("dbping called")
+# cdr.logwrite("dbping called", LF)
 try:
     cursor = cdrdb.connect('CdrGuest').cursor()
     cursor.execute("SELECT COUNT(*) FROM document", timeout = 30)
@@ -84,9 +126,9 @@ except Exception, e:
     # Remember between runs that an error occurred on this run
     errState(True)
 
-    # Record the current task environment
-    saveTaskList("dbping: caught exception type=%s  value=%s" %
-                 (type(e), e))
+    # Uncomment to record the current task environment
+    # saveTaskList("dbping: caught exception type=%s  value=%s" % (type(e), e))
+    cdr.logwrite("dbping: caught exception type=%s  value=%s" % (type(e),e),LF)
 
     # Check for database blockers
     try:
@@ -122,3 +164,4 @@ else:
     # If it just now flipped from on to off, save a task list
     if prevErrState:
         saveTaskList("Saving task list after error recovery")
+    # saveTaskList("Saving task list for testing")
