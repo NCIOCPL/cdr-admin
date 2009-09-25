@@ -71,7 +71,7 @@ try:
  LEFT OUTER JOIN profiles q
               ON q.userid = b.qa_contact
            WHERE bug_status <> 'CLOSED'
-             AND priority %s 'P5'
+             AND priority %s 'P10'
              AND resolution <> 'DUPLICATE'
              AND (resolution <> 'WONTFIX' OR bug_status <> 'RESOLVED')
              AND b.product_id = 1 -- 'CDR'
