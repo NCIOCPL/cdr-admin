@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: GeneralReports.py,v 1.20 2008-12-01 22:26:38 venglisc Exp $
+# $Id: GeneralReports.py,v 1.21 2009-09-25 16:19:53 venglisc Exp $
 #
 # Submenu for general reports.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.20  2008/12/01 22:26:38  venglisc
+# Adding back in the Ad-hoc SQL interface.
+#
 # Revision 1.19  2008/07/11 20:15:32  bkline
 # Replaced old ad hoc query interface on menu with new one (at Lakshmi's
 # request, #4126).
@@ -110,6 +113,8 @@ reports = [
             'Checked Out Documents'),
            ('CdrReport.py', 
             'Checked Out Documents With No Activity'),
+           ('ContentInventory.py',
+            'Content Inventory Report'),
            ('ActiveLogins.py', 
             'Current Sessions'),
            ('db-tables.py',

@@ -1,10 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: CTGov_Compliance_PUP.py,v 1.1 2009-05-04 21:13:42 venglisc Exp $
+# $Id: CTGov_Compliance_PUP.py,v 1.2 2009-09-25 16:18:56 venglisc Exp $
 #
 # Update Non-Compliance Report from CTGov to add PUP information.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2009/05/04 21:13:42  venglisc
+# Initial copy of program to read a spreadsheet with protocol information
+# and populate the PUP information of the primary LeadOrg for the listed
+# protocols. (Bug 4566)
+#
 #----------------------------------------------------------------------
 import cdr, cdrdb, sys, time, cdrdocobject #, cdrcgi, 
 import xml.dom.minidom, ExcelWriter, ExcelReader
@@ -24,7 +29,7 @@ if sys.platform == "win32":
 # this information.
 # -------------------------------------------------------------------
 class Protocol:
-    def __init__(self, nctInfo):
+    def __init__(self, nctInfo, cursor):
         self.cdrId     = nctInfo[u'CDRID']
         self.pID       = nctInfo[u'pid']
         self.source    = nctInfo[u'source']
@@ -37,6 +42,8 @@ class Protocol:
         self.pupName   = []
         self.pupPhone  = []
         self.pupEmail  = []
+        self.vMailerResp = []
+        self.vMailerChange = []
 
         #----------------------------------------------------------------------
         # Filter the document.
@@ -88,7 +95,36 @@ class Protocol:
         nctInfo[u'pupName'] = self.pupName
         nctInfo[u'pupPhone'] = self.pupPhone
         nctInfo[u'pupEmail'] = self.pupEmail
-        
+
+        # Extract the Verification Mailer information from the database
+        # -------------------------------------------------------------
+        cursor.execute("""\
+            SELECT value 
+              FROM query_term 
+             WHERE doc_id = (
+                   SELECT MAX(i.doc_id)
+                     FROM query_term i
+                     JOIN query_term v  -- only extract Verification Mailer
+                       ON v.doc_id = i.doc_id
+                      AND v.path   = '/Mailer/Type'
+                      AND v.value  = 'Verification mailer'
+                    WHERE i.int_val = %s
+                      AND i.path = '/Mailer/Document/@cdr:ref'
+                   )
+               AND path = '/Mailer/Response/ChangesCategory'""" % self.cdrId)
+
+        rows = cursor.fetchall()
+
+        responseCat = []
+        if rows:
+            for row in rows:
+                responseCat.append(row[0])
+
+            nctInfo[u'vMailerResp'] = u'Yes'
+            nctInfo[u'vMailerChange'] = responseCat
+        else:
+            nctInfo[u'vMailerResp'] = u'No'
+
 
 # -------------------------------------------------------------
 #
@@ -154,17 +190,19 @@ fullname = REPORTS_BASE + name
 # ----------------------------------------------------------------------
 ctGovProtocols = readProtocols(filename = REPORTS_BASE + ctGovName)
 
-##conn = cdrdb.connect('CdrGuest')
-##cursor = conn.cursor()
+conn = cdrdb.connect('CdrGuest')
+cursor = conn.cursor()
 
 i = 0
 for docs in ctGovProtocols.keys():
     i += 1
     print '%d: Doc = %s' % (i, docs)
-    Protocol(ctGovProtocols[docs])
+    Protocol(ctGovProtocols[docs], cursor)
+    #print ctGovProtocols[docs]
+    #print '*****'
 
 print 'Records processed: %s' % len(ctGovProtocols)
-
+#sys.exit(1)
 # Create the spreadsheet and define default style, etc.
 # -----------------------------------------------------
 wb      = ExcelWriter.Workbook()
@@ -198,6 +236,8 @@ ws.addCol(10,  60)
 ws.addCol(11,  120)
 ws.addCol(12,  80)
 ws.addCol(13,  150)
+ws.addCol(14,  55)
+ws.addCol(15,  150)
 
 # Create the Header row
 # ---------------------
@@ -215,13 +255,15 @@ exRow.addCell(10, 'Phase')
 exRow.addCell(11, 'PUP Name')
 exRow.addCell(12, 'PUP Phone')
 exRow.addCell(13, 'PUP Email')
+exRow.addCell(14, 'Ver Mailer Response')
+exRow.addCell(15, 'Response Category')
 
 # Add the protocol data one record at a time beginning after 
 # the header row
 # ----------------------------------------------------------
 rowNum = 1
 for row in ctGovProtocols.keys():
-    print rowNum
+    # print rowNum
     if ctGovProtocols[row][u'CDRID'] != 'CDR ID':
         rowNum += 1
         exRow = ws.addRow(rowNum, style1, 40)
@@ -236,14 +278,25 @@ for row in ctGovProtocols.keys():
         exRow.addCell(9, ctGovProtocols[row][u'fda'])
         exRow.addCell(10, ctGovProtocols[row][u'phase'])
 
-        if ctGovProtocols[row].has_key(u'pupName') and ctGovProtocols[row][u'pupName']:
+        if ctGovProtocols[row].has_key(u'pupName') and \
+           ctGovProtocols[row][u'pupName']:
             exRow.addCell(11, ctGovProtocols[row][u'pupName'][0])
 
-        if ctGovProtocols[row].has_key(u'pupPhone') and ctGovProtocols[row][u'pupPhone']:
+        if ctGovProtocols[row].has_key(u'pupPhone') and \
+           ctGovProtocols[row][u'pupPhone']:
             exRow.addCell(12, ctGovProtocols[row][u'pupPhone'][0])
 
-        if ctGovProtocols[row].has_key(u'pupEmail') and ctGovProtocols[row][u'pupEmail']:
+        if ctGovProtocols[row].has_key(u'pupEmail') and \
+           ctGovProtocols[row][u'pupEmail']:
             exRow.addCell(13, ctGovProtocols[row][u'pupEmail'][0])
+
+        if ctGovProtocols[row].has_key(u'vMailerResp') and \
+           ctGovProtocols[row][u'vMailerResp']:
+            exRow.addCell(14, ctGovProtocols[row][u'vMailerResp'][0])
+
+        if ctGovProtocols[row].has_key(u'vMailerChange') and \
+           ctGovProtocols[row][u'vMailerChange']:
+            exRow.addCell(15, ", ".join([x for x in ctGovProtocols[row][u'vMailerChange']]))
 
 t = time.strftime("%Y%m%d%H%M%S")                                               
 
