@@ -4,6 +4,7 @@
 #
 # Report on lists of summaries.
 #
+# $Log: not supported by cvs2svn $
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string, cdrdb, time, xml.dom.minidom
 
