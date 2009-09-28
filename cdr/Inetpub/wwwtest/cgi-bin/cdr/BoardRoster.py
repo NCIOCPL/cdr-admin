@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: BoardRoster.py,v 1.14 2009-05-12 14:18:45 venglisc Exp $
+# $Id: BoardRoster.py,v 1.15 2009-09-28 16:00:08 venglisc Exp $
 #
 # Report to display the Board Roster with or without assistant
 # information.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.14  2009/05/12 14:18:45  venglisc
+# Modified to send Unicode string to sendPage() function. (Bug 4560)
+#
 # Revision 1.13  2008/09/03 18:02:17  venglisc
 # Modified quoting in JavaScript call which prevented IE from running
 # correctly. (Bug 4236)
@@ -65,6 +68,7 @@ fax        = fields and fields.getvalue("finfo") or 'No'
 cdrid      = fields and fields.getvalue("cinfo") or 'No'
 email      = fields and fields.getvalue("einfo") or 'No'
 startDate  = fields and fields.getvalue("dinfo") or 'No'
+blankCol   = fields and fields.getvalue("blank") or 'No'
 flavor     = fields and fields.getvalue("sheet") or 'full'
 session    = cdrcgi.getSession(fields)
 request    = cdrcgi.getRequest(fields)
@@ -104,6 +108,7 @@ header     = cdrcgi.header(title, title, instr, script, buttons,
              form.cinfo.value = form.cinfo.checked ? 'Yes' : 'No';
              form.dinfo.value = form.dinfo.checked ? 'Yes' : 'No';
              form.finfo.value = form.finfo.checked ? 'Yes' : 'No';
+             form.blank.value = form.blank.checked ? 'Yes' : 'No';
          }
      }
      function doFullReport() {
@@ -301,7 +306,7 @@ def makeSheet(rows):
         <tr class="theader">"""
     for k, v in [('Name','Yes'), ('Phone',phone), ('Fax',fax), 
               ('Email',email), ('CDR-ID',cdrid), 
-              ('Start Date', startDate)]:
+              ('Start Date', startDate), (' ', blankCol)]:
         if v == 'Yes':
             rowCount += 1
             html += """
@@ -359,6 +364,9 @@ def makeSheet(rows):
        if startDate == 'Yes':
            html += """
          <td class="cdrid">%s</td>""" % row[5]
+       if blankCol == 'Yes':
+           html += """
+         <td class="blank"></td>"""
        html += """
         </tr>"""
 
@@ -440,7 +448,15 @@ if not boardId:
            <td>
             <input type='checkbox' name='dinfo' 
                    onclick='javascript:doSummarySheet()' id='E5'>
-            StartDate
+            Start Date
+           </td>
+          </tr>
+          <tr>
+           <td> </td>
+           <td>
+            <input type='checkbox' name='blank' 
+                   onclick='javascript:doSummarySheet()' id='E6'>
+            Blank Column
            </td>
           </tr>
          </table>
@@ -579,6 +595,7 @@ html = """\
               vertical-align: top; }
    .phone, .email, .fax, .cdrid
             { vertical-align: top; }
+   .blank   { width: 100px; }
    #main    { font-family: Arial, Helvetica, sans-serif;
               font-size: 12pt; }
   </STYLE>
