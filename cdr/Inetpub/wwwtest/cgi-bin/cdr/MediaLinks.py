@@ -1,10 +1,13 @@
 #----------------------------------------------------------------------
 #
-# $Id: MediaLinks.py,v 1.4 2008-12-12 21:57:48 venglisc Exp $
+# $Id: MediaLinks.py,v 1.5 2009-09-29 13:54:35 bkline Exp $
 #
 # Report listing all document that link to Media documents
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2008/12/12 21:57:48  venglisc
+# Modified report to adjust for new Glossary document structure. (Bug 4394)
+#
 # Revision 1.3  2008/12/02 21:33:50  venglisc
 # Modified to work with the new GlossaryTerm structure. (Bug 4394)
 #
@@ -33,32 +36,50 @@ title   = "CDR Administration"
 section = "Documents that Link to Media Documents"
 header  = cdrcgi.header(title, title, section, script, buttons)
 now     = time.localtime(time.time())
-
+conn    = cdrdb.connect('CdrGuest')
+cursor  = conn.cursor()
 
 # ---------------------------------------------------------------------
 # Select all document types that contain a MediaLink element
 # Note: The SQL query is very slow (due to the like condition) and 
 #       needs to be tweaked.  It takes > 15 sec to return.  Until this
 #       has been improved we have to hard-code the document types.
+#
+# Note: Tweaking of the SQL has been done, and we get the results
+#       immediately now.  However, since the comment above was written,
+#       the requirements for the report have moved on, and the
+#       current implementation is dependent on a hard-code list
+#       of document types anyway.  I've left in the optimized SQL
+#       to illustrate how to work around the limitations of SQL Server's
+#       query optimizer, but that code is never reached.
 # ---------------------------------------------------------------------
 def getMediaDocTypes():
-    return ([['GlossaryTerm'], ['Summary'], ['GlossaryTermConcept']])
-
-    try:
-        conn   = cdrdb.connect()
-        cursor = conn.cursor()
-        cursor.execute("""\
-            SELECT DISTINCT SUBSTRING(path, 2, CHARINDEX('/', path, 2) - 2)
-              FROM query_term_pub
-             WHERE path like '%/MediaLink/MediaID/@cdr:ref'
-            --   AND SUBSTRING(path, 2, 5) != 'Media'
-             ORDER BY 1""")
-        rows = cursor.fetchall()
-    except cdrdb.Error, info:
-        cdrcgi.bail('Database connection failure: %s' % info[1][0])
-
-    return (rows)
-
+    return [['GlossaryConcept'], ['Summary']]
+    cursor.execute("CREATE TABLE #mediadocs (id INT)")
+    cursor.execute("CREATE TABLE #medialinks (i INT, p VARCHAR(255))")
+    cursor.execute("""\
+   INSERT INTO #mediadocs
+        SELECT d.id
+          FROM document d
+          JOIN doc_type t
+            ON t.id = d.doc_type
+         WHERE t.name = 'Media'""")
+    cursor.execute("""\
+   INSERT INTO #medialinks
+        SELECT q.doc_id, q.path
+          FROM query_term q
+          JOIN #mediadocs m
+            ON m.id = q.int_val
+         WHERE q.value LIKE 'CDR00%'""")
+    cursor.execute("""\
+        SELECT DISTINCT t.name
+                   FROM doc_type t
+                   JOIN document d
+                     ON t.id = d.doc_type
+                   JOIN #medialinks m
+                     ON m.i = d.id
+                  WHERE m.p LIKE '%/MediaLink/MediaID/@cdr:ref'""")
+    return cursor.fetchall()
 
 # ---------------------------------------------------------------------
 # This function accepts a GlossaryTermConcept ID and returns all 
@@ -67,8 +88,6 @@ def getMediaDocTypes():
 # ---------------------------------------------------------------------
 def getTermName(id):
     try:
-        # conn   = cdrdb.connect()
-        # cursor = conn.cursor()
         cursor.execute("""\
             SELECT q.doc_id, e.value, s.value
               FROM query_term q
@@ -131,7 +150,6 @@ if request == "Log Out":
 #----------------------------------------------------------------------
 if not docTypes:
     docTypes = getMediaDocTypes()
-
     if type(docTypes) in [type(""), type(u"")]:
         cdrcgi.bail(docTypes)
     form = """\
@@ -236,8 +254,6 @@ if type(docTypes) in (type(""), type(u"")):
 # ----------------------------------------------------------
 for docType in docTypes:
     try:
-        conn   = cdrdb.connect()
-        cursor = conn.cursor()
         dtQual = docType and ("doc_type = '%s'" % docType) or ""
         cursor.execute("""\
            SELECT doc_id, value
