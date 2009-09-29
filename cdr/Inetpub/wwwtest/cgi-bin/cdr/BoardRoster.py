@@ -1,11 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id: BoardRoster.py,v 1.15 2009-09-28 16:00:08 venglisc Exp $
+# $Id: BoardRoster.py,v 1.16 2009-09-29 14:43:19 venglisc Exp $
 #
 # Report to display the Board Roster with or without assistant
 # information.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.15  2009/09/28 16:00:08  venglisc
+# Adding a blank column to the summary sheet report option. (Bug 4649)
+#
 # Revision 1.14  2009/05/12 14:18:45  venglisc
 # Modified to send Unicode string to sendPage() function. (Bug 4560)
 #
@@ -306,7 +309,7 @@ def makeSheet(rows):
         <tr class="theader">"""
     for k, v in [('Name','Yes'), ('Phone',phone), ('Fax',fax), 
               ('Email',email), ('CDR-ID',cdrid), 
-              ('Start Date', startDate), (' ', blankCol)]:
+              ('Start Date', startDate), ('&nbsp;', blankCol)]:
         if v == 'Yes':
             rowCount += 1
             html += """
@@ -366,7 +369,7 @@ def makeSheet(rows):
          <td class="cdrid">%s</td>""" % row[5]
        if blankCol == 'Yes':
            html += """
-         <td class="blank"></td>"""
+         <td class="blank">&nbsp;</td>"""
        html += """
         </tr>"""
 
