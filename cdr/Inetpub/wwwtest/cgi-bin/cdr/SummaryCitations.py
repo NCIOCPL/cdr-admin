@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryCitations.py,v 1.4 2009-07-31 19:18:49 venglisc Exp $
+# $Id: SummaryCitations.py,v 1.5 2009-10-02 18:29:10 venglisc Exp $
 #
 # Report listing all references cited in a selected version of a
 # cancer information summary.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2009/07/31 19:18:49  venglisc
+# Modified sort order to use the locale setting so that non-ASCII characters
+# are sorted within the ASCII sequence. (Bug 4598)
+#
 # Revision 1.3  2009/06/24 17:36:40  venglisc
 # Changing sort order by converting first to lower case. (Bug 4598)
 #
@@ -17,6 +21,8 @@
 # New summary reports.
 #
 #----------------------------------------------------------------------
+# BZIssue::4651 - Adding PMID to citations
+
 import xml.dom.minidom, cgi, socket, struct, re, cdr, cdrcgi, cdrdb
 import locale, time
 
@@ -75,12 +81,16 @@ def report(docId, docVersion):
     summaryTitle = ""
     for refList in dom.getElementsByTagName("ReferenceList"):
         for ref in refList.childNodes:
+            refPmid = ""
             if ref.nodeName == "Citation":
                 refString = cdr.getTextContent(ref).strip()
+
+                if u'PMID' in ref.attributes.keys():
+                    refPmid = str(ref.attributes["PMID"].value)
                 if refString:
                     if refString[-1] != ".":
                         refString += "."
-                    refs.append(refString)
+                    refs.append('%s [@@%s@@]' % (refString, refPmid))
     for child in dom.documentElement.childNodes:
         if child.nodeName == "SummaryTitle":
             summaryTitle = cdr.getTextContent(child)
@@ -90,6 +100,7 @@ def report(docId, docVersion):
     prevRef = None
     digits = re.sub(r"[^\d]", "", docId)
     id = int(digits)
+    pubMedLink = ' [<a href="http://www.ncbi.nlm.nih.gov/pubmed/'
     html = """\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>
@@ -108,10 +119,22 @@ def report(docId, docVersion):
 """ % (id, summaryTitle, time.strftime("%B %d, %Y"), summaryTitle)
     for ref in refs:
         if ref != prevRef:
+            # Building the link for the PubMedID (format is [@@12345@@])
+            # ----------------------------------------------------------
+            nn = ref.find(' [@@')
+            newRef = ref[:nn]    # slice off the PMID
+            newId  = ref[nn+1:]  # slice off the PMID
+            if newId.replace('@@', '') == '[]':
+                newId = ''
+            else:
+                pmid  = newId[3:-3]
+                newId = newId.replace('@@]', '?dopt=Abstract">' 
+                                   + pmid + '</a>]').replace('[@@', pubMedLink)
+
             html += """\
-   <li>%s</li>
-""" % cgi.escape(ref)
-            prevRef = ref
+   <li>%s%s</li>
+""" % (cgi.escape(newRef), newId)
+            prevRef = newRef
     cdrcgi.sendPage(html + """\
   </ol>
  </body>
