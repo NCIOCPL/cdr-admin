@@ -1,11 +1,15 @@
 #----------------------------------------------------------------------
 #
-# $Id: MediaTrackingReport.py,v 1.4 2009-02-03 22:47:17 venglisc Exp $
+# $Id: MediaTrackingReport.py,v 1.5 2009-10-02 17:18:55 bkline Exp $
 #
 # We need a Media Tracking report.  This spreadsheet report will keep track of
 # the development and processing statuses of the Media documents.
 #
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2009/02/03 22:47:17  venglisc
+# Adjusted the XPath for the Glossary since the Glossary document structure
+# had changed. (Bug 4461)
+#
 # Revision 1.3  2008/02/22 20:28:15  venglisc
 # Modifications to add Diagnosis column and use different dates to display
 # report results. (Bug 3839)
@@ -113,58 +117,6 @@ if not fromDate or not toDate or not diagnosis:
 """
     cdrcgi.sendPage(header + form)
 
-#----------------------------------------------------------------------
-# Escape markup special characters.
-#----------------------------------------------------------------------
-def fix(me):
-    if not me:
-        return u"&nbsp;"
-    return me # xml.sax.saxutils.escape(me)
-
-#----------------------------------------------------------------------
-# Prepare definitions for display.
-#----------------------------------------------------------------------
-def fixList(defs):
-    if not defs:
-        return u"&nbsp;"
-    return fix(u"; ".join(defs))
-
-class Summary:
-    titles = {}
-    def __init__(self, node):
-        self.title = None
-        self.docId = node.getAttribute('cdr:ref')
-        #sys.stderr.write("Summary id=%s text=%s\n" % (self.docId,
-        #                        cdr.getTextContent(node)))
-        if self.docId:
-            if self.docId in self.titles:
-                self.title = self.titles[self.docId]
-            else:
-                path = '/Summary/SummaryTitle'
-                values = cdr.getQueryTermValueForId(path, self.docId, conn)
-                if values:
-                    self.title = values[0]
-                    self.titles[self.docId] = self.title
-                    #sys.stderr.write("ti=%s\n" % self.title)
-
-class GlossaryTerm:
-    termNames = {}
-    def __init__(self, node):
-        self.termName = None
-        self.docId = node.getAttribute('cdr:ref')
-        #sys.stderr.write("GlossaryTerm id=%s text=%s\n" % (self.docId,
-        #                        cdr.getTextContent(node)))
-        if self.docId:
-            if self.docId in self.termNames:
-                self.termName = self.termNames[self.docId]
-            else:
-                path = '/GlossaryTermName/TermName/TermNameString'
-                values = cdr.getQueryTermValueForId(path, self.docId, conn)
-                if values:
-                    self.termName = values[0]
-                    self.termNames[self.docId]= self.termName
-                    #sys.stderr.write("gt=%s\n" % self.termName)
-
 class Status:
     def __init__(self, node):
         self.value = u''
@@ -175,12 +127,12 @@ class Status:
                 self.value = cdr.getTextContent(child)
             elif child.nodeName == 'ProcessingStatusDate':
                 self.date = cdr.getTextContent(child)
-            elif child.nodeName == 'Comment':
-                self.comment = cdr.getTextContent(child)
+            elif child.nodeName == 'Comment' and not self.comment:
+                self.comment = cdr.getTextContent(child).strip()
     def addToRow(self, row, dateStyle):
-        row.addCell(6, self.value)
-        row.addCell(7, self.date)
-        row.addCell(8, self.comment)
+        row.addCell(4, self.value)
+        row.addCell(5, self.date)
+        row.addCell(6, self.comment)
 
 #----------------------------------------------------------------------
 # Media document object definition.
@@ -192,8 +144,6 @@ class MediaDoc:
         self.title = None
         self.sourceFilename = None
         self.diagnoses = []
-        self.summaries = []
-        self.glossaryTerms = []
         self.statuses = []
         lastAny, lastPub, chng = cdr.lastVersions('guest', 'CDR%010d' % docId)
         self.lastVersionPublishable = (lastAny != -1 and lastAny == lastPub)
@@ -212,12 +162,6 @@ class MediaDoc:
                 for child in node.childNodes:
                     if child.nodeName == 'ProcessingStatus':
                         self.statuses.append(Status(child))
-            elif node.nodeName == 'ProposedUse':
-                for child in node.childNodes:
-                    if child.nodeName == 'Summary':
-                        self.summaries.append(Summary(child))
-                    elif child.nodeName == 'Glossary':
-                        self.glossaryTerms.append(GlossaryTerm(child))
             elif node.nodeName == 'MediaTitle':
                 self.title = cdr.getTextContent(node)
             elif node.nodeName == 'MediaSource':
@@ -236,14 +180,6 @@ class MediaDoc:
                                 self.diagnoses.append(value.strip()) or None
 
     def addToSheet(self, sheet, dateStyle, rowNum):
-        summaries = []
-        for s in self.summaries:
-            if s.title:
-                summaries.append(s.title)
-        glossaryTerms = []
-        for t in self.glossaryTerms:
-            if t.termName:
-                glossaryTerms.append(t.termName)
         diagnoses = []
         for d in self.diagnoses:
             diagnoses.append(d)
@@ -259,13 +195,11 @@ class MediaDoc:
         row.addCell(1, self.docId, 'Number', mergeDown = mergeDown)
         row.addCell(2, titleCell, mergeDown = mergeDown)
         row.addCell(3, u', '.join(diagnoses), mergeDown = mergeDown)
-        row.addCell(4, u', '.join(summaries), mergeDown = mergeDown)
-        row.addCell(5, u', '.join(glossaryTerms), mergeDown = mergeDown)
-        row.addCell(9, flag, mergeDown = mergeDown)
-        row.addCell(10, self.published or u'', mergeDown = mergeDown,
+        row.addCell(7, flag, mergeDown = mergeDown)
+        row.addCell(8, self.published or u'', mergeDown = mergeDown,
                     style = dateStyle)
         if not self.statuses:
-            for colNum in (6, 7, 8):
+            for colNum in (4, 5, 6):
                 row.addCell(colNum, u'')
         else:
             self.statuses[0].addToRow(row, dateStyle)
@@ -323,29 +257,25 @@ h2Style   = wb.addStyle(font = f, alignment = a, borders = b)
 f         = ExcelWriter.Font(family = 'Swiss', size = 12, bold = True)
 h1Style   = wb.addStyle(font = f, alignment = a, borders = b)
 ws        = wb.addWorksheet("Media Tracking Report", tdStyle, frozenRows = 3)
-ws.addCol( 1,  46.70)
-ws.addCol( 2, 119.25)
-ws.addCol( 3, 125.00)
-ws.addCol( 4,  75.00)
-ws.addCol( 5, 108.75)
-ws.addCol( 6, 151.50)
-ws.addCol( 7,  71.25)
-ws.addCol( 8,  90.00)
-ws.addCol( 9,  71.25)
-ws.addCol(10,  53.25)
+ws.addCol(1,  46.70)
+ws.addCol(2, 119.25)
+ws.addCol(3, 125.00)
+ws.addCol(4, 151.50)
+ws.addCol(5,  71.25)
+ws.addCol(6, 350.00)
+ws.addCol(7,  71.25)
+ws.addCol(8,  53.25)
 row      = ws.addRow(1, h1Style, 15.75)
 title    = 'Media Tracking Report'
-row.addCell(1, title, mergeAcross = 9, style = h1Style)
+row.addCell(1, title, mergeAcross = 7, style = h1Style)
 row      = ws.addRow(2, h2Style)
 subtitle = 'From %s - %s' % (fromDate, toDate)
-row.addCell(1, subtitle, mergeAcross = 9, style = h2Style)
+row.addCell(1, subtitle, mergeAcross = 7, style = h2Style)
 row      = ws.addRow(3, thStyle, 27)
 headings = (
     'CDRID',
-    'Title (Sourcefile Name)',
+    'Title (Source Filename)',
     'Diagnosis',
-    'Proposed Summaries',
-    'Proposed Glossary Terms',
     'Processing Status',
     'Processing Status Date',
     'Comments',
@@ -358,7 +288,10 @@ for docId, docTitle, created in cursor.fetchall():
     mediaDoc = MediaDoc(cursor, docId, docTitle)
     rowNum = mediaDoc.addToSheet(ws, dateStyle, rowNum)
 name = 'MediaTrackingReport-%s.xls' % time.strftime("%Y%m%d%H%M%S")
+if sys.platform == "win32":
+    import os, msvcrt
+    msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
 print "Content-type: application/vnd.ms-excel"
 print "Content-Disposition: attachment; filename=%s" % name
 print
-wb.write(sys.stdout)
+wb.write(sys.stdout, True)
