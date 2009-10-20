@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ShowGlobalChangeTestResults.py,v 1.5 2009-05-18 15:31:20 venglisc Exp $
+# $Id$
 #
 # Web interface for showing changes which would be made by a
 # global change.

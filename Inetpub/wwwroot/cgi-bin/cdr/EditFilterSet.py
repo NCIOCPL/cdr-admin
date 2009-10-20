@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditFilterSet.py,v 1.4 2008-06-03 21:58:55 bkline Exp $
+# $Id$
 #
 # Form for editing named CDR filter sets.
 #

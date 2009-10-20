@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: db-tables.py,v 1.1 2006-05-04 14:48:51 bkline Exp $
+# $Id$
 #
 # CGI program to list the CDR tables/views and their structures.
 #

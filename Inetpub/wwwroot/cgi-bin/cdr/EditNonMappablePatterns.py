@@ -5,7 +5,7 @@
 # expressions (in SQL "LIKE" format) for CTGov Facility values that
 # cannot be mapped.
 #
-# $Id: EditNonMappablePatterns.py,v 1.4 2008-08-26 19:31:58 ameyer Exp $
+# $Id$
 #
 # $Log: not supported by cvs2svn $
 # Revision 1.3  2008/08/22 04:00:57  ameyer

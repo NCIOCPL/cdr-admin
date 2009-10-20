@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: PubJobQueue.py,v 1.1 2002-04-10 20:09:11 bkline Exp $
+# $Id$
 #
 # Lists incomplete jobs in the publishing queue, with links to the
 # status pages for each.

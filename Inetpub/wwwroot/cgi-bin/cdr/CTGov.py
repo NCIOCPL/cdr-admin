@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: CTGov.py,v 1.15 2008-09-17 03:20:02 ameyer Exp $
+# $Id$
 #
 # Submenu for ClinicalTrials.gov activities.
 #

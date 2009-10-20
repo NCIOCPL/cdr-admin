@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: PoliticalSubUnitSearch.py,v 1.3 2009-05-18 15:28:27 venglisc Exp $
+# $Id$
 #
 # Duplicate-checking interface for Political SubUnit documents.
 #

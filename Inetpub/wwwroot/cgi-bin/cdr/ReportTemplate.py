@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ReportTemplate.py,v 1.1 2004-03-23 13:17:15 bkline Exp $
+# $Id$
 #
 # List of ClinicalTrials.gov documents which are duplicates of
 # documents already in the CDR.

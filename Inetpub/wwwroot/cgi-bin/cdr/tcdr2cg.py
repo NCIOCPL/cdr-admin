@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: tcdr2cg.py,v 1.2 2009-02-10 19:32:28 bkline Exp $
+# $Id$
 #
 # Web interface for requesting retransmission of CDR documents to the
 # Cancer.gov GateKeeper.

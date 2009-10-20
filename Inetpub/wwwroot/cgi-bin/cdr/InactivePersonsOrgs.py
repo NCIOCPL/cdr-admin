@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: InactivePersonsOrgs.py,v 1.2 2007-11-03 14:15:07 bkline Exp $
+# $Id$
 #
 # Report on inactive persons and organizations linked to protocols.
 #

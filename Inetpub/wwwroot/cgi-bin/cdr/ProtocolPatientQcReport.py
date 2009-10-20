@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolPatientQcReport.py,v 1.5 2009-05-06 17:25:34 venglisc Exp $
+# $Id$
 #
 # Protocol Patient QC Report.
 #

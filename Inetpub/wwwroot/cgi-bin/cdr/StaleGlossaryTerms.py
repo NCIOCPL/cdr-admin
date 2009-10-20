@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: StaleGlossaryTerms.py,v 1.3 2006-07-10 20:35:23 bkline Exp $
+# $Id$
 #
 # Glossary terms which haven't been modified since 2003-09-11.
 #

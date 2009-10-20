@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: CTGovOutOfScope.py,v 1.1 2003-12-16 16:08:24 bkline Exp $
+# $Id$
 #
 # List of ClinicalTrials.gov documents which are out of scope.
 #

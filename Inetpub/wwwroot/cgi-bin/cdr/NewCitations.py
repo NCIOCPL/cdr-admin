@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: NewCitations.py,v 1.1 2004-03-30 20:25:40 bkline Exp $
+# $Id$
 #
 # Report of Citation documents created during a specified date range.
 #

@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #----------------------------------------------------------------------
 #
-# $Id: CdrQueries.py,v 1.3 2005-12-13 14:41:38 bkline Exp $
+# $Id$
 #
 # Ad-hoc SQL query tool for CDR database.
 #

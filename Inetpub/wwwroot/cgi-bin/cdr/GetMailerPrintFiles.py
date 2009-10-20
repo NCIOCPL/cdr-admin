@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: GetMailerPrintFiles.py,v 1.1 2006-06-20 15:34:05 bkline Exp $
+# $Id$
 #
 # Returns archive of print files from a mailer job.
 #

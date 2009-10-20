@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: UnverifiedCitations.py,v 1.3 2004-09-22 19:39:15 venglisc Exp $
+# $Id$
 #
 # Reports on citations which have not been verified.
 #

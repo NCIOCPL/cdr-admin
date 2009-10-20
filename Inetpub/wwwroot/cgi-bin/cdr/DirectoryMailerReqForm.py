@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: DirectoryMailerReqForm.py,v 1.19 2005-05-13 22:40:37 venglisc Exp $
+# $Id$
 #
 # Request form for all directory mailers.
 #

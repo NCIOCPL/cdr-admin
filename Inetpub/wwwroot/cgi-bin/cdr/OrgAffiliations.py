@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------
-# $Id: OrgAffiliations.py,v 1.2 2007-11-03 14:15:07 bkline Exp $
+# $Id$
 #
 # Creates a report listing Organizations and Protocol Acronym IDs
 # sorted by either the Org or the Acronym.

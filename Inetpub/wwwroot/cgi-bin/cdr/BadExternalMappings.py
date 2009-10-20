@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: BadExternalMappings.py,v 1.1 2006-05-04 14:40:29 bkline Exp $
+# $Id$
 #
 # Report on external mappings to documents of the wrong type.
 #

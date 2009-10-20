@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermSearch.py,v 1.11 2009-03-24 14:45:05 bkline Exp $
+# $Id$
 #
 # Prototype for duplicate-checking interface for GlossaryTerm documents.
 #

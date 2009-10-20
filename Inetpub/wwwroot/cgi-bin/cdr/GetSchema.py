@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: GetSchema.py,v 1.3 2007-10-31 16:07:19 bkline Exp $
+# $Id$
 #
 # Gets a schema document from the repository and returns it as a plain
 # text file.

@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: CTGovDupReport.py,v 1.3 2004-04-15 14:22:30 venglisc Exp $
+# $Id$
 #
 # List of ClinicalTrials.gov documents which are duplicates of
 # documents already in the CDR.

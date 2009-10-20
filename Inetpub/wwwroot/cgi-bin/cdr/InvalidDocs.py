@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: InvalidDocs.py,v 1.2 2007-10-31 16:12:58 bkline Exp $
+# $Id$
 #
 # Reports on invalid or blocked CDR documents.
 #

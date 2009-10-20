@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: DISLists.py,v 1.2 2008-09-10 17:51:06 venglisc Exp $
+# $Id$
 #
 # Report on lists of drug information summaries.
 #

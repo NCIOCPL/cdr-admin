@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtProcReport.py,v 1.2 2006-07-11 13:41:50 bkline Exp $
+# $Id$
 #
 # Report of protocol processing status.
 #

@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: DrugAgentReport2.py,v 1.3 2006-07-20 22:49:50 ameyer Exp $
+# $Id$
 #
 # Request #1602 (second report on Drug/Agent terms).
 #

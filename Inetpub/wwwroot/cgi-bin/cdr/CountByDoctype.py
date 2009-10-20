@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: CountByDoctype.py,v 1.2 2008-03-06 20:40:48 venglisc Exp $
+# $Id$
 #
 # Report to list updated document by document type.
 #

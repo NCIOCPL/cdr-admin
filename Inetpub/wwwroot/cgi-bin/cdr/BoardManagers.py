@@ -1,7 +1,7 @@
 #----------------------------------------------------------------------
 #
 #
-# $Id: BoardManagers.py,v 1.16 2008-09-02 18:54:55 bkline Exp $
+# $Id$
 #
 # Main menu for board managers.
 #

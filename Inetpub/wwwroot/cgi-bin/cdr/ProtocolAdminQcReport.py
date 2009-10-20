@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolAdminQcReport.py,v 1.3 2003-04-11 18:30:56 pzhang Exp $
+# $Id$
 #
 # Protocol Admin QC Report.
 #

@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: OrgProtocolReview.py,v 1.4 2005-06-02 21:52:42 venglisc Exp $
+# $Id$
 #
 # Report to assist editors in checking links to a specified org from
 # protocols.

@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: CountrySearch.py,v 1.4 2009-05-18 15:44:10 venglisc Exp $
+# $Id$
 #
 # Duplicate-checking interface for Country documents.
 #

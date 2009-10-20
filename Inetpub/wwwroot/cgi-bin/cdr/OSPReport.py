@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: OSPReport.py,v 1.10 2007-11-03 14:15:07 bkline Exp $
+# $Id$
 #
 # Queue up report for the Office of Science Policy.
 #

@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: RssDocsNoSites.py,v 1.2 2006-05-17 01:40:32 bkline Exp $
+# $Id$
 #
 # Report on RSS imports without sites.
 #

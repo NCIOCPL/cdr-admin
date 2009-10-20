@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ModWithoutPubVersion.py,v 1.9 2006-11-29 16:07:55 bkline Exp $
+# $Id$
 #
 # Reports on documents which have been changed since a previously 
 # publishable version without a new publishable version have been

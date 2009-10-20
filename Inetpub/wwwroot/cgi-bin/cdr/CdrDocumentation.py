@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: CdrDocumentation.py,v 1.5 2007-08-22 21:42:28 venglisc Exp $
+# $Id$
 #
 # Prototype for CDR reporting/formatting web wrapper.
 #

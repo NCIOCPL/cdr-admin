@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ShowCTGovLog.py,v 1.3 2009-07-20 18:30:51 bkline Exp $
+# $Id$
 #
 # Show the contents of the log for a CTGov import job.
 #

@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolMailerReqForm.py,v 1.30 2009-02-10 21:25:33 bkline Exp $
+# $Id$
 #
 # Request form for all protocol mailers.
 #

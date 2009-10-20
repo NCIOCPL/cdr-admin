@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: LinkedDocs.py,v 1.6 2007-11-03 14:15:07 bkline Exp $
+# $Id$
 #
 # Reports on documents which link to a specified document.
 #

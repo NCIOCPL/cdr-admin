@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ActivityReport.py,v 1.8 2009-05-12 21:50:15 venglisc Exp $
+# $Id$
 #
 # Reports on audit trail content.
 #

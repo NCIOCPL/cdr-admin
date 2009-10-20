@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: Republish.py,v 1.2 2007-12-13 21:02:44 venglisc Exp $
+# $Id$
 #
 # User interface for requesting republication of documents to be
 # sent to Cancer.gov.

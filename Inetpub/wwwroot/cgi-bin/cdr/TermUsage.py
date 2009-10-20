@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: TermUsage.py,v 1.3 2004-01-09 16:03:20 bkline Exp $
+# $Id$
 #
 # Reports on documents which link to specified terms.
 #

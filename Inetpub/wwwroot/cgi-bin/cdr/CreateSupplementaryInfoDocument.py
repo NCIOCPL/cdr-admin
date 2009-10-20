@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: CreateSupplementaryInfoDocument.py,v 1.2 2008-12-11 14:30:47 bkline Exp $
+# $Id$
 #
 # Service for creating a new SupplementaryInfo document in the CDR.
 #

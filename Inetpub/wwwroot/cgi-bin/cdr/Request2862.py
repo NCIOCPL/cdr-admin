@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: Request2862.py,v 1.3 2007-10-31 17:43:09 bkline Exp $
+# $Id$
 #
 # "We need a report that will display Liaison Office trials and the Lead
 # organization contact information for the Liaison office to use."

@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: CoopGroupMembers.py,v 1.3 2004-03-08 18:04:59 venglisc Exp $
+# $Id$
 #
 # Generates a report on member organizations and their principal
 # investigators for a selected cooperative group.

@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: Request4176.py,v 1.4 2008-09-02 18:58:13 bkline Exp $
+# $Id$
 #
 # "Once we implement the regulatory information block, I would like  report
 # that we can run periodically or is generated weekly that lists the

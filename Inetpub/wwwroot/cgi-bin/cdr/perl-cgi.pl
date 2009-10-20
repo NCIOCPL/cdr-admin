@@ -2,7 +2,7 @@
 
 #----------------------------------------------------------------------
 #
-# $Id: perl-cgi.pl,v 1.1 2006-05-04 14:17:51 bkline Exp $
+# $Id$
 #
 # Template for Perl CGI programming; demonstrates returning a binary file.
 #

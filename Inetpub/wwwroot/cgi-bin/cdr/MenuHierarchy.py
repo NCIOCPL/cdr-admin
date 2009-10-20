@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: MenuHierarchy.py,v 1.3 2006-03-28 01:22:02 bkline Exp $
+# $Id$
 #
 # Enables users to review the entire menu hierarchy for a given menu type.
 #

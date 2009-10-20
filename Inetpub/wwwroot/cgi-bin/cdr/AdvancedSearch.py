@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: AdvancedSearch.py,v 1.10 2009-09-01 21:26:41 ameyer Exp $
+# $Id$
 #
 # Main menu for advanced search forms.
 #

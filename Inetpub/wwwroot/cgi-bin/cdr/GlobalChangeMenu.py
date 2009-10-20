@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlobalChangeMenu.py,v 1.1 2009-07-22 01:25:55 ameyer Exp $
+# $Id$
 #
 # Menu for Global changes.
 #

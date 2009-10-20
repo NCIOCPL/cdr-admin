@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: CheckUrls.py,v 1.4 2003-11-05 14:47:47 bkline Exp $
+# $Id$
 #
 # Reports on URLs which cannot be reached.
 #

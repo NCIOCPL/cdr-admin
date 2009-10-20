@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: DiffCTGovProtocol.py,v 1.10 2008-06-03 21:58:55 bkline Exp $
+# $Id$
 #
 # $Log: not supported by cvs2svn $
 # Revision 1.9  2005/11/01 23:23:04  ameyer

@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: CtsSubmittedTrials.py,v 1.7 2009-02-10 19:32:28 bkline Exp $
+# $Id$
 #
 # CDR-side interface for reviewing CTS trials.
 #

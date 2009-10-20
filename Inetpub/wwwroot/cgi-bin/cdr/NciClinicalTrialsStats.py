@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: NciClinicalTrialsStats.py,v 1.4 2008-10-29 20:38:19 bkline Exp $
+# $Id$
 #
 # "We want to create a new report to be added to the Protocols Menu
 # in the CDR, to respond to requests for Clinical Trial Statistics."

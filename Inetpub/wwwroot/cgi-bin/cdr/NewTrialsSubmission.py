@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: NewTrialsSubmission.py,v 1.1 2008-04-17 18:47:50 bkline Exp $
+# $Id$
 #
 # Sub-menu for CIAT/CIPS staff.
 #

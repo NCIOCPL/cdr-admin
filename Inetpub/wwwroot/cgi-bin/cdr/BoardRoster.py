@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: BoardRoster.py,v 1.16 2009-09-29 14:43:19 venglisc Exp $
+# $Id$
 #
 # Report to display the Board Roster with or without assistant
 # information.

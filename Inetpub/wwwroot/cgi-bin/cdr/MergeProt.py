@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: MergeProt.py,v 1.3 2004-02-05 13:33:05 bkline Exp $
+# $Id$
 #
 # Merge ScientificProtocolInfo document into InScopeProtocol document.
 #

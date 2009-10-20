@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: CancerDiagnosisTerms.py,v 1.1 2003-12-16 15:54:31 bkline Exp $
+# $Id$
 #
 # Hierarchical report (in thesaurus-like format) of index terms
 # whose semantic types are some form of Cancer diagnosis.

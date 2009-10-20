@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: GetBoardMemberLetters.py,v 1.1 2006-05-04 14:55:36 bkline Exp $
+# $Id$
 #
 # Page with links to a set of PDQ Board Member Mailers.
 #

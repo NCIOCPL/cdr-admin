@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: EmailerReports.py,v 1.4 2005-03-03 14:27:21 bkline Exp $
+# $Id$
 #
 # Reports on status of electronic mailers.
 #

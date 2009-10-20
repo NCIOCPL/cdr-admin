@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditExternMap.py,v 1.12 2008-01-11 04:38:40 ameyer Exp $
+# $Id$
 #
 # Allows a user to edit the table which maps strings from external
 # systems (such as ClinicalTrials.gov) to CDR document IDs.

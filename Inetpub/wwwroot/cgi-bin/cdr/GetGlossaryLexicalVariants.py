@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: GetGlossaryLexicalVariants.py,v 1.1 2006-11-02 20:40:58 bkline Exp $
+# $Id$
 #
 # Service requested by Chen (request #1895).
 #

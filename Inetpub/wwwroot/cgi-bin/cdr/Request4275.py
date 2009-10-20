@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: Request4275.py,v 1.6 2009-02-20 04:14:40 bkline Exp $
+# $Id$
 #
 # "We would like a new Mailer report so we can track responses easier.
 #

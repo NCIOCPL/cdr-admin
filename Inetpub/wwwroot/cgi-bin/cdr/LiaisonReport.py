@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: LiaisonReport.py,v 1.6 2007-11-03 14:15:07 bkline Exp $
+# $Id$
 #
 # NCI Liaison Office/Brussels Protocol Report.
 #

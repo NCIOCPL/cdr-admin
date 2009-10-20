@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: Help.py,v 1.4 2009-05-06 18:18:22 venglisc Exp $
+# $Id$
 #
 # Display the table of contents for the CDR help system.
 #

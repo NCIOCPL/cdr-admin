@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: CheckedOutDocs.py,v 1.5 2004-07-27 15:56:36 venglisc Exp $
+# $Id$
 #
 # Report on documents checked out to a user.
 #

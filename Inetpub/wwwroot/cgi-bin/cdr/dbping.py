@@ -4,7 +4,7 @@
 #
 # If error, reports to default log file (debug.log) and to web client.
 #
-# $Id: dbping.py,v 1.3 2009-09-25 03:32:49 ameyer Exp $
+# $Id$
 #
 # $Log: not supported by cvs2svn $
 # Revision 1.2  2009/03/31 21:59:18  ameyer

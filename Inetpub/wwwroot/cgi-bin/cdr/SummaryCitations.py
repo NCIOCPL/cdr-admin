@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryCitations.py,v 1.5 2009-10-02 18:29:10 venglisc Exp $
+# $Id$
 #
 # Report listing all references cited in a selected version of a
 # cancer information summary.

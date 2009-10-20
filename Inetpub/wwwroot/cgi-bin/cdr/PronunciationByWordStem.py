@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: PronunciationByWordStem.py,v 1.2 2008-11-19 21:30:26 bkline Exp $
+# $Id$
 #
 # "The Glossary Terms by Status Report will list terms and their
 # pronunciations by the user requesting a specific word stem from

@@ -2,7 +2,7 @@
 #
 # Publishing CGI script.
 #
-# $Id: publishing.py,v 1.30 2009-04-15 20:18:19 venglisc Exp $
+# $Id$
 # $Log: not supported by cvs2svn $
 # Revision 1.29  2007/10/31 21:11:42  bkline
 # Fixed handling of Unicode.

@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryMailerPreview.py,v 1.2 2005-02-15 13:09:21 bkline Exp $
+# $Id$
 #
 # Generate PostScript for a Summary mailer (also has some support for
 # protocol mailers).

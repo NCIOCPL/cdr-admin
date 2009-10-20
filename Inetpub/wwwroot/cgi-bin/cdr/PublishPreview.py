@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: PublishPreview.py,v 1.40 2009-02-20 21:47:47 venglisc Exp $
+# $Id$
 #
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.

@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: MediaLinks.py,v 1.5 2009-09-29 13:54:35 bkline Exp $
+# $Id$
 #
 # Report listing all document that link to Media documents
 #

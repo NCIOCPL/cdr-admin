@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtOwnershipTransfer.py,v 1.2 2009-09-16 17:04:30 venglisc Exp $
+# $Id$
 #
 # Report on mailers which haven't been responded to (other than
 # status and participant mailers).

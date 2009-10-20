@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: TermSearch.py,v 1.18 2009-06-30 17:43:40 venglisc Exp $
+# $Id$
 #
 # Prototype for duplicate-checking interface for Term documents.
 #

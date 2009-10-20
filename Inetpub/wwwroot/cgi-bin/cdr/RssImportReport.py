@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: RssImportReport.py,v 1.8 2007-10-31 17:42:14 bkline Exp $
+# $Id$
 #
 # Reports on import/update of RSS protocol site information.
 #

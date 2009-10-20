@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: CTGovImportReport.py,v 1.8 2009-05-20 16:17:40 venglisc Exp $
+# $Id$
 #
 # Stats on documents imported from ClinicalTrials.gov into CDR.
 #

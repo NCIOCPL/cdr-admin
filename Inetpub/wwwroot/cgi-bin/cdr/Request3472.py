@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: Request3472.py,v 1.2 2007-10-31 15:59:23 bkline Exp $
+# $Id$
 #
 # PDQ Submission Portal Statistics Summary Report.
 #

@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: NewDocsWithPubStatus.py,v 1.3 2004-05-03 13:59:28 bkline Exp $
+# $Id$
 #
 # Reports on newly created documents and their publication statuses.
 #

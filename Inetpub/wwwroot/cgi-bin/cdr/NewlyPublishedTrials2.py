@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: NewlyPublishedTrials2.py,v 1.3 2008-04-23 12:33:56 bkline Exp $
+# $Id$
 #
 # "We need a newly published trials report which lists InScope Protocol
 # and CTGov trials that have published versions, but do not have a

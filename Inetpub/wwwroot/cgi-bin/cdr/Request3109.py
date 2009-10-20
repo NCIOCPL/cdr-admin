@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: Request3109.py,v 1.4 2009-08-05 16:30:59 venglisc Exp $
+# $Id$
 #
 # "We have a request from Oregeon Health Sciences University Cancer Center
 # for a report in Excel format that lists OHSUCC trials that we have in PDQ.

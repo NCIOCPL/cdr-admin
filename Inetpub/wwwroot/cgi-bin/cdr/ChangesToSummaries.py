@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ChangesToSummaries.py,v 1.2 2005-03-24 21:11:26 bkline Exp $
+# $Id$
 #
 # Report of history of changes for a board's summaries
 #

@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: Filter.py,v 1.33 2009-05-11 17:19:35 venglisc Exp $
+# $Id$
 #
 # Transform a CDR document using an XSL/T filter and send it back to
 # the browser.

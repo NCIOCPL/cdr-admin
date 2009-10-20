@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermsByType.py,v 1.2 2007-03-22 17:54:04 bkline Exp $
+# $Id$
 #
 # $Log: not supported by cvs2svn $
 # Revision 1.1  2006/05/04 15:00:22  bkline

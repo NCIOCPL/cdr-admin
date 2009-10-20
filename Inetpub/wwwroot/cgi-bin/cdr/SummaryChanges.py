@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryChanges.py,v 1.4 2008-05-13 21:50:10 bkline Exp $
+# $Id$
 #
 # Report of history of changes to a single summary.
 #

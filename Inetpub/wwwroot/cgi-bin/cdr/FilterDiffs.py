@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: FilterDiffs.py,v 1.2 2007-11-03 14:15:07 bkline Exp $
+# $Id$
 #
 # Compare filters between two servers.
 #

@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: TrialsCitationStats.py,v 1.1 2005-07-07 15:37:40 venglisc Exp $
+# $Id$
 #
 # "We want to create a new report to be added to the Protocols Menu
 # in the CDR, to respond to requests for Clinical Trial Statistics."

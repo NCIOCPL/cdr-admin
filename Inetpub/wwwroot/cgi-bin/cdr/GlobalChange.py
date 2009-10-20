@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------
-# $Id: GlobalChange.py,v 1.22 2008-06-03 21:58:55 bkline Exp $
+# $Id$
 #
 # Perform global changes on XML records in the database.
 #

@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: CCOPOrgReport.py,v 1.3 2004-03-30 21:13:47 bkline Exp $
+# $Id$
 #
 # The NCI Funded CCOP/MBCCOP Organization Report will serve as an
 # additional QC report to check the accuracy of Principal Investigator's

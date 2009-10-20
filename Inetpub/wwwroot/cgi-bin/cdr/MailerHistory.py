@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: MailerHistory.py,v 1.3 2005-03-17 12:54:19 bkline Exp $
+# $Id$
 #
 # Reports on the history of mailers for a particular document.
 #

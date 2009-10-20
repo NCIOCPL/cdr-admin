@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: MailerActivityStatistics.py,v 1.1 2002-05-03 20:28:54 bkline Exp $
+# $Id$
 #
 # Generates report of counts of mailers of each type, generated during
 # a specified date range.

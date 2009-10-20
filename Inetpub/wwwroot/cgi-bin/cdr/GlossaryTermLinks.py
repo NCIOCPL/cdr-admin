@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermLinks.py,v 1.5 2009-02-24 19:34:14 bkline Exp $
+# $Id$
 #
 # Report of documents linking to a specified glossary term.
 #

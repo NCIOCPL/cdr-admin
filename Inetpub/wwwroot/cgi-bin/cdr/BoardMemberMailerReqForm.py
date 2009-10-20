@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: BoardMemberMailerReqForm.py,v 1.6 2005-05-13 22:47:10 venglisc Exp $
+# $Id$
 #
 # Request form for generating RTF letters to board members.
 #

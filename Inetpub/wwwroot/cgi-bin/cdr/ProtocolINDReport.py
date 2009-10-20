@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolINDReport.py,v 1.2 2008-06-12 18:38:04 venglisc Exp $
+# $Id$
 #
 # Report to list protocol information for trials with an IND number
 #

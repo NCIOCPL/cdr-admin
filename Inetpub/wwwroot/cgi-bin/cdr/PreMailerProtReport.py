@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: PreMailerProtReport.py,v 1.4 2004-09-15 20:40:05 venglisc Exp $
+# $Id$
 #
 # Checks run prior to generating mailers for protocols.
 #

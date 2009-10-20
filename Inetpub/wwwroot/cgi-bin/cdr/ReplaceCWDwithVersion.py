@@ -5,7 +5,7 @@
 # Used when the most recent copy of a document has problems and
 # we wish to revert to an earlier version.
 #
-# $Id: ReplaceCWDwithVersion.py,v 1.1 2008-07-04 02:56:13 ameyer Exp $
+# $Id$
 #
 # $Log: not supported by cvs2svn $
 #

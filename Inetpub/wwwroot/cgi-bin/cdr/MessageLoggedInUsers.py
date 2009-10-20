@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: MessageLoggedInUsers.py,v 1.1 2002-08-14 17:27:23 bkline Exp $
+# $Id$
 #
 # Send a message to users currently logged in to the CDR.
 #

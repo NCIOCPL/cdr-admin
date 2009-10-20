@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: GetTree.py,v 1.7 2002-08-15 19:38:41 bkline Exp $
+# $Id$
 #
 # Prototype for CDR Terminology tree viewer.
 #

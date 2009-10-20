@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: CdrTestSession.py,v 1.1 2006-05-04 14:42:07 bkline Exp $
+# $Id$
 #
 # Stub login/logout to support testing of CDR Loader without access to
 # port 2019.

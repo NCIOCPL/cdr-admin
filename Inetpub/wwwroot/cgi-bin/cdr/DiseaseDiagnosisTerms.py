@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: DiseaseDiagnosisTerms.py,v 1.2 2009-05-13 15:33:11 venglisc Exp $
+# $Id$
 #
 # Hierarchical report (in thesaurus-like format) of terminology
 # under Disease/Diagnosis.

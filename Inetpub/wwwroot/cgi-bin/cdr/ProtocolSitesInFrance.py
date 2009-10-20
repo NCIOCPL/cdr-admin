@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolSitesInFrance.py,v 1.2 2006-01-18 22:53:47 venglisc Exp $
+# $Id$
 #
 # Report identifying protocol sites located in France.
 # The output format is *.xml (Excel is able to import this)

@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------
-# $Id: ShowCdrCommands.py,v 1.1 2002-09-29 14:03:25 bkline Exp $
+# $Id$
 #
 # Show CDR summary of commands submitted during a specified time period.
 #

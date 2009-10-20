@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: SpanishGlossaryTermsByStatus.py,v 1.3 2006-10-26 17:47:53 bkline Exp $
+# $Id$
 #
 # Split off from the base glossary terms by status report because new
 # requirements force the report to be performed in batch mode.

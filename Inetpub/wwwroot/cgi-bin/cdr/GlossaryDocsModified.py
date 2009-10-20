@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryDocsModified.py,v 1.2 2007-11-03 14:15:07 bkline Exp $
+# $Id$
 #
 # "The Glossary Documents Modified Report will serve as a QC report to
 # verify which documents were changed within a given time frame, which

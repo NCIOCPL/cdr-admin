@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: TrialsWithResults.py,v 1.1 2005-03-14 16:32:19 bkline Exp $
+# $Id$
 #
 # Summary list of published clinical trial results by CTEP ID.
 #

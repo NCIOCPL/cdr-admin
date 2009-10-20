@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermReports.py,v 1.25 2009-03-03 21:58:12 bkline Exp $
+# $Id$
 #
 # Submenu for glossary term reports.
 #

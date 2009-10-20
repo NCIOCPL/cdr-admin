@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditQueryTermDefs.py,v 1.6 2009-03-17 21:21:55 venglisc Exp $
+# $Id$
 #
 # Prototype for editing CDR query term definitions.
 #

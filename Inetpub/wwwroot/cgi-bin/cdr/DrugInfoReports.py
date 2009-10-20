@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: DrugInfoReports.py,v 1.5 2008-09-17 20:42:32 bkline Exp $
+# $Id$
 #
 # $Log: not supported by cvs2svn $
 # Revision 1.4  2008/09/10 17:31:44  venglisc

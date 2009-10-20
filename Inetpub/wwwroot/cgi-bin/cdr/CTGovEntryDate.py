@@ -6,7 +6,7 @@
 #
 # Gathers parameters and launches CTGovEntryDateBatch.py
 #
-# $Id: CTGovEntryDate.py,v 1.1 2005-12-14 00:10:35 ameyer Exp $
+# $Id$
 #
 # $Log: not supported by cvs2svn $
 #

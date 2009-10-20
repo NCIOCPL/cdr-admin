@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditFilter.py,v 1.24 2009-08-07 16:39:18 venglisc Exp $
+# $Id$
 #
 # Prototype for editing CDR filter documents.
 #

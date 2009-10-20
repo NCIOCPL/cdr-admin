@@ -24,7 +24,7 @@
 #    3. Allow the user to submit the results, plus any overrides for
 #       permanent update.
 #
-# $Id: Request1931.py,v 1.6 2006-06-01 21:44:31 ameyer Exp $
+# $Id$
 #
 # $Log: not supported by cvs2svn $
 # Revision 1.5  2006/03/21 23:44:44  ameyer

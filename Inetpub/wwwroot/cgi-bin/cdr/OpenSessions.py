@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: OpenSessions.py,v 1.1 2002-08-14 17:26:56 bkline Exp $
+# $Id$
 #
 # Display of threads which are still running in the CDR Server (mostly
 # a debugging tool).

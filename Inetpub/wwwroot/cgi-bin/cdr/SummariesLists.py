@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummariesLists.py,v 1.7 2008-08-19 18:45:30 venglisc Exp $
+# $Id$
 #
 # Report on lists of summaries.
 #

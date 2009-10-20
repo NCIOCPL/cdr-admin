@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryMetaData.py,v 1.12 2009-04-02 21:13:26 ameyer Exp $
+# $Id$
 #
 # Report on the metadata for one or more summaries.
 #

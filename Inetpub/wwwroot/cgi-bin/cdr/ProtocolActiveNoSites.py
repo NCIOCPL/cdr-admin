@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolActiveNoSites.py,v 1.1 2006-08-31 21:59:56 venglisc Exp $
+# $Id$
 #
 # Report of active Protocols without any active participating sites
 # or external sites. (Bug 2379)

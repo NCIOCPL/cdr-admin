@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolStatusChange.py,v 1.5 2006-05-04 14:29:50 bkline Exp $
+# $Id$
 #
 # Protocol Status Change Report
 #

@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ShowRawXml.py,v 1.1 2004-07-13 18:05:11 bkline Exp $
+# $Id$
 #
 # Show unformatted XML; mostly useful for filters.
 #

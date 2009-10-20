@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ShowRawImageXml.py,v 1.1 2004-11-17 14:39:55 bkline Exp $
+# $Id$
 #
 # Show unformatted XML for image docs.
 #

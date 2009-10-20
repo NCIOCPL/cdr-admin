@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryTermPhrases.py,v 1.5 2008-11-24 14:50:24 bkline Exp $
+# $Id$
 #
 # Report on phrases matching specified glossary term.
 #

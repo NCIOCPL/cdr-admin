@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------
-# $Id: getBatchStatus.py,v 1.2 2009-09-16 16:37:31 venglisc Exp $
+# $Id$
 #
 # CGI program for displaying the status of batch jobs.
 #

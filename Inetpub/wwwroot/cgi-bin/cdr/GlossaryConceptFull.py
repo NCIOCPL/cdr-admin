@@ -1,7 +1,7 @@
 #----------------------------------------------------------------------
 # coding=latin-1
 #
-# $Id: GlossaryConceptFull.py,v 1.9 2009-08-06 18:50:08 venglisc Exp $
+# $Id$
 #
 # Glossary Term Concept report
 # This report takes a concept and displays all of the Term Name 

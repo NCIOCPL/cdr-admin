@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: Request3935.py,v 1.1 2008-04-17 18:46:41 bkline Exp $
+# $Id$
 #
 # "We need an adhoc report listing protocols that have terms other than
 # drug/agent terms in the Intervention Name field.  Some of the CAM

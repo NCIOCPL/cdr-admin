@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditLinkType.py,v 1.5 2006-10-06 02:43:46 ameyer Exp $
+# $Id$
 #
 # Prototype for editing a CDR link type.
 #

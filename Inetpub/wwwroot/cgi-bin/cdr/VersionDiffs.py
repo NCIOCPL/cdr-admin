@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: VersionDiffs.py,v 1.5 2007-11-03 14:15:07 bkline Exp $
+# $Id$
 #
 # Compare two versions of a document.
 #

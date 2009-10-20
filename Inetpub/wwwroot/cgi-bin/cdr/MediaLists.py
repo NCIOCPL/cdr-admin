@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: MediaLists.py,v 1.1 2008-12-29 21:25:32 venglisc Exp $
+# $Id$
 #
 # Report to list Media documents modified between a certain time 
 # interval.  The user can select to filter by a category and/or

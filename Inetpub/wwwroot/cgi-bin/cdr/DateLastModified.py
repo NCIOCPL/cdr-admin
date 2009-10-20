@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: DateLastModified.py,v 1.2 2002-06-07 13:28:59 bkline Exp $
+# $Id$
 #
 # Reports documents last modified during a specified time period.
 #

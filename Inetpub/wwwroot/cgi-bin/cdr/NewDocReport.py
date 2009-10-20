@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: NewDocReport.py,v 1.5 2009-09-25 16:21:42 venglisc Exp $
+# $Id$
 #
 # Reports on newly created documents and their statuses.
 #

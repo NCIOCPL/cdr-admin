@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: TermTreeB2.py,v 1.2 2007-11-03 14:15:07 bkline Exp $
+# $Id$
 #
 # Second prototype for CDR Terminology tree viewer.
 #

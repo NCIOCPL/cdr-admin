@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: DrugAgentReport.py,v 1.1 2004-05-11 17:50:34 bkline Exp $
+# $Id$
 #
 # Request #1191 (report on Drug/Agent terms).
 #

@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: Request1855.py,v 1.3 2008-04-17 19:17:36 bkline Exp $
+# $Id$
 #
 # "I would like to get a list of unique InterventionType and InterventionName 
 # pairs for InscopeProtocols along with the Original Protocol Title. Please 

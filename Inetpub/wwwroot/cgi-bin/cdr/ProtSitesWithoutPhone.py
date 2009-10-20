@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtSitesWithoutPhone.py,v 1.2 2005-05-26 21:33:52 venglisc Exp $
+# $Id$
 #
 # Queue up report for Protocol sites without contact phone.
 #

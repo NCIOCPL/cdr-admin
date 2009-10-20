@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------
-# $Id: GlobalChangeCTGovMapping.py,v 1.2 2007-10-03 04:15:47 ameyer Exp $
+# $Id$
 #
 # Search CTGovProtocol documents for values that can be mapped
 # using the external_map table.  Map them if any are found.

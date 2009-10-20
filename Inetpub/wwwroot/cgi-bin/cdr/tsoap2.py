@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------
-# $Id: tsoap2.py,v 1.1 2004-07-13 18:09:45 bkline Exp $
+# $Id$
 #
 # Stub for SOAP interface to CDR from Cancer.gov.
 #

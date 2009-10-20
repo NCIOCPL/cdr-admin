@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: GeographicReports.py,v 1.2 2004-09-17 14:06:50 venglisc Exp $
+# $Id$
 #
 # Submenu for geographic reports.
 #

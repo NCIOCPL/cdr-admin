@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: GetReportWorkbook.py,v 1.3 2006-05-04 14:24:46 bkline Exp $
+# $Id$
 #
 # Sends back Excel workbook report to client.
 #

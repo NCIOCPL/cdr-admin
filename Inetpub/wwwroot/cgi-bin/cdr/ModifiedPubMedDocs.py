@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ModifiedPubMedDocs.py,v 1.5 2007-11-03 14:15:07 bkline Exp $
+# $Id$
 #
 # Reports on documents unchanged for a specified number of days.
 #

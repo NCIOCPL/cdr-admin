@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: TermsByType.py,v 1.2 2002-08-15 19:38:42 bkline Exp $
+# $Id$
 #
 # Task 176: For a user-specified type or types, a report that displays all
 # terms with the type(s) must be generated.  The report must display all terms

@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: PreferredProtOrgs.py,v 1.2 2006-10-12 19:49:32 bkline Exp $
+# $Id$
 #
 # $Log: not supported by cvs2svn $
 # Revision 1.1  2003/11/10 18:04:47  bkline

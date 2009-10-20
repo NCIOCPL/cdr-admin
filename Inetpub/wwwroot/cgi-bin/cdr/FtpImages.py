@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------
-# $Id: FtpImages.py,v 1.4 2005-07-28 21:14:40 venglisc Exp $
+# $Id$
 #
 # Ftp files from the CIPSFTP server from the ciat/qa/Images directory
 # and place them on the CIPS network.

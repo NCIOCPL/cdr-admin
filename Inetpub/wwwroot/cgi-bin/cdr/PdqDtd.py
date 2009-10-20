@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: PdqDtd.py,v 1.1 2003-12-16 15:52:21 bkline Exp $
+# $Id$
 #
 # Display the licensee DTD (used for the online CDR documentation).
 #

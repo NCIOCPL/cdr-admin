@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: MissingInfoMailer.py,v 1.4 2009-02-10 19:32:28 bkline Exp $
+# $Id$
 #
 # Program to send out a mailer for missing protocol information.
 #

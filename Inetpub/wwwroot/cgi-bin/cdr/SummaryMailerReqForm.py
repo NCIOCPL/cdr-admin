@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryMailerReqForm.py,v 1.15 2008-03-21 15:40:20 kidderc Exp $
+# $Id$
 #
 # Request form for generating PDQ Editorial Board Members Mailing.
 #

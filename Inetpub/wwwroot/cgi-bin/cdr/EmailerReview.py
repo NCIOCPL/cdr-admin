@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: EmailerReview.py,v 1.5 2008-04-30 15:33:43 bkline Exp $
+# $Id$
 #
 # $Log: not supported by cvs2svn $
 # Revision 1.3  2005/03/02 21:36:58  bkline

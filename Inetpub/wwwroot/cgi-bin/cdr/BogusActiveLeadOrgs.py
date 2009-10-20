@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: BogusActiveLeadOrgs.py,v 1.2 2003-03-10 16:22:56 bkline Exp $
+# $Id$
 #
 # Report of lead orgs claiming to be active, without any active
 # participating sites.

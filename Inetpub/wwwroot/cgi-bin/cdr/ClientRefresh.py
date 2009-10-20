@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ClientRefresh.py,v 1.3 2006-05-04 13:34:09 bkline Exp $
+# $Id$
 #
 # Web service for keeping CDR client files up to date.
 #

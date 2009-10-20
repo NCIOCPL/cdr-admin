@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ShowAllLinkTypes.py,v 1.4 2006-10-06 02:59:08 ameyer Exp $
+# $Id$
 #
 # Displays a table containing information about all link types.
 #

@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: GetCdrImage.py,v 1.2 2008-03-26 20:41:23 venglisc Exp $
+# $Id$
 #
 # Send JPEG version of a CDR image to the browser, possibly resized.
 #

@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: DevSA.py,v 1.10 2009-07-15 01:42:07 ameyer Exp $
+# $Id$
 #
 # Main menu for Developers and System Administrators.
 #

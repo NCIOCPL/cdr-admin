@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: CitationsAddedToProtocols.py,v 1.1 2005-08-29 20:32:23 bkline Exp $
+# $Id$
 #
 # We need a report to check which citations (Published Results and Related
 # Publications) have been added to protocols in a given time frame. It will

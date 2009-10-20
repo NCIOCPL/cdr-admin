@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ShowDocXml.py,v 1.2 2002-08-15 19:49:04 bkline Exp $
+# $Id$
 #
 # Sends the raw XML for a document to a browser.  Useful with IE5.x,
 # which by default shows a hierarchical tree display for the data.

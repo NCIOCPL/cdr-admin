@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: Request4344.py,v 1.4 2009-06-09 14:21:27 bkline Exp $
+# $Id$
 #
 # The Glossary Term Concept by Spanish Definition Status Report will serve
 # as a QC report for Spanish and corresponding English Definitions by Status.

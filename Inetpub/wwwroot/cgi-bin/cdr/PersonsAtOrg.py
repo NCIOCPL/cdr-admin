@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: PersonsAtOrg.py,v 1.6 2004-05-20 22:19:59 venglisc Exp $
+# $Id$
 #
 # Identifieds all person documents which are linked to a specified
 # organization document.

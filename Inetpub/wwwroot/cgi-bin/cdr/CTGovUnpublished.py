@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: CTGovUnpublished.py,v 1.2 2009-07-02 18:47:16 venglisc Exp $
+# $Id$
 #
 # Report of unpublished CTGov trials by Phase.
 # The query originated from the AdHoc query interface.

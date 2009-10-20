@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: QcReport.py,v 1.70 2009-08-07 17:29:43 venglisc Exp $
+# $Id$
 #
 # Transform a CDR document using a QC XSL/T filter and send it back to
 # the browser.

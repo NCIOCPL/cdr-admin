@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: MediaSearch.py,v 1.1 2006-05-04 14:04:00 bkline Exp $
+# $Id$
 #
 # Advanced search interface for CDR Media documents.
 #

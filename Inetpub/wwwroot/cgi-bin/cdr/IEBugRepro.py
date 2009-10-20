@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: IEBugRepro.py,v 1.1 2002-07-18 01:05:25 bkline Exp $
+# $Id$
 #
 # Repro case for bug in Internet Explorer which mistakes XML files
 # for HTML files if it thinks it sees an HTML tag in the document

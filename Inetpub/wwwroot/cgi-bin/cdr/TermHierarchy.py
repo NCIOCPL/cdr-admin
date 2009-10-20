@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: TermHierarchy.py,v 1.5 2002-08-15 19:38:42 bkline Exp $
+# $Id$
 #
 # Prototype for display of Term hierarchy (requirement 2.6 from 
 # Terminology Processing Requirements).

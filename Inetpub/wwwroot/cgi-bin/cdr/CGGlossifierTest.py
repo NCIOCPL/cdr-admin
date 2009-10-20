@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: CGGlossifierTest.py,v 1.3 2009-02-10 19:32:28 bkline Exp $
+# $Id$
 #
 # Minimal test interface for periodically checking to make sure no
 # bit rot has set in while we're waiting for the Cancer.gov team

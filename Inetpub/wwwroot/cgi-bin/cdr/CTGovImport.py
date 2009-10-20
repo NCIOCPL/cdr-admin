@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: CTGovImport.py,v 1.8 2007-03-23 16:40:29 bkline Exp $
+# $Id$
 #
 # User interface for selecting Protocols to be imported from
 # ClinicalTrials.gov.

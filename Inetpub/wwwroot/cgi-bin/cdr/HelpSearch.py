@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: HelpSearch.py,v 1.3 2002-05-03 20:29:49 bkline Exp $
+# $Id$
 #
 # Duplicate-checking interface for Help (Documentation) documents.
 #

@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: GateKeeperStatus.py,v 1.3 2009-02-10 19:32:28 bkline Exp $
+# $Id$
 #
 # Web interface for requesting status from the new Cancer.gov GateKeeper.
 #

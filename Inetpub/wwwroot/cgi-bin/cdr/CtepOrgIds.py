@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: CtepOrgIds.py,v 1.2 2005-05-25 14:13:22 bkline Exp $
+# $Id$
 #
 # Create report that can be used to verify that CTEP org ID mappings
 # are correct.

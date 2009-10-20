@@ -4,7 +4,7 @@
 #
 # Done for Bugzilla issue #1881
 #
-# $Id: CTGovUpdateReport.py,v 1.3 2006-07-03 20:11:51 ameyer Exp $
+# $Id$
 #
 # $Log: not supported by cvs2svn $
 # Revision 1.2  2006/01/10 20:10:15  ameyer

@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: DocVersionHistory.py,v 1.21 2009-06-29 15:24:33 venglisc Exp $
+# $Id$
 #
 # Show version history of document.
 #

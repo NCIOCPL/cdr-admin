@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ExternMapFailures.py,v 1.9 2007-11-03 14:15:07 bkline Exp $
+# $Id$
 #
 # Report on values found in external systems (such as ClinicalTrials.gov)
 # which have not yet been mapped to CDR documents.

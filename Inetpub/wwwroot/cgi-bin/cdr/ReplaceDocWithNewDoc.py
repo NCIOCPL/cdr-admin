@@ -9,7 +9,7 @@
 #
 # Requirements and design are described in Bugzilla issue #3561.
 #
-# $Id: ReplaceDocWithNewDoc.py,v 1.4 2008-12-31 19:40:02 venglisc Exp $
+# $Id$
 #
 # $Log: not supported by cvs2svn $
 # Revision 1.3  2008/10/09 13:57:37  ameyer

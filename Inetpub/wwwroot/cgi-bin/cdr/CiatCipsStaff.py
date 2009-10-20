@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: CiatCipsStaff.py,v 1.11 2009-07-23 20:53:55 ameyer Exp $
+# $Id$
 #
 # Main menu for CIAT/CIPS staff.
 #

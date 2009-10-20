@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolHpQcReport.py,v 1.9 2009-05-06 17:25:34 venglisc Exp $
+# $Id$
 #
 # Protocol Health Professional QC Report.
 #

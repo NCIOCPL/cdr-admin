@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditCSS.py,v 1.4 2002-07-30 13:08:56 bkline Exp $
+# $Id$
 #
 # Prototype for editing CSS stylesheets.
 #

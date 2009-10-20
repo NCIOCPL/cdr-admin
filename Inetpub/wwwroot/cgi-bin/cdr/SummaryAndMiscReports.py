@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummaryAndMiscReports.py,v 1.20 2008-09-02 20:12:08 bkline Exp $
+# $Id$
 #
 # Submenu for summary and miscellanous document reports.
 #

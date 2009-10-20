@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: CitationsInSummaries.py,v 1.2 2006-11-29 16:21:24 bkline Exp $
+# $Id$
 #
 # Report listing all citations linked by a summary document.
 # The output format is *.xml (Excel is able to import this)

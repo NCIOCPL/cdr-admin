@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolCitationsQcReport.py,v 1.5 2009-05-05 21:58:41 ameyer Exp $
+# $Id$
 #
 # Protocol Citations QC Report.
 #

@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: PubStatsByDate.py,v 1.3 2009-01-13 22:13:10 venglisc Exp $
+# $Id$
 #
 # Report to list updated document count by document type.
 #

@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: OrgSearch2.py,v 1.10 2004-02-03 14:40:14 bkline Exp $
+# $Id$
 #
 # Prototype for duplicate-checking interface for Organization documents.
 #

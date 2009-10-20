@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: DISSearch.py,v 1.1 2009-02-12 16:21:49 bkline Exp $
+# $Id$
 #
 # Advanced search interface for CDR DrugInformationSummary documents.
 #

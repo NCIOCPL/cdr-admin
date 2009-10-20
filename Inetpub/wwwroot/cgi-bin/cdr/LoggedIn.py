@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: LoggedIn.py,v 1.1 2002-08-14 17:27:52 bkline Exp $
+# $Id$
 #
 # Display of users currently logged in to the CDR Server.
 #

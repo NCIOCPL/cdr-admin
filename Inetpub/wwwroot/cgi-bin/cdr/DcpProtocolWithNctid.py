@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: DcpProtocolWithNctid.py,v 1.1 2008-05-08 20:40:18 venglisc Exp $
+# $Id$
 #
 # Report of DCP InScopeProtocols with NCT protocol ID
 #

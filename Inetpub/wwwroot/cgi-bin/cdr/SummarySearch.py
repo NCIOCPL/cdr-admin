@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummarySearch.py,v 1.6 2003-06-02 14:23:06 bkline Exp $
+# $Id$
 #
 # Prototype for duplicate-checking interface for Summary documents.
 #

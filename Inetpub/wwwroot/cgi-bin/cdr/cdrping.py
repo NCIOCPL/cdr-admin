@@ -4,7 +4,7 @@
 #
 # If error, reports to default log file (debug.log) and to web client.
 #
-# $Id: cdrping.py,v 1.1 2008-08-07 19:39:03 ameyer Exp $
+# $Id$
 #
 # $Log: not supported by cvs2svn $
 ############

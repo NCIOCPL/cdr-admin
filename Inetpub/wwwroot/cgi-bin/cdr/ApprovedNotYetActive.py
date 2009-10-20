@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ApprovedNotYetActive.py,v 1.5 2009-05-19 19:34:22 venglisc Exp $
+# $Id$
 #
 # Approved Not Yet Active Protocols Verification Report
 #

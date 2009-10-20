@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: AdHocQuery.py,v 1.6 2009-05-06 18:18:22 venglisc Exp $
+# $Id$
 #
 # Displays result set for SQL query.
 #

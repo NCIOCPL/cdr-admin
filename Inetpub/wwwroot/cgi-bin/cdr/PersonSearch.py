@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: PersonSearch.py,v 1.10 2007-11-03 14:15:07 bkline Exp $
+# $Id$
 #
 # Prototype for duplicate-checking interface for Person documents.
 #

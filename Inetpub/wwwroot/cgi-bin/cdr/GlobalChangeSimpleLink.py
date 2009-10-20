@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------
-# $Id: GlobalChangeSimpleLink.py,v 1.2 2009-07-23 23:45:50 ameyer Exp $
+# $Id$
 #
 # Globally change all links (cdr:ref) of any specified type from
 # one value to another.

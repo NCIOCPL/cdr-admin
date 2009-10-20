@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: UnblockDoc.py,v 1.1 2004-09-30 21:00:37 bkline Exp $
+# $Id$
 #
 # Make a blocked document active.
 #

@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: LookupNctId.py,v 1.1 2005-03-14 16:32:19 bkline Exp $
+# $Id$
 #
 # Implement mechanism whereby they can query to get an NCTID for a CTEP ID.
 # They will receive a response with content-type of text/plain, 

@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: DatedActions.py,v 1.3 2002-05-25 02:38:56 bkline Exp $
+# $Id$
 #
 # Reports on dated actions for a particular document type.
 #

@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: CTGovDownloadReport.py,v 1.2 2004-01-23 15:34:21 bkline Exp $
+# $Id$
 #
 # Stats on documents downloaded from ClinicalTrials.gov.
 #

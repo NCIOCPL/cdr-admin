@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: GeoSearch.py,v 1.1 2001-12-01 18:11:44 bkline Exp $
+# $Id$
 #
 # Prototype for duplicate-checking interface for Geographic Entity documents.
 #

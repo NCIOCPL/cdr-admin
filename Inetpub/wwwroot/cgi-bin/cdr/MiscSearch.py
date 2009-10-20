@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: MiscSearch.py,v 1.3 2002-07-11 17:20:10 bkline Exp $
+# $Id$
 #
 # Prototype for duplicate-checking interface for Miscellaneous documents.
 #

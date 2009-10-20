@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ShowFilterSet.py,v 1.2 2009-02-10 19:32:28 bkline Exp $
+# $Id$
 #
 # Drills down into a filter set recursively to show which filters
 # will be applied to a document when the set is invoked.

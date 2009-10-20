@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: GlossaryProcessingStatusReport.py,v 1.4 2009-03-19 18:00:10 bkline Exp $
+# $Id$
 #
 # "The Processing Status Report will display the documents (GTC and GTN)
 # that correspond with the Processing Status selected by the user."

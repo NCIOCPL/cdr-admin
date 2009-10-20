@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: PublishReports.py,v 1.2 2008-02-08 20:56:59 venglisc Exp $
+# $Id$
 #
 # Submenu for publishing reports.
 #

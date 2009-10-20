@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: MailerCheckinReport.py,v 1.3 2005-04-21 21:37:28 bkline Exp $
+# $Id$
 #
 # Generates report on mailers for which reponses have been recorded
 # during a specified date range.

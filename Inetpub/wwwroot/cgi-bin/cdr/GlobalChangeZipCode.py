@@ -2,7 +2,7 @@
 # Perform global change of Person SpecificPostalAddress zip codes when
 # an associated Organization zip code changes.
 #
-# $Id: GlobalChangeZipCode.py,v 1.2 2009-04-28 17:50:15 ameyer Exp $
+# $Id$
 #
 # $Log: not supported by cvs2svn $
 # Revision 1.1  2009/04/17 04:41:01  ameyer

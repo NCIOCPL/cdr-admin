@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtSearch.py,v 1.19 2009-07-01 21:13:54 bkline Exp $
+# $Id$
 #
 # Prototype for duplicate-checking interface for Protocol documents.
 #

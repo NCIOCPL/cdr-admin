@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ForceCtgovImport.py,v 1.3 2007-04-02 15:25:47 bkline Exp $
+# $Id$
 #
 # Interface for forcing the import of a trial from ClinicalTrials.gov
 # when none of the search terms for the trial match the criteria for

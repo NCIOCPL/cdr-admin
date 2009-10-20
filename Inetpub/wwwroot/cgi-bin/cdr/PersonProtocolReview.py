@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: PersonProtocolReview.py,v 1.9 2005-06-22 16:45:11 bkline Exp $
+# $Id$
 #
 # Report to assist editors in checking links to a specified person from
 # protocols.

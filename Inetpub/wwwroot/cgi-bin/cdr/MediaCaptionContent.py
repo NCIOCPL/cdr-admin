@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------
-# $Id: MediaCaptionContent.py,v 1.1 2008-04-24 14:54:07 ameyer Exp $
+# $Id$
 #
 # Produce an Excel spreadsheet showing significant fields from user
 # selected Media documents.

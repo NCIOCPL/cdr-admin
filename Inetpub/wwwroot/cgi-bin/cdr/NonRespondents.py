@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: NonRespondents.py,v 1.6 2006-03-14 14:17:18 bkline Exp $
+# $Id$
 #
 # Report on mailers which haven't been responded to (other than
 # status and participant mailers).

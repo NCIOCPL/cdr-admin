@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: UnchangedDocs.py,v 1.6 2007-10-31 21:13:48 bkline Exp $
+# $Id$
 #
 # Reports on documents unchanged for a specified number of days.
 #

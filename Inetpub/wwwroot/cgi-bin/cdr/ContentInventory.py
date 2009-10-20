@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ContentInventory.py,v 1.3 2009-08-13 21:50:05 venglisc Exp $
+# $Id$
 #
 # Report listing all citations linked by a summary document.
 # The output format is *.xml (Excel is able to import this)

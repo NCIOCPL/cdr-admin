@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: GetXsltParams.py,v 1.1 2002-11-08 13:40:52 bkline Exp $
+# $Id$
 #
 # Show all of the top-level parameters used by CDR filters.  Useful
 # for XSL/T script writers who want to avoid conflicting uses of the

@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: CdrImages.py,v 1.1 2004-11-17 14:39:55 bkline Exp $
+# $Id$
 #
 # Page to show the users the list of image documents in the CDR.
 #

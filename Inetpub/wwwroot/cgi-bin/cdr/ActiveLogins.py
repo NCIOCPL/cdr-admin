@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ActiveLogins.py,v 1.1 2002-06-27 12:21:18 bkline Exp $
+# $Id$
 #
 # Reports on current sessions.
 #

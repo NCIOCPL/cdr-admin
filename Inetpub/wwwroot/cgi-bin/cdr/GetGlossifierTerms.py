@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: GetGlossifierTerms.py,v 1.4 2009-07-05 19:50:23 bkline Exp $
+# $Id$
 #
 # Program to extract glossary terms for glossifier service invoked by
 # Cancer.gov.

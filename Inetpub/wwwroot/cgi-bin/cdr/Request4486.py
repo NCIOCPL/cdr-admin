@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: Request4486.py,v 1.4 2009-03-27 21:25:09 venglisc Exp $
+# $Id$
 #
 # "We need a new glossary term concept by type QC report to help us ensure
 # consistency in the wording of definitions."

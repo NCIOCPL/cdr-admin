@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtocolsLinkedToTerms.py,v 1.2 2009-03-02 16:14:48 bkline Exp $
+# $Id$
 #
 # "We would like a modified version of the Linked documents report for
 # Terms linked to Protocols.

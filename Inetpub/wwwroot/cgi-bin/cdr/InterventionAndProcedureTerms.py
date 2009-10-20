@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: InterventionAndProcedureTerms.py,v 1.3 2008-09-02 19:54:18 bkline Exp $
+# $Id$
 #
 # Hierarchical report (in thesaurus-like format) of index terms
 # whose semantic types are some form of Intervention/procedure.

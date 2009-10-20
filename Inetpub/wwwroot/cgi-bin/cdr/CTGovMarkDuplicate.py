@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: CTGovMarkDuplicate.py,v 1.3 2005-06-02 20:07:32 venglisc Exp $
+# $Id$
 #
 # Interface to allow users to mark a CTGov protocol as a duplicate in
 # the system.  The protocol will be updated in the ctgov_import table

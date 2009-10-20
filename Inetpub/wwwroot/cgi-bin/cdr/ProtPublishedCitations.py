@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ProtPublishedCitations.py,v 1.4 2005-06-06 18:53:16 venglisc Exp $
+# $Id$
 #
 # Report identifying previously published protocols that should be 
 # included in a hotfix.

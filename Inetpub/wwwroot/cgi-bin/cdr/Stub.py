@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: Stub.py,v 1.1 2002-05-25 02:39:47 bkline Exp $
+# $Id$
 #
 # Stub for report which hasn't been implemented yet.
 #

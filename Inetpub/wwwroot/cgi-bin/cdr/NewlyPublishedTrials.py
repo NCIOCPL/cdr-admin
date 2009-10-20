@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: NewlyPublishedTrials.py,v 1.6 2004-07-13 20:55:59 bkline Exp $
+# $Id$
 #
 # Report on newly published trials in batch.
 #

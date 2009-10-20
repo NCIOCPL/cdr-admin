@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: ShowFilterSets.py,v 1.2 2004-08-19 20:35:35 bkline Exp $
+# $Id$
 #
 # $Log: not supported by cvs2svn $
 # Revision 1.1  2004/07/13 18:08:27  bkline

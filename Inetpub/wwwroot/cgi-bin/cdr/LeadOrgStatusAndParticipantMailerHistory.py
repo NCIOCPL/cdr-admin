@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: LeadOrgStatusAndParticipantMailerHistory.py,v 1.3 2004-02-16 22:49:06 bkline Exp $
+# $Id$
 #
 # Reports on the history of S&P mailers for a particular protocol.
 #

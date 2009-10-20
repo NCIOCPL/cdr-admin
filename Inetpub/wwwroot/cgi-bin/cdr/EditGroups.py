@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: EditGroups.py,v 1.3 2002-02-21 15:22:02 bkline Exp $
+# $Id$
 #
 # Prototype for editing CDR groups.
 #

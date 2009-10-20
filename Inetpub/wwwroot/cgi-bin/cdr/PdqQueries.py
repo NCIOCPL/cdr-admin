@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #----------------------------------------------------------------------
 #
-# $Id: PdqQueries.py,v 1.1 2003-01-29 18:47:04 bkline Exp $
+# $Id$
 #
 # Ad-hoc SQL query tool for PDQ database.
 #

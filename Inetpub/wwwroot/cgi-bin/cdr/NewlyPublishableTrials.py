@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: NewlyPublishableTrials.py,v 1.3 2006-08-11 16:18:31 bkline Exp $
+# $Id$
 #
 # Report identifying unpublished trials with publishable versions.
 #

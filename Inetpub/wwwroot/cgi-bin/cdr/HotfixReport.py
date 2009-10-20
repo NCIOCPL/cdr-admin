@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: HotfixReport.py,v 1.9 2006-08-11 16:22:13 bkline Exp $
+# $Id$
 #
 # Report identifying previously published protocols that should be 
 # included in a hotfix.
