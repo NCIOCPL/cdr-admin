@@ -1,60 +1,8 @@
 #----------------------------------------------------------------------
 #
-# $Id: CiteSearch.py,v 1.16 2009-05-06 17:44:56 venglisc Exp $
+# $Id: CiteSearch.py,v 1.16 2009/05/06 17:44:56 venglisc Exp $
 #
 # Prototype for duplicate-checking interface for Citation documents.
-#
-# $Log: not supported by cvs2svn $
-# Revision 1.15  2008/06/23 20:14:49  bkline
-# Made test for validation errors more robust.
-#
-# Revision 1.14  2004/05/11 21:31:15  bkline
-# Modified path for year in response to request #1184.
-#
-# Revision 1.13  2003/11/26 20:53:21  venglisc
-# Replaced the Citation QC Report filter to run the QC Citation filter set
-# instead.
-#
-# Revision 1.12  2003/10/22 13:44:06  bkline
-# Removed dependency on Python regular expression package, which was
-# choking on complex documents.
-#
-# Revision 1.11  2003/09/12 12:34:37  bkline
-# Added support for searching values in linked documents (for the
-# Published In field of the search form).  Request #257.
-#
-# Revision 1.10  2003/03/04 14:11:52  bkline
-# Added missing parameter for %s placeholder in failure message.
-#
-# Revision 1.9  2003/01/29 20:59:11  bkline
-# Added more obnoxious error message when citation import fails
-# validation.
-#
-# Revision 1.8  2002/07/25 01:51:03  bkline
-# Added code to catch network exception.
-#
-# Revision 1.7  2002/07/15 21:50:37  bkline
-# Enhancements for issues #323 and #325.
-#
-# Revision 1.6  2002/05/10 21:19:48  bkline
-# Changed PUBMED to PubMed.
-#
-# Revision 1.5  2002/05/10 21:14:12  bkline
-# Fixed bug in field lists.
-#
-# Revision 1.4  2002/02/25 13:47:51  bkline
-# Added ability to designate CDR document to be overridden by fresh import
-# of PubMed doc (task #57).
-#
-# Revision 1.3  2002/02/20 04:00:16  bkline
-# Modified style of prompt at users' request.
-#
-# Revision 1.2  2002/02/14 19:38:10  bkline
-# Fixed search element paths to match schema changes; replaced hardwired
-# filter ID with filter document name.
-#
-# Revision 1.1  2001/12/01 18:11:44  bkline
-# Initial revision
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, cdrdb, urllib, sys
@@ -79,6 +27,9 @@ impReq    = fields and fields.getvalue("ImportButton")     or None
 srchPmed  = fields and fields.getvalue("SearchPubMed")     or None
 subtitle  = "Citation"
 valErrors = ""
+
+userPair  = cdr.idSessionUser(session, session)
+userInfo  = cdr.getUser((userPair[0], userPair[1]), userPair[0])
 
 #----------------------------------------------------------------------
 # Redirect to PubMed searching if requested (in a different window).
@@ -273,7 +224,7 @@ if not submit:
                                           subtitle, # 'Citation',
                                           conn,
                                           errors)
-    page += """\
+    pubMedImport = """\
    <CENTER>
     <TABLE>
      <TR>
@@ -301,14 +252,24 @@ if not submit:
      </TR>
     </TABLE>
    </CENTER>
+"""
+
+    footer = """\
   </FORM>
  </BODY>
 </HTML>
 """
+    # Suppress the display for PubMed Import for Guest accounts
+    # ---------------------------------------------------------
+    if 'GUEST' in userInfo.groups and len(userInfo.groups) < 2:
+        html = page + footer
+    else:
+        html = page + pubMedImport + footer
+
     # sendPage() expects unicode: decoding page string
     # ------------------------------------------------
-    page = page.decode('utf-8')
-    cdrcgi.sendPage(page)
+    html = html.decode('utf-8')
+    cdrcgi.sendPage(html)
 
 #----------------------------------------------------------------------
 # Define the search fields used for the query.

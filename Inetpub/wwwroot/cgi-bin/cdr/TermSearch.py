@@ -4,53 +4,6 @@
 #
 # Prototype for duplicate-checking interface for Term documents.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.17  2008/01/29 11:41:26  kidderc
-# Added help text.
-#
-# Revision 1.15  2007/10/19 12:59:35  kidderc
-# Added improved feedback when updating drom NCIT.
-#
-# Revision 1.13  2007/10/11 16:22:36  kidderc
-# Moved much of functionality into NCIThes.py. A library module.
-#
-# Revision 1.12  2007/10/10 19:10:26  kidderc
-# Added ajax functionality for prompting if preferred names do not match.
-#
-# Revision 1.11  2007/10/10 13:28:05  kidderc
-# Bug 3037
-#
-# Revision 1.10  2007/10/01 16:15:41  kidderc
-# Bug 3037.
-#
-# Revision 1.9  2007/09/20 21:18:30  bkline
-# Switched to httplib and public server (qa server is broken indefinitely).
-#
-# Revision 1.8  2007/02/01 13:32:13  bkline
-# Replaced Java program for retrieving Concept document from NCIT with
-# HTTP API.
-#
-# Revision 1.7  2005/09/09 20:11:20  bkline
-# More fixes to mapping strings.
-#
-# Revision 1.6  2005/09/01 11:50:53  bkline
-# Corrected values incorrectly set in the mapping spec document.
-#
-# Revision 1.5  2005/08/29 17:07:40  bkline
-# Added code to import new Term document from NCI thesaurus concept.
-#
-# Revision 1.4  2003/08/25 20:25:54  bkline
-# Plugged in named filter set.
-#
-# Revision 1.3  2002/02/20 03:57:33  bkline
-# Fixed bail() -> cdrcgi.bail().
-#
-# Revision 1.2  2002/02/14 19:34:52  bkline
-# Replaced hardwired filter ID with filter name.
-#
-# Revision 1.1  2001/12/01 18:11:44  bkline
-# Initial revision
-#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, cdrdb, xml.dom.minidom, httplib, time, NCIThes
 
@@ -70,11 +23,13 @@ help        = fields and fields.getvalue("HelpButton")      or None
 srchThes    = fields and fields.getvalue("SearchThesaurus") or None
 conceptCode = fields and fields.getvalue("ConceptCode")     or None
 ckPrefNm    = fields and fields.getvalue("CkPrefNm")        or None
-updateDefinition    = fields and fields.getvalue("UpdateDefinition")        or None
-importTerms    = fields and fields.getvalue("ImportTerms")        or None
+updateDefinition    = fields and fields.getvalue("UpdateDefinition")  or None
+importTerms    = fields and fields.getvalue("ImportTerms")  or None
 subtitle    = "Term"
 updateCDRID = fields and fields.getvalue("UpdateCDRID")     or None
 valErrors   = None
+userPair    = cdr.idSessionUser(session, session)
+userInfo    = cdr.getUser((userPair[0], userPair[1]), userPair[0])
 
 if importTerms:
     importTerms = int(importTerms)
@@ -350,6 +305,9 @@ if not submit:
         }
     }
    </SCRIPT>
+""" % (thesaurusSearchUrl,cdrcgi.BASE)
+
+    ccImport = """\
    <CENTER>
     <TABLE>
      <TR>
@@ -409,11 +367,21 @@ if not submit:
      </TR>
     </TABLE>
    </CENTER>
+"""
+
+    footer = """\
   </FORM>
  </BODY>
 </HTML>
-""" % (thesaurusSearchUrl,cdrcgi.BASE)
-    cdrcgi.sendPage(page)
+"""
+    # Suppress the display for Concept Code Import for Guest accounts
+    # ---------------------------------------------------------------
+    if 'GUEST' in userInfo.groups and len(userInfo.groups) < 2:
+        html = page + footer
+    else:
+        html = page + ccImport + footer
+
+    cdrcgi.sendPage(html)
 
 #----------------------------------------------------------------------
 # Define the search fields used for the query.
