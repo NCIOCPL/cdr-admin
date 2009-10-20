@@ -105,7 +105,9 @@ class Doc:
         self.title       = row[6]
         self.pubVFailed  = row[4] == 'F'
         self.transferred = row[7] and row[7][:3].upper() == 'CDR'
+        self.newTrans    = row[8] == 'Y'
 
+newTransfers      = {}
 newTrials         = {}
 pubVersionCreated = {}
 needReview        = {}
@@ -116,7 +118,7 @@ cursor.execute("SELECT dt FROM ctgov_import_job where id = %s" % job)
 dt = cursor.fetchone()[0][:19]
 cursor.execute("""\
          SELECT e.nlm_id, e.locked, e.new, e.needs_review, e.pub_version,
-                d.id, d.title, q.value
+                d.id, d.title, q.value, e.transferred
            FROM ctgov_import_event e
            JOIN ctgov_import i
              ON i.nlm_id = e.nlm_id
@@ -129,7 +131,9 @@ LEFT OUTER JOIN query_term q
 row = cursor.fetchone()
 while row:
     doc = Doc(row)
-    if doc.locked:
+    if doc.newTrans:
+        newTransfers[doc.nlmId] = doc
+    elif doc.locked:
         locked[doc.nlmId] = doc
     elif doc.new:
         newTrials[doc.nlmId] = doc
@@ -169,7 +173,7 @@ def makeSection(docs, label):
      <td valign='top'>%d</td>
      <td valign='top'>%s</td>
     </tr>
-""" % (doc.transferred and 'transferred' or 'normal',
+""" % ((doc.newTrans or doc.transferred) and 'transferred' or 'normal',
        doc.nlmId, doc.cdrId, cgi.escape(doc.title))
         html += """\
    </table>
@@ -197,6 +201,7 @@ html = """\
    <br><br>
   </center>
 """ % (dt, dt)
+html += makeSection(newTransfers, "Newly imported Transferred Trials")
 html += makeSection(newTrials, "New trials imported into CDR")
 html += makeSection(needReview, "Updated trials that require review")
 html += makeSection(pubVersionCreated,
