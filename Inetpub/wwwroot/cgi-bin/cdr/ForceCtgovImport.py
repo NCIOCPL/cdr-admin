@@ -6,12 +6,9 @@
 # when none of the search terms for the trial match the criteria for
 # our import search request.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.2  2006/11/29 16:14:44  bkline
-# Fixed code for setting disposition.
-#
-# Revision 1.1  2006/08/22 19:13:34  bkline
-# New administrative script for marking a CTGov trial for forced import.
+# BZIssue::2065
+# BZIssue::3110
+# BZIssue::4661
 #
 #----------------------------------------------------------------------
 import cgi, cdrcgi, cdrdb
@@ -72,7 +69,12 @@ if nctId:
     conn = cdrdb.connect()
     cursor = conn.cursor()
     dispositionCode = getImportRequestedCode(cursor)
-    cursor.execute("SELECT force FROM ctgov_import WHERE nlm_id = ?", nctId)
+    cursor.execute("""\
+        SELECT c.force, d.name
+          FROM ctgov_import c
+          JOIN ctgov_disposition d
+            ON d.id = c.disposition
+         WHERE nlm_id = ?""", nctId)
     rows = cursor.fetchall()
     if not rows:
         cursor.execute("""\
@@ -81,18 +83,23 @@ if nctId:
         conn.commit()
         extra = describeResult(u"added to table and marked for forced import",
                                nctId, u"green")
-    elif rows[0][0] != 'Y':
+    elif rows[0][0] == 'Y':
+        extra = describeResult(u"already marked for forced import", nctId,
+                               u"red")
+    elif rows[0][1] == 'duplicate':
+        extra = describeResult(u"is marked as a duplicate; you must first "
+                               u"use the 'Mark/Remove Protocols as Duplicates' "
+                               u"Administrative Menu Page to back out the "
+                               u"'duplcate' status for this document",
+                               nctId, u"red")
+    else:
         cursor.execute("""\
             UPDATE ctgov_import
                SET force = 'Y',
                    disposition = %d,
-                   cdr_id = NULL
              WHERE nlm_id = ?""" % dispositionCode, nctId)
         conn.commit()
         extra = describeResult(u"marked for forced import", nctId, u"green")
-    else:
-        extra = describeResult(u"already marked for forced import", nctId,
-                               u"red")
 
 form = u"""\
     <input type='hidden' name='%s' value='%s'>
