@@ -1,8 +1,10 @@
 #----------------------------------------------------------------------
 #
-# $Id$
+# $Id: TerminologyReports.py,v 1.15 2008-12-09 13:33:30 bkline Exp $
 #
 # Submenu for terminology reports.
+#
+# BZIssue::4653 CTRO Access to CDR Admin Interface
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
