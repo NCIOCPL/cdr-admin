@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id$
+# $Id: TermSearch.py 9295 2009-10-20 21:13:25Z bkline $
 #
 # Prototype for duplicate-checking interface for Term documents.
 #

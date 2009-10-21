@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: CiteSearch.py,v 1.16 2009/05/06 17:44:56 venglisc Exp $
+# $Id: CiteSearch.py 9295 2009-10-20 21:13:25Z bkline $
 #
 # Prototype for duplicate-checking interface for Citation documents.
 #
