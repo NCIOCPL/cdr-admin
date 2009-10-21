@@ -8,7 +8,7 @@
 # or submit a publishing job.  Therefore, we're limiting the menu
 # options to these users that are guest group members.
 #
-# BZIssue::4653
+# BZIssue::4653 CTRO Access to CDR Admin Interface
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
