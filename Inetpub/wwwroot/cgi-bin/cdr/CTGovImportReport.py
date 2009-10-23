@@ -4,28 +4,12 @@
 #
 # Stats on documents imported from ClinicalTrials.gov into CDR.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.7  2009/05/18 15:38:09  venglisc
-# Converting string to submit to sendPage to Unicode. (Bug 4560)
-#
-# Revision 1.6  2009/03/06 21:49:40  bkline
-# Added back in maxJobs parameter from Bach version of report.
-#
-# Revision 1.5  2009/03/06 19:43:01  bkline
-# Added highlighting of trials which have been transferred to CT.gov.
-#
-# Revision 1.4  2004/01/23 15:52:23  bkline
-# Added hidden Session variable to form.
-#
-# Revision 1.3  2004/01/22 00:26:31  bkline
-# Added call to cdrcgi.getSession().
-#
-# Revision 1.2  2003/12/16 15:42:30  bkline
-# Added section for failures creating new publishable versions.  Fixed
-# typo in style section.
-#
-# Revision 1.1  2003/11/10 17:59:06  bkline
-# Reports stats on documents imported from ClinicalTrials.gov into CDR.
+# BZIssue::952
+# BZIssue::1968
+# BZIssue::4523
+# BZIssue::4560
+# BZIssue::4577
+# BZIssue::4665
 #
 #----------------------------------------------------------------------
 import cdr, cdrdb, time, cgi, cdrcgi, re
