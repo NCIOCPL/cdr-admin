@@ -95,7 +95,7 @@ def checkForDuplicates(name, names, allDups):
                 checkForDuplicate(docId, (language, None), keys, duplicates)
     if duplicates:
         for key in duplicates:
-            if name.lower() not in ('tpa', 'cab', 'ctx'):
+            if name.lower() not in set(['tpa', 'cab', 'ctx', 'receptor']):
                 language, dictionary = key
                 allDups[(name, language, dictionary)] = duplicates[key]
                 # reportDuplicate(name, duplicates[key], language, dictionary)
