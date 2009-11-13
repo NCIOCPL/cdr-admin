@@ -4,7 +4,10 @@
 #
 # Reports on documents which link to a specified document.
 #
-# $Log: not supported by cvs2svn $
+# $Log: LinkedDocs.py,v $
+# Revision 1.6  2007/11/03 14:15:07  bkline
+# Unicode encoding cleanup (issue #3716).
+#
 # Revision 1.5  2005/02/17 22:48:45  venglisc
 # Added CDR-ID to header of report and changed display of header from
 # using H4 tags to using table and CSS format (Bug 1532).
@@ -28,10 +31,11 @@ import cgi, cdr, cdrcgi, re, string, cdrdb, time
 # Set the form variables.
 #----------------------------------------------------------------------
 fields   = cgi.FieldStorage()
-docId    = fields and fields.getvalue("DocId")          or None
-docTitle = fields and fields.getvalue("DocTitle")       or None
-docType  = fields and fields.getvalue("DocType")        or None
-ldt      = fields and fields.getvalue("LinkingDocType") or None
+docId    = fields.getvalue("DocId")          or None
+fragId   = fields.getvalue("FragId")         or ""
+docTitle = fields.getvalue("DocTitle")       or None
+docType  = fields.getvalue("DocType")        or None
+ldt      = fields.getvalue("LinkingDocType") or None
 session  = cdrcgi.getSession(fields)
 request  = cdrcgi.getRequest(fields)
 title    = "Linked Documents Report"
@@ -118,7 +122,12 @@ SELECT DISTINCT u.fullname
 # If we have a document ID, produce a report.
 #----------------------------------------------------------------------
 if docId:
-    docId = extractDocId(docId)
+    try:
+        idPieces = cdr.exNormalize(docId)
+    except Exception, e:
+        cdrcgi.bail("%s" % e)
+    docId = idPieces[1]
+    fragId = fragId or idPieces[2]
     try:
         # Get the target doc info.
         cursor.execute("""\
@@ -132,9 +141,11 @@ SELECT d.title, t.name
         cdrcgi.bail('Database query failure: %s' % info[1][0])
 
     # Get the info for the linking docs.
-    ldtConstraint = ""
+    ldtConstraint = fragConstraint = ""
     if ldt and ldt != 'Any Type':
         ldtConstraint = "AND t.name = '%s'" % ldt
+    if fragId:
+        fragConstraint = "AND n.target_frag = '%s'" % fragId.replace("'", "''")
     query = """\
 SELECT DISTINCT d.id, d.title, t.name, n.source_elem, n.target_frag
            FROM document d
@@ -144,7 +155,9 @@ SELECT DISTINCT d.id, d.title, t.name, n.source_elem, n.target_frag
              ON n.source_doc = d.id
           WHERE n.target_doc = ?
             %s
-       ORDER BY t.name, d.id, n.source_elem, n.target_frag""" % ldtConstraint
+            %s
+       ORDER BY t.name, d.id, n.source_elem, n.target_frag""" % (ldtConstraint,
+                                                                 fragConstraint)
     try:
         cursor.execute(query, extractDocId(docId))
     except cdrdb.Error, info:
@@ -210,8 +223,9 @@ SELECT DISTINCT d.id, d.title, t.name, n.source_elem, n.target_frag
         html += report + u"""\
   </TABLE>"""
     else:
+        frag = (fragId and "#%s" % fragId) or ""
         html += u"""\
-  <H3>No Documents Currently Link to CDR%010d</H3>""" % docId
+  <H3>No Documents Currently Link to CDR%010d%s</H3>""" % (docId, frag)
     html += u"""\
   </FORM>
   %s
@@ -287,6 +301,11 @@ form     = u"""\
     <TR>
      <TD ALIGN='right'><B>Document ID:&nbsp;</B></TD>
      <TD><INPUT NAME='DocId'></TD>
+    </TR>
+    <TR>
+     <TD ALIGN='right'><B>Fragment ID:&nbsp;</B></TD>
+     <TD><INPUT NAME='FragId'></TD>
+    </TR>
     <TR>
      <TD ALIGN='right'><B>Linking Document Type:&nbsp;</B></TD>
      <TD>%s</TD>
