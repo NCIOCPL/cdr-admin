@@ -5,6 +5,7 @@
 # Submenu for terminology reports.
 #
 # BZIssue::4653 CTRO Access to CDR Admin Interface
+# BZIssue::4698 Genetics Directory Menu Information
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
@@ -73,22 +74,24 @@ form += """\
     <OL>
 """
 reports = [
-           ('MenuHierarchy.py', 'Menu Hierarchy Report', ''),
-           ('Stub.py', 'Term By Type', ''),
            ('DiseaseDiagnosisTerms.py',
             'Cancer Diagnosis Hierarchy', ''),
            ('DiseaseDiagnosisTerms.py',
             'Cancer Diagnosis Hierarchy (Without Alternate Names)',
             '&flavor=short'),
+           ('DrugAgentReport.py', 'Drug/Agent Report', ''),
+           ('DrugAgentReport2.py', 'Drug/Agent Report - All', '&alldrugs=true'),
+           ('DrugReviewReport.py', 'Drug Review Report', ''),
+           ('GeneticConditionMenuMappingReport.py',
+            'Genetics Directory Menu Report', ''),
            ('InterventionAndProcedureTerms.py',
             'Intervention or Procedure Terms', '&IncludeAlternateNames=True'),
            ('InterventionAndProcedureTerms.py',
             'Intervention or Procedure Terms (without Alternate Names)',
             '&IncludeAlternateNames=False'),
-           ('DrugAgentReport.py', 'Drug/Agent Report', ''),
-           ('DrugAgentReport2.py', 'Drug/Agent Report - All', '&alldrugs=true'),
-           ('DrugReviewReport.py', 'Drug Review Report', ''),
+           ('MenuHierarchy.py', 'Menu Hierarchy Report', ''),
            ('SemanticTypeReport.py', 'Semantic Type Report', ''),
+           ('Stub.py', 'Term By Type', ''),
            ('TermHierarchyTree.py', 'Term Hierarchy Tree', ''),
            ('TermHierarchyTree.py',
             'Terms with No Parent Term and Not a Semantic Type',
