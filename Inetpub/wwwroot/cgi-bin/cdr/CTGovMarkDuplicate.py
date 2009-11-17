@@ -7,17 +7,6 @@
 # with the CDR-ID of the InScopeProtocol that the CTGov protocol is
 # a duplicate of.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.2  2004/07/13 15:46:26  venglisc
-# Modified so that document for which the CDR-ID has been removed will
-# set the disposition from "duplicate" to "import requested".
-# With this change the trial will not appear on the report listing all
-# duplicates.
-#
-# Revision 1.1  2004/04/26 20:37:17  venglisc
-# Initial version for user interface allowing to update the CDRID of the
-# ctgov_import table.
-#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, cdrdb, re, string
 
@@ -68,19 +57,12 @@ except cdrdb.Error, info:
 if request == "Update":
     # Test proper entry of input data
     # -------------------------------
-    if not usrCmt:
-        cdrcgi.bail("Comment required to update Protocol")
-
-    if not cdrId or not nctId:
-        if not unmarkCdr:
-             cdrcgi.bail("Both document IDs are required.")
-    elif unmarkCdr and not nctId:
-        cdrcgi.bail("NCT ID required.")
-    elif unmarkCdr and not usrCmt:
-        cdrcgi.bail("Comment is required to remove CDR ID")
-    else:
-        if unmarkCdr and cdrId:
-            cdrcgi.bail("CDR ID not allowed when unmarking NCT ID")
+    if not usrCmt or not nctId:
+        cdrcgi.bail("Comment and NCT ID are both required fields")
+    if unmarkCdr and cdrId:
+        cdrcgi.bail("CDR ID not allowed when unmarking duplicate setting")
+    if not unmarkCdr and not cdrId:
+        cdrcgi.bail("CDR ID is required when marking duplicate")
 
     # ----------------------------------------------------------
     # Find out if the NCTID exists
