@@ -4,6 +4,8 @@
 #
 # Reports on documents which link to a specified document.
 #
+# BZIssue::4672
+# 
 # $Log: LinkedDocs.py,v $
 # Revision 1.6  2007/11/03 14:15:07  bkline
 # Unicode encoding cleanup (issue #3716).
@@ -36,6 +38,9 @@ fragId   = fields.getvalue("FragId")         or ""
 docTitle = fields.getvalue("DocTitle")       or None
 docType  = fields.getvalue("DocType")        or None
 ldt      = fields.getvalue("LinkingDocType") or None
+language = fields.getvalue("Language")       or "EN"
+idBlkd   = fields.getvalue("WithBlocked1")   or "Y"
+listBlkd = fields.getvalue("WithBlocked2")   or "Y"
 session  = cdrcgi.getSession(fields)
 request  = cdrcgi.getRequest(fields)
 title    = "Linked Documents Report"
@@ -43,6 +48,40 @@ instr    = "Report on documents which link to a specified document"
 script   = "LinkedDocs.py"
 SUBMENU  = 'Report Menu'
 buttons  = (SUBMENU, cdrcgi.MAINMENU)
+
+styleOutput = """\
+   <STYLE type="text/css">
+    H3            { font-weight: bold;
+                    font-family: Arial;
+                    font-size: 16pt;
+                    margin: 8pt; }
+    *.doctype     { font-size: 14pt;
+                    font-weight: bold; }
+    TABLE.output  { width: 90%; }
+    th.col1       { font-size: 12pt; 
+                    font-weight: bold;
+                    width: 10%; }
+    th.col2       { font-size: 12pt; 
+                    font-weight: bold;
+                    width: 65%; }
+    th.col3       { font-size: 12pt; 
+                    font-weight: bold;
+                    width: 15%; }
+    th.col4       { font-size: 12pt; 
+                    font-weight: bold;
+                    width: 10%; }
+    h            { font-weight: bold; }
+    TD.header     { font-weight: bold;
+                    text-align: center; }
+    TR.odd        { background-color: #E7E7E7; }
+    TR.even       { background-color: #FFFFFF; }
+    TR.head       { background-color: #D2D2D2; }
+    .link         { color: blue;
+                    text-decoration: underline; }
+    tr.select:hover, tr.outrow:hover
+                  { background: #FFFFCC; }
+   </STYLE>
+"""
 
 #----------------------------------------------------------------------
 # Handle navigation requests.
@@ -141,11 +180,13 @@ SELECT d.title, t.name
         cdrcgi.bail('Database query failure: %s' % info[1][0])
 
     # Get the info for the linking docs.
-    ldtConstraint = fragConstraint = ""
+    ldtConstraint = fragConstraint = blockConstraint = ""
     if ldt and ldt != 'Any Type':
         ldtConstraint = "AND t.name = '%s'" % ldt
     if fragId:
         fragConstraint = "AND n.target_frag = '%s'" % fragId.replace("'", "''")
+    if idBlkd == 'N':
+        blockConstraint = "AND d.active_status = 'A'"
     query = """\
 SELECT DISTINCT d.id, d.title, t.name, n.source_elem, n.target_frag
            FROM document d
@@ -156,8 +197,9 @@ SELECT DISTINCT d.id, d.title, t.name, n.source_elem, n.target_frag
           WHERE n.target_doc = ?
             %s
             %s
-       ORDER BY t.name, d.id, n.source_elem, n.target_frag""" % (ldtConstraint,
-                                                                 fragConstraint)
+            %s
+       ORDER BY t.name, d.title, n.source_elem, n.target_frag""" % (
+                              ldtConstraint, fragConstraint, blockConstraint)
     try:
         cursor.execute(query, extractDocId(docId))
     except cdrdb.Error, info:
@@ -166,7 +208,8 @@ SELECT DISTINCT d.id, d.title, t.name, n.source_elem, n.target_frag
     # Build the report and show it.
     title2 = u"%s for %s Document CDR%d %s" % (title, targetDocInfo[1], 
             docId, makeDate())
-    html = cdrcgi.header(title2, title, instr, script, buttons)
+    html = cdrcgi.header(title2, title, instr, script, buttons, 
+                         stylesheet = styleOutput)
     report = u"""\
     <table>
      <tr>
@@ -202,17 +245,17 @@ SELECT DISTINCT d.id, d.title, t.name, n.source_elem, n.target_frag
   </TABLE>"""
             prevDocType = linkingDocType
             report += u"""\
-  <BR><B>%s</B><BR><BR>
-  <TABLE CELLSPACING='0' CELLPADDING='2' BORDER='1'>
+  <BR><span class="doctype">%s</span><BR><BR>
+  <TABLE class="output" CELLSPACING='0' CELLPADDING='2' BORDER='1'>
    <TR>
-    <TD><B>DocID</B></TD>
-    <TD><B>DocTitle</B></TD>
-    <TD><B>ElementName</B></TD>
-    <TD><B>FragmentID</B></TD>
+    <TH class="col1">DocID</TD>
+    <TH class="col2">DocTitle</TD>
+    <TH class="col3">ElementName</TD>
+    <TH class="col4">FragmentID</TD>
    </TR>""" % linkingDocType
         report += u"""\
-   <TR>
-    <TD VALIGN='top'>CDR%010d</TD>
+   <TR class="outrow">
+    <TD VALIGN='top'>CDR%d</TD>
     <TD VALIGN='top'>%s</TD>
     <TD VALIGN='top'>%s</TD>
     <TD VALIGN='top'>%s</TD>
@@ -225,7 +268,7 @@ SELECT DISTINCT d.id, d.title, t.name, n.source_elem, n.target_frag
     else:
         frag = (fragId and "#%s" % fragId) or ""
         html += u"""\
-  <H3>No Documents Currently Link to CDR%010d%s</H3>""" % (docId, frag)
+  <H3>No Documents Currently Link to CDR%d%s</H3>""" % (docId, frag)
     html += u"""\
   </FORM>
   %s
@@ -237,9 +280,9 @@ SELECT DISTINCT d.id, d.title, t.name, n.source_elem, n.target_frag
 # Search for linked document by title, if so requested.
 #----------------------------------------------------------------------
 if docTitle:
-    header   = cdrcgi.header(title, title, instr, script, ("Submit",
-                                                           SUBMENU,
-                                                           cdrcgi.MAINMENU))
+    header   = cdrcgi.header(title, title, instr, script, 
+                                    ("Submit", SUBMENU, cdrcgi.MAINMENU),
+                                    stylesheet = styleOutput)
     docTypes = getDocTypes()
     dtConstraint = ""
     if docType and docType != 'Any Type':
@@ -266,24 +309,25 @@ SELECT d.id, d.title
    <B>Linking Document Type:&nbsp;</B>
    %s
    <BR><BR>
-   <TABLE CELLSPACING='4' CELLPADDING='0' BORDER='0'>""" % makeList(
+   <TABLE>""" % makeList(
         "LinkingDocType", docTypes)
         while row:
-            form += u"""\
-    <TR>
-     <TD VALIGN='top'>
-      <INPUT TYPE='radio' NAME='DocId' VALUE='%d'>
+            form += u"""
+    <TR class="select">
+     <TD>
+      <INPUT TYPE='radio' NAME='DocId' VALUE='%d' id='%s'>
      </TD>
-     <TD VALIGN='top'>CDR%010d</TD>
-     <TD>%s</TD>
-    </TR>""" % (row[0], row[0], row[1])
+     <TD><label for='%s'>CDR%d</label></TD>
+     <TD><label for='%s'>%s</label></TD>
+    </TR>""" % (row[0], row[0], row[0], row[0], row[0], row[1])
             row = cursor.fetchone()
-        form += u"""\
+        form += u"""
    </TABLE>
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
+   <INPUT TYPE='hidden' Name='WithBlocked1' VALUE='%s'>
   </FORM>
  </BODY>
-</HTML>""" % (cdrcgi.SESSION, session and session or '')
+</HTML>""" % (cdrcgi.SESSION, session and session or '', listBlkd)
     except cdrdb.Error, info:
         cdrcgi.bail('Database query failure: %s' % info[1][0])
     cdrcgi.sendPage(header + form)
@@ -296,34 +340,83 @@ header   = cdrcgi.header(title, title, instr, script, ("Submit",
                                                        cdrcgi.MAINMENU))
 docTypes = getDocTypes()
 form     = u"""\
-   <H3>Report On Specific Document ID</H3>
-   <TABLE CELLSPACING='1' CELLPADDING='1' BORDER='0'>
-    <TR>
-     <TD ALIGN='right'><B>Document ID:&nbsp;</B></TD>
-     <TD><INPUT NAME='DocId'></TD>
-    </TR>
-    <TR>
-     <TD ALIGN='right'><B>Fragment ID:&nbsp;</B></TD>
-     <TD><INPUT NAME='FragId'></TD>
-    </TR>
-    <TR>
-     <TD ALIGN='right'><B>Linking Document Type:&nbsp;</B></TD>
-     <TD>%s</TD>
-    </TR>
-   </TABLE>
-   <HR />
-   <H3>Find Document By Document Type and Title</H3>
-   <TABLE CELLSPACING='1' CELLPADDING='1' BORDER='0'>
-    <TR>
-     <TD ALIGN='right'><B>Document Title:&nbsp;</B></TD>
-     <TD><INPUT NAME='DocTitle' SIZE='70'></TD>
-    </TR>
-    <TR>
-     <TD ALIGN='right'><B>Document Type:&nbsp;</B></TD>
-     <TD>%s</TD>
-    </TR>
-   </TABLE>
-   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'
+   <fieldset>
+    <legend>&nbsp;Find Document by Document ID or ...&nbsp;</legend>
+    <table>
+     <tr>
+      <td>
+       <label class='ilabel' for='DocId'>Document ID</label>
+      </td>
+      <td>
+       <input name='DocId'>
+      </td>
+     </tr>
+     <tr>
+      <td>
+       <label class='ilabel' for='FragId'>Fragment ID</label>
+      </td>
+      <td>
+       <input name='FragId'>
+      </td>
+     </tr>
+     <tr>
+      <td>
+       <label class='ilabel' for='XXX'>Linking Document Type</label>
+      </td>
+      <td>
+       %s
+      </td>
+     </tr>
+     <tr>
+      <td>Include Blocked?:&nbsp;</td>
+      <td>
+       <label for='Y1'>Yes</label>
+          <input type='radio' name='WithBlocked1' value='Y' id='Y1'>
+       &nbsp;&nbsp;&nbsp;
+       <label for='N1'>No</label>
+          <input type='radio' name='WithBlocked1' value='N' CHECKED id='N1'>
+      </td>
+     </tr>
+    </table>
+   </fieldset>
+   <p/>
+   <fieldset>
+    <legend>&nbsp;... Find Document by Document Type and Title&nbsp;</legend>
+    <table>
+     <tr>
+      <td>
+       <label class='ilabel' for='DocTitle'>Document Title</label>
+      </td>
+      <td>
+       <input name='DocTitle' size='40'>
+      </td>
+     </tr>
+     <tr>
+      <td>Document Type:&nbsp;</td>
+      <td>%s</td>
+     </tr>
+     <!--tr>
+      <td>Language:&nbsp;</td>
+      <td>
+       <select name='Language'>
+        <option SELECTED>EN</option>
+        <option>ES</option>
+       </select>
+      </td>
+     </tr-->
+     <tr>
+      <td>Include Blocked?:&nbsp;</td>
+      <td>
+       <label for='Y2'>Yes</label>
+          <input type='radio' name='WithBlocked2' value='Y' id='Y2'>
+       &nbsp;&nbsp;&nbsp;
+       <label for='N2'>No</label>
+          <input type='radio' name='WithBlocked2' value='N' CHECKED id='N2'>
+      </td>
+     </tr>
+    </table>
+   </fieldset>
+   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
   </FORM>
  </BODY>
 </HTML>
