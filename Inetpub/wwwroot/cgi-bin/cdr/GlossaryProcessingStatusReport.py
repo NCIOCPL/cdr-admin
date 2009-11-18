@@ -17,6 +17,7 @@
 # Revision 1.1  2009/01/08 22:08:56  bkline
 # New report (request #4421).
 #
+# BZIssue::4705
 #----------------------------------------------------------------------
 import cgi, cdr, cdrdb, cdrcgi
 etree = cdr.importEtree()
@@ -67,7 +68,12 @@ class SpanishName:
         for s in node.findall('TermNameString'):
             self.string = s.text
     def __unicode__(self):
-        name = cgi.escape(self.string)
+        # Can't call cgi.escape() if string = None
+        if self.string:
+            name = cgi.escape(self.string)
+        else:
+            name = u""
+
         if self.alternate:
             return u"<span class='alt'>%s</span>" % name
         return name
