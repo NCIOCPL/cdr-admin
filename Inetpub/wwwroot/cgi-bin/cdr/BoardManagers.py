@@ -54,6 +54,8 @@
 # Revision 1.1  2003/12/16 16:02:14  bkline
 # Main menu for board managers.
 #
+# BZIssue::4648
+#  Adding menu item for Comprehensive Review Date Report
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
 
@@ -119,6 +121,8 @@ for choice in (
     ('ChangesToSummaries.py',      'Changes to Summaries'         ),
     ('SummaryChanges.py',          'History of Changes to Summary'),
     ('SummaryCitations.py',        'Summaries Citations'          ),
+    ('SummaryCRD.py',              
+                      'Summaries Comprehensive Review Date Report'),
     ('SummaryDateLastModified.py', 'Summaries Date Last Modified' ),
     ('SummariesLists.py',          'Summaries Lists'              ),
     ('SummaryMetaData.py',         'Summaries Metadata'           ),
