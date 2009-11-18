@@ -2,13 +2,13 @@
 #
 # SummaryCRD.py
 # -------------
-# $Id$
+# $Id: SummaryCRD.py 9298 2009-10-21 16:58:14Z volker $
 #
 # BZIssue::4648
 #   Report to list the Comprehensive Review Dates
 #
 #----------------------------------------------------------------------
-import cdr, cgi, cdrcgi, time, cdrdb
+import sys, cdr, cgi, cdrcgi, time, cdrdb, ExcelWriter
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -20,6 +20,7 @@ audience  = fields and fields.getvalue("audience")         or None
 lang      = fields and fields.getvalue("lang")             or None
 showId    = fields and fields.getvalue("showId")           or "N"
 showAll   = fields and fields.getvalue("showAll")          or "N"
+excel     = fields and fields.getvalue("outputFormat")     or "Y"
 groupsEN  = fields and fields.getvalue("grpEN")            or []
 groupsES  = fields and fields.getvalue("grpES")            or []
 submit    = fields and fields.getvalue("SubmitButton")     or None
@@ -112,9 +113,9 @@ def summaryRowESWithID(id, summary, translation):
 
 
 # -------------------------------------------------
-# Create the table row for the Spanish table output
+# Create the table row for the table output
 # -------------------------------------------------
-def addTableRow(row, listCdr = 'Y', listAll = 'Y'):
+def addHtmlTableRow(row, listCdr = 'Y', listAll = 'Y'):
     """Return the HTML code to display a row of the report"""
     cdrId = row[0]
     title = row[1]
@@ -152,6 +153,9 @@ def addTableRow(row, listCdr = 'Y', listAll = 'Y'):
         if row[2] and row[2] == 'Actual':
             html += "%s<br>" % row[1]
             if listAll == 'N': break
+        # Need to add this for MB, who's still using IE6
+        else:
+            html += "&nbsp;<br>"
 
     html += """</td>
     <td>"""
@@ -159,11 +163,56 @@ def addTableRow(row, listCdr = 'Y', listAll = 'Y'):
         if row[2] and row[2] == 'Planned':
             html += "%s<br>" % row[1]
             if listAll == 'N': break
+        # Need to add this for MB, who's still using IE6
+        else:
+            html += "&nbsp;<br>"
 
     html += """</td>
    </tr>
 """
     return html
+
+
+# -------------------------------------------------
+# Create the table row for the table output
+# -------------------------------------------------
+def addExcelTableRow(row, listCdr = 'Y', listAll = 'Y'):
+    """Return the HTML code to display a row of the report"""
+    cdrId = row[0]
+    title = row[1]
+
+    if listAll == 'N':
+        sortOrder = 'desc'
+    else:
+        sortOrder = 'asc'
+
+    if listCdr == 'Y':
+        exRow.addCell(1, cdrId)
+        exRow.addCell(2, title)
+    else:
+        exRow.addCell(2, title)
+
+    query_dates = """\
+        SELECT distinct cdrid, CRDdate, CRDdatetype
+          FROM #CRD_Info
+         WHERE cdrid = %s
+         ORDER BY CRDdate %s
+    """ % (cdrId, sortOrder)
+
+    cursor.execute(query_dates)
+    rows = cursor.fetchall()
+
+    for row in rows:
+        if row[2] and row[2] == 'Actual':
+            exRow.addCell(3, row[1])
+            if listAll == 'N': break
+
+    for row in rows:
+        if row[2] and row[2] == 'Planned':
+            exRow.addCell(4, row[1])
+            if listAll == 'N': break
+
+    return
 
 
 # If the user only picked one summary group, put it into a list so we
@@ -341,6 +390,17 @@ if not lang:
    </table>
    </fieldset>
 
+   <fieldset>
+    <legend>&nbsp;Output Format?&nbsp;</legend>
+    <input name='outputFormat' type='radio' id="idNo"
+           value='N' CHECKED>
+    <label for="idNo">HTML Report</label>
+    <br>
+    <input name='outputFormat' type='radio' id="idYes"
+           value='Y'>
+    <label for="idYes">Excel Report</label>
+   </fieldset>
+
   </form>
  </body>
 </html>
@@ -460,221 +520,472 @@ else:
     audience = 'Health professionals'
 """
 
-# Create the results page.
-#----------------------------------------------------------------------
-instr     = '%s Summaries List -- %s.' % (lang, dateString)
-header    = cdrcgi.rptHeader(title, instr, 
-                          stylesheet = """\
-   <STYLE type="text/css">
-    DL             { margin-left:    0; 
-                     padding-left:   0;
-                     margin-top:    10px;
-                     margin-bottom: 30px; }
-    TABLE          { margin-top:    10px; 
-                     margin-bottom: 30px; } 
+# The report should be displayed as an Excel Spreadsheet 
+# Since I already finished the report as HTML output I'll leave this
+# in here as another option for the users to choose.
+# ------------------------------------------------------------------
+if excel == 'Y':
+    # Create the spreadsheet and define default style, etc.
+    # -----------------------------------------------------
+    wsTitle = u'SummaryCRD'
+    wb      = ExcelWriter.Workbook()
+    b       = ExcelWriter.Border()
+    borders = ExcelWriter.Borders(b, b, b, b)
+    font    = ExcelWriter.Font(name = 'Times New Roman', size = 11)
+    align   = ExcelWriter.Alignment('Left', 'Top', wrap = True)
+    alignS  = ExcelWriter.Alignment('Left', 'Top', wrap = False)
+    style1  = wb.addStyle(alignment = align, font = font)
+    urlFont = ExcelWriter.Font('blue', None, 'Times New Roman', size = 11)
+    style4  = wb.addStyle(alignment = align, font = urlFont)
+    style2  = wb.addStyle(alignment = align, font = font, 
+                             numFormat = 'YYYY-mm-dd')
+    alignH  = ExcelWriter.Alignment('Left', 'Bottom', wrap = True)
+    alignT  = ExcelWriter.Alignment('Left', 'Bottom', wrap = False)
+    headFont= ExcelWriter.Font(bold=True, name = 'Times New Roman', 
+                                                                size = 12)
+    titleFont= ExcelWriter.Font(bold=True, name = 'Times New Roman', 
+                                                                size = 14)
+    boldFont= ExcelWriter.Font(bold=True, name = 'Times New Roman', 
+                                                                size = 11)
+    styleH  = wb.addStyle(alignment = alignH, font = headFont)
+    styleT  = wb.addStyle(alignment = alignT, font = titleFont)
+    style1b = wb.addStyle(alignment = align,  font = boldFont)
+    styleS  = wb.addStyle(alignment = alignS, font = boldFont)
+    styleR  = wb.addStyle(alignment = alignS, font = font)
 
-    *.date         { font-size: 12pt; }
-    *.sectionHdr   { font-size: 12pt;
-                     font-weight: bold;
-                     text-decoration: underline; }
-    td.report      { font-size: 11pt;
-                     padding-right: 15px; 
-                     vertical-align: top; }
-    *.cdrid        { text-align: right }
-    LI             { list-style-type: none }
-    li.report      { font-size: 11pt;
-                     font-weight: normal; }
-    div.es          { height: 10px; }
-    td             { vertical-align: top; }
-   </STYLE>
-""")
+    ws      = wb.addWorksheet(wsTitle, style1, 45, 1)
+    
+    # CIAT wants a title row
+    # ----------------------------------------------------------
+    titleTime = time.strftime("%Y-%m-%d %H:%M:%S")
+    rowCount = 0
+    rowNum = 1
+    exRow = ws.addRow(rowNum, styleT)
+    ### exRow.addCell(1,  '%s - %s, %s' % (board, audience, lang))
 
-# -------------------------
-# Display the Report Title
-# -------------------------
-if lang == 'English':
-    hdrLang = ''
-else:
-    hdrLang = lang
+    rowNum = 1
+    exRow = ws.addRow(rowNum, styleS)
+    exRow.addCell(1,  'Report created: %s' % titleTime)
 
-report    = """\
-   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-  </FORM>
-  <H3>PDQ %s %s Summaries<br>
-  <span class="date">(%s)</span>
-  </H3>
-""" % (cdrcgi.SESSION, session, hdrLang, audience, dateString)
+    # Set the column width
+    # --------------------
+    if showId == 'Y':
+        ws.addCol( 1, 60)
+    ws.addCol( 2, 500)
+    ws.addCol( 3,  60)
+    ws.addCol( 4,  60)
 
-# -------------------------------------------------------------------
-# Decision if the CDR IDs are displayed along with the summary titles
-# - The report with    CDR ID is displayed in a table format.
-# -------------------------------------------------------------------
-if showId == 'N':
-    # Create selection criteria for English/Spanish
-    # and the boards
-    # ---------------------------------------------
-    boards = []
-    iboard = 0
-    if lang == 'English':
-        q_language = """\
-        and language = 'English'
-"""
-        if groupsEN.count('All English'):
-            # Collect all board names
-            # -----------------------
-            cursor.execute("""\
-                SELECT DISTINCT board
-                  FROM #CRD_info
-                 WHERE language = 'English'""")
-            rows = cursor.fetchall()
-            for row in rows:
-                boards.append(row[0])
+    # Create the Header row
+    # ---------------------
+    #rowNum = 3
+    #exRow = ws.addRow(rowNum, styleH)
+    #if showId == 'Y':
+    #    exRow.addCell(1,  'CDR-ID')
+    #exRow.addCell(2,  'Summary Title')
+    #exRow.addCell(3,  'CRD (Actual)')
+    #exRow.addCell(4,  'CRD (Projected)')
+
+    if showId == 'N':
+        # Create selection criteria for English/Spanish
+        # and the boards
+        # ---------------------------------------------
+        boards = []
+        iboard = 0
+        if lang == 'English':
+            q_language = """\
+            and language = 'English'
+    """
+            if groupsEN.count('All English'):
+                # Collect all board names
+                # -----------------------
+                cursor.execute("""\
+                    SELECT DISTINCT board
+                      FROM #CRD_info
+                     WHERE language = 'English'""")
+                rows = cursor.fetchall()
+                for row in rows:
+                    boards.append(row[0])
+            else:
+                for group in groupsEN:
+                    boards.append(group)
         else:
-            for group in groupsEN:
-                boards.append(group)
+            q_language = """\
+            and language = 'Spanish'
+    """
+            if groupsES.count('All Spanish'):
+                cursor.execute("""\
+                    SELECT DISTINCT board
+                      FROM #CRD_info
+                     WHERE language = 'Spanish'""")
+                rows = cursor.fetchall()
+                for row in rows:
+                    boards.append(row[0])
+            else:
+                for group in groupsES:
+                    boards.append(group)
+
+        for board in boards:
+            rowNum += 2
+            exRow = ws.addRow(rowNum, styleT)
+            exRow.addCell(2, '%s - %s, %s' % (board, audience, lang))
+            rowNum += 1
+
+            exRow = ws.addRow(rowNum, styleH)
+            exRow.addCell(2, 'Summary Title')
+            exRow.addCell(3, 'CRD (Actual)')
+            exRow.addCell(4, 'CRD (Projected)')
+
+            # Submit the query to the database.
+            #---------------------------------------------------------
+            query = """\
+                SELECT distinct CdrId, Title, Audience, Language
+                 FROM #CRD_Info
+                 WHERE %s
+                 %s
+                 and board = '%s' 
+                 ORDER BY title
+    """ % (q_audience, q_language, board)
+
+            try:
+                cursor.execute(query)
+                rows = cursor.fetchall()
+            except cdrdb.Error, info:
+                cdrcgi.bail('Failure retrieving Summary documents: %s' %
+                            info[1][0])
+                 
+            if not rows:
+                rows = []
+
+            for row in rows:
+                rowCount += 1
+                rowNum += 1
+                exRow = ws.addRow(rowNum, styleR)
+                addExcelTableRow(row, listCdr = showId, 
+                                                       listAll = showAll)
+
+    # ------------------------------------------------------------------------
+    # Display data including CDR ID
+    # English and Spanish data to be displayed identically except that the 
+    # English translation of the summary titles is displayed under the title
+    # ------------------------------------------------------------------------
     else:
-        q_language = """\
-        and language = 'Spanish'
-"""
-        if groupsES.count('All Spanish'):
-            cursor.execute("""\
-                SELECT DISTINCT board
-                  FROM #CRD_info
-                 WHERE language = 'Spanish'""")
-            rows = cursor.fetchall()
-            for row in rows:
-                boards.append(row[0])
+        # Create selection criteria for English/Spanish
+        # and the boards
+        # ---------------------------------------------
+        boards = []
+        iboard = 0
+        if lang == 'English':
+            q_language = """\
+            and language = 'English'
+    """
+            if groupsEN.count('All English'):
+                # Collect all board names
+                # -----------------------
+                cursor.execute("""\
+                    SELECT DISTINCT board
+                      FROM #CRD_info
+                     WHERE language = 'English'""")
+                rows = cursor.fetchall()
+                for row in rows:
+                    boards.append(row[0])
+            else:
+                for group in groupsEN:
+                    boards.append(group)
         else:
-            for group in groupsES:
-                boards.append(group)
+            q_language = """\
+            and language = 'Spanish'
+    """
+            if groupsES.count('All Spanish'):
+                cursor.execute("""\
+                    SELECT DISTINCT board
+                      FROM #CRD_info
+                     WHERE language = 'Spanish'""")
+                rows = cursor.fetchall()
+                for row in rows:
+                    boards.append(row[0])
+            else:
+                for group in groupsES:
+                    boards.append(group)
 
-    for board in boards:
-        report += """\
-  <h2>%s - %s, %s</h2>
-  <table width = "80%%" border="1">
-   <tr>
-    <th>Summary Title</td>
-    <th>CRD (Actual)</td>
-    <th>CRD (Projected)</td>
-   </tr>
-""" % (board, audience, lang)
+        for board in boards:
+            rowNum += 2
+            exRow = ws.addRow(rowNum, styleT)
+            exRow.addCell(2, '%s - %s, %s' % (board, audience, lang))
+            rowNum += 1
 
-        # Submit the query to the database.
-        #----------------------------------------------------------------------
-        query = """\
-            SELECT distinct CdrId, Title, Audience, Language
-             FROM #CRD_Info
-             WHERE %s
-             %s
-             and board = '%s' 
-             ORDER BY title
-""" % (q_audience, q_language, board)
+            exRow = ws.addRow(rowNum, styleH)
+            exRow.addCell(1, 'CDR-ID')
+            exRow.addCell(2, 'Summary Title')
+            exRow.addCell(3, 'CRD (Actual)')
+            exRow.addCell(4, 'CRD (Projected)')
 
-        try:
-            cursor.execute(query)
-            rows = cursor.fetchall()
-        except cdrdb.Error, info:
-            cdrcgi.bail('Failure retrieving Summary documents: %s' %
-                        info[1][0])
-             
-        if not rows:
-            rows = []
+            # Submit the query to the database.
+            #----------------------------------------------------
+            query = """\
+                SELECT distinct CdrId, Title, Audience, Language
+                 FROM #CRD_Info
+                 WHERE %s
+                 %s
+                 and board = '%s' 
+                 ORDER BY title
+    """ % (q_audience, q_language, board)
 
-        for row in rows:
-            report += addTableRow(row, listCdr = showId, listAll = showAll)
-        report += """\
-  </table>
-"""
+            try:
+                cursor.execute(query)
+                rows = cursor.fetchall()
+            except cdrdb.Error, info:
+                cdrcgi.bail('Failure retrieving Summary documents: %s' %
+                            info[1][0])
+                 
+            if not rows:
+                rows = []
 
-# ------------------------------------------------------------------------
-# Display data including CDR ID
-# English and Spanish data to be displayed identically except that the 
-# English translation of the summary titles is displayed under the title
-# ------------------------------------------------------------------------
+            for row in rows:
+                rowCount += 1
+                rowNum += 1
+                exRow = ws.addRow(rowNum, styleR)
+                addExcelTableRow(row, listCdr = showId, 
+                                                      listAll = showAll)
+
+    rowNum += 1
+    exRow = ws.addRow(rowNum, style1b)
+    exRow.addCell(1, 'Count: %d' % rowCount)
+
+    t = time.strftime("%Y%m%d%H%M%S")                                               
+    # Save the report.
+    # ----------------
+    name = '/SummaryCRDReport-%s.xls' % t
+    REPORTS_BASE = 'd:/cdr/reports'
+    f = open(REPORTS_BASE + name, 'wb')
+    wb.write(f, True)
+    f.close()
+
+    if sys.platform == "win32":
+        import os, msvcrt
+        msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
+
+    print "Content-type: application/vnd.ms-excel"
+    print "Content-Disposition: attachment; filename=%s" % name
+    print
+    wb.write(sys.stdout, True)
+
 else:
-    # Create selection criteria for English/Spanish
-    # and the boards
-    # ---------------------------------------------
-    boards = []
-    iboard = 0
+    # Create the results page (in HTML format).
+    #----------------------------------------------------------------------
+    header    = cdrcgi.rptHeader(title, 
+                              stylesheet = """\
+       <STYLE type="text/css">
+        DL             { margin-left:    0; 
+                         padding-left:   0;
+                         margin-top:    10px;
+                         margin-bottom: 30px; }
+        TABLE          { margin-top:    10px; 
+                         margin-bottom: 30px; } 
+
+        *.date         { font-size: 12pt; }
+        *.sectionHdr   { font-size: 12pt;
+                         font-weight: bold;
+                         text-decoration: underline; }
+        td.report      { font-size: 11pt;
+                         padding-right: 15px; 
+                         vertical-align: top; }
+        *.cdrid        { text-align: right }
+        LI             { list-style-type: none }
+        li.report      { font-size: 11pt;
+                         font-weight: normal; }
+        div.es          { height: 10px; }
+        td             { vertical-align: top; }
+       </STYLE>
+    """)
+
+    # -------------------------
+    # Display the Report Title
+    # -------------------------
     if lang == 'English':
-        q_language = """\
-        and language = 'English'
-"""
-        if groupsEN.count('All English'):
-            # Collect all board names
-            # -----------------------
-            cursor.execute("""\
-                SELECT DISTINCT board
-                  FROM #CRD_info
-                 WHERE language = 'English'""")
-            rows = cursor.fetchall()
-            for row in rows:
-                boards.append(row[0])
-        else:
-            for group in groupsEN:
-                boards.append(group)
+        hdrLang = ''
     else:
-        q_language = """\
-        and language = 'Spanish'
-"""
-        if groupsES.count('All Spanish'):
-            cursor.execute("""\
-                SELECT DISTINCT board
-                  FROM #CRD_info
-                 WHERE language = 'Spanish'""")
-            rows = cursor.fetchall()
-            for row in rows:
-                boards.append(row[0])
+        hdrLang = lang
+
+    report    = """\
+       <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
+      </FORM>
+      <H3>PDQ %s %s Summaries<br>
+      <span class="date">(%s)</span>
+      </H3>
+    """ % (cdrcgi.SESSION, session, hdrLang, audience, dateString)
+
+    # -------------------------------------------------------------------
+    # Decision if the CDR IDs are displayed along with the summary titles
+    # - The report with    CDR ID is displayed in a table format.
+    # -------------------------------------------------------------------
+    if showId == 'N':
+        # Create selection criteria for English/Spanish
+        # and the boards
+        # ---------------------------------------------
+        boards = []
+        iboard = 0
+        if lang == 'English':
+            q_language = """\
+            and language = 'English'
+    """
+            if groupsEN.count('All English'):
+                # Collect all board names
+                # -----------------------
+                cursor.execute("""\
+                    SELECT DISTINCT board
+                      FROM #CRD_info
+                     WHERE language = 'English'""")
+                rows = cursor.fetchall()
+                for row in rows:
+                    boards.append(row[0])
+            else:
+                for group in groupsEN:
+                    boards.append(group)
         else:
-            for group in groupsES:
-                boards.append(group)
+            q_language = """\
+            and language = 'Spanish'
+    """
+            if groupsES.count('All Spanish'):
+                cursor.execute("""\
+                    SELECT DISTINCT board
+                      FROM #CRD_info
+                     WHERE language = 'Spanish'""")
+                rows = cursor.fetchall()
+                for row in rows:
+                    boards.append(row[0])
+            else:
+                for group in groupsES:
+                    boards.append(group)
 
-    for board in boards:
-        report += """\
-  <h2>%s - %s, %s</h2>
-  <table width = "80%%" border="1">
-   <tr>
-    <th>CDR-ID</td>
-    <th>Summary Title</td>
-    <th>CRD (Actual)</td>
-    <th>CRD (Projected)</td>
-   </tr>
-""" % (board, audience, lang)
+        for board in boards:
+            report += """\
+      <h2>%s - %s, %s</h2>
+      <table width = "80%%" border="1">
+       <tr>
+        <th>Summary Title</td>
+        <th>CRD (Actual)</td>
+        <th>CRD (Projected)</td>
+       </tr>
+    """ % (board, audience, lang)
 
-        # Submit the query to the database.
-        #----------------------------------------------------------------------
-        query = """\
-            SELECT distinct CdrId, Title, Audience, Language
-             FROM #CRD_Info
-             WHERE %s
-             %s
-             and board = '%s' 
-             ORDER BY title
-""" % (q_audience, q_language, board)
+            # Submit the query to the database.
+            #----------------------------------------------------------------------
+            query = """\
+                SELECT distinct CdrId, Title, Audience, Language
+                 FROM #CRD_Info
+                 WHERE %s
+                 %s
+                 and board = '%s' 
+                 ORDER BY title
+    """ % (q_audience, q_language, board)
 
-        try:
-            cursor.execute(query)
-            rows = cursor.fetchall()
-        except cdrdb.Error, info:
-            cdrcgi.bail('Failure retrieving Summary documents: %s' %
-                        info[1][0])
-             
-        if not rows:
-            rows = []
+            try:
+                cursor.execute(query)
+                rows = cursor.fetchall()
+            except cdrdb.Error, info:
+                cdrcgi.bail('Failure retrieving Summary documents: %s' %
+                            info[1][0])
+                 
+            if not rows:
+                rows = []
 
-        for row in rows:
-            report += addTableRow(row, listCdr = showId, listAll = showAll)
+            for row in rows:
+                report += addHtmlTableRow(row, listCdr = showId, 
+                                                        listAll = showAll)
+            report += """\
+      </table>
+    """
 
-        report += """\
-  </table>
-"""
+    # ------------------------------------------------------------------------
+    # Display data including CDR ID
+    # English and Spanish data to be displayed identically except that the 
+    # English translation of the summary titles is displayed under the title
+    # ------------------------------------------------------------------------
+    else:
+        # Create selection criteria for English/Spanish
+        # and the boards
+        # ---------------------------------------------
+        boards = []
+        iboard = 0
+        if lang == 'English':
+            q_language = """\
+            and language = 'English'
+    """
+            if groupsEN.count('All English'):
+                # Collect all board names
+                # -----------------------
+                cursor.execute("""\
+                    SELECT DISTINCT board
+                      FROM #CRD_info
+                     WHERE language = 'English'""")
+                rows = cursor.fetchall()
+                for row in rows:
+                    boards.append(row[0])
+            else:
+                for group in groupsEN:
+                    boards.append(group)
+        else:
+            q_language = """\
+            and language = 'Spanish'
+    """
+            if groupsES.count('All Spanish'):
+                cursor.execute("""\
+                    SELECT DISTINCT board
+                      FROM #CRD_info
+                     WHERE language = 'Spanish'""")
+                rows = cursor.fetchall()
+                for row in rows:
+                    boards.append(row[0])
+            else:
+                for group in groupsES:
+                    boards.append(group)
 
-footer = """\
- </BODY>
-</HTML> 
-"""     
+        for board in boards:
+            report += """\
+      <h2>%s - %s, %s</h2>
+      <table width = "80%%" border="1">
+       <tr>
+        <th>CDR-ID</td>
+        <th>Summary Title</td>
+        <th>CRD (Actual)</td>
+        <th>CRD (Projected)</td>
+       </tr>
+    """ % (board, audience, lang)
 
-# Send the page back to the browser.
-#----------------------------------------------------------------------
-cdrcgi.sendPage(header + report + footer)
+            # Submit the query to the database.
+            #----------------------------------------------------------------------
+            query = """\
+                SELECT distinct CdrId, Title, Audience, Language
+                 FROM #CRD_Info
+                 WHERE %s
+                 %s
+                 and board = '%s' 
+                 ORDER BY title
+    """ % (q_audience, q_language, board)
+
+            try:
+                cursor.execute(query)
+                rows = cursor.fetchall()
+            except cdrdb.Error, info:
+                cdrcgi.bail('Failure retrieving Summary documents: %s' %
+                            info[1][0])
+                 
+            if not rows:
+                rows = []
+
+            for row in rows:
+                report += addHtmlTableRow(row, listCdr = showId, 
+                                                     listAll = showAll)
+
+            report += """\
+      </table>
+    """
+
+    footer = """\
+     </BODY>
+    </HTML> 
+    """     
+
+    # Send the page back to the browser.
+    #----------------------------------------------------------------------
+    cdrcgi.sendPage(header + report + footer)
