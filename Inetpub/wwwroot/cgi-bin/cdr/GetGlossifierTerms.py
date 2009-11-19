@@ -210,7 +210,6 @@ cursor.execute("""\
              ON s.doc_id = n.doc_id
 LEFT OUTER JOIN query_term_pub e
              ON e.doc_id = n.doc_id
-            AND LEFT(n.node_loc, 4) = LEFT(e.node_loc, 4)
             AND e.path = '/GlossaryTermName/TermName'
                        + '/@ExcludeFromGlossifier'
           WHERE n.path = '/GlossaryTermName/TermName/TermNameString'
