@@ -5,12 +5,7 @@
 # Program to extract glossary terms for glossifier service invoked by
 # Cancer.gov.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.3  2008/11/25 21:08:25  bkline
-# Added check for new ExcludeFromGlossifier attribute; fixed query errors.
-#
-# Revision 1.2  2008/11/24 14:53:30  bkline
-# Rewritten to use new GlossaryTermName documents.
+# BZIssue::4704
 #
 #----------------------------------------------------------------------
 import cdrdb, re, cdr, socket, sys
@@ -207,15 +202,21 @@ class Term:
 #----------------------------------------------------------------------
 terms = { 'en': {} }
 cursor.execute("""\
-    SELECT n.doc_id, n.value
-      FROM query_term_pub n
-      JOIN pub_proc_cg c
-        ON c.id = n.doc_id
-      JOIN query_term_pub s
-        ON s.doc_id = n.doc_id
-     WHERE n.path = '/GlossaryTermName/TermName/TermNameString'
-       AND s.path = '/GlossaryTermName/TermNameStatus'
-       AND s.value <> 'Rejected'""")
+         SELECT n.doc_id, n.value
+           FROM query_term_pub n
+           JOIN pub_proc_cg c
+             ON c.id = n.doc_id
+           JOIN query_term_pub s
+             ON s.doc_id = n.doc_id
+LEFT OUTER JOIN query_term_pub e
+             ON e.doc_id = n.doc_id
+            AND LEFT(n.node_loc, 4) = LEFT(e.node_loc, 4)
+            AND e.path = '/GlossaryTermName/TermName'
+                       + '/@ExcludeFromGlossifier'
+          WHERE n.path = '/GlossaryTermName/TermName/TermNameString'
+            AND s.path = '/GlossaryTermName/TermNameStatus'
+            AND s.value <> 'Rejected'
+            AND (e.value IS NULL OR e.value <> 'Yes')""")
 rows = cursor.fetchall()
 for docId, name in rows:
     if docId in conceptIndex:
