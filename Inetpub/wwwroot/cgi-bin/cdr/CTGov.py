@@ -4,7 +4,8 @@
 #
 # Submenu for ClinicalTrials.gov activities.
 #
-# $Log: not supported by cvs2svn $
+# BZIssue::4700
+#
 # Revision 1.14  2007/11/06 23:07:05  ameyer
 # Added menu entry for GlobalChangeCTGovMapping.py.
 #
@@ -104,7 +105,7 @@ form = """\
     <OL>
 """ % (cdrcgi.SESSION, session)
 reports = [
-           ('ForceCtgovImport.py?', 'Force CTGov Import'),
+           ('ForceCtgovImport.py?', 'Force CTGov Download'),
            ('CTGovImport.py?which=new&', 'Review New Protocols'),
            ('CTGovImport.py?which=cips&', 'Review Protocols Sent to CIPS')
           ]

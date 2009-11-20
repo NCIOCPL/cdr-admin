@@ -4,7 +4,8 @@
 #
 # Main menu for CIAT/CIPS staff.
 #
-# $Log: not supported by cvs2svn $
+# BZIssue::4700
+#
 # Revision 1.10  2009/07/22 01:25:13  ameyer
 # Added GlobalChangeSimpleLink.py.
 #
@@ -53,7 +54,7 @@ if not session: cdrcgi.bail('Unknown user id or password.')
 # Put up the menu.
 session = "?%s=%s" % (cdrcgi.SESSION, session)
 title   = "CDR Administration"
-section = "CIAT/CIPS Staff"
+section = "CIAT/OCCM Staff"
 buttons = []
 html    = cdrcgi.header(title, title, section, "", buttons) + """\
    <ol>
