@@ -381,7 +381,8 @@ query_info = """\
                WHEN b.value = 'PDQ Cancer Genetics Editorial Advisory Board' OR
                     b.value = 'PDQ Cancer Genetics Editorial Board'
                THEN 'Cancer Genetics Board'
-               WHEN b.value = 'PDQ Pediatric Editorial Treatment Advisory Board' OR
+               WHEN b.value = 'PDQ Pediatric Treatment Editorial Advisory Board' OR
+                    b.value = 'PDQ Pediatric Editorial Treatment Advisory Board' OR
                     b.value = 'PDQ Pediatric Treatment Editorial Board'
                THEN 'Pediatric Treatment Board'
                WHEN b.value = 'PDQ Supportive and Palliative Care Editorial Advisory Board' OR
