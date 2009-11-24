@@ -191,6 +191,10 @@ if directory:
         if doc.lastp.diff:
             rows.append(makeRow(id, "LASTP", doc.lastp, doc))
 
+    # What we're showing
+    stamp = ""
+    if directory:
+        stamp = "Runtime: %s &nbsp; " % directory
     # Counts
     docCount = len(keys)
     verCount = len(rows)
@@ -213,7 +217,7 @@ if directory:
  <input type='radio' name='sortBy' value='byCwdSize'%s>File size</input>
  </center>
 </form>
-<p>Total docs = %d &nbsp; Total versions = %d</p>
+<p>%sTotal docs = %d &nbsp; Total versions = %d</p>
 
   <table border='0'>
   <tr>
@@ -225,7 +229,7 @@ if directory:
  </body>
 </html>
 """ % (directory, chkSortCdrId, chkSortDiff, chkSortSize,
-       docCount, verCount, "".join(rows)))
+       stamp, docCount, verCount, "".join(rows)))
 
 dirs =  glob.glob(BASE + '/20*')
 dirs.sort()
