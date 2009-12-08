@@ -4,6 +4,8 @@
 #
 # Prototype for duplicate-checking interface for Term documents.
 #
+# BZIssue::4714 (change URL and label for searching Thesaurus)
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, cdrdb, xml.dom.minidom, httplib, time, NCIThes
 
