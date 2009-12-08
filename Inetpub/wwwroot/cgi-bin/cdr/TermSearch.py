@@ -77,15 +77,7 @@ if help:
 #----------------------------------------------------------------------
 # Redirect to Thesaurus searching if requested (in a different window).
 #----------------------------------------------------------------------
-thesaurusSearchUrl = ("http://bioportal.nci.nih.gov/ncbo/faces/pages"
-                      "/quick_search.xhtml?_afPfm=-24c59cf2")
-                      
-if srchThes and False:
-    print ("Location:http://bioportal.nci.nih.gov/ncbo/faces"
-           "/pages/quick_search.xhtml?_afPfm=-24c59cf2")
-           
-    sys.exit(0)
-
+thesaurusSearchUrl = "http://nciterms.nci.nih.gov"
 
 #----------------------------------------------------------------------
 # Generate picklist for term types.
@@ -204,7 +196,7 @@ if not submit:
                ('submit', 'HelpButton',   'Help'),
                ('reset',  'CancelButton', 'Clear'),
                ('button', 'javascript:searchThesaurus()',
-                          'Search NCI BioPortal'))
+                          'Search NCI Thesaurus'))
     errors = u""
     if valErrors:
         errors = u"""\
