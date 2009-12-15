@@ -10,6 +10,7 @@
 # BZIssue::3110
 # BZIssue::4661
 # BZIssue::4700
+# BZIssue::4718 (fixed typo in SELECT query)
 #
 #----------------------------------------------------------------------
 import cgi, cdrcgi, cdrdb
