@@ -97,7 +97,7 @@ if nctId:
         cursor.execute("""\
             UPDATE ctgov_import
                SET force = 'Y',
-                   disposition = %d,
+                   disposition = %d
              WHERE nlm_id = ?""" % dispositionCode, nctId)
         conn.commit()
         extra = describeResult(u"marked for forced download", nctId, u"green")
