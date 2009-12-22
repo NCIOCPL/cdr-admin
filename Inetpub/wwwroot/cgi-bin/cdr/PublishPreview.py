@@ -195,6 +195,7 @@ filterSets = {
     'GlossaryTerm'          : ['set:Vendor GlossaryTerm Set'], 
     'GlossaryTermName'      : ['set:Vendor GlossaryTerm Set'],
     'InScopeProtocol'       : ['set:Vendor InScopeProtocol Set'],
+    'Person'                : ['set:Vendor GeneticsProfessional Set'],
     'Summary'               : ['set:Vendor Summary Set']
 }
 
@@ -239,6 +240,23 @@ try:
         cdrcgi.bail("Unable to find specified document %s" % docId)
 
     docType = row[0]
+
+    # If the document is a Person document we need to ensure that
+    # it is a GeneticsProf document.
+    # -----------------------------------------------------------
+    if docType == 'Person':
+        cursor.execute("""\
+            SELECT doc_id
+              FROM query_term
+             WHERE path = '/Person/ProfessionalInformation' +
+                          '/GeneticsProfessionalDetails'    +
+                          '/AdministrativeInformation'      +  
+                          '/Directory/Include'
+               AND doc_id = ?""", (intId,))
+        row = cursor.fetchone()
+        if not row:
+            cdrcgi.bail("*** Error:  %s not a GeneticsProfessional Document" %
+                                                             docId)
 
     # Next we need to identify the version to be displayed
     # ----------------------------------------------------
@@ -288,6 +306,7 @@ if not flavor:
     elif docType == "CTGovProtocol":          flavor = "CTGovProtocol"
     elif docType == "GlossaryTerm":           flavor = "GlossaryTerm"
     elif docType == "GlossaryTermName":       flavor = "GlossaryTerm"
+    elif docType == "Person":                 flavor = "GeneticsProfessional"
     else: cdrcgi.bail("Publish preview only available for Summary, "
                       "DrugInfoSummary, Glossary and Protocol documents")
 showProgress("DocumentType: %s..." % docType)
