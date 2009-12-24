@@ -4,6 +4,8 @@
 #
 # Prototype for duplicate-checking interface for Citation documents.
 #
+# BZIssue::4724
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, cdrdb, urllib, sys
 
@@ -101,7 +103,9 @@ def getPubmedArticle(doc):
     end = doc.find(endTag, start + 1)
     if end == -1:
         return None
-    return doc[start : end + len(endTag)]
+    cclTag = "CommentsCorrectionsList"
+    pattern = re.compile("<%s[\\s>].*?</%s>" % (cclTag, cclTag), re.DOTALL)
+    return pattern.sub("", doc[start : end + len(endTag)])
     
 #----------------------------------------------------------------------
 # Extract the text content of the ArticleTitle element.
