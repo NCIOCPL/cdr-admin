@@ -152,10 +152,10 @@ defs.sort()
 # Create a button for deleting a specific query term definition.
 #----------------------------------------------------------------------
 def makeDeleteButton(path):
-    onclick = 'javascript:delPath("%s");' % cgi.escape(path)
+    onclick = 'javascript:delPath("%s");' % cgi.escape(path, True)
     return ("<input class='fb' type='button' onclick='%s' "
             "value='Delete Definition' />"
-            % onclick)
+            % onclick.replace("'", "&apos;"))
 
 #----------------------------------------------------------------------
 # Display the existing definitions.
