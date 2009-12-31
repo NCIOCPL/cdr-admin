@@ -8,7 +8,8 @@
 # The program selects those documents and outputs the requested fields,
 # one document per row.
 #
-# $Log: not supported by cvs2svn $
+# BZIssue::4717 (add audience selection criterion)
+#
 #----------------------------------------------------------------------
 
 import sys, cgi, cgitb, time, xml.sax, xml.sax.handler, os, os.path, copy
@@ -26,6 +27,7 @@ endDate   = None
 diagnosis = None
 category  = None
 language  = None
+audience  = None
 
 # Form buttons
 BT_SUBMIT  = "Submit"
@@ -73,6 +75,8 @@ if fields:
         category = fields.getlist("category")
     if fields.has_key("language"):
         language = fields.getvalue("language")
+    if fields.has_key("audience"):
+        audience = fields.getvalue("audience")
 
 # Format errors for display
 if errMsgs:
@@ -137,12 +141,15 @@ SELECT DISTINCT value, value
              "Media Caption and Content Report",
              script="MediaCaptionContent.py", buttons=buttons)
     html = header + """
-<p style="font-size: 10pt; font-weight: 600">To prepare an Excel format report of Media Caption
-and Content information, enter starting and ending dates (inclusive) for the
-the last versions of the Media documents to be retrieved.  You may also select
-documents with specific diagnoses, categories, or language of the content
-description.  Relevant fields from the Media documents that meet the selection
-criteria will be displayed in an Excel spreadsheet.</p>
+<p style="font-size: 10pt; font-weight: 600">
+To prepare an Excel format report of Media Caption and Content
+information, enter starting and ending dates (inclusive) for the the
+last versions of the Media documents to be retrieved.  You may also
+select documents with specific diagnoses, categories, language, or
+audience of the content description.  Relevant fields from the Media
+documents that meet the selection criteria will be displayed in an
+Excel spreadsheet.
+</p>
 
 %s
 
@@ -172,6 +179,14 @@ criteria will be displayed in an Excel spreadsheet.</p>
      <option value="es">Spanish</option>
     </select></td>
  </tr>
+ <tr>
+  <td align="right"><b>Audience: </b></td><td align="left">
+    <select name="audience">
+     <option value="all" selected="1">All Audiences</option>
+     <option value="Health_professionals">HP</option>
+     <option value="Patients">Patient</option>
+    </select></td>
+ </tr>
 </table>
 </center>
 <input type="hidden" name=%s value=%s />
@@ -193,7 +208,7 @@ criteria will be displayed in an Excel spreadsheet.</p>
 ######################################################################
 class DocHandler(xml.sax.handler.ContentHandler):
 
-    def __init__(self, wantFields, language):
+    def __init__(self, wantFields, language, audience):
         """
         Initialize parsing.
 
@@ -202,12 +217,14 @@ class DocHandler(xml.sax.handler.ContentHandler):
                          Key   = full path to element.
                          Value = Empty list = []
             language   - "en", "es", or None for any language
+            audience   - "Health_professionals", "Patients", or None (for any)
         """
         self.wantFields = wantFields
 
         # Start with dictionary of desired fields, empty of text
         self.fldText  = copy.deepcopy(wantFields)
         self.language = language
+        self.audience = audience
 
         # Full path to where we are
         self.fullPath = ""
@@ -223,19 +240,19 @@ class DocHandler(xml.sax.handler.ContentHandler):
         self.fullPath += '/' + name
 
         # Is it one we're supposed to collect?
-        if self.wantFields.has_key(self.fullPath):
+        if self.fullPath in self.wantFields:
 
-            # Do we need to filter by language?
-            if self.language and attrs.has_key("language"):
-                # Filter out anything specifying a different language
-                # If no language specified at all, include this element
-                foundLang = attrs.getValue("language")
-                if foundLang and foundLang != self.language:
-                    pass
-                else:
-                    self.getText = self.fullPath
-            else:
-                # Any language okay
+            # Do we need to filter by language or audience?
+            keep = True
+            if self.language:
+                language = attrs.get('language')
+                if language and language != self.language:
+                    keep = False
+            if keep and self.audience:
+                audience = attrs.get('audience')
+                if audience and audience != self.audience:
+                    keep = False
+            if keep:
                 self.getText = self.fullPath
 
     def characters(self, content):
@@ -334,11 +351,22 @@ if language and language != 'all':
    AND qlang.value = '%s'
 """ % language
 
+# Only one audience can be specified
+if audience and audience != 'all':
+    selQry += """\
+  JOIN query_term audience
+    ON audience.doc_id = d.id
+"""
+    whereClause += """\
+   AND audience.path = '/Media/MediaContent/Captions/MediaCaption/@audience'
+   AND audience.value = '%s'
+""" % audience
+
 # Put it all together
 selQry += whereClause + " ORDER BY d.title"
 
 # DEBUG
-cdr.logwrite("\home\alan\media.log", selQry)
+cdr.logwrite(selQry, "d:/cdr/Log/media.log")
 
 # Execute query
 try:
@@ -462,14 +490,13 @@ Failure retrieving filtered doc for doc ID=%d<br />
 Error: %s""" % (docId, result))
 
     xmlText = result[0]
-
-    # Is specific language requested?
-    getLanguage = None
-    if language in ("es", "en"):
-        getLanguage = language
+ 
+   # Is specific language and/or audience requested?
+    getLanguage = language != 'all' and language or None
+    getAudience = audience != 'all' and audience or None
 
     # Parse it, getting back a list of fields
-    dh = DocHandler(wantFields, getLanguage)
+    dh = DocHandler(wantFields, getLanguage, getAudience)
     xml.sax.parseString(xmlText, dh)
     gotFields = dh.getResults()
 
