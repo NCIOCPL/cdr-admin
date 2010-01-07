@@ -414,7 +414,9 @@ dataAlign            = ExcelWriter.Alignment(horizontal="Left",
                                              vertical="Top", wrap="1")
 
 # Create an Excel workbook and a worksheet
-titleText = "Media Caption and Content Report"
+audienceTag = { "Health_professionals": " - HP",
+                "Patients": " - Patient" }.get(audience, "")
+titleText = "Media Caption and Content Report%s" % audienceTag
 wb = ExcelWriter.Workbook('ahm', 'NCI')
 ws = wb.addWorksheet("Media Caption-Content", frozenRows=3)
 
