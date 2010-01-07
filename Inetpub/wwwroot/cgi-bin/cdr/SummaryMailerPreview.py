@@ -42,8 +42,6 @@ elif typNam.upper() == "INSCOPEPROTOCOL":
 resp    = cdr.filterDoc("guest", filters, docId, docVer = version)
 if type(resp) in (str, unicode): cdrcgi.bail(resp)
 if not resp[0]: cdrcgi.bail(resp[1])
-#cdrcgi.bail(resp[0])
-latex   = cdrxmllatex.makeLatex (resp[0], docType, "")
 if os.environ.has_key("TMP"):
     tempfile.tempdir = os.environ["TMP"]
 where = tempfile.mktemp("mailerwork")
@@ -56,6 +54,7 @@ try:
     os.chdir(abspath)
 except Exception, info:
     cdrcgi.bail("Cannot cd to %s" % abspath)
+latex   = cdrxmllatex.makeLatex (resp[0], docType, "")
 filename = docId + ".tex"
 try:
     texFile  = open(filename, "wb")
@@ -71,9 +70,13 @@ for unused in range(3):
     #rc = os.system("latex %s %s" % (LOPTS, filename))
     #if rc:
     #    cdrcgi.bail("Failure running LaTeX processor on %s" % filename)
-rc = os.system("dvips -q %s" % docId)
-if rc:
-    cdrcgi.bail("Failure running dvips processor on %s.dvi" % docId)
+#rc = os.system("dvips -q %s" % docId)
+#if rc:
+#    cdrcgi.bail("Failure running dvips processor on %s.dvi" % docId)
+cmd = "dvips -q %s" % docId
+commandResult = cdr.runCommand(cmd)
+if commandResult.code:
+    cdrcgi.bail("Failure running %s: %s" % (cmd, commandResult.output))
 try:
     psFile = open(docId + ".ps")
     psDoc  = psFile.read()
