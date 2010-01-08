@@ -4,7 +4,6 @@
 #
 # Menu of existing filters.
 #
-# $Log: not supported by cvs2svn $
 # Revision 1.5  2007/11/03 14:15:07  bkline
 # Unicode encoding cleanup (issue #3716).
 #
@@ -37,10 +36,12 @@ orderBy = fields and fields.getvalue('OrderBy') or None
 
 #----------------------------------------------------------------------
 # Edit only on Dev machine.
+# Since we moved to SVN for source control we're not editing filters
+# through this interface anymore
 #----------------------------------------------------------------------
 localhost = socket.gethostname()
-if string.upper(localhost) == "MAHLER":
-    localhost= "Dev"
+#if string.upper(localhost) == "MAHLER":
+#    localhost= "Dev"
 
 #----------------------------------------------------------------------
 # Make sure we're logged in.
@@ -76,14 +77,16 @@ if request == "Compare Filters":
 
 #----------------------------------------------------------------------
 # Handle request for creating a new filter.
+# This is now being done using the command
+#   CreateFilter.py
 #----------------------------------------------------------------------
-if request == "New Filter": 
-    print "Location:http://%s%s/EditFilter.py?%s=%s&Request=New\n" % (
-            cdrcgi.WEBSERVER,
-            cdrcgi.BASE,
-            cdrcgi.SESSION,
-            session)
-    sys.exit(0)
+# if request == "New Filter": 
+#     print "Location:http://%s%s/EditFilter.py?%s=%s&Request=New\n" % (
+#             cdrcgi.WEBSERVER,
+#             cdrcgi.BASE,
+#             cdrcgi.SESSION,
+#             session)
+#     sys.exit(0)
 
 
 #----------------------------------------------------------------------

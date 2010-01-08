@@ -4,7 +4,6 @@
 #
 # Prototype for editing CDR filter documents.
 #
-# $Log: not supported by cvs2svn $
 # Revision 1.23  2008/08/15 04:03:34  ameyer
 # Fixed little bug - err check in "session" should have checked "prodSession".
 #
@@ -87,10 +86,12 @@ import cgi, cdr, cdrdb, os, re, cdrcgi, sys, tempfile, string, socket, time
 
 #----------------------------------------------------------------------
 # Edit only on Dev machine.
+# Since we moved to SVN for source control we're not editing filters
+# through this interface anymore
 #----------------------------------------------------------------------
 localhost = socket.gethostname()
-if string.upper(localhost) == "MAHLER":
-    localhost = "Dev"
+#if string.upper(localhost) == "MAHLER":
+#    localhost = "Dev"
 
 #----------------------------------------------------------------------
 # Set some initial values.
@@ -151,31 +152,8 @@ def showForm(doc, subBanner, buttons):
     hdr = cdrcgi.header(title, banner, subBanner, "EditFilter.py", buttons,
                         numBreaks = 1)
     html = hdr + u"""\
-   <input name='version' type='checkbox'%s>
-   Create new version for Save, Checkin or Clone?
-   <table border=0>
-    <tr>
-     <td align='right' nowrap=1>CVS user ID:&nbsp;</td>
-     <td><input name='cvsid' value='%s'></td>
-    </tr>
-    <tr>
-     <td align='right' nowrap=1>CVS password:&nbsp;</td>
-     <td><input type='password' name='cvspw' value='%s'></td>
-    </tr>
-    <tr>
-     <td align=right nowrap=1>CVS comment:&nbsp;</td>
-     <td><input name='cvscomment' value='%s' size=50></td>
-    </tr>
-    <tr>
-     <td align=right nowrap>Name change for Bach CDR ID (optional): &nbsp;</td>
-     <td><input name='bachid'> Must be specified until Filter is migrated!</td>
-    </tr>
-   </table>
-    (Fill in CVS user ID, password, and comment if you are
-     creating a new version.)
    <br>
-   <br>
-   <textarea name='Doc' rows='20' cols='80'>%s</textarea>
+   <textarea name='Doc' rows='40' cols='80'>%s</textarea>
    <input type='hidden' name='%s' value='%s'>
    <br>
    <br>
@@ -184,11 +162,7 @@ def showForm(doc, subBanner, buttons):
   </form>
  </body>
 </html>
-""" % (version and " CHECKED" or "",
-       cvsid or '',
-       cvspw or '',
-       cvscomment and cgi.escape(cvscomment, 1) or '',
-       doc.replace('\r', ''),
+""" % (doc.replace('\r', ''),
        cdrcgi.SESSION,
        session,
        cdrcgi.REQUEST)
@@ -260,25 +234,6 @@ def runCommand(command):
         return CommandResult(code, output)
     except Exception, info:
         debugLog("failure running command: %s" % str(info))
-
-#----------------------------------------------------------------------
-# Don't leave dross around if we can help it.
-#----------------------------------------------------------------------
-def cvsCleanup(abspath, cvsroot = None):
-    try:
-        os.chdir(abspath)
-        if cvsroot:
-            result = runCommand("cvs -Q %s release -d filt" % cvsroot)
-            if result.code:
-                debugLog("failure releasing workspace: code=%d output=%s" %
-                         (result.code, result.output))
-        os.chdir("..")
-        result = runCommand("rm -rf %s" % abspath)
-        if result.code:
-            debugLog("failure removing %s: code=%d output=%s" %
-                     (abspath, result.code, result.output))
-    except Exception, info:
-        debugLog("cvsCleanup exception: %s" % str(info))
 
 #----------------------------------------------------------------------
 # Find id of document on production server; create doc if necessary.
@@ -394,141 +349,6 @@ def replaceId(doc, devId, prodId):
     return doc.replace(devId, prodId, 1)
 
 #----------------------------------------------------------------------
-# Check the document into CVS archives.
-#----------------------------------------------------------------------
-def doCvs(docId, doc, cvsid, cvspw, cvscomment, session):
-
-    # Replace the document ID with the production server's if needed.
-    prodId = getProdId(docId, doc, session)
-    if prodId != docId:
-        doc = replaceId(doc, docId, prodId)
-
-    # Set up cvs strings and directories
-    cvsroot = "-d:pserver:%s:%s@%s" % (cvsid, cvspw, cdr.CVSROOT)
-    debugLog("initializing CVS workspace: CVSROOT=%s" % cvsroot)
-    if os.environ.has_key("TMP"):
-        tempfile.tempdir = os.environ["TMP"]
-        debugLog("tempfile.tempdir=%s" % tempfile.tempdir)
-    where = tempfile.mktemp("cvswork")
-    abspath = os.path.abspath(where)
-    debugLog("creating directory %s" % abspath)
-    try:
-        os.mkdir(abspath)
-    except Exception, info:
-        debugLog("mkdir %s failure: %s" % (abspath, str(info)))
-        cdrcgi.bail("Cannot create directory %s" % abspath)
-    try:
-        os.chdir(abspath)
-    except Exception, info:
-        debugLog("chdir %s failure: %s" % (abspath, str(info)))
-        cvsCleanup(abspath)
-        cdrcgi.bail("Cannot cd to %s" % abspath)
-
-    errorMessage = ""
-    try:
-        # Check the document out from CVS.
-        debugLog("checking out %s.xml" % prodId)
-        cmd = "cvs %s checkout -d filt cdr/Filters/%s.xml" % (cvsroot, prodId)
-        res = runCommand(cmd)
-        if res.code is not None:
-            debugLog("checkout failure: code=%d output=%s" % (res.code,
-                                                              res.output))
-
-            # Is failure because document is new to CVS?
-            # XXX Fragile, but the best we can do, I think.
-            if res.output.find("cannot find module") == -1:
-                errorMessage = "cvs checkout failure: %d: %s" % \
-                        (res.code, res.output)
-                errorMessage += " [cmd='%s']" % cmd
-
-            # Then use a known document to create a minimal working directory.
-            if not errorMessage:
-                debugLog("adding new document to CVS for %s.xml" % prodId)
-                cmd = "cvs %s co -d filt cdr/Filters/CDR0000000100.xml" % \
-                      cvsroot
-                res = runCommand(cmd)
-                if res.code is not None:
-                    errorMessage = "cvs checkout failure: %d: %s" % \
-                                   (res.code, res.output)
-
-            # Move into the working directory.
-            if not errorMessage:
-                debugLog("moving to filt subdirectory")
-                try:
-                    os.chdir('filt')
-                except Exception, info:
-                    errorMessage = "failure of chdir to %s/filt: %s" % \
-                                   (abspath, str(info))
-
-            # Create the file.
-            if not errorMessage:
-                debugLog("creating file %s.xml" % prodId)
-                try:
-                    f = open("%s.xml" % prodId, "wb")
-                    f.write(doc)
-                    f.close()
-                except Exception, info:
-                    path = "%s/filt/%s.xml" % (abspath, prodId)
-                    errorMessage = "failure creating %s: %s" % (path,
-                                                                str(info))
-
-            # Add it to the CVS archives.
-            if not errorMessage:
-                debugLog("adding %s.xml to CVS archives" % prodId)
-                cmd = "cvs %s add %s.xml" % (cvsroot, prodId)
-                res = runCommand(cmd)
-                if res.code is not None:
-                    errorMessage = "cvs add failure: %d: %s" % (res.code,
-                                                                res.output)
-
-        else:
-
-            # Move into the working directory.
-            debugLog("moving to filt subdirectory")
-            try:
-                os.chdir('filt')
-            except Exception, info:
-                errorMessage = "failure of chdir to %s/filt: %s" % \
-                               (abspath, str(info))
-
-            # Create the file.
-            if not errorMessage:
-                debugLog("writing file %s.xml" % prodId)
-                try:
-                    f = open("%s.xml" % prodId, "wb")
-                    f.write(doc)
-                    f.close()
-                except:
-                    path = "%s/filt/%s.xml" % (abspath, prodId)
-                    errorMessage = "failure creating %s: %s" % (path,
-                                                                str(info))
-
-        # Commit the version of the document.
-        if not errorMessage:
-            debugLog("checking the revision into CVS")
-            cmd = runCommand('cvs %s commit -m"%s" %s.xml' %
-                             (cvsroot,
-                              cvscomment.replace('\r', '')
-                              .replace('\n', ' ')
-                              .replace('"', "'"),
-                              prodId))
-            if cmd.code is not None:
-                errorMessage = "cvs commit failure: %d: %s" % (cmd.code,
-                                                               cmd.output)
-
-    except Exception, info:
-        errorMessage = "Unknown failure running CVS command: %s" % str(info)
-    except:
-        errorMessage = "REALLY unknown failure running CVS command!!!"
-
-    # Remove the working directory.
-    debugLog("CVS work done: cleaning up")
-    cvsCleanup(abspath, cvsroot)
-    if errorMessage:
-        debugLog(errorMessage)
-        cdrcgi.bail(errorMessage)
-
-#----------------------------------------------------------------------
 # Load an existing document.
 #----------------------------------------------------------------------
 if request in ("Load", "View"):
@@ -547,12 +367,6 @@ if request in ("Load", "View"):
     if doc.find("<Errors>") >= 0:
         cdrcgi.bail(doc, banner)
     showForm(cgi.escape(doc), banner, buttons)
-
-#----------------------------------------------------------------------
-# Create a template for a new document.
-#----------------------------------------------------------------------
-elif request == 'New':
-    showForm(BLANKDOC, "Editing new document", ("Load", "Save", "Checkin"))
 
 #--------------------------------------------------------------------
 # Show the differences with a copy of the filter on another server.
@@ -601,62 +415,6 @@ elif request == 'Compare With':
   <pre>%s</pre>
  </body>
 </html>""" % (title, title, report.replace('\r', '')))
-
-#--------------------------------------------------------------------
-# Create a new document using the existing data.
-#----------------------------------------------------------------------
-elif request == 'Clone':
-    if version:
-        if not cvsid or not cvspw or not cvscomment:
-            cdrcgi.bail("CVS user id, password, and comment are all "
-                        "required when versioning.")
-    if not fields.has_key("Doc"):
-        cdrcgi.bail("No document to save")
-    doc = stripId(fields["Doc"].value)
-    docId = cdr.addDoc(session, doc=doc, ver=version and 'Y' or 'N')
-    if docId.find("<Errors>") >= 0:
-        cdrcgi.bail(docId, banner)
-    else:
-        doc = cdr.getDoc(session, docId, 'Y')
-        if doc.find("<Errors>") >= 0:
-            cdrcgi.bail(cdrcgi.decode(doc), banner)
-        if version:
-            doCvs(docId, doc, cvsid, cvspw, cvscomment, session)
-        doc = cdrcgi.decode(doc)
-        buttons = ("Load", "Save", "Checkin", "Clone")
-        showForm(cgi.escape(doc), "Editing existing document", buttons)
-
-#--------------------------------------------------------------------
-# Save the changes to the current document.
-#----------------------------------------------------------------------
-elif request in ('Save', 'Checkin'):
-    if not fields.has_key("Doc"):
-        cdrcgi.bail("No document to save")
-    doc = fields["Doc"].value
-    if version:
-        if not cvsid or not cvspw or not cvscomment:
-            cdrcgi.bail("CVS user id, password, and comment are all "
-                        "required when versioning.")
-    checkIn = request == 'Checkin' and 'Y' or 'N'
-    ver = version and 'Y' or 'N'
-    if re.search("<CdrDoc[^>]*\sId='[^']*'", doc, re.DOTALL):
-        docId = cdr.repDoc(session, doc=doc, checkIn = checkIn, ver = ver)
-    else:
-        docId = cdr.addDoc(session, doc=doc, checkIn = checkIn, ver = ver)
-    if docId.find("<Errors>") >= 0:
-        cdrcgi.bail(docId, banner)
-    else:
-        doc = cdr.getDoc(session, docId)
-        if doc.find("<Errors>") >= 0:
-            cdrcgi.bail(cdrcgi.decode(doc), banner)
-        if version and cvsid and cvspw:
-            doCvs(docId, doc, cvsid, cvspw, cvscomment, session)
-        doc = cdrcgi.decode(doc)
-        if request == 'Save':
-            buttons = ("Load", "Save", "Checkin", "Clone")
-        else:
-            buttons = ("Load", "Clone")
-        showForm(cgi.escape(doc), "Editing existing document", buttons)
 
 #----------------------------------------------------------------------
 # Tell the user we don't know how to do what he asked.
