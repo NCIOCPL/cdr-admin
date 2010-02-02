@@ -5,17 +5,7 @@
 # "We need a new glossary term concept by type QC report to help us ensure
 # consistency in the wording of definitions."
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.3  2009/03/23 21:20:59  venglisc
-# Marking the term name if the term is blocked; displaying error message if
-# no definition text or term name has been specified on the query page.
-# (Bug 4486)
-#
-# Revision 1.2  2009/03/04 16:23:46  bkline
-# Cosmetic cleanup.
-#
-# Revision 1.1  2009/03/03 21:58:11  bkline
-# Added new Glossary Term Concept by Type report (request #4486).
+# BZIssue::4745 (eliminate empty pronunciation parens; ignore case mismatch)
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrdb, cdrcgi, time, xml.dom.minidom
@@ -131,7 +121,7 @@ class Name:
                 if child.nodeName == 'TermNameString':
                     self.englishName = cdr.getTextContent(child, True)
                 elif not spanish and child.nodeName == 'TermPronunciation':
-                    self.pronunciation = cdr.getTextContent(child, True)
+                    self.pronunciation = cdr.getTextContent(child, True).strip()
         for node in dom.getElementsByTagName('ReplacementText'):
             text = cdr.getTextContent(node, True)
             self.replacements[node.getAttribute('name')] = text
@@ -167,7 +157,7 @@ class Definition:
             text = cdr.getTextContent(child, True)
             self.replacements[child.getAttribute('name')] = text
         for child in node.getElementsByTagName('Audience'):
-            self.audiences.add(cdr.getTextContent(child))
+            self.audiences.add(cdr.getTextContent(child).upper())
     def resolve(self, replacementsFromNameDoc, termName):
         reps = self.replacements.copy()
         reps.update(replacementsFromNameDoc)
@@ -206,13 +196,13 @@ class Concept:
         self.definitions = []
         for node in dom.getElementsByTagName('TermDefinition'):
             definition = Definition(node)
-            if audience in definition.audiences:
+            if audience.upper() in definition.audiences:
                 self.definitions.append(definition)
         if spanish:
             self.spanishDefinitions = []
             for node in dom.getElementsByTagName('TranslatedTermDefinition'):
                 definition = Definition(node)
-                if audience in definition.audiences:
+                if audience.upper() in definition.audiences:
                     self.spanishDefinitions.append(definition)
 
     def toHtml(self, spanish):
@@ -303,7 +293,7 @@ class Concept:
             # Processing the first name
             # -------------------------
             termBlocked = u""
-            if self.names:
+            if self.names and self.names[0].pronunciation:
                 name += u" (%s)" % self.names[0].pronunciation
 
                 # Need to indicate if a term has been blocked
@@ -320,7 +310,9 @@ class Concept:
             # Processing all other names (except the first)
             # ---------------------------------------------
             for name in self.names[1:]:
-                enName = u"%s (%s)" % (name.englishName, name.pronunciation)
+                enName = name.englishName
+                if name.pronunciation:
+                    enName += (" (%s)" % name.pronunciation)
                 if name.blocked:
                     termBlocked = self.htmlBlocked
                 html.append(u"""\
