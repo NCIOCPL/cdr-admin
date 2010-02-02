@@ -41,7 +41,8 @@ def getAllBoardNames(language, cursor):
     cursor.execute("""\
         SELECT DISTINCT board
           FROM #CRD_Info
-         WHERE language = '%s'""" % language)
+         WHERE language = '%s'
+           AND len(board) != 0""" % language)
 
     rows = cursor.fetchall()
     for row in rows:
@@ -53,13 +54,14 @@ def getAllBoardNames(language, cursor):
 # -------------------------------------------------
 # Select the dates from the info table
 # -------------------------------------------------
-def getCRDDates(id, sort, cursor):
+def getCRDDates(id, type, sort, cursor):
     query_dates = """\
-        SELECT distinct cdrid, CRDdate, CRDdatetype
+        SELECT distinct cdrid, CRDdate, CRDdatetype, Comment
           FROM #CRD_Info
          WHERE cdrid = %s
-         ORDER BY CRDdate %s
-    """ % (id, sort)
+           AND CRDDateType = '%s'
+         ORDER BY CRDdatetype, CRDdate %s
+    """ % (id, type, sort)
 
     cursor.execute(query_dates)
     return cursor.fetchall()
@@ -78,6 +80,8 @@ def addHtmlTableRow(row, listCdr = 'Y', listAll = 'Y'):
     else:
         sortOrder = 'asc'
 
+    # We create the report either with or without the CDR-ID column
+    # -------------------------------------------------------------
     if listCdr == 'Y':
         html = """\
     <tr>
@@ -90,27 +94,47 @@ def addHtmlTableRow(row, listCdr = 'Y', listAll = 'Y'):
     <td>%s</td>
 """ % (title)
 
-    rows = getCRDDates(cdrId, sortOrder, cursor)
-
+    # Populate the Actual dates and corresponding comments
+    # ----------------------------------------------------
     html += """\
     <td>"""
-    for row in rows:
-        if row[2] and row[2] == 'Actual':
+
+    crdType = 'Actual'
+    rows = getCRDDates(cdrId, crdType, sortOrder, cursor)
+
+    if rows:
+        for row in rows:
             html += "%s<br>" % row[1]
             if listAll == 'N': break
-        # Need to add this for MB, who's still using IE6
-        else:
-            html += "&nbsp;<br>"
 
+        html += "</td><td>"
+        for row in rows:
+            html += "%s<br>" % (row[3] or '')
+            if listAll == 'N': break
+    # Need to add this for MB, who's still using IE6
+    else:
+        html += "&nbsp;<br></td><td>&nbsp;<br>"
+
+    # Populate the Planned dates and corresponding comments
+    # ----------------------------------------------------
     html += """</td>
     <td>"""
-    for row in rows:
-        if row[2] and row[2] == 'Planned':
+
+    crdType = 'Planned'
+    rows = getCRDDates(cdrId, crdType, sortOrder, cursor)
+
+    if rows:
+        for row in rows:
             html += "%s<br>" % row[1]
             if listAll == 'N': break
-        # Need to add this for MB, who's still using IE6
-        else:
-            html += "&nbsp;<br>"
+
+        html += "</td><td>"
+        for row in rows:
+            html += "%s<br>" % (row[3] or '')
+            if listAll == 'N': break
+    # Need to add this for MB, who's still using IE6
+    else:
+        html += "&nbsp;<br></td><td>&nbsp;<br>"
 
     html += """</td>
    </tr>
@@ -118,11 +142,82 @@ def addHtmlTableRow(row, listCdr = 'Y', listAll = 'Y'):
     return html
 
 
+def addHtmlTableRow2(row, listCdr = 'Y', listAll = 'Y'):
+    """Return the HTML code to display a row of the report.
+       If multiple comments exist display each comment on
+       a line separately."""
+    cdrId = row[0]
+    title = row[1]
+
+    if listAll == 'N':
+        sortOrder = 'desc'
+    else:
+        sortOrder = 'asc'
+
+    crdType = 'Actual'
+    aRows = getCRDDates(cdrId, crdType, sortOrder, cursor)
+    crdType = 'Planned'
+    pRows = getCRDDates(cdrId, crdType, sortOrder, cursor)
+    numRows = max(len(aRows), len(pRows))
+    #cdrcgi.bail(pRows)
+
+    # We create the report either with or without the CDR-ID column
+    # -------------------------------------------------------------
+    if listCdr == 'Y':
+        html = """\
+    <tr>
+     <td>%s</td>
+     <td>%s</td>
+     <td>%s</td>
+     <td>%s</td>
+     <td>%s</td>
+     <td>%s</td>
+    </tr>
+""" % (cdrId, title, 
+       aRows and aRows[0][1] or '', aRows and aRows[0][3] or '', 
+       pRows and pRows[0][1] or '', pRows and pRows[0][3] or '')
+    else:
+        html = """\
+    <tr>
+     <td>%s</td>
+     <td>%s</td>
+     <td>%s</td>
+     <td>%s</td>
+     <td>%s</td>
+    </tr>
+""" % (title, 
+       aRows and aRows[0][1] or '', aRows and aRows[0][3] or '', 
+       pRows and pRows[0][1] or '', pRows and pRows[0][3] or '')
+
+    # If more then one date exists and we want to display them all
+    # print the other lines, too.
+    # ------------------------------------------------------------
+    if listAll == 'Y':
+        for i in range(1, numRows):
+            html += """
+    <tr>
+     %s
+     <td>&nbsp;<br></td>
+     <td>%s</td>
+     <td>%s</td>
+     <td>%s</td>
+     <td>%s</td>
+    </tr>
+""" % (listCdr == 'Y' and '<td>&nbsp;<br></td>' or '',
+       aRows and i < len(aRows) and aRows[i][1] or '', 
+       aRows and i < len(aRows) and aRows[i][3] or '', 
+       pRows and i < len(pRows) and pRows[i][1] or '', 
+       pRows and i < len(pRows) and pRows[i][3] or '')
+
+    return html
+
+
+
 # -------------------------------------------------
 # Create the table row for the table output
 # -------------------------------------------------
 def addExcelTableRow(row, listCdr = 'Y', listAll = 'Y'):
-    """Return the HTML code to display a row of the report"""
+    """Return the Excel code to display a row of the report"""
     cdrId = row[0]
     title = row[1]
 
@@ -137,16 +232,22 @@ def addExcelTableRow(row, listCdr = 'Y', listAll = 'Y'):
     else:
         exRow.addCell(2, title)
 
-    rows = getCRDDates(cdrId, sortOrder, cursor)
+    crdType = 'Actual'
+    rows = getCRDDates(cdrId, crdType, sortOrder, cursor)
 
-    for row in rows:
-        if row[2] and row[2] == 'Actual':
+    if rows:
+        for row in rows:
             exRow.addCell(3, row[1])
+            exRow.addCell(4, row[3])
             if listAll == 'N': break
 
-    for row in rows:
-        if row[2] and row[2] == 'Planned':
-            exRow.addCell(4, row[1])
+    crdType = 'Planned'
+    rows = getCRDDates(cdrId, crdType, sortOrder, cursor)
+
+    if rows:
+        for row in rows:
+            exRow.addCell(5, row[1])
+            exRow.addCell(6, row[3])
             if listAll == 'N': break
 
     return
@@ -232,11 +333,11 @@ if not lang:
    <fieldset>
     <legend>&nbsp;Display CR Dates&nbsp;</legend>
     <input name='showAll' type='radio' id="idAll"
-           value='Y' CHECKED>
+           value='Y'>
     <label for="idAll">Show all CR Dates</label>
     <br>
     <input name='showAll' type='radio' id="idOne"
-           value='N'>
+           value='N' CHECKED>
     <label for="idOne">Show last CR Date only</label>
    </fieldset>
 
@@ -335,7 +436,7 @@ if not lang:
     <br>
     <input name='outputFormat' type='radio' id="idYes"
            value='Y'>
-    <label for="idYes">Excel Report</label>
+    <label for="idYes">Excel Report (for testing only)</label>
    </fieldset>
 
   </form>
@@ -347,10 +448,11 @@ if not lang:
 # Create a table for summaries with CR Dates
 # ------------------------------------------
 query_crd = """\
-    SELECT dt.doc_id AS CdrId, dt.value AS CRDDate, t.value AS CRDDateType 
+    SELECT dt.doc_id AS CdrId, dt.value AS CRDDate, 
+           t.value AS CRDDateType , left(dt.node_loc, 4) AS node_loc
       INTO #CRD_Dates
-      FROM query_term_pub dt
-      JOIN  query_term_pub t
+      FROM query_term dt
+      JOIN  query_term t
         ON dt.doc_id = t.doc_id
        AND t.path = '/Summary/ComprehensiveReview/' +
                     'ComprehensiveReviewDate/@DateType'
@@ -375,48 +477,68 @@ except cdrdb.Error, info:
 query_info = """\
     SELECT DISTINCT t.doc_id AS CDRID, t.value AS Title, a.value AS Audience, 
            CASE 
-               WHEN b.value = 'PDQ Adult Treatment Editorial Advisory Board' OR
+               WHEN b.value = 'PDQ Adult Treatment Editorial Advisory Board' 
+                    OR
                     b.value = 'PDQ Adult Treatment Editorial Board'
+                    OR
+                    b.value = 'PDQ Adult Treatment Advisory Board'
                THEN 'Adult Treatment Board'
-               WHEN b.value = 'PDQ Cancer Genetics Editorial Advisory Board' OR
+               WHEN b.value = 'PDQ Cancer Genetics Editorial Advisory Board' 
+                    OR
                     b.value = 'PDQ Cancer Genetics Editorial Board'
                THEN 'Cancer Genetics Board'
-               WHEN b.value = 'PDQ Pediatric Treatment Editorial Advisory Board' OR
-                    b.value = 'PDQ Pediatric Editorial Treatment Advisory Board' OR
+               WHEN b.value = 'PDQ Pediatric Treatment Editorial Advisory Board'
+                    OR
+                    b.value = 'PDQ Pediatric Editorial Treatment Advisory Board'
+                    OR
                     b.value = 'PDQ Pediatric Treatment Editorial Board'
                THEN 'Pediatric Treatment Board'
-               WHEN b.value = 'PDQ Supportive and Palliative Care Editorial Advisory Board' OR
-                    b.value = 'PDQ Supportive and Palliative Care Editorial Board'
+               WHEN b.value = 'PDQ Supportive and Palliative Care '       +
+                              'Editorial Advisory Board'
+                    OR
+                    b.value = 'PDQ Supportive and Palliative Care '       +
+                              'Editorial Board'
                THEN 'Supportive and Palliative Care Board'
-               WHEN b.value = 'PDQ Screening and Prevention Editorial Advisory Board' OR
-                    b.value = 'PDQ Screening and Prevention Editorial Board'
+               WHEN b.value = 'PDQ Screening and Prevention Editorial '   +
+                              'Advisory Board' 
+                    OR
+                    b.value = 'PDQ Screening and Prevention Editorial '   +
+                              'Board'
                THEN 'Screening and Prevention Board'
-               WHEN b.value = 'PDQ Cancer Complementary and Alternative Medicine Editorial Advisory Board' OR
-                    b.value = 'PDQ Cancer Complementary and Alternative Medicine Editorial Board'
+               WHEN b.value = 'PDQ Cancer Complementary and Alternative ' +
+                              'Medicine Editorial Advisory Board'
+                    OR
+                    b.value = 'PDQ Cancer Complementary and Alternative ' +
+                              'Medicine Editorial Board'
                THEN 'Complementary and Alternative Medicine Board'
                ELSE b.value 
            END AS Board, 
            s.int_val AS TranslationOf,
-           l.value AS Language, dt.CRDdate, dt.CRDdatetype
+           l.value AS Language, dt.CRDdate, dt.CRDdatetype,
+           c.value AS Comment
       INTO #CRD_Info
-      FROM query_term_pub t
+      FROM query_term t
       JOIN document d
         ON d.id = t.doc_id
        AND d.active_status = 'A'
-      JOIN query_term_pub b
+      JOIN query_term b
         ON t.doc_id = b.doc_id
        AND b.path = '/Summary/SummaryMetaData/PDQBoard/Board'
-      JOIN query_term_pub a
+      JOIN query_term a
         ON t.doc_id = a.doc_id
        AND a.path = '/Summary/SummaryMetaData/SummaryAudience'
-      JOIN query_term_pub l
+      JOIN query_term l
         ON t.doc_id = l.doc_id
        AND l.path = '/Summary/SummaryMetaData/SummaryLanguage'
- LEFT JOIN query_term_pub s
-        ON s.doc_id = t.doc_id
-       AND s.path = '/Summary/TranslationOf/@cdr:ref'
  LEFT JOIN #CRD_Dates dt
         ON dt.cdrid = t.doc_id
+ LEFT JOIN query_term c
+        ON c.doc_id = t.doc_id
+       AND c.path = '/Summary/ComprehensiveReview/Comment'
+       AND left(c.node_loc, 4) = dt.node_loc
+ LEFT JOIN query_term s
+        ON s.doc_id = t.doc_id
+       AND s.path = '/Summary/TranslationOf/@cdr:ref'
      WHERE t.path = '/Summary/SummaryTitle'
      ORDER BY t.doc_id
 """
@@ -427,6 +549,22 @@ except cdrdb.Error, info:
     cdrcgi.bail('Failure Creating CRD temp table CRD_Info: %s' %
                 info[1][0])
      
+# Removing all Spanish Summaries without a TranslationOf element
+# since we're unable to update the Board appropriately.
+# ---------------------------------------------------------------
+query_delete = """\
+    DELETE FROM #CRD_Info
+     WHERE language = 'Spanish' 
+       AND TranslationOf IS NULL
+"""
+try:
+    cursor.execute(query_delete)
+    #rows = cursor.fetchall()
+except cdrdb.Error, info:
+    cdrcgi.bail('Failure deleting summaries without TranslationOf: %s' %
+                info[1][0])
+     
+
 # Updating the Spanish board names
 # ---------------------------------------------------------------
 query_upd = """\
@@ -511,7 +649,9 @@ if excel == 'Y':
         ws.addCol( 1, 60)
     ws.addCol( 2, 500)
     ws.addCol( 3,  60)
-    ws.addCol( 4,  60)
+    ws.addCol( 4, 200)
+    ws.addCol( 5,  60)
+    ws.addCol( 6, 200)
 
     # Create selection criteria for English/Spanish
     # and the boards
@@ -542,7 +682,9 @@ if excel == 'Y':
             exRow.addCell(1, 'CDR-ID')
         exRow.addCell(2, 'Summary Title')
         exRow.addCell(3, 'CRD (Actual)')
-        exRow.addCell(4, 'CRD (Projected)')
+        exRow.addCell(4, 'Actual Date Comment')
+        exRow.addCell(5, 'CRD (Planned)')
+        exRow.addCell(6, 'Planned Date Comment')
 
         # Submit the query to the database.
         #---------------------------------------------------
@@ -620,7 +762,9 @@ else:
                          padding-right: 15px; 
                          vertical-align: top; }
         *.cdrid        { text-align: right }
-        LI             { list-style-type: none }
+        LI             { list-style-type: bullet; 
+                         font-weight: normal;
+                         font-size: 10pt; }
         li.report      { font-size: 11pt;
                          font-weight: normal; }
         div.es          { height: 10px; }
@@ -680,7 +824,9 @@ else:
         report += """\
     <th>Summary Title</th>
     <th>CRD (Actual)</th>
+    <th>Actual Date Comment</th>
     <th>CRD (Projected)</th>
+    <th>Projected Date Comment</th>
    </tr>
 """
         # Submit the query to the database.
@@ -708,7 +854,7 @@ else:
             rows = []
 
         for row in rows:
-            report += addHtmlTableRow(row, listCdr = showId, 
+            report += addHtmlTableRow2(row, listCdr = showId, 
                                            listAll = showAll)
         report += """\
   </table>
