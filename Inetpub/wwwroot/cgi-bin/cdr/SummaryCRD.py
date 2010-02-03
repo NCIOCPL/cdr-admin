@@ -174,8 +174,8 @@ def addHtmlTableRow2(row, listCdr = 'Y', listAll = 'Y'):
      <td>%s</td>
     </tr>
 """ % (cdrId, title, 
-       aRows and aRows[0][1] or '', aRows and aRows[0][3] or '', 
-       pRows and pRows[0][1] or '', pRows and pRows[0][3] or '')
+       aRows and aRows[0][1] or '&nbsp;', aRows and aRows[0][3] or '&nbsp;', 
+       pRows and pRows[0][1] or '&nbsp;', pRows and pRows[0][3] or '&nbsp;')
     else:
         html = """\
     <tr>
@@ -186,8 +186,8 @@ def addHtmlTableRow2(row, listCdr = 'Y', listAll = 'Y'):
      <td>%s</td>
     </tr>
 """ % (title, 
-       aRows and aRows[0][1] or '', aRows and aRows[0][3] or '', 
-       pRows and pRows[0][1] or '', pRows and pRows[0][3] or '')
+       aRows and aRows[0][1] or '&nbsp;', aRows and aRows[0][3] or '&nbsp;', 
+       pRows and pRows[0][1] or '&nbsp;', pRows and pRows[0][3] or '&nbsp;')
 
     # If more then one date exists and we want to display them all
     # print the other lines, too.
@@ -203,11 +203,11 @@ def addHtmlTableRow2(row, listCdr = 'Y', listAll = 'Y'):
      <td>%s</td>
      <td>%s</td>
     </tr>
-""" % (listCdr == 'Y' and '<td>&nbsp;<br></td>' or '',
-       aRows and i < len(aRows) and aRows[i][1] or '', 
-       aRows and i < len(aRows) and aRows[i][3] or '', 
-       pRows and i < len(pRows) and pRows[i][1] or '', 
-       pRows and i < len(pRows) and pRows[i][3] or '')
+""" % (listCdr == 'Y' and '<td>&nbsp;<br></td>' or '&nbsp;',
+       aRows and i < len(aRows) and aRows[i][1] or '&nbsp;', 
+       aRows and i < len(aRows) and aRows[i][3] or '&nbsp;', 
+       pRows and i < len(pRows) and pRows[i][1] or '&nbsp;', 
+       pRows and i < len(pRows) and pRows[i][3] or '&nbsp;')
 
     return html
 
