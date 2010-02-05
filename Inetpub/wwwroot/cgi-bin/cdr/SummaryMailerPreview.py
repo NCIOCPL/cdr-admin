@@ -5,10 +5,6 @@
 # Generate PostScript for a Summary mailer (also has some support for
 # protocol mailers).
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.1  2003/07/29 12:52:07  bkline
-# Generates PostScript for summary mailers.
-#
 #----------------------------------------------------------------------
 import cdrdb, cdrcgi, re, sys
 sys.path.insert(0, "d:\\cdr\\mailers")
