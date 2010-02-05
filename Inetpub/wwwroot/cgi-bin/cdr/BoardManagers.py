@@ -55,6 +55,7 @@
 # Main menu for board managers.
 #
 # BZIssue::4648
+# BZIssue::4671
 #  Adding menu item for Comprehensive Review Date Report
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
@@ -129,6 +130,7 @@ for choice in (
     ('SummariesTocReport.py',      'Summaries TOC Lists'          ),
     ('SummariesWithProtocolLinks.py',      
                       'Summaries with Protocols Links/Refs Report'),
+    ('SummariesWithMarkup.py',     'Summaries with Markup Report' ),
     ('SummariesWithNonJournalArticleCitations.py',      
              'Summaries with Non-Journal Article Citations Report')
     ):
