@@ -4,24 +4,6 @@
 #
 # Prototype for editing CDR query term definitions.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.5  2009/03/16 15:19:33  bkline
-# Rewritten to avoid the inefficiencies causing 1/2-minute delays which
-# locked up the browser.
-#
-# Revision 1.4  2004/08/02 21:16:35  bkline
-# Added ability to compare definitions between two servers.
-#
-# Revision 1.3  2002/02/21 15:22:03  bkline
-# Added navigation buttons.
-#
-# Revision 1.2  2001/12/01 18:02:48  bkline
-# Enlarged path field size.
-#
-# Revision 1.1  2001/06/13 22:16:32  bkline
-# Initial revision
-#
-#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string, urllib
 
@@ -176,7 +158,7 @@ form = [u"""\
        if (!window.confirm("Delete query term definition for '" + p + "'?"))
            return;
        var form = document.forms[0];
-       form.delete.value = p;
+       form['delete'].value = p;
        form.submit();
    }
   </script>
