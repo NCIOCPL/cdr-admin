@@ -5,7 +5,8 @@
 # Transform a CDR document using a QC XSL/T filter and send it back to
 # the browser.
 #
-# $Log: not supported by cvs2svn $
+# BZIssue::4751 - Modify BU Report to display LOERef
+#
 # Revision 1.69  2009/05/28 20:38:26  venglisc
 # Added checkbox to suppress display of Reference sections. (Bug 4562)
 #
@@ -320,6 +321,7 @@ version  = fields.getvalue("DocVersion") or None
 glossary = fields.getvalue("Glossary")   or None
 images   = fields.getvalue("Images")     or None
 citation = fields.getvalue("Citations")  or None
+loe      = fields.getvalue("LOEs")       or None
 standardWording = fields.getvalue("ShowStandardWording") or None
 displayInternComments = fields.getvalue("DisplayInternalComments") or None
 displayExternComments = fields.getvalue("DisplayExternalComments") or None
@@ -694,6 +696,12 @@ if letUserPickVersion:
        <td>
   <INPUT TYPE='checkbox' NAME='Citations' CHECKED>&nbsp;&nbsp;
   Display the HP Reference Section<BR>
+       </td>
+      </tr>
+      <tr>
+       <td>
+  <INPUT TYPE='checkbox' NAME='LOEs'>&nbsp;&nbsp;
+  Display Level of Evidence terms at end of report<BR>
        </td>
       </tr>
 """
@@ -1289,6 +1297,8 @@ filterParm.append(['DisplayImages',
                        images and "Y" or "N"])
 filterParm.append(['DisplayCitations',
                        citation and "Y" or "N"])
+filterParm.append(['DisplayLOETermList',
+                       loe and "Y" or "N"])
 
 if repType == 'pat' or repType == 'patrs' or repType == 'patbu':
     filterParm.append(['ShowStandardWording',
