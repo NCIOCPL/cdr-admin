@@ -5,10 +5,7 @@
 # Hierarchical report (in thesaurus-like format) of terminology
 # under Disease/Diagnosis.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.1  2003/12/16 15:56:38  bkline
-# Hierarchical report (in thesaurus-like format) of terminology
-# under Disease/Diagnosis.
+# BZIssue::4762 (change 'cancer' to 'Malignant Neoplasm' [per WO])
 #
 #----------------------------------------------------------------------
 import cdrcgi, cdrdb, cgi
@@ -34,7 +31,7 @@ try:
              SELECT doc_id, NULL
                FROM query_term
               WHERE path = '/Term/PreferredName'
-                AND value = 'cancer'""")
+                AND value = 'Malignant Neoplasm'""")
     conn.commit()
     done = 0
     while not done:
