@@ -7,17 +7,9 @@
 #
 # Sheri says we are only to use the first processing status we find.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.3  2009/02/10 21:23:36  bkline
-# More changes for request #4421 (show Spanish names in some cases).
-#
-# Revision 1.2  2009/01/15 20:21:41  bkline
-# Changes to report requested by William.
-#
-# Revision 1.1  2009/01/08 22:08:56  bkline
-# New report (request #4421).
-#
 # BZIssue::4705
+# BZIssue::4777
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrdb, cdrcgi
 etree = cdr.importEtree()
@@ -59,6 +51,24 @@ if request == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
+# Extract text recursively from etree element.
+#----------------------------------------------------------------------
+def getText(e, pieces = None):
+    if pieces is None:
+        pieces = []
+        top = True
+    else:
+        top = False
+    if e.text is not None:
+        pieces.append(e.text)
+    for child in e:
+        getText(child, pieces)
+    if e.tail is not None:
+        pieces.append(e.tail)
+    if top:
+        return u"".join(pieces)
+
+#----------------------------------------------------------------------
 # For Spanish names we need to know whether they're alternate names.
 #----------------------------------------------------------------------
 class SpanishName:
@@ -66,7 +76,7 @@ class SpanishName:
         self.string = u""
         self.alternate = node.get('NameType') == 'alternate'
         for s in node.findall('TermNameString'):
-            self.string = s.text
+            self.string = getText(s)
     def __unicode__(self):
         # Can't call cgi.escape() if string = None
         if self.string:
@@ -94,7 +104,7 @@ class Name:
         tree = etree.XML(docXml.encode('utf-8'))
         for n in tree.findall('TermName'):
             for s in n.findall('TermNameString'):
-                self.string = s.text
+                self.string = getText(s)
         for n in tree.findall('TranslatedName'):
             self.spanish.append(SpanishName(n))
         eName = language == 'en' and 'TermName' or 'TranslatedName'
@@ -106,7 +116,7 @@ class Name:
         for statuses in tree.findall('ProcessingStatuses'):
             for status in statuses.findall('ProcessingStatus'):
                 for statusValue in status.findall('ProcessingStatusValue'):
-                    v = statusValue.text
+                    v = getText(statusValue)
                     if v:
                         self.status = v
                 if self.status:
@@ -151,7 +161,7 @@ class Concept:
             for statuses in tree.findall('ProcessingStatuses'):
                 for status in statuses.findall('ProcessingStatus'):
                     for statusValue in status.findall('ProcessingStatusValue'):
-                        v = statusValue.text
+                        v = getText(statusValue)
                         if v:
                             self.status = v
                     if self.status:
@@ -162,13 +172,13 @@ class Concept:
 #----------------------------------------------------------------------
 class Comment:
     def __init__(self, node):
-        self.text = node.text
+        self.text = getText(node)
         self.audience = node.get('audience') or u''
         self.date = node.get('date') or u''
         self.user = node.get('user') or u''
     def __unicode__(self):
         text = self.text
-        if text is None:
+        if not text:
             text = u"[NO TEXT ENTERED FOR COMMENT]"
         return u"[audience=%s; date=%s; user=%s] %s" % (self.audience,
                                                         self.date,
