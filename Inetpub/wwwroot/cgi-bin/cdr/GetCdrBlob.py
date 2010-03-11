@@ -12,116 +12,132 @@
 import cdrdb, cgi, cdrcgi, cdr, msvcrt, sys, os, time
 etree = cdr.importEtree()
 
-mimeTypes = {
-    'GIF': 'image/gif',
-    'JPEG': 'image/jpeg',
-    'PNG': 'image/png',
-    'MP3': 'audio/mpeg',
-    'RAM': 'audio/x-pn-realaudio',
-    'WAV': 'audio/x-wav',
-    'WMA': 'audio/x-ms-wma',
-    'AVI': 'video/x-msvideo',
-    'MPEG2': 'video/mpeg2',
-    'MJPG': 'video/x-motion-jpeg' }
-suffixes = {
-    'GIF': 'gif',
-    'JPEG': 'jpg',
-    'PNG': 'png',
-    'MP3': 'mp3',
-    'RAM': 'ram',
-    'WAV': 'wav',
-    'AVI': 'avi',
-    'MPEG2': 'mpeg',
-    'MJPG': 'mjpg' }
-
-def makePicklist():
-    picklist = ["<select name='enc'>"]
-    for key in mimeTypes:
-        picklist.append("<option value='%s'>%s</option>" % (key,
-                                                            mimeTypes[key]))
-    picklist.append('</select>')
-    return "\n".join(picklist)
-
-def getEncodingType(cursor, docId, docVer = None):
-    docId = cdr.exNormalize(docId)[1]
-    if docVer:
-        cursor.execute("""\
-            SELECT xml
-              FROM doc_version
-             WHERE id = ?
-               AND num = ?""", (docId, docVer))
-    else:
-        cursor.execute("""\
-            SELECT xml
-              FROM document
-             WHERE id = ?""", docId)
-    rows = cursor.fetchall()
-    if not rows:
+class DocInfo:
+    def __init__(self, cursor, docId, docVer = None):
+        self.docId = cdr.exNormalize(docId)[1]
+        self.docVer = docVer
+        self.mimeType = self.filename = None
         if docVer:
-            cdrcgi.bail("Cannot find version %s of CDR%s" % (docVer, docId))
+            cursor.execute("""\
+                SELECT xml
+                  FROM doc_version
+                 WHERE id = ?
+                   AND num = ?""", (docId, docVer))
         else:
-            cdrcgi.bail("Cannot find CDR%s" % docId)
-    try:
-        tree = etree.XML(rows[0][0].encode('utf-8'))
-    except Exception, e:
-        cdrcgi.bail("parsing CDR%s: %s" % (docId, e))
-    for medium in ('Image', 'Sound', 'Video'):
-        xpath = 'PhysicalMedia/%sData/%sEncoding' % (medium, medium)
-        for e in tree.findall(xpath):
-            return e.text
-    return None
+            cursor.execute("""\
+                SELECT xml
+                  FROM document
+                 WHERE id = ?""", docId)
+        rows = cursor.fetchall()
+        if not rows:
+            if docVer:
+                raise cdr.Exception("Cannot find version %s of CDR%s" %
+                                    (docVer, docId))
+            else:
+                raise cdr.Exception("Cannot find CDR%s" % docId)
+        try:
+            tree = etree.XML(rows[0][0].encode('utf-8'))
+        except Exception, e:
+            raise cdr.Exception("parsing CDR%s: %s" % (docId, e))
+        if tree.tag == 'Media':
+            for medium in ('Image', 'Sound', 'Video'):
+                xpath = 'PhysicalMedia/%sData/%sEncoding' % (medium, medium)
+                for e in tree.findall(xpath):
+                    encoding = e.text
+                    self.mimeType = {
+                        'GIF': 'image/gif',
+                        'JPEG': 'image/jpeg',
+                        'PNG': 'image/png',
+                        'MP3': 'audio/mpeg',
+                        'RAM': 'audio/x-pn-realaudio',
+                        'WAV': 'audio/x-wav',
+                        'WMA': 'audio/x-ms-wma',
+                        'AVI': 'video/x-msvideo',
+                        'MPEG2': 'video/mpeg2',
+                        'MJPG': 'video/x-motion-jpeg' }.get(encoding)
+                    suffix = {
+                        'GIF': 'gif',
+                        'JPEG': 'jpg',
+                        'PNG': 'png',
+                        'MP3': 'mp3',
+                        'RAM': 'ram',
+                        'WAV': 'wav',
+                        'AVI': 'avi',
+                        'MPEG2': 'mpeg',
+                        'MJPG': 'mjpg' }.get(encoding, 'bin')
+                    self.filename = DocInfo.makeFilename(self.docId, docVer,
+                                                         suffix)
+        elif tree.tag == 'SupplementaryInfo':
+            for e in tree.findall('MimeType'):
+                self.mimeType = e.text
+            for e in tree.findall('OriginalFilename'):
+                self.filename = e.text
+            if not self.filename:
+                suffix = {
+                    'application/pdf': 'pdf',
+                    'application/msword': 'doc',
+                    'application/vnd.ms-excel': 'xls',
+                    'application/vnd.wordperfect': 'wpd',
+                    'application/vnd.ms-powerpoint': 'ppt',
+                    'application/zip': 'zip',
+                    'text/html': 'html',
+                    'text/plain': 'txt',
+                    'text/rtf': 'rtf',
+                    'message/rfc822': 'eml',
+                    'image/jpeg': 'jpg' }.get(self.mimeType, 'bin')
+                self.filename = DocInfo.makeFilename(self.docId, docVer,
+                                                     suffix)
+        else:
+            raise cdr.Exception("don't know about '%s' documents" % tree.tag)
+        if not self.mimeType:
+            if docVer:
+                raise cdr.Exception("unable to determine mime type for "
+                                    "version %s of CDR%d" %
+                                    (docVer, self.docId))
+            else:
+                raise cdr.Exception("unable to determine mime type for "
+                                    "CDR%d" % self.docId)
+                
+    @staticmethod
+    def makeFilename(docId, docVer, suffix):
+        if docVer:
+            return "CDR%d-%s.%s" % (docId, docVer, suffix)
+        else:
+            return "CDR%d.%s" % (docId, suffix)
 
 cursor = cdrdb.connect('CdrGuest').cursor()
 fields = cgi.FieldStorage()
 docId  = fields.getvalue('id') or cdrcgi.bail("Missing required 'id' parameter")
 docVer = fields.getvalue('ver') or ''
-enc    = fields.getvalue('enc') or getEncodingType(cursor, docId, docVer)
-if not (enc):
-    docId = cdr.exNormalize(docId)[1]
-    print """\
-Content-type: text/html
-
-<html>
- <head><title>Get CDR Blob</title></head>
- <body>
-  <h1>Get CDR Blob</h1>
-  <form action='GetCdrBlob.py'>
-   <input type='hidden' name='id' value='%s' /> 
-   <input type='hidden' name='ver' value='%s' />
-   Mime Type for CDR%d:  %s
-   <input type='submit' />
-  </form>
- </body>
-</html>""" % (docId, docVer, docId, makePicklist())
-else:
-    msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
-    docId = cdr.exNormalize(docId)[1]
-    if docVer:
-        cursor.execute("""\
+try:
+    info = DocInfo(cursor, docId, docVer)
+except Exception, e:
+    cdrcgi.bail(u"%s" % e)
+msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
+if info.docVer:
+    cursor.execute("""\
             SELECT b.data
               FROM doc_blob b
               JOIN version_blob_usage u
                 ON u.blob_id = b.id
              WHERE u.doc_id = %d
-               AND u.doc_version = %s""" % (docId, docVer))
-    else:
-        cursor.execute("""\
+               AND u.doc_version = %s""" % (info.docId, info.docVer))
+else:
+    cursor.execute("""\
             SELECT b.data
               FROM doc_blob b
               JOIN doc_blob_usage u
                 ON u.blob_id = b.id
-             WHERE u.doc_id = %d""" % docId)
-    rows = cursor.fetchall()
-    if not rows:
-        if docVer:
-            cdrcgi.bail("No blob found for version %s of CDR%d" % (docVer,
-                                                                   docId))
-        else:
-            cdrcgi.bail("no blob found for CDR document %d" % docId)
-    bytes = rows[0][0]
-    now = time.strftime("%Y%m%d%H%M%S")
-    name = "CDR%d-%s.%s" % (docId, now, suffixes[enc])
-    sys.stdout.write("Content-Type: %s\r\n" % mimeTypes[enc])
-    sys.stdout.write("Content-Disposition: attachment; filename=%s\r\n" % name)
-    sys.stdout.write("Content-Length: %d\r\n\r\n" % len(bytes))
-    sys.stdout.write(bytes)
+             WHERE u.doc_id = %d""" % info.docId)
+rows = cursor.fetchall()
+if not rows:
+    if info.docVer:
+        cdrcgi.bail("No blob found for version %s of CDR%d" % (docVer, docId))
+    else:
+        cdrcgi.bail("No blob found for CDR document %d" % docId)
+bytes = rows[0][0]
+sys.stdout.write("Content-Type: %s\r\n" % info.mimeType)
+sys.stdout.write("Content-Disposition: attachment; filename=%s\r\n" %
+                 info.filename)
+sys.stdout.write("Content-Length: %d\r\n\r\n" % len(bytes))
+sys.stdout.write(bytes)
