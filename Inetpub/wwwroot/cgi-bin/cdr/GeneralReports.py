@@ -156,12 +156,12 @@ reports = [
 for r in reports:
     if r[0] != 'CdrFilter':
        form += """
-    <LI><A HREF='%s/%s?%s=%s'>%s</LI>""" % (cdrcgi.BASE, r[0], 
+    <LI><A HREF='%s/%s?%s=%s'>%s</A></LI>""" % (cdrcgi.BASE, r[0], 
                                             cdrcgi.SESSION, 
                                             session, r[1])
     else:
        form += """
-    <LI><A HREF='/cdrFilter.html'>%s</LI>""" % (r[1])
+    <LI><A HREF='/cdrFilter.html'>%s</A></LI>""" % (r[1])
 
 footer = """
    </OL>
