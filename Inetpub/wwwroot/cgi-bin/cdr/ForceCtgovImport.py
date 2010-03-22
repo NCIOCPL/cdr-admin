@@ -11,9 +11,10 @@
 # BZIssue::4661
 # BZIssue::4700
 # BZIssue::4718 (fixed typo in SELECT query)
+# BZIssue::4763 (restrict use of script)
 #
 #----------------------------------------------------------------------
-import cgi, cdrcgi, cdrdb
+import cgi, cdrcgi, cdrdb, cdr
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -28,6 +29,12 @@ SUBMENU = "CTGov Protocols"
 buttons = [SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 header  = cdrcgi.header(title, title, section, "ForceCtgovImport.py", buttons)
 extra   = u""
+
+#----------------------------------------------------------------------
+# Make sure the current user is allowed to use this script.
+#----------------------------------------------------------------------
+if not cdr.canDo(session, 'FORCE CTGOV DOWNLOAD'):
+    cdrcgi.bail("User not authorized to use this script")
 
 #----------------------------------------------------------------------
 # Handle navigation requests.

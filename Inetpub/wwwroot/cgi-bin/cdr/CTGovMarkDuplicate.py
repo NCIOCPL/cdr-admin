@@ -7,6 +7,8 @@
 # with the CDR-ID of the InScopeProtocol that the CTGov protocol is
 # a duplicate of.
 #
+# BZIssue::4763 (restrict use of script)
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, cdrdb, re, string
 
@@ -29,6 +31,12 @@ script    = "CTGovMarkDuplicate.py"
 # Make sure we're logged in.
 #----------------------------------------------------------------------
 if not session: cdrcgi.bail('Unknown or expired CDR session.')
+
+#----------------------------------------------------------------------
+# Make sure the current user is allowed to use this script.
+#----------------------------------------------------------------------
+if not cdr.canDo(session, 'MARK NLM DUPLICATES'):
+    cdrcgi.bail("User not authorized to use this script")
 
 #----------------------------------------------------------------------
 # Handle request to log out.
