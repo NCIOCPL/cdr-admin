@@ -6,6 +6,7 @@
 # the browser.
 #
 # BZIssue::4751 - Modify BU Report to display LOERef
+# BZIssue::4672 - Changes to LinkedDoc Report
 #
 # Revision 1.69  2009/05/28 20:38:26  venglisc
 # Added checkbox to suppress display of Reference sections. (Bug 4562)
@@ -801,6 +802,42 @@ if not docType:
     except cdrdb.Error, info:
             cdrcgi.bail('Unable to find document type for %s: %s' % (docId,
                                                                  info[1][0]))
+    #----------------------------------------------------------------------
+    # Determine the report type if the document is a summary.
+    # Reformatted patient summaries contain a KeyPoint element
+    # The element of the list creating the output is given as a string 
+    # similar to this:  "Treatment Patients KeyPoint KeyPoint KeyPoint"
+    # which will be used to set the propper report type for reformatted
+    # patient summaries.
+    #----------------------------------------------------------------------
+    if docType == 'Summary':
+        isPatient = hasKeyPoint = False
+        inspectSummary = cdr.filterDoc(session, 
+                  """<?xml version="1.0" ?> 
+<xsl:transform version="1.1" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+ <xsl:template          match = "Summary">
+  <xsl:apply-templates select = "SummaryMetaData/SummaryAudience | 
+                                 SummaryMetaData/SummaryType     |
+                                 //KeyPoint"/>
+ </xsl:template>
+
+ <xsl:template          match = "SummaryAudience | SummaryType">
+  <xsl:value-of        select = "."/>
+  <xsl:text> </xsl:text>
+ </xsl:template>
+
+ <xsl:template          match = "KeyPoint">
+  <xsl:text>KeyPoint</xsl:text>
+  <xsl:text> </xsl:text>
+ </xsl:template>
+</xsl:transform>
+                  """, inline = 1, 
+                        docId = docId, docVer = version or None)
+        if inspectSummary[0].find('Patients') > 0:  isPatient   = True
+        if inspectSummary[0].find('KeyPoint') > 0:  hasKeyPoint = True
+
+        if hasKeyPoint and isPatient:
+            repType = 'pat'
 
 #----------------------------------------------------------------------
 # Get count of links to a person document from protocols and summaries.

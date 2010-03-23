@@ -4,7 +4,7 @@
 #
 # Reports on documents which link to a specified document.
 #
-# BZIssue::4672
+# BZIssue::4672 - Changes to LinkedDoc Report
 # 
 # $Log: LinkedDocs.py,v $
 # Revision 1.6  2007/11/03 14:15:07  bkline
@@ -76,7 +76,8 @@ styleOutput = """\
     TR.odd        { background-color: #E7E7E7; }
     TR.even       { background-color: #FFFFFF; }
     TR.head       { background-color: #D2D2D2; }
-    .link         { color: blue;
+    .link         { color: #0033FF;
+                    background-color: 990000;
                     text-decoration: underline; }
     tr.select:hover, tr.outrow:hover
                   { background: #FFFFCC; }
@@ -253,14 +254,18 @@ SELECT DISTINCT d.id, d.title, t.name, n.source_elem, n.target_frag
     <TH class="col3">ElementName</TD>
     <TH class="col4">FragmentID</TD>
    </TR>""" % linkingDocType
-        report += u"""\
+        report += u"""
    <TR class="outrow">
-    <TD VALIGN='top'>CDR%d</TD>
+    <TD VALIGN='top'>
+     <a href="/cgi-bin/cdr/QcReport.py?DocId=CDR%d&Session=guest">
+      <span class="link">CDR%d</span>
+     </a>
+    </TD>
     <TD VALIGN='top'>%s</TD>
     <TD VALIGN='top'>%s</TD>
     <TD VALIGN='top'>%s</TD>
-   </TR>""" % (linkingDocId, linkingDocTitle, linkingElementName,
-               linkingFragId or "&nbsp;")
+   </TR>""" % (linkingDocId, linkingDocId, linkingDocTitle, 
+               linkingElementName, linkingFragId or "&nbsp;")
         row = cursor.fetchone()
     if prevDocType:
         html += report + u"""\
