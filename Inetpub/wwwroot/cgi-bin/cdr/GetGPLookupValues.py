@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: GetGeneticsSyndromes.py 9444 2009-12-22 15:07:28Z bkline $
+# $Id$
 #
 # Service which provides lookup values for GP mailers and application forms.
 #
