@@ -8,12 +8,9 @@
 # media documents and create a list suitable for Visuals Online to be
 # updated.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.2  2007/11/03 14:15:07  bkline
-# Unicode encoding cleanup (issue #3716).
-#
-# Revision 1.1  2007/01/05 23:27:33  venglisc
-# Initial copy of publishing report by date.  (Bug 2111)
+# BZIssue::2111
+# BZIssue::3716
+# BZIssue::4757
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string, cdrdb, time
@@ -24,11 +21,12 @@ import cgi, cdr, cdrcgi, re, string, cdrdb, time
 fields    = cgi.FieldStorage()
 session   = cdrcgi.getSession(fields)
 docTypes  = []
-docType   = fields and fields.getvalue("doctype")          or []
-submit    = fields and fields.getvalue("SubmitButton")     or None
-dateFrom  = fields and fields.getvalue("datefrom")         or ""
-dateTo    = fields and fields.getvalue("dateto")           or ""
-vol       = fields and fields.getvalue("VOL")              or ""
+docType   = fields.getvalue("doctype")          or []
+submit    = fields.getvalue("SubmitButton")     or None
+dateFrom  = fields.getvalue("datefrom")         or ""
+dateTo    = fields.getvalue("dateto")           or ""
+vol       = fields.getvalue("VOL")              or ""
+audience  = fields.getvalue("audience")         or "Both"
 
 # Setting the dates to prepopulate Start/End Date fields
 # ------------------------------------------------------
@@ -177,6 +175,19 @@ if not docType:
        }
    </script>
 """)
+    audienceField = ""
+    if vol:
+        audienceField = """
+       <tr>
+        <td><b>Audience:&nbsp;</b></td>
+        <td>
+         <select name='audience'>
+          <option value='Both' selected='selected'>Both</option>
+          <option value='Patients'>Patient</option>
+          <option value='Health_Professionals'>Health Professional</option>
+         </select>
+        </td>
+       </tr>"""
     form   = """\
    <input type='hidden' name='%s' value='%s'>
    <!-- Table containing the Date -->
@@ -188,11 +199,11 @@ if not docType:
     </tr>
    </table>
  
-   <!-- Table to enter the time frame -->
+   <!-- Table to enter the time frame and select the audience -->
    <table border='0' >
     <tr>
      <td>
-      <table border='0'cellpadding="3">
+      <table border='0' cellpadding="3">
        <tr>
         <td><b>Start Date:&nbsp;</b></td>
         <td><input name='datefrom' value='%s' size='10'></td>
@@ -200,7 +211,7 @@ if not docType:
        <tr>
         <td><b>End Date:&nbsp;</b></td>
         <td><input name='dateto' value='%s' size='10'></td>
-       </tr>
+       </tr>%s
       </table>
      </td>
      <td valign="middle" align="left">(format YYYY-MM-DD)</td>
@@ -215,7 +226,7 @@ if not docType:
      </td>
     </tr>
    </table>
-""" % (cdrcgi.SESSION, session, dateString, dateFrom, dateTo)
+""" % (cdrcgi.SESSION, session, dateString, dateFrom, dateTo, audienceField)
 
     # For the Media Doc report the default docType is 'Media'
     # -------------------------------------------------------
@@ -308,6 +319,23 @@ except cdrdb.Error, info:
     cdrcgi.bail('Failure creating temp table #removed: %s' %
                 info[1][0])
      
+#----------------------------------------------------------------------
+# Bolted on the side for enhancement request #4757: support restriction
+# of the report on published media documents by audience.
+#----------------------------------------------------------------------
+if vol and audience != 'Both':
+    audienceCursor = conn.cursor()
+    audienceCursor.execute("""\
+        SELECT DISTINCT doc_id
+                   FROM query_term_pub
+                  WHERE path in ('/Media/MediaContent/Captions/MediaCaption' +
+                                 '/@audience',
+                                 '/Media/MediaContent/ContentDescriptions' +
+                                 '/ContentDescription/@audience')
+                    AND value = ?""", audience, timeout=300)
+    audienceSet = set([row[0] for row in audienceCursor.fetchall()])
+    audienceCursor.close()
+    audienceCursor = None
 
 # Create #brandnew table
 # ----------------------
@@ -486,9 +514,10 @@ countBrandnew = {}
 # ---------------------------------------------------------------
 if vol:
     mediaIds = []
-    for set in (updates, removes, brandnews, renews):
-        for x in set:
-            mediaIds.append(x[0])
+    for docSet in (updates, removes, brandnews, renews):
+        for x in docSet:
+            if audience == 'Both' or x[0] in audienceSet:
+                mediaIds.append(x[0])
 
     mediaRecords = getMediaInfo(mediaIds)
 
@@ -510,8 +539,8 @@ else:
 #----------------------------------------------------------------------
 # Create the results page.
 #----------------------------------------------------------------------
-instr     = 'Published %s Documents on Cancer.gov -- %s.' % (
-                                      vol and 'Media' or '', dateString)
+instr     = 'Published%s Documents on Cancer.gov -- %s.' % (
+                                      vol and ' Media' or '', dateString)
 header    = cdrcgi.header(title, title, instr, script, buttons, 
                           stylesheet = """\
    <STYLE type="text/css">
@@ -544,14 +573,19 @@ report    = """\
 # ------------------------------------------------------------------------
 # Display Summary Title including CDR ID
 # ------------------------------------------------------------------------
+audienceHeader = ""
+if vol and audience != 'Both':
+    audienceHeader = "%s<br />" % {
+        "Health_Professionals": "Health Professional",
+        "Patients": "Patient" }.get(audience, "Unrecognized audience")
 report += """\
   <center>
     <H3>Published %s Documents</H3>
      Report includes publishing jobs started between<br/>
-     <b>%s</b> and <b>%s</b><br/>
+     <b>%s</b> and <b>%s</b><br/>%s
      <br/>
   </center>
-""" % (vol and 'Media' or '', dateFrom, dateTo)
+""" % (vol and 'Media' or '', dateFrom, dateTo, audienceHeader)
 
 # ***** Main part for Media Doc Published report *****
 # ----------------------------------------------------
