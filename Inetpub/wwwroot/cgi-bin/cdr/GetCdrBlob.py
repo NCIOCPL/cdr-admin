@@ -22,12 +22,12 @@ class DocInfo:
                 SELECT xml
                   FROM doc_version
                  WHERE id = ?
-                   AND num = ?""", (docId, docVer))
+                   AND num = ?""", (self.docId, self.docVer))
         else:
             cursor.execute("""\
                 SELECT xml
                   FROM document
-                 WHERE id = ?""", docId)
+                 WHERE id = ?""", self.docId)
         rows = cursor.fetchall()
         if not rows:
             if docVer:
