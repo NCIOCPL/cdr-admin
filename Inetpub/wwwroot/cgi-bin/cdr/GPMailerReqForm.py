@@ -6,6 +6,7 @@
 #
 # Selection criteria for documents to mail include:
 #   Must be GP Person doc
+#   Must have 
 #   Must be under version control, latest version is selected, whether
 #     or not it is publishable.
 #   Unless individual doc id entered by user, the mailer history for
@@ -291,8 +292,9 @@ else:
               JOIN query_term q
                 ON q.doc_id = v.id
              WHERE q.path = '%s'
+               AND q.value = 'Include'
           GROUP BY v.id
-          ORDER BY v.id""", timeout=300)
+          ORDER BY v.id""" % dirIncludePath, timeout=300)
 
         # Get as many documents as the user asked for.
         rows = cursor.fetchall()
@@ -326,11 +328,16 @@ else:
                        FROM pub_proc_doc d
                        JOIN pub_proc p
                          ON p.id = d.pub_proc
-                      WHERE p.pub_subset LIKE 'Genetics Professional-%'
+                       JOIN query_term q
+                         ON q.doc_id = d.doc_id
+                      WHERE p.pub_subset LIKE 'Genetics Professional-%%'
                         AND p.status <> 'Failure'
                         AND p.completed IS NOT NULL
+                        AND q.path = '%s'
+                        AND q.value = 'Include'
                    GROUP BY d.doc_id
-                   ORDER BY MAX(p.completed), d.doc_id""", timeout=300)
+                   ORDER BY MAX(p.completed), d.doc_id""" % dirIncludePath,
+                       timeout=300)
         for docId, lastMailer in cursor.fetchall():
 
             # Get the latest version and make sure it's not blocked.
