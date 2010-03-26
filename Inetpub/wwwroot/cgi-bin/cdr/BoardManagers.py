@@ -5,7 +5,10 @@
 #
 # Main menu for board managers.
 #
-# $Log: not supported by cvs2svn $
+# BZIssue::4648
+# BZIssue::4671 - Summaries with Markup Report
+# BZIssue::4673 - Adding Board Roster (Full) option
+#
 # Revision 1.15  2008/08/26 21:16:18  venglisc
 # Added new menu item Changes to Summaries (Bug 4243)
 #
@@ -54,8 +57,6 @@
 # Revision 1.1  2003/12/16 16:02:14  bkline
 # Main menu for board managers.
 #
-# BZIssue::4648
-# BZIssue::4671
 #  Adding menu item for Comprehensive Review Date Report
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
@@ -122,6 +123,7 @@ for choice in (
     ('ChangesToSummaries.py',      'Changes to Summaries'         ),
     ('SummaryChanges.py',          'History of Changes to Summary'),
     ('SummaryCitations.py',        'Summaries Citations'          ),
+    ('SummaryComments.py',         'Summaries Comments'           ),
     ('SummaryCRD.py',              
                       'Summaries Comprehensive Review Date Report'),
     ('SummaryDateLastModified.py', 'Summaries Date Last Modified' ),
@@ -145,8 +147,9 @@ form += """\
 """
 
 for choice in (
-    ('QcReport.py',                'Board Member Information QC Report' ),
-    ('BoardRoster.py',             'Board Roster Reports'          ),
+    ('QcReport.py',                'Board Member Information QC Report'  ),
+    ('BoardRoster.py',             'Board Roster Reports'                ),
+    ('BoardRosterFull.py',         'Board Roster Reports (Combined)'     ),
     ('PdqBoards.py',               'PDQ Board Members and Topics'        )
     ):
     form += """\
