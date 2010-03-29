@@ -5,7 +5,10 @@
 # Report listing all references cited in a selected version of a
 # cancer information summary.
 #
-# $Log: not supported by cvs2svn $
+# $Log: SummaryCitations.py,v $
+# Revision 1.5  2009/10/02 18:29:10  venglisc
+# Adding PMID link to citations (Bug 4651)
+#
 # Revision 1.4  2009/07/31 19:18:49  venglisc
 # Modified sort order to use the locale setting so that non-ASCII characters
 # are sorted within the ASCII sequence. (Bug 4598)
@@ -22,6 +25,7 @@
 #
 #----------------------------------------------------------------------
 # BZIssue::4651 - Adding PMID to citations
+# BZIssue::4786 - Fixing non-Pubmed citations
 
 import xml.dom.minidom, cgi, socket, struct, re, cdr, cdrcgi, cdrdb
 import locale, time
@@ -83,7 +87,7 @@ def report(docId, docVersion):
         for ref in refList.childNodes:
             refPmid = ""
             if ref.nodeName == "Citation":
-                refString = cdr.getTextContent(ref).strip()
+                refString = cdr.getTextContent(ref, recurse = True).strip()
 
                 if u'PMID' in ref.attributes.keys():
                     refPmid = str(ref.attributes["PMID"].value)
@@ -117,6 +121,7 @@ def report(docId, docVersion):
   <h2>References:</h2>
   <ol>
 """ % (id, summaryTitle, time.strftime("%B %d, %Y"), summaryTitle)
+
     for ref in refs:
         if ref != prevRef:
             # Building the link for the PubMedID (format is [@@12345@@])
