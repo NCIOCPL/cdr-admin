@@ -5,7 +5,8 @@
 # Transform a CDR document using an XSL/T filter and send it back to
 # the browser.
 #
-# $Log: not supported by cvs2svn $
+# BZIssue::4781 - Have certain links to unpublished docs ignored
+# 
 # Revision 1.32  2009/05/06 18:18:22  venglisc
 # Converted output to unicode to match sendPage input requirements. (Bug 4560)
 #
@@ -173,6 +174,9 @@ displayIComments = (fields.getvalue('internal') == 'true') and 'Y' or None
 displayEComments = (fields.getvalue('external') == 'true') and 'Y' or None
 displayGlossary  = (fields.getvalue('glossary') == 'true') and 'Y' or 'N'
 displayStdWord   = (fields.getvalue('stdword')  == 'true') and 'Y' or 'N'
+isPP             = (fields.getvalue('ispp')     == 'true') and 'Y' or 'N'
+isQC             = (fields.getvalue('isqc')     == 'true') and 'Y' or 'N'
+displayLOETermList = (fields.getvalue('loeref')   == 'true') and 'Y' or 'N'
           # empty insRevLevels is expected.
 
 # ---------------------------------------------------------------
@@ -195,7 +199,10 @@ filterParm = [['insRevLevels',            insRevLevels],
               ['DisplayGlossaryTermList', displayGlossary],
               ['ShowStandardWording',     displayStdWord],
               ['displayBoard',            displayBoard],
-              ['displayAudience',         displayAudience]]
+              ['displayAudience',         displayAudience],
+              ['isPP',                    isPP],
+              ['isQC',                    isQC],
+              ['displayLOETermList',      displayLOETermList]]
 if vendorOrQC:
     filterParm.append(['vendorOrQC', 'QC'])
 
@@ -308,12 +315,14 @@ if fields.getvalue('qcFilterSets'):
 # Filter the document.
 #----------------------------------------------------------------------
 filterWarning = ""
+
 doc = cdr.filterDoc(session, filtId, docId = docId, docVer = docVer,
                     parm = filterParm, port = cdrPort)
 if type(doc) == type(()):
     if doc[1]: filterWarning += doc[1]
     doc = doc[0]
 
+cdrcgi.bail(doc[0:50])
 #----------------------------------------------------------------------
 # Add a table row for an error or warning.
 #----------------------------------------------------------------------

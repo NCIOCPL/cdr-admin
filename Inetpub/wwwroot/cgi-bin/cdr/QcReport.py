@@ -7,6 +7,7 @@
 #
 # BZIssue::4751 - Modify BU Report to display LOERef
 # BZIssue::4672 - Changes to LinkedDoc Report
+# BZIssue::4781 - Have certain links to unpublished docs ignored
 #
 # Revision 1.69  2009/05/28 20:38:26  venglisc
 # Added checkbox to suppress display of Reference sections. (Bug 4562)
@@ -1300,6 +1301,11 @@ if insRevLvls:
 else:
     if docType == 'DrugInformationSummary':
         filterParm = [['insRevLevels', 'publish|approved|proposed']]
+
+# Allow certain QC reports to succeed even without valid GlossaryLink
+# -------------------------------------------------------------------
+if docType == 'DrugInformationSummary' or docType == 'Media:img':
+    filterParm.append(['isQC', 'Y'])
 
 # Patient Summaries are displayed like editorial board markup
 # -----------------------------------------------------------

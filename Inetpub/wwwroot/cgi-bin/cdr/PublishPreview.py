@@ -5,7 +5,8 @@
 # Transform a CDR document using an XSL/T filter and send it back to 
 # the browser.
 #
-# $Log: not supported by cvs2svn $
+# BZIssue::4781 - Have certain links to unpublished docs ignored
+#
 # Revision 1.39  2008/11/20 22:44:44  venglisc
 # Modified the code to display the exception returned by Cancer.gov if a
 # document fails to be processed.  This will help programmers to identify
@@ -314,11 +315,15 @@ showProgress("Using flavor: %s..." % flavor)
 
 #----------------------------------------------------------------------
 # Filter the document.
+# Submit the parameter 'isPP' to allow simulating reports that behave
+# differently for PP and publishing, i.e. denormalization of Glossary
+# links in the Drug Info Summaries.
 #----------------------------------------------------------------------
 if not filterSets.has_key(docType):
     cdrcgi.bail("Don't have filters set up for %s documents yet" % docType)
 doc = cdr.filterDoc(session, filterSets[docType], docId = docId, 
-                    docVer = docVer)
+                    parm = [['isPP', 'Y']], docVer = docVer)
+
 #print docId, docVer, flavor, docType
 #print '*****************************************'
 if type(doc) == type(()):
