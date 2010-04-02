@@ -4,7 +4,8 @@
 #
 # Report listing the Board meetings by date or board.
 #
-# $Log: not supported by cvs2svn $
+# BZIssue::4792 - Add Meeting Canceled attribute to report
+#
 # Revision 1.3  2008/11/28 15:08:23  bkline
 # Report rewritten to match new structure for board meeting information,
 # which now supports a separate meeting time for each meeting.
@@ -125,11 +126,13 @@ class Board:
             return diff
         return cmp(self.cdrId, other.cdrId)
 class Meeting:
-    def __init__(self, meetingDate, meetingTime, board, webEx = False):
+    def __init__(self, meetingDate, meetingTime, board, webEx = False, 
+                                                        canceled = ''):
         self.date = meetingDate
         self.time = meetingTime
         self.board = board
         self.webEx = webEx
+        self.canceled = canceled
         try:
             y, m, d = [int(piece) for piece in meetingDate.split('-')]
             normalizedDate = normalizeDate(y, m, d)
@@ -145,7 +148,7 @@ class Meeting:
         return cmp(self.board.name, other.board.name)
 def collectBoardMeetingInfo(cursor):
     cursor.execute("""\
-SELECT DISTINCT a.id, n.value, d.value, t.value, w.value
+SELECT DISTINCT a.id, n.value, d.value, t.value, w.value, c.value
            FROM active_doc a
            JOIN query_term n
              ON n.doc_id = a.id
@@ -161,6 +164,11 @@ LEFT OUTER JOIN query_term w
             AND LEFT(w.node_loc, 12) = LEFT(d.node_loc, 12)
             AND w.path = '/Organization/PDQBoardInformation/BoardMeetings' +
                          '/BoardMeeting/MeetingDate/@WebEx'
+LEFT OUTER JOIN query_term c
+             ON c.doc_id = d.doc_id
+            AND LEFT(c.node_loc, 12) = LEFT(d.node_loc, 12)
+            AND c.path = '/Organization/PDQBoardInformation/BoardMeetings' +
+                         '/BoardMeeting/@ReasonCanceled'
           WHERE o.value IN ('PDQ Advisory Board', 'PDQ Editorial Board')
             AND o.path = '/Organization/OrganizationType'
             AND n.path = '/Organization/OrganizationNameInformation' +
@@ -170,12 +178,14 @@ LEFT OUTER JOIN query_term w
             AND t.path = '/Organization/PDQBoardInformation/BoardMeetings' +
                          '/BoardMeeting/MeetingTime'""", timeout = 600)
     boards = {}
-    for cdrId, boardName, meetingDate, meetingTime, webEx in cursor.fetchall():
+    for cdrId, boardName, meetingDate, meetingTime, webEx, \
+                                          canceled in cursor.fetchall():
         board = boards.get(cdrId)
         if not board:
             board = Board(cdrId, boardName)
             boards[cdrId] = board
-        board.meetings.append(Meeting(meetingDate, meetingTime, board, webEx))
+        board.meetings.append(Meeting(meetingDate, meetingTime, board, 
+                                                   webEx, canceled))
     boards = boards.values()
     boards.sort()
     return boards
@@ -295,9 +305,12 @@ if flavor == 'ByBoard':
                  if meeting.date >= startDate and meeting.date <= endDate:
                      html.append("""\
   <tr>
-   <td class="dates">%s %s %s</td>
+   <td class="dates">%s %s %s %s</td>
   </tr>
-""" % (meeting.date, meeting.time or "", meeting.webEx and ' (WebEx)' or ''))
+""" % (meeting.date, meeting.time or "", meeting.webEx and ' (WebEx)' or '',
+       meeting.canceled and 
+         (' <span class="DTDerror">(Canceled: %s)</span>' % meeting.canceled) 
+                        or ''))
 
              html.append("""\
  </table>
@@ -367,12 +380,16 @@ else:
                 bg = monthBlocks % 2 == 0 and 'even' or 'odd'
                 html.append("""
    <tr class="%s">
-    <td width="150px" class="dates" align='center'>%s</td>
+    <td width="150px" class="dates" align='center'>%s %s</td>
     <td width="70px" class="dates" align='center'>%s</td>
     <td width="200px" class="dates" align='center'>%s</td>
     <td width="60px" class="dates" align='center'>%s</td>
     <td width="330px" class="dates">%s</td>
-   </tr>""" % (bg, meeting.date, meeting.dayOfWeek, meeting.time,
+   </tr>""" % (bg, meeting.date, 
+                   meeting.canceled and 
+         ('<br><span class="DTDerror">Canceled: %s</span>' % meeting.canceled)
+                   or '',
+               meeting.dayOfWeek, meeting.time,
                meeting.webEx and 'Yes' or '', cgi.escape(meeting.board.name)))
 
             lastDate = meeting.date
