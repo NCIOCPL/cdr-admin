@@ -6,6 +6,7 @@
 # the browser.
 #
 # BZIssue::4781 - Have certain links to unpublished docs ignored
+# BZIssue::4800 - Glossary Term Link error
 # 
 # Revision 1.32  2009/05/06 18:18:22  venglisc
 # Converted output to unicode to match sendPage input requirements. (Bug 4560)
@@ -322,7 +323,6 @@ if type(doc) == type(()):
     if doc[1]: filterWarning += doc[1]
     doc = doc[0]
 
-cdrcgi.bail(doc[0:50])
 #----------------------------------------------------------------------
 # Add a table row for an error or warning.
 #----------------------------------------------------------------------
