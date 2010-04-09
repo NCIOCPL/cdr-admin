@@ -8,6 +8,8 @@
 # individual organizations and statuses.
 #
 # BZIssue::4659
+# BZIssue::4680 - Identify and fix CDR Reports affected by changes 
+#                 to CTGov schema changes
 #
 #----------------------------------------------------------------------
 import cdr, cgi, cdrcgi, cdrdb, sys, time, cdrdocobject
@@ -60,19 +62,30 @@ else:
 # -------------------------------------------
 # Getting the Protocol Grant information
 # -------------------------------------------
-def getGrantNo(id, cursor):
-    cursor.execute("""\
+def getGrantNo(id, docType, cursor):
+    if docType == 'CTGovProtocol':
+        protString = 'CTGovProtocol/PDQAdminInfo'
+        nodeLoc    = 12
+
+    else:
+        protString = 'InScopeProtocol'
+        nodeLoc    = 8
+
+    query = """
         SELECT t.value, g.value
           FROM query_term g
           JOIN query_term t
             on t.doc_id = g.doc_id
-           AND t.path = '/InScopeProtocol/FundingInfo' +
-                        '/NIHGrantContract/NIHGrantContractType'
-           AND left(g.node_loc, 8) = left(t.node_loc, 8)
+           AND t.path = '/%s/FundingInfo' +
+                         '/NIHGrantContract/NIHGrantContractType'
+           AND left(g.node_loc, %d) = left(t.node_loc, %d)
          WHERE g.doc_id = %s
-           AND g.path = '/InScopeProtocol/FundingInfo' +
-                        '/NIHGrantContract/GrantContractNo'
-    """ % id)
+           AND g.path = '/%s/FundingInfo' +
+                         '/NIHGrantContract/GrantContractNo'
+               """ % (protString, nodeLoc, nodeLoc, id, protString)
+
+    cursor.execute(query)
+
     rows = cursor.fetchall()
     grantNo = []
     for row in rows:
@@ -108,51 +121,111 @@ class ProtocolOwnershipTransfer:
         def __init__(self, orgId, q_status, cursor):
             self.protocols = {}
 
+            # This query selects those protocols that used to be 
+            # InScopeProtocols and a new CTGovProtocol with a new CDR-ID was
+            # created.
+            # The current process replaces an InScopeProtocol by saving the
+            # CTGovProtocol type on top of the InScope under the same CDR-ID
+            # --------------------------------------------------------------
+            #cursor.execute("""\
+            #   SELECT t.doc_id, pid.value AS "Primary ID", n.value AS "NCT-ID",
+            #          t.value AS "Owner Org", p.value AS "PRS User", 
+            #          d.value AS "Tr Date", s.value AS "Status",
+            #          oo.value AS "OrgName", o.int_val AS "Org-ID"
+            #     INTO #tprotocols
+            #     FROM query_term t
+            #     JOIN query_term pid
+            #       ON t.doc_id  = pid.doc_id
+            #      AND pid.path  = '/InScopeProtocol/ProtocolIDs/PrimaryID' +
+            #                      '/IDString'
+            #     JOIN query_term n
+            #       ON t.doc_id  = n.doc_id
+            #      AND n.path = '/InScopeProtocol/ProtocolIDs/OtherID/IDString'
+            #  -- JOIN query_term nct
+            #  --   ON t.doc_id  = nct.doc_id
+            #  --  AND nct.path  = '/InScopeProtocol/ProtocolIDs/OtherID/IDType'
+            #  --  AND nct.value = 'ClinicalTrials.gov ID'
+            #  --  AND left(n.node_loc, 8) = left(nct.node_loc, 8)
+            #     JOIN query_term p
+            #       ON t.doc_id  = p.doc_id
+            #      AND p.path = '/InScopeProtocol/CTGovOwnershipTransferInfo' +
+            #                   '/PRSUserName'
+            #     JOIN query_term d
+            #       ON t.doc_id  = d.doc_id
+            #      AND d.path = '/InScopeProtocol/CTGovOwnershipTransferInfo' +
+            #                   '/CTGovOwnershipTransferDate'
+            #     JOIN query_term s
+            #       ON t.doc_id  = s.doc_id
+            #      AND s.path = '/InScopeProtocol/ProtocolAdminInfo'          +
+            #                   '/CurrentProtocolStatus'
+            #     JOIN query_term o
+            #       ON t.doc_id = o.doc_id
+            #      AND o.path = '/InScopeProtocol/ProtocolAdminInfo'          +
+            #                   '/ProtocolLeadOrg/LeadOrganizationID/@cdr:ref'
+            #      AND o.int_val = %s
+            #     JOIN query_term oo
+            #       ON oo.doc_id = o.int_val
+            #      AND oo.path = '/Organization/OrganizationnameInformation'  +
+            #                    '/OfficialName/Name'
+            #    WHERE t.path = '/InScopeProtocol/CTGovOwnershipTransferInfo' +
+            #                   '/CTGovOwnerOrganization'
+            #    %s
+            #    ORDER BY s.value""" % (orgId, q_status), timeout = 300)
+
             cursor.execute("""\
                SELECT t.doc_id, pid.value AS "Primary ID", n.value AS "NCT-ID",
                       t.value AS "Owner Org", p.value AS "PRS User", 
                       d.value AS "Tr Date", s.value AS "Status",
-                      oo.value AS "OrgName", o.int_val AS "Org-ID"
+                      oo.value AS "OrgName", 
+                      o.int_val AS "Org-ID", dt.name AS "DocType"
                  INTO #tprotocols
                  FROM query_term t
+                 JOIN document doc
+                   ON doc.id = t.doc_id
+                 JOIN doc_type dt
+                   ON doc.doc_type = dt.id
                  JOIN query_term pid
                    ON t.doc_id  = pid.doc_id
-                  AND pid.path  = '/InScopeProtocol/ProtocolIDs/PrimaryID' +
-                                  '/IDString'
+                  AND pid.path  = '/CTGovProtocol/PDQAdminInfo' +
+                                  '/PDQProtocolIDs/PrimaryID/IDString'
                  JOIN query_term n
                    ON t.doc_id  = n.doc_id
-                  AND n.path = '/InScopeProtocol/ProtocolIDs/OtherID/IDString'
-              -- JOIN query_term nct
-              --   ON t.doc_id  = nct.doc_id
-              --  AND nct.path  = '/InScopeProtocol/ProtocolIDs/OtherID/IDType'
-              --  AND nct.value = 'ClinicalTrials.gov ID'
-              --  AND left(n.node_loc, 8) = left(nct.node_loc, 8)
+                  AND n.path = '/CTGovProtocol/IDInfo/NCTID'
                  JOIN query_term p
                    ON t.doc_id  = p.doc_id
-                  AND p.path = '/InScopeProtocol/CTGovOwnershipTransferInfo' +
-                               '/PRSUserName'
+                  AND p.path    = '/CTGovProtocol/PDQAdminInfo' +
+                                  '/CTGovOwnershipTransferInfo' +
+                                  '/PRSUserName'
                  JOIN query_term d
                    ON t.doc_id  = d.doc_id
-                  AND d.path = '/InScopeProtocol/CTGovOwnershipTransferInfo' +
-                               '/CTGovOwnershipTransferDate'
+                  AND d.path    = '/CTGovProtocol/PDQAdminInfo' +
+                                  '/CTGovOwnershipTransferInfo' +
+                                  '/CTGovOwnershipTransferDate'
                  JOIN query_term s
                    ON t.doc_id  = s.doc_id
-                  AND s.path = '/InScopeProtocol/ProtocolAdminInfo'          +
-                               '/CurrentProtocolStatus'
+                  AND s.path    = '/CTGovProtocol/OverallStatus'
                  JOIN query_term o
-                   ON t.doc_id = o.doc_id
-                  AND o.path = '/InScopeProtocol/ProtocolAdminInfo'          +
-                               '/ProtocolLeadOrg/LeadOrganizationID/@cdr:ref'
+                   ON t.doc_id  = o.doc_id
+                  AND o.path    = '/CTGovProtocol/Location/Facility' +
+                                  '/Name/@cdr:ref'
                   AND o.int_val = %s
                  JOIN query_term oo
                    ON oo.doc_id = o.int_val
-                  AND oo.path = '/Organization/OrganizationnameInformation'  +
-                                '/OfficialName/Name'
-                WHERE t.path = '/InScopeProtocol/CTGovOwnershipTransferInfo' +
-                               '/CTGovOwnerOrganization'
+                  AND oo.path   = '/Organization/OrganizationnameInformation' +
+                                  '/OfficialName/Name'
+                WHERE t.path    = '/CTGovProtocol/PDQAdminInfo' +
+                                  '/CTGovOwnershipTransferInfo' +
+                                  '/CTGovOwnerOrganization'
+                  AND dt.name in ('CTGovProtocol', 'InScopeProtocol')
+                --AND n.value like 'NCT%%'
                 %s
-                ORDER BY s.value""" % (orgId, q_status), timeout = 300)
+                ORDER BY s.value, n.value""" % (orgId, q_status), timeout = 300)
 
+            # This query is not necessary if we're only looking at 
+            # CTGovProtocols but we need it if InScopeProtocols need to be
+            # considered.  
+            # I'm still waiting if we'll need to look at both doc types.
+            # -------------------------------------------------------------
             cursor.execute("""\
                 SELECT *
                   FROM #tprotocols
@@ -172,15 +245,18 @@ class ProtocolOwnershipTransfer:
                                           u'trDate'  : row[5],
                                           u'status'  : row[6],
                                           u'orgName' : row[7],
-                                          u'orgId'   : row[8]}
+                                          u'orgId'   : row[8],
+                                          u'docType' : row[9]}
                                           ### u'grantNo' : row[9]}
 
                 self.protocols[row[0]][u'blocked']  = \
                                           self.checkBlocked(cdrId, cursor)
                 self.protocols[row[0]][u'ctgovBlk'] = \
-                                          self.checkCtgovBlocked(cdrId, cursor)
+                                          self.checkCtgovBlocked(cdrId, 
+                                                                 row[9], 
+                                                                 cursor)
                 self.protocols[row[0]][u'grantNo'] = \
-                                          getGrantNo(cdrId, cursor)
+                                          getGrantNo(cdrId, row[9], cursor)
 
         # --------------------------------------
         # Check if a protocol is blocked or not
@@ -199,7 +275,10 @@ class ProtocolOwnershipTransfer:
         # -------------------------------------------------
         # Check if a protocol is blocked from CTGov or not
         # -------------------------------------------------
-        def checkCtgovBlocked(self, id, cursor):
+        def checkCtgovBlocked(self, id, docType, cursor):
+            if docType == 'CTGovProtocol':
+                return 'N/A'
+
             cursor.execute("""\
                SELECT *
                  FROM query_term
@@ -314,9 +393,14 @@ class ProtocolOwnershipTransfer:
                        r.value as "TResponse", d.value as "TR date", 
                        t.value as "Log date",
                        s.value AS "Status",  sd.value AS "Status Date",
-                       oo.value AS "OrgName", o.int_val AS "OrgId"
+                       oo.value AS "OrgName", o.int_val AS "OrgId", 
+                       dt.name AS "DocType"
                   INTO #ntprotocols
                   FROM query_term_pub s
+                  JOIN document doc
+                    ON doc.id = s.doc_id
+                  JOIN doc_type dt
+                    ON doc.doc_type = dt.id
                   JOIN query_term_pub pid
                     ON s.doc_id  = pid.doc_id
                    AND pid.path  = '/InScopeProtocol/ProtocolIDs/PrimaryID' +
@@ -415,7 +499,7 @@ class ProtocolOwnershipTransfer:
                 # Populate the GrantNo information
                 # --------------------------------
                 self.protocols[cdrId][u'grantNo'] = \
-                                      getGrantNo(cdrId, cursor)
+                                      getGrantNo(cdrId, row[8], cursor)
 
         # ---------------------------------------
         # Getting the official organization name
@@ -595,8 +679,8 @@ class ProtocolOwnershipTransfer:
                 exRow.addCell( 4, 'CTGov Owner Organization')
                 exRow.addCell( 5, 'PRS User Name')
                 exRow.addCell( 6, 'CTGov Ownership Transfer Date')
-                exRow.addCell( 7, 'Blocked From CTGov')
-                exRow.addCell( 8, 'Blocked From Publication')
+                exRow.addCell( 7, 'Blocked From Publication')
+                exRow.addCell( 8, 'Blocked From CTGov')
                 exRow.addCell( 9, 'Current Protocol Status')
                 exRow.addCell(10, 'Organization Name')
                 exRow.addCell(11, 'Org CDR-ID')
