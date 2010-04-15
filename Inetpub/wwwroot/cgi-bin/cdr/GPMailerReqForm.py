@@ -30,6 +30,7 @@ LOGFILE = cdrmailcommon.LOGFILE
 fields   = cgi.FieldStorage()
 session  = cdrcgi.getSession(fields)
 request  = cdrcgi.getRequest(fields)
+check    = fields.getvalue("precheck")
 docId    = fields.getvalue("DocId")
 email    = fields.getvalue("Email")
 userPick = fields.getvalue("userPick")
@@ -60,6 +61,35 @@ dirIncludePath = ('/Person/ProfessionalInformation/GeneticsProfessionalDetails'
 #----------------------------------------------------------------------
 # Confirm that this version of the specified document can get an emailer.
 #----------------------------------------------------------------------
+class GP:
+    def __cmp__(self, other):
+        return cmp(self.docId, other.docId)
+    def __init__(self, docId, docVersion, cursor):
+        self.docId = docId
+        self.docVersion = docVersion
+        self.title = self.email = None
+        cursor.execute("""\
+            SELECT xml, title
+              FROM doc_version
+             WHERE id = ?
+               AND num = ?""", (docId, docVersion))
+        rows = cursor.fetchall()
+        if rows:
+            docXml, self.title = rows[0]
+            tree = etree.XML(docXml.encode('utf-8'))
+            for location in tree.findall("PersonLocations/PrivatePractice"):
+                usedFor = location.get('UsedFor')
+                if usedFor and 'GPMailer' in usedFor:
+                    for email in location.findall('PrivatePracticeLocation'
+                                                 '/Email'):
+                        self.email = email.text
+            for location in tree.findall("PersonLocations"
+                                         "/OtherPracticeLocation"):
+                usedFor = location.get('UsedFor')
+                if usedFor and 'GPMailer' in usedFor:
+                    for email in location.findall('SpecificEmail'):
+                        self.email = email.text
+                        
 def hasEmailAddress(docId, docVersion):
     filterSet = ['set:Mailer GeneticsProfessional Set']
     response = cdr.filterDoc('guest', filterSet, docId, docVer=docVersion)
@@ -125,6 +155,12 @@ if not request:
     <span class='r'>Genetics Professional-Annual update</span><br>
    <input type='radio' name='userPick' class='r' value='AnnRemail'>
     <span class='r'>Genetics Professional-Annual remail</span><br>
+<!-- -->
+   <br />
+   <input type='checkbox' name='precheck' />
+    <span class='r'>Only run pre-mailer check (not available for remailers)
+    </span>
+<!-- -->
    <br><br><br>
    <b>Limit maximum number of mailers generated:&nbsp;</b>
    <input type='text' name='maxMails' size='12' value='No limit' />
@@ -170,6 +206,14 @@ if maxMailers < 1:
     cdrcgi.bail ("Can't request less than 1 mailer")
 
 #----------------------------------------------------------------------
+# Get a document's title from the all_docs table.
+#----------------------------------------------------------------------
+def getDocTitle(cursor, docId):
+    cursor.execute("SELECT title FROM document WHERE id = ?", docId)
+    rows = cursor.fetchall()
+    return rows and rows[0][0] or u"NO TITLE FOUND"
+
+#----------------------------------------------------------------------
 # Map the mailer type from the CGI form variable.
 #----------------------------------------------------------------------
 mailType = { "Init": "Genetics Professional-Initial",
@@ -178,7 +222,80 @@ mailType = { "Init": "Genetics Professional-Initial",
              "AnnRemail": "Genetics Professional-Annual remail" }.get(userPick)
 if not mailType:
     cdrcgi.bail("Form data corrupted")
-cdr.logwrite("Creating %s job" % mailType, LOGFILE)
+if check:
+    class Problem:
+        def __init__(self, docId, docVersion, cursor):
+            self.docId = docId
+            self.docVersion = docVersion
+            self.title = getDocTitle(cursor, docId)
+        def __cmp__(self, other):
+            return cmp(self.docId, other.docId)
+        @staticmethod
+        def report(docList, problems):
+            docList.sort()
+            problems.sort()
+            html = [u"""\
+<html>
+ <head>
+  <style type='text/css'>
+   * { font-family: Arial, sans-serif }
+   h1 { font-size: 16pt }
+  </style>
+ </head>
+ <body>
+  <h1>%d GPs Without Email Address In GPMailer Block</h1>
+  <table border='1' cellpadding='2' cellspacing='0'>
+   <tr>
+    <th>Document ID</th>
+    <th>Document Version</th>
+    <th>Document Title</th>
+   </tr>
+""" % len(problems)]
+            for problem in problems:
+                html.append(u"""\
+   <tr>
+    <td>%d</td>
+    <td>%d</td>
+    <td>%s</td>
+   </tr>
+""" % (problem.docId, problem.docVersion,
+       problem.title and cgi.escape(problem.title) or "NO TITLE FOUND"))
+            html.append(u"""\
+  </table>
+  <br />
+  <h1>%d GPs Which Would Receive Mailers</h1>
+  <table border='1' cellpadding='2' cellspacing='0'>
+   <tr>
+    <th>Document ID</th>
+    <th>Document Version</th>
+    <th>Document Title</th>
+   </tr>
+""" % len(docList))
+            cursor = conn.cursor()
+            for gp in docList:
+                title = getDocTitle(cursor, docId)
+                html.append(u"""\
+   <tr>
+    <td>%d</td>
+    <td>%d</td>
+    <td>%s</td>
+   </tr>
+""" % (gp.docId, gp.docVersion,
+       gp.title and cgi.escape(gp.title) or "NO TITLE FOUND"))
+            html.append(u"""\
+  </table>
+ </body>
+</html>
+""")
+            cdrcgi.sendPage(u"".join(html))
+
+    problems = []
+    if "Remail" in userPick:
+        cdrcgi.bail("Pre-mailer check is not available for remail jobs")
+    if docId:
+        cdrcgi.bail("Can't specify document ID for pre-mailer check")
+else:
+    cdr.logwrite("Creating %s job" % mailType, LOGFILE)
 
 #----------------------------------------------------------------------
 # Connect to the CDR database.
@@ -186,35 +303,37 @@ cdr.logwrite("Creating %s job" % mailType, LOGFILE)
 try:
     conn = cdrdb.connect('CdrPublishing')
     conn.setAutoCommit (1)
+    cursor = conn.cursor()
 except cdrdb.Error, info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
 
 #----------------------------------------------------------------------
 # Find the publishing system control document.
 #----------------------------------------------------------------------
-try:
-    cursor = conn.cursor()
-    cursor.execute("""\
+if not check:
+    try:
+        cursor.execute("""\
         SELECT d.id
           FROM document d
           JOIN doc_type t
             ON t.id    = d.doc_type
          WHERE t.name  = 'PublishingSystem'
            AND d.title = 'Mailers'""", timeout=90)
-    rows = cursor.fetchall()
-except cdrdb.Error, info:
-    cdrcgi.bail('Database failure looking up control document: %s' %
-                info[1][0])
-if len(rows) < 1:
-    cdrcgi.bail('Unable to find control document for Mailers')
-if len(rows) > 1:
-    cdrcgi.bail('Multiple Mailer control documents found')
-ctrlDocId = rows[0][0]
+        rows = cursor.fetchall()
+    except cdrdb.Error, info:
+        cdrcgi.bail('Database failure looking up control document: %s' %
+                    info[1][0])
+    if len(rows) < 1:
+        cdrcgi.bail('Unable to find control document for Mailers')
+    if len(rows) > 1:
+        cdrcgi.bail('Multiple Mailer control documents found')
+    ctrlDocId = rows[0][0]
 
 #----------------------------------------------------------------------
 # Determine which documents are to be published.
 #----------------------------------------------------------------------
 if docId:
+
     # Simple case - user submitted single document id, isolate the digits
     try:
         intId = cdr.exNormalize(docId)[1]
@@ -243,7 +362,8 @@ if docId:
 
     # Verify that this is a GP with an email address.
     try:
-        if not hasEmailAddress(intId, docVersion):
+        gp = GP(intId, docVersion, cursor)
+        if not gp.email:
             cdrcgi.bail("No email address found in mailer contact block")
     except Exception, e:
         cdrcgi.bail("Failure looking for email address in mailer contact "
@@ -303,19 +423,29 @@ else:
                 continue
             try:
                 # Verify that this is a GP with an email address.
-                if not hasEmailAddress(docId, docVersion):
-                    cdr.logwrite("no email address found in mailer contact "
-                                 "block for version %d of CDR%d" %
+                gp = GP(docId, docVersion, cursor)
+                if not gp.email:
+                    if check:
+                        problems.append(gp)
+                    else:
+                        cdr.logwrite("no email address found in mailer "
+                                     "contact block for version %d of CDR%d" %
                                  (docVersion, docId), LOGFILE)
                 else:
-                    docList.append((docId, docVersion))
+                    docList.append(gp)
                     if len(docList) >= maxMailers:
                         break
             except Exception, e:
-                cdr.logwrite("Failure looking for email address in mailer"
-                             "contact block of version %d of CDR%d: %s" %
-                             (docVersion, docId, e), LOGFILE)
-
+                if check:
+                    problems.append(Problem(docId, docVersion, cursor))
+                else:
+                    cdr.logwrite("Failure looking for email address in mailer"
+                                 "contact block of version %d of CDR%d: %s" %
+                                 (docVersion, docId, e), LOGFILE)
+        if check:
+            Problem.report(docList, problems)
+        else:
+            docList = [(gp.docId, gp.docVersion) for gp in docList]
     elif mailType == 'Genetics Professional-Annual update':
 
         #----------------------------------------------------------------
@@ -356,18 +486,31 @@ else:
             else:
                 docVersion = rows[0][0]
                 try:
-                    if not hasEmailAddress(docId, docVersion):
-                        cdr.logwrite("no email address found in mailer "
-                                     "contact block for version %d of CDR%d" %
-                                     (docVersion, docId), LOGFILE)
+                    gp = GP(docId, docVersion, cursor)
+                    if not gp.email:
+                        if check:
+                            problems.append(gp)
+                        else:
+                            cdr.logwrite("no email address found in mailer "
+                                         "contact block for version %d of "
+                                         "CDR%d" %
+                                         (docVersion, docId), LOGFILE)
                     else:
-                        docList.append((docId, docVersion))
+                        docList.append(gp)
                         if len(docList) >= maxMailers:
                             break
                 except Exception, e:
-                    cdr.logwrite("Failure looking for email address in mailer"
-                                 "contact block of version %d of CDR%d: %s" %
-                                 (docVersion, docId, e), LOGFILE)
+                    if check:
+                        problems.append(Problem(docId, docVersion, cursor))
+                    else:
+                        cdr.logwrite("Failure looking for email address in "
+                                     "mailer contact block of version %d "
+                                     "of CDR%d: %s" %
+                                     (docVersion, docId, e), LOGFILE)
+        if check:
+            Problem.report(docList, problems)
+        else:
+            docList = [(gp.docId, gp.docVersion) for gp in docList]
 
     else:
 
