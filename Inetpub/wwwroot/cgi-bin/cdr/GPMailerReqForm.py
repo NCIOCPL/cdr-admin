@@ -571,7 +571,7 @@ html = """\
      <P>Mailer type = %s</P>
      <P>Number of documents to be mailed = %d</P>
      <P><FONT COLOR='black'>Use
-      <A HREF='%s/PubStatus.py?id=%d'>this link</A> to view job status.
+      <A HREF='%s/PubStatus.py?id=%d'><U>this link</U></A> to view job status.
      </FONT>
      </P>
     </B>
