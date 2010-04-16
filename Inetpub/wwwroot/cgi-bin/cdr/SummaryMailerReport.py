@@ -2,6 +2,8 @@
 #
 # $Id$
 #
+# BZIssue::4807 - Board Member not listed on Mailer Reports
+#
 # [Request 4258:]
 #
 # "We need to have a report to give us some information about the summary
@@ -403,6 +405,8 @@ if board:
           FROM query_term m
           JOIN query_term b
             ON m.doc_id = b.doc_id
+          JOIN active_doc d
+            ON d.id = m.doc_id
          WHERE m.path = '/PDQBoardMemberInfo/BoardMemberName/@cdr:ref'
            AND b.path = '/PDQBoardMemberInfo/BoardMembershipDetails'
                       + '/BoardName/@cdr:ref'
