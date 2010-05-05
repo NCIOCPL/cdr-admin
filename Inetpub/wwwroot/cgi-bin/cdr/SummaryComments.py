@@ -19,10 +19,8 @@ import cdr, cgi, cdrcgi, time, cdrdb, xml.dom.minidom
 #----------------------------------------------------------------------
 fields    = cgi.FieldStorage()
 session   = cdrcgi.getSession(fields)
-boolOp    = fields and fields.getvalue("Boolean")          or "AND"
 audience  = fields and fields.getvalue("audience")         or None
-lang      = fields and fields.getvalue("lang")             or None
-showId    = fields and fields.getvalue("showId")           or "N"
+lang      = fields and fields.getvalue("lang")             or None 
 groups    = fields and fields.getvalue("grp")              or []
 submit    = fields and fields.getvalue("SubmitButton")     or None
 columns   = fields and fields.getvalue("showCol")          or []
@@ -48,8 +46,6 @@ script    = "SummaryComments.py"
 SUBMENU   = "Report Menu"
 buttons   = (SUBMENU, cdrcgi.MAINMENU)
 
-if type(showId) == type(""):
-    showId = [showId]
 if type(columns) == type(""):
     columns = [columns]
 if type(comments) == type(""):
@@ -85,17 +81,6 @@ def getTitle(nodes):
             summarySection = cdr.getTextContent(child).strip()
     return summarySection
 
-
-# ------------------------------------------------
-# Create the table row for the English list output
-# ------------------------------------------------
-# def summaryRow(summary):
-#     """Return the HTML code to display a Summary row"""
-#     html = """\
-#    <LI class="report">%s</LI>
-# """ % (row[1])
-#     return html
-# 
 
 # -------------------------------------------------
 # Create the table row for the English table output
@@ -146,6 +131,20 @@ def htmlCommentRow(info, displayType, addUserCol = True,
     return html
 
 
+#----------------------------------------------------------------------
+# Function to get the title of the current SummarySection
+#----------------------------------------------------------------------
+def getSummarySectionName(parentNode, lastSECTitle):
+    parentNodeName = parentNode.nodeName
+    if parentNodeName == 'SummarySection':
+        return getTitle(parentNode.childNodes)
+    else:
+        lastSECTitle = getSummarySectionName(parentNode.parentNode, 
+                                              lastSECTitle)
+    return lastSECTitle
+
+
+# =====================================================================
 # If the user only picked one summary group, put it into a list so we
 # can deal with the same data structure whether one or more were
 # selected.
@@ -527,20 +526,24 @@ AND audience.value = 'Health professionals'
 # -------------------------------------------------------------
 if docId:
     query = """\
-        SELECT DISTINCT qt.doc_id, title.value DocTitle
-        FROM query_term qt
-        JOIN  query_term title
-        ON    qt.doc_id    = title.doc_id
-        WHERE qt.doc_id = %s 
-        AND title.path   = '/Summary/SummaryTitle'
-        AND qt.doc_id not in (select doc_id 
+        SELECT DISTINCT qt.doc_id, title.value DocTitle,
+                        aud.value 
+          FROM query_term qt
+          JOIN query_term title
+            ON qt.doc_id    = title.doc_id
+          JOIN query_term aud
+            ON qt.doc_id = aud.doc_id
+           AND aud.path  = '/Summary/SummaryMetaData/SummaryAudience'
+         WHERE qt.doc_id = %s 
+           AND title.path   = '/Summary/SummaryTitle'
+           AND qt.doc_id not in (select doc_id 
                                from doc_info 
                                where doc_status = 'I' 
                                and doc_type = 'Summary')
     """ % (docId) 
 else:
     query = """\
-        SELECT DISTINCT top 5 qt.doc_id, title.value DocTitle, 
+        SELECT DISTINCT qt.doc_id, title.value DocTitle, 
         %s
         %s
         FROM  query_term qt
@@ -588,62 +591,54 @@ if not rows:
 # Counting the number of summaries per board
 # ------------------------------------------
 boardCount = {}
-#cdrcgi.bail(rows)
 allSummaries = {}
+
 for summary in rows:
     summaryTitle= summary[1]
+    if not audience: audience = summary[2]
     doc = cdr.getDoc('guest', summary[0], getObject = 1)
 
     dom = xml.dom.minidom.parseString(doc.xml)
     
-    commentElements = dom.getElementsByTagName('Comment')  
-    if not commentElements: continue
+    allElements      = dom.getElementsByTagName('*')  
 
+    # If the summary doesn't contain any Comments or Responses we can
+    # quit here
+    # ---------------------------------------------------------------
+    commentElements  = dom.getElementsByTagName('Comment')  
     rCommentElements = dom.getElementsByTagName('ResponseToComment')  
+    if not commentElements and not rCommentElements: continue
+
     allComments = []
-    for obj in commentElements:
-        #cdrcgi.bail(obj.toxml('utf-8'))
-        thisComment = cdr.getTextContent(obj).strip()
-        atAudience  = obj.getAttribute('audience')
-        atUser      = obj.getAttribute('user')
-        atDate      = obj.getAttribute('date')
-
-        # Need to find the SummarySection title of each comment
-        # Walking the tree backwards until I find the section title
-        # ---------------------------------------------------------
-        if obj.parentNode.nodeName == 'SummarySection':
-            sectionNodes = obj.parentNode.childNodes
-            summarySection = getTitle(sectionNodes)
-        else:
-            if obj.parentNode.parentNode.nodeName == 'SummarySection':
-                sectionNodes = obj.parentNode.parentNode.childNodes
-                summarySection = getTitle(sectionNodes)
-
+    
+    for obj in allElements:
+        if obj.nodeName == 'Comment' or obj.nodeName == 'ResponseToComment':
+            thisComment = cdr.getTextContent(obj).strip()
+            if obj.nodeName == 'Comment':
+                atAudience  = obj.getAttribute('audience')
             else:
-                summarySection = 'No Title for SummarySection found'
-                if obj.parentNode.parentNode.nodeName in ['Insertion',
-                                                          'Deletion']:
-                    summarySection = obj.parentNode.parentNode.nodeName
+                atAudience  = 'Response'
 
+            atUser      = obj.getAttribute('user')
+            atDate      = obj.getAttribute('date')
 
-        allComments.append([summarySection, thisComment, atAudience, 
-                            atUser, atDate])
+            # Need to find the SummarySection title of each comment
+            # Walking the tree backwards until I find the section title
+            # ---------------------------------------------------------
+            if obj.parentNode.nodeName == 'SummarySection':
+                sectionNodes = obj.parentNode.childNodes
+                summarySection = getTitle(sectionNodes)
+            elif obj.parentNode.nodeName == 'Summary' or \
+                 obj.parentNode.parentNode.nodeName == 'Summary':
+                summarySection = 'No Section Title'
+            else:
+                secParentNode = obj.parentNode.parentNode
+                summarySection = getSummarySectionName(secParentNode, '')
 
-        # Looking for a ResponseToComment
-        # -------------------------------
-        if obj.nextSibling and obj.nextSibling.nodeName == 'ResponseToComment':
-            #summarySection = 'R'
-            thisComment = cdr.getTextContent(obj.nextSibling).strip()
-            atAudience = 'Response'
-            atUser = obj.nextSibling.getAttribute('user')
-            atDate = obj.nextSibling.getAttribute('date')
             allComments.append([summarySection, thisComment, atAudience, 
                                 atUser, atDate])
-            #cdrcgi.bail(allComments)
 
     allSummaries[summaryTitle] = allComments
-
-#cdrcgi.bail(allSummaries)
 
 
 # Create the results page.
@@ -690,7 +685,7 @@ header    = cdrcgi.rptHeader(title, instr,
 # -------------------------
 # Display the Report Title
 # -------------------------
-if lang == 'English':
+if lang == 'English' or not lang:
     hdrLang = ''
 else:
     hdrLang = lang
