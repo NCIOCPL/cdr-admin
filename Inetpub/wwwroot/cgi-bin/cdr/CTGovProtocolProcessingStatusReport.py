@@ -20,6 +20,16 @@ FIRST_DATA_ROW = 5
 
 def getCreationDate(cursor, cdrId):
     cursor.execute("""\
+        SELECT MIN(v.dt)
+          FROM doc_version v
+          JOIN doc_type t
+            ON t.id = v.doc_type
+         WHERE v.id = ?
+           AND t.name = 'CTGovProtocol'""", cdrId, timeout=300)
+    rows = cursor.fetchall()
+    if rows:
+        return rows[0][0]
+    cursor.execute("""\
         SELECT MIN(dt)
           FROM audit_trail
          WHERE document = ?""", cdrId)
