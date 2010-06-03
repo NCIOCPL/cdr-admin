@@ -16,108 +16,11 @@
 # invocation.  We then validate the input and setup the requested mailer
 # publication job for the publishing daemon to find and initiate.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.29  2008/03/14 16:37:14  bkline
-# Fixed handling of non-ASCII characters in display of primary protocol
-# IDs in table showing Publication Notification Emailers which have been
-# sent out.
-#
-# Revision 1.28  2007/10/31 17:30:18  bkline
-# More tweaks to wording for publication mailer; adjusted cutoff date.
-#
-# Revision 1.27  2007/08/13 19:51:35  bkline
-# More tweaks to the wording of the publication notification emailer;
-# added support for non-ASCII characters in the email message.
-#
-# Revision 1.26  2007/07/27 17:35:56  bkline
-# Changed emailer sender address to PDQUpdate@cancer.gov at Sheri's request.
-#
-# Revision 1.25  2007/07/26 21:34:58  bkline
-# Final tweaks for Sheri on pub notification email.
-#
-# Revision 1.24  2007/07/13 14:54:12  bkline
-# Implemented new mailer for publication notification (request #3326).
-#
-# Revision 1.23  2006/08/21 16:09:31  bkline
-# Bumped up timeout for initial abstract mailer query.
-#
-# Revision 1.22  2005/05/13 22:42:12  venglisc
-# Modified to pre-populate the email input field with the session owners
-# email address. (Bug 1664)
-#
-# Revision 1.21  2005/03/24 21:20:16  bkline
-# Increased database query timeout thresholds.
-#
-# Revision 1.20  2005/03/03 13:44:07  bkline
-# Modified the selection criteria for protocol abstract remailers at
-# Sheri's request (#1570).
-#
-# Revision 1.19  2004/10/20 21:21:08  bkline
-# Removed temporary block or Brussels protocols.
-#
-# Revision 1.18  2004/10/07 22:08:37  bkline
-# Added temporary code to block some brussels mailers (see request #1350).
-#
-# Revision 1.17  2004/07/17 11:52:21  bkline
-# Added missing arguments for string format placeholder in SQL query.
-#
-# Revision 1.16  2004/07/13 17:51:26  bkline
-# Added support for restricting by PUP.
-#
-# Revision 1.15  2004/05/18 12:42:53  bkline
-# Added support for electronic S&P mailers.
-#
-# Revision 1.14  2003/05/08 20:23:04  bkline
-# Added code to skip blocked documents.
-#
-# Revision 1.13  2003/02/19 22:05:37  bkline
-# Turned off query testing code for S&P mailers.
-#
-# Revision 1.12  2003/02/13 21:43:41  bkline
-# Fixed comment to match previous change.
-#
-# Revision 1.11  2003/02/13 21:11:27  bkline
-# Added 'Temporarily closed' for regular S&P mailers.
-#
-# Revision 1.10  2003/02/07 19:40:07  bkline
-# Corrected a typo ("directory" changed to "protocol").  Added check for
-# all S&P mailers to ensure that the protocol document is not blocked
-# for publication (active_status = 'A').  Expended check for initial
-# mailer to look for any kind of prior S&P mailer, not just another
-# "initial" mailer (because we had to send our first round of quarterly
-# S&P mailers without the benefit of any history from the legacy system).
-# Suppressed check for previous mailer when sending quarterly S&P mailer
-# (Sheri asked that we go ahead and send a quarterly anyway, even if
-# they never got any S&P mailers before).
-#
-# Revision 1.9  2003/01/22 01:43:17  ameyer
-# Added check for last valid version to single doc id.
-# Added check for returned row with nothing in it at same place.
-#
-# Revision 1.8  2003/01/08 23:46:15  bkline
-# Fixed cosmetic typo in SQL query.
-#
-# Revision 1.7  2002/12/06 16:01:59  bkline
-# Fixed typo in WHERE clause (doc_version.publishable = 'P' should have
-# been doc_version.publishable = 'Y').
-#
-# Revision 1.6  2002/11/18 14:39:09  bkline
-# Fixed typo (change Person/Organization to Protocol).
-#
-# Revision 1.5  2002/11/14 14:27:15  bkline
-# Adjusted selection criteria for issue #499.
-#
-# Revision 1.4  2002/11/13 20:34:52  bkline
-# Fixed wording on limit documentation.
-#
-# Revision 1.3  2002/11/07 18:54:47  bkline
-# Incorporated interface changes requested by Lakshmi.
-#
-# Revision 1.2  2002/10/24 02:46:22  bkline
-# Ready for user testing.
-#
-# Revision 1.1  2002/10/22 14:41:51  bkline
-# Consolidated menu for all protocol mailers.
+# BZIssue::499
+# BZIssue::1350
+# BZIssue::1570
+# BZIssue::1664
+# BZIssue::3326
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string, cdrdb, cdrpubcgi, cdrmailcommon, sys
@@ -715,7 +618,7 @@ Content-type: text/html
     print """\
   </table>
  </body>
-</table>"""
+</html>"""
     sys.exit(0)
 
 #----------------------------------------------------------------------
