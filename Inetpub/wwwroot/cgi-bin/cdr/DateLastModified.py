@@ -60,7 +60,7 @@ if not fromDate or not toDate:
     docTypes = cdr.getDoctypes(session)
     if type(docTypes) in [type(""), type(u"")]:
         cdrcgi.bail(docTypes)
-    form = """\
+    form = u"""\
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
    <TABLE BORDER='0'>
     <TR>
@@ -70,10 +70,10 @@ if not fromDate or not toDate:
       <OPTION VALUE='' SELECTED>All Types</OPTION>
 """ % (cdrcgi.SESSION, session)
     for docType in docTypes:
-        form += """\
+        form += u"""\
       <OPTION VALUE='%s'>%s &nbsp;</OPTION>
 """ % (docType, docType)
-    form += """\
+    form += u"""\
     </TR>
     <TR>
      <TD><B>Start Date:&nbsp;</B></TD>
@@ -95,7 +95,7 @@ if not fromDate or not toDate:
 # We have a request; do it.
 #----------------------------------------------------------------------
 headerDocType = docType and ("%s Documents" % docType) or "All Document Types"
-html = """\
+html = u"""\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>
  <head>
@@ -142,7 +142,7 @@ try:
     lastDocType = None
     row = cursor.fetchone()
     if not row:
-        cdrcgi.sendPage(html + """\
+        cdrcgi.sendPage(html + u"""\
   <b>
    <font size='3'>No documents found.</font>
   </b>
@@ -153,12 +153,12 @@ try:
         docType, lastMod, docId, title = row
         if docType != lastDocType:
             if lastDocType:
-                html += """\
+                html += u"""\
   </table>
   <br />
 """
             lastDocType = docType
-            html += """\
+            html += u"""\
   <b>
    <font size='3'>Document Type:&nbsp;&nbsp;&nbsp;&nbsp;%s</font>
   </b>
@@ -181,7 +181,7 @@ try:
     </td>
    </tr>
 """ % docType
-        html += """\
+        html += u"""\
    <tr>
     <td valign='top'>%s</td>
     <td valign='top'>CDR%010d</td>
@@ -190,14 +190,14 @@ try:
 """ % (lastMod, docId, title)
         row = cursor.fetchone()
     if lastDocType:
-        html += """\
+        html += u"""\
   </table>
 """
 
 except cdrdb.Error, info:
     cdrcgi.bail('Database failure: %s' % info[1][0])
 
-cdrcgi.sendPage(html + """\
+cdrcgi.sendPage(html + u"""\
  </body>
 </html>
 """)
