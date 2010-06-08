@@ -60,7 +60,7 @@ if not fromDate or not toDate:
     if type(docTypes) in [type(""), type(u"")]:
         cdrcgi.bail(docTypes)
     if fromDate < cdrcgi.DAY_ONE: fromDate = cdrcgi.DAY_ONE
-    form = """\
+    form = u"""\
    <input type='hidden' name='%s' value='%s'>
    <table border='0'>
     </tr>
@@ -83,7 +83,7 @@ if not fromDate or not toDate:
 #----------------------------------------------------------------------
 # Start the page.
 #----------------------------------------------------------------------
-html = """\
+html = u"""\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>
  <head>
@@ -183,7 +183,7 @@ LEFT OUTER JOIN query_term p
             pmid = "<a href='%s'>%s</a>" % (pmid, row[5])
         else:
             pmid = "&nbsp;"
-        html += """\
+        html += u"""\
    <tr>
     <td>%d</td>
     <td>%s</td>
@@ -196,7 +196,7 @@ LEFT OUTER JOIN query_term p
         row = cursor.fetchone()
 except cdrdb.Error, info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
-cdrcgi.sendPage(html + """\
+cdrcgi.sendPage(html + u"""\
   </table>
  </body>
 </html>
