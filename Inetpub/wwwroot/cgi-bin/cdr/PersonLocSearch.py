@@ -117,11 +117,11 @@ except cdrdb.Error, info:
 #----------------------------------------------------------------------
 # Create the results page.
 #----------------------------------------------------------------------
-html = cdrcgi.advancedSearchResultsPageTop("Person", len(rows), strings)
+html = u"".join(cdrcgi.advancedSearchResultsPageTop("Person", len(rows), strings))
 for i in range(len(rows)):
     docId = "CDR%010d" % rows[i][0]
     title = rows[i][1]
-    html += """\
+    html += u"""\
 <TR>
 <TD       NOWRAP
            WIDTH = "10"
@@ -149,7 +149,7 @@ for i in range(len(rows)):
     else:
         addresses = pattern.findall(response[0])
         if addresses:
-            html += """
+            html += u"""
 <TR>
 <TD>&nbsp;</TD>
 <TD WIDTH="75%%">
@@ -157,7 +157,7 @@ for i in range(len(rows)):
 """
             for address in addresses:
                 html += u"<LI>%s</LI>" % unicode(address, "utf-8")
-            html += """\
+            html += u"""\
 </UL>
 </TD>
 <TD COLSPAN="2">&nbsp;</TD>
