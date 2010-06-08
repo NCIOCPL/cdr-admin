@@ -33,7 +33,7 @@ buttons   = (SUBMENU, cdrcgi.MAINMENU)
 # ---------------------------------------------------
 def drugHeader(listHeader, type):
     """Return the HTML code to display the Summary Board Header"""
-    html = """\
+    html = u"""\
   <SPAN class="sectionHdr">%s (%d)</SPAN>
 """ % (listHeader, combiCount[type])
     return html
@@ -44,7 +44,7 @@ def drugHeader(listHeader, type):
 # ---------------------------------------------------
 def drugHeaderWithID(listHeader, type):
     """Return the HTML code to display the Summary Board Header with ID"""
-    html = """\
+    html = u"""\
   <SPAN class="sectionHdr">%s (%d)</SPAN>
 """ % (listHeader, combiCount[type])
     return html
@@ -55,7 +55,7 @@ def drugHeaderWithID(listHeader, type):
 # ------------------------------------------------
 def summaryRow(summary):
     """Return the HTML code to display a Summary row"""
-    html = """\
+    html = u"""\
    <LI class="report">%s</LI>
 """ % (row[1])
     return html
@@ -66,7 +66,7 @@ def summaryRow(summary):
 # -------------------------------------------------
 def summaryRowWithID(id, summary):
     """Return the HTML code to display a Summary row with ID"""
-    html = """\
+    html = u"""\
    <TR>
     <TD class="report cdrid" width = "8%%">%s</TD>
     <TD class="report">%s</TD>
@@ -117,7 +117,7 @@ if not drugType:
     DL      { margin-left: 0; padding-left: 0 }
    </STYLE>
 """)
-    form   = """\
+    form   = u"""\
    <input type='hidden' name='%s' value='%s'>
  
    <!-- fieldset>
@@ -240,7 +240,7 @@ header    = cdrcgi.rptHeader(title, stylesheet = """\
 # -------------------------
 # Display the Report Title
 # -------------------------
-report    = """\
+report    = u"""\
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
   <H3>Drug Information Summaries<br>
   <span class="date">(%s)</span>
@@ -338,7 +338,7 @@ else:
 
 report += singleAll + combiAll
 
-footer = """\
+footer = u"""\
  </BODY>
 </HTML> 
 """     
