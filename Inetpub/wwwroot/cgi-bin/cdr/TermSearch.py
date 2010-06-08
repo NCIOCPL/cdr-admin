@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: TermSearch.py 9295 2009-10-20 21:13:25Z bkline $
+# $Id$
 #
 # Prototype for duplicate-checking interface for Term documents.
 #
@@ -164,9 +164,9 @@ if ckPrefNm:
                 NCIPrefName = NCIThes.getNCITPreferredName(conceptCode)
                 CDRPrefName = NCIThes.getCDRPreferredName(session,updateCDRID)
                 if ( CDRPrefName.upper().rstrip(' ').lstrip(' ') != NCIPrefName.upper().rstrip(' ').lstrip(' ') ):
-                    cdrcgi.sendPage("""Import cannot be completed since preferred names do not match. (CDR: '%s' and NCIT: '%s')""" % (CDRPrefName.upper(),NCIPrefName.upper()) )
+                    cdrcgi.sendPage(u"""Import cannot be completed since preferred names do not match. (CDR: '%s' and NCIT: '%s')""" % (CDRPrefName.upper(),NCIPrefName.upper()) )
                 else:
-                    cdrcgi.sendPage("")
+                    cdrcgi.sendPage(u"")
 
 #----------------------------------------------------------------------
 # Import a citation document from NCI Thesaurus.
