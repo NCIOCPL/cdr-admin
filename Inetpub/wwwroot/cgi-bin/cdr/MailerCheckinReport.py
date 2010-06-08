@@ -88,7 +88,7 @@ if not fromDate or not toDate:
     then        = time.localtime(time.mktime(then))
     fromDate    = time.strftime("%Y-%m-%d", then)
     mailerTypes = getMailerTypes()
-    form = """\
+    form = u"""\
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
    <TABLE BORDER='0'>
     <TR>
@@ -98,10 +98,10 @@ if not fromDate or not toDate:
       <OPTION VALUE='' SELECTED>All Types</OPTION>
 """ % (cdrcgi.SESSION, session)
     for mailerType in mailerTypes:
-        form += """\
+        form += u"""\
       <OPTION VALUE='%s'>%s &nbsp;</OPTION>
 """ % (mailerType, mailerType)
-    form += """\
+    form += u"""\
     </TR>
     <TR>
      <TD><B>Start Date:&nbsp;</B></TD>
@@ -124,7 +124,7 @@ if not fromDate or not toDate:
 #----------------------------------------------------------------------
 headerMailerType = mailerType and ("%s Mailers" % mailerType) or \
                                    "All Mailer Types"
-html = """\
+html = u"""\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>
  <head>
@@ -182,14 +182,14 @@ try:
     lastMailerType = None
     row            = cursor.fetchone()
     if not row:
-        cdrcgi.sendPage(html + """\
+        cdrcgi.sendPage(html + u"""\
   <b>
    <font size='3'>No matching checkins found.</font>
   </b>
  </body>
 </html>
 """)
-    html += """\
+    html += u"""\
   <table border='1' cellspacing='0' cellpadding='2' width='100%%'>
    <tr>
     <th nowrap='1'>Mailer Type</th>
@@ -204,7 +204,7 @@ try:
             mailerTypeLabel = mailerType
             if lastMailerType:
                 total = totals.get(lastMailerType, 0)
-                html += """\
+                html += u"""\
    <tr>
     <th class='r'>Total</td>
     <td>&nbsp;</td>
@@ -215,7 +215,7 @@ try:
    </tr>
 """ % total
             lastMailerType = mailerType
-        html += """\
+        html += u"""\
    <tr>
     <th>%s</td>
     <td>%s</td>
@@ -229,7 +229,7 @@ except cdrdb.Error, info:
 
 if lastMailerType:
     total = totals.get(lastMailerType, 0)
-    html += """\
+    html += u"""\
    <tr>
     <th class='r'>Total</td>
     <td>&nbsp;</td>
@@ -237,7 +237,7 @@ if lastMailerType:
    </tr>
 """ % total
 
-cdrcgi.sendPage(html + """\
+cdrcgi.sendPage(html + u"""\
   </table>
  </body>
 </html>
