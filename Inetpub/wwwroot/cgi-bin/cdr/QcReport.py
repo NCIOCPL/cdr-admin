@@ -397,7 +397,7 @@ if not docId and not docTitle and not glossaryDefinition:
     if repType:
         extra += "\n   "
         extra += "<INPUT TYPE='hidden' NAME='ReportType' VALUE='%s'>" % repType
-    form = """\
+    form = u"""\
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
    %s
    <TABLE>
@@ -415,7 +415,7 @@ if not docId and not docTitle and not glossaryDefinition:
     </TR>
    </TABLE>
 """ % (cdrcgi.SESSION, session, extra, label[0], fieldName, label[1])
-    cdrcgi.sendPage(header + form + """\
+    cdrcgi.sendPage(header + form + u"""\
   </FORM>
  </BODY>
 </HTML>
@@ -434,14 +434,14 @@ except cdrdb.Error, info:
 # More than one matching title; let the user choose one.
 #----------------------------------------------------------------------
 def showTitleChoices(choices):
-    form = """\
+    form = u"""\
    <H3>More than one matching document found; please choose one.</H3>
 """
     for choice in choices:
-        form += """\
+        form += u"""\
    <INPUT TYPE='radio' NAME='DocId' VALUE='CDR%010d'>[CDR%d] %s<BR>
 """ % (choice[0], choice[0], cgi.escape(choice[1]))
-    cdrcgi.sendPage(header + form + """\
+    cdrcgi.sendPage(header + form + u"""\
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
    <INPUT TYPE='hidden' NAME='DocType' VALUE='%s'>
    <INPUT TYPE='hidden' NAME='ReportType' VALUE='%s'>
@@ -534,7 +534,7 @@ if letUserPickVersion:
         rows = cursor.fetchall()
     except cdrdb.Error, info:
         cdrcgi.bail('Failure retrieving document versions: %s' % info[1][0])
-    form = """\
+    form = u"""\
   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
   <INPUT TYPE='hidden' NAME='DocType' VALUE='%s'>
   <INPUT TYPE='hidden' NAME='DocId' VALUE='CDR%010d'>
@@ -542,11 +542,11 @@ if letUserPickVersion:
 
     ### if docType != 'DIS':
     if docType != 'DrugInformationSummary':
-        form += """\
+        form += u"""\
   <INPUT TYPE='hidden' NAME='ReportType' VALUE='%s'>
 """ % (repType)
 
-    form += """\
+    form += u"""\
   Select document version:&nbsp;<br>
   <SELECT NAME='DocVersion'>
    <OPTION VALUE='-1' SELECTED='1'>Current Working Version</OPTION>
@@ -555,13 +555,13 @@ if letUserPickVersion:
     # Limit display of version comment to 150 chars (if exists)
     # ---------------------------------------------------------
     for row in rows:
-        form += """\
+        form += u"""\
    <OPTION VALUE='%d'>[V%d %s] %s</OPTION>
 """ % (row[0], row[0], row[2][:10],
        not row[1] and "[No comment]" or row[1][:150])
         selected = ""
-    form += "</SELECT>"
-    form += """
+    form += u"</SELECT>"
+    form += u"""
   <BR><BR>
   Select Insertion/Deletion markup to be displayed in the report (one or more):
   <BR>
@@ -573,7 +573,7 @@ if letUserPickVersion:
     # ----------------------------------------------------------------
     if docType == 'Summary':
         if repType != 'pat' and repType != 'patbu' and repType != 'patrs':
-            form += """\
+            form += u"""\
     <td valign="top">
      <table>
       <tr>
@@ -596,7 +596,7 @@ if letUserPickVersion:
 """
     # Display the check boxed for the Revision-level Markup
     # -----------------------------------------------------
-    form += """\
+    form += u"""\
     <td valign="top">
      <table>
       <tr>
@@ -627,7 +627,7 @@ if letUserPickVersion:
     # Display the check boxes for the HP or Patient version sections
     # --------------------------------------------------------------
     if docType == 'GlossaryTermName':
-        form += """\
+        form += u"""\
      <table>
       <tr>
        <td class="colheading">Display Audience Definition</td>
@@ -651,7 +651,7 @@ if letUserPickVersion:
     # Summaries display the External Comments by default
     # --------------------------------------------------
     if docType == 'Summary':
-        form += """\
+        form += u"""\
      <table>
       <tr>
        <td class="colheading">Display Comments and Responses</td>
@@ -676,7 +676,7 @@ if letUserPickVersion:
     # Display the Glossary appendix checkbox
     # --------------------------------------
     if docType == 'Summary':
-        form += """\
+        form += u"""\
   <BR>
      <table>
       <tr>
@@ -711,7 +711,7 @@ if letUserPickVersion:
     # Display the checkbox to display standard wording
     # ------------------------------------------------
     if repType == 'pat' or repType == 'patbu' or repType == 'patrs':
-        form += """\
+        form += u"""\
       <tr>
        <td>
   <INPUT TYPE='checkbox' NAME='ShowStandardWording'>&nbsp;&nbsp;
@@ -719,10 +719,10 @@ if letUserPickVersion:
        </td>
       </tr>
 """
-    form += """
+    form += u"""
      </table>"""
 
-    cdrcgi.sendPage(header + form + """
+    cdrcgi.sendPage(header + form + u"""
  </BODY>
 </HTML>
 """)
