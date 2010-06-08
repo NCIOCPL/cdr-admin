@@ -143,17 +143,17 @@ def loadMenuItems(menuType):
 #----------------------------------------------------------------------
 def showMenuTypes(rows):
     selected = " SELECTED='1'"
-    form = """\
+    form = u"""\
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
    <H2>Select the menu type for the report.</H2>
    <SELECT NAME='MenuType'>
 """ % (cdrcgi.SESSION, session)
     for row in rows:
-        form += """
+        form += u"""
     <OPTION%s>%s</OPTION>
 """ % (selected, cgi.escape(row[0], 1))
         selected = ""
-    form += """
+    form += u"""
    </SELECT>
   </FORM>
  </BODY>
@@ -207,7 +207,7 @@ if not menuTypes.has_key(menuType):
     cdrcgi.bail("INTERNAL ERROR: No terms for menu type '%s' found" % menuType)
 topItems = menuTypes[menuType].topTerms
 topItems.sort(lambda a,b: cmp(menuItems[a].name, menuItems[b].name))
-html = """\
+html = u"""\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>
  <head>
@@ -226,7 +226,7 @@ html = """\
 
 for key in topItems:
     html += displayMenuItem(menuItems[key], 0)
-cdrcgi.sendPage(html + """\
+cdrcgi.sendPage(html + u"""\
  </body>
 </html>
 """)
