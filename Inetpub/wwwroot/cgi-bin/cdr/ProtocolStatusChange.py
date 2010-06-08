@@ -63,7 +63,7 @@ if action == "Log Out":
 # If we have no request, put up the request form.
 #----------------------------------------------------------------------
 if not action:
-    form = """\
+    form = u"""\
   <input type='hidden' name='%s' value='%s'>
   <table>
    <tr>
@@ -76,7 +76,7 @@ if not action:
    </tr>
   </table>
 """ % (cdrcgi.SESSION, session, start, end)
-    cdrcgi.sendPage(header + form + """\
+    cdrcgi.sendPage(header + form + u"""\
  </body>
 </html>
 """)
@@ -234,7 +234,7 @@ except:
 # Start the page.
 #----------------------------------------------------------------------
 today = time.strftime("%B %d, %Y")
-html = """\
+html = u"""\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>
  <head>
@@ -287,7 +287,7 @@ for key in keys:
             lastVPub = 'N'
         if protLeadOrg.activeStatus != 'A':
             lastVPub += ' (B)'
-        html += """\
+        html += u"""\
    <tr>
     <td valign='top'>%s</td>
     <td valign='top'>%s</td>
@@ -314,7 +314,7 @@ for key in keys:
 #----------------------------------------------------------------------
 # Show the report.
 #----------------------------------------------------------------------
-cdrcgi.sendPage(html + """\
+cdrcgi.sendPage(html + u"""\
   </table></center>
  </body>
 </html>
