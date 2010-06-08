@@ -89,7 +89,7 @@ try:
     cursor.execute(query, timeout = int(timeout))
     if not cursor.description:
         cdrcgi.bail('No result set returned')
-    html = """\
+    html = u"""\
 <html>
  <head>
   <title>Ad Hoc Query</title>
@@ -102,29 +102,29 @@ try:
    <tr>
 """ % (query.replace("\r", "").rstrip()).replace("<", "&lt;")
     for col in cursor.description:
-        html += """\
+        html += u"""\
     <th align='center'>%s</th>
 """ % (col[0] or "-")
-    html += """\
+    html += u"""\
    </tr>
 """
     row = cursor.fetchone()
     while row:
-        html += """\
+        html += u"""\
    <tr>
 """
         for col in row:
             if col is None: col = "NULL"
             elif not col: col = "&nbsp;"
             elif type(col) in (type(""), type(u"")): col = cgi.escape(col)
-            html += """\
+            html += u"""\
     <td valign='top'>%s</td>
 """ % col
-        html += """\
+        html += u"""\
    </tr>
 """
         row = cursor.fetchone()
-    html += """\
+    html += u"""\
   </table>
  </body>
 </html>
@@ -132,4 +132,4 @@ try:
 
 except cdrdb.Error, info:
     cdrcgi.bail('Database failure: %s' % info[1][0])
-cdrcgi.sendPage(html)
+cdrcgi.sendPage(u"".join(html))
