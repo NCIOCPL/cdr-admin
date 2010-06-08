@@ -140,7 +140,7 @@ def report(docId, docVersion):
    <li>%s%s</li>
 """ % (cgi.escape(newRef), newId)
             prevRef = newRef
-    cdrcgi.sendPage(html + """\
+    cdrcgi.sendPage(html + u"""\
   </ol>
  </body>
 </html>
@@ -176,7 +176,7 @@ def pickVersion(docId):
         report(docId, None)
     elif len(rows) == 1:
         report(docId, rows[0][0])
-    form = """\
+    form = u"""\
    <input type='hidden' name='%s' value='%s'>
    <input type='hidden' name='DocId' value='%s'>
    Select document version:&nbsp;
@@ -186,11 +186,11 @@ def pickVersion(docId):
     for row in rows:
         # We don't use all of this information any more (at Lakshmi's request).
         ver, dt, usr, valStat, publishable, comment = row
-        form += """\
+        form += u"""\
     <option value='%d'>[V%d %s] %s</option>
 """ % (ver, ver, dt and dt[:10] or "*** NO DATE ***",
        comment and cgi.escape(comment) or "[No comment]")
-    form += """
+    form += u"""
    </select>
   </form>
  </body>
@@ -221,15 +221,15 @@ def getDocId(docTitle):
         cdrcgi.bail("No documents found matching %s" % cgi.escape(docTitle))
     elif len(rows) == 1:
         pickVersion("CDR%010d" % rows[0][0])
-    form = """\
+    form = u"""\
    <input type='hidden' name='%s' value='%s'>
    <h3>More than one matching document found; please choose one.</h3>
 """ % (cdrcgi.SESSION, session)
     for row in rows:
-        form += """
+        form += u"""
    <input type='radio' name='DocId' value='CDR%010d'>[CDR%010d] %s<br>
 """ % (row[0], row[0], cgi.escape(row[1]))
-    form += """
+    form += u"""
   </form>
  </body>
 </html>
@@ -240,7 +240,7 @@ def getDocId(docTitle):
 # Put up the main form for the report.
 #----------------------------------------------------------------------
 def getSummary():
-  cdrcgi.sendPage(header + """\
+  cdrcgi.sendPage(header + u"""\
    <input type='hidden' name='%s' value='%s'>
    <table>
     <tr>
