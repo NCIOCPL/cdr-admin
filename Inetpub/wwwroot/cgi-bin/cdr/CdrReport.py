@@ -57,7 +57,7 @@ if request and days:
                             doc=report)[0]
     html    = unicode(html, 'utf-8').encode('latin-1')
     html    = re.sub('@@DAYS@@', days, html)
-    cdrcgi.sendPage(html)
+    cdrcgi.sendPage(u"".join(html))
 
 #----------------------------------------------------------------------
 # Put out the form if we don't have a request.
@@ -67,7 +67,7 @@ else:
     instr   = "Checked Out Documents With No Activity"
     buttons = ("Submit Request", SUBMENU, cdrcgi.MAINMENU)
     header  = cdrcgi.header(title, title, instr, "CdrReport.py", buttons)
-    form    = """\
+    form    = u"""\
         <INPUT TYPE='hidden' NAME='%s' VALUE='%s'
         <TABLE CELLSPACING='0' CELLPADDING='0' BORDER='0'>
         <TR>
