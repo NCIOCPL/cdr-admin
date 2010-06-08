@@ -225,12 +225,12 @@ header    = cdrcgi.header(title, title, instr, script, buttons,
 # -------------------------
 # Display the Report Title
 # -------------------------
-report    = """\
+report    = u"""\
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
   </FORM>
 """ % (cdrcgi.SESSION, session)
 
-report += """\
+report += u"""\
   <div class="center">
     <H3>Published Documents</H3>
      <b>Documents Listed from Last Weekly Export: Job%s</b>
@@ -241,7 +241,7 @@ report += """\
 
 # Display the header row of the first table
 # ------------------------------------------
-report += """
+report += u"""
    <table width="25%" align="center" border="0">
     <tr class="head">
      <td class="header" align="center" width="70%">Doc Type</td>
@@ -259,19 +259,19 @@ for docTypeCount in docTypesCount:
     # Display the rows with different background color
     # ------------------------------------------------
     if count % 2 == 0:
-        report += """
+        report += u"""
     <tr class="even">"""
     else:
-        report += """
+        report += u"""
     <tr class="odd">"""
-    report += """
+    report += u"""
      <td><b>%s</b></td>
      <td><b>%s</b></td>""" % (docTypeCount[0], docTypeCount[1])
 
-    report += """
+    report += u"""
     </tr>"""
 
-report += """
+report += u"""
     <tr class="footer">
      <td class="footer">Total</td>
      <td class="footer">%s</td>
@@ -286,7 +286,7 @@ inScopeKeys = inScopeCount.keys()
 inScopeKeys.sort()
 #print ""
 
-report += """
+report += u"""
    <div class="center">
     <br>
      <b>InScopeProtocol by Status</b>
@@ -316,21 +316,21 @@ for status in inScopeKeys:
     # -----------------------------------------
     scount += 1
     if scount % 2 == 0:
-        report += """
+        report += u"""
     <tr class="even">"""
     else:
-        report += """
+        report += u"""
     <tr class="odd">"""
-    report += """
+    report += u"""
      <td><b>%s</b></td>
      <td><b>%s</b></td>""" % (status, inScopeCount[status])
 
-    report += """
+    report += u"""
     </tr>"""
 
 # Display the summary for active/closed protocols
 # -----------------------------------------------
-report += """
+report += u"""
     <tr class="footer">
      <td class="footer">Total-active</td>
      <td class="footer">%s</td>
@@ -348,7 +348,7 @@ ctgovKeys = ctgovCount.keys()
 ctgovKeys.sort()
 #print ""
 
-report += """
+report += u"""
    <div class="center">
     <br>
      <b>CTGovProtocol by Status</b>
@@ -379,16 +379,16 @@ for status in ctgovKeys:
     # -----------------------------------------
     scount += 1
     if scount % 2 == 0:
-        report += """
+        report += u"""
     <tr class="even">"""
     else:
-        report += """
+        report += u"""
     <tr class="odd">"""
-    report += """
+    report += u"""
      <td><b>%s</b></td>
      <td><b>%s</b></td>""" % (status, ctgovCount[status])
 
-    report += """
+    report += u"""
     </tr>"""
 
 
@@ -405,7 +405,7 @@ report += """
     </tr>
    </table>""" % (acount, ccount)
 
-footer = """\
+footer = u"""\
  </BODY>
 </HTML> 
 """     
