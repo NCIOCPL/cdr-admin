@@ -101,7 +101,7 @@ if xmlFile:
 #----------------------------------------------------------------------
 if not jobId:
     html = cdrcgi.header(title, title, section, script, buttons,
-                         numBreaks = 1, stylesheet = style) + """\
+                         numBreaks = 1, stylesheet = style) + u"""\
    <input type='hidden' name='%s' value='%s'>
    %s
    <p>Select job to review:</p>
@@ -139,10 +139,10 @@ if not jobId:
             jobInfo = uploadedJobs[job]
         else:
             jobInfo = JobInfo()
-        html += """\
+        html += u"""\
    <li><a href='%s?JobId=%d&%s=%s'>Mailer Job %d %s</a></li>
 """ % (script, job, cdrcgi.SESSION, session, job, jobInfo.showStatus())
-    html += """\
+    html += u"""\
   </ul>
  </body>
 </html>
@@ -225,7 +225,7 @@ header = cdrcgi.header(title, title, section, script, [button] + buttons,
   </script>
 """)
 title  = "Emailers For Job %s %s" % (jobId, jobInfo.showStatus())
-html   = header + """\
+html   = header + u"""\
   <input type='hidden' name='JobId' value='%s'>
   <input type='hidden' name='%s' value='%s'>
   <input type='hidden' name='RtsBatch' value=''>
@@ -268,7 +268,7 @@ class Recipient:
                         self.emailers.append(Emailer(grandchild))
 
 dom = xml.dom.minidom.parse('manifest.xml')
-html += """\
+html += u"""\
   <b>Job Time: </b> %s<br>
   <b>Job Type: </b> %s<br>
   <ul>
@@ -308,25 +308,25 @@ for i in range(len(recipients)):
                      "<button onclick='javascript:markAsRts(%s)'>"
                      "Mark As RTS</button>" % recip)
             
-    html += """\
+    html += u"""\
    <li><b>%s to: </b> %s
     (<a href='%s?XmlFile=Job%s-e/%s'>Recipient XML</a>)
     (<a href='QcReport.py?Session=guest&DocId=%s'>Person QC Report</a>)%s
     <ul>
 """ % (label, address, script, jobId, fileName, recipId, extra)
     for emailer in recipient.emailers:
-        html += """\
+        html += u"""\
      <li>
       <b>Protocol ID: </b> %s
       (<a href='%s?XmlFile=Job%s-e/%s'>Emailer XML</a>)
       (<a href='QcReport.py?Session=guest&DocId=%s'>Document QC Report</a>)
      </li>
 """ % (emailer.protId, script, jobId, emailer.fileName, emailer.docId)
-    html += """\
+    html += u"""\
     </ul>
    </li>
 """
-html += """
+html += u"""
   </ul>
  </body>
 </html>
