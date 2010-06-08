@@ -106,7 +106,7 @@ if not request:
     docTypes = cdr.getDoctypes(session)
     if type(docTypes) in [type(""), type(u"")]:
         cdrcgi.bail(docTypes)
-    form = """\
+    form = u"""\
    <input type='hidden' name='%s' value='%s'>
    <table border='0'>
     <tr>
@@ -120,10 +120,10 @@ if not request:
       <option value='' selected>All Types</option>
 """ % (cdrcgi.SESSION, session, modUser or '')
     for docType in docTypes:
-        form += """\
+        form += u"""\
       <option value='%s'>%s &nbsp;</option>
 """ % (docType, docType)
-    form += """\
+    form += u"""\
     </tr>
     <tr>
      <td><b>Start Date:&nbsp;</b></td>
@@ -257,7 +257,7 @@ html = """\
 # Handle case for no data.
 #----------------------------------------------------------------------
 if not rows:
-    cdrcgi.sendPage(html + """\
+    cdrcgi.sendPage(html + u"""\
   <b><font size='4'>No matching documents found</font></b>
  </body>
 </html>""")
@@ -324,7 +324,7 @@ for row in rows:
 #----------------------------------------------------------------------
 # Finish and send the report.
 #----------------------------------------------------------------------
-cdrcgi.sendPage(html + """\
+cdrcgi.sendPage(html + u"""\
   </table>
  </body>
 </html>
