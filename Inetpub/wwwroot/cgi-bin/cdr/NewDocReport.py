@@ -69,7 +69,7 @@ if not fromDate or not toDate:
     docTypes = cdr.getDoctypes(session)
     if type(docTypes) in [type(""), type(u"")]:
         cdrcgi.bail(docTypes)
-    form = """\
+    form = u"""\
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
    <TABLE BORDER='0'>
     <TR>
@@ -79,7 +79,7 @@ if not fromDate or not toDate:
       <OPTION VALUE='' SELECTED>All Types</OPTION>
 """ % (cdrcgi.SESSION, session)
     for docType in docTypes:
-        form += """\
+        form += u"""\
       <OPTION VALUE='%s'>%s &nbsp;</OPTION>
 """ % (docType, docType)
     form += u"""\
@@ -115,7 +115,7 @@ statuses      = ["Published",
 #----------------------------------------------------------------------
 # Start the page.
 #----------------------------------------------------------------------
-html = """\
+html = u"""\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>
  <head>
@@ -227,7 +227,7 @@ for key in keys:
     total  = 0
     counts = docCounts[key]
     if key != keys[0]:
-        html += """\
+        html += u"""\
    <tr>
     <td>&nbsp;</td>
     <td>&nbsp;</td>
@@ -235,7 +235,7 @@ for key in keys:
    </tr>
 """
     for i in range(len(statuses)):
-        html += """\
+        html += u"""\
    <tr>
     <td nowrap='1'>
      <b>
