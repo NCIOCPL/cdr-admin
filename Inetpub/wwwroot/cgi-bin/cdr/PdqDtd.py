@@ -11,7 +11,7 @@ import cdrcgi, cgi
 file = open('d:/cdr/licensee/pdq.dtd')
 doc  = file.read()
 file.close
-cdrcgi.sendPage("""\
+cdrcgi.sendPage(u"""\
 <html>
  <head>
   <title>PDQ DTD</title>
