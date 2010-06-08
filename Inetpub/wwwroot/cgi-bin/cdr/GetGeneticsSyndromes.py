@@ -49,8 +49,8 @@ LEFT OUTER JOIN query_term o
     root = etree.Element("Syndromes")
     for syndrome in syndromes:
         root.append(syndrome.toElement())
-    cdrcgi.sendPage(etree.tostring(root, xml_declaration=True,
-                                   encoding='utf-8'), 'xml')
+    cdrcgi.sendPage(u"".join(etree.tostring(root, xml_declaration=True,
+                                   encoding='utf-8')), 'xml')
 
 if __name__ == '__main__':
     main()
