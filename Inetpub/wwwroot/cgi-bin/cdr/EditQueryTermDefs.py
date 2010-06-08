@@ -87,19 +87,19 @@ if request == 'Compare' and server1 and server2:
  <body>
 """ % (server1, server2)
     if not extra1 and not extra2:
-        cdrcgi.sendPage(html + """\
+        cdrcgi.sendPage(html + u"""\
   <h2>Query Term Definitions on %s and %s</h2>
   <p>Definitions match</p>
  </body>
 </html>
 """ % (server1, server2))
     if extra1:
-        html += """\
+        html += u"""\
   <h2>On %s</h2>
   <ul>
 """ % server1
         for extra in extra1:
-            html += """\
+            html += u"""\
    <li>%s</li>
 """ % cgi.escape(extra)
         html += """\
@@ -107,18 +107,18 @@ if request == 'Compare' and server1 and server2:
   <br>
 """
     if extra2:
-        html += """\
+        html += u"""\
   <h2>On %s</h2>
   <ul>
 """ % server2
         for extra in extra2:
-            html += """\
+            html += u"""\
    <li>%s</li>
 """ % cgi.escape(extra)
-        html += """\
+        html += u"""\
   </ul>
 """
-    cdrcgi.sendPage(html + """\
+    cdrcgi.sendPage(html + u"""\
  </body>
 </html>
 """)
