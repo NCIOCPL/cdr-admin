@@ -5,6 +5,7 @@
 # Main menu for mailer jobs.
 #
 # BZIssue::4630
+# BZIssue::4779
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
