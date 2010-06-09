@@ -138,7 +138,7 @@ def sendPubNotificationEmail(gp, cursor, conn):
     addresses = [gp.email]
     url = GP.url % gp.docId
     top = u""
-    if True or not cdr.isProdHost():
+    if not cdr.isProdHost():
         top = u"""\
 <p>[SENT TO YOU FOR TESTING, INSTEAD OF TO %s]</p>
 """ % ", ".join(addresses)
@@ -244,7 +244,6 @@ if docId:
 # If not, collect the GPs due for the notification.
 #----------------------------------------------------------------------
 docIds = []
-# legacyGPs = set() # for debugging
 for docId in pubGPs:
     if docId not in legacyGPs and docId not in alreadySent:
         docIds.append(docId)
