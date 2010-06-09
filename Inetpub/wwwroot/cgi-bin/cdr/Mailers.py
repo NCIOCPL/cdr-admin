@@ -32,6 +32,8 @@ if action == cdrcgi.MAINMENU:
 form = "<OL>\n"
 reports = (('DirectoryMailerReqForm.py?', 'Directory Mailers'),
            ('GPMailerReqForm.py?',  'Genetics Professional Mailers'),
+           ('GPPubNotification.py?',
+            'Genetics Professional Publication Notification'),
            ('ProtocolMailerReqForm.py?',  'Protocol Mailers'),
            ('SummaryMailerReqForm.py?BoardType=Editorial&',
             'Summary Mailers (Editorial Board)'),
