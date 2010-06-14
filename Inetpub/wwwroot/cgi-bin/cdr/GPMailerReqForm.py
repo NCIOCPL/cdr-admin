@@ -120,6 +120,12 @@ if request == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
+# Make sure the user is authorized to initiate GP mailer jobs.
+#----------------------------------------------------------------------
+if not cdr.canDo(session, 'GP Mailers'):
+    cdrcgi.bail("User not authorized to initiate GP mailer jobs")
+
+#----------------------------------------------------------------------
 # Put up the form if we don't have a request yet.
 #----------------------------------------------------------------------
 if not request:
@@ -302,7 +308,7 @@ else:
 #----------------------------------------------------------------------
 try:
     conn = cdrdb.connect('CdrPublishing')
-    conn.setAutoCommit (1)
+    conn.setAutoCommit(True)
     cursor = conn.cursor()
 except cdrdb.Error, info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
@@ -529,7 +535,6 @@ else:
         except cdrdb.Error, info:
             cdrcgi.bail('Database failure selecting remailers: %s' % info[1][0])
 
-# Log what we're doing
 # Do we have any results?
 docCount = len(docList)
 if docCount == 0:
