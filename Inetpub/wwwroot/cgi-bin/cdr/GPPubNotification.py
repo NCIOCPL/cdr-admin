@@ -158,7 +158,7 @@ information.  We appreciate your help in keeping the NCI Cancer
 Genetics Services Directory current.</p>
 
 <p style='font-style: italic'
->The NCI Genetics Services Directory Coordinator<br />
+>The NCI Cancer Genetics Services Directory Coordinator<br />
 Office of Cancer Content Management<br />
 National Cancer Institute</p>
 """ % (top, url, url)
