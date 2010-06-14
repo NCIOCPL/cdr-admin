@@ -155,7 +155,7 @@ def sendPubNotificationEmail(gp, cursor, conn):
 >GeneticsDirectory@cancer.gov</a> with any changes that you may have.
 We will also be contacting you annually to verify your directory
 information.  We appreciate your help in keeping the NCI Cancer
-Genetics Directory current.</p>
+Genetics Services Directory current.</p>
 
 <p style='font-style: italic'
 >The NCI Genetics Services Directory Coordinator<br />
