@@ -243,12 +243,13 @@ if docId:
 #----------------------------------------------------------------------
 # If not, collect the GPs due for the notification.
 #----------------------------------------------------------------------
-docIds = []
-for docId in pubGPs:
-    if docId not in legacyGPs and docId not in alreadySent:
-        docIds.append(docId)
-        if len(docIds) >= maxDocs:
-            break
+else:
+    docIds = []
+    for docId in pubGPs:
+        if docId not in legacyGPs and docId not in alreadySent:
+            docIds.append(docId)
+            if len(docIds) >= maxDocs:
+                break
 
 #----------------------------------------------------------------------
 # Show the user what we've done as we're sending out the mailers.
