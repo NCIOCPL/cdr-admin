@@ -4,21 +4,7 @@
 #
 # NCI Liaison Office/Brussels Protocol Report.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.5  2005/09/02 14:15:13  bkline
-# Increased timeouts.
-#
-# Revision 1.4  2003/08/25 20:13:49  bkline
-# Added new column for protocol original title.
-#
-# Revision 1.3  2003/01/02 14:18:47  bkline
-# Fixed typo on <style> attribute.
-#
-# Revision 1.2  2002/10/18 13:53:51  bkline
-# Added more filtering to SQL query; cosmetic change.
-#
-# Revision 1.1  2002/09/23 17:36:40  bkline
-# New report for European protocols.
+# BZissue::4866
 #
 #----------------------------------------------------------------------
 import cdr, cdrdb, cdrcgi, cgi, re, time
@@ -294,4 +280,4 @@ cdrcgi.sendPage(html + u"""\
   </table>
  </body>
 </html>
-"""))
+""")
