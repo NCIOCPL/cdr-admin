@@ -4,30 +4,8 @@
 #
 # Submenu for mailer reports.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.10  2006/06/06 20:26:01  bkline
-# Added new flavor of emailer respondents reports for Brussels trials.
-#
-# Revision 1.9  2005/03/03 14:27:21  bkline
-# Menu changes requested by Sheri (#1572).
-#
-# Revision 1.8  2004/09/17 14:06:50  venglisc
-# Fixed list items to properly teminate the anker link.
-#
-# Revision 1.7  2004/07/13 17:46:42  bkline
-# Added web mailer reports.
-#
-# Revision 1.6  2004/02/17 19:46:39  venglisc
-# Modified menu to remove unused menu items.
-#
-# Revision 1.5  2003/08/25 20:15:22  bkline
-# Plugged in new report for Lead Org S&P Mailer history.
-#
-# Revision 1.4  2003/05/20 19:28:50  bkline
-# Plugged in mailer non-respondents report.
-#
-# Revision 1.3  2002/05/24 20:37:30  bkline
-# New Report Menu structure implemented.
+# BZIssue::4630
+# BZIssue::1572
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
@@ -65,6 +43,8 @@ form = """\
     <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
     <OL>
 """ % (cdrcgi.SESSION, session)
+form += "<LI><A HREF='%s/ListGPEmailers'>%s</LI></A>\n" % (
+            cdr.emailerCgi(), 'GP Emailers List')
 reports = [
            ('LeadOrgStatusAndParticipantMailerHistory.py',
             'Lead Organization Status and Participant Mailer History'),
