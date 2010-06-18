@@ -5,6 +5,7 @@
 # Report on lists of summaries.
 #
 # BZIssue::4744 - Modify Summaries with Protocol Links/Refs report
+# BZIssue::4865 - Summaries with Protocol Links/Refs report bug 
 #
 #----------------------------------------------------------------------
 import sys, cgi, cdr, cdrcgi, re, string, cdrdb, time, ExcelWriter
@@ -18,13 +19,13 @@ session   = cdrcgi.getSession(fields)
 if not session: session = 'CdrGuest'
 lang        = fields and fields.getvalue("lang")             or ''
 groups      = fields and fields.getvalue("grp")              or []
-statuses    = fields and fields.getvalue("status")         or []
+statuses    = fields and fields.getvalue("status")           or []
 submit      = fields and fields.getvalue("SubmitButton")     or None
 cdrId       = fields and fields.getvalue("cdrid")            or ''
 docTitle    = fields and fields.getvalue("title")            or None
 revFrom     = fields and fields.getvalue("reviewedfrom")     or None
 revTo       = fields and fields.getvalue("reviewedto")       or None
-excludeDate = fields and fields.getvalue("exclude")        or 'Yes'
+excludeDate = fields and fields.getvalue("exclude")          or 'Yes'
 displayAll  = fields and fields.getvalue("displayall")       or 'Yes'
 doExcel     = fields and fields.getvalue("doexcel")          or 'No'
 request     = cdrcgi.getRequest(fields)
@@ -42,8 +43,10 @@ buttons     = (SUBMENU, cdrcgi.MAINMENU)
 #statuses.append('Closed')
 #statuses.append('Active')
 #session   = '471F2BE9-7A98C6-248-1RFI84EWTK9Z'
-#---------------------------
-
+#----------------------------------------------------------------------
+# Class to collect all information related to a single ProtocolRef/Link
+# element.
+# ----------------------------------------------------------------------
 class dataRow:
     def __init__(self, cdrid, summaryTitle, summarySecTitle, ref, protCDRID,
                  status, excelOutput = 'No'):
@@ -54,14 +57,14 @@ class dataRow:
         self.protCDRID = protCDRID
         self.linkcdrid = cdr.normalize(protCDRID)
         self.status = status
-        self.linkComment = ''
-        self.linkDate = ''
-        self.linkStatus = ''
-        self.protocolLink = ''
+        self.linkComment      = ''
+        self.linkDate         = ''
+        self.linkStatus       = ''
+        self.protocolLink     = ''
         self.fullProtocolLink = ''
-        self.text = ''
-        self.refTextStart = 0
-        self.refTextSize = 0
+        self.text             = ''
+        self.refTextStart     = 0
+        self.refTextSize      = 0
         if excelOutput == 'Yes':
             self.excelOutput = True
         else:
@@ -79,12 +82,6 @@ class dataRow:
             if parentChildNode.nodeType == xml.dom.minidom.Node.ELEMENT_NODE:
                 if parentChildNode.attributes.length > 0:
                     for (name,value) in parentChildNode.attributes.items():
-                        if name == 'comment':
-                            self.linkComment = parentChildNode.attributes[u"comment"].value
-                        if name == 'LastReviewedDate':
-                            self.linkDate = parentChildNode.attributes[u"LastReviewedDate"].value
-                        if name == 'LastReviewedStatus':
-                            self.linkStatus = parentChildNode.attributes[u"LastReviewedStatus"].value
                         href = ''
                         if self.ref == 'LINK':
                             if name == 'cdr:ref':
@@ -118,6 +115,9 @@ class dataRow:
             self.addText(parentChildNode,binlink)
             binlink = 0
 
+    # Reduce the text to display on the report to a certain number of 
+    # characters.  The number is passed as a parameter 
+    # ---------------------------------------------------------------
     def reduceTo(self,text,count):
         startIndex = self.refTextStart - count
         if startIndex < 0:
@@ -187,15 +187,6 @@ def displayRow(startdate, enddate, linkDate, exclude = 'Yes'):
 # which the protocol status has not changed.
 # ---------------------------------------------------------------------
 def hasStatusChanged(currentStatus, lastStatus):
-    statusOpen   = ['Active', 
-                    'Approved-not yet active', 
-                    'Enrolling by invitation']
-    statusClosed = ['Withdrawn from PDQ',
-                    'Temporarily closed',
-                    'Completed',
-                    'Closed',
-                    'Withdrawn']
-
     # Check if the current Protocol status has changed
     if not string.upper(currentStatus) == string.upper(lastStatus):
         return True
@@ -987,14 +978,19 @@ query = getQuerySegment(lang, 'LINK') + \
         getQuerySegment(lang, 'REF')  + \
         " ORDER BY cdrid, LinkNodeLoc, TitleNodeLocLen desc, status"
 
-#cdrcgi.bail(query)
-
 if not query:
     cdrcgi.bail('No query criteria specified')
 
 dataRows = []
 cdrids = []
 
+# Identify if the element is a link or ref element
+# Populate the instance attributes with the data from the 
+# ProtocolRef/Link attributes
+# Note:  Currently, if the same ProtocolRef is listed multiple times
+#        within a single section only the information for the last
+#        ProtocolRef is picked up and displayed for all of the elements.
+# ----------------------------------------------------------------------
 def checkElement(cdrid,node,parentElem,ref,lastSECTitle):
     for dataRow in dataRows:
         if dataRow.cdrid == cdrid:
@@ -1002,15 +998,25 @@ def checkElement(cdrid,node,parentElem,ref,lastSECTitle):
                 Linkcdrid = cdr.normalize(dataRow.protCDRID)
                 if node.attributes.length > 0:
                     for (name,value) in node.attributes.items():
-                        if name == 'comment':
-                            linkComment = node.attributes[u"comment"].value
-                        if name == 'LastReviewedDate':
-                            linkDate = node.attributes[u"LastReviewedDate"].value
-                        if name == 'LastReviewedStatus':
-                            linkStatus = node.attributes[u"LastReviewedStatus"].value
                         if ref == 'LINK':
                             if name == 'cdr:ref':
                                 if value == Linkcdrid:
+                                    # We need to ensure that we only pick up
+                                    # these attributes for the same record of
+                                    # this protocol ID (Linkcdrid), so we'll
+                                    # iterate over the attributes again once
+                                    # we identified the correct element for this
+                                    # section.
+                                    # ------------------------------------------
+                                    for (name,value) in node.attributes.items():
+                                        if name == 'comment':
+                                            #dataRow.linkComment = \
+                                            #        node.attributes[u"comment"].value
+                                            dataRow.linkComment = value 
+                                        if name == 'LastReviewedDate':
+                                            dataRow.linkDate = value
+                                        if name == 'LastReviewedStatus':
+                                            dataRow.linkStatus = value
                                     if node.childNodes:
                                         for nodeChild in node.childNodes:
                                             if nodeChild == xml.dom.minidom.Node.TEXT_NODE:
@@ -1025,6 +1031,20 @@ def checkElement(cdrid,node,parentElem,ref,lastSECTitle):
                         elif ref == 'REF':
                             if name == 'cdr:href':
                                 if value == Linkcdrid:
+                                    # We need to ensure that we only pick up
+                                    # these attributes for the same record of
+                                    # this protocol ID (Linkcdrid), so we'll
+                                    # iterate over the attributes again once
+                                    # we identified the correct element for this
+                                    # section.
+                                    # ------------------------------------------
+                                    for (name,value) in node.attributes.items():
+                                        if name == 'comment':
+                                            dataRow.linkComment = value 
+                                        if name == 'LastReviewedDate':
+                                            dataRow.linkDate = value
+                                        if name == 'LastReviewedStatus':
+                                            dataRow.linkStatus = value
                                     if node.childNodes:
                                         for nodeChild in node.childNodes:
                                             if nodeChild == xml.dom.minidom.Node.TEXT_NODE:
@@ -1038,6 +1058,11 @@ def checkElement(cdrid,node,parentElem,ref,lastSECTitle):
                                         return
     return
 
+
+# ----------------------------------------------------------
+# Identify all protocolLinks/Refs, and SummarySection titles
+# For the link/ref retrieve the attribute information
+# ----------------------------------------------------------
 def checkChildren(cdrid,parentElem,lastSECTitle):
     parentNodeName = parentElem.nodeName
     for node in parentElem.childNodes:
@@ -1057,10 +1082,15 @@ def checkChildren(cdrid,parentElem,lastSECTitle):
         checkChildren(cdrid,node,lastSECTitle)
     return
 
+
+# ------------------------------------------------------
+# Process the root node of the document (a.k.a. Summary)
+# ------------------------------------------------------
 def updateRefs(cdrid,dom):
     docElem = dom.documentElement
     checkChildren(cdrid,docElem,'')
     return
+
 
 #----------------------------------------------------------------------
 # Submit the query to the database.
@@ -1078,6 +1108,10 @@ if not rows:
 
 LastLinkNodeLoc = ''
 
+# Create a list of instances containing the content for each row
+# populated with the information from the SQL query
+# Also, create a list of Summary CDR-IDs along the way.
+# ------------------------------------------------------------
 for cdrid, summaryTitle, summarySecTitle, ref, protCDRID, status, \
     TitleNodeLoc, TitleNodeLocLen, LinkNodeLoc in rows:
     if LinkNodeLoc != LastLinkNodeLoc:
@@ -1087,6 +1121,9 @@ for cdrid, summaryTitle, summarySecTitle, ref, protCDRID, status, \
             cdrids.append(cdrid)
     LastLinkNodeLoc = LinkNodeLoc
 
+# Extract each summary document from the DB and create the DOM tree
+# Then populate the missing attributes from the XML data.
+# -----------------------------------------------------------------
 for cdrid in cdrids:
     docId = cdr.normalize(cdrid)
     doc = cdr.getDoc(session, docId, checkout = 'N')
@@ -1369,12 +1406,24 @@ else:
                 continue
 
         form.append(u"<tr>")
-        form.append(u"""<td class="%s top">%s</td><td class="%s top">%s</td><td class="%s top">%s</td>"""
-                    %(cssClass,dataRow.cdrid,cssClass,dataRow.summaryTitle,cssClass,dataRow.summarySecTitle))
-        form.append(u"""<td class="%s top"><b>%s :</b> %s</td>""" % (cssClass,dataRow.ref,dataRow.protocolLink))
-        form.append(u"""<td class="%s top">%s</td><td class="%s top">%s</td>""" % (cssClass,dataRow.protCDRID,cssClass,dataRow.status))
-        form.append(u"""<td class="%s top">%s</td><td class="%s top">%s</td>""" % (cssClass,dataRow.linkComment,cssClass,dataRow.linkDate))
-        form.append(u"""<td class="%s top">%s</td>""" % (cssClass,dataRow.linkStatus))
+        form.append(u"""<td class="%s top">%s</td>""" %
+                                            (cssClass, dataRow.cdrid))
+        form.append(u"""<td class="%s top">%s</td>""" %
+                                            (cssClass, dataRow.summaryTitle))
+        form.append(u"""<td class="%s top">%s</td>""" %
+                                            (cssClass, dataRow.summarySecTitle))
+        form.append(u"""<td class="%s top"><b>%s :</b> %s</td>""" % 
+                                 (cssClass,dataRow.ref,dataRow.protocolLink))
+        form.append(u"""<td class="%s top">%s</td>""" % 
+                                            (cssClass, dataRow.protCDRID))
+        form.append(u"""<td class="%s top">%s</td>""" % 
+                                            (cssClass,dataRow.status))
+        form.append(u"""<td class="%s top">%s</td>""" % 
+                                            (cssClass,dataRow.linkComment))
+        form.append(u"""<td class="%s top">%s</td>""" % 
+                                            (cssClass,dataRow.linkDate))
+        form.append(u"""<td class="%s top">%s</td>""" % 
+                                            (cssClass,dataRow.linkStatus))
         form.append(u"</tr>")
         if cssClass == 'cdrTableEven':
             cssClass = 'cdrTableOdd'
