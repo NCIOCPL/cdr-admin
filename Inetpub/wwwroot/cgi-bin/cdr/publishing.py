@@ -3,7 +3,11 @@
 # Publishing CGI script.
 #
 # $Id$
-# $Log: not supported by cvs2svn $
+# $Log: publishing.py,v $
+# Revision 1.30  2009/04/15 20:18:19  venglisc
+# Modified to allow pushing a Republish job.  This is useful if a Republish
+# job failed processing on Gatekeeper and needs to be resubmitted.
+#
 # Revision 1.29  2007/10/31 21:11:42  bkline
 # Fixed handling of Unicode.
 #
@@ -104,10 +108,11 @@
 #
 #
 #----------------------------------------------------------------------
-import cgi, cdrcgi, string, copy, urllib, cdr, cdr2gk, xml.dom.minidom
-import socket, re
-from win32com.client import Dispatch
-import pythoncom
+import cgi, cdrcgi, string, copy, urllib, cdr, xml.dom.minidom
+import lxml.etree as etree
+import cdrdb, socket, re #, cdr2gk
+# from win32com.client import Dispatch
+# import pythoncom
 
 
 #----------------------------------------------------------------------
@@ -122,19 +127,11 @@ class Display:
     # Set up a connection to CDR. Abort when failed.
     #----------------------------------------------------------------   
     def __init__(self):
-            
         try:
-            connStr = "DSN=cdr;UID=CdrPublishing;PWD=***REMOVED***"
-            self.__cdrConn = Dispatch('ADODB.Connection')
-            self.__cdrConn.ConnectionString = connStr
-            self.__cdrConn.Open()
-        except pythoncom.com_error, (hr, msg, exc, arg):
-            self.__cdrConn = None                    
-            if exc is None:
-                reason = "Code %d: %s" % (hr, msg)
-            else:
-                wcode, source, text, helpFile, helpId, scode = exc
-                reason = "Src: " + source + ". Msg: " + text            
+            self.__conn   = cdrdb.connect()
+            self.__cursor = self.__conn.cursor()
+        except cdrdb.Error, info:
+            reason = "Failure: %s" % info[1][0]
             self.__addFooter("Cdr connection failed. %s" % reason)
     
     #---------------------------------------------------------------- 
@@ -143,7 +140,6 @@ class Display:
     # This is the main screen of the Publishing interface
     #----------------------------------------------------------------
     def displaySystems(self):
-
         publishes = []
         pubsys = ["Publishing.py", "", "", ""]        
         pickList = self.__getPubSys()
@@ -209,7 +205,6 @@ class Display:
                     %s</A></LI>\n""" % (cdrcgi.BASE, r[0], cdrcgi.SESSION, 
                                         session, ctrlId, version, 
                                         urllib.quote_plus(r[1]), r[3], r[2])
-
 
         form += HIDDEN % (cdrcgi.SESSION, session)   
         self.__addFooter(form)
@@ -553,13 +548,13 @@ class Display:
                     AND d.num = (SELECT MAX(num) 
                                    FROM doc_version 
                                   WHERE d.id = id)"""
-        rs = self.__execSQL(sql)
+        rows = self.__execSQL(sql)
 
-        while not rs.EOF:
-            tuple[0] = rs.Fields("title").Value
-            tuple[1] = rs.Fields("id").Value
-            tuple[2] = rs.Fields("num").Value
-            docElem = rs.Fields("xml").Value.encode('utf-8')
+        for row in rows:
+            tuple[0] = row[0]
+            tuple[1] = row[1]
+            tuple[2] = row[2]
+            docElem  = row[3].encode('utf-8')
 
             docElem = xml.dom.minidom.parseString(docElem).documentElement
             for node in docElem.childNodes:
@@ -573,11 +568,6 @@ class Display:
             deep = copy.deepcopy(tuple)
             pickList.append(deep)
 
-            rs.MoveNext()
-
-        rs.Close()
-        rs = None
-   
         return pickList
 
 
@@ -593,10 +583,10 @@ class Display:
 
         sql = "SELECT xml FROM doc_version \
                 WHERE id = %s AND num = %s" % (ctrlId, version)
-        rs = self.__execSQL(sql)
+        rows = self.__execSQL(sql)
 
-        while not rs.EOF:
-            docElem = rs.Fields("xml").Value.encode('utf-8')
+        for row in rows:
+            docElem = row[0].encode('utf-8')
 
             docElem = xml.dom.minidom.parseString(docElem).documentElement
             for node in docElem.childNodes:
@@ -631,11 +621,6 @@ class Display:
                         deep = copy.deepcopy(tuple)
                         pickList.append(deep)
 
-            rs.MoveNext()
-
-        rs.Close()
-        rs = None
-       
         return pickList
 
 
@@ -671,13 +656,10 @@ class Display:
 
         sql = "SELECT xml FROM doc_version \
                 WHERE id = %s AND num = %s" % (ctrlId, version)
-        rs = self.__execSQL(sql)
+        rows = self.__execSQL(sql)
 
-        while not rs.EOF:
-            docElem = rs.Fields("xml").Value.encode('utf-8')
-            rs.MoveNext()
-        rs.Close()
-        rs = None
+        for row in rows:
+            docElem = row[0].encode('utf-8')
 
         # Find the Subset node.
         subsetNode = None        
@@ -709,41 +691,34 @@ class Display:
     # Return the email address of the session owner.
     #----------------------------------------------------------------------
     def __getUsrAddr(self):       
-       
         sql = """SELECT u.email 
                    FROM usr u 
                    JOIN session s 
                      ON u.id = s.usr                 
                   WHERE s.name = '%s'""" % session
-        rs = self.__execSQL(sql)
+        rows = self.__execSQL(sql)
 
         email = ""
-        while not rs.EOF:
-            email = rs.Fields("email").Value or ""
+        for row in rows:
+            email = row[0] or ""
             break
-        rs.Close()
-        rs = None
    
         return email
         
+
     #----------------------------------------------------------------
     # Execute the SQL statement using ADODB.
     #----------------------------------------------------------------
     def __execSQL(self, sql):     
-      
         try:
-            (rs, err) = self.__cdrConn.Execute(sql)
-        except pythoncom.com_error, (hr, msg, exc, arg):            
-            if exc is None:
-                reason = "Code %d: %s" % (hr, msg)
-            else:
-                wcode, source, text, helpFile, helpId, scode = exc
-                reason = "Src: " + source + ". Msg: " + text          
-            rs = None
-            self.__cdrConn.Close()
-            self.__cdrConn = None
+            self.__cursor.execute(sql, timeout = 300)
+            rows = self.__cursor.fetchall()
+        except cdrdb.Error, info:
+            reason = "Failure: %s" % info[1][0]
             self.__addFooter("Execute SQL failed. %s" % reason)
-        return rs;
+            raise
+
+        return rows
 
 #----------------------------------------------------------------------
 # Set the form variables.
