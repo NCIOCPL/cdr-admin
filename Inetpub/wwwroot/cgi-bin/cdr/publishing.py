@@ -3,117 +3,14 @@
 # Publishing CGI script.
 #
 # $Id$
-# $Log: publishing.py,v $
-# Revision 1.30  2009/04/15 20:18:19  venglisc
-# Modified to allow pushing a Republish job.  This is useful if a Republish
-# job failed processing on Gatekeeper and needs to be resubmitted.
 #
-# Revision 1.29  2007/10/31 21:11:42  bkline
-# Fixed handling of Unicode.
-#
-# Revision 1.28  2007/05/16 12:37:38  bkline
-# Added non-breaking space when default paramater value is empty.
-#
-# Revision 1.27  2007/05/09 18:32:28  venglisc
-# Definition of PUBTYPES moved from cdr2cg to cdr module.  Importing cdr2gk
-# instead of cdr2cg now.
-# Suppressing the Republish menu from displaying.  There exists a separate
-# menu for this pubType.
-#
-# Revision 1.26  2006/11/24 20:56:04  venglisc
-# Minor modifications to the publishing UI.
-#
-# Revision 1.25  2006/11/21 15:58:40  venglisc
-# Modified to allow QCFilterSets to be run not just on MAHLER (but not on
-# BACH. (Bug 2533)
-#
-# Revision 1.24  2004/01/21 22:42:40  venglisc
-# Created a new screen for the Hot-Fix process allowing the user to
-# copy/paste CDR IDs instead entering manually.  Also allowing user to pick
-# between entering CDR IDs and loading IDs.
-#
-# Revision 1.23  2003/06/19 19:37:08  bkline
-# Bumped up the number of rows for document IDs from 10 to 24.
-#
-# Revision 1.22  2003/02/07 21:15:53  pzhang
-# Changed "reason +=" to "reason =".
-#
-# Revision 1.21  2002/11/20 16:57:15  pzhang
-# Added GroupEmailAddrs and extracted user email from usr table.
-#
-# Revision 1.20  2002/11/07 23:11:28  pzhang
-# Hid QcFilterSets system; Made SubSetName readonly.
-#
-# Revision 1.19  2002/11/05 21:26:27  pzhang
-# Changed FONT of DESC.
-# Added code to show default value based on control document.
-#
-# Revision 1.18  2002/11/05 18:42:30  pzhang
-# Changed New to Current
-#
-# Revision 1.17  2002/11/05 16:04:34  pzhang
-# Enhanced interface per Eileen's input
-#
-# Revision 1.16  2002/10/29 21:01:33  pzhang
-# Called cdr.publish() with parameter allowInActive for Hotfix-Remove.
-#
-# Revision 1.15  2002/10/21 15:42:55  pzhang
-# Increased number of Hotfix DocIds from 25 to 50.
-#
-# Revision 1.14  2002/09/12 18:50:56  pzhang
-# Added port parameter to cdr.py function call.
-#
-# Revision 1.13  2002/09/03 22:27:39  pzhang
-# Added picklist for values 'Yes'/'No'.
-#
-# Revision 1.12  2002/09/03 17:20:37  pzhang
-# Added managing status link.
-# Dropped inactive and mailer control documents from being displayed.
-#
-# Revision 1.11  2002/05/15 22:47:49  pzhang
-# Added code for control document version.
-# Detected valid PubType parameter values.
-#
-# Revision 1.10  2002/05/10 16:12:40  pzhang
-# Made PubType parameter READONLY.
-#
-# Revision 1.9  2002/04/17 21:43:24  pzhang
-# Rewrote code to match new cdrpub.py design.
-# Dropped all CGI helpers in cdrpub.py.
-#
-# Revision 1.8  2002/03/01 22:43:01  pzhang
-# Fixed a bug in forming param using white space as delimeter.
-#
-# Revision 1.7  2002/02/22 17:19:17  pzhang
-# Skiped DocIdParameter page if there is no parameters and no docIds.
-#
-# Revision 1.6  2002/02/22 16:36:40  pzhang
-# Moved hidden Session variable out of initHiddenValues for
-# 	navigateTo to work properly.
-#
-# Revision 1.5  2002/02/21 15:20:35  bkline
-# Added navigation buttons.
-#
-# Revision 1.4  2002/02/20 22:39:53  pzhang
-# Changed module publish to cdrpub.
-#
-# Revision 1.3  2002/02/07 14:45:52  mruben
-# added no output option
-#
-# Revision 1.2  2001/12/03 23:10:05  Pzhang
-# Added email notification feature. Used PubStatus.py for status check.
-#
-# Revision 1.1  2001/12/01 18:11:44  bkline
-# Initial revision
-#
+# BZIssue::2533
+# BZIssue::4870
 #
 #----------------------------------------------------------------------
 import cgi, cdrcgi, string, copy, urllib, cdr, xml.dom.minidom
 import lxml.etree as etree
-import cdrdb, socket, re #, cdr2gk
-# from win32com.client import Dispatch
-# import pythoncom
-
+import cdrdb, socket, re
 
 #----------------------------------------------------------------------
 # Display Publishing System PickList
@@ -140,37 +37,64 @@ class Display:
     # This is the main screen of the Publishing interface
     #----------------------------------------------------------------
     def displaySystems(self):
-        publishes = []
-        pubsys = ["Publishing.py", "", "", ""]        
-        pickList = self.__getPubSys()
-        for s in pickList:
-            pubsys[1] = "%s" % s[1]
-            pubsys[2] = "%s" % s[2]
-            pubsys[3] = "%s [Version %s]<BR><FONT SIZE=3>%s</FONT>" % (
-                s[0], s[2], s[3])            
-            deep = copy.deepcopy(pubsys)
-            publishes.append(deep)
-        if type(publishes) == type(""): cdrcgi.bail(publishes)    
-
-        form = "<H4>Publication Types</H4>\n"
-        form += "<OL>\n"
-        form += "<LI><A href='%s/%s?id=1&%s=%s&type=Manage'>%s</A>\
-                     </LI>\n" % (cdrcgi.BASE, "PubStatus.py", cdrcgi.SESSION,
-                     session, "Manage Publishing Job Status")
-
-        for r in publishes:
-            if r[3][0:7] == "Mailers":
-                continue            
-            if "BACH" ==  string.upper(socket.gethostname()):
-                if r[3][0:12] == "QcFilterSets":
-                    continue
-            form += "<LI><A href='%s/%s?%s=%s&ctrlId=%s&version=%s'>%s</A>\
-                     </LI>\n" % (cdrcgi.BASE, r[0], cdrcgi.SESSION, session, 
-                     r[1], r[2], r[3])
-
-        form += HIDDEN % (cdrcgi.SESSION, session)   
-        self.__addFooter(form)
-
+        form = [u"""\
+    <h4>Publication Types</h4>
+    <ol>
+     <li><a href='%s/PubStats.py?id=1&%s=%s&type=Manage'
+      >Manage Publishing Job Status</a></li>
+""" % (cdrcgi.BASE, cdrcgi.SESSION, session)]
+        self.__cursor.execute("""\
+            SELECT id
+              FROM doc_type
+             WHERE name = 'PublishingSystem'""")
+        rows = self.__cursor.fetchall()
+        if not rows:
+            cdrcgi.bail("Publishing control document has disappeared!")
+        self.__cursor.execute("""\
+            SELECT id, title
+              FROM active_doc
+             WHERE doc_type = ?""", rows[0][0])
+        rows = self.__cursor.fetchall()
+        for docId, docTitle in rows:
+            name = docTitle.upper().strip()
+            if name == 'MAILERS':
+                continue
+            if cdr.isProdHost() and name == 'QCFILTERSETS':
+                continue
+            self.__cursor.execute("""\
+                SELECT MAX(num)
+                  FROM doc_version
+                 WHERE publishable = 'Y'
+                   AND val_status = 'V'
+                   AND id = ?""", docId)
+            rows = self.__cursor.fetchall()
+            if not rows:
+                continue
+            docVersion = rows[0][0]
+            self.__cursor.execute("""\
+                SELECT xml
+                  FROM doc_version
+                 WHERE id = ?
+                   AND num = ?""", (docId, docVersion))
+            docXml = self.__cursor.fetchall()[0][0]
+            tree = etree.XML(docXml.encode('utf-8'))
+            desc = u"*** NO SYSTEM DESCRIPTION FOUND ***"
+            for node in tree.findall('SystemDescription'):
+                desc = node.text.strip()
+            form.append(u"""\
+     <li><a href='%s/publishing.py?%s=%s&ctrlId=%s&version=%d'
+      >%s [Version %d]<br />%s</a></li>
+""" % (cdrcgi.BASE, cdrcgi.SESSION, session, docId, docVersion,
+       cgi.escape(docTitle), docVersion, cgi.escape(desc)))
+        form.append(u"""\
+   </ol>
+   <input type='hidden' name='%s' value='%s' />
+  </form>
+ </body>
+</html>
+""" % (cdrcgi.SESSION, session))
+        form = u"".join(form).encode('utf-8')
+        cdrcgi.sendPage(header + form)
 
     #----------------------------------------------------------------
     # Display all subsets of the publishing system main menu.
@@ -206,7 +130,7 @@ class Display:
                                         session, ctrlId, version, 
                                         urllib.quote_plus(r[1]), r[3], r[2])
 
-        form += HIDDEN % (cdrcgi.SESSION, session)   
+        form += HIDDEN % (cdrcgi.SESSION, session)
         self.__addFooter(form)
 
     #----------------------------------------------------------------------
@@ -730,7 +654,7 @@ action   = cdrcgi.getRequest(fields)
 title    = "CDR Administration"
 section  = "Publishing"
 buttons  = [cdrcgi.MAINMENU, "Log Out"]
-header   = cdrcgi.header(title, title, section, "Publishing.py", buttons)
+header   = cdrcgi.header(title, title, section, "publishing.py", buttons)
 HIDDEN   = """<INPUT TYPE='HIDDEN' NAME='%s' VALUE='%s'>\n"""
 
 #----------------------------------------------------------------------
