@@ -40,7 +40,7 @@ class Display:
         form = [u"""\
     <h4>Publication Types</h4>
     <ol>
-     <li><a href='%s/PubStats.py?id=1&%s=%s&type=Manage'
+     <li><a href='%s/PubStatus.py?id=1&%s=%s&type=Manage'
       >Manage Publishing Job Status</a></li>
 """ % (cdrcgi.BASE, cdrcgi.SESSION, session)]
         self.__cursor.execute("""\
