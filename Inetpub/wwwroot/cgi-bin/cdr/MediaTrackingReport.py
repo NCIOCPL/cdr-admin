@@ -5,7 +5,8 @@
 # We need a Media Tracking report.  This spreadsheet report will keep track of
 # the development and processing statuses of the Media documents.
 #
-# $Log: not supported by cvs2svn $
+# BZIssue::4873 - Remove Board Meeting Recordings display from Tracking Report
+# 
 # Revision 1.4  2009/02/03 22:47:17  venglisc
 # Adjusted the XPath for the Glossary since the Glossary document structure
 # had changed. (Bug 4461)
@@ -231,7 +232,11 @@ cursor.execute("""\
 LEFT OUTER JOIN query_term q
              ON d.id = q.doc_id
             AND q.path = '/Media/MediaContent/Diagnoses/Diagnosis'
+           JOIN query_term c
+             ON d.id = c.doc_id
+            AND c.path = '/Media/MediaContent/Categories/Category'
           WHERE t.name = 'Media'
+            AND c.value <> 'Meeting Recording'
              %s
        GROUP BY d.id, d.title
          HAVING MAX(v.dt) BETWEEN '%s' AND DATEADD(s, -1, DATEADD(d, 1, '%s'))
