@@ -1012,6 +1012,9 @@ def dispJobsByDates():
                     <font size='3'>Job Name</font>
                     </b></td>
                     <td nowrap='1'><b>
+                    <font size='3'>Job Status Reports</font>
+                    </b></td>
+                    <td nowrap='1'><b>
                     <font size='3'>Starting Time</font>
                     </b></td>
                     <td nowrap='1'><b>
@@ -1043,6 +1046,26 @@ def dispJobsByDates():
                        href="PubStatus.py?id=%d&type=Report&%s=%s">
                     <font size='2' color='black'>%s</font>
                     </b></td>
+                    <td nowrap='1'><b>&nbsp;
+                    <a style="text-decoration: underline;"
+                       href="PubStatus.py?id=%d">
+                    <font size='2' color='black'>status</font></a>
+                    </b><br>
+                    <b>&nbsp;
+                    <a style="text-decoration: underline;"
+                       href="PubStatus.py?id=%d&type=FilterFailure&flavor=error">
+                    <font size='2' color='black'>errors</font></a>,
+                    </b>
+                    <b>&nbsp;
+                    <a style="text-decoration: underline;"
+                       href="PubStatus.py?id=%d&type=FilterFailure&flavor=warning">
+                    <font size='2' color='black'>warnings</font></a>,
+                    </b>
+                    <b>&nbsp;
+                    <a style="text-decoration: underline;"
+                       href="PubStatus.py?id=%d&type=FilterFailure&flavor=full">
+                    <font size='2' color='black'>both</font></a>
+                    </b></td>
                     <td nowrap='1'><b>
                     <font size='2' color='black'>%s</font>
                     </b></td>
@@ -1055,6 +1078,7 @@ def dispJobsByDates():
                 </tr>
                     """ % (id, cdrcgi.SESSION, session, id,
                            id, cdrcgi.SESSION, session, name,
+                           id, id, id, id,
                            started, completed, count)
 
             row = cursor.fetchone()
