@@ -40,9 +40,9 @@ buttons     = (SUBMENU, cdrcgi.MAINMENU)
 #---------------------------
 #lang = 'English'
 #groups.append('Adult Treatment')
+#statuses.append('Completed')
 #statuses.append('Closed')
-#statuses.append('Active')
-#session   = '471F2BE9-7A98C6-248-1RFI84EWTK9Z'
+#session   = '4C7D1879-3E134E-107-RX5X92W21575'
 #----------------------------------------------------------------------
 # Class to collect all information related to a single ProtocolRef/Link
 # element.
@@ -1007,23 +1007,39 @@ def checkElement(cdrid,node,parentElem,ref,lastSECTitle):
                                     # iterate over the attributes again once
                                     # we identified the correct element for this
                                     # section.
+                                    #
+                                    # There is a caveat:
+                                    # If we find a link to a protocol multiple
+                                    # times in the same section we need to 
+                                    # ensure that we don't overwrite the 
+                                    # 1st, 2nd, 3rd,... object with the 
+                                    # information from this node.  We are 
+                                    # therefore testing if none of the elements
+                                    # (comment, status, date) have been 
+                                    # populated yet - meaning this is a new
+                                    # occurrence of the link.
                                     # ------------------------------------------
-                                    for (name,value) in node.attributes.items():
-                                        if name == 'comment':
-                                            #dataRow.linkComment = \
-                                            #        node.attributes[u"comment"].value
-                                            dataRow.linkComment = value 
-                                        if name == 'LastReviewedDate':
-                                            dataRow.linkDate = value
-                                        if name == 'LastReviewedStatus':
-                                            dataRow.linkStatus = value
+                                    if not dataRow.linkComment and \
+                                       not dataRow.linkDate    and \
+                                       not dataRow.linkStatus:
+                                        for (name,value) in        \
+                                                  node.attributes.items():
+                                            if name == 'comment':
+                                                dataRow.linkComment = value 
+                                            if name == 'LastReviewedDate':
+                                                dataRow.linkDate = value
+                                            if name == 'LastReviewedStatus':
+                                                dataRow.linkStatus = value
                                     if node.childNodes:
                                         for nodeChild in node.childNodes:
-                                            if nodeChild == xml.dom.minidom.Node.TEXT_NODE:
+                                            if nodeChild ==        \
+                                               xml.dom.minidom.Node.TEXT_NODE:
                                                 if len(nodeChild.Value) == 0:
-                                                    nodeChild.Value = 'Protocol Link'
+                                                    nodeChild.Value = \
+                                                                'Protocol Link'
                                     else:
-                                        textNode = dom.createTextNode('Protocol Link')
+                                        textNode = \
+                                             dom.createTextNode('Protocol Link')
                                         node.appendChild(textNode)
                                     if len(dataRow.protocolLink) == 0:
                                         dataRow.addProtocolLink(parentElem)
@@ -1037,21 +1053,39 @@ def checkElement(cdrid,node,parentElem,ref,lastSECTitle):
                                     # iterate over the attributes again once
                                     # we identified the correct element for this
                                     # section.
+                                    #
+                                    # There is a caveat:
+                                    # If we find a link to a protocol multiple
+                                    # times in the same section we need to 
+                                    # ensure that we don't overwrite the 
+                                    # 1st, 2nd, 3rd,... object with the 
+                                    # information from this node.  We are 
+                                    # therefore testing if none of the elements
+                                    # (comment, status, date) have been 
+                                    # populated yet - meaning this is a new
+                                    # occurrence of the link.
                                     # ------------------------------------------
-                                    for (name,value) in node.attributes.items():
-                                        if name == 'comment':
-                                            dataRow.linkComment = value 
-                                        if name == 'LastReviewedDate':
-                                            dataRow.linkDate = value
-                                        if name == 'LastReviewedStatus':
-                                            dataRow.linkStatus = value
+                                    if not dataRow.linkComment and \
+                                       not dataRow.linkDate    and \
+                                       not dataRow.linkStatus:
+                                        for (name,value) in        \
+                                                  node.attributes.items():
+                                            if name == 'comment':
+                                                dataRow.linkComment = value
+                                            if name == 'LastReviewedDate':
+                                                dataRow.linkDate = value
+                                            if name == 'LastReviewedStatus':
+                                                dataRow.linkStatus = value
                                     if node.childNodes:
                                         for nodeChild in node.childNodes:
-                                            if nodeChild == xml.dom.minidom.Node.TEXT_NODE:
+                                            if nodeChild ==        \
+                                               xml.dom.minidom.Node.TEXT_NODE:
                                                 if len(nodeChild.Value) == 0:
-                                                    nodeChild.Value = 'Protocol Ref'
+                                                    nodeChild.Value = \
+                                                                'Protocol Ref'
                                     else:
-                                        textNode = dom.createTextNode('Protocol Ref')
+                                        textNode = \
+                                             dom.createTextNode('Protocol Ref')
                                         node.appendChild(textNode)
                                     if len(dataRow.protocolLink) == 0:
                                         dataRow.addProtocolLink(parentElem)
@@ -1089,6 +1123,7 @@ def checkChildren(cdrid,parentElem,lastSECTitle):
 def updateRefs(cdrid,dom):
     docElem = dom.documentElement
     checkChildren(cdrid,docElem,'')
+    
     return
 
 
@@ -1124,6 +1159,7 @@ for cdrid, summaryTitle, summarySecTitle, ref, protCDRID, status, \
 # Extract each summary document from the DB and create the DOM tree
 # Then populate the missing attributes from the XML data.
 # -----------------------------------------------------------------
+#cdrids = [62675]
 for cdrid in cdrids:
     docId = cdr.normalize(cdrid)
     doc = cdr.getDoc(session, docId, checkout = 'N')
