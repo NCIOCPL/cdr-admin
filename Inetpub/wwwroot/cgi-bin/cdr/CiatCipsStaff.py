@@ -70,7 +70,6 @@ items   = (('AdvancedSearch.py', 'Advanced Search',       ''               ),
            ('MergeProt.py',      'Protocol Merge',        ''               ),
            ('Reports.py',        'Reports',               ''               ),
            ('EditExternMap.py',  'Update Mapping Table', '' ),
-           ('ReplaceCWDwithVersion.py','Replace CWD with Older Version', ''),
            ('ReplaceDocWithNewDoc.py', 'Replace Doc with New Doc',       ''),
            ('UploadGPSet.py',    'Upload GENETICSPROFESSIONAL Document Set', '')
            )
