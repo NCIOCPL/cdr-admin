@@ -241,6 +241,12 @@ html = cdrcgi.header(TITLE, TITLE, "Please enter request information",
 with the XML text of an earlier version.  It can be used to restore the
 status of a document after it was damaged in some way.</p>
 
+<strong>Warning!  Replacing the CWD with an older version will obscure and
+complicate the true version history and will override recent changes.
+Therefore this function should be used very sparingly, only when there is a
+serious problem with the CWD that cannot be recovered by a simple
+edit.</strong>
+
 <p>Please enter the following information for the document:</p>
 
 <center>
