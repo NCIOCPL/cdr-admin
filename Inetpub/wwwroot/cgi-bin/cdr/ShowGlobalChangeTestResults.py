@@ -59,49 +59,94 @@ if file and directory:
 </html>
 """ % cgi.escape(unicode(doc, "utf-8")))
 
-class Set:
-    # Collection of filenames for one CDR ID
-    def __init__(self):
-        self.old = None
-        self.new = None
-        self.diff = None
-        self.err = None
+class DocFileInfo:
+    """
+    Info about one file, e.g., "CDR0000012345.new.xml
+    """
+    def __init__(self, baseDir, filename):
+        """
+        Constructor.
+        Pass
+            baseDir  - Directory path containing the files.
+            filename -  e.g., "CDR0000012345.new.xml
+        """
+        cdr.logwrite("DocFileInfo: full filename=%s/%s" % (baseDir, filename))
+        self.fname = filename
+        self.fsize = 0
+        try:
+            fullpath = "%s/%s" % (baseDir, filename)
+            self.fsize = os.stat(fullpath).st_size
+        except Exception, info:
+            # Won't always exist
+            self.fname = None
+
+class DocVerInfo:
+    """
+    Info for all versions of one document.
+    """
+    def __init__(self, baseDir, basename):
+        """
+        Constructor
+        Pass:
+            baseDir  - Directory path containing the files.
+            basename - CDR ID in string format "CDR0000012345.lastv".
+        """
+        cdr.logwrite("DocVerInfo: basename=%s" % basename)
+        self.old  = DocFileInfo(baseDir, "%s%s" % (basename, "old.xml"))
+        self.new  = DocFileInfo(baseDir, "%s%s" % (basename, "new.xml"))
+        self.diff = DocFileInfo(baseDir, "%s.%s" % (basename, "diff"))
+        self.err  = DocFileInfo(baseDir, "%s.%s" % (basename, "NEW_ERRORS.txt"))
 
 class Doc:
-    # Collection of all files, for all versions, of one xml doc
-    # lastv and lastp may or may not exist
-    def __init__(self, id):
-        self.id = id
-        self.cwd = Set()
-        self.lastv = Set()
-        self.lastp = Set()
-        self.cwdSize = None
-        self.diffSize = None
+    def __init__(self, baseDir, docId):
+        """
+        Constructor for object representing all files, all versions, of
+        one CDR document.  May include old, new, diff, and error files for
+        each of CWD, last version, and last publishable version.
+
+        Pass:
+            baseDir - Directory path containing the files.
+            docId   - "CDR000..." format CDR ID.
+        """
+
+        cdr.logwrite("Doc: docId=%s" % docId)
+        self.docId = docId
+        self.cwd   = DocVerInfo(baseDir, "%s.%s" % (docId, "cwd"))
+        self.lastv = DocVerInfo(baseDir, "%s.%s" % (docId, "lastv"))
+        self.lastp = DocVerInfo(baseDir, "%s.%s" % (docId, "pub"))
+        cdr.logwrite("Doc.cwd.old.fname=%s" % self.cwd.old.fname)
+
+        # Used for all sorting
+        self.cwdSize  = self.cwd.old.fsize
+        self.diffSize = self.cwd.diff.fsize
 
 def makeLink(name, label):
     # Construct a full hyperlink to show a file using this program
-    return "<a href='%s?dir=%s&file=%s'>%s</a>" % (script, directory, name,
-                                                   label)
+    if name is not None:
+        return "<a href='%s?dir=%s&file=%s'>%s</a>" % (script, directory,
+                                                       name, label)
+    # Else there isn't a file with this name
+    return "n/a"
 
-def makeRow(id, col2, set, doc):
+def makeRow(docId, col2, verInfo):
     """
     Make one row in the file list display
     Pass:
-        id   - Text format doc id, or "&nbsp;" if id already shown.
-        col2 - Disply name, one of "CWD", "LASTV", etc.
-        set  - Collection of filenames for this doc id.
-        doc  - Doc object.
+        docId    - Text format doc id, or "&nbsp;" if id already shown.
+        col2     - Disply name, one of "CWD", "LASTV", etc.
+        verInfo  - Collection of DocFileInfo's for this doc id.
     Return:
         One complete row for the HTML table of hyperlinked files.
     """
+    cdr.logwrite("makeRow: verInfo.old.fname=%s" % verInfo.old.fname)
     # If there is an errors file, we need to hyperlink it
     errLink = "&nbsp;"
-    if set.err:
-        errLink = makeLink(set.err, 'Errs')
+    if verInfo.err.fname:
+        errLink = makeLink(verInfo.err.fname, 'Errs')
     return """\
   <tr>
    <td>%s</td>
-   <td align='center'>%s</td>
+   <td align='left'>%s</td>
    <td>%s</td>
    <td>%s</td>
    <td>%s</td>
@@ -109,42 +154,32 @@ def makeRow(id, col2, set, doc):
    <td align='right'>%s</td>
    <td align='right'>%s</td>
   </tr>
-""" % (id, col2, makeLink(set.old, 'Old'), makeLink(set.new, 'New'),
-       makeLink(set.diff, 'Diff'), errLink, doc.cwdSize, doc.diffSize)
+""" % (docId, col2, makeLink(verInfo.old.fname, 'Old'),
+                 makeLink(verInfo.new.fname, 'New'),
+                 makeLink(verInfo.diff.fname, 'Diff'), errLink,
+                 verInfo.new.fsize, verInfo.diff.fsize)
+
 
 # If the user has picked a directory, take him to a display of
 #   all files in that directory
 if directory:
     baseDir = BASE + directory
+    cdr.logwrite("main: baseDir=%s" % baseDir)
     files = os.listdir(baseDir)
     docs = {}
     for file in files:
+        cdr.logwrite("main: file=%s" % file)
         if file.startswith('CDR0') and (file.endswith('xml') or
                                         file.endswith('diff') or
                                         file.endswith('NEW_ERRORS.txt')):
-            id = file[:13]
-            if id not in docs:
-                doc = docs[id] = Doc(id)
-            else:
-                doc = docs[id]
-            if file[13:17] == '.cwd':
-                set = doc.cwd
-            elif file[13:17] == '.pub':
-                set = doc.lastp
-            else:
-                set = doc.lastv
-            if file.endswith('.diff'):
-                set.diff = file
-                if file[13:17] == '.cwd':
-                    doc.diffSize = os.stat(baseDir + '/' + file).st_size
-            if file.endswith('.NEW_ERRORS.txt'):
-                set.err = file
-            elif file.endswith('new.xml'):
-                set.new = file
-            elif file.endswith('old.xml'):
-                set.old = file
-                if file[13:17] == '.cwd':
-                    doc.cwdSize = os.stat(baseDir + '/' + file).st_size
+            docId = file[:13]
+            cdr.logwrite("main: docId=%s" % docId)
+            if not docs.has_key(docId):
+                cdr.logwrite("main: key not found, creating it")
+                doc = docs[docId] = Doc(baseDir, docId)
+                cdr.logwrite(
+ "main: doc=%s .cwd=%s ..old=%s ...fname=%s" %
+ (doc, doc.cwd, doc.cwd.old, doc.cwd.old.fname))
     keys = docs.keys()
 
     # Check radio buttons
@@ -156,21 +191,21 @@ if directory:
     sortKeys = {}
     maxsize  = 10000000  # Subtract from here to reverse order of sort
     if sortBy == "byCdrId":
-        # Index = id -> id -> Doc
+        # Index = docId -> docId -> Doc
         # Not needed, but simplifies the logic to have all indexes at the
         #   same level of indirection
         for key in keys:
             sortKeys[key] = key
         chkSortCdrId = " checked='1'"
     elif sortBy == "byDiff":
-        # Index = Diff file size -> id -> Doc
+        # Index = Diff file size -> docId -> Doc
         # Using negative of size to get reverse sort order
         for key in keys:
             newKey = '%d.%s' % (maxsize - docs[key].diffSize, key)
             sortKeys[newKey] = key
         chkSortDiff = " checked='1'"
     elif sortBy == "byCwdSize":
-        # Index = CWD file size -> id -> Doc
+        # Index = CWD file size -> docId -> Doc
         for key in keys:
             newKey = '%d.%s' % (maxsize - docs[key].cwdSize, key)
             sortKeys[newKey] = key
@@ -181,15 +216,15 @@ if directory:
     rows = []
     for key in keys:
         doc = docs[sortKeys[key]]
-        id = doc.id
-        if doc.cwd.diff:
-            rows.append(makeRow(id, "CWD", doc.cwd, doc))
-            id = "&nbsp;"
-        if doc.lastv.diff:
-            rows.append(makeRow(id, "LASTV", doc.lastv, doc))
-            id = "&nbsp;"
-        if doc.lastp.diff:
-            rows.append(makeRow(id, "LASTP", doc.lastp, doc))
+        docId = doc.docId
+        if doc.cwd.diff.fname:
+            rows.append(makeRow(docId, "CWD", doc.cwd))
+            docId = "&nbsp;"
+        if doc.lastv.diff.fname:
+            rows.append(makeRow(docId, "LASTV", doc.lastv))
+            docId = "&nbsp;"
+        if doc.lastp.diff.fname:
+            rows.append(makeRow(docId, "LASTP", doc.lastp))
 
     # What we're showing
     stamp = ""
@@ -213,8 +248,8 @@ if directory:
  <input type='hidden' name='reSortDir' value='%s' />
  <input type='submit' name='reSort' value='Sort By' />
  <input type='radio' name='sortBy' value='byCdrId'%s>CDR ID</input>
- <input type='radio' name='sortBy' value='byDiff'%s>Diff size</input>
- <input type='radio' name='sortBy' value='byCwdSize'%s>File size</input>
+ <input type='radio' name='sortBy' value='byDiff'%s>CWD diff size</input>
+ <input type='radio' name='sortBy' value='byCwdSize'%s>New file size</input>
  </center>
 </form>
 <p>%sTotal docs = %d &nbsp; Total versions = %d</p>
@@ -222,7 +257,7 @@ if directory:
   <table border='0'>
   <tr>
    <td>CDR ID</td><td>Ver.</td><td colspan='4'>Files</td>
-   <td>CWD Size</td><td>Diff size</td>
+   <td>New Size</td><td>Diff size</td>
   </tr>
 %s
   </table>
