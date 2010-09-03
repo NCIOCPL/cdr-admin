@@ -70,7 +70,6 @@ class DocFileInfo:
             baseDir  - Directory path containing the files.
             filename -  e.g., "CDR0000012345.new.xml
         """
-        cdr.logwrite("DocFileInfo: full filename=%s/%s" % (baseDir, filename))
         self.fname = filename
         self.fsize = 0
         try:
@@ -91,7 +90,6 @@ class DocVerInfo:
             baseDir  - Directory path containing the files.
             basename - CDR ID in string format "CDR0000012345.lastv".
         """
-        cdr.logwrite("DocVerInfo: basename=%s" % basename)
         self.old  = DocFileInfo(baseDir, "%s%s" % (basename, "old.xml"))
         self.new  = DocFileInfo(baseDir, "%s%s" % (basename, "new.xml"))
         self.diff = DocFileInfo(baseDir, "%s.%s" % (basename, "diff"))
@@ -109,12 +107,10 @@ class Doc:
             docId   - "CDR000..." format CDR ID.
         """
 
-        cdr.logwrite("Doc: docId=%s" % docId)
         self.docId = docId
         self.cwd   = DocVerInfo(baseDir, "%s.%s" % (docId, "cwd"))
         self.lastv = DocVerInfo(baseDir, "%s.%s" % (docId, "lastv"))
         self.lastp = DocVerInfo(baseDir, "%s.%s" % (docId, "pub"))
-        cdr.logwrite("Doc.cwd.old.fname=%s" % self.cwd.old.fname)
 
         # Used for all sorting
         self.cwdSize  = self.cwd.old.fsize
@@ -138,7 +134,6 @@ def makeRow(docId, col2, verInfo):
     Return:
         One complete row for the HTML table of hyperlinked files.
     """
-    cdr.logwrite("makeRow: verInfo.old.fname=%s" % verInfo.old.fname)
     # If there is an errors file, we need to hyperlink it
     errLink = "&nbsp;"
     if verInfo.err.fname:
@@ -164,22 +159,15 @@ def makeRow(docId, col2, verInfo):
 #   all files in that directory
 if directory:
     baseDir = BASE + directory
-    cdr.logwrite("main: baseDir=%s" % baseDir)
     files = os.listdir(baseDir)
     docs = {}
     for file in files:
-        cdr.logwrite("main: file=%s" % file)
         if file.startswith('CDR0') and (file.endswith('xml') or
                                         file.endswith('diff') or
                                         file.endswith('NEW_ERRORS.txt')):
             docId = file[:13]
-            cdr.logwrite("main: docId=%s" % docId)
             if not docs.has_key(docId):
-                cdr.logwrite("main: key not found, creating it")
                 doc = docs[docId] = Doc(baseDir, docId)
-                cdr.logwrite(
- "main: doc=%s .cwd=%s ..old=%s ...fname=%s" %
- (doc, doc.cwd, doc.cwd.old, doc.cwd.old.fname))
     keys = docs.keys()
 
     # Check radio buttons
