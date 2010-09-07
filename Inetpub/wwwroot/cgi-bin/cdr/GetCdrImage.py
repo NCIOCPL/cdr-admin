@@ -24,10 +24,11 @@ cursor  = conn.cursor()
 
 # If the docId comes in in the format 'CDR99999-111.jpg' it is coming 
 # from the PublishPreview with a size postfix.
+# We capture the size instructions.
 # --------------------------------------------------------------------
+cdrId = cdrId.split('.')[0]
 if cdrId.find('-') > 0:
-    docId = cdrId.split('-')[0]
-    width = cdrId.split('-')[1].split('.')[0]
+    docId, width = cdrId.split('-')
 else:
     docId = cdrId
 
