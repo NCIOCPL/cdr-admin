@@ -2,18 +2,7 @@
 #
 # $Id$
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.4  2008/09/10 17:31:44  venglisc
-# Adding new menu option for DrugInfo Lists report (Bug 4250).
-#
-# Revision 1.2  2007/04/27 22:51:54  venglisc
-# Adding new menu item for Publish Preview.
-#
-# Revision 1.1  2006/05/16 20:45:24  venglisc
-# Initila copy of DrugInfoSummary reports menu (Bug 2053).
-#
-# Inintial version of Drug Information Reports Menu page of the 
-# Admin interface. (Bug 2053)
+# BZIssue::4887 - New Drug Information Summary Report
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
@@ -66,6 +55,7 @@ form += """</OL><H3>Other Reports</H3><OL>"""
 
 OtherReports = [
            ('DrugDescriptionReport.py?', 'Drug Description Report'),
+           ('DrugIndicationsReport.py?', 'Drug Indications Report'),
            ('DISLists.py?',              'Drug Information Summaries Lists')]
 
 for r in OtherReports:
