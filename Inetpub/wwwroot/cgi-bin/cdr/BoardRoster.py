@@ -5,57 +5,8 @@
 # Report to display the Board Roster with or without assistant
 # information.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.15  2009/09/28 16:00:08  venglisc
-# Adding a blank column to the summary sheet report option. (Bug 4649)
-#
-# Revision 1.14  2009/05/12 14:18:45  venglisc
-# Modified to send Unicode string to sendPage() function. (Bug 4560)
-#
-# Revision 1.13  2008/09/03 18:02:17  venglisc
-# Modified quoting in JavaScript call which prevented IE from running
-# correctly. (Bug 4236)
-#
-# Revision 1.12  2008/08/22 19:24:25  venglisc
-# Formatting changes to summary sheet and full report. (Bug 4236)
-#
-# Revision 1.11  2008/08/08 22:27:36  venglisc
-# Added TermStartDate as column to summary sheet. (Bug 4236)
-#
-# Revision 1.10  2008/07/22 17:07:28  venglisc
-# Added another option to create a summary sheet for the board managers to
-# display only the name, phone, email, fax, CDR-ID. (Bug 4204)
-#
-# Revision 1.9  2007/08/27 20:57:52  bkline
-# Change in address string at Sheri's request (#3553).
-#
-# Revision 1.8  2006/09/27 23:16:09  venglisc
-# Changing Suite number of Board Manager address. (Bug 2530)
-#
-# Revision 1.7  2006/03/30 16:37:49  venglisc
-# Changed address to replace CIPS with OCCM. (Bug 2031)
-#
-# Revision 1.6  2005/02/23 15:36:34  venglisc
-# Fixed incorrect comment indicators.  This caused the style for italics to
-# be ignored. (Bug 1527)
-#
-# Revision 1.5  2005/02/22 19:17:02  venglisc
-# Modified code to add style for suppressing display of italic information.
-# (Bug 1527)
-#
-# Revision 1.4  2005/02/19 04:08:13  bkline
-# Fixed bug in determining which board members are current.  Fixed bug
-# in identifying editors-in-chief.
-#
-# Revision 1.3  2005/02/17 22:10:22  venglisc
-# Added Board Manager's contact information at end of report (Bug 1527).
-#
-# Revision 1.2  2005/02/10 19:17:36  bkline
-# Converted from POST to GET form request; tightened up SQL query.
-#
-# Revision 1.1  2004/05/21 20:59:37  venglisc
-# Initial Version to create the PDQ Board Member Roster report.
-#
+# BZIssue::4909 - Board Roster Report Change
+# 
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, cdrdb, re, time
 
@@ -63,16 +14,17 @@ import cgi, cdr, cdrcgi, cdrdb, re, time
 # Set the form variables.
 #----------------------------------------------------------------------
 fields     = cgi.FieldStorage()
-boardId    = fields and fields.getvalue("board") or None
-otherInfo  = fields and fields.getvalue("oinfo") or 'No'
-assistant  = fields and fields.getvalue("ainfo") or 'No'
-phone      = fields and fields.getvalue("pinfo") or 'No'
-fax        = fields and fields.getvalue("finfo") or 'No'
-cdrid      = fields and fields.getvalue("cinfo") or 'No'
-email      = fields and fields.getvalue("einfo") or 'No'
-startDate  = fields and fields.getvalue("dinfo") or 'No'
-blankCol   = fields and fields.getvalue("blank") or 'No'
-flavor     = fields and fields.getvalue("sheet") or 'full'
+boardId    = fields and fields.getvalue("board")  or None
+otherInfo  = fields and fields.getvalue("oinfo")  or 'No'
+assistant  = fields and fields.getvalue("ainfo")  or 'No'
+subgroup   = fields and fields.getvalue("sginfo") or 'No'
+phone      = fields and fields.getvalue("pinfo")  or 'No'
+fax        = fields and fields.getvalue("finfo")  or 'No'
+cdrid      = fields and fields.getvalue("cinfo")  or 'No'
+email      = fields and fields.getvalue("einfo")  or 'No'
+startDate  = fields and fields.getvalue("dinfo")  or 'No'
+blankCol   = fields and fields.getvalue("blank")  or 'No'
+flavor     = fields and fields.getvalue("sheet")  or 'full'
 session    = cdrcgi.getSession(fields)
 request    = cdrcgi.getRequest(fields)
 title      = "PDQ Board Roster Report"
@@ -101,8 +53,9 @@ header     = cdrcgi.header(title, title, instr, script, buttons,
              document.getElementById('summary').checked = true;
              }
 
-         document.getElementById('contact').checked = false;
+         document.getElementById('contact').checked   = false;
          document.getElementById('assistant').checked = false;
+         document.getElementById('subgroup').checked  = false;
          var form = document.forms[0];
          {
              form.einfo.value = form.einfo.checked ? 'Yes' : 'No';
@@ -118,12 +71,23 @@ header     = cdrcgi.header(title, title, instr, script, buttons,
          document.getElementById('summary').checked = false;
          var form = document.forms[0];
          {
-             form.oinfo.value = form.oinfo.checked ? 'Yes' : 'No';
-             form.ainfo.value = form.ainfo.checked ? 'Yes' : 'No';
-             form.sheet.value = form.sheet.checked ? 'summary' : 'full';
+             form.oinfo.value  = form.oinfo.checked  ? 'Yes' : 'No';
+             form.ainfo.value  = form.ainfo.checked  ? 'Yes' : 'No';
+             form.sginfo.value = form.sginfo.checked ? 'Yes' : 'No';
+             form.sheet.value  = form.sheet.checked  ? 'summary' : 'full';
          }
      }
     </script>
+    <style type="text/css">
+     td       { font-size: 12pt; }
+     .label   { font-weight: bold; }
+     .label2  { font-size: 11pt;
+                font-weight: bold; }
+     .select:hover { background-color: #FFFFCC; }
+     .grey    {background-color: #BEBEBE; }
+     .topspace { margin-top: 24px; }
+
+    </style>
 """)
 boardId    = boardId and int(boardId) or None
 dateString = time.strftime("%B %d, %Y")
@@ -380,95 +344,110 @@ def makeSheet(rows):
 #----------------------------------------------------------------------
 if not boardId:
     form   = """\
-      <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-      <TABLE border='0'>
-       <TR>
-        <TD ALIGN='right'><B>PDQ Board:&nbsp;</B></TD>
-        <TD>%s</TD>
-       </TR>
-       <TR>
-        <TD ALIGN='right'> </TD>
-        <TD>
-         <INPUT TYPE='checkbox' NAME='oinfo' id='contact'
-                onclick='jacascript:doFullReport()'>
-         Show All Contact Information
-        </TD>
-       </TR>
-       <TR>
-        <TD ALIGN='right'> </TD>
-        <TD>
-         <INPUT TYPE='checkbox' NAME='ainfo' id='assistant'
-                onclick='javascript:doFullReport()'>
-         Show Assistant Information
-         <div style="height: 10px"> </div>
-        </TD>
-       </TR>
-       <TR style="margin-top: 24px">
-        <TD ALIGN='right'> </TD>
-        <TD style="background-color: #BEBEBE">
-         <div style="height: 10px"> </div>
-         <INPUT TYPE='checkbox' NAME='sheet' id='summary'
-                onclick='javascript:doSummarySheet("summary")'>
-          <strong >Create Summary Sheet</strong>
-         <table>
-          <tr>
-           <th><span style="margin-left: 20px"> </span></th>
-           <th style="font-size: 10pt">Include Columns
-          <tr>
-           <td><span style="margin-left: 20px"> </span></td>
-           <td>
-            <input type='checkbox' name='pinfo' 
-                   onclick='javascript:doSummarySheet()' id='E1' CHECKED>
-            Phone
-           </td>
-          </tr>
-          <tr>
-           <td> </td>
-           <td>
-            <input type='checkbox' name='finfo' 
-                   onclick='javascript:doSummarySheet()' id='E2'>
-            Fax
-           </td>
-          </tr>
-          <tr>
-           <td> </td>
-           <td>
-            <input type='checkbox' name='einfo' 
-                   onclick='javascript:doSummarySheet()' id='E3'>
-            Email
-           </td>
-          </tr>
-          <tr>
-           <td> </td>
-           <td>
-            <input type='checkbox' name='cinfo' 
-                   onclick='javascript:doSummarySheet()' id='E4'>
-            CDR-ID
-           </td>
-          </tr>
-          <tr>
-           <td> </td>
-           <td>
-            <input type='checkbox' name='dinfo' 
-                   onclick='javascript:doSummarySheet()' id='E5'>
-            Start Date
-           </td>
-          </tr>
-          <tr>
-           <td> </td>
-           <td>
-            <input type='checkbox' name='blank' 
-                   onclick='javascript:doSummarySheet()' id='E6'>
-            Blank Column
-           </td>
-          </tr>
-         </table>
-        </TD>
-       </TR>
-       </TABLE>
-      </FORM>
-     </BODY>
-    </HTML>
+  <input TYPE='hidden' NAME='%s' VALUE='%s'>
+
+  <table>
+   <tr>
+    <td class="label">PDQ Board:&nbsp;</TD>
+    <td>%s</td>
+   </tr>
+   <tr>
+    <td> </td>
+    <td class="select">
+     <input type='checkbox' name='oinfo' id='contact'
+            onclick='jacascript:doFullReport()'>
+     <label for="contact">Show All Contact Information</label>
+    </td>
+   </tr>
+   <tr>
+    <td> </td>
+    <td class="select">
+     <input type='checkbox' name='sginfo' id='subgroup'
+            onclick='javascript:doFullReport()'>
+     <label for="subgroup">Show Subgroup Information</label>
+    </td>
+   </tr>
+   <tr>
+    <td> </td>
+    <td class="select">
+     <input type='checkbox' name='ainfo' id='assistant'
+            onclick='javascript:doFullReport()'>
+     <label for="assistant">Show Assistant Information</label>
+    </td>
+   </tr>
+   <tr>
+    <td colspan="2">
+     <div style="height: 10px"> </div>
+    </td>
+   </tr>
+   <tr>
+    <td> </td>
+    <td class="grey">
+     <div style="height: 10px"> </div>
+     <input TYPE='checkbox' NAME='sheet' id='summary'
+            onclick='javascript:doSummarySheet("summary")'>
+      <label for="summary" class="select">
+       <strong>Create Summary Sheet</strong>
+      </label>
+     <table>
+      <tr>
+       <th><span style="margin-left: 20px"> </span></th>
+       <th class="label2">Include Columns</th>
+      <tr>
+       <td><span style="margin-left: 20px"> </span></td>
+       <td class="select">
+        <input type='checkbox' name='pinfo' 
+               onclick='javascript:doSummarySheet()' id='E1' CHECKED>
+        <label for="E1">Phone</label>
+       </td>
+      </tr>
+      <tr>
+       <td> </td>
+       <td class="select">
+        <input type='checkbox' name='finfo' 
+               onclick='javascript:doSummarySheet()' id='E2'>
+        <label for="E2">Fax</label>
+       </td>
+      </tr>
+      <tr>
+       <td> </td>
+       <td class="select">
+        <input type='checkbox' name='einfo' 
+               onclick='javascript:doSummarySheet()' id='E3'>
+        <label for="E3">Email</label>
+       </td>
+      </tr>
+      <tr>
+       <td> </td>
+       <td class="select">
+        <input type='checkbox' name='cinfo' 
+               onclick='javascript:doSummarySheet()' id='E4'>
+        <label for="E4">CDR-ID</label>
+       </td>
+      </tr>
+      <tr>
+       <td> </td>
+       <td class="select">
+        <input type='checkbox' name='dinfo' 
+               onclick='javascript:doSummarySheet()' id='E5'>
+        <label for="E5">Start Date</label>
+       </td>
+      </tr>
+      <tr>
+       <td> </td>
+       <td class="select">
+        <input type='checkbox' name='blank' 
+               onclick='javascript:doSummarySheet()' id='E6'>
+        <label for="E6">Blank Column</label>
+       </td>
+      </tr>
+     </table>
+    </td>
+   </tr>
+   </table>
+  </form>
+ </body>
+</html>
 """ % (cdrcgi.SESSION, session, getBoardPicklist())
     cdrcgi.sendPage(header + form)
 
@@ -498,14 +477,8 @@ class BoardMember:
         return 1
     
 #----------------------------------------------------------------------
-# This is trickier than the other form of the report, because we must
-# deal with two possible conditions:
-#   1. A board member is linked to a board, but to none of that board's
-#      summaries.
-#   2. A summary lists a board member whose own document does not
-#      reflect that membership.
-#
-# XXX Note: Comment not reflected in code.  RMK 2005-02-10
+# Select the list of board members associated to a board (passed in
+# by the selection of the user) along with start/end dates.
 #----------------------------------------------------------------------
 try:
     cursor.execute("""\
@@ -560,20 +533,20 @@ except cdrdb.Error, info:
 html = """\
 <!DOCTYPE HTML PUBLIC '-//W3C//DTD HTML 4.01 Transitional//EN'
                       'http://www.w3.org/TR/html4/loose.dtd'>
-<HTML>
- <HEAD>
-  <TITLE>PDQ Board Member Roster Report - %s</title>
-  <META http-equiv='Content-Type' content='text/html; charset=UTF-8'>
-  <STYLE type='text/css'>
-   H1       { font-family: Arial, sans-serif; 
+<html>
+ <head>
+  <title>PDQ Board Member Roster Report - %s</title>
+  <meta http-equiv='Content-Type' content='text/html; charset=UTF-8'>
+  <style type='text/css'>
+   h1       { font-family: Arial, sans-serif; 
               font-size: 16pt;
               text-align: center; 
               font-weight: bold; }
-   H2       { font-family: Arial, sans-serif; 
+   h2       { font-family: Arial, sans-serif; 
               font-size: 14pt;
               text-align: center; 
               font-weight: bold; }
-   P        { font-family: Arial, sans-serif; 
+   p        { font-family: Arial, sans-serif; 
               font-size: 12pt; }
    #summary td, #summary th
             { border: 1px solid black; }
@@ -591,7 +564,7 @@ html = """\
    /* ----------------------------------------------------------- */
    I        { font-family: Arial, sans-serif; font-size: 12pt; 
               font-style: normal; }
-   SPAN.SectionRef { text-decoration: underline; font-weight: bold; }
+   span.SectionRef { text-decoration: underline; font-weight: bold; }
 
    .theader { background-color: #CFCFCF; }
    .name    { font-weight: bold; 
@@ -601,14 +574,14 @@ html = """\
    .blank   { width: 100px; }
    #main    { font-family: Arial, Helvetica, sans-serif;
               font-size: 12pt; }
-  </STYLE>
- </HEAD>  
- <BODY id="main">
+  </style>
+ </head>  
+ <body id="main">
 """ % boardName
 
 if flavor == 'full':
     html += """
-   <H1>%s<br><span style="font-size: 12pt">%s</span></H1>
+   <h1>%s<br><span style="font-size: 12pt">%s</span></h1>
 """ % (boardName, dateString)   
 
 count = 0
@@ -620,6 +593,7 @@ for boardMember in boardMembers:
                              boardMember.id,
                              parm = [['otherInfo', otherInfo],
                                      ['assistant', assistant],
+                                     ['subgroup',  subgroup],
                                      ['eic',
                                       boardMember.isEic and 'Yes' or 'No']])
     if type(response) in (str, unicode):
@@ -694,8 +668,8 @@ html += """
        </td>
    </tr>
   </table>
- </BODY>   
-</HTML>    
+ </body>   
+</html>    
 """ % (boardManagerInfo and boardManagerInfo[0][1] or 'No Board Manager', 
        boardManagerInfo and boardManagerInfo[2][1] or 'TBD',
        boardManagerInfo and boardManagerInfo[1][1] or 'TBD', 
