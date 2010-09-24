@@ -5,6 +5,7 @@
 # Report listing summaries containing specified markup.
 #
 # BZIssue::4756 - Summary Comments Report
+# BZIssue::4908 - Editing Summary Comments Report in MS Word
 #
 # Note:
 # This report has been adapted from the SummariesLists report.
@@ -32,7 +33,8 @@ buttons     = ["Submit Request", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 script      = "SummaryComments.py"
 title       = "CDR Administration"
 section     = "Summary Comments Report"
-header      = cdrcgi.header(title, title, section, script, buttons)
+header      = cdrcgi.header(title, title, section, script, buttons,
+                            method = 'GET')
 
 userCol   = False
 blankCol  = False
@@ -121,7 +123,7 @@ def htmlCommentRow(info, displayType, addUserCol = True,
 
     if addBlankCol:
         html += """\
-    <TD class="s" width="20%%">&nbsp;</TD>
+    <TD class="s" width="20%">&nbsp;</TD>
 """
 
     html += """\
@@ -253,6 +255,7 @@ if not lang and not docId:
                             SUBMENU,
                             cdrcgi.MAINMENU),
                            numBreaks = 1,
+                           method = 'GET',
                            stylesheet = """
    <STYLE type="text/css">
     TD      { font-size:  12pt; }
@@ -642,6 +645,13 @@ for summary in rows:
 
 
 # Create the results page.
+# 
+# Note: Since the users want to be able to convert the HTML output 
+#       to a Word document we need to specify the CSS class selectors
+#       without an asterix '*'.  MS-Word doesn't recognize
+#          *.dada { color: blue; }
+#       as a valid selector but does accept
+#           .dada { color: blue; }
 #----------------------------------------------------------------------
 instr     = '%s Summaries List -- %s.' % (lang, dateString)
 header    = cdrcgi.rptHeader(title, instr, 
@@ -654,11 +664,11 @@ header    = cdrcgi.rptHeader(title, instr,
     TABLE          { margin-top:    10px; 
                      margin-bottom: 30px; } 
 
-    *.date         { font-size: 12pt; }
-    *.boardHdr     { font-size: 12pt;
+    .date          { font-size: 12pt; }
+    .boardHdr      { font-size: 12pt;
                      font-weight: bold;
                      text-decoration: underline; }
-    *.sectionHdr   { font-size: 12pt;
+    .sectionHdr    { font-size: 12pt;
                      font-weight: bold; 
                      font-style: italic; }
     td.report      { font-size: 11pt;
@@ -668,16 +678,16 @@ header    = cdrcgi.rptHeader(title, instr,
     td.display     { background-color: white; 
                      font-weight: bold;
                      text-align: center; }
-    *.cdrid        { text-align: right }
+    .cdrid         { text-align: right }
     LI             { list-style-type: none }
     li.report      { font-size: 11pt;
                      font-weight: normal; }
     div.es          { height: 10px; }
-    *.internal     { font-weight: bold;
+    .internal      { font-weight: bold;
                      color: blue; }
-    *.external     { font-weight: bold;
+    .external      { font-weight: bold;
                      color: green; }
-    *.response     { font-weight: bold;
+    .response      { font-weight: bold;
                      color: brown; }
    </STYLE>
 """)
@@ -690,13 +700,13 @@ if lang == 'English' or not lang:
 else:
     hdrLang = lang
 
+#  <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
+# """ % (cdrcgi.SESSION, session, hdrLang, audience, dateString)
 report    = """\
-   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-  </FORM>
   <H3>PDQ %s %s Summaries<br>
   <span class="date">(%s)</span>
   </H3>
-""" % (cdrcgi.SESSION, session, hdrLang, audience, dateString)
+""" % (hdrLang, audience, dateString)
 
 if not docId: board_type = rows[0][5]
 
