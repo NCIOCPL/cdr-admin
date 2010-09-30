@@ -21,6 +21,7 @@
 # BZIssue::1570
 # BZIssue::1664
 # BZIssue::3326
+# BZIssue::4913
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string, cdrdb, cdrpubcgi, cdrmailcommon, sys
@@ -466,11 +467,6 @@ Medicine's ClinicalTrials.gov Web site as "%s."
 
 We will be contacting you periodically to verify the information and
 look forward to your cooperation.
-
-If you have additional trials to submit, please use the new NCI
-Clinical Trial Submission Portal at
-
-http://pdqupdate.cancer.gov/submission.
 
 Protocol Coordinator
 NCI's PDQ\u00ae Cancer Clinical Trials Registry

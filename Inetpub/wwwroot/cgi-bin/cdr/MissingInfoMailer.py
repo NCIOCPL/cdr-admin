@@ -4,16 +4,7 @@
 #
 # Program to send out a mailer for missing protocol information.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.3  2008/09/02 20:00:23  bkline
-# Wording changes and Unicode cleanup.
-#
-# Revision 1.2  2007/10/31 16:16:54  bkline
-# Final modifications before being placed in production.
-#
-# Revision 1.1  2007/07/26 12:00:12  bkline
-# New script to send out an email message asking for protocol information
-# which has been omitted.
+# BZIssue::4913
 #
 #----------------------------------------------------------------------
 import cdr, cdrdb, cgi, cdrcgi, textwrap, xml.dom.minidom, xml.sax.saxutils
@@ -334,9 +325,6 @@ paras.append(wrapper.fill(u'If you have any questions, please call the PDQ '
 paras.append(u"""\
 PDQ Protocol Coordinator
 Office of Cancer Content Management""")
-paras.append(u"""\
-Submitting new trials to PDQ?  Try our new online submission portal:
-http://pdqupdate.cancer.gov/submission""")
 body = u"\n\n".join(paras) + u"\n"
 
 # Show it to the user for her approval.
