@@ -102,7 +102,9 @@ form += """\
     </OL>
     <H3>Management Reports</H3>
     <OL>
-"""
+     <LI><A HREF='http://bach.nci.nih.gov/cgi-bin/cdr/%s?%s=%s'>%s</A></LI>
+""" % ('FindOrphanedCTGovProtocols.py', cdrcgi.SESSION, session,
+       'CTGov trials not receiving updates')
 
 reports = [
            ('CTGovUpdateReport.py', 'CTGovProtocols Imported vs. CWDs'),
