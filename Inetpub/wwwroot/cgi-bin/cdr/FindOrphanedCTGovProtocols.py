@@ -8,7 +8,7 @@
 #
 #----------------------------------------------------------------------
 import cdrdb, glob, os, re, urllib2, cStringIO, zipfile, lxml.etree as etree
-import sys, cdrcgi
+import sys, cdrcgi, cgi, cdr
 
 def getFiles():
     pattern = re.compile('CTGovDownload-(\\d+).zip')
@@ -82,7 +82,7 @@ class Trial:
         self.cdrId = cdrId
         self.nlmStatus = getNlmStatus(nctId)
         self.pdqStatus = getPdqStatus(cdrId, cursor)
-        self.isBlocked = isBlocked(cdrId, cursor)
+        self.isBlocked = False #isBlocked(cdrId, cursor)
     def __cmp__(self, other):
         diff = cmp(self.nlmStatus, other.nlmStatus)
         if diff:
@@ -93,6 +93,10 @@ class Trial:
         return cmp(self.nctId, other.nctId)
 
 def main():
+    fields = cgi.FieldStorage()
+    session = cdrcgi.getSession(fields)
+    if not cdr.canDo(session, 'REPORT CTGOV ORPHANS'):
+        cdrcgi.bail('User not authorized to run this report')
     workDir, files = getFiles()
     names = set([f[:-4] for f in files])
     html = [u"""\
@@ -119,7 +123,6 @@ def main():
    </tr>
 """ % workDir]
     orphaned = []
-    done = 0
     cursor = cdrdb.connect('CdrGuest').cursor()
     cursor.execute("""\
         SELECT cdr_id, nlm_id
@@ -129,8 +132,8 @@ def main():
     rows = cursor.fetchall()
     for cdrId, nlmId in rows:
         if nlmId.lower() not in names:
-            orphaned.append(Trial(nlmId, cdrId, cursor))
-        done += 1
+            if not isBlocked(cdrId, cursor):
+                orphaned.append(Trial(nlmId, cdrId, cursor))
     orphaned.sort()
     for trial in orphaned:
         html.append(u"""\
