@@ -9,6 +9,7 @@
 # one document per row.
 #
 # BZIssue::4717 (add audience selection criterion)
+# BZIssue::4931 Media Caption and Content Report: Bug in Date Selections
 #
 #----------------------------------------------------------------------
 
@@ -141,59 +142,79 @@ SELECT DISTINCT value, value
              "Media Caption and Content Report",
              script="MediaCaptionContent.py", buttons=buttons)
     html = header + """
+<fieldset>
+<legend>&nbsp;Instructions&nbsp;</legend>
 <p style="font-size: 10pt; font-weight: 600">
 To prepare an Excel format report of Media Caption and Content
-information, enter starting and ending dates (inclusive) for the the
+information, enter starting and ending dates (inclusive) for the
 last versions of the Media documents to be retrieved.  You may also
 select documents with specific diagnoses, categories, language, or
 audience of the content description.  Relevant fields from the Media
 documents that meet the selection criteria will be displayed in an
 Excel spreadsheet.
 </p>
+</fieldset>
 
 %s
 
-<center>
-<table border='0'>
- <tr>
-  <td align="right" nowrap="1"><b>Start date: </b></td>
-  <td align="left"><input type='text' name='startDate' size='12' value='%s' />
- </tr>
- <tr>
-  <td align="right" nowrap="1"><b>&nbsp; &nbsp; &nbsp; End date: </b></td>
-  <td align="left"><input type='text' name='endDate' size='12' value='%s' />
- </tr>
- <tr>
-  <td align="right"><b>Diagnosis: </b></td><td align="left">
-%s
- </tr>
- <tr>
-  <td align="right"><b>Category: </b></td><td align="left">
-%s
- </tr>
- <tr>
-  <td align="right"><b>Language: </b></td><td align="left">
-    <select name="language">
-     <option value="all" selected="1">All Languages</option>
-     <option value="en">English</option>
-     <option value="es">Spanish</option>
-    </select></td>
- </tr>
- <tr>
-  <td align="right"><b>Audience: </b></td><td align="left">
-    <select name="audience">
-     <option value="all" selected="1">All Audiences</option>
-     <option value="Health_professionals">HP</option>
-     <option value="Patients">Patient</option>
-    </select></td>
- </tr>
-</table>
-</center>
-<input type="hidden" name=%s value=%s />
-</form>
-</body>
+    <fieldset>
+     <legend>&nbsp;Time Frame&nbsp;</legend>
+     <center>
+      <table width="100%%" border='0'>
+       <tr>
+        <td width="25%%" align="right" nowrap="1"><b>Start date: </b></td>
+        <td align="left"><input type='text' name='startDate' 
+                                size='12' value='%s' />
+       </tr>
+       <tr>
+        <td align="right" nowrap="1">
+         <b>&nbsp; &nbsp; &nbsp; End date: </b>
+        </td>
+        <td align="left"><input type='text' name='endDate' 
+                                size='12' value='%s' />
+       </tr>
+      </table>
+     </center>
+    </fieldset>
+""" % (errMsgs, startDate, endDate)
+
+    html += """
+    <fieldset>
+     <legend>&nbsp;Include Specific Content&nbsp;</legend>
+     <center>
+      <table width="100%%" border='0'>
+       <tr>
+        <td width="25%%" align="right"><b>Diagnosis: </b></td><td align="left">
+    %s
+       </tr>
+       <tr>
+        <td align="right"><b>Category: </b></td><td align="left">
+    %s
+       </tr>
+       <tr>
+        <td align="right"><b>Language: </b></td><td align="left">
+          <select name="language">
+           <option value="all" selected="1">All Languages</option>
+           <option value="en">English</option>
+           <option value="es">Spanish</option>
+          </select></td>
+       </tr>
+       <tr>
+        <td align="right"><b>Audience: </b></td><td align="left">
+          <select name="audience">
+           <option value="all" selected="1">All Audiences</option>
+           <option value="Health_professionals">HP</option>
+           <option value="Patients">Patient</option>
+          </select></td>
+       </tr>
+      </table>
+     </center>
+    </fieldset>
+   <input type="hidden" name=%s value=%s />
+  </form>
+ </body>
 </html>
-""" % (errMsgs, startDate, endDate,
+""" % (
        cdrcgi.generateHtmlPicklist(conn, "diagnosis", diagnosisMenuQry,
                 optionPattern, selAttrs=selAttrs, firstOpt=dftDiagnosis),
        cdrcgi.generateHtmlPicklist(conn, "category", categoryMenuQry,
@@ -302,7 +323,7 @@ SELECT DISTINCT d.id, d.title
 whereClause = """\
  WHERE t.name = 'Media'
    AND v.dt >= '%s'
-   AND v.dt <= '%s'
+   AND v.dt < dateadd(day, 1, '%s')
 """ % (startDate, endDate)
 
 # If optional criteria entered, add the requisite joins
