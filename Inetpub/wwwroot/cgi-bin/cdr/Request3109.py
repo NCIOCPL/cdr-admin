@@ -39,15 +39,13 @@
 # Could we add a column to indicate whether a trial is published on
 # Cancer.gov yet?"]
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.3  2009/07/02 15:07:05  venglisc
-# Added additional columns with status information to worksheets. (Bug 4604)
+# [Amended by Lakshmi 2010-10-08:
 #
-# Revision 1.2  2007/04/23 12:42:02  bkline
-# Changed filename for output at Lakshmi's request.
+# "Is there a way we can make it so that the PDQ UI is the full CDR
+# identifier that we send to CTGOV."]
 #
-# Revision 1.1  2007/04/23 12:39:38  bkline
-# Organization Protocols Spreadsheet report.
+# BZIssue::4604
+# BZIssue::4933
 #
 #----------------------------------------------------------------------
 
@@ -408,9 +406,9 @@ if debugging:
 
 def addSheet(wb, styles, protocolOrgs, title, sheet = 'ws2'):
     # Note: Columns with width "0.1" are hidden in the output
-    colWidth = { 'ws1':[40, 125, 125, 100, 400,  60, 0.1, 0.1,  65, 100],
-                 'ws2':[40, 125, 125, 100, 400, 0.1, 0.1, 0.1, 100,  65],
-                 'ws3':[40, 125, 125, 100, 400,  60,  60,  60, 100,  65]}
+    colWidth = { 'ws1':[80, 125, 125, 100, 400,  60, 0.1, 0.1,  65, 100],
+                 'ws2':[80, 125, 125, 100, 400, 0.1, 0.1, 0.1, 100,  65],
+                 'ws3':[80, 125, 125, 100, 400,  60,  60,  60, 100,  65]}
     colName  = { 'ws1':['PDQ UI', 'Primary Protocol ID', 
                         'Alternate IDs', 'ClinicalTrials.gov ID', 
                         'Original Title / PDQ Title (bold)', 
@@ -447,7 +445,8 @@ def addSheet(wb, styles, protocolOrgs, title, sheet = 'ws2'):
     rowNum = 2
     for protocolOrg in protocolOrgs:
         row = ws.addRow(rowNum)
-        row.addCell(1, protocolOrg.protocol.docId, style = styles.right)
+        row.addCell(1, cdr.normalize(protocolOrg.protocol.docId),
+                    style = styles.left)
 
         # Change per request (Bug 4606) 
         # Only published protocols are being displayed
