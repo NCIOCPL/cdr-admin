@@ -10,11 +10,54 @@
 # $Log: not supported by cvs2svn $
 #
 #--------------------------------------------------------------
-import cgi, cdr, cdrcgi, cdrdb
+import time, cgi, cdr, cdrcgi, cdrdb
 
 TITLE   = "Replace CWD with Older Version"
 SCRIPT  = "ReplaceCWDwithVersion.py"
 BUTTONS = (cdrcgi.MAINMENU, "Log Out")
+LOGFILE = "%s/%s" % (cdr.DEFAULT_LOGDIR, "CWDReplacements.log")
+
+def logReplacement(session, docIdNum, docType, verStat, verNum,
+                   saveVer, savePub, comment):
+    """
+    Write a message to a log file in a program parsable format giving
+    all details of the replacement.
+
+    Pass:
+        session - Used to get user ID.
+        docIdNum- CDR doc ID.
+        docType - Document type of docId.
+        verStat - Sequence of version numbers from cdr.lastVersions().
+        verNum  - Version number of doc made into CWD.
+        saveVer - True = CWD saved as a version.
+        savePub - True = CWD saved as publishable version.
+        comment - User entered reason for the change.
+
+    Return:
+        Void, data is written to tab separated fields in the log file.
+    """
+    # Format parts needed for logging
+    dateTime = time.strftime("%Y-%m-%d %H:%M:%S")
+
+    # User ID
+    result = cdr.idSessionUser(session, session)
+    if type(result) not in (type(()), type([])):
+        cdrcgi.bail("Unable to generate logging info: %s" % result)
+    userId = result[0].encode('ascii', 'ignore')
+
+    # Full message
+    msg = "%s\t%d\t%s\t%s\t%d\t%d\t%s\t%s\t%s\t%s\t%s\n" % \
+          (dateTime,docIdNum,docType,userId,verStat[0],verStat[1],verStat[2],
+           verNum, saveVer,savePub,comment)
+
+    # Log it
+    try:
+        fp = open(LOGFILE, "a")
+        fp.write(msg)
+        fp.close()
+    except IOError, info:
+        cdrcgi.bail("Error writing logfile %s: %s" % (LOGFILE, info))
+
 
 fields = cgi.FieldStorage()
 if not fields:
@@ -44,6 +87,12 @@ else:
 if action == "Cancel":
     # Force re-input of data by clearing version
     verStr = None
+
+# Check authorization to use this function
+if not cdr.canDo(session, "REPLACE CWD WITH VERSION"):
+    cdrcgi.bail(
+     "Sorry, you are not authorized to promote a version to become "
+     " the current working document")
 
 # Did we get what we needed
 if docIdStr and verStr:
@@ -85,7 +134,7 @@ if docIdStr and verStr:
 
     # Did we find a doc type?  Also means we found a doc
     if docType:
-        # Is the user authorized for this?
+        # Is the user authorized for this specific doctype?
         if not cdr.canDo(session, "MODIFY DOCUMENT", docType):
             cdrcgi.bail(
              "Sorry, you are not authorized to update documents of type %s" %
@@ -96,7 +145,8 @@ if docIdStr and verStr:
             cdrcgi.bail("You must specify a numeric version number")
 
         # Get max version info
-        (lastVer, lastPubVer, isChanged) = cdr.lastVersions(session, docIdStr)
+        verStatus = cdr.lastVersions(session, docIdStr)
+        lastVer, lastPubVer, isChanged = verStatus
 
         # Normalize version to positive integer
         verNum = int(verStr)
@@ -207,6 +257,8 @@ or <strong>Cancel</strong> to re-enter data.</p>
                 # Null docID means errors were fatal
                 html = "<h2>Document save <strong>failed</strong></h2>\n"
             else:
+                logReplacement(session, docIdNum, docType, verStatus, verNum,
+                               saveNewVer, savePub, comment)
                 html = "<h2>Document save <strong>successful</strong></h2>\n"
 
             if errors:
