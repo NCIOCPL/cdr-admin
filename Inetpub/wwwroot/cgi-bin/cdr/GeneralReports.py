@@ -94,7 +94,7 @@ elif action == SUBMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if action == "Log Out": 
+if action == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
@@ -105,59 +105,61 @@ form = """\
    <OL>""" % (cdrcgi.SESSION, session)
 
 reports = [
-           ('CdrQueries.py', 
+           ('CdrQueries.py',
             'Ad-Hoc Reports'),
            ('AdHocQuery.py',
             'Ad-Hoc SQL'),
-           ('CheckedOutDocs.py', 
+           ('CheckedOutDocs.py',
             'Checked Out Documents'),
-           ('CdrReport.py', 
+           ('CdrReport.py',
             'Checked Out Documents With No Activity'),
            ('ContentInventory.py',
             'Content Inventory Report'),
-           ('ActiveLogins.py', 
+           ('ActiveLogins.py',
             'Current Sessions'),
            ('db-tables.py',
             'Database Tables/Columns'),
-           ('DateLastModified.py', 
+           ('DateLastModified.py',
             'Date Last Modified'),
-           ('DatedActions.py', 
+           ('DatedActions.py',
             'Dated Actions'),
-           ('ActivityReport.py', 
+           ('ActivityReport.py',
             'Document Activity Report'),
-           ('DocVersionHistory.py', 
+           ('DocVersionHistory.py',
             'Document Version History'),
-           ('DocumentsModified.py', 
+           ('DocumentsModified.py',
             'Documents Modified'),
-           ('ExternMapFailures.py', 
+           ('ExternMapFailures.py',
             'External Map Failures Report'),
            ('CdrFilter',
             'Filter Document'),
            ('ShowGlobalChangeTestResults.py',
             'Global Change Test Results'),
-           ('InvalidDocs.py', 
+           ('InvalidDocs.py',
             'Invalid Documents'),
-           ('LinkedDocs.py', 
+           ('LinkedDocs.py',
             'Linked Documents'),
-           ('MediaLinks.py', 
+           ('MediaLinks.py',
             'Linked Media Documents'),
-           ('NewDocsWithPubStatus.py', 
+           ('NewDocsWithPubStatus.py',
             'List of New Documents with Publication Status'),
-           ('NewDocReport.py', 
+           ('NewDocReport.py',
             'New Document Count'),
-           ('ModWithoutPubVersion.py', 
+           ('ModWithoutPubVersion.py',
             'Records Modified Since Last Publishable Version'),
-           ('UnchangedDocs.py', 
+           ('UnchangedDocs.py',
             'Unchanged Documents'),
-           ('CheckUrls.py', 
-            'URL Check')
+           ('CheckUrls.py',
+            'URL Check'),
+           ('ReplaceCWDReport.py',
+            'Versions that Replaced CWDs')
           ]
 
 for r in reports:
     if r[0] != 'CdrFilter':
        form += """
-    <LI><A HREF='%s/%s?%s=%s'>%s</A></LI>""" % (cdrcgi.BASE, r[0], 
-                                            cdrcgi.SESSION, 
+    <LI><A HREF='%s/%s?%s=%s'>%s</A></LI>""" % (cdrcgi.BASE, r[0],
+                                            cdrcgi.SESSION,
                                             session, r[1])
     else:
        form += """
