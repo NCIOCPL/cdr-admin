@@ -6,7 +6,8 @@
 # they were last modified as entered by a user, and the date the last
 # Modify action was taken.
 #
-# $Log: not supported by cvs2svn $
+# BZIssue::4924 - Modify Summary Date Last Modified Report
+#
 # Revision 1.13  2008/07/30 17:00:23  venglisc
 # Added date to report. (Bug 4209)
 #
@@ -75,11 +76,6 @@ header      = cdrcgi.header(title, title, section, script, buttons,
    <link type='text/css' rel='stylesheet' href='/stylesheets/CdrCalendar.css'>
    <script language='JavaScript' src='/js/CdrCalendar.js'></script>
    <style type='text/css'>
-    body { background-color: #f8f8f8; font-family: sans-serif;
-           font-size: 11pt; }
-    legend  { font-weight: bold; color: teal; font-family: sans-serif; }
-    fieldset { width: 500px; margin-left: auto; margin-right: auto;
-               display: block; }
     .CdrDateField { width: 100px; }
    </style>
    <script language='JavaScript'>
@@ -348,6 +344,7 @@ class Summary:
         self.lastMod     = row[5]
         self.summaryType = row[6]
         self.lastSave    = row[7]
+        self.lastSaveUsr = Summary.__getSaveUsr(self.docId, cursor)
         self.comment     = None
         if self.board not in Summary.summaries:
             Summary.summaries[self.board] = {}
@@ -389,6 +386,22 @@ class Summary:
                       WHERE id = %s)""" % (docId, docId))
         rows = cursor.fetchall()
         return rows and rows[0][0] or None
+
+    @staticmethod
+    def __getSaveUsr(docId, cursor):
+        "Get the user from the last version of the document."
+        cursor.execute("""\
+       SELECT fullname 
+         FROM doc_last_save dls
+         JOIN doc_save_action dsa
+           ON dsa.doc_id = dls.doc_id
+          AND dls.last_save_date = dsa.save_date
+         JOIN usr u
+           ON u.id = dsa.save_user
+        WHERE dls.doc_id = %s""" % docId)
+        rows = cursor.fetchall()
+        return rows and rows[0][0] or None
+
 
 #----------------------------------------------------------------------
 # Find the summaries that belong in the report.
@@ -631,6 +644,7 @@ def addSection(sheet, summaries, board, language, audience, reportType,
     row.addCell(3 + extraCols, 'Date Last Modified')
     row.addCell(4 + extraCols, 'Last Modify Action Date (System)')
     row.addCell(5 + extraCols, 'LastV Publish?')
+    row.addCell(6 + extraCols, 'User')
     rowNum += 1
     summaries.sort()
     for summary in summaries:
@@ -639,7 +653,11 @@ def addSection(sheet, summaries, board, language, audience, reportType,
         if summaryType == 'Complementary and alternative medicine':
             summaryType = 'CAM'
         lastSave = ("%s" % summary.lastSave)[:10]
-        row.addCell(1, u"CDR%d" % summary.docId, style = styles.left)
+        url = ("http://%s" % cdrcgi.WEBSERVER + \
+                    "/cgi-bin/cdr/DocVersionHistory.py?" + \
+                    "Session=guest&DocId=%s" % summary.docId)
+        row.addCell(1, u"CDR%d" % summary.docId, style = styles.url,
+                    href = url)
         row.addCell(2, summary.title, style = styles.left)
         if reportType == 'S':
             row.addCell(3, summaryType, style = styles.left)
@@ -651,6 +669,7 @@ def addSection(sheet, summaries, board, language, audience, reportType,
         row.addCell(4 + extraCols, lastSave, style = urlStyle,
                     href = url)
         row.addCell(5 + extraCols, summary.lastVFlag, style = styles.center)
+        row.addCell(6 + extraCols, summary.lastSaveUsr, style = styles.center)
         rowNum += 1
     return rowNum + 1
 
