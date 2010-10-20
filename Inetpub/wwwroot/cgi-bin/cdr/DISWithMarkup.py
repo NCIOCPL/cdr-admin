@@ -45,7 +45,6 @@ def reportHeader(disTitle = 'Drug Information Summary Markup'):
     <th>Approved</th>
     <th>Proposed</th>
     <th>Rejected</th>
-    <th>Advisory</th>
    </tr>
 """ % (disTitle)
     return html
@@ -83,7 +82,6 @@ def summaryRow(id, summary, markupCount, display):
     <TD class="%s" width="7%%">%s</TD>
     <TD class="%s" width="7%%">%s</TD>
     <TD class="%s" width="7%%">%s</TD>
-    <TD class="%s" width="7%%">%s</TD>
    </TR>
 """ % (id, id, summary, 
            'publish' in display and 'display' or 'nodisplay',
@@ -97,10 +95,7 @@ def summaryRow(id, summary, markupCount, display):
                            and '&nbsp;' or markupCount['proposed'], 
            'rejected' in display and 'display' or 'nodisplay',
            ('rejected' not in display or markupCount['rejected'] == 0) 
-                           and '&nbsp;' or markupCount['rejected'],
-           'advisory' in display and 'display' or 'nodisplay',
-           ('advisory' not in display or markupCount['advisory'] == 0) 
-                           and '&nbsp;' or markupCount['advisory'])
+                           and '&nbsp;' or markupCount['rejected'])
     return html
 
 
@@ -165,10 +160,6 @@ if not markUp:
            value='rejected' CHECKED>
     <label for="rej">Rejected</label>
     <br>
-    <hr width="25%%">
-    <input name='markUp' type='checkbox' id="adv"
-           value='advisory' CHECKED>
-    <label for="adv">Advisory Board mark-up</label>
    </fieldset>
 
   </form>
@@ -225,22 +216,15 @@ for dis in rows:
     markupCount[dis[0]] = {'publish':0, 
                             'approved':0,
                             'proposed':0,
-                            'rejected':0,
-                            'advisory':0}
+                            'rejected':0}
     
     insertionElements = dom.getElementsByTagName('Insertion')  
     for obj in insertionElements:
         markupCount[dis[0]][obj.getAttribute('RevisionLevel')] += 1
-        advLevel = obj.getAttribute('Source')
-        if advLevel == 'advisory-board':
-            markupCount[dis[0]]['advisory'] += 1
 
     deletionElements  = dom.getElementsByTagName('Deletion')
     for obj in deletionElements:
         markupCount[dis[0]][obj.getAttribute('RevisionLevel')] += 1
-        advLevel = obj.getAttribute('Source')
-        if advLevel == 'advisory-board':
-            markupCount[dis[0]]['advisory'] += 1
 
 #cdrcgi.bail(dis)
 
