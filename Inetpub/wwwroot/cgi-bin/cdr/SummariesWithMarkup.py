@@ -5,6 +5,7 @@
 # Report listing summaries containing specified markup.
 #
 # BZIssue::4671 - Summaries with Mark-up Report
+# BZIssue::4922 - Enhancements to the Summaries with Markup Report
 #
 #----------------------------------------------------------------------
 import cdr, cgi, cdrcgi, time, cdrdb, xml.dom.minidom
@@ -30,6 +31,13 @@ buttons   = (SUBMENU, cdrcgi.MAINMENU)
 if type(showId) == type(""):
     showId = [showId]
 
+# The ReportType is needed to redirect the users to the interim page for
+# displaying markup QC reports
+# ----------------------------------------------------------------------
+if audience == 'Health Professional':
+    ReportType = 'rs'
+else:
+    ReportType = 'pat'
 
 # ---------------------------------------------------
 # Functions to replace sevaral repeated HTML snippets
@@ -81,7 +89,7 @@ def boardHeaderWithID(board_type):
 # -------------------------------------------------
 # Create the table row for the English table output
 # -------------------------------------------------
-def summaryRowWithID(id, summary, boardCount, display):
+def summaryRowWithID(id, summary, boardCount, display, ReportType = 'rs'):
     """Return the HTML code to display a Summary row with ID"""
 
     # The users only want to display those summaries that do have
@@ -102,7 +110,9 @@ def summaryRowWithID(id, summary, boardCount, display):
     # ------------------------------------------------------
     html = """\
    <TR>
-    <TD class="report cdrid" width = "7%%">%s</TD>
+    <TD class="report cdrid" width = "7%%">
+     <a href="/cgi-bin/cdr/QcReport.py?DocId=CDR%s&DocType=Summary&ReportType=%s&Session=guest">%s</a>
+    </TD>
     <TD class="report">%s</TD>
     <TD class="%s" width="7%%">%s</TD>
     <TD class="%s" width="7%%">%s</TD>
@@ -110,7 +120,7 @@ def summaryRowWithID(id, summary, boardCount, display):
     <TD class="%s" width="7%%">%s</TD>
     <TD class="%s" width="7%%">%s</TD>
    </TR>
-""" % (id, summary, 
+""" % (id, ReportType, id, summary, 
            'publish' in display and 'display' or 'nodisplay',
            ('publish' not in display or boardCount['publish']  == 0) 
                            and '&nbsp;' or boardCount['publish'], 
@@ -129,22 +139,11 @@ def summaryRowWithID(id, summary, boardCount, display):
     return html
 
 
-# ------------------------------------------------
-# Create the table row for the Spanish list output
-# ------------------------------------------------
-# def summaryRowES(summary, translation):
-#     """Return the HTML code to display a Spanish Summary"""
-#     html = """\
-#    <LI class="report">%s</LI>
-#    <LI class="report">&nbsp;&nbsp;&nbsp;(%s)<div class="es"> </div></LI>
-# """ % (row[1], row[4])
-#     return html
-# 
-
 # -------------------------------------------------
 # Create the table row for the Spanish table output
 # -------------------------------------------------
-def summaryRowESWithID(id, summary, translation, boardCount, display):
+def summaryRowESWithID(id, summary, translation, boardCount, display, 
+                       ReportType = 'rs'):
     """Return the HTML code to display a Spanish Summary row with ID"""
     # The users only want to display those summaries that do have
     # markup, so we need to suppress the once that don't by counting
@@ -164,7 +163,9 @@ def summaryRowESWithID(id, summary, translation, boardCount, display):
     # ------------------------------------------------------
     html = """\
    <TR>
-    <TD class="report cdrid" width = "7%%">%s</TD>
+    <TD class="report cdrid" width = "7%%">
+     <a href="/cgi-bin/cdr/QcReport.py?DocId=CDR%s&DocType=Summary&ReportType=%s&Session=guest">%s</a>
+    </TD>
     <TD class="report">%s<BR/>
      (%s)
     </TD>
@@ -174,7 +175,7 @@ def summaryRowESWithID(id, summary, translation, boardCount, display):
     <TD class="%s" width="7%%">%s</TD>
     <TD class="%s" width="7%%">%s</TD>
    </TR>
-""" % (id, summary, translation,
+""" % (id, ReportType, id, summary, translation,
            'publish' in display and 'display' or 'nodisplay',
            ('publish' not in display or boardCount['publish']  == 0) 
                            and '&nbsp;' or boardCount['publish'], 
@@ -234,27 +235,12 @@ if not lang:
                            stylesheet = """
    <STYLE type="text/css">
     TD      { font-size:  12pt; }
+    label   { font: 12pt "Arial"; }
     LI.none { list-style-type: none }
     DL      { margin-left: 0; padding-left: 0 }
    </STYLE>
-   <script language='JavaScript'>
-    function someEnglish() {
-        document.getElementById('allEn').checked = false;
-    }
-    function someSpanish() {
-        document.getElementById('allEs').checked = false;
-    }
-    function allEnglish(widget, n) {
-        for (var i = 1; i <= n; ++i)
-            document.getElementById('E' + i).checked = false;
-    }
-    function allSpanish(widget, n) {
-        for (var i = 1; i <= n; ++i)
-            document.getElementById('S' + i).checked = false;
-    }
-   </script>
+""" )
 
-"""                           )
     form   = """\
    <input type='hidden' name='%s' value='%s'>
  
@@ -308,28 +294,30 @@ if not lang:
     <tr>
      <td></td>
      <td>
-      <!-- input type='checkbox' name='grp' value='All English' 
-             onclick="javascript:allEnglish(this, 6)" id="allEn" CHECKED>
-       <label id="allEn">All English</label><br-->
-      <input type='checkbox' name='grp' value='Adult Treatment'
-             onclick="javascript:someEnglish()" id="E1">
-       <label id="E1">Adult Treatment</label><br>
-      <input type='checkbox' name='grp' value='Genetics'
-             onclick="javascript:someEnglish()" id="E2">
-       <label id="E2">Cancer Genetics</label><br>
-      <input type='checkbox' name='grp'
-             value='Complementary and Alternative Medicine'
-                    onclick="javascript:someEnglish()" id="E3">
-       <label id="E3">Complementary and Alternative Medicine</b><br>
-      <input type='checkbox' name='grp' value='Pediatric Treatment'
-             onclick="javascript:someEnglish()" id="E4">
-       <label id="E4">Pediatric Treatment</label><br>
-      <input type='checkbox' name='grp' value='Screening and Prevention'
-             onclick="javascript:someEnglish()" id="E5">
-       <label id="E5">Screening and Prevention</label><br>
-      <input type='checkbox' name='grp' value='Supportive Care'
-             onclick="javascript:someEnglish()" id="E6">
-       <label id="E6">Supportive and Palliative Care</label><br><br>
+       <input type='checkbox' name='grp' 
+              value='Adult Treatment' id="E1">
+       <label for="E1">Adult Treatment</label>
+       <br>
+       <input type='checkbox' name='grp' 
+              value='Genetics' id="E2">
+       <label for="E2">Cancer Genetics</label>
+       <br>
+       <input type='checkbox' name='grp'
+              value='Complementary and Alternative Medicine' id="E3">
+       <label for="E3">Complementary and Alternative Medicine</label>
+       <br>
+       <input type='checkbox' name='grp' 
+              value='Pediatric Treatment' id="E4">
+       <label for="E4">Pediatric Treatment</label>
+       <br>
+       <input type='checkbox' name='grp' 
+              value='Screening and Prevention' id="E5">
+       <label for="E5">Screening and Prevention</label>
+       <br>
+       <input type='checkbox' name='grp' 
+              value='Supportive Care' id="E6">
+       <label for="E6">Supportive and Palliative Care</label>
+       <br><br>
      </td>
     </tr>
     <tr>
@@ -344,18 +332,15 @@ if not lang:
     <tr>
      <td></td>
      <td>
-      <!--input type='checkbox' name='grp' value='All Spanish' 
-             onclick="javascript:allSpanish(this, 3)" id="allEs" CHECKED>
-       <label id="allEs">All Spanish</label><br-->
-      <input type='checkbox' name='grp' value='Spanish Adult Treatment'
-             onclick="javascript:someSpanish()" id="S1" >
-       <label id="S1">Adult Treatment</label><br>
-      <input type='checkbox' name='grp' value='Spanish Pediatric Treatment'
-             onclick="javascript:someSpanish()" id="S2" >
-       <label id="S2">Pediatric Treatment</label><br>
-      <input type='checkbox' name='grp' value='Spanish Supportive Care'
-             onclick="javascript:someSpanish()" id="S3" >
-       <label id="S3">Supportive and Palliative Care</label><br>
+      <input type='checkbox' name='grp' 
+             value='Spanish Adult Treatment' id="S1" >
+       <label for="S1">Adult Treatment</label><br>
+      <input type='checkbox' name='grp' 
+             value='Spanish Pediatric Treatment' id="S2" >
+       <label for="S2">Pediatric Treatment</label><br>
+      <input type='checkbox' name='grp' 
+             value='Spanish Supportive Care' id="S3" >
+       <label for="S3">Supportive and Palliative Care</label><br>
      </td>
     </tr>
    </table>
@@ -600,8 +585,8 @@ header    = cdrcgi.rptHeader(title, instr,
     TABLE          { margin-top:    10px; 
                      margin-bottom: 30px; } 
 
-    *.date         { font-size: 12pt; }
-    *.sectionHdr   { font-size: 12pt;
+    .date          { font-size: 12pt; }
+    .sectionHdr    { font-size: 12pt;
                      font-weight: bold;
                      text-decoration: underline; }
     td.report      { font-size: 11pt;
@@ -611,11 +596,13 @@ header    = cdrcgi.rptHeader(title, instr,
     td.display     { background-color: white; 
                      font-weight: bold;
                      text-align: center; }
-    *.cdrid        { text-align: right }
-    LI             { list-style-type: none }
+    .cdrid         { text-align: right; 
+                     text-decoration: underline; 
+                     text-color: blue; }
+    LI             { list-style-type: none; }
     li.report      { font-size: 11pt;
                      font-weight: normal; }
-    div.es          { height: 10px; }
+    div.es         { height: 10px; }
    </STYLE>
 """)
 
@@ -699,22 +686,22 @@ for row in rows:
         if lang == 'English':
             report += summaryRowWithID(row[0], row[1],
                                        boardCount[row[0]],
-                                       showId)
+                                       showId, ReportType)
         else:
             report += summaryRowESWithID(row[0], row[1], row[4],
                                          boardCount[row[0]],
-                                         showId)
+                                         showId, ReportType)
     else:
         board_type = row[5]
         report += boardHeaderWithID(board_type)
         if lang == 'English':
             report += summaryRowWithID(row[0], row[1],
                                          boardCount[row[0]],
-                                         showId)
+                                         showId, ReportType)
         else:
             report += summaryRowESWithID(row[0], row[1], row[4],
                                          boardCount[row[0]],
-                                         showId)
+                                         showId, ReportType)
 
 report += """
   </TABLE>

@@ -3,6 +3,7 @@
 # $Id$
 #
 # BZIssue::4887 - New Drug Information Summary Report
+# BZIssue::4922 - Enhancements to the Summaries with Markup Report
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
@@ -56,7 +57,8 @@ form += """</OL><H3>Other Reports</H3><OL>"""
 OtherReports = [
            ('DrugDescriptionReport.py?', 'Drug Description Report'),
            ('DrugIndicationsReport.py?', 'Drug Indications Report'),
-           ('DISLists.py?',              'Drug Information Summaries Lists')]
+           ('DISLists.py?',              'Drug Information Summaries Lists'),
+           ('DISWithMarkup.py?',         'Drug Summaries with Markup Report')]
 
 for r in OtherReports:
     form += "<LI><A HREF='%s/%s&%s=%s'>%s</LI></A>\n" % (
