@@ -4,23 +4,8 @@
 #
 # Request form for generating RTF letters to board members.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.5  2005/05/13 21:09:35  venglisc
-# Modified to prepopulate the email input field with the email address
-# from the CDR login session. (Bug 1664)
-#
-# Revision 1.4  2005/03/17 20:17:48  bkline
-# Fixed typo (prosective for prospective).
-#
-# Revision 1.3  2005/03/02 15:48:10  bkline
-# Support for additional letters from Margaret.
-#
-# Revision 1.2  2004/08/26 14:40:26  bkline
-# First working code version.
-#
-# Revision 1.1  2004/07/17 11:52:54  bkline
-# Plugged in user interface for generating PDQ Board Member Correspondence
-# Mailers.
+# BZIssue::1664
+# BZIssue::4939
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrdb, cdrpub, cdrcgi, re, string, cdrmailcommon, sys
@@ -399,7 +384,8 @@ header = cdrcgi.header(title, title, section, script, buttons,
                       'ed-ec-renewal'),
            new Option('Editorial Board Goodbye Letter',    'ed-goodbye'), 
            new Option('Editorial Board Goodbye For Good Letter',
-                      'ed-goodbye-forever')
+                      'ed-goodbye-forever'),
+           new Option('Editorial Board Thank You Letter',  'ed-thankyou')
       ]
    };
        
