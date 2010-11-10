@@ -120,7 +120,7 @@ if request == "Update":
                 UPDATE ctgov_import
                    SET cdr_id = null, 
                        dt = GETDATE(), 
-                       disposition = ?,  -- Value of preQuery
+                       disposition = ?,
                        comment = ?
                  WHERE nlm_id  = ?
 """
@@ -141,7 +141,7 @@ if request == "Update":
                 UPDATE ctgov_import
                    SET cdr_id = ?, 
                        dt = GETDATE(), 
-                       disposition = ?,  -- Value of preQuery
+                       disposition = ?,
                        comment = ?
                  WHERE nlm_id  = ?
 """
@@ -161,7 +161,8 @@ if request == "Update":
         if unmarkCdr:
             cursor.execute(query, (thisDispo[0], dbmarkCmt, nctId))
         else:
-            cursor.execute(query, (thisDispo[0], cdr.exNormalize(cdrId)[1], 
+            #cdrcgi.bail(query)
+            cursor.execute(query, (cdr.exNormalize(cdrId)[1], thisDispo[0], 
                                    dbmarkCmt, nctId))
 
         # -------------------------------------------------------
