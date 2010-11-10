@@ -8,6 +8,7 @@
 # a duplicate of.
 #
 # BZIssue::4763 (restrict use of script)
+# BZIssue::4702 Modify to use SQL placeholders
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, cdrdb, re, string
@@ -79,9 +80,9 @@ if request == "Update":
         query = """
             SELECT nlm_id, cdr_id, comment
             FROM   ctgov_import
-            WHERE  nlm_id = '%s'
-""" % nctId
-        cursor.execute(query)
+            WHERE  nlm_id = ?
+"""
+        cursor.execute(query, nctId)
         row = cursor.fetchone()
 
         if row == None:
@@ -110,17 +111,19 @@ if request == "Update":
         else:
                 dbmarkCmt = row[2] + "; REMOVE CDR-ID:" + usrCmt
 
+        preQuery = """\
+                SELECT id
+                  FROM ctgov_disposition
+                 WHERE name = 'import requested'
+"""
         query = """\
                 UPDATE ctgov_import
                    SET cdr_id = null, 
                        dt = GETDATE(), 
-                       disposition = (SELECT id
-                                        FROM ctgov_disposition
-                                       WHERE name = 'import requested'
-                                     ),
-                       comment = '%s'
-                 WHERE nlm_id = '%s'
-""" % (dbmarkCmt, nctId )
+                       disposition = ?,  -- Value of preQuery
+                       comment = ?
+                 WHERE nlm_id  = ?
+"""
     # Updating a duplicate record 
     # ----------------------------
     else:
@@ -129,19 +132,37 @@ if request == "Update":
         else:
                 dbmarkCmt = row[2] + "; MARK DUPLICATE:" + usrCmt
 
+        preQuery = """\
+                SELECT id
+                  FROM ctgov_disposition
+                 WHERE name = 'duplicate'
+"""
         query = """\
                 UPDATE ctgov_import
-                   SET cdr_id = %s, 
+                   SET cdr_id = ?, 
                        dt = GETDATE(), 
-                       disposition = (SELECT id
-                                        FROM ctgov_disposition
-                                       WHERE name = 'duplicate'
-                                     ),
-                       comment = '%s'
-                 WHERE nlm_id = '%s'
-""" % (cdr.normalize(cdrId)[3:], dbmarkCmt, nctId)
+                       disposition = ?,  -- Value of preQuery
+                       comment = ?
+                 WHERE nlm_id  = ?
+"""
+    #cdrcgi.bail(query)
     try:
-        cursor.execute(query)
+        # We can't select the disposition ID with a sub-query since
+        # we wouldn't be able to use the parameter substitution for 
+        # the query but we also can't use Python's string substitution
+        # because that would fail if comments with a quote (') are 
+        # submitted.
+        # Performing the selection of the disposition separately.
+        # ------------------------------------------------------------
+        cursor.execute(preQuery)
+        thisDispo = cursor.fetchone()
+        cursor.close()
+
+        if unmarkCdr:
+            cursor.execute(query, (thisDispo[0], dbmarkCmt, nctId))
+        else:
+            cursor.execute(query, (thisDispo[0], cdr.exNormalize(cdrId)[1], 
+                                   dbmarkCmt, nctId))
 
         # -------------------------------------------------------
         # If the NCI ID doesn't exist the UPDATE will return with
