@@ -552,7 +552,7 @@ if docCount == 0:
 #   e.g., id=25, version=3, then form: "CDR0000000025/3"
 # This works on a docList produced by a query, or produced by user entry
 #   of a single document id
-idVer = ["CDR%010d/%d" % pair for pair in docList]
+idVer = ["CDR%010d/%d" % tuple(pair) for pair in docList]
 
 # Drop the job into the queue.
 result = cdr.publish (credentials=session, pubSystem='Mailers',
