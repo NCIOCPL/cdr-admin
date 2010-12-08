@@ -18,9 +18,10 @@
 # Cloned (but heavily modified) from Alan's directory mailer request form.
 #
 # BZIssue::4630
+# BZIssue::4966
 #
 #----------------------------------------------------------------------
-import sys, cgi, cdr, cdrcgi, cdrdb, cdrmailcommon
+import sys, cgi, cdr, cdrcgi, cdrdb, cdrmailcommon, datetime
 etree = cdr.importEtree()
 LOGFILE = cdrmailcommon.LOGFILE
 
@@ -459,6 +460,9 @@ else:
         # Give priority to the ones which have gone the longest without
         # getting a mailer.
         #----------------------------------------------------------------
+        today = datetime.date.today()
+        cutoff = datetime.date(today.year - 1, today.month, today.day)
+        cutoff = cutoff.strftime("%Y-%m-%d")
         cursor.execute("""\
             SELECT DISTINCT d.doc_id, MAX(p.completed)
                        FROM pub_proc_doc d
@@ -475,6 +479,10 @@ else:
                    ORDER BY MAX(p.completed), d.doc_id""" % dirIncludePath,
                        timeout=300)
         for docId, lastMailer in cursor.fetchall():
+
+            # Has it been long enough?
+            if str(lastMailer) > cutoff:
+                continue
 
             # Get the latest version and make sure it's not blocked.
             cursor.execute("""\
