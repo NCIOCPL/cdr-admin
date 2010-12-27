@@ -185,7 +185,7 @@ if action == "Submit":
  ORDER BY d.title""" % (sReference,sIn,sDate)
 
     try:
-        cursor.execute(sQuery)
+        cursor.execute(sQuery, timeout = 300)
         rows = cursor.fetchall()
     except cdrdb.Error, info:
         cdrcgi.bail("Failure retrieving document IDs: %s" % info[1][0])
@@ -207,7 +207,7 @@ WHERE v.num = %s
 AND d.id = %s
         """ % (drugInf.version,drugInf.id)
         try:
-            cursor.execute(sQuery)
+            cursor.execute(sQuery, timeout = 300)
             rows = cursor.fetchall()
         except cdrdb.Error, info:
             cdrcgi.bail("Failure retrieving document XML: %s" % info[1][0])
@@ -298,7 +298,7 @@ sQuery = """\
  ORDER BY d.title"""
 
 try:
-    cursor.execute(sQuery)
+    cursor.execute(sQuery, timeout = 300)
                                                 
     rows = cursor.fetchall()
 except cdrdb.Error, info:
