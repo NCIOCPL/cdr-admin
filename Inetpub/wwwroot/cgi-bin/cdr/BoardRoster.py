@@ -6,6 +6,7 @@
 # information.
 #
 # BZIssue::4909 - Board Roster Report Change
+# BZIssue::4979 - Error in Board Roster Report
 # 
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, cdrdb, re, time
@@ -609,12 +610,12 @@ for boardMember in boardMembers:
     # MS-Word.
     # -----------------------------------------------------------
     if flavor == 'full':
-        html += """
+        html += u"""
         <table width='100%%'>
          <tr>
           <td>%s<td>
          </tr>
-        </table>""" % response[0]
+        </table>""" % unicode(response[0], 'utf-8')
     else:
         row = extractSheetInfo(response[0])
         row = row + [boardMember.id] + [boardMember.termSdate]
