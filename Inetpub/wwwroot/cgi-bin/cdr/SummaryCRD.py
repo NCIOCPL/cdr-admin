@@ -6,6 +6,7 @@
 #
 # BZIssue::4648
 #   Report to list the Comprehensive Review Dates
+# BZIssue::4987 - Problem using Comprehensive Review Date Report
 #
 #----------------------------------------------------------------------
 import sys, cdr, cgi, cdrcgi, time, cdrdb, ExcelWriter
@@ -412,7 +413,7 @@ if not lang:
              onclick="javascript:someSpanish()" id="S1" >
        <label id="S1">Adult Treatment</label><br>
       <input type='checkbox' name='grpES'
-             value='Complementary and Alternative Medicine Board'
+             value='Cancer Complementary and Alternative Medicine Board'
              onclick="javascript:someSpanish()" id="S2">
        <label id="S2">Complementary and Alternative Medicine</b><br>
       <input type='checkbox' name='grpES' 
@@ -510,7 +511,7 @@ query_info = """\
                     OR
                     b.value = 'PDQ Cancer Complementary and Alternative ' +
                               'Medicine Editorial Board'
-               THEN 'Complementary and Alternative Medicine Board'
+               THEN 'Cancer Complementary and Alternative Medicine Board'
                ELSE b.value 
            END AS Board, 
            s.int_val AS TranslationOf,
