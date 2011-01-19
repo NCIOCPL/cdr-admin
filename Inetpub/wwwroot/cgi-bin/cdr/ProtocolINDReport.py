@@ -9,6 +9,7 @@
 # Initial copy of program to create a Protocol Report with IND Information.
 # (Bug 2028)
 #
+# BZIssue::4989 - FDA IND report does not run
 #
 #----------------------------------------------------------------------
 import cdrdb, sys, time, cdrcgi, ExcelWriter
@@ -59,7 +60,7 @@ cursor.execute("""\
              (doc_id      INTEGER      NOT NULL,
               primary_id  VARCHAR(100) NOT NULL,
               ctgov_id    VARCHAR(100) NULL,
-              otitle      VARCHAR(500) NOT NULL,
+              otitle      VARCHAR(600) NOT NULL,
               hptitle     VARCHAR(500) NOT NULL,
               ind_num     VARCHAR(50)  NOT NULL,
               ind_sn      VARCHAR(50)  NULL,
