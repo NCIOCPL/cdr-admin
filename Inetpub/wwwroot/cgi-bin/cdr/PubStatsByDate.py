@@ -463,6 +463,10 @@ except cdrdb.Error, info:
                 info[1][0])
      
 # Select information of updated table (count or doc-id)
+# Note: This counts every document exactly one time.
+#       If a document has been added *and* updated 
+#       during the given time period it's only been 
+#       counted as an added document.
 # -----------------------------------------------------
 query = """
 %s
@@ -501,10 +505,54 @@ except cdrdb.Error, info:
     cdrcgi.bail('Failure selecting updated documents: %s' %
                 info[1][0])
  
+# Select information of updated table (count or doc-id)
+# Note: This might count documents multiple times.
+#       If a document has been added *and* updated 
+#       during the given time period it's counted once
+#       in each category.
+# -----------------------------------------------------
+query = """
+%s
+  FROM pub_proc_doc ppd
+  JOIN pub_proc pp
+    ON pp.id = ppd.pub_proc
+  JOIN document d
+    ON d.id = ppd.doc_id
+  JOIN doc_type dt
+    ON d.doc_type = dt.id
+ WHERE pp.started between '%s' and dateadd(DAY, 1, '%s')
+   AND pub_subset LIKE 'Push_%%'
+   AND pp.status = 'Success'
+   AND ppd.removed = 'N'
+--   AND NOT EXISTS (SELECT 'x'
+--                     FROM #phoenix i
+--                    WHERE started between '%s' and dateadd(DAY, 1, '%s')
+--                      AND ppd.doc_id = i.doc_id
+--                  )
+--   AND NOT EXISTS (SELECT 'x'
+--                     FROM #brandnew b
+--                    WHERE started between '%s' and dateadd(DAY, 1, '%s')
+--                      AND ppd.doc_id = b.doc_id
+--                  )
+ %s
+ %s""" % (q_select2, dateFrom, dateTo, dateFrom, dateTo, 
+                     dateFrom, dateTo, q_and, q_group)
+
+try:
+    cursor = conn.cursor()
+    cursor.execute(query)
+    updates2 = cursor.fetchall()
+    cursor.close()
+    cursor = None
+except cdrdb.Error, info:
+    cdrcgi.bail('Failure selecting updated documents: %s' %
+                info[1][0])
+ 
 # Create a dictionary out of the update list
 # (It's easier to select the results later on)
 # --------------------------------------------
 countUpdate   = {}
+countUpdate2  = {}
 countRemove   = {}
 countRenew    = {}
 countBrandnew = {}
@@ -514,7 +562,7 @@ countBrandnew = {}
 # ---------------------------------------------------------------
 if vol:
     mediaIds = []
-    for docSet in (updates, removes, brandnews, renews):
+    for docSet in (updates, updates2, removes, brandnews, renews):
         for x in docSet:
             if audience == 'Both' or x[0] in audienceSet:
                 mediaIds.append(x[0])
@@ -526,6 +574,9 @@ if vol:
 else:
     for update in updates:
         countUpdate[update[0]] = update[1]
+
+    for update2 in updates2:
+        countUpdate2[update2[0]] = update2[1]
 
     for remove in removes:
         countRemove[remove[0]] = remove[1]
@@ -542,12 +593,12 @@ else:
 instr     = 'Published%s Documents on Cancer.gov -- %s.' % (
                                       vol and ' Media' or '', dateString)
 header    = cdrcgi.header(title, title, instr, script, buttons, 
-                          stylesheet = """\
+                          stylesheet = """
    <STYLE type="text/css">
     H3            { font-weight: bold;
-	                font-family: Arial;
+                    font-family: Arial;
                     font-size: 16pt; 
-	                margin: 8pt; }
+                    margin: 8pt; }
     TABLE.output  { margin-left: auto;
                     margin-right: auto; }
     TABLE.output  TD
@@ -559,7 +610,33 @@ header    = cdrcgi.header(title, title, instr, script, buttons,
     TR.head       { background-color: #D2D2D2; }
     .link         { color: blue; 
                     text-decoration: underline; }
+    .doc          { text-align: left;
+                    vertical-align: top; }
+    .star         { background-color: #D2D2D2; }
+    p             { font-weight: bold;
+                    font-family: Arial;
+                    font-size: 10pt; }
+    #wrapper      { text-align: center;
+                    margin: 0 auto;
+                    width: 500px;
+                    border: 1px solid #ccc;
+                    padding: 5px; }
+    #myvar        { border: 1px solid #ccc;
+                    background: #f2f2f2;
+                    padding: 10px }
    </STYLE>
+
+   <script language='JavaScript' type='text/javascript'>
+       function showDoc(obj) {
+           var el = document.getElementById(obj);
+           if ( el.style.display == "none") {
+                el.style.display = '';
+           }
+           else {
+                el.style.display = 'none';
+           }
+       }
+   </script>
 """)
 
 # -------------------------
@@ -583,14 +660,68 @@ report += """\
     <H3>Published %s Documents</H3>
      Report includes publishing jobs started between<br/>
      <b>%s</b> and <b>%s</b><br/>%s
-     <br/>
-  </center>
 """ % (vol and 'Media' or '', dateFrom, dateTo, audienceHeader)
+
+if not vol:
+    report += """\
+     <div id="wrapper">
+      <p>For an explanation of the numbers please click
+         <span class="link">
+          <a onclick="showDoc('myvar');" title="Explain the Numbers">here</a>
+         </span> 
+      </p>
+      <div id="myvar" style="display: none">
+       <table>
+        <tr>
+         <td class="doc"><strong>Added-Old</strong></td>
+         <td class="doc">This number includes documents that existed 
+                         on Cancer.gov, had been removed and added again.</td>
+        </tr>
+        <tr>
+         <td class="doc"><strong>Added-New</strong></td>
+         <td class="doc">This number includes documents that are new and 
+                         never existed on Cancer.gov before.</td>
+        </tr>
+        <tr>
+         <td class="doc"><strong>Updated</strong></td>
+         <td class="doc">This number includes documents that have been 
+                         updated on Cancer.gov. If a document has been
+                         added <strong>and</strong> updated during the 
+                         specified time period it is
+                         only counted as a new document.</td>
+        </tr>
+        <tr>
+         <td class="doc"><strong>Updated*</strong></td>
+         <td class="doc">This number includes documents that have been
+                         updated on Cancer.gov. If a document has been
+                         added <strong>and</strong> updated during the 
+                         specified time period it is
+                         counted twice, once as a new document
+                         and once as an updated document.</td>
+        </tr>
+        <tr>
+         <td class="doc"><strong>Removed</strong></td>
+         <td class="doc">This number includes documents that have been
+                         removed from Cancer.gov.</td>
+        </tr>
+        <tr>
+         <td class="doc"><strong>Total</strong></td>
+         <td class="doc">This number sums up all columns (except for
+                         the column Updated* to only count a document
+                         once per time frame specified.</td>
+        </tr>
+       </table>
+      </div>
+     </div>
+  </center>
+  <p></p>
+"""
 
 # ***** Main part for Media Doc Published report *****
 # ----------------------------------------------------
 if vol:
     report += """
+  <br>
   <table class="output" border="1">
    <tr class="head">
     <td class="header">CDR-ID</td>
@@ -636,14 +767,15 @@ if vol:
 # Display the header row
 # ----------------------
 report += """
-   <table class="output" width="45%%" border="0">
+   <table class="output" width="50%%" border="0">
     <tr class="head">
-     <td class="header" width="25%%">Doc Type</td>
-     <td class="header" width="15%%">Added-Old</td>
-     <td class="header" width="15%%">Added-New</td>
-     <td class="header" width="15%%">Updated</td>
-     <td class="header" width="15%%">Removed</td>
-     <td class="header" width="15%%">Total</td>
+     <td class="header" width="22%%">Doc Type</td>
+     <td class="header" width="13%%">Added-Old</td>
+     <td class="header" width="13%%">Added-New</td>
+     <td class="header" width="13%%">Updated</td>
+     <td class="header star" width="13%%">Updated*</td>
+     <td class="header" width="13%%">Removed</td>
+     <td class="header" width="13%%">Total</td>
     </tr>"""
 
 # Selecting the document types to be displayed
@@ -701,8 +833,8 @@ for docType in docTypes:
         report += """
      <td align="right">0</td>"""
 
-    # Display fourth column (updated documents)
-    # -----------------------------------------
+    # Display fourth column (updated documents - unique count)
+    # --------------------------------------------------------
     if countUpdate.has_key(docType):
         total += countUpdate[docType]
         report += """
@@ -713,7 +845,20 @@ for docType in docTypes:
         report += """
      <td align="right">0</td>"""
 
-    # Display fifth column (documents being deleted)
+    # Display fifth column (updated documents - not unique count)
+    # We are not counting these to the total
+    # -----------------------------------------------------------
+    if countUpdate.has_key(docType):
+        # total += countUpdate2[docType]
+        report += """
+     <td class="star" align="right">
+      <b>%s</b>
+     </td>""" % countUpdate2[docType]
+    else:
+        report += """
+     <td align="right">0</td>"""
+
+    # Display sixth column (documents being deleted)
     # ----------------------------------------------
     if countRemove.has_key(docType):
         total += countRemove[docType]
@@ -725,7 +870,8 @@ for docType in docTypes:
         report += """
      <td align="right">0</td>"""
 
-    # Display total column (a total of all previous columns)
+    # Display total column (a total of all previous columns
+    # except for the second update column)
     # ------------------------------------------------------
     if total:
         report += """
