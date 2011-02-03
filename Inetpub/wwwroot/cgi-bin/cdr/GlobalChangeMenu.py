@@ -33,7 +33,7 @@ html    = cdrcgi.header(title, title, section, "", buttons) + """\
 items   = (
            ('GlobalChange.py',         'Global Change Protocol Links'  ),
            ('GlobalChangeZipCode.py',  'Global Change Zip Codes'       ),
-           ('GlobalChangeSimpleLink.py','Global Change Simple Links'   ),
+           ('GlobalChangeLink.py',     'Global Change Links'           ),
            ('ShowGlobalChangeTestResults.py','Global Change Test Results'),
            ('Logout.py',               'Log Out'                       )
            )
