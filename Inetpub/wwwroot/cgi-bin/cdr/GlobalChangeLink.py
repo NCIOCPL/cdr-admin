@@ -39,15 +39,10 @@ if __name__ == "__main__":
     linkVars.chkLinkRef("old", 0)
 
     # Multiple new links are allowed
-    i = 0
-    while True:
-        # First one is always done
-        linkVars.chkLinkRef("new", i)
-        i += 1
-
-        # Don't go beyond max
-        if i >= GlobalChangeLinkBatch.MAX_ADD_LINKS:
-            break
+    # First one is always checked, others may be
+    linkVars.chkLinkRef("new", 0)
+    i = 1
+    while i < GlobalChangeLinkBatch.MAX_ADD_LINKS:
 
         # DEBUG
         # cdr.logwrite(
@@ -65,6 +60,7 @@ if __name__ == "__main__":
                 linkVars.chkLinkRef("new", i)
         else:
             break
+        i += 1
 
     # Back to simple variables
     linkVars.chkRefTypes()
