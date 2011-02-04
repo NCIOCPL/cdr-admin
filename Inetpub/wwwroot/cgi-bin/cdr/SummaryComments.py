@@ -40,7 +40,9 @@ userCol   = False
 blankCol  = False
 displayComment = { 'internal':False,
                    'external':False,
-                   'response':False }
+                   'response':False,
+                   'permanent':False,
+                   'advisory':False}
 request   = cdrcgi.getRequest(fields)
 title     = "CDR Administration"
 instr     = "Summary Comments Report"
@@ -68,9 +70,19 @@ if 'showBlank' in columns:
 
 # Display which comment types?
 # ----------------------------
-if 'internal' in comments:  displayComment['internal'] = True
-if 'external' in comments:  displayComment['external'] = True
-if 'response' in comments:  displayComment['response'] = True
+if 'internal' in comments or 'all' in comments:  
+    displayComment['internal'] = True
+if 'external' in comments or 'all' in comments:
+    displayComment['external'] = True
+if 'permanent' in comments or 'all' in comments:
+    displayComment['permanent'] = True
+if 'advisory' in comments or 'all' in comments:
+    displayComment['advisory'] = True
+
+# Response is set individually
+# ----------------------------
+if 'response' in comments:
+    displayComment['response'] = True
 
 # ---------------------------------------------------
 # Selecting the title of the section
@@ -84,12 +96,62 @@ def getTitle(nodes):
     return summarySection
 
 
+# ----------------------------------------------------------
+# Function to return True or False to indicate which of the
+# rows of comments are selected to be printed on the report.
+# Note:  For the ResponseToComment element it had been 
+#        decided that these will never be listed as Internal
+#        or External comments, so the audience has been 
+#        overloaded and is set to 'Response' for these 
+#        elements.  For Comment elements the audience is set
+#        to 'Internal' or 'External'.
+# ----------------------------------------------------------
+def printThisRow(audience, displayType, duration, source):
+    # If internal and external are both selected we want to
+    # display all comments but we still need to check if 
+    # the Response should be included in the list.
+    # ------------------------------------------------------
+    if displayType['internal'] and displayType['external']:
+        if audience == 'Response':
+            if displayType['response']:
+                return True
+            else:
+                return False
+            return True
+        return True
+
+    if duration == 'permanent' and displayType['permanent']: return True
+    if source == 'advisory-board' and displayType['advisory']: return True
+
+    # Only Internal or external are selected
+    # --------------------------------------
+    if audience == 'Internal' and displayType['internal']:
+        if duration and not displayType[duration.lower()]:
+            return False
+        return True
+    elif audience == 'External' and displayType['external']: 
+        if source and not displayType['advisory']:
+            return False
+        return True
+
+
+    # If the comment is a 'Response' we need to check this
+    # separately.
+    # -----------------------------------------------------
+    if audience == 'Response' and displayType['response']: 
+        return True
+
+    return False
+
+    
+    
 # -------------------------------------------------
 # Create the table row for the English table output
 # -------------------------------------------------
 def htmlCommentRow(info, displayType, addUserCol = True, 
                                       addBlankCol = True, first = True):
     """Return the HTML code to display a Comment row"""
+    #cdrcgi.bail(displayType)
     html = ''
     if first:
         section = info[0]
@@ -97,12 +159,22 @@ def htmlCommentRow(info, displayType, addUserCol = True,
         section = ''
     comment  = info[1]
     audience = info[2] or ''
-    user     = info[3] or '&nbsp;'
-    date     = info[4] or '&nbsp;'
+    duration = info[3] or ''
+    source   = info[4] or ''
+    user     = info[5] or '&nbsp;'
+    date     = info[6] or '&nbsp;'
 
-    # Nothing to do if the comment type hasn't been selected
-    # ------------------------------------------------------
-    if audience and not displayType[audience.lower()]: return html
+
+    # Do we print this row based on the content and the options
+    # checked?
+    # ---------------------------------------------------------
+    if not printThisRow(audience, displayType, duration, source): return html
+
+    label = audience and audience[0].upper() or '-'
+    if duration:
+        label += ' ' + duration[0].upper()
+    if source:
+        label += ' ' + source[0].upper()
 
     # Create the table row display
     # If a markup type hasn't been checked the table cell will be
@@ -114,7 +186,7 @@ def htmlCommentRow(info, displayType, addUserCol = True,
     <TD class="report cdrid" width = "25%%">%s</TD>
     <TD class="%s" width="40%%">[%s] %s</TD>
 """ % (section, audience and audience.lower() or ' ', 
-                audience and audience[0].upper() or ' ', comment)
+                label, comment)
 
     if addUserCol:
         html += """\
@@ -213,15 +285,23 @@ if docTitle and not docId:
 
         if displayComment['internal']:
             form += """
-     <input id="C1" name='showComment' type='hidden' value='internal'>
+     <input id='int' name='showComment' type='hidden' value='internal'>
     """
         if displayComment['external']:
             form += """
-     <input id="C2" name='showComment' type='hidden' value='external'>
+     <input id='ext' name='showComment' type='hidden' value='external'>
     """
         if displayComment['response']:
             form += """
-     <input id="C3" name='showComment' type='hidden' value='response'>
+     <input id='resp' name='showComment' type='hidden' value='response'>
+    """
+        if displayComment['permanent']:
+            form += """
+     <input id='perm' name='showComment' type='hidden' value='permanent'>
+    """
+        if displayComment['advisory']:
+            form += """
+     <input id='adv' name='showComment' type='hidden' value='advisory'>
     """
 
         if userCol:
@@ -257,14 +337,126 @@ if not lang and not docId:
                            numBreaks = 1,
                            method = 'GET',
                            stylesheet = """
-   <STYLE type="text/css">
+   <style type="text/css">
     TD      { font-size:  12pt; }
     LI.none { list-style-type: none }
     DL      { margin-left: 0; padding-left: 0 }
     P.title { font-size: 12pt;
               font-style: italic; 
               font-weight: bold; }
-   </STYLE>
+    *.comone   { margin-bottom: 8px; }
+    *.comgroup { background: #C9C9C9; 
+                 margin-bottom: 8px; }
+   </style>
+
+   <script type='text/javascript'>
+     function dispInternal() {
+         var checks  = ['ext', 'adv', 'all']
+         if (document.getElementById('int').checked &&
+             !document.getElementById('perm').checked) {
+             for (var j in checks) {
+                 document.getElementById(checks[j]).checked = false;
+             }
+         }
+         else if (document.getElementById('int').checked &&
+                  document.getElementById('perm').checked) {
+             for (var j in checks) {
+                 document.getElementById(checks[j]).checked = false;
+             }
+         }
+         else if (!document.getElementById('int').checked &&
+                  document.getElementById('perm').checked) {
+
+             for (var j in checks) {
+                 document.getElementById(checks[j]).checked = false;
+             }
+         }
+     }
+
+     function dispPermanent() {
+         var checks  = ['ext', 'adv', 'all']
+         if (document.getElementById('perm').checked &&
+             !document.getElementById('int').checked) {
+             for (var j in checks) {
+                 document.getElementById(checks[j]).checked = false;
+             }
+         }
+         else if (document.getElementById('perm').checked &&
+                  document.getElementById('int').checked) {
+             for (var j in checks) {
+                 document.getElementById(checks[j]).checked = false;
+             }
+         }
+         else if (!document.getElementById('perm').checked &&
+                  document.getElementById('int').checked) {
+             for (var j in checks) {
+                 document.getElementById(checks[j]).checked = false;
+             }
+         }
+     }
+
+
+     function dispExternal() {
+         var checks  = ['int', 'perm', 'all']
+         if (document.getElementById('ext').checked &&
+             !document.getElementById('adv').checked) {
+             for (var j in checks) {
+                 document.getElementById(checks[j]).checked = false;
+             }
+         }
+         else if (document.getElementById('ext').checked &&
+                  document.getElementById('adv').checked) {
+             for (var j in checks) {
+                 document.getElementById(checks[j]).checked = false;
+             }
+         }
+         else if (!document.getElementById('ext').checked &&
+                  document.getElementById('adv').checked) {
+             for (var j in checks) {
+                 document.getElementById(checks[j]).checked = false;
+             }
+         }
+     }
+
+
+     function dispAdvisory() {
+         var checks  = ['int', 'perm', 'all']
+         if (document.getElementById('adv').checked &&
+             !document.getElementById('ext').checked) {
+             for (var j in checks) {
+                 document.getElementById(checks[j]).checked = false;
+             }
+         }
+         else if (document.getElementById('adv').checked &&
+                  document.getElementById('ext').checked) {
+             for (var j in checks) {
+                 document.getElementById(checks[j]).checked = false;
+             }
+         }
+         else if (!document.getElementById('adv').checked &&
+                  document.getElementById('ext').checked) {
+             for (var j in checks) {
+                 document.getElementById(checks[j]).checked = false;
+             }
+         }
+     }
+
+
+     function dispAll() {
+         var checks  = ['int', 'perm', 'ext', 'adv']
+         if (document.getElementById('all').checked) {
+             for (var j in checks) {
+                 document.getElementById(checks[j]).checked = true;
+             }
+         }
+         else if (!document.getElementById('all').checked) {
+             for (var j in checks) {
+                 document.getElementById(checks[j]).checked = false;
+             }
+         }
+     }
+
+   </script>
 
 """                           )
     form   = """\
@@ -347,22 +539,42 @@ if not lang and not docId:
    </table>
    </fieldset>
 
+   <p>
    <fieldset>
-    <legend>&nbsp;Type of Comments to display&nbsp;</legend>
-    <label for="C1">
-     <input id="C1" name='showComment' type='checkbox'
-            value='internal' CHECKED>
-     Internal Comments (I)</label>
-    <br>
-    <label for="C2">
-     <input id="C2" name='showComment' type='checkbox'
-            value='external'>
-     External Comments (E)</label>
-    <br>
-    <label for="C3">
-     <input id="C3" name='showComment' type='checkbox' 
-            value='response' CHECKED>
-     Response to Comments (R)</label>
+    <legend>&nbsp;Select Comment Types to be displayed&nbsp;</legend>
+    <div class='comgroup'>
+     <input name='showComment' type='checkbox' id='int'
+             value='internal'
+                   onclick='javascript:dispInternal()'>
+     <label for='int'>I - Internal Comments (excluding permanent comments)</label>
+     <br>
+     <input name='showComment' type='checkbox' id='perm'
+             value='permanent' 
+             onclick='javascript:dispPermanent()'>
+     <label for='perm'>P - Permanent Comments (internal & external)</label>
+    </div>
+    <div class='comgroup'>
+     <input name='showComment' type='checkbox' id='ext'
+             value='external' checked='CHECKED'
+                   onclick='javascript:dispExternal()'>
+     <label for='ext'>E - External Comments (excluding advisory comments)</label>
+     <br>
+     <input name='showComment' type='checkbox' id='adv'
+             value='advisory' 
+             onclick='javascript:dispAdvisory()'>
+     <label for='adv'>A - Advisory Board Comments (internal & external)</label>
+    </div>
+    <div class='comone'>
+     <input name='showComment' type='checkbox' id='all'
+             value='all'
+                   onclick='javascript:dispAll()'>
+     <label for='all'>All Comments</label>
+    </div>
+    <div class='comone'>
+     <input name='showComment' type='checkbox' id="resp" 
+            value='response' checked='CHECKED'>
+     <label for='resp'>R - Response to Comments</label>
+    </div>
    </fieldset>
 
    <fieldset>
@@ -619,8 +831,11 @@ for summary in rows:
             thisComment = cdr.getTextContent(obj).strip()
             if obj.nodeName == 'Comment':
                 atAudience  = obj.getAttribute('audience')
+                atDuration  = obj.getAttribute('duration') or ''
+                atSource    = obj.getAttribute('source') or ''
             else:
-                atAudience  = 'Response'
+                atAudience  = u'Response'
+                atDuration = atSource = ''
 
             atUser      = obj.getAttribute('user')
             atDate      = obj.getAttribute('date')
@@ -638,8 +853,8 @@ for summary in rows:
                 secParentNode = obj.parentNode.parentNode
                 summarySection = getSummarySectionName(secParentNode, '')
 
-            allComments.append([summarySection, thisComment, atAudience, 
-                                atUser, atDate])
+            allComments.append([summarySection, thisComment, atAudience,
+                                atDuration, atSource, atUser, atDate])
 
     allSummaries[summaryTitle] = allComments
 
@@ -748,6 +963,8 @@ for title, allComments in allSummaries.items():
     first      = True
     allRows    = 0
     sectionTitle = ''
+    #cdrcgi.bail(displayComment)
+    #cdrcgi.bail(allComments[0:7])
     for commentInfo in allComments:
         # We only want to display a section title if it differs from
         # the previous one but we need to account for the fact that
