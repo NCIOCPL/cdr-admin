@@ -315,7 +315,240 @@ section  = "QC Report"
 SUBMENU  = "Reports Menu"
 buttons  = ["Submit", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 header   = cdrcgi.header(title, title, getSectionTitle(repType),
-                         "QcReport.py", buttons, method = 'GET')
+                         "QcReport.py", buttons, method = 'GET',
+                         stylesheet = """
+  <style type = 'text/css'>
+    fieldset            { margin-bottom: 10px; }
+    /* fieldset.docversion { width: 860px; */
+    fieldset.docversion { width: 75%;
+                          margin-left: auto;
+                          margin-right: auto;
+                          margin-bottom: 0; 
+                          display: block; }
+    fieldset.wrapper    { width: 520px;
+                          margin-left: auto;
+                          margin-right: auto;
+                          display: block; }
+    *.comgroup          { background: #C9C9C9; 
+                          margin-bottom: 8px; }
+  </style>
+
+  <script languate = 'JavaScript'>
+     function dispInternal() {
+         var checks  = ['ext', 'adv', 'allcomment']
+         if (document.getElementById('int').checked &&
+             !document.getElementById('perm').checked) {
+             var optionson = ['ai', 'se', 'sa', 'dr']
+             var optionsoff = ['ae', 'dp']
+             for (var i in optionson) {
+                 document.getElementById(optionson[i]).checked = true;
+             }
+             for (var i in optionsoff) {
+                 document.getElementById(optionsoff[i]).checked = false;
+             }
+             for (var j in checks) {
+                 document.getElementById(checks[j]).checked = false;
+             }
+         }
+         else if (document.getElementById('int').checked &&
+                  document.getElementById('perm').checked) {
+             var optionson = ['ai', 'se', 'sa', 'dr', 'dp']
+             var optionsoff = ['ae']
+             for (var i in optionson) {
+                 document.getElementById(optionson[i]).checked = true;
+             }
+             for (var i in optionsoff) {
+                 document.getElementById(optionsoff[i]).checked = false;
+             }
+
+             for (var j in checks) {
+                 document.getElementById(checks[j]).checked = false;
+             }
+         }
+         else if (!document.getElementById('int').checked &&
+                  document.getElementById('perm').checked) {
+             var optionson = ['ai', 'ae', 'se', 'sa', 'dp']
+             var optionsoff = ['dr']
+             for (var i in optionson) {
+                 document.getElementById(optionson[i]).checked = true;
+             }
+             for (var i in optionsoff) {
+                 document.getElementById(optionsoff[i]).checked = false;
+             }
+
+             for (var j in checks) {
+                 document.getElementById(checks[j]).checked = false;
+             }
+         }
+     }
+
+
+     function dispPermanent() {
+         var checks  = ['ext', 'adv', 'allcomment']
+         if (document.getElementById('perm').checked &&
+             !document.getElementById('int').checked) {
+             var optionson = ['ai', 'ae', 'se', 'sa', 'dp']
+             var optionsoff = ['dr']
+             for (var i in optionson) {
+                 document.getElementById(optionson[i]).checked = true;
+             }
+             for (var i in optionsoff) {
+                 document.getElementById(optionsoff[i]).checked = false;
+             }
+             for (var j in checks) {
+                 document.getElementById(checks[j]).checked = false;
+             }
+         }
+         else if (document.getElementById('perm').checked &&
+                  document.getElementById('int').checked) {
+             var optionson = ['ai', 'se', 'sa', 'dr', 'dp']
+             var optionsoff = ['ae']
+             for (var i in optionson) {
+                 document.getElementById(optionson[i]).checked = true;
+             }
+             for (var i in optionsoff) {
+                 document.getElementById(optionsoff[i]).checked = false;
+             }
+
+             for (var j in checks) {
+                 document.getElementById(checks[j]).checked = false;
+             }
+         }
+         else if (!document.getElementById('perm').checked &&
+                  document.getElementById('int').checked) {
+             var optionson = ['ai', 'se', 'sa', 'dr']
+             var optionsoff = ['ae', 'dp']
+             for (var i in optionson) {
+                 document.getElementById(optionson[i]).checked = true;
+             }
+             for (var i in optionsoff) {
+                 document.getElementById(optionsoff[i]).checked = false;
+             }
+
+             for (var j in checks) {
+                 document.getElementById(checks[j]).checked = false;
+             }
+         }
+     }
+
+
+     function dispExternal() {
+         var checks  = ['int', 'perm', 'allcomment']
+         if (document.getElementById('ext').checked &&
+             !document.getElementById('adv').checked) {
+             var optionson = ['ae', 'se', 'dp', 'dr']
+             var optionsoff = ['ai', 'sa']
+             for (var i in optionson) {
+                 document.getElementById(optionson[i]).checked = true;
+             }
+             for (var i in optionsoff) {
+                 document.getElementById(optionsoff[i]).checked = false;
+             }
+             for (var j in checks) {
+                 document.getElementById(checks[j]).checked = false;
+             }
+         }
+         else if (document.getElementById('ext').checked &&
+                  document.getElementById('adv').checked) {
+             var optionson = ['ae', 'se', 'dp', 'dr']
+             var optionsoff = ['ai', 'sa']
+             for (var i in optionson) {
+                 document.getElementById(optionson[i]).checked = true;
+             }
+             for (var i in optionsoff) {
+                 document.getElementById(optionsoff[i]).checked = false;
+             }
+             for (var j in checks) {
+                 document.getElementById(checks[j]).checked = false;
+             }
+         }
+         else if (!document.getElementById('ext').checked &&
+                  document.getElementById('adv').checked) {
+             var optionson = ['ai', 'ae', 'sa', 'dp', 'dr']
+             var optionsoff = ['se']
+             for (var i in optionson) {
+                 document.getElementById(optionson[i]).checked = true;
+             }
+             for (var i in optionsoff) {
+                 document.getElementById(optionsoff[i]).checked = false;
+             }
+             for (var j in checks) {
+                 document.getElementById(checks[j]).checked = false;
+             }
+         }
+     }
+
+
+     function dispAdvisory() {
+         var checks  = ['int', 'perm', 'allcomment']
+         if (document.getElementById('adv').checked &&
+             !document.getElementById('ext').checked) {
+             var optionson = ['ai', 'ae', 'sa', 'dp', 'dr']
+             var optionsoff = ['se']
+             for (var i in optionson) {
+                 document.getElementById(optionson[i]).checked = true;
+             }
+             for (var i in optionsoff) {
+                 document.getElementById(optionsoff[i]).checked = false;
+             }
+             for (var j in checks) {
+                 document.getElementById(checks[j]).checked = false;
+             }
+         }
+         else if (document.getElementById('adv').checked &&
+                  document.getElementById('ext').checked) {
+             var optionson = ['ae', 'se', 'sa', 'dp', 'dr']
+             var optionsoff = ['ai']
+             for (var i in optionson) {
+                 document.getElementById(optionson[i]).checked = true;
+             }
+             for (var i in optionsoff) {
+                 document.getElementById(optionsoff[i]).checked = false;
+             }
+             for (var j in checks) {
+                 document.getElementById(checks[j]).checked = false;
+             }
+         }
+         else if (!document.getElementById('adv').checked &&
+                  document.getElementById('ext').checked) {
+             var optionson = ['ae', 'se', 'dp', 'dr']
+             var optionsoff = ['ai', 'sa']
+             for (var i in optionson) {
+                 document.getElementById(optionson[i]).checked = true;
+             }
+             for (var i in optionsoff) {
+                 document.getElementById(optionsoff[i]).checked = false;
+             }
+             for (var j in checks) {
+                 document.getElementById(checks[j]).checked = false;
+             }
+         }
+     }
+
+
+     function dispAll() {
+         var optionson = ['ai', 'ae', 'se', 'sa', 'dp', 'dr']
+         var checks  = ['int', 'perm', 'ext', 'adv']
+         if (document.getElementById('allcomment').checked) {
+             for (var i in optionson) {
+                 document.getElementById(optionson[i]).checked = true;
+             }
+             for (var j in checks) {
+                 document.getElementById(checks[j]).checked = false;
+             }
+         }
+     }
+     function showOptions(obj) {
+         var el = document.getElementById(obj);
+         if (el.style.display == 'none') {
+             el.style.display = '';
+         }
+         else {
+             el.style.display = 'none';
+         }
+     }
+  </script>
+""")
 docId    = fields.getvalue(cdrcgi.DOCID) or None
 docType  = fields.getvalue("DocType")    or None
 docTitle = fields.getvalue("DocTitle")   or None
@@ -325,8 +558,18 @@ images   = fields.getvalue("Images")     or None
 citation = fields.getvalue("Citations")  or None
 loe      = fields.getvalue("LOEs")       or None
 standardWording = fields.getvalue("ShowStandardWording") or None
-displayInternComments = fields.getvalue("DisplayInternalComments") or None
-displayExternComments = fields.getvalue("DisplayExternalComments") or None
+audInternComments    = fields.getvalue("AudInternalComments")  or None
+audExternComments    = fields.getvalue("AudExternalComments")  or None
+durPermanentComments = fields.getvalue("DurPermanentComments") or None
+durRegularComments   = fields.getvalue("DurRegularComments")   or None
+srcAdvisoryComments  = fields.getvalue("SrcAdvisoryComments")  or None
+srcEditorComments    = fields.getvalue("SrcEditorComments")    or None
+
+grp1Internal         = fields.getvalue("internal") or None
+grp1Permanent        = fields.getvalue("permanent") or None
+grp2External         = fields.getvalue("external") or None
+grp2Advisory         = fields.getvalue("advisory") or None
+
 displayBoard    = fields.getvalue('Editorial-board') and 'editorial-board_' or ''
 displayBoard   += fields.getvalue('Advisory-board')  and 'advisory-board'   or ''
 displayAudience = fields.getvalue('Patient') and 'patient_' or ''
@@ -350,17 +593,56 @@ if docId:
 
 # ---------------------------------------------------------------
 # Passing a single parameter to the filter to decide if only the
-# internal, external, all, or none of the comments should be
-# displayed.
+# internal, external, all, or none of the audience comments 
+# should be displayed.
 # ---------------------------------------------------------------
-if not displayInternComments and not displayExternComments:
-    displayComments = 'N'  # No comments
-elif displayInternComments and not displayExternComments:
-    displayComments = 'I'  # Internal comments only
-elif not displayInternComments and displayExternComments:
-    displayComments = 'E'  # External comments only (default)
+if not audInternComments and not audExternComments:
+    audienceComments = 'N'  # No comments
+elif audInternComments and not audExternComments:
+    audienceComments = 'I'  # Internal comments only
+elif not audInternComments and audExternComments:
+    audienceComments = 'E'  # External comments only (default)
 else:
-    displayComments = 'A'  # All comments
+    audienceComments = 'A'  # All comments
+
+# ---------------------------------------------------------------
+# The source of a comment can be editorial or advisory
+# ---------------------------------------------------------------
+if not srcAdvisoryComments and not srcEditorComments:
+    sourceComments = 'N'  # No comments
+elif srcAdvisoryComments and not srcEditorComments:
+    sourceComments = 'V'  # Advisory board comments only
+elif not srcAdvisoryComments and srcEditorComments:
+    sourceComments = 'E'  # Editorial board comments only (default)
+else:
+    sourceComments = 'A'  # All comments
+
+# ---------------------------------------------------------------
+# The duration of a comment can be normal or permanent
+# ---------------------------------------------------------------
+if not durPermanentComments and not durRegularComments:
+    durationComments = 'N'  # No comments
+elif durPermanentComments and not durRegularComments:
+    durationComments = 'P'  # Permanent comments only
+elif not durPermanentComments and durRegularComments:
+    durationComments = 'R'  # External comments only (default)
+else:
+    durationComments = 'A'  # All comments
+
+# ---------------------------------------------------------------
+# In the case that two comment types should be combined (internal
+# and permanent/external and advisory) we need to submit an 
+# additional parameter to the filters.
+# ---------------------------------------------------------------
+if grp1Internal and grp1Permanent:
+    includeExtPerm = 'Y'
+else:
+    includeExtPerm = 'N'
+
+if grp2External and grp2Advisory:
+    includeIntAdv  = 'Y'
+else:
+    includeIntAdv  = 'N'
 
 #----------------------------------------------------------------------
 # Handle navigation requests.
@@ -547,26 +829,29 @@ if letUserPickVersion:
 """ % (repType)
 
     form += u"""\
-  Select document version:&nbsp;<br>
+  <fieldset class='docversion'>
+   <legend>&nbsp;Select document version&nbsp;</legend>
+  <div style="width: 100%; text-align: center;">
+  <div style="margin: 0 auto;">
   <SELECT NAME='DocVersion'>
    <OPTION VALUE='-1' SELECTED='1'>Current Working Version</OPTION>
 """
 
-    # Limit display of version comment to 150 chars (if exists)
+    # Limit display of version comment to 120 chars (if exists)
     # ---------------------------------------------------------
     for row in rows:
         form += u"""\
    <OPTION VALUE='%d'>[V%d %s] %s</OPTION>
 """ % (row[0], row[0], row[2][:10],
-       not row[1] and "[No comment]" or row[1][:150])
+       not row[1] and "[No comment]" or row[1][:120])
         selected = ""
-    form += u"</SELECT>"
+    form += u"</SELECT></div></div>"
     form += u"""
-  <BR><BR>
-  Select Insertion/Deletion markup to be displayed in the report (one or more):
+  </fieldset>
   <BR>
-  <table width="60%" border="0">
-   <tr>
+  <fieldset class="wrapper">
+   <legend>&nbsp;Select Insertion/Deletion markup to be displayed 
+           (one or more)&nbsp;</legend>
 """
     # The Board Markup does not apply to the Patient Version Summaries
     # or the GlossaryTerm reports
@@ -574,54 +859,33 @@ if letUserPickVersion:
     if docType == 'Summary':
         if repType != 'pat' and repType != 'patbu' and repType != 'patrs':
             form += u"""\
-    <td valign="top">
-     <table>
-      <tr>
-       <td class="colheading">Board Markup</td>
-      </tr>
-       <td>
-        <INPUT TYPE    = "checkbox"
-               NAME    = "Editorial-board"
-               CHECKED>&nbsp;&nbsp; Editorial board markup
-       </td>
-      </tr>
-      <tr>
-       <td>
-        <INPUT TYPE    = "checkbox"
-               NAME    = "Advisory-board">&nbsp;&nbsp; Advisory board markup
-       </td>
-      </tr>
-     </table>
-    </td>
+     <fieldset>
+      <legend>&nbsp;Board Markup&nbsp;</legend>
+      <input name='Editorial-board' type='checkbox' id='eBoard'
+                   checked='1'>
+      <label for='eBoard'>Editorial board markup</label>
+      <br>
+      <input name='Advisory-board' type='checkbox' id='aBoard'>
+      <label for='aBoard'>Advisory board markup</label>
+     </fieldset>
 """
     # Display the check boxed for the Revision-level Markup
     # -----------------------------------------------------
     form += u"""\
     <td valign="top">
-     <table>
-      <tr>
-       <td class="colheading">Revision-level Markup</td>
-      </tr>
-      <tr>
-       <td>
-        <INPUT TYPE="checkbox" NAME="publish">&nbsp;&nbsp; With publish attribute
-       </td>
-      </tr>
-      <tr>
-       <td>
-        <INPUT TYPE="checkbox" NAME="approved"
-                         CHECKED='1'>&nbsp;&nbsp; With approved attribute<BR>
-       </td>
-      </tr>
-      <tr>
-       <td>
-        <INPUT TYPE="checkbox" NAME="proposed">&nbsp;&nbsp; With proposed attribute
-       </td>
-      </tr>
-     </table>
-    </td>
-   </tr>
-  </table>
+     <fieldset>
+      <legend>&nbsp;Revision-level Markup&nbsp;</legend>
+      <input name='publish' type='checkbox' id='pup'>
+      <label for='pup'>With publish attribute</label>
+      <br>
+      <input name='approved' type='checkbox' id='app'
+                   checked='1'>
+      <label for='app'>With approved attribute</label>
+      <br>
+      <input name='proposed' type='checkbox' id='prop'>
+      <label for='prop'>With proposed attribute</label>
+     </fieldset>
+  </fieldset>
 """
 
     # Display the check boxes for the HP or Patient version sections
@@ -652,33 +916,169 @@ if letUserPickVersion:
     # --------------------------------------------------
     if docType == 'Summary':
         form += u"""\
+     <p>
+     <fieldset>
+      <legend>&nbsp;Select Comment Types to be displayed&nbsp;</legend>
+      <div class='comgroup'>
+      <input name='internal' type='checkbox' id='int'
+                   onclick='javascript:dispInternal()'>
+      <label for='int'>Internal Comments (excluding permanent comments)</label>
+      <br>
+      <input name='permanent' type='checkbox' id='perm'
+                   onclick='javascript:dispPermanent()'>
+      <label for='perm'>Permanent Comments (internal & external)</label>
+      </div>
+"""
+        # The users don't want the option for advisory-board comments
+        # displayed for the patient summaries because these summaries 
+        # are never reviewed by the advisory board.
+        # In order to keep the code unchanged I'm just removing the 
+        # option displayed but not those options that are actually
+        # being checked by the JavaScript functions.
+        # -----------------------------------------------------------
+        # XXX
+        if repType != 'pat' and repType != 'patbu' and repType != 'patrs':
+            form += u"""\
+      <div class='comgroup'>
+      <input name='external' type='checkbox' id='ext'
+                   checked='1'
+                   onclick='javascript:dispExternal()'>
+      <label for='ext'>External Comments (excluding advisory comments)</label>
+      <br>
+      <input name='advisory' type='checkbox' id='adv'
+                   onclick='javascript:dispAdvisory()'>
+      <label for='adv'>Advisory Board Comments (internal & external)</label>
+      </div>
+"""
+        else:
+            form += u"""\
+      <div class='comgroup'>
+      <input name='external' type='checkbox' id='ext'
+                   checked='1'
+                   onclick='javascript:dispExternal()'>
+      <label for='ext'>External Comments</label>
+       <!-- div style="display: none;">
+       <br>
+       <input name='advisory' type='checkbox' id='adv'
+                   onclick='javascript:dispAdvisory()'>
+       <label for='adv'>Advisory Board Comments (internal & external)</label>
+       </div -->
+      </div>
+"""
+
+        form += u"""\
+      <div class='comgroup'>
+      <input name='all' type='checkbox' id='allcomment'
+                   onclick='javascript:dispAll()'>
+      <label for='allcomment'>All Comments</label>
+     </div>
+     Click <a onclick="showOptions('hide');" title='More options'
+              style="color: blue; text-decoration: underline;">here</a>
+     for individual options ...
+     </fieldset>
+     <fieldset id='hide' style="display: none;">
      <table>
       <tr>
-       <td class="colheading">Display Comments and Responses</td>
+       <td class="colheading" 
+           colspan="3">Display Comments and Responses 
+                       (mark comment type to be displayed)</td>
+      </tr>
+      <tr>
+       <td>
+        <table>
+      <tr>
+       <td class="subheading">Audience (txt color)</td>
       </tr>
       <tr>
        <td>
         <INPUT TYPE    = "checkbox"
-               NAME    = "DisplayInternalComments"
-                            >&nbsp;&nbsp; Display Internal Comments
+               NAME    = "AudInternalComments"
+               ID      = "ai"
+                            >&nbsp; Internal 
        </td>
       </tr>
       <tr>
        <td>
         <INPUT TYPE    = "checkbox"
-               NAME    = "DisplayExternalComments"
-               CHECKED = '1'>&nbsp;&nbsp; Display External Comments
+               NAME    = "AudExternalComments"
+               ID      = "ae"
+               CHECKED = '1'>&nbsp; External 
+       </td>
+       </tr>
+       </table>
+       </td>
+       <td>
+        <table>
+      <tr>
+       <td class="subheading">Source (txt spacing)</td>
+      </tr>
+         <tr>
+       <td>
+        <INPUT TYPE    = "checkbox"
+               NAME    = "SrcEditorComments"
+               ID      = "se"
+               CHECKED = "1">&nbsp; Not Advisory 
+       </td>
+      </tr>
+      <tr>
+       <td>
+        <INPUT TYPE    = "checkbox"
+               NAME    = "SrcAdvisoryComments"
+               ID      = "sa"
+                            >&nbsp; Advisory 
+       </td>
+       </tr>
+       </table>
+       </td>
+       <td>
+        <table>
+      <tr>
+       <td class="subheading">Duration (background)</td>
+      </tr>
+         <tr>
+       <td>
+        <INPUT TYPE    = "checkbox"
+               NAME    = "DurPermanentComments"
+               ID      = "dp"
+               CHECKED = '1'>&nbsp; Permanent 
+       </td>
+      </tr>
+      <tr>
+       <td>
+        <INPUT TYPE    = "checkbox"
+               NAME    = "DurRegularComments"
+               ID      = "dr"
+               CHECKED = '1'>&nbsp; Non-permanent 
+       </td>
+       </tr>
+       </table>
        </td>
       </tr>
      </table>
+     </fieldset>
 """
 
     # Display the Glossary appendix checkbox
     # --------------------------------------
     if docType == 'Summary':
         form += u"""\
-  <BR>
-     <table>
+  <p>
+     <fieldset>
+      <legend>&nbsp;Misc Print Options&nbsp;</legend>
+      &nbsp;<input name='Glossary' type='checkbox' id='dispGlos'>&nbsp;
+      <label for='dispGlos'>Include glossary terms at end of report</label>
+      <br>
+      &nbsp;<input name='Images' type='checkbox' id='dispImg'>&nbsp;
+      <label for='dispImg'>Display images instead of placeholder</label>
+      <br>
+      &nbsp;<input name='Citations' type='checkbox' id='dispCit'
+             checked='1'>&nbsp;
+      <label for='dispCit'>Display the HP Reference Section</label>
+      <br>
+      &nbsp;<input name='LOEs' type='checkbox' id='dispLoe'>&nbsp;
+      <label for='dispLoe'>Display Level of Evidence terms at end of report</label>
+
+     <!-- table>
       <tr>
        <td class="colheading">Misc Print Options</td>
       </tr>
@@ -705,22 +1105,31 @@ if letUserPickVersion:
   <INPUT TYPE='checkbox' NAME='LOEs'>&nbsp;&nbsp;
   Display Level of Evidence terms at end of report<BR>
        </td>
-      </tr>
+      </tr -->
 """
 
     # Display the checkbox to display standard wording
     # ------------------------------------------------
     if repType == 'pat' or repType == 'patbu' or repType == 'patrs':
         form += u"""\
-      <tr>
-       <td>
-  <INPUT TYPE='checkbox' NAME='ShowStandardWording'>&nbsp;&nbsp;
-  Show standard wording with mark-up<BR>
-       </td>
-      </tr>
+      <br>
+      &nbsp<input name='ShowStandardWording' type='checkbox' 
+             id='stdWord'>&nbsp;
+      <label for='stdWord'>Show standard wording with mark-up</label>
 """
+
+#        form += u"""\
+#      <tr>
+#       <td>
+#  <INPUT TYPE='checkbox' NAME='ShowStandardWording'>&nbsp;&nbsp;
+#  Show standard wording with mark-up<BR>
+#       </td>
+#      </tr>
+#"""
     form += u"""
-     </table>"""
+     </fieldset>"""
+#    form += u"""
+#     </table>"""
 
     cdrcgi.sendPage(header + form + u"""
  </BODY>
@@ -1307,10 +1716,17 @@ else:
 if docType == 'DrugInformationSummary' or docType == 'Media:img':
     filterParm.append(['isQC', 'Y'])
 
-# Patient Summaries are displayed like editorial board markup
-# -----------------------------------------------------------
+# Supply the summary comments and board display parameters
+# --------------------------------------------------------
 if docType.startswith('Summary'):
-    filterParm.append(['DisplayComments', displayComments ])
+    filterParm.append(['DisplayComments', audienceComments ])
+    filterParm.append(['DurationComments', durationComments ])
+    filterParm.append(['SourceComments', sourceComments ])
+    filterParm.append(['IncludeExtPerm', includeExtPerm ])
+    filterParm.append(['IncludeIntAdv', includeIntAdv ])
+
+    # Patient Summaries are displayed like editorial board markup
+    # -----------------------------------------------------------
     if repType == 'pat' or repType == 'patrs' or repType == 'patbu':
         displayBoard += 'editorial-board_'
     filterParm.append(['displayBoard', displayBoard])
@@ -1318,8 +1734,8 @@ if docType.startswith('Summary'):
 # Need to set the displayBoard parameter or all markup will be dropped
 # --------------------------------------------------------------------
 if docType.startswith('GlossaryTerm'):
-    filterParm.append(['DisplayComments', displayComments ])
-                       # displayComments and 'Y' or 'N'])
+    filterParm.append(['DisplayComments', audienceComments ])
+                       # audienceComments and 'Y' or 'N'])
     filterParm.append(['displayBoard', 'editorial-board_'])
     filterParm.append(['displayAudience', displayAudience])
 
