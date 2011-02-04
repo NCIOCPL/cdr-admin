@@ -259,7 +259,8 @@ class BoardMember:
                 d = e.text
                 if d:
                     self.start = d
-            for e in node.findall('TermEndDate'):
+            for e in node.findall('TerminationDate'):
+            #for e in node.findall('TermEndDate'):
                 d = e.text
                 if d:
                     self.end = d
