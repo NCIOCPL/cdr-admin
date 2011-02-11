@@ -4,7 +4,8 @@
 #
 # Status of a publishing job.
 #
-# $Log: not supported by cvs2svn $
+# BZIssue::4997 - Bug in PubStatus Report
+#
 # Revision 1.32  2008/04/28 16:48:59  venglisc
 # Changed the formatting to display errors in red and changed strings to
 # Unicode strings. (Bug 3923)
@@ -325,21 +326,24 @@ def dispFilterFailures(flavor = 'full'):
     textPattern = re.compile(u'<LI class="(.*)</LI>')
     textPattern2 = re.compile(u'<Messages><message>')
     textPattern3 = re.compile(u'</message></Messages>')
+    errorPattern = re.compile(u'DTDerror')
 
     for row in rows:
-        text = textPattern.search(row[4])
+        text = textPattern.search(row[4])    # searching for warnings
+        eText = errorPattern.search(row[4])  # searching for errors
 
         if flavor == 'full':
             html += addRow(row)
         elif flavor == 'warning':
             # Only print the row if the pattern was found
             # -------------------------------------------
-            if text:
+            if text and not eText:
                html += addRow(row)
         elif flavor == 'error':
-            # Only print the row if the warning pattern was not found
-            # -------------------------------------------------------
-            if not text:
+            # Print the row if the error pattern was found
+            # (it might also contain warnings)
+            # --------------------------------------------
+            if eText:
                html += addRow(row)
         else:
             cdrcgi.bail('Error: Valid values for flavor are: '
