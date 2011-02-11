@@ -4,8 +4,7 @@
 #
 # Status of a publishing job.
 #
-# BZIssue::4997 - Bug in PubStatus Report
-#
+# $Log: not supported by cvs2svn $
 # Revision 1.32  2008/04/28 16:48:59  venglisc
 # Changed the formatting to display errors in red and changed strings to
 # Unicode strings. (Bug 3923)
@@ -946,20 +945,24 @@ def dispJobsByDates():
     instr   = "Publishing Job Summary"
     buttons = ["Report Menu", cdrcgi.MAINMENU, "Log Out"]
     script  = "PubStatus.py"
-    header  = cdrcgi.header(title, title, instr, script, buttons)
+    header  = cdrcgi.header(title, title, instr, script, buttons,
+                            stylesheet = """
+  <style type = 'text/css'>
+    th             { font: bold 16px arial; 
+                     background-color:  #AFAFAF; }
+   .text           { font: bold 10pt arial; 
+                     color: black; }
+   .link           { font: bold 10pt arial; 
+                     color: black; }
+  </style>
+                            """)
 
     conn   = cdrdb.connect("CdrGuest")
     cursor = conn.cursor()
 
     form = """
-       <center>
-       <b>
-        <font size='4'>Publishing Job Report</font>
-       </b>
-       <br />
-       <b>
-        <font size='4'>From %s to %s</font>
-       </b>
+      <center style="font: bold 18px arial;">
+        <span>Publishing Job Report<br />From %s to %s</span>
       </center>
       <br />
       <br />
@@ -995,38 +998,26 @@ def dispJobsByDates():
         row        = cursor.fetchone()
         if not row:
             cdrcgi.sendPage(header + """
-              <b>
-               <font size='3'>No publishing jobs during this period.</font>
-              </b>
+              <span style="font: bold 18px arial;">
+               No publishing jobs during this period.
+              </span>
              </body>
             </html>
                                    """)
 
         form += """
-            <font size='2'>
+            <span style="font: 15px arial">
              <B>Note:</b> A 
               <span style="background-color: #FF7F50;">Colored row</span> 
-                did not complete loading to the Cancer.gov live site</font>
+                did not complete loading to the Cancer.gov live site</span>
             <table border='1' cellspacing='0' cellpadding='2' width='100%%'>
                 <tr>
-                    <td nowrap='1'><b>
-                    <font size='3'>Job ID</font>
-                    </b></td>
-                    <td nowrap='1'><b>
-                    <font size='3'>Job Name</font>
-                    </b></td>
-                    <td nowrap='1'><b>
-                    <font size='3'>Job Status Reports</font>
-                    </b></td>
-                    <td nowrap='1'><b>
-                    <font size='3'>Starting Time</font>
-                    </b></td>
-                    <td nowrap='1'><b>
-                    <font size='3'>Ending Time</font>
-                    </b></td>
-                    <td nowrap='1'><b>
-                    <font size='3'>NumDocs</font>
-                    </b></td>
+                    <th nowrap='1'>Job ID</th>
+                    <th nowrap='1'>Job Name</th>
+                    <th nowrap='1'>Job Status Reports</th>
+                    <th nowrap='1'>Starting Time</th>
+                    <th nowrap='1'>Ending Time</th>
+                    <th nowrap='1'>NumDocs</th>
                 </tr>
                 """
         while row:
@@ -1040,45 +1031,43 @@ def dispJobsByDates():
                 form += '<tr>'
 
             form += """
-                    <td nowrap='1'><b>
-                    <a style="text-decoration: underline;"
-                       href="PubStatus.py?id=%d&type=Report&%s=%s">
-                    <font size='2' color='black'>%d</font>
-                    </b></td></a>
-                    <td nowrap='1'><b>
-                    <a style="text-decoration: underline;"
-                       href="PubStatus.py?id=%d&type=Report&%s=%s">
-                    <font size='2' color='black'>%s</font>
-                    </b></td>
-                    <td nowrap='1'><b>&nbsp;
-                    <a style="text-decoration: underline;"
-                       href="PubStatus.py?id=%d">
-                    <font size='2' color='black'>status</font></a>
-                    </b><br>
-                    <b>&nbsp;
-                    <a style="text-decoration: underline;"
-                       href="PubStatus.py?id=%d&type=FilterFailure&flavor=error">
-                    <font size='2' color='black'>errors</font></a>,
-                    </b>
-                    <b>&nbsp;
-                    <a style="text-decoration: underline;"
-                       href="PubStatus.py?id=%d&type=FilterFailure&flavor=warning">
-                    <font size='2' color='black'>warnings</font></a>,
-                    </b>
-                    <b>&nbsp;
-                    <a style="text-decoration: underline;"
-                       href="PubStatus.py?id=%d&type=FilterFailure&flavor=full">
-                    <font size='2' color='black'>both</font></a>
-                    </b></td>
-                    <td nowrap='1'><b>
-                    <font size='2' color='black'>%s</font>
-                    </b></td>
-                    <td nowrap='1'><b>
-                    <font size='2' color='black'>%s</font>
-                    </b></td>
-                    <td nowrap='1'><b>
-                    <font size='2' color='black'>%d</font>
-                    </b></td>
+                    <td nowrap='1'>
+                     <a style="text-decoration: underline; color: black;"
+                        href="PubStatus.py?id=%d&type=Report&%s=%s">
+                      <span class="link">%d</span></a>
+                    </td>
+                    <td nowrap='1'>
+                     <a style="text-decoration: underline; color: black;"
+                        href="PubStatus.py?id=%d&type=Report&%s=%s">
+                      <span class="link">%s<span class="link"></a>
+                    </td>
+                    <td nowrap='1'>&nbsp;
+                     <a style="text-decoration: underline; color: black;"
+                        href="PubStatus.py?id=%d">
+                      <span class="link">status</span></a>
+                     <br />
+                     &nbsp;
+                     <a style="text-decoration: underline; color: black;"
+                        href="PubStatus.py?id=%d&type=FilterFailure&flavor=error"
+                        ><span class="link">errors</span></a>, 
+                     &nbsp;
+                     <a style="text-decoration: underline; color: black;"
+                        href="PubStatus.py?id=%d&type=FilterFailure&flavor=warning"
+                        ><span class="link">warnings</span></a>, 
+                     &nbsp; 
+                     <a style="text-decoration: underline; color: black;"
+                        href="PubStatus.py?id=%d&type=FilterFailure&flavor=full"
+                        ><span class="link">both</span></a>
+                    </td>
+                    <td nowrap='1'>
+                     <span class="text">%s</span>
+                    </td>
+                    <td nowrap='1'>
+                     <span class="text">%s</span>
+                    </td>
+                    <td nowrap='1'>
+                     <span class="text">%d</span>
+                    </td>
                 </tr>
                     """ % (id, cdrcgi.SESSION, session, id,
                            id, cdrcgi.SESSION, session, name,
