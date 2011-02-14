@@ -6,6 +6,8 @@
 #
 # BZIssue::4756 - Summary Comments Report
 # BZIssue::4908 - Editing Summary Comments Report in MS Word
+# BZIssue::4968 - Modification to Summaries Comments Report to 
+#                 Show/Hide Certain Comments
 #
 # Note:
 # This report has been adapted from the SummariesLists report.
