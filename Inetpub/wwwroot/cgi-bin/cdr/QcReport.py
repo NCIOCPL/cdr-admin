@@ -8,6 +8,8 @@
 # BZIssue::4751 - Modify BU Report to display LOERef
 # BZIssue::4672 - Changes to LinkedDoc Report
 # BZIssue::4781 - Have certain links to unpublished docs ignored
+# BZIssue::4967 - [Summary] Modification to QC Reports to Show/Hide 
+#                 Certain Comments
 #
 # Revision 1.69  2009/05/28 20:38:26  venglisc
 # Added checkbox to suppress display of Reference sections. (Bug 4562)
