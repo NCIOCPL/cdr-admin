@@ -92,7 +92,7 @@ if request == "Save Changes":
 #----------------------------------------------------------------------
 title   = "CDR Administration"
 section = "Edit User Information"
-buttons = ["Save Changes", "Delete User", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
+buttons = ["Save Changes", "Inactivate User", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 #script  = "DumpParams.pl"
 script  = "EditUser.py"
 header  = cdrcgi.header(title, title, section, script, buttons)
