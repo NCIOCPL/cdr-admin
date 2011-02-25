@@ -337,7 +337,7 @@ header   = cdrcgi.header(title, title, getSectionTitle(repType),
 
   <script languate = 'JavaScript'>
      function dispInternal() {
-         var checks  = ['ext', 'adv', 'allcomment']
+         var checks  = ['ext', 'adv', 'allcomment', 'nocomment']
          if (document.getElementById('int').checked &&
              !document.getElementById('perm').checked) {
              var optionson = ['ai', 'se', 'sa', 'dr']
@@ -386,7 +386,7 @@ header   = cdrcgi.header(title, title, getSectionTitle(repType),
 
 
      function dispPermanent() {
-         var checks  = ['ext', 'adv', 'allcomment']
+         var checks  = ['ext', 'adv', 'allcomment', 'nocomment']
          if (document.getElementById('perm').checked &&
              !document.getElementById('int').checked) {
              var optionson = ['ai', 'ae', 'se', 'sa', 'dp']
@@ -435,7 +435,7 @@ header   = cdrcgi.header(title, title, getSectionTitle(repType),
 
 
      function dispExternal() {
-         var checks  = ['int', 'perm', 'allcomment']
+         var checks  = ['int', 'perm', 'allcomment', 'nocomment']
          if (document.getElementById('ext').checked &&
              !document.getElementById('adv').checked) {
              var optionson = ['ae', 'se', 'dp', 'dr']
@@ -482,7 +482,7 @@ header   = cdrcgi.header(title, title, getSectionTitle(repType),
 
 
      function dispAdvisory() {
-         var checks  = ['int', 'perm', 'allcomment']
+         var checks  = ['int', 'perm', 'allcomment', 'nocomment']
          if (document.getElementById('adv').checked &&
              !document.getElementById('ext').checked) {
              var optionson = ['ai', 'ae', 'sa', 'dp', 'dr']
@@ -530,10 +530,22 @@ header   = cdrcgi.header(title, title, getSectionTitle(repType),
 
      function dispAll() {
          var optionson = ['ai', 'ae', 'se', 'sa', 'dp', 'dr']
-         var checks  = ['int', 'perm', 'ext', 'adv']
+         var checks  = ['int', 'perm', 'ext', 'adv', 'nocomment']
          if (document.getElementById('allcomment').checked) {
              for (var i in optionson) {
                  document.getElementById(optionson[i]).checked = true;
+             }
+             for (var j in checks) {
+                 document.getElementById(checks[j]).checked = false;
+             }
+         }
+     }
+     function dispNone() {
+         var optionson = ['ai', 'ae', 'se', 'sa', 'dp', 'dr']
+         var checks  = ['int', 'perm', 'ext', 'adv', 'allcomment']
+         if (document.getElementById('nocomment').checked) {
+             for (var i in optionson) {
+                 document.getElementById(optionson[i]).checked = false;
              }
              for (var j in checks) {
                  document.getElementById(checks[j]).checked = false;
@@ -973,6 +985,10 @@ if letUserPickVersion:
       <input name='all' type='checkbox' id='allcomment'
                    onclick='javascript:dispAll()'>
       <label for='allcomment'>All Comments</label>
+      <br>
+      <input name='no' type='checkbox' id='nocomment'
+                   onclick='javascript:dispNone()'>
+      <label for='nocomment'>No Comments</label>
      </div>
      Click <a onclick="showOptions('hide');" title='More options'
               style="color: blue; text-decoration: underline;">here</a>
