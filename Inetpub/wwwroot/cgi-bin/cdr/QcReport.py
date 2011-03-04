@@ -10,6 +10,9 @@
 # BZIssue::4781 - Have certain links to unpublished docs ignored
 # BZIssue::4967 - [Summary] Modification to QC Reports to Show/Hide 
 #                 Certain Comments
+# BZIssue::5006 - Minor Revisions to QC Report Interfaces - Comments Options
+#
+# ---------------------------------------------------------------------
 #
 # Revision 1.69  2009/05/28 20:38:26  venglisc
 # Added checkbox to suppress display of Reference sections. (Bug 4562)
@@ -935,6 +938,7 @@ if letUserPickVersion:
       <legend>&nbsp;Select Comment Types to be displayed&nbsp;</legend>
       <div class='comgroup'>
       <input name='internal' type='checkbox' id='int'
+                   checked='1'
                    onclick='javascript:dispInternal()'>
       <label for='int'>Internal Comments (excluding permanent comments)</label>
       <br>
@@ -955,7 +959,6 @@ if letUserPickVersion:
             form += u"""\
       <div class='comgroup'>
       <input name='external' type='checkbox' id='ext'
-                   checked='1'
                    onclick='javascript:dispExternal()'>
       <label for='ext'>External Comments (excluding advisory comments)</label>
       <br>
@@ -1012,7 +1015,7 @@ if letUserPickVersion:
         <INPUT TYPE    = "checkbox"
                NAME    = "AudInternalComments"
                ID      = "ai"
-                            >&nbsp; Internal 
+               CHECKED = '1'>&nbsp; Internal 
        </td>
       </tr>
       <tr>
@@ -1020,7 +1023,7 @@ if letUserPickVersion:
         <INPUT TYPE    = "checkbox"
                NAME    = "AudExternalComments"
                ID      = "ae"
-               CHECKED = '1'>&nbsp; External 
+                            >&nbsp; External 
        </td>
        </tr>
        </table>
@@ -1043,7 +1046,7 @@ if letUserPickVersion:
         <INPUT TYPE    = "checkbox"
                NAME    = "SrcAdvisoryComments"
                ID      = "sa"
-                            >&nbsp; Advisory 
+               CHECKED = '1'>&nbsp; Advisory 
        </td>
        </tr>
        </table>
@@ -1058,7 +1061,7 @@ if letUserPickVersion:
         <INPUT TYPE    = "checkbox"
                NAME    = "DurPermanentComments"
                ID      = "dp"
-               CHECKED = '1'>&nbsp; Permanent 
+                            >&nbsp; Permanent 
        </td>
       </tr>
       <tr>
