@@ -4,7 +4,8 @@
 #
 # CGI program to list the CDR tables/views and their structures.
 #
-# $Log: not supported by cvs2svn $
+# BZIssue::5002 - Setting up MAHLER
+#
 #----------------------------------------------------------------------
 import cdrdb, cdrcgi
 
@@ -71,8 +72,12 @@ class Catalog:
     def __init__(self, cursor):
         self.databases = {}
         cursor.execute("""\
-    SELECT CATALOG_NAME
-    FROM master.INFORMATION_SCHEMA.SCHEMATA""")
+    SELECT name 
+      FROM master..sysdatabases 
+     ORDER BY name""")
+###        cursor.execute("""\
+###    SELECT CATALOG_NAME
+###    FROM master.INFORMATION_SCHEMA.SCHEMATA""")
         for row in cursor.fetchall():
             try:
                 database = Database(cursor, row[0])
