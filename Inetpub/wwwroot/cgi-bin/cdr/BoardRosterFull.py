@@ -23,15 +23,15 @@ flavor     = fields and fields.getvalue("sheet") or 'full'
 rptType    = fields and fields.getvalue("rpttype") or 'html'
 session    = cdrcgi.getSession(fields)
 request    = cdrcgi.getRequest(fields)
-title      = "PDQ Board Roster Report"
-instr      = "Report on PDQ Board Roster"
-script     = "BoardRosterFull.py"
-SUBMENU    = "Report Menu"
+title      = u"PDQ Board Roster Report"
+instr      = u"Report on PDQ Board Roster"
+script     = u"BoardRosterFull.py"
+SUBMENU    = u"Report Menu"
 buttons    = ("Submit", SUBMENU, cdrcgi.MAINMENU)
 header     = cdrcgi.header(title, title, instr, script, buttons, 
                            method = 'GET')
 
-dateString = time.strftime("%B %d, %Y")
+dateString = time.strftime(u"%B %d, %Y")
 
 filterType= {'summary':'name:PDQBoardMember Roster Summary',
              'excel'  :'name:PDQBoardMember Roster Excel',
@@ -131,7 +131,7 @@ def addExcelTableRow(person):
 # If we don't have a request, put up the form.
 #----------------------------------------------------------------------
 if not boardType:
-    form   = """\
+    form   = u"""\
       <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
       <TABLE border='0'>
        <TR>
@@ -207,7 +207,7 @@ if rptType == 'html':
     # ---------------------------------------------------------------
     # Create the HTML Output Page
     # ---------------------------------------------------------------
-    html = """\
+    html = u"""\
     <!DOCTYPE HTML PUBLIC '-//W3C//DTD HTML 4.01 Transitional//EN'
                           'http://www.w3.org/TR/html4/loose.dtd'>
     <HTML>
@@ -277,14 +277,14 @@ if rptType == 'html':
         # MS-Word.
         # -----------------------------------------------------------
         if flavor == 'full':
-            html += """
+            html += u"""
             <table width='100%%'>
              <tr>
               <td>%s<span style="font-style: italic">%s</span><br><br><td>
              </tr>
-            </table>""" % (response[0], boardMember[2])
+            </table>""" % (unicode(response[0], 'utf-8'), boardMember[2])
 
-    html += """
+    html += u"""
       <br>
      </BODY>   
     </HTML>    
@@ -294,7 +294,7 @@ if rptType == 'html':
     # Since the address is build by a common address module we're
     # better off removing it in the final HTML output
     # ------------------------------------------------------------
-    cdrcgi.sendPage(html.replace('U.S.A.<br>', ''))
+    cdrcgi.sendPage(html.replace(u'U.S.A.<br>', u''))
 
 # ----------------------------------------------------------------
 # The users decided not to have the Excel option implemented.  This
