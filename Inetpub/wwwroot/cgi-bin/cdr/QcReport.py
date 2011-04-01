@@ -929,8 +929,13 @@ if letUserPickVersion:
 """
 
     # Display the Comment display checkbox
-    # Summaries display the External Comments by default
-    # --------------------------------------------------
+    # Patient Summaries display the Internal Comments by default
+    # Internal Option Grid:  X  X  O
+    #                        O  X  X
+    # HP Summaries display the External Comments by default
+    # External Option Grid:  O  X  X
+    #                        X  O  X
+    # -----------------------------------------------------------
     if docType == 'Summary':
         form += u"""\
      <p>
@@ -938,7 +943,15 @@ if letUserPickVersion:
       <legend>&nbsp;Select Comment Types to be displayed&nbsp;</legend>
       <div class='comgroup'>
       <input name='internal' type='checkbox' id='int'
-                   checked='1'
+"""
+        if repType != 'pat' and repType != 'patbu' and repType != 'patrs':
+            form += u"""\
+"""
+        else:
+            form += u"""\
+                   CHECKED="1"
+"""
+        form += u"""\
                    onclick='javascript:dispInternal()'>
       <label for='int'>Internal Comments (excluding permanent comments)</label>
       <br>
@@ -959,6 +972,7 @@ if letUserPickVersion:
             form += u"""\
       <div class='comgroup'>
       <input name='external' type='checkbox' id='ext'
+                   CHECKED="1"
                    onclick='javascript:dispExternal()'>
       <label for='ext'>External Comments (excluding advisory comments)</label>
       <br>
@@ -971,15 +985,13 @@ if letUserPickVersion:
             form += u"""\
       <div class='comgroup'>
       <input name='external' type='checkbox' id='ext'
-                   checked='1'
                    onclick='javascript:dispExternal()'>
       <label for='ext'>External Comments</label>
-       <!-- div style="display: none;">
-       <br>
-       <input name='advisory' type='checkbox' id='adv'
+       <!-- I need the element as a hidden field so that I can use the same
+            javascript functions for HP and Patient version -->
+       <input name='advisory' type='hidden' id='adv'
                    onclick='javascript:dispAdvisory()'>
-       <label for='adv'>Advisory Board Comments (internal & external)</label>
-       </div -->
+       </div>
       </div>
 """
 
@@ -1014,16 +1026,36 @@ if letUserPickVersion:
        <td>
         <INPUT TYPE    = "checkbox"
                NAME    = "AudInternalComments"
-               ID      = "ai"
-               CHECKED = '1'>&nbsp; Internal 
+"""
+
+        if repType != 'pat' and repType != 'patbu' and repType != 'patrs':
+            form += u"""\
+"""
+        else:
+            form += u"""\
+               CHECKED = "1"
+"""
+
+        form += u"""\
+               ID      = "ai">&nbsp; Internal 
        </td>
       </tr>
       <tr>
        <td>
         <INPUT TYPE    = "checkbox"
                NAME    = "AudExternalComments"
-               ID      = "ae"
-                            >&nbsp; External 
+"""
+
+        if repType != 'pat' and repType != 'patbu' and repType != 'patrs':
+            form += u"""\
+               CHECKED = "1"
+"""
+        else:
+            form += u"""\
+"""
+
+        form += u"""\
+               ID      = "ae">&nbsp; External 
        </td>
        </tr>
        </table>
@@ -1037,16 +1069,26 @@ if letUserPickVersion:
        <td>
         <INPUT TYPE    = "checkbox"
                NAME    = "SrcEditorComments"
-               ID      = "se"
-               CHECKED = "1">&nbsp; Not Advisory 
+               CHECKED = "1"
+               ID      = "se">&nbsp; Not Advisory 
        </td>
       </tr>
       <tr>
        <td>
         <INPUT TYPE    = "checkbox"
                NAME    = "SrcAdvisoryComments"
-               ID      = "sa"
-               CHECKED = '1'>&nbsp; Advisory 
+"""
+
+        if repType != 'pat' and repType != 'patbu' and repType != 'patrs':
+            form += u"""\
+"""
+        else:
+            form += u"""\
+               CHECKED = "1"
+"""
+
+        form += u"""\
+               ID      = "sa">&nbsp; Advisory 
        </td>
        </tr>
        </table>
@@ -1060,16 +1102,26 @@ if letUserPickVersion:
        <td>
         <INPUT TYPE    = "checkbox"
                NAME    = "DurPermanentComments"
-               ID      = "dp"
-                            >&nbsp; Permanent 
+"""
+
+        if repType != 'pat' and repType != 'patbu' and repType != 'patrs':
+            form += u"""\
+               CHECKED = "1"
+"""
+        else:
+            form += u"""\
+"""
+
+        form += u"""\
+               ID      = "dp">&nbsp; Permanent 
        </td>
       </tr>
       <tr>
        <td>
         <INPUT TYPE    = "checkbox"
                NAME    = "DurRegularComments"
-               ID      = "dr"
-               CHECKED = '1'>&nbsp; Non-permanent 
+               CHECKED = "1"
+               ID      = "dr">&nbsp; Non-permanent 
        </td>
        </tr>
        </table>
