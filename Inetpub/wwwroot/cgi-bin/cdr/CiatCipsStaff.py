@@ -5,6 +5,7 @@
 # Main menu for CIAT/CIPS staff.
 #
 # BZIssue::4700
+# BZIssue::5013 - [Glossary Audio] Create Audio Download Tool
 #
 # Revision 1.10  2009/07/22 01:25:13  ameyer
 # Added GlobalChangeSimpleLink.py.
@@ -60,6 +61,7 @@ html    = cdrcgi.header(title, title, section, "", buttons) + """\
    <ol>
 """
 items   = (('AdvancedSearch.py', 'Advanced Search',       ''               ),
+           ('FtpAudio.py',       'Audio Download',        ''               ),
            ('getBatchStatus.py', 'Batch Job Status',      ''               ),
            ('CTGov.py',          'CTGov Protocols',       ''               ),
            ('GlobalChange.py',   'Global Change Protocol Links', ''        ),
