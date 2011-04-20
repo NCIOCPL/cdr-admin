@@ -45,6 +45,8 @@ form = """\
     <OL>
 """ % (cdrcgi.SESSION, session)
 reports = [
+           ('GatekeeperStatus.py',
+            'Gatekeeper Status Request'),
            ('PubStatus.py',
             'Publishing Job Activities'),
            ('PubStatsByDate.py',
