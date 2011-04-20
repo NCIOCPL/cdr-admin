@@ -99,7 +99,7 @@ def showForm(extra = u""):
    <table border='0' cellpadding='2' cellspacing='0'>
     <tr>
      <th align='right'>GateKeeper Host:&nbsp;</th>
-     <td><input class='fw' name='targetHost' value='gkdev.cancer.gov'></td>
+     <td><input class='fw' name='targetHost' value='gatekeeper.cancer.gov'></td>
     </tr>
     <tr>
      <th align='right'>Job ID:&nbsp;</th>
