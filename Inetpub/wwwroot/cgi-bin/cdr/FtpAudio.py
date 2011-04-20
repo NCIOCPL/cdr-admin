@@ -51,7 +51,7 @@ ftpDone   = None
 # ----------------------------
 if testMode:
     audioPath = audioPath.replace('ciat/', 'ciat/test/')
-    targetDir = os.path.join('Testing', defTarget)
+    targetDir = os.path.join('Testing', targetDir)
 
     # request = "Get Audio"
 
@@ -146,15 +146,6 @@ if request == "Get Audio" and ftpDone != 'Y':
                    ftp.rename(name, audioPath + '%s/%s' %
                                                (CiatTarget, name))
                    # ftp.storbinary('STOR ' + ciatFile, open(targetFile, 'rb')) 
-
-           ### # Delete the file if it was transferred from default directory
-           ### # ------------------------------------------------------------
-           ### if sourceDir == 'Term_Audio':
-           ###     if not testMode:
-           ###         pp = ftp.pwd()
-           ###         cdrcgi.bail('%s/%s' % (pp, name))
-           ###         ftp.delete(name)
-           ###     #print "%d chunks for %s" % (len(bytes), name)
 
        ftp.quit()
        ftpDone = 'Y'
