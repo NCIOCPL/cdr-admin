@@ -356,7 +356,7 @@ def installZipFile(zipName):
     try:
         book = ExcelReader.Workbook(fileBuf=xlsBytes)
     except Exception as e:
-        bail("ExcelReader.Workbook contructor error" % e)
+        bail("ExcelReader.Workbook constructor error", e)
     if not book:
         bail("Spreadsheet not created")
 
@@ -411,8 +411,8 @@ def installZipFile(zipName):
             # We do it this onesy/twosey way because a cell can be empty
             #   and not present at all in row.cells
             for cell in row.cells:
-                cdr.logwrite("row %d: col %d: value=%s" %
-                             (rowCount, cell.col, cell.val))
+                # cdr.logwrite("row %d: col %d: value=%s" %
+                #              (rowCount, cell.col, cell.val))
                 if cell.col == 0:
                     cdrId = int(cell.val)
                 elif cell.col == 1:
@@ -571,7 +571,7 @@ def listZipFiles(session):
     # Instructions and output table column headers
     html += """
 <p>Click a link to a zip file to review from the table below.  Only those files
-that have not yet been completely reviewed are hyperlinked.</p)
+that have not yet been completely reviewed are hyperlinked.</p>
 
 <table border='1'>
   <tr>
@@ -684,7 +684,7 @@ def makeOneMp3FormRow(mp3obj, zipFilename):
     html += "  <td>%s</td>\n" % mp3obj.language
 
     # Pronunciation
-    html += "  <td>%s</td>\n" % escape(mp3obj.pronunciation)
+    html += "  <td>%s</td>\n" % (escape(mp3obj.pronunciation) or "&nbsp;")
 
     # mp3 filename, hyprlinked to allow user to hear it
     val = escape(mp3obj.mp3_name)
@@ -692,7 +692,7 @@ def makeOneMp3FormRow(mp3obj, zipFilename):
                (SCRIPT, mp3obj.id, zipFilename, val)
 
     # Note from the reader (currently Vanessa)
-    html += "  <td>%s</td>\n" % escape(mp3obj.reader_note)
+    html += "  <td>%s</td>\n" % (escape(mp3obj.reader_note) or "&nbsp;")
 
     # Place to add or update reviewer's note, and row close
     html += \
@@ -804,10 +804,11 @@ of files.)</p>
 <p>Use the radio buttons to approve or reject a file.</p>
 <p>When finished, click "Save" to save any changes to the database.  If all
 files in the set have been reviewed and any have been rejected, a
-spreadsheet containing rejected terms will be created and emailed to you.
+spreadsheet containing rejected terms will be created and displayed on
+your workstation.  Please save it for future use.
 </p>
 
-<table border='1'>
+<table border='1' style='empty-cells: show'>
 <tr>
  <th>Approve<br />
      &nbsp; Reject<br />
@@ -864,7 +865,6 @@ def isReviewComplete(mp3List):
         True  = All have been reviewed.
         False = One or more remain to review.
     """
-    cdr.logwrite("isReviewComplete called")
     for mp3obj in mp3List:
         if mp3obj.review_status == 'U':
             return False
@@ -884,8 +884,6 @@ def saveChanges(fields, session):
         True  = Some changes were made.
         False = No changes.
     """
-    cdr.logwrite("Save changes called")
-
     # Get all of the database info corresponding to the submitted data
     zipId    = int(fields.getvalue("ReviewedZipfileId"))
     mp3index = loadMp3Table(zipId)
@@ -952,10 +950,6 @@ def doneZipfileReview(session, oldZipName, mp3List):
            user's browser.
         Else displays a message that all recordings were approved.
     """
-    cdr.logwrite("doneZipfileReview called - oldZipName=%s" % oldZipName)
-
-    # Update status
-
     # Create the output objects
     book  = ExcelWriter.Workbook()
     sheet = book.addWorksheet("Term Names")
@@ -1109,8 +1103,8 @@ if __name__ == "__main__":
             zipId = int(zipIdStr)
 
     # XXX DEBUG
-    cdr.logwrite("request=%s zipName=%s zipIdStr=%s" %
-                 (request, zipName, zipIdStr))
+    # cdr.logwrite("request=%s zipName=%s zipIdStr=%s" %
+    #              (request, zipName, zipIdStr))
 
     # If here for the first time (no fields), show available files
     if not fields:
