@@ -8,7 +8,7 @@
 #----------------------------------------------------------------------
 
 import sys, os, time, glob, cgi, re, operator, zipfile, msvcrt
-import cdr, cdrdb, cdrcgi, ExcelReader, ExcelWriter
+import cdr, cdrdb, cdrcgi, xlrd, ExcelWriter
 import cgitb
 cgitb.enable()
 
@@ -278,6 +278,26 @@ def insertZipFileRow(zipName):
     return zipId
 
 
+def getCell(sheet, row, col):
+    """
+    Extract the value from a cell in the worksheet.
+
+    Pass:
+        Sheet instance.
+        Row index, origin 0.
+        Column index, origin 0.
+
+    Return:
+        Value in whatever data type is found.
+        If empty string or no cell at all, return None
+    """
+    try:
+        value = sheet.cell(row, col).value
+    except (IndexError, ValueError):
+        return None
+    return value
+
+
 def installZipFile(zipName):
     """
     Check to see if a a zip file has been loaded into the term_audio_zipfile
@@ -354,14 +374,16 @@ def installZipFile(zipName):
 
     # Open the spreadsheet
     try:
-        book = ExcelReader.Workbook(fileBuf=xlsBytes)
+        # book = ExcelReader.Workbook(fileBuf=xlsBytes)
+        book = xlrd.open_workbook(file_contents=xlsBytes)
     except Exception as e:
         bail("ExcelReader.Workbook constructor error", e)
     if not book:
         bail("Spreadsheet not created")
 
     # Extract spreadsheet stuff of interest
-    sheet = book[0]
+    # sheet = book[0]
+    sheet = book.sheet_by_index(0)
     if not sheet:
         bail("No worksheet found in spreadsheet")
 
@@ -377,26 +399,30 @@ def installZipFile(zipName):
     userId = getUserId(session, cursor)
     now    = getSqlDate(cursor)
 
+
+    # Check for labels on first line
+    upperLeft = sheet.cell(0, 0).value
+    if upperLeft != "CDR ID":
+        bail('Expected first line to begin with "CDR ID", but got "%s"' %
+              upperLeft)
+
+    # First data line
+    rowx = 1
+    done = False
+
     # Wrap everything in a transaction
     try:
         conn.setAutoCommit(False)
     except Exception as e:
         bail("Unable to create transaction for zipfile installation", e)
 
-    rowCount = 0
     try:
         # Create the required row in the database
         zipId = insertZipFileRow(zipName)
 
         # Walk the spreadsheet, processing each useful mp3 row
-        for row in sheet.rows:
-            # Skip header row
-            # XXX There has to be a less fragile way to do this
-            if rowCount == 0:
-                rowCount += 1
-                continue
-
-            # Default values for all items in spreadsheet
+        while True:
+            # Set default values for all items in spreadsheet
             # Many of these are required, we'll catch an exception from
             #   SQL Server if they aren't there
             cdrId         = None
@@ -408,40 +434,45 @@ def installZipFile(zipName):
             reviewerNote  = None
 
             # Load values from the sheet
-            # We do it this onesy/twosey way because a cell can be empty
-            #   and not present at all in row.cells
-            for cell in row.cells:
-                # cdr.logwrite("row %d: col %d: value=%s" %
-                #              (rowCount, cell.col, cell.val))
-                if cell.col == 0:
-                    cdrId = int(cell.val)
-                elif cell.col == 1:
-                    termName = cell.val
-                elif cell.col == 2:
-                    language = cell.val
-                elif cell.col == 3:
-                    pronunciation = cell.val
-                elif cell.col == 4:
-                    filename = cell.val
-                elif cell.col == 5:
-                    readerNote = cell.val
-                elif cell.col == 6:
-                    reviewerNote = cell.val
-                elif cell.col == 7:
-                    # This one requires a kludge for multiple input formats
-                    # The reviewer note might appear in either column 7 or 8
-                    if cell.val is not None and reviewerNote is None:
-                        reviewerNote = cell.val
+            try:
+                cdrId = int(sheet.cell(rowx, 0).value)
+                # cdr.logwrite('got rowx=%d, cdrId=%d' % (rowx, cdrId))
+            except IndexError:
+                # Past the end of the rows
+                # cdr.logwrite('broke on rowx=%d, cdrId=%d' % (rowx, cdrId))
+                done = True
+                break
+            except (ValueError, TypeError) as e:
+                bail('Expecting CDR ID integer on row=%d, got "%s"' %
+                     (rowx + 1, sheet.cell(rowx, 0).value))
 
-                # Another kludge for multiple input formats
-                # Some filenames have a MAC OSX prefix.  These are redundant
-                if filename and filename.startswith(USELESS):
-                    continue
+            # Get the rest with less checking
+            termName     = getCell(sheet, rowx, 1)
+            language     = getCell(sheet, rowx, 2)
+            pronunciation= getCell(sheet, rowx, 3)
+            filename     = getCell(sheet, rowx, 4)
+            readerNote   = getCell(sheet, rowx, 5)
+            reviewerNote = getCell(sheet, rowx, 6)
+
+            # Reviewer note requires a kludge for multiple input formats
+            # An early version of the spreadsheet had a place for approval
+            #   in column 6 with reviewer note in col 7.
+            # Later versions have reviewer note in 6
+            extra = getCell(sheet, rowx, 7)
+            if extra and not reviewerNote:
+                reviewerNote = extra
+
+            # Got everything from this row
+            rowx += 1
+
+            # Another kludge for multiple input formats
+            # Some filenames have a MAC OSX prefix.  These are redundant
+            if filename and filename.startswith(USELESS):
+                # Continue without inserting the row
+                continue
 
             # A final test for missing filenames
             if not filename:
-                # DEBUG
-                conn.commit()
                 bail("Missing filename in zipfile for CDRID=%s, term=%s"
                      % (cdrId, termName))
 
@@ -451,16 +482,13 @@ def installZipFile(zipName):
                                         pronunciation, filename,
                                         readerNote, reviewerNote,
                                         userId, now))
-                # XXX DEBUG
-                conn.commit()
             except Exception as e:
                 bail("Failed to insert row for cdrId=%d, term=%s" %
                      (cdrId, termName), e)
-            rowCount += 1
 
     finally:
-        # If we processed all rows successfully, commit
-        if rowCount == len(sheet.rows):
+        # If we processed all rows successfully, commit both tables
+        if done:
             conn.commit()
         else:
             conn.rollback()
@@ -587,8 +615,31 @@ that have not yet been completely reviewed are hyperlinked.</p>
     # Get a list of objects representing zip files on the disk
     fileList = getZipFileList()
 
+    # Sort the list by filename
+    nameList = sorted(fileList, key=operator.attrgetter("fname"))
+
+    # Supersort by category,  name is within category
+    sortedList = []
+
+    # Started files
+    for tzf in nameList:
+        if zipNameIndex.has_key(tzf.fname):
+            if zipNameIndex[tzf.fname].complete == 'N':
+                sortedList.append(tzf)
+
+    # Unreviewed files
+    for tzf in nameList:
+        if not zipNameIndex.has_key(tzf.fname):
+            sortedList.append(tzf)
+
+    # Completed files - all the rest
+    for tzf in nameList:
+        if zipNameIndex.has_key(tzf.fname):
+            if zipNameIndex[tzf.fname].complete == 'Y':
+                sortedList.append(tzf)
+
     # Populate the table
-    for tzf in fileList:
+    for tzf in sortedList:
 
         refName = tzf.fname
 
