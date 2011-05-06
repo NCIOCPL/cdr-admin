@@ -62,6 +62,7 @@ html    = cdrcgi.header(title, title, section, "", buttons) + """\
 """
 items   = (('AdvancedSearch.py', 'Advanced Search',       ''               ),
            ('FtpAudio.py',       'Audio Download',        ''               ),
+           ('GlossaryTermAudioReview.py', 'Audio Review Glossary Term',  ''),
            ('getBatchStatus.py', 'Batch Job Status',      ''               ),
            ('CTGov.py',          'CTGov Protocols',       ''               ),
            ('GlobalChange.py',   'Global Change Protocol Links', ''        ),
