@@ -7,6 +7,7 @@
 #
 # BZIssue::4909 - Board Roster Report Change
 # BZIssue::4979 - Error in Board Roster Report
+# BZIssue::5023 - Changes to Board Roster Report
 # 
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, cdrdb, re, time
@@ -25,6 +26,8 @@ cdrid      = fields and fields.getvalue("cinfo")  or 'No'
 email      = fields and fields.getvalue("einfo")  or 'No'
 startDate  = fields and fields.getvalue("dinfo")  or 'No'
 blankCol   = fields and fields.getvalue("blank")  or 'No'
+govEmp     = fields and fields.getvalue("govemp")  or 'No'
+### recHonor   = fields and fields.getvalue("honoraria")  or 'No'
 flavor     = fields and fields.getvalue("sheet")  or 'full'
 session    = cdrcgi.getSession(fields)
 request    = cdrcgi.getRequest(fields)
@@ -66,6 +69,8 @@ header     = cdrcgi.header(title, title, instr, script, buttons,
              form.dinfo.value = form.dinfo.checked ? 'Yes' : 'No';
              form.finfo.value = form.finfo.checked ? 'Yes' : 'No';
              form.blank.value = form.blank.checked ? 'Yes' : 'No';
+             form.govemp.value = form.govemp.checked ? 'Yes' : 'No';
+             /*form.honoraria.value = form.honoraria.checked ? 'Yes' : 'No';*/
          }
      }
      function doFullReport() {
@@ -229,20 +234,27 @@ def addSpecificContactInfo(boardIds, boardInfo):
     newBoardInfo = []
     try:
         cursor.execute("""\
-SELECT q.doc_id, q.value as SpPhone, f.value as SpFax, e.value as SpEmail
-  FROM query_term q
+    SELECT g.doc_id, g.value AS GE, h.value, q.value as SpPhone, 
+           f.value as SpFax, e.value as SpEmail
+      FROM query_term g
+LEFT OUTER JOIN query_term h
+        ON g.doc_id = h.doc_id
+       AND h.path = '/PDQBoardMemberInfo/GovernmentEmployee/@HonorariaDeclined'
 LEFT OUTER JOIN query_term f
-    ON q.doc_id = f.doc_id
-   AND f.path = '/PDQBoardMemberInfo/BoardMemberContact' +
-                '/SpecificBoardMemberContact/BoardContactFax'
+        ON g.doc_id = f.doc_id
+       AND f.path = '/PDQBoardMemberInfo/BoardMemberContact' +
+                    '/SpecificBoardMemberContact/BoardContactFax'
 LEFT OUTER JOIN query_term e
-    ON q.doc_id = e.doc_id
-   AND e.path = '/PDQBoardMemberInfo/BoardMemberContact/' +
-                'SpecificBoardMemberContact/BoardContactEmail'
- WHERE q.doc_id IN (%s)
-   AND q.path = '/PDQBoardMemberInfo/BoardMemberContact' +
-                '/SpecificBoardMemberContact/BoardContactPhone'
- ORDER BY q.path""" % ','.join(["'%d'" % id for id in boardIds]))
+        ON g.doc_id = e.doc_id
+       AND e.path = '/PDQBoardMemberInfo/BoardMemberContact/' +
+                    'SpecificBoardMemberContact/BoardContactEmail'
+LEFT OUTER JOIN query_term q
+        ON g.doc_id = q.doc_id
+       AND q.path = '/PDQBoardMemberInfo/BoardMemberContact' +
+                    '/SpecificBoardMemberContact/BoardContactPhone'
+     WHERE g.doc_id IN (%s)
+       AND g.path = '/PDQBoardMemberInfo/GovernmentEmployee'
+  ORDER BY q.path""" % ','.join(["'%d'" % id for id in boardIds]))
     except cdrdb.Error, info:
         cdrcgi.bail('Database query failure for SpecificInfo: %s' % info[1][0]+
                     '<br>Board has No Board Members')
@@ -253,13 +265,30 @@ LEFT OUTER JOIN query_term e
     # ----------------------------------------------
     for member in boardInfo:
         memCount = len(member)
-        for cdrId, phone, fax, email in rows:
+        for cdrId, ge, honor, phone, fax, email in rows:
             if member[4] == cdrId:
-                member = member + [phone or None, fax or None, email or None]
+                member = member + [ge, honor or None, phone or None, 
+                                   fax or None, email or None]
         if memCount == len(member):
-            member = member + [None, None, None]
+            member = member + [None, None, None, None, None]
         newBoardInfo.append(member)
     return newBoardInfo
+
+
+# ---------------------------------------------------------------------
+# A non-government employee may decline to receive a honorarium.  
+# Returning the appropriate value for the person.
+# ---------------------------------------------------------------------
+def checkHonoraria(govEmployee, declined = u''):
+    if govEmployee == 'Yes':
+        return u''
+    elif govEmployee == u'Unknown':
+        return u''
+    elif govEmployee == 'No':
+        if declined == 'Yes':
+            return u'*'
+        else:
+            return u''
 
 
 #----------------------------------------------------------------------
@@ -272,9 +301,11 @@ def makeSheet(rows):
     rowCount = 0
     html = """
         <tr class="theader">"""
-    for k, v in [('Name','Yes'), ('Phone',phone), ('Fax',fax), 
-              ('Email',email), ('CDR-ID',cdrid), 
-              ('Start Date', startDate), ('&nbsp;', blankCol)]:
+    for k, v in [('Name', 'Yes'), ('Phone', phone), ('Fax', fax), 
+              ('Email', email), ('CDR-ID', cdrid), 
+              ('Start Date', startDate), ('Gov. Empl.', govEmp),
+              ### ('Rec. Honor.', recHonor), 
+              ('&nbsp;', blankCol)]:
         if v == 'Yes':
             rowCount += 1
             html += """
@@ -285,57 +316,86 @@ def makeSheet(rows):
 
     # Populate the table with data rows
     # =================================
-    #for row in name, phone, fax, email, cdrid, termStardDate, spPhone, ...
+    # for row in name, phone, fax, email, cdrid, termStardDate, 
+    # govEmpl, recHonor, spPhone, ...
+    # ----------------------------------------------------------
     for row in rows:
        html += """
         <tr>
          <td class="name">%s</td>""" % row[0]
+       # Phone, Fax, Email may also have specific info
+       # ---------------------------------------------
        if phone == 'Yes':
            html += """
          <td class="phone">%s""" % row[1]
-           if row[1] and row[6]:
-               html += "<br>%s</td>" % row[6]
-           elif not row[1] and row[6]:
-               html += "%s</td>" % row[6]
+           if row[1] and row[8]:
+               html += "<br>%s</td>" % row[8]
+           elif not row[1] and row[8]:
+               html += "%s</td>" % row[8]
            else:
                html += "</td>"
 
        if fax   == 'Yes':
            html += """
          <td class="fax">%s""" % row[2]
-           if row[2] and row[7]:
-               html += "<br>%s</td>" % row[7]
-           elif not row[2] and row[7]:
-               html += "%s</td>" % row[7]
+           if row[2] and row[9]:
+               html += "<br>%s</td>" % row[9]
+           elif not row[2] and row[9]:
+               html += u"%s</td>" % row[9]
            else:
-               html += "</td>"
+               html += u"</td>"
 
        if email == 'Yes':
-           html += """
+           html += u"""
          <td class="email">
           <a href="mailto:%s">%s</a>
          """ % (row[3], row[3])
-           if row[3] and row[8]:
-               html += """<br>
+           if row[3] and row[10]:
+               html += u"""<br>
           <a href="mailto:%s">%s</a>
-         """ % (row[8], row[8])
-           elif not row[3] and row[8]:
-               html += """
+         """ % (row[10], row[10])
+           elif not row[3] and row[10]:
+               html += u"""
           <a href="mailto:%s">%s</a>
-         </td>""" % (row[8], row[8])
+         </td>""" % (row[10], row[10])
            else:
                html += "</td>"
 
+       # If the CDR-ID is to be printed
+       # ------------------------------
        if cdrid == 'Yes':
-           html += """
+           html += u"""
          <td class="cdrid">%s</td>""" % row[4]
        if startDate == 'Yes':
-           html += """
+           html += u"""
          <td class="cdrid">%s</td>""" % row[5]
+
+       # If the Government Employee column is printed
+       # --------------------------------------------
+       if govEmp == 'Yes':
+           if row[7] is None:
+               declined = u''
+           else:
+               declined = row[7]
+
+           # The field Govt Employee is mandatory but was empty for
+           # some documents during testing.
+           # ------------------------------------------------------
+           if row[6] is None: row[6] = u'Unknown'
+
+           html += u"""
+         <td class="cdrid">%s<sup><b>%s</b></sup></td>""" % (row[6],
+                                               checkHonoraria(row[6], declined))
+       ### if recHonor == 'Yes':
+       ###     html += u"""
+       ###   <td class="cdrid">%s</td>""" % (not(row[7]) and u'Yes' or u'No')
+
+       # If a blank column is printed
+       # ----------------------------
        if blankCol == 'Yes':
-           html += """
+           html += u"""
          <td class="blank">&nbsp;</td>"""
-       html += """
+       html += u"""
         </tr>"""
 
     return (html, rowCount)
@@ -434,6 +494,24 @@ if not boardId:
         <label for="E5">Start Date</label>
        </td>
       </tr>
+      <tr>
+       <td> </td>
+       <td class="select">
+        <input type='checkbox' name='govemp' 
+               onclick='javascript:doSummarySheet()' id='E7'>
+        <label for="E7">Government Employee</label>
+       </td>
+      </tr>
+      <!--
+      <tr>
+       <td> </td>
+       <td class="select">
+        <input type='checkbox' name='honoraria' 
+               onclick='javascript:doSummarySheet()' id='E8'>
+        <label for="E8">Receives Honoraria</label>
+       </td>
+      </tr>
+      -->
       <tr>
        <td> </td>
        <td class="select">
@@ -626,7 +704,7 @@ for boardMember in boardMembers:
 if flavor == 'summary':
     allRows = addSpecificContactInfo(boardIds, allRows)
     out  = makeSheet(allRows)
-    html += """\
+    html += u"""\
        <table id="summary" cellspacing="0" cellpadding="5">
         <tr>
          <td id="hdg" colspan="%d">%s<br>
@@ -637,9 +715,14 @@ if flavor == 'summary':
        </table>
 """ % (out[1], boardName, dateString, out[0])   
 
+    if govEmp == 'Yes':
+        html += u"""\
+       <b>* - Honoraria Declined</b>
+       <br/>"""
+
 boardManagerInfo = getBoardManagerInfo(boardId)
 
-html += """
+html += u"""
   <br>
   <table width='100%%'>
    <tr>
