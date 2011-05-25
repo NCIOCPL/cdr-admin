@@ -325,7 +325,8 @@ def dispFilterFailures(flavor = 'full'):
     textPattern = re.compile(u'<LI class="(.*)</LI>')
     textPattern2 = re.compile(u'<Messages><message>')
     textPattern3 = re.compile(u'</message></Messages>')
-    errorPattern = re.compile(u'DTDerror')
+    ### errorPattern = re.compile(u'DTDerror')
+    errorPattern = re.compile(u'error')
 
     for row in rows:
         text = textPattern.search(row[4])    # searching for warnings
