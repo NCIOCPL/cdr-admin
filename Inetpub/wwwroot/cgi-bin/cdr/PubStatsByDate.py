@@ -11,6 +11,7 @@
 # BZIssue::2111
 # BZIssue::3716
 # BZIssue::4757
+# BZIssue::5062 - Modify Media Change Report
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string, cdrdb, time
@@ -99,7 +100,11 @@ LEFT OUTER JOIN query_term v
              ON m.doc_id = dv.id
            JOIN document d
              ON dv.id = d.id
+           JOIN query_term c
+             ON m.doc_id = c.doc_id
           WHERE m.path = '/Media/MediaTitle'
+            AND c.path = '/Media/MediaContent/Categories/Category'
+            AND c.value not in ('pronunciation', 'meeting recording')
             AND m.doc_id in (%s)
             AND dv.num = (
                           SELECT max(num)
