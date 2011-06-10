@@ -43,7 +43,7 @@ class TermZipFile:
         self.zipId, self.fname, self.fdate, self.complete = zipData
 
     def __str__(self):
-        return ("zipId=%d   fname=%s   fdate=%s   complete=%s" %
+        return ("zipId=%s   fname=%s   fdate=%s   complete=%s" %
                 (self.zipId, self.fname, self.fdate, self.complete))
 
 class TermMp3:
@@ -65,16 +65,18 @@ class TermMp3:
         self.review_date   = row[11]
 
     def __str__(self):
-        mp3Str = "id=%d   zipfile_id=%d   review_status=%s   cdr_id=%d  \n" \
+        mp3Str = "id=%s   zipfile_id=%s   review_status=%s   cdr_id=%s  \n" \
                  "term_name=%s   language=%s  pronunciation=%s  \n" \
                  "mp3_name=%s   reader_note=%s   reviewer_note=%s  \n" \
-                 "reviewer_id=%id   review_date=%s\n" % \
+                 "reviewer_id=%s   review_date=%s\n" % \
                  (self.id, self.zipfile_id, self.review_status, self.cdr_id,
                   self.term_name, self.language, self.pronunciation,
                   self.mp3_name, self.reader_note, self.reviewer_note,
                   self.reviewer_id, self.review_date)
 
-        return mp3Str
+        # For debugging, we may need to write to an ASCII file
+        # 'replace' is good enough for debugging
+        return mp3Str.encode('ascii', 'replace')
 
 
 def bail(ctxtMsg, e=None):
@@ -240,7 +242,7 @@ def loadMp3Table(zipId):
     return mp3Index
 
 
-def insertZipFileRow(zipName):
+def insertZipFileRow(cursor, zipName):
     """
     Insert a row into term_audio_zipfile for one zip file.
 
@@ -261,8 +263,6 @@ def insertZipFileRow(zipName):
         bail("Unable to get mtime for zip file '%s'" % zipName, e)
 
     try:
-        conn = cdrdb.connect()
-        cursor = conn.cursor()
         cursor.execute("""
           INSERT term_audio_zipfile
                  (filename, filedate)
@@ -270,8 +270,6 @@ def insertZipFileRow(zipName):
         cursor.execute("SELECT @@IDENTITY")
         row = cursor.fetchone()
         zipId = int(row[0])
-        conn.commit()
-        cursor.close()
     except Exception as e:
         bail("Error inserting row in term_audio_zipfile", e)
 
@@ -374,15 +372,13 @@ def installZipFile(zipName):
 
     # Open the spreadsheet
     try:
-        # book = ExcelReader.Workbook(fileBuf=xlsBytes)
         book = xlrd.open_workbook(file_contents=xlsBytes)
     except Exception as e:
-        bail("ExcelReader.Workbook constructor error", e)
+        bail("xlrd.Workbook constructor error", e)
     if not book:
         bail("Spreadsheet not created")
 
     # Extract spreadsheet stuff of interest
-    # sheet = book[0]
     sheet = book.sheet_by_index(0)
     if not sheet:
         bail("No worksheet found in spreadsheet")
@@ -399,16 +395,27 @@ def installZipFile(zipName):
     userId = getUserId(session, cursor)
     now    = getSqlDate(cursor)
 
-
-    # Check for labels on first line
-    upperLeft = sheet.cell(0, 0).value
-    if upperLeft != "CDR ID":
-        bail('Expected first line to begin with "CDR ID", but got "%s"' %
-              upperLeft)
-
-    # First data line
-    rowx = 1
+    # Point past optional labels on the first line to the first row of data
+    rowx = 0
     done = False
+    while True:
+        try:
+            upperLeft = sheet.cell(rowx, 0).value
+            num = int(upperLeft)
+        except IndexError:
+            # Past the end of the rows!
+            bail("No data found in spreadsheet!")
+        except (ValueError, TypeError) as e:
+            # We got something other than the CDR ID, point past it
+            rowx += 1
+        else:
+            # Sanity check (and to silence Pychecker unused variable warning)
+            if num < 1:
+                bail("Got unexpected CDR ID=%d in first row of spreadsheet."
+                      % num)
+
+            # This ought to be the first data row
+            break
 
     # Wrap everything in a transaction
     try:
@@ -418,7 +425,7 @@ def installZipFile(zipName):
 
     try:
         # Create the required row in the database
-        zipId = insertZipFileRow(zipName)
+        zipId = insertZipFileRow(cursor, zipName)
 
         # Walk the spreadsheet, processing each useful mp3 row
         while True:
@@ -443,8 +450,16 @@ def installZipFile(zipName):
                 done = True
                 break
             except (ValueError, TypeError) as e:
-                bail('Expecting CDR ID integer on row=%d, got "%s"' %
-                     (rowx + 1, sheet.cell(rowx, 0).value))
+                # I don't know what to do here.  It could be a bad row
+                #  in the middle of the spreadsheet, a blank row in the
+                #  middle, a blank row at the end, or a corrupt spreadsheet
+                # The one case I've seen is blank row at the end.  I'll
+                #  therefore treat it as benign but log it.
+                cdr.logwrite('%s: ' % SCRIPT +
+                             'Expecting CDR ID integer on row=%d, got "%s"' %
+                              (rowx + 1, sheet.cell(rowx, 0).value))
+                rowx += 1
+                continue
 
             # Get the rest with less checking
             termName     = getCell(sheet, rowx, 1)
@@ -459,7 +474,7 @@ def installZipFile(zipName):
             #   in column 6 with reviewer note in col 7.
             # Later versions have reviewer note in 6
             extra = getCell(sheet, rowx, 7)
-            if extra and not reviewerNote:
+            if extra:
                 reviewerNote = extra
 
             # Got everything from this row
@@ -473,8 +488,8 @@ def installZipFile(zipName):
 
             # A final test for missing filenames
             if not filename:
-                bail("Missing filename in zipfile for CDRID=%s, term=%s"
-                     % (cdrId, termName))
+                # User has to reject this
+                filename = "MISSING!"
 
             # Insert the row into the table
             try:
@@ -540,7 +555,8 @@ def updateMp3Row(cursor, mp3obj):
                                 mp3obj.reviewer_id, mp3obj.review_date,
                                 mp3obj.id))
     except Exception as e:
-        bail("Error updating mp3 row for zipId=%d, cdrId=%d", e)
+        bail("Error updating mp3 row for zipId=%d, cdrId=%d"
+              % (mp3obj.zipfile_id, mp3obj.cdr_id), e)
 
 
 def getZipFileList():
@@ -651,7 +667,7 @@ that have not yet been completely reviewed are hyperlinked.</p>
 
             # If we haven't completed reviewing, hyperlink database id
             if tzf.complete == 'N':
-                refName = "<a href='%s?zipId=%d&%s=%s'>'" % \
+                refName = "<a href='%s?zipId=%d&%s=%s'>" % \
                             (SCRIPT, tzf.zipId, cdrcgi.SESSION, session) + \
                           "%s</a>" % tzf.fname
         else:
@@ -1051,7 +1067,7 @@ def doneZipfileReview(session, oldZipName, mp3List):
             haveRejects = True
 
     # If there were no rejects, we're done
-    cdr.logwrite("doneZipfileReview found no rejects")
+    # cdr.logwrite("doneZipfileReview found no rejects")
     if not haveRejects:
         html = cdrcgi.header(HEADER + " - Processing complete", HEADER,
                          "Proccessing of this file is complete",
