@@ -18,6 +18,7 @@ HEADER  = "Glossary Term Audio Review"
 BUTTONS = (cdrcgi.MAINMENU, "Logout")
 ZIPDIR  = "d:/cdr/Audio_from_CIPSFTP"
 REVDIR  = "%s/GeneratedRevisionSheets" % ZIPDIR
+MAXNOTE = 2040
 
 # Some early zipfiles included some redundant lines with this name prefix
 USELESS = "__MACOSX"
@@ -65,7 +66,7 @@ class TermMp3:
         self.review_date   = row[11]
 
     def __str__(self):
-        mp3Str = "id=%s   zipfile_id=%s   review_status=%s   cdr_id=%s  \n" \
+        mp3Str = u"id=%s   zipfile_id=%s   review_status=%s   cdr_id=%s  \n" \
                  "term_name=%s   language=%s  pronunciation=%s  \n" \
                  "mp3_name=%s   reader_note=%s   reviewer_note=%s  \n" \
                  "reviewer_id=%s   review_date=%s\n" % \
@@ -548,6 +549,8 @@ def updateMp3Row(cursor, mp3obj):
         Open database cursor
         TermMp3 object with the latest values
     """
+    # DEBUG
+    # cdr.logwrite("Updating: %s" % mp3obj)
     mp3Sql = """
       UPDATE term_audio_mp3
          SET review_status = ?,
@@ -983,7 +986,11 @@ def saveChanges(fields, session):
         revNote   = fields.getvalue("revNote%d" % mId, None)
 
         # User may have input utf-8 Spanish chars in reviewer note
-        revNote = revNote.decode('utf-8', 'replace')
+        if revNote:
+            revNote = revNote.decode('utf-8', 'replace')
+            # Limit the length for database input
+            if len(revNote) > MAXNOTE:
+                revNote = revNote[:MAXNOTE]
 
         # Compare
         if revStatus != mp3obj.review_status or \
