@@ -469,6 +469,11 @@ def installZipFile(zipName):
             readerNote   = getCell(sheet, rowx, 5)
             reviewerNote = getCell(sheet, rowx, 6)
 
+            # Confirm language and fail here if it's wrong
+            if language not in ("English", "Spanish"):
+                bail("Expecting English or Spanish for CDR ID=%s.  Got %s" %
+                      (cdrId, language))
+
             # Reviewer note requires a kludge for multiple input formats
             # An early version of the spreadsheet had a place for approval
             #   in column 6 with reviewer note in col 7.
@@ -613,7 +618,7 @@ def listZipFiles(session):
                          script=SCRIPT, buttons=BUTTONS)
 
     # Instructions and output table column headers
-    html += """
+    html += u"""
 <p>Click a link to a zip file to review from the table below.  Only those files
 that have not yet been completely reviewed are hyperlinked.</p>
 
@@ -733,7 +738,7 @@ def makeOneMp3FormRow(mp3obj, zipFilename):
     if mp3obj.review_status == 'R': rcheck = " checked='1'"
     if mp3obj.review_status == 'U': ucheck = " checked='1'"
 
-    html = """
+    html = u"""
  <tr><td>
   <input type='radio' name='appr%d' value='A'%s />
   <input type='radio' name='appr%d' value='R'%s />
@@ -742,28 +747,28 @@ def makeOneMp3FormRow(mp3obj, zipFilename):
 """ % (mId, acheck, mId, rcheck, mId, ucheck)
 
     # CDR ID
-    html += "  <td>%d</td>\n" % mp3obj.cdr_id
+    html += u"  <td>%d</td>\n" % mp3obj.cdr_id
 
     # Term name
-    html += " <td>%s</td>\n" % mp3obj.term_name
+    html += u" <td>%s</td>\n" % mp3obj.term_name
 
     # Language
-    html += "  <td>%s</td>\n" % mp3obj.language
+    html += u"  <td>%s</td>\n" % mp3obj.language
 
     # Pronunciation
-    html += "  <td>%s</td>\n" % (escape(mp3obj.pronunciation) or "&nbsp;")
+    html += u"  <td>%s</td>\n" % (escape(mp3obj.pronunciation) or "&nbsp;")
 
     # mp3 filename, hyprlinked to allow user to hear it
     val = escape(mp3obj.mp3_name)
-    html += "  <td><a href='%s?mp3=%d&zName=%s'>%s</a></td>\n" % \
+    html += u"  <td><a href='%s?mp3=%d&zName=%s'>%s</a></td>\n" % \
                (SCRIPT, mp3obj.id, zipFilename, val)
 
     # Note from the reader (currently Vanessa)
-    html += "  <td>%s</td>\n" % (escape(mp3obj.reader_note) or "&nbsp;")
+    html += u"  <td>%s</td>\n" % (escape(mp3obj.reader_note) or "&nbsp;")
 
     # Place to add or update reviewer's note, and row close
     html += \
-"""  <td><textarea name="revNote%d" rows="1" cols="40">%s</textarea>
+u"""  <td><textarea name="revNote%d" rows="1" cols="40">%s</textarea>
   </td>
  </tr>
 """ % (mId, escape(mp3obj.reviewer_note))
@@ -864,7 +869,7 @@ def showZipfile(zipId, session):
                               "Review and approve or reject mp3 files",
                               script=SCRIPT, buttons=buttons))
 
-    html.append("""
+    html.append(u"""
 <p>Click a hyperlinked mp3 filename to play the sound in your browser
 configured mp3 player (already reviewed files are at the bottom of the list
 of files.)</p>
@@ -977,9 +982,12 @@ def saveChanges(fields, session):
         revStatus = fields.getvalue("appr%d" % mId)
         revNote   = fields.getvalue("revNote%d" % mId, None)
 
+        # User may have input utf-8 Spanish chars in reviewer note
+        revNote = revNote.decode('utf-8', 'replace')
+
         # Compare
         if revStatus != mp3obj.review_status or \
-           revNote != mp3obj.reviewer_note:
+             revNote != mp3obj.reviewer_note:
 
             # Update the object
             mp3obj.review_status = revStatus
@@ -1017,7 +1025,27 @@ def doneZipfileReview(session, oldZipName, mp3List):
            user's browser.
         Else displays a message that all recordings were approved.
     """
-    # Create the output objects
+    # Construct a new spreadsheet based on the old one
+    m = re.match(NAMEPAT, oldZipName)
+    if not m:
+        bail('The filename "%s" doesn\'t match the expected pattern')
+    basePrefix = m.group("base")
+    revSuffix  = m.group("rev")
+    if not revSuffix:
+        # File will contain rejects from an original zip file.
+        newXlsName = basePrefix + "_Rev1"
+    else:
+        # File wil contain rejects from a revised file
+        m = re.match(REVPAT, revSuffix)
+        if not m:
+            bail('Badly formed revision number in "%s"' % oldZipName)
+        revNum = int(m.group("num"))
+        newXlsName = "%s_Rev%d" % (basePrefix, revNum + 1)
+
+    # Spreadsheet filename is the .xls name plus ".xls"
+    newXlsFileName = "%s.xls" % newXlsName
+
+    # Create the output spreadsheet objects
     book  = ExcelWriter.Workbook()
     sheet = book.addWorksheet("Term Names")
 
@@ -1053,13 +1081,24 @@ def doneZipfileReview(session, oldZipName, mp3List):
     # Check each record, saving the rejected ones in the spreadsheet
     for mp3obj in mp3List:
         if mp3obj.review_status == 'R':
+            # Construct new mp3 filename
+            if mp3obj.language == "English":
+                isoLang = "en"
+            elif mp3obj.language == "Spanish":
+                isoLang = "es"
+            else:
+                bail("Unsupported language name=%s for CDR ID=%s" %
+                      (mp3obj.language, mp3obj.cdr_id))
+            new_mp3_name = "%s/%d_%s.mp3" % (newXlsName,
+                                             mp3obj.cdr_id, isoLang)
+
+            # Add the row
             row = sheet.addRow(nextRow)
             row.addCell(0, mp3obj.cdr_id, "Number")
             row.addCell(1, mp3obj.term_name)
             row.addCell(2, mp3obj.language)
             row.addCell(3, mp3obj.pronunciation)
-            # XXX - CHECK IF FILENAME ALREADY CONTAINS PREFIX - ELSE ADD IT
-            row.addCell(4, mp3obj.mp3_name)
+            row.addCell(4, new_mp3_name)
             row.addCell(5, mp3obj.reader_note)
             row.addCell(6, mp3obj.reviewer_note)
 
@@ -1072,7 +1111,7 @@ def doneZipfileReview(session, oldZipName, mp3List):
         html = cdrcgi.header(HEADER + " - Processing complete", HEADER,
                          "Proccessing of this file is complete",
                          script=SCRIPT, buttons=["Continue",]) + \
-"""
+u"""
 <p>All %d mp3 files in the zip file named "%s" have been reviewed and
 approved.</p>
 
@@ -1094,32 +1133,15 @@ for review.</p>
         # We're done
         cdrcgi.sendPage(html)
 
-    # Construct a new filename based on the old one
-    m = re.match(NAMEPAT, oldZipName)
-    if not m:
-        bail('The filename "%s" doesn\'t match the expected pattern')
-    basePrefix = m.group("base")
-    revSuffix  = m.group("rev")
-    if not revSuffix:
-        # File will contain rejects from an original zip file.
-        newFileName = basePrefix + "_Rev1.xls"
-    else:
-        # File wil contain rejects from a revised file
-        m = re.match(REVPAT, revSuffix)
-        if not m:
-            bail('Badly formed revision number in "%s"' % oldZipName)
-        revNum = int(m.group("num"))
-        newFileName = "%s_Rev%d.xls" % (basePrefix, revNum + 1)
-
     # Save the file to our special directory
     try:
-        fp = open("%s/%s" % (REVDIR, newFileName), "wb")
+        fp = open("%s/%s" % (REVDIR, newXlsFileName), "wb")
     except Exception as e:
-        bail('Unable to open "%s" for output' % newFileName, e)
+        bail('Unable to open "%s" for output' % newXlsFileName, e)
     try:
         book.write(fp, asXls=True)
     except Exception as e:
-        bail('Unable to write spreadsheet "%s"' % newFileName, e)
+        bail('Unable to write spreadsheet "%s"' % newXlsFileName, e)
 
     # We've saved an output file, update the status to completed
     updateZipfileCompletion(oldZipName, 'Y')
@@ -1128,7 +1150,7 @@ for review.</p>
     msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
     sys.stdout.write("Content-Type: application/vnd.ms-excel\r\n")
     sys.stdout.write("Content-disposition: attachment; filename=%s\n\n" %
-                      newFileName)
+                      newXlsFileName)
     book.write(sys.stdout, asXls=True)
     sys.exit()
 
@@ -1180,6 +1202,9 @@ if __name__ == "__main__":
     # Back to admin?
     elif request == cdrcgi.MAINMENU:
         cdrcgi.navigateTo("Admin.py", session)
+
+    elif request == "Logout":
+        cdrcgi.navigateTo("Logout.py", session)
 
     # Cancel display of a spreadsheet set
     elif request == "Cancel":
