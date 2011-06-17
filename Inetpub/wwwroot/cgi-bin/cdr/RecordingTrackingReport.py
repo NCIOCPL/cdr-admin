@@ -7,6 +7,8 @@
 #
 # BZIssue::4880 - Board Meeting Recordings Tracking Report
 #                 (report adapted from Media Tracking Report)
+# BZIssue::5068 - [Media] Board Meeting Recording Tracking Report to 
+#                 display blocked documents 
 # 
 #----------------------------------------------------------------------
 import cgi, cdr, cdrdb, cdrcgi, string, time, xml.dom.minidom, xml.sax.saxutils
@@ -257,7 +259,9 @@ class MediaDoc:
 # ---------------------------------------------------------------------
 cursor.execute("""\
          SELECT d.id, d.title, r.value, MAX(v.dt)
-           FROM active_doc d
+           -- Several Meeting Recording documents are blocked.
+           -- FROM active_doc d
+           FROM document d
            JOIN doc_type t
              ON t.id = d.doc_type
            JOIN doc_version v
