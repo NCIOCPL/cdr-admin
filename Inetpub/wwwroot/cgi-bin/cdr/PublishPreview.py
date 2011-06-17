@@ -6,6 +6,7 @@
 # the browser.
 #
 # BZIssue::4781 - Have certain links to unpublished docs ignored
+# BZIssue::5053 - [Summaries] Pub Preview Error
 #
 # Revision 1.39  2008/11/20 22:44:44  venglisc
 # Modified the code to display the exception returned by Cancer.gov if a
@@ -140,6 +141,7 @@
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, cdrdb, re, cdr2gk, sys, time
+import lxml.html
 # Interim fix to allow Protocol Patient publish preview
 ##import cdr2cg
 
@@ -153,16 +155,18 @@ if not fields:
     session    = 'guest'
     docId      = sys.argv[1]
     docVersion = len(sys.argv) > 2 and sys.argv[2] or None
-    dbgLog     = len(sys.argv) > 3 and sys.argv[3] or None
-    flavor     = len(sys.argv) > 4 and sys.argv[4] or None
-    cgHost     = len(sys.argv) > 5 and sys.argv[5] or None
-    ssHost     = len(sys.argv) > 6 and sys.argv[6] or 'www.cancer.gov'
+    preserveLnk= len(sys.argv) > 3 and sys.argv[3] or False
+    dbgLog     = len(sys.argv) > 4 and sys.argv[4] or None
+    flavor     = len(sys.argv) > 5 and sys.argv[5] or None
+    cgHost     = len(sys.argv) > 6 and sys.argv[6] or None
+    ssHost     = len(sys.argv) > 7 and sys.argv[7] or 'www.cancer.gov'
     monitor    = 1
 else:
     session    = cdrcgi.getSession(fields)   or cdrcgi.bail("Not logged in")
     docId      = fields.getvalue(cdrcgi.DOCID) or cdrcgi.bail("No Document",
                                                            title)
     docVersion = fields.getvalue("Version")  or None
+    preserveLnk= fields.getvalue("OrigLinks") or False
     flavor     = fields.getvalue("Flavor")   or None
     dbgLog     = fields.getvalue("DebugLog") or None
     cgHost     = fields.getvalue("cgHost")   or None
@@ -312,6 +316,7 @@ if not flavor:
                       "DrugInfoSummary, Glossary and Protocol documents")
 showProgress("DocumentType: %s..." % docType)
 showProgress("Using flavor: %s..." % flavor)
+showProgress("Preserving links: %s..." % preserveLnk)
 
 #----------------------------------------------------------------------
 # Filter the document.
@@ -352,6 +357,7 @@ except:
 # Show it.
 #----------------------------------------------------------------------
 showProgress("Done...")
+showProgress("\nContinue with local substitutions...")
 
 # The output from Cancer.gov is modified to add the CDR-ID to the title
 # We are also adding a style to work around a IE6 bug that causes the 
@@ -364,18 +370,46 @@ showProgress("Done...")
 # cdrcgi.sendPage("%s" % resp.xmlResult)
 # Include the CDR-ID of the document to the HTML title
 # ----------------------------------------------------
+showProgress("Replacing title element...")
 pattern3 = re.compile('<title>CDR Preview', re.DOTALL)
 html = pattern3.sub('<title>Publish Preview: CDR%s' % intId, resp.xmlResult)
 
 # Fix the print out so that it's not cut off in IE6
 # -------------------------------------------------
+showProgress("Including IE6 CSS...")
 pattern4 = re.compile('</head>', re.DOTALL)
 html = pattern4.sub('\n<!--[if IE 6]>\n<link rel="stylesheet" type="text/css" media="print" href="/stylesheets/ppprint.css">\n<![endif]-->\n</head>\n', html)
 
-# Make the SummaryRef elements clickable within the document
-# ----------------------------------------------------------
-pattern5 = re.compile('<a class="SummaryRef" href=".*?#Section_(.*?)"')
-html = pattern5.sub('<a class="SummaryRef" href="#Section_\g<1>"', html)
+
+# Parsing HTML document in order to manipulate links within the doc
+# -----------------------------------------------------------------
+myHtml = lxml.html.fromstring(html)
+
+# Removing the hostname from the fragment links to create a local
+# anchor target (Example: #Section_50).  This allows links within 
+# the document to work properly (SummaryFragmentRefs).
+# Other links are deactivated (Glossary, Summary) so that the 
+# user isn't constantly bringing up an error page.
+# ---------------------------------------------------------------
+if not preserveLnk:
+    showProgress("Converting local links...")
+    #myRefs = myHtml.cssselect('a.SummaryRef')
+    for x in myHtml.cssselect('a.SummaryRef'):
+        link = x.get('href')
+        if link.find('#') > 0:
+           newLink = '#%s' % link.split('#')[1]
+           x.set('href', newLink)
+        else:
+           x.set('onclick', 'return false')
+    
+    for gloss in myHtml.cssselect('a.Summary-GlossaryTermRef'):
+        gloss.set('href', '')
+        gloss.set('onclick', 'return false')
+else:
+    showProgress("Preserving original links...")
+
+html = lxml.html.tostring(myHtml)
+
 
 # Replace the image links for the popup boxes to point to our production
 # server if running in production
