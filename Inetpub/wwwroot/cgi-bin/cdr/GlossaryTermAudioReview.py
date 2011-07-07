@@ -924,7 +924,7 @@ your workstation.  Please save it for future use.
 </html>
 """ % (zipId, cdrcgi.SESSION, session))
 
-    finalHtml = "".join(html)
+    finalHtml = u"".join(html)
 
     cdrcgi.sendPage(finalHtml)
 
