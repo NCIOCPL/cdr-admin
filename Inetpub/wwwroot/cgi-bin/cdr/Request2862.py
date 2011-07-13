@@ -5,7 +5,8 @@
 # "We need a report that will display Liaison Office trials and the Lead
 # organization contact information for the Liaison office to use."
 #
-# $Log: not supported by cvs2svn $
+# BZIssue::5077 - Fix NCI Liaison office report
+#
 #----------------------------------------------------------------------
 
 import cdrdb, cdrdocobject, sys, cdr, xml.dom.minidom, ExcelWriter, time
@@ -111,8 +112,11 @@ def addSheet(wb, styles, protocols, title):
         if title in protocol.sheets:
             n += 1
             url = ("http://www.cancer.gov/clinicaltrials/"
-                   "view_clinicaltrials.aspx?version=healthprofessional&"
+                   "search/view?version=healthprofessional&"
                    "cdrid=%d" % protocol.docId)
+            #url = ("http://www.cancer.gov/clinicaltrials/"
+            #       "view_clinicaltrials.aspx?version=healthprofessional&"
+            #       "cdrid=%d" % protocol.docId)
             person = protocol.persons and protocol.persons[0] or ProtPerson()
             row = ws.addRow(rowNum)
             row.addCell(1, protocol.docId, style = styles.right)
