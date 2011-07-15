@@ -385,6 +385,9 @@ html = pattern4.sub('\n<!--[if IE 6]>\n<link rel="stylesheet" type="text/css" me
 # -----------------------------------------------------------------
 myHtml = lxml.html.fromstring(html)
 
+url = "http://%s.%s/" % (cdr.PUB_NAME, cdr.DOMAIN_NAME)
+#myHtml.make_links_absolute(url)
+
 # Removing the hostname from the fragment links to create a local
 # anchor target (Example: #Section_50).  This allows links within 
 # the document to work properly (SummaryFragmentRefs).
@@ -394,6 +397,7 @@ myHtml = lxml.html.fromstring(html)
 if not preserveLnk:
     showProgress("Converting local links...")
     #myRefs = myHtml.cssselect('a.SummaryRef')
+    # Make the internal links clickable
     for x in myHtml.cssselect('a.SummaryRef'):
         link = x.get('href')
         if link.find('#') > 0:
@@ -402,6 +406,16 @@ if not preserveLnk:
         else:
            x.set('onclick', 'return false')
     
+    # Redirect the audio files to the local server to ensure that
+    # new (not yet published) audio files can be previewed
+    # -----------------------------------------------------------
+    for media in myHtml.cssselect('a.CDR_audiofile'):
+        link = media.get('href')
+        cdrid = re.search('\d+', link.replace('.mp3', '')).group(0)
+        mediaUrl = '%scgi-bin/cdr/GetCdrBlob.py?id=%s' % (url, cdrid)
+        media.set('href', mediaUrl)
+
+    # Make the Glossary links dead
     for gloss in myHtml.cssselect('a.Summary-GlossaryTermRef'):
         gloss.set('href', '')
         gloss.set('onclick', 'return false')
