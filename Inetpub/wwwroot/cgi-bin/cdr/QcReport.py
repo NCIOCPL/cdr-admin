@@ -334,11 +334,17 @@ header   = cdrcgi.header(title, title, getSectionTitle(repType),
                           margin-left: auto;
                           margin-right: auto;
                           display: block; }
+    *.gogreen         { width: 95%;
+                        border: 1px solid green;
+                          background: #99FF66; }
+    *.gg              { border: 1px solid green; 
+                        background: #99FF66; 
+                        color: #006600; }
     *.comgroup          { background: #C9C9C9; 
                           margin-bottom: 8px; }
   </style>
 
-  <script languate = 'JavaScript'>
+  <script language = 'JavaScript'>
      function dispInternal() {
          var checks  = ['ext', 'adv', 'allcomment', 'nocomment']
          if (document.getElementById('int').checked &&
@@ -574,6 +580,10 @@ glossary = fields.getvalue("Glossary")   or None
 images   = fields.getvalue("Images")     or None
 citation = fields.getvalue("Citations")  or None
 loe      = fields.getvalue("LOEs")       or None
+qd       = fields.getvalue("QD")         or None
+kpbox    = fields.getvalue("Keypoints")  or None
+learnmore= fields.getvalue("Learnmore")  or None
+
 standardWording = fields.getvalue("ShowStandardWording") or None
 audInternComments    = fields.getvalue("AudInternalComments")  or None
 audExternComments    = fields.getvalue("AudExternalComments")  or None
@@ -1151,34 +1161,6 @@ if letUserPickVersion:
       &nbsp;<input name='LOEs' type='checkbox' id='dispLoe'>&nbsp;
       <label for='dispLoe'>Display Level of Evidence terms at end of report</label>
 
-     <!-- table>
-      <tr>
-       <td class="colheading">Misc Print Options</td>
-      </tr>
-      <tr>
-       <td>
-  <INPUT TYPE='checkbox' NAME='Glossary'>&nbsp;&nbsp;
-  Include glossary terms at end of report<BR>
-       </td>
-      </tr>
-      <tr>
-       <td>
-  <INPUT TYPE='checkbox' NAME='Images'>&nbsp;&nbsp;
-  Display images instead of placeholder<BR>
-       </td>
-      </tr>
-      <tr>
-       <td>
-  <INPUT TYPE='checkbox' NAME='Citations' CHECKED>&nbsp;&nbsp;
-  Display the HP Reference Section<BR>
-       </td>
-      </tr>
-      <tr>
-       <td>
-  <INPUT TYPE='checkbox' NAME='LOEs'>&nbsp;&nbsp;
-  Display Level of Evidence terms at end of report<BR>
-       </td>
-      </tr -->
 """
 
     # Display the checkbox to display standard wording
@@ -1189,6 +1171,15 @@ if letUserPickVersion:
       &nbsp<input name='ShowStandardWording' type='checkbox' 
              id='stdWord'>&nbsp;
       <label for='stdWord'>Show standard wording with mark-up</label>
+      <p>
+     <fieldset class="gogreen">
+      <legend class="gg">&nbsp;GoGreen Options&nbsp;</legend>
+      &nbsp;<input name='Keypoints' type='checkbox' id='dispKP'>&nbsp;
+      <label for='dispKP'>Display Key Point boxes</label>
+      <br>
+      &nbsp;<input name='Learnmore' type='checkbox' id='dispLearnMore'>&nbsp;
+      <label for='dispLearnMore'>Display To Learn More sections</label>
+     </fieldset>
 """
 
 #        form += u"""\
@@ -1199,7 +1190,17 @@ if letUserPickVersion:
 #       </td>
 #      </tr>
 #"""
-    form += u"""
+    # Display the Quick&Dirty option checkbox
+    # ---------------------------------------
+    if docType == 'Summary':
+        form += u"""\
+     </fieldset>
+  <p>
+     <fieldset>
+      <legend>&nbsp;911 Options&nbsp;</legend>
+      &nbsp;<input name='QD' type='checkbox' id='dispQD'>&nbsp;
+      <label for='dispQD'>Run Quick &amp; Dirty report</label>
+      <br>
      </fieldset>"""
 #    form += u"""
 #     </table>"""
@@ -1249,20 +1250,30 @@ filters = {
         ["set:QC Summary Set"],
     'Summary:bu':    # Bold/Underline
         ["set:QC Summary Set (Bold/Underline)"],
+    'Summary:buqd':    # Bold/Underline - Quick and Dirty
+        ["set:QC QD Summary Set (Bold/Underline)"],
     'Summary:rs':    # Redline/Strikeout
         ["set:QC Summary Set"],
-    'Summary:but':   # Bold/Underline
-        ["set:QC Summary Set (Bold/Underline) Test"],
-    'Summary:rst':   # Redline/Strikeout
-        ["set:QC Summary Set Test"],
+    'Summary:rsqd':  # Redline/Strikeout - Quick and Dirty
+        ["set:QC QD Summary Set"],
+    #'Summary:but':   # Bold/Underline
+    #    ["set:QC Summary Set (Bold/Underline) Test"],
+    #'Summary:rst':   # Redline/Strikeout
+    #    ["set:QC Summary Set Test"],
     'Summary:nm':    # No markup
         ["set:QC Summary Set"],
     'Summary:pat':   # Patient
         ["set:QC Summary Patient Set"],
-    'Summary:patrs': # Patient
+    'Summary:patrs': # Patient R/S
         ["set:QC Summary Patient Set"],
-    'Summary:patbu': # Patient
+    'Summary:patqd': # Patient - Quick and Dirty
+        ["set:QC QD Summary Patient Set"],
+    'Summary:patrsqd': # Patient R/S - Quick and Dirty
+        ["set:QC QD Summary Patient Set"],
+    'Summary:patbu': # Patient BU
         ["set:QC Summary Patient Set (Bold/Underline)"],
+    'Summary:patbuqd': # Patient BU - Quick and Dirty
+        ["set:QC QD Summary Patient Set (Bold/Underline)"],
     'Term':
         ["set:QC Term Set"]
 }
@@ -1740,6 +1751,7 @@ if repType == "pp":
 # Filter the document.
 #----------------------------------------------------------------------
 if repType: docType += ":%s" % repType
+if qd: docType += 'qd'
 
 # ---------------------------------------------------------------------
 # The next two lines are needed to run the Media and Miscellaneaous QC
@@ -1754,7 +1766,6 @@ if docType == 'MiscellaneousDocument': docType += ":rs"
 if version == "-1": version = None
 
 if not filters.has_key(docType):
-    # cdrcgi.bail(filters)
     doc = cdr.getDoc(session, docId, version = version or "Current",
                      getObject = 1)
     if type(doc) in (type(""), type(u"")):
@@ -1767,9 +1778,8 @@ if not filters.has_key(docType):
  <body>
   <pre>%s</pre>
  </body>
-</html>""" % (doc.ctrl['DocTitle'], cgi.escape(doc.xml))
-    cdrcgi.sendPage(html)
-    #cdrcgi.sendPage(cdrcgi.unicodeToLatin1(html))
+</html>""" % (doc.ctrl['DocTitle'], doc.xml.decode('utf-8'))
+    cdrcgi.sendPage(html.encode('utf-8'))
 
 filterParm = []
 
@@ -1835,6 +1845,10 @@ filterParm.append(['DisplayLOETermList',
 if repType == 'pat' or repType == 'patrs' or repType == 'patbu':
     filterParm.append(['ShowStandardWording',
                        standardWording and "Y" or "N"])
+    filterParm.append(['ShowKPBox',
+                       kpbox and "Y" or "N"])
+    filterParm.append(['ShowLearnMoreSection',
+                       learnmore and "Y" or "N"])
 
 doc = cdr.filterDoc(session, filters[docType], docId = docId,
                     docVer = version or None, parm = filterParm)
