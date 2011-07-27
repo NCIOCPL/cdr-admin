@@ -452,4 +452,4 @@ html = pattern7.sub(
        '  src="http://%s/cgi-bin/cdr/GetCdrImage' % 
        pp_host, html)
 
-cdrcgi.sendPage("%s" % html)
+cdrcgi.sendPage("%s" % html.decode('utf-8'))
