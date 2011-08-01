@@ -11,7 +11,7 @@
 # Report of documents modified within a specified time range.
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, cdrdb, time, pyXLWriter, sys
+import cgi, cdr, cdrcgi, cdrdb, time, ExcelWriter, sys
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -83,12 +83,12 @@ if not startDate or not endDate:
         <TD>%s</TD>
        </TR>
        <TR>
-        <TD ALIGN='right'>Start Date:&nbsp;</TD>
+        <TD ALIGN='right'><b>Start Date:&nbsp;</b></TD>
         <TD><INPUT NAME='startdate'>
          (use format YYYY-MM-DD for dates, e.g. 2005-01-01)
         </TD>
        <TR>
-        <TD ALIGN='right'>End Date:&nbsp;</TD>
+        <TD ALIGN='right'><b>End Date:&nbsp;</b></TD>
         <TD><INPUT NAME='enddate'></TD>
        </TR>
        </TABLE>
@@ -97,10 +97,6 @@ if not startDate or not endDate:
     </HTML>
 """ % (cdrcgi.SESSION, session, getDoctypePicklist())
     cdrcgi.sendPage(header + form)
-
-def fix(title):
-    return title.encode('latin-1', 'replace')
-    #return title.split(';')[0].encode('latin-1', 'replace')
 
 # ---------------------------------------------------------------
 # Create the report.
@@ -134,32 +130,29 @@ t = time.strftime("%Y%m%d%H%M%S")
 print "Content-type: application/vnd.ms-excel"
 print "Content-Disposition: attachment; filename=DocumentsModified-%s.xls" % t
 print
-workbook = pyXLWriter.Writer(sys.stdout)
-worksheet = workbook.add_worksheet("Modified Documents")
-format = workbook.add_format()
-format.set_bold();
-format.set_color('white')
-format.set_bg_color('blue')
-format.set_align('center')
-center = workbook.add_format()
-center.set_align('center')
-worksheet.set_column(0, 8)
-worksheet.set_column(1, 60)
-worksheet.set_column(2, 12)
-worksheet.set_column(3, 12)
-worksheet.write([0, 0], "Doc ID", format)
-worksheet.write([0, 1], "Doc Title", format)
-worksheet.write([0, 2], "Last Version", format)
-worksheet.write([0, 3], "Publishable", format)
-
-row = 1
+workbook = ExcelWriter.Workbook()
+worksheet = workbook.addWorksheet("Modified Documents")
+align = ExcelWriter.Alignment('Center')
+font = ExcelWriter.Font('white', bold=True)
+interior = ExcelWriter.Interior('blue')
+headerStyle = workbook.addStyle(alignment=align, font=font, interior=interior)
+centerStyle = workbook.addStyle(alignment=align)
+worksheet.addCol(1, 45)
+worksheet.addCol(2, 300)
+worksheet.addCol(3, 70)
+worksheet.addCol(4, 70)
+row = worksheet.addRow(1, headerStyle)
+row.addCell(1, "Doc ID")
+row.addCell(2, "Doc Title")
+row.addCell(3, "Last Version")
+row.addCell(4, "Publishable")
+rowNumber = 2
 
 for docId, docVer, docTitle, publishable in rows:
-    if publishable not in ('Y', 'N'):
-        publishable = fix(publishable)
-    worksheet.write([row, 0], "%d" % docId, center)
-    worksheet.write([row, 1], fix(docTitle))
-    worksheet.write([row, 2], "%d" % docVer, center)
-    worksheet.write([row, 3], fix(publishable), center)
-    row += 1
-workbook.close()
+    row = worksheet.addRow(rowNumber)
+    row.addCell(1, "%d" % docId, style=centerStyle)
+    row.addCell(2, docTitle)
+    row.addCell(3, "%d" % docVer, style=centerStyle)
+    row.addCell(4, publishable, style=centerStyle)
+    rowNumber += 1
+workbook.write(sys.stdout, True)
