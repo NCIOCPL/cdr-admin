@@ -77,9 +77,10 @@ def isBlocked(cdrId, cursor):
     return rows[0][0].upper() != 'A'
 
 class Trial:
-    def __init__(self, nctId, cdrId, cursor):
+    def __init__(self, nctId, cdrId, cursor, reasonDropped):
         self.nctId = nctId
         self.cdrId = cdrId
+        self.reasonDropped = reasonDropped
         self.nlmStatus = getNlmStatus(nctId)
         self.pdqStatus = getPdqStatus(cdrId, cursor)
         self.isBlocked = False #isBlocked(cdrId, cursor)
@@ -120,20 +121,21 @@ def main():
     <th>NLM Status</th>
     <th>PDQ Status</th>
     <th>Blocked?</th>
+    <th>Comments</th>
    </tr>
 """ % workDir]
     orphaned = []
     cursor = cdrdb.connect('CdrGuest').cursor()
     cursor.execute("""\
-        SELECT cdr_id, nlm_id
+        SELECT cdr_id, nlm_id, reason_dropped
           FROM ctgov_import
          WHERE disposition = 6
       ORDER BY nlm_id""")
     rows = cursor.fetchall()
-    for cdrId, nlmId in rows:
+    for cdrId, nlmId, reasonDropped in rows:
         if nlmId.lower() not in names:
             if not isBlocked(cdrId, cursor):
-                orphaned.append(Trial(nlmId, cdrId, cursor))
+                orphaned.append(Trial(nlmId, cdrId, cursor, reasonDropped))
     orphaned.sort()
     for trial in orphaned:
         html.append(u"""\
@@ -143,9 +145,11 @@ def main():
     <td>%s</td>
     <td>%s</td>
     <td>%s</td>
+    <td>%s</td>
    </tr>
 """ % (trial.nctId.upper(), trial.cdrId, trial.nlmStatus, trial.pdqStatus,
-       trial.isBlocked and u"Yes" or u"No"))
+       trial.isBlocked and u"Yes" or u"No",
+       cgi.escape(trial.reasonDropped or u"&nbsp;")))
     html.append(u"""\
   </table>
  </body>
