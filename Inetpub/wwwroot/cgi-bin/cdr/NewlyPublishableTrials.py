@@ -4,14 +4,10 @@
 #
 # Report identifying unpublished trials with publishable versions.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.2  2004/07/13 17:56:36  bkline
-# Final version of new report.
+# BZIssue::5011
 #
-# Revision 1.1  2004/06/02 17:53:00  bkline
-# Report identifying unpublished trials with publishable versions.
 #----------------------------------------------------------------------
-import cdrdb, pyXLWriter, sys, time, cdrcgi
+import cdrdb, ExcelWriter, sys, time, cdrcgi
 
 class Protocol:
     def __init__(self, id, date, user, status):
@@ -28,23 +24,19 @@ class Protocol:
 inScope = {}
 ctGov   = {}
 prots   = {}
-debug   = 0
+debug   = False #True
 
 def show(what):
     if debug:
         sys.stderr.write(what + '\n')
 
 def fixString(s):
-    if type(s) == type(u""):
-        return s.encode('latin-1', 'replace')
-    return str(s)
+    if not s:
+        return u""
+    return unicode(s)
 
-def fixList(list):
-    if not list: return ''
-    s = fixString(list[0])
-    for m in list[1:]:
-        s += ", %s" % fixString(m)
-    return s
+def fixList(values):
+    return u", ".join([fixString(v) for v in values])
 
 def getDateRange(prots):
     low = ""
@@ -64,19 +56,18 @@ def getDateRange(prots):
     return "%s through %s" % (low, high)
 
 def addWorksheet(workbook, title, headers, widths, prots):
-    worksheet = workbook.add_worksheet(title)
+    worksheet = workbook.addWorksheet(title)
     for col in range(len(headers)):
-        worksheet.set_column(col, widths[col])
-        worksheet.write([5, col], headers[col], hdrFormat)
-    worksheet.write([0, 0], "Newly Publishable Trials", tformat1)
-    worksheet.write([1, 0], getDateRange(prots), tformat1)
-    c = 1
-    while c < len(headers):
-        worksheet.write_blank([0, c], tformat1)
-        worksheet.write_blank([1, c], tformat1)
-        c += 1
-    worksheet.write([3, 0], "%s Protocols" % title, tformat2)
-    worksheet.write_blank([3, 1], tformat2)
+        worksheet.addCol(col + 1, widths[col])
+    row = worksheet.addRow(1, tformat1)
+    row.addCell(1, "Newly Publishable Trials", mergeAcross=len(headers) - 1)
+    row = worksheet.addRow(2, tformat1)
+    row.addCell(1, getDateRange(prots), mergeAcross=len(headers) - 1)
+    row = worksheet.addRow(4, tformat2)
+    row.addCell(1, "%s Protocols" % title, mergeAcross=1)
+    row = worksheet.addRow(6, hdrFormat)
+    for col in range(len(headers)):
+        row.addCell(col + 1, headers[col])
     keys = prots.keys()
     for key in keys:
         prot = prots[key]
@@ -90,35 +81,33 @@ def addWorksheet(workbook, title, headers, widths, prots):
             return result
         return cmp(a, b)
     keys.sort(sorter)
-    r = 6
+    r = 7
     for key in keys:
         prot = prots[key]
         nRows = len(prot.studyCats) or 1
         for rowNum in range(nRows):
-            c = 0
-            worksheet.write([r, c], `prot.id`, lformat)
+            row = worksheet.addRow(r, lformat)
+            c = 1
+            row.addCell(c, `prot.id`)
             c += 1
-            worksheet.write([r, c], fixList(prot.primaryIds), lformat)
+            row.addCell(c, fixList(prot.primaryIds))
             c += 1
             if prot.studyCats:
-                worksheet.write([r, c], fixString(prot.studyCats[rowNum]),
-                                lformat)
+                row.addCell(c, fixString(prot.studyCats[rowNum]))
             c += 1
             if title == 'InScope':
-                worksheet.write([r, c], fixList(prot.specialCats), lformat)
+                row.addCell(c, fixList(prot.specialCats))
                 c += 1
-            worksheet.write([r, c], fixString(prot.status), lformat);
+            row.addCell(c, fixString(prot.status))
             c += 1
             if title == 'InScope':
-                worksheet.write([r, c], fixList(prot.sourceNames), lformat)
+                row.addCell(c, fixList(prot.sourceNames))
                 c += 1
-                worksheet.write([r, c], fixString(prot.reviewApprovalType),
-                                lformat)
+                row.addCell(c, fixString(prot.reviewApprovalType))
                 c += 1
-            worksheet.write([r, c], prot.date and prot.date[:10] or "",
-                            lformat)
+            row.addCell(c, prot.date and prot.date[:10] or "")
             c += 1
-            worksheet.write([r, c], fixString(prot.user), lformat)
+            row.addCell(c, fixString(prot.user))
             r += 1
 
 if sys.platform == "win32":
@@ -277,27 +266,21 @@ t = time.strftime("%Y%m%d%H%M%S")
 if not debug:
     print "Content-type: application/vnd.ms-excel"
     print ("Content-Disposition: attachment; "
-           "filename=NewlyPublishedTrials-%s.xls" % t)
+           "filename=NewlyPublishableTrials-%s.xls" % t)
     print 
 
-workbook = pyXLWriter.Writer(sys.stdout)
+workbook = ExcelWriter.Workbook()
 show("workbook created...")
-hdrFormat = workbook.add_format()
-hdrFormat.set_bold();
-hdrFormat.set_align('center')
-hdrFormat.set_text_wrap(1)
-tformat1 = workbook.add_format()
-tformat1.set_bold();
-tformat1.set_size(16)
-tformat1.set_align('center')
-tformat1.set_merge(1)
-tformat2 = workbook.add_format()
-tformat2.set_bold();
-tformat2.set_size(12)
-tformat2.set_merge(1)
-tformat2.set_align('left')
-lformat = workbook.add_format()
-lformat.set_align('left')
+align = ExcelWriter.Alignment('Center', wrap=True)
+font = ExcelWriter.Font(bold=True)
+hdrFormat = workbook.addStyle(alignment=align, font=font)
+align = ExcelWriter.Alignment('Center')
+font = ExcelWriter.Font(bold=True, size=16)
+tformat1 = workbook.addStyle(alignment=align, font=font)
+align = ExcelWriter.Alignment('Left')
+font = ExcelWriter.Font(bold=True, size=12)
+tformat2 = workbook.addStyle(alignment=align, font=font)
+lformat = workbook.addStyle(alignment=align)
 titles  = ('InScope', 'CTGov')
 headers = (
     ('DocID', 'ProtocolID','Study Category', 'Special Category',
@@ -307,13 +290,13 @@ headers = (
      'Date Made\nPublishable', 'User')
     )
 widths  = (
-    (9.71, 25.29, 18.43, 18.43, 18.43, 18.43, 18.43, 18, 12),
-    (9.71, 25.29, 18.43, 18.43, 18, 12)
+    (50, 150, 100, 100, 100, 100, 100, 100, 75),
+    (50, 150, 100, 100, 100, 75)
     )
 
 addWorksheet(workbook, titles[0], headers[0], widths[0], inScope)
 show("%s worksheet created..." % titles[0])
 addWorksheet(workbook, titles[1], headers[1], widths[1], ctGov)
 show("%s worksheet created..." % titles[1])
-workbook.close()
+workbook.write(sys.stdout, True)
 show("done...")
