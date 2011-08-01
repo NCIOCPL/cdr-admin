@@ -6,7 +6,7 @@
 #
 # $Log: not supported by cvs2svn $
 #----------------------------------------------------------------------
-import cdrdb, pyXLWriter, sys, time
+import cdrdb, ExcelWriter, sys, time
 
 if sys.platform == "win32":
     import os, msvcrt
@@ -82,42 +82,40 @@ print "Content-type: application/vnd.ms-excel"
 print "Content-Disposition: attachment; filename=DrugAgentReport-%s.xls" % t
 print 
 
-#file = open("b:/tmp/DrugAgentReport.xls", "wb")
-#workbook = pyXLWriter.Writer(file)
-workbook = pyXLWriter.Writer(sys.stdout)
-worksheet = workbook.add_worksheet("Terms")
-
-format = workbook.add_format()
-format.set_bold();
-format.set_color('white')
-format.set_bg_color('blue')
-format.set_align('center')
-
-worksheet.set_column(0, 50)
-worksheet.set_column(1, 50)
-worksheet.set_column(2, 18)
-worksheet.set_column(3, 20)
-worksheet.write([0, 0], "Preferred Name", format)
-worksheet.write([0, 1], "Other Names", format)
-worksheet.write([0, 2], "Count of Protocols", format)
-worksheet.write([0, 3], "Primary Protocol IDs", format)
-baseRow = 1
+workbook = ExcelWriter.Workbook()
+worksheet = workbook.addWorksheet("Terms")
+align = ExcelWriter.Alignment('Center')
+font = ExcelWriter.Font('white', bold=True)
+interior = ExcelWriter.Interior('blue')
+headerStyle = workbook.addStyle(alignment=align, font=font, interior=interior)
+centerStyle = workbook.addStyle(alignment=align)
+worksheet.addCol(1, 300)
+worksheet.addCol(2, 300)
+worksheet.addCol(3, 100)
+worksheet.addCol(4, 100)
+row = worksheet.addRow(1, headerStyle)
+row.addCell(1, "Preferred Name")
+row.addCell(2, "Other Names")
+row.addCell(3, "Count of Protocols")
+row.addCell(4, "Primary Protocol IDs")
+rowNum = 2
+leftAlign = workbook.addStyle(alignment=ExcelWriter.Alignment('Left'))
 for term in terms:
     if not term.protocols:
         continue
-    worksheet.write([baseRow, 0], term.name.encode('latin-1', 'replace'))
-    worksheet.write([baseRow, 2], len(term.protocols))
-    for i in range(len(term.otherNames)):
-        val = term.otherNames[i].encode('latin-1', 'replace')
-        worksheet.write([baseRow + i, 1], val)
-    for i in range(len(term.protocols)):
-        val = term.protocols[i].encode('latin-1', 'replace')
-        worksheet.write([baseRow + i, 3], val)
-    rowsToSkip = 1
-    if len(term.otherNames) > rowsToSkip:
-        rowsToSkip = len(term.otherNames)
-    if len(term.protocols) > rowsToSkip:
-        rowsToSkip = len(term.protocols)
-    baseRow += rowsToSkip + 1
-    #sys.stderr.write("\rWrote %d rows" % baseRow)
-workbook.close()
+    row = worksheet.addRow(rowNum)
+    row.addCell(1, term.name, leftAlign)
+    row.addCell(3, len(term.protocols))
+    i = 0
+    totalRows = max(len(term.otherNames), len(term.protocols))
+    while i < totalRows:
+        if i:
+            rowNum += 1
+            row = worksheet.addRow(rowNum)
+        if i < len(term.otherNames):
+            row.addCell(2, term.otherNames[i], style=leftAlign)
+        if i < len(term.protocols):
+            row.addCell(4, term.protocols[i], style=leftAlign)
+        i += 1
+    rowNum += 1
+workbook.write(sys.stdout, True)
