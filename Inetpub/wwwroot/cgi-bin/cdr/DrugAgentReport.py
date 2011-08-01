@@ -2,53 +2,73 @@
 #
 # $Id$
 #
-# Request #1191 (report on Drug/Agent terms).
+# Report on Drug/Agent terms.
 #
-# $Log: not supported by cvs2svn $
+# BZIssue::1191
+# BZIssue::5011
+#
 #----------------------------------------------------------------------
-import cdrdb, ExcelWriter, sys, time
+import cdrdb, ExcelWriter, sys, time, lxml.etree as etree
 
 if sys.platform == "win32":
     import os, msvcrt
     msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
 
+def findActiveProtocols():
+    cursor.execute("""\
+SELECT doc_id 
+  INTO #active_protocols 
+  FROM query_term 
+ WHERE path = '/InScopeProtocol/ProtocolAdminInfo/CurrentProtocolStatus'
+   AND value IN ('Active', 'Approved-not yet active')""")
+
+def getPrimaryIds():
+    ids = {}
+    cursor.execute("""\
+SELECT i.doc_id, i.value
+  FROM query_term i
+  JOIN #active_protocols a
+    ON a.doc_id = i.doc_id
+ WHERE i.path = '/InScopeProtocol/ProtocolIDs/PrimaryID/IDString'""")
+    for docId, primaryId in cursor.fetchall():
+        ids[docId] = primaryId
+    return ids
+
+def getInterventions():
+    interventions = {}
+    cursor.execute("""\
+SELECT i.doc_id, i.int_val
+  FROM query_term i
+  JOIN #active_protocols a
+    ON a.doc_id = i.doc_id
+ WHERE i.path = '/InScopeProtocol/ProtocolDetail/StudyCategory/Intervention'
+              + '/InterventionNameLink/@cdr:ref'""")
+    for protocolId, interventionId in cursor.fetchall():
+        if interventionId not in interventions:
+            interventions[interventionId] = set([protocolId])
+        else:
+            interventions[interventionId].add(protocolId)
+    return interventions
+
 class Term:
-    def __init__(self, id):
+    def __init__(self, id, protocolIds, primaryIds):
         self.id         = id
         self.name       = u""
         self.otherNames = []
         self.protocols  = []
-        cursor.execute("""\
-            SELECT value, path
-              FROM query_term
-             WHERE path in ('/Term/PreferredName',
-                            '/Term/OtherName/OtherTermName')
-               AND doc_id = ?""", id)
-        for name, path in cursor.fetchall():
-            if path == '/Term/PreferredName':
-                self.name = name
-            else:
-                self.otherNames.append(name)
+        cursor.execute("SELECT xml FROM document WHERE id = ?", id)
+        tree = etree.XML(cursor.fetchall()[0][0].encode('utf-8'))
+        for node in tree.findall('PreferredName'):
+            self.name = node.text
+        for node in tree.findall('OtherName/OtherTermName'):
+            self.otherNames.append(node.text)
         self.otherNames.sort(lambda a,b: cmp(a.upper(), b.upper()))
-        cursor.execute("""\
-            SELECT q3.value
-              FROM document d
-              JOIN query_term q1
-                ON q1.doc_id = d.id
-              JOIN query_term q2
-                ON q2.doc_id = d.id
-              JOIN query_term q3
-                ON q3.doc_id = d.id
-             WHERE q1.path = '/InScopeProtocol/ProtocolAdminInfo'
-                           + '/CurrentProtocolStatus'
-               AND q2.path = '/InScopeProtocol/ProtocolDetail/StudyCategory'
-                           + '/Intervention/InterventionNameLink/@cdr:ref'
-               AND q3.path = '/InScopeProtocol/ProtocolIDs/PrimaryID/IDString'
-               AND q1.value IN ('Active', 'Approved-not yet active')
-               AND q2.int_val = ?""", id)
-        for row in cursor.fetchall():
-            if row[0] not in self.protocols:
-                self.protocols.append(row[0])
+        if protocolIds:
+            for protocolId in protocolIds:
+                primaryId = primaryIds.get(protocolId,
+                                           "[NO PRIMARY ID FOR CDR%d]" %
+                                           protocolId)
+                self.protocols.append(primaryId)
         self.protocols.sort(lambda a,b: cmp(a.upper(), b.upper()))
 
 conn = cdrdb.connect('CdrGuest')
@@ -62,20 +82,16 @@ cursor.execute("""\
                                 WHERE path = '/Term/PreferredName'
                                   AND value = 'Drug/agent')
            ORDER BY doc_id""")
+rows = cursor.fetchall()
 terms = []
-#file = open("DrugAgentReport.txt", "w")
-for row in cursor.fetchall():
-    term = Term(row[0])
-    #file.write("%d %s\n" % (term.id, term.name.encode('latin-1', 'replace')))
-    #for otherName in term.otherNames:
-    #    file.write("\tother name: %s\n" % otherName.encode('latin-1',
-    #                                                       'replace'))
-    #for protocol in term.protocols:
-    #    file.write("\tprotocol: %s\n" % protocol.encode('latin-1', 'replace'))
-    terms.append(term)
-    #sys.stderr.write("\rLoaded %d terms" % len(terms))
-#sys.exit(0)
-#sys.stderr.write("\n")
+findActiveProtocols()
+primaryIds = getPrimaryIds()
+interventions = getInterventions()
+for row in rows:
+    termId = row[0]
+    protocolIds = interventions.get(termId)
+    if protocolIds:
+        terms.append(Term(termId, protocolIds, primaryIds))
 t = time.strftime("%Y%m%d%H%M%S")
 terms.sort(lambda a,b: cmp(len(b.protocols), len(a.protocols)))
 print "Content-type: application/vnd.ms-excel"
@@ -90,9 +106,9 @@ interior = ExcelWriter.Interior('blue')
 headerStyle = workbook.addStyle(alignment=align, font=font, interior=interior)
 centerStyle = workbook.addStyle(alignment=align)
 worksheet.addCol(1, 300)
-worksheet.addCol(2, 300)
+worksheet.addCol(2, 400)
 worksheet.addCol(3, 100)
-worksheet.addCol(4, 100)
+worksheet.addCol(4, 150)
 row = worksheet.addRow(1, headerStyle)
 row.addCell(1, "Preferred Name")
 row.addCell(2, "Other Names")
@@ -101,8 +117,6 @@ row.addCell(4, "Primary Protocol IDs")
 rowNum = 2
 leftAlign = workbook.addStyle(alignment=ExcelWriter.Alignment('Left'))
 for term in terms:
-    if not term.protocols:
-        continue
     row = worksheet.addRow(rowNum)
     row.addCell(1, term.name, leftAlign)
     row.addCell(3, len(term.protocols))
