@@ -15,15 +15,11 @@
 # with NewlyPublishedTrials.py, a report that was retired a little
 # over two years ago.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.2  2006/09/28 15:11:20  bkline
-# Logic modified at Sheri's request (see comment #10 of issue #2443).
-#
-# Revision 1.1  2006/09/28 11:56:43  bkline
-# Request #2443.
+# BZIssue::2443
+# BZIssue::5011
 #
 #----------------------------------------------------------------------
-import cdrdb, pyXLWriter, sys, time, cdrcgi, cgi
+import cdrdb, ExcelWriter, sys, time, cdrcgi, cgi
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -103,7 +99,7 @@ class Protocol:
 inScope    = {}
 ctGov      = {}
 prots      = {}
-debug      = False
+debug      = False # True
 statuses   = {}
 sources    = {}
 approvals  = {}
@@ -114,16 +110,12 @@ def show(what):
         sys.stderr.write(what + '\n')
 
 def fixString(s):
-    if type(s) == type(u""):
-        return s.encode('latin-1', 'replace')
-    return str(s)
+    if not s:
+        return u""
+    return unicode(s)
 
-def fixList(list):
-    if not list: return ''
-    s = fixString(list[0])
-    for m in list[1:]:
-        s += ", %s" % fixString(m)
-    return s
+def fixList(values):
+    return u", ".join([fixString(v) for v in values])
 
 def getDateRange():
     return "%s through %s" % (startDate, endDate)
@@ -133,52 +125,48 @@ def createSortedList(valueSet):
     valueList.sort()
     return valueList
 
-def writeTotals(sheet, values, title, row):
-    sheet.write([row, 0], title, tformat3)
-    row += 1
+def writeTotals(sheet, values, title, rowNum):
+    row = sheet.addRow(rowNum, tformat3)
+    row.addCell(1, title)
+    rowNum += 1
     keys = values.keys()
     keys.sort()
     for key in keys:
-        sheet.write([row, 0], key, lformat)
-        sheet.write([row, 1], values[key], rformat)
-        row += 1
-    return row + 2
+        row = sheet.addRow(rowNum)
+        row.addCell(1, key, style=lformat)
+        row.addCell(2, values[key], style=rformat)
+        rowNum += 1
+    return rowNum + 2
 
 def addTotalsSheet(workbook, prots, inScope, ctGov):
-    worksheet = workbook.add_worksheet('Totals')
-    worksheet.set_column(0, 30)
-    worksheet.set_column(1, 5)
-    worksheet.write([0, 0], "Newly Published Trials", tformat1)
-    worksheet.write([1, 0], getDateRange(), tformat1)
-    worksheet.write([3, 0], "InScope and CTGov Totals", tformat2)
-    for c in range(1, 8):
-        worksheet.write_blank([0, c], tformat1)
-        worksheet.write_blank([1, c], tformat1)
-    #worksheet.write_blank([3, 1], tformat2)
+    worksheet = workbook.addWorksheet('Totals')
+    worksheet.addCol(1, 150)
+    worksheet.addCol(2, 25)
+    row = worksheet.addRow(1, tformat1)
+    row.addCell(1, "Newly Published Trials", mergeAcross=7)
+    row = worksheet.addRow(2, tformat1)
+    row.addCell(1, getDateRange(), mergeAcross=7)
+    row = worksheet.addRow(4, tformat2)
+    row.addCell(1, "InScope and CTGov Totals")
         
-    row = writeTotals(worksheet, categories, "Study Category",            5)
-    row = writeTotals(worksheet, statuses,   "Current Protocol Status", row)
-    row = writeTotals(worksheet, sources,    "Protocol Source",         row)
-    row = writeTotals(worksheet, approvals,  "Approval",                row)
+    r = writeTotals(worksheet, categories, "Study Category",          6)
+    r = writeTotals(worksheet, statuses,   "Current Protocol Status", r)
+    r = writeTotals(worksheet, sources,    "Protocol Source",         r)
+    r = writeTotals(worksheet, approvals,  "Approval",                r)
 
 def addWorksheet(workbook, title, headers, widths, prots):
-    worksheet = workbook.add_worksheet(title)
+    worksheet = workbook.addWorksheet(title)
     for col in range(len(headers)):
-        worksheet.set_column(col, widths[col])
-        worksheet.write([5, col], headers[col], hdrFormat)
-    worksheet.write([0, 0], "Newly Published Trials", tformat1)
-    worksheet.write([1, 0], getDateRange(), tformat1)
-    c = 1
-    while c < len(headers):
-        worksheet.write_blank([0, c], tformat1)
-        worksheet.write_blank([1, c], tformat1)
-        c += 1
-    worksheet.write([3, 0], "%s Protocols" % title, tformat2)
-    #c = 1
-    #while c < len(headers):
-    #    worksheet.write_blank([3, c], tformat2)
-    #    c += 1
-    #worksheet.write_blank([3, 1], tformat2)
+        worksheet.addCol(col + 1, widths[col])
+    row = worksheet.addRow(1, tformat1)
+    row.addCell(1, "Newly Published Trials", mergeAcross=len(headers) - 1)
+    row = worksheet.addRow(2, tformat1)
+    row.addCell(1, getDateRange(), mergeAcross=len(headers) - 1)
+    row = worksheet.addRow(4, tformat2)
+    row.addCell(1, "%s Protocols" % title)
+    row = worksheet.addRow(6, hdrFormat)
+    for col in range(len(headers)):
+        row.addCell(col + 1, headers[col])
     keys = prots.keys()
     for key in keys:
         prot             = prots[key]
@@ -193,46 +181,40 @@ def addWorksheet(workbook, title, headers, widths, prots):
             return result
         return cmp(a, b)
     keys.sort(sorter)
-    r = 6
+    r = 7
     for key in keys:
         prot = prots[key]
         nRows = len(prot.studyCats) or 1
         for rowNum in range(nRows):
-            c = 0
-            worksheet.write([r, c], `prot.id`, lformat)
+            row = worksheet.addRow(r, lformat)
+            c = 1
+            row.addCell(c, `prot.id`)
             c += 1
-            worksheet.write([r, c], fixList(prot.primaryIds), lformat)
+            row.addCell(c, fixList(prot.primaryIds))
             c += 1
             if prot.studyCats:
-                worksheet.write([r, c], fixString(prot.studyCats[rowNum]),
-                                lformat)
+                row.addCell(c, fixString(prot.studyCats[rowNum]))
             c += 1
             if title == 'InScope':
-                worksheet.write([r, c], fixList(prot.specialCats), lformat)
+                row.addCell(c, fixList(prot.specialCats))
                 c += 1
-            worksheet.write([r, c], fixString(prot.status), lformat);
+            row.addCell(c, fixString(prot.status))
             c += 1
             if title == 'InScope':
-                worksheet.write([r, c], fixList(prot.sourceNames), lformat)
+                row.addCell(c, fixList(prot.sourceNames))
                 c += 1
-                worksheet.write([r, c], fixString(prot.reviewApprovalType),
-                                lformat)
+                row.addCell(c, fixString(prot.reviewApprovalType))
                 c += 1
-                worksheet.write([r, c], fixList(prot.submissionComplete),
-                                lformat)
+                row.addCell(c, fixList(prot.submissionComplete))
                 c += 1
-            worksheet.write([r, c], prot.date and prot.date[:10] or "",
-                            lformat)
+            row.addCell(c, prot.date and prot.date[:10] or "")
             c += 1
-            worksheet.write([r, c], fixString(prot.user), lformat)
+            row.addCell(c, fixString(prot.user))
             r += 1
     r += 2
-    worksheet.write([r, 0], "Total: %d" % len(prots), tformat3)
+    row = worksheet.addRow(r, tformat3)
+    row.addCell(1, "Total: %d" % len(prots))
 
-#if len(sys.argv) == 3:
-#    debug     = True
-#    startDate = '2006-01-01'
-#    endDate   = '2006-09-01'
 if sys.platform == "win32":
     import os, msvcrt
     msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
@@ -410,28 +392,21 @@ if not debug:
            "filename=NewlyPublishedTrials-%s.xls" % t)
     print 
 
-workbook = pyXLWriter.Writer(sys.stdout)
+workbook = ExcelWriter.Workbook()
 show("workbook created")
-hdrFormat = workbook.add_format()
-hdrFormat.set_bold()
-hdrFormat.set_align('center')
-hdrFormat.set_text_wrap(1)
-tformat1 = workbook.add_format()
-tformat1.set_bold()
-tformat1.set_size(16)
-tformat1.set_align('center')
-tformat1.set_merge(1)
-tformat2 = workbook.add_format()
-tformat2.set_bold()
-tformat2.set_size(12)
-tformat2.set_align('left')
-#tformat2.set_merge(1)
-tformat3 = workbook.add_format()
-tformat3.set_bold()
-rformat = workbook.add_format()
-rformat.set_align('right')
-lformat = workbook.add_format()
-lformat.set_align('left')
+align = ExcelWriter.Alignment('Center', wrap=True)
+font = ExcelWriter.Font(bold=True)
+hdrFormat = workbook.addStyle(alignment=align, font=font)
+tformat3 = workbook.addStyle(font=font)
+align = ExcelWriter.Alignment('Center')
+font = ExcelWriter.Font(bold=True, size=16)
+tformat1 = workbook.addStyle(alignment=align, font=font)
+align = ExcelWriter.Alignment('Left')
+font = ExcelWriter.Font(bold=True, size=12)
+tformat2 = workbook.addStyle(alignment=align, font=font)
+lformat = workbook.addStyle(alignment=align)
+align = ExcelWriter.Alignment('Right')
+rformat = workbook.addStyle(alignment=align)
 titles  = ('InScope', 'CTGov')
 headers = (
     ('DocID', 'ProtocolID','Study Category', 'Special Category',
@@ -441,13 +416,13 @@ headers = (
      'Date Published', 'User')
     )
 widths  = (
-    (9.71, 25.29, 18.43, 18.43, 18.43, 18.43, 18.43, 18, 18, 12),
-    (9.71, 25.29, 18.43, 18.43, 18, 12)
+    (50, 150, 100, 100, 100, 100, 100, 100, 100, 75),
+    (50, 150, 100, 100, 100, 75)
     )
 addTotalsSheet(workbook, prots, inScope, ctGov)
 addWorksheet(workbook, titles[0], headers[0], widths[0], inScope)
 show("%s worksheet created" % titles[0])
 addWorksheet(workbook, titles[1], headers[1], widths[1], ctGov)
 show("%s worksheet created" % titles[1])
-workbook.close()
+workbook.write(sys.stdout, True)
 show("done")
