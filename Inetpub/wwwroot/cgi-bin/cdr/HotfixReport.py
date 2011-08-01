@@ -5,68 +5,44 @@
 # Report identifying previously published protocols that should be 
 # included in a hotfix.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.8  2005/08/17 20:00:59  venglisc
-# Removed the commented out sections since the new code has been approved
-# and is running in production. (Bug 1718)
-#
-# Revision 1.7  2005/08/02 20:28:02  bkline
-# Version approved by users for issue #1718.
-#
-# Revision 1.6  2005/07/14 09:57:35  bkline
-# Changes made for issue #1718.
-#
-# Revision 1.5  2005/03/16 17:20:11  venglisc
-# Corrected some problems in the queries to eliminate incorrect hits.
-# Added another worksheet to include new CTGovProtocols.
-# Modified the output file from HotFixReport to InterimUpdateReport.
-# Added the prtocol type to the list of removed protocols. (Bugs 1396, 1538)
-#
-# Revision 1.4  2004/07/13 17:48:44  bkline
-# Modified query to use only publishing jobs sent to Cancer.gov.
-#
-# Revision 1.3  2004/06/02 14:59:10  bkline
-# Logic changes requested by Sheri (comment #18 in request #1183).
-#
-# Revision 1.2  2004/05/17 14:29:30  bkline
-# Bumped up timeout values; fixed typo in column header; added extra
-# blank worksheet; removed dead code.
-#
-# Revision 1.1  2004/05/11 17:49:27  bkline
-# Report identifying previously published protocols that should be
-# included in a hotfix.
+# BZIssue::1183 (see comment #18)
+# BZIssue::1396
+# BZIssue::1538
+# BZIssue::1718
+# BZIssue::5011
 #
 #----------------------------------------------------------------------
-import cdrdb, pyXLWriter, sys, time, cdrcgi
+import cdrdb, ExcelWriter, sys, time, cdrcgi
+
+DEBUGGING = False
+
+def milestone(m):
+    if DEBUGGING:
+        sys.stderr.write("MILESTONE %s\n" % m.upper())
 
 def addWorksheet(workbook, title, headers, widths, headerFormat, rows):
-    worksheet = workbook.add_worksheet(title)
+    sys.stderr.write("writing sheet '%s'\n" % title)
+    worksheet = workbook.addWorksheet(title)
+    row = worksheet.addRow(1)
     for col in range(len(headers)):
-        worksheet.set_column(col, widths[col])
-        worksheet.write([0, col], headers[col], headerFormat)
-    #worksheet.set_column(3, 70)
-    #worksheet.write([0, 3], "URL", headerFormat)
-    r = 1
-    for row in rows:
-        c = 0
-        for col in row:
+        worksheet.addCol(col + 1, widths[col])
+        row.addCell(col + 1, headers[col], headerFormat)
+    r = 2
+    for dbrow in rows:
+        row = worksheet.addRow(r)
+        c = 1
+        for col in dbrow:
             if type(col) == type(9):
                 col = `col`
-            elif type(col) == type(u""):
-                col = col.encode('latin-1', 'replace')
-            if 0 and c == 2:
-                worksheet.write([r, c], col, datefmt)
-            elif c == 1:
+            if c == 2:
                 url = ("http://%s/cgi-bin/cdr/PublishPreview.py"
                        "?DocId=CDR%d&Session=guest" % (cdrcgi.WEBSERVER,
                                                        row[0]))
-                worksheet.write_url([r, c], url, col)
+                row.addCell(2, col, href=url)
             else:
-                worksheet.write([r, c], col)
+                row.addCell(c, col)
             c += 1
-        #worksheet.write([r, c], url)
         r += 1
-    #sys.stderr.write("Created worksheet %s\n" % title)
 
 if sys.platform == "win32":
     import os, msvcrt
@@ -89,7 +65,7 @@ cursor.execute("""\
              job INTEGER     NOT NULL,
         doc_type VARCHAR(32) NOT NULL,
    active_status CHAR        NOT NULL)""")
-
+milestone('a')
 cursor.execute("""\
     INSERT INTO #t0
          SELECT a.id, MAX(p.id), t.name, a.active_status
@@ -110,6 +86,7 @@ cursor.execute("""\
                             AND status = 'Success'
                         )
        GROUP BY a.id, t.name, a.active_status""", timeout = 300)
+milestone('b')
 
 # Create a temp table listing all documents created under #t0 along
 # with it's published version number
@@ -132,6 +109,7 @@ cursor.execute("""\
            JOIN #t0 t
              ON p.doc_id = t.id
             AND p.pub_proc = t.job""", timeout = 300)
+milestone('c')
 
 # Create a temp table with all the existing latest valid versions
 # These are either the same version numbers as the ones created under
@@ -150,6 +128,7 @@ cursor.execute("""\
           WHERE v.publishable = 'Y'
             AND v.val_status = 'V'
        GROUP BY v.id""", timeout = 300)
+milestone('d')
 
 #----------------------------------------------------------------------
 # New code, RMK 2005-06-15.
@@ -167,6 +146,7 @@ rows = cursor.fetchall()
 if not rows:
     cdrcgi.bail("failure finding last full push")
 lastFullPush = rows[0][0]
+milestone('e')
 
 #----------------------------------------------------------------------
 # Find the last version we published for the protocols.
@@ -183,6 +163,7 @@ cursor.execute("""\
           WHERE t.name IN ('InScopeProtocol', 'CTGovProtocol')
             AND d.pub_proc >= ?
        GROUP BY d.doc_id""", lastFullPush, timeout = 300)
+milestone('f')
 
 #----------------------------------------------------------------------
 # Get the last publishable versions for these documents.
@@ -197,6 +178,7 @@ cursor.execute("""\
           WHERE v.publishable = 'Y'
             AND v.val_status = 'V'
        GROUP BY v.id""", timeout = 300)
+milestone('g')
 
 #----------------------------------------------------------------------
 # Find InScopeProtocol documents with newer publishable versions.
@@ -215,29 +197,27 @@ cursor.execute("""\
        AND v2.ver > v1.ver
   ORDER BY v3.dt""", timeout = 300)
 rows = cursor.fetchall()
-
+milestone('h')
 
 t = time.strftime("%Y%m%d%H%M%S")
 print "Content-type: application/vnd.ms-excel"
 print "Content-Disposition: attachment; filename=InterimUpdateReport-%s.xls" % t
 print 
 
-workbook = pyXLWriter.Writer(sys.stdout)
-
-format = workbook.add_format()
-format.set_bold();
-format.set_color('white')
-format.set_bg_color('blue')
-format.set_align('center')
+workbook = ExcelWriter.Workbook()
+align = ExcelWriter.Alignment('Center')
+font = ExcelWriter.Font('white', bold=True)
+interior = ExcelWriter.Interior('blue')
+fmt = workbook.addStyle(alignment=align, font=font, interior=interior)
 
 # Create worksheet listing all updated InScopeProtocols
 # -----------------------------------------------------
 titles  = ('Updated InScopeProtocols', 'Updated CTGov Protocols',
            'New CTGov Protocols',
            'Removed Protocols (All)', 'Updated Summaries')
-headers = ['DocID', 'Primary Protocol ID','Latest Publishable Version Date']
-widths  = (8, 35, 40)
-addWorksheet(workbook, titles[0], headers, widths, format, rows)
+headers = ['DocID', 'Primary Protocol ID', 'Latest Publishable Version Date']
+widths  = (40, 200, 200)
+addWorksheet(workbook, titles[0], headers, widths, fmt, rows)
 
 #----------------------------------------------------------------------
 # Find InScopeProtocol documents with newer publishable versions.
@@ -257,8 +237,9 @@ cursor.execute("""\
        AND v2.ver > v1.ver
   ORDER BY v3.dt""", timeout = 300)
 rows = cursor.fetchall()
+milestone('i')
 
-addWorksheet(workbook, titles[1], headers, widths, format, rows)
+addWorksheet(workbook, titles[1], headers, widths, fmt, rows)
 
 # Create Worksheet for new CTGov Protocol
 # Note: These queries are taken from the program 
@@ -275,6 +256,7 @@ cursor.execute("""\
         doc_type VARCHAR(32)  NOT NULL,
           status VARCHAR(255) NOT NULL,
         ver_date DATETIME         NULL)""")
+milestone('j')
 
 cursor.execute("""\
     INSERT INTO #publishable (id, ver, doc_type, status)
@@ -291,6 +273,7 @@ SELECT DISTINCT d.id, MAX(v.num), t.name, s.value
             AND s.path IN ('/CTGovProtocol/OverallStatus')
             AND s.value <> 'Withdrawn'
        GROUP BY d.id, t.name, s.value""", timeout = 300)
+milestone('k')
 
 # Update the #publishable table to add the publication date
 # ---------------------------------------------------------
@@ -301,6 +284,7 @@ cursor.execute("""\
       JOIN doc_version v    
         ON d.id = v.id      
        AND d.ver = v.num""")
+milestone('l')
 
 # Create table listing all protocol documents already published.
 # --------------------------------------------------------------
@@ -320,6 +304,7 @@ SELECT DISTINCT d.doc_id
             AND p.status = 'Success'
             AND p.completed IS NOT NULL
             AND (d.failure IS NULL OR d.failure <> 'Y')""", timeout = 300)
+milestone('m')
 
 # Create table listing the diff between published and publishable 
 # documents.  These will be all documents that are still unpublished.
@@ -332,6 +317,7 @@ cursor.execute("""\
          SELECT id
            FROM #publishable
           WHERE id NOT IN (SELECT id FROM #published)""", timeout = 300)
+milestone('n')
 
 # Create worksheet listing all to-be published CTGov Protocols
 # ------------------------------------------------------------
@@ -345,8 +331,9 @@ cursor.execute("""\
           WHERE q.path = '/CTGovProtocol/IDInfo/OrgStudyID'
           ORDER BY p.ver_date""", timeout = 300)
 rows = cursor.fetchall()
+milestone('o')
 
-addWorksheet(workbook, titles[2], headers, widths, format, rows)
+addWorksheet(workbook, titles[2], headers, widths, fmt, rows)
 
 # Create worksheet listing all removed protocols
 # ----------------------------------------------
@@ -371,11 +358,12 @@ cursor.execute("""\
        AND (#t1.removed IS NULL OR #t1.removed <> 'Y')
      ORDER BY q.path, v.dt""", timeout = 300)
 rows = cursor.fetchall()
-addWorksheet(workbook, titles[3], headers, widths, format, rows)
+milestone('p')
+addWorksheet(workbook, titles[3], headers, widths, fmt, rows)
 
 # Create empty Summary worksheet
 # ------------------------------
 headers[1] = 'Summary Title'
-addWorksheet(workbook, titles[4], headers, widths, format, [])
+addWorksheet(workbook, titles[4], headers, widths, fmt, [])
 
-workbook.close()
+workbook.write(sys.stdout, True)
