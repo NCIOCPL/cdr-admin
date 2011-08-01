@@ -13,6 +13,33 @@ import lxml.etree as etree
 import cdrdb, socket, re
 
 #----------------------------------------------------------------------
+# Testing if the document to be hot-fixed is a meeting recording doc.
+#----------------------------------------------------------------------
+def isMeetingRecording(id):
+    try:
+        conn   = cdrdb.connect()
+        cursor = conn.cursor()
+    except cdrdb.Error, info:
+        reason = "Failure: %s" % info[1][0]
+        cdr.logwrite("Cdr connection failed in isMeetingRecording(). \
+                      %s" % reason)
+
+    cursor.execute("""
+        select d.id 
+          from document d
+          join query_term_pub q
+            on q.doc_id = d.id
+           and q.path = '/Media/@Usage'
+         where d.id = ?
+           and q.value = 'Internal'   -- Meeting Recording
+        """, id)
+    row = cursor.fetchone()
+
+    if row:
+        return True
+    return False
+
+#----------------------------------------------------------------------
 # Display Publishing System PickList
 #----------------------------------------------------------------------
 class Display:
@@ -716,6 +743,19 @@ if fields.has_key('Session') and fields.has_key('SubSet') and \
                         docIds.pop()
                 # cdr.logwrite("docIds After: %s" % docIds)
                 for i in range(len(docIds)):
+                    # At the moment the media documents include image files,
+                    # audio pronunciation files, and meeting recordings.  The
+                    # meeting recordings (MR) are excluded from regular 
+                    # publishing but the hot-fix publishing would allow a 
+                    # document to be published if the ID gets entered manually.
+                    # We're checking the IDs here to prevent this.
+                    # ---------------------------------------------------------
+                    if isMeetingRecording(int(docIds[i])):
+                        cdr.logwrite("Error: Internal document detected - \
+                                      %s" % docIds[i])
+                        cdrcgi.bail("Error: Unable to publish Meeting \
+                                     Recordings (usage='internal') - \
+                                     CDR%s" % docIds[i])
                     docIds[i] = 'CDR' + str(int(docIds[i]))
 
         params = None
