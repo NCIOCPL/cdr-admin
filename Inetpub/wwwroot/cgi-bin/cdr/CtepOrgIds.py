@@ -10,7 +10,7 @@
 # Report used to verify that CTEP org ID mappings are correct.
 #
 #----------------------------------------------------------------------
-import cdrcgi, cdrdb, sys, pyXLWriter, csv, urllib, os, msvcrt, time
+import cdrcgi, cdrdb, sys, csv, urllib, os, msvcrt, time, ExcelWriter
 
 class Org:
     def __init__(self, id, name):
@@ -51,10 +51,10 @@ except:
 
 conn   = cdrdb.connect('CdrGuest')
 cursor = conn.cursor()
-book   = pyXLWriter.Writer(sys.stdout)
-sheet  = book.add_worksheet("CTEP Orgs")
+book   = ExcelWriter.Workbook()
+sheet  = book.addWorksheet("CTEP Orgs")
 orgs   = loadOrgs(cursor)
-row    = 0
+rowNum = 1
 #format = book.add_format()
 labels = True
 #format.set_num_format(49)
@@ -71,29 +71,31 @@ for values in csv.reader(urlObj):
             if org:
                 org.matched = True
                 cdrId       = "%d" % org.id
-                cdrName     = org.name.strip().encode('latin-1', 'ignore')
+                cdrName     = org.name.strip()
             else:
                 cdrId       = "-----"
                 cdrName     = "No match"
-        sheet.write([row, 0], cdrId)
-        sheet.write_string([row, 1], cdrName)
-        sheet.write_string([row, 2], ctepId.strip())
-        sheet.write_string([row, 3], ctepName.strip())
-        sheet.write_string([row, 4], city.strip())
-        sheet.write_string([row, 5], state.strip())
-        sheet.write_string([row, 6], country.strip())
-        row += 1
+        row = sheet.addRow(rowNum)
+        row.addCell(1, cdrId)
+        row.addCell(1, cdrName)
+        row.addCell(1, ctepId.strip())
+        row.addCell(1, ctepName.strip())
+        row.addCell(1, city.strip())
+        row.addCell(1, state.strip())
+        row.addCell(1, country.strip())
+        rowNum += 1
 
 keys = orgs.keys()
 keys.sort()
 for key in keys:
     org = orgs[key]
     if not org.matched:
-        row    += 1
-        cdrId   = "%d" % org.id
-        cdrName = org.name.strip().encode('latin-1', 'ignore')
-        sheet.write([row, 0], cdrId)
-        sheet.write_string([row, 1], cdrName)
-        sheet.write_string([row, 2], key.encode('latin-1', 'ignore'))
-        sheet.write_string([row, 3], "Not found on CTEP site")
-book.close()
+        rowNum += 1
+        cdrId = "%d" % org.id
+        cdrName = org.name.strip()
+        row = sheet.addRow(rowNum)
+        row.addCell(1, cdrId)
+        row.addCell(2, cdrName)
+        row.addCell(3, key)
+        row.addCell(4, "Not found on CTEP site")
+book.write(sys.stdout, True)
