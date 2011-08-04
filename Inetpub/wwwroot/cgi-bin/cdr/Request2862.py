@@ -6,6 +6,8 @@
 # organization contact information for the Liaison office to use."
 #
 # BZIssue::5077 - Fix NCI Liaison office report
+# BZIssue::5084 - Liaison office report to identify trials that need 
+#                 updating in ctgov
 #
 #----------------------------------------------------------------------
 
@@ -94,7 +96,7 @@ def getElementText(parent, name):
 def addSheet(wb, styles, protocols, title):
     ws = wb.addWorksheet(title)
     col = 1
-    for width in (40, 200, 70, 70, 200, 100, 100):
+    for width in (40, 200, 70, 70, 70, 200, 100, 100):
         ws.addCol(col, width)
         col += 1
     row = ws.addRow(1, styles.title, 20)
@@ -103,7 +105,8 @@ def addSheet(wb, styles, protocols, title):
     row = ws.addRow(4, styles.header)
     col = 1
     for name in ('DocID', 'Primary Protocol ID', 'Date First\nPublished',
-                 'Date Last\nModified', 'LO Personnel', 'Phone', 'Email'):
+                 'Date Last\nModified', 'Date Last\nVerified', 
+                 'LO Personnel', 'Phone', 'Email'):
         row.addCell(col, name, style = styles.header)
         col += 1
     n = 0
@@ -123,15 +126,16 @@ def addSheet(wb, styles, protocols, title):
             row.addCell(2, protocol.protId, style = styles.url, href = url)
             row.addCell(3, protocol.firstPub, style = styles.center)
             row.addCell(4, protocol.lastMod, style = styles.center)
-            row.addCell(5, person.makeCellString(), style = styles.left)
-            row.addCell(6, person.phone, style = styles.left)
-            row.addCell(7, person.email, style = styles.left)
+            row.addCell(5, protocol.lastVer, style = styles.center)
+            row.addCell(6, person.makeCellString(), style = styles.left)
+            row.addCell(7, person.phone, style = styles.left)
+            row.addCell(8, person.email, style = styles.left)
             rowNum += 1
             for person in protocol.persons[1:]:
                 row = ws.addRow(rowNum)
-                row.addCell(5, person.makeCellString(), style = styles.left)
-                row.addCell(6, person.phone, style = styles.left)
-                row.addCell(7, person.email, style = styles.left)
+                row.addCell(6, person.makeCellString(), style = styles.left)
+                row.addCell(7, person.phone, style = styles.left)
+                row.addCell(8, person.email, style = styles.left)
                 rowNum += 1
     countRow.addCell(1, "Total Number of Trials: %d" % n,
                      style = styles.header, mergeAcross = 7)
@@ -264,6 +268,7 @@ class Protocol:
         self.protId = None
         self.firstPub = str(firstPub)[:10]
         self.lastMod = None
+        self.lastVer = None
         self.persons = []
         self.sheets = ["All Trials"]
         cursor.execute("""\
@@ -276,6 +281,10 @@ class Protocol:
         for node in dom.documentElement.childNodes:
             if node.nodeName == 'DateLastModified':
                 self.lastMod = cdr.getTextContent(node)
+            elif node.nodeName == 'VerificationInfo':
+                for child in node.childNodes:
+                    if child.nodeName == 'VerificationDate':
+                        self.lastVer = cdr.getTextContent(child)
             elif node.nodeName == 'ProtocolIDs':
                 for child in node.childNodes:
                     if child.nodeName == 'PrimaryID':
