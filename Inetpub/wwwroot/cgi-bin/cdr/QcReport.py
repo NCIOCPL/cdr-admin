@@ -1,4 +1,4 @@
-#----------------------------------------------------------------------
+#-----------------------------------------------------------------------------
 #
 # $Id$
 #
@@ -11,8 +11,9 @@
 # BZIssue::4967 - [Summary] Modification to QC Reports to Show/Hide 
 #                 Certain Comments
 # BZIssue::5006 - Minor Revisions to QC Report Interfaces - Comments Options
+# BZIssue::5065 - [Summaries] 2 More Patient Summary QC Report Display Options
 #
-# ---------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 #
 # Revision 1.69  2009/05/28 20:38:26  venglisc
 # Added checkbox to suppress display of Reference sections. (Bug 4562)
@@ -1151,9 +1152,6 @@ if letUserPickVersion:
       &nbsp;<input name='Glossary' type='checkbox' id='dispGlos'>&nbsp;
       <label for='dispGlos'>Include glossary terms at end of report</label>
       <br>
-      &nbsp;<input name='Images' type='checkbox' id='dispImg'>&nbsp;
-      <label for='dispImg'>Display images instead of placeholder</label>
-      <br>
       &nbsp;<input name='Citations' type='checkbox' id='dispCit'
              checked='1'>&nbsp;
       <label for='dispCit'>Display the HP Reference Section</label>
@@ -1171,25 +1169,29 @@ if letUserPickVersion:
       &nbsp<input name='ShowStandardWording' type='checkbox' 
              id='stdWord'>&nbsp;
       <label for='stdWord'>Show standard wording with mark-up</label>
-      <p>
+"""
+    if docType == 'Summary':
+        form += u"""\
+     <p>
      <fieldset class="gogreen">
       <legend class="gg">&nbsp;GoGreen Options&nbsp;</legend>
+      &nbsp;<input name='Images' type='checkbox' id='dispImg'>&nbsp;
+      <label for='dispImg'>Display images instead of placeholder</label>
+      <br>
+"""
+    if repType == 'pat' or repType == 'patbu' or repType == 'patrs':
+        form += u"""\
       &nbsp;<input name='Keypoints' type='checkbox' id='dispKP'>&nbsp;
       <label for='dispKP'>Display Key Point boxes</label>
       <br>
       &nbsp;<input name='Learnmore' type='checkbox' id='dispLearnMore'>&nbsp;
       <label for='dispLearnMore'>Display To Learn More sections</label>
+"""
+
+    form += u"""\
      </fieldset>
 """
 
-#        form += u"""\
-#      <tr>
-#       <td>
-#  <INPUT TYPE='checkbox' NAME='ShowStandardWording'>&nbsp;&nbsp;
-#  Show standard wording with mark-up<BR>
-#       </td>
-#      </tr>
-#"""
     # Display the Quick&Dirty option checkbox
     # ---------------------------------------
     if docType == 'Summary':
