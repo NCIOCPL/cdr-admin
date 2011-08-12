@@ -96,7 +96,7 @@ def getElementText(parent, name):
 def addSheet(wb, styles, protocols, title):
     ws = wb.addWorksheet(title)
     col = 1
-    for width in (40, 200, 70, 70, 70, 200, 100, 100):
+    for width in (40, 180, 100, 70, 70, 70, 200, 100, 120):
         ws.addCol(col, width)
         col += 1
     row = ws.addRow(1, styles.title, 20)
@@ -104,9 +104,9 @@ def addSheet(wb, styles, protocols, title):
     countRow = ws.addRow(2, styles.header)
     row = ws.addRow(4, styles.header)
     col = 1
-    for name in ('DocID', 'Primary Protocol ID', 'Date First\nPublished',
-                 'Date Last\nModified', 'Date Last\nVerified', 
-                 'LO Personnel', 'Phone', 'Email'):
+    for name in ('DocID', 'Primary Protocol ID', 'Alternate ID', 
+                 'Date First\nPublished', 'Date Last\nModified', 
+                 'Date Last\nVerified', 'LO Personnel', 'Phone', 'Email'):
         row.addCell(col, name, style = styles.header)
         col += 1
     n = 0
@@ -124,18 +124,19 @@ def addSheet(wb, styles, protocols, title):
             row = ws.addRow(rowNum)
             row.addCell(1, protocol.docId, style = styles.right)
             row.addCell(2, protocol.protId, style = styles.url, href = url)
-            row.addCell(3, protocol.firstPub, style = styles.center)
-            row.addCell(4, protocol.lastMod, style = styles.center)
-            row.addCell(5, protocol.lastVer, style = styles.center)
-            row.addCell(6, person.makeCellString(), style = styles.left)
-            row.addCell(7, person.phone, style = styles.left)
-            row.addCell(8, person.email, style = styles.left)
+            row.addCell(3, protocol.altId, style = styles.url, href = url)
+            row.addCell(4, protocol.firstPub, style = styles.center)
+            row.addCell(5, protocol.lastMod, style = styles.center)
+            row.addCell(6, protocol.lastVer, style = styles.center)
+            row.addCell(7, person.makeCellString(), style = styles.left)
+            row.addCell(8, person.phone, style = styles.left)
+            row.addCell(9, person.email, style = styles.left)
             rowNum += 1
             for person in protocol.persons[1:]:
                 row = ws.addRow(rowNum)
-                row.addCell(6, person.makeCellString(), style = styles.left)
-                row.addCell(7, person.phone, style = styles.left)
-                row.addCell(8, person.email, style = styles.left)
+                row.addCell(7, person.makeCellString(), style = styles.left)
+                row.addCell(8, person.phone, style = styles.left)
+                row.addCell(9, person.email, style = styles.left)
                 rowNum += 1
     countRow.addCell(1, "Total Number of Trials: %d" % n,
                      style = styles.header, mergeAcross = 7)
@@ -266,6 +267,7 @@ class Protocol:
         self.docId = docId
         self.docVer = docVer
         self.protId = None
+        self.altId  = None
         self.firstPub = str(firstPub)[:10]
         self.lastMod = None
         self.lastVer = None
@@ -289,6 +291,12 @@ class Protocol:
                 for child in node.childNodes:
                     if child.nodeName == 'PrimaryID':
                         self.protId = getElementText(child, 'IDString')
+                    elif child.nodeName == 'OtherID':
+                        self.altId = getElementText(child, 'IDString')
+                        if self.altId.find('EU-') > -1:
+                            break
+                        else:
+                            self.altId = None
             elif node.nodeName == 'ProtocolAdminInfo':
                 mailAbstractTo = getElementText(node, 'MailAbstractTo')
                 for child in node.childNodes:
