@@ -6,6 +6,7 @@
 #
 # BZIssue::4671 - Summaries with Mark-up Report
 # BZIssue::4922 - Enhancements to the Summaries with Markup Report
+# BZIssue::5094 - Summ. with Markup Report - Add option to show all summaries
 #
 #----------------------------------------------------------------------
 import cdr, cgi, cdrcgi, time, cdrdb, xml.dom.minidom
@@ -19,11 +20,12 @@ boolOp    = fields and fields.getvalue("Boolean")          or "AND"
 audience  = fields and fields.getvalue("audience")         or None
 lang      = fields and fields.getvalue("lang")             or None
 showId    = fields and fields.getvalue("showId")           or "N"
+showAll   = fields and fields.getvalue("showAll")          or "N"
 groups    = fields and fields.getvalue("grp")              or []
 submit    = fields and fields.getvalue("SubmitButton")     or None
 request   = cdrcgi.getRequest(fields)
 title     = "CDR Administration"
-instr     = "Summaries with Mark-up"
+instr     = "Summaries Markup Report"
 script    = "SummariesWithMarkup.py"
 SUBMENU   = "Report Menu"
 buttons   = (SUBMENU, cdrcgi.MAINMENU)
@@ -75,33 +77,25 @@ def boardHeaderWithID(board_type):
     return html
 
 
-# ------------------------------------------------
-# Create the table row for the English list output
-# ------------------------------------------------
-# def summaryRow(summary):
-#     """Return the HTML code to display a Summary row"""
-#     html = """\
-#    <LI class="report">%s</LI>
-# """ % (row[1])
-#     return html
-# 
-
 # -------------------------------------------------
 # Create the table row for the English table output
 # -------------------------------------------------
-def summaryRowWithID(id, summary, boardCount, display, ReportType = 'rs'):
+def summaryRowWithID(id, summary, boardCount, display, ReportType = 'rs',
+                         showAllRows = 'N'):
     """Return the HTML code to display a Summary row with ID"""
 
     # The users only want to display those summaries that do have
     # markup, so we need to suppress the once that don't by counting
     # the number of markup elements.
+    # 
+    # The above decision has changed and the users would like the 
+    # option now to display summaries without markup as well.
     # --------------------------------------------------------------
-    #cdrcgi.bail(display)
     num = 0
     for list in display:
         num += boardCount[list]
 
-    if num == 0: return ""
+    if num == 0 and showAllRows == 'N': return ""
 
     # Create the table row display
     # If a markup type hasn't been checked the table cell will be
@@ -143,18 +137,20 @@ def summaryRowWithID(id, summary, boardCount, display, ReportType = 'rs'):
 # Create the table row for the Spanish table output
 # -------------------------------------------------
 def summaryRowESWithID(id, summary, translation, boardCount, display, 
-                       ReportType = 'rs'):
+                       ReportType = 'rs', showAllRows = 'N'):
     """Return the HTML code to display a Spanish Summary row with ID"""
     # The users only want to display those summaries that do have
     # markup, so we need to suppress the once that don't by counting
     # the number of markup elements.
+    #
+    # The above decision has changed and the users would like the 
+    # option now to display summaries without markup as well.
     # --------------------------------------------------------------
-    #cdrcgi.bail(display)
     num = 0
     for list in display:
         num += boardCount[list]
 
-    if num == 0: return ""
+    if num == 0 and showAllRows == 'N': return ""
 
     # Create the table row display
     # If a markup type hasn't been checked the table cell will be
@@ -256,7 +252,7 @@ if not lang:
    </fieldset>
 
    <fieldset>
-    <legend>&nbsp;Type of mark-up&nbsp;</legend>
+    <legend>&nbsp;Type of markup&nbsp;</legend>
     <input name='showId' type='checkbox' id="pub"
            value='publish' CHECKED>
     <label for="pub">Publish</label>
@@ -276,7 +272,12 @@ if not lang:
     <hr width="25%%">
     <input name='showId' type='checkbox' id="adv"
            value='advisory' CHECKED>
-    <label for="adv">Advisory Board mark-up</label>
+    <label for="adv">Advisory Board markup</label>
+    <br>
+    <hr width="25%%">
+    <input name='showAll' type='checkbox' id="all"
+           value='allrows'>
+    <label for="all">Include rows without markup</label>
    </fieldset>
 
    <fieldset>
@@ -351,6 +352,12 @@ if not lang:
 </html>
 """ % (cdrcgi.SESSION, session)
     cdrcgi.sendPage(header + form)
+
+# If we don't have groups the user must have forgotten to enter a
+# summary type.
+# ----------------------------------------------------------------
+if not groups:
+    cdrcgi.bail("Please select a summary type!")
 
 #----------------------------------------------------------------------
 # Language variable has been selected
@@ -686,22 +693,22 @@ for row in rows:
         if lang == 'English':
             report += summaryRowWithID(row[0], row[1],
                                        boardCount[row[0]],
-                                       showId, ReportType)
+                                       showId, ReportType, showAll)
         else:
             report += summaryRowESWithID(row[0], row[1], row[4],
                                          boardCount[row[0]],
-                                         showId, ReportType)
+                                         showId, ReportType, showAll)
     else:
         board_type = row[5]
         report += boardHeaderWithID(board_type)
         if lang == 'English':
             report += summaryRowWithID(row[0], row[1],
                                          boardCount[row[0]],
-                                         showId, ReportType)
+                                         showId, ReportType, showAll)
         else:
             report += summaryRowESWithID(row[0], row[1], row[4],
                                          boardCount[row[0]],
-                                         showId, ReportType)
+                                         showId, ReportType, showAll)
 
 report += """
   </TABLE>
