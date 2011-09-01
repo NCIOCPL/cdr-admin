@@ -19,6 +19,9 @@ BUTTONS = (cdrcgi.MAINMENU, "Logout")
 ZIPDIR  = "d:/cdr/Audio_from_CIPSFTP"
 REVDIR  = "%s/GeneratedRevisionSheets" % ZIPDIR
 MAXNOTE = 2040
+MAXFILE = 250
+MAXTERM = 250
+MAXNAME = 250
 
 # Some early zipfiles included some redundant lines with this name prefix
 USELESS = "__MACOSX"
@@ -277,7 +280,7 @@ def insertZipFileRow(cursor, zipName):
     return zipId
 
 
-def getCell(sheet, row, col):
+def getCell(sheet, row, col, maxlen=None):
     """
     Extract the value from a cell in the worksheet.
 
@@ -285,6 +288,8 @@ def getCell(sheet, row, col):
         Sheet instance.
         Row index, origin 0.
         Column index, origin 0.
+        Optional length:
+            If passed, will trim whitespace and insure maxlen not exceeded.
 
     Return:
         Value in whatever data type is found.
@@ -294,6 +299,12 @@ def getCell(sheet, row, col):
         value = sheet.cell(row, col).value
     except (IndexError, ValueError):
         return None
+
+    if maxlen:
+        value = value.strip()
+        if len(value) > maxlen:
+            bail("Input row=%d col=%d value is too long, max=%d.  "
+                 "Please check data.")
     return value
 
 
@@ -987,7 +998,13 @@ def saveChanges(fields, session):
 
         # User may have input utf-8 Spanish chars in reviewer note
         if revNote:
-            revNote = revNote.decode('utf-8', 'replace')
+            # Fix character set and remove leading/trailing whitespace
+            revNote = revNote.decode('utf-8', 'replace').strip()
+
+            # Fix whitespace and newline translation problems
+            # DEBUG cdr.logwrite('revNote="%s"' % revNote)
+            revNote = re.sub(r"[\r\n]+", "\n", revNote).strip()
+
             # Limit the length for database input
             if len(revNote) > MAXNOTE:
                 revNote = revNote[:MAXNOTE]
