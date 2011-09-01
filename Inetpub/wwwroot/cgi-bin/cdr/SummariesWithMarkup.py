@@ -277,7 +277,7 @@ if not lang:
     <hr width="25%%">
     <input name='showAll' type='checkbox' id="all"
            value='allrows'>
-    <label for="all">Include rows without markup</label>
+    <label for="all">Include summaries without markup</label>
    </fieldset>
 
    <fieldset>
