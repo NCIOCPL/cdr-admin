@@ -571,6 +571,18 @@ header   = cdrcgi.header(title, title, getSectionTitle(repType),
              el.style.display = 'none';
          }
      }
+     function checkGreen() {
+         var optgreen = ['dispImg', 'dispKP', 'dispLearnMore']
+         for (var k in optgreen) {
+           //  if (document.getElementById(optgreen[k]).checked == false) 
+             if (document.getElementById('allGreen').checked == false) {
+                 document.getElementById(optgreen[k]).checked = false;
+             }
+             else {
+                 document.getElementById(optgreen[k]).checked = true;
+             }
+         }
+     }
   </script>
 """)
 docId    = fields.getvalue(cdrcgi.DOCID) or None
@@ -1170,23 +1182,38 @@ if letUserPickVersion:
              id='stdWord'>&nbsp;
       <label for='stdWord'>Show standard wording with mark-up</label>
 """
+    wsp = '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'
     if docType == 'Summary':
         form += u"""\
      <p>
      <fieldset class="gogreen">
-      <legend class="gg">&nbsp;GoGreen Options&nbsp;</legend>
-      &nbsp;<input name='Images' type='checkbox' id='dispImg'>&nbsp;
-      <label for='dispImg'>Display images instead of placeholder</label>
-      <br>
+      <legend class="gg">&nbsp;GoGreen Option(s)&nbsp;</legend>
 """
+
     if repType == 'pat' or repType == 'patbu' or repType == 'patrs':
         form += u"""\
-      &nbsp;<input name='Keypoints' type='checkbox' id='dispKP'>&nbsp;
-      <label for='dispKP'>Display Key Point boxes</label>
+      &nbsp;<input name='AllGreen' type='checkbox' id='allGreen'
+                   onclick=javascript:checkGreen()>&nbsp;
+      <label for='allGreen'>Check all Options</label>
       <br>
-      &nbsp;<input name='Learnmore' type='checkbox' id='dispLearnMore'>&nbsp;
-      <label for='dispLearnMore'>Display To Learn More sections</label>
 """
+
+    if docType == 'Summary':
+        form += u"""\
+      %s<input name='Images' type='checkbox' id='dispImg'>&nbsp;
+      <label for='dispImg'>Replace images with placeholders</label>
+      <br>
+""" % wsp
+
+    if repType == 'pat' or repType == 'patbu' or repType == 'patrs':
+        form += u"""\
+      %s<input name='Keypoints' type='checkbox' id='dispKP'>&nbsp;
+      <label for='dispKP'>Replace Key Point boxes with placeholders</label>
+      <br>
+      %s<input name='Learnmore' type='checkbox' id='dispLearnMore'>&nbsp;
+      <label for='dispLearnMore'>Replace To Learn More section 
+                                 with placeholder</label>
+""" % (wsp, wsp)
 
     form += u"""\
      </fieldset>
@@ -1838,7 +1865,7 @@ if repType == "bu" or repType == "but":
 filterParm.append(['DisplayGlossaryTermList',
                        glossary and "Y" or "N"])
 filterParm.append(['DisplayImages',
-                       images and "Y" or "N"])
+                       images and "N" or "Y"])
 filterParm.append(['DisplayCitations',
                        citation and "Y" or "N"])
 filterParm.append(['DisplayLOETermList',
@@ -1848,9 +1875,9 @@ if repType == 'pat' or repType == 'patrs' or repType == 'patbu':
     filterParm.append(['ShowStandardWording',
                        standardWording and "Y" or "N"])
     filterParm.append(['ShowKPBox',
-                       kpbox and "Y" or "N"])
+                       kpbox and "N" or "Y"])
     filterParm.append(['ShowLearnMoreSection',
-                       learnmore and "Y" or "N"])
+                       learnmore and "N" or "Y"])
 
 doc = cdr.filterDoc(session, filters[docType], docId = docId,
                     docVer = version or None, parm = filterParm)
