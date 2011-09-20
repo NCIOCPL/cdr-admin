@@ -5,9 +5,10 @@
 # User interface for requesting republication of documents to be
 # sent to Cancer.gov.
 #
-# $Log: not supported by cvs2svn $
 # Revision 1.1  2007/05/16 16:03:38  bkline
 # User interface for resending documents to Cancer.gov.
+#
+# BZIssue::4855 - Add GKTarget Parameter to Re-publishing Job Interface
 #
 #----------------------------------------------------------------------
 import cdr, cdrdb, cdrcgi, cgi, RepublishDocs
@@ -24,6 +25,10 @@ docType = fields.getvalue('DocType')    or None
 allType = fields.getvalue('AllType')    and True or False
 newDocs = fields.getvalue('NewDocs')    and True or False
 gkHost  = fields.getvalue('GKHost')     or ''
+gkPubTarget= fields.getvalue('GKTarget')   or ''
+if not gkPubTarget.lower() in ('', 'gatekeeper', 'preview', 'live'):
+    cdrcgi.bail(u'Invalid value for GKTarget: %s. Allowed values are:'
+                u'GateKeeper, Preview, Live' % gkPubTarget)
 email   = fields.getvalue('Email')      or ''
 failed  = fields.getvalue('FailedOnly') and True or False
 SUBMENU = "Developer Menu"
@@ -80,7 +85,7 @@ def makeDoctypePicklist():
             ON d.doc_type = t.id
           JOIN pub_proc_cg c
             ON c.id = d.id
-      ORDER BY t.name""")
+      ORDER BY t.name""", timeout = 300)
     html = ["""\
       <select name='DocType' class='field'>
        <option value='' selected>&nbsp;</option>
@@ -160,11 +165,16 @@ def showForm(extra):
     </tr>
     <tr>
      <th align='right'>Email Address:&nbsp;</th>
-     <td><input name='Email' class='field'></td>
+     <td><input name='Email' class='field'
+                value='operator@cips.nci.nih.gov'></td>
     </tr>
     <tr>
      <th align='right'>GateKeeper Host:&nbsp;</th>
      <td><input name='GKHost' class='field'></td>
+    </tr>
+    <tr>
+     <th align='right'>GateKeeper Target:&nbsp;</th>
+     <td><input name='GKTarget' class='field' value='Preview'></td>
     </tr>
     <tr>
      <td>&nbsp;</td>
@@ -177,7 +187,7 @@ def showForm(extra):
     <tr>
      <td>&nbsp;</td>
      <td>
-      <input type='checkbox' name='NewDocs' checked>
+      <input type='checkbox' name='NewDocs'>
       Include linked documents not on Cancer.gov
      </td>
     </tr>
@@ -204,7 +214,7 @@ if (docList or jobList or docType):
         docList = [cdr.exNormalize(d)[1] for d in docList.split()]
         jobList = [int(job) for job in jobList.split()]
         jobId   = cr.republish(newDocs, docList, jobList, docType, allType,
-                               failed, email, gkHost)
+                               failed, email, gkHost, gkPubTarget)
         extra = """
    <p>Export job %d created successfully</p><br>""" % jobId
     except Exception, e:
