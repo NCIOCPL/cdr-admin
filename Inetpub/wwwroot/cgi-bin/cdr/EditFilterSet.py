@@ -4,7 +4,7 @@
 #
 # Form for editing named CDR filter sets.
 #
-# $Log: not supported by cvs2svn $
+# $Log: EditFilterSet.py,v $
 # Revision 1.3  2007/11/03 14:15:07  bkline
 # Unicode encoding cleanup (issue #3716).
 #
@@ -138,7 +138,7 @@ def makeDelFunction():
         body = u"""\
         alert("Filter set cannot be deleted; it is used as a member of:"""
         for row in rows:
-            body += '\\n"\n            + "%s' % cgi.escape(row[0])
+            body += '\\n"\n            + "%s' % row[0]
         return body + '");\n';
     else:
         return u"""\
@@ -148,14 +148,17 @@ def makeDelFunction():
             frm.doWhat.value = 'Delete';
             frm.submit();
         }
-""" % cgi.escape(setName)
+""" % cdrcgi.unicodeToJavaScriptCompatible(cdr.toUnicode(setName))
                 
+# ---------------------------------------------------------------
+# Internal bail() function
+# ---------------------------------------------------------------
 def bail(str, args):
     if args:
-        str += "<ul>\n"
+        str += u"<ul>\n"
         for arg in args:
-            str += "<li>%s</li>\n" % cgi.escape(arg)
-        str += "</ul>\n"
+            str += u"<li>%s</li>\n" % cgi.escape(repr(arg))
+        str += u"</ul>\n"
     cdrcgi.bail(str)
 
 #----------------------------------------------------------------------
@@ -167,6 +170,7 @@ def showForm(isNew, members = None):
 <html>
  <head>
   <title>Edit CDR Filter Set</title>
+  <meta http-equiv="Content-type" content="text/html;charset=utf-8" />
   <basefont face='Arial, Helvetica, sans-serif'>
   <link rel='stylesheet' href='/stylesheets/dataform.css'>
   <script language='JavaScript'>
@@ -372,7 +376,7 @@ def showForm(isNew, members = None):
 </html>
 """ % (makeDelFunction(),
        isNew == 'Y' and "return;" or "",
-       setName and cgi.escape(setName, 1) or '',
+       setName and cgi.escape(cdr.toUnicode(setName), 1) or '',
        noMembers,
        isNew != 'Y' and """\
       <input type='button' name='DelSet' value='Delete Set' 
@@ -381,7 +385,7 @@ def showForm(isNew, members = None):
 """ or "",
        SUBMENU,
        cdrcgi.MAINMENU,
-       setName and cgi.escape(setName, 1) or '',
+       setName and cgi.escape(cdr.toUnicode(setName), 1) or '',
        setDesc and cgi.escape(setDesc, 1) or '',
        setNotes and cgi.escape(setNotes, 1) or '',
        getSetMemberHtml(members),
@@ -390,14 +394,14 @@ def showForm(isNew, members = None):
        cdrcgi.SESSION,
        session,
        isNew,
-       setName and cgi.escape(setName, 1) or '')
+       setName and cgi.escape(cdr.toUnicode(setName), 1) or '')
     cdrcgi.sendPage(html)
 
 #----------------------------------------------------------------------
 # Edit an existing filter set.
 #----------------------------------------------------------------------
 if request == 'Edit':
-    filterSet = cdr.getFilterSet('guest', setName)
+    filterSet = cdr.getFilterSet('guest', cdr.toUnicode(setName))
     setDesc = filterSet.desc
     setNotes = filterSet.notes
     showForm('N', filterSet.members)
@@ -413,11 +417,13 @@ if request == 'New':
 #----------------------------------------------------------------------
 if doWhat == 'Delete':
     try:
-        cdr.delFilterSet(session, setName)
-    except Exception, args:
-        cdrcgi.bail("Failure deleting filter set", extra = args)
+        cdr.delFilterSet(session, cdr.toUnicode(setName))
+    except StandardError, args:
+        cdrcgi.bailnew("Failure deleting filter set", extra = args)
+    except UnicodeDecodeError, args:
+        cdrcgi.bail(u"Unicode decode error deleting filter set", args)
     except:
-        cdrcgi.bail("Unknown failure deleting filter set")
+        cdrcgi.bailnew("Unknown failure deleting filter set")
     cdrcgi.navigateTo("EditFilterSets.py", session)
 
 #----------------------------------------------------------------------
@@ -437,8 +443,10 @@ if doWhat == 'Save':
         newSet = cdr.FilterSet(newName, setDesc, setNotes, setMemberList)
         try:
             cdr.addFilterSet(session, newSet)
-        except Exception, args:
+        except StandardError, args:
             cdrcgi.bail("Failure adding new filter set", extra = args)
+        except UnicodeDecodeError, args:
+            cdrcgi.bail(u"Unicode decode error saving new filter set", args)
         except:
             cdrcgi.bail("Unknown failure adding new filter set")
         setName = newName
@@ -446,11 +454,14 @@ if doWhat == 'Save':
         oldSet = cdr.FilterSet(setName, setDesc, setNotes, setMemberList)
         try:
             cdr.repFilterSet(session, oldSet)
-        except Exception, args:
-            bail("Failure storing changes to filter set", args)
+        except StandardError, args:
+            bail(u"Failure storing changes to filter set", args)
+        except UnicodeDecodeError, args:
+            cdrcgi.bail(u"Unicode decode error updating filter set", args)
         except:
             cdrcgi.bail("Unknown failure storing changes to filter set")
-    filterSet = cdr.getFilterSet('guest', setName)
+
+    filterSet = cdr.getFilterSet('guest', cdr.toUnicode(setName))
     setDesc = filterSet.desc
     setNotes = filterSet.notes
     showForm('N', filterSet.members)

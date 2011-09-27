@@ -4,7 +4,10 @@
 #
 # Menu of existing filter sets.
 #
-# $Log: not supported by cvs2svn $
+# $Log: EditFilterSets.py,v $
+# Revision 1.5  2007/11/03 14:15:07  bkline
+# Unicode encoding cleanup (issue #3716).
+#
 # Revision 1.4  2004/05/11 17:33:18  bkline
 # Plugged in ShowFilterSets.py.
 #
@@ -123,7 +126,8 @@ form = u"""\
    <ul>
 """
 for row in rows:
-    name1 = urllib.quote_plus(row[0])
+    ### name1 = urllib.quote_plus(row[0])
+    name1 = urllib.quote_plus(row[0].encode('utf-8'))
     name2 = cgi.escape(row[0], 1)
     desc  = cgi.escape(row[1], 1).replace("'", "&apos;")
     form += u"""\
