@@ -6,20 +6,70 @@
 # information.
 #
 # BZIssue::4673 - Changes to PDQ Board Roster report.
+# BZIssue::5060 - [Summaries] Changes to Combined Board Roster Report
+#                 Adding summary sheet options to the program
 # 
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, cdrdb, re, time, operator
 import sys, ExcelWriter
+import lxml.html
+
+# ---------------------------------------------------------------------
+# Class to collect all of the information for a single board member
+# ---------------------------------------------------------------------
+class BoardMemberInfo:
+    def __init__(self, person, html):
+        self.boardMemberID  = person[0]
+        self.boardID   = person[1]
+        self.boardName = person[2]
+        self.startDate = person[3]
+        self.govEmpl   = person[5]
+        self.phone     = ''
+        self.fax       = ''
+        self.email     = ''
+
+        myHtml = lxml.html.fromstring(html)
+        self.boardMemberName = myHtml.find('b').text
+        table = myHtml.find('table')
+        try:
+            for element in table.iter():
+                if element.tag == 'phone':  
+                    self.phone = element.text
+                elif element.tag == 'fax':    
+                    self.fax   = element.text
+                elif element.tag == 'email':  
+                    self.email = element.text
+        except:
+            pass
+
 
 #----------------------------------------------------------------------
 # Set the form variables.
 #----------------------------------------------------------------------
 fields     = cgi.FieldStorage()
 boardType  = fields and fields.getvalue("board")  or None
-# boardId    = fields and fields.getvalue("board") or None
+sortType   = fields and fields.getvalue("sort")  or None
 otherInfo  = fields and fields.getvalue("oinfo") or 'Yes'
 assistant  = fields and fields.getvalue("ainfo") or 'Yes'
-flavor     = fields and fields.getvalue("sheet") or 'full'
+flavor     = fields and fields.getvalue("sheet") and 'summary' or 'full'
+#if flavor == 'on':  flavor == 'summary'
+boardInfo  = fields and fields.getvalue("binfo") and 'Yes' or 'No' 
+phoneInfo  = fields and fields.getvalue("pinfo") and 'Yes' or 'No'
+faxInfo    = fields and fields.getvalue("finfo") and 'Yes' or 'No'
+emailInfo  = fields and fields.getvalue("einfo") and 'Yes' or 'No'
+cdrIDInfo  = fields and fields.getvalue("cinfo") and 'Yes' or 'No'
+dateInfo   = fields and fields.getvalue("dinfo") and 'Yes' or 'No'
+geInfo     = fields and fields.getvalue("govemp") and 'Yes' or 'No'
+blank      = fields and fields.getvalue("blank") and 'Yes' or 'No'
+
+# List to define the column headings and identify which columns to be
+# displayed
+# -------------------------------------------------------------------
+columns = [('Board Name',boardInfo), 
+           ('Phone', phoneInfo), ('Fax', faxInfo), 
+           ('Email', emailInfo), ('CDR-ID', cdrIDInfo), 
+           ('Start Date', dateInfo), ('Gov. Empl', geInfo), ('Blank', blank)]
+
 rptType    = fields and fields.getvalue("rpttype") or 'html'
 session    = cdrcgi.getSession(fields)
 request    = cdrcgi.getRequest(fields)
@@ -29,14 +79,63 @@ script     = u"BoardRosterFull.py"
 SUBMENU    = u"Report Menu"
 buttons    = ("Submit", SUBMENU, cdrcgi.MAINMENU)
 header     = cdrcgi.header(title, title, instr, script, buttons, 
-                           method = 'GET')
+                           method = 'GET',
+                           stylesheet = """
+    <script type='text/javascript'>
+     function doSummarySheet(box) {
+         if (box == 'summary')
+             {
+             if (document.getElementById('summary').checked == true)
+                 {
+                 document.getElementById('summary').checked = true;
+                 }
+             else
+                 {
+                 document.getElementById('summary').checked = false;
+                 }
+             }
+         else
+             {
+             document.getElementById('summary').checked = true;
+             }
+
+         /*
+         document.getElementById('contact').checked   = false;
+         document.getElementById('assistant').checked = false;
+         document.getElementById('subgroup').checked  = false;
+         */
+         var form = document.forms[0];
+         {
+             form.sheet.value = form.sheet.checked ? 'summary' : 'full';
+             form.binfo.value = form.binfo.checked ? 'Yes' : 'No';
+             form.pinfo.value = form.pinfo.checked ? 'Yes' : 'No';
+             form.finfo.value = form.finfo.checked ? 'Yes' : 'No';
+             form.einfo.value = form.einfo.checked ? 'Yes' : 'No';
+             form.cinfo.value = form.cinfo.checked ? 'Yes' : 'No';
+             form.dinfo.value = form.dinfo.checked ? 'Yes' : 'No';
+             form.blank.value = form.blank.checked ? 'Yes' : 'No';
+             form.govemp.value = form.govemp.checked ? 'Yes' : 'No';
+         }
+     }
+    </script>
+    <style type="text/css">
+     td       { font-size: 12pt; }
+     .label   { font-weight: bold; }
+     .label2  { font-size: 11pt;
+                font-weight: bold; }
+     .select:hover { background-color: #FFFFCC; }
+     .grey    {background-color: #BEBEBE; }
+     .topspace { margin-top: 24px; }
+
+    </style>
+""")
 
 dateString = time.strftime(u"%B %d, %Y")
 
 filterType= {'summary':'name:PDQBoardMember Roster Summary',
              'excel'  :'name:PDQBoardMember Roster Excel',
              'full'   :'name:PDQBoardMember Roster'}
-allRows   = []
+#allRows   = []
 
 #----------------------------------------------------------------------
 # Handle navigation requests.
@@ -54,6 +153,17 @@ try:
     cursor = conn.cursor()
 except cdrdb.Error, info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
+
+# ---------------------------------------------------------------------
+# Counting how many columns are to be printed. We need to know this
+# value for the colspan attribute of the table to be created.
+# ---------------------------------------------------------------------
+def countCols(cols):
+    k = 0
+    for header, display in cols:
+        if display == 'Yes': k += 1
+    return k
+
 
 #----------------------------------------------------------------------
 # Look up title of a board, given its ID.
@@ -105,7 +215,52 @@ SELECT DISTINCT board.id, board.title
 
 
 # -------------------------------------------------
-# Create the table row for the table output
+# Create the table row for a specific person
+# -------------------------------------------------
+def addTableRow(person, columns):
+    tableRows = {}
+    for colHeader, colDisplay in columns:
+        if colHeader == 'Board Name': 
+            tableRows[colHeader] = person.boardName 
+        elif colHeader == 'Phone':
+            tableRows[colHeader] = person.phone 
+        elif colHeader == 'Fax':
+            tableRows[colHeader] = person.fax 
+        elif colHeader == 'Email':
+            tableRows[colHeader] = person.email 
+        elif colHeader == 'CDR-ID':
+            tableRows[colHeader] = person.boardMemberID 
+        elif colHeader == 'Start Date':
+            tableRows[colHeader] = person.startDate 
+        elif colHeader == 'Gov. Empl':
+            tableRows[colHeader] = person.govEmpl 
+        elif colHeader == 'Blank':
+            tableRows[colHeader] = ''
+
+    htmlRow = u"""\
+       <tr>
+        <td>%s</td>""" % person.boardMemberName
+
+    for colHeader, colDisplay in columns:
+        if colDisplay == 'Yes' and colHeader == 'Email':
+            htmlRow += u"""
+        <td class="email">
+         <a href="mailto:%s">%s</a>
+        </td>""" % (tableRows[colHeader], tableRows[colHeader])
+        elif colDisplay == 'Yes' and colHeader == 'Blank':
+            htmlRow += u"""
+        <td class="blank">&nbsp;</td>"""
+        elif colDisplay == 'Yes':
+            htmlRow += u"""
+        <td>%s</td>""" % tableRows[colHeader]
+
+    htmlRow += u"""
+       </tr>"""
+    return htmlRow
+
+
+# -------------------------------------------------
+# Create the row for the Excel output
 # -------------------------------------------------
 def addExcelTableRow(person):
     """Return the Excel code to display a row of the report"""
@@ -143,6 +298,99 @@ if not boardType:
         </SELECT>
         </TD>
        </TR>
+       <TR>
+        <TD ALIGN='right'><B>Sort report by:&nbsp;</B></TD>
+        <TD>
+        <SELECT NAME='sort'>
+        <OPTION SELECTED value='Member'>Member Name</OPTION>
+        <OPTION value='Board'>Member Name (group by Board)</OPTION>
+        </SELECT>
+        </TD>
+       </TR>
+
+   <tr>
+    <td colspan="2">
+     <div style="height: 10px"> </div>
+    </td>
+   </tr>
+   <tr>
+    <td> </td>
+    <td class="grey">
+     <div style="height: 10px"> </div>
+     <input TYPE='checkbox' NAME='sheet' id='summary'
+            onclick='javascript:doSummarySheet("summary")'>
+      <label for="summary" class="select">
+       <strong>Create Summary Sheet</strong>
+      </label>
+     <table>
+      <tr>
+       <th><span style="margin-left: 20px"> </span></th>
+       <th class="label2">Include Columns</th>
+      <tr>
+       <td><span style="margin-left: 20px"> </span></td>
+       <td class="select">
+        <input type='checkbox' name='binfo' 
+               onclick='javascript:doSummarySheet()' id='E1' CHECKED>
+        <label for="E1">Board Name</label>
+       </td>
+      </tr>
+      <tr>
+       <td><span style="margin-left: 20px"> </span></td>
+       <td class="select">
+        <input type='checkbox' name='pinfo' 
+               onclick='javascript:doSummarySheet()' id='E2' CHECKED>
+        <label for="E2">Phone</label>
+       </td>
+      </tr>
+      <tr>
+       <td> </td>
+       <td class="select">
+        <input type='checkbox' name='finfo' 
+               onclick='javascript:doSummarySheet()' id='E3'>
+        <label for="E3">Fax</label>
+       </td>
+      </tr>
+      <tr>
+       <td> </td>
+       <td class="select">
+        <input type='checkbox' name='einfo' 
+               onclick='javascript:doSummarySheet()' id='E4'>
+        <label for="E4">Email</label>
+       </td>
+      </tr>
+      <tr>
+       <td> </td>
+       <td class="select">
+        <input type='checkbox' name='cinfo' 
+               onclick='javascript:doSummarySheet()' id='E5'>
+        <label for="E5">CDR-ID</label>
+       </td>
+      </tr>
+      <tr>
+       <td> </td>
+       <td class="select">
+        <input type='checkbox' name='dinfo' 
+               onclick='javascript:doSummarySheet()' id='E6'>
+        <label for="E6">Start Date</label>
+       </td>
+      </tr>
+      <tr>
+       <td> </td>
+       <td class="select">
+        <input type='checkbox' name='govemp' 
+               onclick='javascript:doSummarySheet()' id='E7'>
+        <label for="E7">Government Employee</label>
+       </td>
+      </tr>
+      <tr>
+       <td> </td>
+       <td class="select">
+        <input type='checkbox' name='blank' 
+               onclick='javascript:doSummarySheet()' id='E8'>
+        <label for="E8">Blank Column</label>
+       </td>
+      </tr>
+
        </TABLE>
       </FORM>
      </BODY>
@@ -162,7 +410,7 @@ boardIds  = allBoards.keys()
 try:
     cursor.execute("""\
  SELECT DISTINCT member.doc_id, member.int_val,
-                 term_start.value, person_doc.title
+                 term_start.value, person_doc.title, ge.value
             FROM query_term member
             JOIN query_term curmemb
               ON curmemb.doc_id = member.doc_id
@@ -171,6 +419,9 @@ try:
               ON person.doc_id = member.doc_id
             JOIN document person_doc
               ON person_doc.id = person.doc_id
+            JOIN query_term ge
+              ON ge.doc_id = person_doc.id
+             AND ge.path = '/PDQBoardMemberInfo/GovernmentEmployee'
  LEFT OUTER JOIN query_term term_start
               ON term_start.doc_id = member.doc_id
              AND LEFT(term_start.node_loc, 4) = LEFT(member.node_loc, 4)
@@ -187,21 +438,27 @@ try:
            ORDER BY member.int_val""" % 
                       ", ".join(["%s" % x for x in boardIds]), timeout = 300)
     rows = cursor.fetchall()
+    cursor.close()
     boardMembers = []
 
-    for docId, boardId, term_start, name in rows:
+    for docId, boardId, term_start, name, ge in rows:
         boardName = getBoardName(boardId)
-        boardMembers.append([docId, boardId, boardName, term_start, name])
+        boardMembers.append([docId, boardId, boardName, term_start, name, ge])
 
 except cdrdb.Error, info:
     cdrcgi.bail('Database query failure: %s' % info[1][0])
 
 # Sorting the list alphabetically by board member
+# or by board member grouped by board name
 # -----------------------------------------------
-getcount = operator.itemgetter(4)
-sortedMembers = sorted(boardMembers, key=getcount)
+if sortType == 'Member':
+    getcount = operator.itemgetter(4)
+    sortedMembers = sorted(boardMembers, key=getcount)
+else:
+    sortedMembers = sorted(boardMembers, key=operator.itemgetter(2, 4))
 
 # We're creating two flavors of the report here: excel and html
+# (but users decided later not to use the Excel report anymore)
 # -------------------------------------------------------------
 if rptType == 'html':
     # ---------------------------------------------------------------
@@ -249,16 +506,57 @@ if rptType == 'html':
        .phone, .email, .fax, .cdrid
                 { vertical-align: top; }
        .blank   { width: 100px; }
+       .bheader { font-family: Arial, sans-serif; 
+                  font-size: 14pt;
+                  font-weight: bold; }
        #main    { font-family: Arial, Helvetica, sans-serif;
                   font-size: 12pt; }
       </STYLE>
      </HEAD>  
      <BODY id="main">
        <H1>All %s Boards<br>
-       <span style="font-size: 12pt">%s</span></H1>
-    """ % (boardType, boardType, dateString)   
+    """ % (boardType, boardType)   
 
+    # Adjusting the report title depending on the input values
+    # --------------------------------------------------------
+    if sortType == 'Member':
+        html += u"""
+       <span style="font-size: 12pt">by Member</span><br>
+    """
+    else:
+        html += u"""
+       <span style="font-size: 12pt">by Board and Member</span><br>
+    """
+    html += u"""
+       <span style="font-size: 12pt">%s</span></H1>
+    """ % (dateString)   
+
+    boardTitle = None
+    lastBoardTitle = None
+
+    # Need to create the table wrapper for the summary sheet
+    # We always print at least the board member name as a column
+    # -----------------------------------------------------------
+    if flavor == 'summary':
+        html += u"""
+      <table id="summary" cellspacing="0" cellpadding="5">
+       <tr class="theader">
+        <th class="thcell">Name</th>"""
+
+        # Add column headings
+        # -------------------
+        for colHeader, colDisplay in columns:
+            if colDisplay == 'Yes':
+                html += u"""
+        <th class="thcell">%s</th>""" % colHeader
+        html += """
+       </tr>
+"""
+
+    # Loop through the list of sorted members to get the address info
+    # ---------------------------------------------------------------
     for boardMember in sortedMembers:
+        boardTitle = boardMember[2]
         response = cdr.filterDoc('guest',
                                  ['set:Denormalization PDQBoardMemberInfo Set',
                                   'name:Copy XML for Person 2',
@@ -277,12 +575,64 @@ if rptType == 'html':
         # MS-Word.
         # -----------------------------------------------------------
         if flavor == 'full':
-            html += u"""
-            <table width='100%%'>
-             <tr>
-              <td>%s<span style="font-style: italic">%s</span><br><br><td>
-             </tr>
-            </table>""" % (unicode(response[0], 'utf-8'), boardMember[2])
+            # If we're grouping by board we need to display the board name
+            # as a title.
+            # ------------------------------------------------------------
+            if not sortType == 'Member' and not lastBoardTitle == boardTitle:
+                html += u"""
+            <br>
+            <span class="bheader">%s</span>
+            <br>
+            """ % (boardTitle)
+
+            # If we're not grouping by board we need to print the board for
+            # each board member
+            # -------------------------------------------------------------
+            if sortType == 'Member':
+                html += u"""
+                <table width='100%%'>
+                 <tr>
+                  <td>%s<span style="font-style: italic">%s</span><br><br><td>
+                 </tr>
+                </table>""" % (unicode(response[0], 'utf-8'), boardMember[2])
+            else:
+                html += u"""
+                <table width='100%%'>
+                 <tr>
+                  <td>%s<br><td>
+                 </tr>
+                </table>""" % (unicode(response[0], 'utf-8'))
+            lastBoardTitle = boardTitle
+
+        # Creating the Summary sheet output
+        # ---------------------------------
+        else:
+            memberInfo = BoardMemberInfo(boardMember, response[0])
+
+            # If we're grouping by board we need to display the board name
+            # as an individuel row in the table
+            # ------------------------------------------------------------
+            if not sortType == 'Member' and not lastBoardTitle == boardTitle:
+                html += u"""
+            <tr>
+             <td class="theader" colspan="%d">
+              <b>%s</b>
+             </td>
+            </tr>
+            """ % (countCols(columns) + 1, boardTitle)
+            #if sortType == 'Member':
+            html += u"""%s
+            """ % (addTableRow(memberInfo, columns))
+            #else:
+            #    html += u"""%s
+            #""" % (addTableRow(memberInfo, columns))
+
+            lastBoardTitle = boardTitle
+
+    # Need to end the table wrapper for the summary sheet
+    # ------------------------------------------------------
+    if not flavor == 'full':
+        html += u"""      </table>"""
 
     html += u"""
       <br>
@@ -353,8 +703,7 @@ elif rptType == 'excel':
     ws.addCol( 5, 100)
     ws.addCol( 6, 100)
 
-    # Create selection criteria for English/Spanish
-    # and the boards
+    # Set the report headers and starting cell IDs
     # ---------------------------------------------
     boards = []
     iboard = 0
