@@ -338,7 +338,7 @@ if not boardType:
        <td><span style="margin-left: 20px"> </span></td>
        <td class="select">
         <input type='checkbox' name='pinfo' 
-               onclick='javascript:doSummarySheet()' id='E2' CHECKED>
+               onclick='javascript:doSummarySheet()' id='E2'>
         <label for="E2">Phone</label>
        </td>
       </tr>
