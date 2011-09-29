@@ -128,11 +128,11 @@ for choice in (
                       'Summaries Comprehensive Review Date Report'),
     ('SummaryDateLastModified.py', 'Summaries Date Last Modified' ),
     ('SummariesLists.py',          'Summaries Lists'              ),
+    ('SummariesWithMarkup.py',     'Summaries Markup Report'      ),
     ('SummaryMetaData.py',         'Summaries Metadata'           ),
     ('SummariesTocReport.py',      'Summaries TOC Lists'          ),
     ('SummariesWithProtocolLinks.py',      
                       'Summaries with Protocols Links/Refs Report'),
-    ('SummariesWithMarkup.py',     'Summaries with Markup Report' ),
     ('SummariesWithNonJournalArticleCitations.py',      
              'Summaries with Non-Journal Article Citations Report')
     ):
@@ -150,6 +150,7 @@ for choice in (
     ('QcReport.py',                'Board Member Information QC Report'  ),
     ('BoardRoster.py',             'Board Roster Reports'                ),
     ('BoardRosterFull.py',         'Board Roster Reports (Combined)'     ),
+    ('BoardInvitationHistory.py',  'Invitation History Report'           ),
     ('PdqBoards.py',               'PDQ Board Members and Topics'        )
     ):
     form += """\
