@@ -2,12 +2,14 @@
 #
 # $Id$
 #
-# Transform a CDR document using an XSL/T filter and send it back to 
+# Transform a CDR document using an XSL/T filter and send it back to
 # the browser.
 #
 # BZIssue::4781 - Have certain links to unpublished docs ignored
 # BZIssue::5053 - [Summaries] Pub Preview Error
+# BZIssue::5113 - Modifying PublishPreview to Work with WCMS Release 6.3
 #
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Revision 1.39  2008/11/20 22:44:44  venglisc
 # Modified the code to display the exception returned by Cancer.gov if a
 # document fails to be processed.  This will help programmers to identify
@@ -178,9 +180,6 @@ else:
 #----------------------------------------------------------------------
 if cgHost:
     cdr2gk.host = cgHost
-    # Temporary fix for Protocol_Patient PP
-    ##if flavor == 'Protocol_Patient':
-    ##    cdr2cg.host = cgHost
 
 #----------------------------------------------------------------------
 # Debugging output.
@@ -196,8 +195,8 @@ showProgress("Started...")
 #----------------------------------------------------------------------
 filterSets = {
     'CTGovProtocol'         : ['set:Vendor CTGovProtocol Set'],
-    'DrugInformationSummary': ['set:Vendor DrugInfoSummary Set'], 
-    'GlossaryTerm'          : ['set:Vendor GlossaryTerm Set'], 
+    'DrugInformationSummary': ['set:Vendor DrugInfoSummary Set'],
+    'GlossaryTerm'          : ['set:Vendor GlossaryTerm Set'],
     'GlossaryTermName'      : ['set:Vendor GlossaryTerm Set'],
     'InScopeProtocol'       : ['set:Vendor InScopeProtocol Set'],
     'Person'                : ['set:Vendor GeneticsProfessional Set'],
@@ -219,7 +218,7 @@ except cdrdb.Error, info:
 #----------------------------------------------------------------------
 # We are covering three situations here.
 # a) No Version parameter is given
-#    The original behavior will be performed, namely to display the 
+#    The original behavior will be performed, namely to display the
 #    latest publishable version of the document if it exists.
 # b) The Version parameter is set to 'cwd'
 #    The current working document will be displayed
@@ -239,7 +238,7 @@ try:
           JOIN document
             ON document.doc_type = doc_type.id
          WHERE document.id = ?""", (intId,))
-    
+
     row = cursor.fetchone()
     if not row:
         cdrcgi.bail("Unable to find specified document %s" % docId)
@@ -255,7 +254,7 @@ try:
               FROM query_term
              WHERE path = '/Person/ProfessionalInformation' +
                           '/GeneticsProfessionalDetails'    +
-                          '/AdministrativeInformation'      +  
+                          '/AdministrativeInformation'      +
                           '/Directory/Include'
                AND doc_id = ?""", (intId,))
         row = cursor.fetchone()
@@ -291,14 +290,14 @@ try:
     else:
         docVer = None
 
-except cdrdb.Error, info:    
-        cdrcgi.bail('Failure finding specified version for %s: %s' % (docId, 
+except cdrdb.Error, info:
+        cdrcgi.bail('Failure finding specified version for %s: %s' % (docId,
                                                                  info[1][0]))
 showProgress("Fetched document version: %s..." % row[0])
 
 # Note: The values for flavor listed here are not the only values possible.
 #       These values are the default values but XMetaL macros may pass
-#       additional values for the flavor attribute. 
+#       additional values for the flavor attribute.
 #       Currently, the additional values are implemented:
 #         Protocol_Patient
 #         Summary_Patient       (unused)
@@ -326,11 +325,9 @@ showProgress("Preserving links: %s..." % preserveLnk)
 #----------------------------------------------------------------------
 if not filterSets.has_key(docType):
     cdrcgi.bail("Don't have filters set up for %s documents yet" % docType)
-doc = cdr.filterDoc(session, filterSets[docType], docId = docId, 
+doc = cdr.filterDoc(session, filterSets[docType], docId = docId,
                     parm = [['isPP', 'Y']], docVer = docVer)
 
-#print docId, docVer, flavor, docType
-#print '*****************************************'
 if type(doc) == type(()):
     doc = doc[0]
 showProgress("Document filtering complete...")
@@ -347,23 +344,23 @@ try:
     showProgress("Submitting request to Cancer.gov...")
     resp = cdr2gk.pubPreview(doc, flavor)
     showProgress("Response received from Cancer.gov...")
+    #fp = open('d:/home/venglisch/temp/pp_GK.html', 'w')
+    #fp.write(resp.xmlResult)
+    #fp.close()
 except:
-    cdrcgi.bail(str(cdr2gk.pubPreview(doc, flavor)))
-
-#doc = cdrcgi.decode(doc)
-#doc = re.sub("@@DOCID@@", docId, doc)
+    cdrcgi.bail('Error in PubPreview: ' + str(cdr2gk.pubPreview(doc, flavor)))
 
 #----------------------------------------------------------------------
 # Show it.
 #----------------------------------------------------------------------
 showProgress("Done...")
-showProgress("\nContinue with local substitutions...")
+showProgress("Continue with local substitutions...")
 
 # The output from Cancer.gov is modified to add the CDR-ID to the title
-# We are also adding a style to work around a IE6 bug that causes the 
+# We are also adding a style to work around a IE6 bug that causes the
 # document printed to be cut of on the right by shifting the entire
 # document to the left
-# We also need to modify the image links so that they are pulled from 
+# We also need to modify the image links so that they are pulled from
 # the CDR server.
 # ---------------------------------------------------------------------
 
@@ -376,9 +373,9 @@ html = pattern3.sub('<title>Publish Preview: CDR%s' % intId, resp.xmlResult)
 
 # Fix the print out so that it's not cut off in IE6
 # -------------------------------------------------
-showProgress("Including IE6 CSS...")
-pattern4 = re.compile('</head>', re.DOTALL)
-html = pattern4.sub('\n<!--[if IE 6]>\n<link rel="stylesheet" type="text/css" media="print" href="/stylesheets/ppprint.css">\n<![endif]-->\n</head>\n', html)
+# showProgress("Including IE6 CSS...")
+# pattern4 = re.compile('</head>', re.DOTALL)
+# html = pattern4.sub('\n<!--[if IE 6]>\n<link rel="stylesheet" type="text/css" media="print" href="/stylesheets/ppprint.css">\n<![endif]-->\n</head>\n', html)
 
 
 # Parsing HTML document in order to manipulate links within the doc
@@ -389,23 +386,52 @@ url = "http://%s.%s/" % (cdr.PUB_NAME, cdr.DOMAIN_NAME)
 #myHtml.make_links_absolute(url)
 
 # Removing the hostname from the fragment links to create a local
-# anchor target (Example: #Section_50).  This allows links within 
+# anchor target (Example: #Section_50).  This allows links within
 # the document to work properly (SummaryFragmentRefs).
-# Other links are deactivated (Glossary, Summary) so that the 
+# Other links are deactivated (Glossary, Summary) so that the
 # user isn't constantly bringing up an error page.
 # ---------------------------------------------------------------
+### preserveLnk = True ###
 if not preserveLnk:
     showProgress("Converting local links...")
     #myRefs = myHtml.cssselect('a.SummaryRef')
     # Make the internal links clickable
-    for x in myHtml.cssselect('a.SummaryRef'):
-        link = x.get('href')
-        if link.find('#') > 0:
-           newLink = '#%s' % link.split('#')[1]
-           x.set('href', newLink)
+    #for x in myHtml.cssselect('a.SummaryRef'):
+    #    link = x.get('href')
+    #    if link.find('#') > 0:
+    #       newLink = '#%s' % link.split('#')[1]
+    #       x.set('href', newLink)
+    #    else:
+    #       x.set('onclick', 'return false')
+
+    # Modify SummaryRef links
+    # These links are identified by the inlinetype attribute
+    # ------------------------------------------------------
+    for x in myHtml.xpath('//a[@inlinetype = "SummaryRef"]'):
+        # The SummaryRef links don't contain an href attribute
+        # because Percussion isn't able to add this to the PP
+        # output.  Without the href attribute the text is not
+        # displayed as an anchor (underlined).  Setting an
+        # empty href to satisfy the display style
+        # ----------------------------------------------------
+        if not 'href' in x.attrib:
+            x.set('href', '')
+            link  = '/cgi-bin/cdr/PublishPreview.py?Session=guest'
+            link += '&DocId=%s' % x.get('objectid')
+            x.set('href', link)
+            #x.attrib['href'] = ''
+        # Those links that do contain a link need to be modified
+        # to only display the ID (or NAME) target.
+        # With this change the local links will work.
+        # ------------------------------------------------------
         else:
-           x.set('onclick', 'return false')
-    
+            link = x.get('href')
+            if link.find('#') > 0:
+               newLink = '#%s' % link.split('#')[1]
+               x.set('href', newLink)
+            else:
+               x.set('onclick', 'return false')
+
     # Redirect the audio files to the local server to ensure that
     # new (not yet published) audio files can be previewed
     # -----------------------------------------------------------
@@ -416,40 +442,46 @@ if not preserveLnk:
         media.set('href', mediaUrl)
 
     # Make the Glossary links dead
+    # Glossary links are identified by this specific class
+    # ----------------------------------------------------
     for gloss in myHtml.cssselect('a.Summary-GlossaryTermRef'):
         gloss.set('href', '')
         gloss.set('onclick', 'return false')
 else:
     showProgress("Preserving original links...")
 
-html = lxml.html.tostring(myHtml)
-
+html = lxml.html.tostring(myHtml.getroottree())
 
 # Replace the image links for the popup boxes to point to our production
 # server if running in production
 # --------------------------------------------------------------------------
 if html.find('gatekeeper.cancer.gov') == -1:
     pp_host = cdr.DEV_HOST
+    import socket
+    if socket.gethostname().upper() == 'FRANCK':
+        pp_host = 'franck.nci.nih.gov'
 else:
     pp_host = cdr.PROD_HOST
 
 pattern6 = re.compile(
        'imageName=http://mahler.nci.nih.gov/cgi-bin/cdr/GetCdrImage')
 html = pattern6.sub(
-       'imageName=http://%s/cgi-bin/cdr/GetCdrImage' % 
+       'imageName=http://%s/cgi-bin/cdr/GetCdrImage' %
        pp_host, html)
 
-# We need slightly different patterns depending if we're receiving a 
+# We need slightly different patterns depending if we're receiving a
 # summary or a glossary document
 # ---------------------------------------------------------------------
-if html.find('class="document-title">Dictionary of Cancer Terms') == -1:
-    pattern7 = re.compile(
-               'src="http://mahler.nci.nih.gov/cgi-bin/cdr/GetCdrImage')
-else:  # for Glossary PP
-    pattern7 = re.compile(
-               '  src="http://mahler.nci.nih.gov/cgi-bin/cdr/GetCdrImage')
+#if html.find('class="document-title">Dictionary of Cancer Terms') == -1:
+#if html.find('<h1>Dictionary of Cancer Terms') == -1:
+#    pattern7 = re.compile(
+#               'src="http://mahler.nci.nih.gov/cgi-bin/cdr/GetCdrImage')
+#else:  # for Glossary PP
+#    pattern7 = re.compile(
+#               '  src="http://mahler.nci.nih.gov/cgi-bin/cdr/GetCdrImage')
+pattern7 = re.compile(
+           'src="http://mahler.nci.nih.gov/cgi-bin/cdr/GetCdrImage')
 html = pattern7.sub(
-       '  src="http://%s/cgi-bin/cdr/GetCdrImage' % 
-       pp_host, html)
+           'src="http://%s/cgi-bin/cdr/GetCdrImage' % pp_host, html)
 
 cdrcgi.sendPage("%s" % html.decode('utf-8'))
