@@ -1134,7 +1134,7 @@ def getTitleText(nodelist):
         if node.nodeType == node.TEXT_NODE:
             rc = rc + node.data
         elif node.nodeType == node.ELEMENT_NODE:
-            rc = getText(node.childNodes)
+            rc = getTitleText(node.childNodes)
     return rc
 
 
