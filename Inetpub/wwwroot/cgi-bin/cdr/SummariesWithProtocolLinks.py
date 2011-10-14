@@ -6,6 +6,7 @@
 #
 # BZIssue::4744 - Modify Summaries with Protocol Links/Refs report
 # BZIssue::4865 - Summaries with Protocol Links/Refs report bug 
+# BZIssue::5120 - Missing Text from protocol ref report
 #
 #----------------------------------------------------------------------
 import sys, cgi, cdr, cdrcgi, re, string, cdrdb, time, ExcelWriter
@@ -38,11 +39,12 @@ buttons     = (SUBMENU, cdrcgi.MAINMENU)
 #---------------------------
 # DEBUG SETTINGS
 #---------------------------
-#lang = 'English'
-#groups.append('Adult Treatment')
-#statuses.append('Completed')
-#statuses.append('Closed')
-#session   = '4C7D1879-3E134E-107-RX5X92W21575'
+# lang = 'English'
+# groups.append('Genetics')
+# statuses.append('Completed')
+# statuses.append('Closed')
+# session   = 'guest'
+# docId = 62855
 #----------------------------------------------------------------------
 # Class to collect all information related to a single ProtocolRef/Link
 # element.
@@ -1110,11 +1112,30 @@ def checkChildren(cdrid,parentElem,lastSECTitle):
             elif nodeName == 'Title':
                 if parentNodeName == 'SummarySection':
                     for chNode in node.childNodes:
-                        if chNode.nodeType == xml.dom.minidom.Node.TEXT_NODE:
-                            lastSECTitle = chNode.nodeValue
+                        lastSECTitle = getTitleText(node.childNodes)
             
         checkChildren(cdrid,node,lastSECTitle)
     return
+
+
+# -------------------------------------------------------------------------
+# Extract the text content of the node and concatenate as a single string
+# This only gets the text of the next element but that's OK since the title
+# does not have a deeper node structure:
+#   <Title><GeneName>BRCA1</GeneName> works well with 
+#          <GeneName>BRC2</GeneName></Title>
+# But this will not work:
+#   <Title><GeneName>BRCA<sup>1</sup></GeneName> works well with 
+#          <GeneName>BRC<sup>2</sup></GeneName></Title>
+# -------------------------------------------------------------------------
+def getTitleText(nodelist):
+    rc = u""
+    for node in nodelist:
+        if node.nodeType == node.TEXT_NODE:
+            rc = rc + node.data
+        elif node.nodeType == node.ELEMENT_NODE:
+            rc = getText(node.childNodes)
+    return rc
 
 
 # ------------------------------------------------------
