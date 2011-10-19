@@ -2,7 +2,6 @@
 #
 # $Id$
 #
-# $Log: not supported by cvs2svn $
 # Revision 1.1  2004/07/13 18:08:27  bkline
 # Show all filter sets.
 #
@@ -117,7 +116,10 @@ for set in sets:
     setDict[set.name] = filterSet
 keys = setDict.keys()
 keys.sort()
-report = """\
+
+# Creating the HTML output page
+# -----------------------------
+report = u"""\
 <html>
  <head>
   <title>CDR Filter Sets</title>
@@ -143,13 +145,20 @@ report = """\
   <h1>CDR Filter Sets</h1>
   <ul>
 """
+
+# Adding the individual filters with their members
+# ------------------------------------------------
 for key in keys:
     report += showFilterSet(setDict[key], key)
-report += """\
+
+# Adding the HTML footer to the output
+# ------------------------------------
+report += u"""\
   </ul>
  </body>
 </html>"""
-print """\
-Content-type: text/html
-
-""" + report
+#print """\
+#Content-type: text/html
+#
+#""" + report
+cdrcgi.sendPage(report)
