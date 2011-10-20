@@ -2,11 +2,30 @@
 #
 # $Id$
 #
-# Summary list of published clinical trial results by CTEP ID.
+# Summary list of published clinical trial results by CTEP ID or by
+# PubMed ID.  Can be invoked with one of two parameters, named ctepid
+# and pmid.  For example:
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.1  2009/08/10 16:21:28  bkline
-# Summary list of published clinical trial results by CTEP ID.
+# http://bach.nci.nih.gov/cgi-bin/cdr/GetPubResults.py?ctepid=17
+# http://bach.nci.nih.gov/cgi-bin/cdr/GetPubResults.py?pmid=11685731
+#
+# In either case the response will contain an XML document whose top
+# level element is PubmedArticleSet, with zero or more PubmedArticle
+# child elements, using the structures specified in NLM's PUBMED DTD.
+# If the ctepid parameter is used and no trial is found with that ID
+# the service will return an XML document with a single Failure element
+# whose text content is "No trial found for CTEP ID <parameter value>."
+# Similarly if the pmid parameter is supplied with a value for which
+# a Citation document cannot be found, a Failure element will be
+# returned with the text content "No citation found for PMID <value>."
+#
+# This is one of a set of three services implemented for CTEP.  See
+# also:
+#   TrialsWithResults.py
+#   LookupNctId.py
+#
+# BZIssue::1408
+# BZIssue::1579
 #
 #----------------------------------------------------------------------
 import cdr, cdrdb, cgi, re, time, os, xml.dom.minidom, sys
