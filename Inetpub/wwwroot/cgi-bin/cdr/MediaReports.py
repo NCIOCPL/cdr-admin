@@ -2,23 +2,9 @@
 #
 # $Id$
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.5  2008/04/25 02:26:09  ameyer
-# Added menu entry for MediaCaptionContent.py.
-#
-# Revision 1.4  2007/05/18 20:18:29  venglisc
-# Added new menu item for Linked Media Documents report. (Bug 3226)
-#
-# Revision 1.3  2006/05/08 18:18:40  bkline
-# Added Media Tracking Report, and some rewording (at Margaret's request);
-# see request 2135.
-#
-# Revision 1.2  2006/05/04 14:04:56  bkline
-# Added MediaSearcy.py.
-#
-# Revision 1.1  2005/05/04 18:14:01  venglisc
-# Inintial version of Media Reports Menu page of the Admin interface.
-# (Bug 1653)
+# BZIssue::1653
+# BZIssue::2135
+# BZIssue::3226
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
@@ -85,6 +71,20 @@ for choice in(
     form += """
     <LI><a href='%s/%s&%s'>%s</a></LI>""" % (cdrcgi.BASE, choice[0],
                                               session, choice[1])
+form += """\
+   </OL>
+
+   <H3>Other Reports</H3>
+   <OL>"""
+
+for choice in (
+    ('PronunciationRecordings.py?',
+     'Audio Pronunciation Recordings Tracking Report'),
+    ):
+    form += """\
+    <LI><a href='%s/%s&%s'>%s</a></LI>""" % (cdrcgi.BASE, choice[0],
+                                             session, choice[1])
+
 footer = """
    </OL>
   </FORM>
