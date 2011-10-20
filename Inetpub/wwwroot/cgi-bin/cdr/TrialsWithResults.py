@@ -2,11 +2,44 @@
 #
 # $Id$
 #
-# Summary list of published clinical trial results by CTEP ID.
+# Summary list of published clinical trial results by CTEP ID.  This
+# is one of three services provided for CTEP.  This service requires
+# no parameters, and returns a single XML response document in the form:
 #
-# $Log: not supported by cvs2svn $
+#  <TrialsWithResults>
+#    <Trial ctepid='...'>
+#      <Article pmid='...' date='yyyy-mm-dd'/>
+#      <Article pmid='...' date='yyyy-mm-dd'/>
+#      :
+#      :
+#    </Trial>
+#    <Trial ctepid='...'>
+#      <Article pmid='...' date='yyyy-mm-dd'/>
+#      :
+#    </Trial>
+#      :
+#      :
+#  </TrialsWithResults>
+#
+# Program logic:
+#
+# 1. Collect all trials which have a CTEP ID
+# 2. Collect PubMed ID and date of last CDR version for all Citations
+# 3. For each trial from step 1:
+#    * If there is at least one PublishedResult or RelatedPublication:
+#      * Include the trial in the response, with its CTEP ID
+#      * For each PublishedResult or RelatedPublication article:
+#        * List the article's ID and date from step 2
+#
+# See also:
+#   GetPubResults.py
+#   LookupNctId.py
+#
+# BZIssue::1408
+# BZIssue::1579
+#
 #----------------------------------------------------------------------
-import cdr, cdrdb, re, time, os, xml.dom.minidom, sys
+import cdr, cdrdb, re
 
 class Citation:
     def __init__(self, id):
@@ -34,21 +67,6 @@ class Citation:
         if not rows:
             raise Exception("CDR%d: no PMID found" % id)
         self.pmid = rows[0]
-        return
-
-        dom = xml.dom.minidom.parseString(doc.xml)
-        for node in dom.documentElement.childNodes:
-            if node.nodeName == 'PubmedArticle':
-                self.pmid = Citation.extractPmid(node)
-        if not self.pmid:
-            raise Exception("CDR%d: no PMID found" % id)
-
-    def extractPmid(node):
-        for child in node.childNodes:
-            for grandchild in child.childNodes:
-                if grandchild.nodeName == 'PMID':
-                    return cdr.getTextContent(grandchild)
-    extractPmid = staticmethod(extractPmid)
 
 pattern = re.compile(r"[-\s]")
 conn = cdrdb.connect('CdrGuest')
@@ -100,7 +118,6 @@ cursor.execute("""\
                              FROM doc_version
                             WHERE id = cdr_id
                               AND num = ver)""")
-trials = {}
 citations = {}
 cursor.execute("SELECT cdr_id, pmid, ver_date FROM #pm_cites")
 rows = cursor.fetchall()
@@ -111,29 +128,33 @@ cursor.execute("""\
           FROM #ctep_trials t
           JOIN query_term c
             ON c.doc_id = t.cdr_id
-         WHERE c.path = '/InScopeProtocol/PublishedResults'
-                      + '/Citation/@cdr:ref'""")
+         WHERE c.path IN ('/InScopeProtocol/PublishedResults' +
+                          '/Citation/@cdr:ref',
+                          '/InScopeProtocol/RelatedPublications' +
+                          '/RelatedCitation/@cdr:ref')""")
 rows = cursor.fetchall()
-for trialId, citeId in rows:
-    trialId = trialId.strip()
+trialCitationSets = {}
+for ctepId, citeId in rows:
+    ctepId = ctepId.strip()
     if citeId in citations:
-        if trialId in trials:
-            trial = trials[trialId]
+        if ctepId in trialCitationSets:
+            trialCitationSet = trialCitationSets[ctepId]
         else:
-            trial = trials[trialId] = {}
-        trial[citeId] = True
-trialIds = trials.keys()
-trialIds.sort()
+            trialCitationSet = trialCitationSets[ctepId] = set()
+        trialCitationSet.add(citeId)
+ctepIds = trialCitationSets.keys()
+ctepIds.sort()
 lines = ["<TrialsWithResults>"]
-for trialId in trialIds:
-    citeIds = trials[trialId].keys()
+for ctepId in ctepIds:
+    citeIds = list(trialCitationSets[ctepId])
     citeIds.sort(lambda a,b: cmp(citations[a][0], citations[b][0]))
-    lines.append(" <Trial ctepid='%s'>" % trialId.strip())
+    lines.append(" <Trial ctepid='%s'>" % ctepId.strip())
     for citeId in citeIds:
         cite = citations[citeId]
         lines.append("  <Article pmid='%s' date='%s'/>" % (cite[0].strip(),
                                                            cite[1][:10]))
     lines.append(" </Trial>")
 lines.append("</TrialsWithResults>")
-sys.stdout.write("Content-type: text/xml\n\n")
-sys.stdout.write('\n'.join(lines) + '\n')
+print "Content-type: text/xml"
+print ""
+print '\n'.join(lines)
