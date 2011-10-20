@@ -7,7 +7,12 @@
 # containing the corresponding NCT ID if we find it, and the string
 # ID NOT FOUND if we don't.
 #
-# $Log: not supported by cvs2svn $
+# This is one of three services implemented for CTEP.  See also:
+#   TrialsWithResults.py
+#   GetPubResults.py
+#
+# BZIssue::1408
+#
 #----------------------------------------------------------------------
 import cdrdb, cgi, sys
 
