@@ -380,6 +380,9 @@ html = pattern3.sub('<title>Publish Preview: CDR%s' % intId, resp.xmlResult)
 
 # Parsing HTML document in order to manipulate links within the doc
 # -----------------------------------------------------------------
+#fp = open('d:/home/venglisch/temp/pp_before.html', 'w')
+#fp.write(resp.xmlResult.encode('utf-8'))
+#fp.close()
 myHtml = lxml.html.fromstring(html)
 
 url = "http://%s.%s/" % (cdr.PUB_NAME, cdr.DOMAIN_NAME)
@@ -450,7 +453,14 @@ if not preserveLnk:
 else:
     showProgress("Preserving original links...")
 
-html = lxml.html.tostring(myHtml.getroottree())
+# Without the include_meta_content_type parameter all meta elements
+# will be dropped from the head.
+# Using method = 'xml' because the document is defined as XHTML
+# -----------------------------------------------------------------
+html = lxml.html.tostring(myHtml.getroottree(),
+                          include_meta_content_type = True,
+                          encoding = 'utf-8',
+                          method = 'xml')
 
 # Replace the image links for the popup boxes to point to our production
 # server if running in production
