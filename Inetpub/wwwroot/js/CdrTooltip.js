@@ -1,5 +1,5 @@
 /*
- * $Id: CdrTooltip.js,v 1.1.1.1 2007-04-07 04:08:30 bkline Exp $
+ * $Id$
  *
  * Client-side code for displaying popup descriptions of indicators
  * and reforms used in the simulation.  Derived from the HTML pages

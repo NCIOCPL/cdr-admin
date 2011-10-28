@@ -1,12 +1,24 @@
 /*
- * $Id: CdrCalendar.js,v 1.1.1.1 2007-04-07 04:08:29 bkline Exp $
+ * $Id$
  *
  * Modeled after the calendar used in Django.
  *
- * $Log: not supported by cvs2svn $
- * Revision 1.1  2006/12/04 21:05:38  bkline
- * JavaScript calendar.
+ * JavaScript calendar.  In order to have a form field use the calendar
+ * widget, you need to load this script in your HTML header block,
+ * load the CdrCalendar.css rules, and attach the CdrDateField class
+ * to the input element for the field:
  *
+ * <html>
+ *  <head>
+ *   <link type='text/css' rel='stylesheet' href='/stylesheets/CdrCalendar.css'>
+ *   <script language='JavaScript' src='/js/CdrCalendar.js'></script>
+ *  </head>
+ *  <body>
+ *   <form ...>
+ *    <input class="CdrDateField" name=... />
+ *   </form>
+ *  </body>
+ * </html>
  */
 
 var CdrCalendar = {
@@ -28,18 +40,6 @@ var CdrCalendar = {
 
         field.title = "Click calendar to edit this field ...";
         // Don't want the user to edit the field directly.
-/*
-        if (CdrCalendar.ie) {
-            field.readOnly = "1";
-            // field.setAttribute('readonly', '1');
-            // field.disabled = "1";
-        }
-        else {
-            field.readOnly = "1";
-            //field.disabled = "1";
-            // field.setAttribute('disabled', '1');
-        }
-*/
         if (CdrCalendar.setReadOnly)
             field.readOnly = "1";
 
@@ -352,10 +352,14 @@ CdrCalendar.debugLog("n="+n+" n.nodeName="+n.nodeName+" n.scrollTop="+n.scrollTo
         CdrCalendar.cals[num].drawNextYear();
     },
     handleCalendarCallback: function(num) {
-        return "function(y, m, d) { CdrCalendar.fields[" + num +
-               "].value = CdrCalendar.makeIsoDate(y,m,d); " +
-               "document.getElementById(CdrCalendar.calBoxIdBase + " + num +
-               ").style.display='none'}";
+        return "function(y, m, d) {\n" +
+               "    var f = CdrCalendar.fields[" + num + "];\n" +
+               "    var i = CdrCalendar.calBoxIdBase + " + num + ";\n" +
+               "    var c = document.getElementById(i);\n" +
+               "    f.value = CdrCalendar.makeIsoDate(y,m,d);\n" +
+               "    if (f.onchange) f.onchange();\n" +
+               "    c.style.display = 'none';\n" +
+               "}\n";
     },
     stopPropagation: function(e) {
         if (!e) e = window.event;
@@ -379,18 +383,6 @@ CdrCalendar.Calendar.prototype = {
     adjustPosition: function() {
         var x        = CdrCalendar.findX(this.img) + 20;
         var y        = CdrCalendar.findY(this.img);
-/*
-        var w        = 176; // buggy -> this.calBox.offsetWidth;
-        var h        = 184; // buggy -> this.calBox.clientHeight;
-        var vpWidth  = CdrCalendar.getViewportWidth();
-        var vpHeight = CdrCalendar.getViewportHeight();
-        window.status="x="+x+" y="+y+" vpWidth="+vpWidth+" vpHeight="+vpHeight+
-                " w="+w+" h="+h;
-        if (y > vpHeight - h)
-            y = vpHeight - h;
-        if (x > vpWidth - w)
-            x = vpWidth - w;
-*/
         if (y < 0)
             y = 0;
         if (x < 0)
