@@ -1,12 +1,8 @@
 /*
- * $Id: CdrCalendar.css,v 1.1.1.1 2007-04-07 04:07:21 bkline Exp $
+ * $Id$
  *
- * Style for CDR web calendar control.
- *
- * $Log: not supported by cvs2svn $
- * Revision 1.1  2006/12/04 21:06:20  bkline
- * Stylesheet instructions for CDR JavaScript calendar.
- *
+ * Stylesheet instructions for CDR JavaScript calendar.  See instructions
+ * in CdrCalendar.js on enabling the calendar widget for form fields.
  */
 
 .cdr-cal-box {
