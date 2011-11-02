@@ -1014,9 +1014,11 @@ def saveChanges(fields, session):
              revNote != mp3obj.reviewer_note:
 
             # Update the object
+            # Only change review_date if there was a status change
+            if mp3obj.review_status != revStatus:
+                mp3obj.review_date = now
             mp3obj.review_status = revStatus
             mp3obj.reviewer_note = revNote
-            mp3obj.review_date   = now
             mp3obj.reviewer_id   = userId
 
             # Update on disk
