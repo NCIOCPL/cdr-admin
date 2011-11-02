@@ -106,6 +106,7 @@ if __name__ == "__main__":
         revStatus = fields.getvalue("revStatus", None)
         startDate = fields.getvalue("startDate", "2010-01-01")
         endDate   = fields.getvalue("endDate", "2999-01-01")
+        reportType= fields.getvalue("reportType", "full")
         beenHere  = fields.getvalue("beenHere", None)
 
         # Extend end date to cover all of the time that day, not just 0:0:0
@@ -115,14 +116,21 @@ if __name__ == "__main__":
         if request == "Admin Menu":
             cdrcgi.navigateTo("Admin.py", session)
 
-        # User must specify langage and review status, dates can be defaulted
+        # Validate inputs
         if beenHere:
+            # Must specify langage and review status, dates can be defaulted
             if not language:
                 errMsg += "Language is required<br />\n"
             if not revStatus:
                 errMsg += "Approval status is required<br />\n"
+
+            # Dates have to make sense
+            if endDate < startDate:
+                errMsg += "End date cannot be before start date<br />\n"
+
             if errMsg:
                 errMsg = "<p class='errmsg'>" + errMsg + "</p>\n"
+
 
     # Stylesheet for both versions of output
     stylesheet = """\
@@ -150,7 +158,7 @@ if __name__ == "__main__":
     #######################################################
     # Prompt for inputs if we don't have what we need
     #######################################################
-    if not fields or not language or not revStatus:
+    if not fields or not language or not revStatus or errMsg:
         # Headers
         buttons = ('Submit', 'Admin Menu')
         html.append(cdrcgi.header(HEADER, HEADER,
@@ -185,14 +193,22 @@ limit the size of the output.</p>
    <label for="U">Unreviewed</label>
 </fieldset>
 <fieldset>
+ <legend> Select Full or Summary Report </legend>
+   <input type="radio" name="reportType" value="full" checked="checked" />
+   <label for="full">Full report showing terms</label>
+   <br />
+   <input type="radio" name="reportType" value="summary" />
+   <label for="summary">Summary report with grand totals only</label>
+</fieldset>
+<fieldset>
  <legend> Optional Start and End Dates </legend>
    <input type="text" name="startDate" id="startDate"
           class="CdrDateField size="10" />
-   <label for="startDate">Start date (YYYY-MM-DD)</label>
+   <label for="startDate">Start date</label>
    <br />
    <input type="text" name="endDate" id="endDate"
           class="CdrDateField size="10" />
-   <label for="endDate">End date (YYYY-MM-DD)</label>
+   <label for="endDate">End date</label>
 </fieldset>
 
 <input type="hidden" name="beenHere" value="beenHere" />
@@ -266,7 +282,8 @@ SELECT z.id, m.term_name, m.review_date, u.fullname
         if not row or row[0] != zipId:
             # Terminate old zipfile if we have one
             if zipId >=0:
-                html.append("""\
+                if reportType == "full":
+                    html.append("""\
  <tr>
   <td class='summary' colspan='3'>Subtotal - %s only: &nbsp;
   Approved=%d &nbsp; Rejected=%d &nbsp; Unreviewed=%d</td>
@@ -281,9 +298,10 @@ SELECT z.id, m.term_name, m.review_date, u.fullname
 
         if row:
             if row[0] != zipId:
-                # Start a new zipfile output
                 zipId = row[0]
-                html.append("""\
+                if reportType == "full":
+                    # Start a new zipfile output
+                    html.append("""\
 <table class='data' border="1">
  <tr>
   <th colspan='3'>%s</th>
@@ -294,7 +312,8 @@ SELECT z.id, m.term_name, m.review_date, u.fullname
   <th width='30%%'>User</th>
  </tr>
 """ % zipData[zipId][0])
-            html.append("""\
+            if reportType == "full":
+                html.append("""\
  <tr>
   <td>%s</td>
   <td>%s</td>
