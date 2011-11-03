@@ -59,12 +59,12 @@ form += """\
    <OL>"""
 
 for choice in(
-              ('RecordingTrackingReport.py?', 
+              ('RecordingTrackingReport.py?',
                                    'Board Meeting Recording Tracking Report'),
               ('MediaLists.py?',          'Media Lists'),
               ('MediaTrackingReport.py?', 'Media Tracking Report'),
               ('MediaCaptionContent.py?', 'Media Caption and Content Report'),
-              ('PubStatsByDate.py?VOL=Y',      
+              ('PubStatsByDate.py?VOL=Y',
                                           'Media Doc Publishing Report'),
               ('MediaLinks.py?',          'Linked Media Documents'),
              ):
@@ -78,8 +78,8 @@ form += """\
    <OL>"""
 
 for choice in (
-    ('PronunciationRecordings.py?',
-     'Audio Pronunciation Recordings Tracking Report'),
+    ('GlossaryTermAudioReviewReport.py?',
+     'Audio Pronunciation Review Statistics Report'),
     ):
     form += """\
     <LI><a href='%s/%s&%s'>%s</a></LI>""" % (cdrcgi.BASE, choice[0],
