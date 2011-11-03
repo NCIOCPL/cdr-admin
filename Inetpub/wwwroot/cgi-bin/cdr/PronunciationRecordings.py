@@ -31,6 +31,7 @@ header    = cdrcgi.header(title, title, section, script, buttons,
    <link type='text/css' rel='stylesheet' href='/stylesheets/CdrCalendar.css'>
    <script language='JavaScript' src='/js/CdrCalendar.js'></script>
    <style type='text/css'>
+    .err { width: 100%; text-align: center; font-weight: bold; color: red }
     .CdrDateField { width: 100px; }
    </style>
 """)
@@ -54,14 +55,13 @@ elif request == SUBMENU:
 if request == "Log Out": 
     cdrcgi.logout(session)
 
-## #----------------------------------------------------------------------
-## # Connect to the CDR database.
-## #----------------------------------------------------------------------
-## try:
-##     conn   = cdrdb.connect('CdrGuest')
-##     cursor = conn.cursor()
-## except cdrdb.Error, info:
-##     cdrcgi.bail('Database connection failure: %s' % info[1][0])
+#----------------------------------------------------------------------
+# William asked us to explain this to the users (I'm not kidding).
+#----------------------------------------------------------------------
+explanation = ""
+if request and startDate > endDate:
+    explanation = "<p class='err'>End date cannot precede start date.</p>"
+    request = None
 
 #----------------------------------------------------------------------
 # Put up the menu if we don't have selection criteria yet.
@@ -69,10 +69,11 @@ if request == "Log Out":
 if not request:
     form = """\
    <input type='hidden' name='%s' value='%s' />
+   %s
    <fieldset class='dates'>
     <legend>Date Range</legend>
     <label for='start'>Start Date:</label>
-    <input name='StartDate' value='2011-01-01' class='CdrDateField'
+    <input name='StartDate' value='%s' class='CdrDateField'
            id='start' /> &nbsp;
     <label for='end'>End Date:</label>
     <input name='EndDate' value='%s' class='CdrDateField' id='end' />
@@ -85,60 +86,11 @@ if not request:
     <br />
     <input name='Language' type='radio' value='es' class='choice' /> Spanish
   </form>
-""" % (cdrcgi.SESSION, session, today)
+""" % (cdrcgi.SESSION, session, explanation, startDate, endDate)
     cdrcgi.sendPage(header + form + """\
  </body>
 </html>
 """)
-
-#----------------------------------------------------------------------
-# Collection information we'll need for each Media document.
-#----------------------------------------------------------------------
-## class MediaDoc:
-##     def __init__(self, docId, created, cursor):
-##         self.docId = docId
-##         self.created = created
-##         self.title = self.status = self.statusDate = None
-##         self.firstPub = self.lastMod = None
-##         self.pubDate = None
-##         self.glossaryTerms = []
-##         self.comments = []
-##         self.lastVersionPublishable = False
-##         versions = cdr.lastVersions('guest', 'CDR%010d' % docId)
-##         if versions[0] == versions[1] and versions[0] > 0:
-##             self.lastVersionPublishable = True
-##         cursor.execute("SELECT dt FROM last_doc_publication WHERE doc_id = ?",
-##                        docId)
-##         rows = cursor.fetchall()
-##         if rows:
-##             self.pubDate = rows[0][0]
-##         cursor.execute("SELECT first_pub, xml FROM document WHERE id = ?",
-##                        docId)
-##         self.firstPub, docXml = cursor.fetchall()[0]
-##         tree = etree.XML(docXml.encode('utf-8'))
-##         for node in tree.findall('MediaTitle'):
-##             self.title = node.xpath("string()")
-##         for node in tree.findall('ProposedUse/Glossary'):
-##             self.glossaryTerms.append(node.get("{%s}ref" % NAMESPACE))
-##         for node in tree.findall('DateLastModified'):
-##             self.lastMod = node.text
-##         for node in tree.findall('ProcessingStatuses/ProcessingStatus'):
-##             for child in node:
-##                 if child.tag == 'ProcessingStatusValue':
-##                     self.status = child.text
-##                 elif child.tag == 'ProcessingStatusDate':
-##                     self.statusDate = child.text
-##                 elif child.tag == 'Comment':
-##                     self.comments.append(child.text)
-##             break
-##     def __cmp__(self, other):
-##         if self.lastVersionPublishable == other.lastVersionPublishable:
-##             if self.lastMod == other.lastMod:
-##                 return cmp(self.title, other.title)
-##             return cmp(self.lastMod, other.lastMod)
-##         if self.lastVersionPublishable:
-##             return -1
-##         return 1
 
 #----------------------------------------------------------------------
 # Queue up a request for the report.
