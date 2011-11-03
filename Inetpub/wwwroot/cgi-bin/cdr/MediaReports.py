@@ -78,6 +78,8 @@ form += """\
    <OL>"""
 
 for choice in (
+    ('PronunciationRecordings.py?',
+     'Audio Pronunciation Recordings Tracking Report'),
     ('GlossaryTermAudioReviewReport.py?',
      'Audio Pronunciation Review Statistics Report'),
     ):
