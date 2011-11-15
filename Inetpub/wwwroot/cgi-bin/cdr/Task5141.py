@@ -118,9 +118,12 @@ UPDATE ctgov_import
     return status + "</p>"
 
 #----------------------------------------------------------------------
-# Make sure we're logged in.
+# Make sure we're logged in and are authorized to use this script.
 #----------------------------------------------------------------------
-if not session: cdrcgi.bail('Unknown or expired CDR session.')
+if not session:
+    cdrcgi.bail('Unknown or expired CDR session.')
+if not cdr.canDo(session, 'SWAP NCT IDS'):
+    cdrcgi.bail("You are not authorized to use this script")
 
 #----------------------------------------------------------------------
 # Handle navigation requests.
