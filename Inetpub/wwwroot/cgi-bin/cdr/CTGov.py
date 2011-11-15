@@ -6,6 +6,7 @@
 #
 # BZIssue::4700
 # BZIssue::4804
+# BZIssue::5141
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
@@ -63,8 +64,9 @@ form = """\
 reports = [
            ('ForceCtgovImport.py?', 'Force CTGov Download'),
            ('CTGovImport.py?which=new&', 'Review New Protocols'),
-           ('CTGovImport.py?which=cips&', 'Review Protocols Sent to CIPS')
-          ]
+           ('CTGovImport.py?which=cips&', 'Review Protocols Sent to CIPS'),
+           ('Task5141.py?', 'Swap NCT IDs')
+]
 for r in reports:
     form += "<LI><A HREF='%s/%s%s=%s'>%s</A></LI>\n" % (
             cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
