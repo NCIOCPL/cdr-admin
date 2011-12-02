@@ -4,7 +4,8 @@
 #
 # Report on lists of summaries.
 #
-# $Log: not supported by cvs2svn $
+# BZIssue::5104 - [Summaries] Changes to Summaries TOC Lists report
+#
 # Revision 1.5  2008/09/29 17:48:21  venglisc
 # Fixing typo left over from testing.
 #
@@ -26,7 +27,7 @@
 #
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, string, cdrdb, time
+import cgi, cdr, cdrcgi, re, string, cdrdb, time, sys
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -37,18 +38,55 @@ boolOp    = fields and fields.getvalue("Boolean")          or "AND"
 audience  = fields and fields.getvalue("audience")         or None
 lang      = fields and fields.getvalue("lang")             or None
 showId    = fields and fields.getvalue("showId")           or "N"
-tocLevel  = fields and fields.getvalue("tocLevel")         or "3"
+tocLevel  = fields and fields.getvalue("tocLevel")         or "9"
 groups    = fields and fields.getvalue("grp")              or []
+byCdrid   = fields and fields.getvalue("byCdrid")          or None
+docVers   = fields and fields.getvalue("DocVersion")       or None
+byTitle   = fields and fields.getvalue("byTitle")          or None
 submit    = fields and fields.getvalue("SubmitButton")     or None
+docType   = "Summary"
 request   = cdrcgi.getRequest(fields)
 title     = "CDR Administration"
 instr     = "Summaries TOC Lists"
 script    = "SummariesTocReport.py"
 SUBMENU   = "Report Menu"
-buttons   = (SUBMENU, cdrcgi.MAINMENU)
+buttons   = ("Submit", SUBMENU, cdrcgi.MAINMENU)
+header   = cdrcgi.header(title, title, "Summaries TOC Report",
+                         script, buttons, method = 'GET',
+                         stylesheet = """
+  <style type = 'text/css'>
+    body            { font: 12pt "Arial"; }
+    span.ip:hover     { background-color: #FFFFCC; }
+    fieldset        { margin-bottom: 10px; }
+    /* fieldset.docversion { width: 860px; */
+    fieldset.docversion 
+                    { width: 75%;
+                      margin-left: auto;
+                      margin-right: auto;
+                      margin-bottom: 0; 
+                      display: block; }
+    fieldset.wrapper{ width: 520px;
+                      margin-left: auto;
+                      margin-right: auto;
+                      display: block; }
+    *.gogreen       { width: 95%;
+                      border: 1px solid green;
+                      background: #99FF66; }
+    *.gg            { border: 1px solid green; 
+                      background: #99FF66; 
+                      color: #006600; }
+    *.comgroup      { background: #C9C9C9; 
+                      margin-bottom: 8px; }
+  </style>
+""")
 
+# Testing
+#byCdrid = 62875
+#byTitle = 'Breast'
+
+# ----------------------------------------------------
 # Functions to replace sevaral repeated HTML snippets
-# ===================================================
+# ----------------------------------------------------
 def boardHeader(header):
     """Return the HTML code to display the Summary Board Header"""
     html = """\
@@ -56,12 +94,47 @@ def boardHeader(header):
 """ % board_type
     return html
 
-def summaryRow(id, summary, toc):
+#----------------------------------------------------------------------
+# More than one matching title; let the user choose one.
+#----------------------------------------------------------------------
+def showTitleChoices(choices):
+    form = u"""\
+   <H3>More than one matching document found; please choose one.</H3>
+"""
+    i = 0
+    for choice in choices:
+        i += 1
+        form += u"""\
+   <span class="ip">
+    <INPUT TYPE='radio' NAME='byCdrid' VALUE='CDR%010d' id='byCdrid%d'>
+    <label for='byCdrid%d'>%s (CDR%06d)</label><br>
+   </span>
+""" % (choice[0], i, i, cgi.escape(choice[1]), choice[0])
+    cdrcgi.sendPage(header + form + u"""\
+   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
+   <INPUT TYPE='hidden' NAME='DocType' VALUE='%s'>
+   <INPUT TYPE='hidden' NAME='ReportType' VALUE='%s'>
+   <INPUT TYPE='hidden' NAME='showId' VALUE='%s'>
+   <INPUT TYPE='hidden' NAME='tocLevel' VALUE='%s'>
+  </FORM>
+ </BODY>
+</HTML>
+""" % (cdrcgi.SESSION, session, docType, 'TOC', showId, tocLevel))
+
+# ----------------------------------------------------
+#
+# ----------------------------------------------------
+def summaryRow(id, summary, toc, docVersion = None):
     """Return the HTML code to display a Summary row"""
-    response = cdr.filterDoc('guest', ['name:Summaries TOC Report'], id, 
-                             parm = filterParm)
+    if byCdrid:
+        response = cdr.filterDoc('guest', ['name:Summaries TOC Report'], id, 
+                             parm = filterParm, docVer = docVersion)
+    else:
+        response = cdr.filterDoc('guest', ['name:Revision Markup Filter', 
+                                       'name:Summaries TOC Report'], id, 
+                             parm = filterParm, docVer = docVersion)
     html = unicode(response[0], "utf-8")
-    html += """\
+    html += u"""\
 """
     return html
 
@@ -98,18 +171,31 @@ dateString = time.strftime("%B %d, %Y")
 #----------------------------------------------------------------------
 # If we don't have a request, put up the form.
 #----------------------------------------------------------------------
-if not lang:
+if not lang and (not byCdrid and not byTitle):
+                           #("Submit",
+                           # SUBMENU,
+                           # cdrcgi.MAINMENU),
     header = cdrcgi.header(title, title, instr + ' - ' + dateString, 
-                           script,
-                           ("Submit",
-                            SUBMENU,
-                            cdrcgi.MAINMENU),
+                           script, buttons,
                            numBreaks = 1,
                            stylesheet = """
    <STYLE type="text/css">
     TD      { font-size:  12pt; }
     LI.none { list-style-type: none }
     DL      { margin-left: 0; padding-left: 0 }
+    *.singletoc, *.multitoc, *.alltoc
+            { width: 50%;
+              font: 12pt "Arial";
+              border: 2px solid white;
+              margin-top: 20px;
+              margin-bottom: 20px;
+              margin-left: auto;
+              margin-right:auto;
+              padding: 5px;
+              background: #CCCCCC; }
+    *.alltoc
+            { background: #CCDDCC; }
+
    </STYLE>
    <script language='JavaScript'>
     function someEnglish() {
@@ -132,17 +218,22 @@ if not lang:
 
     form   = """\
    <input type='hidden' name='%s' value='%s'>
+   <input type='hidden' name='singletoc' value='N'>
  
+   <div class='singletoc'>
+   <b>Single Summary</b>
    <fieldset>
-    <legend>&nbsp;Select Summary Audience&nbsp;</legend>
-    <input name='audience' type='radio' id="byHp"
-           value='Health Professional' CHECKED>
-    <label for="byHp">Health Professional</label>
+    <legend>&nbsp;Document Title or CDR-ID&nbsp;</legend>
+    <label for="byCdrid">CDR-ID</label>
+    <input name='byCdrid' size='15' id="byCdrid">
     <br>
-    <input name='audience' type='radio' id="byPat"
-           value='Patient'>
-    <label for="byPat">Patient</label>
+    <label for="byTitle">Title</label>
+    <input name='byTitle' size='40' id='byTitle'>
    </fieldset>
+   </div>
+
+   <div class='alltoc'>
+   <b>Shared Options (Single Summary, All Summaries)</b>
    <fieldset>
     <legend>&nbsp;Display CDR-ID?&nbsp;</legend>
     <input name='showId' type='radio' id="idNo"
@@ -153,10 +244,25 @@ if not lang:
            value='Y'>
     <label for="idYes">With CDR-ID</label>
    </fieldset>
+
    <fieldset>
     <legend>&nbsp;TOC Levels?&nbsp;</legend>
     <input name='tocLevel' type='text' size='1' value='3' CHECKED>
     (QC Report uses "3" - leave blank to see all levels)
+   </fieldset>
+   </div>
+
+   <div class='multitoc'>
+   <b>All Summaries</b>
+   <fieldset>
+    <legend>&nbsp;Select Summary Audience&nbsp;</legend>
+    <input name='audience' type='radio' id="byHp"
+           value='Health Professional' CHECKED>
+    <label for="byHp">Health Professional</label>
+    <br>
+    <input name='audience' type='radio' id="byPat"
+           value='Patient'>
+    <label for="byPat">Patient</label>
    </fieldset>
 
    <fieldset>
@@ -226,12 +332,43 @@ if not lang:
     </tr>
    </table>
    </fieldset>
+   </div>
 
   </form>
  </body>
 </html>
 """ % (cdrcgi.SESSION, session)
     cdrcgi.sendPage(header + form)
+
+#----------------------------------------------------------------------
+# If we have a document title but not a document ID, find the ID.
+#----------------------------------------------------------------------
+#if not lang and not docId:
+if byTitle and byCdrid:
+    byTitle = None
+
+if byTitle:
+    lookingFor = 'title'
+    try:
+        cursor.execute("""\
+            SELECT d.id, d.title
+              FROM document d
+              JOIN doc_type dt
+                on dt.id = d.doc_type
+             WHERE title LIKE ?
+               AND dt.name = '%s'
+             ORDER BY d.title""" % docType, '%' + byTitle + '%')
+        rows = cursor.fetchall()
+        if not rows:
+            cdrcgi.bail("Unable to find document with %s '%s'" % (lookingFor,
+                                                                  byTitle))
+        if len(rows) > 1:
+            showTitleChoices(rows)
+        intId = rows[0][0]
+        docId = "CDR%010d" % intId
+    except cdrdb.Error, info:
+        cdrcgi.bail('Failure looking up document %s: %s' % (lookingFor,
+                                                            info[1][0]))
 
 #----------------------------------------------------------------------
 # Language variable has been selected
@@ -398,19 +535,90 @@ if not query:
     cdrcgi.bail('No query criteria specified')   
 
 #----------------------------------------------------------------------
-# Submit the query to the database.
+# If we are running the report for a single summary but we don't have
+# a version number yet, display the intermediary screen to select the
+# version.
 #----------------------------------------------------------------------
-try:
-    cursor = conn.cursor()
-    cursor.execute(query)
-    rows = cursor.fetchall()
-    cursor.close()
-    cursor = None
-except cdrdb.Error, info:
-    cdrcgi.bail('Failure retrieving Summary documents: %s' %
-                info[1][0])
+cursor = conn.cursor()
+letUserPickVersion = True
+if byCdrid:
+    byCdrid = cdr.exNormalize(byCdrid)[1]
+    if not docVers:
+        try:
+            cursor.execute("""\
+                SELECT num,
+                       comment,
+                       dt
+                  FROM doc_version
+                 WHERE id = ?
+              ORDER BY num DESC""", byCdrid)
+            vrows = cursor.fetchall()
+        except cdrdb.Error, info:
+            cdrcgi.bail('Failure retrieving document versions: %s' % info[1][0])
+        form = u"""\
+      <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
+      <INPUT TYPE='hidden' NAME='DocType' VALUE='%s'>
+      <INPUT TYPE='hidden' NAME='byCdrid' VALUE='CDR%010d'>
+      <INPUT TYPE='hidden' NAME='showId' VALUE='%s'>
+      <INPUT TYPE='hidden' NAME='tocLevel' VALUE='%s'>
+    """ % (cdrcgi.SESSION, session, docType, byCdrid, showId, tocLevel)
+
+        form += u"""\
+      <fieldset class='docversion'>
+       <legend>&nbsp;Select document version&nbsp;</legend>
+      <div style="width: 100%; text-align: center;">
+      <div style="margin: 0 auto;">
+      <SELECT NAME='DocVersion'>
+       <OPTION VALUE='-1' SELECTED='1'>Current Working Version</OPTION>
+    """
+
+        # Limit display of version comment to 120 chars (if exists)
+        # ---------------------------------------------------------
+        for row in vrows:
+            form += u"""\
+       <OPTION VALUE='%d'>[V%d %s] %s</OPTION>
+    """ % (row[0], row[0], row[2][:10],
+           not row[1] and "[No comment]" or row[1][:120])
+            selected = ""
+        form += u"</SELECT></div></div>"
+        form += u"""
+      </fieldset>
+    """
+        cdrcgi.sendPage(header + form)
+
+    else:
+        if docVers == "-1": docVers = None
+
+    # We need the summary title to display on the report
+    # --------------------------------------------------
+    try:
+        query = """\
+    SELECT DISTINCT qt.doc_id, title.value DocTitle, 
+                    'dummy1', 'dummy2', title.value EnglTitle, ' '
+      FROM query_term qt 
+      JOIN query_term title 
+        ON qt.doc_id = title.doc_id 
+     WHERE title.path = '/Summary/SummaryTitle' 
+       AND qt.doc_id = %s""" % byCdrid
+        
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        cursor.close()
+        cursor = None
+    except cdrdb.Error, info:
+        cdrcgi.bail('Failure retrieving single Summary document: %s' %
+                    info[1][0])
+else:
+    try:
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        cursor.close()
+        cursor = None
+    except cdrdb.Error, info:
+        cdrcgi.bail('Failure retrieving Summary documents: %s' %
+                    info[1][0])
      
-if not rows:
+if not rows and not vrows:
     cdrcgi.bail('No Records Found for Selection: %s ' % lang+"; "+audience+"; "+groups[0] )
 
 #cdrcgi.bail("Result: [%s]" % rows)
@@ -445,30 +653,44 @@ header    = cdrcgi.rptHeader(title, instr,
                      width: 540px; }
     *.hdrDate      { font-size: 12pt;
                      font-weight: bold; }
+    *.Insertion    { color: red; }
+    *.Deletion     { color: red; 
+                     text-decoration: line-through; }
    </STYLE>
 """)
 
 # -------------------------
-# Display the Report Title
+# Display the Report Titles
 # -------------------------
-if lang == 'English':
+# Single Summary TOC Report
+if byCdrid:
     report    = """\
-   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-  </FORM>
-  <div class="ehdr">PDQ %s Summaries<br>
-  <span class="hdrDate">%s</span>
-  </div>
-""" % (cdrcgi.SESSION, session, audience, dateString)
+       <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
+      </FORM>
+      <div class="ehdr">Single Summary TOC Report<br>
+      <span class="hdrDate">%s</span>
+      </div>
+    """ % (cdrcgi.SESSION, session, dateString)
+# Multi-Summary TOC Report
 else:
-    report    = """\
-   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-  </FORM>
-  <div class="shdr">PDQ %s %s Summaries<br>
-  <span class="hdrDate">%s</span>
-  </div>
-""" % (cdrcgi.SESSION, session, lang, audience, dateString)
+    if lang == 'English':
+        report    = """\
+       <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
+      </FORM>
+      <div class="ehdr">PDQ %s Summaries<br>
+      <span class="hdrDate">%s</span>
+      </div>
+    """ % (cdrcgi.SESSION, session, audience, dateString)
+    else:
+        report    = """\
+       <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
+      </FORM>
+      <div class="shdr">PDQ %s %s Summaries<br>
+      <span class="hdrDate">%s</span>
+      </div>
+    """ % (cdrcgi.SESSION, session, lang, audience, dateString)
 
-board_type = rows[0][5]
+board_type = rows[0][5] or None
 
 # -------------------------------------------------------------------
 # Decision if the CDR IDs are displayed along with the summary titles
@@ -480,7 +702,7 @@ board_type = rows[0][5]
 # ------------------------------------------------------------------------
 filterParm = []
 filterParm = [['showLevel', tocLevel], ['showId', showId ]]
-report += """\
+report += u"""\
   <U><H4>%s</H4></U>
 """ % board_type
 
@@ -489,10 +711,14 @@ for row in rows:
     # heading
     # ----------------------------------------------------------
     if row[5] == board_type:
-       if lang == 'English':
-          report += summaryRow(row[0], row[1], toc = tocLevel)
-       else:
-          report += summaryRow(row[0], row[1], toc = tocLevel)
+       report += summaryRow(row[0], row[1], toc = tocLevel, 
+                                               docVersion = docVers)
+       #if lang == 'English':
+       #   report += summaryRow(row[0], row[1], toc = tocLevel, 
+       #                                        docVersion = docVers)
+       #else:
+       #   report += summaryRow(row[0], row[1], toc = tocLevel, 
+       #                                        docVersion = docVers)
 
     # For the Treatment Summary Type we need to check if this is an 
     # adult or pediatric summary
@@ -500,11 +726,15 @@ for row in rows:
     else:
        board_type = row[5]
        report += boardHeader(board_type)
-       if lang == 'English':
-          report += summaryRow(row[0], row[1], toc = tocLevel)
-       else:
-          report += summaryRow(row[0], row[1], toc = tocLevel)
-footer = """\
+       report += summaryRow(row[0], row[1], toc = tocLevel, 
+                                               docVersion = docVers)
+       #if lang == 'English':
+       #   report += summaryRow(row[0], row[1], toc = tocLevel, 
+       #                                        docVersion = docVers)
+       #else:
+       #   report += summaryRow(row[0], row[1], toc = tocLevel, 
+       #                                        docVersion = docVers)
+footer = u"""\
  </BODY>
 </HTML> 
 """     
