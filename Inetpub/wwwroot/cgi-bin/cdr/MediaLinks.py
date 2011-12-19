@@ -54,7 +54,7 @@ cursor  = conn.cursor()
 #       query optimizer, but that code is never reached.
 # ---------------------------------------------------------------------
 def getMediaDocTypes():
-    return [['GlossaryConcept'], ['Summary']]
+    return [['GlossaryTerm'], ['Summary']]
     cursor.execute("CREATE TABLE #mediadocs (id INT)")
     cursor.execute("CREATE TABLE #medialinks (i INT, p VARCHAR(255))")
     cursor.execute("""\
@@ -220,9 +220,9 @@ html = """\
 #----------------------------------------------------------------------
 # Create a dictionary listing the path to use for the title information
 #----------------------------------------------------------------------
-titlePath = {'GlossaryTerm':
+titlePath = {'GlossaryTermXXX':
                '/GlossaryTerm/TermName',
-             'GlossaryTermConcept': 
+             'GlossaryTerm': 
                '/GlossaryTermConcept/TermDefinition/DefinitionText',
              'Summary'     :
                '/Summary/SummaryTitle'}
@@ -255,14 +255,15 @@ if type(docTypes) in (type(""), type(u"")):
 for docType in docTypes:
     try:
         dtQual = docType and ("doc_type = '%s'" % docType) or ""
+        #cdrcgi.bail(docType)
         cursor.execute("""\
            SELECT doc_id, value
              FROM  query_term_pub
             WHERE doc_id IN 
                   ( %s )
                   AND path = '%s'
-                  %s""" % (innerSQL['Summary'], titlePath[docType],
-                                 sortSQL[docType]))
+                  %s""" % (innerSQL[docType], titlePath[docType],
+                                 sortSQL[docType]), timeout = 300)
         rows = cursor.fetchall()
     except cdrdb.Error, info:
         cdrcgi.bail('Database connection failure: %s' % info[1][0])
