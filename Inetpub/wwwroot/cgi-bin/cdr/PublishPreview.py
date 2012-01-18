@@ -419,19 +419,29 @@ if not preserveLnk:
         # ----------------------------------------------------
         if not 'href' in x.attrib:
             x.set('href', '')
-            link  = '/cgi-bin/cdr/PublishPreview.py?Session=guest'
-            link += '&DocId=%s' % x.get('objectid')
+            iLink = x.get('objectid')
+            if iLink.find('#') > 0:
+                link = '#Section_%s' % iLink.split('#_')[1]
+            else:
+                link  = '/cgi-bin/cdr/PublishPreview.py?Session=guest'
+                link += '&DocId=%s' % x.get('objectid')
+
             x.set('href', link)
-            #x.attrib['href'] = ''
+
         # Those links that do contain a link need to be modified
         # to only display the ID (or NAME) target.
         # With this change the local links will work.
+        # Note: The first part of the 'if' broke after the last
+        #       PP update on Percussion.  The links to internal
+        #       targets are now set with the if block above
         # ------------------------------------------------------
         else:
             link = x.get('href')
             if link.find('#') > 0:
                newLink = '#%s' % link.split('#')[1]
                x.set('href', newLink)
+            # Resetting the glossary links so we don't follow
+            # a dead end.
             else:
                x.set('onclick', 'return false')
 
