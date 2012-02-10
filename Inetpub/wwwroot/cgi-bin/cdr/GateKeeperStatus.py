@@ -147,6 +147,10 @@ def checkPubProcCg(cursor, cdrId):
 # Create the HTML format to add to the output table.
 # -----------------------------------------------------------------
 def addRow(cursor, cdrFlag):
+    if doc.pubType == "Remove":
+        cdrRecord = cdrFlag and "Error" or "Removed"
+    else:
+        cdrRecord = cdrFlag and "OK" or "Error"
     return(u"""\
    <tr>
     <td>%s</td>
@@ -163,7 +167,7 @@ def addRow(cursor, cdrFlag):
        doc.cdrId or "&nbsp;", doc.pubType or "&nbsp;",
        doc.docType or "&nbsp;", doc.status or "&nbsp;",
        doc.dependentStatus or "&nbsp;", doc.location or "&nbsp;",
-       cdrFlag and 'OK' or 'Error'))
+       cdrRecord))
 
 
 # -----------------------------------------------------------------
