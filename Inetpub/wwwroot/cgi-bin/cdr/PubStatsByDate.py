@@ -12,6 +12,7 @@
 # BZIssue::3716
 # BZIssue::4757
 # BZIssue::5062 - Modify Media Change Report
+# BAIssue::5173 - ICRDB Stats Report
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string, cdrdb, time
@@ -90,8 +91,8 @@ def getMediaInfo(ids):
         return []
 
     query = """
-         SELECT m.doc_id, m.value, d.first_pub, dv.dt, dv.updated_dt, v.value,
-                dv.num, dv.publishable
+         SELECT distinct m.doc_id, m.value, d.first_pub, dv.dt, 
+                dv.updated_dt, v.value, dv.num, dv.publishable
            FROM query_term m
 LEFT OUTER JOIN query_term v
              ON m.doc_id = v.doc_id
