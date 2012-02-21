@@ -15,19 +15,19 @@ import cgi, cdr, cdrcgi, cdrdb, urllib, sys, lxml.etree as etree
 #----------------------------------------------------------------------
 fields    = cgi.FieldStorage()
 session   = cdrcgi.getSession(fields)
-boolOp    = fields and fields.getvalue("Boolean")          or "AND"
-title     = fields and fields.getvalue("Title")            or None
-author    = fields and fields.getvalue("Author")           or None
-journal   = fields and fields.getvalue("Journal")          or None
-year      = fields and fields.getvalue("Year")             or None
-volume    = fields and fields.getvalue("Volume")           or None
-issue     = fields and fields.getvalue("Issue")            or None
-importID  = fields and fields.getvalue("ImportID")         or None
-replaceID = fields and fields.getvalue("ReplaceID")        or None
-submit    = fields and fields.getvalue("SubmitButton")     or None
-help      = fields and fields.getvalue("HelpButton")       or None
-impReq    = fields and fields.getvalue("ImportButton")     or None
-srchPmed  = fields and fields.getvalue("SearchPubMed")     or None
+boolOp    = fields.getvalue("Boolean")      or "AND"
+title     = fields.getvalue("Title")        or None
+author    = fields.getvalue("Author")       or None
+journal   = fields.getvalue("Journal")      or None
+year      = fields.getvalue("Year")         or None
+volume    = fields.getvalue("Volume")       or None
+issue     = fields.getvalue("Issue")        or None
+importID  = fields.getvalue("ImportID")     or None
+replaceID = fields.getvalue("ReplaceID")    or None
+submit    = fields.getvalue("SubmitButton") or None
+help      = fields.getvalue("HelpButton")   or None
+impReq    = fields.getvalue("ImportButton") or None
+srchPmed  = fields.getvalue("SearchPubMed") or None
 subtitle  = "Citation"
 valErrors = ""
 
