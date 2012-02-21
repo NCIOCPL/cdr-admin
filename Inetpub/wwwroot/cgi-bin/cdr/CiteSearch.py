@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: CiteSearch.py 9295 2009-10-20 21:13:25Z bkline $
+# $Id$
 #
 # Prototype for duplicate-checking interface for Citation documents.
 #
