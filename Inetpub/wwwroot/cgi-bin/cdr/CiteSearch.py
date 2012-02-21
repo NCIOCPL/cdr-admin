@@ -5,9 +5,10 @@
 # Prototype for duplicate-checking interface for Citation documents.
 #
 # BZIssue::4724
+# BZIssue::5174
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, cdrdb, urllib, sys
+import cgi, cdr, cdrcgi, cdrdb, urllib, sys, lxml.etree as etree
 
 #----------------------------------------------------------------------
 # Get the form variables.
@@ -84,115 +85,109 @@ def findExistingCitation(pmid):
 #----------------------------------------------------------------------
 # Replace PubmedArticle element in document with new version.
 #----------------------------------------------------------------------
-def replacePubmedArticle(doc, newPubmedArticle):
-    endTag = "</PubmedArticle>"
-    start = doc.find("<PubmedArticle>")
-    if start == -1:
-        cdrcgi.bail("Unable to find PubmedArticle in existing document")
-    end = doc.find(endTag, start + 1)
-    return doc[:start] + newPubmedArticle + doc[end + len(endTag) : ]
+def replacePubmedArticle(doc, article):
+    tree = etree.XML(doc.xml)
+    for node in tree.findall("PubmedArticle"):
+        tree.replace(node, article)
+        doc.xml = etree.tostring(tree)
+        return doc
     
 #----------------------------------------------------------------------
 # Extract the PubmedArticle element from the document.
 #----------------------------------------------------------------------
 def getPubmedArticle(doc):
-    endTag = "</PubmedArticle>"
-    start = doc.find("<PubmedArticle>")
-    if start == -1:
-        return None
-    end = doc.find(endTag, start + 1)
-    if end == -1:
-        return None
-    cclTag = "CommentsCorrectionsList"
-    pattern = re.compile("<%s[\\s>].*?</%s>" % (cclTag, cclTag), re.DOTALL)
-    return pattern.sub("", doc[start : end + len(endTag)])
+    try:
+        tree = etree.XML(doc)
+    except:
+        cdrcgi.bail("unable to parse document from NLM")
+    for node in tree.findall("PubmedArticle"):
+        etree.strip_elements(node, "CommentsCorrectionsList")
+        return node
     
 #----------------------------------------------------------------------
 # Extract the text content of the ArticleTitle element.
 #----------------------------------------------------------------------
 def getArticleTitle(article):
-    startTag = "<ArticleTitle>"
-    start = article.find(startTag)
-    if start == -1:
-        return None
-    end = article.find("</ArticleTitle>", start + 1)
-    if end == -1:
-        return None
-    return article[start + len(startTag) : end]
+    for node in article.findall("MedlineCitation/Article/ArticleTitle"):
+        return node.text
 
 #----------------------------------------------------------------------
-# Import a citation document from PubMed.
+# Retrieve an XML document for a Pubmed article from NLM.
+#----------------------------------------------------------------------
+def fetchCitation(pmid):
+    host = "eutils.ncbi.nlm.nih.gov"
+    app  = "/entrez/eutils/efetch.fcgi"
+    url  = "http://" + host + app + "?db=pubmed&retmode=xml&id=" + pmid
+    try:
+        reader = urllib.urlopen(url)
+    except:
+        cdrcgi.bail("NLM server unavailable; please try again later")
+    article = getPubmedArticle(reader.read())
+    if article is None: cdrcgi.bail("Article Not Found")
+    return article
+
+#----------------------------------------------------------------------
+# Create a new CDR Doc object, using the information retrieved from NLM.
+#----------------------------------------------------------------------
+def createNewCitationDoc(article):
+    title = getArticleTitle(article) 
+    if not title: cdrcgi.bail("Unable to find article title")
+    ctrl = { "DocType": "Citation", "DocTitle": title[:255] }
+    root = etree.Element("Citation")
+    details = etree.SubElement(root, "VerificationDetails")
+    etree.SubElement(details, "Verified").text = "Yes"
+    etree.SubElement(details, "VerifiedIn").text = "PubMed"
+    root.append(article)
+    docXml = etree.tostring(root)
+    return cdr.Doc(docXml, "Citation", ctrl, encoding="utf-8")
+
+#----------------------------------------------------------------------
+# Handle a request to import a citation document from PubMed.
 #----------------------------------------------------------------------
 if impReq:
     if not session: cdrcgi.bail("User not logged in")
+    article = fetchCitation(importID)
     if replaceID:
-        oldDoc = cdr.getDoc(session, replaceID, 'Y')
-        if oldDoc.startswith("<Errors"):
-            cdrcgi.bail("Unable to retrieve %s" % replaceID)
-        if not getPubmedArticle(oldDoc):
-            cdrcgi.bail("Document %s is not a PubMed Citation" % replaceID)
+        oldDoc = cdr.getDoc(session, replaceID, "Y", getObject=True)
+        if cdr.checkErr(oldDoc):
+            cdrcgi.bail("Unable to check out CDR document %s" % replaceID)
+        doc = replacePubmedArticle(oldDoc, article)
+        if doc is None:
+            cdr.unlock(session, replaceID)
+            cdrcgi.bail("%s is not a Citation document" % replaceID)
+        resp = cdr.repDoc(session, doc=str(doc), val='Y', showWarnings=True)
     else:
         docId = findExistingCitation(importID)
         if docId:
-            cdrcgi.bail("Citation has already been imported as CDR%010d" %
-                        docId)
-    host    = 'www.ncbi.nlm.nih.gov'
-    app     = '/entrez/utils/pmfetch.fcgi'
-    base    = 'http://' + host + app + '?db=PubMed&report=sgml&mode=text&id='
-    url     = base + importID
-    try:
-        uobj    = urllib.urlopen(url)
-    except:
-        cdrcgi.bail("NLM server unavailable; please try again later");
-    page    = uobj.read()
-    article = getPubmedArticle(page)
-    if not article: cdrcgi.bail("Article Not Found")
-    if not replaceID:
-        title   = getArticleTitle(article) 
-        if not title: cdrcgi.bail("Unable to find article title")
-        title   = title[:255]
-        doc     = """\
-<CdrDoc Type='Citation' Id=''>
- <CdrDocCtl>
-  <DocType>Citation</DocType>
-  <DocTitle>%s</DocTitle>
- </CdrDocCtl>
- <CdrDocXml><![CDATA[<Citation>
-   <VerificationDetails>
-    <Verified>Yes</Verified>
-    <VerifiedIn>PubMed</VerifiedIn>
-   </VerificationDetails>
-   %s
-  </Citation>]]></CdrDocXml>
-</CdrDoc>
-"""
-        doc = doc % (title, article)
-        resp = cdr.addDoc(session, doc = doc, val = 'Y', showWarnings = 1)
-    else:
-        doc = replacePubmedArticle(oldDoc, article)
-        resp = cdr.repDoc(session, doc = doc, val = 'Y', showWarnings = 1)
-    if not resp[0]:
-        cdrcgi.bail("Failure adding PubMed citation %s: %s" %
-                    (title, cdr.checkErr(resp[1])))
-    if resp[1]:
-        valErrors = formatErrors(resp[1])
+            cdrcgi.bail("Citation already imported as CDR%010d" % docId)
+        doc = createNewCitationDoc(article)
+        resp = cdr.addDoc(session, doc=str(doc), val='Y', showWarnings=True)
+    docId, errors = resp
+    if not docId:
+        fp = open("d:/tmp/%s.xml" % importID, "w")
+        fp.write(str(doc))
+        fp.close()
+        cdrcgi.bail("Failure saving PubMed citation %s: %s" %
+                    (importID, cdr.checkErr(errors)))
+    if errors:
+        valErrors = formatErrors(errors)
     if valErrors:
         pubVerNote = "(with validation errors)"
     else:
-        doc = cdr.getDoc(session, resp[0], 'Y')
+        doc = cdr.getDoc(session, docId, 'Y')
         if doc.startswith("<Errors"):
-            cdrcgi.bail("Unable to retrieve %s" % resp[0])
-        resp2 = cdr.repDoc(session, doc = doc, val = 'Y', ver = 'Y',
-                          checkIn = 'Y', showWarnings = 1)
-        if not resp2[0]:
+            cdrcgi.bail("Unable to retrieve %s" % docId)
+        resp = cdr.repDoc(session, doc=doc, val='Y', ver='Y', checkIn='Y',
+                          showWarnings=True)
+        if not resp[0]:
             cdrcgi.bail("Failure creating publishable version for %s:<br />%s" %
-                        (resp[0], formatErrors(resp2[1])))
+                        (docId, formatErrors(resp[1])))
         pubVerNote = "(with publishable version)"
-    if not replaceID:
-        subtitle = "Citation added as %s %s" % (resp[0], pubVerNote)
+    if replaceID:
+        subtitle = "Citation %s updated %s" % (docId, pubVerNote)
     else:
-        subtitle = "Citation %s updated %s" % (resp[0], pubVerNote)
-    # FALL THROUGH TO FORM DISPLAY
+        subtitle = "Citation added as %s %s" % (docId, pubVerNote)
+    # Continue with search form display
 
 #----------------------------------------------------------------------
 # Display the search form.
