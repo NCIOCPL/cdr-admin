@@ -12,6 +12,8 @@
 #                 Certain Comments
 # BZIssue::5006 - Minor Revisions to QC Report Interfaces - Comments Options
 # BZIssue::5065 - [Summaries] 2 More Patient Summary QC Report Display Options
+# BZIssue::5159 - [Summaries] Changes to HP & Patient QC Report Interfaces 
+#                 and Display Options
 #
 # ----------------------------------------------------------------------------
 #
@@ -589,13 +591,13 @@ docId    = fields.getvalue(cdrcgi.DOCID) or None
 docType  = fields.getvalue("DocType")    or None
 docTitle = fields.getvalue("DocTitle")   or None
 version  = fields.getvalue("DocVersion") or None
-glossary = fields.getvalue("Glossary")   or None
+glossary = fields.getvalue("Glossaries") or None
 images   = fields.getvalue("Images")     or None
-citation = fields.getvalue("Citations")  or None
+citation = fields.getvalue("CitationsHP") or None
 loe      = fields.getvalue("LOEs")       or None
 qd       = fields.getvalue("QD")         or None
 kpbox    = fields.getvalue("Keypoints")  or None
-learnmore= fields.getvalue("Learnmore")  or None
+learnmore= fields.getvalue("LearnMore")  or None
 
 standardWording = fields.getvalue("ShowStandardWording") or None
 audInternComments    = fields.getvalue("AudInternalComments")  or None
@@ -771,6 +773,23 @@ def showTitleChoices(choices):
  </BODY>
 </HTML>
 """ % (cdrcgi.SESSION, session, docType or '', repType or ''))
+
+# ---------------------------------------------------------------------
+#
+# ---------------------------------------------------------------------
+def addCheckbox(inputLabels, inputName, inputID='', checked=0):
+    if checked == 0:
+       isChecked = ''
+    else:
+       isChecked = "checked='1'"
+
+    cbHtml = u"""\
+      <input name='%s' type='checkbox' id='%s'
+             %s>&nbsp;
+      <label for='%s'>%s</label>
+      <br>
+""" % (inputName, inputID, isChecked, inputID, inputLabels[inputName])
+    return cbHtml
 
 #----------------------------------------------------------------------
 # If we have a document title (or glossary definition) but not a
@@ -950,6 +969,50 @@ if letUserPickVersion:
       </tr>
     </table>
 """
+
+# Start - Misc Print Options block
+# ------------------------------------
+    checkboxLabels = { 'CitationsPat':'Display Reference section',
+                       'CitationsHP':'Display HP Reference section',
+                       'Glossaries':'Display glossary terms at end of report',
+                       'Images':'Display images',
+                       'Keypoints':'Display Key Point boxes',
+                       'LearnMore':
+                            'Display To Learn More section',
+                       'LOEs':
+                            'Display Level of Evidence terms',
+                       'StandardWording':
+                            'Display standard wording with mark-up'
+                 }
+
+    # Display the Misc. Print Options check boxes for Patients
+    # --------------------------------------------------------
+    if docType == 'Summary':
+        if repType == 'pat' or repType == 'patbu' or repType == 'patrs':
+            form += u"""\
+         <p>
+         <fieldset>
+          <legend>&nbsp;Misc Print Options&nbsp;</legend>
+    """
+
+            form += addCheckbox(checkboxLabels, 'Glossaries', 
+                                inputID='displayGlossaries')
+            form += addCheckbox(checkboxLabels, 'Images', 
+                                inputID='displayImages', checked=0)
+            form += addCheckbox(checkboxLabels, 'Keypoints', 
+                                inputID='displayKeypoints', checked=1)
+            form += addCheckbox(checkboxLabels, 'StandardWording', 
+                                inputID='displayStandardWording')
+            form += addCheckbox(checkboxLabels, 'CitationsPat', 
+                                inputID='displayCitations', checked=1)
+            form += addCheckbox(checkboxLabels, 'LearnMore', 
+                                inputID='displayLearnMore', checked=1)
+
+        # End - Misc Print Options block
+        # ------------------------------
+            form += u"""\
+             </fieldset>
+        """
 
     # Display the Comment display checkbox
     # Patient Summaries display the Internal Comments by default
@@ -1154,76 +1217,35 @@ if letUserPickVersion:
      </fieldset>
 """
 
-    # Display the Glossary appendix checkbox
-    # --------------------------------------
+    # Display the Misc. Print Options check boxes for HP
+    # --------------------------------------------------
     if docType == 'Summary':
-        form += u"""\
-  <p>
-     <fieldset>
-      <legend>&nbsp;Misc Print Options&nbsp;</legend>
-      &nbsp;<input name='Glossary' type='checkbox' id='dispGlos'>&nbsp;
-      <label for='dispGlos'>Include glossary terms at end of report</label>
-      <br>
-      &nbsp;<input name='Citations' type='checkbox' id='dispCit'
-             checked='1'>&nbsp;
-      <label for='dispCit'>Display the HP Reference Section</label>
-      <br>
-      &nbsp;<input name='LOEs' type='checkbox' id='dispLoe'>&nbsp;
-      <label for='dispLoe'>Display Level of Evidence terms at end of report</label>
+        if repType != 'pat' and repType != 'patbu' and repType != 'patrs':
+            form += u"""\
+         <p>
+         <fieldset>
+          <legend>&nbsp;Misc Print Options&nbsp;</legend>
+    """
 
-"""
+            form += addCheckbox(checkboxLabels, 'Glossaries', 
+                                inputID='displayGlossaries')
+            form += addCheckbox(checkboxLabels, 'CitationsHP', 
+                                inputID='displayCitations', checked=1)
+            form += addCheckbox(checkboxLabels, 'Images', 
+                                inputID='displayImages', checked=0)
+            form += addCheckbox(checkboxLabels, 'LOEs', 
+                                inputID='displayLOEs')
 
-    # Display the checkbox to display standard wording
-    # ------------------------------------------------
-    if repType == 'pat' or repType == 'patbu' or repType == 'patrs':
-        form += u"""\
-      <br>
-      &nbsp<input name='ShowStandardWording' type='checkbox' 
-             id='stdWord'>&nbsp;
-      <label for='stdWord'>Show standard wording with mark-up</label>
-"""
-    wsp = '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'
-    if docType == 'Summary':
-        form += u"""\
-     <p>
-     <fieldset class="gogreen">
-      <legend class="gg">&nbsp;GoGreen Option(s)&nbsp;</legend>
-"""
-
-    if repType == 'pat' or repType == 'patbu' or repType == 'patrs':
-        form += u"""\
-      &nbsp;<input name='AllGreen' type='checkbox' id='allGreen'
-                   onclick=javascript:checkGreen()>&nbsp;
-      <label for='allGreen'>Check all Options</label>
-      <br>
-"""
-
-    if docType == 'Summary':
-        form += u"""\
-      %s<input name='Images' type='checkbox' id='dispImg'>&nbsp;
-      <label for='dispImg'>Replace images with placeholders</label>
-      <br>
-""" % wsp
-
-    if repType == 'pat' or repType == 'patbu' or repType == 'patrs':
-        form += u"""\
-      %s<input name='Keypoints' type='checkbox' id='dispKP'>&nbsp;
-      <label for='dispKP'>Replace Key Point boxes with placeholders</label>
-      <br>
-      %s<input name='Learnmore' type='checkbox' id='dispLearnMore'>&nbsp;
-      <label for='dispLearnMore'>Replace To Learn More section 
-                                 with placeholder</label>
-""" % (wsp, wsp)
-
-    form += u"""\
-     </fieldset>
-"""
+        # End - Misc Print Options block
+        # ------------------------------
+            form += u"""\
+             </fieldset>
+        """
 
     # Display the Quick&Dirty option checkbox
     # ---------------------------------------
     if docType == 'Summary':
         form += u"""\
-     </fieldset>
   <p>
      <fieldset>
       <legend>&nbsp;911 Options&nbsp;</legend>
@@ -1865,7 +1887,7 @@ if repType == "bu" or repType == "but":
 filterParm.append(['DisplayGlossaryTermList',
                        glossary and "Y" or "N"])
 filterParm.append(['DisplayImages',
-                       images and "N" or "Y"])
+                       images and "Y" or "N"])
 filterParm.append(['DisplayCitations',
                        citation and "Y" or "N"])
 filterParm.append(['DisplayLOETermList',
@@ -1875,9 +1897,9 @@ if repType == 'pat' or repType == 'patrs' or repType == 'patbu':
     filterParm.append(['ShowStandardWording',
                        standardWording and "Y" or "N"])
     filterParm.append(['ShowKPBox',
-                       kpbox and "N" or "Y"])
+                       kpbox and "Y" or "N"])
     filterParm.append(['ShowLearnMoreSection',
-                       learnmore and "N" or "Y"])
+                       learnmore and "Y" or "N"])
 
 doc = cdr.filterDoc(session, filters[docType], docId = docId,
                     docVer = version or None, parm = filterParm)
