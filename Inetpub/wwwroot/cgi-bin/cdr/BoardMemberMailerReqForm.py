@@ -372,6 +372,10 @@ header = cdrcgi.header(title, title, section, script, buttons,
    var letters = {
        'advisory': [
            new Option('Advisory Board Invitation Letter', 'adv-invitation'),
+           new Option('Advisory Board Review Letter for Email',
+                      'adv-summ-email'),
+           new Option('Advisory Board Review Letter for FedEx',
+                      'adv-summ-fedex'),
            new Option('Advisory Board Still Interested Letter',
                       'adv-interested'),
            new Option('Advisory Board Thank You Letter',  'adv-thankyou')
