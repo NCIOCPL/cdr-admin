@@ -132,7 +132,7 @@ def fetchCitation(pmid):
 def createNewCitationDoc(article):
     title = getArticleTitle(article) 
     if not title: cdrcgi.bail("Unable to find article title")
-    ctrl = { "DocType": "Citation", "DocTitle": title[:255] }
+    ctrl = { "DocType": "Citation", "DocTitle": title[:255].encode("utf-8") }
     root = etree.Element("Citation")
     details = etree.SubElement(root, "VerificationDetails")
     etree.SubElement(details, "Verified").text = "Yes"
