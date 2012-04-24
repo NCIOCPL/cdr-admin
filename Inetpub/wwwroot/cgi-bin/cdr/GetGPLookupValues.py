@@ -74,8 +74,8 @@ LEFT OUTER JOIN query_term o
     root.append(getValues(vvLists, 'GeneticsTeamServices', 'TeamServices'))
     root.append(getValues(vvLists, 'MemberOfGeneticsSociety', 'Societies'))
     root.append(getValues(vvLists, 'GeneticsBoardName', 'Specialties'))
-    cdrcgi.sendPage(u"".join(etree.tostring(root, xml_declaration=True,
-                                   encoding='utf-8')), 'xml')
+    cdrcgi.sendPage(unicode(etree.tostring(root, xml_declaration=True,
+                                   encoding='utf-8'), "utf-8"), 'xml')
 
 if __name__ == '__main__':
     main()
