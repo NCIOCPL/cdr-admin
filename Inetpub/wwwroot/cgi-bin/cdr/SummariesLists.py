@@ -4,7 +4,8 @@
 #
 # Report on lists of summaries.
 #
-# $Log: not supported by cvs2svn $
+# BZIssue::5177 - Adding a Table Option to the Summaries Lists Report
+#
 # Revision 1.6  2007/11/03 14:15:07  bkline
 # Unicode encoding cleanup (issue #3716).
 #
@@ -37,6 +38,7 @@ boolOp    = fields and fields.getvalue("Boolean")          or "AND"
 audience  = fields and fields.getvalue("audience")         or None
 lang      = fields and fields.getvalue("lang")             or None
 showId    = fields and fields.getvalue("showId")           or "N"
+showTable = fields and fields.getvalue("showTable")        or "N"
 groups    = fields and fields.getvalue("grp")              or []
 submit    = fields and fields.getvalue("SubmitButton")     or None
 request   = cdrcgi.getRequest(fields)
@@ -74,56 +76,59 @@ def boardHeaderWithID(board_type):
     return html
 
 
-# ------------------------------------------------
-# Create the table row for the English list output
-# ------------------------------------------------
-def summaryRow(summary):
-    """Return the HTML code to display a Summary row"""
-    html = """\
-   <LI class="report">%s</LI>
-""" % (row[1])
-    return html
-
-
 # -------------------------------------------------
 # Create the table row for the English table output
 # -------------------------------------------------
-def summaryRowWithID(id, summary):
+def summaryTableRow(id, summary, translation, addCdrID='N', addBlank='N',
+                                              language='English'):
     """Return the HTML code to display a Summary row with ID"""
+
+    # Start the table row
+    # -------------------
     html = """\
-   <TR>
-    <TD class="report cdrid" width = "8%%">%s</TD>
-    <TD class="report">%s</TD>
+   <TR>"""
+
+    # Setting the class and column headers for table display
+    # ------------------------------------------------------
+    if addBlank == 'Y': 
+        showGrid = 'blankCol'
+    else:
+        showGrid = ''
+
+
+    # Add an extra cell for the CDR-ID
+    # --------------------------------
+    if addCdrID == 'Y':
+        html += """
+    <TD class="report cdrid %s" width="8%%">%s</TD>""" % (showGrid, id)
+
+    # Display the Summary title
+    # -------------------------
+    html += """
+    <TD class="report %s">%s""" % (showGrid, summary)
+
+    # Add the English translation for Spanish summaries
+    # -------------------------------------------------
+    if language == 'Spanish':
+        html += """<br/>
+        (%s)""" % translation
+
+    # End the summaries cell
+    # ----------------------
+    html += """
+    </TD>"""
+
+    # Add and extra blank column
+    # --------------------------
+    if addBlank == 'Y':
+        html += """
+    <TD class="report %s" width="25%%">&nbsp;</TD>""" % showGrid
+
+    # End the table row
+    # -----------------
+    html += """
    </TR>
-""" % (id, summary)
-    return html
-
-
-# ------------------------------------------------
-# Create the table row for the Spanish list output
-# ------------------------------------------------
-def summaryRowES(summary, translation):
-    """Return the HTML code to display a Spanish Summary"""
-    html = """\
-   <LI class="report">%s</LI>
-   <LI class="report">&nbsp;&nbsp;&nbsp;(%s)<div class="es"> </div></LI>
-""" % (row[1], row[4])
-    return html
-
-
-# -------------------------------------------------
-# Create the table row for the Spanish table output
-# -------------------------------------------------
-def summaryRowESWithID(id, summary, translation):
-    """Return the HTML code to display a Spanish Summary row with ID"""
-    html = """\
-   <TR>
-    <TD class="report cdrid" width = "8%%">%s</TD>
-    <TD class="report">%s<BR/>
-     (%s)
-    </TD>
-   </TR>
-""" % (id, summary, translation)
+"""
     return html
 
 
@@ -158,6 +163,12 @@ dateString = time.strftime("%B %d, %Y")
 #----------------------------------------------------------------------
 # If we don't have a request, put up the form.
 #----------------------------------------------------------------------
+### For Testing ###
+#lang = 'English'
+#groups = ['Adult Treatment']
+#audience = 'Patient'
+### For Testing ###
+
 if not lang:
     header = cdrcgi.header(title, title, instr + ' - ' + dateString, 
                            script,
@@ -213,6 +224,16 @@ if not lang:
     <label for="idYes">With CDR-ID</label>
    </fieldset>
 
+   <fieldset>
+    <legend>&nbsp;Display in Table Format?&nbsp;</legend>
+    <input name='showTable' type='radio' id="tableNo"
+           value='N' CHECKED>
+    <label for="tableNo">Standard</label>
+    <br>
+    <input name='showTable' type='radio' id="tableYes"
+           value='Y'>
+    <label for="tableYes">Table format with blank column</label>
+   </fieldset>
    <fieldset>
     <legend>&nbsp;Select Summary Language and Summary Type&nbsp;</legend>
    <table border = '0'>
@@ -473,7 +494,6 @@ except cdrdb.Error, info:
 if not rows:
     cdrcgi.bail('No Records Found for Selection: %s ' % lang+"; "+audience+"; "+groups[0] )
 
-#cdrcgi.bail("Result: %s" % rows[75])
 # Counting the number of summaries per board
 # ------------------------------------------
 boardCount = {}
@@ -493,18 +513,21 @@ header    = cdrcgi.rptHeader(title, instr,
                      padding-left:   0;
                      margin-top:    10px;
                      margin-bottom: 30px; }
-    TABLE          { margin-top:    10px; 
+    TABLE          { border-collapse: collapse;
+                     margin-top:    10px; 
                      margin-bottom: 30px; } 
 
     *.date         { font-size: 12pt; }
     *.sectionHdr   { font-size: 12pt;
                      font-weight: bold;
                      text-decoration: underline; }
-    td.report      { font-size: 11pt;
+    *.report       { font-size: 11pt;
                      padding-right: 15px; 
                      vertical-align: top; }
+    *.blankCol     { empty-cells: show;
+                     border: 1px solid black; }
     *.cdrid        { text-align: right }
-    LI             { list-style-type: none }
+    li             { list-style-type: none }
     li.report      { font-size: 11pt;
                      font-weight: normal; }
     div.es          { height: 10px; }
@@ -526,12 +549,6 @@ report    = """\
   <span class="date">(%s)</span>
   </H3>
 """ % (cdrcgi.SESSION, session, hdrLang, audience, dateString)
-#else:
-#    report    = """\
-#   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-#  </FORM>
-#  <H3>PDQ %s %s Summaries</H3>
-#""" % (cdrcgi.SESSION, session, lang, audience)
 
 board_type = rows[0][5]
 
@@ -545,61 +562,51 @@ board_type = rows[0][5]
 # English and Spanish data to be displayed identically except that the 
 # English translation of the summary titles is displayed under the title
 # ------------------------------------------------------------------------
-if showId == 'N':
-    report += """\
-  <span class="sectionHdr">%s (%d)</span>
-  <DL>
-""" % (board_type, boardCount[board_type])
-
-    for row in rows:
-        # If we encounter a new board_type we need to create a new
-        # heading
-        # ----------------------------------------------------------
-        if row[5] == board_type:
-            if lang == 'English':
-                report += summaryRow(row[1])
-            else:
-                report += summaryRowES(row[1], row[4])
-
-        # For the Treatment Summary Type we need to check if this is an 
-        # adult or pediatric summary
-        # -------------------------------------------------------------
-        else:
-            board_type = row[5]
-            report += boardHeader(board_type)
-            if lang == 'English':
-                report += summaryRow(row[1])
-            else:
-                report += summaryRowES(row[1], row[4])
-# ------------------------------------------------------------------------
-# Display data including CDR ID
-# English and Spanish data to be displayed identically except that the 
-# English translation of the summary titles is displayed under the title
-# ------------------------------------------------------------------------
-else:
-    report += """\
+report += """\
   <span class="sectionHdr">%s (%d)</span>
   <TABLE width = "100%%">
 """ % (board_type, boardCount[board_type])
 
-    for row in rows:
-        # If we encounter a new board_type we need to create a new
-        # heading
-        # ----------------------------------------------------------
-        if row[5] == board_type:
-            if lang == 'English':
-                report += summaryRowWithID(row[0], row[1])
-            else:
-                report += summaryRowESWithID(row[0], row[1], row[4])
-        else:
-            board_type = row[5]
-            report += boardHeaderWithID(board_type)
-            if lang == 'English':
-                report += summaryRowWithID(row[0], row[1])
-            else:
-                report += summaryRowESWithID(row[0], row[1], row[4])
+# Need to create a header row if we're displaying a table
+# -------------------------------------------------------
+if showTable == 'Y': 
+    if showId == 'Y':
+        showHeader = """\
+   <TR>
+    <TH class="report blankCol">CDR-ID</TH>
+    <TH class="report blankCol">Title</TH>
+    <TH class="report blankCol"> </TH>
+   </TR>
+"""
+    else:
+        showHeader = """\
+   <TR>
+    <TH class="report blankCol">Title</TH>
+    <TH class="report blankCol"> </TH>
+   </TR>
+"""
+    report += showHeader
 
-    report += """
+# Creating the individual rows
+# ----------------------------------------
+for row in rows:
+    # If we encounter a new board_type we need to create a new
+    # heading
+    # ----------------------------------------------------------
+    if row[5] == board_type:
+        report += summaryTableRow(row[0], row[1], row[4], 
+                                  addCdrID=showId, addBlank=showTable,
+                                  language=lang)
+    else:
+        board_type = row[5]
+        report += boardHeaderWithID(board_type)
+
+        if showTable == 'Y':
+            report += showHeader
+        report += summaryTableRow(row[0], row[1], row[4], 
+                                  addCdrID=showId, addBlank=showTable,
+                                  language=lang)
+report += """
   </TABLE>
 """
 
