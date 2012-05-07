@@ -4,7 +4,8 @@
 #
 # Report on lists of drug information summaries.
 #
-# $Log: not supported by cvs2svn $
+# BZIssue::5198 - Adding a Table Option to Drug Summaries Lists Report
+#
 # Revision 1.1  2008/09/10 17:30:49  venglisc
 # Initial version of DrugInformationSummaries List report (Bug 4250).
 #
@@ -19,6 +20,7 @@ session   = cdrcgi.getSession(fields)
 # audience  = fields and fields.getvalue("audience")         or "Patient"
 drugType  = fields and fields.getvalue("type")             or None
 showId    = fields and fields.getvalue("showId")           or "N"
+showTable = fields and fields.getvalue("showTable")        or "N"
 submit    = fields and fields.getvalue("SubmitButton")     or None
 request   = cdrcgi.getRequest(fields)
 title     = "CDR Administration"
@@ -28,52 +30,103 @@ SUBMENU   = "Report Menu"
 buttons   = (SUBMENU, cdrcgi.MAINMENU)
 
 
-# ---------------------------------------------------
-# Functions to replace sevaral repeated HTML snippets
-# ---------------------------------------------------
-def drugHeader(listHeader, type):
-    """Return the HTML code to display the Summary Board Header"""
-    html = u"""\
-  <SPAN class="sectionHdr">%s (%d)</SPAN>
-""" % (listHeader, combiCount[type])
-    return html
-
-
-# ---------------------------------------------------
-# 
-# ---------------------------------------------------
-def drugHeaderWithID(listHeader, type):
-    """Return the HTML code to display the Summary Board Header with ID"""
-    html = u"""\
-  <SPAN class="sectionHdr">%s (%d)</SPAN>
-""" % (listHeader, combiCount[type])
-    return html
-
-
-# ------------------------------------------------
-# Create the table row for the English list output
-# ------------------------------------------------
-def summaryRow(summary):
-    """Return the HTML code to display a Summary row"""
-    html = u"""\
-   <LI class="report">%s</LI>
-""" % (row[1])
-    return html
-
-
 # -------------------------------------------------
 # Create the table row for the English table output
 # -------------------------------------------------
-def summaryRowWithID(id, summary):
+def summaryTableRow(id, summary, addCdrID='Y', addBlank='N'):
     """Return the HTML code to display a Summary row with ID"""
-    html = u"""\
-   <TR>
-    <TD class="report cdrid" width = "8%%">%s</TD>
-    <TD class="report">%s</TD>
+
+    # Start the table row
+    # -------------------
+    html = """\
+   <TR>"""
+
+    # Setting the class and column headers for table display
+    # ------------------------------------------------------
+    if addBlank == 'Y': 
+        showGrid = 'blankCol'
+    else:
+        showGrid = ''
+
+
+    # Add an extra cell for the CDR-ID
+    # --------------------------------
+    if addCdrID == 'Y':
+        html += """
+    <TD class="report cdrid %s" width="8%%">%s</TD>""" % (showGrid, id)
+
+    # Display the Summary title
+    # -------------------------
+    html += """
+    <TD class="report %s">%s""" % (showGrid, summary)
+
+    # End the summaries cell
+    # ----------------------
+    html += """
+    </TD>"""
+
+    # Add and extra blank column
+    # --------------------------
+    if addBlank == 'Y':
+        html += """
+    <TD class="report %s" width="50%%">&nbsp;</TD>""" % showGrid
+
+    # End the table row
+    # -----------------
+    html += """
    </TR>
-""" % (id, summary)
+"""
     return html
 
+
+
+# ---------------------------------------------------
+# Functions to replace sevaral repeated HTML snippets
+# ---------------------------------------------------
+def disHeader(listHeader, disCount):
+    """Return the HTML code to display the Summary Board Header"""
+    html = u"""\
+  <SPAN class="sectionHdr">%s (%d)</SPAN>
+  <TABLE width = "100%%">
+""" % (listHeader, disCount)
+    return html
+
+
+## ---------------------------------------------------
+## 
+## ---------------------------------------------------
+#def drugHeaderWithID(listHeader, type):
+#    """Return the HTML code to display the Summary Board Header with ID"""
+#    html = u"""\
+#  <SPAN class="sectionHdr">%s (%d)</SPAN>
+#""" % (listHeader, combiCount[type])
+#    return html
+#
+#
+## ------------------------------------------------
+## Create the table row for the English list output
+## ------------------------------------------------
+#def summaryRow(summary):
+#    """Return the HTML code to display a Summary row"""
+#    html = u"""\
+#   <LI class="report">%s</LI>
+#""" % (row[1])
+#    return html
+#
+##
+## -------------------------------------------------
+## Create the table row for the English table output
+## -------------------------------------------------
+#def summaryRowWithID(id, summary):
+#    """Return the HTML code to display a Summary row with ID"""
+#    html = u"""\
+#   <TR>
+#    <TD class="report cdrid" width = "8%%">%s</TD>
+#    <TD class="report">%s</TD>
+#   </TR>
+#""" % (id, summary)
+#    return html
+#
 
 # =====================================================================
 # Main starts here
@@ -100,6 +153,9 @@ except cdrdb.Error, info:
 dateString = time.strftime("%B %d, %Y")
 instr = instr % dateString
 
+### Testing
+#drugType = 'All'
+### Testing
 #----------------------------------------------------------------------
 # If we don't have a request, put up the form.
 #----------------------------------------------------------------------
@@ -120,16 +176,6 @@ if not drugType:
     form   = u"""\
    <input type='hidden' name='%s' value='%s'>
  
-   <!-- fieldset>
-    <legend>&nbsp;Select Summary Audience&nbsp;</legend>
-    <input name='audience' type='radio' id="byHp"
-           value='Health Professional'>
-    <label for="byHp">Health Professional</label>
-    <br>
-    <input name='audience' type='radio' id="byPat"
-           value='Patient' CHECKED>
-    <label for="byPat">Patient</label>
-   </fieldset -->
    <fieldset>
     <legend>&nbsp;Display CDR-ID?&nbsp;</legend>
     <input name='showId' type='radio' id="idNo"
@@ -151,6 +197,17 @@ if not drugType:
     <br>
     <input name='type' type='radio' id="both" value='All' CHECKED>
     <label for="both">Both</label>
+   </fieldset>
+
+   <fieldset>
+    <legend>&nbsp;Display in Table Format?&nbsp;</legend>
+    <input name='showTable' type='radio' id="tableNo"
+           value='N' CHECKED>
+    <label for="tableNo">Standard</label>
+    <br>
+    <input name='showTable' type='radio' id="tableYes"
+           value='Y'>
+    <label for="tableYes">Table format with blank column</label>
    </fieldset>
 
   </form>
@@ -196,8 +253,6 @@ except cdrdb.Error, info:
      
 if not rows:
     cdrcgi.bail('No Records Found for Selection: %s ' % drugType   + "; ")
-    # cdrcgi.bail('No Records Found for Selection: %s ' % drugType   + "; "
-    #                                                     + audience + "; ")
 
 # Counting the number of summaries per board
 # ------------------------------------------
@@ -219,16 +274,19 @@ header    = cdrcgi.rptHeader(title, stylesheet = """\
                      padding-left:   0;
                      margin-top:    10px;
                      margin-bottom: 30px; }
-    TABLE          { margin-top:    10px; 
+    TABLE          { border-collapse:collapse;
+                     margin-top:    10px; 
                      margin-bottom: 30px; } 
 
     *.date         { font-size: 12pt; }
     *.sectionHdr   { font-size: 12pt;
                      font-weight: bold;
                      text-decoration: underline; }
-    td.report      { font-size: 11pt;
+    *.report       { font-size: 11pt;
                      padding-right: 15px; 
                      vertical-align: top; }
+    *.blankCol     { empty-cells: show;
+                     border: 1px solid black; }
     *.cdrid        { text-align: right }
     LI             { list-style-type: none }
     li.report      { font-size: 11pt;
@@ -252,91 +310,59 @@ report    = u"""\
 # - The report without CDR ID is displayed as a none-bulleted list.
 # - The report with    CDR ID is displayed in a table format.
 # -------------------------------------------------------------------
+
 # ------------------------------------------------------------------------
-# Display data without CDR ID
+# Display the data
 # ------------------------------------------------------------------------
-singleHdDone = combiHdDone = False
-singleReport = combiReport = ''
-singleAll    = combiAll    = ''
-combiHeader  = ''
+reportS = disHeader('Single Agent Drug', combiCount['Single'])
+reportD = disHeader('Combination Drug', combiCount['Combi'])
 
-if showId == 'N':
-    for row in rows:
-        # Display the Single Drug section
-        # ----------------------------------------------------------
-        if row[4] != 'Yes' and (drugType == 'All' or drugType == 'Single'):
-            if not singleHdDone:
-                singleHdDone = True
-                singleHeader = drugHeader('Single Agent Drug', 'Single')
-
-            singleReport += summaryRow(row[1])
-
-        # Display the Combination Drug section
-        # -------------------------------------------------------------
-        elif row[4] == 'Yes' and (drugType == 'All' or drugType == 'Combi'):
-            if not combiHdDone:
-                combiHdDone = True
-                combiHeader = drugHeader('Combination Drug', 'Combi')
-
-            combiReport += summaryRow(row[1])
-
-    # Put the two sections together
-    # This if-block is necessary in order to create a valid HTML document
-    # -------------------------------------------------------------------
-    if drugType in ('All', 'Single'):
-        singleAll = singleHeader + """
-  <UL>
-"""               + singleReport + """\
-  </UL>
+if showTable == 'Y': 
+    if showId == 'Y':
+        showHeader = """\
+   <TR>
+    <TH class="report blankCol">CDR-ID</TH>
+    <TH class="report blankCol">Title</TH>
+    <TH class="report blankCol"> </TH>
+   </TR>
 """
-    if drugType in ('All', 'Combi'):
-        combiAll = combiHeader + """
-  <UL>
-"""               + combiReport + """\
-  </UL>
+    else:
+        showHeader = """\
+   <TR>
+    <TH class="report blankCol">Title</TH>
+    <TH class="report blankCol"> </TH>
+   </TR>
 """
+    reportS += showHeader
+    reportD += showHeader
 
-# ------------------------------------------------------------------------
-# Display data including CDR ID
-# ------------------------------------------------------------------------
-else:
-    for row in rows:
-        # If we encounter a new board_type we need to create a new
-        # heading
-        # ----------------------------------------------------------
-        if row[4] != 'Yes' and (drugType == 'All' or drugType == 'Single'):
-            if not singleHdDone:
-                singleHdDone = True
-                singleHeader = drugHeaderWithID('Single Agent Drug', 'Single')
-
-            singleReport += summaryRowWithID(row[0], row[1])
-
-        # Display the Combination Drug section
-        # -------------------------------------------------------------
-        elif row[4] == 'Yes' and (drugType == 'All' or drugType == 'Combi'):
-            if not combiHdDone:
-                combiHdDone = True
-                combiHeader = drugHeaderWithID('Combination Drug', 'Combi')
-
-            combiReport += summaryRowWithID(row[0], row[1])
-
-    # Put the two sections together
-    # This if-block is necessary in order to create a valid HTML document
-    # -------------------------------------------------------------------
-    if drugType in ('All', 'Single'):
-        singleAll = singleHeader + """
-  <TABLE width = "100%">
-"""               + singleReport + """\
+# Creating the individual rows
+# ----------------------------------------
+for row in rows:
+    # The rows list all Drug Summary records sorted by DIS/Combo.
+    # If only one type needs to be printed then skip the other
+    # otherwise we'll need to print a second heading for the second
+    # type.
+    # ----------------------------------------------------------
+    if row[4] != 'Yes':
+        reportS += summaryTableRow(row[0], row[1], addCdrID=showId, 
+                                   addBlank=showTable)
+    if row[4] == 'Yes':
+        reportD += summaryTableRow(row[0], row[1], addCdrID=showId, 
+                                  addBlank=showTable)
+reportS += """
   </TABLE>
 """
-    if drugType in ('All', 'Combi'):
-        combiAll = combiHeader + """
-  <TABLE width = "100%">
-"""               + combiReport + """\
+reportD += """
   </TABLE>
 """
 
-report += singleAll + combiAll
+# Decide which of the two individual reports should be printed
+# ------------------------------------------------------------
+if drugType == 'All' or drugType == 'Single':
+    report += reportS
+if drugType == 'All' or drugType == 'Combi':
+    report += reportD
 
 footer = u"""\
  </BODY>
