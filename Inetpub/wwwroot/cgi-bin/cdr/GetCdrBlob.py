@@ -97,7 +97,7 @@ class DocInfo:
             else:
                 raise cdr.Exception("unable to determine mime type for "
                                     "CDR%d" % self.docId)
-                
+
     @staticmethod
     def makeFilename(docId, docVer, suffix):
         if docVer:
@@ -132,9 +132,10 @@ else:
 rows = cursor.fetchall()
 if not rows:
     if info.docVer:
-        cdrcgi.bail("No blob found for version %s of CDR%d" % (docVer, docId))
+        cdrcgi.bail("No blob found for version %s of CDR%d" % (docVer,
+            info.docId))
     else:
-        cdrcgi.bail("No blob found for CDR document %d" % docId)
+        cdrcgi.bail("No blob found for CDR document %d" % info.docId)
 bytes = rows[0][0]
 sys.stdout.write("Content-Type: %s\r\n" % info.mimeType)
 sys.stdout.write("Content-Disposition: attachment; filename=%s\r\n" %
