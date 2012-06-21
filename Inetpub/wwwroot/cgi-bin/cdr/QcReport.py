@@ -311,12 +311,19 @@ def getSectionTitle(repType):
         return "QC Report (Unrecognized Type)"
 
 #----------------------------------------------------------------------
+# Map for finding the filters for a given document type.
+#----------------------------------------------------------------------
+filters = cdr.FILTERS
+
+#----------------------------------------------------------------------
 # Get the parameters from the request.
 #----------------------------------------------------------------------
 repTitle = "CDR QC Report"
 fields   = cgi.FieldStorage() or cdrcgi.bail("No Request Found", repTitle)
+docId    = fields.getvalue(cdrcgi.DOCID) or None
 session  = cdrcgi.getSession(fields) or cdrcgi.bail("Not logged in")
 action   = cdrcgi.getRequest(fields)
+qcParams = fields.getvalue('paramset') or '0'
 title    = "CDR Administration"
 repType  = fields.getvalue("ReportType") or None
 section  = "QC Report"
@@ -587,7 +594,6 @@ header   = cdrcgi.header(title, title, getSectionTitle(repType),
      }
   </script>
 """)
-docId    = fields.getvalue(cdrcgi.DOCID) or None
 docType  = fields.getvalue("DocType")    or None
 docTitle = fields.getvalue("DocTitle")   or None
 version  = fields.getvalue("DocVersion") or None
@@ -1262,74 +1268,6 @@ if letUserPickVersion:
 """)
 
 #----------------------------------------------------------------------
-# Map for finding the filters for a given document type.
-#----------------------------------------------------------------------
-filters = {
-    'Citation':
-        ["set:QC Citation Set"],
-    'CTGovProtocol':
-        ["set:QC CTGovProtocol Set"],
-    'DrugInformationSummary':
-        ["set:QC DrugInfoSummary Set"],
-    ### 'DIS':
-    ###     ["set:QC DrugInfoSummary Set"],
-    'GlossaryTerm':
-        ["set:QC GlossaryTerm Set"],
-    'GlossaryTerm:rs': # Redline/Strikeout
-        ["set:QC GlossaryTerm Set (Redline/Strikeout)"],
-    'GlossaryTermConcept':
-        ["name:Glossary Term Concept QC Report Filter"],
-    'GlossaryTermName':
-        ["set:QC GlossaryTermName"],
-    'GlossaryTermName:gtnwc':
-        ["set:QC GlossaryTermName with Concept Set"],
-    'InScopeProtocol':
-        ["set:QC InScopeProtocol Set"],
-    'Media:img':
-        ["set:QC Media Set"],
-    'MiscellaneousDocument':
-        ["set:QC MiscellaneousDocument Set"],
-    'MiscellaneousDocument:rs':
-        ["set:QC MiscellaneousDocument Set (Redline/Strikeout)"],
-    'Organization':
-        ["set:QC Organization Set"],
-    'Person':
-        ["set:QC Person Set"],
-    'PDQBoardMemberInfo':
-        ["set:QC PDQBoardMemberInfo Set"],
-    'Summary':
-        ["set:QC Summary Set"],
-    'Summary:bu':    # Bold/Underline
-        ["set:QC Summary Set (Bold/Underline)"],
-    'Summary:buqd':    # Bold/Underline - Quick and Dirty
-        ["set:QC QD Summary Set (Bold/Underline)"],
-    'Summary:rs':    # Redline/Strikeout
-        ["set:QC Summary Set"],
-    'Summary:rsqd':  # Redline/Strikeout - Quick and Dirty
-        ["set:QC QD Summary Set"],
-    #'Summary:but':   # Bold/Underline
-    #    ["set:QC Summary Set (Bold/Underline) Test"],
-    #'Summary:rst':   # Redline/Strikeout
-    #    ["set:QC Summary Set Test"],
-    'Summary:nm':    # No markup
-        ["set:QC Summary Set"],
-    'Summary:pat':   # Patient
-        ["set:QC Summary Patient Set"],
-    'Summary:patrs': # Patient R/S
-        ["set:QC Summary Patient Set"],
-    'Summary:patqd': # Patient - Quick and Dirty
-        ["set:QC QD Summary Patient Set"],
-    'Summary:patrsqd': # Patient R/S - Quick and Dirty
-        ["set:QC QD Summary Patient Set"],
-    'Summary:patbu': # Patient BU
-        ["set:QC Summary Patient Set (Bold/Underline)"],
-    'Summary:patbuqd': # Patient BU - Quick and Dirty
-        ["set:QC QD Summary Patient Set (Bold/Underline)"],
-    'Term':
-        ["set:QC Term Set"]
-}
-
-#----------------------------------------------------------------------
 # Determine the document type.
 #----------------------------------------------------------------------
 if not docType:
@@ -1901,6 +1839,34 @@ if repType == 'pat' or repType == 'patrs' or repType == 'patbu':
     filterParm.append(['ShowLearnMoreSection',
                        learnmore and "Y" or "N"])
 
+# ----------------------------------------------------------------
+# Saving QC report parameters in DB table
+# ----------------------------------------------------------------
+def saveParms(parms):
+    parms.sort()
+    try:
+        cursor.execute("""\
+     INSERT INTO url_parm_set( longURL) 
+            VALUES (?)""", (repr(parms),))
+        conn.commit()
+        cursor.execute("""\
+     SELECT max(id) from url_parm_set""")
+        row = cursor.fetchone()
+
+    except cdrdb.Error, info:
+        cdrcgi.bail('Failure inserting parms: %s' % (info[1][0]))
+
+    return row[0]
+
+
+# Before filtering the document write the parameters to a DB
+# table to access parameters for Word converstion
+# ----------------------------------------------------------------
+try:
+    parmId = saveParms(filterParm)
+except:
+    cdrcgi.bail("Something went wrong")
+
 doc = cdr.filterDoc(session, filters[docType], docId = docId,
                     docVer = version or None, parm = filterParm)
 #if (type(doc) in (type(""), type(u"")):
@@ -1957,4 +1923,5 @@ if type(doc) != type(u""):
 #----------------------------------------------------------------------
 # Send it.
 #----------------------------------------------------------------------
-cdrcgi.sendPage(doc)
+cdrcgi.sendPage(doc, parms='parmstring=yes&parmid=%s' % parmId, 
+                     docId=docId, docType=docType)
