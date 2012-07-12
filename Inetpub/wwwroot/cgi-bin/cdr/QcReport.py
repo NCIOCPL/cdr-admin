@@ -1924,4 +1924,4 @@ if type(doc) != type(u""):
 # Send it.
 #----------------------------------------------------------------------
 cdrcgi.sendPage(doc, parms='parmstring=yes&parmid=%s' % parmId, 
-                     docId=docId, docType=docType)
+                     docId=docId, docType=docType, docVer=version)

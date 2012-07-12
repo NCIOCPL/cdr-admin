@@ -1,6 +1,6 @@
 #-----------------------------------------------------------------------------
 #
-# $Id: $
+# $Id$
 #
 # When the users are converting a QC report to MS-Word the report is 
 # rerun using a GET with the URL.  However, the length of the URL that
