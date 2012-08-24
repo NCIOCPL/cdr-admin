@@ -6,13 +6,6 @@
 # bit rot has set in while we're waiting for the Cancer.gov team
 # to QC the service.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.2  2008/12/18 15:55:42  bkline
-# Code and CSS cleanup.
-#
-# Revision 1.1  2008/12/11 13:15:41  bkline
-# Unit test for glossifier service built for Cancer.gov.
-#
 #----------------------------------------------------------------------
 import warnings, cgi, cdrcgi, re
 
