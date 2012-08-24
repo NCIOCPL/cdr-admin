@@ -4,35 +4,6 @@
 #
 # Main menu for advanced search forms.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.9  2009/05/06 03:21:57  ameyer
-# Trivial change to send unicode to sendPage instead of ASCII.
-#
-# Revision 1.8  2008/09/18 13:57:47  bkline
-# Added Drug Information Summaries search.
-#
-# Revision 1.7  2006/05/04 13:27:09  bkline
-# Added Media.
-#
-# Revision 1.6  2004/09/10 17:09:53  venglisc
-# Added style for mouse-hover background color to be consistend with the
-# change to the menus. (Bug 1331)
-#
-# Revision 1.5  2002/05/16 14:33:04  bkline
-# Changed wording of menu for Person with locations.
-#
-# Revision 1.4  2002/02/22 02:18:58  bkline
-# Added advanced search page for Documentation documents.
-#
-# Revision 1.3  2002/02/20 04:00:51  bkline
-# Added menu item for GlossaryTerm search.
-#
-# Revision 1.2  2002/02/14 19:34:21  bkline
-# Replaced Geographic Unit with Country and Political SubUnit choices.
-#
-# Revision 1.1  2001/12/01 18:11:44  bkline
-# Initial revision
-#
 #----------------------------------------------------------------------
 import cgi, cdrcgi, urllib
 
