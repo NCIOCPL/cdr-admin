@@ -1,15 +1,11 @@
+#!/usr/bin/python
 #----------------------------------------------------------------------
 #
 # $Id$
 #
-# Audit Trail report.
-#
-# $Log: not supported by cvs2svn $
-# Revision 1.1  2003/02/24 21:17:38  bkline
-# New report requested by Lakshmi.
+# Audit Trail report (new report requested by Lakshmi).
 #
 #----------------------------------------------------------------------
-#!/usr/bin/python
 
 import sys, cgi, time, cdrcgi, cdrdb, re
 
