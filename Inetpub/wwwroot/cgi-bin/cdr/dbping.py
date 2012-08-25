@@ -6,14 +6,6 @@
 #
 # $Id$
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.2  2009/03/31 21:59:18  ameyer
-# Added logging of the current task list for the machine around errors.
-# Moved from debug.log to dbping.log, to concentrate relevant info.
-#
-# Revision 1.1  2008/08/07 19:39:29  ameyer
-# Version modified to include logging.
-#
 ############
 import os, subprocess, cdr, cdrdb
 
