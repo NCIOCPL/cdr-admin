@@ -5,7 +5,8 @@
 # Report on Oncore trials which are duplicates of trials we already
 # have in the repository.
 #
-# $Log: not supported by cvs2svn $
+# BZIssue::4010
+#
 #----------------------------------------------------------------------
 import urllib, cdrdb, cdr, cdrcgi, time, re
 
