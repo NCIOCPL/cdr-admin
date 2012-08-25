@@ -4,63 +4,9 @@
 #
 # Prototype for duplicate-checking interface for Protocol documents.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.18  2009/05/11 17:51:30  venglisc
-# Converted string to unicode before passing to sendPage(). (Bug 4560)
-#
-# Revision 1.17  2009/05/01 02:07:10  ameyer
-# Forced input form sent to sendPage into unicode to silence warning.
-# Also checking in debugging code that Bob added some time ago.
-#
-# Revision 1.16  2006/06/06 22:10:37  bkline
-# Added ability to enter CDR ID directly.
-#
-# Revision 1.15  2004/04/09 12:17:32  bkline
-# Added SecondaryID to list of CTGovProtocol elements to be searched
-# (see Sheri's comment #10 for request #1165).
-#
-# Revision 1.14  2004/04/06 18:52:37  bkline
-# Implemented enhancements for request #1165.
-#
-# Revision 1.13  2003/12/17 01:21:33  bkline
-# Added code to pass session to results page function (to support
-# CTGovProtocol report).
-#
-# Revision 1.12  2003/12/17 01:06:00  bkline
-# Added support for CTGovProtocol documents.
-#
-# Revision 1.11  2003/12/16 15:45:42  bkline
-# Added TitleText to path for out of scope protocol searches.
-#
-# Revision 1.10  2003/12/08 18:46:08  bkline
-# Increased query timeout.
-#
-# Revision 1.9  2003/03/04 22:46:58  bkline
-# Modifications for CDR enhancement request #301.
-#
-# Revision 1.8  2002/07/11 20:50:18  bkline
-# Caught up with changed filter title.
-#
-# Revision 1.7  2002/05/30 17:06:41  bkline
-# Corrected CVS log comment for previous version.
-#
-# Revision 1.6  2002/05/30 17:01:05  bkline
-# New protocol filters from Cheryl.
-#
-# Revision 1.5  2002/05/08 17:41:51  bkline
-# Updated to reflect Volker's new filter names.
-#
-# Revision 1.4  2002/04/12 20:01:55  bkline
-# Plugged in new filters for InScopeProtocol documents.
-#
-# Revision 1.3  2002/02/20 03:58:55  bkline
-# Modified search paths to match modified schemas.
-#
-# Revision 1.2  2002/02/14 19:35:51  bkline
-# Replaced hardwired filter ID with filter name.
-#
-# Revision 1.1  2001/12/01 18:11:44  bkline
-# Initial revision
+# BZIssue::301
+# BZIssue::1165
+# BZIssue::4560
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, cdrdb, os
