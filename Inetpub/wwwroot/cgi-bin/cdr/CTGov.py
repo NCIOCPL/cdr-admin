@@ -82,8 +82,8 @@ reports = [
            ('GlobalChangeCTGovMapping.py',
             'Global Change Protocols to Find Mappings'),
            ('EditNonMappablePatterns.py',
-            'Update List of Non-mappable Patterns')
-          ]
+            'Update List of Non-mappable Patterns'),
+           ('ctrp-mapping-gaps.py', 'CTRP Mapping Gaps')          ]
 for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s'>%s</A></LI>\n" % (
             cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
