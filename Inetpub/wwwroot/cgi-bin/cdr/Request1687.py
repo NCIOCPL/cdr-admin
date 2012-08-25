@@ -4,7 +4,6 @@
 #
 # Mapped orgs without phones.
 #
-# $Log: not supported by cvs2svn $
 #----------------------------------------------------------------------
 import cdrdb
 
