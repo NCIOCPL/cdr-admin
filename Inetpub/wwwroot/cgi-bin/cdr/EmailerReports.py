@@ -4,15 +4,7 @@
 #
 # Reports on status of electronic mailers.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.3  2004/12/27 20:32:56  bkline
-# Added missing import for sys module.
-#
-# Revision 1.2  2004/09/09 15:23:46  bkline
-# Fixed typo; added date-range defaults (request #1328).
-#
-# Revision 1.1  2004/07/13 18:02:48  bkline
-# Administrative support for electronic mailers.
+# BZIssue::1328
 #
 #----------------------------------------------------------------------
 import cdr, cdrdb, cdrcgi, cgi, time, sys
