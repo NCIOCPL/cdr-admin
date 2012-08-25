@@ -2,40 +2,7 @@
 #
 # $Id$
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.9  2005/11/01 23:23:04  ameyer
-# Changed order of documents in the diff.  Adjusted flags.
-#
-# Revision 1.8  2005/10/18 15:32:23  ameyer
-# Apply textwrap module to word wrapping docs for diff.
-#
-# Revision 1.7  2005/10/07 03:08:43  ameyer
-# Added colorization.
-# Using ascii instead of latin-1.  Need to go over this.
-#
-# Revision 1.6  2005/10/04 18:18:38  ameyer
-# Restructured bailouts when inside a try block to keep the bailout from
-# triggering the catch clause.
-# Reverted to latin-1 from experimental use of ascii encoding.
-#
-# Revision 1.5  2005/09/30 03:51:02  ameyer
-# Modified report to diff different versions from before (Issue 1845).
-#
-# Revision 1.4  2005/07/22 19:41:20  venglisc
-# Removed print statement in code that caused IIS on BACH to trip up.
-# (Bug 1779)
-#
-# Revision 1.3  2003/12/18 22:05:29  bkline
-# Moved the line splitting before the invocation of diff and removed
-# the visual clues about where extra line breaks have been added.
-#
-# Revision 1.2  2003/12/17 13:48:32  bkline
-# Implemented wrapping of long lines at Lakshmi's request.
-#
-# Revision 1.1  2003/12/16 16:10:56  bkline
-# Script to show the differences between the current working copy of
-# a CTGovProtocol document and the latest publishable version (or
-# the first version if there are no publishable versions).
+# BZIssue::1779
 #
 #----------------------------------------------------------------------
 import cdr, cdrcgi, cdrdb, sys, cgi, re, sys, os, textwrap
