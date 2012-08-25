@@ -4,9 +4,7 @@
 #
 # Report on NCI cancer centers.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.2  2006/05/04 16:08:41  bkline
-# Added CVS keywords.
+# BZIssue::2113
 #
 #----------------------------------------------------------------------
 import cdrdb, ExcelWriter, sys
