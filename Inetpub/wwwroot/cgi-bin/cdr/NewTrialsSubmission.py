@@ -4,7 +4,6 @@
 #
 # Sub-menu for CIAT/CIPS staff.
 #
-# $Log: not supported by cvs2svn $
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
 
