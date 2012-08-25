@@ -4,39 +4,10 @@
 #
 # Report on the metadata for one or more summaries.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.11  2009/02/23 18:37:50  venglisc
-# Minor change to the CSS. (Bug 4475)
-#
-# Revision 1.9  2009/02/10 18:45:31  venglisc
-# Displaying top section titles bold. (Bug 4475)
-#
-# Revision 1.8  2008/06/03 21:58:56  bkline
-# Replaced StandardError (going away at some point) with Exception objects.
-#
-# Revision 1.7  2007/11/03 14:40:15  bkline
-# Restored table borders for the right tables this time.
-#
-# Revision 1.6  2007/11/03 14:36:36  bkline
-# Restored table borders at Margaret's request.
-#
-# Revision 1.5  2007/11/03 14:15:07  bkline
-# Unicode encoding cleanup (issue #3716).
-#
-# Revision 1.4  2007/02/21 17:16:52  venglisc
-# Modified query to only display publishable documents.  Modified CSS
-# and added CDR-ID to display. (Bug 2905)
-#
-# Revision 1.3  2005/07/19 22:02:28  ameyer
-# Modified the logic to report that data is missing rather than just
-# blow up when processing invalid records.
-#
-# Revision 1.2  2005/06/28 20:47:48  venglisc
-# Added two new MetaData elements (SummaryDescription, SummaryURL) to the QC
-# report. (Bug 1724)
-#
-# Revision 1.1  2003/11/10 18:14:24  bkline
-# Report on the metadata for one or more summaries.
+# BZIssue::1724
+# BZIssue::2905
+# BZIssue::3716
+# BZIssue::4475
 #
 #----------------------------------------------------------------------
 import cdr, cgi, cdrcgi, cdrdb, re
