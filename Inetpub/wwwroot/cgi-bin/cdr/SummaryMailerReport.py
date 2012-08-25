@@ -2,6 +2,8 @@
 #
 # $Id$
 #
+# BZIssue::4258
+# BZIssue::4250
 # BZIssue::4807 - Board Member not listed on Mailer Reports
 #
 # [Request 4258:]
@@ -29,13 +31,6 @@
 # (Editorial or Advisory), enter a Date Range, and select whether to sort
 # by Board Member or by Summary.  I will put in a sample of the report.
 # Request form for generating RTF letters to board members."
-#
-# $Log: not supported by cvs2svn $
-# Revision 1.2  2008/09/17 20:42:32  bkline
-# Added test to make sure e.text was not null for Received element.
-#
-# Revision 1.1  2008/09/02 19:00:02  bkline
-# New reports for Margaret (#4258 and #4259).
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrdb, cdrcgi, time
