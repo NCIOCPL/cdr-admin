@@ -2,7 +2,6 @@
 #
 # $Id$
 #
-# $Log: not supported by cvs2svn $
 #----------------------------------------------------------------------
 import cdrdb, cdrcgi, xml.sax.saxutils
 
