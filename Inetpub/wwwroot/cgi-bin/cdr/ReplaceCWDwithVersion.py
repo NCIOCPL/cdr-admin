@@ -1,4 +1,5 @@
 #--------------------------------------------------------------
+#
 # Replace the Current Working Version of a document with an
 # earlier version.
 #
@@ -6,8 +7,6 @@
 # we wish to revert to an earlier version.
 #
 # $Id$
-#
-# $Log: not supported by cvs2svn $
 #
 #--------------------------------------------------------------
 import time, cgi, cdr, cdrcgi, cdrdb
