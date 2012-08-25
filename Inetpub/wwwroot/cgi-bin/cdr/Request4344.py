@@ -5,16 +5,7 @@
 # The Glossary Term Concept by Spanish Definition Status Report will serve
 # as a QC report for Spanish and corresponding English Definitions by Status.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.3  2009/05/20 15:38:46  bkline
-# Fix a bug which was displaying the wrong CDR ID when a definition
-# placeholder was missing.
-#
-# Revision 1.2  2009/03/04 22:18:51  bkline
-# Improved error handling.
-#
-# Revision 1.1  2009/02/12 16:21:06  bkline
-# New glossary report.
+# BZIssue::4344
 #
 #----------------------------------------------------------------------
 import cdrcgi, cgi, cdr, cdrdb, xml.dom.minidom
