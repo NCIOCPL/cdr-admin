@@ -102,23 +102,16 @@ form = u"""\
        sortReq % (cdrcgi.BASE, cdrcgi.SESSION, session, "", "DocTitle")
       )
 
-DevEdit = u"""
-          <A HREF='%s/EditFilter.py?%s=%s&Request=Load&DocId=CDR%010d'>Edit</A>
-          """ 
-
 for row in rows:
     form += u"""\
     <TR>
      <TD>CDR%010d</TD>
      <TD NOALIGN='1'>
-      %s
       <A HREF='%s/EditFilter.py?%s=%s&Request=View&DocId=CDR%010d'>View</A>
      </TD>
      <TD VALIGN='top'>%s</TD>
     </TR>
-""" % (row[0], 
-       (localhost == "Dev") and DevEdit % (cdrcgi.BASE, 
-                                cdrcgi.SESSION, session, row[0]) or "",
+""" % (row[0],
        cdrcgi.BASE, cdrcgi.SESSION, session, row[0],
        cgi.escape(row[1]))
 
