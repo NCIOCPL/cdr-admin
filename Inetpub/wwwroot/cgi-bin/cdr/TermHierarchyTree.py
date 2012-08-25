@@ -1,4 +1,12 @@
-# see 3316 for details.
+#----------------------------------------------------------------------
+#
+# $Id$
+#
+# Dynamic viewer for terminology hierarchy.
+#
+# BZIssue::3316
+#
+#----------------------------------------------------------------------
 import cdrcgi, cdrdb, cgi
 
 fields = cgi.FieldStorage()
