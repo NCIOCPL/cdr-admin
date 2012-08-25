@@ -11,7 +11,8 @@
 # It needs to be place in the Admin menu under Reports/Protocols/Data Import
 # reports/CTEP Institutions with Address Information
 #
-# $Log: not supported by cvs2svn $
+# BZIssue::4064
+#
 #----------------------------------------------------------------------
 import cgi, cdrdb, cdrdocobject, sys, time
 
