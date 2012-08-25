@@ -6,7 +6,6 @@
 #
 # Template for Perl CGI programming; demonstrates returning a binary file.
 #
-# $Log: not supported by cvs2svn $
 #----------------------------------------------------------------------
 use CGI;
 use Archive::Zip;
