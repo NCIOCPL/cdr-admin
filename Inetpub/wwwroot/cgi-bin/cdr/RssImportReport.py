@@ -4,28 +4,9 @@
 #
 # Reports on import/update of RSS protocol site information.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.7  2006/05/04 14:36:02  bkline
-# Extended report to handle other RSS-like sources.
-#
-# Revision 1.6  2005/09/13 21:45:36  bkline
-# Added status column (request #1830).
-#
-# Revision 1.5  2005/08/29 17:02:50  bkline
-# Added table for protocols which have been published, but don't have a
-# DateLastModified element.
-#
-# Revision 1.4  2005/06/23 15:16:32  bkline
-# Modifications requested in issue #1730 (tables split).
-#
-# Revision 1.3  2005/06/09 18:42:41  bkline
-# Fixed test for new imports.
-#
-# Revision 1.2  2005/06/01 12:46:14  bkline
-# Fixed bug in reporting whether a publishable version was created.
-#
-# Revision 1.1  2005/05/11 20:57:24  bkline
-# Report created for Sheri (request #1669).
+# BZIssue::1669
+# BZIssue::1730
+# BZIssue::1830
 #
 #----------------------------------------------------------------------
 import cdr, cdrdb, cdrcgi, cgi, re, time
