@@ -8,8 +8,6 @@
 #
 # $Id$
 #
-# $Log: not supported by cvs2svn $
-#
 #----------------------------------------------------------------------
 
 import sys, cgi, cdr, cdrcgi, cdrbatch
