@@ -4,10 +4,6 @@
 #
 # Report of protocol processing status.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.1  2006/05/04 15:08:52  bkline
-# Report of protocol processing status.
-#
 #----------------------------------------------------------------------
 
 import cdrbatch, cdrcgi, cgi, cdrdb, cdr, time
