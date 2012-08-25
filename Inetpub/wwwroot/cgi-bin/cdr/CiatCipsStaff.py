@@ -49,6 +49,7 @@ items   = (('AdvancedSearch.py', 'Advanced Search',       ''               ),
            ('EditExternMap.py',  'Update Mapping Table', '' ),
            ('ReplaceCWDwithVersion.py','Replace CWD with Older Version', ''),
            ('ReplaceDocWithNewDoc.py', 'Replace Doc with New Doc',       ''),
+           ('UpdatePreMedlineCitations.py', 'Update Pre-Medline Citations', ''),
            ('UploadGPSet.py',    'Upload GENETICSPROFESSIONAL Document Set', '')
            )
 for item in items:
