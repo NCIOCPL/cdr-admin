@@ -4,34 +4,6 @@
 #
 # Main menu for Developers and System Administrators.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.9  2009/04/28 17:53:17  ameyer
-# Added another global change task.  Renamed old one for more explanatory name.
-#
-# Revision 1.8  2008/09/26 00:20:53  ameyer
-# Removed Replace Doc with New Doc.  Now in CiatCipsStaff.py menu.
-#
-# Revision 1.7  2008/07/04 02:57:21  ameyer
-# Added menu entries for saving old version as CWD, replacing Summary.
-#
-# Revision 1.6  2007/10/31 16:03:33  bkline
-# Added republish command.
-#
-# Revision 1.5  2006/01/19 21:12:24  ameyer
-# Added ProjectedAccrual processing to menu.  May remove it later.
-#
-# Revision 1.4  2005/07/07 22:26:35  venglisc
-# Removed menu item to update CSS Stylesheets. (Bug 1747)
-#
-# Revision 1.3  2004/08/26 14:05:52  bkline
-# Added unblock page.
-#
-# Revision 1.2  2004/08/10 15:39:26  bkline
-# Plugged in new menu items for editing the external mapping values.
-#
-# Revision 1.1  2003/12/16 16:09:20  bkline
-# Main menu for Developers and System Administrators.
-#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
 
