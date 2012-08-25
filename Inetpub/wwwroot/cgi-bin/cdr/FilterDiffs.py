@@ -4,10 +4,6 @@
 #
 # Compare filters between two servers.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.1  2002/09/11 21:11:57  bkline
-# New report to compare all filters between two specified servers.
-#
 #----------------------------------------------------------------------
 
 import cdr, cdrdb, cgi, cdrcgi, os, tempfile, re
@@ -73,11 +69,11 @@ def getFilters(tmpDir, server):
               FROM document d
               JOIN doc_type t
                 ON t.id = d.doc_type
-             WHERE t.name = 'Filter'""")
+             WHERE t.name = 'Filter'""", timeout=300)
         rows = curs.fetchall()
-    except:
+    except Exception, e:
         cleanup(tmpDir)
-        cdrcgi.bail('Database failure on %s: %s' % (server, info[1][0]))
+        cdrcgi.bail('Database failure on %s: %s' % (server, e))
     for row in rows:
         try:
             title = row[0].replace(" ", "@@SPACE@@") \
