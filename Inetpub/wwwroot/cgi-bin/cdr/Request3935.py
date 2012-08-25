@@ -16,7 +16,6 @@
 # except add in the CDR ID of the protocol in a column right before the
 # title column."
 #
-# $Log: not supported by cvs2svn $
 #----------------------------------------------------------------------
 import cdrdb, cdrcgi, sys, cgi
 
