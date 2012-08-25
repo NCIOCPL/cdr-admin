@@ -1,17 +1,11 @@
 #----------------------------------------------------------------------
+#
 # Compare CTgovProtocol documents from an import job with the current
 # publishable version of the the same documents.
 #
-# Done for Bugzilla issue #1881
+# BZIssue::1881
 #
 # $Id$
-#
-# $Log: not supported by cvs2svn $
-# Revision 1.2  2006/01/10 20:10:15  ameyer
-# Minor change to comments and screen title.
-#
-# Revision 1.1  2005/12/23 02:19:53  ameyer
-# Report differences between imported and current working docs.
 #
 #----------------------------------------------------------------------
 
@@ -91,7 +85,7 @@ def getJobList(daysBack):
           SELECT id, dt FROM ctgov_import_job
            WHERE dt >= '%s'
              AND dt <= '%s'
-          ORDER BY dt DESC""" % (firstDate, lastDate))
+          ORDER BY dt DESC""" % (firstDate, lastDate), timeout=600)
         rows = cursor.fetchall()
         cursor.close()
     except cdrdb.Error, info:
@@ -244,7 +238,7 @@ def findImportedDocs(firstJob, lastJob):
     # Find the date_time of the firstJob
     try:
         cursor.execute("SELECT dt FROM ctgov_import_job WHERE id = %d" \
-                        % firstJob)
+                        % firstJob, timeout=600)
         firstDate = cursor.fetchone()[0]
     except cdrdb.Error, info:
         cdrcgi.bail("Unable to find date of first job: %s" % str(info),
@@ -254,7 +248,7 @@ def findImportedDocs(firstJob, lastJob):
     # If none, use today's date_time
     try:
         cursor.execute("SELECT id, dt FROM ctgov_import_job WHERE id = %d" \
-                        % (lastJob + 1))
+                        % (lastJob + 1), timeout=600)
         limitJob = cursor.fetchone()
         if limitJob:
             limitDate  = limitJob[1]
@@ -277,7 +271,7 @@ def findImportedDocs(firstJob, lastJob):
             AND j.id <= %d
             AND j.id >= %d
        GROUP BY d.cdr_id
-            """ % (lastJob, firstJob))
+            """ % (lastJob, firstJob), timeout=600)
     except cdrdb.Error, info:
         cdrcgi.bail("Unable to select doc IDs: %s" % str(info),
                     logfile=LF)
@@ -291,7 +285,7 @@ def findImportedDocs(firstJob, lastJob):
             AND v.dt > '%s'
             AND v.dt < '%s'
             AND v.comment LIKE 'ImportCTGovProtocols: %%'
-       GROUP BY v.id, t.dt""" % (firstDate, limitDate))
+       GROUP BY v.id, t.dt""" % (firstDate, limitDate), timeout=600)
         docIdVer = cursor.fetchall()
     except cdrdb.Error, info:
         cdrcgi.bail("Unable to select version numbers: %s" % str(info),
