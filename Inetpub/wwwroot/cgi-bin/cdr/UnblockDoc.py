@@ -4,7 +4,6 @@
 #
 # Make a blocked document active.
 #
-# $Log: not supported by cvs2svn $
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, cdrdb
 
