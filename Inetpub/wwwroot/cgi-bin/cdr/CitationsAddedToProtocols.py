@@ -9,7 +9,8 @@
 # server as a QC report to check which glossary terms were created within a
 # given time frame with a particular status set.
 #
-# $Log: not supported by cvs2svn $
+# BZIssue::1793
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrdb, cdrcgi, string, time, xml.dom.minidom
 
