@@ -6,9 +6,7 @@
 # pronunciations by the user requesting a specific word stem from
 # the Glossary Term name or Term Pronunciation." (request 2643)
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.1  2006/11/29 15:44:36  bkline
-# New report for request #2643.
+# BZIssue::2643
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrdb, cdrcgi, string, time, xml.dom.minidom, xml.sax.saxutils
