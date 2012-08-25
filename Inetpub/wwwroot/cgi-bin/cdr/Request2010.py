@@ -2,7 +2,6 @@
 #
 # $Id$
 #
-# $Log: not supported by cvs2svn $
 #----------------------------------------------------------------------
 import cdrdb, cdr, cdrcgi, xml.dom.minidom, cgi, sys
 
