@@ -4,17 +4,6 @@
 #
 # Displays a table containing information about all link types.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.3  2002/02/21 15:22:03  bkline
-# Added navigation buttons.
-#
-# Revision 1.2  2001/08/06 18:34:58  bkline
-# Switched to new cdrdb modlue.
-#
-# Revision 1.1  2001/06/13 22:16:32  bkline
-# Initial revision
-#
-#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string, dbi, cdrdb
 
