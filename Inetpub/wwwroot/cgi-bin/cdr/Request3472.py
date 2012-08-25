@@ -4,9 +4,7 @@
 #
 # PDQ Submission Portal Statistics Summary Report.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.1  2007/08/27 18:09:35  bkline
-# PDQ Protocol Submissions Portal Activity Report (request #3472).
+# BZIssue::3472
 #
 #----------------------------------------------------------------------
 import cgi, cdrcgi, cdr, xml.dom.minidom, urllib
