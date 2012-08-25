@@ -7,18 +7,6 @@
 #
 # $Id$
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.3  2008/08/22 04:00:57  ameyer
-# Added ability to review all existing external_map strings and make any
-# non-mappable that match the patterns.
-# Also made a number of user interface tweaks.
-#
-# Revision 1.2  2008/08/20 03:52:04  ameyer
-# Numerous changes, had to replace simple URL link with javascript.
-#
-# Revision 1.1  2008/07/23 05:08:56  ameyer
-# Initial version.
-#
 #----------------------------------------------------------------------
 import cgitb; cgitb.enable()
 
