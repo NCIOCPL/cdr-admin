@@ -4,22 +4,7 @@
 #
 # Menu of existing filters.
 #
-# Revision 1.5  2007/11/03 14:15:07  bkline
-# Unicode encoding cleanup (issue #3716).
-#
-# Revision 1.4  2003/02/25 20:04:49  pzhang
-# Showed edit feature only on Dev machine (MAHLER now).
-# Sorted filter list by DocId or DocTitle.
-#
-# Revision 1.3  2002/11/08 13:40:52  bkline
-# Added new report to show all top-level param for XSL/T filters.
-#
-# Revision 1.2  2002/09/13 17:08:52  bkline
-# Added View command and button to compare all filters between two
-# servers.
-#
-# Revision 1.1  2002/07/17 18:51:29  bkline
-# Easier access to CDR filter editing.
+# BZIssue::3716
 #
 #----------------------------------------------------------------------
 import cgi, cdrcgi, cdrdb, sys, string, socket
@@ -33,15 +18,6 @@ request = cdrcgi.getRequest(fields)
 s1      = fields and fields.getvalue('s1') or None
 s2      = fields and fields.getvalue('s2') or None
 orderBy = fields and fields.getvalue('OrderBy') or None
-
-#----------------------------------------------------------------------
-# Edit only on Dev machine.
-# Since we moved to SVN for source control we're not editing filters
-# through this interface anymore
-#----------------------------------------------------------------------
-localhost = socket.gethostname()
-#if string.upper(localhost) == "MAHLER":
-#    localhost= "Dev"
 
 #----------------------------------------------------------------------
 # Make sure we're logged in.
@@ -76,28 +52,11 @@ if request == "Compare Filters":
             cdrcgi.WEBSERVER, cdrcgi.BASE, s1, s2)
 
 #----------------------------------------------------------------------
-# Handle request for creating a new filter.
-# This is now being done using the command
-#   CreateFilter.py
-#----------------------------------------------------------------------
-# if request == "New Filter": 
-#     print "Location:http://%s%s/EditFilter.py?%s=%s&Request=New\n" % (
-#             cdrcgi.WEBSERVER,
-#             cdrcgi.BASE,
-#             cdrcgi.SESSION,
-#             session)
-#     sys.exit(0)
-
-
-#----------------------------------------------------------------------
 # Retrieve and display the action information.
 #----------------------------------------------------------------------
 title   = "CDR Administration"
 section = "Manage Filters"
-if localhost == "Dev":
-    buttons = ["New Filter", "Filter Params", cdrcgi.MAINMENU, "Log Out"]
-else:
-    buttons = ["Filter Params", cdrcgi.MAINMENU, "Log Out"]
+buttons = ["Filter Params", cdrcgi.MAINMENU, "Log Out"]
 script  = "EditFilters.py"
 header  = cdrcgi.header(title, title, section, script, buttons, numBreaks = 1)
 
