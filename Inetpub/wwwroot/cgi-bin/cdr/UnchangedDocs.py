@@ -4,21 +4,7 @@
 #
 # Reports on documents unchanged for a specified number of days.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.5  2007/10/31 21:11:42  bkline
-# Fixed handling of Unicode.
-#
-# Revision 1.4  2004/02/17 19:55:02  venglisc
-# Modified the header title.
-#
-# Revision 1.3  2002/04/24 20:37:10  bkline
-# Changed "Title" label to "DocTitle" at Eileen's request (issue #161).
-#
-# Revision 1.2  2002/02/21 15:22:03  bkline
-# Added navigation buttons.
-#
-# Revision 1.1  2001/12/01 18:11:44  bkline
-# Initial revision
+# BZissue::161
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string, cdrdb
