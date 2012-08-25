@@ -5,31 +5,6 @@
 # User interface for selecting Protocols to be imported from
 # ClinicalTrials.gov.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.7  2007/03/22 17:53:13  bkline
-# Changes for Sheri (see Bugzilla request #3015).
-#
-# Revision 1.6  2004/02/23 15:31:20  bkline
-# Added check to make sure there are errors before we start to report them.
-#
-# Revision 1.5  2004/02/16 23:40:57  bkline
-# Rewrote interface to allow user to specify the CDR document ID for
-# duplicate trials (enhancement request #1104).
-#
-# Revision 1.4  2003/12/16 15:41:18  bkline
-# Modified code to open NLM document in a separate window so that it
-# uses a different window for each document.
-#
-# Revision 1.3  2003/12/08 19:23:23  bkline
-# Modified code to show most recent trials first.
-#
-# Revision 1.2  2003/11/25 12:45:47  bkline
-# Opened NLM display of document in separate window at Lakshmi's request.
-#
-# Revision 1.1  2003/11/10 17:57:34  bkline
-# User interface for reviewing protocol documents downloaded from
-# ClinicalTrials.gov to determine their disposition.
-#
 #----------------------------------------------------------------------
 import cdr, cdrbatch, cgi, cdrcgi, cdrdb, time
 
