@@ -26,25 +26,7 @@
 #
 # $Id$
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.5  2006/03/21 23:44:44  ameyer
-# When more than one ProtocolPhase exists, we now only insert an
-# ExpectedEnrollment after the last one.
-#
-# Revision 1.4  2006/03/16 21:59:42  ameyer
-# Added 200 seconds to query timeout value per Sheri's request.
-#
-# Revision 1.3  2006/01/26 22:00:23  ameyer
-# Suppressed ModifyDocs output to stderr.
-# Fixed button bug - no navigation for "Exit" button.
-#
-# Revision 1.2  2006/01/19 23:56:09  ameyer
-# Replaced a generator function "return (row[0] for row in rows" with
-# code to make the program backwards compatible with the version of
-# Python on Bach.
-#
-# Revision 1.1  2006/01/04 03:28:07  ameyer
-# Add ExpectedEnrollment elements.
+# BZIssue::1931
 #
 #----------------------------------------------------------------------
 
