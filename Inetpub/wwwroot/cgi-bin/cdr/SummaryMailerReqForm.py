@@ -4,40 +4,8 @@
 #
 # Request form for generating PDQ Editorial Board Members Mailing.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.14  2007/05/25 13:49:46  kidderc
-# 3132. Fixed problem with board members who are Current members of a board
-# and not current members of another board showing up for the board that
-# they are not current members of.
-#
-# Revision 1.12  2007/04/20 19:16:52  kidderc
-# 3132. Minor cosmetic changes.
-#
-# Revision 1.9  2007/04/12 12:44:29  kidderc
-# 3132. Add ability to send mailers based on person or document.
-#
-# Revision 1.7  2007/04/06 14:58:01  bkline
-# Removed unused modules from import statement in preparate for turning
-# over enhancement of this script to Charlie Kidder.
-#
-# Revision 1.6  2005/05/13 22:41:04  venglisc
-# Modified to pre-populate the email input field with the session owners
-# email address. (Bug 1664)
-#
-# Revision 1.5  2002/11/13 20:35:25  bkline
-# Ready for user testing.
-#
-# Revision 1.4  2002/11/07 12:51:25  bkline
-# Fixed variable name (changed mailType to subset).
-#
-# Revision 1.3  2002/10/24 20:02:03  bkline
-# Expanded script to handle both board types.
-#
-# Revision 1.2  2002/02/21 22:34:00  bkline
-# Added navigation buttons.
-#
-# Revision 1.1  2001/12/01 18:11:44  bkline
-# Initial revision
+# BZIssue::1664
+# BZIssue::3132
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrdb, cdrpub, cdrcgi, re, string, cdrmailcommon, sys, socket
