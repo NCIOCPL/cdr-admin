@@ -45,11 +45,9 @@ try:
     import cdr
     import cdrdb
     import cdrmailcommon
-    from xml.parsers.xmlproc import xmlproc
     conn = cdrmailcommon.emailerConn('dropbox')
     show("Python", sys.version)
     show("lxml", "%d.%d.%d.%d" % lxml.etree.LXML_VERSION[:4])
-    show("xmlproc", xmlproc.version)
     show("Image", Image.VERSION)
     show("xlrd", xlrd.__VERSION__)
     show("pyXLWriter", "%s.%s.%s" % pyXLWriter.version_info[:3])
