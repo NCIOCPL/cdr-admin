@@ -10,7 +10,7 @@
 # BZIssue::5141
 #
 #----------------------------------------------------------------------
-import re, glob, cgi, cdrdb, cdrcgi
+import re, glob, cgi, cdrdb, cdrcgi, cdr
 
 #----------------------------------------------------------------------
 # Disposition values for the ctgov_import table.
