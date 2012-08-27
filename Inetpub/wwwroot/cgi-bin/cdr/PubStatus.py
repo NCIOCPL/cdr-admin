@@ -196,36 +196,36 @@ def dispJobStatus():
     html    = """\
        <TABLE>
         <TR>
-         <TD ALIGN='right' NOWRAP><B>Publishing System: &nbsp;</B></TD>
-         <TD><FONT COLOR='black'>%s</FONT></TD>
+         <TD class="tlabel">Publishing System: &nbsp;</B></TD>
+         <TD class="ttext">%s</TD>
         </TR>
         <TR>
-         <TD ALIGN='right' NOWRAP><B>System Subset: &nbsp;</B></TD>
-         <TD><FONT COLOR='black'>%s %s</FONT></TD>
+         <TD class="tlabel">System Subset: &nbsp;</B></TD>
+         <TD class="ttext">%s %s</TD>
         </TR>
         <TR>
-         <TD ALIGN='right' NOWRAP><B>User Name: &nbsp;</B></TD>
-         <TD><FONT COLOR='black'>%s</FONT></TD>
+         <TD class="tlabel">User Name: &nbsp;</B></TD>
+         <TD class="ttext">%s</TD>
         </TR>
         <TR>
-         <TD ALIGN='right' NOWRAP><B>Output Location: &nbsp;</B></TD>
-         <TD><FONT COLOR='black'>%s</FONT></TD>
+         <TD class="tlabel">Output Location: &nbsp;</B></TD>
+         <TD class="ttext">%s</TD>
         </TR>
         <TR>
-         <TD ALIGN='right' NOWRAP><B>Started: &nbsp;</B></TD>
-         <TD><FONT COLOR='black'>%s</FONT></TD>
+         <TD class="tlabel">Started: &nbsp;</B></TD>
+         <TD class="ttext">%s</TD>
         </TR>
         <TR>
-         <TD ALIGN='right' NOWRAP><B>Completed: &nbsp;</B></TD>
-         <TD><FONT COLOR='black'>%s</FONT></TD>
+         <TD class="tlabel">Completed: &nbsp;</B></TD>
+         <TD class="ttext">%s</TD>
         </TR>
         <TR>
-         <TD ALIGN='right' NOWRAP><B>Status: &nbsp;</B></TD>
-         <TD><FONT COLOR='black'>%s</FONT></TD>
+         <TD class="tlabel">Status: &nbsp;</B></TD>
+         <TD class="ttext">%s</TD>
         </TR>
         <TR>
-         <TD ALIGN='right' valign='top' NOWRAP><B>Messages: &nbsp;</B></TD>
-         <TD><FONT COLOR='black'>%s</FONT></TD>
+         <TD class="tlabel">Messages: &nbsp;</B></TD>
+         <TD class="ttext">%s</TD>
         </TR>
        </TABLE>
       </FORM>
@@ -391,12 +391,12 @@ def dispJobSetting():
     html    = """\
                <TABLE>
                 <TR>
-                 <TD ALIGN='right' NOWRAP><B>System Subset: &nbsp;</B></TD>
-                 <TD><FONT COLOR='black'>%s</FONT></TD>
+                 <TD class="tlabel">System Subset: &nbsp;</TD>
+                 <TD class="ttext">%s</TD>
                 </TR>
                 <TR>
-                 <TD ALIGN='right' NOWRAP><B>User Name: &nbsp;</B></TD>
-                 <TD><FONT COLOR='black'>%s</FONT></TD>
+                 <TD class="tlabel">User Name: &nbsp;</TD>
+                 <TD class="ttext">%s</TD>
                 </TR>
                </TABLE>
               """ % (row[2], row[3])
@@ -557,27 +557,27 @@ Please access from the main publishing menu""" % \
     header  = cdrcgi.header(title, title, instr, script, buttons)
 
     HEADER1 = """
-               <BR><FONT COLOR="NAVY">
-                    <b>Jobs waiting for user approval%s<b>
-                   </FONT>
+               <BR>
+               <span style="color: navy; font-weight: bold;"> Jobs 
+                waiting for user approval%s</span>
                <BR><TABLE BORDER=0>
               """ % msg
     HEADER2 = """
                 <tr><td>
                 <table border="1">
                 <tr>
-                <td valign='top'></td>
-                <td valign='top'><B>JobId</B></td>
-                <td valign='top'><B>JobName</B></td>
-                <td valign='top'><B>Started</B></td>
-                <td valign='top'><B>Status</B></td>
+                <td class="tlabel"></td>
+                <td class="tlabel">JobId</td>
+                <td class="tlabel">JobName</td>
+                <td class="tlabel">Started</td>
+                <td class="tlabel">Status</td>
                 </tr>
               """
     ROW     = """<tr><td><INPUT TYPE='CHECKBOX' NAME='Jobs' VALUE='%d' CHECKED></td>
-                     <td><FONT COLOR='black'>%d</FONT></td>
-                     <td><FONT COLOR='black'>%s</FONT></td>
-                     <td><FONT COLOR='black'>%s</FONT></td>
-                     <td><FONT COLOR='black'>%s</FONT></td></tr>
+                     <td class="ttext">%d</td>
+                     <td class="ttext">%s</td>
+                     <td class="ttext">%s</td>
+                     <td class="ttext">%s</td></tr>
               """
 
     if not len(rows):
@@ -611,8 +611,8 @@ Please access from the main publishing menu""" % \
         for row in rows:
             html += ROW % (row[0], row[0], row[1], row[2], row[3])
         html += "</TABLE></td></tr></table>"
-        html += "<BR><FONT COLOR='NAVY'>Resume checked job(s) with "
-        html += "the following description</FONT><br/>"
+        html += "<BR><span style='color: navy;'>Resume checked job(s) with "
+        html += "the following description</span><br/>"
         html += "<TEXTAREA NAME='CgJobDesc' ROWS='5' COLS='80'>"
         html += "Enter a brief job description for Cancer.gov.</TEXTAREA>"
 
@@ -830,19 +830,22 @@ def dispCgWork():
               """ % (vendor, push, lRemoved, lUpdated, lAdded)
 
     HEADER  = """\
-               <BR><FONT COLOR="RED"><b>Documents %s</b> %s</FONT><BR>
+               <BR>
+               <span style="color: red; font-weight: bold;">Documents 
+                 %s %s</span>
+               <BR>
                <a NAME='%s'></a>
                %s
                <TABLE BORDER=1>
                 <tr>
-                <td valign='top'><B>DocId</B></td>
-                <td valign='top'><B>DocType</B></td>
-                <td valign='top'><B>DocTitle</B></td>
+                <th class="theader">DocId</th>
+                <th class="theader">DocType</th>
+                <th class="theader">DocTitle</th>
                 </tr>
               """
-    ROW     = """<tr><td><FONT COLOR='black'>%s</FONT></td>
-                     <td><FONT COLOR='black'>%s</FONT></td>
-                     <td><FONT COLOR='black'>%s</FONT></td></tr>"""
+    ROW     = """<tr><td class="ttext">%s</td>
+                     <td class="ttext">%s</td>
+                     <td class="ttext">%s</td></tr>"""
 
     # Only if the push job hasn't finished yet will we be able to 
     # display the newly added documents.  Once the job finished the 
