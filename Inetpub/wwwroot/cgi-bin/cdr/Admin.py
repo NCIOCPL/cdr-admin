@@ -2,9 +2,7 @@
 #
 # $Id$
 #
-# Prototype for CDR admin main menu.
-#
-# $Log: not supported by cvs2svn $
+# CDR admin main menu.
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
@@ -13,12 +11,7 @@ import cgi, cdr, cdrcgi, re, string
 # Set the form variables.
 #----------------------------------------------------------------------
 fields  = cgi.FieldStorage()
-session = cdrcgi.getSession(fields)
-
-#----------------------------------------------------------------------
-# Make sure the login was successful.
-#----------------------------------------------------------------------
-if not session: cdrcgi.bail('Unknown user id or password.')
+session = cdrcgi.getSession(fields) or 'guest'
 
 #----------------------------------------------------------------------
 # Put up the main menu.
