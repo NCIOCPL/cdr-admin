@@ -3,7 +3,6 @@
 #
 # Show CDR summary of commands submitted during a specified time period.
 #
-# $Log: not supported by cvs2svn $
 #----------------------------------------------------------------------
 import cdr, cdrcgi, cdrdb, cgi, xml.dom.minidom
 
@@ -19,7 +18,7 @@ command = "ShowCdrCommands.py"
 title   = "CDR Administration"
 section = "Show CDR Commands"
 SUBMENU = "Reports Menu"
-buttons = ["Submit"] #[SUBMENU, cdrcgi.MAINMENU, "Log Out"]
+buttons = ["Submit"]
 header  = cdrcgi.header(title, title, section, command, buttons)
 
 #----------------------------------------------------------------------
@@ -67,7 +66,7 @@ if not start or not end:
 class CdrCommand:
     "Object representing most interesting information about a CDR command."
     def __init__(self, node):
-        self.info = "???"
+        self.info = u"???"
         for child in node.childNodes:
             if child.nodeName == "CdrLastVersions":
                 self.cdrLastVersions(child)
@@ -90,29 +89,29 @@ class CdrCommand:
 
     def cdrSearch(self, node):
         maxDocs = None
-        query = "???"
+        query = u"???"
         for child in node.childNodes:
             if child.nodeName == "Query":
                 query = cdr.getTextContent(child)
                 maxDocsAttr = child.getAttribute("MaxDocs")
                 if maxDocsAttr: maxDocs = maxDocsAttr
-        self.info = "CdrSearch(query=%s" % query
-        if maxDocs: self.info += ",maxDocs=%s" % maxDocs
-        self.info += ")"
+        self.info = u"CdrSearch(query=%s" % query
+        if maxDocs: self.info += u",maxDocs=%s" % maxDocs
+        self.info += u")"
 
     def cdrGetDocType(self, node):
-        docType = "???"
+        docType = u"???"
         typeAttr = node.getAttribute("Type")
         if typeAttr: docType = typeAttr
         omitDtd = node.getAttribute("OmitDtd")
         getEnumValues = node.getAttribute("GetEnumValues")
-        self.info = "CdrGetDocType(type=%s" % docType
-        if omitDtd: self.info += ",omitDtd=%s" % omitDtd
-        if getEnumValues: self.info += ",getEnumValues=%s" % getEnumValues
-        self.info += ")"
+        self.info = u"CdrGetDocType(type=%s" % docType
+        if omitDtd: self.info += u",omitDtd=%s" % omitDtd
+        if getEnumValues: self.info += u",getEnumValues=%s" % getEnumValues
+        self.info += u")"
 
     def cdrAddDoc(self, node):
-        docType = "???"
+        docType = u"???"
         checkIn = None
         validate = None
         version = None
@@ -136,18 +135,18 @@ class CdrCommand:
                 setLinks = cdr.getTextContent(child)
             elif child.nodeName == "Reason":
                 reason = cdr.getTextContent(child)
-        self.info = "CdrAddDoc(type=%s" % docType
-        if checkIn: self.info += ",checkIn=%s" % checkIn
-        if validate: self.info += ",validate=%s" % validate
-        if version: self.info += ",version=%s" % version
-        if publishable: self.info += ",publishable=%s" % publishable
-        if setLinks: self.info += ",setLinks=%s" % setLinks
-        if reason: self.info += ",reason=%s" % reason
-        self.info += ")"
+        self.info = u"CdrAddDoc(type=%s" % docType
+        if checkIn: self.info += u",checkIn=%s" % checkIn
+        if validate: self.info += u",validate=%s" % validate
+        if version: self.info += u",version=%s" % version
+        if publishable: self.info += u",publishable=%s" % publishable
+        if setLinks: self.info += u",setLinks=%s" % setLinks
+        if reason: self.info += u",reason=%s" % reason
+        self.info += u")"
 
     def cdrRepDoc(self, node):
-        id = "???"
-        docType = "???"
+        id = u"???"
+        docType = u"???"
         checkIn = None
         validate = None
         version = None
@@ -173,17 +172,17 @@ class CdrCommand:
                 setLinks = cdr.getTextContent(child)
             elif child.nodeName == "Reason":
                 reason = cdr.getTextContent(child)
-        self.info = "CdrRepDoc(id=%s,type=%s" % (id, docType)
-        if checkIn: self.info += ",checkIn=%s" % checkIn
-        if validate: self.info += ",validate=%s" % validate
-        if version: self.info += ",version=%s" % version
-        if publishable: self.info += ",publishable=%s" % publishable
-        if setLinks: self.info += ",setLinks=%s" % setLinks
-        if reason: self.info += ",reason=%s" % reason
-        self.info += ")"
+        self.info = u"CdrRepDoc(id=%s,type=%s" % (id, docType)
+        if checkIn: self.info += u",checkIn=%s" % checkIn
+        if validate: self.info += u",validate=%s" % validate
+        if version: self.info += u",version=%s" % version
+        if publishable: self.info += u",publishable=%s" % publishable
+        if setLinks: self.info += u",setLinks=%s" % setLinks
+        if reason: self.info += u",reason=%s" % reason
+        self.info += u")"
 
     def cdrGetDoc(self, node):
-        id = "???"
+        id = u"???"
         lock = None
         ver = None
         for child in node.childNodes:
@@ -193,27 +192,27 @@ class CdrCommand:
                 lock = cdr.getTextContent(child)
             elif child.nodeName == "DocVersion":
                 ver = cdr.getTextContent(child)
-        self.info = "CdrGetDoc(id=%s" % id
+        self.info = u"CdrGetDoc(id=%s" % id
         if lock:
-            self.info += ",%s" % lock
+            self.info += u",%s" % lock
         if ver:
-            self.info += ",%s" % ver
-        self.info += ")"
+            self.info += u",%s" % ver
+        self.info += u")"
 
     def cdrLogon(self, node):
-        uid = "???"
-        pwd = "???"
+        uid = u"???"
+        pwd = u"???"
         for child in node.childNodes:
             if child.nodeName == "UserName":
                 uid = cdr.getTextContent(child)
             elif child.nodeName == "Password":
                 pwd = cdr.getTextContent(child)
-        self.info = "CdrLogon(uid=%s,pwd=%s)" % (uid, "$$$$$$$$$") #pwd)
+        self.info = u"CdrLogon(uid=%s,pwd=%s)" % (uid, u"$$$$$$$$$")
 
     def cdrFilter(self, node):
         filters = []
         params  = []
-        doc = "???"
+        doc = u"???"
         for child in node.childNodes:
             if child.nodeName == "Filter":
                 href = child.getAttribute("href")
@@ -223,43 +222,44 @@ class CdrCommand:
                 elif name:
                     filters.append(name)
                 else:
-                    filters.append("<inline>")
+                    filters.append(u"<inline>")
             elif child.nodeName == "Document":
                 href = child.getAttribute("href")
                 ver  = child.getAttribute("version")
                 if href:
                     doc = href
                     if ver:
-                        doc += ("/%s" % ver)
+                        doc += (u"/%s" % ver)
                 else:
-                    doc = "<inline>"
+                    doc = u"<inline>"
             elif child.nodeName == "Parms":
                 for parm in child.childNodes:
                     if parm.nodeName == "Parm":
-                        name = "???"
-                        val  = "???"
+                        name = u"???"
+                        val  = u"???"
                         for parmChild in parm.childNodes:
                             if parmChild.nodeName == "Name":
                                 name = cdr.getTextContent(parmChild)
                             elif parmChild.nodeName == "Value":
                                 val = cdr.getTextContent(parmChild)
                         params.append("%s=%s" % (name, val))
-        self.info = "CdrFilter(filters=[%s],doc=%s" % (",".join(filters), doc)
-        if params: self.info += ",params=[%s]" % ";".join(params)
-        self.info += ")"
+        self.info = u"CdrFilter(filters=[%s],doc=%s" % (u",".join(filters),
+                                                        doc)
+        if params: self.info += u",params=[%s]" % u";".join(params)
+        self.info += u")"
 
     def cdrLastVersions(self, node):
         for child in node.childNodes:
             if child.nodeName == "DocId":
-                self.info = "CdrLastVersions(docId=%s)" % \
+                self.info = u"CdrLastVersions(docId=%s)" % \
                             cdr.getTextContent(child)
                 return
-        self.info = "CdrLastVersions(docId=???)"
+        self.info = u"CdrLastVersions(docId=???)"
 
     def __repr__(self): return self.info
 
-title = "CDR Commands between %s and %s" % (start, end)
-html = """\
+title = u"CDR Commands between %s and %s" % (start, end)
+html = u"""\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>
  <head>
@@ -285,11 +285,11 @@ cursor.execute("""\
 row = cursor.fetchone()
 while row:
     commandSet, thread, received = row
-    dom = xml.dom.minidom.parseString(commandSet)
+    dom = xml.dom.minidom.parseString(commandSet.encode('utf-8'))
     for cmdNode in dom.documentElement.childNodes:
         if cmdNode.nodeName == "CdrCommand":
             cmd = CdrCommand(cmdNode)
-            html += """\
+            html += u"""\
    <tr>
     <td valign='top'>%d</td>
     <td nowrap='1' valign='top'>%s</td>
@@ -297,7 +297,7 @@ while row:
    </tr>
 """ % (thread, received, cmd)
     row = cursor.fetchone()
-cdrcgi.sendPage(html + """\
+cdrcgi.sendPage(html + u"""\
   </table>
  </body>
 </html>
