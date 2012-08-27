@@ -5,9 +5,6 @@
 # "The Glossary Term Concept - Documents Modified Report will serve as a
 # QC report to verify which documents were changed within a given time
 # frame. The report will be separated into English and Spanish.
-#
-# $Log: not supported by cvs2svn $
-# Revision 1.1  2008/10/14 12:51:55  bkline
 # New "documents modified" reports for restructured glossary documents.
 #
 #----------------------------------------------------------------------
@@ -120,7 +117,15 @@ class GlossaryTermConcept:
                                                                self.text)
     def __init__(self, docId, docVersion, language, audience, cursor):
         cursor.execute("""\
-            SELECT v.title, v.xml, v.publishable, d.first_pub
+            SELECT MIN(d.first_pub)
+              FROM document d
+              JOIN query_term q
+                ON q.doc_id = d.id
+             WHERE q.path = '/GlossaryTermName/GlossaryTermConcept/@cdr:ref'
+               AND q.int_val = ?""", docId)
+        self.firstPub = cursor.fetchall()[0][0]
+        cursor.execute("""\
+            SELECT v.title, v.xml, v.publishable
               FROM doc_version v
               JOIN document d
                 ON d.id = v.id
@@ -132,7 +137,6 @@ class GlossaryTermConcept:
         self.docVersion       = docVersion
         self.publishable      = rows[0][2] == 'Y'
         self.title            = rows[0][0]
-        self.firstPub         = rows[0][3]
         self.comment          = None
         self.dateLastModified = None
         elementName           = 'TermDefinition'
@@ -189,7 +193,7 @@ sheet.addCol(5, 350)
 row.addCell(1, u'DocId')
 row.addCell(2, u'Date Last Modified')
 row.addCell(3, u'Publishable?')
-row.addCell(4, u'Date First Published')
+row.addCell(4, u'Date First Published (*)')
 row.addCell(5, u'Last Comment')
 rowNum = 2
 for term in terms:
@@ -206,6 +210,9 @@ for term in terms:
     row.addCell(4, firstPub, style = center)
     row.addCell(5, term.comment and term.comment.toString() or u'')
     rowNum += 1
+row = sheet.addRow(rowNum)
+row.addCell(1, "(*) Date any GlossaryTermName document linked to the "
+            "concept document was first published")
 try:
     import os, msvcrt
     msvcrt.setmode (1, os.O_BINARY)
