@@ -30,63 +30,7 @@
 # Based on an original request form for new physician initial mailers by
 # Bob Kline.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.18  2003/12/24 21:46:05  bkline
-# Implemented modifications to physician and organization annual update
-# mailer processing to smooth out the workflow throughout the year
-# (enhancement request #1016).
-#
-# Revision 1.17  2003/05/12 15:48:58  bkline
-# Filtered out blocked documents in SQL queries; consolidated some
-# multiple-test SQL clauses using "IN".
-#
-# Revision 1.16  2003/03/05 02:54:41  ameyer
-# Changed handling of remailers for single, named document - was broken.
-#
-# Revision 1.15  2003/02/04 22:00:24  ameyer
-# Increased timeouts from default 30 to 120 seconds on selection queries.
-#
-# Revision 1.14  2003/01/22 01:49:08  ameyer
-# Added check for returned row with nothing in it to validation of
-# single doc id entered by user.
-#
-# Revision 1.13  2002/11/08 03:07:50  ameyer
-# Removed a debugging line inadvertently left in, restoring the correct one.
-#
-# Revision 1.12  2002/11/08 02:35:07  ameyer
-# Revised user interface to match Lakshmi's change request.
-#
-# Revision 1.11  2002/11/01 05:25:45  ameyer
-# Changed form of parameter passed to remail selector.
-# Added publishable='Y' to version selection (forgot to comment this
-# in previous checkin.)
-#
-# Revision 1.10  2002/11/01 02:44:44  ameyer
-# Fix top document/distinct selection commands.
-#
-# Revision 1.9  2002/10/22 21:54:26  ameyer
-# Added user control to limit the number of docs selected for mailing.
-#
-# Revision 1.8  2002/10/09 15:23:06  ameyer
-# Optimized queries - run significantly faster.
-# Set autocommit on.
-#
-# Revision 1.7  2002/10/03 20:33:35  ameyer
-# About to change the queries yet again, and want to save this version.
-#
-# Revision 1.6  2002/10/03 17:38:43  ameyer
-# Optimized physican annual update selection query.  Still untested.
-#
-# Revision 1.4  2002/09/26 15:13:55  ameyer
-# Revised queries for selecting docs, other development changes.
-#
-# Revision 1.2  2002/06/07 00:12:44  ameyer
-# Continuing development.  This is still a pre-production version.
-#
-# Revision 1.1  2002/03/19 23:39:06  ameyer
-# CGI portion of the directory mailer selection software.
-# Displays menu, selects documents, initiates publishing job.
-#
+# BZIssue::1016
 #
 #----------------------------------------------------------------------
 import sys, cgi, cdr, cdrcgi, re, string, cdrdb, cdrpubcgi, cdrmailcommon
@@ -273,7 +217,7 @@ try:
             ON t.id    = d.doc_type
          WHERE t.name  = 'PublishingSystem'
            AND d.title = 'Mailers'
-""", timeout=90)
+""", timeout=600)
     rows = cursor.fetchall()
 except cdrdb.Error, info:
     cdrcgi.bail('Database failure looking up control document: %s' %
@@ -441,7 +385,7 @@ else:
                                         'Physician-Annual update')
             AND doc_version.publishable = 'Y'
             AND document.active_status  = 'A'
-       GROUP BY document.id""", timeout = 120)
+       GROUP BY document.id""", timeout=600)
 
         #----------------------------------------------------------------
         # Create a list containing the date of the last successful mailer 
@@ -523,7 +467,7 @@ else:
                                        'NIH institute, center, or division')
             AND doc_version.publishable = 'Y'
             AND document.active_status  = 'A'
-       GROUP BY document.id""", timeout = 120)
+       GROUP BY document.id""", timeout=600)
 
         #----------------------------------------------------------------
         # Create a list containing the date of the last successful mailer 
@@ -600,14 +544,14 @@ LEFT OUTER JOIN #already_mailed_ids a
 
         # Fill it
         try:
-            cursor.execute(tmpQry, timeout=120)
+            cursor.execute(tmpQry, timeout=600)
         except cdrdb.Error, info:
             cdrcgi.bail("Failure filling temp table for mailers: %s" \
                         % info[1][0])
 
     # Execute the main query to find all matching documents
     try:
-        cursor.execute(qry, timeout=120)
+        cursor.execute(qry, timeout=600)
         docList = cursor.fetchall()
     except cdrdb.Error, info:
         cdrcgi.bail("Failure retrieving document IDs: %s" % info[1][0])
