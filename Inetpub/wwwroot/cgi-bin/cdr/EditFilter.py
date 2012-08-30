@@ -159,7 +159,7 @@ elif request == 'Compare With':
     doc2 = getFilterXml(title, server)
     name1 = "localhost-copy.xml"
     name2 = "%s-copy.xml" % server
-    cmd = "diff -au %s %s" % (name1, name2)
+    cmd = "/cygwin/bin/diff -au %s %s" % (name1, name2)
     try:
         workDir = cdr.makeTempDir('diff')
     except Exception, args:
