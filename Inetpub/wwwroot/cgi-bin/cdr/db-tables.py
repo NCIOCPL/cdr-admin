@@ -75,13 +75,10 @@ class Catalog:
     SELECT name 
       FROM master..sysdatabases 
      ORDER BY name""")
-###        cursor.execute("""\
-###    SELECT CATALOG_NAME
-###    FROM master.INFORMATION_SCHEMA.SCHEMATA""")
         for row in cursor.fetchall():
             try:
                 database = Database(cursor, row[0])
-                self.databases[database.name] = database
+                self.databases[database.name.lower()] = database
             except:
                 pass
 
@@ -126,26 +123,6 @@ if __name__ == '__main__':
     database = catalog.databases['cdr']
     showTables(database.tables, "TABLES", html)
     showTables(database.views, "VIEWS", html)
-##     dbNames.sort()
-##     for dbName in dbNames:
-##         html.append("<span class='dbname'>%s DATABASE</span>\n" % dbName)
-##         database = catalog.databases[dbName]
-##         showTables(database.tables, "TABLES", html)
-##         showTables(database.views, "VIEWS", html)
-                
-
-
-##     table = tables[key]
-##     html.append(u"""\
-##  <b>%s</b> [%s]""" % (table.name, table.type == 'VIEW' and u"V" or u"T"))
-##     for col in table.cols:
-##         if col.pkPos:
-##             html.append(u"""\
-##      <b>%-30s</b> %s""" % (col.name, col.type))
-##         else:
-##             html.append(u"""\
-##      %-30s %s""" % (col.name, col.type))
-##     html.append(u"")
 
 html.append(u"""\
   </pre>
