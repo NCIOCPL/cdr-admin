@@ -164,6 +164,7 @@ def main():
             sys.exit(0)
         except Exception, e:
             status = u"<p class='err'>%s</p>" % cgi.escape(unicode(e))
+        trialId = None
     poIds = ctrp.getPoidMappings()
     geoMap = ctrp.GeographicalMappings()
     html = [u"""\
@@ -189,7 +190,13 @@ def main():
   %s
   <table width="100%%">
 """ % (session, status)]
-    cursor.execute("""\
+    if trialId:
+        cursor.execute("""\
+  SELECT ctrp_id, cdr_id, nct_id, doc_xml
+    FROM ctrp_import
+   WHERE ctrp_id = ?""", trialId)
+    else:
+        cursor.execute("""\
   SELECT i.ctrp_id, i.cdr_id, i.nct_id, i.doc_xml
     FROM ctrp_import i
     JOIN ctrp_import_disposition d
