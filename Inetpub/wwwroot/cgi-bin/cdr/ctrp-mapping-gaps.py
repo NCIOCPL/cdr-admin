@@ -107,7 +107,7 @@ SELECT doc_id
     docXml = rows[0][0]
     tree = etree.XML(docXml.encode('utf-8'))
     doc = None
-    for node in tree.xpath("location/*[po_id='%s']" % poId):
+    for node in tree.xpath("//*[po_id='%s']" % poId):
         if docType == 'Organization':
             org = ctrp.Protocol.Org(node)
             doc = cdr.makeCdrDoc(org.createCdrDocXml(), docType)
