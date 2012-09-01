@@ -17,12 +17,7 @@ import cgi, cdr, cdrcgi, re, string
 # Set the form variables.
 #----------------------------------------------------------------------
 fields  = cgi.FieldStorage()
-session = cdrcgi.getSession(fields)
-
-#----------------------------------------------------------------------
-# Make sure the login was successful.
-#----------------------------------------------------------------------
-if not session: cdrcgi.bail('Unknown user id or password.')
+session = "guest"
 
 #----------------------------------------------------------------------
 # Put up the menu.
@@ -41,7 +36,6 @@ html    = cdrcgi.header(title, title, section, "", buttons,
              var link = document.getElementById('pp2link');
              var docid = document.getElementById('cdrid').value;
              var pp2link = link + docid;
-             // alert(pp2link);
              document.getElementById('pp2link').href = pp2link
              }
 
@@ -50,10 +44,6 @@ html    = cdrcgi.header(title, title, section, "", buttons,
              var index = document.getElementById('ppdt').selectedIndex;
              var doctype = document.getElementById('ppdt').options[index].text;
              var pplink = link + doctype;
-             //alert(document.getElementById('ppdt').selectedIndex);
-             //alert(document.getElementById('ppdt').value);
-             //alert(document.getElementById('ppdt').options[index].text);
-             //alert(pplink);
              document.getElementById('pplink').href = pplink
              }
         </script>
@@ -67,6 +57,8 @@ items   = (('AdvancedSearch.py',       'Advanced Search Menu'          ),
            )
 for item in items:
     if item[1] == 'Publish Preview2':
+        if not cdr.isDevHost():
+            continue
         html += """\
     <li><a href='%s/%s%s&ReportType=pp&DocType=' 
            id="pplink" onclick=setDocType()>%s</a> &nbsp;
@@ -79,6 +71,8 @@ for item in items:
     </select></li>
 """ % (cdrcgi.BASE, item[0], session, item[1])
     elif item[1] == 'Publish Preview':
+        if not cdr.isDevHost():
+            continue
         html += """\
     <li><a href='%s/%s%s&ReportType=pp&DocId=' 
            id="pp2link" onclick=setCdrId()>%s</a> &nbsp;
