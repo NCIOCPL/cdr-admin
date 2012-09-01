@@ -52,8 +52,7 @@ html    = cdrcgi.header(title, title, section, "", buttons,
 """
 items   = (('AdvancedSearch.py',       'Advanced Search Menu'          ),
            ('PublishPreview.py',       'Publish Preview'),
-           ('TerminologyReports.py',   'Terminology Reports'),
-           ('Logout.py',               'Log Out'                       )
+           ('TerminologyReports.py',   'Terminology Reports')
            )
 for item in items:
     if item[1] == 'Publish Preview2':
