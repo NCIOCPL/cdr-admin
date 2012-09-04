@@ -14,6 +14,7 @@
 # BZIssue::5065 - [Summaries] 2 More Patient Summary QC Report Display Options
 # BZIssue::5159 - [Summaries] Changes to HP & Patient QC Report Interfaces 
 #                 and Display Options
+# BZIssue::5229 - [CTGov] Missing Information In CTGov Protocol Full QC Report
 #
 # ----------------------------------------------------------------------------
 #
@@ -320,8 +321,8 @@ filters = cdr.FILTERS
 #----------------------------------------------------------------------
 repTitle = "CDR QC Report"
 fields   = cgi.FieldStorage() or cdrcgi.bail("No Request Found", repTitle)
-docId    = fields.getvalue(cdrcgi.DOCID) or None
-session  = cdrcgi.getSession(fields) or cdrcgi.bail("Not logged in")
+docId    = fields.getvalue(cdrcgi.DOCID) or None ###'CDR360620' or None
+session  = cdrcgi.getSession(fields) or cdrcgi.bail("Not logged in") ### 'guest'
 action   = cdrcgi.getRequest(fields)
 qcParams = fields.getvalue('paramset') or '0'
 title    = "CDR Administration"
@@ -1862,10 +1863,11 @@ def saveParms(parms):
 # Before filtering the document write the parameters to a DB
 # table to access parameters for Word converstion
 # ----------------------------------------------------------------
-try:
-    parmId = saveParms(filterParm)
-except:
-    cdrcgi.bail("Something went wrong")
+parmId = saveParms(filterParm)
+
+docParms = ""
+if docType.startswith('Summary'):
+    docParms = "parmstring=yes&parmid=%s" % parmId
 
 doc = cdr.filterDoc(session, filters[docType], docId = docId,
                     docVer = version or None, parm = filterParm)
@@ -1920,8 +1922,9 @@ elif docType == 'PDQBoardMemberInfo':
 if type(doc) != type(u""):
     doc = unicode(doc, 'utf-8')
 
+# cdrcgi.bail('%s - %s' % (docParms, type(docParms)))
 #----------------------------------------------------------------------
 # Send it.
 #----------------------------------------------------------------------
-cdrcgi.sendPage(doc, parms='parmstring=yes&parmid=%s' % parmId, 
-                     docId=docId, docType=docType, docVer=version)
+cdrcgi.sendPage(doc, parms=docParms, docId=docId, 
+                     docType=docType, docVer=version)
