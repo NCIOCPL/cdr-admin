@@ -40,7 +40,6 @@ items   = (('EditGroups.py',           'Manage Groups'                 ),
            ('Republish.py',            'Re-Publishing'                 ),
            ('Reports.py',              'Reports'                       ),
            ('Mailers.py',              'Mailers'                       ),
-           ('MergeProt.py',            'Protocol Merge'                ),
            ('GlobalChangeMenu.py',     'Global Changes'                ),
            ('getBatchStatus.py',       'Batch Job Status'              ),
            ('MessageLoggedInUsers.py', 'Send Email to Users Currently '

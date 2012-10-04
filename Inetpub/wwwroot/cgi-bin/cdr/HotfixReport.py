@@ -10,6 +10,7 @@
 # BZIssue::1538
 # BZIssue::1718
 # BZIssue::5011
+# BZIssue::5239 (removed from ProtocolReports.py; needed elsewhere? XXX)
 #
 #----------------------------------------------------------------------
 import cdrdb, ExcelWriter, sys, time, cdrcgi

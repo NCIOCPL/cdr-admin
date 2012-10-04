@@ -46,31 +46,13 @@ form = """\
 form += "<LI><A HREF='%s/ListGPEmailers'>%s</LI></A>\n" % (
             cdr.emailerCgi(), 'GP Emailers List')
 reports = [
-           ('LeadOrgStatusAndParticipantMailerHistory.py',
-            'Lead Organization Status and Participant Mailer History'),
            ('MailerActivityStatistics.py', 
             'Mailer Activity Counts'),
-           ('MailerCheckinReport.py', 
-            'Mailer Check-In Count'),
            ('MailerHistory.py', 
             'Mailer History'),
-           ('Request4275.py', 'Mailers Received - Detailed'),
-           ('NonRespondents.py', 
-            'Non-Respondents'),
-           ('PreMailerProtReport.py',
-            'Pre-Mailer Protocol Check')
+           ('Request4275.py', 'Mailers Received - Detailed')
           ]
 for r in reports:
-    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI></A>\n" % (
-            cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
-form += "<LI><A HREF='%s/RespondentReport.py'>%s</LI></A>\n" % (
-            cdr.emailerCgi(), 'Web Mailer Respondents')
-form += ("<LI><A HREF='%s/RespondentReport.py?flavor=Brussels'>%s</LI></A>\n" %
-         (cdr.emailerCgi(), 'Web Mailer Respondents - NCI Liaison Office'))
-for r in [
-           ('EmailerReports.py',
-            'Web Mailer Updates')
-         ]:
     form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI></A>\n" % (
             cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
 

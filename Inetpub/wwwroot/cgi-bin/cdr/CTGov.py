@@ -112,7 +112,6 @@ reports = [
            ('CTGovUpdateReport.py', 'CTGovProtocols Imported vs. CWDs'),
            ('CTGovProtocolProcessingStatusReport.py',
             'CTGovProtocols Processing Status Report'),
-           ('CTGovUnpublished.py', 'CTGovProtocols Unpublished with Phase'),
            ('CTGovEntryDate.py', 'CTGovProtocols vs. Early EntryDate'),
            ('ExternMapFailures.py', 'External Map Failures Report'),
            ('CTGovDupReport.py', 'Records Marked Duplicate'),

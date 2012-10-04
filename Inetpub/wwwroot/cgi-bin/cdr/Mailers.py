@@ -31,27 +31,19 @@ if action == cdrcgi.MAINMENU:
 # List the available options.
 #----------------------------------------------------------------------
 form = "<OL>\n"
-reports = (('DirectoryMailerReqForm.py?', 'Directory Mailers'),
-           ('GPMailerReqForm.py?',  'Genetics Professional Mailers'),
+reports = (('GPMailerReqForm.py?',  'Genetics Professional Mailers'),
            ('GPPubNotification.py?',
             'Genetics Professional Publication Notification'),
-           ('ProtocolMailerReqForm.py?',  'Protocol Mailers'),
            ('SummaryMailerReqForm.py?BoardType=Editorial&',
             'Summary Mailers (Editorial Board)'),
            ('SummaryMailerReqForm.py?BoardType=Advisory&',
             'Summary Mailers (Advisory Board)'),
            ('BoardMemberMailerReqForm.py?',
-            'PDQ&reg; Board Member Correspondence Mailers'),
-           ('EmailerReview.py?',
-            'Electronic Mailer Review (on CDR Server)'))
+            'PDQ&reg; Board Member Correspondence Mailers'))
 
 for r in reports:
     form += "<LI><A HREF='%s/%s%s=%s'>%s</A></LI>\n" % (
             cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
-form += """\
-<LI><A HREF='http://%s/PDQUpdate/cgi-bin/ShowBatchInfo.py'
->Electronic Mailer Review (on E-Mailer Server)</A></LI>
-""" % (cdr.isDevHost() and "verdi.nci.nih.gov" or "pdqupdate.cancer.gov")
 form += """\
 <LI><A HREF="%s/Logout.py?%s=%s">%s</LI>
 </OL>
