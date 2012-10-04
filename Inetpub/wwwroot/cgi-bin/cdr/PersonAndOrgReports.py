@@ -55,6 +55,8 @@ form += """\
     <OL>
 """
 reports = [
+           ('CoopGroupMembers.py', 
+            'Cooperative Group Member Orgs and Investigators'),
            ('InactivePersonsOrgs.py', 
             'Inactive Persons/Organizations Linked to Protocols'),
            ('Request3109.py', 

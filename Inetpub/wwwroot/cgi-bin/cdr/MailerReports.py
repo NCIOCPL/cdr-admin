@@ -46,8 +46,12 @@ form = """\
 form += "<LI><A HREF='%s/ListGPEmailers'>%s</LI></A>\n" % (
             cdr.emailerCgi(), 'GP Emailers List')
 reports = [
+           ('LeadOrgStatusAndParticipantMailerHistory.py',
+            'Lead Organization Status and Participant Mailer History'),
            ('MailerActivityStatistics.py', 
             'Mailer Activity Counts'),
+           ('MailerCheckinReport.py', 
+            'Mailer Check-In Count'),
            ('MailerHistory.py', 
             'Mailer History'),
            ('Request4275.py', 'Mailers Received - Detailed')
