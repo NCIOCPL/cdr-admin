@@ -7,15 +7,19 @@
 # $Log: not supported by cvs2svn $
 # Revision 1.1  2008/02/08 21:51:10  venglisc
 # Inintial copy of report listing documents (and protocols) published
-# in the latest export job. (Bug 3912)
+# in the latest export job. (Bug 3812)
 #
 # Revision 1.1  2007/01/05 23:27:33  venglisc
 # Initial copy of publishing report by date.  (Bug 2111)
 #
 #
+# BZIssue::5237: Report for publication document counts fails on 
+#                non-production server
+#
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, string, cdrdb, time, xml.dom.minidom
+import cgi, cdr, cdrcgi, re, string, cdrdb, time
 import os, sys, glob
+import lxml.etree as etree
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -41,10 +45,45 @@ script    = "PubStatsByDate.py"
 SUBMENU   = "Report Menu"
 buttons   = (SUBMENU, cdrcgi.MAINMENU)
 
+protQuery = """
+    SELECT doc_id, doc_version 
+      FROM pub_proc_doc ppd
+      JOIN active_doc d
+        ON d.id = ppd.doc_id
+      JOIN doc_type dt
+        ON d.doc_type = dt.id
+     WHERE pub_proc = %s
+       AND dt.name = '%s'
+"""
+
+# -------------------------------------------------------------------
+# Retrieve the XML from the database
+# Returns the protocol object
+# -------------------------------------------------------------------
+def getProtocol(docId, num):
+    query = """
+        SELECT xml 
+          FROM doc_version 
+         WHERE id = %s
+           AND num = %s 
+""" % (docId, num)
+
+    try:
+        cursor = conn.cursor()
+        cursor.execute(query)
+        row = cursor.fetchone()
+
+    except cdrdb.Error, info:
+        cdrcgi.bail('Failure retrieving XML: %s' % info[1][0])
+
+    return etree.XML(row[0].encode('utf-8'))
+
+
 # -------------------------------------------------------------------
 # Count the InScopeProtocols by status
+# This version goes to the vendor output directory to do the counting
 # -------------------------------------------------------------------
-def getInScopeCount(jobID = 4867):
+def getInScopeCountOld(jobID = 4867):
     """
     Function to collect the InScopeProtocols from the last
     export job (given by the JobID) and counting the number
@@ -61,30 +100,97 @@ def getInScopeCount(jobID = 4867):
             ### allFiles = glob.glob('CDR*0.xml')
             allFiles = glob.glob('CDR*.xml')
             for protocol in allFiles:
-                dom = xml.dom.minidom.parse(protocol)
-                docElem = dom.documentElement
-                for node in docElem.childNodes:
-                    if node.nodeName == 'ProtocolAdminInfo':
-                        for child in node.childNodes:
-                            if child.nodeName == 'CurrentProtocolStatus':
-                                status = str(cdr.getTextContent(child).strip())
-                                if inScopeCount.has_key(status):
-                                    inScopeCount[status] += 1
-                                else:
-                                    inScopeCount[status]  = 1
-                dom.unlink()
+                dom = etree.parse(protocol)
+                root = dom.getroot()
+                curStatus=root.find('./ProtocolAdminInfo/CurrentProtocolStatus')
+                status = curStatus.text
 
-    except:
-        cdrcgi.bail("Error collecting InScope filenames: %s" % sys.exc_info()[0])
-        print formatExceptionInfo()
-        raise
+                if inScopeCount.has_key(status):
+                    inScopeCount[status] += 1
+                else:
+                    inScopeCount[status]  = 1
+
+    except Exception as e:
+        cdrcgi.bail("Error collecting InScope filenames: %s" % e)
+
+    return(inScopeCount)
+
+# -------------------------------------------------------------------
+# Count the InScopeProtocols by status
+# This version retrieves the documents from the database
+# -------------------------------------------------------------------
+def getInScopeCount(jobID = 4867):
+    """
+    Function to collect the InScopeProtocols from the last
+    export job (given by the JobID) and counting the number
+    of documents per CurrentStatus.
+    """
+    query = protQuery % (jobID, 'InScopeProtocol')
+
+    try:
+        cursor = conn.cursor()
+        cursor.execute(query)
+        rows = cursor.fetchall()
+
+        inScopeCount = {}
+        for (docID, version) in rows:
+            xml = getProtocol(docID, version)
+
+            # root = dom.getroot()
+            curStatus = xml.find('./ProtocolAdminInfo/CurrentProtocolStatus')
+            status = curStatus.text
+
+            if inScopeCount.has_key(status):
+                inScopeCount[status] += 1
+            else:
+                inScopeCount[status]  = 1
+
+    except Exception as e:
+        cdrcgi.bail("Error collecting InScope filenames: %s" % e)
 
     return(inScopeCount)
 
 # -------------------------------------------------------------------
 # Count the CTGovProtocols by status
+# This version retrieves the documents from the database
 # -------------------------------------------------------------------
 def getCTGovCount(jobID = 4867):
+    """
+    Function to collect the CTGovProtocols from the last
+    export job (given by the JobID) and counting the number
+    of documents per CurrentStatus.
+    """
+    query = protQuery % (jobID, 'CTGovProtocol')
+
+    try:
+        cursor = conn.cursor()
+        cursor.execute(query)
+        rows = cursor.fetchall()
+
+        ctgovCount = {}
+        for (docID, version) in rows:
+            xml = getProtocol(docID, version)
+
+            curStatus = xml.find('./OverallStatus')
+            if curStatus is not None:
+                status = curStatus.text
+
+            if ctgovCount.has_key(status):
+                ctgovCount[status] += 1
+            else:
+                ctgovCount[status]  = 1
+
+    except Exception as e:
+        cdrcgi.bail("Error collecting CTGov filenames: %s" % e)
+    
+    return(ctgovCount)
+
+
+# -------------------------------------------------------------------
+# Count the CTGovProtocols by status
+# This version goes to the vendor output directory to do the counting
+# -------------------------------------------------------------------
+def getCTGovCountOld(jobID = 4867):
     """
     Function to collect the CTGovProtocols from the last
     export job (given by the JobID) and counting the number
@@ -100,23 +206,19 @@ def getCTGovCount(jobID = 4867):
             ### allFiles = glob.glob('CDR*0.xml')
             allFiles = glob.glob('CDR*.xml')
             for protocol in allFiles:
-                dom = xml.dom.minidom.parse(protocol)
-                docElem = dom.documentElement
-                for node in docElem.childNodes:
-                    if node.nodeName == 'CurrentProtocolStatus':
-                        status = str(cdr.getTextContent(node).strip())
-                        if ctgovCount.has_key(status):
-                            ctgovCount[status] += 1
-                        else:
-                            ctgovCount[status]  = 1
-                dom.unlink()
+                dom = etree.parse(protocol)
+                root = dom.getroot()
+                curStatus = root.find('./CurrentProtocolStatus')
+                status = curStatus.text
 
-    except:
-        dada = formatExceptionInfo()
-        cdrcgi.bail("%s" % str(dada))
-        cdrcgi.bail("Error collecting CTGov filenames: %s" % sys.exc_info()[0])
-        raise
+                if ctgovCount.has_key(status):
+                    ctgovCount[status] += 1
+                else:
+                    ctgovCount[status]  = 1
 
+    except Exception as e:
+        cdrcgi.bail("Error collecting CTGov filenames: %s" % e)
+    
     return(ctgovCount)
 
 
@@ -346,7 +448,6 @@ report += u"""
 ctgovCount = getCTGovCount(jobID[0])
 ctgovKeys = ctgovCount.keys()
 ctgovKeys.sort()
-#print ""
 
 report += u"""
    <div class="center">
@@ -365,7 +466,6 @@ report += u"""
 scount = 0
 acount = 0
 ccount = 0
-#cdrcgi.bail(ctgovCount)
 
 for status in ctgovKeys:
     # Counting total of active and closed CTGovProtocols
