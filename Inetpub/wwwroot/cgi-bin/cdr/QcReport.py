@@ -15,6 +15,7 @@
 # BZIssue::5159 - [Summaries] Changes to HP & Patient QC Report Interfaces 
 #                 and Display Options
 # BZIssue::5229 - [CTGov] Missing Information In CTGov Protocol Full QC Report
+# BZIssue::5249 - Standard wording in Patient QC report not displaying in green
 #
 # ----------------------------------------------------------------------------
 #
@@ -606,7 +607,7 @@ qd       = fields.getvalue("QD")         or None
 kpbox    = fields.getvalue("Keypoints")  or None
 learnmore= fields.getvalue("LearnMore")  or None
 
-standardWording = fields.getvalue("ShowStandardWording") or None
+standardWording      = fields.getvalue("StandardWording") or None
 audInternComments    = fields.getvalue("AudInternalComments")  or None
 audExternComments    = fields.getvalue("AudExternalComments")  or None
 durPermanentComments = fields.getvalue("DurPermanentComments") or None
