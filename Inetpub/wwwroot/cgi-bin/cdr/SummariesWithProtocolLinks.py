@@ -323,6 +323,7 @@ function isSpanishItemChecked(){
     return($('All Spanish').checked ||
     $('Spanish Adult Treatment').checked ||
     $('Spanish Pediatric Treatment').checked ||
+    $('Spanish Screening and Prevention').checked ||
     $('Spanish Supportive Care').checked);
 }
 
@@ -352,6 +353,7 @@ function checkAllSpanish(checked){
     $('All Spanish').checked = checked;
     $('Spanish Adult Treatment').checked = checked;
     $('Spanish Pediatric Treatment').checked = checked;
+    $('Spanish Screening and Prevention').checked = checked;
     $('Spanish Supportive Care').checked = checked;
 }
 
@@ -629,6 +631,11 @@ if not lang and not cdrId:
        <b>Pediatric Treatment</b></input>
       </label><br>
       <label>
+       <input type='checkbox' id='Spanish Screening and Prevention' name='grp' 
+       value='Spanish Screening and Prevention' onClick="spanishItemClicked();">
+       <b>Screening and Prevention</b></input>
+      </label><br>
+      <label>
        <input type='checkbox' id='Spanish Supportive Care' name='grp' 
        value='Spanish Supportive Care' onClick="spanishItemClicked();">
        <b>Supportive and Palliative Care</b></input>
@@ -862,7 +869,9 @@ if not docId:
           boardPick += """'CDR0000256158', """
       elif groups[i] == 'Genetics':
           boardPick += """'CDR0000032120', 'CDR0000257061', """
-      elif groups[i] == 'Screening and Prevention':
+      elif groups[i] == 'Screening and Prevention' and lang == 'English':
+          boardPick += """'CDR0000028536', 'CDR0000028537', """
+      elif groups[i] == 'Spanish Screening and Prevention' and lang == 'Spanish':
           boardPick += """'CDR0000028536', 'CDR0000028537', """
       elif groups[i] == 'Pediatric Treatment' and lang == 'English':
           boardPick += """'CDR0000028557', 'CDR0000028558', """

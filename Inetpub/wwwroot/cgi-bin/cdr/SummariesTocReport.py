@@ -321,7 +321,7 @@ if not lang and (not byCdrid and not byTitle):
      <td></td>
      <td>
       <input type='checkbox' name='grp' value='All Spanish' 
-             onclick="javascript:allSpanish(this, 3)" id="allEs" CHECKED>
+             onclick="javascript:allSpanish(this, 4)" id="allEs" CHECKED>
        <label id="allEs">All Spanish</label><br>
       <input type='checkbox' name='grp' value='Spanish Adult Treatment'
              onclick="javascript:someSpanish()" id="S1" >
@@ -329,9 +329,12 @@ if not lang and (not byCdrid and not byTitle):
       <input type='checkbox' name='grp' value='Spanish Pediatric Treatment'
              onclick="javascript:someSpanish()" id="S2" >
        <label id="S2">Pediatric Treatment</label><br>
+      <input type='checkbox' name='grp' value='Spanish Screening and Prevention'
+             onclick="javascript:someSpanish()" id="S3">
+       <label id="S3">Screening and Prevention</label><br>
       <input type='checkbox' name='grp' value='Spanish Supportive Care'
-             onclick="javascript:someSpanish()" id="S3" >
-       <label id="S3">Supportive and Palliative Care</label><br>
+             onclick="javascript:someSpanish()" id="S4" >
+       <label id="S4">Supportive and Palliative Care</label><br>
      </td>
     </tr>
    </table>
@@ -402,8 +405,10 @@ for i in range(len(groups)):
       boardPick += """'CDR0000256158', 'CDR0000423294', """
   elif groups[i] == 'Genetics':
       boardPick += """'CDR0000032120', 'CDR0000257061', """
-  elif groups[i] == 'Screening and Prevention':
+  elif groups[i] == 'Screening and Prevention' and lang == 'English':
       boardPick += """'CDR0000028536', 'CDR0000028537', """
+  elif groups[i] == 'Spanish Screening and Prevention' and lang == 'Spanish':
+      boardPick += """'CDR0000028536', 'CDR0000028537', """   ### XXX
   elif groups[i] == 'Pediatric Treatment' and lang == 'English':
       boardPick += """'CDR0000028557', 'CDR0000028558', """
   elif groups[i] == 'Spanish Pediatric Treatment' and lang == 'Spanish':

@@ -21,7 +21,8 @@ audience  = fields and fields.getvalue("audience")         or None
 lang      = fields and fields.getvalue("lang")             or None
 showId    = fields and fields.getvalue("showId")           or "N"
 showAll   = fields and fields.getvalue("showAll")          or "N"
-groups    = fields and fields.getvalue("grp")              or []
+groupEN   = fields and fields.getvalue("grpEN")            or []
+groupES   = fields and fields.getvalue("grpES")            or []
 submit    = fields and fields.getvalue("SubmitButton")     or None
 request   = cdrcgi.getRequest(fields)
 title     = "CDR Administration"
@@ -32,6 +33,15 @@ buttons   = (SUBMENU, cdrcgi.MAINMENU)
 
 if type(showId) == type(""):
     showId = [showId]
+
+# Pick the groups by language for which to run the report for
+# -----------------------------------------------------------
+if lang == 'English':
+    groups = groupEN
+elif lang == 'Spanish':
+    groups = groupES
+else:
+    groups = []
 
 # The ReportType is needed to redirect the users to the interim page for
 # displaying markup QC reports
@@ -295,27 +305,27 @@ if not lang:
     <tr>
      <td></td>
      <td>
-       <input type='checkbox' name='grp' 
+       <input type='checkbox' name='grpEN' 
               value='Adult Treatment' id="E1">
        <label for="E1">Adult Treatment</label>
        <br>
-       <input type='checkbox' name='grp' 
+       <input type='checkbox' name='grpEN' 
               value='Genetics' id="E2">
        <label for="E2">Cancer Genetics</label>
        <br>
-       <input type='checkbox' name='grp'
+       <input type='checkbox' name='grpEN'
               value='Complementary and Alternative Medicine' id="E3">
        <label for="E3">Complementary and Alternative Medicine</label>
        <br>
-       <input type='checkbox' name='grp' 
+       <input type='checkbox' name='grpEN' 
               value='Pediatric Treatment' id="E4">
        <label for="E4">Pediatric Treatment</label>
        <br>
-       <input type='checkbox' name='grp' 
+       <input type='checkbox' name='grpEN' 
               value='Screening and Prevention' id="E5">
        <label for="E5">Screening and Prevention</label>
        <br>
-       <input type='checkbox' name='grp' 
+       <input type='checkbox' name='grpEN' 
               value='Supportive Care' id="E6">
        <label for="E6">Supportive and Palliative Care</label>
        <br><br>
@@ -333,15 +343,21 @@ if not lang:
     <tr>
      <td></td>
      <td>
-      <input type='checkbox' name='grp' 
+      <input type='checkbox' name='grpES' 
              value='Spanish Adult Treatment' id="S1" >
-       <label for="S1">Adult Treatment</label><br>
-      <input type='checkbox' name='grp' 
+       <label for="S1">Adult Treatment</label>
+       <br>
+      <input type='checkbox' name='grpES' 
              value='Spanish Pediatric Treatment' id="S2" >
-       <label for="S2">Pediatric Treatment</label><br>
-      <input type='checkbox' name='grp' 
-             value='Spanish Supportive Care' id="S3" >
-       <label for="S3">Supportive and Palliative Care</label><br>
+       <label for="S2">Pediatric Treatment</label>
+       <br>
+       <input type='checkbox' name='grpES' 
+              value='Spanish Screening and Prevention' id="S3">
+       <label for="S3">Screening and Prevention</label>
+       <br>
+      <input type='checkbox' name='grpES' 
+             value='Spanish Supportive Care' id="S4" >
+       <label for="S4">Supportive and Palliative Care</label><br>
      </td>
     </tr>
    </table>
@@ -387,7 +403,9 @@ for i in range(len(groups)):
       boardPick += """'CDR0000256158', 'CDR0000423294', """
   elif groups[i] == 'Genetics':
       boardPick += """'CDR0000032120', 'CDR0000257061', """
-  elif groups[i] == 'Screening and Prevention':
+  elif groups[i] == 'Screening and Prevention' and lang == 'English':
+      boardPick += """'CDR0000028536', 'CDR0000028537', """
+  elif groups[i] == 'Spanish Screening and Prevention' and lang == 'Spanish':
       boardPick += """'CDR0000028536', 'CDR0000028537', """
   elif groups[i] == 'Pediatric Treatment' and lang == 'English':
       boardPick += """'CDR0000028557', 'CDR0000028558', """

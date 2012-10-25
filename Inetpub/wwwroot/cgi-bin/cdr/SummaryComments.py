@@ -505,6 +505,7 @@ if not lang and not docId:
       <select name='grp'>
        <option>Adult Treatment</option>
        <option>Pediatric Treatment</option>
+       <option>Screening and Prevention</option>
        <option>Supportive and Palliative Care</option>
        <option selected="SELECTED">Please select a summary type ...</option>
       </select>
@@ -627,7 +628,9 @@ if not docId:
           boardPick += """'CDR0000256158', 'CDR0000423294', """
       elif groups[i] == 'Cancer Genetics':
           boardPick += """'CDR0000032120', 'CDR0000257061', """
-      elif groups[i] == 'Screening and Prevention':
+      elif groups[i] == 'Screening and Prevention' and lang == 'English':
+          boardPick += """'CDR0000028536', 'CDR0000028537', """
+      elif groups[i] == 'Screening and Prevention' and lang == 'Spanish':
           boardPick += """'CDR0000028536', 'CDR0000028537', """
       elif groups[i] == 'Pediatric Treatment' and lang == 'English':
           boardPick += """'CDR0000028557', 'CDR0000028558', """

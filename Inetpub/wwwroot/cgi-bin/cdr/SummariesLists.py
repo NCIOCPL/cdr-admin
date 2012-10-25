@@ -39,7 +39,8 @@ audience  = fields and fields.getvalue("audience")         or None
 lang      = fields and fields.getvalue("lang")             or None
 showId    = fields and fields.getvalue("showId")           or "N"
 showTable = fields and fields.getvalue("showTable")        or "N"
-groups    = fields and fields.getvalue("grp")              or []
+groupEN   = fields and fields.getvalue("grpEN")            or []
+groupES   = fields and fields.getvalue("grpES")            or []
 submit    = fields and fields.getvalue("SubmitButton")     or None
 request   = cdrcgi.getRequest(fields)
 title     = "CDR Administration"
@@ -48,6 +49,14 @@ script    = "SummariesLists.py"
 SUBMENU   = "Report Menu"
 buttons   = (SUBMENU, cdrcgi.MAINMENU)
 
+# Pick the groups by language for which to run the report for
+# -----------------------------------------------------------
+if lang == 'English':
+    groups = groupEN
+elif lang == 'Spanish':
+    groups = groupES
+else:
+    groups = []
 
 # ---------------------------------------------------
 # Functions to replace sevaral repeated HTML snippets
@@ -198,8 +207,7 @@ if not lang:
             document.getElementById('S' + i).checked = false;
     }
    </script>
-
-"""                           )
+""" )
     form   = """\
    <input type='hidden' name='%s' value='%s'>
  
@@ -249,26 +257,26 @@ if not lang:
     <tr>
      <td></td>
      <td>
-      <input type='checkbox' name='grp' value='All English' 
+      <input type='checkbox' name='grpEN' value='All English' 
              onclick="javascript:allEnglish(this, 6)" id="allEn" CHECKED>
        <label id="allEn">All English</label><br>
-      <input type='checkbox' name='grp' value='Adult Treatment'
+      <input type='checkbox' name='grpEN' value='Adult Treatment'
              onclick="javascript:someEnglish()" id="E1">
        <label id="E1">Adult Treatment</label><br>
-      <input type='checkbox' name='grp' value='Genetics'
+      <input type='checkbox' name='grpEN' value='Genetics'
              onclick="javascript:someEnglish()" id="E2">
        <label id="E2">Cancer Genetics</label><br>
-      <input type='checkbox' name='grp'
+      <input type='checkbox' name='grpEN'
              value='Complementary and Alternative Medicine'
-                    onclick="javascript:someEnglish()" id="E3">
-       <label id="E3">Complementary and Alternative Medicine</b><br>
-      <input type='checkbox' name='grp' value='Pediatric Treatment'
+             onclick="javascript:someEnglish()" id="E3">
+       <label id="E3">Complementary and Alternative Medicine</label><br>
+      <input type='checkbox' name='grpEN' value='Pediatric Treatment'
              onclick="javascript:someEnglish()" id="E4">
        <label id="E4">Pediatric Treatment</label><br>
-      <input type='checkbox' name='grp' value='Screening and Prevention'
+      <input type='checkbox' name='grpEN' value='Screening and Prevention'
              onclick="javascript:someEnglish()" id="E5">
        <label id="E5">Screening and Prevention</label><br>
-      <input type='checkbox' name='grp' value='Supportive Care'
+      <input type='checkbox' name='grpEN' value='Supportive Care'
              onclick="javascript:someEnglish()" id="E6">
        <label id="E6">Supportive and Palliative Care</label><br><br>
      </td>
@@ -285,18 +293,21 @@ if not lang:
     <tr>
      <td></td>
      <td>
-      <input type='checkbox' name='grp' value='All Spanish' 
-             onclick="javascript:allSpanish(this, 3)" id="allEs" CHECKED>
+      <input type='checkbox' name='grpES' value='All Spanish' 
+             onclick="javascript:allSpanish(this, 4)" id="allEs" CHECKED>
        <label id="allEs">All Spanish</label><br>
-      <input type='checkbox' name='grp' value='Spanish Adult Treatment'
+      <input type='checkbox' name='grpES' value='Spanish Adult Treatment'
              onclick="javascript:someSpanish()" id="S1" >
        <label id="S1">Adult Treatment</label><br>
-      <input type='checkbox' name='grp' value='Spanish Pediatric Treatment'
+      <input type='checkbox' name='grpES' value='Spanish Pediatric Treatment'
              onclick="javascript:someSpanish()" id="S2" >
        <label id="S2">Pediatric Treatment</label><br>
-      <input type='checkbox' name='grp' value='Spanish Supportive Care'
-             onclick="javascript:someSpanish()" id="S3" >
-       <label id="S3">Supportive and Palliative Care</label><br>
+      <input type='checkbox' name='grpES' value='Spanish Screening and Prevention'
+             onclick="javascript:someSpanish()" id="S3">
+       <label id="S3">Screening and Prevention</label><br>
+      <input type='checkbox' name='grpES' value='Spanish Supportive Care'
+             onclick="javascript:someSpanish()" id="S4" >
+       <label id="S4">Supportive and Palliative Care</label><br>
      </td>
     </tr>
    </table>
@@ -336,7 +347,9 @@ for i in range(len(groups)):
       boardPick += """'CDR0000256158', 'CDR0000423294', """
   elif groups[i] == 'Genetics':
       boardPick += """'CDR0000032120', 'CDR0000257061', """
-  elif groups[i] == 'Screening and Prevention':
+  elif groups[i] == 'Screening and Prevention' and lang == 'English':
+      boardPick += """'CDR0000028536', 'CDR0000028537', """
+  elif groups[i] == 'Spanish Screening and Prevention' and lang == 'Spanish':
       boardPick += """'CDR0000028536', 'CDR0000028537', """
   elif groups[i] == 'Pediatric Treatment' and lang == 'English':
       boardPick += """'CDR0000028557', 'CDR0000028558', """

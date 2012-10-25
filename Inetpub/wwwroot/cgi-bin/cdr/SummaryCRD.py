@@ -379,8 +379,8 @@ if not lang:
        <label id="E2">Cancer Genetics</label><br>
       <input type='checkbox' name='grpEN'
              value='Cancer Complementary and Alternative Medicine Board'
-                    onclick="javascript:someEnglish()" id="E3">
-       <label id="E3">Complementary and Alternative Medicine</b><br>
+             onclick="javascript:someEnglish()" id="E3">
+       <label id="E3">Complementary and Alternative Medicine</label><br>
       <input type='checkbox' name='grpEN' value='Pediatric Treatment Board'
              onclick="javascript:someEnglish()" id="E4">
        <label id="E4">Pediatric Treatment</label><br>
@@ -405,25 +405,30 @@ if not lang:
     <tr>
      <td></td>
      <td>
-      <input type='checkbox' name='grpES' value='All Spanish' 
-             onclick="javascript:allSpanish(this, 4)" id="allEs" CHECKED>
+      <input type='checkbox' name='grpES' 
+             value='All Spanish' 
+             onclick="javascript:allSpanish(this, 5)" id="allEs" CHECKED>
        <label id="allEs">All Spanish</label><br>
       <input type='checkbox' name='grpES' 
              value='Adult Treatment Board'
-             onclick="javascript:someSpanish()" id="S1" >
+             onclick="javascript:someSpanish()" id="S1">
        <label id="S1">Adult Treatment</label><br>
       <input type='checkbox' name='grpES'
              value='Cancer Complementary and Alternative Medicine Board'
              onclick="javascript:someSpanish()" id="S2">
-       <label id="S2">Complementary and Alternative Medicine</b><br>
+       <label id="S2">Complementary and Alternative Medicine</label><br>
       <input type='checkbox' name='grpES' 
              value='Pediatric Treatment Board'
-             onclick="javascript:someSpanish()" id="S3" >
+             onclick="javascript:someSpanish()" id="S3">
        <label id="S3">Pediatric Treatment</label><br>
       <input type='checkbox' name='grpES' 
+             value='Screening and Prevention Board'
+             onclick="javascript:someSpanish()" id="S4">
+       <label id="S4">Screening and Prevention</label><br>
+      <input type='checkbox' name='grpES' 
              value='Supportive and Palliative Care Board'
-             onclick="javascript:someSpanish()" id="S4" >
-       <label id="S4">Supportive and Palliative Care</label><br>
+             onclick="javascript:someSpanish()" id="S5">
+       <label id="S5">Supportive and Palliative Care</label><br>
      </td>
     </tr>
    </table>
@@ -541,6 +546,7 @@ query_info = """\
         ON s.doc_id = t.doc_id
        AND s.path = '/Summary/TranslationOf/@cdr:ref'
      WHERE t.path = '/Summary/SummaryTitle'
+       AND len(t.value) > 0  -- exclude empty title rows
      ORDER BY t.doc_id
 """
 try:
@@ -550,19 +556,36 @@ except cdrdb.Error, info:
     cdrcgi.bail('Failure Creating CRD temp table CRD_Info: %s' %
                 info[1][0])
      
+
+# Removing all English Summaries for which the board element
+# doesn't exist (is empty).  This is a not null field in #CRD_Info.
+# ---------------------------------------------------------------
+query_en_delete = """\
+    DELETE FROM #CRD_Info
+     WHERE language = 'English'
+       AND len(Board) = 0
+"""
+try:
+    cursor.execute(query_en_delete)
+    #rows = cursor.fetchall()
+except cdrdb.Error, info:
+    cdrcgi.bail('Failure deleting EN summaries without BoardName: %s' %
+                info[1][0])
+     
+
 # Removing all Spanish Summaries without a TranslationOf element
 # since we're unable to update the Board appropriately.
 # ---------------------------------------------------------------
-query_delete = """\
+query_es_delete = """\
     DELETE FROM #CRD_Info
      WHERE language = 'Spanish' 
        AND TranslationOf IS NULL
 """
 try:
-    cursor.execute(query_delete)
+    cursor.execute(query_es_delete)
     #rows = cursor.fetchall()
 except cdrdb.Error, info:
-    cdrcgi.bail('Failure deleting summaries without TranslationOf: %s' %
+    cdrcgi.bail('Failure deleting ES summaries without TranslationOf: %s' %
                 info[1][0])
      
 
@@ -579,6 +602,7 @@ query_upd = """\
                        AND e.board not like '%Advisory%'
                    )
      WHERE TranslationOf IS NOT NULL
+       AND language = 'Spanish'  -- to protect against data entry errors
 """
 
 try:
