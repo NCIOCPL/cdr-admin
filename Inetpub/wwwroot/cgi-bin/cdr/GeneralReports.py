@@ -150,7 +150,7 @@ reports = [
            ('UnchangedDocs.py',
             'Unchanged Documents'),
            ('CheckUrls.py',
-            'URL Check'),
+            'URL Check (Batch job - runs ~15 min)'),
            ('ReplaceCWDReport.py',
             'Versions that Replaced CWDs')
           ]
