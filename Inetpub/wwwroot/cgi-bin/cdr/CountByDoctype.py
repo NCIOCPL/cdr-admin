@@ -20,7 +20,7 @@ title   = "CDR Administration"
 section = "Published Documents Count"
 SUBMENU = 'Report Menu'
 buttons = ["Submit", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-header  = cdrcgi.header(title, title, section, "CountByDoctypeLR.py", buttons,
+header  = cdrcgi.header(title, title, section, "CountByDoctype.py", buttons,
                         method = 'GET')
 email   = fields and fields.getvalue('email') or None
 command = 'lib/Python/CdrLongReports.py'
@@ -80,7 +80,7 @@ except Exception, e:
     cdrcgi.bail("Could not start job: " + str(e))
 jobId       = batch.getJobId()
 buttons     = [SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-script      = 'CountByDoctypeLR.py'
+script      = 'CountByDoctype.py'
 header      = cdrcgi.header(title, title, section, script, buttons,
                             stylesheet = """\
   <style type='text/css'>
