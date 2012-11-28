@@ -11,8 +11,10 @@
 # Revision 1.1  2001/12/01 18:11:44  bkline
 # Initial revision
 #
+# BZIssue::5244 - URL Check report not working
+#
 #----------------------------------------------------------------------
-import cgi, cdrdb, cdrcgi, cdrbatch
+import cgi, cdr, cdrdb, cdrcgi, cdrbatch
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -26,8 +28,25 @@ SUBMENU = 'Report Menu'
 buttons = ["Submit", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 header  = cdrcgi.header(title, title, section, "CheckUrls.py", buttons,
                         method = 'GET')
-email   = fields and fields.getvalue('email') or None
+email   = fields and fields.getvalue('Email') or None
+docType = fields and fields.getvalue('DocType') or None
+audience= fields and fields.getvalue('Audience') or ''
+language= fields and fields.getvalue('Language') or ''
+
+args = [('docType', docType), 
+        ('audience', audience),
+        ('language', language)]
+
 command = 'lib/Python/CdrLongReports.py'
+docTypes = cdr.getDoctypes(session)
+
+# Make sure audience and language has been selected for the two doc types
+# -----------------------------------------------------------------------
+if not audience and docType in ('Summary', 'GlossaryTermConcept'):
+    cdrcgi.bail('Input Error: Audience not specified')
+
+if not language and docType in ('Summary', 'GlossaryTermConcept'):
+    cdrcgi.bail('Input Error: Language not specified')
 
 #----------------------------------------------------------------------
 # Handle navigation requests.
@@ -48,18 +67,94 @@ if request == "Log Out":
 #----------------------------------------------------------------------
 if not email:
     form = """\
+   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
+
+   <fieldset>
    <p>
-    This report requires a few minutes to complete.
+    This report requires a while to complete.
     When the report processing has completed, email notification
     will be sent to the addresses specified below.  At least
     one email address must be provided.  If more than one
     address is specified, separate the addresses with a blank.
    </p>
+   </fieldset>
+
    <br>
-  <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-    <b>Email address(es):&nbsp;&nbsp;&nbsp;</b>
-     <INPUT Name='email' Size='40'>
+   <fieldset>
+    <legend>&nbsp;Select Document Type&nbsp;</legend>
+     <div style="float: left; width:80px;">
+     <b>Doc Type: </b>
+     </div>
+     <div style="float:left; margin-left:10px;">
+     <select name='DocType'>
+     <option value='' SELECTED>Select doctype</option>
+     <option value='GlossaryTermConcept'>Glossary Term Concept</option>
+     <option value='Summary'>Summary</option>
+     <option value='InScopeProtocol'>InScopeProtocol</option>
+     <option value='CTGovProtocol'>CTGovProtocol</option>
+     <option value='DrugInformationSummary'>Drug Information Summary</option>
+     <option value='Person'>Person</option>
+     <option value='ClinicalTrialSearchString'>Clinical Trials Search String</option>
+     <option value='Citation'>Citation</option>
+     <option value='MiscellaneousDocument'>Miscellaneous Documents</option>
+     <option value='Organization'>Organization</option>
+        
 """ % (cdrcgi.SESSION, session)
+
+    #  <option value='%s'>%s &nbsp;</option>
+    #for docType in docTypes:
+    #    form += """
+    #    <option value='%s'>%s &nbsp;</option>
+#""" % (docType, docType)
+
+    form += """\
+    </select>
+     <br>
+     </div>
+     <div style="margin-left:80px;">
+     </div>
+    <br><br>
+    <b>Email address(es):&nbsp;&nbsp;&nbsp;</b>
+    <br>
+    <INPUT Name='Email' Size='42' value='%s'>
+
+   </fieldset>
+""" % cdr.getEmail(session)
+
+    form += """\
+   <fieldset>
+    <legend>&nbsp;Select for Summary or Glossary&nbsp;</legend>
+     <div>
+     <div style="float: left; width: 80px;">
+      <b>Audience: </b>
+      </div>
+      <div style="float: left; margin-left: 10px;">
+      <select name="Audience">
+       <option value='' SELECTED>Select audience</option>
+       <option value='HP'>HP</option>
+       <option value='Pat'>Patient</option>
+      </select>
+      </div>
+      </div>
+
+     <br><br>
+
+     <div>
+     <div style="float:left; width:  80px;">
+      <b>Language: </b>
+      </div>
+      <div style="float: left; margin-left: 10px;">
+      <select name="Language">
+       <option value='' SELECTED>Select language</option>
+       <option value='EN'>English</option>
+       <option value='ES'>Spanish</option>
+      </select>
+      </div>
+      </div>
+    
+    <br><br>
+"""
+
     cdrcgi.sendPage(header + form + """\
  </BODY>
 </HTML>
@@ -69,7 +164,7 @@ if not email:
 # If we get here, we're ready to queue up a request for the report.
 #----------------------------------------------------------------------
 batch = cdrbatch.CdrBatch(jobName = "URL Check",
-                          command = command, email = email)
+                          command = command, email = email, args = args)
 try:
     batch.queue()
 except Exception, e:
@@ -80,18 +175,23 @@ script      = 'CheckUrls.py'
 header      = cdrcgi.header(title, title, section, script, buttons,
                             stylesheet = """\
   <style type='text/css'>
-   body { font-family: Arial }
+   body     { font-family: Arial }
+   *.uline  { text-decoration: underline;  
+              color: blue; }
   </style>
  """)
 base = "http://%s%s" % (cdrcgi.WEBSERVER, cdrcgi.BASE)
 cdrcgi.sendPage(header + """\
+   <fieldset>
    <h4>Report has been queued for background processing</h4>
    <p>
     To monitor the status of the job, click this
-    <a href='%s/getBatchStatus.py?%s=%s&jobId=%s'><u>link</u></a>
+    <a href='%s/getBatchStatus.py?%s=%s&jobId=%s'>
+     <span class="uline">link</span></a>
     or use the CDR Administration menu to select 'View
     Batch Job Status'.
    </p>
+   </fieldset>
   </form>
  </body>
 </html>
