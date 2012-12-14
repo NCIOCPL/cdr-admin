@@ -1,25 +1,39 @@
+#----------------------------------------------------------------------
+#
+# $Id$
+#
+# Report to display DrugInfoSummaries
+#
+# BZIssue::5264 - [DIS] Formatting Changes to Drug Description Report
+#
+#----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, cdrdb, re, sys, time, xml.dom.minidom
 
 #----------------------------------------------------------------------
 # Get the parameters from the request.
 #----------------------------------------------------------------------
 repTitle = "CDR QC Report"
-fields   = cgi.FieldStorage() or cdrcgi.bail("No Request Found", repTitle)
-session  = cdrcgi.getSession(fields) or cdrcgi.bail("Not logged in")
+fields   = cgi.FieldStorage() or \
+                            cdrcgi.bail("No Request Found", repTitle)
+session  = cdrcgi.getSession(fields) or \
+                            cdrcgi.bail("Not logged in")
 action   = cdrcgi.getRequest(fields)
 fromDate = fields and fields.getvalue('FromDate') or None #'2002-01-01'
 toDate   = fields and fields.getvalue('ToDate')   or None #'2006-06-01'
-drug   = fields and fields.getlist("Drug") or []
+drug     = fields and fields.getlist("Drug") or []
 drugReferenceType = fields and fields.getvalue("DrugReferenceType") or 'NCI'
 selectByType = fields and fields.getvalue("SelectByType") or 'Drug'
 title    = "CDR Administration"
+instr    = "Drug Description Report"
+script   = "DrugDescriptionReport.py"
 section  = "QC Report"
 SUBMENU  = "Reports Menu"
 buttons  = ["Submit", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 if action == "Submit":
     buttons  = ["Back",SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-header   = cdrcgi.header(title, title, "Drug Description Report",
-                         "DrugDescriptionReport.py", buttons, method = 'GET')
+
+header   = cdrcgi.header(title, title, instr, script, 
+                         buttons, method = 'GET')
 #----------------------------------------------------------------------
 # Handle navigation requests.
 #----------------------------------------------------------------------
@@ -54,77 +68,120 @@ class DrugInfo:
             self.name = self.name[:delim]
         self.name = self.name.strip()
 
-def buildIndividualDrugTable(id,name,description,summary):
-    html = "<table>"
-    html += "<tr>"
-    html += "<td width = 10%></td>"
-    html += "<td width = 10%><h3>CDRID</h3></td>"
-    html += """<td  valign='top'><h4>%s</h4></td>""" %id
-    html += "<td width = 10%></td>"
-    html += "</tr>"
+# -----------------------------------------------------------------
+# Building the HTML output. Each DIS is displayed within a table
+# with four columns (left and right column for spacing only)
+# -----------------------------------------------------------------
+def buildIndividualDrugTable(id, name, description, summary):
+    html = u"""
+  <table>
+   <tr>
+    <td width=10%%></td>
+    <td class='label' width=10%%>CDR-ID</td>
+    <td class='info' valign='top'>
+      <a href="/cgi-bin/cdr/QcReport.py?Session=guest&DocId=%s">
+      %s
+      </a>
+    </td>
+    <td width=10%%></td>
+   </tr>
+""" % (id, id)
     
-    html += "<tr>"
-    html += "<td></td>"
-    html += "<td  valign='top'><h3>Drug Name</h3></td>"
-    html += """<td  valign='top'><h4>%s</h4></td>""" % name
-    html += "<td></td>"
-    html += "</tr>"
+    html += u"""\
+   <tr>
+    <td></td>
+    <td class='label' valign='top'>Drug Name</td>
+    <td class='info' valign='top'>
+     %s
+    </td>
+    <td></td>
+   </tr>
+""" % name
 
-    html += "<tr></tr>"
+    html += u"""\
+   <tr>
+    <td></td>
+    <td class='label' valign='top'>Description</td>
+    <td class='info' valign='top'>
+     %s
+    </td>
+    <td></td>
+   </tr>
+""" % description
 
-    html += "<tr>"
-    html += "<td></td>"
-    html += "<td  valign='top'><h3>Description</h3></td>"
-    html += """<td  valign='top'><h4>%s</h4></td>""" % description
-    html += "<td></td>"
-    html += "</tr>"
-
-    html += "<tr></tr>"
-
-    html += "<tr>"
-    html += "<td></td>"
-    html += "<td  valign='top'><h3>Summary</h3></td>"
-    html += """<td  valign='top'><h4>%s</h4></td>""" % summary
-    html += "<td></td>"
-    html += "</tr>"    
-
-    html += "</table>"
+    html += u"""\
+   <tr>
+    <td></td>
+    <td class='label' valign='top'>Summary</td>
+    <td class='info' valign='top'>
+     %s
+    </td>
+    <td></td>
+   </tr>
+  </table>
+""" % summary.decode('utf-8')
 
     return html;    
     
+
+# --------------------------------------------------------------------
+#
+# --------------------------------------------------------------------
 def MakeDrugDescriptions(drugInfo):
     keys = drugInfo.keys()
     html=""
     keys.sort(lambda a,b: cmp(drugInfo[a].name, drugInfo[b].name))
     for key in keys:
         drug = drugInfo[key]
-        html += buildIndividualDrugTable(drug.id,drug.name,drug.description,drug.summary)
-        html += "<br><hr width=80% align=center /><br>"
+        html += buildIndividualDrugTable(drug.id, drug.name, drug.description,
+                                         drug.summary)
+
+        # Separator for the individual documents
+        html += """\
+    <br>
+     <hr width=80% align=center/>
+    <br>"""
 
     return html;
 
+
+# --------------------------------------------------------------------
+#
+# --------------------------------------------------------------------
 def VerifyDate(fieldName,date):
     dateSplit = date.split("-")
     if  len(dateSplit) is not 3:
-        cdrcgi.bail('invalid %s<br><br>Make sure format is YYYY-MM-DD' % fieldName)
+        cdrcgi.bail('invalid %s<br><br>Make sure format is YYYY-MM-DD' % 
+                                                                 fieldName)
     VerifyDateValue(fieldName,"Year",dateSplit[0],4,1900,2099)
     VerifyDateValue(fieldName,"Month",dateSplit[1],2,1,12)
     VerifyDateValue(fieldName,"Day",dateSplit[2],2,1,31)
 
+
+# --------------------------------------------------------------------
+#
+# --------------------------------------------------------------------
 def VerifyDateValue(fieldName,fieldItem,dateItem,length,minValue,maxValue):
     if not dateItem.isdigit():
-        cdrcgi.bail('invalid %s<br><br>%s must not contains non numbers' % (fieldName,fieldItem))
+        cdrcgi.bail('invalid %s<br><br>%s must not contains non numbers' % 
+                                                (fieldName,fieldItem))
     if len(dateItem) is not length:
-        cdrcgi.bail('invalid %s<br><br>%s must be %d numbers long' % (fieldName,fieldItem,length))
+        cdrcgi.bail('invalid %s<br><br>%s must be %d numbers long' % 
+                                                (fieldName,fieldItem,length))
 
     intVal = int(dateItem)
     if intVal < minValue:
-        cdrcgi.bail('invalid %s<br><br>%s must be >= %d' % (fieldName,fieldItem,minValue))
+        cdrcgi.bail('invalid %s<br><br>%s must be >= %d' % 
+                                                (fieldName,fieldItem,minValue))
     if intVal > maxValue:
-        cdrcgi.bail('invalid %s<br><br>%s must be <= %d' % (fieldName,fieldItem,maxValue))
+        cdrcgi.bail('invalid %s<br><br>%s must be <= %d' % 
+                                                (fieldName,fieldItem,maxValue))
 
     return intVal
 
+
+# --------------------------------------------------------------------
+# --------------------------------------------------------------------
 def getAllNodeText(node):
     s = ""
     if node.nodeName in ["Para"]:
@@ -137,6 +194,9 @@ def getAllNodeText(node):
     s.strip()
     return s
 
+
+# --------------------------------------------------------------------
+# --------------------------------------------------------------------
 def getAllSummaryText(node):
     s = ""
     if node.nodeName == "SummarySection":
@@ -148,6 +208,8 @@ def getAllSummaryText(node):
     return s
 
     
+# --------------------------------------------------------------------
+# --------------------------------------------------------------------
 if action == "Submit":
     sIn = ""
     sReference = ""
@@ -170,19 +232,20 @@ if action == "Submit":
         where path = '/DrugInformationSummary/DrugReference/DrugReferenceType' and value = '%s')""" % drugReferenceType
 
     sQuery = """SELECT d.id, d.title, MAX(v.num)
- FROM document d 
- JOIN doc_version v 
- ON v.id = d.id 
- JOIN doc_type t 
- ON t.id = d.doc_type 
- JOIN audit_trail a 
- ON a.document = d.id 
- WHERE t.name = 'DrugInformationSummary' 
- %s 
- %s 
- GROUP BY d.id, d.title 
- %s
- ORDER BY d.title""" % (sReference,sIn,sDate)
+                  FROM document d 
+                  JOIN doc_version v 
+                    ON v.id = d.id 
+                  JOIN doc_type t 
+                    ON t.id = d.doc_type 
+                  JOIN audit_trail a 
+                    ON a.document = d.id 
+                 WHERE t.name = 'DrugInformationSummary' 
+                 %s 
+                 %s 
+                 GROUP BY d.id, d.title 
+                 %s
+                 ORDER BY d.title
+""" % (sReference, sIn, sDate)
 
     try:
         cursor.execute(sQuery, timeout = 300)
@@ -194,18 +257,18 @@ if action == "Submit":
     drugInfo={}
     for id, docTitle, docVerNum in rows:
         if id not in drugInfo:
-            drugInfo[id] = DrugInfo(id,docTitle,docVerNum,"","")
+            drugInfo[id] = DrugInfo(id, docTitle, docVerNum, "", "")
 
     keys = drugInfo.keys()
     for key in keys:
         drugInf = drugInfo[key]
         sQuery = """SELECT d.xml
-FROM document d
-JOIN doc_version v 
-ON v.id = d.id
-WHERE v.num = %s
-AND d.id = %s
-        """ % (drugInf.version,drugInf.id)
+                      FROM document d
+                      JOIN doc_version v 
+                        ON v.id = d.id
+                     WHERE v.num = %s
+                       AND d.id = %s
+""" % (drugInf.version, drugInf.id)
         try:
             cursor.execute(sQuery, timeout = 300)
             rows = cursor.fetchall()
@@ -213,21 +276,30 @@ AND d.id = %s
             cdrcgi.bail("Failure retrieving document XML: %s" % info[1][0])
 
         dom = xml.dom.minidom.parseString(rows[0][0].encode('utf-8'))
+
         # Get the Description
+        # -------------------
         element = dom.getElementsByTagName('Description')
         drugInf.description = getAllNodeText(element[0])
+
         # Get the Summary
-        sSummary = ""
-        for node in dom.documentElement.childNodes:
-            s = getAllSummaryText(node).strip()
-            if len(sSummary) > 0 and len(s) > 0 and not sSummary.endswith("<br><br>"):
-                sSummary += "<br><br>"
-            sSummary += s
-        sSummary = sSummary.strip()
-        if sSummary.startswith("<br><br>"):
-            sSummary = sSummary[8:len(sSummary)-1]
-        sSummary = sSummary.replace("<br><br><br><br>","<br><br>")
-        drugInf.summary = sSummary
+        # ----------------
+        mySummary = cdr.filterDoc('guest', ['name:Format DIS SummarySection'], 
+                                  docId = drugInf.id)
+        drugInf.summary = mySummary[0]
+        ###cdrcgi.bail(u"%s" % mySummary[0].decode('utf-8'))
+        ####
+        #sSummary = ""
+        #for node in dom.documentElement.childNodes:
+        #    s = getAllSummaryText(node).strip()
+        #    if len(sSummary) > 0 and len(s) > 0 and not sSummary.endswith("<br><br>"):
+        #        sSummary += "<br><br>"
+        #    sSummary += s
+        #sSummary = sSummary.strip()
+        #if sSummary.startswith("<br><br>"):
+        #    sSummary = sSummary[8:len(sSummary)-1]
+        #sSummary = sSummary.replace("<br><br><br><br>","<br><br>")
+        #drugInf.summary = sSummary
 
     now = time.localtime(time.time())
     Date   = time.strftime("%b %d, %Y %I:%M%p", now)
@@ -238,43 +310,59 @@ AND d.id = %s
 """
 
     form = """\
-<INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-<INPUT TYPE='hidden' NAME='SelectByType' VALUE='%s'>
-<INPUT TYPE='hidden' NAME='FromDate' VALUE='%s'>
-<INPUT TYPE='hidden' NAME='ToDate' VALUE='%s'>
-<INPUT TYPE='hidden' NAME='DrugReferenceType' VALUE='%s'>
-%s
-<style type='text/css'>
+  <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
+  <INPUT TYPE='hidden' NAME='SelectByType' VALUE='%s'>
+  <INPUT TYPE='hidden' NAME='FromDate' VALUE='%s'>
+  <INPUT TYPE='hidden' NAME='ToDate' VALUE='%s'>
+  <INPUT TYPE='hidden' NAME='DrugReferenceType' VALUE='%s'>
+  %s
+  <style type='text/css'>
    ul { margin-left: 20pt }
-   h2 { font-size: 15pt; font-family:Arial; color:black; font-weight:bold}
-   h3 { font-size: 13pt; font-family:Arial; color:black; font-weight:bold }
-   h4 { font-size: 13pt; font-family:Arial; color:black }
+   *.title  { font-size: 15pt; 
+              font-family:Arial; 
+              color:black;
+              font-weight:bold }
+   td.label { font-size: 11pt; 
+              font-family:Arial; 
+              color:black; 
+              font-weight:bold }
+   td.info  { font-size: 11pt; 
+              font-family:Arial; 
+              color:black }
+   td       { font-size: 11pt; 
+              font-family:Arial; 
+              color:black }
    li, span.r, p, h4 
-   { 
-        font-size: 11pt; font-family:'Arial'; color:black;
-        margin-bottom: 10pt; font-weight:normal 
-   }
+            { font-size: 11pt; 
+              font-family:'Arial'; 
+              color:black;
+              margin-bottom: 10pt; 
+              font-weight:normal }
    b, th 
    {  font-size: 11pt; font-family:'Arial'; color:black;
         margin-bottom: 10pt; font-weight:bold 
    }
    .error { color: red; }
   </style>
-<form method='post' action='DrugDescriptionReport.py'>
-<div align = 'center'>
-<h2>Drug Description Report<br>%s</h2>
-</div>
-<div>
-%s
-</div>
-</form>
-""" % (cdrcgi.SESSION, session,selectByType,fromDate,toDate,drugReferenceType,sDrug,Date,MakeDrugDescriptions(drugInfo))
+<!-- form method='post' action='%s' -->
+   <div align = 'center'>
+    <span class='title'>Drug Description Report<br>%s</span>
+   </div>
+   <br/>
+   <div>
+   %s
+   </div>
+  </form>
+""" % (cdrcgi.SESSION, session, selectByType, fromDate, toDate, 
+       drugReferenceType, sDrug, script, Date, MakeDrugDescriptions(drugInfo))
     
     cdrcgi.sendPage(header + form + """\
  </BODY>
 </HTML>
 """)
 
+# --------------------------------------------------------------------
+# --------------------------------------------------------------------
 class Drug:
     def __init__(self, id, docTitle):
         self.id = id
@@ -320,7 +408,7 @@ def makeDrugList(drugs):
         selected=""
     
     html = u"""\
-      <select id='Drug' name='Drug' style='width:600px' multiple size=12>
+      <select id='Drug' name='Drug' style='width:450px' multiple size=12>
       <option value='All' %s>All Drugs   (Select this to report on all the below drugs)</option>
 """ % selected
 
@@ -341,7 +429,6 @@ def makeDrugList(drugs):
 #----------------------------------------------------------------------
 # If we have a document type but no doc ID or title, ask for the title.
 #----------------------------------------------------------------------
-
 now         = time.localtime(time.time())
 toDateNew   = time.strftime("%Y-%m-%d", now)
 then        = list(now)
@@ -350,7 +437,7 @@ then        = time.localtime(time.mktime(then))
 fromDateNew = time.strftime("%Y-%m-%d", then)
 toDate      = toDate or toDateNew
 fromDate    = fromDate or fromDateNew
-style       = "style='width: 200px'"
+style       = "style='width: 100px'"
 drugStartDisplay = "none"
 dateStartDisplay = "none"
 typeStartDisplay = "none"
@@ -378,26 +465,22 @@ elif drugReferenceType == "NLM":
 else:
     fdaChecked = "checked"
 
+# Setting up the form to pick the report type
+# --------------------------------------------
 form = """\
 <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
   <style type='text/css'>
-   ul { margin-left: 20pt }
-   h2 { font-size: 14pt; font-family:Arial; color:Navy }
-   h3 { font-size: 13pt; font-family:Arial; color:black; font-weight:bold }
-   h4 { font-size: 14pt; font-family:Arial; color:black }
-   li, span.r, p, h4 
-   { 
-        font-size: 11pt; font-family:'Arial'; color:black;
-        margin-bottom: 10pt; font-weight:normal 
+   label, b, td
+   {  font-size: 11pt; 
+      font-family:'Arial';
    }
-   b, th 
-   {  font-size: 11pt; font-family:'Arial'; color:black;
-        margin-bottom: 10pt; font-weight:bold 
+   *.usage
+   {  font-size: 10pt; 
+      font-family:'Arial';
    }
-   .error { color: red; }
   </style>
-  <script language='JavaScript'>
 
+  <script language='JavaScript'>
    function radioClicked(whichOne)
    {
        var elemDrugControls = document.getElementById('DrugControls');
@@ -433,57 +516,78 @@ form = """\
    }
        
   </script>
-  <form method='post' action='DrugDescriptionReport.py'>
-  <p>
-     Select how you want to filter for drugs: 
-     </p>
-     <h4>
-    <input type="radio" name="SelectByType" id="DrugCheck" value="Drug" %s onClick="radioClicked('Drug')">By Drug Name</input><br>
-    <input type="radio" name="SelectByType" id="DateCheck" value="Date" %s onClick="radioClicked('Date')">By Date of Last Published Version</input><br>
-    <input type="radio" name="SelectByType" id="TypeCheck" value="ReferenceType" %s onClick="radioClicked('ReferenceType')">By Drug Reference Type</input><br>
-    </h4>
-    <div id = 'DrugControls' style="display:%s"><br><br>
-     <p>
-     Select the Drug(s) from the list below. Use Ctrl+'Click' to select more than one. 
-     </p>
+
+  <form method='post' action='%s'>
+   <fieldset>
+    <legend>&nbsp;Select how to filter for drugs&nbsp;</legend>
+     <input type="radio" name="SelectByType" id="DrugCheck" 
+            value="Drug" %s onClick="radioClicked('Drug')">
+     <label for="DrugCheck">By Drug Name</label>
+     <br>
+     <input type="radio" name="SelectByType" id="DateCheck" 
+            value="Date" %s onClick="radioClicked('Date')">
+     <label for="DateCheck">By Date of Last Published Version</label>
+     <br>
+     <input type="radio" name="SelectByType" id="TypeCheck" 
+            value="ReferenceType" %s onClick="radioClicked('ReferenceType')">
+     <label for="TypeCheck">By Drug Reference Type</label>
+   </fieldset>
+   <br>
+""" % (cdrcgi.SESSION, session, script, 
+       drugStartChecked, dateStartChecked, typeStartChecked)
+   
+form += """\
+   <div id='DrugControls' style="display:%s">
+    <fieldset>
+     <legend>&nbsp;Select Drugs&nbsp;</legend>
+     <span class='usage'>Use Ctrl+'Click' to select more than one.</span>
      %s
      <br>
-     <br>
-     <br>
-     </div>
-     <div id = 'DateControls' style="display:%s"><br><br>
-     <p>
-     Select The Date Range of the Last Published Version: 
-     </p>
-     <TABLE BORDER='0'>
-    <TR>
-     <TD ALIGN='right'><B>On or After Date:&nbsp;</B></TD>
-     <TD><INPUT NAME='FromDate' VALUE='%s' %s></td>
-     <td>
-         (use format YYYY-MM-DD for dates, e.g. 2002-01-01)</TD>
-        </td>
-    </TR>
-    <TR>
-     <TD ALIGN='right'><B>On or Before Date:&nbsp;</B></TD>
-     <TD><INPUT NAME='ToDate' VALUE='%s' %s>&nbsp;</TD>
-    </TR></TABLE>
-    <br>
-    </div>
-    <div id = 'TypeControls' style="display:%s"><br><br>
-    <p>
-     Select The Drug Reference Type:
-     </p>
-     <h4>
-    <input type="radio" name="DrugReferenceType" value="NCI" %s id="NCIRadio">NCI</input><br>
-    <input type="radio" name="DrugReferenceType" value="FDA" %s id="FDARadio">FDA</input><br>
-    <input type="radio" name="DrugReferenceType" value="NLM" %s id="NLMRadio">NLM</input><br>
-    </h4>
-    </div>
-    </form>
-""" % (cdrcgi.SESSION, session,drugStartChecked,dateStartChecked,typeStartChecked,drugStartDisplay,makeDrugList(drugs),dateStartDisplay,fromDate, style, toDate, style, typeStartDisplay,nciChecked,fdaChecked,nlmChecked)
-#header = header.replace("<BODY BGCOLOR='EEEEEE'>","<BODY BGCOLOR='EEEEEE' onLoad='bodyLoad()'>")
+    </fieldset>
+   </div>
+""" % (drugStartDisplay, makeDrugList(drugs)) 
+
+form += """\
+   <div id='DateControls' style="display:%s">
+    <fieldset>
+     <legend>&nbsp;Select Date Range of last pub version&nbsp;</legend>
+     <TABLE BORDER='0' style='float:left'>
+      <TR>
+       <TD ALIGN='right'>On or After Date:&nbsp;</TD>
+       <TD><INPUT NAME='FromDate' VALUE='%s' %s></td>
+      </TR>
+      <TR>
+       <TD ALIGN='right'>On or Before Date:&nbsp;</TD>
+       <TD><INPUT NAME='ToDate' VALUE='%s' %s>&nbsp;</TD>
+      </TR>
+     </TABLE>
+     <span class='usage'>Use format YYYY-MM-DD for dates, e.g. 2002-01-01</span>
+
+    </fieldset>
+   </div>
+""" % (dateStartDisplay, fromDate, style, toDate, style)
+
+form += """\
+   <div id='TypeControls' style="display:%s">
+    <fieldset>
+     <legend>&nbsp;Select Drug Reference Type&nbsp;</legend>
+      <input type="radio" name="DrugReferenceType" 
+             value="NCI" %s id="NCIRadio">
+      <label for="NCIRadio">NCI</label>
+      <br>
+      <input type="radio" name="DrugReferenceType" 
+             value="FDA" %s id="FDARadio">
+      <label for="FDARadio">FDA</label>
+      <br>
+      <input type="radio" name="DrugReferenceType" 
+             value="NLM" %s id="NLMRadio">
+      <label for="NLMRadio">NLM</label>
+    </fieldset>
+   </div>
+  </form>
+""" % (typeStartDisplay, nciChecked, fdaChecked, nlmChecked)
+
 cdrcgi.sendPage(header + form + """\
  </BODY>
 </HTML>
 """)    
-
