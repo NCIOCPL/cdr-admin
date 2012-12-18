@@ -51,7 +51,7 @@ try:
 except Exception, info:
     cdrcgi.bail("Cannot cd to %s" % abspath)
 latex   = cdrxmllatex.makeLatex (resp[0], docType, "")
-filename = docId + ".tex"
+filename = "%s.tex" % docId
 try:
     texFile  = open(filename, "wb")
     texFile.write(latex.getLatex())
@@ -74,7 +74,7 @@ commandResult = cdr.runCommand(cmd)
 if commandResult.code:
     cdrcgi.bail("Failure running %s: %s" % (cmd, commandResult.output))
 try:
-    psFile = open(docId + ".ps")
+    psFile = open("%s.ps" % docId)
     psDoc  = psFile.read()
     psFile.close()
 except:
