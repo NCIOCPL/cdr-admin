@@ -97,7 +97,7 @@ SELECT DISTINCT value
             selected = ""
 
     except cdrdb.Error, info:
-        cdrcgi.bail('Database query failure: %s' % info[1][0])
+        cdrcgi.bail('Database failure - Query I: %s' % info[1][0])
     return picklist + "</SELECT>"
 
 #----------------------------------------------------------------------
@@ -120,16 +120,95 @@ SELECT DISTINCT board.id, board.title
             AND org_type.value IN ('PDQ Editorial Board',
                                    'PDQ Advisory Board')
        ORDER BY board.title""")
-        for row in cursor.fetchall():
-            semi = row[1].find(';')
-            if semi != -1: boardTitle = trim(row[1][:semi])
-            else:          boardTitle = trim(row[1])
-            picklist += "<OPTION%s>%s</OPTION>" % (selected, boardTitle)
-            selected = ""
-            boardDict[boardTitle] = row[0]
     except cdrdb.Error, info:
-        cdrcgi.bail('Database query failure: %s' % info[1][0])
+        cdrcgi.bail('Database failure - Query II: %s' % info[1][0])
+
+    for row in cursor.fetchall():
+        semi = row[1].find(';')
+        if semi != -1: boardTitle = trim(row[1][:semi])
+        else:          boardTitle = trim(row[1])
+        picklist += "<OPTION%s>%s</OPTION>" % (selected, boardTitle)
+        selected = ""
+        boardDict[boardTitle] = row[0]
+
     return picklist + "</SELECT>"
+
+
+#----------------------------------------------------------------------
+# Create an HTML table listing a summary with its board members
+#----------------------------------------------------------------------
+def makeSummaryTable(summaryId, members, cdrId='No'):
+    # Begin a table
+    # -------------
+    html = """\
+  <table width='100%%' border='0'>
+"""
+    # Print the header row (optional CDR-id and Summary name)
+    # -------------------------------------------------------
+    headrow = False
+    for member in members:
+        if member[2] == summaryId and not headrow:
+            headrow = True
+            # Add a column for the CDR-ID if requested
+            # ----------------------------------------
+            if cdrId == 'Yes':
+                html += """\
+   <tr>
+    <th class='theader' width='7%%' align='right'>
+     <span class='group'>%10d</span>
+    </th>
+    <th class='theader'>
+     <span class='group'>%s</span>
+    </th>
+   </tr>
+""" % (member[2], re.sub(";", "--", trim(member[3])))
+            else:
+                html += """\
+   <tr>
+    <th class='theader' colspan='2'>
+     <span class='group'>%s</span>
+    </th>
+   </tr>
+""" % re.sub(";", "--", trim(member[3]))
+
+    # Print the data rows (the board member name)
+    # -------------------------------------------
+        if member[2] == summaryId:
+            html += """\
+"""
+            # Add a column for the CDR-ID if requested
+            # ----------------------------------------
+            if cdrId == 'Yes' and not headrow:
+                html += """\
+   <tr>
+    <td width='7%%' align='right'>
+     <span class='content'>%10d</span>
+    </td>
+    <td>
+     <span class='content'>%s</span>
+    </td>
+   </tr>
+""" % (member[2], trim(member[1][:member[1].index(';')]))
+            else:
+                html += """\
+   <tr>
+    <td width='2%%' align='right'>
+     <span class='content'> </span>
+    </td>
+    <td>
+     <span class='content'>%s</span>
+    </td>
+   </tr>
+""" % (trim(member[1][:member[1].index(';')]))
+
+    # Close the table
+    # ---------------
+    html += """\
+  </table>
+  <br>
+"""
+    return html
+
 
 #----------------------------------------------------------------------
 # If we don't have a request, put up the form.
@@ -140,41 +219,46 @@ if not boardInfo:
                                                            SUBMENU,
                                                            cdrcgi.MAINMENU))
     form     = u"""\
+  <style type='text/css'>
+   *  { font-family: Arial; }
+  </style>
       <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-      <TABLE>
-       <TR>
-        <TD ALIGN='right'><B>PDQ Board:&nbsp;</B></TD>
-        <TD>%s</TD>
-       </TR>
-       <TR>
-        <TD ALIGN='right'><B>Summary Audience:&nbsp;</B></TD>
-        <TD>%s</TD>
-       </TR>
-      </TABLE>
-      <CENTER>
-       <TABLE border='0'>
-        <TR>
-         <TD>
-          <INPUT TYPE='radio' NAME='ShowCdrId' VALUE='Yes'>
-           With CDR ID<BR>
-         </TD>
-         <TD>
-          <INPUT TYPE='radio' NAME='RepType' VALUE='ByTopic' checked='1'>
-           Order by Topic<BR>
-         </TD>
-        </TR>
-        <TR>
-         <TD>
-          <INPUT TYPE='radio' NAME='ShowCdrId' VALUE='No' CHECKED>
-           Without CDR ID<BR>
-         </TD>
-         <TD>
-          <INPUT TYPE='radio' NAME='RepType' VALUE='ByMember'>
-           Order by Board Member<BR>
-         </TD>
-        </TR>
-       </TABLE>
-      </CENTER>
+      <fieldset>
+       <legend>&nbsp;Select Board and Audience&nbsp;</legend>
+        <B>PDQ Board:&nbsp;</B>
+        <br>%s
+        <br>
+        <B>Summary Audience:&nbsp;</B>
+        <br>%s
+      </fieldset>
+      <br>
+      <fieldset>
+         <div style="float:left; width:120px;">
+         <b>Display Cdr-Id:</b>
+         </div>
+         <div style="float:left; width:70px;">
+          <INPUT TYPE='radio' NAME='ShowCdrId' VALUE='Yes' id='y1'>
+          <label for='y1'>Yes</label>
+         </div>
+         <div style="float:left; width:120px;">
+          <INPUT TYPE='radio' NAME='ShowCdrId' VALUE='No' id='n1' checked='1'>
+          <label for='n1'>No</label>
+         </div>
+          <br>
+
+         <div style="float:left; clear:left; width:120px;">
+         <b>Order by:</b>
+         </div>
+         <div style="float:left; width:70px;">
+          <INPUT TYPE='radio' NAME='RepType' VALUE='ByTopic' id='y2' 
+                                                          checked='1'>
+          <label for='y2'>Topic</label>
+         </div>
+         <div style="float:left; width:150px;">
+          <INPUT TYPE='radio' NAME='RepType' VALUE='ByMember' id='n2'>
+          <label for='n2'>Board Member</label>
+         </div>
+      </fieldset>
       </FORM>
      </BODY>
     </HTML>
@@ -213,7 +297,13 @@ if audience and len(audience) > 1:
 #----------------------------------------------------------------------
 if repType == 'ByTopic':
     instr     = 'Board Report by Topics -- %s.' % dateString
-    header    = cdrcgi.header(title, title, instr, script, buttons)
+    header    = cdrcgi.header(title, title, instr, script, buttons,
+            stylesheet = """\
+  <style type='text/css'>
+   *.group   { font-family: Arial; font-size: 12pt; font-weight: bold }
+   *.content { font-family: Arial; font-size: 12pt; font-weight: normal }
+  </style>
+""")
     audString = ""
     if audience:
         audString = "<BR>(%s)" % audience
@@ -223,7 +313,7 @@ if repType == 'ByTopic':
   <H4>Topics for %s%s</H4>
 """ % (cdrcgi.SESSION, session, boardName, audString)
     try:
-        cursor.execute("""\
+        query = """\
 SELECT DISTINCT board_member.id, board_member.title,
                 summary.doc_id, summary.value
            FROM document board_member
@@ -239,97 +329,59 @@ SELECT DISTINCT board_member.id, board_member.title,
              ON summary.doc_id = summary_board.doc_id
             AND summary.path = '%s'
              %s
+           JOIN document d
+             ON d.id = summary.doc_id
+            AND d.active_status = 'A'
           WHERE summary_board.int_val = ?
        ORDER BY summary.value, board_member.title""" % (sbmPath, sbPath,
-                                                        stPath, audienceJoin), 
-                boardId)
+                                                        stPath, audienceJoin)
 
+        cursor.execute(query, boardId)
         prevSummaryId = 0
-        for row in cursor.fetchall():
+        rows = cursor.fetchall()
 
-# Decision if the report will be printed with or without CDR ID
-# =============================================================
-            if showCdrId == 'Yes':
-                if row[2] != prevSummaryId:
-#                    if prevSummaryId:
-#                        report += """\
-#"""
-                     report += """\
-  </TABLE>
-  <TABLE width='100%%' border='0'>
-   <TR>
-    <TD width='10%%' align='right'>
-     <BR/>
-     <FONT SIZE='4'>%10d</FONT>
-    </TD>
-    <TD>
-     <BR/>
-     <FONT SIZE='4'>%s</FONT>
-    </TD>
-   </TR>
-""" % (row[2], re.sub(";", "--", trim(row[3])))
-                     prevSummaryId = row[2]
+    except cdrdb.Error, info:
+        cdrcgi.bail('Database failure - Query III: %s' % info[1][0])
 
-                report += """\
-   <TR>
-    <TD width='10%%'> </TD>
-    <TD>
-     <FONT SIZE='3'>%s</FONT>
-    </TD>
-   </TR>
-""" % (trim(row[1][:row[1].index(';')]))
-                if prevSummaryId:
-                    report += """\
-"""
-### Code for report without CDR ID
-### ==============================
-#                    if prevSummaryId:
-#                        report += """\
-#"""
-            else:
-                if row[2] != prevSummaryId:
-                     report += """\
-  </TABLE>
-  <TABLE width='100%%' border='0'>
-   <TR>
-    <TD colspan='2'>
-     <BR/>
-     <FONT SIZE='4'>%s</FONT>
-    </TD>
-    <TD width='5%%' align='right'>
-     <BR/>
-     <FONT SIZE='4'></FONT>
-    </TD>
-   </TR>
-""" % (re.sub(";", "--", trim(row[3])))
-                     prevSummaryId = row[2]
+    # Create a dictionary of summaries and IDs and sort
+    # -------------------------------------------------
+    summaries  = [i[3] for i in rows]
+    sumDict = dict.fromkeys(summaries)
+    summaryInfo  = [[i[3], i[2]] for i in rows]
 
-                report += """\
-   <TR>
-    <TD width='5%%'> </TD>
-    <TD>
-     <FONT SIZE='3'>%s</FONT>
-    </TD>
-   </TR>
-""" % (trim(row[1][:row[1].index(';')]))
-                if prevSummaryId:
-                    report += """\
-"""
-# =======================================
-        report += """\
+    # Create the dictionary from a list
+    for name, id in summaryInfo:
+        sumDict[name] = id
+
+    # Display the information sorted by summary names
+    sumSort = sumDict.keys()
+    sumSort.sort()
+
+    # Create a HTML table for each topic and list the board members
+    # -------------------------------------------------------------
+    for summary in sumSort:
+        report += makeSummaryTable(sumDict[summary], rows, showCdrId)
+
+    # Finish up the report output
+    # ===========================
+    report += """\
   </TABLE>
  </BODY>
 </HTML>
 """
-    except cdrdb.Error, info:
-        cdrcgi.bail('Database query failure: %s' % info[1][0])
     cdrcgi.sendPage(header + report)
 
 #----------------------------------------------------------------------
 # Show the members of the board, with associated topics.
 #----------------------------------------------------------------------
 instr     = 'Board Report by Members -- %s.' % dateString
-header    = cdrcgi.header(title, title, instr, script, buttons)
+header    = cdrcgi.header(title, title, instr, script, buttons,
+            stylesheet = """\
+  <style type='text/css'>
+   *.group   { font-family: Arial; font-size: 12pt; font-weight: bold }
+   *.content { font-family: Arial; font-size: 12pt; font-weight: normal }
+  </style>
+""")
 members   = {}
 topics    = {}
 audString = ""
@@ -393,6 +445,9 @@ SELECT DISTINCT board_member.id, board_member.title,
              ON summary.doc_id = summary_board.doc_id
             AND summary.path = '%s'
              %s
+           JOIN document d
+             ON d.id = summary.doc_id
+            AND d.active_status = 'A'
           WHERE summary_board.int_val = ?""" % (sbmPath, sbPath, stPath,
                                                 audienceJoin), 
             boardId)
@@ -403,7 +458,7 @@ SELECT DISTINCT board_member.id, board_member.title,
                     re.sub(";", "--", trim(row[3]))))
 
 except cdrdb.Error, info:
-    cdrcgi.bail('Database query failure: %s' % info[1][0])
+    cdrcgi.bail('Database failure - Query IV: %s' % info[1][0])
 
 keys = members.keys()
 keys.sort(lambda a, b: cmp(members[a].name, members[b].name))
@@ -411,9 +466,12 @@ for key in keys:
     member = members[key]
     try:
         report += """\
-  <FONT SIZE='4'>%s</FONT>
-  <TABLE width='100%%' border='0'>
-   <TR>
+  <table width='100%%' border='0'>
+   <tr>
+    <th class='theader' colspan='2'>
+     <span class='group'>%s</span>
+    </th>
+   </tr>
 """ % (member.name)
     except:
         cdrcgi.bail("member.name = " + member.name)
@@ -428,23 +486,30 @@ for key in keys:
 # ============================================================
             if showCdrId == 'Yes':
                report += """\
-    <TD width='10%%' align='right'><FONT SIZE='-0'>%10d</FONT></TD>
-    <TD width='2%%'></TD>
-    <TD><FONT SIZE='-0'>%s</FONT></TD>
-   </TR>
+   <tr>
+    <td width='7%%' align='right'>
+     <span class='content'>%10d</span>&nbsp;
+    </td>
+    <td>
+     <span class='content'>%s</span>
+    </td>
+   </tr>
 """ % (topic.id, topic.name)
             else:
                report += """\
-    <TD width='5%%'></TD>
-    <TD><FONT SIZE='-0'>%s</FONT></TD>
-   </TR>
+   <tr>
+    <td width='5%%'></TD>
+    <td>
+     <span class='content'>%s</span>
+    </td>
+   </tr>
 """ % (topic.name)
 
         report += """\
-  </TABLE>
-  <BR/>
+  </table>
+  <br/>
 """
-    report += """\
+report += """\
  </BODY>
 </HTML>
 """
