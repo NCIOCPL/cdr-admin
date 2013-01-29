@@ -62,13 +62,9 @@ def extractInt(str):
 #----------------------------------------------------------------------
 # Set the form variables.
 #----------------------------------------------------------------------
-cdr.logwrite("Program initiation time=%f" % time.time())
 fields     = cgi.FieldStorage()
-cdr.logwrite("Got field storage time=%f" % time.time())
 session    = cdrcgi.getSession(fields)
-cdr.logwrite("Got session time=%f" % time.time())
 request    = cdrcgi.getRequest(fields)
-cdr.logwrite("Got request time=%f" % time.time())
 usage      = fields.getvalue('usage')      or None
 value      = fields.getvalue('value')      or None
 pattern    = fields.getvalue('pattern')    or ""
@@ -77,7 +73,6 @@ alphaStart = fields.getvalue('alphaStart') or ""
 maxRowStr  = fields.getvalue('maxRows')    or "250"
 noMapped   = fields.getvalue('noMapped')   or None
 noMappable = fields.getvalue('noMappable') or None
-cdr.logwrite("Got 6 more fields time=%f" % time.time())
 title      = "CDR Administration"
 section    = "External Map Editor"
 script     = "EditExternMap.py"
@@ -95,7 +90,6 @@ if docId and not pattern:
 if docId and (noMapped or noMappable):
     cdrcgi.bail("If searching for a mapped document ID, you must uncheck " + \
                 "both mapping check boxes.")
-cdr.logwrite("End of program initiation time=%f" % time.time())
 style    = """\
   <style  type='text/css'>input.r { background-color: EEEEEE }</style>
   <script type='text/javascript'>
@@ -233,7 +227,6 @@ def typeOk(mapId, docId):
 #----------------------------------------------------------------------
 form = ""
 if request == "Save Changes":
-    cdr.logwrite("Begin reading form vars for save time=%f" % time.time())
 
     # Get user id to associate with update to external_map
     cursor.execute("""\
@@ -299,7 +292,6 @@ if request == "Save Changes":
             # key=map table id, value=mappable checkbox approved by uer
             key = extractInt(field)
             newMable[key] = "Y"
-    cdr.logwrite("End reading form vars for save time=%f" % time.time())
 
     # Track changes
     numChanges = 0
@@ -604,7 +596,6 @@ if request in ("Save Changes", "Get Values"):
     else:
         whereNoMappable = " AND m.mappable = 'Y'"
 
-    cdr.logwrite("SQL initiation time=%f" % time.time())
     # Construct and execute specific query for user input
     if pattern:
         cursor.execute("""\
@@ -645,7 +636,6 @@ if request in ("Save Changes", "Get Values"):
        ORDER BY m.value""" % (maxRows,whereUsage,whereNoMap,whereNoMappable))
     row = cursor.fetchone()
 
-    cdr.logwrite("SQL completion time=%f" % time.time())
     # No hits?
     if not row:
         form += """\
@@ -717,5 +707,4 @@ if request in ("Save Changes", "Get Values"):
  </body>
 </html>
 """
-cdr.logwrite("Form completion time=%f" % time.time())
 cdrcgi.sendPage(header + form)
