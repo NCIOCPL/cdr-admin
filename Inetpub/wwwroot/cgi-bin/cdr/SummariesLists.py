@@ -5,6 +5,7 @@
 # Report on lists of summaries.
 #
 # BZIssue::5177 - Adding a Table Option to the Summaries Lists Report
+# BZIssue::5273 - Identifying Modules in Summary Reports
 #
 # Revision 1.6  2007/11/03 14:15:07  bkline
 # Unicode encoding cleanup (issue #3716).
@@ -462,15 +463,19 @@ AND audience.value = 'Health professionals'
 # Put all the pieces together for the SELECT statement
 # -------------------------------------------------------------
 query = """\
-SELECT DISTINCT qt.doc_id, title.value DocTitle, 
+SELECT DISTINCT qt.doc_id, title.value DocTitle,
 %s
 %s
+,module.value
 FROM  query_term qt
 %s
 JOIN  query_term title
 ON    qt.doc_id    = title.doc_id
 JOIN  query_term audience
 ON    qt.doc_id    = audience.doc_id
+LEFT OUTER JOIN  query_term module
+ON    module.doc_id = title.doc_id  
+AND module.path = '/Summary/@ModuleOnly'
 WHERE title.path   = '/Summary/SummaryTitle'
 %s
 AND   board.path   = '/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref'
@@ -607,16 +612,22 @@ for row in rows:
     # heading
     # ----------------------------------------------------------
     if row[5] == board_type:
-        report += summaryTableRow(row[0], row[1], row[4], 
+        report += summaryTableRow(row[0], '%s%s' % (row[1],
+                                                     row[6] and ' (Module)'
+                                                                 or ''), 
+                                  row[4], 
                                   addCdrID=showId, addBlank=showTable,
                                   language=lang)
     else:
+        #cdrcgi.bail('2')
         board_type = row[5]
         report += boardHeaderWithID(board_type)
 
         if showTable == 'Y':
             report += showHeader
-        report += summaryTableRow(row[0], row[1], row[4], 
+        report += summaryTableRow(row[0], '%s%s' % (row[1], 
+                                         row[6] and ' (Module)' or ''),
+                                  row[4], 
                                   addCdrID=showId, addBlank=showTable,
                                   language=lang)
 report += """

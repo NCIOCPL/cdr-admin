@@ -7,6 +7,7 @@
 # BZIssue::4671 - Summaries with Mark-up Report
 # BZIssue::4922 - Enhancements to the Summaries with Markup Report
 # BZIssue::5094 - Summ. with Markup Report - Add option to show all summaries
+# BZIssue::5273 - Identifying Modules in Summary Reports
 #
 #----------------------------------------------------------------------
 import cdr, cgi, cdrcgi, time, cdrdb, xml.dom.minidom
@@ -520,13 +521,17 @@ AND audience.value = 'Health professionals'
 query = """\
 SELECT DISTINCT qt.doc_id, title.value DocTitle, 
 %s
-%s
+%s,
+mod.value
 FROM  query_term qt
 %s
 JOIN  query_term title
 ON    qt.doc_id    = title.doc_id
 JOIN  query_term audience
 ON    qt.doc_id    = audience.doc_id
+LEFT OUTER JOIN query_term mod
+ON    mod.doc_id = qt.doc_id
+AND   mod.path     = '/Summary/@ModuleOnly'
 WHERE title.path   = '/Summary/SummaryTitle'
 %s
 AND   board.path   = '/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref'
@@ -709,22 +714,32 @@ for row in rows:
     # ----------------------------------------------------------
     if row[5] == board_type:
         if lang == 'English':
-            report += summaryRowWithID(row[0], row[1],
+            report += summaryRowWithID(row[0], 
+                                       '%s%s' % (row[1], row[6] and ' (Module)'
+                                                                or ''),
                                        boardCount[row[0]],
                                        showId, ReportType, showAll)
         else:
-            report += summaryRowESWithID(row[0], row[1], row[4],
+            report += summaryRowESWithID(row[0],
+                                       '%s%s' % (row[1], row[6] and ' (Module)'
+                                                                or ''),
+                                         row[4],
                                          boardCount[row[0]],
                                          showId, ReportType, showAll)
     else:
         board_type = row[5]
         report += boardHeaderWithID(board_type)
         if lang == 'English':
-            report += summaryRowWithID(row[0], row[1],
-                                         boardCount[row[0]],
-                                         showId, ReportType, showAll)
+            report += summaryRowWithID(row[0], 
+                                       '%s%s' % (row[1], row[6] and ' (Module)'
+                                                                or ''),
+                                       boardCount[row[0]],
+                                       showId, ReportType, showAll)
         else:
-            report += summaryRowESWithID(row[0], row[1], row[4],
+            report += summaryRowESWithID(row[0], 
+                                        '%s%s' % (row[1], row[6] and ' (Module)'
+                                                                or ''),
+                                         row[4],
                                          boardCount[row[0]],
                                          showId, ReportType, showAll)
 

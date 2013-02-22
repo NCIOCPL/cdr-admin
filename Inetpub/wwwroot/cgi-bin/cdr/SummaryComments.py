@@ -8,6 +8,7 @@
 # BZIssue::4908 - Editing Summary Comments Report in MS Word
 # BZIssue::4968 - Modification to Summaries Comments Report to 
 #                 Show/Hide Certain Comments
+# BZIssue::5273 - Identifying Modules in Summary Reports
 #
 # Note:
 # This report has been adapted from the SummariesLists report.
@@ -746,14 +747,17 @@ AND audience.value = 'Health professionals'
 # -------------------------------------------------------------
 if docId:
     query = """\
-        SELECT DISTINCT qt.doc_id, title.value DocTitle,
-                        aud.value 
+        SELECT DISTINCT qt.doc_id, title.value DocTitle, mod.value,
+                        aud.value
           FROM query_term qt
           JOIN query_term title
             ON qt.doc_id    = title.doc_id
           JOIN query_term aud
             ON qt.doc_id = aud.doc_id
            AND aud.path  = '/Summary/SummaryMetaData/SummaryAudience'
+          LEFT OUTER JOIN query_term mod
+            ON mod.doc_id = qt.doc_id
+           AND mod.path = '/Summary/@ModuleOnly'
          WHERE qt.doc_id = %s 
            AND title.path   = '/Summary/SummaryTitle'
            AND qt.doc_id not in (select doc_id 
@@ -763,7 +767,7 @@ if docId:
     """ % (docId) 
 else:
     query = """\
-        SELECT DISTINCT qt.doc_id, title.value DocTitle, 
+        SELECT DISTINCT qt.doc_id, title.value DocTitle, mod.value,
         %s
         %s
         FROM  query_term qt
@@ -772,6 +776,9 @@ else:
         ON    qt.doc_id    = title.doc_id
         JOIN  query_term audience
         ON    qt.doc_id    = audience.doc_id
+   LEFT OUTER JOIN query_term mod
+           ON mod.doc_id = qt.doc_id
+          AND mod.path = '/Summary/@ModuleOnly'
         WHERE title.path   = '/Summary/SummaryTitle'
         %s
         AND   board.path   = '/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref'
@@ -814,8 +821,8 @@ boardCount = {}
 allSummaries = {}
 
 for summary in rows:
-    summaryTitle= summary[1]
-    if not audience: audience = summary[2]
+    summaryTitle= '%s%s' % (summary[1], summary[2] and ' (Module)' or '')
+    if not audience: audience = summary[3]
     doc = cdr.getDoc('guest', summary[0], getObject = 1)
 
     dom = xml.dom.minidom.parseString(doc.xml)

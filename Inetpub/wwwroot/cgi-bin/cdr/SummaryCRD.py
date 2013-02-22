@@ -7,6 +7,7 @@
 # BZIssue::4648
 #   Report to list the Comprehensive Review Dates
 # BZIssue::4987 - Problem using Comprehensive Review Date Report
+# BZIssue::5273 - Identifying Modules in Summary Reports
 #
 #----------------------------------------------------------------------
 import sys, cdr, cgi, cdrcgi, time, cdrdb, ExcelWriter
@@ -148,7 +149,7 @@ def addHtmlTableRow2(row, listCdr = 'Y', listAll = 'Y'):
        If multiple comments exist display each comment on
        a line separately."""
     cdrId = row[0]
-    title = row[1]
+    title = '%s%s' % (row[1], row[4] and ' (Module)' or '')
 
     if listAll == 'N':
         sortOrder = 'desc'
@@ -860,8 +861,11 @@ else:
         and language = '%s'
 """ % lang
         query = """\
-            SELECT distinct CdrId, Title, Audience, Language
+            SELECT distinct CdrId, Title, Audience, Language, mod.value
              FROM #CRD_Info
+        LEFT OUTER JOIN query_term mod
+                     ON mod.doc_id = CdrId
+                    AND mod.path = '/Summary/@ModuleOnly'
              WHERE %s
              %s
              and board = '%s' 
