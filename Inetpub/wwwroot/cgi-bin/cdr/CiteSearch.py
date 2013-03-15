@@ -31,8 +31,11 @@ srchPmed  = fields.getvalue("SearchPubMed") or None
 subtitle  = "Citation"
 valErrors = ""
 
+# Get user name
 userPair  = cdr.idSessionUser(session, session)
-userInfo  = cdr.getUser((userPair[0], userPair[1]), userPair[0])
+
+# Use it to get info about his groups
+userInfo  = cdr.getUser(session, userPair[0])
 
 #----------------------------------------------------------------------
 # Redirect to PubMed searching if requested (in a different window).
@@ -44,7 +47,7 @@ if srchPmed:
 #----------------------------------------------------------------------
 # Show help screen for advanced search.
 #----------------------------------------------------------------------
-if help: 
+if help:
     cdrcgi.bail("Sorry, help for this interface has not yet been developed.")
 
 #----------------------------------------------------------------------
@@ -64,7 +67,7 @@ def formatErrors(errorsString):
                                asSequence = True):
         result += (cgi.escape("%s") % error) + "<br />\n"
     return result
-    
+
 #----------------------------------------------------------------------
 # See if citation already exists.
 #----------------------------------------------------------------------
@@ -91,7 +94,7 @@ def replacePubmedArticle(doc, article):
         tree.replace(node, article)
         doc.xml = etree.tostring(tree)
         return doc
-    
+
 #----------------------------------------------------------------------
 # Extract the PubmedArticle element from the document.
 #----------------------------------------------------------------------
@@ -103,7 +106,7 @@ def getPubmedArticle(doc):
     for node in tree.findall("PubmedArticle"):
         etree.strip_elements(node, "CommentsCorrectionsList")
         return node
-    
+
 #----------------------------------------------------------------------
 # Extract the text content of the ArticleTitle element.
 #----------------------------------------------------------------------
@@ -130,7 +133,7 @@ def fetchCitation(pmid):
 # Create a new CDR Doc object, using the information retrieved from NLM.
 #----------------------------------------------------------------------
 def createNewCitationDoc(article):
-    title = getArticleTitle(article) 
+    title = getArticleTitle(article)
     if not title: cdrcgi.bail("Unable to find article title")
     ctrl = { "DocType": "Citation", "DocTitle": title[:255].encode("utf-8") }
     root = etree.Element("Citation")
@@ -301,7 +304,7 @@ searchFields = (cdrcgi.SearchField(title,
 #----------------------------------------------------------------------
 # Construct the query.
 #----------------------------------------------------------------------
-(query, strings) = cdrcgi.constructAdvancedSearchQuery(searchFields, boolOp, 
+(query, strings) = cdrcgi.constructAdvancedSearchQuery(searchFields, boolOp,
                                                        "Citation")
 if not query:
     cdrcgi.bail('No query criteria specified')
@@ -316,13 +319,13 @@ try:
     cursor.close()
     cursor = None
 except cdrdb.Error, info:
-    cdrcgi.bail('Failure retrieving Citation documents: %s' % 
+    cdrcgi.bail('Failure retrieving Citation documents: %s' %
                 info[1][0])
 
 #----------------------------------------------------------------------
 # Create the results page.
 #----------------------------------------------------------------------
-html = cdrcgi.advancedSearchResultsPage("Citation", rows, strings, 
+html = cdrcgi.advancedSearchResultsPage("Citation", rows, strings,
                                         "set:QC Citation Set")
 
 #----------------------------------------------------------------------
