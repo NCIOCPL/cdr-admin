@@ -43,22 +43,24 @@ elif request == SUBMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if request == "Log Out": 
+if request == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
 # Handle request to delete the user.
 #----------------------------------------------------------------------
-if request == "Delete User":
+if request == "Inactivate User":
     error = cdr.delUser(session, usrName)
-    if error: 
+    if error:
+        # Server delUsr() no longer supports this but leaving it in
+        #  in case we ever reinstate it.
         if error.upper().find("COLUMN REFERENCE CONSTRAINT"):
             error = "Cannot delete user %s.  "\
                     "System actions have already been recorded for this user."\
                   % usrName
         cdrcgi.bail(error)
     cdrcgi.navigateTo("EditUsers.py", session)
-    #cdrcgi.mainMenu(session, "User %s Deleted Successfully" % usrName)
+    #cdrcgi.mainMenu(session, "User %s Inactivated Successfully" % usrName)
 
 def fixVal(v):
     return v and cgi.escape(v, True) or "None"
@@ -69,6 +71,7 @@ def fixVal(v):
 if request == "Save Changes":
     name     = fields and fields.getvalue("name") or ""
     password = fields and fields.getvalue("password") or ""
+    password2= fields and fields.getvalue("password2") or ""
     comment  = fields.getvalue("comment")
     fullname = fields.getvalue("fullname")
     office   = fields.getvalue("office")
@@ -83,7 +86,16 @@ if request == "Save Changes":
     if office   != "None": user.office       = office
     if email    != "None": user.email        = email
     if phone    != "None": user.phone        = phone
+
+    # putUser always wants something in the password field
+    # '' means leave password alone
+    if (password != password2):
+        cdrcgi.bail("Typed passwords do not match")
+    user.password = password
+
+    # Send update to server
     error = cdr.putUser(session, usrName, user)
+
     if error: cdrcgi.bail(error)
     usrName = name
 
@@ -92,7 +104,8 @@ if request == "Save Changes":
 #----------------------------------------------------------------------
 title   = "CDR Administration"
 section = "Edit User Information"
-buttons = ["Save Changes", "Inactivate User", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
+buttons = ["Save Changes", "Inactivate User", SUBMENU, cdrcgi.MAINMENU,
+           "Log Out"]
 #script  = "DumpParams.pl"
 script  = "EditUser.py"
 header  = cdrcgi.header(title, title, section, script, buttons)
@@ -107,6 +120,16 @@ if type(user)   == type(""): cdrcgi.bail(user)
 if type(groups) == type(""): cdrcgi.bail(groups)
 
 #----------------------------------------------------------------------
+# Setup messages to report last action success
+#----------------------------------------------------------------------
+if request == "Save Changes":
+    successMessage = "\n<H4>(Successfully Updated)</H4>"
+elif request == "Inactivate User":
+    successMessage = "\n<H4>(User successfully inactivated)</H4>"
+else:
+    successMessage = ""
+
+#----------------------------------------------------------------------
 # Display the information for the user.
 #----------------------------------------------------------------------
 form = """\
@@ -115,10 +138,6 @@ form = """\
 <TR>
 <TD ALIGN='right' NOWRAP><B>User Id:</B></TD>
 <TD><INPUT NAME='name' value="%s" SIZE='80'><TD>
-</TR>
-<TR>
-<TD ALIGN='right' NOWRAP><B>Password:</B></TD>
-<TD><INPUT NAME='password' value="%s" SIZE='80'><TD>
 </TR>
 <TR>
 <TD ALIGN='right' NOWRAP><B>Full Name:</B></TD>
@@ -137,10 +156,21 @@ form = """\
 <TD><INPUT NAME='phone' value="%s" SIZE='80'><TD>
 </TR>
 <TR>
+<TD COLSPAN='2'>Leave password blank to retain current password.
+ Enter new one twice to change it.</TD>
+</TR>
+<TR>
+<TD ALIGN='right' NOWRAP><B>Password:</B></TD>
+<TD><INPUT NAME='password' value='' SIZE='80' TYPE='password'><TD>
+</TR>
+<TR>
+<TD ALIGN='right' NOWRAP><B>Retype PW:</B></TD>
+<TD><INPUT NAME='password2' value='' SIZE='80', TYPE='password'><TD>
+</TR>
+<TR>
 <TD ALIGN='right' NOWRAP VALIGN='top'><B>Groups:</B></TD>
-""" % (user.name, 
-       request == "Save Changes" and "\n<H4>(Successfully Updated)</H4>" or "",
-       fixVal(user.name), fixVal(user.password),
+""" % (user.name, successMessage,
+       fixVal(user.name),
        fixVal(user.fullname), fixVal(user.office),
        fixVal(user.email), fixVal(user.phone))
 
@@ -159,8 +189,8 @@ for group in groups:
                                             cdrcgi.SESSION,
                                             session)
     form += """\
-<TD><INPUT TYPE='checkbox' 
-           value="%s" 
+<TD><INPUT TYPE='checkbox'
+           value="%s"
            %sNAME='groups'><A HREF="%s">%s</A></INPUT></TD>
 """ % (group, flag, url, group)
     nGroups += 1
