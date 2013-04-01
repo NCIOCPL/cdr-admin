@@ -105,7 +105,6 @@ JOB_HTML_NAME = "Global+Change"
 # Generate a page in uniform style for form
 #----------------------------------------------------------------------
 def sendGlblChgPage (parms):
-
     """
     Generate an HTML page in our standard style with all saved
     state information, buttons, etc.
@@ -143,7 +142,6 @@ def sendGlblChgPage (parms):
    .termblock { font-size: 120%; font-weight: bold }
   </style>
 """)
-
     # Save state in the form
     # Values are encoded to prevent quotes or other chars from
     #   causing problems in the output html
@@ -266,7 +264,6 @@ for fd in ('docType', 'email', 'specificPhone', 'specificRole',
 
         # Store it in our state container
         ssVars[fd] = fdVal
-        cdr.logwrite("   Saving '%s'='%s'" % (fd, ssVars[fd]), LF)
 
     # If trmStatusName got converted to stringified array, convert it back
     # This is fragile and will fail if we ever get commas or quotes
@@ -338,9 +335,6 @@ except Exception, e:
 # Now we execute each stage in the global change.
 for stage in chg.getStages():
 
-    # For DEBUG, log something
-    cdr.logwrite ("Main loop: " + stage.getExcpMsg(), LF)
-
     # Execute the stage
     # It will tell us if we need to go on or stop and talk to the user
     # It may not actually execute anything at all, just evaluate its
@@ -402,13 +396,10 @@ if not email:
                      logfile=LF)
 
     if result.getRetType() == cdrglblchg.RET_NONE:
-        cdr.logwrite ("Sending No docs found message to browser", LF);
         sendGlblChgPage (("No documents found", chg.showSoFarHtml() +
             "<h2>No documents found matching global search criteria<h2>\n",
             (('cancel', 'Done'),)))
     else:
-
-        cdr.logwrite ("Sending willChange report to browser", LF);
         instruct = """
 <p>A background job will be created to perform the global change.
 Results of the job will be emailed.</p>
@@ -437,8 +428,6 @@ Results of the job will be emailed.</p>
 
         html = chg.showSoFarHtml() + instruct + result.getPageHtml()
 
-        cdr.logwrite (html, LF)
-
         buttons = (('submit', 'Submit'), ('testOnly', 'Test'),
                    ('cancel', 'Cancel'))
         sendGlblChgPage (("Final review", html, buttons))
@@ -449,10 +438,19 @@ ssVars['email'] = email
 #----------------------------------------------------------------------
 # Invoke the batch process to complete the actual processing
 #----------------------------------------------------------------------
+
+# Duplicate the existing session so that batch job will have a
+#  logged in session that remains active if this user logs off
+newSession = cdr.dupSession(session)
+
 # Convert all session info to a sequence of batch job args
 args = []
 for var in ssVars.keys():
-    args.append ((var, ssVars[var]))
+    # Use the new session name, not the original one
+    if var == cdrcgi.SESSION:
+        args.append ((var, newSession))
+    else:
+        args.append ((var, ssVars[var]))
 
 # Get user selected document ids from the will change report
 docIdList = fields.getvalue ("glblDocId");
@@ -464,20 +462,26 @@ if not docIdList:
 args.append (("glblDocIds", docIdList))
 
 # Create batch job
-cdr.logwrite ("About to launch batch job", LF)
 newJob = cdrbatch.CdrBatch (jobName=JOB_NAME,
                             command="lib/Python/GlobalChangeBatch.py",
                             args=args,
                             email=email)
 
+# DEBUG
+cdr.logwrite ("Created batch job", LF)
+
 # Queue it for background processing
 try:
     newJob.queue()
+    cdr.logwrite ("Queued batch job", LF)
+    # time.sleep(30)
 except Exception, e:
     cdrcgi.bail ("Batch job could not be started: " + str (e), logfile=LF)
 
 # Get an id user can use to find out what happened
 jobId = newJob.getJobId()
+# DEBUG
+cdr.logwrite ("jobId=%d  session=%s" % (jobId, session), LF)
 
 # Tell user how to find the results
 html = """
