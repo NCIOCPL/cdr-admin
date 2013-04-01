@@ -91,9 +91,11 @@ if startDate:
         cdrcgi.bail ("BUG - Shouldn't be here unless Submit or Test clicked")
 
     # If we got here, we're ready to go
+    # Create a session from the existing one to use in the batch part
+    newSession = cdr.dupSession(session)
     args = (("startDt", startDate),
             ("endDt", endDate),
-            (cdrcgi.SESSION, session),
+            (cdrcgi.SESSION, newSession),
             ("runMode", runMode))
     newJob = cdrbatch.CdrBatch(jobName=JOB_NAME,
                 command="lib/Python/GlobalChangeCTGovMappingBatch.py",
