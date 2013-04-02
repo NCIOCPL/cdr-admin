@@ -600,11 +600,8 @@ if formNum == 'form1':
 
 # If the user has Submitted a request for updates, do it
 if request == 'Submit Request' and formNum == "form2":
-    # Need userid and password
-    (user, pw) = cdr.idSessionUser(session, session)
-
     # Start the job
-    job = ModifyDocs.Job(user, pw, Filter(), Transform(),
+    job = ModifyDocs.Job(session, None, Filter(), Transform(),
                          "Programmed add of ExpectedEnrollment",
                          testMode=testMode)
     # Don't want stderr log appearing in browser output
