@@ -64,7 +64,7 @@ that the asynchronous callback function will always be invoked if he's
 submitting the AJAX request synchronously) or is it so outrageous that
 we should take the trouble to rewrite it?
 
--- 
+--
 Bob Kline
 http://www.rksystems.com
 mailto:***REMOVED***
@@ -87,7 +87,7 @@ it's justified, though I'd guess that the users would want us doing
 other things as long as we didn't think it was going to cause
 problems.  Let's discuss it tomorrow.
 
--- 
+--
 Alan Meyer
 AM Systems, Inc.
 Randallstown, MD USA
@@ -116,13 +116,13 @@ subtitle    = "Term"
 updateCDRID = fields and fields.getvalue("UpdateCDRID")     or None
 valErrors   = None
 userPair    = cdr.idSessionUser(session, session)
-userInfo    = cdr.getUser((userPair[0], userPair[1]), userPair[0])
+userInfo    = cdr.getUser(session, userPair[0])
 
 if importTerms:
     importTerms = int(importTerms)
 else:
     importTerms = 0
-    
+
 if updateDefinition:
     updateDefinition = int(updateDefinition)
 else:
@@ -157,7 +157,7 @@ else:
 #conceptCode = 'C1795'
 #-----------------------------------
 
-if help: 
+if help:
     cdrcgi.bail("Sorry, help for this interface has not yet "
                 "been developed.")
 
@@ -182,7 +182,7 @@ def termTypeList(conn, fName):
         cursor.close()
         cursor = None
     except cdrdb.Error, info:
-        cdrcgi.bail('Failure retrieving term type list from CDR: %s' % 
+        cdrcgi.bail('Failure retrieving term type list from CDR: %s' %
                     info[1][0])
     html = """\
       <SELECT NAME='%s'>
@@ -238,7 +238,7 @@ def semanticTypeList(conn, fName):
 try:
     conn = cdrdb.connect('CdrGuest')
 except cdrdb.Error, info:
-    cdrcgi.bail('Failure connecting to CDR: %s' % info[1][0])    
+    cdrcgi.bail('Failure connecting to CDR: %s' % info[1][0])
 
 # check to see if the preferred names match
 # if they don't return error message to ajax call.
@@ -267,8 +267,8 @@ if impReq:
         result = NCIThes.addNewTerm(session,conceptCode,updateDefinition=updateDefinition,importTerms=importTerms)
 
     if result.startswith("<error>"):
-        cdrcgi.bail(result)        
-                            
+        cdrcgi.bail(result)
+
     subtitle = result
 
 #----------------------------------------------------------------------
@@ -302,7 +302,7 @@ if not submit:
                                           fields,
                                           buttons,
                                           subtitle, #'Term',
-                                          conn, 
+                                          conn,
                                           errors)
     page += """\
    <SCRIPT LANGUAGE='JavaScript'>
@@ -319,7 +319,7 @@ if not submit:
     {
         return document.getElementById(id);
     }
-    
+
     function getXMLHttpRequest()
     {
         var request = false;
@@ -353,13 +353,13 @@ if not submit:
         retval = true;
         updateCDRID = $('UpdateCDRID').value;
         conceptCode = $('ConceptCode').value;
-        
+
         if ( updateCDRID.length < 1 )
             return true;
 
         if ( conceptCode.length < 2 )
             return true;
-        
+
         session = $('Session').value;
         url = '%s/TermSearch.py?Session=' + session +
           '&CkPrefNm=1&UpdateCDRID=' + updateCDRID + '&ConceptCode=' + conceptCode;
@@ -478,7 +478,7 @@ searchFields = (cdrcgi.SearchField(prefTerm,
 # Construct the query.
 #----------------------------------------------------------------------
 (query, strings) = cdrcgi.constructAdvancedSearchQuery(searchFields,
-                                                       boolOp, 
+                                                       boolOp,
                                                        "Term")
 if not query:
     cdrcgi.bail('No query criteria specified')
@@ -493,13 +493,13 @@ try:
     cursor.close()
     cursor = None
 except cdrdb.Error, info:
-    cdrcgi.bail('Failure retrieving Term documents: %s' % 
+    cdrcgi.bail('Failure retrieving Term documents: %s' %
                 info[1][0])
 
 #----------------------------------------------------------------------
 # Create the results page.
 #----------------------------------------------------------------------
-html = cdrcgi.advancedSearchResultsPage("Term", rows, strings, 
+html = cdrcgi.advancedSearchResultsPage("Term", rows, strings,
                                         'set:QC Term Set')
 
 #----------------------------------------------------------------------
