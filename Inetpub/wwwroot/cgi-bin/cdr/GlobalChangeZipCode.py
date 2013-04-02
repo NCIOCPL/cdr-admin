@@ -456,14 +456,16 @@ confirm = fields.getvalue("confirmed", None)
 if not confirm:
     finalConfirm(parms)
 
+# Get a new session for the job
+batchSession = cdr.dupSession(parms.session)
+
 # Setup parameters for job
 response = cdr.idSessionUser(parms.session, parms.session)
 if type(response) in (type(""), type(u"")):
     cdrcgi.bail("Internal session error: %s" % response)
 usrId = response[0]
-pw    = response[1]
 args  = (('usrId', usrId),
-         ('pw', pw),
+         ('batchSession', batchSession),
          ('orgId', parms.orgId),
          ('oldZip', parms.oldZip),
          ('newZip', parms.newZip),
