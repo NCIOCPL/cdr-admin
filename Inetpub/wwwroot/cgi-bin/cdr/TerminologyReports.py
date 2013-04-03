@@ -58,7 +58,7 @@ updates   = [
 
 # Determining the menus to adjust for Guest users
 # -----------------------------------------------
-userInfo = cdr.getUser((userPair[0], userPair[1]), userPair[0])
+userInfo = cdr.getUser(session, userPair[0])
 if 'GUEST' in userInfo.groups and len(userInfo.groups) < 2:
     reports = roReports
 else:
