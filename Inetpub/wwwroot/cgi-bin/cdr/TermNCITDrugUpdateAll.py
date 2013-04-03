@@ -42,16 +42,16 @@ if request == cdrcgi.MAINMENU:
     cdrcgi.navigateTo("Admin.py", session)
 elif request == SUBMENU:
     cdrcgi.navigateTo("reports.py", session)
-    
+
 #----------------------------------------------------------------------
 # Save the uploaded set.
 #----------------------------------------------------------------------
-def saveSet(filterDefFile):    
+def saveSet(filterDefFile):
     if filterDefFile.file:
         bytes = filterDefFile.file.read()
     else:
         bytes = filterDefFile.value
-        
+
     if not bytes:
         cdrcgi.bail("Empty file")
     #cdrcgi.bail("number of bytes: %d" % len(bytes))
@@ -68,7 +68,7 @@ def saveSet(filterDefFile):
 # Send to backend process
 #----------------------------------------------------------------------
 def sendToBackEnd():
-    
+
     name = ''
     command = 'lib/Python/CdrLongReports.py'
     doDBUpdate = 0
@@ -79,7 +79,7 @@ def sendToBackEnd():
         filterDefFile = fields['FilterDefFile']
     except:
         filterDefFile = None
-    
+
     if filterDefFile is not None:
         name = saveSet(filterDefFile)
 
@@ -90,10 +90,13 @@ def sendToBackEnd():
     #cdrcgi.bail("Done")
     #-------------------------------------------------------------------------------------------
 
+    # Duplicate user's session so batch part can run if he logs out
+    batchSession = cdr.dupSession(session)
+
     args = (('doDBUpdate', doDBUpdate),
         ('excelFile', name),
         ('drug', 1),
-        ('session',session))
+        ('session', batchSession))
 
     batch = cdrbatch.CdrBatch(jobName = instr, command = command, email = email,
                               args = args)
@@ -103,7 +106,7 @@ def sendToBackEnd():
         cdrcgi.bail("Could not start job: " + str(e))
     jobId       = batch.getJobId()
     buttons     = [SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-    
+
     header      = cdrcgi.header(title, title, instr, '', ("Submit",SUBMENU,
                             cdrcgi.MAINMENU),
                                 stylesheet = """\
@@ -123,8 +126,8 @@ def sendToBackEnd():
      </body>
     </html>
     """ % (cdrcgi.WEBSERVER, cdrcgi.BASE, cdrcgi.SESSION, session, jobId))
-        
-            
+
+
 if request == "Submit":
     sendToBackEnd()
 
@@ -140,7 +143,7 @@ header = cdrcgi.header(title, title, instr, script,
 
 form   = """\
    <input type='hidden' name='%s' value='%s'>
-   
+
 <table align=center>
 <tr>
 <td width=5%%>
