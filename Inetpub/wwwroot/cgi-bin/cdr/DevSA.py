@@ -4,6 +4,8 @@
 #
 # Main menu for Developers and System Administrators.
 #
+# BZIssue::5296
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
 
@@ -51,6 +53,7 @@ items   = (('EditGroups.py',           'Manage Groups'                 ),
            ('Request1931.py',
             'Guess ExpectedEnrollment from ProjectedAccrual'),
            ('ReplaceCWDwithVersion.py','Replace CWD with Older Version'),
+           ('del-some-docs.py',        'Delete CDR Documents'          ),
            ('Logout.py',               'Log Out'                       )
            )
 for item in items:
