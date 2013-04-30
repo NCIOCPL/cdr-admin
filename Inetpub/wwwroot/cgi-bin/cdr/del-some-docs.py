@@ -108,7 +108,7 @@ html.append(u"""\
 (please read the instructions above)
 <br />
 <br />
-<input id="submit" type="Submit" />
+<input id="submit" type="Submit" value="Delete Documents" />
 </form>
 """ % session)
 html.append(u"</body></html>")
