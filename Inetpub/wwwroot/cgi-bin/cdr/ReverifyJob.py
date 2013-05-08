@@ -99,6 +99,7 @@ if not jobId and not jobStatus:
     <br>
     <select name='status' id="status">
      <option>Failure</option>
+     <option>Stalled</option>
      <option CHECKED='1'>Success</option>
     </select>
     <label for="idOne">Job status</label>
