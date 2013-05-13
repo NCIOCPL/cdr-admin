@@ -4,37 +4,6 @@
 #
 # Prototype for duplicate-checking interface for Organization documents.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.9  2003/12/09 19:13:26  bkline
-# Bumped up the timeout value for the query.
-#
-# Revision 1.8  2003/08/25 20:19:05  bkline
-# Added support for searching on FormerName element.
-#
-# Revision 1.7  2002/08/08 12:16:29  bkline
-# Changed path for AlternateName.
-#
-# Revision 1.6  2002/06/28 20:13:57  bkline
-# Plugged in QcReport.py for Organization advanced search.
-#
-# Revision 1.5  2002/06/04 20:19:34  bkline
-# Fixed typos in query_term paths.
-#
-# Revision 1.4  2002/05/08 17:41:50  bkline
-# Updated to reflect Volker's new filter names.
-#
-# Revision 1.3  2002/02/20 03:59:34  bkline
-# Modified code to match changes in schemas.
-#
-# Revision 1.2  2002/02/14 19:37:23  bkline
-# Modified search elements to match schema changes; fixed display filter.
-#
-# Revision 1.1  2001/12/01 18:11:44  bkline
-# Initial revision
-#
-# Revision 1.1  2001/07/17 19:17:43  bkline
-# Initial revision
-#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, cdrdb
 
@@ -67,7 +36,7 @@ def orgTypeList(conn, fName):
    WHERE path = '/Organization/OrganizationType'
      AND value IS NOT NULL
      AND value <> ''
-ORDER BY value"""
+ORDER BY 1"""
     pattern = "<option value='%s'>%s &nbsp;</option>"
     return cdrcgi.generateHtmlPicklist(conn, fName, query, pattern)
 

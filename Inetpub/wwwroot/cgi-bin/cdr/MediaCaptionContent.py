@@ -121,7 +121,7 @@ SELECT DISTINCT qt.doc_id, qt.value
 SELECT DISTINCT value, value
   FROM query_term
  WHERE path = '/Media/MediaContent/Categories/Category'
- ORDER BY value
+ ORDER BY 1
 """
 
     # Pattern for forming option items in picklist selects

@@ -96,7 +96,7 @@ def protocolStatusList(conn, fName):
 SELECT DISTINCT value, value
            FROM query_term
           WHERE path = '%s'
-       ORDER BY value""" % STATUS_PATH
+       ORDER BY 1""" % STATUS_PATH
     pattern = "<option value='%s'>%s&nbsp;</option>"
     return cdrcgi.generateHtmlPicklist(conn, fName, query, pattern,
                                        firstOpt = defaultOpt)
