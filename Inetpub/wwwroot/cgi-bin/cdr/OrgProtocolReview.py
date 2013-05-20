@@ -53,11 +53,11 @@ elif request == SUBMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if request == "Log Out": 
+if request == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
-# If we don't have an email address raise an error 
+# If we don't have an email address raise an error
 #----------------------------------------------------------------------
 if (name or id) and not email:
    cdrcgi.bail("Email required to process this request")
@@ -124,7 +124,7 @@ def putUpSelection(rows):
 </HTML>
 """ % (cdrcgi.SESSION, session, email or "", options)
     cdrcgi.sendPage(header + form)
-    
+
 #----------------------------------------------------------------------
 # Get the document ID.
 #----------------------------------------------------------------------
@@ -152,7 +152,7 @@ else:
     if len(rows) < 1: cdrcgi.bail("Unknown organization '%s'" % name)
     id = rows[0][0]
 
-#----------------------------------------------------------------------    
+#----------------------------------------------------------------------
 # If we get here, we're ready to queue up a request for the report.
 #----------------------------------------------------------------------
 args = (("id", str(id)),) #age), ("BaseDocType", docType), ("Host", cdrcgi.WEBSERVER))
@@ -173,16 +173,15 @@ header      = cdrcgi.header(title, title, section, script, buttons,
    body { font-family: Arial }
   </style>
  """)
-baseUrl = 'http://%s.nci.nih.gov/cgi-bin/cdr' % socket.gethostname()
 cdrcgi.sendPage(header + """\
    <h4>Report has been queued for background processing</h4>
    <p>
     To monitor the status of the job, click this
-    <a href='%s/getBatchStatus.py?%s=%s&jobId=%s'><u>link</u></a>
+    <a href='getBatchStatus.py?%s=%s&jobId=%s'><u>link</u></a>
     or use the CDR Administration menu to select 'View
     Batch Job Status'.
    </p>
   </form>
  </body>
 </html>
-""" % (baseUrl, cdrcgi.SESSION, session, jobId))
+""" % (cdrcgi.SESSION, session, jobId))
