@@ -19,33 +19,44 @@
 # BZIssue::5013 - [Glossary Audio] Create Audio Download Tool
 #
 # *********************************************************************
-import cgi, cdr, cdrcgi, re, string, os, time, optparse, ftplib, shutil
-import glob
+import cgi, cdr, cdrcgi, re, string, os, time, optparse, shutil, paramiko
+import glob#, ftplib
 
 #----------------------------------------------------------------------
 # Set the form variables.
 #----------------------------------------------------------------------
+LOGNAME   = "FtpAudio.log"
 defTarget = "Audio_from_CIPSFTP"
 CiatTarget= "Audio_Transferred"
 defSource = "Term_Audio"
 fields    = cgi.FieldStorage()
 session   = cdrcgi.getSession(fields) or "guest"
 request   = cdrcgi.getRequest(fields) # or "Get Audio"
-ftpRoot   = '/u/ftp'
+ftpRoot   = '/u/ftp/cdr'
 baseDir   = '/qa/ciat/Audio/'
 audioPath = ftpRoot + baseDir
 sourceDir = fields and fields.getvalue("SourceDir") or defSource
 targetDir = fields and fields.getvalue("TargetDir") or defTarget
 testMode  = fields and fields.getvalue("TestMode") or False
+
+# For testing
+# sourceDir = "Term_Audio"
+# targetDir = "Audio_from_CIPSFTP"
+# testMode = True
+# request  = "Get Audio"
+
 title     = "CDR Administration"
 section   = "FTP Audio from CIPSFTP"
 buttons   = ["Get Audio", cdrcgi.MAINMENU, "Log Out"]
 script    = "FtpAudio.py"
-ftphost   = "cipsftp.nci.nih.gov"
-ftpuser   = "cdrdev"
-ftppwd    = "***REMOVED***"
 
 ftpDone   = None
+
+# ---------------------------------------------------------------------
+# Instantiate the Log class
+# ---------------------------------------------------------------------
+l   = cdr.Log(LOGNAME)
+l.write("FtpAudio - Started")
 
 # Running program in Test mode
 # ----------------------------
@@ -55,7 +66,15 @@ if testMode:
 
     # request = "Get Audio"
 
-
+# Open the SFTP connection and login
+# ----------------------------------
+FTPSERVER  = cdr.h.host['SFTP'][0]  #or '***REMOVED***-m'
+PORT = 22
+transport = paramiko.Transport((FTPSERVER, PORT))
+FTPLOCK    = 'sending'
+username = "cdroperator"
+password = "***REMOVED***"
+transport.connect(username = username, password = password)
 
 #----------------------------------------------------------------------
 # Make sure we're logged in.
@@ -88,75 +107,90 @@ if request == "Get Audio" and ftpDone != 'Y':
     if not os.path.exists(os.path.join('d:\\cdr', targetDir)):
        os.mkdir(os.path.join('d:\\cdr', targetDir))
 
-    ftp = ftplib.FTP(ftphost)
+    # ftp = ftplib.FTP(ftphost)
+    sftp = paramiko.SFTPClient.from_transport(transport)
     try: 
-       ftp.login(ftpuser, ftppwd)
-       
-       ftp.cwd(audioPath + sourceDir)
-       ftp.set_debuglevel(0)
+       ftpDir = audioPath + sourceDir
+       sftp.chdir(ftpDir)
+       l.write("ftpDir: %s" % ftpDir)
 
        # Checking if any zip files are available to be downloaded
        #  -------------------------------------------------------
-       zipFiles = ftp.nlst()
+       zipFiles = sftp.listdir()
        nZipFiles = 0
        for zipFile in zipFiles:
            if zipFile.endswith('.zip'): nZipFiles += 1
        if not nZipFiles:
+           l.write("No zip files found.")
+           l.write("Ftp done!")
            cdrcgi.bail('No Audio zip files to download')
+
+       l.write("Found files:\n%s" % zipFiles)
 
        # Checking which zip files have already been downloaded earlier
        # -------------------------------------------------------------
-       os.chdir('d:\\cdr\%s' % targetDir)
+       os.chdir('/cdr/%s' % targetDir)
        oldFiles = glob.glob('*.[zZ][iI][pP]')
+       l.write("Old files in .../%s:\n%s" % (targetDir, oldFiles))
 
        # Download and move/rename all available Zip files
        # ------------------------------------------------
        newFiles = []
-       for name in ftp.nlst():
+       dbgmsg = []
+
+       for name in sftp.listdir():
+           dbgmsg.append("testing %s (%s)" % (repr(name),
+                                              cgi.escape(str(type(name)))))
            if name.endswith('.zip'):
+               l.write("Zip file found: %s" % name)
+
                # Don't overwrite files previously copied (unless in test mode)
                # -------------------------------------------------------------
                if name in oldFiles and not testMode:
                    cdrcgi.bail('Error:  Local File %s already exists!' % name)
 
                bytes = []
-               ftp.retrbinary('RETR ' + name, lambda a: bytes.append(a))
-               targetFile = os.path.join('d:\\cdr', targetDir, name)
-               f = open(targetFile, 'wb')
-               f.write("".join(bytes))
-               f.close()
+               targetFile = '/cdr/%s/%s' % (targetDir, name)
+               l.write("Copy from: %s/%s" % (ftpDir, name))
+               l.write("       to: %s" % targetFile)
+
+               sftp.get('%s/%s' % (ftpDir, name), '%s' % (targetFile))
                newFiles.append(name)
+           else:
+               l.write("No zip file: %s" % name)
 
            # Copy the file to 'transferred' directory if it was 
            # transferred from the default directory
            # This way we won't copy the file again the next time
            # around.
            # ----------------------------------------------------
+           dbgmsg.append("sourceDir is %s" % sourceDir)
+           # l.write(sourceDir)
+           # l.write(audioPath)
+           # l.write(CiatTarget)
            if sourceDir == 'Term_Audio':
                # ciatFile = '../' + CiatTarget + '/' + name
                # Do nothing in testmode, move the files in live mode
                # ---------------------------------------------------
                if testMode:
-                   ftp.rename(name, audioPath + name + 'x')
-                   ftp.rename(audioPath + name + 'x', name)
-                   #ftp.storbinary('STOR ' + ciatFile, open(targetFile, 'rb')) 
-                   #ftp.sendcmd('RNFR %s' % name)
-                   #ftp.sendcmd('RNTO %s' % ciatFile)
+                   sftp.rename(name, audioPath + name + 'x')
+                   sftp.rename(audioPath + name + 'x', name)
                else:
-                   ftp.rename(name, audioPath + '%s/%s' %
+                   dbgmsg.append("renaming %s to %s" % (name, audioPath +
+                                                        "%s/%s" %
+                                                        (CiatTarget, name)))
+                   sftp.rename(name, audioPath + '%s/%s' %
                                                (CiatTarget, name))
-                   # ftp.storbinary('STOR ' + ciatFile, open(targetFile, 'rb')) 
+                   dbgmsg.append("rename complete")
+               l.write("File %s moved to Term_Audio" % name)
+               l.write("-----")
 
-       ftp.quit()
        ftpDone = 'Y'
-    except ftplib.error_reply, info:
-       cdrcgi.bail(u"FTP Unexpected Error: %s" % info)
-    except ftplib.error_perm, info:
-       cdrcgi.bail(u"FTP File or User Permission Error: %s" % info)
-    except ftplib.error_proto, info:
-       cdrcgi.bail(u"FTP Server Error: %s" % info)
+       l.write("Ftp done!")
+    except Exception, info:
+       cdrcgi.bail(u"FTP Error: %s (DEBUG INFO FOLLOWS)<br />%s)" %
+                   (info, "<br />".join(dbgmsg)))
     
-
 #----------------------------------------------------------------------
 # Display confirmation message when FTP is done.
 #----------------------------------------------------------------------
@@ -185,7 +219,7 @@ if ftpDone == 'Y':
 
    form += u"""
 </table>
-<H3>FTP %sCompleted</H3>
+<H4>Download %sCompleted</H4>
 """ % testString
 
    cdrcgi.sendPage(header + form + u"</BODY></HTML>")
@@ -196,7 +230,7 @@ if ftpDone == 'Y':
 #----------------------------------------------------------------------
 header = cdrcgi.header(title, title, section, script, buttons)
 form = u"""\
-<H2>FTP Term Audio Files from CIPSFTP</H2>
+<H2>FTP Term Audio Files from CANCERINFO</H2>
 <TABLE border='0'>
  <TR>
   <TD NOWRAP>
