@@ -97,21 +97,29 @@ fieldset {
 }
 </style>
 
-<h2>Select a job type and job ID to set status to failed state</h2>
 
-<p>Note: This program cannot be used to change a successful job to
+<fieldset>
+<h3>Select a job type and job ID to set status to failed state</h3>
+<b>Note</b>: This program cannot be used to change a successful job to
 a failed state.  Doing so could cause inconsistency in the database.
 Its proper use is only to cleanup after a crash that left a publishing
 or batch job in some initial or in-process state that is must be cleared
-in order to unblock further jobs.</p>
+in order to unblock further jobs.
 
+</fieldset>
 <fieldset>
+  <div style="float:left; margin-right:280px;">
   <label for='theId'>Job ID</label>
   <input type='text' name='JobId' size='10' id='theId' />
-  <label for='typePub'> Publishing Job</label>
+  </div>
+
+  <div style="float:right; width:300px;">
   <input type='radio' name='JobType' value='pubJob' id='typePub' />
-  <label for='typeBatch'> Batch Job</label>
+  <label for='typePub'> Publishing Job</label>
+  <br/>
   <input type='radio' name='JobType' value='batchJob' id='typeBatch' />
+  <label for='typeBatch'>Batch Job</label>
+  </div>
 </fieldset>
 """
 
