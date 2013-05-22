@@ -109,7 +109,7 @@ class ProtocolOwnershipTransfer:
         #--------------------------------------------------------------
         self.cdrId    = orgId
         self.q_status = query
-        self.conn     = cdrdb.connect('CdrGuest', dataSource = host)
+        self.conn     = cdrdb.connect('CdrGuest')
         self.cursor   = self.conn.cursor()
 
     # -------------------------------------------------------------------
