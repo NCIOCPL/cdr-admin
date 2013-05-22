@@ -127,7 +127,7 @@ def buildZipfile(fileNames):
         listFile.write("%s\n" % name)
     listFile.close()
     os.chdir(cdr.CLIENT_FILES_DIR)
-    result = cdr.runCommand("zip -@ %s < %s" % (zipName, listName))
+    result = cdr.runCommand("d:\\bin\\zip -@ %s < %s" % (zipName, listName))
     debugLog("Creating %s" % zipName) 
     if result.code:
         msg = "zip failure code %d (%s)" % (result.code, result.output)
