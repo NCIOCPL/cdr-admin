@@ -88,7 +88,8 @@ if request == "Log Out":
 def listTermChoices():
     path = "/Term/MenuInformation/MenuItem/MenuParent/@cdr:ref"
     try:
-        conn = cdrdb.connect('CdrGuest', dataSource=cdr.PROD_NAME)
+        # conn = cdrdb.connect('CdrGuest', dataSource=cdr.PROD_DB_NAME)
+        conn = cdrdb.connect('CdrGuest')
         cursor = conn.cursor()
         cursor.execute("""\
    SELECT DISTINCT c.doc_id,
@@ -151,6 +152,10 @@ if not email or not cancer or request != "Submit":
     one email address must be provided.  If more than one
     address is specified, separate the addresses with a blank.
    </p>
+   <p><strong>NOTE: </strong> The report has been modified to only look at
+    the local database, which is not necessarily the production database.
+    If run on Mahler or Franck it will not report production (Bach) data.
+   </p>
    <br>
    <table border='0'>
     <tr>
@@ -181,7 +186,7 @@ if not email or not cancer or request != "Submit":
       <b>Active between:&nbsp;</b>
      </td>
      <td>
-      <input name='begin' size='4' value='%s'> and 
+      <input name='begin' size='4' value='%s'> and
       <input name='end' size='4' value='%s'><br>
      </td>
     </tr>
@@ -205,7 +210,7 @@ if not email or not cancer or request != "Submit":
        begin, end, cdrcgi.SESSION, session)
     cdrcgi.sendPage(header + form)
 
-#----------------------------------------------------------------------    
+#----------------------------------------------------------------------
 # If we get here, we're ready to queue up a request for the report.
 #----------------------------------------------------------------------
 if type(cancer) not in (type([]), type(())):
