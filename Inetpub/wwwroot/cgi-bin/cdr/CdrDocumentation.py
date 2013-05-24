@@ -51,7 +51,7 @@ title   = "CDR Administration"
 instr   = "CDR Documentation (PDF)"
 buttons = (SUBMENU, cdrcgi.MAINMENU)
 header  = cdrcgi.header(title, title, instr, "CdrDocumentation.py", buttons)
-server  = "bach.nci.nih.gov"
+tier    = 'PROD'
 location= "cdr/Documentation"
 cgiLoc  = "cgi-bin/cdr"
 usrdocs = [['CdrUserGuide.pdf',  'User Guide'],
@@ -61,8 +61,11 @@ usrhtml = [['Help.py', 'User Guide'],
            ['Help.py?flavor=System%', 'System Documentation'],
            ['Help.py?flavor=Operating%Instructions', 'Operation Manual']]
 
+# Resolve tier to host fully qualified name in CBIIT environment
+hostInfo = cdr.h.getTierHostNames(tier, 'APPWEB')
+server   = hostInfo.qname
 
-form    = """\
+form = """\
   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
   <h3>CDR Documentation (PDF) as of 2007-08-22</h3>
   <ol>
@@ -80,8 +83,8 @@ form += """\
 """
 for row in usrhtml:
    form += """\
-   <li><a href="http://%s/%s/%s">%s</a></li>
-""" % (server, cgiLoc, row[0], row[1])
+   <li><a href="%s">%s</a></li>
+""" % (cdr.h.makeCdrCgiUrl(tier, row[0]), row[1])
 
 form    += """\
   </ol>
