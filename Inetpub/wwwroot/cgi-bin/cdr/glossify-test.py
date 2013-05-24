@@ -10,7 +10,7 @@
 #     http://pdqupdate.cancer.gov/u/glossify
 #
 #----------------------------------------------------------------------
-import sys
+import sys, cdrutil
 def bail(out):
     print """\
 Content-type: text/html
@@ -22,7 +22,13 @@ try:
     import suds.client, cgi
 except Exception, e:
     bail("import: %s" % e)
-URL = 'http://pdqupdate.cancer.gov/u/glossify'
+env = cdrutil.getEnvironment()
+if env == "CBIIT":
+    hosts = cdrutil.AppHost(env, cdrutil.getTier())
+    host = hosts.getHostNames("GLOSSIFIERWEB").name
+    URL = "http://%s/cgi-bin/glossify" % host
+else:
+    URL = 'http://pdqupdate.cancer.gov/u/glossify'
 FRAGMENT = (u"<p>Gerota\u2019s capsule breast cancer and mammography "
             u"as well as invasive breast cancer, too</p>")
 
