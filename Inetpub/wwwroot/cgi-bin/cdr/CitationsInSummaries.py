@@ -34,14 +34,14 @@ fullname = REPORTS_BASE + name
 #----------------------------------------------------------------------
 cursor.execute("""\
 SELECT distinct d.id CDRID, d.title
-  FROM query_term q 
+  FROM query_term q
   JOIN document d
     ON d.id = q.int_val
   JOIN document s
     ON s.id = q.doc_id
  WHERE path like '/Summary/%CitationLink/@cdr:ref'
 --   AND d.val_status = 'V'
-   AND d.active_status = 'A' 
+   AND d.active_status = 'A'
    AND s.active_status = 'A'
  ORDER BY d.id desc
 """, timeout = 300)
@@ -59,9 +59,9 @@ style1  = wb.addStyle(alignment = align, font = font)
 urlFont = ExcelWriter.Font('blue', None, 'Times New Roman', size = 11)
 style4  = wb.addStyle(alignment = align, font = urlFont)
 ws      = wb.addWorksheet("Citations in Summaries", style1, 45, 1)
-style2  = wb.addStyle(alignment = align, font = font, 
+style2  = wb.addStyle(alignment = align, font = font,
                          numFormat = 'YYYY-mm-dd')
-    
+
 # Set the colum width
 # -------------------
 ws.addCol( 1, 50)
@@ -73,22 +73,23 @@ exRow = ws.addRow(1, style2)
 exRow.addCell(1, 'CDR-ID')
 exRow.addCell(2, 'Citation Title')
 
-# Add the protocol data one record at a time beginning after 
+# Add the protocol data one record at a time beginning after
 # the header row
 # ----------------------------------------------------------
 rowNum = 1
 for row in rows:
     rowNum += 1
     exRow = ws.addRow(rowNum, style1, 40)
-    url = ("http://bach.nci.nih.gov/cgi-bin/cdr/"
-           "QcReport.py?Session=guest&DocId=%d" % row[0])
+    # Look at data on the production server
+    url = cdrdb.h.makeCdrCgiUrl('PROD', "QCReport.py") + \
+           "?Session=guest&DocId=%d" % row[0]
     exRow.addCell(1, " %s" % row[0], href = url, style = style4)
     exRow.addCell(2, row[1], style = style2)
 
-t = time.strftime("%Y%m%d%H%M%S")                                               
-print "Content-type: application/vnd.ms-excel"                                  
-print "Content-Disposition: attachment; filename=CitationsInSummaries-%s.xls" % t    
-print                
+t = time.strftime("%Y%m%d%H%M%S")
+print("Content-type: application/vnd.ms-excel")
+print("Content-Disposition: attachment; filename=CitationsInSummaries-%s.xls" % t)
+print("")
 
 wb.write(sys.stdout, True)
 
@@ -96,7 +97,7 @@ wb.write(sys.stdout, True)
 # # ---------------
 # fobj = file(fullname, "w")
 # wb.write(fobj)
-# print ""
-# print "  Report written to %s" % fullname
+# print("")
+# print("  Report written to %s" % fullname)
 # fobj.close()
-# 
+#
