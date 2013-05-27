@@ -4,7 +4,7 @@
 # $Id$
 #
 # Glossary Term Concept report
-# This report takes a concept and displays all of the Term Name 
+# This report takes a concept and displays all of the Term Name
 # definitions that are linked to this concept document
 #
 # $Log: not supported by cvs2svn $
@@ -71,7 +71,7 @@ def showTermNameChoices(choices):
 # Create a single row to be displayed in an HTML table (two columns)
 #----------------------------------------------------------------------
 def addSingleRow(data, label):
-    # Adding row for Date Last Reviewed 
+    # Adding row for Date Last Reviewed
     if label in data:
         htmlRow = """
    <tr>
@@ -81,18 +81,19 @@ def addSingleRow(data, label):
     <td>%s</td>
    </tr>
 """ % (LABEL[label], data[label])
-    
+
     return htmlRow
 
 
 #----------------------------------------------------------------------
-# Create a single row for the Media link such that the media is being 
+# Create a single row for the Media link such that the media is being
 # displayed.
-# We're creating a small DOM that we can parse in order to extract the 
+# We're creating a small DOM that we can parse in order to extract the
 # CDR-ID of the media document.
 #----------------------------------------------------------------------
 def addMediaRow(data, label):
     #cdrcgi.bail(data[label])
+    url = cdr.h.makeCdrCgiUrl("PROD", "GetCdrImage.py?id")
     htmlRow = ''
     for row in data['MediaLink']:
         mediaString = '''
@@ -115,11 +116,11 @@ def addMediaRow(data, label):
      <b>%s</b>
     </td>
     <td width="70%%">%s  <br>
-     <img src="http://bach.nci.nih.gov/cgi-bin/cdr/GetCdrImage.py?id=%s-300.jpg">
+     <img src="%s=%s-300.jpg">
     </td>
    </tr>
-""" % (LABEL[label], mediaValue, mediaID)
-    
+""" % (LABEL[label], mediaValue, url, mediaID)
+
     return htmlRow
 
 #----------------------------------------------------------------------
@@ -127,7 +128,7 @@ def addMediaRow(data, label):
 # row.
 #----------------------------------------------------------------------
 def addMultipleRow(data, label):
-    # Adding row for Date Last Reviewed 
+    # Adding row for Date Last Reviewed
     if label in data:
         iRow = -1
         htmlRows = ""
@@ -144,7 +145,7 @@ def addMultipleRow(data, label):
     </td>
     <td width="70%%">%s</td>
    </tr>""" % (iLabel, value)
-    
+
     return htmlRows
 
 
@@ -152,15 +153,15 @@ def addMultipleRow(data, label):
 # Same as addMultipleRow() but we are also adding a single attribute
 #----------------------------------------------------------------------
 def addAttributeRow(data, label, indent = False):
-    # Adding row for Date Last Reviewed 
+    # Adding row for Date Last Reviewed
     if data.has_key(label):
         iRow = -1
         htmlRows = ""
         for value, attribute in data[label]:
             try:
-                attrValue = ('<a href="/cgi-bin/cdr/QcReport.py?' + 
+                attrValue = ('<a href="/cgi-bin/cdr/QcReport.py?' +
                              'Session=guest&amp;DocId=%d">CDR%d</a>') % (
-                                              cdr.exNormalize(attribute)[1], 
+                                              cdr.exNormalize(attribute)[1],
                                               cdr.exNormalize(attribute)[1])
             except:
                 attrValue = '<a href="%s">%s</a>' % (attribute, attribute)
@@ -187,7 +188,7 @@ def addAttributeRow(data, label, indent = False):
     </td>
     <td width="70%%">%s (%s)</td>
    </tr>""" % (iLabel, value, attrValue)
-    
+
     return htmlRows
 
 
@@ -198,7 +199,7 @@ def addAttributeRow(data, label, indent = False):
 #-----------------------------------------------------------------------
 def resolvePlaceHolder(language, termData, definitionText):
      # Create the Glossary Definition
-     tmpdoc  = u"\n<GlossaryTermDef xmlns:cdr = 'cips.nci.nih.gov/cdr'>\n"  
+     tmpdoc  = u"\n<GlossaryTermDef xmlns:cdr = 'cips.nci.nih.gov/cdr'>\n"
      tmpdoc += termData.get(language, u"@S@%s (en inglés)@E@" % termData['en'])\
                   + u"\n"
      #tmpdoc += u" <TermNameString>" + \
@@ -222,11 +223,11 @@ def resolvePlaceHolder(language, termData, definitionText):
 
      tmpdoc += u"</GlossaryTermDef>\n"
 
-     # Need to encode the unicode string to UTF-8 since that's what the 
-     # filter module expects.  Decoding it back to unicode once the 
+     # Need to encode the unicode string to UTF-8 since that's what the
+     # filter module expects.  Decoding it back to unicode once the
      # filtered document comes back.
      # --------------------------------------------------------------------
-     doc = cdr.filterDoc('guest', ['name:Glossary Term Definition Update'], 
+     doc = cdr.filterDoc('guest', ['name:Glossary Term Definition Update'],
                          doc = tmpdoc.encode('utf-8'))
 
      if type(doc) in (type(""), type(u"")):
@@ -244,26 +245,26 @@ def resolvePlaceHolder(language, termData, definitionText):
 # #-----------------------------------------------------------------------
 # def displayComment(commentList):
 #      # Create the Glossary Definition
-#      tmpdoc  = u"\n<GlossaryTermDef xmlns:cdr = 'cips.nci.nih.gov/cdr'>\n"  
-# 
+#      tmpdoc  = u"\n<GlossaryTermDef xmlns:cdr = 'cips.nci.nih.gov/cdr'>\n"
+#
 #      # Add the CommentText and attributes
 #      for comment in commentList:
 #          tmpdoc += u"  %s\n" % comment
-# 
+#
 #      tmpdoc += u"</GlossaryTermDef>\n"
-# 
-#      # Need to encode the unicode string to UTF-8 since that's what the 
-#      # filter module expects.  Decoding it back to unicode once the 
+#
+#      # Need to encode the unicode string to UTF-8 since that's what the
+#      # filter module expects.  Decoding it back to unicode once the
 #      # filtered document comes back.
 #      # --------------------------------------------------------------------
-#      doc = cdr.filterDoc('guest', ['name:Glossary Term Definition Update'], 
+#      doc = cdr.filterDoc('guest', ['name:Glossary Term Definition Update'],
 #                          doc = tmpdoc.encode('utf-8'))
-# 
+#
 #      if type(doc) in (type(""), type(u"")):
 #          cdrcgi.bail(doc)
 #      if type(doc) == type(()):
 #          doc = doc[0].decode('utf-8')
-# 
+#
 #      return doc
 
 
@@ -275,22 +276,22 @@ def resolvePlaceHolder(language, termData, definitionText):
 def displayMarkup(xmlString, element):
      # Create XML document to be filtered
      if element == 'TermName':
-         tmpdoc  = u"\n<TermNameDef xmlns:cdr = 'cips.nci.nih.gov/cdr'>\n"  
+         tmpdoc  = u"\n<TermNameDef xmlns:cdr = 'cips.nci.nih.gov/cdr'>\n"
          tmpdoc += u"  %s\n" % xmlString
          tmpdoc += u"</TermNameDef>\n"
      elif element == 'Comment':
-         tmpdoc  = u"\n<GlossaryTermDef xmlns:cdr = 'cips.nci.nih.gov/cdr'>\n"  
+         tmpdoc  = u"\n<GlossaryTermDef xmlns:cdr = 'cips.nci.nih.gov/cdr'>\n"
          # Add the CommentText and attributes
          for comment in xmlString:
              tmpdoc += u"  %s\n" % comment
          tmpdoc += u"</GlossaryTermDef>\n"
 
 
-     # Need to encode the unicode string to UTF-8 since that's what the 
-     # filter module expects.  Decoding it back to unicode once the 
+     # Need to encode the unicode string to UTF-8 since that's what the
+     # filter module expects.  Decoding it back to unicode once the
      # filtered document comes back.
      # --------------------------------------------------------------------
-     doc = cdr.filterDoc('guest', ['name:Glossary Term Definition Update'], 
+     doc = cdr.filterDoc('guest', ['name:Glossary Term Definition Update'],
                          doc = tmpdoc.encode('utf-8'))
 
      if type(doc) in (type(""), type(u"")):
@@ -328,7 +329,7 @@ elif action == SUBMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if action == "Log Out": 
+if action == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
@@ -370,7 +371,7 @@ except cdrdb.Error, info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
 
 #----------------------------------------------------------------------
-# Passing a CDR-ID and the document type 
+# Passing a CDR-ID and the document type
 # Returning a list with a concept ID and all linking term names
 #----------------------------------------------------------------------
 def getAllTermNames(conceptId):
@@ -382,7 +383,7 @@ def getAllTermNames(conceptId):
     return [row[0] for row in cursor.fetchall()]
 
 #----------------------------------------------------------------------
-# Getting the status of the GlossaryTermNames so that we can 
+# Getting the status of the GlossaryTermNames so that we can
 # identify blocked terms.
 #----------------------------------------------------------------------
 def getTermNameStatus(termList):
@@ -432,7 +433,7 @@ def getSharedInfo(docId):
                                        cdr.getTextContent(node).strip())
 
             # For related information we add a list [value, attribute]
-            # for each entry resulting in 
+            # for each entry resulting in
             #   {'RelatedExternalRef:[[val1, attr1], [val2, attr2], ...], ...}
             # ----------------------------------------------------------------
             if node.nodeName == 'RelatedInformation':
@@ -466,7 +467,7 @@ def getSharedInfo(docId):
     return sharedContent
 
 #----------------------------------------------------------------------
-# We're selecting the information from the GTC document to be 
+# We're selecting the information from the GTC document to be
 # combined with the information from the GTN document.
 # The data is stored in a dictionary.
 #----------------------------------------------------------------------
@@ -483,7 +484,7 @@ def getConcept(docId):
         for node in docElem.childNodes:
             if node.nodeName == 'TermDefinition' or \
                node.nodeName == 'TranslatedTermDefinition':
-                if node.nodeName == 'TermDefinition': 
+                if node.nodeName == 'TermDefinition':
                     language = 'en'
                 else:
                     language = 'es'
@@ -494,7 +495,7 @@ def getConcept(docId):
 
                 # Prepare the dictionary that we add the data to
                 # The format of the dictionary will be
-                #    concept{'en-Patient':{element1:value, 
+                #    concept{'en-Patient':{element1:value,
                 #                          element2:[value1, value2],}
                 #            'en-HP'     :{element1:value,
                 #                          element2:[value1, value2], ...}}
@@ -506,15 +507,15 @@ def getConcept(docId):
                     # Adding all values that are not multiply occuring
                     # Creating entry 'key':value
                     # -----------------------------------------------------
-                    for element in ['DefinitionStatus', 
+                    for element in ['DefinitionStatus',
                                     'StatusDate', 'DateLastReviewed',
                                     'DateLastModified', 'TranslatedStatus',
                                     'TranslatedStatusDate']:
                         if child.nodeName == element:
                             concept['%s-%s' % (language, audience)].update(
                               {element:str(cdr.getTextContent(child).strip())})
-                    
-                    # We need to preserve the inline markup of the 
+
+                    # We need to preserve the inline markup of the
                     # definition text.
                     # -----------------------------------------------------
                     if (child.nodeName == 'DefinitionText'):
@@ -575,8 +576,8 @@ def getConcept(docId):
     return concept
 
 #----------------------------------------------------------------------
-# Select the information of the GTN document to be combined with the 
-# information from the GTC document.  We need the term named and the 
+# Select the information of the GTN document to be combined with the
+# information from the GTC document.  We need the term named and the
 # ReplacementText elements.
 #----------------------------------------------------------------------
 def getNameDefinition(docId):
@@ -597,10 +598,10 @@ def getNameDefinition(docId):
                 i += 1
                 language  = node.getAttribute('language') or 'en'
                 alternate = node.getAttribute('NameType') or None
-                
+
                 # We need to find the primary translation string
-                # and also store additional alternate strings to 
-                # be displayed together.  These are stored as 
+                # and also store additional alternate strings to
+                # be displayed together.  These are stored as
                 # 'enx':[one, two], 'esx':[uno, duo], ...
                 # Note:  We need to escape possible '&' characters
                 #        in the TermNameString
@@ -715,12 +716,12 @@ html = """\
    .big          { font-size: 14pt;
                    font-weight: bold; }
    .center       { text-align: center; }
-   .name         { color: blue; 
+   .name         { color: blue;
                    font-weight: bold;
                    background-color: #EEEEEE; }
    .term-normal  { background-color: yellow; }
    .term-capped  { background-color: yellow; }
-   .term-name    { color: blue; 
+   .term-name    { color: blue;
                    font-weight: bold; }
    .term-concept { color: green;
                    font-weight: bold; }
@@ -729,8 +730,8 @@ html = """\
    .blocked, .special
                  { color: red;
                    font-weight: bold; }
-   .attribute    { font-weight: normal; 
-                   font-style: italic; 
+   .attribute    { font-weight: normal;
+                   font-style: italic;
                    background-color: #FFFFFF; }
    .insertapproved { color: red; }
    .deleteapproved { text-decoration: line-through; }
@@ -748,16 +749,16 @@ html = """\
   </b>
   </div>
 """ % (conceptId, time.strftime(time.ctime()))
-  
+
 # Display the CDR-ID
 # ------------------
 html += '  <span class="big">CDR%s</span>' % conceptId
 
-# Get the concept information to be displayed 
+# Get the concept information to be displayed
 # -----------------------------------------------------------
 conceptInfo = getConcept(conceptId)
 
-# We need to mark the term names that have been blocked.  For 
+# We need to mark the term names that have been blocked.  For
 # this we need to go back to the database, which could have
 # been done more intelligently, but the request to display
 # blocked GTNs came after the program was nearly completed.
@@ -765,7 +766,7 @@ conceptInfo = getConcept(conceptId)
 termNameStatus = getTermNameStatus(termNameIds)
 # cdrcgi.bail(termNameStatus)
 
-# Get the term name (for spanish and english) for each of the 
+# Get the term name (for spanish and english) for each of the
 # related GlossaryTermName document and create a dictionary
 # holding all of this information
 # -----------------------------------------------------------
@@ -786,7 +787,7 @@ for termNameId in termNameIds:
 languages = ['en', 'es']
 audiences = ['Patient', 'Health professional']
 
-# The users decided to only display those term blocks for which a 
+# The users decided to only display those term blocks for which a
 # definition exists.
 # Creating the languages/audiences list from the conceptInfo keys
 # ---------------------------------------------------------------
@@ -840,7 +841,7 @@ for lang in languages:
 
                     html += """</td>
    </tr>"""
-                # Display the blocked term names in red and don't 
+                # Display the blocked term names in red and don't
                 # bother displaying the term definition
                 # -----------------------------------------------
                 else:
@@ -867,7 +868,7 @@ for lang in languages:
                                                         termData['en'], id)
                 else:
                     html += u"""\
-    <td class="blocked" width="70%%">BLOCKED - 
+    <td class="blocked" width="70%%">BLOCKED -
      <span class='special'>%s (en inglés)</span> (CDR%s)""" % (
                                                         termData['en'], id)
                     continue
@@ -877,7 +878,7 @@ for lang in languages:
             # (The HTML output is created in the filter)
             # ----------------------------------------------------
             if conceptInfo.has_key('%s-%s' % (lang, aud)):
-                definitionRow = resolvePlaceHolder(lang, termData, 
+                definitionRow = resolvePlaceHolder(lang, termData,
                                             conceptInfo['%s-%s' % (lang, aud)])
                 ### There may be a better way to do this substitution???
                 ### ####################################################
@@ -886,8 +887,8 @@ for lang in languages:
                 # term name could be marked up with insertion/deletion
                 # markup.  We need to find the first character within this
                 # string that needs to be capitalized.
-                # If the first character is a '<' this indicates the 
-                # beginning of the <span> element for markup. The first 
+                # If the first character is a '<' this indicates the
+                # beginning of the <span> element for markup. The first
                 # character after the </span> should then be capitalized.
                 # --------------------------------------------------------
                 replaceList = re.findall('@@.*?@@', definitionRow)
@@ -908,17 +909,17 @@ for lang in languages:
                 # If there was a term without Spanish name display it
                 # in red to stand out.
                 # ----------------------------------------------------
-                definitionRow = definitionRow.replace('@S@', 
+                definitionRow = definitionRow.replace('@S@',
                                              '<span class="special">', 1)
-                definitionRow = definitionRow.replace('@E@', '</span>') 
+                definitionRow = definitionRow.replace('@E@', '</span>')
                 html += definitionRow
 
         html += """
   </table>
   <p/>
   <table border="0" width="100%%" cellspacing="0" cellpadding="0">"""
-  
-        # Adding the Term Concept information at the end of each 
+
+        # Adding the Term Concept information at the end of each
         # language/audience section
         # -----------------------------------------------------------
         if conceptInfo.has_key('%s-%s' % (lang, aud)):
@@ -956,20 +957,20 @@ for lang in languages:
             if conceptInfo['%s-%s' % (lang, aud)].has_key('StatusDate'):
                 html += addSingleRow(conceptInfo['%s-%s' % (lang, aud)],
                                     'StatusDate')
-    
+
             # Adding Comment rows
             # We need to process the attributes, too, so we're sending
             # the Comment node through a filter
             if conceptInfo['%s-%s' % (lang, aud)].has_key('Comment'):
                 commentRow = displayMarkup(
-                            conceptInfo['%s-%s' % (lang, aud)]['Comment'], 
+                            conceptInfo['%s-%s' % (lang, aud)]['Comment'],
                                                                'Comment')
                 html += commentRow
-            # Adding row for Date Last Modified 
+            # Adding row for Date Last Modified
             if conceptInfo['%s-%s' % (lang, aud)].has_key('DateLastModified'):
                 html += addSingleRow(conceptInfo['%s-%s' % (lang, aud)],
                                     'DateLastModified')
-            # Adding row for Date Last Reviewed 
+            # Adding row for Date Last Reviewed
             if conceptInfo['%s-%s' % (lang, aud)].has_key('DateLastReviewed'):
                 html += addSingleRow(conceptInfo['%s-%s' % (lang, aud)],
                                     'DateLastReviewed')
