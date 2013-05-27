@@ -105,7 +105,7 @@ form += """\
     <H3>Management Reports</H3>
     <OL>
      <LI><A HREF='%s?%s=%s'>%s</A></LI>
-""" % (cdr.h.makeCdrCgiUrl('bach', 'FindOrphanedCTGovProtocols.py'),
+""" % (cdr.h.makeCdrCgiUrl('PROD', 'FindOrphanedCTGovProtocols.py'),
        cdrcgi.SESSION, session, 'CTGov trials not receiving updates')
 
 reports = [
