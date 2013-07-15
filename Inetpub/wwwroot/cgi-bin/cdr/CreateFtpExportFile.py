@@ -1,7 +1,7 @@
 #----------------------------------------------------------------------
 #
 # CreateFtpExportFile.py
-# ------------------
+# ----------------------
 # $Id: CreateFtpExportFile.py $
 #
 # Creating the file FtpExportData.txt in the output directory.
@@ -20,23 +20,20 @@ submit    = fields and fields.getvalue("SubmitButton")     or None
 request   = cdrcgi.getRequest(fields)
 title     = "CDR Administration"
 instr     = "Create FtpExportData.txt file"
-script    = "CreateFtpExport.py"
-buttons   = (SUBMENU, cdrcgi.MAINMENU)
+script    = "CreateFtpExportFile.py"
 
 # Handle navigation requests.
 #----------------------------------------------------------------------
 if request == cdrcgi.MAINMENU:
     cdrcgi.navigateTo("Admin.py", session)
-elif request == SUBMENU:
-    cdrcgi.navigateTo("reports.py", session)
 
 #----------------------------------------------------------------------
 # If we don't have a request, put up the form.
 #----------------------------------------------------------------------
+#jobId = '12345'
 if not jobId:
     header = cdrcgi.header(title, title, instr, script,
-                           ("Submit", SUBMENU, cdrcgi.MAINMENU),
-                           numBreaks = 1)
+                           ("Submit", cdrcgi.MAINMENU), numBreaks = 1)
     form   = """\
    <input type='hidden' name='%s' value='%s'>
  
