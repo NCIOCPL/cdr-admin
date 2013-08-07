@@ -181,8 +181,16 @@ def dispJobStatus():
                 ON u.id = p.usr
              WHERE p.id = ?
     """, (jobId,))
-        (pubSystem, subset, name, dir, started, completed, status,
-         messages, no_output) = cursor.fetchone()
+
+        # If we manually enter a JobID for that doesn't exist yet
+        # fetching the result will fail and create an error
+        # -------------------------------------------------------
+        try:
+            (pubSystem, subset, name, dir, started, completed, status,
+             messages, no_output) = cursor.fetchone()
+        except:
+            cdrcgi.bail('Job%d does not exist!' % jobId)
+
     except cdrdb.Error, info:
         cdrcgi.bail("Failure retrieving job information: %s" % info[1][0])
 
