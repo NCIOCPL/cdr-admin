@@ -147,6 +147,7 @@ def makeSummaryTable(summaryId, members, cdrId='No'):
     # -------------------------------------------------------
     headrow = False
     for member in members:
+        #cdrcgi.bail(repr(member))
         if member[2] == summaryId and not headrow:
             headrow = True
             # Add a column for the CDR-ID if requested
@@ -158,18 +159,20 @@ def makeSummaryTable(summaryId, members, cdrId='No'):
      <span class='group'>%10d</span>
     </th>
     <th class='theader'>
-     <span class='group'>%s</span>
+     <span class='group'>%s%s</span>
     </th>
    </tr>
-""" % (member[2], re.sub(";", "--", trim(member[3])))
+""" % (member[2], re.sub(";", "--", trim(member[3])), member[4] and 
+                                                  ' (Module only)' or '')
             else:
                 html += """\
    <tr>
     <th class='theader' colspan='2'>
-     <span class='group'>%s</span>
+     <span class='group'>%s%s</span>
     </th>
    </tr>
-""" % re.sub(";", "--", trim(member[3]))
+""" % (re.sub(";", "--", trim(member[3])), member[4] and 
+                                                  ' (Module only)' or '')
 
     # Print the data rows (the board member name)
     # -------------------------------------------
@@ -315,7 +318,7 @@ if repType == 'ByTopic':
     try:
         query = """\
 SELECT DISTINCT board_member.id, board_member.title,
-                summary.doc_id, summary.value
+                summary.doc_id, summary.value, mod.value
            FROM document board_member
            JOIN query_term summary_board_member
              ON summary_board_member.int_val = board_member.id
@@ -329,6 +332,9 @@ SELECT DISTINCT board_member.id, board_member.title,
              ON summary.doc_id = summary_board.doc_id
             AND summary.path = '%s'
              %s
+           LEFT OUTER JOIN query_term mod
+             ON mod.doc_id = summary.doc_id
+            AND mod.path = '/Summary/@ModuleOnly'
            JOIN document d
              ON d.id = summary.doc_id
             AND d.active_status = 'A'
@@ -431,7 +437,7 @@ SELECT DISTINCT board_member.id, board_member.title
 
     cursor.execute("""\
 SELECT DISTINCT board_member.id, board_member.title,
-                summary.doc_id, summary.value
+                summary.doc_id, summary.value, mod.value
            FROM document board_member
            JOIN query_term summary_board_member
              ON summary_board_member.int_val = board_member.id
@@ -445,6 +451,9 @@ SELECT DISTINCT board_member.id, board_member.title,
              ON summary.doc_id = summary_board.doc_id
             AND summary.path = '%s'
              %s
+           LEFT OUTER JOIN query_term mod
+             ON mod.doc_id = summary.doc_id
+            AND mod.path = '/Summary/@ModuleOnly'
            JOIN document d
              ON d.id = summary.doc_id
             AND d.active_status = 'A'
