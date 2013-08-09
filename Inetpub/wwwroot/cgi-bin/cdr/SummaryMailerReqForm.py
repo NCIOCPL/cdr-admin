@@ -8,7 +8,7 @@
 # BZIssue::3132
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrdb, cdrpub, cdrcgi, re, string, cdrmailcommon, sys, socket
+import cgi, cdr, cdrdb, cdrpub, cdrcgi, re, string, cdrmailcommon, sys
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -221,9 +221,7 @@ def sendToAll():
 """ % (jobId, cdrcgi.BASE, jobId))
 
 def selectIndividualDocuments(type):
-    sUrl = "Location:http://"
-    sUrl += socket.gethostname()
-    sUrl += ".nci.nih.gov"
+    sUrl = "Location:https://" + ".".join(cdr.h.host["APPC"])
     sUrl += cdrcgi.BASE
     sUrl += "/"
     sUrl += "SummaryMailerReqFormInd.py?"
