@@ -27,11 +27,13 @@ if not session and False:
 
 # One of these for each CT.gov trial document.
 class CTGovProtocol:
-    def __init__(self, nlmId, title, received, phase):
+    def __init__(self, nlmId, title, received, phase, ctrpId, haveCtrp):
         self.nlmId    = nlmId
         self.title    = title
         self.received = str(received)[:10]
         self.phase    = phase
+        self.ctrpId   = ctrpId
+        self.haveCtrp = haveCtrp
     def __cmp__(self, other):
         diff = cmp(self.received, other.received)
         if diff:
@@ -74,6 +76,7 @@ def showList(cursor, errors = None, extra = None):
    h3   { font-size: 13pt; }
    .err { font-family: Arial; color: red; font-size: 14pt; font-weight: bold; }
    .msg { color: green; font-size: 14pt; font-weight: bold; }
+   td a.ctrp { text-decoration: underline; font-weight: bold; color: maroon; }
   </style>
 """ % timeStr)]
     # Add saved session
@@ -100,11 +103,13 @@ def showList(cursor, errors = None, extra = None):
 """)
     try:
         cursor.execute("""\
-    SELECT c.nlm_id, c.title, c.downloaded, c.phase
-      FROM ctgov_import c
-      JOIN ctgov_disposition d
-        ON d.id = c.disposition
-       AND d.name = '%s'""" % disposition)
+         SELECT n.nlm_id, n.title, n.downloaded, n.phase, n.ctrp_id, c.ctrp_id
+           FROM ctgov_import n
+           JOIN ctgov_disposition d
+             ON d.id = n.disposition
+            AND d.name = '%s'
+LEFT OUTER JOIN ctrp_import c
+             ON n.ctrp_id = c.ctrp_id""" % disposition, timeout=300)
         rows = cursor.fetchall()
         
     except Exception, info:
@@ -113,7 +118,9 @@ def showList(cursor, errors = None, extra = None):
     protocols = []
     if rows:
         for row in rows:
-            protocol = CTGovProtocol(row[0], row[1], row[2], row[3])
+            haveCtrp = row[5] is not None
+            protocol = CTGovProtocol(row[0], row[1], row[2], row[3], row[4],
+                                     haveCtrp)
             protocols.append(protocol)
         protocols.sort()
     
@@ -124,6 +131,7 @@ def showList(cursor, errors = None, extra = None):
 """ % (len(protocols), len(protocols)))
 
     n = 0
+    ctrpTemplate = u'<a class="ctrp" href="%s" target="_blank">%s</a>'
     for protocol in protocols:
         href = u'javascript:openWindow("%s")' % protocol.nlmId
         inputFields = u"""
@@ -141,9 +149,17 @@ def showList(cursor, errors = None, extra = None):
       <input type='radio' name='disp-%d' value='4'>&nbsp;
       Reviewed - Need OCCM Feedback
 """ % n
+        ctrp = u"&nbsp;"
+        if protocol.ctrpId:
+            if protocol.haveCtrp:
+                url = "show-ctrp-doc.py?id=%s" % protocol.ctrpId
+                ctrp = ctrpTemplate % (url, protocol.ctrpId)
+            else:
+                ctrp = protocol.ctrpId
         html.append(u"""\
     <tr>
      <td><b><a href='%s'>%s</a></b></td>
+     <td>%s</td>
      <td><i>%s</i></td>
      <td>%s</td>
      <td>%s</td>
@@ -151,7 +167,7 @@ def showList(cursor, errors = None, extra = None):
 %s
      </td>
     </tr>
-""" % (href, protocol.nlmId, cgi.escape(protocol.title),
+""" % (href, protocol.nlmId, ctrp, cgi.escape(protocol.title),
        protocol.phase or u"No phase specified",
        protocol.received, inputFields))
         n += 1
