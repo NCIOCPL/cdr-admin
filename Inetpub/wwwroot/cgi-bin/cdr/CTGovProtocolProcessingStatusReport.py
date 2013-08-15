@@ -5,6 +5,7 @@
 # New processing report for unpublishable CT.gov protocols.
 #
 # BZIssue::4804
+# BZIssue::5309 (OCECDR-3610)
 #
 #----------------------------------------------------------------------
 import cdr, ExcelWriter, cdrdb, lxml.etree as etree, time, cdrcgi, sys
@@ -71,6 +72,8 @@ class CTGovProtocol:
         self.protStatus   = None
         self.phases       = []
         self.transferred  = False
+        self.ctrpId       = None
+        self.inCtrpTable  = False
         cursor.execute("SELECT xml FROM document WHERE id = ?", cdrId)
         rows = cursor.fetchall()
         tree = etree.XML(rows[0][0].encode('utf-8'))
@@ -109,6 +112,17 @@ class CTGovProtocol:
             elif node.tag == 'PDQAdminInfo':
                 for child in node.findall('CTGovOwnershipTransferInfo'):
                     self.transferred = True
+        if self.nctId:
+            cursor.execute("SELECT ctrp_id FROM ctgov_import WHERE nlm_id = ?",
+                           self.nctId)
+            rows = cursor.fetchall()
+            if rows:
+                self.ctrpId = rows[0][0]
+                if self.ctrpId:
+                    cursor.execute("""\
+SELECT COUNT(*) FROM ctrp_import WHERE ctrp_id = ?""", self.ctrpId)
+                    self.inCtrpTable = cursor.fetchall()[0][0] > 0
+                           
     def __cmp__(self, other):
         diff = cmp(other.phases, self.phases)
         if diff:
@@ -166,10 +180,18 @@ def main():
     book = ExcelWriter.Workbook()
     font = ExcelWriter.Font(name='Arial', size=10)
     normalStyle = book.addStyle(font=font)
-    font = ExcelWriter.Font(color='#FF0000', name='Arial', size=10)
-    redStyle = book.addStyle(font=font)
     dateStyle = book.addStyle(font=font, numFormat='YYYY-mm-dd')
     datetimeStyle = book.addStyle(font=font, numFormat='YYYY-mm-dd HH:MM:SS')
+    font = ExcelWriter.Font(color='#FF0000', name='Arial', size=10)
+    redStyle = book.addStyle(font=font)
+    font = ExcelWriter.Font(color='#7E354D', name='Arial', size=10)
+    maroonStyle = book.addStyle(font=font)
+    font = ExcelWriter.Font(color='#800000', name='Arial', size=10)
+    maroonStyle = book.addStyle(font=font)
+    font = ExcelWriter.Font(color='#8C001A', name='Arial', size=10)
+    burgundyStyle = book.addStyle(font=font)
+    font = ExcelWriter.Font(color='#0000FF', name='Arial', size=10)
+    blueStyle = book.addStyle(font=font)
     font = ExcelWriter.Font(name='Arial', size=10, bold=True)
     boldStyle = book.addStyle(font=font)
     font = ExcelWriter.Font(name='Arial', size=10, bold=True, color='#FF0000')
@@ -180,8 +202,9 @@ def main():
     font = ExcelWriter.Font(name='Arial', size=12, bold=True)
     titleStyle = book.addStyle(alignment=align, font=font)
     sheet = book.addWorksheet('CTGov', normalStyle)
-    widths = (60, 100, 100, 200, 100, 100, 100, 60, 100, 100, 350)
-    labels = ('CDR ID', 'Org Study ID', 'NCT ID', 'Processing Status(es)',
+    widths = (60, 100, 100, 100, 200, 100, 100, 100, 60, 100, 100, 350)
+    labels = ('CDR ID', 'Org Study ID', 'NCT ID',
+              'CTRP ID', 'Processing Status(es)',
               'User', 'Processing Start', 'Processing End', 'Date Created',
               'Phase(s)', 'Overall Status', 'Comment')
     for i, width in enumerate(widths):
@@ -203,29 +226,38 @@ def main():
         row.addCell(2, u"FAILURE: %s" % failure.exception, mergeAcross=9)
     FIRST_DATA_ROW += len(failures)
     for i, protocol in enumerate(protocols):
-        row = sheet.addRow(i + FIRST_DATA_ROW,
-                           protocol.transferred and redStyle or normalStyle)
+        style = protocol.transferred and redStyle or normalStyle
+        ctrp = None
+        if protocol.ctrpId:
+            style = blueStyle
+            ctrp = protocol.ctrpId
+            if protocol.inCtrpTable:
+                style = burgundyStyle
+                ctrp += " (X)"
+        row = sheet.addRow(i + FIRST_DATA_ROW, style)
         row.addCell(1, protocol.cdrId)
         if protocol.orgStudyId:
             row.addCell(2, protocol.orgStudyId)
         if protocol.nctId:
             row.addCell(3, protocol.nctId)
+        if ctrp:
+            row.addCell(4, ctrp)
         if protocol.procStatuses:
-            row.addCell(4, u"; ".join(protocol.procStatuses))
+            row.addCell(5, u"; ".join(protocol.procStatuses))
         if protocol.user:
-            row.addCell(5, protocol.user)
+            row.addCell(6, protocol.user)
         if protocol.procStart:
-            row.addCell(6, fixDateTime(protocol.procStart))
+            row.addCell(7, fixDateTime(protocol.procStart))
         if protocol.procEnd:
-            row.addCell(7, fixDateTime(protocol.procEnd))
+            row.addCell(8, fixDateTime(protocol.procEnd))
         if protocol.dateCreated:
-            row.addCell(8, fixDate(protocol.dateCreated))
+            row.addCell(9, fixDate(protocol.dateCreated))
         if protocol.phases:
-            row.addCell(9, u"; ".join(protocol.phases))
+            row.addCell(10, u"; ".join(protocol.phases))
         if protocol.protStatus:
-            row.addCell(10, protocol.protStatus)
+            row.addCell(11, protocol.protStatus)
         if protocol.comment:
-            row.addCell(11, protocol.comment)
+            row.addCell(12, protocol.comment)
 
     row = sheet.addRow(FIRST_DATA_ROW + 2 + len(protocols), boldStyle)
     row.addCell(1, "Total Count", mergeAcross=1)
@@ -248,4 +280,7 @@ def main():
     book.write(sys.stdout, True)
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except Exception, e:
+        cdrcgi.bail("whoops: %s" % e)
