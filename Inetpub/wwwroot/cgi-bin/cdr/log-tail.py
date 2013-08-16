@@ -5,7 +5,7 @@
 # Show a piece of a log file.
 #
 #----------------------------------------------------------------------
-import os, cgi, sys, time, re
+import os, cgi, sys, time, re, cdr
 
 DEFAULT_COUNT = 2000000
 
@@ -54,6 +54,21 @@ s = fields.getvalue("s") or ""
 c = fields.getvalue("c") or ""
 
 if p:
+    if s.startswith('"') and s.endswith('"') and len(s) > 2:
+        try:
+            cmd = 'find %s %s' % (s, p)
+            result = cdr.runCommand(cmd)
+            print "Content-type: text/plain\n\n%s" % result.output
+        except Exception, e:
+            print "Content-type: text/plain\n\n%s\n%s" % (cmd, repr(e))
+        sys.exit(0)
+    if "*" in p or "?" in p:
+        try:
+            result = cdr.runCommand("dir %s" % p)
+            print "Content-type: text/plain\n\n%s" % result.output
+        except Exception, e:
+            print "Content-type: text/plain\n\n%s" % repr(e)
+        sys.exit(0)
     try:
         stat = os.stat(p)
         stamp = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(stat.st_mtime))
