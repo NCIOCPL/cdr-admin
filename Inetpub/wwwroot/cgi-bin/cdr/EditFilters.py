@@ -18,6 +18,7 @@ request = cdrcgi.getRequest(fields)
 s1      = fields and fields.getvalue('s1') or None
 s2      = fields and fields.getvalue('s2') or None
 orderBy = fields and fields.getvalue('OrderBy') or None
+LABEL   = "Compare Filters With the Production Server"
 
 #----------------------------------------------------------------------
 # Make sure we're logged in.
@@ -45,11 +46,9 @@ if request == "Log Out":
 #----------------------------------------------------------------------
 # Show the differences between the filters on two servers.
 #----------------------------------------------------------------------
-if request == "Compare Filters":
-    if not s1 or not s2:
-        cdrcgi.bail("Must specify both servers")
-    print "Location:http://%s%s/FilterDiffs.py?s1=%s&s2=%s\n" % (
-            cdrcgi.WEBSERVER, cdrcgi.BASE, s1, s2)
+if request == LABEL:
+    print "Location:http://%s%s/FilterDiffs.py\n" % (
+            cdrcgi.WEBSERVER, cdrcgi.BASE)
 
 #----------------------------------------------------------------------
 # Retrieve and display the action information.
@@ -85,11 +84,7 @@ except cdrdb.Error, info:
 
 sortReq = u"<A HREF='%s/EditFilters.py?%s=%s&OrderBy=%s'>%s</A>"
 form = u"""\
-   <INPUT TYPE='submit' NAME='%s' VALUE='Compare Filters'>&nbsp;&nbsp;
-   between
-   <INPUT NAME='s1' VALUE='bach'>&nbsp;
-   and
-   <INPUT NAME='s2' VALUE='mahler'>&nbsp;
+   <INPUT TYPE='submit' NAME='%s' VALUE='%s'>
    <H2>CDR Filters</H2>
    <TABLE border='1' cellspacing='0' cellpadding='2'>
     <TR>
@@ -97,7 +92,7 @@ form = u"""\
      <TD><B>Action</B></TD>
      <TD><B>%s</B></TD>
     </TR>
-""" % (cdrcgi.REQUEST,
+""" % (cdrcgi.REQUEST, LABEL,
        sortReq % (cdrcgi.BASE, cdrcgi.SESSION, session, "DocId", "DocId"),
        sortReq % (cdrcgi.BASE, cdrcgi.SESSION, session, "", "DocTitle")
       )
