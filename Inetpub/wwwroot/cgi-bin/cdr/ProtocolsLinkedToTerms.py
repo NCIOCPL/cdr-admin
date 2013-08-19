@@ -117,7 +117,7 @@ if docId:
     except:
         cdrcgi.bail("Invalid document ID '%s'" % docId)
 
-    # Find the protocols linked to this term.
+    # Find the protocols linked to this term and not abandoned.
     query = """\
         SELECT DISTINCT d.id, t.name
            FROM document d
@@ -127,7 +127,15 @@ if docId:
              ON n.source_doc = d.id
           WHERE n.target_doc = ?
             AND t.name IN ('InScopeProtocol', 'CTGovProtocol',
-                           'ScientificProtocolInfo')"""
+                           'ScientificProtocolInfo')
+            AND NOT d.id IN (SELECT a.doc_id
+                               FROM query_term a
+                              WHERE a.path = 
+                                   '/InScopeProtocol'                      +
+                                   '/CTGovOwnershipTransferContactLog'     +
+                                   '/CTGovOwnershipTransferContactResponse'
+                                AND a.value = 'Abandoned')"""
+    
     try:
         cursor.execute(query, docId, timeout = 300)
         rows = cursor.fetchall()
