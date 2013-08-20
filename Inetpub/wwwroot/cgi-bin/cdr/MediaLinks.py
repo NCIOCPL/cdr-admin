@@ -4,20 +4,9 @@
 #
 # Report listing all document that link to Media documents
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.4  2008/12/12 21:57:48  venglisc
-# Modified report to adjust for new Glossary document structure. (Bug 4394)
-#
-# Revision 1.3  2008/12/02 21:33:50  venglisc
-# Modified to work with the new GlossaryTerm structure. (Bug 4394)
-#
-# Revision 1.2  2007/05/18 21:34:55  venglisc
-# Minor HTML formatting changes. (Bug 3226)
-#
-# Revision 1.1  2007/05/18 21:19:45  venglisc
-# Initial version of MediaLinks report listing Summaries and/or Glossaries
-# that are linking to a Media document. (Bug 3226)
-#
+# BZIssue::4394  Modified report to adjust for new Glossary document structure.
+# BZIssue::3226  Initial version of report.
+# OCECDR-3619    Optimized query that was timing out.
 #
 #----------------------------------------------------------------------
 import cdr, cdrdb, cdrcgi, cgi, re, time
@@ -254,9 +243,22 @@ if type(docTypes) in (type(""), type(u"")):
 # ----------------------------------------------------------
 for docType in docTypes:
     try:
-        dtQual = docType and ("doc_type = '%s'" % docType) or ""
-        #cdrcgi.bail(docType)
-        cursor.execute("""\
+        # Optimize very slow query for links from glossary terms.
+        # This version takes about 3 seconds (compared to 6-7 minutes for
+        # the nested queries).
+        if docType == "GlossaryTerm":
+            cursor.execute("""\
+SELECT DISTINCT q1.doc_id, q1.value
+           FROM query_term_pub q1
+           JOIN query_term_pub q2
+             ON q1.doc_id = q2.doc_id
+           JOIN query_term_pub q3
+             ON q2.int_val = q3.doc_id
+          WHERE q1.path = '/GlossaryTermConcept/TermDefinition/DefinitionText'
+            AND q3.path LIKE '%MediaID/@cdr:ref'
+       ORDER BY q1.value""")
+        else:
+            cursor.execute("""\
            SELECT doc_id, value
              FROM  query_term_pub
             WHERE doc_id IN 
