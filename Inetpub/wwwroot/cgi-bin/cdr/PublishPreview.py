@@ -8,6 +8,7 @@
 # BZIssue::4781 - Have certain links to unpublished docs ignored
 # BZIssue::5053 - [Summaries] Pub Preview Error
 # BZIssue::5113 - Modifying PublishPreview to Work with WCMS Release 6.3
+# BZIssue::OCECDR-3618 - Audio does not play in pub preview
 #
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Revision 1.39  2008/11/20 22:44:44  venglisc
@@ -385,7 +386,8 @@ html = pattern3.sub('<title>Publish Preview: CDR%s' % intId, resp.xmlResult)
 #fp.close()
 myHtml = lxml.html.fromstring(html)
 
-url = "http://%s.%s/" % (cdr.PUB_NAME, cdr.DOMAIN_NAME)
+url = "http://%s.%s/" % (cdr.h.host['APPC'][0], cdr.h.host['APPC'][1])
+
 #myHtml.make_links_absolute(url)
 
 # Removing the hostname from the fragment links to create a local
