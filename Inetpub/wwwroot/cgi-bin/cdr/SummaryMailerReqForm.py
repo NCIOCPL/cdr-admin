@@ -6,6 +6,7 @@
 #
 # BZIssue::1664
 # BZIssue::3132
+# BZIssue::OCECDR-3640: Unable to run Advisory Board Summary Mailers
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrdb, cdrpub, cdrcgi, re, string, cdrmailcommon, sys
@@ -208,6 +209,9 @@ def sendToAll():
 
     # Tell user how to get status
     header = cdrcgi.header(title, title, section, None, [])
+    sHttp = "https://%s.%s/cgi-bin/cdr" % (cdr.h.host['APPC'][0],
+                                            cdr.h.host['APPC'][1])
+    
     cdrcgi.sendPage(header + """\
     <H3>Job Number %d Submitted</H3>
     <B>
@@ -218,11 +222,11 @@ def sendToAll():
    </FORM>
   </BODY>
  </HTML>
-""" % (jobId, cdrcgi.BASE, jobId))
+""" % (jobId, sHttp, jobId))
 
 def selectIndividualDocuments(type):
-    sUrl = "Location:https://" + ".".join(cdr.h.host["APPC"])
-    sUrl += cdrcgi.BASE
+    sUrl = "Location:https://%s.%s/cgi-bin/cdr" % (cdr.h.host['APPC'][0],
+                                                   cdr.h.host['APPC'][1])
     sUrl += "/"
     sUrl += "SummaryMailerReqFormInd.py?"
     sArgs = cdrcgi.SESSION 
