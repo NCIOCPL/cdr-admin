@@ -163,7 +163,7 @@ def makeSummaryTable(summaryId, members, cdrId='No'):
     </th>
    </tr>
 """ % (member[2], re.sub(";", "--", trim(member[3])), member[4] and 
-                                                  ' (Module only)' or '')
+                                                  ' (Module)' or '')
             else:
                 html += """\
    <tr>
@@ -172,7 +172,7 @@ def makeSummaryTable(summaryId, members, cdrId='No'):
     </th>
    </tr>
 """ % (re.sub(";", "--", trim(member[3])), member[4] and 
-                                                  ' (Module only)' or '')
+                                                  ' (Module)' or '')
 
     # Print the data rows (the board member name)
     # -------------------------------------------
