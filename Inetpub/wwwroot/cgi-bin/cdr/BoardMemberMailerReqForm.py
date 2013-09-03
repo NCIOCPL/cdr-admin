@@ -378,7 +378,9 @@ header = cdrcgi.header(title, title, section, script, buttons,
                       'adv-summ-fedex'),
            new Option('Advisory Board Still Interested Letter',
                       'adv-interested'),
-           new Option('Advisory Board Thank You Letter',  'adv-thankyou')
+           new Option('Advisory Board Thank You Letter',  'adv-thankyou'),
+           new Option('Advisory Board Big Thank You Letter',
+                      'adv-big-thankyou'),
        ],
        'editorial': [
            new Option('Editorial Board Invitation Letter', 'ed-invitation'),
@@ -391,7 +393,9 @@ header = cdrcgi.header(title, title, section, script, buttons,
            new Option('Editorial Board Goodbye Letter',    'ed-goodbye'), 
            new Option('Editorial Board Goodbye For Good Letter',
                       'ed-goodbye-forever'),
-           new Option('Editorial Board Thank You Letter',  'ed-thankyou')
+           new Option('Editorial Board Thank You Letter',  'ed-thankyou'),
+           new Option('Editorial Board Comprehensive Review Letter',
+                      'ed-comp-review'),
       ]
    };
        
