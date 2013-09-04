@@ -23,12 +23,19 @@
 #
 #----------------------------------------------------------------------
 
-import cgi, cgitb, cdr, cdrcgi, cdrdb
+import cgi, cgitb, cdr, re, cdrcgi, cdrdb
 cgitb.enable()
 
 # Prepare a log file for what we're about to do
 # Not using a banner since the program comes through here more than once
 G_log = cdr.Log("ReplaceDocWithNewDoc.log", banner=None)
+
+# Regex for find self referencing cdr:ref and cdr:href
+# Group('cdrid') is the long form CDR ID of the document, CDR0000123456
+#  which goes in the middle between the two parts
+PAT1 =  """cdr:h?ref\s*=\s*['"](?P<cdrid>"""
+PAT2 = ")#"
+refPat = None
 
 # These will contain the full documents, in cdr.getDoc CdrDoc format.
 # If they exist, the docs have been checked out and must be checked in
@@ -190,6 +197,7 @@ SELECT DISTINCT t.name, d.id, d.title, n.source_elem, n.target_frag
              ON n.source_doc = d.id
           WHERE n.target_doc = ?
             AND n.target_frag is not null
+            AND d.id <> n.target_doc
        ORDER BY t.name, d.id, n.source_elem, n.target_frag
 """, cdr.exNormalize(targetDocId)[1])
     except Exception, info:
@@ -424,6 +432,9 @@ if oldDocId:
 if newDocId:
     newDocIdStr = cdr.exNormalize(newDocId)[0]
 
+    # Here's the pattern for find the self references in the new doc
+    refPat = re.compile(PAT1 + newDocIdStr + PAT2)
+
 # Navigation away from form?
 if request in (cdrcgi.MAINMENU, START_CANCEL):
     cdrcgi.navigateTo("Admin.py", session)
@@ -536,6 +547,12 @@ if request != CONFIRM_SUBMIT:
     except Exception, info:
         fatal("Error retrieving titles for docs: %s" % info)
 
+    # Determine the number of internal references to replace
+    # Requires fetching the new doc without lock for count
+    newXml = cdr.getDoc(session, newDocId, checkout='N', getObject=True).xml
+    refList  = refPat.findall(newXml)
+    refCount = len(refList)
+
     # Tell user what will be done
     html += """
 <style type='text/css'>
@@ -613,6 +630,20 @@ breaking any links.</p>
 version.</p>
 """
 
+    # Report how many internal references will be patched
+    if refCount:
+        html += """
+<p>The new document contains %d internal references (e.g.,
+cdr:href="%s#_123) in which the new CDR ID will be replaced by the
+CDR ID of the old document (e.g., %s#_123).</p>""" % (refCount,
+newDocIdStr, oldDocIdStr)
+
+    else:
+        html += """
+<p>There were no internal references (e.g., cdr:href="%s#_123) in which the
+new CDR ID would need to be replaced by the old one.
+""" % newDocIdStr
+
     # Request confirmation
     log("Requesting confirmation, replace %s with %s" %
         (oldDocIdStr, newDocIdStr))
@@ -650,6 +681,18 @@ versionDocIfNeeded(session, oldDocIdStr, str(oldDoc))
 
 # Remove the WillReplace element from the new doc
 xml = removeWillReplace(session, newDoc.xml)
+
+# Fixup internal references to use the correct CDR ID
+# Only change:
+#   cdr:ref or cdr:href, not any comments or other uses of the new ID
+#   refs with fragment IDs, not references without fragments
+# In other words, only change ID strings that fit the exact refPat regex
+while True:
+    m = refPat.search(xml)
+    if m:
+        xml = xml[:m.start('cdrid')] + oldDocIdStr + xml[m.end('cdrid'):]
+    else:
+        break
 
 # Use the new XML to replace the text of the old document
 # We've still got all the CdrDocCtl fields from the new doc here
