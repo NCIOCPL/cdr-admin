@@ -304,7 +304,7 @@ def removeWillReplace(session, docXml):
   <xsl:if                        test = "not(../DateLastModified)">
    <DateLastModified>
     <xsl:value-of              select = "document(concat('cdrutil:/date/',
-                                                         '%25Y-%25m-%25#d'))"/>
+                                                         '%25Y-%25m-%25d'))"/>
    </DateLastModified>
   </xsl:if>
  </xsl:template>
@@ -316,7 +316,7 @@ def removeWillReplace(session, docXml):
  <xsl:template                  match = 'DateLastModified'>
   <xsl:copy>
    <xsl:value-of               select = "document(concat('cdrutil:/date/',
-                                                         '%25Y-%25m-%25#d'))"/>
+                                                         '%25Y-%25m-%25d'))"/>
   </xsl:copy>
  </xsl:template>
 
