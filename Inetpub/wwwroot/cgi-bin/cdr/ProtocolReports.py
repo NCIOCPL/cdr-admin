@@ -4,6 +4,8 @@
 #
 # Submenu for protocol reports.
 #
+# BZIssue::5239 (JIRA::OCECDR-3543) - menu cleanup
+#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi
 
@@ -58,44 +60,23 @@ form.append("""\
     <H3>Management Reports</H3>
     <OL>
 """)
-for r in (('ApprovedNotYetActive.py',
-           'Approved Not Yet Active Report', ''),
-          ('Request1687.py',
-           'CTEP Orgs Without Phones', ''),
-          ('CTGovEntryDate.py',
+for r in (('CTGovEntryDate.py',
            'CTGovProtocols vs. Early EntryDate', ''),
-          ('Request2113.py', 
-           'NCI Cancer Centers', ''),
-          ('LiaisonReport.py', 
-           'NCI Liaison Office/Brussels Protocol Report', ''),
           ('Request3935.py',
            "Non-Drug/Agent Protocol Interventions", ''),
           ('PreferredProtOrgs.py', 
            'Preferred Protocol Organizations', ''),
-          ('NciClinicalTrialsStats.py', 
-           'Profile of NCI Sponsored Clinical Trials', ''),
-          ('TrialsCitationStats.py',
-           'Protocol Citation Statistics', ''),
           ('Request1855.py',
            'Protocol Interventions', '&cols=2'),
           ('Request1855.py',
            'Protocol Interventions by Protocol Title', ''),
-          ('ProtSitesWithoutPhone.py',
-           'Protocol Sites Without Phone Numbers', ''),
           ('ProtOwnershipTransfer.py',
            'Protocol Transfer of Ownership Responses (Batch Job)', ''),
           ('ProtOwnershipTransferOrg.py',
            'Protocol Transfer of Ownership Responses by Org/Status', ''),
           ('ProtocolsLinkedToTerms.py',
            'Protocols Linked to Terms', ''),
-          ('ProtocolActiveNoSites.py',
-           'Protocols with Active Status But No Active Sites', ''),
-          ('ProtocolINDReport.py',
-           'Protocols with FDA IND Information (Excel)', ''),
-          ('Request4176.py',
-           'Protocols with Regulatory Info Block', ''),
-          ('OutcomeMeasuresCodingReport.py',
-           'Protocols without Outcomes', '&onlyMissing=Y')):
+          ):
     form.append("<LI><A HREF='%s/%s?%s=%s%s'>%s</A></LI>\n" %
                 (cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[2], r[1]))
 form.append("""\
@@ -106,35 +87,10 @@ form.append("""\
 for r in (('NewlyPublishableTrials.py', 
            'Newly Publishable Trials', ''),
           ('NewlyPublishedTrials2.py', 
-           'Newly Published Trials', ''),
-          ('ProtocolStatusChange.py',
-           'Protocol Status Change Report', ''),
-          ('ProtProcReport.py',
-           'Protocol Processing Status Report', ''),
-          ('ProtProcReport.py',
-           'Protocol Processing Status Report with Protocol Title',
-           '&include-title=true'),
-          ('Request3654.py', 'Scientific Protocol Tracking Report', '')):
+           'Newly Published Trials', '')):
     form.append("<LI><A HREF='%s/%s?%s=%s%s'>%s</A></LI>\n" %
                 (cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[2], r[1]))
 
-form.append("""\
-    </OL>
-    <H3>Data Import Reports</H3>
-    <OL>
-""")
-for r in (('RssImportReport.py', 'COG Import/Update Statistics Report',
-           '&source=COG'),
-          ('Request4064.py',
-           'CTEP Institutions with Address Information (XML)',
-           '&output=xml'),
-          ('Request4064.py',
-           'CTEP Institutions with Address Information (Excel)',
-           '&output=xls'),
-          ('RssImportReport.py', 'RSS Import/Update Statistics Report', ''),
-          ('RssDocsNoSites.py', 'RSS Imports With No External Sites', '')):
-    form.append("<LI><A HREF='%s/%s?%s=%s%s'>%s</A></LI>\n" %
-                (cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[2], r[1]))
 form.append("""\
     </OL>
     <H3>Other Reports</H3>

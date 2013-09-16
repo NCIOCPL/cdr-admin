@@ -4,7 +4,7 @@
 #
 # Menu for Global changes.
 #
-# $Log: not supported by cvs2svn $
+# BZIssue::5239 (JIRA::OCECDR-3543)
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
@@ -31,8 +31,6 @@ html    = cdrcgi.header(title, title, section, "", buttons) + """\
    <ol>
 """
 items   = (
-           ('GlobalChange.py',         'Global Change Protocol Links'  ),
-           ('GlobalChangeZipCode.py',  'Global Change Zip Codes'       ),
            ('GlobalChangeLink.py',     'Global Change Links'           ),
            ('ShowGlobalChangeTestResults.py','Global Change Test Results'),
            ('Logout.py',               'Log Out'                       )

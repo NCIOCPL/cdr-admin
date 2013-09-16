@@ -6,6 +6,7 @@
 #
 # BZIssue::4630
 # BZIssue::1572
+# BZIssue::5239 (JIRA::OCECDR-3543) - menu cleanup
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
@@ -46,8 +47,6 @@ form = """\
 form += "<LI><A HREF='%s/ListGPEmailers'>%s</LI></A>\n" % (
             cdr.emailerCgi(), 'GP Emailers List')
 reports = [
-           ('LeadOrgStatusAndParticipantMailerHistory.py',
-            'Lead Organization Status and Participant Mailer History'),
            ('MailerActivityStatistics.py', 
             'Mailer Activity Counts'),
            ('MailerCheckinReport.py', 

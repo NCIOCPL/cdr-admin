@@ -9,6 +9,7 @@
 # BZIssue::4700
 # BZIssue::5013 - [Glossary Audio] Create Audio Download Tool
 # BZIssue::4942 - CTRP mapping gaps
+# BZIssue::5239 (JIRA::OCECDR-3543) - menu cleanup
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
@@ -39,16 +40,12 @@ items   = (('AdvancedSearch.py', 'Advanced Search',       ''               ),
            ('getBatchStatus.py', 'Batch Job Status',      ''               ),
            ('CTGov.py',          'CTGov Protocols',       ''               ),
            ('ctrp-mapping-gaps.py', 'CTRP Mapping Gaps',  ''               ),
-           ('GlobalChange.py',   'Global Change Protocol Links', ''        ),
-           ('GlobalChangeZipCode.py', 'Global Change Zip Codes', ''        ),
-           ('FtpImages.py',      'Images Download',       ''               ),
            ('Mailers.py',        'Mailers',               ''               ),
            ('Reports.py',        'Reports',               ''               ),
            ('EditExternMap.py',  'Update Mapping Table', '' ),
            ('ReplaceCWDwithVersion.py','Replace CWD with Older Version', ''),
            ('ReplaceDocWithNewDoc.py', 'Replace Doc with New Doc',       ''),
            ('UpdatePreMedlineCitations.py', 'Update Pre-Medline Citations', ''),
-           ('UploadGPSet.py',    'Upload GENETICSPROFESSIONAL Document Set', '')
            )
 for item in items:
     html += """\
