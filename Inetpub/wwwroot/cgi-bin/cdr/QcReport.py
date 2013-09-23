@@ -16,6 +16,7 @@
 #                 and Display Options
 # BZIssue::5229 - [CTGov] Missing Information In CTGov Protocol Full QC Report
 # BZIssue::5249 - Standard wording in Patient QC report not displaying in green
+# BZIssue::OCECDR-3630 - Patient Summary QC Reports Missing Reference Section
 #
 # ----------------------------------------------------------------------------
 #
@@ -601,7 +602,8 @@ docTitle = fields.getvalue("DocTitle")   or None
 version  = fields.getvalue("DocVersion") or None
 glossary = fields.getvalue("Glossaries") or None
 images   = fields.getvalue("Images")     or None
-citation = fields.getvalue("CitationsHP") or None
+citation = fields.getvalue("CitationsHP") \
+             or fields.getvalue("CitationsPat") or None
 loe      = fields.getvalue("LOEs")       or None
 qd       = fields.getvalue("QD")         or None
 kpbox    = fields.getvalue("Keypoints")  or None
