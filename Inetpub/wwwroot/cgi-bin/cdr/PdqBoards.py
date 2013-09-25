@@ -42,6 +42,7 @@ boardInfo = fields and fields.getvalue("BoardInfo")      or None
 audience  = fields and fields.getvalue("Audience")       or None
 repType   = fields and fields.getvalue("RepType")        or None
 showCdrId = fields and fields.getvalue("ShowCdrId")      or None
+pubOnly   = fields and fields.getvalue("pubOnly")        or None
 session   = cdrcgi.getSession(fields)
 request   = cdrcgi.getRequest(fields)
 title     = "PDQ Board Report"
@@ -55,6 +56,17 @@ sbmPath   = '/Summary/SummaryMetaData/PDQBoard/BoardMember/@cdr:ref'
 trimPat   = re.compile("[\s;]+$")
 bmPath    = '/Person/ProfessionalInformation/PDQBoardMembershipDetails/PDQ'\
             '%Board/@cdr:ref'
+
+#----------------------------------------------------------------------
+# If the user requests published Summaries only, we need query_term_pub
+#  for any selection of the Summary documents themselves.
+# All other query_term selections use the current working document to
+#  get the latest values for board members, orgs, picklists, etc.
+#----------------------------------------------------------------------
+if pubOnly == 'Yes':
+    qTermTbl = 'query_term_pub'
+else:
+    qTermTbl = 'query_term'
 
 #----------------------------------------------------------------------
 # Handle navigation requests.
@@ -162,7 +174,7 @@ def makeSummaryTable(summaryId, members, cdrId='No'):
      <span class='group'>%s%s</span>
     </th>
    </tr>
-""" % (member[2], re.sub(";", "--", trim(member[3])), member[4] and 
+""" % (member[2], re.sub(";", "--", trim(member[3])), member[4] and
                                                   ' (Module)' or '')
             else:
                 html += """\
@@ -171,7 +183,7 @@ def makeSummaryTable(summaryId, members, cdrId='No'):
      <span class='group'>%s%s</span>
     </th>
    </tr>
-""" % (re.sub(";", "--", trim(member[3])), member[4] and 
+""" % (re.sub(";", "--", trim(member[3])), member[4] and
                                                   ' (Module)' or '')
 
     # Print the data rows (the board member name)
@@ -253,7 +265,7 @@ if not boardInfo:
          <b>Order by:</b>
          </div>
          <div style="float:left; width:70px;">
-          <INPUT TYPE='radio' NAME='RepType' VALUE='ByTopic' id='y2' 
+          <INPUT TYPE='radio' NAME='RepType' VALUE='ByTopic' id='y2'
                                                           checked='1'>
           <label for='y2'>Topic</label>
          </div>
@@ -261,6 +273,12 @@ if not boardInfo:
           <INPUT TYPE='radio' NAME='RepType' VALUE='ByMember' id='n2'>
           <label for='n2'>Board Member</label>
          </div>
+
+      </fieldset>
+      <br>
+      <fieldset>
+         <label><b>Only published Summaries:</b>
+         <INPUT TYPE='checkbox' NAME='pubOnly' VALUE='Yes' checked='1' id='n3' /></label>
       </fieldset>
       </FORM>
      </BODY>
@@ -281,7 +299,7 @@ dateString = time.strftime("%B %d, %Y", time.localtime(time.time()))
 getBoardPicklist(boardList)
 boardId    = boardList[boardInfo]
 boardName  = boardInfo
-if not boardId: 
+if not boardId:
     cdrcgi.bail("Board information garbled: %s" % boardInfo)
 
 #----------------------------------------------------------------------
@@ -326,9 +344,9 @@ SELECT DISTINCT board_member.id, board_member.title,
            JOIN query_term summary_board
              ON summary_board.doc_id = summary_board_member.doc_id
             AND summary_board.path = '%s'
-            AND LEFT(summary_board.node_loc, 8) = 
+            AND LEFT(summary_board.node_loc, 8) =
                 LEFT(summary_board_member.node_loc, 8)
-           JOIN query_term summary
+           JOIN %s summary
              ON summary.doc_id = summary_board.doc_id
             AND summary.path = '%s'
              %s
@@ -339,8 +357,8 @@ SELECT DISTINCT board_member.id, board_member.title,
              ON d.id = summary.doc_id
             AND d.active_status = 'A'
           WHERE summary_board.int_val = ?
-       ORDER BY summary.value, board_member.title""" % (sbmPath, sbPath,
-                                                        stPath, audienceJoin)
+       ORDER BY summary.value, board_member.title""" % (
+                    sbmPath, sbPath, qTermTbl, stPath, audienceJoin)
 
         cursor.execute(query, boardId)
         prevSummaryId = 0
@@ -445,9 +463,9 @@ SELECT DISTINCT board_member.id, board_member.title,
            JOIN query_term summary_board
              ON summary_board.doc_id = summary_board_member.doc_id
             AND summary_board.path = '%s'
-            AND LEFT(summary_board.node_loc, 8) = 
+            AND LEFT(summary_board.node_loc, 8) =
                 LEFT(summary_board_member.node_loc, 8)
-           JOIN query_term summary
+           JOIN %s summary
              ON summary.doc_id = summary_board.doc_id
             AND summary.path = '%s'
              %s
@@ -457,13 +475,12 @@ SELECT DISTINCT board_member.id, board_member.title,
            JOIN document d
              ON d.id = summary.doc_id
             AND d.active_status = 'A'
-          WHERE summary_board.int_val = ?""" % (sbmPath, sbPath, stPath,
-                                                audienceJoin), 
-            boardId)
+          WHERE summary_board.int_val = ?""" % (
+                    sbmPath, sbPath, qTermTbl, stPath, audienceJoin), boardId)
     for row in cursor.fetchall():
         if not members.has_key(row[0]):
             members[row[0]] = Member(row[0], trim(row[1][:row[1].index(';')]))
-        members[row[0]].topics.append(Topic(row[2], 
+        members[row[0]].topics.append(Topic(row[2],
                     re.sub(";", "--", trim(row[3]))))
 
 except cdrdb.Error, info:
