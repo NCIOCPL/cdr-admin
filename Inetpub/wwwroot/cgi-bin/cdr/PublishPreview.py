@@ -372,13 +372,6 @@ showProgress("Replacing title element...")
 pattern3 = re.compile('<title>CDR Preview', re.DOTALL)
 html = pattern3.sub('<title>Publish Preview: CDR%s' % intId, resp.xmlResult)
 
-# Fix the print out so that it's not cut off in IE6
-# -------------------------------------------------
-# showProgress("Including IE6 CSS...")
-# pattern4 = re.compile('</head>', re.DOTALL)
-# html = pattern4.sub('\n<!--[if IE 6]>\n<link rel="stylesheet" type="text/css" media="print" href="/stylesheets/ppprint.css">\n<![endif]-->\n</head>\n', html)
-
-
 # Parsing HTML document in order to manipulate links within the doc
 # -----------------------------------------------------------------
 #fp = open('d:/home/venglisch/temp/pp_before.html', 'w')
@@ -479,17 +472,19 @@ html = lxml.html.tostring(myHtml.getroottree(),
 # --------------------------------------------------------------------------
 if html.find('gatekeeper.cancer.gov') == -1:
     pp_host = cdr.DEV_HOST
-    import socket
-    if socket.gethostname().upper() == 'FRANCK':
-        pp_host = 'franck.nci.nih.gov'
+    # Not needed in CBIIT environment
+    # import socket
+    # if socket.gethostname().upper() == 'FRANCK':
+    #     pp_host = 'franck.nci.nih.gov'
 else:
     pp_host = cdr.PROD_HOST
 
-pattern6 = re.compile(
-       'imageName=http://mahler.nci.nih.gov/cgi-bin/cdr/GetCdrImage')
-html = pattern6.sub(
-       'imageName=http://%s/cgi-bin/cdr/GetCdrImage' %
-       pp_host, html)
+# Not needed in CBIIT environment
+# pattern4 = re.compile(
+#        'imageName=http://mahler.nci.nih.gov/cgi-bin/cdr/GetCdrImage')
+# html = pattern4.sub(
+#        'imageName=http://%s/cgi-bin/cdr/GetCdrImage' %
+#        pp_host, html)
 
 # We need slightly different patterns depending if we're receiving a
 # summary or a glossary document
@@ -501,9 +496,26 @@ html = pattern6.sub(
 #else:  # for Glossary PP
 #    pattern7 = re.compile(
 #               '  src="http://mahler.nci.nih.gov/cgi-bin/cdr/GetCdrImage')
-pattern7 = re.compile(
-           'src="http://mahler.nci.nih.gov/cgi-bin/cdr/GetCdrImage')
-html = pattern7.sub(
-           'src="http://%s/cgi-bin/cdr/GetCdrImage' % pp_host, html)
+
+# Not needed in CBIIT environment
+# pattern5 = re.compile(
+#            'src="http://mahler.nci.nih.gov/cgi-bin/cdr/GetCdrImage')
+# html = pattern5.sub(
+#            'src="http://%s/cgi-bin/cdr/GetCdrImage' % pp_host, html)
+
+# CBIIT doesn't allow access to www.cancer.gov which holds all the current
+# CSS.  We need to pick that up from www.qa.cancer.gov instead
+# Strangely, access is allowed from the DEV tier.  Can't test yet on STAGE
+# since STAGE is not setup yet.
+# ------------------------------------------------------------------------
+#if cdr.h.tier in ('QA', 'STAGE'):
+if cdr.h.tier in ('QA'):
+    pattern6 = re.compile('http://www.cancer.gov/')
+    html = pattern6.sub('http://www.%s.cancer.gov/' % cdr.h.tier.lower(), html)
+
+if not cdr.h.tier == 'PROD':
+    pattern7 = re.compile('http://cdr.cancer.gov/cgi-bin/cdr/GetCdrImage.py')
+    html = pattern7.sub('http://cdr.%s.cancer.gov/cgi-bin/cdr/GetCdrImage.py' \
+                                                    % cdr.h.tier.lower(), html)
 
 cdrcgi.sendPage("%s" % html.decode('utf-8'))
