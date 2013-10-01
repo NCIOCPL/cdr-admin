@@ -57,6 +57,15 @@ trimPat   = re.compile("[\s;]+$")
 bmPath    = '/Person/ProfessionalInformation/PDQBoardMembershipDetails/PDQ'\
             '%Board/@cdr:ref'
 
+# CSS styling for both types of report
+listStyle = """
+  <style type='text/css'>
+   *.group   { font-family: Arial; font-size: 12pt; font-weight: bold }
+   *.content { font-family: Arial; font-size: 12pt; font-weight: normal }
+   ul        { list-style-type: none; }
+  </style>
+"""
+
 #----------------------------------------------------------------------
 # If the user requests published Summaries only, we need query_term_pub
 #  for any selection of the Summary documents themselves.
@@ -147,81 +156,68 @@ SELECT DISTINCT board.id, board.title
 
 
 #----------------------------------------------------------------------
-# Create an HTML table listing a summary with its board members
+# Create an HTML block listing a summary with its board members
 #----------------------------------------------------------------------
-def makeSummaryTable(summaryId, members, cdrId='No'):
-    # Begin a table
-    # -------------
-    html = """\
-  <table width='100%%' border='0'>
-"""
-    # Print the header row (optional CDR-id and Summary name)
-    # -------------------------------------------------------
+def makeSummaryDisplay(summaryId, members, cdrId='No'):
+    """
+    Create display for a single summary, and within that, board members
+    linked to that Summary
+
+    Pass:
+        summaryId - CDR ID as an integer.
+        members   - array of:
+                        board member CDR ID
+                        board member title
+                        summary CDR ID from board member document
+                        summary title
+                        module only specifier, or None
+    Return:
+        Block of html for one Summary.
+    """
+
+    # Begin a paragraph
+    html = "<p>"
+
+    # Create a summary header row if and only if there are any people linked
+    #  to this summary.
+    # Walking through the members, we create the header row if and when we
+    #  find the first member actually linked in his own record.
     headrow = False
     for member in members:
-        #cdrcgi.bail(repr(member))
-        if member[2] == summaryId and not headrow:
-            headrow = True
-            # Add a column for the CDR-ID if requested
-            # ----------------------------------------
-            if cdrId == 'Yes':
-                html += """\
-   <tr>
-    <th class='theader' width='7%%' align='right'>
-     <span class='group'>%10d</span>
-    </th>
-    <th class='theader'>
-     <span class='group'>%s%s</span>
-    </th>
-   </tr>
-""" % (member[2], re.sub(";", "--", trim(member[3])), member[4] and
-                                                  ' (Module)' or '')
-            else:
-                html += """\
-   <tr>
-    <th class='theader' colspan='2'>
-     <span class='group'>%s%s</span>
-    </th>
-   </tr>
-""" % (re.sub(";", "--", trim(member[3])), member[4] and
-                                                  ' (Module)' or '')
 
-    # Print the data rows (the board member name)
-    # -------------------------------------------
         if member[2] == summaryId:
-            html += """\
-"""
-            # Add a column for the CDR-ID if requested
-            # ----------------------------------------
-            if cdrId == 'Yes' and not headrow:
-                html += """\
-   <tr>
-    <td width='7%%' align='right'>
-     <span class='content'>%10d</span>
-    </td>
-    <td>
-     <span class='content'>%s</span>
-    </td>
-   </tr>
-""" % (member[2], trim(member[1][:member[1].index(';')]))
-            else:
-                html += """\
-   <tr>
-    <td width='2%%' align='right'>
-     <span class='content'> </span>
-    </td>
-    <td>
-     <span class='content'>%s</span>
-    </td>
-   </tr>
-""" % (trim(member[1][:member[1].index(';')]))
+            if not headrow:
+                # Prepare a CDR ID if requested
+                cdrId = ""
+                if showCdrId == "Yes":
+                    cdrId = " (%d)" % summaryId
 
-    # Close the table
-    # ---------------
-    html += """\
-  </table>
-  <br>
-"""
+                # Same for module indicator
+                module = ""
+                if member[4]:
+                    module = " (Module)"
+
+                # Prepare Summary topic line
+                html += "<span class='group'>%s%s%s</span>\n" % (
+                                trim(member[3]), module, cdrId)
+
+                # Start the unordered list of members
+                html += " <ul>\n"
+
+                # Don't print the summary name again
+                headrow = True
+
+            # Print the data rows (the board member name)
+            html += "   <li><span class='content'>%s</span></li>\n" % \
+                        trim(member[1][:member[1].index(';')])
+
+        # DEBUG
+        else:
+            cdr.logwrite("no summaryId match for member: %s" % str(member))
+
+    # Close the list and paragraph
+    html += "  </ul>\n </p>\n"
+
     return html
 
 
@@ -235,7 +231,7 @@ if not boardInfo:
                                                            cdrcgi.MAINMENU))
     form     = u"""\
   <style type='text/css'>
-   *  { font-family: Arial; }
+   *         { font-family: Arial; }
   </style>
       <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
       <fieldset>
@@ -319,12 +315,7 @@ if audience and len(audience) > 1:
 if repType == 'ByTopic':
     instr     = 'Board Report by Topics -- %s.' % dateString
     header    = cdrcgi.header(title, title, instr, script, buttons,
-            stylesheet = """\
-  <style type='text/css'>
-   *.group   { font-family: Arial; font-size: 12pt; font-weight: bold }
-   *.content { font-family: Arial; font-size: 12pt; font-weight: normal }
-  </style>
-""")
+                              stylesheet=listStyle)
     audString = ""
     if audience:
         audString = "<BR>(%s)" % audience
@@ -384,7 +375,7 @@ SELECT DISTINCT board_member.id, board_member.title,
     # Create a HTML table for each topic and list the board members
     # -------------------------------------------------------------
     for summary in sumSort:
-        report += makeSummaryTable(sumDict[summary], rows, showCdrId)
+        report += makeSummaryDisplay(sumDict[summary], rows, showCdrId)
 
     # Finish up the report output
     # ===========================
@@ -400,12 +391,7 @@ SELECT DISTINCT board_member.id, board_member.title,
 #----------------------------------------------------------------------
 instr     = 'Board Report by Members -- %s.' % dateString
 header    = cdrcgi.header(title, title, instr, script, buttons,
-            stylesheet = """\
-  <style type='text/css'>
-   *.group   { font-family: Arial; font-size: 12pt; font-weight: bold }
-   *.content { font-family: Arial; font-size: 12pt; font-weight: normal }
-  </style>
-""")
+                          stylesheet=listStyle)
 members   = {}
 topics    = {}
 audString = ""
@@ -435,6 +421,9 @@ class Topic:
         self.name = name
 
 #----------------------------------------------------------------------
+# Construct a report with major headings for board member followed by a list
+# of Summaries linked to that board member.
+#
 # This is trickier than the other form of the report, because we must
 # deal with two possible conditions:
 #   1. A board member is linked to a board, but to none of that board's
@@ -491,50 +480,24 @@ keys.sort(lambda a, b: cmp(members[a].name, members[b].name))
 for key in keys:
     member = members[key]
     try:
-        report += """\
-  <table width='100%%' border='0'>
-   <tr>
-    <th class='theader' colspan='2'>
-     <span class='group'>%s</span>
-    </th>
-   </tr>
-""" % (member.name)
+        report += "<p>%s\n <ul>\n" % member.name
     except:
         cdrcgi.bail("member.name = " + member.name)
         raise
     if member.topics:
-        report += """\
-"""
         member.topics.sort(lambda a, b: cmp(a.name, b.name))
         for topic in member.topics:
 
-# Decision if the report will be printed with or without CDR ID
-# ============================================================
-            if showCdrId == 'Yes':
-               report += """\
-   <tr>
-    <td width='7%%' align='right'>
-     <span class='content'>%10d</span>&nbsp;
-    </td>
-    <td>
-     <span class='content'>%s</span>
-    </td>
-   </tr>
-""" % (topic.id, topic.name)
-            else:
-               report += """\
-   <tr>
-    <td width='5%%'></TD>
-    <td>
-     <span class='content'>%s</span>
-    </td>
-   </tr>
-""" % (topic.name)
+            # Prepare a CDR ID if requested
+            cdrId = ""
+            if showCdrId == "Yes":
+                cdrId = " (%d)" % topic.id
 
-        report += """\
-  </table>
-  <br/>
-"""
+            # Create the line for the topic
+            report += " <li><span class='content'>%s%s</span></li>\n" % (
+                        topic.name, cdrId)
+        report += " </ul>\n</p>\n"
+
 report += """\
  </BODY>
 </HTML>
