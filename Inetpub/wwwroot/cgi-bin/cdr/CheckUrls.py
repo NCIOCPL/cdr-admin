@@ -2,17 +2,14 @@
 #
 # $Id$
 #
-# Reports on URLs which cannot be reached.
+# Gather information for reports on ExternalRef elements.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.3  2002/02/21 15:43:13  bkline
-# Added navigation buttons.
-#
-# Revision 1.1  2001/12/01 18:11:44  bkline
-# Initial revision
+# Can be used to find broken links or to compare html/head/title
+# elements of linked-to web pages with stored versions in
+# ExternalRef/@ExRefPageTitle attributes.
 #
 # BZIssue::5244 - URL Check report not working
-#
+# BZIssue::None - (JIRA::OCECDR-3651) - External Refs report
 #----------------------------------------------------------------------
 import cgi, cdr, cdrdb, cdrcgi, cdrbatch
 
@@ -32,10 +29,12 @@ email   = fields and fields.getvalue('Email') or None
 docType = fields and fields.getvalue('DocType') or None
 audience= fields and fields.getvalue('Audience') or ''
 language= fields and fields.getvalue('Language') or ''
+jobType = fields and fields.getvalue('JobType') or None
 
-args = [('docType', docType), 
+args = [('docType', docType),
         ('audience', audience),
-        ('language', language)]
+        ('language', language),
+        ('jobType', jobType)]
 
 command = 'lib/Python/CdrLongReports.py'
 docTypes = cdr.getDoctypes(session)
@@ -59,7 +58,7 @@ elif request == SUBMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if request == "Log Out": 
+if request == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
@@ -98,7 +97,7 @@ if not email:
      <option value='Citation'>Citation</option>
      <option value='MiscellaneousDocument'>Miscellaneous Documents</option>
      <option value='Organization'>Organization</option>
-        
+
 """ % (cdrcgi.SESSION, session)
 
     #  <option value='%s'>%s &nbsp;</option>
@@ -151,7 +150,21 @@ if not email:
       </select>
       </div>
       </div>
-    
+   </fieldset>
+
+   <fieldset>
+    <legend>&nbsp;Select Type of Report&nbsp;</legend>
+     <div style="float: left;">
+     <strong>
+      <input name='JobType' type='radio' value='UrlErrs' checked='checked'>
+        URL Errors</input><br />
+      <input name='JobType' type='radio' value='TitleMismatch'>
+        Page Title Mismatches</input><br />
+      <input name='JobType' type='radio' value='AllTitles'>
+        All Page Titles</input>
+     </div>
+     </strong>
+   </fieldset>
     <br><br>
 """
 
@@ -160,7 +173,7 @@ if not email:
 </HTML>
 """)
 
-#----------------------------------------------------------------------    
+#----------------------------------------------------------------------
 # If we get here, we're ready to queue up a request for the report.
 #----------------------------------------------------------------------
 batch = cdrbatch.CdrBatch(jobName = "URL Check",
@@ -176,7 +189,7 @@ header      = cdrcgi.header(title, title, section, script, buttons,
                             stylesheet = """\
   <style type='text/css'>
    body     { font-family: Arial }
-   *.uline  { text-decoration: underline;  
+   *.uline  { text-decoration: underline;
               color: blue; }
   </style>
  """)
