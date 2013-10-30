@@ -41,9 +41,10 @@ LABEL = { 'DateLastModified'      :'Date Last Modified',
           'MediaLink'             :'Media Link',
           'NCIThesaurusID'        :'NCI Thesaurus ID',
           'PDQTerm'               :'PDQ Term',
-          'RelatedExternalRef'    :'Related External Ref',
-          'RelatedDrugSummaryRef' :'Related Drug Summary Ref',
-          'RelatedSummaryRef'     :'Related Summary Ref',
+          'RelatedExternalRef'    :'Rel External Ref',
+          'RelatedDrugSummaryLink':'Rel Drug Summary Link',
+          'RelatedSummaryRef'     :'Rel Summary Ref',
+          'RelatedGlossaryTermNameLink':'Rel Glossary Term',
           'StatusDate'            :'Status Date',
           'TermType'              :'Term Type',
           'TranslatedStatus'      :'Translated Status',
@@ -418,8 +419,9 @@ def getSharedInfo(docId):
         docElem = dom.documentElement
 
         sharedElements = ['MediaLink', 'TermType', 'PDQTerm',
-                          'NCIThesaurusID', 'RelatedDrugSummaryRef',
-                          'RelatedExternalRef', 'RelatedSummaryRef']
+                          'NCIThesaurusID', 'RelatedDrugSummaryLink',
+                          'RelatedExternalRef', 'RelatedSummaryRef',
+                          'RelatedGlossaryTermNameLink']
         sharedContent = {}
         for sharedElement in sharedElements:
             sharedContent[sharedElement] = []
@@ -438,10 +440,10 @@ def getSharedInfo(docId):
             # ----------------------------------------------------------------
             if node.nodeName == 'RelatedInformation':
                 for child in node.childNodes:
-                    if child.nodeName == 'RelatedDrugSummaryRef':
-                        sharedContent['RelatedDrugSummaryRef'].append(
+                    if child.nodeName == 'RelatedDrugSummaryLink':
+                        sharedContent['RelatedDrugSummaryLink'].append(
                                       [cdr.getTextContent(child).strip(),
-                                       child.getAttribute('cdr:href').strip()])
+                                       child.getAttribute('cdr:ref').strip()])
                     if child.nodeName == 'RelatedExternalRef':
                         sharedContent['RelatedExternalRef'].append(
                                       [cdr.getTextContent(child).strip(),
@@ -451,6 +453,11 @@ def getSharedInfo(docId):
                         sharedContent['RelatedSummaryRef'].append(
                                       [cdr.getTextContent(child).strip(),
                                        child.getAttribute('cdr:href').strip()])
+                    if child.nodeName == 'RelatedGlossaryTermNameLink':
+                        #cdrcgi.bail(child.getAttribute('cdr:href'))
+                        sharedContent['RelatedGlossaryTermNameLink'].append(
+                                      [cdr.getTextContent(child).strip(),
+                                       child.getAttribute('cdr:ref').strip()])
 
             if node.nodeName == 'PDQTerm':
                 sharedContent['PDQTerm'].append(
@@ -991,9 +998,12 @@ for lang in languages:
 
 # Create the table rows for the elements that include an attribute
 # ----------------------------------------------------------------
-relDSRHtml   = addAttributeRow(sharedXml, 'RelatedDrugSummaryRef', indent=True)
+relDSRHtml   = addAttributeRow(sharedXml, 'RelatedDrugSummaryLink', 
+                                                                   indent=True)
 relSRHtml    = addAttributeRow(sharedXml, 'RelatedSummaryRef',     indent=True)
 relERHtml    = addAttributeRow(sharedXml, 'RelatedExternalRef',    indent=True)
+relGLHtml    = addAttributeRow(sharedXml, 'RelatedGlossaryTermNameLink', 
+                                                                   indent=True)
 pdqTermHtml  = addAttributeRow(sharedXml, 'PDQTerm')
 
 # Create the table rows for the elements without attribute
@@ -1012,7 +1022,7 @@ html += """
 
 # Adding the related information to HTML document
 # -----------------------------------------------
-if relDSRHtml or relSRHtml or relERHtml:
+if relDSRHtml or relSRHtml or relERHtml or relGLHtml:
     html += """
   <table border="0" width="100%%" cellspacing="0" cellpadding="0">
    <tr>
@@ -1023,8 +1033,9 @@ if relDSRHtml or relSRHtml or relERHtml:
   %s
   %s
   %s
+  %s
   </table>
-""" % (relDSRHtml, relSRHtml, relERHtml)
+""" % (relDSRHtml, relSRHtml, relERHtml, relGLHtml)
 
 # Adding PDQTerm and Thesaurus information to HTML document
 # ---------------------------------------------------------
