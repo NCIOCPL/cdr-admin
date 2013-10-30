@@ -9,6 +9,8 @@
 #                                           Volker Englisch, 2011-09-23
 #
 # BZIssue::5061 -Board Membership and Invitation History Report
+# OCECDR-3649: PDQ Board Invitation History Report - Problem with 
+#              exclude current members options
 # 
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, cdrdb, re, time
@@ -92,23 +94,24 @@ class BoardMember:
     def __init__(self, cursor, row):
         self.bmId      = row[0]
         self.persId    = row[1]
-        self.boardId   = row[4]
         self.fname     = row[2]
         self.lname     = row[3]
-        self.boardname = row[5]
-        self.current   = None
-        self.invDate   = None
-        self.aoe       = ''
-        self.response  = None
-        self.endDate   = None
-        self.reason    = None
+        self.boardInfo = row[4]
+        ### self.boardId   = row[4]
+        ### self.boardname = row[5]
+        # self.current   = None
+        #self.invDate   = None
+        #self.aoe       = ''
+        #self.response  = None
+        #self.endDate   = None
+        #self.reason    = None
 
-        if self.boardname.find('Advisory'):
-            self.currentAd = True
-            self.currentEd = False
-        else:
-            self.currentAd = False
-            self.currentEd = True
+        ### if self.boardname.find('Advisory'):
+        ###     self.currentAd = True
+        ###     self.currentEd = False
+        ### else:
+        ###     self.currentAd = False
+        ###     self.currentEd = True
 
         cursor.execute("""SELECT xml
                           FROM document
@@ -116,19 +119,79 @@ class BoardMember:
         docXml = cursor.fetchall()[0][0]
         tree = etree.XML(docXml.encode('utf-8'))
 
-        for detailsNode in tree.findall('BoardMembershipDetails'):
-            if detailsNode.findall('BoardName')[0].text == self.boardname:
+        self.allBoardsInfo = {}
+        for boardId, boardName in self.boardInfo: 
+            self.allBoardsInfo[boardId] = {'name':boardName}
+            for detailsNode in tree.findall('BoardMembershipDetails'):
+                if detailsNode.findall('BoardName')[0].text == boardName:
 
-                self.current = detailsNode.findall('CurrentMember')[0].text
-                self.invDate   = detailsNode.findall('InvitationDate')[0].text
-                self.response  = detailsNode.findall('ResponseToInvitation')[0].text
-                if detailsNode.findall('AreaOfExpertise'):
-                    self.aoe = ", ".join(["%s" % g.text for g in \
-                                     detailsNode.findall('AreaOfExpertise')])
-                if detailsNode.findall('TerminationDate'):
-                    self.endDate   = detailsNode.findall('TerminationDate')[0].text
-                if detailsNode.findall('TerminationReason'):
-                    self.reason    = detailsNode.findall('TerminationReason')[0].text
+
+                    #self.current = detailsNode.findall('CurrentMember')[0].text
+                    self.allBoardsInfo[boardId]['current'] = detailsNode.findall('CurrentMember')[0].text
+                    #self.invDate   = detailsNode.findall('InvitationDate')[0].text
+                    self.allBoardsInfo[boardId]['invdate'] = detailsNode.findall('InvitationDate')[0].text
+                    #self.response  = detailsNode.findall('ResponseToInvitation')[0].text
+                    self.allBoardsInfo[boardId]['response'] = detailsNode.findall('ResponseToInvitation')[0].text
+                    if detailsNode.findall('AreaOfExpertise'):
+                        #self.aoe = ", ".join(["%s" % g.text for g in \
+                        #                 detailsNode.findall('AreaOfExpertise')])
+                        self.allBoardsInfo[boardId]['aoe'] = ", ".join(["%s" % g.text for g in \
+                                         detailsNode.findall('AreaOfExpertise')])
+                    if detailsNode.findall('TerminationDate'):
+                        #self.endDate   = detailsNode.findall('TerminationDate')[0].text
+                        self.allBoardsInfo[boardId]['termdate'] = detailsNode.findall('TerminationDate')[0].text
+                    if detailsNode.findall('TerminationReason'):
+                        #self.reason    = detailsNode.findall('TerminationReason')[0].text
+                        self.allBoardsInfo[boardId]['termreason'] = detailsNode.findall('TerminationReason')[0].text
+        #cdrcgi.bail(self.allBoardsInfo)
+
+
+#----------------------------------------------------------------------
+# Function to decide if a board member needs to get printed.
+# If there is no exclusion criteria specified the board memeber will 
+# always get printed.  If there is a criteria 'A' specified, the 
+# appropriate board (Advisory or Editorial) regardless of the type
+# (Genetics, Treatment, etc) will turn off printing if the board 
+# member is currently active on that board.
+#----------------------------------------------------------------------
+def printRow(boardMember, includeIds, exclude):
+    printIt = True
+
+    # Print everything if no exclusion is specified
+    # ---------------------------------------------
+    if not exclude:
+        return printIt
+
+    # Find out if printing needs to be suppressed based on the 
+    # exclusion criteria
+    # --------------------------------------------------------
+    # If both current ed board and adv board members need to
+    # be excluded check if this person is current for either
+    # one.
+    if 'Editorial Board' in exclude and \
+         'Editorial Advisory Board' in exclude:
+        for id in boardMember.allBoardsInfo.keys():
+            if 'current' in boardMember.allBoardsInfo[id]        and \
+               boardMember.allBoardsInfo[id]['current'] == 'Yes':
+               printIt = False
+    # If current ed board members need to be excluded check 
+    # to ensure the board is not an adv board.
+    elif 'Editorial Board' in exclude:
+        for id in boardMember.allBoardsInfo.keys():
+            if 'current' in boardMember.allBoardsInfo[id]        and \
+               boardMember.allBoardsInfo[id]['current'] == 'Yes' and \
+               boardMember.allBoardsInfo[id]['name'].find('Advisory') == -1:
+               printIt = False
+    # If current adv board members need to be excluded check
+    # to ensure the board is not an ed board.
+    elif 'Editorial Advisory Board' in exclude:
+        for id in boardMember.allBoardsInfo.keys():
+            if 'current' in boardMember.allBoardsInfo[id]        and \
+               boardMember.allBoardsInfo[id]['current'] == 'Yes' and \
+               boardMember.allBoardsInfo[id]['name'].find('Advisory') > 0:
+               printIt = False
+
+    return printIt
 
 
 #----------------------------------------------------------------------
@@ -189,81 +252,99 @@ SELECT DISTINCT board.id, board.title
 
 #----------------------------------------------------------------------
 # Creating the table rows for the HTML output - one row for each member
+# and board.
 # This requires that the members are coming in sorted because all that
 # we do now is to filter the members we don't want to see and add 
 # additional information for the person that we do want to see.
 # Return:  string containing <tr>... info </tr>
 #----------------------------------------------------------------------
 def makeRow(cursor, row, boardIds, dispColumn, excludeRow):
+    if not type(boardIds) == type([]):
+        boardIds = [boardIds]
     member = BoardMember(cursor, row)
+    bmrow = u""
 
-    for skip in excludeRow:
-        #cdrcgi.bail("%s - %s" % (member.boardname, skip))
-        if member.boardname.find(skip) > 0 and member.current == 'Yes':
-            #cdrcgi.bail("%s (%s) : %s, %d" % (member.boardname, skip, 
-            #     excludeRow, member.boardname.find(skip)))
-            return ""
+    for boardId in member.allBoardsInfo.keys():
+        # Check if this row needs to be printed
+        if not printRow(member, boardIds, excludeRow):
+            return bmrow
+        ### for skip in excludeRow:
+        ###     #cdrcgi.bail("%s - %s" % (member.boardname, skip))
+        ###     if member.boardname.find(skip) > 0 and member.current == 'Yes':
+        ###         #cdrcgi.bail("%s (%s) : %s, %d" % (member.boardname, skip, 
+        ###         #     excludeRow, member.boardname.find(skip)))
+        ###         return ""
 
-    if str(member.boardId) in boardIds:
-        cssClass = u"%s" % member.boardId
+        if str(boardId) in boardIds:
+            cssClass = u"%s" % boardId
 
-        if member.current == 'Yes':
-            cssClass += u" current"
-        else:
-            cssClass += u" notcurrent"
-        row = """
-     <tr class="%s">
-      <td>%d</td>
-      <td>%s, %s</td>
-""" % (cssClass, member.bmId, member.lname, member.fname) 
-    
-        if 'BoardName' in dispColumn:
-            row += """
-      <td>%s</td>
-""" % (member.boardname)
+            if 'current' in member.allBoardsInfo[boardId] and \
+                            member.allBoardsInfo[boardId]['current'] == 'Yes':
+                cssClass += u" current"
+            else:
+                cssClass += u" notcurrent"
+            bmrow += """
+         <tr class="%s">
+          <td>%d</td>
+          <td>%s, %s</td>
+    """ % (cssClass, member.bmId, member.lname, member.fname) 
+        
+            if 'BoardName' in dispColumn:
+                bmrow += """
+          <td>%s</td>
+    """ % (member.allBoardsInfo[boardId]['name'])
 
-        if 'AoE' in dispColumn:
-            row += """
-      <td>%s</td>
-""" % (member.aoe or "&nbsp;")
+            if 'AoE' in dispColumn:
+                bmrow += """
+          <td>%s</td>
+    """ % ('aoe' in member.allBoardsInfo[boardId] and
+                    member.allBoardsInfo[boardId]['aoe'] or "&nbsp;")
 
-        if 'Invitation' in dispColumn:
-            row += """
-      <td>%s</td>
-""" % (member.invDate)
+            if 'Invitation' in dispColumn:
+                bmrow += """
+          <td>%s</td>
+    """ % ('invdate' in member.allBoardsInfo[boardId] and 
+                        member.allBoardsInfo[boardId]['invdate'] or "&nbsp;")
 
-        if 'Response' in dispColumn:
-            row += """
-      <td>%s</td>
-""" % (member.response)
+            if 'Response' in dispColumn:
+                bmrow += """
+          <td>%s</td>
+    """ % ('response' in member.allBoardsInfo[boardId] and
+                         member.allBoardsInfo[boardId]['response'])
 
-        if 'Current' in dispColumn:
-            row += """
-      <td>%s</td>
-""" % (member.current)
+            if 'Current' in dispColumn:
+                bmrow += """
+          <td>%s</td>
+    """ % ('current' in member.allBoardsInfo[boardId] and 
+                        member.allBoardsInfo[boardId]['current'] or '&nbsp;')
 
-        if 'EndDate' in dispColumn:
-            row += """
-      <td>%s</td>
-""" % (member.endDate)
+            if 'EndDate' in dispColumn:
+                bmrow += """
+          <td>%s</td>
+    """ % ('termdate' in member.allBoardsInfo[boardId] and
+                         member.allBoardsInfo[boardId]['termdate'])
 
-        if 'Termination' in dispColumn:
-            row += """
-      <td>%s</td>
-""" % (member.reason)
+            if 'Termination' in dispColumn:
+                bmrow += """
+          <td>%s</td>
+    """ % ('termreason' in member.allBoardsInfo[boardId] and
+                           member.allBoardsInfo[boardId]['termreason'])
 
-        # If a blank column is printed
-        # ----------------------------
-        if 'BlankCol' in dispColumn:
-            row += u"""
-         <td class="blank">&nbsp;</td>"""
+            # If a blank column is printed
+            # ----------------------------
+            if 'BlankCol' in dispColumn:
+                bmrow += u"""
+             <td class="blank">&nbsp;</td>"""
 
-        row += """
-     </tr>
-"""
-        return row
-    else:
-        return ""
+            bmrow += """
+         </tr>
+    """
+    ###         return row
+    ###     else:
+    ###         return ""
+    #    if member.fname == 'Karen':
+    #        cdrcgi.bail(member.allBoardsInfo)
+    return bmrow
 
 
 #----------------------------------------------------------------------
@@ -377,11 +458,14 @@ if not boardIds:
 #----------------------------------------------------------------------
 # Get the board's name from its ID.  If multiple boards are selected
 # we're adjusting the report title
+# If 'All Boards' is selected all board IDs are concatenated into a 
+# single string
 #----------------------------------------------------------------------
 # Selected single board or AllBoards entry
 if not type(boardIds) == type([]):
     if boardIds.find(',') > 0:
         reportTitle = 'PDQ Board Invitation History for All Boards'
+        boardIds = boardIds.split(',')  # convert to list
     else:
         boardId    = boardIds and int(boardIds) or None
         reportTitle = getBoardName(boardId)
@@ -414,10 +498,20 @@ try:
              AND o.path    = '/Organization/OrganizationNameInformation'  +
                              '/OfficialName/Name'
            WHERE q.path    = '/PDQBoardMemberInfo/BoardMemberName/@cdr:ref'
+ -- and q.doc_id in (639551, 404154) -- 410773, 404154, 369926, 369860)
            ORDER BY ln.value, fn.value, o.value
 """, timeout = 300)
-    boardMembers = cursor.fetchall()
-    # cdrcgi.bail(rows)
+    rows = cursor.fetchall()
+
+    boardMembers = []
+    lastMemberId = 0
+    for row in rows:
+        if row[0] == lastMemberId:
+            boardMembers[len(boardMembers)-1][4].append([row[4], row[5]])
+        else:
+            boardMembers.append([row[0], row[1], row[2], row[3], 
+                                                       [[row[4], row[5]]]])
+        lastMemberId = row[0]
 
 except cdrdb.Error, info:
     cdrcgi.bail('Database query failure: %s' % info[1][0])
@@ -485,11 +579,15 @@ html = """\
 columns = []
 exclude = []
 htmlCol = ''
+# What needs to be excluded?
+# --------------------------
 if excludeCurrEd:
     exclude.append('Editorial Board')
 if excludeCurrAd:
     exclude.append('Editorial Advisory Board')
 
+# What needs to be displayed?
+# ---------------------------
 if dispBoardName: 
     columns.append('BoardName')
     htmlCol += '    <th>Board Name</th>\n'
@@ -530,7 +628,7 @@ html += u"""\
     <tr>
      <th>ID</th>
      <th>Name</th>
-     %s""" % htmlCol
+%s""" % htmlCol
 
 html += u"""\
     </tr>"""
