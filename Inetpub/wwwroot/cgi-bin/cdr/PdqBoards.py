@@ -198,7 +198,8 @@ def makeSummaryDisplay(summaryId, members, cdrId='No'):
                     module = " (Module)"
 
                 # Prepare Summary topic line
-                html += "<span class='group'>%s%s%s</span>\n" % (
+                # css affects browser display, <b> affects Word display
+                html += "<span class='group'><b>%s%s%s</b></span>\n" % (
                                 trim(member[3]), module, cdrId)
 
                 # Start the unordered list of members
@@ -480,7 +481,8 @@ keys.sort(lambda a, b: cmp(members[a].name, members[b].name))
 for key in keys:
     member = members[key]
     try:
-        report += "<p>%s\n <ul>\n" % member.name
+        report += "<p><span class='group'><b>%s</b></span></p>\n <ul>\n" \
+                   % member.name
     except:
         cdrcgi.bail("member.name = " + member.name)
         raise
@@ -494,8 +496,8 @@ for key in keys:
                 cdrId = " (%d)" % topic.id
 
             # Create the line for the topic
-            report += " <li><span class='content'>%s%s</span></li>\n" % (
-                        topic.name, cdrId)
+            report += " <li><span class='content'>%s%s</span></li>\n" \
+                        % (topic.name, cdrId)
         report += " </ul>\n</p>\n"
 
 report += """\
