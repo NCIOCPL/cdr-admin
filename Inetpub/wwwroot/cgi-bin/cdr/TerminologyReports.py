@@ -95,7 +95,8 @@ reports = [
            ('TermHierarchyTree.py', 'Term Hierarchy Tree', ''),
            ('TermHierarchyTree.py',
             'Terms with No Parent Term and Not a Semantic Type',
-            '&SemanticTerms=False')
+            '&SemanticTerms=False'),
+           ('ocecdr-3588.py', 'Thesaurus Concepts Not Marked Public', ''),
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s%s'>%s</LI></A>\n" % (
