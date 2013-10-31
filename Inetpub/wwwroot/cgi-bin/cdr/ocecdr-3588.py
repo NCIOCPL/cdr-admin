@@ -87,7 +87,7 @@ LEFT OUTER JOIN query_term p
             AND p.node_loc = c.node_loc
             AND p.path = '/Term/NCIThesaurusConcept/@Public'
           WHERE c.path = '/Term/NCIThesaurusConcept'
-            AND p.value IS NULL
+            AND (p.value IS NULL OR p.value <> 'Yes')
        ORDER BY c.doc_id, c.value""")
 title = "NCI Thesaurus Links Not Marked Public"
 style = """
