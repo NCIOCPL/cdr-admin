@@ -4,66 +4,14 @@
 #
 # Submenu for summary and miscellanous document reports.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.19  2007/10/16 18:44:07  kidderc
-# 3666. Add Summaries with Non-Journal Article Citations report
-#
-# Revision 1.18  2005/04/12 19:21:09  venglisc
-# Added Publish Preview menu option. (Bug 1531)
-#
-# Revision 1.17  2005/03/24 21:12:36  bkline
-# Plugged in Changes to Summaries report.
-#
-# Revision 1.16  2005/02/16 19:12:35  venglisc
-# Replaced the Stub.py to run the BoardRoster report. (Bug 1537)
-#
-# Revision 1.15  2004/09/09 19:19:44  venglisc
-# Minor changes to menu entries to have menu items match between the
-# CIAT and CIPS summary menu. (Bug 1329).
-#
-# Revision 1.14  2004/07/13 20:46:33  venglisc
-# Added new menu item for SummariesTocReport. (Bug 1231)
-# Added CSS code to display headers and list items properly.
-#
-# Revision 1.13  2004/04/16 21:50:48  venglisc
-# Removed stub to link to proper page for Board Member QC report.
-#
-# Revision 1.12  2004/04/08 20:31:10  bkline
-# Plugged in additions requested by Margaret (request #1059).
-#
-# Revision 1.11  2004/03/11 20:53:28  venglisc
-# Minor change to one menu entry.
-#
-# Revision 1.10  2004/03/05 21:47:44  venglisc
-# Modified the menu selection and added new SummariesLists menu item.
-#
-# Revision 1.9  2003/08/01 21:02:49  bkline
-# Plugged in Summary Metadata report.
-#
-# Revision 1.8  2003/06/13 20:31:17  bkline
-# Suppressed menu item for "Changes to Summaries" report at Margaret's
-# request.
-#
-# Revision 1.7  2003/06/02 14:24:45  bkline
-# Plugged in two new summary reports.
-#
-# Revision 1.6  2003/05/08 20:26:42  bkline
-# New summary reports.
-#
-# Revision 1.5  2002/12/30 15:15:47  bkline
-# Fixed a typo.
-#
-# Revision 1.4  2002/12/26 19:40:41  bkline
-# Rearranged for issue #545.
-#
-# Revision 1.3  2002/06/06 12:01:09  bkline
-# Custom handling for Person and Summary QC reports.
-#
-# Revision 1.2  2002/05/25 02:39:13  bkline
-# Removed extra blank lines from HTML output.
-#
-# Revision 1.1  2002/05/24 20:37:32  bkline
-# New Report Menu structure implemented.
+# BZIssue::545      - menu reorganization
+# BZIssue::1059     - plugged in additions requested by Margaret
+# BZIssue::1231     - added SummariesTocReport; fixed CSS list & header rules
+# BZIssue::1329     - match entries between CIAT and CIPS summary menus
+# BZIssue::1531     - added Publish Preview menu option
+# BZIssue::1537     - replaced the Stub.py to run the BoardRoster report
+# BZIssue::3666     - added Summaries with Non-Journal Article Citations report
+# JIRA::OCECDR-3650 - added Summary Internal Links report
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
@@ -140,6 +88,7 @@ reports = [
            ('SummariesTocReport.py?',      'Summaries TOC Lists'),
            ('SummariesWithProtocolLinks.py?',      'Summaries with Protocols Links/Refs Report'),
            ('SummariesWithNonJournalArticleCitations.py?',      'Summaries with Non-Journal Article Citations Report'),
+           ('ocecdr-3650.py?',             'Summary Internal Links'),
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s%s=%s'>%s</A></LI>\n" % (
