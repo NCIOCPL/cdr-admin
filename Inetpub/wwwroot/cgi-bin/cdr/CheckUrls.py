@@ -41,11 +41,12 @@ docTypes = cdr.getDoctypes(session)
 
 # Make sure audience and language has been selected for the two doc types
 # -----------------------------------------------------------------------
-if not audience and docType in ('Summary', 'GlossaryTermConcept'):
-    cdrcgi.bail('Input Error: Audience not specified')
+if jobType == 'UrlErrs' and docType in ('Summary', 'GlossaryTermConcept'):
+    if not audience:
+        cdrcgi.bail('Input Error: Audience not specified')
 
-if not language and docType in ('Summary', 'GlossaryTermConcept'):
-    cdrcgi.bail('Input Error: Language not specified')
+    if not language:
+        cdrcgi.bail('Input Error: Language not specified')
 
 #----------------------------------------------------------------------
 # Handle navigation requests.
