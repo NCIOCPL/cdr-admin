@@ -131,8 +131,8 @@ try:
     cdr.logwrite("%s: status: %s" % (PROG, jobStatus), LOGFILE)
     cdr.logwrite("%s: mode:   %s" % (PROG, jobMode), LOGFILE)
     
-    cmd = os.path.join(PUBPATH, u'%s --user=%s --passwd=***REDACTED*** --jobid=%d --status=%s %s' % (
-                                 PROG, user, jobId, jobStatus, runmode))
+    cmd = os.path.join(PUBPATH, u'%s --session=%s --jobid=%d --status=%s %s' % (
+                                 PROG, session, jobId, jobStatus, runmode))
 
     cdr.logwrite('Submitting command...\n%s' % repr(cmd), LOGFILE)
 
