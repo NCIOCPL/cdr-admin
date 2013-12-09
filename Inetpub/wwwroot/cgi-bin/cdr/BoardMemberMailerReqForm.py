@@ -6,6 +6,7 @@
 #
 # BZIssue::1664
 # BZIssue::4939
+# JIRA::OCECDR-3679 - workaround for IE Javascript bug
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrdb, cdrpub, cdrcgi, re, string, cdrmailcommon, sys
@@ -380,7 +381,7 @@ header = cdrcgi.header(title, title, section, script, buttons,
                       'adv-interested'),
            new Option('Advisory Board Thank You Letter',  'adv-thankyou'),
            new Option('Advisory Board Big Thank You Letter',
-                      'adv-big-thankyou'),
+                      'adv-big-thankyou')
        ],
        'editorial': [
            new Option('Editorial Board Invitation Letter', 'ed-invitation'),
@@ -395,7 +396,7 @@ header = cdrcgi.header(title, title, section, script, buttons,
                       'ed-goodbye-forever'),
            new Option('Editorial Board Thank You Letter',  'ed-thankyou'),
            new Option('Editorial Board Comprehensive Review Letter',
-                      'ed-comp-review'),
+                      'ed-comp-review')
       ]
    };
        
