@@ -4,129 +4,7 @@
 #
 # Status of a publishing job.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.32  2008/04/28 16:48:59  venglisc
-# Changed the formatting to display errors in red and changed strings to
-# Unicode strings. (Bug 3923)
-#
-# Revision 1.31  2008/02/26 23:47:24  venglisc
-# Minor modifications to FilterFailure output to make HTML valid and display
-# validation messages. (Bug 3923)
-#
-# Revision 1.30  2008/01/17 16:03:36  venglisc
-# Modifying pushing information after completed job (Bug 3736)
-#
-# Revision 1.29  2007/12/28 22:41:29  venglisc
-# During the new Gatekeeper test phase we needed to be able to review
-# pushed documents even though the push job's status was 'Verifying' instead
-# of 'Success'.
-# Additional minor formatting (CSS) changes and we increased the number of
-# documents to be displayed.
-#
-# Revision 1.28  2007/08/07 20:08:39  ameyer
-# Upgraded an error message.  No changes to logic.
-#
-# Revision 1.27  2007/05/01 21:29:14  venglisc
-# Test Message.
-#
-# Revision 1.26  2007/02/21 00:39:10  ameyer
-# If the request specifies jobs to be resumed or killed, we now check
-# to be sure the job was still in a Waiting state before proceeding.  This
-# prevents errors caused by use of the back, or refresh buttons or by use
-# of multiple tabs or windows.
-#
-# Revision 1.25  2007/02/20 23:57:15  venglisc
-# Added line break to correct display of text area.
-#
-# Revision 1.24  2006/10/19 22:51:56  ameyer
-# Added logging of updates of the pub_proc table to publish.log.
-#
-# Revision 1.23  2006/08/28 22:06:54  venglisc
-# Fixed problem causing the first row of the report to be dropped. (Bug 2453)
-#
-# Revision 1.22  2006/08/24 15:35:24  venglisc
-# Minor changes to the if statement listing flavor error report.
-#
-# Revision 1.21  2006/08/24 14:16:49  venglisc
-# Added default else: block to catch invalid entry of 'flavor'.
-#
-# Revision 1.20  2006/07/05 20:21:35  venglisc
-# Modified program to add three flavors of the FilterFailure report:
-# flavor = full (default), warning (full w/o errors), error (full w/o warning)
-# Since the number of benign warning messages is constantly increasing this
-# will allow us to identify true problems (a.k.a. errors) quickly. (Bug 2283)
-#
-# Revision 1.19  2005/07/28 23:05:08  venglisc
-# Modified the program to check all push jobs by default.  This eliminates
-# the problem that a push job may be submitted without having checked the
-# particular job.  Now a job needs to be unchecked if it should not be
-# processed.
-#
-# Revision 1.18  2005/03/25 17:02:40  venglisc
-# Corrected anker link to updated/removed/added section.
-# Modified table output by inserting a space after each semicolon ';' to
-# allow protocols with many protocol IDs to format properly.
-#
-# Revision 1.17  2005/01/24 19:29:59  venglisc
-# Minor changes to correctly display the FilterFailure error report table.
-#
-# Revision 1.16  2004/09/27 16:51:00  venglisc
-# Modified header alignment of table to align left.
-#
-# Revision 1.15  2004/03/19 18:48:35  venglisc
-# Modified code to pick up document types (the rows of the statistics report)
-# from a database query instead of having them hard coded.
-# Also made some minor formatting changes:  table columns are now same size.
-#
-# Revision 1.14  2004/02/27 18:40:05  venglisc
-# Added CTGovProtocol Document type to the report output.  Alphabetized the
-# display of the document types.
-#
-# Revision 1.13  2003/08/25 17:54:05  bkline
-# Replaced SQL queries for publication job report with queries that are:
-#  * much more efficient;
-#  * easier to understand; and
-#  * correct.
-#
-# Revision 1.12  2003/06/09 18:56:30  pzhang
-# Fixed a bug in TABLE end tag.
-# Changed latin-1 to utf8 in html.encode().
-#
-# Revision 1.11  2003/03/05 16:16:30  pzhang
-# Added messages to be part of the failure report.
-# Column messages are normally NULL unless something is wrong.
-#
-# Revision 1.10  2003/02/13 23:05:36  pzhang
-# Added CgJobDesc textarea for pushing job description.
-# Added code to report published documents.
-#
-# Revision 1.9  2003/01/08 22:26:31  pzhang
-# Added a draft of dispJobDiff().
-# Displayed output_dir as None when it is "".
-#
-# Revision 1.8  2002/11/05 16:04:34  pzhang
-# Enhanced interface per Eileen's input
-#
-# Revision 1.7  2002/09/11 21:11:18  pzhang
-# Displayed the top 500 document infor for each type.
-#
-# Revision 1.6  2002/08/20 15:58:04  pzhang
-# Checked session validity before killing or resuming.
-#
-# Revision 1.5  2002/08/19 22:04:23  pzhang
-# Added dispJobSetting(), dispJobControl() and dispCgWork().
-#
-# Revision 1.4  2002/08/19 16:23:34  pzhang
-# Added dispFilterFailures().
-#
-# Revision 1.3  2002/04/25 21:12:22  bkline
-# Fixed bug which was overwriting name of publishing system.
-#
-# Revision 1.2  2002/02/14 21:46:52  mruben
-# Added support for no_output flag [bkline for mruben].
-#
-# Revision 1.1  2001/12/01 18:11:44  bkline
-# Initial revision
+# OCECDR-3695: PubStatus Report Drops Push Job
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrdb, cdrcgi, re, string, time
@@ -987,12 +865,13 @@ def dispJobsByDates():
     try:
         cursor.execute("""\
                 SELECT pp.id, pp.pub_subset, pp.started,
-		               pp.completed, count(pp.id) AS numDocs, pp.status
-                  FROM pub_proc pp, pub_proc_doc ppd
+		               pp.completed, count(ppd.pub_proc) AS numDocs, pp.status
+                  FROM pub_proc pp
+       LEFT OUTER JOIN pub_proc_doc ppd
+                    ON pp.id = ppd.pub_proc
                  WHERE pp.started >= '%s'
                    AND pp.completed <= DATEADD(s, -1, DATEADD(d, 1, '%s'))
                    AND pp.status in ('Success','Verifying')
-                   AND pp.id = ppd.pub_proc
                    AND ppd.failure IS NULL
                    AND pp.pub_system IN (
                            SELECT d.id
