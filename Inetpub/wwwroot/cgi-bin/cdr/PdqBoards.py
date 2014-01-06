@@ -213,8 +213,8 @@ def makeSummaryDisplay(summaryId, members, cdrId='No'):
                         trim(member[1][:member[1].index(';')])
 
         # DEBUG
-        else:
-            cdr.logwrite("no summaryId match for member: %s" % str(member))
+        # else:
+        #     cdr.logwrite("no summaryId match for member: %s" % str(member))
 
     # Close the list and paragraph
     html += "  </ul>\n </p>\n"
