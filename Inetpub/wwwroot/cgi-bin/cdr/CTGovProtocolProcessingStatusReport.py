@@ -5,7 +5,8 @@
 # New processing report for unpublishable CT.gov protocols.
 #
 # BZIssue::4804
-# BZIssue::5309 (OCECDR-3610)
+# BZIssue::5309 (JIRA::OCECDR-3610)
+# JIRA::OCECDR-3692)
 #
 #----------------------------------------------------------------------
 import cdr, ExcelWriter, cdrdb, lxml.etree as etree, time, cdrcgi, sys
@@ -90,7 +91,7 @@ class CTGovProtocol:
                         self.nctId = child.text
             elif node.tag == 'ProtocolProcessingDetails':
                 if haveProtocolProcessingDetails:
-                    continue # William only wants onfo from the first block
+                    continue # William only wants info from the first block
                 haveProtocolProcessingDetails = True
                 for child in node:
                     if child.tag == 'ProcessingStatus':
@@ -129,16 +130,122 @@ SELECT COUNT(*) FROM ctrp_import WHERE ctrp_id = ?""", self.ctrpId)
             return diff
         return cmp(self.dateCreated, other.dateCreated)
 
+class Styles:
+    def __init__(self, bk):
+        font = ExcelWriter.Font(name='Arial', size=10)
+        self.normal = bk.addStyle(font=font)
+        self.date = bk.addStyle(font=font, numFormat='YYYY-mm-dd')
+        self.datetime = bk.addStyle(font=font, numFormat='YYYY-mm-dd HH:MM:SS')
+        font = ExcelWriter.Font(color='#FF0000', name='Arial', size=10)
+        self.red = bk.addStyle(font=font)
+        font = ExcelWriter.Font(color='#7E354D', name='Arial', size=10)
+        self.maroon = bk.addStyle(font=font)
+        font = ExcelWriter.Font(color='#800000', name='Arial', size=10)
+        self.maroon = bk.addStyle(font=font)
+        font = ExcelWriter.Font(color='#8C001A', name='Arial', size=10)
+        self.burgundy = bk.addStyle(font=font)
+        font = ExcelWriter.Font(color='#0000FF', name='Arial', size=10)
+        self.blue = bk.addStyle(font=font)
+        font = ExcelWriter.Font(name='Arial', size=10, bold=True)
+        self.bold = bk.addStyle(font=font)
+        font = ExcelWriter.Font(name='Arial', size=10, bold=True,
+                                color='#FF0000')
+        self.error = bk.addStyle(font=font)
+        align = ExcelWriter.Alignment('Center', 'Center', wrap=True)
+        bg = ExcelWriter.Interior('#DDD9C3')
+        self.label = bk.addStyle(alignment=align, font=font, interior=bg)
+        font = ExcelWriter.Font(name='Arial', size=12, bold=True)
+        self.title = bk.addStyle(alignment=align, font=font)
+
+def addSheet(book, title, styles, failures, protocols, counts, transferred):
+    first_data_row = 5
+    sheet = book.addWorksheet(title, styles.normal)
+    widths = (60, 100, 100, 100, 200, 100, 100, 100, 60, 100, 100, 350)
+    labels = ('CDR ID', 'Org Study ID', 'NCT ID',
+              'CTRP ID', 'Processing Status(es)',
+              'User', 'Processing Start', 'Processing End', 'Date Created',
+              'Phase(s)', 'Overall Status', 'Comment')
+    for i, width in enumerate(widths):
+        sheet.addCol(i + 1, width)
+    row = sheet.addRow(1, styles.title)
+    row.addCell(1, "CTGov Protocol Processing Status Report", mergeAcross=10)
+    row = sheet.addRow(2, styles.title)
+    row.addCell(1, time.strftime("%Y-%m-%d %H:%M"), mergeAcross=10)
+    row = sheet.addRow(4, styles.label)
+    for i, label in enumerate(labels):
+        row.addCell(i + 1, label)
+
+    #--------------------------------------------------------------
+    # Populate the sheet.
+    #--------------------------------------------------------------
+    for i, failure in enumerate(failures):
+        row = sheet.addRow(i + first_data_row, styles.error)
+        row.addCell(1, failure.docId)
+        row.addCell(2, u"FAILURE: %s" % failure.exception, mergeAcross=9)
+    first_data_row += len(failures)
+    for i, protocol in enumerate(protocols):
+        style = protocol.transferred and styles.red or styles.normal
+        ctrp = None
+        if protocol.ctrpId:
+            style = styles.blue
+            ctrp = protocol.ctrpId
+            if protocol.inCtrpTable:
+                style = styles.burgundy
+                ctrp += " (X)"
+        row = sheet.addRow(i + first_data_row, style)
+        row.addCell(1, protocol.cdrId)
+        if protocol.orgStudyId:
+            row.addCell(2, protocol.orgStudyId)
+        if protocol.nctId:
+            row.addCell(3, protocol.nctId)
+        if ctrp:
+            row.addCell(4, ctrp)
+        if protocol.procStatuses:
+            row.addCell(5, u"; ".join(protocol.procStatuses))
+        if protocol.user:
+            row.addCell(6, protocol.user)
+        if protocol.procStart:
+            row.addCell(7, fixDateTime(protocol.procStart))
+        if protocol.procEnd:
+            row.addCell(8, fixDateTime(protocol.procEnd))
+        if protocol.dateCreated:
+            row.addCell(9, fixDate(protocol.dateCreated))
+        if protocol.phases:
+            row.addCell(10, u"; ".join(protocol.phases))
+        if protocol.protStatus:
+            row.addCell(11, protocol.protStatus)
+        if protocol.comment:
+            row.addCell(12, protocol.comment)
+
+    row = sheet.addRow(first_data_row + 2 + len(protocols), styles.bold)
+    row.addCell(1, "Total Count", mergeAcross=1)
+    row.addCell(3, len(protocols), "Number")
+    statuses = counts.keys()
+    statuses.sort()
+    for i, status in enumerate(statuses):
+        row = sheet.addRow(first_data_row + len(protocols) + 3 + i)
+        row.addCell(1, status, mergeAcross=1)
+        row.addCell(3, counts[status], "Number")
+    row = sheet.addRow(first_data_row + len(protocols) + 3 + len(counts),
+                       styles.red)
+    row.addCell(1, "Transferred Trials", mergeAcross=1)
+    row.addCell(3, transferred, "Number")
+
 def main():
-    global FIRST_DATA_ROW
-    counts = {}
-    transferredCount = 0
     conn = cdrdb.connect('CdrGuest')
     cursor = conn.cursor()
 
     #--------------------------------------------------------------
-    # Collect the protocol information.
+    # Create the workbook.
     #--------------------------------------------------------------
+    book = ExcelWriter.Workbook()
+    styles = Styles(book)
+
+    #--------------------------------------------------------------
+    # Collect the protocol information for the first sheet.
+    #--------------------------------------------------------------
+    counts = {}
+    transferredCount = 0
     cursor.execute("""\
              SELECT DISTINCT v.id
                FROM doc_version v
@@ -173,105 +280,43 @@ def main():
                 cdr.logwrite("CDR%d: %s" % (docId, e), LOGFILE)
     protocols.sort()
     failures.sort()
+    addSheet(book, 'Unpublished', styles, failures, protocols, counts,
+             transferredCount)
 
     #--------------------------------------------------------------
-    # Create the workbook.
+    # Create the sheet for OCECDR-3692.
     #--------------------------------------------------------------
-    book = ExcelWriter.Workbook()
-    font = ExcelWriter.Font(name='Arial', size=10)
-    normalStyle = book.addStyle(font=font)
-    dateStyle = book.addStyle(font=font, numFormat='YYYY-mm-dd')
-    datetimeStyle = book.addStyle(font=font, numFormat='YYYY-mm-dd HH:MM:SS')
-    font = ExcelWriter.Font(color='#FF0000', name='Arial', size=10)
-    redStyle = book.addStyle(font=font)
-    font = ExcelWriter.Font(color='#7E354D', name='Arial', size=10)
-    maroonStyle = book.addStyle(font=font)
-    font = ExcelWriter.Font(color='#800000', name='Arial', size=10)
-    maroonStyle = book.addStyle(font=font)
-    font = ExcelWriter.Font(color='#8C001A', name='Arial', size=10)
-    burgundyStyle = book.addStyle(font=font)
-    font = ExcelWriter.Font(color='#0000FF', name='Arial', size=10)
-    blueStyle = book.addStyle(font=font)
-    font = ExcelWriter.Font(name='Arial', size=10, bold=True)
-    boldStyle = book.addStyle(font=font)
-    font = ExcelWriter.Font(name='Arial', size=10, bold=True, color='#FF0000')
-    errorStyle = book.addStyle(font=font)
-    align = ExcelWriter.Alignment('Center', 'Center', wrap=True)
-    background = ExcelWriter.Interior('#DDD9C3')
-    labelStyle = book.addStyle(alignment=align, font=font, interior=background)
-    font = ExcelWriter.Font(name='Arial', size=12, bold=True)
-    titleStyle = book.addStyle(alignment=align, font=font)
-    sheet = book.addWorksheet('CTGov', normalStyle)
-    widths = (60, 100, 100, 100, 200, 100, 100, 100, 60, 100, 100, 350)
-    labels = ('CDR ID', 'Org Study ID', 'NCT ID',
-              'CTRP ID', 'Processing Status(es)',
-              'User', 'Processing Start', 'Processing End', 'Date Created',
-              'Phase(s)', 'Overall Status', 'Comment')
-    for i, width in enumerate(widths):
-        sheet.addCol(i + 1, width)
-    row = sheet.addRow(1, titleStyle)
-    row.addCell(1, "CTGov Protocol Processing Status Report", mergeAcross=10)
-    row = sheet.addRow(2, titleStyle)
-    row.addCell(1, time.strftime("%Y-%m-%d %H:%M"), mergeAcross=10)
-    row = sheet.addRow(4, labelStyle)
-    for i, label in enumerate(labels):
-        row.addCell(i + 1, label)
+    counts = {}
+    transferredCount = 0
+    protocols = []
+    failures = []
+    cursor.execute("""\
+SELECT DISTINCT doc_id
+           FROM query_term
+          WHERE path = '/CTGovProtocol/ProtocolProcessingDetails'
+                     + '/ProcessingStatus'
+            AND value = 'Published - need admin info'""", timeout=300)
+    rows = cursor.fetchall()
+    for row in rows:
+        docId = row[0]
+        try:
+            protocol = CTGovProtocol(cursor, docId)
+            if protocol.transferred:
+                transferredCount += 1
+            for status in protocol.procStatuses:
+                counts[status] = counts.get(status, 0) + 1
+            protocols.append(protocol)
+        except Exception, e:
+            failures.append(Failure(docId, e))
+            cdr.logwrite("CDR%d: %s" % (docId, e), LOGFILE)
+    protocols.sort()
+    failures.sort()
+    addSheet(book, "Published - need admin info", styles, failures, protocols,
+             counts, transferredCount)
 
     #--------------------------------------------------------------
-    # Populate the report.
+    # Send the workbook back to the user.
     #--------------------------------------------------------------
-    for i, failure in enumerate(failures):
-        row = sheet.addRow(i + FIRST_DATA_ROW, errorStyle)
-        row.addCell(1, failure.docId)
-        row.addCell(2, u"FAILURE: %s" % failure.exception, mergeAcross=9)
-    FIRST_DATA_ROW += len(failures)
-    for i, protocol in enumerate(protocols):
-        style = protocol.transferred and redStyle or normalStyle
-        ctrp = None
-        if protocol.ctrpId:
-            style = blueStyle
-            ctrp = protocol.ctrpId
-            if protocol.inCtrpTable:
-                style = burgundyStyle
-                ctrp += " (X)"
-        row = sheet.addRow(i + FIRST_DATA_ROW, style)
-        row.addCell(1, protocol.cdrId)
-        if protocol.orgStudyId:
-            row.addCell(2, protocol.orgStudyId)
-        if protocol.nctId:
-            row.addCell(3, protocol.nctId)
-        if ctrp:
-            row.addCell(4, ctrp)
-        if protocol.procStatuses:
-            row.addCell(5, u"; ".join(protocol.procStatuses))
-        if protocol.user:
-            row.addCell(6, protocol.user)
-        if protocol.procStart:
-            row.addCell(7, fixDateTime(protocol.procStart))
-        if protocol.procEnd:
-            row.addCell(8, fixDateTime(protocol.procEnd))
-        if protocol.dateCreated:
-            row.addCell(9, fixDate(protocol.dateCreated))
-        if protocol.phases:
-            row.addCell(10, u"; ".join(protocol.phases))
-        if protocol.protStatus:
-            row.addCell(11, protocol.protStatus)
-        if protocol.comment:
-            row.addCell(12, protocol.comment)
-
-    row = sheet.addRow(FIRST_DATA_ROW + 2 + len(protocols), boldStyle)
-    row.addCell(1, "Total Count", mergeAcross=1)
-    row.addCell(3, len(protocols), "Number")
-    statuses = counts.keys()
-    statuses.sort()
-    for i, status in enumerate(statuses):
-        row = sheet.addRow(FIRST_DATA_ROW + len(protocols) + 3 + i)
-        row.addCell(1, status, mergeAcross=1)
-        row.addCell(3, counts[status], "Number")
-    row = sheet.addRow(FIRST_DATA_ROW + len(protocols) + 3 + len(counts),
-                       redStyle)
-    row.addCell(1, "Transferred Trials", mergeAcross=1)
-    row.addCell(3, transferredCount, "Number")
     stamp = time.strftime("%Y%m%d%H%M%S")
     name = "procstat-%s.xls" % stamp
     print "Content-type: application/vnd.ms-excel"
