@@ -6,6 +6,7 @@
 # Cancer.gov.
 #
 # BZIssue::4704
+# BZIssue::5289 / JIRA::OCECDR-3590
 #
 #----------------------------------------------------------------------
 import cdrdb, re, cdr, socket, sys
@@ -238,7 +239,7 @@ rows = cursor.fetchall()
 for docId, name in rows:
     if docId in terms['en']:
         conceptId = conceptIndex[docId]
-        dictionarySet = dictionaries[language].get(conceptId, None)
+        dictionarySet = dictionaries['en'].get(conceptId, None)
         term = Term(docId, name, 'en', dictionarySet)
         terms['en'][docId].append(term)
 if DEBUG:
@@ -282,6 +283,26 @@ for docId, name, language in rows:
             terms[language][docId] = [term]
         else:
             terms[language][docId].append(term)
+
+#----------------------------------------------------------------------
+# Get the variant Spanish names from the external string mapping table.
+#----------------------------------------------------------------------
+cursor.execute("""\
+    SELECT m.doc_id, m.value
+      FROM external_map m
+      JOIN external_map_usage u
+        ON u.id = m.usage
+     WHERE u.name = 'Spanish GlossaryTerm Phrases'""")
+rows = cursor.fetchall()
+for docId, name in rows:
+    if docId in terms['es']:
+        conceptId = conceptIndex[docId]
+        dictionarySet = dictionaries['es'].get(conceptId, None)
+        term = Term(docId, name, 'es', dictionarySet)
+        terms['es'][docId].append(term)
+if DEBUG:
+    sys.stderr.write("%d spanish variant names\n" % len(rows))
+
 names = {}
 for language in terms:
     langTerms = terms[language]
