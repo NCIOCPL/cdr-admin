@@ -166,7 +166,7 @@ def showForm(extra):
     <tr>
      <th align='right'>Email Address:&nbsp;</th>
      <td><input name='Email' class='field'
-                value='operator@cips.nci.nih.gov'></td>
+                value='NCIPDQoperator@mail.nih.gov'></td>
     </tr>
     <tr>
      <th align='right'>GateKeeper Host:&nbsp;</th>
