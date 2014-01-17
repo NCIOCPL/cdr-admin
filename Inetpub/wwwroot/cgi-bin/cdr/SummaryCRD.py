@@ -8,6 +8,7 @@
 #   Report to list the Comprehensive Review Dates
 # BZIssue::4987 - Problem using Comprehensive Review Date Report
 # BZIssue::5273 - Identifying Modules in Summary Reports
+# OCECDR-3698 - Failure Running Comprehensive Review Date Report
 #
 #----------------------------------------------------------------------
 import sys, cdr, cgi, cdrcgi, time, cdrdb, ExcelWriter
@@ -591,6 +592,8 @@ except cdrdb.Error, info:
      
 
 # Updating the Spanish board names
+# This will fail if an English summary lists two different board
+# names (check the query_term table for distinct values)
 # ---------------------------------------------------------------
 query_upd = """\
     UPDATE #CRD_Info
@@ -606,11 +609,39 @@ query_upd = """\
        AND language = 'Spanish'  -- to protect against data entry errors
 """
 
+query_error = """\
+   SELECT DISTINCT t.cdrid AS "ES ID", f.cdrid AS "EN ID", 
+          f.board AS "Board Name"
+     from #CRD_Info f
+     JOIN #CRD_info t
+       ON f.cdrid = t.TranslationOf
+    WHERE f.language = 'English'
+      AND f.board not like '%Advisory%'
+      and t.TranslationOf IS NOT NULL
+      AND t.language = 'Spanish' 
+      and  t.cdrid in (SELECT s.cdrid --, count(distinct e.Board)
+                         FROM #CRD_Info e
+                         JOIN #CRD_Info s
+                           ON e.cdrid = s.TranslationOf
+                        WHERE  e.language = 'English'
+                          AND e.board not like '%Advisory%'
+                          and s.TranslationOf IS NOT NULL
+                          AND s.language = 'Spanish' 
+                        group by s.cdrid
+                       having count(distinct e.board) > 1)
+"""
+
 try:
     cursor.execute(query_upd)
 except cdrdb.Error, info:
-    cdrcgi.bail('Failure Updating Spanish board names: %s' %
-                info[1][0])
+    try:
+        cursor.execute(query_error)
+        rows = cursor.fetchall()
+        cdrcgi.bail('Failure Updating Spanish board names: %s<br/>\
+                     Summary with multiple board names exists: %s' %
+                     (info[1][0], rows))
+    except cdrdb.Error, info:
+        cdrcgi.bail('Failure in Spanish board error query: %s' % info[1][0])
 
 # Create selection criteria for HP or Patient version
 # ---------------------------------------------------
