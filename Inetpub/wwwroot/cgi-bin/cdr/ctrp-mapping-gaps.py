@@ -210,7 +210,7 @@ ORDER BY i.ctrp_id""")
         try:
             tree = etree.XML(docXml.encode('utf-8'))
             title = ctrp.MappingProblem.getChildText(tree, 'official_title')
-            problems = findMappingProblems(session, tree, poIds, geoMap)
+            problems = findMappingProblems(session, tree, poIds, geoMap, True)
 ##             title, problems = findMappingProblems(session,
 ##                                                   docXml.encode('utf-8'),
 ##                                                   poIds, geoMap)
