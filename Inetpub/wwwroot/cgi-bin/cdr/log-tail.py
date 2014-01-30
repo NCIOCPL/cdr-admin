@@ -52,6 +52,7 @@ fields = cgi.FieldStorage()
 p = fields.getvalue("p") or ""
 s = fields.getvalue("s") or ""
 c = fields.getvalue("c") or ""
+r = fields.getvalue("r") or None # raw (binary)?
 
 if p:
     if s.startswith('"') and s.endswith('"') and len(s) > 2:
@@ -66,6 +67,19 @@ if p:
         try:
             result = cdr.runCommand("dir %s" % p)
             print "Content-type: text/plain\n\n%s" % result.output
+        except Exception, e:
+            print "Content-type: text/plain\n\n%s" % repr(e)
+        sys.exit(0)
+    if r:
+        try:
+            name = os.path.basename(p)
+            fp = open(p, "rb")
+            bytes = fp.read()
+            fp.close()
+            print "Content-type: application/octet-stream"
+            print "Content-disposition: attachment;filename=%s" % name
+            print ""
+            sys.stdout.write(bytes)
         except Exception, e:
             print "Content-type: text/plain\n\n%s" % repr(e)
         sys.exit(0)
