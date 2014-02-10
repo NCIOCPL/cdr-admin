@@ -4,22 +4,31 @@
 #
 # Page with links to a set of PDQ Board Member Mailers.
 #
-# $Log: not supported by cvs2svn $
 #----------------------------------------------------------------------
 import cdrdb, cdrcgi, cgi, os, sys
+
+#----------------------------------------------------------------------
+# Look for the mailer job first in the new location, then in the old.
+#----------------------------------------------------------------------
+def findJob(job):
+    bases = ("d:/cdr/Output/Mailers", "d:/cdr/Mailers/Output")
+    for base in bases:
+        dirName = "%s/Job%s-r" % (base, job)
+        if os.path.isdir(dirName):
+            return dirName
+    cdrcgi.bail("Unable to find output for mailer job %s" % job)
 
 #----------------------------------------------------------------------
 # Set the form variables.
 #----------------------------------------------------------------------
 fields    = cgi.FieldStorage()
 session   = cdrcgi.getSession(fields) or "guest"
-baseDir   = 'd:/cdr/Mailers/Output'
 title     = "CDR Administration"
 section   = "Board Member Letters"
 job       = fields and fields.getvalue("job") or cdrcgi.bail("Job required")
 fileName  = fields and fields.getvalue("file") or None
 script    = "GetBoardMemberLetters.py"
-dirName   = "%s/Job%s-r" % (baseDir, job)
+dirName   = findJob(job)
 header    = cdrcgi.header(title, title, section, script)
 
 if fileName:
