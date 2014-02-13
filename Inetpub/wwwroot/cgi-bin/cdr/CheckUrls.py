@@ -6,7 +6,7 @@
 #
 # Can be used to find broken links or to compare html/head/title
 # elements of linked-to web pages with stored versions in
-# ExternalRef/@ExRefPageTitle attributes.
+# ExternalRef/@SourceTitle attributes.
 #
 # BZIssue::5244 - URL Check report not working
 # BZIssue::None - (JIRA::OCECDR-3651) - External Refs report
