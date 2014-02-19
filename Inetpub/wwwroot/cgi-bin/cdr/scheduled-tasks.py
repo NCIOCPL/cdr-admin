@@ -138,6 +138,14 @@ class Exec:
             cmd += " [in %s]" % self.workdir
         return cmd
 
+class Settings:
+    def __init__(self, node=None):
+        self.enabled = True
+        if node is not None:
+            for child in node:
+                if child.tag == TAG.Enabled:
+                    self.enabled = child.text.lower() == 'true'
+
 class Task:
     HTML = True
     def __init__(self, node, name):
@@ -145,6 +153,9 @@ class Task:
         self.created = self.author = self.description = None
         self.triggers = []
         self.actions = []
+        self.settings = Settings()
+        for child in node.findall(TAG.Settings):
+            self.settings = Settings(child)
         for child in node.findall(TAG.RegistrationInfo + "/*"):
             tags.add(child.tag)
             if child.tag == TAG.Date:
@@ -165,6 +176,8 @@ class Task:
                 tags.add(child.tag)
                 self.actions.append(serialize(child))
     def enabled(self):
+        if self.settings.enabled == False:
+            return False
         for trigger in self.triggers:
             if trigger.enabled:
                 return True
@@ -217,6 +230,7 @@ limits = set()
 stat = os.stat(REPORT)
 when = time.asctime(time.localtime(stat.st_mtime))
 doc = open(REPORT).read()
+#doc = open("schtasks.xml").read()
 #doc = re.search("<Tasks>.*</Tasks>", msg, re.DOTALL).group(0)
 tree = etree.XML(doc) #re.sub("<\\?xml[^>]*>\\s*", "", doc))
 name = None
