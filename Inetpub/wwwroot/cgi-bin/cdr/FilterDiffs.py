@@ -4,8 +4,6 @@
 #
 # Compare filters between the current tier and the production tier.
 #
-# OCECDR-3623
-#
 #----------------------------------------------------------------------
 import cdr, cdrdb, cgi, cdrcgi, os, tempfile, re, shutil, glob
 
@@ -54,10 +52,11 @@ def getLocalFilters(tmpDir):
         cdrcgi.bail('Database failure: %s' % e)
     for row in rows:
         try:
-            title = row[0].replace(" ", "@@SPACE@@") \
-                          .replace(":", "@@COLON@@") \
-                          .replace("/", "@@SLASH@@") \
-                          .replace("*", "@@STAR@@")
+            title = row[0].strip()
+            title = title.replace(" ", "@@SPACE@@") \
+                         .replace(":", "@@COLON@@") \
+                         .replace("/", "@@SLASH@@") \
+                         .replace("*", "@@STAR@@")
             xml = row[1].replace("\r", "")
             filename = "%s/@@MARK@@%s@@MARK@@" % (cdr.h.tier, title)
             open(filename, "w").write(xml.encode('utf-8'))
