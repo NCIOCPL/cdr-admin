@@ -29,7 +29,7 @@ class GPMailers:
                dictionary has column values from the gp_emailer table
     """
 
-    URL = "https://gpmailers.dev.cancer.gov/cgi-bin/ListGPEmailers?raw=1"
+    URL = "%s/ListGPEmailers?raw=1" % cdr.emailerCgi()
 
     def __init__(self):
         """
