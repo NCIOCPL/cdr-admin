@@ -2,6 +2,7 @@
 # $Id$
 # JIRA::OCECDR-3734
 
+import cdr
 import cdrdb
 import datetime
 import msvcrt
@@ -82,10 +83,13 @@ class GPMailers:
         self._add_column_headers(sheet)
         self._set_column_widths(sheet)
         row_number = 1
+        prev_id = None
         for row in sorted(rows):
             mailed = row[1] and row[1].strftime("%Y-%m-%d") or ""
             bounced = row[4] and row[4].strftime("%Y-%m-%d") or ""
-            sheet.write(row_number, 0, row[0])
+            doc_id = row[0] != prev_id and row[0] or ""
+            prev_id = row[0]
+            sheet.write(row_number, 0, doc_id)
             sheet.write(row_number, 1, row[2])
             sheet.write(row_number, 2, row[3])
             sheet.write(row_number, 3, mailed)
