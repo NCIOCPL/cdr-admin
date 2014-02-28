@@ -7,6 +7,7 @@
 # BZIssue::4630
 # BZIssue::1572
 # BZIssue::5239 (JIRA::OCECDR-3543) - menu cleanup
+# JIRA::OCECDR-3734
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
