@@ -4,12 +4,15 @@
 #
 # Reports documents last modified during a specified time period.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.1  2002/04/22 22:15:45  bkline
-# New report (Generic Date Last Modified).
+# JIRA::OCECDR-3731
 #
 #----------------------------------------------------------------------
-import cdr, cdrdb, cdrcgi, cgi, re, time, xml.dom.minidom
+import cdr, cdrdb, cdrcgi, cgi, re, time
+import xlwt
+import os
+import msvcrt
+import datetime
+import sys
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -17,9 +20,10 @@ import cdr, cdrdb, cdrcgi, cgi, re, time, xml.dom.minidom
 fields   = cgi.FieldStorage()
 session  = cdrcgi.getSession(fields)
 request  = cdrcgi.getRequest(fields)
-fromDate = fields and fields.getvalue('FromDate') or None
-toDate   = fields and fields.getvalue('ToDate')   or None
-docType  = fields and fields.getvalue('DocType')  or None
+fromDate = fields.getvalue('FromDate') or None
+toDate   = fields.getvalue('ToDate')   or None
+docType  = fields.getvalue('DocType')  or None
+format_  = fields.getvalue('format')   or "html"
 SUBMENU = "Report Menu"
 buttons = ["Submit Request", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 script  = "DateLastModified.py"
@@ -62,11 +66,14 @@ if not fromDate or not toDate:
         cdrcgi.bail(docTypes)
     form = u"""\
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
+   <STYLE>
+    .fixed-width { width: 200px; }
+   </STYLE>
    <TABLE BORDER='0'>
     <TR>
      <TD><B>Document Type:&nbsp;</B></TD>
      <TD>
-      <SELECT NAME='DocType'>
+      <SELECT class='fixed-width' NAME='DocType'>
       <OPTION VALUE='' SELECTED>All Types</OPTION>
 """ % (cdrcgi.SESSION, session)
     for docType in docTypes:
@@ -77,12 +84,21 @@ if not fromDate or not toDate:
     </TR>
     <TR>
      <TD><B>Start Date:&nbsp;</B></TD>
-     <TD><INPUT NAME='FromDate' VALUE='%s'>&nbsp;
+     <TD><INPUT class='fixed-width' NAME='FromDate' VALUE='%s'>&nbsp;
          (use format YYYY-MM-DD for dates, e.g. 2002-01-01)</TD>
     </TR>
     <TR>
      <TD><B>End Date:&nbsp;</B></TD>
-     <TD><INPUT NAME='ToDate' VALUE='%s'>&nbsp;</TD>
+     <TD><INPUT class='fixed-width' NAME='ToDate' VALUE='%s'>&nbsp;</TD>
+    </TR>
+    <TR>
+     <TD><B>Format:&nbsp;</B></TD>
+     <TD>
+      <SELECT class='fixed-width' NAME='format'>
+       <OPTION value='html' selected='selected'>HTML</OPTION>
+       <OPTION value='excel'>Excel Workbook</OPTION>
+      </SELECT>&nbsp;
+     </TD>
     </TR>
    </TABLE>
   </FORM>
@@ -95,7 +111,8 @@ if not fromDate or not toDate:
 # We have a request; do it.
 #----------------------------------------------------------------------
 headerDocType = docType and ("%s Documents" % docType) or "All Document Types"
-html = u"""\
+if format_ == "html":
+    html = u"""\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>
  <head>
@@ -115,7 +132,16 @@ html = u"""\
   <br />
   <br />
 """ % (headerDocType, time.strftime("%m/%d/%Y", now), fromDate, toDate)
-   
+else:
+    book = xlwt.Workbook(encoding="UTF-8")
+    font = xlwt.Font()
+    font.bold = True
+    alignment = xlwt.Alignment()
+    alignment.horz = xlwt.Alignment.HORZ_CENTER
+    headerStyle = xlwt.XFStyle()
+    headerStyle.font = font
+    headerStyle.alignment = alignment
+
 #----------------------------------------------------------------------
 # Extract the information from the database.
 #----------------------------------------------------------------------
@@ -142,23 +168,24 @@ try:
     lastDocType = None
     row = cursor.fetchone()
     if not row:
-        cdrcgi.sendPage(html + u"""\
+            cdrcgi.sendPage(html + u"""\
   <b>
    <font size='3'>No documents found.</font>
   </b>
  </body>
 </html>
 """)
+
     while row:
         docType, lastMod, docId, title = row
         if docType != lastDocType:
-            if lastDocType:
-                html += u"""\
+            if format_ == "html":
+                if lastDocType:
+                    html += u"""\
   </table>
   <br />
 """
-            lastDocType = docType
-            html += u"""\
+                html += u"""\
   <b>
    <font size='3'>Document Type:&nbsp;&nbsp;&nbsp;&nbsp;%s</font>
   </b>
@@ -181,15 +208,34 @@ try:
     </td>
    </tr>
 """ % docType
-        html += u"""\
+            else:
+                sheet = book.add_sheet(docType)
+                widths = (5000, 4000, 25000)
+                for i, width in enumerate(widths):
+                    sheet.col(i).width = width
+                header = "%s Documents Last Modified Between %s and %s" % (
+                    docType, fromDate, toDate)
+                sheet.write_merge(0, 0, 0, 2, header, headerStyle)
+                sheet.write(2, 0, "Date Last Modified", headerStyle)
+                sheet.write(2, 1, "CDR ID", headerStyle)
+                sheet.write(2, 2, "Document Title", headerStyle)
+                rowNumber = 3
+            lastDocType = docType
+        if format_ == "html":
+            html += u"""\
    <tr>
     <td valign='top'>%s</td>
     <td valign='top'>CDR%010d</td>
     <td>%s</td>
    </tr>
 """ % (lastMod, docId, title)
+        else:
+            sheet.write(rowNumber, 0, lastMod)
+            sheet.write(rowNumber, 1, "CDR%010d" % docId)
+            sheet.write(rowNumber, 2, title)
+            rowNumber += 1
         row = cursor.fetchone()
-    if lastDocType:
+    if format_ == "html" and lastDocType:
         html += u"""\
   </table>
 """
@@ -197,7 +243,16 @@ try:
 except cdrdb.Error, info:
     cdrcgi.bail('Database failure: %s' % info[1][0])
 
-cdrcgi.sendPage(html + u"""\
+if format_ == "html":
+    cdrcgi.sendPage(html + u"""\
  </body>
 </html>
 """)
+else:
+    now = datetime.datetime.now()
+    name = "DateLastModified-%s.xls" % now.strftime("%Y%m%d%H%M%S")
+    msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
+    print "Content-type: application/vnd.ms-excel"
+    print "Content-disposition: attachment; filename=%s" % name
+    print
+    book.save(sys.stdout)
