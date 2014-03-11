@@ -1,0 +1,63 @@
+/*
+ * $Id$
+ */
+body {
+    background-color: #e8e8e8;
+    color: black;
+    font-family: Arial, sans-serif;
+    font-size: 12pt;
+    margin: 0;
+    padding: 8px;
+}
+body.report { background-color: white; }
+header { margin-bottom: 15px; }
+header h1 {
+    color: white; 
+    margin: 0;
+    font-size: 32px;
+    padding-left: 8px;
+    background-color: #936;
+    height: 38px;
+}
+header h1 span {
+    float: right;
+    margin: 0 6px;
+    position: relative;
+}
+header h1 span input {
+    position: relative;
+    bottom: 6px;
+}
+header h2 { 
+    background-color: #ffc;
+    margin: 0 0 15px 0;
+    font-size: 13px;
+    font-weight: normal;
+    padding-left: 8px;
+}
+table { background-color: white; margin: 5px auto; }
+table caption { background-color: #936; font-weight: bold; font-size: 12pt; padding: 5px; color: white; border: 2px solid white; }
+table caption p { font-weight: normal; font-size: 10pt; }
+th { background-color: #936; color: white; }
+th { background-color: #696969; } /* dim grey */
+td { background-color: #e4e4e4; vertical-align: top; }
+th, td { font-size: 11pt; padding: 2px; }
+td.middle { vertical-align: middle; }
+td.center { text-align: center; }
+td.right { text-align: right; }
+.nowrap { white-space: nowrap; }
+.odd td { background-color: #eee; }
+fieldset { border: 2px solid #936; width: 500px; margin: 10px auto; }
+fieldset fieldset, div fieldset { width: auto; border: 1px solid black; }
+legend { color: #936; }
+.labeled-field { padding: 2px; }
+.labeled-field label {
+    width: 100px;
+    float: left;
+    text-align: right;
+    clear: both;
+    margin-right: 5px;
+}
+.error { color: red; font-weight: bold; }
+.warning { color: green; }
+.hidden { display: none; }
