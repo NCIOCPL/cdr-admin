@@ -4,28 +4,13 @@
 #
 # Report on lists of summaries.
 #
+# BZIssue::1010 - Initial report
+# BZIssue::1011 - Initial report
+# BZIssue::3204 - Added count of summaries per board; display fix
+# BZIssue::3716 - Unicode encoding cleanup
 # BZIssue::5177 - Adding a Table Option to the Summaries Lists Report
 # BZIssue::5273 - Identifying Modules in Summary Reports
-#
-# Revision 1.6  2007/11/03 14:15:07  bkline
-# Unicode encoding cleanup (issue #3716).
-#
-# Revision 1.5  2007/05/01 23:56:23  venglisc
-# Added a count of summaries per board and corrected the display of the
-# newish CAM Advisory Board. (Bug 3204)
-#
-# Revision 1.4  2004/03/30 23:09:24  venglisc
-# Fixed a problem that dropped the first summary of every summary type.
-#
-# Revision 1.3  2004/01/13 23:51:18  venglisc
-# Added comments to the code.  Removed query_s since it is now handled with
-# one query for both, English and Spanish requests.
-#
-# Revision 1.2  2004/01/13 23:23:40  venglisc
-# Creating new summaries list reports per request (Bug 1010/1011).
-#
-# Revision 1.1  2003/12/19 18:30:00  bkline
-# New report for CDR requests #1010/1011.
+# JIRA::OCECDR-3721 - Additional blank columns
 #
 #----------------------------------------------------------------------
 import cdr, cgi, cdrcgi, time, cdrdb
@@ -35,14 +20,15 @@ import cdr, cgi, cdrcgi, time, cdrdb
 #----------------------------------------------------------------------
 fields    = cgi.FieldStorage()
 session   = cdrcgi.getSession(fields)
-boolOp    = fields and fields.getvalue("Boolean")          or "AND"
-audience  = fields and fields.getvalue("audience")         or None
-lang      = fields and fields.getvalue("lang")             or None
-showId    = fields and fields.getvalue("showId")           or "N"
-showTable = fields and fields.getvalue("showTable")        or "N"
-groupEN   = fields and fields.getvalue("grpEN")            or []
-groupES   = fields and fields.getvalue("grpES")            or []
-submit    = fields and fields.getvalue("SubmitButton")     or None
+boolOp    = fields.getvalue("Boolean")          or "AND"
+audience  = fields.getvalue("audience")         or None
+lang      = fields.getvalue("lang")             or None
+showId    = fields.getvalue("showId")           or "N"
+showTable = fields.getvalue("showTable")        or "N"
+groupEN   = fields.getvalue("grpEN")            or []
+groupES   = fields.getvalue("grpES")            or []
+submit    = fields.getvalue("SubmitButton")     or None
+extra     = fields.getvalue("extra")            or "0"
 request   = cdrcgi.getRequest(fields)
 title     = "CDR Administration"
 instr     = "Summaries Lists"
@@ -89,7 +75,7 @@ def boardHeaderWithID(board_type):
 # -------------------------------------------------
 # Create the table row for the English table output
 # -------------------------------------------------
-def summaryTableRow(id, summary, translation, addCdrID='N', addBlank='N',
+def summaryTableRow(id, summary, translation, addCdrID='N', blankColumns=0,
                                               language='English'):
     """Return the HTML code to display a Summary row with ID"""
 
@@ -100,8 +86,8 @@ def summaryTableRow(id, summary, translation, addCdrID='N', addBlank='N',
 
     # Setting the class and column headers for table display
     # ------------------------------------------------------
-    if addBlank == 'Y': 
-        showGrid = 'blankCol'
+    if showTable == 'Y':
+        showGrid = ' blankCol'
     else:
         showGrid = ''
 
@@ -110,12 +96,12 @@ def summaryTableRow(id, summary, translation, addCdrID='N', addBlank='N',
     # --------------------------------
     if addCdrID == 'Y':
         html += """
-    <TD class="report cdrid %s" width="8%%">%s</TD>""" % (showGrid, id)
+    <TD style="width:70px" class="report cdrid%s">%s</TD>""" % (showGrid, id)
 
     # Display the Summary title
     # -------------------------
     html += """
-    <TD class="report %s">%s""" % (showGrid, summary)
+    <TD style="width:50%%" class="report%s">%s""" % (showGrid, summary)
 
     # Add the English translation for Spanish summaries
     # -------------------------------------------------
@@ -128,11 +114,12 @@ def summaryTableRow(id, summary, translation, addCdrID='N', addBlank='N',
     html += """
     </TD>"""
 
-    # Add and extra blank column
-    # --------------------------
-    if addBlank == 'Y':
-        html += """
-    <TD class="report %s" width="25%%">&nbsp;</TD>""" % showGrid
+    # Add any extra blank column requested
+    # ------------------------------------
+    if showTable == "Y":
+        for i in range(blankColumns):
+            html += """
+    <TD class="report blankCol">&nbsp;</TD>"""
 
     # End the table row
     # -----------------
@@ -140,7 +127,6 @@ def summaryTableRow(id, summary, translation, addCdrID='N', addBlank='N',
    </TR>
 """
     return html
-
 
 # If the user only picked one summary group, put it into a list so we
 # can deal with the same data structure whether one or more were
@@ -241,7 +227,9 @@ if not lang:
     <br>
     <input name='showTable' type='radio' id="tableYes"
            value='Y'>
-    <label for="tableYes">Table format with blank column</label>
+    <label for="tableYes">Table format with </label>
+    <input name="extra" id="extra" value="1" style="width: 25px">
+    <label for="extra"> blank column(s)</label>
    </fieldset>
    <fieldset>
     <legend>&nbsp;Select Summary Language and Summary Type&nbsp;</legend>
@@ -587,22 +575,21 @@ report += """\
 
 # Need to create a header row if we're displaying a table
 # -------------------------------------------------------
-if showTable == 'Y': 
+if showTable == 'Y':
+    blankCols = '    <TH class="report blankCol"> </TH>\n' * int(extra)
     if showId == 'Y':
         showHeader = """\
    <TR>
     <TH class="report blankCol">CDR-ID</TH>
     <TH class="report blankCol">Title</TH>
-    <TH class="report blankCol"> </TH>
-   </TR>
-"""
+%s   </TR>
+""" % blankCols
     else:
         showHeader = """\
    <TR>
     <TH class="report blankCol">Title</TH>
-    <TH class="report blankCol"> </TH>
-   </TR>
-"""
+%s   </TR>
+""" % blankCols
     report += showHeader
 
 # Creating the individual rows
@@ -616,7 +603,7 @@ for row in rows:
                                                      row[6] and ' (Module)'
                                                                  or ''), 
                                   row[4], 
-                                  addCdrID=showId, addBlank=showTable,
+                                  addCdrID=showId, blankColumns=int(extra),
                                   language=lang)
     else:
         #cdrcgi.bail('2')
@@ -628,7 +615,7 @@ for row in rows:
         report += summaryTableRow(row[0], '%s%s' % (row[1], 
                                          row[6] and ' (Module)' or ''),
                                   row[4], 
-                                  addCdrID=showId, addBlank=showTable,
+                                  addCdrID=showId, blankColumns=int(extra),
                                   language=lang)
 report += """
   </TABLE>
