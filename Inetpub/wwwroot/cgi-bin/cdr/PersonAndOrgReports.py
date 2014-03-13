@@ -5,6 +5,7 @@
 # Submenu for person and organization reports.
 #
 # BZIssue::5239 (JIRA::OCECDR-3543) - menu cleanup
+# JIRA::OCECDR-3740 - restore Persons Practicing at Organization report
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
@@ -65,6 +66,8 @@ reports = [
             'Organization Protocol Review'),
 	       ('PersonProtocolReview.py', 
             'Person Protocol Review'),
+           ('PersonsAtOrg.py', 
+            'Persons Practicing at Organizations'),
            ('PreferredProtOrgs.py', 
             'Preferred Protocol Organizations')
           ]
