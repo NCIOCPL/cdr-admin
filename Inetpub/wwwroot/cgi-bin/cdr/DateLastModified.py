@@ -168,6 +168,7 @@ try:
     lastDocType = None
     row = cursor.fetchone()
     if not row:
+        if format_ == "html":
             cdrcgi.sendPage(html + u"""\
   <b>
    <font size='3'>No documents found.</font>
@@ -175,6 +176,8 @@ try:
  </body>
 </html>
 """)
+        else:
+            cdrcgi.bail("No documents found")
 
     while row:
         docType, lastMod, docId, title = row
