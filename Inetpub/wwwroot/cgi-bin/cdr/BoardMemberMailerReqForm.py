@@ -394,6 +394,8 @@ header = cdrcgi.header(title, title, section, script, buttons,
            new Option('Editorial Board Goodbye Letter',    'ed-goodbye'), 
            new Option('Editorial Board Goodbye For Good Letter',
                       'ed-goodbye-forever'),
+           new Option('Editorial Board Reformatted Summary Review',
+                      'ed-ref-summ-rev'),
            new Option('Editorial Board Thank You Letter',  'ed-thankyou'),
            new Option('Editorial Board Comprehensive Review Letter',
                       'ed-comp-review')
