@@ -7,6 +7,7 @@
 # BZIssue::1664
 # BZIssue::4939
 # JIRA::OCECDR-3679 - workaround for IE Javascript bug
+# JIRA::OCECDR-3736 - added Editorial Board Reformatted Summary Review mailer
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrdb, cdrpub, cdrcgi, re, string, cdrmailcommon, sys
