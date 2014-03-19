@@ -56,8 +56,8 @@ class Request:
             "/Media/PermissionInformation/SpanishTranslationPermissionResponse"
         )
         query = cdrdb.Query("query_term", "doc_id").unique()
-        query.where("path IN (?, ?)", *paths)
-        query.where("value = 'Permission Denied'")
+        query.where(query.Condition("path", paths, "IN"))
+        query.where(query.Condition("value", "Permission Denied"))
         query.execute(self.cursor)
         columns = (
             Report.Column("Media DocTitle", width="300px"),
@@ -70,6 +70,8 @@ class Request:
         docs = [Media(row[0], self.cursor) for row in self.cursor.fetchall()]
         rows = []
         for doc in docs:
+            if not doc.in_range(self):
+                continue
             col1 = "%s (CDR%d)" % (doc.title, doc.doc_id)
             col2 = doc.request_date
             col3 = doc.english_response or ""
@@ -104,12 +106,14 @@ class Request:
         for language in self.option1:
             paths.append("/Media/PermissionInformation/%s" % tags[language])
         query = cdrdb.Query("query_term", "doc_id").unique()
-        query.where("path IN (%s)" % ",".join(["?"] * len(paths)), *paths)
-        query.where("value = 'Yes'")
+        query.where(query.Condition("path", paths, "IN"))
+        query.where(query.Condition("value", "Yes"))
         query.execute(self.cursor)
         docs = [Media(row[0], self.cursor) for row in self.cursor.fetchall()]
         rows = []
         for doc in docs:
+            if not doc.in_range(self):
+                continue
             approvals = []
             for approval in doc.approved:
                 approvals.append("%s (CDR%d)" % (approval.title,
@@ -152,6 +156,8 @@ class Request:
         )
         rows = []
         for doc in docs:
+            if not doc.in_range(self):
+                continue
             col2 = "%s (CDR%d)" % (doc.title, doc.doc_id)
             col3 = Report.Cell(doc.request_date, classes="nowrap")
             col4 = Report.Cell(doc.response_date, classes="nowrap")
@@ -176,12 +182,14 @@ class Request:
             cdrcgi.bail("Summary type(s) not specified")
         args = [language]
         caption = "Media Approved For Use With %s " % language
-        qry = cdrdb.Query("query_term m", "m.doc_id").unique()
-        qry.join("query_term l", "l.doc_id = m.int_val")
-        qry.where("m.path = "
-                  "'/Media/PermissionInformation/ApprovedUse/Summary/@cdr:ref'")
-        qry.where("l.path = '/Summary/SummaryMetaData/SummaryLanguage'")
-        qry.where("l.value = ?", language)
+        m_path = "/Media/PermissionInformation/ApprovedUse/Summary/@cdr:ref"
+        l_path = "/Summary/SummaryMetaData/SummaryLanguage"
+        t_path = "/Summary/SummaryMetaData/SummaryType"
+        query = cdrdb.Query("query_term m", "m.doc_id").unique()
+        query.join("query_term l", "l.doc_id = m.int_val")
+        query.where(query.Condition("m.path", m_path))
+        query.where(query.Condition("l.path", l_path))
+        query.where(query.Condition("l.value", language))
         if "all" in types:
             caption += "Summaries"
         else:
@@ -192,10 +200,10 @@ class Request:
             else:
                 caption += ", ".join(types[:-1])
                 caption += ", and %s Summaries" % types[-1]
-            qry.join("query_term t", "t.doc_id = l.doc_id")
-            qry.where("t.path = '/Summary/SummaryMetaData/SummaryType'")
-            qry.where("t.value IN (%s)" % ",".join(["?"] * len(types)), *types)
-        qry.execute(self.cursor)
+            query.join("query_term t", "t.doc_id = l.doc_id")
+            query.where(query.Condition("t.path", t_path))
+            query.where(query.Condition("t.value", types, "IN"))
+        query.execute(self.cursor)
         return Results([row[0] for row in self.cursor.fetchall()], caption)
     def approvals_by_doctype(self):
         doctype = self.fields.getvalue("doctype")
@@ -210,10 +218,10 @@ class Request:
         pattern = "/Media/PermissionInformation/ApprovedUse/%s/@cdr:ref"
         doctypes = ("summary", "glossary")
         if doctype in doctypes:
-            query.where("path = ?", pattern % doctype.capitalize())
+            query.where(query.Condition("path", pattern % doctype.capitalize()))
         else:
-            query.where("path IN (%s)" % ",".join(["?"] * len(doctypes)),
-                        *[pattern % t.capitalize() for t in doctypes])
+            paths = [pattern % t.capitalize() for t in doctypes]
+            query.where(query.Condition("path", paths, "IN"))
         query.execute(self.cursor)
         return Results([row[0] for row in self.cursor.fetchall()], caption)
     def approvals_by_docid(self):
@@ -227,14 +235,22 @@ class Request:
         paths = ["/Media/PermissionInformation/ApprovedUse/Glossary/@cdr:ref",
                  "/Media/PermissionInformation/ApprovedUse/Summary/@cdr:ref"]
         query = cdrdb.Query("query_term", "doc_id").unique()
-        query.where("path IN (%s)" % ",".join(["?"] * len(paths)), *paths)
-        query.where("int_val = ?", doc_id)
+        query.where(query.Condition("path", paths, "IN"))
+        query.where(query.Condition("int_val", doc_id))
         query.execute(self.cursor)
         return Results([row[0] for row in self.cursor.fetchall()],
                        "Media Approved For Use With CDR%s" % doc_id)
     class DateRange:
         def __init__(self, start, end):
             self.start, self.end = start, end
+        def in_range(self, date):
+            if not date:
+                return False
+            if self.start and self.start > date:
+                return False
+            if self.end and self.end < date:
+                return False
+            return True
 
 class Form(cdrcgi.Page):
     def __init__(self):
@@ -351,6 +367,9 @@ function clear_option_2() {
         self.add(self.B.LEGEND("Select PDQ Summaries"))
         for language in ("English", "Spanish"):
             self.add_radio("summary", language, language, wrapper=None)
+        Condition = cdrdb.Query.Condition
+        t_path = Condition("t.path", "/Summary/SummaryMetaData/SummaryType")
+        l_path = Condition("t.path", "/Summary/SummaryMetaData/SummaryLanguage")
         for language in ("English", "Spanish"):
             lang = language.lower()
             self.add('<fieldset id="%s_block" class="hidden">' % lang)
@@ -358,9 +377,9 @@ function clear_option_2() {
             self.add_checkbox(lang, "All", "all")
             query = cdrdb.Query("query_term t", "t.value").unique()
             query.join("query_term l", "t.doc_id = l.doc_id")
-            query.where("t.path = '/Summary/SummaryMetaData/SummaryType'")
-            query.where("l.path = '/Summary/SummaryMetaData/SummaryLanguage'")
-            query.where("l.value = ?", language)
+            query.where(t_path)
+            query.where(l_path)
+            query.where(Condition("l.value", language))
             query.order("t.value")
             for row in query.execute(self.cursor).fetchall():
                 if row[0]:
@@ -418,8 +437,9 @@ class Table(Report.Table):
 
 class Media:
     def __init__(self, doc_id, cursor):
-        qry = cdrdb.Query("document", "title", "xml").where("id = ?", doc_id)
-        rows = qry.execute(cursor).fetchall()
+        query = cdrdb.Query("document", "title", "xml")
+        query.where(query.Condition("id", doc_id))
+        rows = query.execute(cursor).fetchall()
         if not rows:
             cdrcgi.bail("Media document %s not found" % doc_id)
         self.title = rows[0][0].split(";")[0]
@@ -455,10 +475,19 @@ class Media:
                         self.approved.append(Approval(doc_id, cursor))
                     except:
                         pass
+    def in_range(self, request):
+        if request.req:
+            if not request.req.in_range(self.request_date):
+                return False
+        if request.exp:
+            if not request.exp.in_range(self.expiration_date):
+                return False
+        return True
 
 class Approval:
     def __init__(self, doc_id, cursor):
-        query = cdrdb.Query("document", "title").where("id = ?", doc_id)
+        query = cdrdb.Query("document", "title")
+        query.where(query.Condition("id", doc_id))
         self.doc_id = doc_id
         self.title = query.execute(cursor).fetchall()[0][0].split(";")[0]
 
