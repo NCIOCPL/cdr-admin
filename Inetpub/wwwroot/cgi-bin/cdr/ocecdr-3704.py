@@ -264,7 +264,7 @@ class Form(cdrcgi.Page):
             "session": self._session
         }
         cdrcgi.Page.__init__(self, "CDR Administration", **settings)
-        self.add_script("CdrCalendar.setReadOnly = false;")
+        self.add_script("CdrCalendar.setReadOnly = false;\n")
         self.option1()
         self.option2()
         self.common()
