@@ -49,7 +49,7 @@ td.right { text-align: right; }
 .odd td { background-color: #eee; }
 fieldset { border: 2px solid #936; width: 500px; margin: 10px auto; }
 fieldset fieldset, div fieldset { width: auto; border: 1px solid black; }
-legend { color: #936; }
+legend { color: #936; font-weight: bold; }
 .labeled-field { padding: 2px; }
 .labeled-field label {
     width: 100px;
@@ -61,3 +61,4 @@ legend { color: #936; }
 .error { color: red; font-weight: bold; }
 .warning { color: green; }
 .hidden { display: none; }
+.labeled-field input, .labeled-field select { width: 300px; }
