@@ -36,7 +36,14 @@ header h2 {
     padding-left: 8px;
 }
 table { background-color: white; margin: 5px auto; }
-table caption { background-color: #936; font-weight: bold; font-size: 12pt; padding: 5px; color: white; border: 2px solid white; }
+table caption {
+    background-color: #936;
+    font-weight: bold;
+    font-size: 12pt;
+    padding: 5px;
+    color: white;
+    border: 2px solid white;
+}
 table caption p { font-weight: normal; font-size: 10pt; }
 th { background-color: #936; color: white; }
 th { background-color: #696969; } /* dim grey */
@@ -59,6 +66,7 @@ legend { color: #936; font-weight: bold; }
     margin-right: 5px;
 }
 .error { color: red; font-weight: bold; }
+.strong { font-weight: bold; }
 .warning { color: green; }
 .hidden { display: none; }
 .labeled-field input, .labeled-field select { width: 300px; }
