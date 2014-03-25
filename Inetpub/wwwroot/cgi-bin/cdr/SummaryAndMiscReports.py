@@ -26,9 +26,9 @@ title   = "CDR Administration"
 section = "Summary and Miscellaneous Document Reports"
 SUBMENU = "Reports Menu"
 buttons = [SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-header  = cdrcgi.header(title, title, section, "SummaryAndMiscReports.py", 
+header  = cdrcgi.header(title, title, section, "SummaryAndMiscReports.py",
                         buttons, stylesheet = """\
-  <style type='text/css'>   
+  <style type='text/css'>
    H2 { font-family: Arial; font-size: 14pt; font-weight: bold }
    LI { font-family: Arial; font-size: 12pt; font-weight: bold }
   </style>
@@ -45,7 +45,7 @@ elif action == SUBMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if action == "Log Out": 
+if action == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
@@ -59,13 +59,13 @@ form = """\
 """ % (cdrcgi.SESSION, session)
 reports = [
            # ('Stub.py?', 'Changes to Summaries')
-           ('QcReport.py?DocType=Summary&ReportType=bu&', 
+           ('QcReport.py?DocType=Summary&ReportType=bu&',
             'Bold/Underline (HP/Old Patient)'),
-           ('QcReport.py?DocType=Summary&ReportType=rs&', 
+           ('QcReport.py?DocType=Summary&ReportType=rs&',
             'Redline/Strikeout (HP/Old Patient)'),
-           ('QcReport.py?DocType=Summary&ReportType=pat&', 
+           ('QcReport.py?DocType=Summary&ReportType=pat&',
             'New Patient'),
-           ('QcReport.py?DocType=Summary&ReportType=pp&', 
+           ('QcReport.py?DocType=Summary&ReportType=pp&',
             'Publish Preview')
           ]
 for r in reports:
@@ -86,8 +86,11 @@ reports = [
            ('SummariesLists.py?',          'Summaries Lists'),
            ('SummaryMetaData.py?',         'Summaries Metadata'),
            ('SummariesTocReport.py?',      'Summaries TOC Lists'),
-           ('SummariesWithProtocolLinks.py?',      'Summaries with Protocols Links/Refs Report'),
-           ('SummariesWithNonJournalArticleCitations.py?',      'Summaries with Non-Journal Article Citations Report'),
+           ('SummaryTypeChangeReport.py?', 'Summaries Type Of Change'),
+           ('SummariesWithProtocolLinks.py?',
+                    'Summaries with Protocols Links/Refs Report'),
+           ('SummariesWithNonJournalArticleCitations.py?',
+                    'Summaries with Non-Journal Article Citations Report'),
            ('ocecdr-3650.py?',             'Summary Internal Links'),
           ]
 for r in reports:
