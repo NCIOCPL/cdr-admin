@@ -35,7 +35,7 @@ header h2 {
     font-weight: normal;
     padding-left: 8px;
 }
-table { background-color: white; margin: 5px auto; }
+table { background-color: white; margin: 5px auto; border-collapse:collapse; }
 table caption {
     background-color: #936;
     font-weight: bold;
@@ -48,7 +48,8 @@ table caption p { font-weight: normal; font-size: 10pt; }
 th { background-color: #936; color: white; }
 th { background-color: #696969; } /* dim grey */
 td { background-color: #e4e4e4; vertical-align: top; }
-th, td { font-size: 11pt; padding: 2px; }
+td { background-color: #ccc; }
+th, td { font-size: 11pt; padding: 2px; border: 1px solid black; }
 td.middle { vertical-align: middle; }
 td.center { text-align: center; }
 td.right { text-align: right; }
