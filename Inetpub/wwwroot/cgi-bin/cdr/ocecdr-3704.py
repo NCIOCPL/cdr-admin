@@ -123,7 +123,7 @@ class Request:
             col3 = doc.english_response or ""
             col4 = doc.expiration_date
             col5 = doc.spanish_request or ""
-            col6 = "\n\n".join(approvals)
+            col6 = approvals
             col7 = doc.comments
             if doc.response_date:
                 col3 += " (%s)" % doc.response_date
@@ -369,7 +369,7 @@ function clear_option_2() {
             self.add_radio("summary", language, language, wrapper=None)
         Condition = cdrdb.Query.Condition
         t_path = Condition("t.path", "/Summary/SummaryMetaData/SummaryType")
-        l_path = Condition("t.path", "/Summary/SummaryMetaData/SummaryLanguage")
+        l_path = Condition("l.path", "/Summary/SummaryMetaData/SummaryLanguage")
         for language in ("English", "Spanish"):
             lang = language.lower()
             self.add('<fieldset id="%s_block" class="hidden">' % lang)
@@ -384,7 +384,7 @@ function clear_option_2() {
             for row in query.execute(self.cursor).fetchall():
                 if row[0]:
                     self.add_checkbox(lang, row[0], row[0],
-                                      widget_class="summary-type")
+                                      widget_classes="summary-type")
             self.add("</fieldset>")
         self.add("</fieldset>")
         self.add_script("""\
