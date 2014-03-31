@@ -66,6 +66,7 @@ legend { color: #936; font-weight: bold; }
     clear: both;
     margin-right: 5px;
 }
+label.clickable:hover { color: white; background-color: #936; }
 .error { color: red; font-weight: bold; }
 .strong { font-weight: bold; }
 .warning { color: green; }
