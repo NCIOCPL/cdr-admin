@@ -4,16 +4,8 @@
 #
 # Prototype for editing a CDR group.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.2  2002/02/21 15:22:02  bkline
-# Added navigation buttons.
-#
-# Revision 1.1  2001/06/13 22:16:32  bkline
-# Initial revision
-#
-#
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, string
+import cgi, cdr, cdrcgi
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -21,13 +13,13 @@ import cgi, cdr, cdrcgi, re, string
 fields  = cgi.FieldStorage()
 session = cdrcgi.getSession(fields)
 request = cdrcgi.getRequest(fields)
-grpName = fields and fields.getvalue("grp") or None
+grpName = fields.getvalue("grp") or None
 SUBMENU = "Group Menu"
 
 #----------------------------------------------------------------------
 # Make sure we have an active session.
 #----------------------------------------------------------------------
-if not session: cdrcgi.bail('Unknown or expired CDR session.')
+if not session: cdrcgi.bail("Unknown or expired CDR session.")
 
 #----------------------------------------------------------------------
 # Handle navigation requests.
@@ -58,18 +50,18 @@ if request == "Save Changes":
     name  = fields and fields.getvalue("name") or ""
     group = cdr.Group(name)
     users = fields and fields.getvalue("users") or []
-    if type(users) == type([]): group.users = users
-    else:                       group.users = [users]
+    if type(users) is list: group.users = users
+    else:                   group.users = [users]
     comment = fields.getvalue("comment")
     if comment != "None": group.comment = comment
     actions = fields.getvalue("actions")
     if actions:
-        if type(actions) == type(""): actions = [actions]
+        if isinstance(actions, basestring): actions = [actions]
         for action in actions:
             pair = action.split("::")
             if len(pair) == 2: (action, doctype) = pair
             else:              (action, doctype) = (pair[0], None)
-            if not group.actions.has_key(action): group.actions[action] = []
+            if action not in group.actions: group.actions[action] = []
             if doctype: group.actions[action].append(doctype)
     error = cdr.putGroup(session, grpName, group)
     if error: cdrcgi.bail(error)
@@ -82,8 +74,8 @@ title   = "CDR Administration"
 section = "Edit Group Information"
 buttons = ["Save Changes", "Delete Group", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 script  = "EditGroup.py"
-#script  = "DumpParams.pl"
-header  = cdrcgi.header(title, title, section, script, buttons)
+page    = cdrcgi.Page(title, subtitle=section, action=script, buttons=buttons,
+                      session=session, body_classes="checkbox-form")
 
 #----------------------------------------------------------------------
 # Populate the group object.
@@ -97,109 +89,98 @@ else:           group = cdr.getGroup(session, grpName)
 actions  = cdr.getActions(session)
 users    = cdr.getUsers(session)
 doctypes = cdr.getDoctypes(session)
-if type(group)    == type(""): cdrcgi.bail(group)
-if type(actions)  == type(""): cdrcgi.bail(actions)
-if type(users)    == type(""): cdrcgi.bail(users)
-if type(doctypes) == type(""): cdrcgi.bail(doctypes)
+if isinstance(group,    basestring): cdrcgi.bail(group)
+if isinstance(actions,  basestring): cdrcgi.bail(actions)
+if isinstance(users,    basestring): cdrcgi.bail(users)
+if isinstance(doctypes, basestring): cdrcgi.bail(doctypes)
 
 #----------------------------------------------------------------------
 # Display the information for the group.
 #----------------------------------------------------------------------
-form = """\
-<H2>%s</H2>%s
-<H3>Group Name</H3>
-<INPUT NAME='name' SIZE='40' VALUE='%s'>
-<H3>Description</H3>
-<TEXTAREA NAME='comment' COLS='80' ROWS='4'>%s</TEXTAREA>
-""" % (group.name, 
-       request == "Save Changes" and "\n<H4>(Successfully Updated)</H4>" or "",
-       group.name, group.comment)
+B = page.B
+page.add(B.INPUT(type="hidden", name="grp", value=group.name))
+page.add(B.H2(group.name, style="font: 20pt Arial bold;"))
+if request == "Save Changes":
+    page.add(B.H4("(Successfully Updated)"))
+page.add(B.H3("Group Name"))
+page.add(B.INPUT(name="name", value=group.name, style="width: 200px;"))
+page.add(B.H3("Description"))
+page.add(B.TEXTAREA(group.comment or "", name="comment", rows="4", cols="80"))
 
 #----------------------------------------------------------------------
 # List the users which can be assigned to the group.
 #----------------------------------------------------------------------
-form += "<H3>Users</H3>\n<TABLE>\n"
+session = "%s=%s" % (cdrcgi.SESSION, session)
+page.add(B.H3("Users"))
+page.add("<table class='checkboxes'>")
 nUsers = 0
 USERS_PER_ROW = 6
 for user in users:
-    if nUsers % USERS_PER_ROW == 0:
-        form += "<TR><TD>&nbsp;&nbsp;</TD>"
-    flag = user in group.users and "CHECKED\n" or ""
-    url = "%s/EditUser.py?usr=%s&%s=%s" % (cdrcgi.BASE, 
-                                           user,
-                                           cdrcgi.SESSION,
-                                           session)
-    form += """\
-<TD><INPUT TYPE='checkbox' 
-           VALUE='%s' 
-           %sNAME='users'><A HREF="%s">%s</A></INPUT></TD>
-""" % (user, flag, url, user)
+    if nUsers % USERS_PER_ROW == 0: page.add("<tr>")
+    field = B.INPUT(type="checkbox", value=user, name="users")
+    if user in group.users:
+        field.set("checked", "checked")
+    url = "%s/EditUser.py?usr=%s&%s" % (cdrcgi.BASE, user, session)
+    page.add(B.TD(field, B.A(user, href=url)))
     nUsers += 1
-    if nUsers % USERS_PER_ROW == 0: form += "</TR>\n"
-form += "</TABLE>\n"
+    if nUsers % USERS_PER_ROW == 0: page.add("</tr>")
+if nUsers and nUsers % USERS_PER_ROW != 0: page.add("</tr>")
+page.add("</table>")
 
 #----------------------------------------------------------------------
 # Add the actions for which the group can be authorized.
 #----------------------------------------------------------------------
-form += "<H3>Actions</H3>\n"
+page.add(B.H3("Actions"))
 
 #----------------------------------------------------------------------
 # Add the actions independent of specific document types.
 #----------------------------------------------------------------------
-form += """\
-<H4>Not Specific To Any Document Type</H4>
-<TABLE>
-"""
+page.add(B.H4("Not Specific To Any Document Type"))
+page.add("<table class='checkboxes'>")
 nActions = 0
 ACTIONS_PER_ROW = 5
-actionKeys = list(actions.keys())
-actionKeys.sort()
-for actionKey in actionKeys:
-    if actions[actionKey] != 'Y':
-        if nActions % ACTIONS_PER_ROW == 0:
-            form += "<TR><TD>&nbsp;&nbsp;</TD>"
-        flag = group.actions.has_key(actionKey) and "CHECKED\n" or ""
-        form += """\
-<TD><INPUT TYPE='checkbox'
-           VALUE='%s'
-           %sNAME='actions'>%s</INPUT></TD>
-""" % (actionKey, flag, actionKey)
+for name in sorted(actions.keys()):
+    if actions[name] != 'Y':
+        if nActions % ACTIONS_PER_ROW == 0: page.add("<tr>")
+        field_id = "action-%s" % name.replace(" ", "_")
+        field = B.INPUT(type="checkbox", value=name, name="actions",
+                        id=field_id)
+        if name in group.actions:
+            field.set("checked", "checked")
+        label = B.LABEL(name, B.FOR(field_id))
+        page.add(B.TD(field, label))
         nActions += 1
-        if nActions % ACTIONS_PER_ROW == 0: form += "</TR>\n"
-form += "</TABLE>\n"
+        if nActions % ACTIONS_PER_ROW == 0: page.add("</tr>")
+if nActions and nActions % ACTIONS_PER_ROW != 0: page.add("</tr>")
+page.add("</table>")
 
 #----------------------------------------------------------------------
 # Add the actions specific to individual document types.
 #----------------------------------------------------------------------
 DOCTYPES_PER_ROW = 7
-for actionKey in actionKeys:
-    if actions[actionKey] == 'Y':
-        grpAction = None
-        if group.actions.has_key(actionKey):
-            grpAction = group.actions[actionKey]
-        form += "<H4>%s</H4>\n<TABLE>\n" % actionKey
+for name in sorted(actions.keys()):
+    if actions[name] == 'Y':
+        grpAction = group.actions.get(name)
+        page.add(B.H4(name))
+        page.add("<table class='checkboxes'>")
         nDoctypes = 0
         for doctype in doctypes:
             if doctype == "ProtocolSourceDoc": continue
-            if nDoctypes % DOCTYPES_PER_ROW == 0:
-                form += "<TR><TD>&nbsp;&nbsp;</TD>"
-            flag = ""
+            if nDoctypes % DOCTYPES_PER_ROW == 0: page.add("<tr>")
+            field_id = ("action-%s-%s" % (name, doctype)).replace(" ", "_")
+            value = "%s::%s" % (name, doctype)
+            field = B.INPUT(type="checkbox", value=value, name="actions",
+                            id=field_id)
             if grpAction and doctype in grpAction:
-                flag = "CHECKED\n"
-            form += """\
-<TD><INPUT TYPE='checkbox'
-           VALUE='%s::%s'
-           %sNAME='actions'>%s</INPUT></TD>
-""" % (actionKey, doctype, flag, doctype)
+                field.set("checked", "checked")
+            label = B.LABEL(doctype, B.FOR(field_id))
+            page.add(B.TD(field, label))
             nDoctypes += 1
-            if nDoctypes % DOCTYPES_PER_ROW == 0: form += "</TR>\n"
-        form += "</TABLE>\n"
+            if nDoctypes % DOCTYPES_PER_ROW == 0: page.add("</tr>")
+        if nDoctypes and nDoctypes % DOCTYPES_PER_ROW != 0: page.add("</tr>")
+        page.add("</table>")
 
 #----------------------------------------------------------------------
-# Add the session key and send back the form.
+# Show the form.
 #----------------------------------------------------------------------
-form += """\
-<INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-<INPUT TYPE='hidden' NAME='grp' VALUE='%s'>
-""" % (cdrcgi.SESSION, session, group.name)
-cdrcgi.sendPage(header + form + "</FORM></BODY></HTML>")
+page.send()
