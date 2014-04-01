@@ -21,6 +21,7 @@
 input.CdrDateField {
     background: white;
     font-weight: normal;
+    width: 100px;
 }
 input.CdrDateField[disabled] {
     color: black;
