@@ -35,6 +35,25 @@ header h2 {
     font-weight: normal;
     padding-left: 8px;
 }
+h3 {
+    font: 16pt "Arial";
+    color: navy;
+    font-weight: bold;
+    background: transparent;
+}
+body.admin-menu { background-color: #dfdfdf; }
+.admin-menu header { margin-bottom: 35px; }
+.admin-menu li a {
+    color: navy;
+    text-decoration: none;
+    background: transparent;
+}
+.admin-menu li {
+    color: navy;
+    font: 12pt "Arial";
+    font-weight: bold;
+}
+.admin-menu li a:hover { background: #ffc; }
 table { background-color: white; margin: 5px auto; border-collapse:collapse; }
 table caption {
     background-color: #936;
