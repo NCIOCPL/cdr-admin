@@ -5,9 +5,10 @@
 # BZIssue::1653
 # BZIssue::2135
 # BZIssue::3226
+# BZIssue::3704
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, string
+import cgi, cdrcgi
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -19,7 +20,9 @@ title   = "CDR Administration"
 section = "Media Reports"
 SUBMENU = "Reports Menu"
 buttons = [SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-header  = cdrcgi.header(title, title, section, "Reports.py", buttons)
+page    = cdrcgi.Page(title, subtitle=section, action="Reports.py",
+                      buttons=buttons, session=session,
+                      body_classes="admin-menu")
 
 #----------------------------------------------------------------------
 # Handle navigation requests.
@@ -36,60 +39,52 @@ if action == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
-# Display available menu choices.
+# QC reports.
 #----------------------------------------------------------------------
 session = "%s=%s" % (cdrcgi.SESSION, session)
-#    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-form = """\
-   <H3>QC Reports</H3>
-   <OL>
-    <LI><a href='MediaSearch.py?%s'>Advanced Search</a></LI>
-""" % session
+B = cdrcgi.Page.B
+page.add(B.H3("QC Reports"))
+page.add("<ol>")
+url = "MediaSearch.py?%s" % session
+page.add(B.LI(B.A("Advanced Search", href=url)))
+url = "%s/QcReport.py?DocType=Media&ReportType=img&%s" % (cdrcgi.BASE, session)
+page.add(B.LI(B.A("Media Doc QC Report", href=url)))
+page.add("</ol>")
 
-for choice in (
-               ('img',  'Media Doc QC Report'   ),
-              ):
-    form += """\
-    <LI><a href='%s/QcReport.py?DocType=Media&ReportType=%s&%s'>%s</a></LI>
-""" % (cdrcgi.BASE, choice[0], session, choice[1])
-form += """\
-   </OL>
+#----------------------------------------------------------------------
+# Management reports.
+#----------------------------------------------------------------------
+page.add(B.H3("Management Reports"))
+page.add("<ol>")
+for script, label in(
+    ('RecordingTrackingReport.py?', 'Board Meeting Recording Tracking Report'),
+    ('MediaLists.py?',              'Media Lists'),
+    ('ocecdr-3704.py?',             'Media Permissions Report'),
+    ('MediaTrackingReport.py?',     'Media Tracking Report'),
+    ('MediaCaptionContent.py?',     'Media Caption and Content Report'),
+    ('PubStatsByDate.py?VOL=Y&',    'Media Doc Publishing Report'),
+    ('MediaLinks.py?',              'Linked Media Documents'),
+):
+    url = "%s/%s%s" % (cdrcgi.BASE, script, session)
+    page.add(B.LI(B.A(label, href=url)))
+page.add("</ol>")
 
-   <H3>Management Reports</H3>
-   <OL>"""
-
-for choice in(
-              ('RecordingTrackingReport.py?',
-                                   'Board Meeting Recording Tracking Report'),
-              ('MediaLists.py?',          'Media Lists'),
-              ('MediaTrackingReport.py?', 'Media Tracking Report'),
-              ('MediaCaptionContent.py?', 'Media Caption and Content Report'),
-              ('PubStatsByDate.py?VOL=Y',
-                                          'Media Doc Publishing Report'),
-              ('MediaLinks.py?',          'Linked Media Documents'),
-             ):
-    form += """
-    <LI><a href='%s/%s&%s'>%s</a></LI>""" % (cdrcgi.BASE, choice[0],
-                                              session, choice[1])
-form += """\
-   </OL>
-
-   <H3>Other Reports</H3>
-   <OL>"""
-
-for choice in (
+#----------------------------------------------------------------------
+# Other reports.
+#----------------------------------------------------------------------
+page.add(B.H3("Other Reports"))
+page.add("<ol>")
+for script, label in (
     ('PronunciationRecordings.py?',
      'Audio Pronunciation Recordings Tracking Report'),
     ('GlossaryTermAudioReviewReport.py?',
      'Audio Pronunciation Review Statistics Report'),
-    ):
-    form += """\
-    <LI><a href='%s/%s&%s'>%s</a></LI>""" % (cdrcgi.BASE, choice[0],
-                                             session, choice[1])
+):
+    url = "%s/%s%s" % (cdrcgi.BASE, script, session)
+    page.add(B.LI(B.A(label, href=url)))
+page.add("</ol>")
 
-footer = """
-   </OL>
-  </FORM>
- </BODY>
-</HTML>"""
-cdrcgi.sendPage(header + form + footer)
+#----------------------------------------------------------------------
+# Display the menu.
+#----------------------------------------------------------------------
+page.send()
