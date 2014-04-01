@@ -8,104 +8,27 @@
 # BZIssue::4909 - Board Roster Report Change
 # BZIssue::4979 - Error in Board Roster Report
 # BZIssue::5023 - Changes to Board Roster Report
+# OCECDR-3720: [Summaries] Board Roster Summary Sheet - More Options 
 # 
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, cdrdb, re, time
+import cgi, cdr, cdrcgi, cdrdb, re, time, lxml.etree as etree
+import datetime, lxml.html
 
 #----------------------------------------------------------------------
-# Set the form variables.
+# Initial variables.
 #----------------------------------------------------------------------
 fields     = cgi.FieldStorage()
-boardId    = fields and fields.getvalue("board")  or None
-otherInfo  = fields and fields.getvalue("oinfo")  or 'No'
-assistant  = fields and fields.getvalue("ainfo")  or 'No'
-subgroup   = fields and fields.getvalue("sginfo") or 'No'
-phone      = fields and fields.getvalue("pinfo")  or 'No'
-fax        = fields and fields.getvalue("finfo")  or 'No'
-cdrid      = fields and fields.getvalue("cinfo")  or 'No'
-email      = fields and fields.getvalue("einfo")  or 'No'
-startDate  = fields and fields.getvalue("dinfo")  or 'No'
-blankCol   = fields and fields.getvalue("blank")  or 'No'
-govEmp     = fields and fields.getvalue("govemp")  or 'No'
-### recHonor   = fields and fields.getvalue("honoraria")  or 'No'
-flavor     = fields and fields.getvalue("sheet")  or 'full'
 session    = cdrcgi.getSession(fields)
 request    = cdrcgi.getRequest(fields)
-title      = "PDQ Board Roster Report"
-instr      = "Report on PDQ Board Roster"
-script     = "BoardRoster.py"
+TITLE      = "PDQ Board Roster Report"
+subtitle   = "Full or Selected PDQ Board Roster Address Information"
+action     = "BoardRoster.py"
 SUBMENU    = "Report Menu"
-buttons    = ("Submit", SUBMENU, cdrcgi.MAINMENU)
-header     = cdrcgi.header(title, title, instr, script, buttons, 
-                           method = 'GET', 
-                           stylesheet = """
-    <script type='text/javascript'>
-     function doSummarySheet(box) {
-         if (box == 'summary')
-             {
-             if (document.getElementById('summary').checked == true)
-                 {
-                 document.getElementById('summary').checked = true;
-                 }
-             else
-                 {
-                 document.getElementById('summary').checked = false;
-                 }
-             }
-         else
-             {
-             document.getElementById('summary').checked = true;
-             }
-
-         document.getElementById('contact').checked   = false;
-         document.getElementById('assistant').checked = false;
-         document.getElementById('subgroup').checked  = false;
-         var form = document.forms[0];
-         {
-             form.einfo.value = form.einfo.checked ? 'Yes' : 'No';
-             form.sheet.value = form.sheet.checked ? 'summary' : 'full';
-             form.pinfo.value = form.pinfo.checked ? 'Yes' : 'No';
-             form.cinfo.value = form.cinfo.checked ? 'Yes' : 'No';
-             form.dinfo.value = form.dinfo.checked ? 'Yes' : 'No';
-             form.finfo.value = form.finfo.checked ? 'Yes' : 'No';
-             form.blank.value = form.blank.checked ? 'Yes' : 'No';
-             form.govemp.value = form.govemp.checked ? 'Yes' : 'No';
-             /*form.honoraria.value = form.honoraria.checked ? 'Yes' : 'No';*/
-         }
-     }
-     function doFullReport() {
-         document.getElementById('summary').checked = false;
-         var form = document.forms[0];
-         {
-             form.oinfo.value  = form.oinfo.checked  ? 'Yes' : 'No';
-             form.ainfo.value  = form.ainfo.checked  ? 'Yes' : 'No';
-             form.sginfo.value = form.sginfo.checked ? 'Yes' : 'No';
-             form.sheet.value  = form.sheet.checked  ? 'summary' : 'full';
-         }
-     }
-    </script>
-    <style type="text/css">
-     td       { font-size: 12pt; }
-     .label   { font-weight: bold; }
-     .label2  { font-size: 11pt;
-                font-weight: bold; }
-     .select:hover { background-color: #FFFFCC; }
-     .grey    {background-color: #BEBEBE; }
-     .topspace { margin-top: 24px; }
-
-    </style>
-""")
-boardId    = boardId and int(boardId) or None
+buttons    = ["Submit", SUBMENU, cdrcgi.MAINMENU]
 dateString = time.strftime("%B %d, %Y")
-
-filterType= {'summary':'name:PDQBoardMember Roster Summary',
+filterType = {'summary':'name:PDQBoardMember Roster Summary',
              'full'   :'name:PDQBoardMember Roster'}
-allRows   = []
 
-# We can only run one report at a time: Full or Summary
-# -----------------------------------------------------
-if flavor == 'summary' and (otherInfo == 'Yes' or assistant == 'Yes'):
-    cdrcgi.bail("Please uncheck 'Create Summary Sheet' to run 'Full' report")
 
 #----------------------------------------------------------------------
 # Handle navigation requests.
@@ -115,6 +38,7 @@ if request == cdrcgi.MAINMENU:
 elif request == SUBMENU:
     cdrcgi.navigateTo("reports.py", session)
 
+
 #----------------------------------------------------------------------
 # Set up a database connection and cursor.
 #----------------------------------------------------------------------
@@ -123,6 +47,88 @@ try:
     cursor = conn.cursor()
 except cdrdb.Error, info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
+
+
+#----------------------------------------------------------------------
+# Display the request form used to specify the report options.
+#----------------------------------------------------------------------
+def show_form():
+    boards = [("", "Pick a Board")] + getActiveBoards()
+    form = cdrcgi.Page(TITLE, subtitle=subtitle, buttons=buttons, 
+                       action=action, session=session)
+    form.add("<fieldset>")
+    form.add(cdrcgi.Page.B.LEGEND("Select Board"))
+    form.add_select("board", "PDQ Board", boards)
+    form.add("</fieldset>")
+    form.add("<fieldset>")
+    form.add(cdrcgi.Page.B.LEGEND("Select Report Type"))
+    form.add_radio("report-type", "Full", "full", wrapper=None, checked=True)
+    form.add_radio("report-type", "Summary", "summary", wrapper=None)
+    form.add('<fieldset id="full-options-block" class="hidden">')
+    form.add(cdrcgi.Page.B.LEGEND("Full Report Options"))
+    form.add_checkbox("full-opts", "Show All Contact Information", "other")
+    form.add_checkbox("full-opts", "Show Subgroup Information", "subgroup")
+    form.add_checkbox("full-opts", "Show Assistant Information", "assistant")
+    form.add("</fieldset>")
+    form.add('<fieldset id="columns" class="hidden">')
+    form.add(cdrcgi.Page.B.LEGEND("Columns to Include"))
+    form.add_checkbox("columns", "Phone", "phone", checked=True)
+    form.add_checkbox("columns", "Fax", "fax")
+    form.add_checkbox("columns", "E-mail", "email", checked=True)
+    form.add_checkbox("columns", "CDR ID", "cdr-id")
+    form.add_checkbox("columns", "Start Date", "start-date")
+    form.add_checkbox("columns", "Government Employee", "employee")
+    form.add_checkbox("columns", "Areas of Expertise", "expertise")
+    form.add_checkbox("columns", "Membership in Subgroups", "subgroup")
+    termEnd = "Term End Date (calculated using the term renewal frequency)"
+    form.add_checkbox("columns", "%s" % termEnd, "end-date")
+    form.add_checkbox("columns", "Affiliations", "affiliation")
+    form.add_checkbox("columns", "Contact Mode", "mode")
+    form.add_checkbox("columns", "Assistant Name", "assistant-name")
+    form.add_checkbox("columns", "Assistant E-mail", "assistant-email")
+    form.add("</fieldset>")
+    form.add("<fieldset id='misc-options', class='hidden'>")
+    form.add(cdrcgi.Page.B.LEGEND("Miscellanous Summary Report Options"))
+    form.add_text_field("blank", "Extra Cols", value="0",
+                      classes="blanks")
+    form.add("</fieldset>")
+    form.add_output_options("html")
+    form.add("</fieldset>")
+    form.add_css("input.blanks { width: 60px; }\n")
+    form.add_css("select:hover { background-color: #ffc; }\n")
+    form.add_script("""\
+function check_columns(dummy) {}
+function check_report_type(choice) {
+    console.log('check_report_type(' + choice + ')');
+    switch (choice) {
+    case 'full':
+        jQuery('#full-options-block').show();
+        jQuery('#columns').hide();
+        jQuery('#misc-options').hide();
+        jQuery('#report-format-block').hide();
+        break;
+    case 'summary':
+        jQuery('#full-options-block').hide();
+        jQuery('#columns').show();
+        jQuery('#misc-options').show();
+        jQuery('#report-format-block').show();
+        break;
+    default:
+        jQuery('#full-options-block').hide();
+        jQuery('#columns').hide();
+        jQuery('#misc-options').hide();
+        jQuery('#report-format-block').hide();
+        break;
+    }
+}
+//jQuery('#report-format-block').addClass('hidden');
+jQuery(function() {
+    check_report_type(jQuery('input[name="report-type"]:radio:checked').val());
+});
+//console.log('report-type is ' + jQuery('input[name="report-type"]:radio:checked').val());
+""")
+    form.send()
+
 
 #----------------------------------------------------------------------
 # Look up title of a board, given its ID.
@@ -137,42 +143,32 @@ def getBoardName(id):
     except Exception, e:
         cdrcgi.bail('Looking up board title: %s' % str(e))
 
+
 #----------------------------------------------------------------------
 # Remove cruft from a document title.
 #----------------------------------------------------------------------
 def cleanTitle(title):
-    semicolon = title.find(';')
-    if semicolon != -1:
-        title = title[:semicolon]
-    return title.strip()
+    return title.split(";")[0].strip()
+
 
 #----------------------------------------------------------------------
-# Build a picklist for PDQ Boards.
-# This function serves two purposes:
-# a)  create the picklist for the selection of the board
-# b)  create a dictionary in subsequent calls to select the board
-#     ID based on the board selected in the first call.
+# Build a drop-down menu list for PDQ Boards.
 #----------------------------------------------------------------------
-def getBoardPicklist():
-    picklist = "<SELECT NAME='board' onchange='javascript:doSummarySheet(\"summary\")'>\n"
-    sel      = " SELECTED"
+def getActiveBoards():
     try:
         cursor.execute("""\
 SELECT DISTINCT board.id, board.title
-           FROM document board
+           FROM active_doc board
            JOIN query_term org_type
              ON org_type.doc_id = board.id
           WHERE org_type.path = '/Organization/OrganizationType'
             AND org_type.value IN ('PDQ Editorial Board',
                                    'PDQ Advisory Board')
        ORDER BY board.title""")
-        for id, title in cursor.fetchall():
-            title = cleanTitle(title)
-            picklist += "<OPTION%s value='%d'>%s</OPTION>\n" % (sel, id, title)
-            sel = ""
+        return [(row[0], cleanTitle(row[1])) for row in cursor.fetchall()]
     except cdrdb.Error, info:
         cdrcgi.bail('Database query failure: %s' % info[1][0])
-    return picklist + "</SELECT>\n"
+
 
 #----------------------------------------------------------------------
 # Get the information for the Board Manager
@@ -186,349 +182,123 @@ SELECT path, value
  AND   doc_id = ?
  ORDER BY path""", orgId)
 
+        return cursor.fetchall()
     except cdrdb.Error, info:
         cdrcgi.bail('Database query failure for BoardManager: %s' % info[1][0])
-    return cursor.fetchall()
+
 
 #----------------------------------------------------------------------
-# Extract the relevant information from the HTML snippet (which is
-# created using the filter modules)
-# The phone, fax, email information has been wrapped with the 
-# respective elements in the filter for the summary sheet flavor
+# This function creates the columns/column headings for the table.
+# We're including all headings in a list to ensure a given sort order.
 #----------------------------------------------------------------------
-def extractSheetInfo(boardInfo):
-    #cdrcgi.bail(boardInfo)
-    myName  = boardInfo.split('<b>')[1].split('</b>')[0]
-    #myTitle = boardInfo.split('<br>')[1]
-    if boardInfo.find('<Phone>') > -1:
-        try:
-            myPhone = boardInfo.split('<Phone>')[1].split('</Phone>')[0]
-        except:
-            cdrcgi.bail(boardInfo)
-    else:
-        myPhone = ''
-
-    if boardInfo.find('<Email>') > -1:
-        try:
-            myEmail = boardInfo.split('<Email>')[1].split('</Email>')[0]
-        except:
-            cdrcgi.bail(boardInfo)
-    else:
-        myEmail = ''
-
-    if boardInfo.find('<Fax>') > -1:
-        try:
-            myFax   = boardInfo.split('<Fax>')[1].split('</Fax>')[0]
-        except:
-            cdrcgi.bail(boardInfo)
-    else:
-        myFax   = ''
+def makeColumns(cols):
+    nameWidth = 250
+    colWidth  = 100
+    columns = [cdrcgi.Report.Column('Name', width='%dpx' % nameWidth)]
+    pageWidth = 1000
+    for label, field in (
+        ("Phone", "phone"), 
+        ("Fax", "fax"), 
+        ("Email", "email"), 
+        ("CDR-ID", "cdr-id"), 
+        ("Start Date", "start-date"), 
+        ("Gov. Empl.", "employee"),
+        ("Area of Exp.", "expertise"), 
+        ("Member Subgrp", "subgroup"),
+        ("Term End Date", "end-date"),
+        ("Affil. Name", "affiliation"),
+        ("Contact Mode", "mode"),
+        ("Assist. Name", "assistant-name"),
+        ("Assist. Email", "assistant-email")
+    ):
+        if field in cols:
+            columns.append(cdrcgi.Report.Column(label))
     
-    return [myName, myPhone, myFax, myEmail]
-
-
-#----------------------------------------------------------------------
-# Add the specific information to the boardInfo records
-#----------------------------------------------------------------------
-def addSpecificContactInfo(boardIds, boardInfo):
-    newBoardInfo = []
-    try:
-        cursor.execute("""\
-    SELECT g.doc_id, g.value AS GE, h.value, q.value as SpPhone, 
-           f.value as SpFax, e.value as SpEmail
-      FROM query_term g
-LEFT OUTER JOIN query_term h
-        ON g.doc_id = h.doc_id
-       AND h.path = '/PDQBoardMemberInfo/GovernmentEmployee/@HonorariaDeclined'
-LEFT OUTER JOIN query_term f
-        ON g.doc_id = f.doc_id
-       AND f.path = '/PDQBoardMemberInfo/BoardMemberContact' +
-                    '/SpecificBoardMemberContact/BoardContactFax'
-LEFT OUTER JOIN query_term e
-        ON g.doc_id = e.doc_id
-       AND e.path = '/PDQBoardMemberInfo/BoardMemberContact/' +
-                    'SpecificBoardMemberContact/BoardContactEmail'
-LEFT OUTER JOIN query_term q
-        ON g.doc_id = q.doc_id
-       AND q.path = '/PDQBoardMemberInfo/BoardMemberContact' +
-                    '/SpecificBoardMemberContact/BoardContactPhone'
-     WHERE g.doc_id IN (%s)
-       AND g.path = '/PDQBoardMemberInfo/GovernmentEmployee'
-  ORDER BY q.path""" % ','.join(["'%d'" % id for id in boardIds]))
-    except cdrdb.Error, info:
-        cdrcgi.bail('Database query failure for SpecificInfo: %s' % info[1][0]+
-                    '<br>Board has No Board Members')
-
-    rows = cursor.fetchall()
-
-    # Add the specific info to the boardInfo records
-    # ----------------------------------------------
-    for member in boardInfo:
-        memCount = len(member)
-        for cdrId, ge, honor, phone, fax, email in rows:
-            if member[4] == cdrId:
-                member = member + [ge, honor or None, phone or None, 
-                                   fax or None, email or None]
-        if memCount == len(member):
-            member = member + [None, None, None, None, None]
-        newBoardInfo.append(member)
-    return newBoardInfo
-
-
-# ---------------------------------------------------------------------
-# A non-government employee may decline to receive a honorarium.  
-# Returning the appropriate value for the person.
-# ---------------------------------------------------------------------
-def checkHonoraria(govEmployee, declined = u''):
-    if govEmployee == 'Yes':
-        return u''
-    elif govEmployee == u'Unknown':
-        return u''
-    elif govEmployee == 'No':
-        if declined == 'Yes':
-            return u'*'
+    # Adding blank columns and adjusting the width to the number of
+    # already existing columns
+    # -------------------------------------------------------------
+    if extra > 0:
+        remainWidth = pageWidth - nameWidth - (len(columns) - 1) * colWidth
+        if remainWidth > 0:
+            blankWidth = remainWidth / extra
         else:
-            return u''
+            blankWidth = colWidth
+        for col in range(extra):
+            width = colWidths and int(colWidths[col]) or blankWidth
+            columns.append(cdrcgi.Report.Column(" ", width="%dpx" % width))
+
+    return columns
 
 
-#----------------------------------------------------------------------
-# Once the information for all board members has been collected create
-# the HTML table to be displayed
-#----------------------------------------------------------------------
-def makeSheet(rows):
-    # Create the table and table headings
-    # ===================================
-    rowCount = 0
-    html = """
-        <tr class="theader">"""
-    for k, v in [('Name', 'Yes'), ('Phone', phone), ('Fax', fax), 
-              ('Email', email), ('CDR-ID', cdrid), 
-              ('Start Date', startDate), ('Gov. Empl.', govEmp),
-              ### ('Rec. Honor.', recHonor), 
-              ('&nbsp;', blankCol)]:
-        if v == 'Yes':
-            rowCount += 1
-            html += """
-         <th class="thcell">%s</th>""" % k
+# ----------------------------------------------------------------------
+# Table post Process
+# Add additional CSS
+# ----------------------------------------------------------------------
+def post(table, page):
+    page.add_css("td.footer { background-color: white; font-weight: bold; }")
+    page.add_css("table.report { border-collapse: collapse;}\n")
+    page.add_css(".report td, .report th { border: 1px black solid; }\n")
+    page.add_css(".report td.footer { border: none; }\n")
 
-    html += """
-        </tr>"""
+# ----------------------------------------------------------------------
+# Callback function to format multiple email addresses in one cell
+# for the HTML output
+# ----------------------------------------------------------------------
+def email_format(cell, fmt):
+    if fmt != "html":
+        return None
+    B = cdrcgi.Page.B
+    td = B.TD()
+    br = None
+    for address in cell.values():
+        a = B.A(address, href="mailto:%s" % address)
+        if br is not None:
+            td.append(br)
+        td.append(a)
+        br = B.BR()
+    return td
 
-    # Populate the table with data rows
-    # =================================
-    # for row in name, phone, fax, email, cdrid, termStardDate, 
-    # govEmpl, recHonor, spPhone, ...
-    # ----------------------------------------------------------
-    for row in rows:
-       html += """
-        <tr>
-         <td class="name">%s</td>""" % row[0]
-       # Phone, Fax, Email may also have specific info
-       # ---------------------------------------------
-       if phone == 'Yes':
-           html += """
-         <td class="phone">%s""" % row[1]
-           if row[1] and row[8]:
-               html += "<br>%s</td>" % row[8]
-           elif not row[1] and row[8]:
-               html += "%s</td>" % row[8]
-           else:
-               html += "</td>"
 
-       if fax   == 'Yes':
-           html += """
-         <td class="fax">%s""" % row[2]
-           if row[2] and row[9]:
-               html += "<br>%s</td>" % row[9]
-           elif not row[2] and row[9]:
-               html += u"%s</td>" % row[9]
-           else:
-               html += u"</td>"
-
-       if email == 'Yes':
-           html += u"""
-         <td class="email">
-          <a href="mailto:%s">%s</a>
-         """ % (row[3], row[3])
-           if row[3] and row[10]:
-               html += u"""<br>
-          <a href="mailto:%s">%s</a>
-         """ % (row[10], row[10])
-           elif not row[3] and row[10]:
-               html += u"""
-          <a href="mailto:%s">%s</a>
-         </td>""" % (row[10], row[10])
-           else:
-               html += "</td>"
-
-       # If the CDR-ID is to be printed
-       # ------------------------------
-       if cdrid == 'Yes':
-           html += u"""
-         <td class="cdrid">%s</td>""" % row[4]
-       if startDate == 'Yes':
-           html += u"""
-         <td class="cdrid">%s</td>""" % row[5]
-
-       # If the Government Employee column is printed
-       # --------------------------------------------
-       if govEmp == 'Yes':
-           if row[7] is None:
-               declined = u''
-           else:
-               declined = row[7]
-
-           # The field Govt Employee is mandatory but was empty for
-           # some documents during testing.
-           # ------------------------------------------------------
-           if row[6] is None: row[6] = u'Unknown'
-
-           html += u"""
-         <td class="cdrid">%s<sup><b>%s</b></sup></td>""" % (row[6],
-                                               checkHonoraria(row[6], declined))
-       ### if recHonor == 'Yes':
-       ###     html += u"""
-       ###   <td class="cdrid">%s</td>""" % (not(row[7]) and u'Yes' or u'No')
-
-       # If a blank column is printed
-       # ----------------------------
-       if blankCol == 'Yes':
-           html += u"""
-         <td class="blank">&nbsp;</td>"""
-       html += u"""
-        </tr>"""
-
-    return (html, rowCount)
+# *********************************************************************
+# Main program starts here
+# *********************************************************************
 
 #----------------------------------------------------------------------
 # If we don't have a request, put up the form.
 #----------------------------------------------------------------------
+boardId = fields.getvalue("board")
 if not boardId:
-    form   = """\
-  <input TYPE='hidden' NAME='%s' VALUE='%s'>
+    show_form()
 
-  <table>
-   <tr>
-    <td class="label">PDQ Board:&nbsp;</TD>
-    <td>%s</td>
-   </tr>
-   <tr>
-    <td> </td>
-    <td class="select">
-     <input type='checkbox' name='oinfo' id='contact'
-            onclick='jacascript:doFullReport()'>
-     <label for="contact">Show All Contact Information</label>
-    </td>
-   </tr>
-   <tr>
-    <td> </td>
-    <td class="select">
-     <input type='checkbox' name='sginfo' id='subgroup'
-            onclick='javascript:doFullReport()'>
-     <label for="subgroup">Show Subgroup Information</label>
-    </td>
-   </tr>
-   <tr>
-    <td> </td>
-    <td class="select">
-     <input type='checkbox' name='ainfo' id='assistant'
-            onclick='javascript:doFullReport()'>
-     <label for="assistant">Show Assistant Information</label>
-    </td>
-   </tr>
-   <tr>
-    <td colspan="2">
-     <div style="height: 10px"> </div>
-    </td>
-   </tr>
-   <tr>
-    <td> </td>
-    <td class="grey">
-     <div style="height: 10px"> </div>
-     <input TYPE='checkbox' NAME='sheet' id='summary'
-            onclick='javascript:doSummarySheet("summary")'>
-      <label for="summary" class="select">
-       <strong>Create Summary Sheet</strong>
-      </label>
-     <table>
-      <tr>
-       <th><span style="margin-left: 20px"> </span></th>
-       <th class="label2">Include Columns</th>
-      <tr>
-       <td><span style="margin-left: 20px"> </span></td>
-       <td class="select">
-        <input type='checkbox' name='pinfo' 
-               onclick='javascript:doSummarySheet()' id='E1' CHECKED>
-        <label for="E1">Phone</label>
-       </td>
-      </tr>
-      <tr>
-       <td> </td>
-       <td class="select">
-        <input type='checkbox' name='finfo' 
-               onclick='javascript:doSummarySheet()' id='E2'>
-        <label for="E2">Fax</label>
-       </td>
-      </tr>
-      <tr>
-       <td> </td>
-       <td class="select">
-        <input type='checkbox' name='einfo' 
-               onclick='javascript:doSummarySheet()' id='E3'>
-        <label for="E3">Email</label>
-       </td>
-      </tr>
-      <tr>
-       <td> </td>
-       <td class="select">
-        <input type='checkbox' name='cinfo' 
-               onclick='javascript:doSummarySheet()' id='E4'>
-        <label for="E4">CDR-ID</label>
-       </td>
-      </tr>
-      <tr>
-       <td> </td>
-       <td class="select">
-        <input type='checkbox' name='dinfo' 
-               onclick='javascript:doSummarySheet()' id='E5'>
-        <label for="E5">Start Date</label>
-       </td>
-      </tr>
-      <tr>
-       <td> </td>
-       <td class="select">
-        <input type='checkbox' name='govemp' 
-               onclick='javascript:doSummarySheet()' id='E7'>
-        <label for="E7">Government Employee</label>
-       </td>
-      </tr>
-      <!--
-      <tr>
-       <td> </td>
-       <td class="select">
-        <input type='checkbox' name='honoraria' 
-               onclick='javascript:doSummarySheet()' id='E8'>
-        <label for="E8">Receives Honoraria</label>
-       </td>
-      </tr>
-      -->
-      <tr>
-       <td> </td>
-       <td class="select">
-        <input type='checkbox' name='blank' 
-               onclick='javascript:doSummarySheet()' id='E6'>
-        <label for="E6">Blank Column</label>
-       </td>
-      </tr>
-     </table>
-    </td>
-   </tr>
-   </table>
-  </form>
- </body>
-</html>
-""" % (cdrcgi.SESSION, session, getBoardPicklist())
-    cdrcgi.sendPage(header + form)
+#----------------------------------------------------------------------
+# Get the rest of request variables.
+#----------------------------------------------------------------------
+boardId    = int(boardId)
+flavor     = fields.getvalue("report-type") or "full"
+full_opts  = set(fields.getlist("full-opts"))
+cols       = set(fields.getlist("columns"))
+blankInfo  = fields.getvalue("blank")  or '0'
+otherInfo  = "other" in full_opts and "Yes" or "No"
+assistant  = "assistant" in full_opts and "Yes" or "No"
+subgroup   = "subgroup" in full_opts and "Yes" or "No"
+
+# If blank columns are specified with a width specifier extract 
+# the width and make sure we have enough values for each column
+# The width would be specified in pixels with values separated
+# by spaces, for example  '3:20 40 60' will add 3 columns with 
+# a width of 20px, 40px, and 60px respectively.
+# -------------------------------------------------------------
+blankCol = blankInfo.split(':')[0]
+extra = int(blankCol)
+colWidths = None
+
+# This test only makes sense for non-Excel output of the summary sheet
+# --------------------------------------------------------------------
+if flavor == 'summary' and len(blankInfo.split(':')) == 2 \
+                       and fields.getvalue("format") == 'html':
+    colWidths = blankInfo.split(':')[1].split()
+    if len(colWidths) < extra:
+        cdrcgi.bail('Not enough values for column widths specified!')
 
 #----------------------------------------------------------------------
 # Get the board's name from its ID.
@@ -539,16 +309,209 @@ boardName = getBoardName(boardId)
 # Object for one PDQ board member.
 #----------------------------------------------------------------------
 class BoardMember:
-    now = time.strftime("%Y-%m-%d")
+    today = str(datetime.date.today())
     def __init__(self, docId, eic_start, eic_finish, term_start, name):
-        self.id        = docId
-        self.name      = cleanTitle(name)
-        self.isEic     = (eic_start and eic_start <= BoardMember.now and
-                          (not eic_finish or eic_finish > BoardMember.now))
-        self.eicSdate  = eic_start
-        self.eicEdate  = eic_finish
+        """
+        Seed the object with a few initial values
+
+        Create the remaining members needed for the summary flavor or
+        the report.
+        """
+        self.id = docId
+        self.name = cleanTitle(name)
+        self.isEic = (eic_start and eic_start <= BoardMember.today and
+                      (not eic_finish or eic_finish > BoardMember.today))
+        self.eicSdate = eic_start
+        self.eicEdate = eic_finish
         self.termSdate = term_start
+
+        # Get these values later, with finish_object().
+        self.fullName = self.phone = self.fax = self.email = None
+        self.governmentEmployee = self.honorariaDeclined = None
+        self.specificPhone = self.specificFax = self.specificEmail = None
+        self.termEndDate = None
+        self.contactMode = self.assistantName = self.assistantEmail = None
+        self.affiliations = []
+        self.subgroups = []
+        self.expertises = []
+        self.finished = False
+
+    def get_phones(self):
+        """
+        Assemble a de-duplcated list of email addresses
+        """
+        phones = []
+        if self.phone:
+            phones.append(self.phone)
+        if self.specificPhone and self.specificPhone != self.phone:
+            phones.append(self.specificPhone)
+        return phones or ""
+
+    def get_faxes(self):
+        """
+        Assemble a de-duplicated list of fax addresses
+        """
+        faxes = []
+        if self.fax:
+            faxes.append(self.fax)
+        if self.specificFax and self.specificFax != self.fax:
+            faxes.append(self.specificFax)
+        return faxes or ""
+
+    def get_emails(self):
+        """
+        Assemble the cell to show the email addresses
+
+        De-duplicate and register a callback so we can render
+        multiple addresses with hyperlink markup.
+        """
+        emails = []
+        if self.email:
+            emails.append(self.email)
+        if self.specificEmail:
+            se = self.specificEmail
+            if not self.email or self.email.lower() != se.lower():
+                emails.append(se)
+        if not emails:
+            return ""
+        return cdrcgi.Report.Cell(emails, callback=email_format)
+
+    def get_employee_status(self):
+        """
+        Format the cell indicating whether the member is a fed
+
+        Add a footnote for non-employees who have declined the
+        honariariam to which they are entitled.
+        """
+        status = self.governmentEmployee or "Unknown"
+        if status == "No" and self.honorariaDeclined == "Yes":
+            return "No^*"
+        return status
+
+    def make_row(self, cols, extra):
+        """
+        Assemble an array of cells, based on which columns are requested
+        """
+        self.finish_object()
+        row = [cdrcgi.Report.Cell(self.fullName, bold=True)]
+        if "phone" in cols:
+            row.append(self.get_phones())
+        if "fax" in cols:
+            row.append(self.get_faxes())
+        if "email" in cols:
+            row.append(self.get_emails())
+        if "cdr-id" in cols:
+            row.append(self.id)
+        if "start-date" in cols:
+            row.append(self.termSdate)
+        if "employee" in cols:
+            row.append(self.get_employee_status())
+        if "expertise" in cols:
+            row.append(self.expertises or "")
+        if "subgroup" in cols:
+            row.append(self.subgroups or "")
+        if "end-date" in cols:
+            row.append(cdrcgi.Report.Cell(self.termEndDate or "", 
+                       classes=("emphasis", "center")))
+        if "affiliation" in cols:
+            row.append(self.affiliations or "")
+        if "mode" in cols:
+            row.append(self.contactMode or "")
+        if "assistant-name" in cols:
+            row.append(self.assistantName or "")
+        if "assistant-email" in cols:
+            if self.assistantEmail:
+                url = "mailto:%s" % self.assistantEmail
+                row.append(cdrcgi.Report.Cell(self.assistantEmail, href=url))
+            else:
+                row.append("")
+        for col in range(extra):
+            row.append("")
+        return row
+
+    def parse(self, fragments):
+        """
+        Extract name and contact info from HTML fragments
+        """
+        nodes = lxml.html.fragments_fromstring(fragments)
+        for node in nodes:
+            try:
+                if node.tag == "b":
+                    self.fullName = node.text
+                elif node.tag == "table":
+                    for child in node.findall("tr/td/phone"):
+                        self.phone = child.text
+                    for child in node.findall("tr/td/fax"):
+                        self.fax = child.text
+                    for child in node.findall("tr/td/email"):
+                        self.email = child.text
+            except:
+                # Ignore non-element nodes (e.g., "Inactive - ")
+                pass
+
+    def finish_object(self):
+        """
+        Find the rest of the information needed for the summary report
+        """
+        if self.finished:
+            return
+        cursor.execute("SELECT xml FROM document WHERE id = ?", self.id)
+        root = etree.XML(cursor.fetchall()[0][0].encode("utf-8"))
+        aoe = sgrp = termEndDate = aName = cMode = asName = asEmail = None
+        for node in root:
+            if node.tag == "BoardMembershipDetails":
+                for child in node:
+                    if child.tag == "AreaOfExpertise":
+                        self.expertises.append(child.text)
+                    elif child.tag == "MemberOfSubgroup":
+                        self.subgroups.append(child.text)
+                    elif child.tag == "TermRenewalFrequency":
+                        # Need to calculate the term end date from the 
+                        # start date and renewal frequency
+                        # --------------------------------------------
+                        termRenewal = child.text
+                        frequency = {'Every year':1, 
+                                     'Every two years':2}
+                        year = datetime.timedelta(365)
+
+                        try:
+                            if self.termSdate:
+                                termStart = datetime.datetime.strptime(
+                                                 self.termSdate, '%Y-%m-%d')
+                                termEnd = (termStart + 
+                                             frequency[termRenewal] * year)
+                                self.termEndDate = termEnd.strftime('%Y-%m-%d')
+                        except:
+                            cdrcgi.bail('Invalid date format on ' +
+                                        'TermStartDate for: %s - %s' % (
+                                         self.fullName, self.termSdate))
+            elif node.tag == "Affiliations":
+                for child in node.findall("Affiliation/AffiliationName"):
+                    self.affiliations.append(child.text)
+            elif node.tag == "BoardMemberContactMode":
+                self.contactMode = node.text
+            elif node.tag == "BoardMemberAssistant":
+                for child in node:
+                    if child.tag == "AssistantName":
+                        self.assistantName = child.text
+                    elif child.tag == "AssistantEmail":
+                        self.assistantEmail = child.text
+            elif node.tag == "GovernmentEmployee":
+                self.governmentEmployee = node.text
+                self.honorariaDeclined = node.get("HonorariaDeclined")
+            elif node.tag == "BoardMemberContact":
+                for child in node.findall("SpecificBoardMemberContact/*"):
+                    if child.tag == "BoardContactFax":
+                        self.specificFax = child.text
+                    if child.tag == "BoardContactEmail":
+                        self.specificEmail = child.text
+                    if child.tag == "BoardContactPhone":
+                        self.specificPhone = child.text
+        self.finished = True
     def __cmp__(self, other):
+        """
+        Sort editors-in-chief before others, subgroup by name
+        """
         if self.isEic == other.isEic:
             return cmp(self.name.upper(), other.name.upper())
         elif self.isEic:
@@ -593,7 +556,8 @@ try:
              AND person.path  = '/PDQBoardMemberInfo/BoardMemberName/@cdr:ref'
              AND curmemb.value = 'Yes'
              AND person_doc.active_status = 'A'
-             AND member.int_val = ?""", boardId, timeout = 300)
+             AND member.int_val = ?
+""", boardId, timeout = 300)
     rows = cursor.fetchall()
     boardMembers = []
     boardIds     = []
@@ -606,10 +570,12 @@ try:
 except cdrdb.Error, info:
     cdrcgi.bail('Database query failure: %s' % info[1][0])
 
-# ---------------------------------------------------------------
-# Create the HTML Output Page
-# ---------------------------------------------------------------
-html = """\
+
+if flavor == 'full':
+    # ---------------------------------------------------------------
+    # Create the HTML Output Page
+    # ---------------------------------------------------------------
+    html = """\
 <!DOCTYPE HTML PUBLIC '-//W3C//DTD HTML 4.01 Transitional//EN'
                       'http://www.w3.org/TR/html4/loose.dtd'>
 <html>
@@ -658,12 +624,15 @@ html = """\
  <body id="main">
 """ % boardName
 
-if flavor == 'full':
     html += """
    <h1>%s<br><span style="font-size: 12pt">%s</span></h1>
 """ % (boardName, dateString)   
+else:
+    otherInfo = assistant = "No"
 
-count = 0
+# ------------------------------------------------------------------------
+# Collect all of the data for the board members
+# ------------------------------------------------------------------------
 for boardMember in boardMembers:
     response = cdr.filterDoc('guest',
                              ['set:Denormalization PDQBoardMemberInfo Set',
@@ -684,7 +653,7 @@ for boardMember in boardMembers:
     # information from the HTML snippet
     #
     # We need to wrap each person in a table in order to prevent
-    # page breaks within address blocks after the convertion to 
+    # page breaks within address blocks after the conversion to 
     # MS-Word.
     # -----------------------------------------------------------
     if flavor == 'full':
@@ -695,71 +664,67 @@ for boardMember in boardMembers:
          </tr>
         </table>""" % unicode(response[0], 'utf-8')
     else:
-        row = extractSheetInfo(response[0])
-        row = row + [boardMember.id] + [boardMember.termSdate]
-        allRows.append(row)
+        boardMember.parse(response[0])
  
 # Create the HTML table for the summary sheet
 # -------------------------------------------
 if flavor == 'summary':
-    allRows = addSpecificContactInfo(boardIds, allRows)
-    out  = makeSheet(allRows)
-    html += u"""\
-       <table id="summary" cellspacing="0" cellpadding="5">
-        <tr>
-         <td id="hdg" colspan="%d">%s<br>
-           <span style="font-size: 12pt">%s</span>
-         </td>
-        </tr>
-        %s
-       </table>
-""" % (out[1], boardName, dateString, out[0])   
+    rows = [member.make_row(cols, extra) for member in boardMembers]
+    if "employee" in cols:
+        rows.append([cdrcgi.Report.Cell("* - Honoraria Declined", 
+                                        colspan=len(cols) + 1,
+                                        classes="footer")])
+    caption = [boardName, dateString]
+    columns = makeColumns(cols)
+    table = cdrcgi.Report.Table(columns, rows, caption=caption,
+                                html_callback_post=post)
+    report = cdrcgi.Report('%s - %s' % (boardName, dateString), [table])
+    report.send(fields.getvalue("format"))
 
-    if govEmp == 'Yes':
-        html += u"""\
-       <b>* - Honoraria Declined</b>
-       <br/>"""
 
-boardManagerInfo = getBoardManagerInfo(boardId)
+# At the end collect the information for the board manager
+# --------------------------------------------------------
+if flavor == 'full':
+    boardManagerInfo = getBoardManagerInfo(boardId)
 
-html += u"""
-  <br>
-  <table width='100%%'>
-   <tr>
-    <td>
-     <b><u>Board Manager Information</u></b><br>
-     <b>%s</b><br>
-     Office of Cancer Content Management (OCCM)<br>
-     Office of Communications and Education<br>
-     National Cancer Institute<br>
-     9609 Medical Center Drive, MSC 9760<br>
-     Rockville, MD 20850<br><br>
-     <table border="0" width="100%%" cellspacing="0" cellpadding="0">
-      <tr>
-       <td width="35%%">Phone</td>
-       <td width="65%%">%s</td>
-      </tr>
-      <tr>
-       <td>Fax</td>
-       <td>240-276-7679</td>
-      </tr>
-      <tr>
-       <td>Email</td>
-       <td><a href="mailto:%s">%s</a></td>
-      </tr>
-     </table>
-       </td>
-   </tr>
-  </table>
- </body>   
-</html>    
-""" % (boardManagerInfo and boardManagerInfo[0][1] or 'No Board Manager', 
-       boardManagerInfo and boardManagerInfo[2][1] or 'TBD',
-       boardManagerInfo and boardManagerInfo[1][1] or 'TBD', 
-       boardManagerInfo and boardManagerInfo[1][1] or 'TBD')
+    html += u"""
+      <br>
+      <table width='100%%'>
+       <tr>
+        <td>
+         <b><u>Board Manager Information</u></b><br>
+         <b>%s</b><br>
+         Office of Cancer Content Management (OCCM)<br>
+         Office of Communications and Education<br>
+         National Cancer Institute<br>
+         9609 Medical Center Drive, MSC 9760<br>
+         Rockville, MD 20850<br><br>
+         <table border="0" width="100%%" cellspacing="0" cellpadding="0">
+          <tr>
+           <td width="35%%">Phone</td>
+           <td width="65%%">%s</td>
+          </tr>
+          <tr>
+           <td>Fax</td>
+           <td>240-276-7679</td>
+          </tr>
+          <tr>
+           <td>Email</td>
+           <td><a href="mailto:%s">%s</a></td>
+          </tr>
+         </table>
+           </td>
+       </tr>
+      </table>
+     </body>   
+    </html>    
+    """ % (boardManagerInfo and boardManagerInfo[0][1] or 'No Board Manager', 
+           boardManagerInfo and boardManagerInfo[2][1] or 'TBD',
+           boardManagerInfo and boardManagerInfo[1][1] or 'TBD', 
+           boardManagerInfo and boardManagerInfo[1][1] or 'TBD')
 
-# The users don't want to display the country if it's the US.
-# Since the address is build by a common address module we're
-# better off removing it in the final HTML output
-# ------------------------------------------------------------
-cdrcgi.sendPage(html.replace('U.S.A.<br>', ''))
+    # The users don't want to display the country if it's the US.
+    # Since the address is build by a common address module we're
+    # better off removing it in the final HTML output
+    # ------------------------------------------------------------
+    cdrcgi.sendPage(html.replace('U.S.A.<br>', ''))
