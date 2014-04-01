@@ -91,3 +91,37 @@ label.clickable:hover { color: white; background-color: #936; }
 .warning { color: green; }
 .hidden { display: none; }
 .labeled-field input, .labeled-field select { width: 300px; }
+.checkbox-form { background-color: #dfdfdf; color: navy; }
+.checkbox-form h3 { font: 16pt Arial bold; }
+.checkbox-form h4 { font: 14pt Arial bold; }
+.checkbox-form header { margin-bottom: 35px; }
+table.checkboxes { background: transparent; margin: 15px; }
+table.checkboxes td {
+    background: transparent;
+    border: none;
+    color: navy;
+    font: 10pt Arial;
+}
+table.checkboxes td a {
+    color: navy;
+    background: transparent;
+    text-decoration: none;
+    font: 10pt Arial;
+}
+/*
+table { background-color: white; margin: 5px auto; border-collapse:collapse; }
+table caption {
+    background-color: #936;
+    font-weight: bold;
+    font-size: 12pt;
+    padding: 5px;
+    color: white;
+    border: 2px solid white;
+}
+table caption p { font-weight: normal; font-size: 10pt; }
+th { background-color: #936; color: white; }
+th { background-color: #696969; }
+td { background-color: #e4e4e4; vertical-align: top; }
+td { background-color: #ccc; }
+th, td { font-size: 11pt; padding: 2px; border: 1px solid black; }
+*/
