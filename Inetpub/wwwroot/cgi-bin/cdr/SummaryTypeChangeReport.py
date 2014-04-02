@@ -49,6 +49,13 @@ def fatal(msg, log=False):
         cdr.logwrite("Summary Type Change Report - Error: %s" % msg)
     cdrcgi.bail(msg)
 
+def tableSpacer(table, page):
+    """
+    Put some space before or after a table.
+    """
+    cdr.logwrite("tableSpacer called")
+    page.add_css("table { margin-top: 25px; }")
+
 class DocChanges:
     """
     All of the information about changes made to one Summary document.
@@ -148,6 +155,14 @@ class TOCConfig:
         self.startDate = fields.getvalue("startDate", MIN_DATE)
         self.endDate   = fields.getvalue("endDate", MAX_DATE)
         self.sortOrder = fields.getvalue("sortOrder")
+
+        # Human readable forms of start and end date
+        self.startShowDate = self.startDate
+        if self.startDate == MIN_DATE:
+            self.startShowDate = 'Beginning'
+        self.endShowDate = self.endDate
+        if self.endDate == MAX_DATE:
+            self.endShowDate = time.strftime('%Y-%m-%d')
 
         # Language is a required field.  If not there we haven't been
         #  through the input form yet and can't get other info
@@ -494,12 +509,13 @@ class OutputReport:
             if self.cfg.repType == 'basic':
                 caption = 'Type of Change Report (Most Recent Change)'
             else:
-                caption = 'Type of Change Report (All Changes by Summary)'
+                caption = ['Type of Change Report (All Changes by Summary)',
+                 '%s - %s' % (self.cfg.startShowDate, self.cfg.endShowDate)]
 
             # Create the one and only table
-            options = {'banner': BANNER, 'subtitle': SUBBANNER}
-            tables.append(cdrcgi.Report.Table(self.cols, rows,
-                          caption=caption, options=options))
+            options = {'banner': BANNER, 'subtitle': SUBBANNER,
+                       'caption': caption}
+            tables.append(cdrcgi.Report.Table(self.cols, rows, **options))
 
         # Advanced report sorted by type of change
         else:
@@ -557,15 +573,16 @@ class OutputReport:
         Return:
             Populated object.
         """
-        caption   = "Type of Change Report (%s)" % tocType
+        caption   = ["Type of Change Report", tocType,
+                 '%s - %s' % (self.cfg.startShowDate, self.cfg.endShowDate)]
 
         # Use first word of the type of change as a worksheet name
         words     = tocType.split()
         sheetName = words[0]
-        options   = {'sheet_name': sheetName}
 
         # Create and return the new table
-        return cdrcgi.Report.Table(cols, rows, caption=caption, **options)
+        return cdrcgi.Report.Table(cols, rows, caption=caption,
+                       sheet_name=sheetName, html_callback_pre=tableSpacer)
 
     def createColumns(self):
         """
@@ -578,7 +595,7 @@ class OutputReport:
         columns = []
 
         # Leftmost column is always a doc title and ID
-        columns.append(cdrcgi.Report.Column('Summary', width='150px'))
+        columns.append(cdrcgi.Report.Column('Summary', width='220px'))
 
         # Basic reports need cols for types of change and comments
         if self.cfg.repType == 'basic':
@@ -1049,8 +1066,6 @@ def extractTOC(cursor, docChg, requestedTypes,
         docChg.addChange(typeTxt, dateTxt, comments)
 
     return
-
-
 
 #----------------------------------------------------------------------
 # MAIN
