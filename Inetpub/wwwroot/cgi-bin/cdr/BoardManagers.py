@@ -124,22 +124,23 @@ for choice in (
     ('SummaryChanges.py',          'History of Changes to Summary'),
     ('SummaryCitations.py',        'Summaries Citations'          ),
     ('SummaryComments.py',         'Summaries Comments'           ),
-    ('SummaryCRD.py',              
+    ('SummaryCRD.py',
                       'Summaries Comprehensive Review Date Report'),
     ('SummaryDateLastModified.py', 'Summaries Date Last Modified' ),
     ('SummariesLists.py',          'Summaries Lists'              ),
     ('SummariesWithMarkup.py',     'Summaries Markup Report'      ),
     ('SummaryMetaData.py',         'Summaries Metadata'           ),
     ('SummariesTocReport.py',      'Summaries TOC Lists'          ),
-    ('SummariesWithProtocolLinks.py',      
+    ('SummaryTypeChangeReport.py?','Summaries Type Of Change'     ),
+    ('SummariesWithProtocolLinks.py',
                       'Summaries with Protocols Links/Refs Report'),
-    ('SummariesWithNonJournalArticleCitations.py',      
+    ('SummariesWithNonJournalArticleCitations.py',
              'Summaries with Non-Journal Article Citations Report')
     ):
     form += """\
     <LI><a href='%s/%s?%s'>%s</a></LI>
 """ % (cdrcgi.BASE, choice[0], session, choice[1])
-    
+
 form += """\
    </OL>
    <H2>Board Member Information Reports</H2>
@@ -156,7 +157,7 @@ for choice in (
     form += """\
     <LI><a href='%s/%s?DocType=PDQBoardMemberInfo&%s'>%s</a></LI>
 """ % (cdrcgi.BASE, choice[0], session, choice[1])
-    
+
 cdrcgi.sendPage(header + form + """\
    </OL>
    <H2>Miscellaneous Document QC Report</H2>
