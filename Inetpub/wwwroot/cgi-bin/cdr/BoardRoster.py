@@ -87,7 +87,7 @@ def show_form():
     form.add_checkbox("columns", "Assistant Name", "assistant-name")
     form.add_checkbox("columns", "Assistant E-mail", "assistant-email")
     form.add("</fieldset>")
-    form.add("<fieldset id='misc-options', class='hidden'>")
+    form.add("<fieldset id='misc-options' class='hidden'>")
     form.add(cdrcgi.Page.B.LEGEND("Miscellanous Summary Report Options"))
     form.add_text_field("blank", "Extra Cols", value="0",
                       classes="blanks")
