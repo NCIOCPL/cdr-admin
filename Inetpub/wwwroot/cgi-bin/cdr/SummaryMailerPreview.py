@@ -10,8 +10,29 @@ import cdrdb, cdrcgi, re, sys
 sys.path.insert(0, "d:\\cdr\\mailers")
 import cdr, cdrxmllatex, cgi, cdrcgi, os, tempfile
 
+#----------------------------------------------------------------------
+# Object for results of an external command.
+#----------------------------------------------------------------------
+class CommandResult:
+    def __init__(self, code, output, error = None):
+        self.code   = code
+        self.output = output
+        self.error  = error
+
+#----------------------------------------------------------------------
+# Run an external command.
+#----------------------------------------------------------------------
+def runCommand(command):
+    commandStream = os.popen('%s 2>&1' % command)
+    output = commandStream.read()
+    code = commandStream.close()
+    return CommandResult(code, output)
+
 LOPTS   = ("-halt-on-error -quiet -interaction batchmode "
            "-include-directory d:/cdr/mailers/style")
+#LOPTS   = ("-halt-on-error -interaction batchmode "
+#           "-include-directory d:/cdr/mailers/style")
+#LOPTS   = ("-interaction batchmode")
 fields  = cgi.FieldStorage()
 docId   = fields and fields.getvalue("DocId") or cdrcgi.bail("No Doc ID")
 digits  = re.sub(r"[^\d]+", "", docId)
@@ -51,16 +72,27 @@ try:
 except Exception, info:
     cdrcgi.bail("Cannot cd to %s" % abspath)
 latex   = cdrxmllatex.makeLatex (resp[0], docType, "")
-filename = "%s.tex" % docId
+filename = docId + ".tex"
+
 try:
     texFile  = open(filename, "wb")
     texFile.write(latex.getLatex())
     texFile.close()
 except:
     cdrcgi.bail("Cannot write %s" % filename)
+
 cmd = "latex %s %s" % (LOPTS, filename)
+cmd = '"D:\\Program Files\\MiKTeX\\miktex\\bin\\latex.EXE" %s %s' % (LOPTS, filename)
+
+# Accessing /tmp should always work and not result in permission problems
+# -----------------------------------------------------------------------
+# cmd = '/tmp/latex.exe %s %s' % (LOPTS, filename)
+# cmd = "/tmp/test.py"
+# cmd = '"D:\\Program Files\\MiKTeX\\miktex\\bin\\test.py" %s %s' % (LOPTS, filename)
+
 for unused in range(3):
-    commandResult = cdr.runCommand(cmd)
+    commandResult = runCommand(cmd)
+    # cdrcgi.bail(repr(commandResult.output))
     if commandResult.code:
         cdrcgi.bail("Failure running %s: %s" % (cmd, commandResult.output))
     #rc = os.system("latex %s %s" % (LOPTS, filename))
@@ -70,11 +102,11 @@ for unused in range(3):
 #if rc:
 #    cdrcgi.bail("Failure running dvips processor on %s.dvi" % docId)
 cmd = "dvips -q %s" % docId
-commandResult = cdr.runCommand(cmd)
+commandResult = runCommand(cmd)
 if commandResult.code:
     cdrcgi.bail("Failure running %s: %s" % (cmd, commandResult.output))
 try:
-    psFile = open("%s.ps" % docId)
+    psFile = open(docId + ".ps")
     psDoc  = psFile.read()
     psFile.close()
 except:
