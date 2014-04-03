@@ -53,7 +53,6 @@ def tableSpacer(table, page):
     """
     Put some space before or after a table.
     """
-    cdr.logwrite("tableSpacer called")
     page.add_css("table { margin-top: 25px; }")
 
 class DocChanges:
@@ -148,10 +147,10 @@ class TOCConfig:
         self.fields    = fields
         self.repType   = fields.getvalue("repType")
         self.oFormat   = fields.getvalue("oFormat")
-        self.spcCdrId  = fields.getvalue("byCdrid", None)
-        self.spcTitle  = fields.getvalue("byTitle", None)
-        self.audience  = fields.getvalue("audience", None)
-        self.language  = fields.getvalue("language", None)
+        self.spcCdrId  = fields.getvalue("byCdrid")
+        self.spcTitle  = fields.getvalue("byTitle")
+        self.audience  = fields.getvalue("audience")
+        self.language  = fields.getvalue("language")
         self.startDate = fields.getvalue("startDate", MIN_DATE)
         self.endDate   = fields.getvalue("endDate", MAX_DATE)
         self.sortOrder = fields.getvalue("sortOrder")
@@ -239,6 +238,10 @@ class TOCConfig:
                 Val = True  = Include comments
                       False = No comments
         """
+        # Check for all types, all comments, if so, no more to do
+        if self.fields.getvalue('allTcCm'):
+            return self.getAllTypesOfChange()
+
         # Insert the info to return here
         typeDict = {}
 
@@ -573,8 +576,13 @@ class OutputReport:
         Return:
             Populated object.
         """
+        plural_s = ''
+        if len(rows) > 1:
+            plural_s = 's'
         caption   = ["Type of Change Report", tocType,
-                 '%s - %s' % (self.cfg.startShowDate, self.cfg.endShowDate)]
+                 '%s - %s: (%d change%s)'
+                 % (self.cfg.startShowDate, self.cfg.endShowDate,
+                    len(rows), plural_s)]
 
         # Use first word of the type of change as a worksheet name
         words     = tocType.split()
@@ -667,16 +675,17 @@ class OutputReport:
                         continue
                     for key in self.cfg.sortedTypes:
 
-                        # If we have this type of change, append date
+                        # If we have this type of change, append date, comment
                         if chg[0] == key:
                             alreadySeenTocs.add(key)
                             row.append(chg[1])
+                            if self.cfg.requestedTypes[key]:
+                                row.append(chg[2] if chg[2] else EMPTY)
                         else:
-                            # Empty date
+                            # Empty date and, if needed, comment
                             row.append(EMPTY)
-                        # Comment or empty, but only if comments checked
-                        if self.cfg.requestedTypes[key]:
-                            row.append(chg[2] if chg[2] else EMPTY)
+                            if self.cfg.requestedTypes[key]:
+                                row.append(EMPTY)
 
                 # Add the one and only row to the returned sequence of rows
                 rows.append(row)
@@ -891,11 +900,11 @@ def createInputForm(session):
 
     <input class='radio' type='radio' name='repType' id='repBasic'
            value='basic' checked='checked'/>
-    <label class='radio' for='repBasic'>Basic &nbsp; &nbsp; </label>
+    <label class='radio' for='repBasic'>Basic (most recent change) &nbsp; </label>
 
     <input class='radio' type='radio' name='repType' id='repAdvanced'
            value='advanced' />
-    <label class='radio' for='repAdvanced'>Advanced</label>
+    <label class='radio' for='repAdvanced'>Advanced (all changes) </label>
     </fieldset>
 
     <fieldset>
@@ -951,8 +960,14 @@ def createInputForm(session):
    <div class='chgtypes'>
    <b>Types of Change</b>
    <fieldset>
-    <legend>&nbsp;Check change types + comments if desired&nbsp;</legend>
+    <legend>
+      &nbsp;Check desired change types + comments (Basic report only) &nbsp;
+    </legend>
    <table border = '0'>
+     <tr>
+      <td colspan='2'><input type='checkbox' name='allTcCm' value='allTcCm'
+           checked='checked'>All types and all comments (or select below)</td>
+     </tr>
 """
     for i in range(len(typesOfChange)):
         tocHtml += """
