@@ -25,6 +25,14 @@ def main():
     form = Form()
     form.send()
 
+def extract_board_name(doc_title):
+    board_name = doc_title.split(";")[0].strip()
+    board_name = board_name.replace("PDQ ", "").strip()
+    board_name = board_name.replace(" Editorial Board", "").strip()
+    if board_name.startswith("Cancer Complementary"):
+        board_name = board_name.replace("Cancer ", "").strip()
+    return board_name
+
 class Request:
     def __init__(self):
         self.fields = cgi.FieldStorage()
@@ -177,32 +185,39 @@ class Request:
         language = self.fields.getvalue("summary")
         if not language:
             cdrcgi.bail("Summary language not specified")
-        types = self.fields.getlist(language.lower())
-        if not types:
-            cdrcgi.bail("Summary type(s) not specified")
+        boards = self.fields.getlist(language.lower())
+        if not boards:
+            cdrcgi.bail("Summary boards(s) not specified")
         args = [language]
         caption = "Media Approved For Use With %s " % language
         m_path = "/Media/PermissionInformation/ApprovedUse/Summary/@cdr:ref"
         l_path = "/Summary/SummaryMetaData/SummaryLanguage"
-        t_path = "/Summary/SummaryMetaData/SummaryType"
+        b_path = "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"
+        t_path = "/Summary/TranslationOf/@cdr:ref"
         query = cdrdb.Query("query_term m", "m.doc_id").unique()
-        query.join("query_term l", "l.doc_id = m.int_val")
         query.where(query.Condition("m.path", m_path))
+        query.join("query_term l", "l.doc_id = m.int_val")
         query.where(query.Condition("l.path", l_path))
         query.where(query.Condition("l.value", language))
-        if "all" in types:
+        if "all" in boards:
             caption += "Summaries"
         else:
-            if len(types) == 1:
-                caption += "%s Summaries" % types[0]
-            elif len(types) == 2:
-                caption += "%s and %s Summaries" % (types[0], types[1])
+            names = [self.get_board_name(b) for b in boards]
+            if len(boards) == 1:
+                caption += "%s Summaries" % names[0]
+            elif len(boards) == 2:
+                caption += "%s and %s Summaries" % (names[0], names[1])
             else:
-                caption += ", ".join(types[:-1])
-                caption += ", and %s Summaries" % types[-1]
-            query.join("query_term t", "t.doc_id = l.doc_id")
-            query.where(query.Condition("t.path", t_path))
-            query.where(query.Condition("t.value", types, "IN"))
+                caption += ", ".join(names[:-1])
+                caption += ", and %s Summaries" % names[-1]
+            if language == "English":
+                query.join("query_term b", "b.doc_id = l.doc_id")
+            else:
+                query.join("query_term t", "t.doc_id = l.doc_id")
+                query.join("query_term b", "b.doc_id = t.int_val")
+                query.where(query.Condition("t.path", t_path))
+            query.where(query.Condition("b.path", b_path))
+            query.where(query.Condition("b.int_val", boards, "IN"))
         query.execute(self.cursor)
         return Results([row[0] for row in self.cursor.fetchall()], caption)
     def approvals_by_doctype(self):
@@ -240,6 +255,10 @@ class Request:
         query.execute(self.cursor)
         return Results([row[0] for row in self.cursor.fetchall()],
                        "Media Approved For Use With CDR%s" % doc_id)
+    def get_board_name(self, doc_id):
+        query = cdrdb.Query("document", "title")
+        query.where(cdrdb.Query.Condition("id", doc_id))
+        return extract_board_name(query.execute(self.cursor).fetchall()[0][0])
     class DateRange:
         def __init__(self, start, end):
             self.start, self.end = start, end
@@ -323,7 +342,7 @@ function clear_option_1() {
         self.add(self.B.LEGEND("OPTION 2: Specific Version"))
         choices = (
             ("Choose Document Type", "doctype"),
-            ("Select Summary Language and Summary Type", "summary"),
+            ("Select Summary Language and Board", "summary"),
             ("Enter the CDR ID of a certain summary or glossary term", "docid")
         )
         for label, value in choices:
@@ -362,30 +381,49 @@ function clear_option_2() {
         for label, value in choices:
             self.add_radio("doctype", label, value)
         self.add("</fieldset>")
+    def get_boards(self, query):
+        boards = []
+        for doc_id, doc_title in query.execute(self.cursor).fetchall():
+            boards.append((extract_board_name(doc_title), doc_id))
+        return sorted(boards)
     def summary_block(self):
         self.add('<fieldset id="summary_block" class="hidden">')
         self.add(self.B.LEGEND("Select PDQ Summaries"))
         for language in ("English", "Spanish"):
             self.add_radio("summary", language, language, wrapper=None)
-        Condition = cdrdb.Query.Condition
-        t_path = Condition("t.path", "/Summary/SummaryMetaData/SummaryType")
-        l_path = Condition("l.path", "/Summary/SummaryMetaData/SummaryLanguage")
-        for language in ("English", "Spanish"):
-            lang = language.lower()
-            self.add('<fieldset id="%s_block" class="hidden">' % lang)
-            self.add(self.B.LEGEND("%s Summary Types" % language))
-            self.add_checkbox(lang, "All", "all")
-            query = cdrdb.Query("query_term t", "t.value").unique()
-            query.join("query_term l", "t.doc_id = l.doc_id")
-            query.where(t_path)
-            query.where(l_path)
-            query.where(Condition("l.value", language))
-            query.order("t.value")
-            for row in query.execute(self.cursor).fetchall():
-                if row[0]:
-                    self.add_checkbox(lang, row[0], row[0],
-                                      widget_classes="summary-type")
-            self.add("</fieldset>")
+        C = cdrdb.Query.Condition
+        self.add('<fieldset id="english_block" class="hidden">')
+        self.add(self.B.LEGEND("English Summary Board(s)"))
+        self.add_checkbox("english", "All English", "all")
+        query = cdrdb.Query("active_doc d", "d.id", "d.title").unique()
+        query.join("query_term b", "b.int_val = d.id")
+        query.join("query_term l", "b.doc_id = l.doc_id")
+        query.where(C("b.path",
+                      "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"))
+        query.where(C("l.path", "/Summary/SummaryMetaData/SummaryLanguage"))
+        query.where(C("l.value", "English"))
+        query.where(C("d.title", "%Editorial Advisory%", "NOT LIKE"))
+        for board_name, board_id in self.get_boards(query):
+            self.add_checkbox("english", board_name, str(board_id),
+                              widget_classes="summary-type")
+        self.add("</fieldset>")
+
+        # Spanish summaries don't store their own boards, so they need a
+        # different query, unfortunately.
+        self.add('<fieldset id="spanish_block" class="hidden">')
+        self.add(self.B.LEGEND("Spanish Summary Board(s)"))
+        self.add_checkbox("spanish", "All Spanish", "all")
+        query = cdrdb.Query("active_doc d", "d.id", "d.title").unique()
+        query.join("query_term b", "b.int_val = d.id")
+        query.join("query_term t", "t.int_val = b.doc_id")
+        query.where(C("b.path",
+                      "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"))
+        query.where(C("t.path", "/Summary/TranslationOf/@cdr:ref"))
+        query.where(C("d.title", "%Editorial Advisory%", "NOT LIKE"))
+        for board_name, board_id in self.get_boards(query):
+            self.add_checkbox("spanish", board_name, str(board_id),
+                              widget_classes="summary-type")
+        self.add("</fieldset>")
         self.add("</fieldset>")
         self.add_script("""\
 function check_summary(id) {
