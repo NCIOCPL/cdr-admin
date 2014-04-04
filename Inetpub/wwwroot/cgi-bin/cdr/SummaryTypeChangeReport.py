@@ -7,7 +7,7 @@
 #
 #                                           Alan Meyer, March 2014
 #----------------------------------------------------------------------
-import cgi, time, lxml.etree as lx, cdr, cdrcgi, cdrdb
+import cgi, time, datetime, lxml.etree as lx, cdr, cdrcgi, cdrdb
 
 SCRIPT = "SummaryTypeChangeReport.py"
 
@@ -16,8 +16,8 @@ SUBBANNER = "Summaries Type of Change"
 RPTMENU   = "Report Menu"
 buttons   = ("Submit", RPTMENU, cdrcgi.MAINMENU)
 
-MIN_DATE  = '1000'
-MAX_DATE  = '9999'
+MIN_DATE  = str(datetime.date(2002, 1, 1))
+MAX_DATE  = str(datetime.date.today())
 # English language board names: Short display name, Full db name
 # NOTE: This will need to be maintained if board names change
 ENGLISH_BOARDS = (
@@ -827,13 +827,14 @@ def createAdvancedMenu():
      <p class='instructions'>
       Fill in the following additional fields for an "advanced" report
      </p>
-     <fieldset class='dates'>
+     <fieldset>
       <legend>&nbsp;Date Limits for Changes&nbsp;</legend>
       <label for='startDate'> Start date </label>
-      <input name='startDate' size=12 />
-      <br />
-      <label for='endDate'> End date </label>
-      <input name='endDate' size=12/>
+      <input type='text' name='startDate' id='startDate' value='%s'
+            class='CdrDateField' size=10 />
+      <label for='endDate'> &nbsp; &nbsp; &nbsp; End date </label>
+      <input type='text' name='endDate' id='endDate' value='%s'
+            class='CdrDateField' size=10 />
      </fieldset>
 
      <fieldset>
@@ -848,7 +849,8 @@ def createAdvancedMenu():
       <label for='orderByType'>By Type of Change</label>
      </fieldset>
     </div>
-"""
+""" % (MIN_DATE, MAX_DATE)
+
     return html
 
 def createInputForm(session):
@@ -867,12 +869,14 @@ def createInputForm(session):
     """
     header = cdrcgi.header(BANNER, BANNER, SUBBANNER, SCRIPT,
                            buttons, stylesheet = """
+   <LINk type='text/css' rel='stylesheet' href='/stylesheets/CdrCalendar.css'>
+   <SCRIPT type='text/javascript' language='JavaScript'
+            src='/js/CdrCalendar.js'></SCRIPT>
    <STYLE type="text/css">
     TD      { font-size:  12pt; }
     LI.none { list-style-type: none }
     DL      { margin-left: 0; padding-left: 0 }
     div.singletoc fieldset label { width: 80px; float: left; }
-    div.advanced  fieldset.dates label { width: 80px; float: left;}
     .instructions { font: 12pt "Arial"; }
     div     { margin-left: 100px;
               margin-right: 100px;
