@@ -99,7 +99,6 @@ def show_form():
     form.add_script("""\
 function check_columns(dummy) {}
 function check_report_type(choice) {
-    console.log('check_report_type(' + choice + ')');
     switch (choice) {
     case 'full':
         jQuery('#full-options-block').show();
@@ -121,11 +120,9 @@ function check_report_type(choice) {
         break;
     }
 }
-//jQuery('#report-format-block').addClass('hidden');
 jQuery(function() {
     check_report_type(jQuery('input[name="report-type"]:radio:checked').val());
 });
-//console.log('report-type is ' + jQuery('input[name="report-type"]:radio:checked').val());
 """)
     form.send()
 
