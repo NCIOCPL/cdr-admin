@@ -19,7 +19,7 @@ buttons   = ("Submit", RPTMENU, cdrcgi.MAINMENU)
 MIN_DATE  = str(datetime.date(2002, 1, 1))
 MAX_DATE  = str(datetime.date.today())
 # English language board names: Short display name, Full db name
-# NOTE: This will need to be maintained if board names change
+# NOTE: This will need to be maintained if board names change FIND BETTER WAY!
 ENGLISH_BOARDS = (
     ('Adult Treatment', 'PDQ Adult Treatment Editorial Board'),
     ('Cancer Genetics', 'PDQ Cancer Genetics Editorial Board'),
@@ -823,7 +823,7 @@ def createAdvancedMenu():
     """
     html = """
     <div class='advanced'>
-     <b>Advanced Report</b>
+     <b>Advanced Report - Select Dates and Organization</b>
      <p class='instructions'>
       Fill in the following additional fields for an "advanced" report
      </p>
@@ -925,7 +925,7 @@ def createInputForm(session):
    </div>
 
    <div class='singletoc'>
-   <b>Specific Summaries</b>
+   <b>Basic Report - Select Specific Summaries</b>
    <fieldset>
     <legend>&nbsp;Document Title or CDR-ID&nbsp;</legend>
     <label for="byCdrid">CDR-ID(s)</label>
@@ -937,7 +937,8 @@ def createInputForm(session):
    </div>
 
    <div>
-   <b>All Summaries</b>
+   <b>Basic Report - Select Groups of Summaries<br />
+   &nbsp; (if no specific Summaries selected)</b>
    <fieldset>
     <legend>&nbsp;Select Summary Audience&nbsp;</legend>
     <label>
@@ -962,7 +963,7 @@ def createInputForm(session):
 
     tocHtml = """
    <div class='chgtypes'>
-   <b>Types of Change</b>
+   <b>Basic Report - Select Types of Change</b>
    <fieldset>
     <legend>
       &nbsp;Check desired change types + comments (Basic report only) &nbsp;
