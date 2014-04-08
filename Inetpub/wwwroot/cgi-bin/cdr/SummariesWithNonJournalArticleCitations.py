@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummariesWithProtocolLinks.py$
+# $Id$
 #
 # Report on summaries with citations to publications other than journal
 # articles.
