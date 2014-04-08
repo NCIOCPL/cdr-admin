@@ -2,63 +2,115 @@
 #
 # $Id: SummariesWithProtocolLinks.py
 #
-# Report on lists of summaries.
+# Report on summaries with citations to publications other than journal
+# articles.
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, string, cdrdb, time, xml.dom.minidom
+import cdr
+import cdrcgi
+import cdrdb
+import cgi
+import lxml.etree as etree
+import time
 
 #----------------------------------------------------------------------
 # Set the form variables.
 #----------------------------------------------------------------------
-fields    = cgi.FieldStorage()
-session   = cdrcgi.getSession(fields)
-#boolOp    = fields and fields.getvalue("Boolean")          or "AND"
-lang      = fields and fields.getvalue("lang")             or None
-groups    = fields and fields.getvalue("grp")              or []
-types    = fields and fields.getvalue("type")         or []
-submit    = fields and fields.getvalue("SubmitButton")     or None
-request   = cdrcgi.getRequest(fields)
-title     = "CDR Administration"
-instr     = "Summaries With Non-Journal Article Citations Report"
-script    = "SummariesWithNonJournalArticleCitations.py"
-SUBMENU   = "Report Menu"
-buttons   = (SUBMENU, cdrcgi.MAINMENU)
-
-#---------------------------
-# DEBUG SETTINGS
-#---------------------------
-#lang = 'English'
-#groups.append('Adult Treatment')
-#groups.append('All English')
-#types.append('All Types')
-#types.append('Internet')
-#session   = '472F1902-706FCE-248-I179PKDICJPG'
-#---------------------------
-
-class dataRow:
-    def __init__(self,cdrid,summaryTitle,summarySecTitle,citationType,citCDRID,citationTitle,internetWebSite):
-        self.cdrid = cdrid
-        self.summaryTitle = summaryTitle
-        self.summarySecTitle = summarySecTitle
-        self.citationType = citationType
-        self.citCDRID = citCDRID
-        self.linkcdrid = cdr.normalize(citCDRID)
-        self.citationTitle = citationTitle
-        self.pubDetails = ''
-        self.internetWebSite = internetWebSite
-    
-    def addPubDetails(self,pubDetails):
-        self.pubDetails = pubDetails
+fields     = cgi.FieldStorage()
+session    = cdrcgi.getSession(fields)
+lang       = fields.getvalue("lang")
+english    = fields.getlist("english")
+spanish    = fields.getlist("spanish")
+types      = fields.getlist("type")
+request    = cdrcgi.getRequest(fields)
+title      = "CDR Administration"
+instr      = "Summaries With Non-Journal Article Citations Report"
+script     = "SummariesWithNonJournalArticleCitations.py"
+SUBMENU    = "Report Menu"
+buttons    = ("Submit", SUBMENU, cdrcgi.MAINMENU)
+start      = time.time()
+dateString = time.strftime("%B %d, %Y")
+subtitle   = "%s - %s" % (instr, dateString)
+DEBUGGING  = False
 
 #----------------------------------------------------------------------
-# If the user only picked one summary group, put it into a list so we
-# can deal with the same data structure whether one or more were
-# selected. Ditto for statuses.
+# Callback for constructing the citation display, possibly with a
+# link to a web site.
 #----------------------------------------------------------------------
-if type(groups) in (type(""), type(u"")):
-    groups = [groups]
-if type(types) in (type(""), type(u"")):
-    types = [types]
+def pub_info_cell(cell, fmt):
+    citation = cell.values()
+    if citation.info.web_site:
+        url = citation.info.web_site
+        link = cdrcgi.Page.B.A(url, href=url, target="_blank")
+        br = cdrcgi.Page.B.BR()
+        return cdrcgi.Page.B.TD(citation.info.pub_details, br, link)
+    return cdrcgi.Page.B.TD(citation.info.pub_details)
+
+#----------------------------------------------------------------------
+# Debug logging, turned off by default.
+#----------------------------------------------------------------------
+def debug_log(what):
+    if DEBUGGING:
+        now = time.time()
+        elapsed = now - start
+        fp = open("d:/tmp/swnjac.log", "a")
+        fp.write("%10.3f: %s\n" % (elapsed, what))
+        fp.close()
+
+#----------------------------------------------------------------------
+# Get the list of citations types from which the report requester
+# can select.  Avoid proceedings and journal publications.
+#----------------------------------------------------------------------
+def get_citation_types(cursor):
+    C = cdrdb.Query.Condition
+    query = cdrdb.Query("query_term", "value").unique()
+    query.where(C("path", "/Citation/PDQCitation/CitationType"))
+    query.where(C("value", "Proceeding%", "NOT LIKE"))
+    query.where(C("value", "Journal%", "NOT LIKE"))
+    query.order("value")
+    return [row[0] for row in query.execute(cursor).fetchall()]
+
+#----------------------------------------------------------------------
+# Get the list of editorial boards for one of the languages.  Called
+# by get_english_boards() and get_spanish_boards(), each of which
+# builds a custom query for this purpose.
+#----------------------------------------------------------------------
+def get_boards(query, cursor):
+    boards = []
+    for doc_id, doc_title in query.execute(cursor).fetchall():
+        boards.append((cdr.extract_board_name(doc_title), doc_id))
+    return sorted(boards)
+
+#----------------------------------------------------------------------
+# Get the list of editorial boards linked to active English summaries.
+#----------------------------------------------------------------------
+def get_english_boards(cursor):
+    C = cdrdb.Query.Condition
+    query = cdrdb.Query("active_doc d", "d.id", "d.title").unique()
+    query.join("query_term b", "b.int_val = d.id")
+    query.join("query_term l", "b.doc_id = l.doc_id")
+    query.where(C("b.path",
+                  "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"))
+    query.where(C("l.path", "/Summary/SummaryMetaData/SummaryLanguage"))
+    query.where(C("l.value", "English"))
+    query.where(C("d.title", "%Editorial Advisory%", "NOT LIKE"))
+    return get_boards(query, cursor)
+
+#----------------------------------------------------------------------
+# Get the list of editorial boards linked to English summaries which
+# have been translated into Spanish.
+#----------------------------------------------------------------------
+def get_spanish_boards(cursor):
+    C = cdrdb.Query.Condition
+    query = cdrdb.Query("active_doc d", "d.id", "d.title").unique()
+    query.join("query_term b", "b.int_val = d.id")
+    query.join("query_term t", "t.int_val = b.doc_id")
+    query.where(C("b.path",
+                  "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"))
+    query.where(C("t.path", "/Summary/TranslationOf/@cdr:ref"))
+    query.where(C("d.title", "%Editorial Advisory%", "NOT LIKE"))
+    query.where(C("d.title", "%Complementary%", "NOT LIKE"))
+    return get_boards(query, cursor)
 
 #----------------------------------------------------------------------
 # Handle navigation requests.
@@ -71,626 +123,331 @@ elif request == SUBMENU:
 #----------------------------------------------------------------------
 # Build date string for header.
 #----------------------------------------------------------------------
-dateString = time.strftime("%B %d, %Y")
+
+#----------------------------------------------------------------------
+# Connect to the database.
+#----------------------------------------------------------------------
+try:
+    conn = cdrdb.connect('CdrGuest')
+    cursor = conn.cursor()
+except Exception, e:
+    cdrcgi.bail("Unable to connect to the CDR database: %s" % e)
 
 #----------------------------------------------------------------------
 # If we don't have a request, put up the form.
 #----------------------------------------------------------------------
 if not lang:
-    jscript = """
-<style type="text/css">
-body {
-    font-family: sans-serif;
-    font-size: 11pt;
-    }
-legend  {
-    font-weight: bold;
-    color: teal;
-    font-family: sans-serif;
-    }
-fieldset {
-    width: 500px;
-    margin-left: auto;
-    margin-right: auto;
-    display: block;
-    }
-</style>
-
-<script language='JavaScript' src='/js/scriptaculous/prototype.js'></script>
-<script language='JavaScript' src='/js/scriptaculous/scriptaculous.js'></script>
-<script type="text/javascript">
-
-Event.observe(window, 'load', function(){
-    checkAllEnglish(0);
-    checkAllSpanish(0);
-    checkAllTypes(0);
-    $('All English').checked = 1;
-    $('All Types').checked = 1;
-    $('English').checked = 1;
-});
-
-function isEnglishItemChecked(){
-    return ($('All English').checked ||
-    $('Adult Treatment').checked ||
-    $('Genetics').checked ||
-    $('Complementary and Alternative Medicine').checked  ||
-    $('Pediatric Treatment').checked ||
-    $('Screening and Prevention').checked ||
-    $('Supportive Care').checked);
+    jscript = """\
+function isEnglishItemChecked() {
+    return jQuery('.en-cb:checked').length > 0;
 }
 
-function isSpanishItemChecked(){
-    return($('All Spanish').checked ||
-    $('Spanish Adult Treatment').checked ||
-    $('Spanish Pediatric Treatment').checked ||
-    $('Spanish Screening and Prevention').checked ||
-    $('Spanish Supportive Care').checked);
+function isSpanishItemChecked() {
+    return jQuery('.es-cb:checked').length > 0;
 }
 
-function isTypeItemChecked(){
-    return($('All Types').checked ||
-    $('Book').checked ||
-    $('Book [Internet]').checked ||
-    $('Book chapter').checked ||
-    $('Book chapter [Internet]').checked ||
-    $('Abstract').checked ||
-    $('Abstract [Internet]').checked ||
-    $('Database').checked ||
-    $('Database entry').checked ||
-    $('Internet').checked ||
-    $('Meeting Paper').checked ||
-    $('Meeting Paper [Internet]').checked);
+function isTypeItemChecked() {
+    return jQuery('.ct-cb:checked').length > 0;
 }
 
-function checkAllEnglish(checked){
-    $('All English').checked = checked;
-    $('Adult Treatment').checked = checked;
-    $('Genetics').checked = checked;
-    $('Complementary and Alternative Medicine').checked = checked;
-    $('Pediatric Treatment').checked = checked;
-    $('Screening and Prevention').checked = checked;
-    $('Supportive Care').checked = checked;    
+function clearEnglish() {
+    jQuery('.en-cb').prop('checked', false);
 }
 
-function checkAllSpanish(checked){
-    $('All Spanish').checked = checked;
-    $('Spanish Adult Treatment').checked = checked;
-    $('Spanish Pediatric Treatment').checked = checked;
-    $('Spanish Screening and Prevention').checked = checked;
-    $('Spanish Supportive Care').checked = checked;
+function clearSpanish() {
+    jQuery('.es-cb').prop('checked', false);
 }
 
-function checkAllTypes(checked){
-    $('All Types').checked = checked;
-    $('Book').checked = checked;
-    $('Book [Internet]').checked = checked;
-    $('Book chapter').checked = checked;
-    $('Book chapter [Internet]').checked = checked;
-    $('Abstract').checked = checked;
-    $('Abstract [Internet]').checked = checked;
-    $('Database').checked = checked;
-    $('Database entry').checked = checked;
-    $('Internet').checked = checked;
-    $('Meeting Paper').checked = checked;
-    $('Meeting Paper [Internet]').checked = checked;
+function clearTypes() {
+    jQuery('.ct-cb').prop('checked', false);
 }
 
-function englishItemClicked(){
-    $('All English').checked = 0;
-    $('English').checked = 1;
-    $('Spanish').checked = 0;
-    checkAllSpanish(0);
+function englishItemClicked() {
+    jQuery('#english-all').prop('checked', false);
+    jQuery('#lang-english').prop('checked', true);
+    jQuery('#lang-spanish').prop('checked', false);
+    clearSpanish();
     if (!isEnglishItemChecked())
-        $('All English').checked = 1;
+        jQuery('#english-all').prop('checked', true);
 }
 
-function spanishItemClicked(){
-    $('All Spanish').checked = 0;
-    $('Spanish').checked = 1;
-    $('English').checked = 0;
-    checkAllEnglish(0);
+function spanishItemClicked() {
+    jQuery('#spanish-all').prop('checked', false);
+    jQuery('#lang-spanish').prop('checked', true);
+    jQuery('#lang-english').prop('checked', false);
+    clearEnglish();
     if (!isSpanishItemChecked())
-        $('All Spanish').checked = 1;
+        jQuery('#spanish-all').prop('checked', true);
 }
 
 function citationItemClicked(){
-    $('All Types').checked = 0;
+    jQuery('#type-all').prop('checked', false);
     if (!isTypeItemChecked())
-        $('All Types').checked = 1;
+        jQuery('#type-all').prop('checked', true);
 }
 
-function langClicked(lang){
-    checkAllEnglish(0);
-    checkAllSpanish(0);
-    if (lang == 'English'){
-        $('All English').disabled = 0;
-        $('All English').checked = 1;
+function langClicked(lang) {
+    clearEnglish();
+    clearSpanish();
+    if (lang == 'English') {
+        jQuery('#english-all').removeAttr('disabled');
+        jQuery('#english-all').prop('checked', true);
+        jQuery('#es-boards').hide();
+        jQuery('#en-boards').show();
     }
     else{
-        $('All Spanish').disabled = 0;
-        $('All Spanish').checked = 1;
+        jQuery('#spanish-all').removeAttr('disabled');
+        jQuery('#spanish-all').prop('checked', true);
+        jQuery('#es-boards').show();
+        jQuery('#en-boards').hide();
     }
 }
 
-function allEnglishClicked(){
-    checkAllEnglish(0);
-    checkAllSpanish(0);
-    $('English').checked = 1;
-    $('All English').checked = 1;
+function allEnglishClicked() {
+    clearEnglish();
+    clearSpanish();
+    jQuery('#lang-english').prop('checked', true);
+    jQuery('#english-all').prop('checked', true);
 }
 
-function allSpanishClicked(){
-    checkAllEnglish(0);
-    checkAllSpanish(0);
-    $('Spanish').checked = 1;
-    $('All Spanish').checked = 1;
+function allSpanishClicked() {
+    clearEnglish();
+    clearSpanish();
+    jQuery('#lang-spanish').prop('checked', true);
+    jQuery('#spanish-all').prop('checked', true);
 }
 
-function allTypesClicked(){
-    checkAllTypes(0);
-    $('All Types').checked = 1;
+function allTypesClicked() {
+    clearTypes();
+    jQuery('#type-all').prop('checked', true);
 }
 
-</script>
+jQuery(function() {
+    clearEnglish();
+    clearSpanish();
+    clearTypes();
+    jQuery('#english-all').prop('checked', true);
+    jQuery('#type-all').prop('checked', true);
+    jQuery('#lang-english').prop('checked', true);
+});
 """
-    header = cdrcgi.header(title, title, instr + ' - ' + dateString, 
-                           script,
-                           ("Submit",
-                            SUBMENU,
-                            cdrcgi.MAINMENU),
-                           numBreaks = 1,stylesheet = jscript)
-    form   = """\
-   <input type='hidden' name='%s' value='%s'>
- 
-    <fieldset>
-    <legend>&nbsp;Select Language and PDQ Summaries&nbsp;</legend>
-    <table>
-   <tr>
-     <td width=100>
-      <input id='English' name='lang' type='radio' value='English' 
-       onClick="langClicked('English');" CHECKED><b>English</b></input>
-     </td>
-     <td>
-      <b>Select PDQ Summaries: (one or more)</b>
-     </td>
-    </tr>
-    <tr>
-     <td></td>
-     <td>
-      <input type='checkbox' id='All English' name='grp' value='All English' 
-       onClick="allEnglishClicked();" CHECKED>
-       <b>All English</b></input><br>
-      <input type='checkbox' id='Adult Treatment' name='grp' 
-       value='Adult Treatment' onClick="englishItemClicked();">
-       <b>Adult Treatment</b></input><br>
-      <input type='checkbox' id='Genetics' name='grp' value='Genetics' 
-       onClick="englishItemClicked();">
-       <b>Cancer Genetics</b></input><br>
-      <input type='checkbox' name='grp' 
-       id='Complementary and Alternative Medicine' 
-       onClick="englishItemClicked();"
-       value='Complementary and Alternative Medicine'>
-       <b>Complementary and Alternative Medicine</b></input><br>
-      <input type='checkbox' id='Pediatric Treatment' name='grp' 
-       value='Pediatric Treatment' onClick="englishItemClicked();">
-       <b>Pediatric Treatment</b></input><br>
-      <input type='checkbox' id='Screening and Prevention' name='grp' 
-       value='Screening and Prevention' onClick="englishItemClicked();">
-       <b>Screening and Prevention</b></input><br>
-      <input type='checkbox' id='Supportive Care' name='grp' 
-       value='Supportive Care' onClick="englishItemClicked();">
-       <b>Supportive and Palliative Care</b><br></input>
-     </td>
-    </tr>
-    </table>
-    </fieldset>
 
-    <fieldset>
-    <table>
-    <tr>
-     <td width=100>
-      <input id='Spanish' name='lang' type='radio' value='Spanish' 
-       onClick="langClicked('Spanish');"><b>Spanish</b></input>
-     </td>
-     <td>
-      <b>Select PDQ Summaries: (one or more)</b>
-     </td>
-    </tr>
-    <tr>
-     <td></td>
-     <td>
-      <input type='checkbox' id='All Spanish' name='grp' value='All Spanish' 
-       onClick="allSpanishClicked();">
-       <b>All Spanish</b></input><br>
-      <input type='checkbox' id='Spanish Adult Treatment' name='grp' 
-       value='Spanish Adult Treatment' onClick="spanishItemClicked();">
-       <b>Adult Treatment</b></input><br>
-      <input type='checkbox' id='Spanish Pediatric Treatment' name='grp' 
-       value='Spanish Pediatric Treatment' onClick="spanishItemClicked();">
-       <b>Pediatric Treatment</b></input><br>
-      <input type='checkbox' id='Spanish Screening and Prevention' name='grp' 
-       value='Spanish Screening and Prevention' onClick="spanishItemClicked();">
-       <b>Screening and Prevention</b></input><br>
-      <input type='checkbox' id='Spanish Supportive Care' name='grp' 
-       value='Spanish Supportive Care' onClick="spanishItemClicked();">
-       <b>Supportive and Palliative Care</b></input><br>
-     </td>
-    </tr>
-    </table>
-    </fieldset>
-
-<br>
-    <fieldset>
-    <legend>&nbsp;Select Citation Type: (one or more)&nbsp;</legend>
-    <table>
-    <tr>
-     <td width=100></td>
-     <td>
-      <input id='All Types' type='checkbox' name='type' value='All Types' 
-       onClick="allTypesClicked();" CHECKED>
-       <b>All Types</b><br>
-      <input id='Book' type='checkbox' name='type' value='Book' 
-       onClick="citationItemClicked();">
-       <b>Book</b><br>
-      <input id='Book [Internet]' type='checkbox' name='type' 
-       value='Book [Internet]' onClick="citationItemClicked();">
-       <b>Book [Internet]</b><br>
-      <input id='Book chapter' type='checkbox' name='type' value='Book chapter' 
-       onClick="citationItemClicked();">
-       <b>Book chapter</b><br>
-       <input id='Book chapter [Internet]' type='checkbox' name='type' 
-        value='Book chapter [Internet]' onClick="citationItemClicked();">
-       <b>Book chapter [Internet]</b><br>
-       <input id='Abstract' type='checkbox' name='type' value='Abstract' 
-        onClick="citationItemClicked();">
-       <b>Abstract</b><br>
-       <input id='Abstract [Internet]' type='checkbox' name='type' 
-        value='Abstract [Internet]' onClick="citationItemClicked();">
-       <b>Abstract [Internet]</b><br>
-       <input id='Database' type='checkbox' name='type' value='Database' 
-        onClick="citationItemClicked();">
-       <b>Database</b><br>
-       <input id='Database entry' type='checkbox' name='type' 
-        value='Database entry' onClick="citationItemClicked();">
-       <b>Database entry</b><br>
-       <input id='Internet' type='checkbox' name='type' value='Internet' 
-        onClick="citationItemClicked();">
-       <b>Internet</b><br>
-       <input id='Meeting Paper' type='checkbox' name='type' 
-        value='Meeting Paper' onClick="citationItemClicked();">
-       <b>Meeting Paper</b><br>
-       <input id='Meeting Paper [Internet]' type='checkbox' name='type' 
-        value='Meeting Paper [Internet]' onClick="citationItemClicked();">
-       <b>Meeting Paper [Internet]</b><br>
-     </td>
-    </tr>    
-   </table>
-   </fieldset>
-
-  </form>
- </body>
-</html>
-""" % (cdrcgi.SESSION, session)
-    cdrcgi.sendPage(header + form)
+    page = cdrcgi.Page(title, subtitle=subtitle, buttons=buttons,
+                       action=script, session=session)
+    page.add_script(jscript)
+    page.add("<fieldset>")
+    page.add(page.B.LEGEND("Select Language and PDQ Summaries"))
+    page.add_radio("lang", "English", "English", checked=True, wrapper=None,
+                   onclick="langClicked('English')")
+    page.add_radio("lang", "Spanish", "Spanish", wrapper=None,
+                   onclick="langClicked('Spanish')")
+    page.add('<fieldset id="en-boards">')
+    page.add(page.B.LEGEND("Select PDQ Summaries (one or more)"))
+    page.add_checkbox("english", "All English", "all", checked=True,
+                      onclick="allEnglishClicked();", widget_classes="en-cb")
+    for label, doc_id in get_english_boards(cursor):
+        page.add_checkbox("english", label, str(doc_id), widget_classes="en-cb",
+                          onclick="englishItemClicked();")
+    page.add("</fieldset>")
+    page.add('<fieldset id="es-boards" class="hidden">')
+    page.add(page.B.LEGEND("Select PDQ Summaries (one or more):"))
+    page.add_checkbox("spanish", "All Spanish", "all",
+                      onclick="allSpanishClicked();", widget_classes="es-cb")
+    for label, doc_id in get_spanish_boards(cursor):
+        page.add_checkbox("spanish", label, str(doc_id), widget_classes="es-cb",
+                          onclick="spanishItemClicked();")
+    page.add("</fieldset>")
+    page.add("</fieldset>")
+    page.add("<fieldset>")
+    page.add(page.B.LEGEND("Select Citation Type (one or more)"))
+    page.add_checkbox("type", "All Types", "all", checked=True,
+                      onclick="allTypesClicked();", widget_classes="ct-cb")
+    for cite_type in get_citation_types(cursor):
+        page.add_checkbox("type", cite_type, cite_type,
+                          onclick="citationItemClicked();",
+                          widget_classes="ct-cb")
+    page.add("</fieldset>")
+    page.send()
 
 #----------------------------------------------------------------------
-# Create the selection criteria based on the groups picked by the user
-# But the decision will be based on the content of the board instead
-# of the SummaryType.
-# Based on the SummaryType selected on the form the boardPick list is
-# being created including the Editorial and Advisory board for each
-# type.  These board IDs can then be decoded into the proper 
-# heading to be used for each selected summary type.
-# --------------------------------------------------------------------
-boardPick = ''
-for i in range(len(groups)):
-  if groups[i] == 'Adult Treatment' and lang == 'English':
-      boardPick += """'CDR0000028327', 'CDR0000035049', """
-  elif groups[i] == 'Spanish Adult Treatment' and lang == 'Spanish':
-      boardPick += """'CDR0000028327', 'CDR0000035049', """
-  elif groups[i] == 'Complementary and Alternative Medicine':
-      boardPick += """'CDR0000256158', """
-  elif groups[i] == 'Genetics':
-      boardPick += """'CDR0000032120', 'CDR0000257061', """
-  elif groups[i] == 'Screening and Prevention' and lang == 'English':
-      boardPick += """'CDR0000028536', 'CDR0000028537', """
-  elif groups[i] == 'Spanish Screening and Prevention' and lang == 'Spanish':
-      boardPick += """'CDR0000028536', 'CDR0000028537', """
-  elif groups[i] == 'Pediatric Treatment' and lang == 'English':
-      boardPick += """'CDR0000028557', 'CDR0000028558', """
-  elif groups[i] == 'Spanish Pediatric Treatment' and lang == 'Spanish':
-      boardPick += """'CDR0000028557', 'CDR0000028558', """
-  elif groups[i] == 'Supportive Care' and lang == 'English':
-      boardPick += """'CDR0000028579', 'CDR0000029837', """
-  elif groups[i] == 'Spanish Supportive Care' and lang == 'Spanish':
-      boardPick += """'CDR0000028579', 'CDR0000029837', """
-  else:
-      boardPick += """'""" + groups[i] + """', """
-
-typesPick=''
-for i in range(len(types)):
-    typesPick += "'" + types[i] + "',"
-
-#------------------------------------
-# build the query
-#------------------------------------
-def getQuery(lang):
-    query = [u"""SELECT distinct qt.doc_id as cdrid, title.value as summaryTitle, secTitle.value as summarySecTitle,"""]
-    query.append(u"""qcitationtype.value as citationType, qt.int_val as citCDRID, qcitationtitle.value as citationTitle
-      FROM query_term qt
-      JOIN query_term title ON qt.doc_id = title.doc_id
-      JOIN query_term qcitationtype ON qt.int_val = qcitationtype.doc_id
-      JOIN query_term qcitationtitle ON qt.int_val = qcitationtitle.doc_id
-      JOIN query_term secTitle ON qt.doc_id = secTitle.doc_id
-      JOIN query_term lang ON qt.doc_id = lang.doc_id """)
-    
-    if lang == 'English':
-        query.append(u""" JOIN query_term board ON qt.doc_id = board.doc_id """)
+# Construct an SQL query based on the options selected by the report's
+# requestor.
+#----------------------------------------------------------------------
+def getQuery():
+    C = cdrdb.Query.Condition
+    query = cdrdb.Query("query_term_pub s", "s.doc_id").unique()
+    query.join("active_doc a", "a.id = s.doc_id")
+    query.join("query_term c", "c.doc_id = s.int_val")
+    query.where("s.path LIKE '/Summary%CitationLink/@cdr:ref'")
+    query.where("c.path = '/Citation/PDQCitation/CitationType'")
+    if not types or "all" in types:
+        query.where("c.value NOT LIKE 'Journal%'")
+        query.where("c.value NOT LIKE 'Proceeding%'")
     else:
-        query.append(u""" JOIN query_term qtrans ON qtrans.doc_id = qt.doc_id
-                     JOIN query_term board ON qtrans.int_val = board.doc_id """)
-    
-    query.append(u""" WHERE qt.path like '%CitationLink/@cdr:ref' """)
-
-    if lang == 'Spanish':
-        query.append(u""" AND qtrans.path = '/Summary/TranslationOf/@cdr:ref' """)
-
-    query.append(u"""\
-    AND title.path = '/Summary/SummaryTitle'
-    AND qcitationtype.path = '/Citation/PDQCitation/CitationType'
-    AND qcitationtitle.path = '/Citation/PDQCitation/CitationTitle' 
-    AND secTitle.path like '/Summary/%SummarySection/Title' 
-    AND LEFT(secTitle.node_loc,len(secTitle.node_loc)-4) =  LEFT(qt.node_loc,len(secTitle.node_loc)-4) 
-    AND board.path = '/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref' """)
-
-    allStr = "All " + lang
-    if boardPick.find(allStr) == -1:
-        query.append(u""" AND board.value in (""")
-        query.append(boardPick[:-2])
-        query.append(u""") """)
-
-    if typesPick.find("All Types") == -1:
-        query.append(u""" AND qcitationtype.value in (""")
-        query.append(typesPick[:-1])
-        query.append(u""") """)
+        query.where(C("c.value", types, "IN"))
+    if lang == "English":
+        if not english or "all" in english:
+            query.join("query_term_pub l", "l.doc_id = s.doc_id")
+            query.where("l.path = '/Summary/SummaryMetaData/SummaryLanguage'")
+            query.where("l.value = 'English'")
+        else:
+            query.join("query_term_pub b", "b.doc_id = s.doc_id")
+            query.where(C("b.int_val", english, "IN"))
     else:
-        query.append(u""" AND qcitationtype.value not like 'Journal%' AND qcitationtype.value not like 'Proceeding%'""")
-    
-    query.append(u"""
-    AND lang.path = '/Summary/SummaryMetaData/SummaryLanguage'
-    AND lang.value = '""")
-
-    query.append(lang)
-    
-    query.append(u"""'
-    AND EXISTS (SELECT 'x'
-                   FROM doc_version v
-                  WHERE v.id = qt.doc_id AND v.val_status = 'V' 
-                    AND v.publishable = 'Y') 
-     AND qt.doc_id not in (select doc_id 
-                             from doc_info 
-                            where doc_status = 'I' 
-                              and doc_type = 'Summary')
-    """)
-
-    query = u"".join(query)
+        if not spanish or "all" in spanish:
+            query.join("query_term_pub l", "l.doc_id = s.doc_id")
+            query.where("l.path = '/Summary/SummaryMetaData/SummaryLanguage'")
+            query.where("l.value = 'Spanish'")
+        else:
+            query.join("query_term_pub t", "t.doc_id = s.doc_id")
+            query.where("t.path = '/Summary/TranslationOf/@cdr:ref'")
+            query.join("query_term b", "b.doc_id = t.int_val")
+            query.where("b.path = "
+                        "'/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref'")
+            query.where(C("b.int_val", spanish, "IN"))
+    query.order(1)
     return query
 
-def getInternetWebSite(dom):
-    docElem = dom.documentElement
-    externalRefs = docElem.getElementsByTagName('ExternalRef')
-    for externalRef in externalRefs:
-        for childNode in externalRef.childNodes:
-            if childNode.nodeType == xml.dom.minidom.Node.TEXT_NODE:
-                if childNode.nodeValue.strip().startswith('Available online'):
-                    return externalRef.attributes['cdr:xref'].value
-
-    return ''
-
-dataRows = []
-citcdrids = []
-
-# -------------------------------------------------------------
-# Put all the pieces together for the SELECT statement
-# -------------------------------------------------------------
-
-query = getQuery(lang) + " ORDER BY cdrid"
-
-#cdrcgi.bail(query)
-
-if not query:
-    cdrcgi.bail('No query criteria specified')
-
 #----------------------------------------------------------------------
-# Submit the query to the database.
+# Information about a citation found in a summary.  There's one
+# instance for each such appearance of a citation in a summary,
+# but we collect and store the common information about each citation
+# only once, no matter how many appearances occur in summaries.
 #----------------------------------------------------------------------
-try:
-    conn = cdrdb.connect('CdrGuest')
-    cursor = conn.cursor()
-    cursor.execute(query,timeout=300)
-    rows = cursor.fetchall()
-except cdrdb.Error, info:
-    cdrcgi.bail('Failure retrieving Summary documents: %s' % info[1][0])
-     
-if not rows:
-    cdrcgi.bail('No Records Found for Selection')
-
-for cdrid,summaryTitle,summarySecTitle,citationType,citCDRID,citationTitle in rows:
-    dataRows.append(dataRow(cdrid,summaryTitle,summarySecTitle,citationType,citCDRID,citationTitle,''))
-    if citCDRID not in citcdrids:
-        citcdrids.append(citCDRID)
-
-cursor.close()
-cursor = None
-
-for citcdrid in citcdrids:
-    citdocId = cdr.normalize(citcdrid)
-    filter = ['set:Denormalization Citation Set',
-              'name:Copy XML for Citation QC Report']
-    doc = cdr.filterDoc(session,filter,docId=citdocId)
-    filterResult = doc[0]
-    dom = xml.dom.minidom.parseString(filterResult)
-    docElem = dom.documentElement
-    elems = docElem.getElementsByTagName('FormattedReference')
-    for elem in elems:
-        for child in elem.childNodes:
-            if child.nodeType == xml.dom.minidom.Node.TEXT_NODE:
-                formattedReference = child.nodeValue
-    
-    for dataRow in dataRows:
-        if dataRow.citCDRID == citcdrid:
-            dataRow.addPubDetails(formattedReference)
-
-for dataRow in dataRows:
-    if dataRow.citationType.find('Internet') >= 0:
-        if dataRow.internetWebSite == '':
-            docId = cdr.normalize(dataRow.citCDRID)
-            doc = cdr.getDoc(session, docId, 'N',getObject=1)
-            if doc.xml.startswith("<Errors"):
-                continue
-            dom = xml.dom.minidom.parseString(doc.xml)
-            internetWebSite = getInternetWebSite(dom)
-            for dataRow2 in dataRows:
-                if dataRow2.citCDRID == dataRow.citCDRID:
-                    dataRow2.internetWebSite = internetWebSite
+class Citation:
+    citations = {}
+    filters = ['set:Denormalization Citation Set',
+               'name:Copy XML for Citation QC Report']
+    class Info:
+        """
+        Information about a Citation document, independent of where
+        it is used in summaries.
+        """
+        def __init__(self, doc_id):
+            self.doc_id = doc_id
+            self.title = self.type = self.web_site = None
+            self.pub_details = ""
+            query = cdrdb.Query("document", "xml")
+            query.where(query.Condition("id", doc_id))
+            doc = query.execute(cursor).fetchall()[0][0]
+            tree = etree.XML(doc.encode("utf-8"))
+            for node in tree.findall("PDQCitation/CitationType"):
+                self.type = node.text
+            for node in tree.findall("PDQCitation/CitationTitle"):
+                self.title = node.text
+            if "Internet" in self.type:
+                for node in tree.iter("ExternalRef"):
+                    self.web_site = node.get("{cips.nci.nih.gov/cdr}xref")
+            response = cdr.filterDoc(session, Citation.filters, docId=doc_id)
+            if isinstance(response, basestring):
+                debug_log("failure filtering citation %s: %s" %
+                          (doc_id, repr(response)))
+                cdrcgi.bail("failure filtering citation CDR%s: %s" %
+                            (doc_id, repr(response)))
+            xml = response[0]
+            try:
+                tree = etree.XML(xml)
+            except Exception, e:
+                debug_log("failure parsing %s: %s" % (repr(xml), e))
+                cdrcgi.bail("failure parsing %s: %s" % (repr(xml), e))
+            for node in tree.iter("FormattedReference"):
+                self.pub_details = node.text
+    def __init__(self, doc_id, node):
+        """
+        Store the information about this particular use of the citation
+        in a summary, and make sure the common information about the
+        Citation document has been captured.
+        """
+        self.doc_id = doc_id
+        self.section_title = None
+        parent = node.getparent()
+        while parent is not None:
+            if parent.tag == "SummarySection":
+                break
+            parent = parent.getparent()
+        if parent is not None:
+            for child in parent.findall("Title"):
+                self.section_title = child.text
+        if doc_id not in Citation.citations:
+            Citation.citations[doc_id] = Citation.Info(doc_id)
+        self.info = Citation.citations[doc_id]
             
+    @staticmethod
+    def get_eligible_citations():
+        """
+        Get a list of all citations whose types match those selected
+        on the report request form.
+        """
+        query = cdrdb.Query("query_term", "doc_id").unique()
+        query.where("path = '/Citation/PDQCitation/CitationType'")
+        if not types or "all" in types:
+            query.where("value NOT LIKE 'Journal%'")
+            query.where("value NOT LIKE 'Proceeding%'")
+        else:
+            query.where(query.Condition("value", types, "IN"))
+        return set([row[0] for row in query.execute(cursor).fetchall()])
+Citation.eligible_citations = Citation.get_eligible_citations()
+debug_log("got eligible citations")
 
-# out put the results table
-header = cdrcgi.rptHeader(title, instr)
+#----------------------------------------------------------------------
+# One of these for each summary which will be represented on the report.
+#----------------------------------------------------------------------
+class Summary:
+    count = 0
+    def __init__(self, doc_id):
+        citations = set()
+        self.doc_id = doc_id
+        self.title = None
+        self.citations = []
+        query = cdrdb.Query("document", "xml")
+        query.where(query.Condition("id", doc_id))
+        doc_xml = query.execute(cursor).fetchall()[0][0]
+        tree = etree.XML(doc_xml.encode("utf-8"))
+        for node in tree.findall("SummaryTitle"):
+            self.title = node.text
+        for node in tree.iter("CitationLink"):
+            cdr_ref = node.get("{cips.nci.nih.gov/cdr}ref")
+            try:
+                citation_id = cdr.exNormalize(cdr_ref)[1]
+            except:
+                continue
+            if citation_id in Citation.eligible_citations:
+                citation = Citation(citation_id, node)
+                key = (citation_id, citation.section_title)
+                if key not in citations:
+                    self.citations.append(citation)
+                    citations.add(key)
+        Summary.count += 1
+        debug_log("constructed %d summaries" % Summary.count)
 
-form   = [u"""\
- <style type="text/css">
-table
-{
-    font-family: Verdana, Tahoma, sans-serif;
-    font-size: 8pt;
-    text-align: top;
-}
-th.cdrTable
-{
-    font-family: Verdana, Tahoma, sans-serif;
-    font-size: 8pt;
-    text-align: top;
-    color: white;
-    background: #664;
-}
-td.cdrTableEven
-{
-    font-family: Verdana, Tahoma, sans-serif;
-    font-size: 8pt;
-    text-align: top;
-    color: black;
-    background: #FFC;
-}
-td.cdrTableOdd
-{
-    font-family: Verdana, Tahoma, sans-serif;
-    font-size: 8pt;
-    text-align: top;
-    color: #220;
-    background: #FFE;
-}
-a:link 
-{
-    color: blue; 
-    text-decoration: none;
-    font-weight: bold;
-} /* unvisited link */
-a:active 
-{
-    color: blue; 
-    text-decoration: none;
-    font-weight: bold;
-}
-a:visited 
-{
-    color: blue;
-    text-decoration: none;
-    font-weight: bold;
-} /* visited link */
-a:hover 
-{
-    color: white; 
-    background-color:blue; 
-    text-decoration: underline;
-    font-weight: bold;
-} /* mouse over link */
-
-a.selected:link 
-{
-    color: purple;
-    font-style:italic;
-    text-decoration: none;
-    font-weight: bold;
-} /* unvisited link */
-a.selected:active 
-{
-    color: blue;
-    font-style:italic;
-    text-decoration: none;
-    font-weight: bold;
-}
-a.selected:visited 
-{
-    color: purple;
-    font-style:italic;
-    text-decoration: none;
-    font-weight: bold;
-} /* visited link */
-a.selected:hover 
-{
-    color: white; 
-    background-color:purple;
-    font-style:italic;
-    text-decoration: underline;
-    font-weight: bold;
-} /* mouse over link */
-
-  </style>
-  
-   <input type='hidden' name='%s' value='%s'>
-    <p style="text-align: center; font-family: Verdana, Tahoma, sans-serif; font-size: 12pt; font-weight: bold; color: #553;">
-    Summaries with Non-Journal Article Citations Report<br>
-    <span style="text-align: center; font-family: Verdana, Tahoma, sans-serif; font-size: 11pt; font-weight: normal; color: #553;">%s</span>
-    </p>
-   
-   <table>
-   <tr>
-   <th  class="cdrTable">cdrid</th>
-   <th  class="cdrTable">Summary Title</th>
-   <th  class="cdrTable">Summary Sec Title</th>
-   <th  class="cdrTable">Citation Type</th>
-   <th  class="cdrTable">Citation CDRID</th>
-   <th  class="cdrTable">Doc Title</th>
-   <th  class="cdrTable">Publication Details/Other Publication Info</th>
-   </tr>
-   """ % (cdrcgi.SESSION, session, dateString)]
-cssClass = 'cdrTableEven'
-for dataRow in dataRows:
-    form.append(u"<tr>")
-    form.append(u"""<td class="%s">%s</td><td class="%s">%s</td><td class="%s">%s</td>"""
-                %(cssClass,dataRow.cdrid,cssClass,dataRow.summaryTitle,cssClass,dataRow.summarySecTitle))
-    form.append(u"""<td class="%s">%s</td><td class="%s">%s</td><td class="%s">%s</td>"""
-                % (cssClass,dataRow.citationType,cssClass,dataRow.citCDRID,cssClass,dataRow.citationTitle))
-    details = dataRow.pubDetails
-    if len(dataRow.internetWebSite) > 0:
-        details += '<a href='
-        details += dataRow.internetWebSite
-        details += """ target='_blank'> """
-        details += dataRow.internetWebSite
-        details += '</a>'
-    form.append(u"""<td class="%s">%s</td>"""
-                % (cssClass,details))
-    form.append(u"</tr>")
-    if cssClass == 'cdrTableEven':
-        cssClass = 'cdrTableOdd'
-    else:
-        cssClass = 'cdrTableEven'
-    
-form.append(u"""</table>
-  </form>
- </body>
-</html>
-""")
-form = u"".join(form)
-cdrcgi.sendPage(header + form)
+#----------------------------------------------------------------------
+# Assemble and return the report.
+#----------------------------------------------------------------------
+query = getQuery()
+debug_log("got query")
+rows = query.execute(cursor, timeout=300).fetchall()
+debug_log("query returned %d rows" % len(rows))
+summaries = [Summary(row[0]) for row in rows]
+debug_log("got %d summaries" % len(summaries))
+cols = (
+    cdrcgi.Report.Column("Summary ID"),
+    cdrcgi.Report.Column("Summary Title"),
+    cdrcgi.Report.Column("Summary Sec Title"),
+    cdrcgi.Report.Column("Citation Type"),
+    cdrcgi.Report.Column("Citation ID"),
+    cdrcgi.Report.Column("Citation Title"),
+    cdrcgi.Report.Column("Publication Details/Other Publication Info")
+)
+rows = []
+for summary in summaries:
+    for citation in summary.citations:
+        pub_info = cdrcgi.Report.Cell(citation, callback=pub_info_cell)
+        row = (summary.doc_id, summary.title, citation.section_title,
+               citation.info.type, citation.doc_id, citation.info.title,
+               pub_info)
+        rows.append(row)
+debug_log("%d rows" % len(rows))
+table = cdrcgi.Report.Table(cols, sorted(rows))
+report = cdrcgi.Report(title, [table], banner=instr, subtitle=dateString)
+debug_log("table ready")
+report.send()
