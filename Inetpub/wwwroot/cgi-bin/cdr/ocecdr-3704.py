@@ -331,11 +331,7 @@ function clear_option_1() {
         self.add_date_field("exp_start", "Start Date")
         self.add_date_field("exp_end", "End Date")
         self.add("</fieldset>")
-        self.add("<fieldset>")
-        self.add(self.B.LEGEND("Output Format"))
-        self.add_radio("format", "Excel Workbook", "excel", checked=True)
-        self.add_radio("format", "Web Page ", "html")
-        self.add("</fieldset>")
+        self.add_output_options("html")
         self.add("</fieldset>")
     def option2(self):
         self.add("<fieldset>")
