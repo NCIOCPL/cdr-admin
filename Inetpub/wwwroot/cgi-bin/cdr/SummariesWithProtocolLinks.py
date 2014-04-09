@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummariesWithProtocolLinks.py
+# $Id: SummariesWithProtocolLinks.py$
 #
 # Report on lists of summaries.
 #
@@ -294,135 +294,97 @@ td.top {
 </style>
 
 <link   type='text/css' rel='stylesheet' href='/stylesheets/CdrCalendar.css'>
-<script type='text/javascript' language='JavaScript' src='/js/CdrCalendar.js'></script>
-
-<script type='text/javascript' language='JavaScript' src='/js/scriptaculous/prototype.js'></script>
-<script type='text/javascript' language='JavaScript' src='/js/scriptaculous/scriptaculous.js'></script>
+<script type='text/javascript' src='/js/CdrCalendar.js'></script>
+<script type='text/javascript' src='/js/jquery.js'></script>
 <script type='text/javascript'>
 
-Event.observe(window, 'load', function(){
+jQuery(function() {
     checkAllEnglish(0);
     checkAllSpanish(0);
     checkAllStatus(0);
-    $('All English').checked = 1;
-    $('All Status').checked = 1;
-    $('English').checked = 1;
+    jQuery('#All_English').prop('checked', true);
+    jQuery('#All_Status').prop('checked', true);
+    jQuery('#English').prop('checked', true);
 });
 
-function isEnglishItemChecked(){
-    return ($('All English').checked ||
-    $('Adult Treatment').checked ||
-    $('Genetics').checked ||
-    $('Complementary and Alternative Medicine').checked  ||
-    $('Pediatric Treatment').checked ||
-    $('Screening and Prevention').checked ||
-    $('Supportive Care').checked);
+function isEnglishItemChecked() {
+    return jQuery('.en-cb:checked').length > 0;
 }
 
 function isSpanishItemChecked(){
-    return($('All Spanish').checked ||
-    $('Spanish Adult Treatment').checked ||
-    $('Spanish Pediatric Treatment').checked ||
-    $('Spanish Screening and Prevention').checked ||
-    $('Spanish Supportive Care').checked);
+    return jQuery('.es-cb:checked').length > 0;
 }
 
-function isStatusItemChecked(){
-    return($('All Status').checked ||
-    $('Active').checked ||
-    $('Approved-not yet active').checked ||
-    $('Enrolling by invitation').checked ||
-    $('Temporarily closed').checked ||
-    $('Closed').checked ||
-    $('Completed').checked ||
-    $('Withdrawn').checked ||
-    $('Withdrawn from PDQ').checked);
+function isStatusItemChecked() {
+    return jQuery('.st-cb:checked').length > 0;
 }
 
-function checkAllEnglish(checked){
-    $('All English').checked = checked;
-    $('Adult Treatment').checked = checked;
-    $('Genetics').checked = checked;
-    $('Complementary and Alternative Medicine').checked = checked;
-    $('Pediatric Treatment').checked = checked;
-    $('Screening and Prevention').checked = checked;
-    $('Supportive Care').checked = checked;    
+function checkAllEnglish(checked) {
+    jQuery('.en-cb').prop('checked', checked);
 }
 
-function checkAllSpanish(checked){
-    $('All Spanish').checked = checked;
-    $('Spanish Adult Treatment').checked = checked;
-    $('Spanish Pediatric Treatment').checked = checked;
-    $('Spanish Screening and Prevention').checked = checked;
-    $('Spanish Supportive Care').checked = checked;
+function checkAllSpanish(checked) {
+    jQuery('.es-cb').prop('checked', checked);
 }
 
-function checkAllStatus(checked){
-    $('All Status').checked = checked;
-    $('Active').checked = checked;
-    $('Approved-not yet active').checked = checked;
-    $('Enrolling by invitation').checked = checked;
-    $('Temporarily closed').checked = checked;
-    $('Closed').checked = checked;
-    $('Completed').checked = checked;
-    $('Withdrawn').checked = checked;
-    $('Withdrawn from PDQ').checked = checked;
+function checkAllStatus(checked) {
+    jQuery('.st-cb').prop('checked', checked);
 }
 
-function englishItemClicked(){
-    $('All English').checked = 0;
-    $('English').checked = 1;
-    $('Spanish').checked = 0;
+function englishItemClicked() {
+    jQuery('#All_English').prop('checked', false);
+    jQuery('#English').prop('checked', true);
+    jQuery('#Spanish').prop('checked', false);
     checkAllSpanish(0);
     if (!isEnglishItemChecked())
-        $('All English').checked = 1;
+        jQuery('#All_English').prop('checked', true);
 }
 
-function spanishItemClicked(){
-    $('All Spanish').checked = 0;
-    $('Spanish').checked = 1;
-    $('English').checked = 0;
+function spanishItemClicked() {
+    jQuery('#All_Spanish').prop('checked', false);
+    jQuery('#Spanish').prop('checked', true);
+    jQuery('#English').prop('checked', false);
     checkAllEnglish(0);
     if (!isSpanishItemChecked())
-        $('All Spanish').checked = 1;
+        jQuery('#All_Spanish').prop('checked', true);
 }
 
-function statusItemClicked(){
-    $('All Status').checked = 0;
+function statusItemClicked() {
+    jQuery('#All_Status').prop('checked', false);
     if (!isStatusItemChecked())
-        $('All Status').checked = 1;
+        jQuery('#All_Status').prop('checked', true);
 }
 
-function langClicked(lang){
+function langClicked(lang) {
     checkAllEnglish(0);
     checkAllSpanish(0);
-    if (lang == 'English'){
-        $('All English').disabled = 0;
-        $('All English').checked = 1;
+    if (lang == 'English') {
+        jQuery('#All_English').removeAttr('disabled');
+        jQuery('#All_English').prop('checked', true);
     }
-    else{
-        $('All Spanish').disabled = 0;
-        $('All Spanish').checked = 1;
+    else {
+        jQuery('#All_Spanish').removeAttr('disabled');
+        jQuery('#All_Spanish').prop('checked', true);
     }
 }
 
-function allEnglishClicked(){
+function allEnglishClicked() {
     checkAllEnglish(0);
     checkAllSpanish(0);
-    $('English').checked = 1;
-    $('All English').checked = 1;
+    jQuery('#English').prop('checked', true);
+    jQuery('#All_English').prop('checked', true);
 }
 
-function allSpanishClicked(){
+function allSpanishClicked() {
     checkAllEnglish(0);
     checkAllSpanish(0);
-    $('Spanish').checked = 1;
-    $('All Spanish').checked = 1;
+    jQuery('#Spanish').prop('checked', true);
+    jQuery('#All_Spanish').prop('checked', true);
 }
 
-function allStatusClicked(){
+function allStatusClicked() {
     checkAllStatus(0);
-    $('All Status').checked = 1;
+    jQuery('#All_Status').prop('checked', true);
 }
 
 </script>
@@ -559,41 +521,44 @@ if not lang and not cdrId:
      <td></td>
      <td>
       <label>
-       <input type='checkbox' id='All English' name='grp' 
-              value='All English' onClick="allEnglishClicked();" CHECKED>
+       <input type='checkbox' id='All_English' name='grp' 
+              value='All English' onClick="allEnglishClicked();" CHECKED
+              class='en-cb'>
         <b>All English</b>
        </input>
       </label>
       <br>
       <label>
        <input type='checkbox' id='Adult Treatment' name='grp' 
-       value='Adult Treatment' onClick="englishItemClicked();">
+       value='Adult Treatment' onClick="englishItemClicked();" class='en-cb'>
        <b>Adult Treatment</b></input>
       </label><br>
       <label>
        <input type='checkbox' id='Genetics' name='grp' 
-       value='Genetics' onClick="englishItemClicked();">
+       value='Genetics' onClick="englishItemClicked();" class='en-cb'>
        <b>Cancer Genetics</b></input>
       </label><br>
       <label>
        <input type='checkbox' name='grp' 
        id='Complementary and Alternative Medicine' onClick="englishItemClicked();"
-       value='Complementary and Alternative Medicine'>
+       value='Complementary and Alternative Medicine' class='en-cb'>
        <b>Complementary and Alternative Medicine</b></input>
       </label><br>
       <label>
        <input type='checkbox' id='Pediatric Treatment' name='grp' 
-       value='Pediatric Treatment' onClick="englishItemClicked();">
+       value='Pediatric Treatment' onClick="englishItemClicked();"
+       class='en-cb'>
        <b>Pediatric Treatment</b></input>
       </label><br>
       <label>
        <input type='checkbox' id='Screening and Prevention' name='grp' 
-       value='Screening and Prevention' onClick="englishItemClicked();">
+       value='Screening and Prevention' onClick="englishItemClicked();"
+       class='en-cb'>
        <b>Screening and Prevention</b></input>
       </label><br>
       <label>
        <input type='checkbox' id='Supportive Care' name='grp' 
-       value='Supportive Care' onClick="englishItemClicked();">
+       value='Supportive Care' onClick="englishItemClicked();" class='en-cb'>
        <b>Supportive and Palliative Care</b><br></input>
       </label>
      </td>
@@ -616,28 +581,32 @@ if not lang and not cdrId:
      <td></td>
      <td>
       <label>
-       <input type='checkbox' id='All Spanish' name='grp' 
-       value='All Spanish' onClick="allSpanishClicked();">
+       <input type='checkbox' id='All_Spanish' name='grp' 
+       value='All Spanish' onClick="allSpanishClicked();" class='es-cb'>
        <b>All Spanish</b></input>
       </label><br>
       <label>
        <input type='checkbox' id='Spanish Adult Treatment' name='grp' 
-       value='Spanish Adult Treatment' onClick="spanishItemClicked();">
+       value='Spanish Adult Treatment' onClick="spanishItemClicked();"
+       class='es-cb'>
        <b>Adult Treatment</b></input>
       </label><br>
       <label>
        <input type='checkbox' id='Spanish Pediatric Treatment' name='grp' 
-       value='Spanish Pediatric Treatment' onClick="spanishItemClicked();">
+       value='Spanish Pediatric Treatment' onClick="spanishItemClicked();"
+       class='es-cb'>
        <b>Pediatric Treatment</b></input>
       </label><br>
       <label>
        <input type='checkbox' id='Spanish Screening and Prevention' name='grp' 
-       value='Spanish Screening and Prevention' onClick="spanishItemClicked();">
+       value='Spanish Screening and Prevention' onClick="spanishItemClicked();"
+       class='es-cb'>
        <b>Screening and Prevention</b></input>
       </label><br>
       <label>
        <input type='checkbox' id='Spanish Supportive Care' name='grp' 
-       value='Spanish Supportive Care' onClick="spanishItemClicked();">
+       value='Spanish Supportive Care' onClick="spanishItemClicked();"
+       class='es-cb'>
        <b>Supportive and Palliative Care</b></input>
       </label><br>
      </td>
@@ -700,14 +669,14 @@ if not lang and not cdrId:
      <td width=100></td>
      <td>
       <label>
-       <input type='checkbox' id='All Status' name='status' 
+       <input type='checkbox' id='All_Status' name='status' class='st-cb'
               value='All Status' onClick="allStatusClicked();" CHECKED>
         <b>All Status</b>
        </input>
       </label>
       <br>
       <label>
-       <input type='checkbox' id='Active' name='status' 
+       <input type='checkbox' id='Active' name='status' class='st-cb'
               value='Active' onClick="statusItemClicked();">
         <b>Active</b>
        </input>
@@ -715,41 +684,44 @@ if not lang and not cdrId:
       <br>
       <label>
        <input type='checkbox' id='Approved-not yet active' name='status' 
-              value='Approved-not yet active' onClick="statusItemClicked();">
+              value='Approved-not yet active' onClick="statusItemClicked();"
+              class='st-cb'>
         <b>Approved-not yet active</b>
        </input>
       </label>
       <br>
       <label>
        <input type='checkbox' id='Enrolling by invitation' name='status' 
-              value='Enrolling by invitation' onClick="statusItemClicked();">
+              value='Enrolling by invitation' onClick="statusItemClicked();"
+              class='st-cb'>
         <b>Enrolling by invitation</b>
        </input>
       </label>
       <br>
       <label>
        <input type='checkbox' id='Temporarily closed' name='status' 
-              value='Temporarily closed' onClick="statusItemClicked();">
+              value='Temporarily closed' onClick="statusItemClicked();"
+              class='st-cb'>
         <b>Temporarily closed</b>
        </input>
       </label>
       <br>
       <label>
-       <input type='checkbox' id='Closed' name='status' 
+       <input type='checkbox' id='Closed' name='status' class='st-cb'
                value='Closed' onClick="statusItemClicked();">
         <b>Closed</b>
        </input>
       </label>
       <br>
       <label>
-       <input type='checkbox' id='Completed' name='status' 
+       <input type='checkbox' id='Completed' name='status' class='st-cb'
                value='Completed' onClick="statusItemClicked();">
         <b>Completed</b>
        </input>
       </label>
       <br>
       <label>
-       <input type='checkbox' id='Withdrawn' name='status' 
+       <input type='checkbox' id='Withdrawn' name='status' class='st-cb'
                value='Withdrawn' onClick="statusItemClicked();">
         <b>Withdrawn</b>
        </input>
@@ -757,7 +729,8 @@ if not lang and not cdrId:
       <br>
       <label>
         <input type='checkbox' id='Withdrawn from PDQ' name='status' 
-               value='Withdrawn from PDQ' onClick="statusItemClicked();">
+               value='Withdrawn from PDQ' onClick="statusItemClicked();"
+               class='st-cb'>
          <b>Withdrawn from PDQ</b>
         </input>
       </label>
