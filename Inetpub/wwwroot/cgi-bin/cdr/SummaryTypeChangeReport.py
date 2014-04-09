@@ -18,28 +18,6 @@ buttons   = ("Submit", RPTMENU, cdrcgi.MAINMENU)
 
 MIN_DATE  = str(datetime.date(2002, 1, 1))
 MAX_DATE  = str(datetime.date.today())
-# English language board names: Short display name, Full db name
-# NOTE: This will need to be maintained if board names change FIND BETTER WAY!
-ENGLISH_BOARDS = (
-    ('Adult Treatment', 'PDQ Adult Treatment Editorial Board'),
-    ('Cancer Genetics', 'PDQ Cancer Genetics Editorial Board'),
-    ('Complementary and Alternative Medicine',
-        'PDQ Cancer Complementary and Alternative Medicine Editorial Board'),
-    ('Pediatric Treatment', 'PDQ Pediatric Treatment Editorial Board'),
-    ('Screening and Prevention',
-        'PDQ Screening and Prevention Editorial Board'),
-    ('Supportive and Palliative Care',
-        'PDQ Supportive and Palliative Care Editorial Board')
-)
-
-SPANISH_BOARDS = (
-    ('Spanish Adult Treatment', 'PDQ Adult Treatment Editorial Board'),
-    ('Spanish Pediatric Treatment', 'PDQ Pediatric Treatment Editorial Board'),
-    ('Spanish Screening and Prevention',
-        'PDQ Screening and Prevention Editorial Board'),
-    ('Spanish Supportive and Palliative Care',
-        'PDQ Supportive and Palliative Care Editorial Board')
-)
 
 def fatal(msg, log=False):
     """
@@ -204,10 +182,10 @@ class TOCConfig:
 
         # Not all, search for them
         if self.language == 'English':
-            boardList = ENGLISH_BOARDS
+            boardList = EnglishBoards
             inputId   = 'enboard'
         else:
-            boardList = SPANISH_BOARDS
+            boardList = SpanishBoards
             inputId   = 'esboard'
 
         # All the checked boards
@@ -744,6 +722,36 @@ class OutputReport:
         """
         return (u"%s (%d)" % (sumChg.docTitle, sumChg.docId))
 
+def createBoardLists():
+    """
+    Populate two global variables:
+        EnglishBoards
+        SpanishBoards
+
+    Structure created for each is a list, in alpha order, of:
+        Short board name, Full board name, Board organization CDR ID
+    """
+    # Search database for names
+    global EnglishBoards, SpanishBoards
+
+    boardDict = cdr.getBoardNames('editorial', 'short')
+
+    # Invert dict (to val[key]), removing " Editorial Board"
+    boardVdict = {}
+    for key, val in boardDict.items():
+        # Kludges to get name users want
+        val2 = val.replace(' Editorial Board', '')
+        if val2.startswith('Cancer Complementary'):
+            val2 = val2.replace('Cancer ', '')
+        boardVdict[val2] = key
+
+    for key in sorted(boardVdict.keys()):
+        pair = (key, boardVdict[key])
+        EnglishBoards.append(pair)
+        if key not in ('Cancer Genetics',
+                       'Complementary and Alternative Medicine'):
+            SpanishBoards.append(pair)
+
 def createBoardsMenu():
     """
     Create an input form for selecting boards for English and Spanish.
@@ -775,13 +783,15 @@ def createBoardMenu(language):
     """
     # Header for the section
     if language == 'English':
-        boardList = ENGLISH_BOARDS
+        boardList = EnglishBoards
         checked   = ' checked'
         inputId   = 'enboard'
+        allLang   = 'allEnglish'
     else:
-        boardList = SPANISH_BOARDS
+        boardList = SpanishBoards
         checked   = ''
         inputId   = 'esboard'
+        allLang   = 'allSpanish'
     html = """
     <tr>
      <td width=100>
@@ -794,16 +804,20 @@ def createBoardMenu(language):
     <tr>
      <td></td>
      <td>
-      <label><input type='checkbox' name='alllang' value='%s' %s />All %s
+      <label><input type='checkbox' name='alllang' id='%s' value='%s'
+              onclick="javascript:uncheckMultiBox('%s')" %s />All %s
       </label><br>
-""" % (language, checked, language, language, checked, language)
+""" % (language, checked, language, allLang, language,
+       inputId, checked, language)
 
     # Selection for editorial boards
     idx = 0
     for row in boardList:
         html += """
-      <label><input type='checkbox' name='boardId' value='%s%d' />%s</label><br>
-""" % (inputId, idx, row[0])
+      <label><input type='checkbox' name='boardId' value='%s%d' id='%s%d'
+              onclick="javascript:checkIt('%s', false)" %s />All %s</label>
+      <br />
+""" % (inputId, idx, inputId, idx, allLang, checked, row[0])
         idx += 1
 
     # Rest of the section
@@ -824,9 +838,6 @@ def createAdvancedMenu():
     html = """
     <div class='advanced'>
      <b>Advanced Report - Select Dates and Organization</b>
-     <p class='instructions'>
-      Fill in the following additional fields for an "advanced" report
-     </p>
      <fieldset>
       <legend>&nbsp;Date Limits for Changes&nbsp;</legend>
       <label for='startDate'> Start date </label>
@@ -869,7 +880,7 @@ def createInputForm(session):
     """
     header = cdrcgi.header(BANNER, BANNER, SUBBANNER, SCRIPT,
                            buttons, stylesheet = """
-   <LINk type='text/css' rel='stylesheet' href='/stylesheets/CdrCalendar.css'>
+   <LINK type='text/css' rel='stylesheet' href='/stylesheets/CdrCalendar.css' />
    <SCRIPT type='text/javascript' language='JavaScript'
             src='/js/CdrCalendar.js'></SCRIPT>
    <STYLE type="text/css">
@@ -891,6 +902,38 @@ def createInputForm(session):
         margin: 10px;
         width: auto; }
    </STYLE>
+
+   <SCRIPT type="text/javascript" lang="JavaScript">
+    function checkIt(boxId, checked) {
+        var chkVal = '';
+        if (checked)
+            chkVal = "checked";
+        var elem = document.getElementById(boxId)
+        if (elem) {
+            elem.checked = chkVal;
+            return true;
+        }
+        return false;
+    }
+
+    // Uncheck ids beginning enboard, esboard, typ, cmt, as requested
+    function uncheckMultiBox(prefix) {
+        var i=0;
+        while (true) {
+            var boardId = prefix + i;
+            if (!checkIt(boardId, false))
+                break;
+            ++i;
+        }
+    }
+
+    // Uncheck specific change types and comments
+    function uncheckTypes() {
+        uncheckMultiBox('toc');
+        uncheckMultiBox('cmt');
+    }
+
+    </SCRIPT>
 
 """                           )
     form   = """\
@@ -916,18 +959,18 @@ def createInputForm(session):
 
     <input class='radio' type='radio' name='oFormat' id='fmtHtml'
            value='html' checked='checked' />
-    <label class='radio' for='orderBySummary'>HTML &nbsp; &nbsp; </label>
+    <label class='radio' for='orderBySummary'>Web Page &nbsp; &nbsp; </label>
 
     <input class='radio' type='radio' name='oFormat' id='fmtExcel'
            value='excel' />
-    <label class='radio' for='oFormat'>Excel</label>
+    <label class='radio' for='oFormat'>Excel Workbook</label>
     </fieldset>
    </div>
 
    <div class='singletoc'>
    <b>Basic Report - Select Specific Summaries</b>
    <fieldset>
-    <legend>&nbsp;Document Title or CDR-ID&nbsp;</legend>
+    <legend>&nbsp;CDR-ID or Document Title&nbsp;</legend>
     <label for="byCdrid">CDR-ID(s)</label>
     <input name='byCdrid' size='50' id="byCdrid">
     <br />
@@ -971,16 +1014,20 @@ def createInputForm(session):
    <table border = '0'>
      <tr>
       <td colspan='2'><input type='checkbox' name='allTcCm' value='allTcCm'
-           checked='checked'>All types and all comments (or select below)</td>
+          onclick="javascript:uncheckTypes()" id='allTcCm' checked='checked'
+       >All types and all comments (or select below)</td>
      </tr>
 """
     for i in range(len(typesOfChange)):
         tocHtml += """
      <tr>
-      <td><input type='checkbox' name='typ' value='toc%d'>%s</td>
-      <td><input type='checkbox' name='cmt' value='cmt%d'>Comments</td>
+      <td><input type='checkbox' name='typ' value='toc%d' id='toc%d'
+              onclick="javascript:checkIt('allTcCm', false)"
+           >%s</td>
+      <td><input type='checkbox' name='cmt' value='cmt%d' id='cmt%d'
+           >Comments</td>
      </tr>
-""" % (i, typesOfChange[i], i)
+""" % (i, i, typesOfChange[i], i, i)
 
     tocHtml += """
     </table>
@@ -1090,6 +1137,11 @@ def extractTOC(cursor, docChg, requestedTypes,
 #----------------------------------------------------------------------
 # MAIN
 #----------------------------------------------------------------------
+# Populate board lists
+EnglishBoards = []
+SpanishBoards = []
+
+createBoardLists()
 
 # Extract variables from the form
 cfg = TOCConfig(cgi.FieldStorage())
