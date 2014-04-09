@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 #
-# $Id: SummariesWithProtocolLinks.py$
+# $Id$
 #
 # Report on lists of summaries.
 #
