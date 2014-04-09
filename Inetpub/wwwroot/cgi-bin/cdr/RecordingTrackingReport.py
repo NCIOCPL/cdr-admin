@@ -11,7 +11,7 @@
 #                 display blocked documents 
 # 
 #----------------------------------------------------------------------
-import cgi, cdr, cdrdb, cdrcgi, string, time, xml.dom.minidom, xml.sax.saxutils
+import cgi, cdr, cdrdb, cdrcgi, time, xml.dom.minidom
 import ExcelWriter, sys
 
 #----------------------------------------------------------------------
@@ -75,20 +75,6 @@ td.top {
 <link   type='text/css' rel='stylesheet' href='/stylesheets/CdrCalendar.css'>
 <script type='text/javascript' language='JavaScript' src='/js/CdrCalendar.js'></script>
 
-<script type='text/javascript' language='JavaScript' src='/js/scriptaculous/prototype.js'></script>
-<script type='text/javascript' language='JavaScript' src='/js/scriptaculous/scriptaculous.js'></script>
-<script type='text/javascript'>
-
-Event.observe(window, 'load', function(){
-    checkAllEnglish(0);
-    checkAllSpanish(0);
-    checkAllStatus(0);
-    $('All English').checked = 1;
-    $('All Status').checked = 1;
-    $('English').checked = 1;
-});
-
-</script>
 """
 header = cdrcgi.header(title, title, instr + ' - ' + dateString, 
                            script, buttons, 
