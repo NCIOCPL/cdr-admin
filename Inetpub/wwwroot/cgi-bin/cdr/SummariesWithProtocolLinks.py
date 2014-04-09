@@ -32,7 +32,6 @@ request     = cdrcgi.getRequest(fields)
 title       = "CDR Administration"
 instr       = "Summaries With Protocol Links/Refs Report"
 script      = "SummariesWithProtocolLinks.py"
-script = "SWPL.py"
 SUBMENU     = "Report Menu"
 buttons     = (SUBMENU, cdrcgi.MAINMENU)
 
