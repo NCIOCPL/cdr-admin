@@ -5,7 +5,7 @@
 # Report on lists of summaries.
 #
 # BZIssue::4744 - Modify Summaries with Protocol Links/Refs report
-# BZIssue::4865 - Summaries with Protocol Links/Refs report bug 
+# BZIssue::4865 - Summaries with Protocol Links/Refs report bug
 # BZIssue::5120 - Missing Text from protocol ref report
 #
 #----------------------------------------------------------------------
@@ -15,24 +15,24 @@ import xml.dom.minidom
 #----------------------------------------------------------------------
 # Set the form variables.
 #----------------------------------------------------------------------
-fields    = cgi.FieldStorage()
-session   = cdrcgi.getSession(fields)
-if not session: session = 'CdrGuest'
-lang        = fields and fields.getvalue("lang")             or ''
-groups      = fields and fields.getvalue("grp")              or []
-statuses    = fields and fields.getvalue("status")           or []
-submit      = fields and fields.getvalue("SubmitButton")     or None
-cdrId       = fields and fields.getvalue("cdrid")            or ''
-docTitle    = fields and fields.getvalue("title")            or None
-revFrom     = fields and fields.getvalue("reviewedfrom")     or None
-revTo       = fields and fields.getvalue("reviewedto")       or None
-excludeDate = fields and fields.getvalue("exclude")          or 'Yes'
-displayAll  = fields and fields.getvalue("displayall")       or 'Yes'
-doExcel     = fields and fields.getvalue("doexcel")          or 'No'
+fields      = cgi.FieldStorage()
+session     = cdrcgi.getSession(fields)           or "guest"
+lang        = fields.getvalue("lang")             or ''
+groups      = fields.getvalue("grp")              or []
+statuses    = fields.getvalue("status")           or []
+submit      = fields.getvalue("SubmitButton")     or None
+cdrId       = fields.getvalue("cdrid")            or ''
+docTitle    = fields.getvalue("title")            or None
+revFrom     = fields.getvalue("reviewedfrom")     or None
+revTo       = fields.getvalue("reviewedto")       or None
+excludeDate = fields.getvalue("exclude")          or 'Yes'
+displayAll  = fields.getvalue("displayall")       or 'Yes'
+doExcel     = fields.getvalue("doexcel")          or 'No'
 request     = cdrcgi.getRequest(fields)
 title       = "CDR Administration"
 instr       = "Summaries With Protocol Links/Refs Report"
 script      = "SummariesWithProtocolLinks.py"
+script = "SWPL.py"
 SUBMENU     = "Report Menu"
 buttons     = (SUBMENU, cdrcgi.MAINMENU)
 
@@ -51,14 +51,14 @@ buttons     = (SUBMENU, cdrcgi.MAINMENU)
 # ----------------------------------------------------------------------
 class dataRow:
     def __init__(self, cdrid, summaryTitle, summarySecTitle, ref, protCDRID,
-                 status, excelOutput = 'No'):
-        self.cdrid = cdrid
-        self.summaryTitle = summaryTitle
-        self.summarySecTitle = summarySecTitle
-        self.ref = ref
-        self.protCDRID = protCDRID
-        self.linkcdrid = cdr.normalize(protCDRID)
-        self.status = status
+                 status, excelOutput='No'):
+        self.cdrid            = cdrid
+        self.summaryTitle     = summaryTitle
+        self.summarySecTitle  = summarySecTitle
+        self.ref              = ref
+        self.protCDRID        = protCDRID
+        self.linkcdrid        = cdr.normalize(protCDRID)
+        self.status           = status
         self.linkComment      = ''
         self.linkDate         = ''
         self.linkStatus       = ''
@@ -67,23 +67,20 @@ class dataRow:
         self.text             = ''
         self.refTextStart     = 0
         self.refTextSize      = 0
-        if excelOutput == 'Yes':
-            self.excelOutput = True
-        else:
-            self.excelOutput = False
-    
-    def addProtocolLink(self,parentElem):
+        self.excelOutput      = excelOutput == "Yes"
+
+    def addProtocolLink(self, parentElem):
         self.text = ''
         self.addText(parentElem,0)
         self.fullProtocolLink = self.text
-        self.protocolLink = self.reduceTo(self.fullProtocolLink,200)
+        self.protocolLink = self.reduceTo(self.fullProtocolLink, 200)
 
-    def addText(self,parentElem,bInLink):
+    def addText(self, parentElem, bInLink):
         binlink = 0
         for parentChildNode in parentElem.childNodes:
             if parentChildNode.nodeType == xml.dom.minidom.Node.ELEMENT_NODE:
                 if parentChildNode.attributes.length > 0:
-                    for (name,value) in parentChildNode.attributes.items():
+                    for (name, value) in parentChildNode.attributes.items():
                         href = ''
                         if self.ref == 'LINK':
                             if name == 'cdr:ref':
@@ -105,7 +102,7 @@ class dataRow:
                                     self.refTextStart = len(self.text)
                                     self.refTextSize = len(href)
                                     self.text += href
-                                
+
             if parentChildNode.nodeType == xml.dom.minidom.Node.TEXT_NODE:
                 self.text += parentChildNode.nodeValue + " "
                 if bInLink == 1:
@@ -117,10 +114,10 @@ class dataRow:
             self.addText(parentChildNode,binlink)
             binlink = 0
 
-    # Reduce the text to display on the report to a certain number of 
-    # characters.  The number is passed as a parameter 
+    # Reduce the text to display on the report to a certain number of
+    # characters.  The number is passed as a parameter
     # ---------------------------------------------------------------
-    def reduceTo(self,text,count):
+    def reduceTo(self, text, count):
         startIndex = self.refTextStart - count
         if startIndex < 0:
             startIndex = 0;
@@ -139,13 +136,16 @@ class dataRow:
 
 
 # ---------------------------------------------------------------------
-# Function to determine if the LastReviewed date of the current 
-# ProtocolRef/Link is within the given date range and needs to be 
+# Function to determine if the LastReviewed date of the current
+# ProtocolRef/Link is within the given date range and needs to be
 # displayed or not.
+# Note (2014-04-09): believe it or not, this function returns True
+# if the rows should NOT be displayed, and False if it SHOULD be
+# displayed.  Don't know why.
 # ---------------------------------------------------------------------
-def displayRow(startdate, enddate, linkDate, exclude = 'Yes'):
+def displayRow(startDate, endDate, linkDate, exclude='Yes'):
     # If no linkDate exists print this row
-    if not linkDate: 
+    if not linkDate:
         return False
 
     # Test if the date format is correct.  Return if it isn't
@@ -154,48 +154,28 @@ def displayRow(startdate, enddate, linkDate, exclude = 'Yes'):
         dateTest = time.strptime(linkDate, '%Y-%m-%d')
     except:
         return False
-        
+
 
     # If the linkDate is within the date range and the exclude flag has
     # been set to 'Yes' -- don't print the row
-    # If the linkDate is within the date range and the exclude flag has 
+    # If the linkDate is within the date range and the exclude flag has
     # been set to 'No'  -- print the row
     # -----------------------------------------------------------------
+    inRange = startDate <= linkDate and endDate >= linkDate
     if exclude == 'Yes':
-        if (time.strptime(startdate, '%Y-%m-%d') <= 
-                time.strptime(linkDate, '%Y-%m-%d')
-            and
-            time.strptime(enddate, '%Y-%m-%d')   >= 
-                time.strptime(linkDate, '%Y-%m-%d')):
-            return True
-        else:
-            return False
+        return inRange
     else:
-        if (time.strptime(startdate, '%Y-%m-%d') <= 
-                time.strptime(linkDate, '%Y-%m-%d')
-            and
-            time.strptime(enddate, '%Y-%m-%d')   >= 
-                time.strptime(linkDate, '%Y-%m-%d')):
-            return False
-        else:
-            return True
-
-    return False
+        return not inRange
 
 
 # ---------------------------------------------------------------------
-# Function to determine if the current status has changed compared 
-# with the last status.  We want to suppress displaying records for 
+# Function to determine if the current status has changed compared
+# with the last status.  We want to suppress displaying records for
 # which the protocol status has not changed.
 # ---------------------------------------------------------------------
 def hasStatusChanged(currentStatus, lastStatus):
     # Check if the current Protocol status has changed
-    if not string.upper(currentStatus) == string.upper(lastStatus):
-        return True
-    else:
-        return False
-
-    return False
+    return string.upper(currentStatus) != string.upper(lastStatus)
 
 
 # -------------------------------------------------
@@ -283,7 +263,7 @@ p.title {
     width: 100px;
     }
 *.mittich {
-    width: 50px; 
+    width: 50px;
     margin-left: auto;
     margin-right: auto;
     display: block;
@@ -389,7 +369,7 @@ function allStatusClicked() {
 
 </script>
 """
-header = cdrcgi.header(title, title, instr + ' - ' + dateString, 
+header = cdrcgi.header(title, title, instr + ' - ' + dateString,
                            script,
                            ("Submit",
                             SUBMENU,
@@ -404,7 +384,7 @@ try:
     cursor = conn.cursor()
 except cdrdb.Error, info:
     cdrcgi.bail('Failure connecting to database: %s' % info[1][0])
-     
+
 #----------------------------------------------------------------------
 # If we have a title string but no ID, find the matching summary.
 #----------------------------------------------------------------------
@@ -469,7 +449,7 @@ if docTitle and not docId:
 if not lang and not cdrId:
     form   = """\
    <input type='hidden' name='%s' value='%s'>
- 
+
     <fieldset>
      <legend>&nbsp;Enter CDR-ID or Summary Title&nbsp;</legend>
    <table border = '0' width="100%%">
@@ -508,7 +488,7 @@ if not lang and not cdrId:
     <table>
    <tr>
      <td width=100>
-      <input id='English' name='lang' type='radio' 
+      <input id='English' name='lang' type='radio'
              value='English' onClick="langClicked('English');" CHECKED>
        <b>English</b>
       </input>
@@ -521,7 +501,7 @@ if not lang and not cdrId:
      <td></td>
      <td>
       <label>
-       <input type='checkbox' id='All_English' name='grp' 
+       <input type='checkbox' id='All_English' name='grp'
               value='All English' onClick="allEnglishClicked();" CHECKED
               class='en-cb'>
         <b>All English</b>
@@ -529,35 +509,35 @@ if not lang and not cdrId:
       </label>
       <br>
       <label>
-       <input type='checkbox' id='Adult Treatment' name='grp' 
+       <input type='checkbox' id='Adult Treatment' name='grp'
        value='Adult Treatment' onClick="englishItemClicked();" class='en-cb'>
        <b>Adult Treatment</b></input>
       </label><br>
       <label>
-       <input type='checkbox' id='Genetics' name='grp' 
+       <input type='checkbox' id='Genetics' name='grp'
        value='Genetics' onClick="englishItemClicked();" class='en-cb'>
        <b>Cancer Genetics</b></input>
       </label><br>
       <label>
-       <input type='checkbox' name='grp' 
+       <input type='checkbox' name='grp'
        id='Complementary and Alternative Medicine' onClick="englishItemClicked();"
        value='Complementary and Alternative Medicine' class='en-cb'>
        <b>Complementary and Alternative Medicine</b></input>
       </label><br>
       <label>
-       <input type='checkbox' id='Pediatric Treatment' name='grp' 
+       <input type='checkbox' id='Pediatric Treatment' name='grp'
        value='Pediatric Treatment' onClick="englishItemClicked();"
        class='en-cb'>
        <b>Pediatric Treatment</b></input>
       </label><br>
       <label>
-       <input type='checkbox' id='Screening and Prevention' name='grp' 
+       <input type='checkbox' id='Screening and Prevention' name='grp'
        value='Screening and Prevention' onClick="englishItemClicked();"
        class='en-cb'>
        <b>Screening and Prevention</b></input>
       </label><br>
       <label>
-       <input type='checkbox' id='Supportive Care' name='grp' 
+       <input type='checkbox' id='Supportive Care' name='grp'
        value='Supportive Care' onClick="englishItemClicked();" class='en-cb'>
        <b>Supportive and Palliative Care</b><br></input>
       </label>
@@ -569,7 +549,7 @@ if not lang and not cdrId:
     <tr>
      <td width=100>
       <label>
-       <input id='Spanish' name='lang' type='radio' 
+       <input id='Spanish' name='lang' type='radio'
        value='Spanish' onClick="langClicked('Spanish');"><b>Spanish</b></input>
       </label>
      </td>
@@ -581,30 +561,30 @@ if not lang and not cdrId:
      <td></td>
      <td>
       <label>
-       <input type='checkbox' id='All_Spanish' name='grp' 
+       <input type='checkbox' id='All_Spanish' name='grp'
        value='All Spanish' onClick="allSpanishClicked();" class='es-cb'>
        <b>All Spanish</b></input>
       </label><br>
       <label>
-       <input type='checkbox' id='Spanish Adult Treatment' name='grp' 
+       <input type='checkbox' id='Spanish Adult Treatment' name='grp'
        value='Spanish Adult Treatment' onClick="spanishItemClicked();"
        class='es-cb'>
        <b>Adult Treatment</b></input>
       </label><br>
       <label>
-       <input type='checkbox' id='Spanish Pediatric Treatment' name='grp' 
+       <input type='checkbox' id='Spanish Pediatric Treatment' name='grp'
        value='Spanish Pediatric Treatment' onClick="spanishItemClicked();"
        class='es-cb'>
        <b>Pediatric Treatment</b></input>
       </label><br>
       <label>
-       <input type='checkbox' id='Spanish Screening and Prevention' name='grp' 
+       <input type='checkbox' id='Spanish Screening and Prevention' name='grp'
        value='Spanish Screening and Prevention' onClick="spanishItemClicked();"
        class='es-cb'>
        <b>Screening and Prevention</b></input>
       </label><br>
       <label>
-       <input type='checkbox' id='Spanish Supportive Care' name='grp' 
+       <input type='checkbox' id='Spanish Supportive Care' name='grp'
        value='Spanish Supportive Care' onClick="spanishItemClicked();"
        class='es-cb'>
        <b>Supportive and Palliative Care</b></input>
@@ -617,7 +597,7 @@ if not lang and not cdrId:
     <p/>
 
     <fieldset>
-     <legend>&nbsp;Include/Exclude ProtocolLink/Ref Elements 
+     <legend>&nbsp;Include/Exclude ProtocolLink/Ref Elements
              for this Date Range&nbsp;</legend>
 
     <table class="tablecenter" border="0">
@@ -626,7 +606,7 @@ if not lang and not cdrId:
        <label for="reviewedfrom">From: </label>
       </td>
       <td>
-       <input id="reviewedfrom" name="reviewedfrom" 
+       <input id="reviewedfrom" name="reviewedfrom"
                 value="Select start date"
                 class="CdrDateField">
       </td>
@@ -636,7 +616,7 @@ if not lang and not cdrId:
        <label for="reviewedto">To: </label>
       </td>
       <td>
-       <input id="reviewedto" name="reviewedto" 
+       <input id="reviewedto" name="reviewedto"
                 value="Select end date"
                 class="CdrDateField">
       </td>
@@ -650,7 +630,7 @@ if not lang and not cdrId:
          </input>
         </label>
         <label for="excludedate">
-         <input type="radio" name="exclude" id="excludedate" 
+         <input type="radio" name="exclude" id="excludedate"
                 value="Yes" checked="checked">
          <b>Exclude</b>
          </input>
@@ -683,7 +663,7 @@ if not lang and not cdrId:
       </label>
       <br>
       <label>
-       <input type='checkbox' id='Approved-not yet active' name='status' 
+       <input type='checkbox' id='Approved-not yet active' name='status'
               value='Approved-not yet active' onClick="statusItemClicked();"
               class='st-cb'>
         <b>Approved-not yet active</b>
@@ -691,7 +671,7 @@ if not lang and not cdrId:
       </label>
       <br>
       <label>
-       <input type='checkbox' id='Enrolling by invitation' name='status' 
+       <input type='checkbox' id='Enrolling by invitation' name='status'
               value='Enrolling by invitation' onClick="statusItemClicked();"
               class='st-cb'>
         <b>Enrolling by invitation</b>
@@ -699,7 +679,7 @@ if not lang and not cdrId:
       </label>
       <br>
       <label>
-       <input type='checkbox' id='Temporarily closed' name='status' 
+       <input type='checkbox' id='Temporarily closed' name='status'
               value='Temporarily closed' onClick="statusItemClicked();"
               class='st-cb'>
         <b>Temporarily closed</b>
@@ -728,7 +708,7 @@ if not lang and not cdrId:
       </label>
       <br>
       <label>
-        <input type='checkbox' id='Withdrawn from PDQ' name='status' 
+        <input type='checkbox' id='Withdrawn from PDQ' name='status'
                value='Withdrawn from PDQ' onClick="statusItemClicked();"
                class='st-cb'>
          <b>Withdrawn from PDQ</b>
@@ -737,18 +717,18 @@ if not lang and not cdrId:
       <br>
       <br>
      </td>
-    </tr>    
+    </tr>
     <tr>
      <td align="right"><b>Include:</b></td>
      <td>
       <label>
-       <input type="radio" id="displayall" name="displayall" 
+       <input type="radio" id="displayall" name="displayall"
                 value="Yes" checked="checked">
                 <b>All</b>
       &nbsp; &nbsp; &nbsp; &nbsp;
       </label>
       <label>
-       <input type="radio" id="displayall" name="displayall" 
+       <input type="radio" id="displayall" name="displayall"
                 value="No">
                 <b>Changed Status Only</b>
       </label>
@@ -766,16 +746,16 @@ if not lang and not cdrId:
     <tr>
      <td>
       <label>
-       <input type="radio" id="doexcel" name="doexcel" 
-                value="Yes"> 
-        <b>Excel</b> 
+       <input type="radio" id="doexcel" name="doexcel"
+                value="Yes">
+        <b>Excel</b>
        </input>
       </label>
      <td>
       <label>
        <input type="radio" id="dohtml" name="doexcel"
-                value="No" checked="checked"> 
-        <b>HTML</b> 
+                value="No" checked="checked">
+        <b>HTML</b>
        </input>
       </label>
      </td>
@@ -791,7 +771,7 @@ if not lang and not cdrId:
 
 
 # ---------------------------------------------------------------------
-# If we have a cdrId (either a title or ID has been entered) we need 
+# If we have a cdrId (either a title or ID has been entered) we need
 # to get the summary language
 # ---------------------------------------------------------------------
 if not lang and cdrId:
@@ -830,7 +810,7 @@ if not docId:
     # of the SummaryType.
     # Based on the SummaryType selected on the form the boardPick list is
     # being created including the Editorial and Advisory board for each
-    # type.  These board IDs can then be decoded into the proper 
+    # type.  These board IDs can then be decoded into the proper
     # heading to be used for each selected summary type.
     # --------------------------------------------------------------------
     for i in range(len(groups)):
@@ -871,10 +851,10 @@ def getQuerySegment(lang, ref):
                  secTitle.value as summarySecTitle,'"""]
 
     query.append(ref)
-    
+
     query.append(u"""' as ref, qt.int_val as protCDRID, qstatus.value as status,
       secTitle.node_loc as TitleNodeLoc,
-      len(secTitle.node_loc) as TitleNodeLocLen,qt.node_loc as LinkNodeLoc 
+      len(secTitle.node_loc) as TitleNodeLocLen,qt.node_loc as LinkNodeLoc
       FROM query_term qt
       JOIN query_term title    ON qt.doc_id  = title.doc_id
       JOIN query_term qstatus  ON qt.int_val = qstatus.doc_id
@@ -883,7 +863,7 @@ def getQuerySegment(lang, ref):
     if not docId:
         query.append(u"""
       JOIN query_term lang     ON qt.doc_id  = lang.doc_id """)
-    
+
         if lang == 'English':
             query.append(u"""
       JOIN query_term board    ON qt.doc_id = board.doc_id """)
@@ -905,20 +885,20 @@ def getQuerySegment(lang, ref):
 
     query.append(u"""\
     AND title.path = '/Summary/SummaryTitle'
-    AND (qstatus.path = 
-                  '/InScopeProtocol/ProtocolAdminInfo/CurrentProtocolStatus' 
+    AND (qstatus.path =
+                  '/InScopeProtocol/ProtocolAdminInfo/CurrentProtocolStatus'
          OR
-         qstatus.path = 
+         qstatus.path =
                   '/CTGovProtocol/OverallStatus'
         )
-    AND secTitle.path like '/Summary/%SummarySection/Title' 
+    AND secTitle.path like '/Summary/%SummarySection/Title'
     AND LEFT(secTitle.node_loc,len(secTitle.node_loc)-4) =  LEFT(qt.node_loc,len(secTitle.node_loc)-4) """)
-    
+
     if statusPick.find("All Status") == -1:
         query.append(u""" AND qstatus.value in (""")
         query.append(statusPick[:-1])
         query.append(u""") """)
-    
+
     if not docId:
         query.append(u"""
     AND board.path = '/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref' """)
@@ -938,21 +918,21 @@ def getQuerySegment(lang, ref):
         query.append(u"""
     AND qt.doc_id = %s
     """ % docId)
-    
+
     query.append(u"""
     AND EXISTS (SELECT 'x'
                    FROM doc_version v
-                  WHERE v.id = qt.doc_id AND v.val_status = 'V' 
-                    AND v.publishable = 'Y') 
-     AND qt.doc_id not in (select doc_id 
-                             from doc_info 
-                            where doc_status = 'I' 
+                  WHERE v.id = qt.doc_id AND v.val_status = 'V'
+                    AND v.publishable = 'Y')
+     AND qt.doc_id not in (select doc_id
+                             from doc_info
+                            where doc_status = 'I'
                               and doc_type = 'Summary')
     """)
 
     query = u"".join(query)
     return query
-      
+
 # -------------------------------------------------------------
 # Put all the pieces together for the SELECT statement
 # -------------------------------------------------------------
@@ -969,7 +949,7 @@ dataRows = []
 cdrids = []
 
 # Identify if the element is a link or ref element
-# Populate the instance attributes with the data from the 
+# Populate the instance attributes with the data from the
 # ProtocolRef/Link attributes
 # Note:  Currently, if the same ProtocolRef is listed multiple times
 #        within a single section only the information for the last
@@ -994,12 +974,12 @@ def checkElement(cdrid,node,parentElem,ref,lastSECTitle):
                                     #
                                     # There is a caveat:
                                     # If we find a link to a protocol multiple
-                                    # times in the same section we need to 
-                                    # ensure that we don't overwrite the 
-                                    # 1st, 2nd, 3rd,... object with the 
-                                    # information from this node.  We are 
+                                    # times in the same section we need to
+                                    # ensure that we don't overwrite the
+                                    # 1st, 2nd, 3rd,... object with the
+                                    # information from this node.  We are
                                     # therefore testing if none of the elements
-                                    # (comment, status, date) have been 
+                                    # (comment, status, date) have been
                                     # populated yet - meaning this is a new
                                     # occurrence of the link.
                                     # ------------------------------------------
@@ -1009,7 +989,7 @@ def checkElement(cdrid,node,parentElem,ref,lastSECTitle):
                                         for (name,value) in        \
                                                   node.attributes.items():
                                             if name == 'comment':
-                                                dataRow.linkComment = value 
+                                                dataRow.linkComment = value
                                             if name == 'LastReviewedDate':
                                                 dataRow.linkDate = value
                                             if name == 'LastReviewedStatus':
@@ -1040,12 +1020,12 @@ def checkElement(cdrid,node,parentElem,ref,lastSECTitle):
                                     #
                                     # There is a caveat:
                                     # If we find a link to a protocol multiple
-                                    # times in the same section we need to 
-                                    # ensure that we don't overwrite the 
-                                    # 1st, 2nd, 3rd,... object with the 
-                                    # information from this node.  We are 
+                                    # times in the same section we need to
+                                    # ensure that we don't overwrite the
+                                    # 1st, 2nd, 3rd,... object with the
+                                    # information from this node.  We are
                                     # therefore testing if none of the elements
-                                    # (comment, status, date) have been 
+                                    # (comment, status, date) have been
                                     # populated yet - meaning this is a new
                                     # occurrence of the link.
                                     # ------------------------------------------
@@ -1095,7 +1075,7 @@ def checkChildren(cdrid,parentElem,lastSECTitle):
                 if parentNodeName == 'SummarySection':
                     for chNode in node.childNodes:
                         lastSECTitle = getTitleText(node.childNodes)
-            
+
         checkChildren(cdrid,node,lastSECTitle)
     return
 
@@ -1104,10 +1084,10 @@ def checkChildren(cdrid,parentElem,lastSECTitle):
 # Extract the text content of the node and concatenate as a single string
 # This only gets the text of the next element but that's OK since the title
 # does not have a deeper node structure:
-#   <Title><GeneName>BRCA1</GeneName> works well with 
+#   <Title><GeneName>BRCA1</GeneName> works well with
 #          <GeneName>BRC2</GeneName></Title>
 # But this will not work:
-#   <Title><GeneName>BRCA<sup>1</sup></GeneName> works well with 
+#   <Title><GeneName>BRCA<sup>1</sup></GeneName> works well with
 #          <GeneName>BRC<sup>2</sup></GeneName></Title>
 # -------------------------------------------------------------------------
 def getTitleText(nodelist):
@@ -1126,7 +1106,7 @@ def getTitleText(nodelist):
 def updateRefs(cdrid,dom):
     docElem = dom.documentElement
     checkChildren(cdrid,docElem,'')
-    
+
     return
 
 
@@ -1140,7 +1120,7 @@ try:
     rows = cursor.fetchall()
 except cdrdb.Error, info:
     cdrcgi.bail('Failure retrieving Summary documents: %s' % info[1][0])
-     
+
 if not rows:
     cdrcgi.bail('No Records Found for Selection')
 
@@ -1153,7 +1133,7 @@ LastLinkNodeLoc = ''
 for cdrid, summaryTitle, summarySecTitle, ref, protCDRID, status, \
     TitleNodeLoc, TitleNodeLocLen, LinkNodeLoc in rows:
     if LinkNodeLoc != LastLinkNodeLoc:
-        dataRows.append(dataRow(cdrid, summaryTitle, summarySecTitle, ref, 
+        dataRows.append(dataRow(cdrid, summaryTitle, summarySecTitle, ref,
                                 protCDRID, status, doExcel))
         if cdrid not in cdrids:
             cdrids.append(cdrid)
@@ -1189,15 +1169,15 @@ if doExcel == 'Yes':
     style1  = wb.addStyle(alignment = align, font = font)
     urlFont = ExcelWriter.Font('blue', None, 'Times New Roman', size = 11)
     style4  = wb.addStyle(alignment = align, font = urlFont)
-    style2  = wb.addStyle(alignment = align, font = font, 
+    style2  = wb.addStyle(alignment = align, font = font,
                              numFormat = 'YYYY-mm-dd')
     alignH  = ExcelWriter.Alignment('Left', 'Bottom', wrap = True)
     alignT  = ExcelWriter.Alignment('Left', 'Bottom', wrap = False)
-    headFont= ExcelWriter.Font(bold=True, name = 'Times New Roman', 
+    headFont= ExcelWriter.Font(bold=True, name = 'Times New Roman',
                                                                 size = 12)
-    titleFont= ExcelWriter.Font(bold=True, name = 'Times New Roman', 
+    titleFont= ExcelWriter.Font(bold=True, name = 'Times New Roman',
                                                                 size = 14)
-    boldFont= ExcelWriter.Font(bold=True, name = 'Times New Roman', 
+    boldFont= ExcelWriter.Font(bold=True, name = 'Times New Roman',
                                                                 size = 11)
     styleH  = wb.addStyle(alignment = alignH, font = headFont)
     styleT  = wb.addStyle(alignment = alignT, font = titleFont)
@@ -1206,7 +1186,7 @@ if doExcel == 'Yes':
     styleR  = wb.addStyle(alignment = alignS, font = font)
 
     ws      = wb.addWorksheet(wsTitle, style1, 45, 1)
-    
+
     # CIAT wants a title row
     # ----------------------------------------------------------
     titleTime = time.strftime("%Y-%m-%d %H:%M:%S")
@@ -1240,10 +1220,10 @@ if doExcel == 'Yes':
     if revFrom and revTo:
         exRow = ws.addRow(rowNum, styleR)
         if excludeDate == 'Yes':
-            exRow.addCell(1, 'Links shown if not reviewed between %s and %s' % 
+            exRow.addCell(1, 'Links shown if not reviewed between %s and %s' %
                                                              (revFrom, revTo))
         elif excludeDate == 'No':
-            exRow.addCell(1, 'Links shown if reviewed between %s and %s' % 
+            exRow.addCell(1, 'Links shown if reviewed between %s and %s' %
                                                              (revFrom, revTo))
         else:
             cdrcgi.bail("Don't know if date range is inclusive or exclusive!")
@@ -1265,11 +1245,11 @@ if doExcel == 'Yes':
     #---------------------------------------------------
     for dataRow in dataRows:
         if revFrom and revTo:
-            if displayRow(revFrom, revTo, dataRow.linkDate, excludeDate): 
+            if displayRow(revFrom, revTo, dataRow.linkDate, excludeDate):
                 continue
 
         if displayAll == 'No':
-            if not hasStatusChanged(dataRow.status, dataRow.linkStatus): 
+            if not hasStatusChanged(dataRow.status, dataRow.linkStatus):
                 continue
 
         rowCount += 1
@@ -1282,7 +1262,7 @@ if doExcel == 'Yes':
     exRow = ws.addRow(rowNum, style1b)
     exRow.addCell(1, 'Count: %d' % rowCount)
 
-    t = time.strftime("%Y%m%d%H%M%S")                                               
+    t = time.strftime("%Y%m%d%H%M%S")
     # Save the report.
     # ----------------
     name = '/SummariesWithProtocolLinksReport-%s.xls' % t
@@ -1302,9 +1282,9 @@ if doExcel == 'Yes':
 
 else:
     # out put the results table
-    header = cdrcgi.rptHeader(title, instr) 
+    header = cdrcgi.rptHeader(title, instr)
     form   = [u"""\
-     <style type="text/css">
+     <style type='text/css'>
     table
     {
         font-family: Verdana, Tahoma, sans-serif;
@@ -1338,56 +1318,56 @@ else:
     td.top {
         vertical-align: text-top;
         }
-    a:link 
+    a:link
     {
-        color: red; 
+        color: red;
         text-decoration: none;
         font-weight: bold;
     } /* unvisited link */
-    a:active 
+    a:active
     {
-        color: red; 
+        color: red;
         text-decoration: none;
         font-weight: bold;
     }
-    a:visited 
+    a:visited
     {
         color: red;
         text-decoration: none;
         font-weight: bold;
     } /* visited link */
-    a:hover 
+    a:hover
     {
-        color: white; 
-        background-color:red; 
+        color: white;
+        background-color:red;
         text-decoration: underline;
         font-weight: bold;
     } /* mouse over link */
 
-    a.selected:link 
+    a.selected:link
     {
         color: purple;
         font-style:italic;
         text-decoration: none;
         font-weight: bold;
     } /* unvisited link */
-    a.selected:active 
+    a.selected:active
     {
         color: blue;
         font-style:italic;
         text-decoration: none;
         font-weight: bold;
     }
-    a.selected:visited 
+    a.selected:visited
     {
         color: purple;
         font-style:italic;
         text-decoration: none;
         font-weight: bold;
     } /* visited link */
-    a.selected:hover 
+    a.selected:hover
     {
-        color: white; 
+        color: white;
         background-color:purple;
         font-style:italic;
         text-decoration: underline;
@@ -1395,15 +1375,15 @@ else:
     } /* mouse over link */
 
       </style>
-      
+
        <input type='hidden' name='%s' value='%s'>
-        <p style="text-align: center; font-family: Verdana, Tahoma, sans-serif; font-size: 12pt; font-weight: bold; color: #553;">
+        <p style='text-align: center; font-family: Verdana, Tahoma, sans-serif; font-size: 12pt; font-weight: bold; color: #553;'>
         Summaries with Protocol Links/Refs Report<br>
-        <span style="text-align: center; 
-                     font-family: Verdana, Tahoma, sans-serif; 
-                     font-size: 11pt; 
-                     font-weight: normal; 
-                     color: #553;">
+        <span style='text-align: center;
+                     font-family: Verdana, Tahoma, sans-serif;
+                     font-size: 11pt;
+                     font-weight: normal;
+                     color: #553;'>
        """ % (cdrcgi.SESSION, session)]
 
     if revFrom and revTo:
@@ -1419,29 +1399,29 @@ else:
     form.append(u"""
         %s</span>
         </p>
-       
+
        <table>
        <tr>
-       <th  class="cdrTable">CDR-ID</th>
-       <th  class="cdrTable">Summary Title</th>
-       <th  class="cdrTable">Summary Sec Title</th>
-       <th  class="cdrTable">Protocol Link/Ref</th>
-       <th  class="cdrTable">CDR-ID</th>
-       <th  class="cdrTable">Current Protocol Status</th>
-       <th  class="cdrTable">Comment</th>
-       <th  class="cdrTable">Last Reviewed Date</th>
-       <th  class="cdrTable">Last Reviewed Status</th>
+       <th  class='cdrTable'>CDR-ID</th>
+       <th  class='cdrTable'>Summary Title</th>
+       <th  class='cdrTable'>Summary Sec Title</th>
+       <th  class='cdrTable'>Protocol Link/Ref</th>
+       <th  class='cdrTable'>CDR-ID</th>
+       <th  class='cdrTable'>Current Protocol Status</th>
+       <th  class='cdrTable'>Comment</th>
+       <th  class='cdrTable'>Last Reviewed Date</th>
+       <th  class='cdrTable'>Last Reviewed Status</th>
        </tr>
        """ % dateString)
 
     cssClass = 'cdrTableEven'
     for dataRow in dataRows:
         if revFrom and revTo:
-            if displayRow(revFrom, revTo, dataRow.linkDate, excludeDate): 
+            if displayRow(revFrom, revTo, dataRow.linkDate, excludeDate):
                 continue
 
         if displayAll == 'No':
-            if not hasStatusChanged(dataRow.status, dataRow.linkStatus): 
+            if not hasStatusChanged(dataRow.status, dataRow.linkStatus):
                 continue
 
         form.append(u"<tr>")
@@ -1451,24 +1431,24 @@ else:
                                             (cssClass, dataRow.summaryTitle))
         form.append(u"""<td class="%s top">%s</td>""" %
                                             (cssClass, dataRow.summarySecTitle))
-        form.append(u"""<td class="%s top"><b>%s :</b> %s</td>""" % 
+        form.append(u"""<td class="%s top"><b>%s :</b> %s</td>""" %
                                  (cssClass,dataRow.ref,dataRow.protocolLink))
-        form.append(u"""<td class="%s top">%s</td>""" % 
+        form.append(u"""<td class="%s top">%s</td>""" %
                                             (cssClass, dataRow.protCDRID))
-        form.append(u"""<td class="%s top">%s</td>""" % 
+        form.append(u"""<td class="%s top">%s</td>""" %
                                             (cssClass,dataRow.status))
-        form.append(u"""<td class="%s top">%s</td>""" % 
+        form.append(u"""<td class="%s top">%s</td>""" %
                                             (cssClass,dataRow.linkComment))
-        form.append(u"""<td class="%s top">%s</td>""" % 
+        form.append(u"""<td class="%s top">%s</td>""" %
                                             (cssClass,dataRow.linkDate))
-        form.append(u"""<td class="%s top">%s</td>""" % 
+        form.append(u"""<td class="%s top">%s</td>""" %
                                             (cssClass,dataRow.linkStatus))
         form.append(u"</tr>")
         if cssClass == 'cdrTableEven':
             cssClass = 'cdrTableOdd'
         else:
             cssClass = 'cdrTableEven'
-        
+
     form.append(u"""</table>
       </form>
      </body>
