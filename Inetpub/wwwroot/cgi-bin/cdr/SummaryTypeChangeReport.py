@@ -815,9 +815,9 @@ def createBoardMenu(language):
     for row in boardList:
         html += """
       <label><input type='checkbox' name='boardId' value='%s%d' id='%s%d'
-              onclick="javascript:checkIt('%s', false)" %s />All %s</label>
+              onclick="javascript:checkIt('%s', false)" />All %s</label>
       <br />
-""" % (inputId, idx, inputId, idx, allLang, checked, row[0])
+""" % (inputId, idx, inputId, idx, allLang, row[0])
         idx += 1
 
     # Rest of the section
