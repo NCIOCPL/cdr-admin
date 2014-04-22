@@ -148,7 +148,6 @@ class TOCConfig:
         # Determine report type from checkbox
         if not self.repType:
             self.repType = 'basic'
-        cdr.logwrite("repType=%s" % self.repType, LF)
 
         # Human readable forms of start and end date
         self.startShowDate = self.startDate
@@ -689,8 +688,8 @@ class OutputReport:
                                 continue
 
                             seenTocs.add(key)
+                            row.append(chg[1])
                             if self.cfg.requestedTypes[key]:
-                                row.append(chg[1])
                                 row.append(chg[2] if chg[2] else EMPTY)
 
                     # If we haven't seen this type of chg, provide empty cells
@@ -759,14 +758,8 @@ class OutputReport:
             Unicode string representing a Summary.
         """
         # Strip unneded info from the title
-        tailPos = -1
         title   = sumChg.docTitle
-        if len(self.cfg.boards) == 1 and self.cfg.boards[0] != 'all':
-            # Only one board in the report.  Don't need to state it
-            tailPos = title.find(';')
-        if tailPos == -1:
-            # Just chop off the audience string
-            tailPos = title.rfind(';')
+        tailPos = title.find(';')
         if tailPos > 0:
             title = title[:tailPos]
 
