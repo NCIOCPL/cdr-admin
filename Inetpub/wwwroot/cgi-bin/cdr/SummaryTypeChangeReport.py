@@ -9,6 +9,9 @@
 #----------------------------------------------------------------------
 import cgi, time, datetime, lxml.etree as lx, cdr, cdrcgi, cdrdb
 
+# DEBUG
+LF = "d:/cdr/log/toc.log"
+
 SCRIPT = "SummaryTypeChangeReport.py"
 
 BANNER    = "CDR Administration"
@@ -24,7 +27,16 @@ def fatal(msg, log=False):
     Display and optionally log an error message.
     """
     if log:
-        cdr.logwrite("Summary Type Change Report - Error: %s" % msg)
+        logMsg = "Summary ToC Report Error: "
+        if type(msg) == type([]):
+            msg.insert(0, logMsg)
+            cdr.logwrite(msg)
+        else:
+            cdr.logwrite("%s%s" % (logMsg, msg))
+
+    # bail() allows "extras" for sequences
+    if type(msg) == type([]):
+        cdrcgi.bail(msg[0], extra=msg[1:])
     cdrcgi.bail(msg)
 
 def tableSpacer(table, page):
@@ -123,7 +135,7 @@ class TOCConfig:
             cdrcgi.navigateTo("Admin.py", self.session)
 
         self.fields    = fields
-        self.repType   = fields.getvalue("repType")
+        self.repType   = fields.getvalue("repTypeA")
         self.oFormat   = fields.getvalue("oFormat")
         self.spcCdrId  = fields.getvalue("byCdrid")
         self.spcTitle  = fields.getvalue("byTitle")
@@ -132,6 +144,11 @@ class TOCConfig:
         self.startDate = fields.getvalue("startDate", MIN_DATE)
         self.endDate   = fields.getvalue("endDate", MAX_DATE)
         self.sortOrder = fields.getvalue("sortOrder")
+
+        # Determine report type from checkbox
+        if not self.repType:
+            self.repType = 'basic'
+        cdr.logwrite("repType=%s" % self.repType, LF)
 
         # Human readable forms of start and end date
         self.startShowDate = self.startDate
@@ -148,13 +165,14 @@ class TOCConfig:
 
         # Boards
         self.boards = self.getSelectedBoards()
+        self.requestedTypes = self.getSelectedTypesOfChange()
 
-        if self.repType == 'basic':
-            # Requested type in basic report are what user specified
-            self.requestedTypes = self.getSelectedTypesOfChange()
-        else:
-            # Advanced automatically includes ALL types and all comments
-            self.requestedTypes = self.getAllTypesOfChange()
+        # if self.repType == 'basic':
+        #     # Requested type in basic report are what user specified
+        #     self.requestedTypes = self.getSelectedTypesOfChange()
+        # else:
+        #     # Advanced automatically includes ALL types and all comments
+        #     self.requestedTypes = self.getAllTypesOfChange()
 
         self.sortedTypes = sorted(self.requestedTypes.keys())
 
@@ -329,7 +347,8 @@ class TOCConfig:
             "1234 5678" or "CDR0000001234 cdr0000005678".
 
         Only one title allowed and it is only checked if no IDs have been
-        specified.
+        specified.  If title has two hits, one HP and one Patient, use
+        self.audience to disambiguate.
 
         Return:
             Sequence of [[id, title], ...]
@@ -367,8 +386,13 @@ class TOCConfig:
             titleLead = self.spcTitle + '%'
             qry = cdrdb.Query('document d', 'd.id', 'd.title')
             qry.join('doc_type t', 'd.doc_type = t.id')
+            qry.join('query_term q', 'd.id = q.doc_id')
             qry.where(qry.Condition('d.title', titleLead, 'LIKE'))
+            qry.where(qry.Condition('d.active_status', 'A'))
             qry.where(qry.Condition('t.name', 'Summary'))
+            qry.where(qry.Condition('q.path',
+                                   '/Summary/SummaryMetaData/SummaryAudience'))
+            qry.where(qry.Condition('q.value', self.audience))
             qry.order('d.id')
 
             cursor = qry.execute()
@@ -380,7 +404,7 @@ class TOCConfig:
                 fatal('No Summary found with leading title chars: "%s"'
                        % self.spcTitle)
             if len(idTitles) > 1:
-                msg    = ["Multiple Summaries match title lead:",]
+                msg    = [u"Multiple Summaries match title lead:",]
                 count  = 0
                 maxCnt = 10
                 for docId, docTitle in idTitles:
@@ -388,7 +412,7 @@ class TOCConfig:
                     count += 1
                     if count > maxCnt:
                         msg.append("Stopped after %d titles" % count)
-                fatal("<br />".join(msg))
+                fatal(msg)
 
         return idTitles
 
@@ -433,11 +457,6 @@ class TOCConfig:
         newResults = []
         for toc in self.sortedTypes:
             newResults.extend(tocDocs[toc])
-
-        # DEBUG
-        # cdr.logwrite("Count of newResults=%d" % len(newResults))
-        # for n in newResults:
-        #     cdr.logwrite(n.showText())
 
         return newResults
 
@@ -603,7 +622,7 @@ class OutputReport:
 
         return columns
 
-    def createRows(self, sumChg):
+    def createRows(self, sumChg, noTitle=False):
         """
         Create one or more rows to represent a single Summary in the report.
 
@@ -617,14 +636,19 @@ class OutputReport:
                 One row per change in a doc with multiple changes.
 
         Pass:
-            sumChg - DocChanges object for this specific Summary.
-                     For one flavor of the advanced report there may be
-                      multiple DocChanges object passed (in different calls)
-                      for one Summary.
+            sumChg  - DocChanges object for this specific Summary.
+                      For one flavor of the advanced report there may be
+                       multiple DocChanges object passed (in different calls)
+                       for one Summary.
+            noTitle - Don't show a title, this is a continuation of the title
+                       on the previous row.
 
         Return:
             Zero or more rows for passed DocChanges object.
         """
+        # DEBUG
+        debugRowCnt = 0
+
         # Representation of an empty cell
         EMPTY = ''
 
@@ -635,38 +659,52 @@ class OutputReport:
         row  = []
 
         # All reports start with a summary ID
-        row.append(self.makeTitle(sumChg))
+        if noTitle:
+            row.append(EMPTY)
+        else:
+            row.append(self.makeTitle(sumChg))
 
         # Basic report
         if self.cfg.repType == 'basic':
             if len(sumChg.changes) == 0:
-                # No changes in this Summary, create a blank row
-                for i in range(self.colCount):
+                # No changes in this Summary, set blank row
+                i = 1
+                while i < self.colCount:
                     row.append(EMPTY)
+                    i += 1
             else:
                 # Don't add the same type of change twice
-                alreadySeenTocs = set()
+                seenTocs = set()
 
-                # chg[0] = type of change, [1] = date, [2] = comment
-                for chg in sumChg.changes:
-                    if chg[0] in alreadySeenTocs:
-                        continue
-                    for key in self.cfg.sortedTypes:
+                # In case we need to produce multiple rows for one doc
+                nextRowChg = DocChanges(sumChg.docId, sumChg.docTitle)
 
-                        # If we have this type of change, append date, comment
+                # Process changes in sorted order.  Col headers done that way
+                for key in self.cfg.sortedTypes:
+                    for chg in sumChg.changes:
                         if chg[0] == key:
-                            alreadySeenTocs.add(key)
-                            row.append(chg[1])
+                            # If type of chg already reported, set this aside
+                            if key in seenTocs:
+                                nextRowChg.addChange(chg[0], chg[1], chg[2])
+                                continue
+
+                            seenTocs.add(key)
                             if self.cfg.requestedTypes[key]:
+                                row.append(chg[1])
                                 row.append(chg[2] if chg[2] else EMPTY)
-                        else:
-                            # Empty date and, if needed, comment
+
+                    # If we haven't seen this type of chg, provide empty cells
+                    if key not in seenTocs:
+                        row.append(EMPTY)
+                        if self.cfg.requestedTypes[key]:
                             row.append(EMPTY)
-                            if self.cfg.requestedTypes[key]:
-                                row.append(EMPTY)
 
                 # Add the one and only row to the returned sequence of rows
                 rows.append(row)
+
+                # Were any additional rows required?
+                if len(nextRowChg.changes) > 0:
+                    rows.extend(self.createRows(nextRowChg, True))
 
         # Advanced report
         else:
@@ -720,7 +758,19 @@ class OutputReport:
         Return:
             Unicode string representing a Summary.
         """
-        return (u"%s (%d)" % (sumChg.docTitle, sumChg.docId))
+        # Strip unneded info from the title
+        tailPos = -1
+        title   = sumChg.docTitle
+        if len(self.cfg.boards) == 1 and self.cfg.boards[0] != 'all':
+            # Only one board in the report.  Don't need to state it
+            tailPos = title.find(';')
+        if tailPos == -1:
+            # Just chop off the audience string
+            tailPos = title.rfind(';')
+        if tailPos > 0:
+            title = title[:tailPos]
+
+        return (u"%s (%d)" % (title, sumChg.docId))
 
 def createBoardLists():
     """
@@ -766,7 +816,6 @@ def createBoardsMenu():
     </tr>
    </table>
    </fieldset>
-   </div>
 """
     return html
 
@@ -838,6 +887,11 @@ def createAdvancedMenu():
     html = """
     <div class='advanced'>
      <b>Advanced Report - Select Dates and Organization</b>
+      <br />
+      <br />
+      &nbsp;<label class='legend'><input type='checkbox' name='repTypeA'
+                   value='advanced'> Advanced Report </input></label>
+      <br />
      <fieldset>
       <legend>&nbsp;Date Limits for Changes&nbsp;</legend>
       <label for='startDate'> Start date </label>
@@ -887,8 +941,9 @@ def createInputForm(session):
     TD      { font-size:  12pt; }
     LI.none { list-style-type: none }
     DL      { margin-left: 0; padding-left: 0 }
-    div.singletoc fieldset label { width: 80px; float: left; }
+    fieldset.singletoc label { width: 80px; float: left; }
     .instructions { font: 12pt "Arial"; }
+    .legend { font-weight: bold; color: teal; font-family: sans-serif; }
     div     { margin-left: 100px;
               margin-right: 100px;
               display: block;
@@ -942,58 +997,38 @@ def createInputForm(session):
 
    <div>
     <b>Type of Report</b>
+    <fieldset class='radio'>
+     <legend>&nbsp;Format&nbsp;</legend>
+
+     <input class='radio' type='radio' name='oFormat' id='fmtHtml'
+            value='html' checked='checked' />
+     <label class='radio' for='orderBySummary'>Web Page &nbsp; &nbsp; </label>
+
+     <input class='radio' type='radio' name='oFormat' id='fmtExcel'
+            value='excel' />
+     <label class='radio' for='oFormat'>Excel Workbook</label>
+    </fieldset>
     <fieldset>
-    <legend>&nbsp;Level&nbsp;</legend>
-
-    <input class='radio' type='radio' name='repType' id='repBasic'
-           value='basic' checked='checked'/>
-    <label class='radio' for='repBasic'>Basic (most recent change) &nbsp; </label>
-
-    <input class='radio' type='radio' name='repType' id='repAdvanced'
-           value='advanced' />
-    <label class='radio' for='repAdvanced'>Advanced (all changes) </label>
+     <legend>&nbsp;Audience&nbsp;</legend>
+     <label>
+     <input name='audience' type='radio' value='Health Professionals'
+         checked='checked' />
+     Health Professionals &nbsp; &nbsp;
+     </label>
+     <label><input name='audience' type='radio' value='Patients' />Patients</label>
     </fieldset>
 
-    <fieldset>
-    <legend>&nbsp;Format&nbsp;</legend>
-
-    <input class='radio' type='radio' name='oFormat' id='fmtHtml'
-           value='html' checked='checked' />
-    <label class='radio' for='orderBySummary'>Web Page &nbsp; &nbsp; </label>
-
-    <input class='radio' type='radio' name='oFormat' id='fmtExcel'
-           value='excel' />
-    <label class='radio' for='oFormat'>Excel Workbook</label>
-    </fieldset>
-   </div>
-
-   <div class='singletoc'>
-   <b>Basic Report - Select Specific Summaries</b>
-   <fieldset>
-    <legend>&nbsp;CDR-ID or Document Title&nbsp;</legend>
+   <fieldset class='singletoc'>
+    <legend>&nbsp;For Specific Summaries - CDR-ID or Document Title&nbsp;</legend>
     <label for="byCdrid">CDR-ID(s)</label>
     <input name='byCdrid' size='50' id="byCdrid">
     <br />
     <label for="byTitle">Title</label>
     <input name='byTitle' size='50' id='byTitle'>
    </fieldset>
-   </div>
-
-   <div>
-   <b>Basic Report - Select Groups of Summaries<br />
-   &nbsp; (if no specific Summaries selected)</b>
-   <fieldset>
-    <legend>&nbsp;Select Summary Audience&nbsp;</legend>
-    <label>
-    <input name='audience' type='radio' value='Health Professionals'
-        checked='checked' />
-    Health Professionals &nbsp; &nbsp;
-    </label>
-    <label><input name='audience' type='radio' value='Patients' />Patients</label>
-   </fieldset>
 
    <fieldset>
-    <legend>&nbsp;Select Summary Language and Summary Type&nbsp;</legend>
+    <legend>&nbsp;For Multiple Summaries - Summary Language and Summary Type&nbsp;</legend>
    <table border = '0'>
     <tr>
 """ % (cdrcgi.SESSION, session)
@@ -1005,11 +1040,9 @@ def createInputForm(session):
                                           'SummaryChangeType')
 
     tocHtml = """
-   <div class='chgtypes'>
-   <b>Basic Report - Select Types of Change</b>
    <fieldset>
     <legend>
-      &nbsp;Check desired change types + comments (Basic report only) &nbsp;
+      &nbsp;Change types + comments &nbsp;
     </legend>
    <table border = '0'>
      <tr>
