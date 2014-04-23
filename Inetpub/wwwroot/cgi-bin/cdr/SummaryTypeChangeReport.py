@@ -162,16 +162,15 @@ class TOCConfig:
         if not self.language:
             return
 
-        # Boards
+        # Boards, types of change
         self.boards = self.getSelectedBoards()
         self.requestedTypes = self.getSelectedTypesOfChange()
 
-        # if self.repType == 'basic':
-        #     # Requested type in basic report are what user specified
-        #     self.requestedTypes = self.getSelectedTypesOfChange()
-        # else:
-        #     # Advanced automatically includes ALL types and all comments
-        #     self.requestedTypes = self.getAllTypesOfChange()
+        # Are there any comments in the output report?
+        self.hasComments = False
+        for key, val in self.requestedTypes.items():
+            if val:
+                self.hasComments = True
 
         self.sortedTypes = sorted(self.requestedTypes.keys())
 
@@ -617,7 +616,8 @@ class OutputReport:
                 columns.append(
                     cdrcgi.Report.Column('Type of Change', width='150px'))
             columns.append(cdrcgi.Report.Column('Date', width='80px'))
-            columns.append(cdrcgi.Report.Column('Comment', width='180px'))
+            if self.cfg.hasComments:
+                columns.append(cdrcgi.Report.Column('Comment', width='180px'))
 
         return columns
 
@@ -724,10 +724,11 @@ class OutputReport:
                     # Type of change, date, comment
                     row.append(chg[0])
                     row.append(chg[1])
-                    if chg[2]:
-                        row.append(chg[2])
-                    else:
-                        row.append(EMPTY)
+                    if self.cfg.hasComments:
+                        if chg[2]:
+                            row.append(chg[2])
+                        else:
+                            row.append(EMPTY)
 
                     rows.append(row)
                     row = []
@@ -738,10 +739,11 @@ class OutputReport:
                 #  (see TOCConfig.sortResultsByTOC())
                 for chg in sumChg.changes:
                     row.append(chg[1])
-                    if chg[2]:
-                        row.append(chg[2])
-                    else:
-                        row.append(EMPTY)
+                    if self.cfg.hasComments:
+                        if chg[2]:
+                            row.append(chg[2])
+                        else:
+                            row.append(EMPTY)
                     rows.append(row)
 
         # Return zero or more rows
@@ -879,11 +881,11 @@ def createAdvancedMenu():
     """
     html = """
     <div class='advanced'>
-     <b>Advanced Report - Select Dates and Organization</b>
+     <b>All Changes - Select Dates and Organization</b>
       <br />
       <br />
       &nbsp;<label class='legend'><input type='checkbox' name='repTypeA'
-                   value='advanced'> Advanced Report </input></label>
+                   value='advanced'> Show All Changes </input></label>
       <br />
      <fieldset>
       <legend>&nbsp;Date Limits for Changes&nbsp;</legend>
@@ -946,6 +948,9 @@ def createInputForm(session):
               margin-bottom: 20px;
               padding: 5px;
               background: #CCCCCC; }
+    div.head{ border: none;
+              margin-top: 0;
+              background: transparent; }
     fieldset {
         margin: 10px;
         width: auto; }
@@ -987,6 +992,14 @@ def createInputForm(session):
     form   = """\
    <input type='hidden' name='%s' value='%s'>
    <input type='hidden' name='singletoc' value='N'>
+<div class='head'>
+<p>The basic form of this report displays the most recent change information
+for each of the selected Summaries.</p>
+
+<p>To see earlier changes, scroll down, check the box marked
+"Show All Changes", and enter any Date Limits and Organization Of Results
+choices.</p>
+</div>
 
    <div>
     <b>Type of Report</b>
