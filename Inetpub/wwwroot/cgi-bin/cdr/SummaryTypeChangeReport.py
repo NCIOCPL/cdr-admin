@@ -885,7 +885,7 @@ def createAdvancedMenu():
       <br />
       <br />
       &nbsp;<label class='legend'><input type='checkbox' name='repTypeA'
-             value='advanced'> Show Type of Change History </input></label>
+             value='advanced'> Show Type of Change History</input></label>
       <br />
      <fieldset>
       <legend>&nbsp;Date Limits for Changes&nbsp;</legend>
@@ -997,8 +997,8 @@ def createInputForm(session):
 for each of the selected Summaries.</p>
 
 <p>To see earlier changes, scroll down, check the box marked
-"Show All Changes", and enter any Date Limits and Organization Of Results
-choices.</p>
+"Show Type of Change History", and enter any Date Limits and Organization
+Of Results choices.</p>
 </div>
 
    <div>
