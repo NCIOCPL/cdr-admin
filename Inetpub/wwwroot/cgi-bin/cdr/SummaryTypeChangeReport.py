@@ -881,11 +881,11 @@ def createAdvancedMenu():
     """
     html = """
     <div class='advanced'>
-     <b>All Changes - Select Dates and Organization</b>
+     <b>Type of Change History Report</b>
       <br />
       <br />
       &nbsp;<label class='legend'><input type='checkbox' name='repTypeA'
-                   value='advanced'> Show All Changes </input></label>
+             value='advanced'> Show Type of Change History </input></label>
       <br />
      <fieldset>
       <legend>&nbsp;Date Limits for Changes&nbsp;</legend>
@@ -1002,7 +1002,7 @@ choices.</p>
 </div>
 
    <div>
-    <b>Type of Report</b>
+    <b>Type of Change Report</b>
     <fieldset class='radio'>
      <legend>&nbsp;Format&nbsp;</legend>
 
