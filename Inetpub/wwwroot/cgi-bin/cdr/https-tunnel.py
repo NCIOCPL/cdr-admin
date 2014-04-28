@@ -13,13 +13,13 @@ import msvcrt
 import os
 import sys
 
-msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
-content_length = os.environ.get("CONTENT_LENGTH")
-if content_length:
-    request = sys.stdin.read(int(content_length))
-else:
-    request = sys.stdin.read()
 try:
+    msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
+    content_length = os.environ.get("CONTENT_LENGTH")
+    if content_length:
+        request = sys.stdin.read(int(content_length))
+    else:
+        request = sys.stdin.read()
     response = cdr.sendCommands(request, timeout=600)
     print """\
 Content-type: application/xml; charset=utf-8
