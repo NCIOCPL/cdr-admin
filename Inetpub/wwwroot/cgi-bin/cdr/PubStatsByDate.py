@@ -4,7 +4,7 @@
 #
 # Report to list updated document count by document type.
 #
-# Added an option to the script (VOL=Y) to allow to pull out the 
+# Added an option to the script (VOL=Y) to allow to pull out the
 # media documents and create a list suitable for Visuals Online to be
 # updated.
 #
@@ -12,129 +12,36 @@
 # BZIssue::3716
 # BZIssue::4757
 # BZIssue::5062 - Modify Media Change Report
-# BAIssue::5173 - ICRDB Stats Report
+# BZIssue::5173 - ICRDB Stats Report
+# JIRA::OCECDR-3800 - Address security vulnerabilities
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, string, cdrdb, time
+import cgi
+import cdr
+import cdrcgi
+import cdrdb
+import datetime
+
+LOG_QUERIES = False
 
 #----------------------------------------------------------------------
 # Set the form variables.
 #----------------------------------------------------------------------
+conn      = cdrdb.connect()
+cursor    = conn.cursor()
 fields    = cgi.FieldStorage()
 session   = cdrcgi.getSession(fields)
-docTypes  = []
-docType   = fields.getvalue("doctype")          or []
-submit    = fields.getvalue("SubmitButton")     or None
-dateFrom  = fields.getvalue("datefrom")         or ""
-dateTo    = fields.getvalue("dateto")           or ""
-vol       = fields.getvalue("VOL")              or ""
-audience  = fields.getvalue("audience")         or "Both"
-
-# Setting the dates to prepopulate Start/End Date fields
-# ------------------------------------------------------
-now       = time.localtime(time.time())
-then      = list(now)
-then[2]  -= 7
-then      = time.localtime(time.mktime(then))
-
-if not dateFrom:
-    dateFrom = time.strftime("%Y-%m-%d", then)
-
-if not dateTo:
-    dateTo   = time.strftime("%Y-%m-%d", now)
-
 request   = cdrcgi.getRequest(fields)
-
+doc_type  = fields.getlist("doc_type")
+date_from = fields.getvalue("date_from")
+date_to   = fields.getvalue("date_to")
+vol       = fields.getvalue("VOL")
+audience  = fields.getvalue("audience") or "Both"
 title     = "CDR Administration"
-
-if not vol:
-    instr = "Publishing Job Statistics by Date"
-else:
-    instr = "Media Doc Publishing Report"
-
+instr     = "Publishing Job Statistics by Date"
 script    = "PubStatsByDate.py"
 SUBMENU   = "Report Menu"
-buttons   = (SUBMENU, cdrcgi.MAINMENU)
-
-# ---------------------------------------------------
-# Function to get the document types from the CDR
-# ---------------------------------------------------
-def getDocType():
-    """Select all published document types"""
-    query = """
-        SELECT DISTINCT dt.name, d.doc_type
-          FROM document d
-          JOIN pub_proc_cg cg
-            ON cg.id = d.id
-          JOIN doc_type dt
-            ON d.doc_type = dt.id
-         ORDER BY dt.name"""
-
-    try:
-        cursor = conn.cursor()
-        cursor.execute(query)
-        rows = cursor.fetchall()
-        cursor.close()
-        cursor = None
-    except cdrdb.Error, info:
-        cdrcgi.bail('Failure retrieving document types: %s' %
-                    info[1][0])
-    return rows
-
-# ------------------------------------------------------------------
-# Function to get the Media information to be displayed in the table
-# from the CDR
-# We're selecting the information for the latest version of the doc.
-# ------------------------------------------------------------------
-def getMediaInfo(ids):
-    if not ids:
-        return []
-
-    query = """
-         SELECT distinct m.doc_id, m.value, d.first_pub, dv.dt, 
-                dv.updated_dt, v.value, dv.num, dv.publishable
-           FROM query_term m
-LEFT OUTER JOIN query_term v
-             ON m.doc_id = v.doc_id
-            AND v.path = '/Media/@BlockedFromVOL'
-           JOIN doc_version dv
-             ON m.doc_id = dv.id
-           JOIN document d
-             ON dv.id = d.id
-           JOIN query_term c
-             ON m.doc_id = c.doc_id
-          WHERE m.path = '/Media/MediaTitle'
-            AND c.path = '/Media/MediaContent/Categories/Category'
-            AND c.value not in ('pronunciation', 'meeting recording')
-            AND m.doc_id in (%s)
-            AND dv.num = (
-                          SELECT max(num)
-                            FROM doc_version x
-                           WHERE x.id = dv.id
-                         )
-          ORDER BY m.value
-""" % ', '.join(["%s" % x for x in ids])
-
-    try:
-        cursor = conn.cursor()
-        cursor.execute(query)
-        rows = cursor.fetchall()
-        cursor.close()
-        cursor = None
-    except cdrdb.Error, info:
-        cdrcgi.bail('Failure retrieving Media info: %s' %
-                    info[1][0])
-
-    return rows
-
-
-#----------------------------------------------------------------------
-# If the user only picked one document type, put it into a list so we
-# can deal with the same data structure whether one or more were
-# selected.
-#----------------------------------------------------------------------
-if type(docType) in (type(""), type(u"")):
-    docType = [docType]
+buttons   = ("Submit", SUBMENU, cdrcgi.MAINMENU)
 
 #----------------------------------------------------------------------
 # Handle navigation requests.
@@ -145,18 +52,53 @@ elif request == SUBMENU:
     cdrcgi.navigateTo("reports.py", session)
 
 #----------------------------------------------------------------------
-# Set up a database connection and cursor.
+# Adjustments to form variables.
 #----------------------------------------------------------------------
-try:
-    conn = cdrdb.connect("CdrGuest")
-    cursor = conn.cursor()
-except cdrdb.Error, info:
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
+if not date_to:
+    date_to = datetime.date.today()
+if not date_from:
+    date_from = date_to - datetime.timedelta(7)
+if vol:
+    instr = "Media Doc Publishing Report"
 
 #----------------------------------------------------------------------
-# Build date string for header.
+# Find the published document types.
+# It doesn't make sense, but adding a second column to the results
+# set speeds up the query by orders of magnitude.
 #----------------------------------------------------------------------
-dateString = time.strftime("%B %d, %Y")
+def get_pub_doc_types():
+    query = cdrdb.Query("doc_type t", "t.name", "d.doc_type").unique().order(1)
+    query.join("document d", "d.doc_type = t.id")
+    query.join("pub_proc_cg c", "c.id = d.id")
+    if LOG_QUERIES:
+        query.log(label="PUB DOC TYPES QUERY")
+    return [row[0] for row in query.execute(cursor).fetchall()]
+
+#----------------------------------------------------------------------
+# Function to get the Media information to be displayed in the table
+# from the CDR
+# We're selecting the information for the latest version of the doc.
+#----------------------------------------------------------------------
+def get_media_info(ids):
+    if not ids:
+        return []
+    last_ver = cdrdb.Query("doc_version", "MAX(num)").where("id = v.id")
+    query = cdrdb.Query("query_term t", "t.doc_id", "t.value", "d.first_pub",
+                        "v.dt", "v.updated_dt", "b.value", "v.num",
+                        "v.publishable").unique().order("t.value")
+    query.join("doc_version v", "t.doc_id = v.id")
+    query.join("document d", "v.id = d.id")
+    query.join("query_term c", "t.doc_id = c.doc_id")
+    query.outer("query_term b",
+                "t.doc_id = b.doc_id AND b.path = '/Media/@BlockedFromVOL'")
+    query.where("t.path = '/Media/MediaTitle'")
+    query.where("c.path = '/Media/MediaContent/Categories/Category'")
+    query.where("c.value NOT IN ('pronunciation', 'meeting recording')")
+    query.where(query.Condition("d.id", ids, "IN"))
+    query.where(query.Condition("v.num", last_ver))
+    if LOG_QUERIES:
+        query.log(label="MEDIA INFO QUERY")
+    return query.execute(cursor).fetchall()
 
 # ***** First Pass *****
 #----------------------------------------------------------------------
@@ -164,396 +106,178 @@ dateString = time.strftime("%B %d, %Y")
 # For the Media Doc report, however, we only need the Start/End date
 # fields to put up.
 #----------------------------------------------------------------------
-if not docType:
-    header = cdrcgi.header(title, title, instr, script,
-                           ("Submit",
-                            SUBMENU,
-                            cdrcgi.MAINMENU),
-                           numBreaks = 1,
-                           stylesheet = """
-   <script language='JavaScript' type='text/javascript'>
-       function clearAll() {
-           document.getElementById('all').checked = false;
-       }
-       function clearOthers(widget, n) {
-           for (var i = 1; i<=n; ++i)
-               document.getElementById('D' + i).checked = false;
-       }
-   </script>
-""")
-    audienceField = ""
+if not doc_type or not cdrcgi.is_date(date_from) or not cdrcgi.is_date(date_to):
+    page = cdrcgi.Page(title, subtitle=instr, action=script,
+                       buttons=buttons, session=session)
+    page.add("<fieldset>")
+    page.add(page.B.LEGEND("Date Range"))
+    page.add_date_field("date_from", "Start Date", value=date_from)
+    page.add_date_field("date_to", "End Date", value=date_to)
+    page.add("</fieldset>")
     if vol:
-        audienceField = """
-       <tr>
-        <td><b>Audience:&nbsp;</b></td>
-        <td>
-         <select name='audience'>
-          <option value='Both' selected='selected'>Both</option>
-          <option value='Patients'>Patient</option>
-          <option value='Health_Professionals'>Health Professional</option>
-         </select>
-        </td>
-       </tr>"""
-    form   = """\
-   <input type='hidden' name='%s' value='%s'>
-   <!-- Table containing the Date -->
-   <table border='0' width='25%%'>
-    <tr>
-     <td colspan='3'>
-      %s<br><br>
-     </td>
-    </tr>
-   </table>
- 
-   <!-- Table to enter the time frame and select the audience -->
-   <table border='0' >
-    <tr>
-     <td>
-      <table border='0' cellpadding="3">
-       <tr>
-        <td><b>Start Date:&nbsp;</b></td>
-        <td><input name='datefrom' value='%s' size='10'></td>
-       </tr>
-       <tr>
-        <td><b>End Date:&nbsp;</b></td>
-        <td><input name='dateto' value='%s' size='10'></td>
-       </tr>%s
-      </table>
-     </td>
-     <td valign="middle" align="left">(format YYYY-MM-DD)</td>
-    </tr>
-   </table>
-
-   <!-- table to display a horizontal ruler -->
-   <table border='0' width='25%%'>
-    <tr>
-     <td width="320">
-      <hr width="50%%">
-     </td>
-    </tr>
-   </table>
-""" % (cdrcgi.SESSION, session, dateString, dateFrom, dateTo, audienceField)
-
-    # For the Media Doc report the default docType is 'Media'
-    # -------------------------------------------------------
-    if vol:
-        html = """
-   <input type='hidden' name='doctype' value='Media'>
-   <input type='hidden' name='VOL'     value='Y'>"""
-    # For the Pub Job Statistic report we need to select the docType
-    # --------------------------------------------------------------
+        page.add("<fieldset>")
+        page.add(page.B.LEGEND("Select Audience"))
+        page.add_radio("audience", "Both", "Both", checked=True)
+        page.add_radio("audience", "Patient", "Patients")
+        page.add_radio("audience", "Health Professional",
+                       "Health_Professionals")
+        page.add("</fieldset>")
+        page.add(page.B.INPUT(name="doc_type", value="Media", type="hidden"))
+        page.add(page.B.INPUT(name="VOL", value="Y", type="hidden"))
     else:
-        docTypes = getDocType()
-    
-        html = """
-   <table border='0'>
-    <tr>
-     <td>
-      <input type='checkbox' name='doctype' value='All' CHECKED
-             onclick="javascript:clearOthers(this, %d)" id="all">
-      <b>All Document Types</b><br>
-     </td>
-    </tr>
-    <tr>
-     <td>&nbsp;... or ...</td>
-    </tr>""" % (len(docTypes))
-
-        i = 0
-        for docType in docTypes:
-            i += 1
-            html += """
-    <tr>
-     <td>
-      <input type='checkbox' name='doctype' value='%s'
-             onclick="javascript:clearAll()" id=D%d>
-      <b>%s</b>
-     </td>
-    </tr>""" % (docType[0], i, docType[0]) 
-        html += """
-   </table>"""
-
-    html += """
-  </form>
- </body>
-</html>"""
-        
-    cdrcgi.sendPage(header + form + html)
+        doc_types = get_pub_doc_types()
+        page.add("<fieldset>")
+        page.add(page.B.LEGEND("Choose Document Type(s)"))
+        page.add_checkbox("doc_type", "All", "All", checked=True,
+                          onclick="clear_others();")
+        for t in doc_types:
+            page.add_checkbox("doc_type", t, t, onclick="clear_all();",
+                              widget_classes="dt-cb")
+        page.add("</fieldset>")
+        page.add_script("""\
+function clear_all() { jQuery("#doc_type-all").prop("checked", false); }
+function clear_others() { jQuery(".dt-cb").prop("checked", false); }""")
+    page.send()
 
 # ***** Second Pass *****
-# If the option 'All' has been selected in addition to individual
-# doctypes we're assuming that all doc types should be displayed
-# ---------------------------------------------------------------
-if docType[0] == 'All':
-    docType = ['All']
-
 #----------------------------------------------------------------------
 # Creating temporary tables
-# The SQL queries for both reports Media Doc and Job Statistics are 
-# slightly different, in the first we're selecting document IDs in the 
+# The SQL queries for both reports Media Doc and Job Statistics are
+# slightly different, in the first we're selecting document IDs in the
 # other one we're selecting counts.
 #----------------------------------------------------------------------
-if vol:
-    q_select = "SELECT rbp.doc_id"
-    q_select2= "SELECT DISTINCT ppd.doc_id"
-    q_and    = "   AND dt.name = 'Media'"
-    q_group  = ""
-else:
-    q_select = "SELECT dt.name, count(*)"
-    q_select2= "SELECT dt.name, count(distinct ppd.doc_id)"
-    q_and    = ""
-    q_group  = " GROUP BY dt.name"
 
 # Create #removed table
 # ---------------------
-query = """SELECT doc_id, MAX(started) AS started 
-  INTO #removed
-  FROM pub_proc_doc ppd
-  JOIN pub_proc pp
-    ON pp.id = ppd.pub_proc
- WHERE started < dateadd(DAY, 1, '%s')
-   AND pub_subset like 'Push_%%'
-   AND status      = 'Success'
-   AND ppd.removed = 'Y'
- GROUP BY doc_id""" % dateTo
+query = cdrdb.Query("pub_proc_doc d", "d.doc_id", "MAX(p.started) AS started")
+query.join("pub_proc p", "p.id = d.pub_proc")
+query.where(query.Condition("p.started", "%s 23:59:59" % date_to, "<="))
+query.where("p.pub_subset LIKE 'Push_%'")
+query.where("p.status = 'Success'")
+query.where("d.removed = 'Y'")
+query.group("d.doc_id")
+query.into("##removed")
+if LOG_QUERIES:
+    query.log(label="##REMOVED QUERY")
+query.execute(cursor)
+conn.commit()
 
-try:
-    cursor = conn.cursor()
-    cursor.execute(query)
-    cursor.close()
-    cursor = None
-except cdrdb.Error, info:
-    cdrcgi.bail('Failure creating temp table #removed: %s' %
-                info[1][0])
-     
-#----------------------------------------------------------------------
-# Bolted on the side for enhancement request #4757: support restriction
-# of the report on published media documents by audience.
-#----------------------------------------------------------------------
-if vol and audience != 'Both':
-    audienceCursor = conn.cursor()
-    audienceCursor.execute("""\
-        SELECT DISTINCT doc_id
-                   FROM query_term_pub
-                  WHERE path in ('/Media/MediaContent/Captions/MediaCaption' +
-                                 '/@audience',
-                                 '/Media/MediaContent/ContentDescriptions' +
-                                 '/ContentDescription/@audience')
-                    AND value = ?""", audience, timeout=300)
-    audienceSet = set([row[0] for row in audienceCursor.fetchall()])
-    audienceCursor.close()
-    audienceCursor = None
+# Create #prevpub table
+# ----------------------
+query = cdrdb.Query("pub_proc_doc d", "d.doc_id").unique()
+query.join("pub_proc p", "p.id = d.pub_proc")
+query.where(query.Condition("p.started", date_from, "<"))
+query.where("p.pub_subset LIKE 'Push_%'")
+query.where("p.status = 'Success'")
+query.into("##prevpub")
+if LOG_QUERIES:
+    query.log(label="##PREVPUB QUERY")
+query.execute(cursor)
+conn.commit()
 
 # Create #brandnew table
 # ----------------------
-query = """SELECT ppd.doc_id, min(pp.started) AS started
-  INTO #brandnew 
-  FROM pub_proc_doc ppd
-  JOIN pub_proc pp
-    ON pp.id = ppd.pub_proc
- WHERE pp.started between '%s' and dateadd(DAY, 1, '%s')
-   AND pp.pub_subset LIKE 'Push_%%'
-   AND pp.status = 'Success'
-   AND NOT EXISTS (SELECT 'x'
-                     FROM pub_proc_doc a
-                     JOIN pub_proc b
-                       ON b.id = a.pub_proc
-                    WHERE started < '%s'
-                      AND pub_subset LIKE 'Push_%%'
-                      AND status = 'Success'
-                      AND a.doc_id = ppd.doc_id
-                  )
-GROUP BY ppd.doc_id
-ORDER BY ppd.doc_id""" % (dateFrom, dateTo, dateFrom)
+subquery = cdrdb.Query("##prevpub", "doc_id")
+query = cdrdb.Query("pub_proc_doc d", "d.doc_id", "MIN(p.started) AS started")
+query.join("pub_proc p", "p.id = d.pub_proc")
+query.where(query.Condition("p.started", date_from, ">="))
+query.where(query.Condition("p.started", "%s 23:59:59" % date_to, "<="))
+query.where("p.pub_subset LIKE 'Push_%'")
+query.where("p.status = 'Success'")
+query.where(query.Condition("d.doc_id", subquery, "NOT IN"))
+query.group("d.doc_id")
+query.into("##brandnew")
+if LOG_QUERIES:
+    query.log(label="##BRANDNEW QUERY")
+query.execute(cursor)
+conn.commit()
 
-try:
-    cursor = conn.cursor()
-    cursor.execute(query)
-    cursor.close()
-    cursor = None
-except cdrdb.Error, info:
-    cdrcgi.bail('Failure creating temp table #brandnew: %s' %
-                info[1][0])
-     
 # Create #phoenix table
 # ---------------------
-query = """SELECT ppd.doc_id, min(pp.started) as started 
-  INTO #phoenix
-  FROM pub_proc_doc ppd
-  JOIN pub_proc pp
-    ON pp.id = ppd.pub_proc
-  JOIN #removed r
-    ON r.doc_id = ppd.doc_id
- WHERE pp.started > r.started
-   AND pub_subset LIKE 'Push_%%'
-   AND status = 'Success'
-   AND ppd.removed = 'N'
- GROUP BY ppd.doc_id
- ORDER BY ppd.doc_id"""
+query = cdrdb.Query("pub_proc_doc d", "d.doc_id", "MIN(p.started) AS started")
+query.join("pub_proc p", "p.id = d.pub_proc")
+query.join("##removed r", "r.doc_id = d.doc_id")
+query.where("p.started > r.started")
+query.where("p.pub_subset LIKE 'Push_%'")
+query.where("p.status = 'Success'")
+query.where("d.removed = 'N'")
+query.group("d.doc_id")
+query.into("##phoenix")
+if LOG_QUERIES:
+    query.log(label="##PHOENIX QUERY")
+query.execute(cursor)
+conn.commit()
 
-try:
-    cursor = conn.cursor()
-    cursor.execute(query)
-    cursor.close()
-    cursor = None
-except cdrdb.Error, info:
-    cdrcgi.bail('Failure creating temp table #phoenix: %s' %
-                info[1][0])
-     
+def get_docs_or_counts(cursor, temp_table, date_from, date_to, vol):
+    if vol:
+        query = cdrdb.Query("%s p" % temp_table, "p.doc_id")
+        query.where("t.name = 'Media'")
+    else:
+        query = cdrdb.Query("%s p" % temp_table, "t.name", "COUNT(*)")
+        query.group("t.name")
+    query.join("document d", "d.id = p.doc_id")
+    query.join("doc_type t", "d.doc_type = t.id")
+    query.where(query.Condition("p.started", date_from, ">="))
+    query.where(query.Condition("p.started", "%s 23:59:59" % date_to, "<="))
+    if LOG_QUERIES:
+        query.log(label="#DOCS OR COUNTS QUERY (%s)" % temp_table)
+    return query.execute(cursor).fetchall()
+
 # Select information from removed table (count or doc-ID)
 # -------------------------------------------------------
-query = """\
- %s
-  from #removed rbp
-  JOIN document d
-    ON d.id = rbp.doc_id
-  JOIN doc_type dt
-    ON d.doc_type = dt.id
- WHERE started between '%s' and dateadd(DAY, 1, '%s')
- %s
- %s""" % (q_select, dateFrom, dateTo, q_and, q_group)
+removes = get_docs_or_counts(cursor, "##removed", date_from, date_to, vol)
 
-try:
-    cursor = conn.cursor()
-    cursor.execute(query)
-    removes = cursor.fetchall()
-    cursor.close()
-    cursor = None
-except cdrdb.Error, info:
-    cdrcgi.bail('Failure selecting removed documents: %s' %
-                info[1][0])
-     
 # Select information of brandnew table (count or doc_ID)
 # ------------------------------------------------------
-query = """
-%s
-  from #brandnew rbp
-  JOIN document d
-    ON d.id = rbp.doc_id
-  JOIN doc_type dt
-    ON d.doc_type = dt.id
- WHERE started between '%s' and dateadd(DAY, 1, '%s')
- %s
- %s""" % (q_select, dateFrom, dateTo, q_and, q_group)
+brandnews = get_docs_or_counts(cursor, "##brandnew", date_from, date_to, vol)
 
-try:
-    cursor = conn.cursor()
-    cursor.execute(query)
-    brandnews = cursor.fetchall()
-    cursor.close()
-    cursor = None
-except cdrdb.Error, info:
-    cdrcgi.bail('Failure selecting brand new documents: %s' %
-                info[1][0])
-     
 # Select information of re-published new table (count or doc-id)
 # --------------------------------------------------------------
-query = """
-%s
-  FROM #phoenix rbp
-  JOIN document d
-    ON d.id = rbp.doc_id
-  JOIN doc_type dt
-    ON d.doc_type = dt.id
- WHERE started between '%s' and dateadd(DAY, 1, '%s')
- %s
- %s""" % (q_select, dateFrom, dateTo, q_and, q_group)
+renews = get_docs_or_counts(cursor, "##phoenix", date_from, date_to, vol)
 
-try:
-    cursor = conn.cursor()
-    cursor.execute(query)
-    renews = cursor.fetchall()
-    cursor.close()
-    cursor = None
-except cdrdb.Error, info:
-    cdrcgi.bail('Failure selecting old new documents: %s' %
-                info[1][0])
-     
-# Select information of updated table (count or doc-id)
-# Note: This counts every document exactly one time.
-#       If a document has been added *and* updated 
-#       during the given time period it's only been 
-#       counted as an added document.
-# -----------------------------------------------------
-query = """
-%s
-  FROM pub_proc_doc ppd
-  JOIN pub_proc pp
-    ON pp.id = ppd.pub_proc
-  JOIN document d
-    ON d.id = ppd.doc_id
-  JOIN doc_type dt
-    ON d.doc_type = dt.id
- WHERE pp.started between '%s' and dateadd(DAY, 1, '%s')
-   AND pub_subset LIKE 'Push_%%'
-   AND pp.status = 'Success'
-   AND ppd.removed = 'N'
-   AND NOT EXISTS (SELECT 'x'
-                     FROM #phoenix i
-                    WHERE started between '%s' and dateadd(DAY, 1, '%s')
-                      AND ppd.doc_id = i.doc_id
-                  )
-   AND NOT EXISTS (SELECT 'x'
-                     FROM #brandnew b
-                    WHERE started between '%s' and dateadd(DAY, 1, '%s')
-                      AND ppd.doc_id = b.doc_id
-                  )
- %s
- %s""" % (q_select2, dateFrom, dateTo, dateFrom, dateTo, 
-                     dateFrom, dateTo, q_and, q_group)
-
-try:
-    cursor = conn.cursor()
-    cursor.execute(query)
-    updates = cursor.fetchall()
-    cursor.close()
-    cursor = None
-except cdrdb.Error, info:
-    cdrcgi.bail('Failure selecting updated documents: %s' %
-                info[1][0])
- 
 # Select information of updated table (count or doc-id)
 # Note: This might count documents multiple times.
-#       If a document has been added *and* updated 
+#       If a document has been added *and* updated
 #       during the given time period it's counted once
 #       in each category.
 # -----------------------------------------------------
-query = """
-%s
-  FROM pub_proc_doc ppd
-  JOIN pub_proc pp
-    ON pp.id = ppd.pub_proc
-  JOIN document d
-    ON d.id = ppd.doc_id
-  JOIN doc_type dt
-    ON d.doc_type = dt.id
- WHERE pp.started between '%s' and dateadd(DAY, 1, '%s')
-   AND pub_subset LIKE 'Push_%%'
-   AND pp.status = 'Success'
-   AND ppd.removed = 'N'
---   AND NOT EXISTS (SELECT 'x'
---                     FROM #phoenix i
---                    WHERE started between '%s' and dateadd(DAY, 1, '%s')
---                      AND ppd.doc_id = i.doc_id
---                  )
---   AND NOT EXISTS (SELECT 'x'
---                     FROM #brandnew b
---                    WHERE started between '%s' and dateadd(DAY, 1, '%s')
---                      AND ppd.doc_id = b.doc_id
---                  )
- %s
- %s""" % (q_select2, dateFrom, dateTo, dateFrom, dateTo, 
-                     dateFrom, dateTo, q_and, q_group)
+if vol:
+    query = cdrdb.Query("pub_proc_doc pd", "d.id").unique()
+    query.where("t.name = 'Media'")
+else:
+    query = cdrdb.Query("pub_proc_doc pd", "t.name", "COUNT(DISTINCT d.id)")
+    query.group("t.name")
+query.join("pub_proc p", "p.id = pd.pub_proc")
+query.join("document d", "d.id = pd.doc_id")
+query.join("doc_type t", "t.id = d.doc_type")
+query.where("p.started >= '%s'" % date_from)
+query.where("p.started <= '%s 23:59:59'" % date_to)
+query.where("p.pub_subset LIKE 'Push_%'")
+query.where("p.status = 'Success'")
+query.where("pd.removed = 'N'")
+if LOG_QUERIES:
+    query.log(label="UPDATES2 QUERY")
+updates2 = query.execute(cursor).fetchall()
 
-try:
-    cursor = conn.cursor()
-    cursor.execute(query)
-    updates2 = cursor.fetchall()
-    cursor.close()
-    cursor = None
-except cdrdb.Error, info:
-    cdrcgi.bail('Failure selecting updated documents: %s' %
-                info[1][0])
- 
+# Select information of updated table (count or doc-id)
+# Note: This counts every document exactly one time.
+#       If a document has been added *and* updated
+#       during the given time period it's only been
+#       counted as an added document.
+# -----------------------------------------------------
+subquery1 = cdrdb.Query("##phoenix", "doc_id")
+subquery1.where("started >= '%s'" % date_from)
+subquery1.where("started <= '%s 23:59:59'" % date_to)
+subquery2 = cdrdb.Query("##brandnew", "doc_id")
+subquery2.where("started >= '%s'" % date_from)
+subquery2.where("started <= '%s 23:59:59'" % date_to)
+query.where(query.Condition("d.id", subquery1, "NOT IN"))
+query.where(query.Condition("d.id", subquery2, "NOT IN"))
+if LOG_QUERIES:
+    query.log(label="UPDATES QUERY")
+updates = query.execute(cursor).fetchall()
+
+
 # Create a dictionary out of the update list
 # (It's easier to select the results later on)
 # --------------------------------------------
@@ -563,17 +287,33 @@ countRemove   = {}
 countRenew    = {}
 countBrandnew = {}
 
-# Collect all doc-ids in one list and get the information for the 
+#----------------------------------------------------------------------
+# Bolted on the side for enhancement request #4757: support restriction
+# of the report on published media documents by audience.
+#----------------------------------------------------------------------
+if vol and audience != 'Both':
+    paths = (
+        "/Media/MediaContent/Captions/MediaCaption/@audience",
+        "/Media/MediaContent/ContentDescriptions/ContentDescription/@audience",
+    )
+    query = cdrdb.Query("query_term_pub", "doc_id").unique()
+    query.where(query.Condition("value", audience))
+    query.where(query.Condition("path", paths, "IN"))
+    if LOG_QUERIES:
+        query.log(label="AUDIENCES QUERY")
+    audiences = set([row[0] for row in query.execute(cursor, 300)])
+
+# Collect all doc-ids in one list and get the information for the
 # report for each of the documents from the database
 # ---------------------------------------------------------------
 if vol:
     mediaIds = []
     for docSet in (updates, updates2, removes, brandnews, renews):
-        for x in docSet:
-            if audience == 'Both' or x[0] in audienceSet:
-                mediaIds.append(x[0])
+        for doc in docSet:
+            if audience == 'Both' or doc[0] in audiences:
+                mediaIds.append(doc[0])
 
-    mediaRecords = getMediaInfo(mediaIds)
+    mediaRecords = get_media_info(mediaIds)
 
 # Store the row counts in a dictionary to be accessed later
 # ---------------------------------------------------------
@@ -594,27 +334,32 @@ else:
         countRenew[renew[0]] = renew[1]
 
 #----------------------------------------------------------------------
+# Build date string for header.
+#----------------------------------------------------------------------
+dateString = datetime.date.today().strftime("%B %d, %Y")
+
+#----------------------------------------------------------------------
 # Create the results page.
 #----------------------------------------------------------------------
 instr     = 'Published%s Documents on Cancer.gov -- %s.' % (
                                       vol and ' Media' or '', dateString)
-header    = cdrcgi.header(title, title, instr, script, buttons, 
+header    = cdrcgi.header(title, title, instr, script, buttons[1:],
                           stylesheet = """
    <STYLE type="text/css">
     H3            { font-weight: bold;
                     font-family: Arial;
-                    font-size: 16pt; 
+                    font-size: 16pt;
                     margin: 8pt; }
     TABLE.output  { margin-left: auto;
                     margin-right: auto; }
     TABLE.output  TD
                   { padding: 3px; }
-    TD.header     { font-weight: bold; 
+    TD.header     { font-weight: bold;
                     text-align: center; }
     TR.odd        { background-color: #E7E7E7; }
     TR.even       { background-color: #FFFFFF; }
     TR.head       { background-color: #D2D2D2; }
-    .link         { color: blue; 
+    .link         { color: blue;
                     text-decoration: underline; }
     .doc          { text-align: left;
                     vertical-align: top; }
@@ -666,7 +411,7 @@ report += """\
     <H3>Published %s Documents</H3>
      Report includes publishing jobs started between<br/>
      <b>%s</b> and <b>%s</b><br/>%s
-""" % (vol and 'Media' or '', dateFrom, dateTo, audienceHeader)
+""" % (vol and 'Media' or '', date_from, date_to, audienceHeader)
 
 if not vol:
     report += """\
@@ -674,25 +419,25 @@ if not vol:
       <p>For an explanation of the numbers please click
          <span class="link">
           <a onclick="showDoc('myvar');" title="Explain the Numbers">here</a>
-         </span> 
+         </span>
       </p>
       <div id="myvar" style="display: none">
        <table>
         <tr>
          <td class="doc"><strong>Added-Old</strong></td>
-         <td class="doc">This number includes documents that existed 
+         <td class="doc">This number includes documents that existed
                          on Cancer.gov, had been removed and added again.</td>
         </tr>
         <tr>
          <td class="doc"><strong>Added-New</strong></td>
-         <td class="doc">This number includes documents that are new and 
+         <td class="doc">This number includes documents that are new and
                          never existed on Cancer.gov before.</td>
         </tr>
         <tr>
          <td class="doc"><strong>Updated</strong></td>
-         <td class="doc">This number includes documents that have been 
+         <td class="doc">This number includes documents that have been
                          updated on Cancer.gov. If a document has been
-                         added <strong>and</strong> updated during the 
+                         added <strong>and</strong> updated during the
                          specified time period it is
                          only counted as a new document.</td>
         </tr>
@@ -700,7 +445,7 @@ if not vol:
          <td class="doc"><strong>Updated*</strong></td>
          <td class="doc">This number includes documents that have been
                          updated on Cancer.gov. If a document has been
-                         added <strong>and</strong> updated during the 
+                         added <strong>and</strong> updated during the
                          specified time period it is
                          counted twice, once as a new document
                          and once as an updated document.</td>
@@ -757,14 +502,15 @@ if vol:
     <td align="center">%s</td>
     <td align="center">%s</td>
    </tr>
-""" % (id, id, title, first[:10], verDt[:16], publishable, volFlag and volFlag[:1] or "")
+""" % (id, id, title, first[:10], verDt[:16], publishable,
+       volFlag and volFlag[:1] or "")
 
 
     footer = """\
   </table>
  </BODY>
-</HTML> 
-"""     
+</HTML>
+"""
     cdrcgi.sendPage(header + report + footer)
 
 
@@ -788,18 +534,16 @@ report += """
 # User can select to display all document types or select individual
 # document types by selecting a check box.
 # ------------------------------------------------------------------
-if docType[0] == 'All':
-    allDocTypes = getDocType()
-    for type in allDocTypes:
-        docTypes.append(type[0])
+if "All" in doc_type:
+    doc_types = get_pub_doc_types()
 else:
-    docTypes = docType
+    doc_types = doc_type
 
 # Display the columns of the display table
 # (Creating a column should probably be handled in a function)
 # ------------------------------------------------------------
 count = 0
-for docType in docTypes:
+for doc_type in doc_types:
     total = 0
     count += 1
 
@@ -813,40 +557,40 @@ for docType in docTypes:
     <tr class="odd">"""
 
     report += """
-     <td><b>%s</b></td>""" % docType
+     <td><b>%s</b></td>""" % doc_type
 
     # Display second column (documents added again after being deleted)
     # -----------------------------------------------------------------
-    if countRenew.has_key(docType):
-        total += countRenew[docType]
+    if countRenew.has_key(doc_type):
+        total += countRenew[doc_type]
         report += """
      <td align="right">
       <b>%s</b>
-     </td>""" % countRenew[docType]
+     </td>""" % countRenew[doc_type]
     else:
         report += """
      <td align="right">0</td>"""
 
     # Display third column (documents being added for the first time)
     # ---------------------------------------------------------------
-    if countBrandnew.has_key(docType):
-        total += countBrandnew[docType]
+    if countBrandnew.has_key(doc_type):
+        total += countBrandnew[doc_type]
         report += """
      <td align="right">
       <b>%s<b/>
-     </td>""" % countBrandnew[docType]
+     </td>""" % countBrandnew[doc_type]
     else:
         report += """
      <td align="right">0</td>"""
 
     # Display fourth column (updated documents - unique count)
     # --------------------------------------------------------
-    if countUpdate.has_key(docType):
-        total += countUpdate[docType]
+    if countUpdate.has_key(doc_type):
+        total += countUpdate[doc_type]
         report += """
      <td align="right">
       <b>%s</b>
-     </td>""" % countUpdate[docType]
+     </td>""" % countUpdate[doc_type]
     else:
         report += """
      <td align="right">0</td>"""
@@ -854,24 +598,24 @@ for docType in docTypes:
     # Display fifth column (updated documents - not unique count)
     # We are not counting these to the total
     # -----------------------------------------------------------
-    if countUpdate.has_key(docType):
-        # total += countUpdate2[docType]
+    if countUpdate.has_key(doc_type):
+        # total += countUpdate2[doc_type]
         report += """
      <td class="star" align="right">
       <b>%s</b>
-     </td>""" % countUpdate2[docType]
+     </td>""" % countUpdate2[doc_type]
     else:
         report += """
      <td align="right">0</td>"""
 
     # Display sixth column (documents being deleted)
     # ----------------------------------------------
-    if countRemove.has_key(docType):
-        total += countRemove[docType]
+    if countRemove.has_key(doc_type):
+        total += countRemove[doc_type]
         report += """
      <td align="right">
       <b>%s</b>
-     </td>""" % countRemove[docType]
+     </td>""" % countRemove[doc_type]
     else:
         report += """
      <td align="right">0</td>"""
@@ -898,8 +642,8 @@ report += """
 
 footer = """\
  </BODY>
-</HTML> 
-"""     
+</HTML>
+"""
 
 #----------------------------------------------------------------------
 # Send the page back to the browser.

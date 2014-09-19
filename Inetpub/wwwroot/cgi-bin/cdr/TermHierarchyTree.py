@@ -5,15 +5,20 @@
 # Dynamic viewer for terminology hierarchy.
 #
 # BZIssue::3316
+# JIRA::OCECDR-3800 - Address security vulnerabilities
 #
 #----------------------------------------------------------------------
-import cdrcgi, cdrdb, cgi
+import cdrcgi
+import cdrdb
+import cgi
+
+LOG_QUERIES = False
 
 fields = cgi.FieldStorage()
 session  = cdrcgi.getSession(fields) or cdrcgi.bail("Not logged in")
 action   = cdrcgi.getRequest(fields)
-SemanticTerms = fields and fields.getvalue("SemanticTerms") or "True"
-cdrid = fields and fields.getvalue("CDRID") or None
+SemanticTerms = fields.getvalue("SemanticTerms") or "True"
+cdrid = fields.getvalue("CDRID")
 title    = "CDR Administration"
 section  = "Term Hierarchy Tree"
 if SemanticTerms == "False":
@@ -32,11 +37,7 @@ if action == cdrcgi.MAINMENU:
     cdrcgi.navigateTo("Admin.py", session)
 elif action == SUBMENU:
     cdrcgi.navigateTo("Reports.py", session)
-
-#----------------------------------------------------------------------
-# Handle request to log out.
-#----------------------------------------------------------------------
-if action == "Log Out": 
+if action == "Log Out":
     cdrcgi.logout(session)
 
 class CDRID:
@@ -48,7 +49,6 @@ class Term:
         self.name = name
         self.id = id
         self.isSemantic = isSemantic
-        #self.aliases = []
         self.children = []
         self.parents = []
         self.uname = name.upper()
@@ -58,74 +58,126 @@ class Term:
 
 conn = cdrdb.connect('CdrGuest')
 cursor = conn.cursor()
+
+def log_query(q, label):
+    if LOG_QUERIES:
+        q.log(label=label)
+
 try:
     # create a temporary table to store info
-    cursor.execute("CREATE TABLE #terms(id INTEGER, parent INTEGER, boolSemanticType INTEGER)")
+    cursor.execute("""\
+    CREATE TABLE #terms
+             (id INTEGER,
+          parent INTEGER,
+boolSemanticType INTEGER)
+""")
     conn.commit()
 
+    # Subqueries
+    obsolete = cdrdb.Query("query_term", "doc_id")
+    obsolete.where("path = '/Term/TermType/TermTypeName'")
+    obsolete.where("value = 'Obsolete term'")
+    not_obsolete = cdrdb.Query.Condition("doc_id", obsolete, "NOT IN")
+    parents = cdrdb.Query("#terms", "id")
+    parents.where("id = p.doc_id")
+    parents.where("parent = p.int_val")
+    not_already_inserted = "NOT EXISTS (%s)" % parents
+    semantic_types = cdrdb.Query("query_term", "doc_id")
+    semantic_types.where("path = '/Term/TermType/TermTypeName'")
+    semantic_types.where("value = 'Semantic type'")
+    semantic_types.where(not_obsolete)
+    non_semantic_types = cdrdb.Query("query_term", "doc_id")
+    non_semantic_types.where("path = '/Term/TermType/TermTypeName'")
+    non_semantic_types.where("value <> 'Semantic type'")
+    non_semantic_types.where(not_obsolete)
+
+    # Link from child term to parent
+    parent_path = "/Term/TermRelationship/ParentTerm/TermId/@cdr:ref"
+    is_parent = "p.path = '%s'" % parent_path
+
     # populate with all the semantic terms
-    cursor.execute("""\
-        INSERT INTO #terms
-             SELECT doc_id, NULL, 1
-               FROM query_term
-              WHERE path = '/Term/TermType/TermTypeName'
-                AND value = 'Semantic type'
-                AND doc_id not in(
-                                  SELECT doc_id from query_term
-                                   WHERE path = '/Term/TermType/TermTypeName'
-                                     AND value = 'Obsolete term')""")
+    '''cursor.execute("""\
+INSERT INTO #terms
+     SELECT doc_id, NULL, 1
+       FROM query_term
+      WHERE path = '/Term/TermType/TermTypeName'
+        AND value = 'Semantic type'
+        AND doc_id NOT IN
+   (SELECT doc_id from query_term
+     WHERE path = '/Term/TermType/TermTypeName'
+       AND value = 'Obsolete term')
+""")'''
+    select = cdrdb.Query("query_term", "doc_id", "NULL", "1")
+    select.where("path = '/Term/TermType/TermTypeName'")
+    select.where("value = 'Semantic type'")
+    select.where(not_obsolete)
+    log_query(select, "SEMANTIC TERMS QUERY")
+    cursor.execute("INSERT INTO #terms %s" % select)
     conn.commit()
 
     # populate with all the non-semantic terms
-    cursor.execute("""\
-        INSERT INTO #terms
-             SELECT doc_id, NULL, 0
-               FROM query_term
-              WHERE path = '/Term/TermType/TermTypeName'
-                AND value <> 'Semantic type'
-                AND doc_id not in(
+    '''cursor.execute("""\
+INSERT INTO #terms
+     SELECT doc_id, NULL, 0
+       FROM query_term
+      WHERE path = '/Term/TermType/TermTypeName'
+        AND value <> 'Semantic type'
+        AND doc_id NOT IN
+   (SELECT doc_id from query_term
+     WHERE path = '/Term/TermType/TermTypeName'
+       AND value = 'Obsolete term')
+""")'''
+    select = cdrdb.Query("query_term", "doc_id", "NULL", "0")
+    select.where("path = '/Term/TermType/TermTypeName'")
+    select.where("value <> 'Semantic type'")
+    select.where(not_obsolete)
+    log_query(select, "NON-SEMANTIC TERMS QUERY")
+    cursor.execute("INSERT INTO #terms %s" % select)
+    conn.commit()
+
+    done = False
+    while not done:
+
+        # add the semantic type parent rows
+        '''cursor.execute("""\
+INSERT INTO #terms
+     SELECT p.doc_id, p.int_val, 1
+       FROM query_term p
+       JOIN #terms t
+         ON t.id = p.int_val
+      WHERE p.path = '/Term/TermRelationship/ParentTerm/TermId/@cdr:ref'
+        AND NOT EXISTS (SELECT *
+                          FROM #terms
+                         WHERE id = p.doc_id
+                           AND parent = p.int_val)
+        AND p.doc_id IN (SELECT doc_id
+                               FROM query_term
+                              WHERE path = '/Term/TermType/TermTypeName'
+                                AND value = 'Semantic type'
+                                AND doc_id not in(
                                   SELECT doc_id from query_term
                                    WHERE path = '/Term/TermType/TermTypeName'
-                                     AND value = 'Obsolete term')""")
-    conn.commit()    
-    
-    done = 0
-    while not done:
-        # add the semantic type parent rows
-        cursor.execute("""\
-            INSERT INTO #terms
-                 SELECT p.doc_id, p.int_val, 1
-                   FROM query_term p
-                   JOIN #terms t
-                     ON t.id = p.int_val
-                  WHERE p.path = '/Term/TermRelationship/ParentTerm'
-                               + '/TermId/@cdr:ref'
-                    AND NOT EXISTS (SELECT *
-                                      FROM #terms
-                                     WHERE id = p.doc_id
-                                       AND parent = p.int_val)
-                    AND p.doc_id IN (SELECT doc_id
-                                           FROM query_term
-                                          WHERE path = '/Term/TermType'
-                                                     + '/TermTypeName'
-                                            AND value = 'Semantic type'
-                                            AND doc_id not in(
-                                                              SELECT doc_id from query_term
-                                                               WHERE path = '/Term/TermType/TermTypeName'
-                                                                 AND value = 'Obsolete term'))
-                    AND p.int_val IN (SELECT doc_id
-                                           FROM query_term
-                                          WHERE path = '/Term/TermType'
-                                                     + '/TermTypeName'
-                                            AND value = 'Semantic type'
-                                            AND doc_id not in(
-                                                              SELECT doc_id from query_term
-                                                               WHERE path = '/Term/TermType/TermTypeName'
-                                                                 AND value = 'Obsolete term'))
-                                            """)
+                                     AND value = 'Obsolete term'))
+        AND p.int_val IN (SELECT doc_id
+                               FROM query_term
+                              WHERE path = '/Term/TermType/TermTypeName'
+                                AND value = 'Semantic type'
+                                AND doc_id not in(
+                                  SELECT doc_id from query_term
+                                   WHERE path = '/Term/TermType/TermTypeName'
+                                     AND value = 'Obsolete term'))
+                                """)'''
+        query = cdrdb.Query("query_term p", "p.doc_id", "p.int_val", "1")
+        query.join("#terms t", "t.id = p.int_val")
+        query.where(is_parent)
+        query.where(not_already_inserted)
+        query.where(query.Condition("p.doc_id", semantic_types, "IN"))
+        query.where(query.Condition("p.int_val", semantic_types, "IN"))
+        log_query(query, "SEMANTIC TYPE PARENT QUERY")
+        cursor.execute("INSERT INTO #terms %s" % query)
 
         #add the non-semantic type parent rows
-        cursor.execute("""\
+        '''cursor.execute("""\
             INSERT INTO #terms
                  SELECT p.doc_id, p.int_val, 0
                    FROM query_term p
@@ -138,65 +190,96 @@ try:
                                      WHERE id = p.doc_id
                                        AND parent = p.int_val)
                     AND p.doc_id IN (SELECT doc_id
-                                           FROM query_term
-                                          WHERE path = '/Term/TermType'
-                                                     + '/TermTypeName'
-                                            AND value <> 'Semantic type'
-                                            AND doc_id not in(
-                                                              SELECT doc_id from query_term
-                                                               WHERE path = '/Term/TermType/TermTypeName'
-                                                                 AND value = 'Obsolete term'))
+                           FROM query_term
+                          WHERE path = '/Term/TermType/TermTypeName'
+                            AND value <> 'Semantic type'
+                            AND doc_id not in(
+                                  SELECT doc_id from query_term
+                                   WHERE path = '/Term/TermType/TermTypeName'
+                                     AND value = 'Obsolete term'))
                     AND p.int_val IN (SELECT doc_id
-                                           FROM query_term
-                                          WHERE path = '/Term/TermType'
-                                                     + '/TermTypeName'
-                                            AND value <> 'Semantic type'
-                                            AND doc_id not in(
-                                                              SELECT doc_id from query_term
-                                                               WHERE path = '/Term/TermType/TermTypeName'
-                                                                 AND value = 'Obsolete term'))
-                                            """)
-        
+                           FROM query_term
+                          WHERE path = '/Term/TermType/TermTypeName'
+                            AND value <> 'Semantic type'
+                            AND doc_id not in(
+                                  SELECT doc_id from query_term
+                                   WHERE path = '/Term/TermType/TermTypeName'
+                                     AND value = 'Obsolete term'))
+                                            """)'''
+        query = cdrdb.Query("query_term p", "p.doc_id", "p.int_val", "0")
+        query.join("#terms t", "t.id = p.int_val")
+        query.where(is_parent)
+        query.where(not_already_inserted)
+        query.where(query.Condition("p.doc_id", non_semantic_types, "IN"))
+        query.where(query.Condition("p.int_val", non_semantic_types, "IN"))
+        log_query(query, "NON-SEMANTIC TYPE PARENT QUERY")
+        cursor.execute("INSERT INTO #terms %s" % query)
+
         if not cursor.rowcount:
-            done = 1
+            done = True
         conn.commit()
-        
+
         # all non-semantic rows that don't have parents will be assigned to
         # a semantic term.
-        cursor.execute("""\
-            INSERT INTO #terms
-                 SELECT p.doc_id, p.int_val, 0
-                   FROM query_term p
-                  WHERE NOT EXISTS (SELECT *
-                                      FROM #terms
-                                     WHERE id = p.doc_id
-                                       AND parent = p.int_val)
-                    AND p.doc_id IN (SELECT id from #terms
-                                      WHERE parent is null and boolSemanticType = 0)
-                    AND p.doc_id NOT IN (SELECT id from #terms
-                                      WHERE parent is not null)
-                    AND p.int_val IN (SELECT doc_id
-                                           FROM query_term
-                                          WHERE path = '/Term/TermType'
-                                                     + '/TermTypeName'
-                                            AND value = 'Semantic type'
-                                            AND doc_id not in(
-                                                              SELECT doc_id from query_term
-                                                               WHERE path = '/Term/TermType/TermTypeName'
-                                                                 AND value = 'Obsolete term'))
-                                            """)
-        
+        # XXX Very suspicious that Charlie didn't use a WHERE clause
+        # to narrow the rows in the query_term SELECT by path value;
+        # check with the users to find out the exact logic needed.
+        # (See commented calls to query.where() below.)
+        '''cursor.execute("""\
+INSERT INTO #terms
+     SELECT p.doc_id, p.int_val, 0
+       FROM query_term p
+      WHERE NOT EXISTS (SELECT *
+                          FROM #terms
+                         WHERE id = p.doc_id
+                           AND parent = p.int_val)
+        AND p.doc_id IN (SELECT id from #terms
+                          WHERE parent is null and boolSemanticType = 0)
+        AND p.doc_id NOT IN (SELECT id from #terms
+                          WHERE parent is not null)
+        AND p.int_val IN (SELECT doc_id
+                               FROM query_term
+                              WHERE path = '/Term/TermType/TermTypeName'
+                                AND value = 'Semantic type'
+                                AND doc_id not in(
+                                  SELECT doc_id from query_term
+                                   WHERE path = '/Term/TermType/TermTypeName'
+                                     AND value = 'Obsolete term'))
+                                            """)'''
+        non_semantic_orphans = cdrdb.Query("#terms", "id")
+        non_semantic_orphans.where("parent IS NULL")
+        non_semantic_orphans.where("boolSemanticType = 0")
+        non_orphans = cdrdb.Query("#terms", "id").where("parent IS NOT NULL")
+        query = cdrdb.Query("query_term p", "p.doc_id", "p.int_val", "0")
+        #query.where(is_parent)
+        #query.where("p.path = '/Term/SemanticType/@cdr:ref'")
+        query.where(not_already_inserted)
+        query.where(query.Condition("p.doc_id", non_semantic_orphans, "IN"))
+        query.where(query.Condition("p.doc_id", non_orphans, "NOT IN"))
+        query.where(query.Condition("p.int_val", semantic_types, "IN"))
+        log_query(query, "NON-SEMANTIC ORPHANS QUERY")
+        cursor.execute("INSERT INTO #terms %s" % query)
         if not cursor.rowcount:
-            done = 1
+            done = True
         conn.commit()
-        
-    cursor.execute("""\
+
+    '''cursor.execute("""\
         SELECT d.id, n.value, d.parent, d.boolSemanticType
           FROM #terms d
           JOIN query_term n
             ON n.doc_id = d.id
          WHERE n.path = '/Term/PreferredName'
-      ORDER BY d.parent desc""")
+      ORDER BY d.parent desc""")'''
+    columns = ("t.id", "n.value", "t.parent", "t.boolSemanticType")
+    query = cdrdb.Query("#terms t", *columns)
+    query.join("query_term n", "n.doc_id = t.id").order("t.parent DESC")
+    query.where("n.path = '/Term/PreferredName'")
+    log_query(query, "TERM HIERARCHY TREE QUERY")
+    query.execute(cursor)
+    # DEBUGGING
+    #for row in cursor.fetchall():
+    #    print repr(row)
+    #exit(0)
     terms = {}
     for id, name, parent, isSemantic in cursor.fetchall():
         if terms.has_key(id):
@@ -205,7 +288,7 @@ try:
             term = terms[id] = Term(name.rstrip(),id,isSemantic)
         if parent and parent not in term.parents:
             term.parents.append(parent)
-            
+
     #if flavor != 'short':
     #    cursor.execute("""\
     #        SELECT DISTINCT q.doc_id, q.value
@@ -246,8 +329,8 @@ def expandUp(t):
 # add all terms that don't have parents
 def addTerms(terms,SemanticTerms):
     html = [u""]
-    
-    # create a dummy partent node so we can sort the top node
+
+    # create a dummy parent node so we can sort the top node
     parentTerm = terms[-1] = Term("",-1,0)
 
     for id in terms:
@@ -265,13 +348,13 @@ def addTerms(terms,SemanticTerms):
                     # expand the tree upward
                     if term.parents:
                         expandUp(term)
-                                
+
     parentTerm.children.sort(lambda a,b: cmp(a.uname, b.uname))
-    
+
     for rootTerm in parentTerm.children:
         html.append(addTerm(rootTerm,rootTerm))
 
-    html = u"".join(html)        
+    html = u"".join(html)
     return html
 
 def addLeafIDsToList(t,cdrids):
@@ -303,7 +386,7 @@ def addTerm(t,parent):
    <a style="font-size: 8pt; color: rgb(200, 100, 100)"
       onclick="Send2Clipboard('%s');" href='#'>&nbsp(copy)</a>""" % cbText)
         html.append(u"<ul>")
-        
+
         t.children.sort(lambda a,b: cmp(a.uname, b.uname))
         for child in t.children:
             html.append(addTerm(child, t))
@@ -319,6 +402,7 @@ def addTerm(t,parent):
 
 
 # generate HTML
+# XXX This is whacked! Charlie has two opening <html> tags. :-( FIX!
 html =[u"""\
 <html>
 <input type='hidden' name='%s' value='%s'>
@@ -341,7 +425,7 @@ html.append(u"""\
 
     ul.treeview li.leaf.selected {
 		font-style: italic;
-	}	
+	}
 
 	ul.treeview li.parent{
 		color: Navy;
@@ -354,15 +438,15 @@ html.append(u"""\
 	ul.treeview li.hide ul {
 		display: none;
 	}
-  </style> 
-  
+  </style>
+
   <script type="text/javascript">
-      function Send2Clipboard(s) 
+      function Send2Clipboard(s)
     {
-        if( window.clipboardData ) 
-        { 
+        if( window.clipboardData )
+        {
             clipboardData.setData("text", s);
-            alert("Data has been copied to the clipboard."); 
+            alert("Data has been copied to the clipboard.");
         }
         else
         {
@@ -371,18 +455,20 @@ html.append(u"""\
             var myTextField = document.getElementById("CopiedCDRIDsEditBox");
             myTextField.value = s;
             myTextField.select();
-            alert("CDRID's have been copied to the edit box at the bottom of this page. You can type Ctrl+C now to copy to the clipboard.");
-        } 
+            alert("CDRID's have been copied to the edit box at the " +
+                  "bottom of this page. You can type Ctrl+C now to copy " +
+                  "to the clipboard.");
+        }
     }
 
     function clickOnName(e, item)
     {
         e = (e) ? e : ((window.event) ? window.event : "")
-        if (e) 
+        if (e)
         {
             var tg = (window.event) ? e.srcElement : e.target;
 
-            if (tg == item) 
+            if (tg == item)
             {
                 if (item.className == "parent hide")
                 {
@@ -396,7 +482,7 @@ html.append(u"""\
                         {
                             item.childNodes[i].innerHTML = "-";
                             break;
-                        }        
+                        }
                     }
                 }
                 else
@@ -408,24 +494,24 @@ html.append(u"""\
                         {
                             item.childNodes[i].innerHTML = "+";
                             break;
-                        }        
+                        }
                     }
                 }
             }
             else
-                return;               
-        }                                                           
-    }    
-    
+                return;
+        }
+    }
+
     function clickOnSign(e, id)
     {
         var item = document.getElementById(id);
         e = (e) ? e : ((window.event) ? window.event : "")
-        if (e) 
+        if (e)
         {
             var tg = (window.event) ? e.srcElement : e.target;
 
-            //if (tg == item) 
+            //if (tg == item)
             //{
                 if (item.className == "parent hide")
                 {
@@ -439,7 +525,7 @@ html.append(u"""\
                         {
                             item.childNodes[i].innerHTML = "-";
                             break;
-                        }        
+                        }
                     }
                 }
                 else
@@ -451,24 +537,24 @@ html.append(u"""\
                         {
                             item.childNodes[i].innerHTML = "+";
                             break;
-                        }        
+                        }
                     }
                 }
             //}
             //else
-            //    return;               
-        }                                                           
+            //    return;
+        }
     }
 	</script>
  </head>
  <body>
   <table><tr><td width="60%">""")
-  
+
 html.append(u"""\
 <h1>%s</h1></td><td align="right">
   </td></tr></table>
   <ul class="treeview">
-""" % section) 
+""" % section)
 
 html.append(addTerms(terms,SemanticTerms))
 
@@ -480,6 +566,5 @@ html.append(u"""\
  </body>
 </html>""")
 html = u"".join(html)
-#header = header.replace("<BODY","""<BODY onload="onload();" """)
 cdrcgi.sendPage(header + html)
 

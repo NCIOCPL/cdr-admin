@@ -4,38 +4,34 @@
 #
 # Enables users to review the entire menu hierarchy for a given menu type.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.2  2004/11/05 19:48:05  venglisc
 # In order to sort the children of a term based on the SortOrder attribute
 # value the sortString was introduced.  The sortString is equal to the
-# TermName is the SortOrder attribute does not exist, otherwise it is the
+# TermName if the SortOrder attribute does not exist, otherwise it is the
 # SortOrder value itself.  Sort the children of a term by the sortString but
 # display the term name.
 #
-# Revision 1.1  2003/05/08 20:27:27  bkline
-# New terminology report for menu information.
+# JIRA::OCECDR-3800 - Address security vulnerabilities
 #
 #----------------------------------------------------------------------
-import xml.dom.minidom, cgi, socket, struct, re, cdr, cdrcgi, cdrdb, time
+import cdr
+import cdrcgi
+import cdrdb
+import cgi
+import lxml.etree as etree
+import time
 
 #----------------------------------------------------------------------
 # Get the parameters from the request.
 #----------------------------------------------------------------------
 fields   = cgi.FieldStorage()
-session  = fields and cdrcgi.getSession(fields)   or None
-request  = fields and cdrcgi.getRequest(fields)   or None
-menuType = fields and fields.getvalue("MenuType") or None
+session  = cdrcgi.getSession(fields) or cdrcgi.bail("Please log in")
+request  = cdrcgi.getRequest(fields)
+menuType = fields.getvalue("MenuType")
 script   = "MenuHierarchy.py"
 SUBMENU  = "Report Menu"
 buttons  = ["Submit Request", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 title    = "CDR Administration"
 section  = "Menu Hierarchy Report"
-header   = cdrcgi.header(title, title, section, script, buttons)
-
-#----------------------------------------------------------------------
-# Make sure we're logged in.
-#----------------------------------------------------------------------
-if not session: cdrcgi.bail('Unknown or expired CDR session.')
 
 #----------------------------------------------------------------------
 # Handle navigation requests.
@@ -44,12 +40,23 @@ if request == cdrcgi.MAINMENU:
     cdrcgi.navigateTo("Admin.py", session)
 elif request == SUBMENU:
     cdrcgi.navigateTo("Reports.py", session)
+if request == "Log Out":
+    cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
-# Handle request to log out.
+# Collect the menu type names. Make sure any selected value is valid.
+# If not, we have a hacker, in which case we avoid showing any helpful
+# information.
 #----------------------------------------------------------------------
-if request == "Log Out": 
-    cdrcgi.logout(session)
+query = cdrdb.Query("query_term", "value").unique().order(1)
+query.where("path = '/Term/MenuInformation/MenuItem/MenuType'")
+menuTypes = [row[0] for row in query.execute().fetchall()]
+if not menuTypes:
+    cdrcgi.bail("No menu types found in CDR terminology documents.")
+if len(menuTypes) == 1:
+    menuType = menuTypes[0]
+elif menuType and menuType not in menuTypes:
+    cdrcgi.bail("Corrupted form data")
 
 class MenuItem:
     def __init__(self, id, sortString, menuTypeName, name, status):
@@ -80,12 +87,11 @@ def loadMenuItems(menuType):
     global findIndex
     parms = (("MenuType", menuType))
     response = cdr.report('guest', 'Menu Term Tree', parms)
-    dom = xml.dom.minidom.parseString(response.replace("<![CDATA[", "")
-                                              .replace("]]>", ""))
+    docXml = response.replace("<![CDATA[", "").replace("]]>", "")
+    tree = etree.XML(docXml)
     tempIndex = {}
-    for elem in dom.documentElement.childNodes:
-        #print "node name:", elem.nodeName
-        if elem.nodeName == "MenuItem":
+    for node in tree:
+        if node.tag == "MenuItem":
             termId       = None
             termName     = None
             menuTypeName = None
@@ -93,21 +99,21 @@ def loadMenuItems(menuType):
             displayName  = None
             parentId     = None
 	    sortString   = None
-            for child in elem.childNodes:
-                if child.nodeName == "TermId":
-                    termId = int(cdr.getTextContent(child))
-                elif child.nodeName == "TermName":
-                    termName = cdr.getTextContent(child)
-                elif child.nodeName == "MenuType":
-                    menuTypeName = cdr.getTextContent(child)
-                elif child.nodeName == "MenuStatus":
-                    menuStatus = cdr.getTextContent(child)
-                elif child.nodeName == "DisplayName":
-                    displayName = cdr.getTextContent(child)
-                elif child.nodeName == "ParentId":
-                    parentId = int(cdr.getTextContent(child))
-		elif child.nodeName == "SortString":
-		    sortString = cdr.getTextContent(child)
+            for child in node:
+                if child.tag == "TermId":
+                    termId = int(child.text)
+                elif child.tag == "TermName":
+                    termName = child.text
+                elif child.tag == "MenuType":
+                    menuTypeName = child.text
+                elif child.tag == "MenuStatus":
+                    menuStatus = child.text
+                elif child.tag == "DisplayName":
+                    displayName = child.text
+                elif child.tag == "ParentId":
+                    parentId = int(child.text)
+		elif child.tag == "SortString":
+		    sortString = child.text
 
             if termId and termName and menuTypeName:
                 if menuTypeName not in menuTypes:
@@ -117,7 +123,8 @@ def loadMenuItems(menuType):
                 if key in menuItems:
                     menuItem = menuItems[key]
                 else:
-                    menuItem = MenuItem(termId, sortString, menuTypeName, name, menuStatus)
+                    menuItem = MenuItem(termId, sortString, menuTypeName,
+                                        name, menuStatus)
                     menuItems[key] = menuItem
                 if parentId:
                     menuItem.parents.append(parentId)
@@ -131,7 +138,6 @@ def loadMenuItems(menuType):
         for parentId in menuItem.parents:
             key2 = (parentId, menuItem.menuTypeName)
             if key2 not in tempIndex:
-                #print "key (%d, %s) not found in tempIndex" % key2
                 continue
             for parentKey in tempIndex[key2]:
                 parent = menuItems[parentKey]
@@ -142,64 +148,39 @@ def loadMenuItems(menuType):
 # Put up a selection list from which the user can select a menu type.
 #----------------------------------------------------------------------
 def showMenuTypes(rows):
-    selected = " SELECTED='1'"
-    form = u"""\
-   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-   <H2>Select the menu type for the report.</H2>
-   <SELECT NAME='MenuType'>
-""" % (cdrcgi.SESSION, session)
-    for row in rows:
-        form += u"""
-    <OPTION%s>%s</OPTION>
-""" % (selected, cgi.escape(row[0], 1))
-        selected = ""
-    form += u"""
-   </SELECT>
-  </FORM>
- </BODY>
-</HTML>
-"""
-    cdrcgi.sendPage(header + form)
+    page = cdrcgi.Page(title, subtitle=section, action=script,
+                       buttons=buttons, session=session)
+    page.add("<fieldset>")
+    page.add(page.B.LEGEND("Select Menu Type For Report"))
+    page.add_select("MenuType", "Type", rows)
+    page.add("</fieldset>")
+    page.send()
 
 if not menuType:
-    try:
-        conn = cdrdb.connect('CdrGuest')
-        cursor = conn.cursor()
-        cursor.execute("""\
-        SELECT DISTINCT value
-                   FROM query_term
-                  WHERE path = '/Term/MenuInformation/MenuItem/MenuType'""")
-        rows = cursor.fetchall()
-    except:
-        cdrcgi.bail("Failure fetching list of menu types from database")
-    if not rows:
-        cdrcgi.bail("No menu types found in CDR terminology documents.")
-    if len(rows) == 1:
-        menuType = rows[0][0]
-    else:
-        showMenuTypes(rows)
+        showMenuTypes(menuTypes)
 
 #----------------------------------------------------------------------
 # Display a term and its children.
-# This is the second level display.
 #----------------------------------------------------------------------
-def displayMenuItem(item, level):
+def displayMenuItem(item, level=0):
     b1 = level == 1 and "<b>" or ""
     b2 = level == 1 and "</b>" or ""
-    html = "&nbsp;" * level * 5 + b1 + cgi.escape(item.name) + b2 + "<br>\n"
+    html = " " * level * 5 + b1 + cgi.escape(item.name) + b2 + "\n"
 
-    # We want only sort the children of the terms by the sortString not the terms itself
-    # ----------------------------------------------------------------------------------
+    # Sort the children of the terms by the sortString not the terms itself
+    # ---------------------------------------------------------------------
     if level == 1:
-        item.children.sort(lambda a,b: cmp(menuItems[a].sortString, menuItems[b].sortString))
+        item.children.sort(lambda a,b: cmp(menuItems[a].sortString,
+                                           menuItems[b].sortString))
     else:
-        item.children.sort(lambda a,b: cmp(menuItems[a].name, menuItems[b].name))
+        item.children.sort(lambda a,b: cmp(menuItems[a].name,
+                                           menuItems[b].name))
 
     if level < 2:
         for child in item.children:
             html += displayMenuItem(menuItems[child], level + 1)
     return html
-    
+
 menuItems = {}
 menuTypes = {}
 loadMenuItems(menuType)
@@ -208,25 +189,26 @@ if not menuTypes.has_key(menuType):
 topItems = menuTypes[menuType].topTerms
 topItems.sort(lambda a,b: cmp(menuItems[a].name, menuItems[b].name))
 html = u"""\
-<!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
+<!DOCTYPE html>
 <html>
  <head>
   <title>Menu Hierarchy Report -- %s</title>
-  <basefont face="Arial, Helvetica, sans-serif">
-  <link rel="STYLESHEET" href="/stylesheets/dataform.css">
+  <link rel="stylesheet" href="/stylesheets/dataform.css">
   <style type='text/css'>
+   *, pre.sans-serif { font-family: Arial, Helvetica, sans-serif; }
    h2 { text-align: center; font-size: 16pt; font-weight: bold; }
    body { font-size: 12pt; }
   </style>
  </head>
  <body>
   <h2>Menu Hierarchy Report<br>%s<br>%s</h2>
-  <br>
+  <pre class="sans-serif">
 """ % (menuType, menuType, time.strftime("%B %d, %Y"))
 
 for key in topItems:
-    html += displayMenuItem(menuItems[key], 0)
+    html += displayMenuItem(menuItems[key])
 cdrcgi.sendPage(html + u"""\
+  </pre>
  </body>
 </html>
 """)

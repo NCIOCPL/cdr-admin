@@ -2,41 +2,29 @@
 #
 # $Id$
 #
-# Reports on documents unchanged for a specified number of days.
+# Reports on citation documents which have changed.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.4  2004/02/17 19:38:18  venglisc
-# Modified Report header display.
-#
-# Revision 1.3  2002/04/24 20:36:03  bkline
-# Changed "Title" label to "DocTitle" as requested by Eileen (issue #161).
-#
-# Revision 1.2  2002/02/21 22:34:00  bkline
-# Added navigation buttons.
-#
-# Revision 1.1  2001/12/01 18:11:44  bkline
-# Initial revision
+# BZIssue::161 - Changed "Title" label to "DocTitle" as requested by Eileen
+# JIRA::OCECDR-3800 - Address security vulnerabilities
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, string, cdrdb
+import cgi
+import cdrcgi
+import cdrdb
+import urllib
 
 #----------------------------------------------------------------------
 # Named constants.
 #----------------------------------------------------------------------
-SCRIPT  = '/cgi-bin/cdr/Filter.py'
-SUBMENU = 'Report Menu'
+SCRIPT  = "ModifiedPubMedDocs.py"
+SUBMENU = "Report Menu"
 
 #----------------------------------------------------------------------
 # Set the form variables.
 #----------------------------------------------------------------------
 fields  = cgi.FieldStorage()
-session = cdrcgi.getSession(fields)
+session = cdrcgi.getSession(fields) or cdrcgi.bail("Please log in")
 request = cdrcgi.getRequest(fields)
-
-#----------------------------------------------------------------------
-# Make sure we have an active session.
-#----------------------------------------------------------------------
-if not session: cdrcgi.bail('Unknown or expired CDR session.')
 
 #----------------------------------------------------------------------
 # Handle navigation requests.
@@ -47,67 +35,42 @@ elif request == SUBMENU:
     cdrcgi.navigateTo("reports.py", session)
 
 #----------------------------------------------------------------------
-# Set up a database connection and cursor.
-#----------------------------------------------------------------------
-try:
-    conn = cdrdb.connect()
-    cursor = conn.cursor()
-except cdrdb.Error, info:
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
-
-#----------------------------------------------------------------------
 # Submit the query to the database.
 #----------------------------------------------------------------------
-query = """\
-SELECT DISTINCT document.id,
-                document.title
-           FROM document
-           JOIN query_term
-             ON query_term.doc_id = document.id
-          WHERE query_term.path   = '/Citation/PubmedArticle/ModifiedRecord'
-            AND query_term.value  = 'Yes'
-       ORDER BY document.title
-"""
-try:
-    cursor.execute(query)
-    rows = cursor.fetchall()
-except cdrdb.Error, info:
-    cdrcgi.bail('Database query failure: %s' % info[1][0])
+query = cdrdb.Query("document d", "d.id", "d.title").unique().order(2)
+query.join("query_term q", "q.doc_id = d.id")
+query.where("q.path = '/Citation/PubmedArticle/ModifiedRecord'")
+query.where("q.value = 'Yes'")
+rows = query.execute().fetchall()
 
+#----------------------------------------------------------------------
+# Assemble the report.
+#----------------------------------------------------------------------
 title   = u"CDR Administration"
 instr   = u"Modified PubMed Documents"
 buttons = (SUBMENU, cdrcgi.MAINMENU)
-header  = cdrcgi.header(title, title, instr, u"ModifiedPubMedDocs.py", buttons)
-html    = u"""\
-<b>Number of modified documents: %d<b>
-<TABLE BORDER='0' WIDTH='100%%' CELLSPACING='1' CELLPADDING='1'>
- <TR BGCOLOR='silver' VALIGN='top'>
-  <TD ALIGN='center'><FONT SIZE='-1'><B>Doc ID</B></FONT></TD>
-  <TD ALIGN='center'><FONT SIZE='-1'><B>DocTitle</B></FONT></TD>
- </TR>
-""" % len(rows)
-for row in rows:
-    docId = "CDR%010d" % row[0]
-    title = row[1]
-    shortTitle = title[:100] 
-    if len(title) > 100: shortTitle += " ..."
-    html += u"""\
-<TR>
-  <TD BGCOLOR='white' VALIGN='top' ALIGN='center'>
-   <A HREF='%s?DocId=%s&Filter=%s'>
-    <FONT SIZE='-1'>%s</FONT>
-   </A>
-  </TD>
-  <TD BGCOLOR='white' ALIGN='left'><FONT SIZE='-1'>%s</FONT></TD>
- </TR>
-""" % (SCRIPT, 
-       docId,
-       'name:Citation QC Report',
-       docId,
-       shortTitle)
-cdrcgi.sendPage(header + html + u"""\
-   </TABLE>
-   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-  </FORM>
- </BODY>
-</HTML>""" % (cdrcgi.SESSION, session))
+caption = "Modified Documents (%d)" % len(rows)
+columns = (
+    cdrcgi.Report.Column("Doc ID"),
+    cdrcgi.Report.Column("Doc Title"),
+)
+table_rows = []
+parms = {
+    cdrcgi.SESSION: session,
+    "Filter": "name:Citation QC Report"
+}
+for doc_id, doc_title in rows:
+    doc_id_string = "CDR%010d" % doc_id
+    parms["DocId"] = doc_id_string
+    url = "Filter.py?" + urllib.urlencode(parms)
+    short_title = doc_title[:100]
+    if len(doc_title) > 100:
+        short_title += " ..."
+    row = (
+        cdrcgi.Report.Cell(doc_id_string, href=url),
+        short_title,
+    )
+    table_rows.append(row)
+table = cdrcgi.Report.Table(columns, table_rows, caption=caption)
+report = cdrcgi.Report(title, [table], banner=title, subtitle=instr)
+report.send()

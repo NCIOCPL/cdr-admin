@@ -4,24 +4,15 @@
 #
 # Report on phrases matching specified glossary term.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.4  2004/08/31 12:55:17  bkline
-# Modified logic to allow invocation from XMetaL without knowing which
-# document types to search yet.
-#
-# Revision 1.3  2004/08/26 14:08:58  bkline
-# Added missing hidden field for trials.
-#
-# Revision 1.2  2004/08/12 13:43:28  bkline
-# Changes requested by Margaret (including ability to restrict the
-# report to search specified document types).
-#
-# Revision 1.1  2004/05/11 17:58:51  bkline
-# Report on phrases matching specified glossary term.
+# JIRA::OCECDR-3800 - eliminated security vulnerabilities
 #
 #----------------------------------------------------------------------
-
-import cdr, cdrdb, cdrcgi, cgi, re, cdrbatch, socket
+import cdr
+import cdrbatch
+import cdrcgi
+import cdrdb
+import cgi
+import re
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -29,12 +20,12 @@ import cdr, cdrdb, cdrcgi, cgi, re, cdrbatch, socket
 fields   = cgi.FieldStorage()
 session  = cdrcgi.getSession(fields)
 request  = cdrcgi.getRequest(fields)
-id       = fields and fields.getvalue('Id')      or None
-name     = fields and fields.getvalue('Name')    or None
-hp       = fields and fields.getvalue('hp')      or None
-patient  = fields and fields.getvalue('patient') or None
-trials   = fields and fields.getvalue('trials')  or None
-email    = fields and fields.getvalue("Email")   or cdr.getEmail(session)
+id       = fields.getvalue('Id')
+name     = fields.getvalue('Name')
+hp       = fields.getvalue('hp')
+patient  = fields.getvalue('patient')
+trials   = fields.getvalue('trials')
+email    = fields.getvalue("Email") or cdr.getEmail(session)
 SUBMENU  = "Report Menu"
 buttons  = ["Submit Request", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 script   = "GlossaryTermPhrases.py"
@@ -63,81 +54,79 @@ if request == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
+# Parameter validation.
+#----------------------------------------------------------------------
+if id:
+    digits = re.sub('[^\d]+', '', id)
+    try:
+        id = int(digits)
+    except:
+        id = ""
+
+#----------------------------------------------------------------------
 # If we don't have a request, put up the request form.
 #----------------------------------------------------------------------
 if not name and not id or not email or not (hp or patient or trials):
-    form = """\
-   <p>
-    This report requires a few minutes to complete.
-    When the report processing has completed, email notification
-    will be sent to all addresses specified below.  At least
-    one email address must be provided.  If more than one
-    address is specified, separate the addresses with a blank.
-   </p>
-   <br>
-   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-   <TABLE BORDER='0'>
-    <TR>
-     <TD ALIGN='right'><B>Document ID:&nbsp;</B></TD>
-     <TD><INPUT NAME='Id'%s></TD>
-    </TR>
-    <TR>
-     <TD ALIGN='right'><B>Glossary Term Name:&nbsp;</B></TD>
-     <TD><INPUT NAME='Name'></TD>
-    </TR>
-    <TR>
-     <TD ALIGN='right'><B>Email:&nbsp;</B></TD>
-     <TD><INPUT NAME='Email'></TD>
-    </TR>
-    <TR>
-     <TD ALIGN='right' VALIGN='top'><B>Document Type:&nbsp;</B></TD>
-     <TD><INPUT TYPE='checkbox' NAME='hp'>Health Professional Summaries<BR>
-         <INPUT TYPE='checkbox' NAME='patient'>Patient Summaries<BR>
-         <INPUT TYPE='checkbox' NAME='trials'>Patient Abstracts</TD>
-    </TR>
-   </TABLE>
-   <BR>
-   [NOTE: This report can take several minutes to prepare; please be patient.]
-  </FORM>
- </BODY>
-</HTML>
-""" % (cdrcgi.SESSION, session, id and (" VALUE='%s'" % id) or "")
-    cdrcgi.sendPage(header + form)
+    instructions = (
+        "This report requires a few minutes to complete. "
+        "A document ID or a term name must be provided. If you enter a name "
+        "string which matches the start of more than one term name, you "
+        "will be asked to select the term name for the report from the "
+        "list of matching names. "
+        "When the report processing has completed, email notification "
+        "will be sent to all addresses specified below.  At least "
+        "one email address must be provided.  If more than one "
+        "address is specified, separate the addresses with a blank."
+    )
+    note = "The report can take several minutes to prepare; please be patient."
+    page = cdrcgi.Page(title, subtitle=section, action=script,
+                       buttons=buttons, session=session)
+    page.add(page.B.FIELDSET(page.B.P(instructions)))
+    page.add("<fieldset>")
+    page.add(page.B.LEGEND("Enter Document ID or Glossary Term Name"))
+    page.add_text_field("Id", "Document ID", value=id or "")
+    page.add_text_field("Name", "Term Name", value=name or "")
+    page.add("</fieldset>")
+    page.add("<fieldset>")
+    page.add(page.B.LEGEND("Enter Required Email Address"))
+    page.add_text_field("Email", "Email", value=email or "")
+    page.add("</fieldset>")
+    page.add("<fieldset>")
+    page.add(page.B.LEGEND("Document Types (at least one is required)"))
+    page.add_checkbox("hp", "Health Professional Summaries", "hp",
+                      checked=hp and True or False)
+    page.add_checkbox("patient", "Patient Summaries", "patient",
+                      checked=patient and True or False)
+    page.add_checkbox("trials", "Patient Abstracts", "trials",
+                      checked=trials and True or False)
+    page.add("</fieldset>")
+    page.add(page.B.FIELDSET(page.B.P(note, page.B.CLASS("warning"))))
+    page.send()
 
 #----------------------------------------------------------------------
 # Allow the user to select from a list of protocols matching title string.
 #----------------------------------------------------------------------
 def putUpSelection(rows):
-    options = ""
-    selected = " SELECTED"
-    for row in rows:
-        options += """\
-    <OPTION VALUE='CDR%010d'%s>CDR%010d: %s</OPTION>
-""" % (row[0], selected, row[0], row[1])
-        selected = ""
-    form = u"""\
-   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-   <INPUT TYPE='hidden' NAME='Email' VALUE='%s'>
-   <INPUT TYPE='hidden' NAME='hp' VALUE='%s'>
-   <INPUT TYPE='hidden' NAME='patient' VALUE='%s'>
-   <INPUT TYPE='hidden' NAME='trials' VALUE='%s'>
-   <H3>Select term for report:<H3>
-   <SELECT NAME='Id'>
-    %s
-   </SELECT>
-  </FORM>
- </BODY>
-</HTML>
-""" % (cdrcgi.SESSION, session, email or "", hp or "", patient or "", trials or "", options)
-    cdrcgi.sendPage(header + form)
+    page = cdrcgi.Page(title, subtitle=section, action=script,
+                       buttons=buttons, session=session)
+    page.add("<fieldset>")
+    page.add_css("fieldset { width: 1000px; }")
+    page.add(page.B.LEGEND("Select Term For Report"))
+    for doc_id, name in rows:
+        id_string = cdr.normalize(doc_id)
+        label = u"%s: %s" % (id_string, name)
+        page.add_radio("Id", label, id_string)
+    page.add("</fieldset>")
+    page.add(page.B.INPUT(name="Email", value=email or "", type="hidden"))
+    page.add(page.B.INPUT(name="hp", value=hp or "", type="hidden"))
+    page.add(page.B.INPUT(name="patient", value=patient or "", type="hidden"))
+    page.add(page.B.INPUT(name="trials", value=trials or "", type="hidden"))
+    page.send()
 
 #----------------------------------------------------------------------
 # Get the document ID.
 #----------------------------------------------------------------------
-if id:
-    digits = re.sub('[^\d]+', '', id)
-    id     = int(digits)
-else:
+if not id:
     try:
         namePattern = name + "%"
         conn   = cdrdb.connect()
@@ -161,41 +150,18 @@ else:
 #----------------------------------------------------------------------
 # If we get here, we're ready to queue up a request for the report.
 #----------------------------------------------------------------------
-doctypes = ""
-if trials:
-    doctypes = "PatientAbstracts "
-if hp:
-    doctypes += "HPSummaries "
-if patient:
-    doctypes += "PatientSummaries"
-doctypes = doctypes.strip()
+doctypes = []
+doctype_fields = (
+    (trials, "PatientAbstracts"),
+    (hp, "HPSummaries"),
+    (patient, "PatientSummaries"),
+)
+doctypes = " ".join([name for field, name in doctype_fields if field])
 args = (("id", str(id)),("types", doctypes))
-
-batch = cdrbatch.CdrBatch(jobName = "Glossary Term Search",
-                          command = command, email = email,
-                          args = args)
+batch = cdrbatch.CdrBatch(jobName="Glossary Term Search", command=command,
+                          email=email, args=args)
 try:
     batch.queue()
 except Exception, e:
     cdrcgi.bail("Could not start job: " + str(e))
-jobId       = batch.getJobId()
-buttons     = [SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-script      = 'GlossaryTermPhrases.py'
-header      = cdrcgi.header(title, title, section, script, buttons,
-                            stylesheet = """\
-  <style type='text/css'>
-   body { font-family: Arial }
-  </style>
- """)
-cdrcgi.sendPage(header + """\
-   <h4>Report has been queued for background processing</h4>
-   <p>
-    To monitor the status of the job, click this
-    <a href='getBatchStatus.py?%s=%s&jobId=%s'><u>link</u></a>
-    or use the CDR Administration menu to select 'View
-    Batch Job Status'.
-   </p>
-  </form>
- </body>
-</html>
-""" % (cdrcgi.SESSION, session, jobId))
+batch.show_status_page(session, title, section, script, SUBMENU)

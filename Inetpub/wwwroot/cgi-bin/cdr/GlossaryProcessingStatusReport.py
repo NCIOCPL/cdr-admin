@@ -9,9 +9,13 @@
 #
 # BZIssue::4705
 # BZIssue::4777
+# JIRA::OCECDR-3800
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrdb, cdrcgi
+import cdr
+import cdrcgi
+import cdrdb
+import cgi
 etree = cdr.importEtree()
 
 #----------------------------------------------------------------------
@@ -19,17 +23,16 @@ etree = cdr.importEtree()
 #----------------------------------------------------------------------
 fields   = cgi.FieldStorage()
 session  = cdrcgi.getSession(fields)
-status   = fields.getvalue('status')
-showAll  = fields.getvalue('all')
-language = fields.getvalue('language')
-audience = fields.getvalue('audience')
+status   = fields.getvalue("status")
+show_all = fields.getvalue("all") == "yes"
+language = fields.getvalue("language")
+audience = fields.getvalue("audience")
 session  = cdrcgi.getSession(fields)
 request  = cdrcgi.getRequest(fields)
 title    = "Glossary Processing Status Report"
 script   = "GlossaryProcessingStatusReport.py"
 SUBMENU  = "Report Menu"
 buttons  = ("Submit Request", SUBMENU, cdrcgi.MAINMENU, "Log Out")
-header   = cdrcgi.header(title, title, title, script, buttons)
 
 #----------------------------------------------------------------------
 # Make sure we're logged in.
@@ -43,12 +46,20 @@ if request == cdrcgi.MAINMENU:
     cdrcgi.navigateTo("Admin.py", session)
 elif request == SUBMENU:
     cdrcgi.navigateTo("Reports.py", session)
+if request == "Log Out":
+    cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
-# Handle request to log out.
+# Collect the list of status values.
 #----------------------------------------------------------------------
-if request == "Log Out": 
-    cdrcgi.logout(session)
+def get_status_values():
+    values = set()
+    for name in ('GlossaryTermName', 'GlossaryTermConcept'):
+        doc_type = cdr.getDoctype('guest', name)
+        valid_vals = dict(doc_type.vvLists)
+        vv_list = valid_vals['ProcessingStatusValue']
+        values |= set(vv_list)
+    return values
 
 #----------------------------------------------------------------------
 # Extract text recursively from etree element.
@@ -83,7 +94,6 @@ class SpanishName:
             name = cgi.escape(self.string)
         else:
             name = u""
-
         if self.alternate:
             return u"<span class='alt'>%s</span>" % name
         return name
@@ -186,60 +196,115 @@ class Comment:
                                                         cgi.escape(text))
 
 #----------------------------------------------------------------------
-# Generate the report.
+# Scrub the values to make sure they haven't been tampered with.
 #----------------------------------------------------------------------
-def report(status):
+status_values = get_status_values()
+if status not in status_values:
+    status = None
+if language not in ("en", "es"):
+    language = None
+if audience not in ("Patient", "Health Professional"):
+    audience = None
 
-    # Collect all the concepts with matching processing statuses.
-    concepts = {}
-    cursor = cdrdb.connect('CdrGuest').cursor()
-    cursor.execute("""\
-        SELECT DISTINCT doc_id
-                   FROM query_term
-                  WHERE path = '/GlossaryTermConcept/ProcessingStatuses'
-                             + '/ProcessingStatus/ProcessingStatusValue'
-                    AND value = ?""", status)
-    for row in cursor.fetchall():
-        docId = row[0]
-        concept = Concept(docId, cursor)
-        if concept.status == status:
-            concepts[docId] = concept
+#----------------------------------------------------------------------
+# If we don't have a report request, show the request form.
+#----------------------------------------------------------------------
+if not status or not language or not audience:
+    page = cdrcgi.Page("CDR Reports", subtitle=title, action=script,
+                       buttons=buttons, session=session)
+    instructions = (
+        "All fields are required. The option to include linked glossary "
+        "documents causes the report to include glossary term concept "
+        "documents which do not have the selected status but are linked "
+        "by at least one glossary term name document which does have "
+        "that status. It also causes the inclusion of glossary term name "
+        "documents which do not have the selected status but whose concept "
+        "document has that status."
+    )
+    page.add(page.B.FIELDSET(page.B.P(instructions)))
+    page.add("<fieldset>")
+    page.add(page.B.LEGEND("Select Processing Status"))
+    page.add_select("status", "Status", sorted(status_values))
+    page.add("</fieldset>")
+    page.add("<fieldset>")
+    page.add(page.B.LEGEND("Include Linked Glossary Documents?"))
+    page.add_radio("all", "Show only documents with selected status", "no",
+                   checked=True)
+    page.add_radio("all",
+                   "Also show linked glossary documents with other statuses",
+                   "yes")
+    page.add("</fieldset>")
+    page.add("<fieldset>")
+    page.add(page.B.LEGEND("Language"))
+    page.add_radio("language", "English", "en", checked=True)
+    page.add_radio("language", "Spanish", "es")
+    page.add("</fieldset>")
+    page.add("<fieldset>")
+    page.add(page.B.LEGEND("Audience"))
+    page.add_radio("audience", "Patient", "Patient", checked=True)
+    page.add_radio("audience", "Health Professional", "Health Professional")
+    page.add("</fieldset>")
+    page.send()
 
-    # Collect all the names with matching processing statuses.
-    cursor.execute("""\
-        SELECT DISTINCT doc_id
-                   FROM query_term
-                  WHERE path = '/GlossaryTermName/ProcessingStatuses'
-                             + '/ProcessingStatus/ProcessingStatusValue'
-                    AND value = ?""", status)
-    for row in cursor.fetchall():
-        docId = row[0]
-        name = Name(docId, cursor)
-        if name.status == status:
-            concept = concepts.get(name.conceptId)
-            if concept is None:
-                concept = Concept(name.conceptId, showAll and cursor or None)
-                concepts[name.conceptId] = concept
-            concept.names[docId] = name
+#----------------------------------------------------------------------
+# Collect all the concepts with matching processing statuses.
+#----------------------------------------------------------------------
+concepts = {}
+cursor = cdrdb.connect('CdrGuest').cursor()
+cursor.execute("""\
+    SELECT DISTINCT doc_id
+               FROM query_term
+              WHERE path = '/GlossaryTermConcept/ProcessingStatuses'
+                         + '/ProcessingStatus/ProcessingStatusValue'
+                AND value = ?""", status)
+for row in cursor.fetchall():
+    docId = row[0]
+    concept = Concept(docId, cursor)
+    if concept.status == status:
+        concepts[docId] = concept
 
-    # Fill in any names with the wrong statuses if we're showing everything.
-    if showAll:
-        for conceptId in concepts:
-            if not conceptId:
-                continue
-            concept = concepts[conceptId]
-            cursor.execute("""\
-       SELECT DISTINCT doc_id
-                  FROM query_term
-                 WHERE path = '/GlossaryTermName/GlossaryTermConcept/@cdr:ref'
-                   AND int_val = ?""", conceptId)
-            for row in cursor.fetchall():
-                nameId = row[0]
-                if nameId not in concept.names:
-                    concept.names[nameId] = Name(nameId, cursor, conceptId)
+#----------------------------------------------------------------------
+# Collect all the names with matching processing statuses.
+#----------------------------------------------------------------------
+cursor.execute("""\
+    SELECT DISTINCT doc_id
+               FROM query_term
+              WHERE path = '/GlossaryTermName/ProcessingStatuses'
+                         + '/ProcessingStatus/ProcessingStatusValue'
+                AND value = ?""", status)
+for row in cursor.fetchall():
+    docId = row[0]
+    name = Name(docId, cursor)
+    if name.status == status:
+        concept = concepts.get(name.conceptId)
+        if concept is None:
+            concept = Concept(name.conceptId, show_all and cursor or None)
+            concepts[name.conceptId] = concept
+        concept.names[docId] = name
 
-    # Build the HTML report.
-    html = [u"""\
+#----------------------------------------------------------------------
+# Fill in any names with the wrong statuses if we're showing everything.
+#----------------------------------------------------------------------
+if show_all:
+    for conceptId in concepts:
+        if not conceptId:
+            continue
+        concept = concepts[conceptId]
+        cursor.execute("""\
+   SELECT DISTINCT doc_id
+              FROM query_term
+             WHERE path = '/GlossaryTermName/GlossaryTermConcept/@cdr:ref'
+               AND int_val = ?""", conceptId)
+        for row in cursor.fetchall():
+            nameId = row[0]
+            if nameId not in concept.names:
+                concept.names[nameId] = Name(nameId, cursor, conceptId)
+
+#----------------------------------------------------------------------
+# Assemble the report.
+#----------------------------------------------------------------------
+html = [u"""\
+<!DOCTYPE html>
 <html>
  <head>
   <title>%s</title>
@@ -272,23 +337,23 @@ def report(status):
     <th>Last Comment</th>
    </tr>
 """ % (title, title)]
-    conceptIds = concepts.keys()
-    conceptIds.sort()
-    for conceptId in conceptIds:
-        concept = concepts[conceptId]
-        nameIds = concept.names.keys()
-        rowspan = len(nameIds) or 1
-        gtcId = gtcStatus = gtcComment = gtn = gtnStatus = gtnComment = u""
-        if showAll or concept.status == status:
-            gtcId = concept.docId
-            gtcStatus = concept.status or u""
-            gtcComment = concept.comment or u""
-        nameIds.sort()
-        if nameIds:
-            gtn = concept.names[nameIds[0]]
-            gtnStatus = gtn.status
-            gtnComment = gtn.comment
-        html.append(u"""\
+conceptIds = concepts.keys()
+conceptIds.sort()
+for conceptId in conceptIds:
+    concept = concepts[conceptId]
+    nameIds = concept.names.keys()
+    rowspan = len(nameIds) or 1
+    gtcId = gtcStatus = gtcComment = gtn = gtnStatus = gtnComment = u""
+    if show_all or concept.status == status:
+        gtcId = concept.docId
+        gtcStatus = concept.status or u""
+        gtcComment = concept.comment or u""
+    nameIds.sort()
+    if nameIds:
+        gtn = concept.names[nameIds[0]]
+        gtnStatus = gtn.status
+        gtnComment = gtn.comment
+    html.append(u"""\
    <tr>
     <td valign='top' rowspan='%d'>%s</td>
     <td valign='top' rowspan='%d'>%s</td>
@@ -299,91 +364,17 @@ def report(status):
    </tr>
 """ % (rowspan, gtcId, rowspan, gtcStatus, rowspan, gtcComment,
        gtn, gtnStatus, gtnComment))
-        for nameId in nameIds[1:]:
-            name = concept.names[nameId]
-            html.append(u"""\
+    for nameId in nameIds[1:]:
+        name = concept.names[nameId]
+        html.append(u"""\
    <tr>
     <td valign='top'>%s</td>
     <td valign='top'>%s</td>
     <td valign='top'>%s</td>
    </tr>
 """ % (name, name.status, name.comment))
-    html.append(u"""\
+html.append(u"""\
   </table>
  </body>
 </html>""")
-    cdrcgi.sendPage(u"".join(html))
-
-#----------------------------------------------------------------------
-# Put up the request form for the report.
-#----------------------------------------------------------------------
-def showForm(extra):
-    docType = cdr.getDoctype('guest', 'GlossaryTermName')
-    validVals = dict(docType.vvLists)
-    vvList = validVals['ProcessingStatusValue']
-    statusValues = set(vvList)
-    docType = cdr.getDoctype('guest', 'GlossaryTermConcept')
-    validVals = dict(docType.vvLists)
-    vvList = validVals['ProcessingStatusValue']
-    statusValues |= set(vvList)
-    form = [u"""\
-   <input type='hidden' name='%s' value='%s'>
-   <table>
-    <tr>
-     <td align='right'><b>Processing Status:&nbsp;</b></td>
-     <td>
-      <select name='status'>
-       <option value=''>Select Processing Status Value</option>
-""" % (cdrcgi.SESSION, session)]
-    for statusValue in statusValues:
-        form.append(u"""\
-       <option value='%s'>%s</option>
-""" % (statusValue, statusValue))
-    form.append(u"""\
-      </select> %s
-     </td>
-    </tr>
-    <tr>
-     <td align='right'>
-      <b>Show ALL related term names and concepts?:&nbsp;</b>
-     </td>
-     <td><input type='checkbox' name='all' /></td>
-    </tr>
-    <tr>
-     <td align='right'><b>Language:&nbsp;</b></td>
-     <td>
-      English <input type='radio' name='language' value='en' checked='1'/>
-      &nbsp;
-      Spanish <input type='radio' name='language' value='es' />
-     </td>
-    </tr>
-    <tr>
-     <td align='right'><b>Audience:&nbsp;</b></td>
-     <td>
-      Patient
-      <input type='radio' name='audience' value='Patient' checked='1' />
-      &nbsp;
-      Health professional
-      <input type='radio' name='audience' value='Health professional' />
-     </td>
-    </tr>
-    <tr>
-     <td colspan='2'><i>The required language and audience choices
-      determine which comments will be included in the report.</i></td>
-    </tr>
-   </table>
-  </form>
- </body>
-</html>""" % extra)
-    cdrcgi.sendPage(header + u"".join(form))
-
-#----------------------------------------------------------------------
-# Handle request to log out.
-#----------------------------------------------------------------------
-if request == "Submit Request": 
-    if status and language and audience:
-        report(status)
-    else:
-        showForm(u"<span style='color: red; font-weight: bold'>REQUIRED</span>")
-else:
-    showForm(u"")
+cdrcgi.sendPage(u"".join(html))

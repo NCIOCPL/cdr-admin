@@ -14,32 +14,20 @@
 # Users enter a date range from which to select terms into an HTML form
 # and the software then produces the Excel format report.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.6  2007/08/23 19:36:31  ameyer
-# Added comment display of /Term/OtherTerm/Comment.  Adjusted fields
-# widths to better accomodate comment display.
-#
-# Revision 1.5  2007/08/09 14:24:33  ameyer
-# Fixed failure to add comments on 3rd worksheet DefinitionText.
-#
-# Revision 1.4  2007/07/31 14:18:32  ameyer
-# Added code to tell Windows to set output to binary mode for Excel97 format.
-#
-# Revision 1.3  2007/07/27 02:19:13  ameyer
-# Added some logging.
-# Switched to output in XML (wb.write...False).
-#
-# Revision 1.2  2007/07/25 03:27:53  ameyer
-# This version appears to meet all requirements.
-#
-# Revision 1.1  2007/06/15 04:04:09  ameyer
-# Initial version.  Only two of three worksheets so far implemented.
-#
+# JIRA::OCECDR-3800
 #
 #----------------------------------------------------------------------
 
-import sys, cgi, cgitb, time, xml.sax, xml.sax.handler, os, os.path
-import cdr, cdrcgi, cdrdb, ExcelWriter
+import cdr
+import cdrcgi
+import cdrdb
+import cgi
+import datetime
+import ExcelWriter
+import os
+import sys
+import xml.sax
+import xml.sax.handler
 
 # Global list of head node numbers of blocks of elements with an
 #   included ReviewStatus element = 'Problematic'
@@ -49,101 +37,60 @@ g_problemBlockSet = None
 def logMsg(msg):
     cdr.logwrite(msg, "d:/cdr/Log/drr.log")
 
-cgitb.enable()
-
 # Global worksheet row number, reset for each sheet in workbook
 G_wsRow = 0
 
-# Form buttons
+#----------------------------------------------------------------------
+# Form buttons.
+#----------------------------------------------------------------------
 BT_SUBMIT  = "Submit"
 BT_ADMIN   = cdrcgi.MAINMENU
 BT_REPORTS = "Reports Menu"
 BT_LOGOUT  = "Logout"
 buttons = (BT_SUBMIT, BT_REPORTS, BT_ADMIN, BT_LOGOUT)
 
-session   = None
-startDate = None
-endDate   = None
-errMsg    = ""
+#----------------------------------------------------------------------
+# Form values.
+#----------------------------------------------------------------------
+fields     = cgi.FieldStorage()
+session    = cdrcgi.getSession(fields) or cdrcgi.bail("Please login")
+action     = cdrcgi.getRequest(fields)
+start_date = fields.getvalue("start")
+end_date   = fields.getvalue("end")
 
-fields = cgi.FieldStorage()
+#----------------------------------------------------------------------
+# Handle navigation requests.
+#----------------------------------------------------------------------
+if action == BT_REPORTS:
+    cdrcgi.navigateTo("Reports.py", session)
+if action == BT_ADMIN:
+    cdrcgi.navigateTo("Admin.py", session)
+if action == BT_LOGOUT:
+    cdrcgi.logout(session)
 
-# Action
-if fields:
-    session = cdrcgi.getSession(fields) or cdrcgi.bail("Please login")
-
-    # Navigation
-    action = cdrcgi.getRequest(fields)
-    if action == BT_REPORTS:
-        cdrcgi.navigateTo("Reports.py", session)
-    if action == BT_ADMIN:
-        cdrcgi.navigateTo("Admin.py", session)
-    if action == BT_LOGOUT:
-        cdrcgi.logout(session)
-
-    # If user has entered a start date, we've got what we need.
-    if fields.has_key("startDate"):\
-        # Validate dates
-        startDate = fields.getvalue('startDate')
-        if not cdr.strptime(startDate, '%Y-%m-%d'):
-            errMsg = "Invalid start date '%s' " % startDate
-            startDate = None
-        if fields.has_key("endDate"):
-            endDate = fields.getvalue('endDate')
-            if not cdr.strptime(endDate, '%Y-%m-%d'):
-                errMsg += "Invalid end date '%s' " % endDate
-                startDate = None
-        else:
-            errMsg += "Missing end date"
-
-        if errMsg:
-            errMsg += ".  Please use yyyy-mm-dd format."
-
-# Format errors
-if errMsg:
-    errMsg = "<p><strong><font color='red'>%s</font></strong></p>" % errMsg
-
-if not startDate or errMsg:
-    # If no start date, or invalid one, the form has not been display,
-    #   or not filled in, or not filled in correctly
-    # Display an HTML form on screen
-
-    # Default dates are 7 days ago to today
-    now = time.time()
-    ago = now - (7 * 24 * 60 * 60)
-    startDate = time.strftime("%Y-%m-%d", time.localtime(ago))
-    endDate   = time.strftime("%Y-%m-%d", time.localtime(now))
-
-    # Construct html form
-    header = cdrcgi.header("Administrative Subsystem",
-             "Drug Review Report", "Drug review report",
-             script="DrugReviewReport.py", buttons=buttons)
-    html = header + """
-<p>To prepare an Excel format report of Drug/Agent terms,
-enter a start date and an optional end date for the
-creation or import of Drug/Agent terms.  Terms of semantic type
-"Drug/Agent" that were created or imported in the specified date
-range will be included in the report.</p>
-
-%s
-
-<table width='40%%' border='0'>
- <tr>
-  <th align="right">Start date:</th>
-  <td><input type='text' name='startDate' value='%s' size='12' /></td>
- </tr><tr>
-  <th align="right">End date:</th>
-  <td><input type='text' name='endDate' value='%s' size='12' /></td>
- </tr>
- <input type="hidden" name=%s value=%s />
-</table>
-</form>
-</body>
-</html>
-""" % (errMsg, startDate, endDate, cdrcgi.SESSION, session)
-
-    # Send html and exit
-    cdrcgi.sendPage(html)
+#----------------------------------------------------------------------
+# Show the form if we don't have a request yet.
+#----------------------------------------------------------------------
+if not cdrcgi.is_date(start_date) or not cdrcgi.is_date(end_date):
+    end = datetime.date.today()
+    start = end - datetime.timedelta(7)
+    page = cdrcgi.Page("CDR Reports", subtitle="Drug Review Report",
+                       action="DrugReviewReport.py", buttons=buttons,
+                       session=session)
+    instructions = (
+        "To prepare an Excel format report of Drug/Agent terms, "
+        "enter a start date and an optional end date for the "
+        "creation or import of Drug/Agent terms.  Terms of semantic "
+        "type \"Drug/Agent\" that were created or imported in the "
+        "specified date range will be included in the report."
+    )
+    page.add(page.B.FIELDSET(page.B.P(instructions)))
+    page.add("<fieldset>")
+    page.add(page.B.LEGEND("Date Range"))
+    page.add_date_field("start", "Start Date", value=start)
+    page.add_date_field("end", "End Date", value=end)
+    page.add("</fieldset>")
+    page.send()
 
 # If we got here, user clicked submit with valid start and end dates
 # Create an Excel workbook
@@ -548,7 +495,7 @@ def addWorksheet(session, wb, title, colList, qry, dateCol):
 
     # Perform SQL selection
     rows = None
-    conn = cdrdb.connect()
+    conn = cdrdb.connect("CdrGuest")
     try:
         cursor = conn.cursor()
         cursor.execute(qry)
@@ -667,7 +614,7 @@ def addComment(handler):
 #----------------------------------------------------------------------
 
 # Get the document id for the Term doc for semantic type = 'Drug/Agent'
-conn = cdrdb.connect()
+conn = cdrdb.connect("CdrGuest")
 drugAgentDocId = 0
 try:
     cursor = conn.cursor()
@@ -724,7 +671,7 @@ SELECT q3.doc_id, q3.value
    AND q3.value >= '%s'
    AND q3.value <= '%s'
  GROUP BY q3.doc_id, q3.value
-""" % (drugAgentDocId, startDate, endDate)
+""" % (drugAgentDocId, start_date, end_date)
 
 # cdrcgi.bail("here")
 g_problemBlockSet = None
@@ -765,7 +712,7 @@ SELECT q2.doc_id, q2.value
        AND value = 'NCI Thesaurus'
     )
  GROUP BY q2.doc_id, q2.value
-""" % (drugAgentDocId, startDate, endDate)
+""" % (drugAgentDocId, start_date, end_date)
 
 g_problemBlockSet = None
 ws = addWorksheet(session, wb, "New Drugs from the CDR", wsCols, qry, 5)
@@ -818,14 +765,15 @@ SELECT q3.doc_id, q3.value
    AND q2.value = 'Problematic'
    AND q3.path = '/Term/DateLastModified'
    AND q3.value > '%s'
-   AND q3.value < '%s'
+   AND q3.value <= '%s'
  GROUP BY q3.doc_id, q3.value
-""" % (drugAgentDocId, startDate, endDate)
+""" % (drugAgentDocId, start_date, end_date)
 
 g_problemBlockSet = set()
 ws = addWorksheet(session, wb, "Drugs to be Reviewed", wsCols, qry, 9)
 
 # DEBUG
+#DBG import os.path
 #DBG fname = "d:/cdr/log/DrugTerm.xls"
 #DBG if os.path.exists(fname):
 #DBG     os.remove(fname)

@@ -12,7 +12,7 @@ body {
 body.report { background-color: white; }
 header { margin-bottom: 15px; }
 header h1 {
-    color: white; 
+    color: white;
     margin: 0;
     font-size: 32px;
     padding-left: 8px;
@@ -28,7 +28,7 @@ header h1 span input {
     position: relative;
     bottom: 6px;
 }
-header h2 { 
+header h2 {
     background-color: #ffc;
     margin: 0 0 15px 0;
     font-size: 13px;
@@ -71,10 +71,11 @@ td { background-color: #e4e4e4; vertical-align: top; }
 td { background-color: #ccc; }
 th, td { font-size: 11pt; padding: 2px; border: 1px solid black; }
 td.middle { vertical-align: middle; }
-td.center { text-align: center; }
-td.right { text-align: right; }
+.center { text-align: center; }
+.right { text-align: right; }
 .nowrap { white-space: nowrap; }
 .odd td { background-color: #eee; }
+table.report { margin-bottom: 20px; }
 fieldset { border: 2px solid #936; width: 500px; margin: 10px auto; }
 fieldset fieldset, div fieldset { width: auto; border: 1px solid black; }
 legend { color: #936; font-weight: bold; }
@@ -92,7 +93,9 @@ label.clickable:hover { color: white; background-color: #936; }
 .emphasis { font-style: italic; }
 .warning { color: green; }
 .hidden { display: none; }
-.labeled-field input, .labeled-field select { width: 300px; }
+.labeled-field input, .labeled-field select, .labeled-field textarea {
+    width: 300px;
+}
 .checkbox-form { background-color: #dfdfdf; color: navy; }
 .checkbox-form h3 { font: 16pt Arial bold; }
 .checkbox-form h4 { font: 14pt Arial bold; }
@@ -110,3 +113,4 @@ table.checkboxes td a {
     text-decoration: none;
     font: 10pt Arial;
 }
+.advanced-search .buttons { text-align: center; width: 100%; }

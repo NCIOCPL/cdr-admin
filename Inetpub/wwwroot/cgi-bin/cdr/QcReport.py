@@ -5,282 +5,52 @@
 # Transform a CDR document using a QC XSL/T filter and send it back to
 # the browser.
 #
+# BZIssue::545
+# BZIssue::1119 - Query mod to avoid picking up PDQKey for orgs
+# BZIssue::1054 - @@..@@ parameters for BoardMember QC report
+# BZIssue::1050 - UI for running QC report from the menus
+# BZIssue::1054 - Label change ("Date Received" -> "Date Response Received")
+# BZIssue::1415 - Support list of glossary terms for HP summaries
+# BZIssue::1516 - @@..@@ parameters for Org QC report
+# BZIssue::1531 - Modifications to allow PublishPreview QC reports
+# BZIssue::1545 - Enhance org links in person QC reports
+# BZIssue::1555 - Form enhancement for controlling board markup selection
+# BZIssue::1653 - Added option for Media QC Report
+# BZIssue::1657 - Support Editorial Board/Advisory Board markup (summaries)
+# BZIssue::1707 - Default displayBoard variable for patient summaries
+# BZIssue::1744 - Added new summary report types (patbu and patrs)
+# BZIssue::1868 - Audience filtering for GlossaryTerm redline/strikeout reports
+# BZIssue::1939 - Redline/strikeout in Miscellaneous doc QA reports
+# BZIssue::2053 - Added filter set for DrugInfoSummary (DIS) docs
+# BZIssue::2920 - Internal/external comment display in summaries
+# BZIssue::3067 - Support insertion/deletion markup for DIS docs
+# BZIssue::3699 - Support new glossary term document types (concept and name)
+# BZIssue::4248 - Truncate long version comments; DIS report mods
+# BZIssue::4329 - Handle case where no comment exists for a version
+# BZIssue::3035 - Redline/strikeout report for old GlossaryTerm docs
+# BZIssue::4395 - Control image display in Summary QC report
+# BZIssue;:4478 - Glossary Term Name with Concept QC report
+# BZIssue::4562 - Added checkbox to suppress display of Reference sections
 # BZIssue::4751 - Modify BU Report to display LOERef
 # BZIssue::4672 - Changes to LinkedDoc Report
 # BZIssue::4781 - Have certain links to unpublished docs ignored
-# BZIssue::4967 - [Summary] Modification to QC Reports to Show/Hide 
+# BZIssue::4967 - [Summary] Modification to QC Reports to Show/Hide
 #                 Certain Comments
 # BZIssue::5006 - Minor Revisions to QC Report Interfaces - Comments Options
 # BZIssue::5065 - [Summaries] 2 More Patient Summary QC Report Display Options
-# BZIssue::5159 - [Summaries] Changes to HP & Patient QC Report Interfaces 
+# BZIssue::5159 - [Summaries] Changes to HP & Patient QC Report Interfaces
 #                 and Display Options
 # BZIssue::5229 - [CTGov] Missing Information In CTGov Protocol Full QC Report
 # BZIssue::5249 - Standard wording in Patient QC report not displaying in green
 # BZIssue::OCECDR-3630 - Patient Summary QC Reports Missing Reference Section
-#
-# ----------------------------------------------------------------------------
-#
-# Revision 1.69  2009/05/28 20:38:26  venglisc
-# Added checkbox to suppress display of Reference sections. (Bug 4562)
-#
-# Revision 1.68  2009/03/23 15:48:10  venglisc
-# Modified DocType coming in from Drug Summaries to be the CDR doctype
-# 'DrugInformationSummary' instead of 'DIS' allowing for comparison with the
-# database value.
-#
-# Revision 1.67  2009/03/10 21:49:38  bkline
-# Cosmetic cleanup.
-#
-# Revision 1.66  2009/03/10 21:35:05  bkline
-# Suppressed version choice page for "Glossary Term Name with Concept"
-# QC report at William's request (see comment #3 in issue #4478); also
-# (same comment) added code to distinguish between errors caused by
-# entering a CDR for a document of the wrong type, and errors caused by
-# entering a CDR ID for which no document can be found.
-#
-# Revision 1.65  2009/03/03 18:34:50  venglisc
-# Modified program to use filter set for GlossaryTermName instead of single
-# filter.
-#
-# Revision 1.64  2009/02/10 22:40:45  bkline
-# Added Glossary Term Name with Concept QC Report (request #4478).
-#
-# Revision 1.63  2009/02/10 21:29:13  bkline
-# Added ability to search for glossary term concept documents by
-# definition substring.
-#
-# Revision 1.62  2009/01/06 21:38:12  ameyer
-# Fixed my fix to a Unicode bug.  Added documentation to make clearer
-# what the sequence of encodings is.
-#
-# Revision 1.61  2008/12/16 22:10:39  ameyer
-# Fixed encoding so that final sendPage sends Unicode instead of UTF-8.
-#
-# Revision 1.60  2008/12/11 20:18:49  venglisc
-# Modified program to allow to selectively display images or a placeholder in
-# the Summary QC reports. (Bug 4395)
-#
-# Revision 1.59  2008/11/07 17:13:27  venglisc
-# Modified report to allow users to run the Redline/strikeout report for
-# the old GlossaryTerm documents after the switch to GlossaryTermNames.
-# (Bug 3035)
-#
-# Revision 1.58  2008/11/04 21:12:30  venglisc
-# Minor changes to allow GlossaryTermName publish preview reports to be
-# submitted from the Admin interface.
-#
-# Revision 1.57  2008/10/21 20:24:10  venglisc
-# The user interface failed if no comment existed for a version. (Bug 4329)
-#
-# Revision 1.56  2008/09/30 21:10:36  venglisc
-# Limiting display of version comment to first 150 characters. (Bug 4248)
-#
-# Revision 1.55  2008/09/30 20:44:46  venglisc
-# Modifications to call an intermediate page for DrugInfoSummaries. (Bug 4248)
-#
-# Revision 1.54  2008/01/23 22:59:57  venglisc
-# Added filter sets for GlossaryTermName and GlossaryTermConcept to run
-# QC reports. (Bug 3699)
-#
-# Revision 1.53  2007/04/09 20:47:45  venglisc
-# Modified to allow insertion/deletion markup for DrugInfoSummaries.
-# (Bug 3067)
-#
-# Revision 1.52  2007/02/23 22:48:51  venglisc
-# Modifications to display comments as internal and external comments within
-# the summaries. (Bug 2920)
-#
-# Revision 1.51  2006/05/16 20:50:28  venglisc
-# Adding filter set for DrugInfoSummary documents. (Bug 2053)
-#
-# Revision 1.50  2005/12/28 21:14:08  venglisc
-# Adding code to allow Miscellaneous Document QC reports to be displayed with
-# Redline/Strikeout markup. (Bug 1939)
-#
-# Revision 1.49  2005/10/20 20:54:29  venglisc
-# Modified to include creating of GlossaryTerm Redline/Strikeout reports
-# that allow the user to limit the output to a specified audience type
-# (Health professional or Patient).  Bug 1868
-#
-# Revision 1.48  2005/07/01 19:29:45  venglisc
-# Added new report type (repType) patbu for patient summary (bold/underline)
-# and added patrs for patient summary (redline/strikeout).  The latter is
-# identical to the repType 'pat' but has been added for consitend naming
-# between the two report types. (Bug 1744)
-#
-# Revision 1.47  2005/06/02 19:48:20  venglisc
-# Fixed code to pass a default for the displayBoard variable for patient
-# summaries. (Bug 1707)
-#
-# Revision 1.46  2005/05/25 16:18:02  venglisc
-# Added code to allow summary QC reports to be run with Editorial Board or
-# Advisory Board mark-up. (Bug 1657)
-# Modifications to CDR Admin Interface to allow specification of the
-# individual board mark-up. (Bug 1555)
-#
-# Revision 1.45  2005/05/04 18:04:06  venglisc
-# Added option for Media QC Report. (Bug 1653)
-#
-# Revision 1.44  2005/04/21 21:24:37  venglisc
-# Modifications to allow PublishPreview QC reports. (Bug 1531)
-#
-# Revision 1.43  2005/02/24 21:06:55  venglisc
-# Added coded to replace @@SESSION@@ string with the session id.  This
-# allows to create a link in the Person QC documents to the Organization QC
-# report or a particular org. (Bug 1545)
-#
-# Revision 1.42  2005/02/23 20:00:35  venglisc
-# Made changes to replace two @@..@@ strings with results from database
-# queries for the Organization QC report. (Bug 1516)
-# Some additional changes are included to address PublishPreview changes
-# which do not affect the Org reports.
-#
-# Revision 1.41  2004/12/01 23:56:12  venglisc
-# So far, a list of glossary terms used throughout a summary could only be
-# displayed at the end of a document for patient summaries.  These
-# modifications allow to have the list of glossary terms be available for
-# HP summaries as well. (Bug 1415)
-#
-# Revision 1.40  2004/10/22 20:20:49  venglisc
-# The BoardMember QC report failed if a person was not linked to a summary.
-# This has been fixed by setting a bogus batch job ID to query the database.
-#
-# Revision 1.39  2004/07/13 19:43:40  venglisc
-# Modified label from "Date Received" to "Date Response Received" (Bug 1054).
-#
-# Revision 1.38  2004/04/28 16:01:20  venglisc
-# Modified SQL statement to eliminate picking up the value of the PDQKey
-# instead of an organization cdr:ref ID. (Bug 1119)
-#
-# Revision 1.37  2004/04/16 22:06:51  venglisc
-# Modified program to achieve the following:
-# a)  Create user interface to run the QC report from the menus (Bug 1059)
-# b)  Update the @@...@@ parameters of the BoardMember QC report to
-#     populate these with the output from database queries. (Bug 1054).
-#
-# Revision 1.36  2004/04/02 19:46:20  venglisc
-# Included function to populate the active/closed protocol link variables
-# for the Organization QC report.
-#
-# Revision 1.35  2004/03/06 23:23:37  bkline
-# Added code to replace @@CTGOV_PROTOCOLS@@.
-#
-# Revision 1.34  2004/01/14 18:45:22  venglisc
-# Modified user input form to allow Reformatted Patient Summaries to use the
-# Comment element as well as Redline/Strikeout and Bold/Under reports.
-#
-# Revision 1.33  2003/12/16 15:49:13  bkline
-# Modifed report to drop PDQ indexing section if first attempt to filter
-# a CTGovProtocol document fails.
-#
-# Revision 1.32  2003/11/25 12:48:34  bkline
-# Added code to plug in information about latest mods to document.
-#
-# Revision 1.31  2003/11/20 21:36:04  bkline
-# Plugged in support for CTGovProtocol documents.
-#
-# Revision 1.30  2003/11/12 19:58:47  bkline
-# Modified Person QC report to reflect use in external_map table.
-#
-# Revision 1.29  2003/09/16 21:15:39  bkline
-# Changed test for Summary docType to take into account suffixes that
-# may have been added to the string to indicate which flavor of report
-# has been requested.
-#
-# Revision 1.28  2003/09/05 21:05:43  bkline
-# Tweaks for "Display Comments" checkbox requested by Margaret.
-#
-# Revision 1.27  2003/09/04 21:31:01  bkline
-# Added checkbox for DisplayComments (summary reports).
-#
-# Revision 1.26  2003/08/27 16:39:28  venglisc
-# Modified code to include the report type but (bold/underline test)
-# to pass the additional parameter just as report type bu (bold/underline)
-# does.
-#
-# Revision 1.25  2003/08/25 20:27:30  bkline
-# Plugged in support for displaying StandardWording markup in patient
-# summary QC report.
-#
-# Revision 1.24  2003/08/11 21:57:19  venglisc
-# Modified code to pass an additional parameter named delRefLevels to the
-# summary QC reports to handle insertion/deletion markup properly.
-# The parameter revLevels has been renamed to insRevLevels.
-#
-# Revision 1.23  2003/08/01 21:01:43  bkline
-# Added code to create subtitle dynamically based on report subtype;
-# added separate CGI variables for deletion markup settings.
-#
-# Revision 1.22  2003/07/29 12:45:35  bkline
-# Checked in modifications made by Peter before he left the project.
-#
-# Revision 1.21  2003/06/13 20:27:26  bkline
-# Added interface for choosing whether to include glossary terms list
-# at the bottom of the patient summary report.
-#
-# Revision 1.20  2003/05/22 13:25:39  bkline
-# Checked 'approved' option by default at Margaret's request.
-#
-# Revision 1.19  2003/05/09 20:41:20  pzhang
-# Added Summary:pat to filter sets.
-#
-# Revision 1.18  2003/05/08 20:25:24  bkline
-# User now allowed to specify revision level.
-#
-# Revision 1.17  2003/04/10 21:34:23  pzhang
-# Added Insertion/Deletion revision level feature.
-# Used filter set names for all filter sets.
-#
-# Revision 1.16  2003/04/02 21:21:15  pzhang
-# Added the filter to sort OrganizationName.
-#
-# Revision 1.15  2002/12/30 15:15:47  bkline
-# Fixed a typo.
-#
-# Revision 1.14  2002/12/26 21:54:40  bkline
-# Added doc id to new screen for multiple matching titles.
-#
-# Revision 1.13  2002/12/26 21:50:24  bkline
-# Changes implemented for issue #545.
-#
-# Revision 1.12  2002/09/26 15:31:17  bkline
-# New filters for summary QC reports.
-#
-# Revision 1.11  2002/09/19 15:14:26  bkline
-# Added filters at Cheryl's request.
-#
-# Revision 1.10  2002/08/14 17:26:16  bkline
-# Added new denormalization filters for summaries.
-#
-# Revision 1.9  2002/06/26 20:38:52  bkline
-# Plugged in mailer info for Organization QC reports.
-#
-# Revision 1.8  2002/06/26 18:30:48  bkline
-# Fixed bug in mailer query logic.
-#
-# Revision 1.7  2002/06/26 16:35:17  bkline
-# Implmented report of audit_trail activity.
-#
-# Revision 1.6  2002/06/24 17:15:24  bkline
-# Added documents linking to Person.
-#
-# Revision 1.5  2002/06/06 15:01:06  bkline
-# Switched to GET HTTP method so "Edit with Microsoft Word" will work in IE.
-#
-# Revision 1.4  2002/06/06 12:01:08  bkline
-# Custom handling for Person and Summary QC reports.
-#
-# Revision 1.3  2002/05/08 17:41:53  bkline
-# Updated to reflect Volker's new filter names.
-#
-# Revision 1.2  2002/05/03 20:30:22  bkline
-# New filters and filter names.
-#
-# Revision 1.1  2002/04/22 13:54:07  bkline
-# New QC reports.
+# JIRA::OCECDR-3800 - Address security vulnerabilities
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, cdrdb, re, sys
+import cgi
+import cdr
+import cdrcgi
+import cdrdb
+import re
 
 #----------------------------------------------------------------------
 # Dynamically create the title of the menu section (request #809).
@@ -324,7 +94,7 @@ filters = cdr.FILTERS
 repTitle = "CDR QC Report"
 fields   = cgi.FieldStorage() or cdrcgi.bail("No Request Found", repTitle)
 docId    = fields.getvalue(cdrcgi.DOCID) or None ###'CDR360620' or None
-session  = cdrcgi.getSession(fields) or cdrcgi.bail("Not logged in") ### 'guest'
+session  = cdrcgi.getSession(fields) or cdrcgi.bail("Not logged in")
 action   = cdrcgi.getRequest(fields)
 qcParams = fields.getvalue('paramset') or '0'
 title    = "CDR Administration"
@@ -341,7 +111,7 @@ header   = cdrcgi.header(title, title, getSectionTitle(repType),
     fieldset.docversion { width: 75%;
                           margin-left: auto;
                           margin-right: auto;
-                          margin-bottom: 0; 
+                          margin-bottom: 0;
                           display: block; }
     fieldset.wrapper    { width: 520px;
                           margin-left: auto;
@@ -350,10 +120,10 @@ header   = cdrcgi.header(title, title, getSectionTitle(repType),
     *.gogreen         { width: 95%;
                         border: 1px solid green;
                           background: #99FF66; }
-    *.gg              { border: 1px solid green; 
-                        background: #99FF66; 
+    *.gg              { border: 1px solid green;
+                        background: #99FF66;
                         color: #006600; }
-    *.comgroup          { background: #C9C9C9; 
+    *.comgroup          { background: #C9C9C9;
                           margin-bottom: 8px; }
   </style>
 
@@ -586,7 +356,7 @@ header   = cdrcgi.header(title, title, getSectionTitle(repType),
      function checkGreen() {
          var optgreen = ['dispImg', 'dispKP', 'dispLearnMore']
          for (var k in optgreen) {
-           //  if (document.getElementById(optgreen[k]).checked == false) 
+           //  if (document.getElementById(optgreen[k]).checked == false)
              if (document.getElementById('allGreen').checked == false) {
                  document.getElementById(optgreen[k]).checked = false;
              }
@@ -622,8 +392,8 @@ grp1Permanent        = fields.getvalue("permanent") or None
 grp2External         = fields.getvalue("external") or None
 grp2Advisory         = fields.getvalue("advisory") or None
 
-displayBoard    = fields.getvalue('Editorial-board') and 'editorial-board_' or ''
-displayBoard   += fields.getvalue('Advisory-board')  and 'advisory-board'   or ''
+displayBoard  = fields.getvalue('Editorial-board') and 'editorial-board_' or ''
+displayBoard += fields.getvalue('Advisory-board')  and 'advisory-board'   or ''
 displayAudience = fields.getvalue('Patient') and 'patient_' or ''
 displayAudience +=fields.getvalue('HP')      and 'hp'       or ''
 glossaryDefinition = fields.getvalue('GlossaryDefinition')
@@ -643,9 +413,19 @@ if docId:
     digits = re.sub('[^\d]+', '', docId)
     intId  = int(digits)
 
+#----------------------------------------------------------------------
+# Do some parameter scrubbing for OCECDR-3800.
+#----------------------------------------------------------------------
+if docType and re.search("\\W", docType):
+    cdrcgi.bail("Invalid document type parameter")
+if repType and re.search("\\W", repType):
+    cdrcgi.bail("Invalid report type parameter")
+if version and re.search("\\W", version) and int(version) != -1:
+    cdrcgi.bail("Invalid document version parameter")
+
 # ---------------------------------------------------------------
 # Passing a single parameter to the filter to decide if only the
-# internal, external, all, or none of the audience comments 
+# internal, external, all, or none of the audience comments
 # should be displayed.
 # ---------------------------------------------------------------
 if not audInternComments and not audExternComments:
@@ -683,7 +463,7 @@ else:
 
 # ---------------------------------------------------------------
 # In the case that two comment types should be combined (internal
-# and permanent/external and advisory) we need to submit an 
+# and permanent/external and advisory) we need to submit an
 # additional parameter to the filters.
 # ---------------------------------------------------------------
 if grp1Internal and grp1Permanent:
@@ -716,6 +496,7 @@ if action == "Log Out":
 if not docId and not docTitle and not glossaryDefinition:
     extra = ""
     fieldName = 'DocTitle'
+    label = ["", ""]
     if docType:
         extra += "<INPUT TYPE='hidden' NAME='DocType' VALUE='%s'>" % docType
         if docType == 'PDQBoardMemberInfo':
@@ -788,11 +569,7 @@ def showTitleChoices(choices):
 #
 # ---------------------------------------------------------------------
 def addCheckbox(inputLabels, inputName, inputID='', checked=0):
-    if checked == 0:
-       isChecked = ''
-    else:
-       isChecked = "checked='1'"
-
+    isChecked = checked and "checked='1'" or ""
     cbHtml = u"""\
       <input name='%s' type='checkbox' id='%s'
              %s>&nbsp;
@@ -830,14 +607,15 @@ if not docId:
                  WHERE doc_type.name = ?
                    AND document.title LIKE ?""", (docType, docTitle + '%'))
         else:
+            # How can we get here???
             cursor.execute("""\
-                SELECT id
+                SELECT id, title
                   FROM document
                  WHERE title LIKE ?""", docTitle + '%')
         rows = cursor.fetchall()
         if not rows:
-            cdrcgi.bail("Unable to find document with %s '%s'" % (lookingFor,
-                                                                  docTitle))
+            cdrcgi.bail("Unable to find document with %s %s" %
+                        (lookingFor, repr(docTitle)))
         if len(rows) > 1:
             showTitleChoices(rows)
         intId = rows[0][0]
@@ -861,7 +639,7 @@ elif docType:
         cdrcgi.bail("CDR%d not found" % intId)
     elif rows[0][0].upper() != docType.upper():
         cdrcgi.bail("CDR%d has document type %s" % (intId, rows[0][0]))
-    
+
 #----------------------------------------------------------------------
 # Let the user pick the version for most Summary or Glossary reports.
 #----------------------------------------------------------------------
@@ -912,14 +690,14 @@ if letUserPickVersion:
         form += u"""\
    <OPTION VALUE='%d'>[V%d %s] %s</OPTION>
 """ % (row[0], row[0], row[2][:10],
-       not row[1] and "[No comment]" or row[1][:120])
+       not row[1] and "[No comment]" or cgi.escape(row[1][:120]))
         selected = ""
     form += u"</SELECT></div></div>"
     form += u"""
   </fieldset>
   <BR>
   <fieldset class="wrapper">
-   <legend>&nbsp;Select Insertion/Deletion markup to be displayed 
+   <legend>&nbsp;Select Insertion/Deletion markup to be displayed
            (one or more)&nbsp;</legend>
 """
     # The Board Markup does not apply to the Patient Version Summaries
@@ -1005,17 +783,17 @@ if letUserPickVersion:
           <legend>&nbsp;Misc Print Options&nbsp;</legend>
     """
 
-            form += addCheckbox(checkboxLabels, 'Glossaries', 
+            form += addCheckbox(checkboxLabels, 'Glossaries',
                                 inputID='displayGlossaries')
-            form += addCheckbox(checkboxLabels, 'Images', 
+            form += addCheckbox(checkboxLabels, 'Images',
                                 inputID='displayImages', checked=0)
-            form += addCheckbox(checkboxLabels, 'Keypoints', 
+            form += addCheckbox(checkboxLabels, 'Keypoints',
                                 inputID='displayKeypoints', checked=1)
-            form += addCheckbox(checkboxLabels, 'StandardWording', 
+            form += addCheckbox(checkboxLabels, 'StandardWording',
                                 inputID='displayStandardWording')
-            form += addCheckbox(checkboxLabels, 'CitationsPat', 
+            form += addCheckbox(checkboxLabels, 'CitationsPat',
                                 inputID='displayCitations', checked=1)
-            form += addCheckbox(checkboxLabels, 'LearnMore', 
+            form += addCheckbox(checkboxLabels, 'LearnMore',
                                 inputID='displayLearnMore', checked=1)
 
         # End - Misc Print Options block
@@ -1057,9 +835,9 @@ if letUserPickVersion:
       </div>
 """
         # The users don't want the option for advisory-board comments
-        # displayed for the patient summaries because these summaries 
+        # displayed for the patient summaries because these summaries
         # are never reviewed by the advisory board.
-        # In order to keep the code unchanged I'm just removing the 
+        # In order to keep the code unchanged I'm just removing the
         # option displayed but not those options that are actually
         # being checked by the JavaScript functions.
         # -----------------------------------------------------------
@@ -1108,8 +886,8 @@ if letUserPickVersion:
      <fieldset id='hide' style="display: none;">
      <table>
       <tr>
-       <td class="colheading" 
-           colspan="3">Display Comments and Responses 
+       <td class="colheading"
+           colspan="3">Display Comments and Responses
                        (mark comment type to be displayed)</td>
       </tr>
       <tr>
@@ -1133,7 +911,7 @@ if letUserPickVersion:
 """
 
         form += u"""\
-               ID      = "ai">&nbsp; Internal 
+               ID      = "ai">&nbsp; Internal
        </td>
       </tr>
       <tr>
@@ -1151,7 +929,7 @@ if letUserPickVersion:
 """
 
         form += u"""\
-               ID      = "ae">&nbsp; External 
+               ID      = "ae">&nbsp; External
        </td>
        </tr>
        </table>
@@ -1166,7 +944,7 @@ if letUserPickVersion:
         <INPUT TYPE    = "checkbox"
                NAME    = "SrcEditorComments"
                CHECKED = "1"
-               ID      = "se">&nbsp; Not Advisory 
+               ID      = "se">&nbsp; Not Advisory
        </td>
       </tr>
       <tr>
@@ -1184,7 +962,7 @@ if letUserPickVersion:
 """
 
         form += u"""\
-               ID      = "sa">&nbsp; Advisory 
+               ID      = "sa">&nbsp; Advisory
        </td>
        </tr>
        </table>
@@ -1209,7 +987,7 @@ if letUserPickVersion:
 """
 
         form += u"""\
-               ID      = "dp">&nbsp; Permanent 
+               ID      = "dp">&nbsp; Permanent
        </td>
       </tr>
       <tr>
@@ -1217,7 +995,7 @@ if letUserPickVersion:
         <INPUT TYPE    = "checkbox"
                NAME    = "DurRegularComments"
                CHECKED = "1"
-               ID      = "dr">&nbsp; Non-permanent 
+               ID      = "dr">&nbsp; Non-permanent
        </td>
        </tr>
        </table>
@@ -1237,13 +1015,13 @@ if letUserPickVersion:
           <legend>&nbsp;Misc Print Options&nbsp;</legend>
     """
 
-            form += addCheckbox(checkboxLabels, 'Glossaries', 
+            form += addCheckbox(checkboxLabels, 'Glossaries',
                                 inputID='displayGlossaries')
-            form += addCheckbox(checkboxLabels, 'CitationsHP', 
+            form += addCheckbox(checkboxLabels, 'CitationsHP',
                                 inputID='displayCitations', checked=1)
-            form += addCheckbox(checkboxLabels, 'Images', 
+            form += addCheckbox(checkboxLabels, 'Images',
                                 inputID='displayImages', checked=0)
-            form += addCheckbox(checkboxLabels, 'LOEs', 
+            form += addCheckbox(checkboxLabels, 'LOEs',
                                 inputID='displayLOEs')
 
         # End - Misc Print Options block
@@ -1292,18 +1070,18 @@ if not docType:
     #----------------------------------------------------------------------
     # Determine the report type if the document is a summary.
     # Reformatted patient summaries contain a KeyPoint element
-    # The element of the list creating the output is given as a string 
+    # The element of the list creating the output is given as a string
     # similar to this:  "Treatment Patients KeyPoint KeyPoint KeyPoint"
     # which will be used to set the propper report type for reformatted
     # patient summaries.
     #----------------------------------------------------------------------
     if docType == 'Summary':
         isPatient = hasKeyPoint = False
-        inspectSummary = cdr.filterDoc(session, 
-                  """<?xml version="1.0" ?> 
+        inspectSummary = cdr.filterDoc(session,
+                  """<?xml version="1.0" ?>
 <xsl:transform version="1.1" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
  <xsl:template          match = "Summary">
-  <xsl:apply-templates select = "SummaryMetaData/SummaryAudience | 
+  <xsl:apply-templates select = "SummaryMetaData/SummaryAudience |
                                  SummaryMetaData/SummaryType     |
                                  //KeyPoint"/>
  </xsl:template>
@@ -1318,7 +1096,7 @@ if not docType:
   <xsl:text> </xsl:text>
  </xsl:template>
 </xsl:transform>
-                  """, inline = 1, 
+                  """, inline = 1,
                         docId = docId, docVer = version or None)
         if inspectSummary[0].find('Patients') > 0:  isPatient   = True
         if inspectSummary[0].find('KeyPoint') > 0:  hasKeyPoint = True
@@ -1643,7 +1421,7 @@ SELECT person.doc_id, summary.value, audience.value, max(ppd.pub_proc) as jobid
        batchId = 0
        summaryIds = '(0)'
 
-
+    # XXX Where's the path clause for query_term summary???
     query = """
 SELECT mailer.doc_id, mailer.int_val, summary.value, response.value,
        title.value
@@ -1695,7 +1473,7 @@ SELECT mailer.doc_id, mailer.int_val, summary.value, response.value,
         %s
        </TD>
       </TR>
-""" % (row[4], row[3])
+""" % (cgi.escape(row[4]), row[3])
     doc    = re.sub("@@SUMMARY_MAILER_SENT@@", html, doc)
 
     # -----------------------------------------------------------------
@@ -1771,8 +1549,9 @@ if not filters.has_key(docType):
  <body>
   <pre>%s</pre>
  </body>
-</html>""" % (doc.ctrl['DocTitle'], doc.xml.decode('utf-8'))
-    cdrcgi.sendPage(html.encode('utf-8'))
+</html>""" % (cgi.escape(doc.ctrl['DocTitle'].decode("utf-8")),
+              cgi.escape(doc.xml.decode('utf-8')))
+    cdrcgi.sendPage(html)
 
 filterParm = []
 
@@ -1850,7 +1629,7 @@ def saveParms(parms):
     parms.sort()
     try:
         cursor.execute("""\
-     INSERT INTO url_parm_set( longURL) 
+     INSERT INTO url_parm_set( longURL)
             VALUES (?)""", (repr(parms),))
         conn.commit()
         cursor.execute("""\
@@ -1929,5 +1708,5 @@ if type(doc) != type(u""):
 #----------------------------------------------------------------------
 # Send it.
 #----------------------------------------------------------------------
-cdrcgi.sendPage(doc, parms=docParms, docId=docId, 
+cdrcgi.sendPage(doc, parms=docParms, docId=docId,
                      docType=docType, docVer=version)

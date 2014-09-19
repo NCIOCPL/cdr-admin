@@ -5,51 +5,36 @@
 # We need a Media Tracking report.  This spreadsheet report will keep track of
 # the development and processing statuses of the Media documents.
 #
+# BZIssue::3839 - Add diagnosis column; modify date display
+# BZIssue::4461 - Adjust for changed glossary document structure
 # BZIssue::4873 - Remove Board Meeting Recordings display from Tracking Report
-# 
-# Revision 1.4  2009/02/03 22:47:17  venglisc
-# Adjusted the XPath for the Glossary since the Glossary document structure
-# had changed. (Bug 4461)
-#
-# Revision 1.3  2008/02/22 20:28:15  venglisc
-# Modifications to add Diagnosis column and use different dates to display
-# report results. (Bug 3839)
-#
-# Revision 1.2  2006/05/08 17:04:08  bkline
-# Changed file extension to wrong string (.xls) to work around IE bug.
-#
-# Revision 1.1  2006/05/04 14:07:43  bkline
-# Spreadsheet report to track processing of CDR Media documents.
+# JIRA::OCECDR-3800 - Address security vulnerabilities
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrdb, cdrcgi, string, time, xml.dom.minidom, xml.sax.saxutils
-import ExcelWriter, sys
-
-# ---------------------------------------------------------------------
-# Select the available diagnosis terms
-# ---------------------------------------------------------------------
-def getDiagnoses():
-    cursor.execute("""\
-      SELECT DISTINCT value
-        FROM query_term
-       WHERE path = '/Media/MediaContent/Diagnoses/Diagnosis'
-       ORDER BY value""")
-    return cursor.fetchall() 
+import cgi
+import cdr
+import cdrdb
+import cdrcgi
+import datetime
+import ExcelWriter
+import lxml.etree as etree
+import sys
 
 #----------------------------------------------------------------------
 # Set the form variables.
 #----------------------------------------------------------------------
-fields   = cgi.FieldStorage()
-session  = fields and fields.getvalue("Session") or None
-fromDate = fields and fields.getvalue('FromDate') or None
-toDate   = fields and fields.getvalue('ToDate') or None
-diagnosis= fields and fields.getlist('Diagnosis') or None
-request  = cdrcgi.getRequest(fields)
-title    = "CDR Administration"
-instr    = "Media Tracking Report"
-buttons  = ["Submit Request", "Report Menu", cdrcgi.MAINMENU, "Log Out"]
-script   = "MediaTrackingReport.py"
-header   = cdrcgi.header(title, title, instr, script, buttons)
+cursor    = cdrdb.connect('CdrGuest').cursor()
+fields    = cgi.FieldStorage()
+session   = cdrcgi.getSession(fields)
+request   = cdrcgi.getRequest(fields)
+from_date = fields.getvalue("start_date")
+to_date   = fields.getvalue("end_date")
+diagnosis = fields.getlist('Diagnosis') or ["any"]
+title     = "CDR Administration"
+instr     = "Media Tracking Report"
+buttons   = ["Submit Request", "Report Menu", cdrcgi.MAINMENU, "Log Out"]
+script    = "MediaTrackingReport.py"
+start     = datetime.datetime.now()
 
 #----------------------------------------------------------------------
 # Handle requests.
@@ -58,78 +43,49 @@ if request == cdrcgi.MAINMENU:
     cdrcgi.navigateTo("Admin.py", session)
 elif request == "Report Menu":
     cdrcgi.navigateTo("Reports.py", session)
-elif request == "Log Out": 
+elif request == "Log Out":
     cdrcgi.logout(session)
 
-# ---------------------------------------------------------------------
-# Create Database connection
-# ---------------------------------------------------------------------
-conn = cdrdb.connect('CdrGuest')
-cursor = conn.cursor()
+#----------------------------------------------------------------------
+# Get the picklist values for diagnoses.
+#----------------------------------------------------------------------
+query = cdrdb.Query("query_term t", "t.doc_id", "t.value").unique().order(2)
+query.join("query_term m", "m.int_val = t.doc_id")
+query.where("t.path = '/Term/PreferredName'")
+query.where("m.path = '/Media/MediaContent/Diagnoses/Diagnosis/@cdr:ref'")
+diagnoses = [["any", "Any Diagnosis"]] + query.execute(cursor).fetchall()
 
 #----------------------------------------------------------------------
 # Ask the user for the report parameters.
 #----------------------------------------------------------------------
-if not fromDate or not toDate or not diagnosis:
-    now         = time.localtime(time.time())
-    toDateNew   = time.strftime("%Y-%m-%d", now)
-    then        = list(now)
-    then[1]    -= 1
-    then[2]    += 1
-    then        = time.localtime(time.mktime(then))
-    fromDateNew = time.strftime("%Y-%m-%d", then)
-    toDate      = toDate or toDateNew
-    fromDate    = fromDate or fromDateNew
+if not request or not cdrcgi.is_date(from_date) or not cdrcgi.is_date(to_date):
+    end = datetime.date.today()
+    start = end - datetime.timedelta(30)
+    page = cdrcgi.Page(title, subtitle=instr, action=script,
+                       buttons=buttons, session=session)
+    page.add("<fieldset>")
+    page.add(page.B.LEGEND("Report Filtering"))
+    page.add_date_field("start_date", "Start Date", value=start)
+    page.add_date_field("end_date", "End Date", value=end)
+    page.add_select("diagnosis", "Diagnosis", diagnoses, "any", multiple=True)
+    page.add("</fieldset>")
+    page.send()
 
-    diagnoses   = getDiagnoses()
-    diagnoses[0]= [u'All']
-
-    form        = """\
-   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-   <TABLE BORDER='0'>
-    <TR>
-     <TD><B>Start Date:&nbsp;</B></TD>
-     <TD><INPUT NAME='FromDate' VALUE='%s'>&nbsp;
-         (use format YYYY-MM-DD for dates, e.g. 2002-01-01)</TD>
-    </TR>
-    <TR>
-     <TD><B>End Date:&nbsp;</B></TD>
-     <TD><INPUT NAME='ToDate' VALUE='%s'>&nbsp;</TD>
-    </TR>
-    <TR>
-     <TD><B>Diagnosis:</B></TD>
-     <TD>
-      <SELECT NAME="Diagnosis" SIZE="10" MULTIPLE>
-""" % (cdrcgi.SESSION, session, fromDate, toDate)
-
-    for value in diagnoses:
-        form   += """\
-       <OPTION>%s</OPTION>
-""" % value[0]
-
-    form       += """\
-      </SELECT>
-     </TD>
-    </TR>
-   </TABLE>
-  </FORM>
- </BODY>
-</HTML>
-"""
-    cdrcgi.sendPage(header + form)
-
+#----------------------------------------------------------------------
+# Information from a single ProcessingStatus element in a Media doc.
+#----------------------------------------------------------------------
 class Status:
     def __init__(self, node):
         self.value = u''
         self.date = u''
         self.comment = u''
-        for child in node.childNodes:
-            if child.nodeName == 'ProcessingStatusValue':
-                self.value = cdr.getTextContent(child)
-            elif child.nodeName == 'ProcessingStatusDate':
-                self.date = cdr.getTextContent(child)
-            elif child.nodeName == 'Comment' and not self.comment:
-                self.comment = cdr.getTextContent(child).strip()
+        for child in node:
+            if child.tag == "ProcessingStatusValue":
+                self.value = child.text
+            elif child.tag == "ProcessingStatusDate":
+                self.date = child.text
+            elif child.tag == "Comment" and not self.comment:
+                self.comment = child.text.strip()
     def addToRow(self, row, dateStyle):
         row.addCell(4, self.value)
         row.addCell(5, self.date)
@@ -148,37 +104,37 @@ class MediaDoc:
         self.statuses = []
         lastAny, lastPub, chng = cdr.lastVersions('guest', 'CDR%010d' % docId)
         self.lastVersionPublishable = (lastAny != -1 and lastAny == lastPub)
-        cursor.execute("""\
-            SELECT MAX(dt)
-              FROM last_doc_publication
-             WHERE doc_id = ?
-               AND pub_subset LIKE 'Push_Documents_To_Cancer.Gov%'""", docId)
-        rows = cursor.fetchall()
+        query = cdrdb.Query("last_doc_publication", "MAX(dt)")
+        query.where(query.Condition("doc_id", docId))
+        query.where("pub_subset LIKE 'Push_Documents_To_Cancer.Gov%'")
+        rows = query.execute(cursor).fetchall()
         self.published = rows and rows[0][0] and str(rows[0][0])[:10] or None
-        cursor.execute("SELECT xml FROM document WHERE id = ?", docId)
-        docXml = cursor.fetchall()[0][0]
-        dom = xml.dom.minidom.parseString(docXml.encode('utf-8'))
-        for node in dom.documentElement.childNodes:
-            if node.nodeName == 'ProcessingStatuses':
-                for child in node.childNodes:
-                    if child.nodeName == 'ProcessingStatus':
+        query = cdrdb.Query("document", "xml")
+        query.where(query.Condition("id", docId))
+        docXml = query.execute(cursor).fetchall()[0][0]
+        tree = etree.XML(docXml.encode("utf-8"))
+        for node in tree:
+            if node.tag == "ProcessingStatuses":
+                for child in node:
+                    if child.tag == "ProcessingStatus":
                         self.statuses.append(Status(child))
-            elif node.nodeName == 'MediaTitle':
-                self.title = cdr.getTextContent(node)
-            elif node.nodeName == 'MediaSource':
-                for child in node.childNodes:
-                    if child.nodeName == 'OriginalSource':
-                        for grandchild in child.childNodes:
-                            if grandchild.nodeName == 'SourceFilename':
-                                value = cdr.getTextContent(grandchild)
+            elif node.tag == "MediaTitle":
+                self.title = node.text
+            elif node.tag == "MediaSource":
+                for child in node:
+                    if child.tag == "OriginalSource":
+                        for grandchild in child:
+                            if grandchild.tag == "SourceFilename":
+                                value = grandchild.text
                                 self.sourceFilename = value.strip() or None
-            elif node.nodeName == 'MediaContent':
-                for child in node.childNodes:
-                    if child.nodeName == 'Diagnoses':
-                        for grandchild in child.childNodes:
-                            if grandchild.nodeName == 'Diagnosis':
-                                value = cdr.getTextContent(grandchild)
-                                self.diagnoses.append(value.strip()) or None
+            elif node.tag == "MediaContent":
+                for child in node:
+                    if child.tag == "Diagnoses":
+                        for grandchild in child:
+                            if grandchild.tag == "Diagnosis":
+                                value = grandchild.text
+                                if value is not None and value.strip():
+                                    self.diagnoses.append(value.strip())
 
     def addToSheet(self, sheet, dateStyle, rowNum):
         diagnoses = []
@@ -209,39 +165,24 @@ class MediaDoc:
                 row = sheet.addRow(rowNum)
                 status.addToRow(row, dateStyle)
         return rowNum + 1
-        
-#----------------------------------------------------------------------
-# Create/display the report.
-#----------------------------------------------------------------------
-# If 'All' has been selected we need to submit the SQL statement 
-# without diagnosis filter.  Preparing the filter.
-# ---------------------------------------------------------------------
-if diagnosis[0] == 'All':
-    sqlDiagnosis = u''
-else:
-    sqlDiagnosis = u'AND q.value in (%s)' % \
-                     u','.join(["'%s'" % d for d in diagnosis])
 
-cursor.execute("""\
-         SELECT d.id, d.title, MAX(v.dt)
-           FROM document d
-           JOIN doc_type t
-             ON t.id = d.doc_type
-           JOIN doc_version v
-             ON v.id = d.id
-LEFT OUTER JOIN query_term q
-             ON d.id = q.doc_id
-            AND q.path = '/Media/MediaContent/Diagnoses/Diagnosis'
-           JOIN query_term c
-             ON d.id = c.doc_id
-            AND c.path = '/Media/MediaContent/Categories/Category'
-          WHERE t.name = 'Media'
-            AND c.value <> 'Meeting Recording'
-             %s
-       GROUP BY d.id, d.title
-         HAVING MAX(v.dt) BETWEEN '%s' AND DATEADD(s, -1, DATEADD(d, 1, '%s'))
-       ORDER BY d.title
-""" % (sqlDiagnosis, fromDate, toDate), timeout = 300)
+#----------------------------------------------------------------------
+# Create the SQL query. String interpolation for the dates in the
+# HAVING clause is safe below, because we've validated those values
+# above with calls to cdrcgi.is_date().
+#----------------------------------------------------------------------
+query = cdrdb.Query("document d", "d.id", "d.title", "MAX(v.dt)").order(2)
+query.join("doc_version v", "v.id = d.id")
+query.join("query_term q1", "q1.doc_id = d.id")
+query.where("q1.path = '/Media/MediaContent/Categories/Category'")
+query.where("q1.value <> 'Meeting Recording'")
+if diagnosis and "any" not in diagnosis:
+    query.join("query_term q2", "q2.doc_id = d.id")
+    query.where("q2.path = '/Media/MediaContent/Diagnoses/Diagnosis/@cdr:ref'")
+    query.where(query.Condition("q2.int_val", diagnosis, "IN"))
+query.group("d.id", "d.title")
+query.having("MAX(v.dt) BETWEEN '%s' AND '%s 23:59:59'" % (from_date, to_date))
+query.log()
 
 #----------------------------------------------------------------------
 # Set up the spreadsheet.
@@ -274,7 +215,7 @@ row      = ws.addRow(1, h1Style, 15.75)
 title    = 'Media Tracking Report'
 row.addCell(1, title, mergeAcross = 7, style = h1Style)
 row      = ws.addRow(2, h2Style)
-subtitle = 'From %s - %s' % (fromDate, toDate)
+subtitle = 'From %s - %s' % (from_date, to_date)
 row.addCell(1, subtitle, mergeAcross = 7, style = h2Style)
 row      = ws.addRow(3, thStyle, 27)
 headings = (
@@ -289,10 +230,14 @@ headings = (
 for i in range(len(headings)):
     row.addCell(i + 1, headings[i])
 rowNum = 4
-for docId, docTitle, created in cursor.fetchall():
+for docId, docTitle, created in query.execute(cursor, 300).fetchall():
     mediaDoc = MediaDoc(cursor, docId, docTitle)
     rowNum = mediaDoc.addToSheet(ws, dateStyle, rowNum)
-name = 'MediaTrackingReport-%s.xls' % time.strftime("%Y%m%d%H%M%S")
+now = datetime.datetime.now()
+delta = now - start
+row = ws.addRow(rowNum)
+row.addCell(1, "elapsed: %s" % delta, mergeAcross=7)
+name = 'MediaTrackingReport-%s.xls' % now.strftime("%Y%m%d%H%M%S")
 if sys.platform == "win32":
     import os, msvcrt
     msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)

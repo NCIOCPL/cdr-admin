@@ -4,21 +4,19 @@
 #
 # Reports on documents which link to specified terms.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.2  2002/02/21 22:34:01  bkline
-# Added navigation buttons.
-#
-# Revision 1.1  2001/12/01 18:11:44  bkline
-# Initial revision
+# JIRA::OCECDR-3800 - Address security vulnerabilities
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, string, cdrdb
+import cgi
+import cdr
+import cdrcgi
+import cdrdb
 
 #----------------------------------------------------------------------
 # Set the form variables.
 #----------------------------------------------------------------------
 fields  = cgi.FieldStorage()
-docIds  = fields and fields.getvalue("DocId")   or None
+doc_ids = fields.getvalue("doc_ids") or ""
 session = cdrcgi.getSession(fields)
 request = cdrcgi.getRequest(fields)
 SUBMENU = "Report Menu"
@@ -32,127 +30,63 @@ elif request == SUBMENU:
     cdrcgi.navigateTo("reports.py", session)
 
 #----------------------------------------------------------------------
-# Put out the form if we don't have a request.
-#----------------------------------------------------------------------
-if not docIds:
-    title   = "Term Usage"
-    instr   = "Report on documents indexed by specified terms"
-    script  = "TermUsage.py"
-    buttons = ("Submit Request", SUBMENU, cdrcgi.MAINMENU)
-    header  = cdrcgi.header(title, title, instr, script, buttons)
-    form    = """\
-    <TABLE CELLSPACING='0' CELLPADDING='0' BORDER='0'>
-    <TR>
-      <TD ALIGN='right'><B>Term ID:&nbsp;</B></TD>
-      <TD><INPUT NAME='DocId'></TD>
-    </TR>
-    <TR>
-      <TD ALIGN='right'><B>Term ID:&nbsp;</B></TD>
-      <TD><INPUT NAME='DocId'></TD>
-    </TR>
-    <TR>
-      <TD ALIGN='right'><B>Term ID:&nbsp;</B></TD>
-      <TD><INPUT NAME='DocId'></TD>
-    </TR>
-   </TABLE>
-   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-  </FORM>
- </BODY>
-</HTML>
-""" % (cdrcgi.SESSION, session)
-    cdrcgi.sendPage(header + form)
-
-#----------------------------------------------------------------------
 # Normalize the field values.
 #----------------------------------------------------------------------
-if type(docIds) != type([]):
-    docIds = [docIds]
-pattern = re.compile("(\d+)")
-for i in range(len(docIds)):
-    value = docIds[i]
-    match = pattern.search(value)
-    if not match:
-        cdrcgi.bail("Invalid document ID: %s" % value)
-    intVal = string.atoi(match.group(1))
-    if not intVal:
-        cdrcgi.bail("Invalid document ID: %s" % value)
-    docIds[i] = intVal
+try:
+    term_ids = [cdr.exNormalize(i)[1] for i in doc_ids.strip().split()]
+except:
+    cdrcgi.bail("Invalid document ID format in %s" % repr(doc_ids))
 
 #----------------------------------------------------------------------
-# Set up a database connection and cursor.
+# Put out the form if we don't have a request.
 #----------------------------------------------------------------------
-try:
-    conn = cdrdb.connect()
-    cursor = conn.cursor()
-except cdrdb.Error, info:
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
+if not term_ids:
+    title    = "Term Usage"
+    subtitle = "Report on documents indexed by specified terms"
+    script   = "TermUsage.py"
+    buttons  = ("Submit Request", SUBMENU, cdrcgi.MAINMENU)
+    page     = cdrcgi.Page(title, subtitle=subtitle, buttons=buttons,
+                           action=script, session=session)
+    page.add("<fieldset>")
+    page.add(page.B.LEGEND("Enter Term IDs Separated By Spaces"))
+    page.add_textarea_field("doc_ids", "Term IDs")
+    page.add("</fieldset>")
+    page.send()
 
 #----------------------------------------------------------------------
 # Find the documents using the specified terms.
 #----------------------------------------------------------------------
-query   = """\
-SELECT DISTINCT ut.name, ud.id, ud.title, td.id, td.title
-           FROM doc_type ut
-           JOIN document ud
-             ON ud.doc_type = ut.id
-           JOIN query_term q
-             ON q.doc_id = ud.id
-           JOIN document td
-             ON td.id = q.int_val
-          WHERE q.path LIKE '%/@cdr:ref'
-            AND ut.name <> 'Term'
-            AND td.id IN ("""
-sep = ""
-for id in docIds:
-    query += sep + '?'
-    sep = ', '
-query += """)
-       ORDER BY ut.name, ud.title
-"""
+columns = ("doc_type.name", "doc.id", "doc.title", "term.id", "term.title")
+query = cdrdb.Query("doc_type", *columns).unique()
+query.join("document doc", "doc_type.id = doc.doc_type")
+query.join("query_term cdr_ref", "doc.id = cdr_ref.doc_id")
+query.join("document term", "term.id = cdr_ref.int_val")
+query.where("cdr_ref.path LIKE '%/@cdr:ref'")
+query.where("doc_type.name <> 'Term'")
+query.where(query.Condition("term.id", term_ids, "IN"))
+query.order("doc_type.name", "doc.title", "term.id")
+rows = query.execute().fetchall()
 
-try:
-    cursor.execute(query, docIds)
-    rows = cursor.fetchall()
-except cdrdb.Error, info:
-    cdrcgi.bail('Database query failure: %s' % info[1][0])
-
+#----------------------------------------------------------------------
+# Assemble the report.
+#----------------------------------------------------------------------
+count   = len(set([row[1] for row in rows]))
 title   = "CDR Term Usage Report"
-instr   = "Number of documents using specified terms: %d" % len(rows)
-buttons = (SUBMENU, cdrcgi.MAINMENU)
-header  = cdrcgi.header(title, title, instr, "TermUsage.py", buttons)
-html    = """\
-<TABLE BORDER='0' WIDTH='100%%' CELLSPACING='1' CELLPADDING='3'>
- <TR BGCOLOR='silver' VALIGN='top'>
-  <TD ALIGN='center'><FONT SIZE='-1'><B>Doc Type</B></FONT></TD>
-  <TD ALIGN='center'><FONT SIZE='-1'><B>Doc ID</B></FONT></TD>
-  <TD ALIGN='center'><FONT SIZE='-1'><B>Doc Title</B></FONT></TD>
-  <TD ALIGN='center'><FONT SIZE='-1'><B>Term ID</B></FONT></TD>
-  <TD ALIGN='center'><FONT SIZE='-1'><B>Term</B></FONT></TD>
- </TR>
-"""
-for row in rows:
-    title = row[2]
-    termName = row[4]
-    #shortTitle = title[:50] 
-    #shortTermName = termName[:30]
-    #if len(title) > 50: shortTitle += " ..."
-    #if len(termName) > 30: shortTermName += " ..."
-    html += u"""\
- <TR>
-  <TD BGCOLOR='white' VALIGN='top' ALIGN='left'><FONT SIZE='-1'>%s</FONT></TD>
-  <TD BGCOLOR='white' VALIGN='top' ALIGN='center'><FONT SIZE='-1'>CDR%010d</FONT></TD>
-  <TD BGCOLOR='white' VALIGN='top' ALIGN='left'><FONT SIZE='-1'>%s</FONT></TD>
-  <TD BGCOLOR='white' VALIGN='top' ALIGN='center'><FONT SIZE='-1'>CDR%010d</FONT></TD>
-  <TD BGCOLOR='white' VALIGN='top' ALIGN='left'><FONT SIZE='-1'>%s</FONT></TD>
- </TR>
-""" % (row[0],
-       row[1],
-       title, #shortTitle,
-       row[3],
-       termName) #shortTermName)
-cdrcgi.sendPage(header + html + """\
-   </TABLE>
-   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-  </FORM>
- </BODY>
-</HTML>""" % (cdrcgi.SESSION, session))
+caption = "Number of documents using specified terms: %d" % count
+columns = (
+    cdrcgi.Report.Column("Doc Type"),
+    cdrcgi.Report.Column("Doc ID"),
+    cdrcgi.Report.Column("Doc Title"),
+    cdrcgi.Report.Column("Term ID"),
+    cdrcgi.Report.Column("Term Title"),
+)
+rows = [(
+    row[0],
+    cdr.normalize(row[1]),
+    row[2],
+    cdr.normalize(row[3]),
+    row[4],
+) for row in rows]
+table = cdrcgi.Report.Table(columns, rows)
+report = cdrcgi.Report(title, table, banner=title, subtitle=caption)
+report.send()

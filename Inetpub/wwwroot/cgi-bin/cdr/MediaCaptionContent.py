@@ -10,219 +10,135 @@
 #
 # BZIssue::4717 (add audience selection criterion)
 # BZIssue::4931 Media Caption and Content Report: Bug in Date Selections
-#
+# JIRA::OCECDR-3800 - Address security vulnerabilities
 #----------------------------------------------------------------------
 
-import sys, cgi, cgitb, time, xml.sax, xml.sax.handler, os, os.path, copy
-import cdr, cdrcgi, cdrdb, ExcelWriter
+import cdr
+import cdrcgi
+import cdrdb
+import cgi
+import copy
+import datetime
+import ExcelWriter
+import os
+import sys
+import xml.sax
+import xml.sax.handler
 
-cgitb.enable()
-
-# No errors yet
-errMsgs = ""
-
+#----------------------------------------------------------------------
 # CGI form variables
-session   = None
-startDate = None
-endDate   = None
-diagnosis = None
-category  = None
-language  = None
-audience  = None
+#----------------------------------------------------------------------
+fields     = cgi.FieldStorage()
+action     = cdrcgi.getRequest(fields)
+session    = cdrcgi.getSession(fields) or cdrcgi.bail("Please login")
+diagnosis  = fields.getlist("diagnosis") or ["any"]
+category   = fields.getlist("category") or ["any"]
+language   = fields.getvalue("language") or "all"
+audience   = fields.getvalue("audience") or "all"
+start_date = fields.getvalue("start_date")
+end_date   = fields.getvalue("end_date")
 
+#----------------------------------------------------------------------
 # Form buttons
+#----------------------------------------------------------------------
 BT_SUBMIT  = "Submit"
 BT_ADMIN   = cdrcgi.MAINMENU
 BT_REPORTS = "Reports Menu"
 BT_LOGOUT  = "Logout"
 buttons = (BT_SUBMIT, BT_REPORTS, BT_ADMIN, BT_LOGOUT)
 
-# Has the user entered anything yet?
-fields = cgi.FieldStorage()
-if fields:
-    session = cdrcgi.getSession(fields) or cdrcgi.bail("Please login")
+#----------------------------------------------------------------------
+# Handle navigation requests.
+#----------------------------------------------------------------------
+if action == BT_REPORTS:
+    cdrcgi.navigateTo("Reports.py", session)
+if action == BT_ADMIN:
+    cdrcgi.navigateTo("Admin.py", session)
+if action == BT_LOGOUT:
+    cdrcgi.logout(session)
 
-    # Standard button navigation
-    action = cdrcgi.getRequest(fields)
-    if action == BT_REPORTS:
-        cdrcgi.navigateTo("Reports.py", session)
-    if action == BT_ADMIN:
-        cdrcgi.navigateTo("Admin.py", session)
-    if action == BT_LOGOUT:
-        cdrcgi.logout(session)
-
-    # Start and end dates are required
-    if fields.has_key("startDate"):
-        # Validate dates
-        startDate = fields.getvalue('startDate')
-        if not cdr.strptime(startDate, '%Y-%m-%d'):
-            errMsgs += "Invalid start date '%s'.<br />" % startDate
-            startDate = None
-        if fields.has_key("endDate"):
-            endDate = fields.getvalue('endDate')
-            if not cdr.strptime(endDate, '%Y-%m-%d'):
-                errMsgs += "Invalid end date '%s'.<br />" % endDate
-                startDate = None
-        else:
-            errMsgs += "Missing end date.<br />"
-
-        if errMsgs:
-            errMsgs += "Please use yyyy-mm-dd format."
-
-    # Other fields are optional
-    if fields.has_key("diagnosis"):
-        diagnosis = fields.getlist("diagnosis")
-    if fields.has_key("category"):
-        category = fields.getlist("category")
-    if fields.has_key("language"):
-        language = fields.getvalue("language")
-    if fields.has_key("audience"):
-        audience = fields.getvalue("audience")
-
-# Format errors for display
-if errMsgs:
-    errMsgs = "<p><strong><font color='red'>%s</font></strong></p>" % errMsgs
-
+#----------------------------------------------------------------------
 # Connection to database
+#----------------------------------------------------------------------
 try:
-    conn = cdrdb.connect()
-except cdrdb.Error, info:
-    cdrcgi.bail("Unable to connect to database:<br />%s" % str(info))
+    conn = cdrdb.connect("CdrGuest")
+    cursor = conn.cursor()
+except Exception, e:
+    cdrcgi.bail("Unable to connect to database", extra=[str(e)])
 
-if not startDate or errMsgs:
-    # If no start date, or invalid one, the form has not been displayed,
-    #   or not filled in, or not filled in correctly
-    # Display an HTML form on screen
+#----------------------------------------------------------------------
+# Assemble the lists of valid values.
+#----------------------------------------------------------------------
+query = cdrdb.Query("query_term t", "t.doc_id", "t.value")
+query.join("query_term m", "m.int_val = t.doc_id")
+query.where("t.path = '/Term/PreferredName'")
+query.where("m.path = '/Media/MediaContent/Diagnoses/Diagnosis/@cdr:ref'")
+results = query.unique().order(2).execute(cursor).fetchall()
+diagnoses = [("any", "Any Diagnosis")] + results
+query = cdrdb.Query("query_term", "value", "value")
+query.where("path = '/Media/MediaContent/Categories/Category'")
+query.where("value <> ''")
+results = query.unique().order(1).execute(cursor).fetchall()
+categories = [("any", "Any Category")] + results
+languages = (("all", "All Languages"), ("en", "English"), ("es", "Spanish"))
+audiences = (
+    ("all", "All Audiences"),
+    ("Health_professionals", "HP"),
+    ("Patients", "Patient"),
+)
 
-    # Setup default dates for 30 days ago through today
-    now = time.time()
-    ago = now - (30 * 24 * 60 * 60)
-    startDate = time.strftime("%Y-%m-%d", time.localtime(ago))
-    endDate   = time.strftime("%Y-%m-%d", time.localtime(now))
+#----------------------------------------------------------------------
+# Validate the form values. The expectation is that any bogus values
+# will come from someone tampering with the form, so no need to provide
+# the hacker with any useful diagnostic information. Dates will be
+# scrubbed in the test below.
+#----------------------------------------------------------------------
+for value, values in ((diagnosis, diagnoses), (audience, audiences),
+                      (language, languages), (category, categories)):
+    if isinstance(value, basestring):
+        value = [value]
+    values = [str(v[0]).lower() for v in values]
+    for val in value:
+        if val.lower() not in values:
+            cdrcgi.bail("Corrupted form value")
 
-    # Query to fetch all of the Diagnosis ids and terms in Media documents
-    diagnosisMenuQry = """\
-SELECT DISTINCT qt.doc_id, qt.value
-  FROM query_term qt
-  JOIN query_term qm
-    ON qt.doc_id = qm.int_val
- WHERE qt.path = '/Term/PreferredName'
-   AND qm.int_val IN (
-    SELECT DISTINCT int_val
-      FROM query_term
-     WHERE path = '/Media/MediaContent/Diagnoses/Diagnosis/@cdr:ref'
-  )
- ORDER BY qt.value
-"""
-    # Query to fetch all categories used in Media documents
-    # Ignores any defined categories that aren't actually used
-    # Fetches each twice for easy use in cdrcgi.generateHtmlPicklist()
-    categoryMenuQry = """\
-SELECT DISTINCT value, value
-  FROM query_term
- WHERE path = '/Media/MediaContent/Categories/Category'
- ORDER BY 1
-"""
-
-    # Pattern for forming option items in picklist selects
-    optionPattern = "<option value='%s'>%s</option>"
-
-    # Add these attributes to "select" element
-    selAttrs = "multiple='1' size='5'"
-
-    # First option for diagnosis and category picklists
-    dftDiagnosis = \
-      "<option value='any' selected='1'>Any Diagnosis</option>\n"
-    dftCategory  = \
-      "<option value='any' selected='1' multiple='1'>Any Category</option>\n"
-
-    # Construct html form
-    header = cdrcgi.header("Administrative Subsystem",
-             "Media Caption and Content Report",
-             "Media Caption and Content Report",
-             script="MediaCaptionContent.py", buttons=buttons)
-    html = header + """
-<fieldset>
-<legend>&nbsp;Instructions&nbsp;</legend>
-<p style="font-size: 10pt; font-weight: 600">
-To prepare an Excel format report of Media Caption and Content
-information, enter starting and ending dates (inclusive) for the
-last versions of the Media documents to be retrieved.  You may also
-select documents with specific diagnoses, categories, language, or
-audience of the content description.  Relevant fields from the Media
-documents that meet the selection criteria will be displayed in an
-Excel spreadsheet.
-</p>
-</fieldset>
-
-%s
-
-    <fieldset>
-     <legend>&nbsp;Time Frame&nbsp;</legend>
-     <center>
-      <table width="100%%" border='0'>
-       <tr>
-        <td width="25%%" align="right" nowrap="1"><b>Start date: </b></td>
-        <td align="left"><input type='text' name='startDate' 
-                                size='12' value='%s' />
-       </tr>
-       <tr>
-        <td align="right" nowrap="1">
-         <b>&nbsp; &nbsp; &nbsp; End date: </b>
-        </td>
-        <td align="left"><input type='text' name='endDate' 
-                                size='12' value='%s' />
-       </tr>
-      </table>
-     </center>
-    </fieldset>
-""" % (errMsgs, startDate, endDate)
-
-    html += """
-    <fieldset>
-     <legend>&nbsp;Include Specific Content&nbsp;</legend>
-     <center>
-      <table width="100%%" border='0'>
-       <tr>
-        <td width="25%%" align="right"><b>Diagnosis: </b></td><td align="left">
-    %s
-       </tr>
-       <tr>
-        <td align="right"><b>Category: </b></td><td align="left">
-    %s
-       </tr>
-       <tr>
-        <td align="right"><b>Language: </b></td><td align="left">
-          <select name="language">
-           <option value="all" selected="1">All Languages</option>
-           <option value="en">English</option>
-           <option value="es">Spanish</option>
-          </select></td>
-       </tr>
-       <tr>
-        <td align="right"><b>Audience: </b></td><td align="left">
-          <select name="audience">
-           <option value="all" selected="1">All Audiences</option>
-           <option value="Health_professionals">HP</option>
-           <option value="Patients">Patient</option>
-          </select></td>
-       </tr>
-      </table>
-     </center>
-    </fieldset>
-   <input type="hidden" name=%s value=%s />
-  </form>
- </body>
-</html>
-""" % (
-       cdrcgi.generateHtmlPicklist(conn, "diagnosis", diagnosisMenuQry,
-                optionPattern, selAttrs=selAttrs, firstOpt=dftDiagnosis),
-       cdrcgi.generateHtmlPicklist(conn, "category", categoryMenuQry,
-                optionPattern, selAttrs=selAttrs, firstOpt=dftCategory),
-       cdrcgi.SESSION, session)
-
-    # Send html and exit
-    cdrcgi.sendPage(html)
+#----------------------------------------------------------------------
+# Show the form if we don't have a request yet.
+#----------------------------------------------------------------------
+if not cdrcgi.is_date(start_date) or not cdrcgi.is_date(end_date):
+    end = datetime.date.today()
+    start = end - datetime.timedelta(30)
+    title = "Administrative Subsystem"
+    subtitle = "Media Caption and Content Report"
+    script = "MediaCaptionContent.py"
+    page = cdrcgi.Page(title, subtitle=subtitle, action=script,
+                       buttons=buttons, session=session)
+    instructions = (
+        "To prepare an Excel format report of Media Caption and Content "
+        "information, enter starting and ending dates (inclusive) for the "
+        "last versions of the Media documents to be retrieved.  You may also "
+        "select documents with specific diagnoses, categories, language, or "
+        "audience of the content description.  Relevant fields from the Media "
+        "documents that meet the selection criteria will be displayed in an "
+        "Excel spreadsheet."
+    )
+    page.add("<fieldset>")
+    page.add(page.B.LEGEND("Instructions"))
+    page.add(page.B.P(instructions))
+    page.add("</fieldset>")
+    page.add("<fieldset>")
+    page.add(page.B.LEGEND("Time Frame"))
+    page.add_date_field("start_date", "Start Date", value=start)
+    page.add_date_field("end_date", "End Date", value=end)
+    page.add("</fieldset>")
+    page.add("<fieldset>")
+    page.add(page.B.LEGEND("Include Specific Content"))
+    page.add_select("diagnosis", "Diagnosis", diagnoses, "any", multiple=True)
+    page.add_select("category", "Category", categories, "any", multiple=True)
+    page.add_select("language", "Language", languages, "all")
+    page.add_select("audience", "Audience", audiences, "all")
+    page.add("</fieldset>")
+    page.send()
 
 ######################################################################
 #                        SAX Parser for doc                          #
@@ -309,102 +225,70 @@ class DocHandler(xml.sax.handler.ContentHandler):
 #                    Retrieve data for the report                    #
 ######################################################################
 
-# Create base query for the documents
-selQry = """\
-SELECT DISTINCT d.id, d.title
-  FROM document d
-  JOIN doc_type t
-    ON d.doc_type = t.id
-  JOIN doc_version v
-    ON d.id = v.id
-"""
+# Path strings for where clauses.
+content_path = "/Media/MediaContent"
+diagnosis_path = content_path + "/Diagnoses/Diagnosis/@cdr:ref"
+category_path = content_path + "/Categories/Category"
+caption_path = content_path + "/Captions/MediaCaption"
+language_path = caption_path + "/@language"
+audience_path = caption_path + "/@audience"
 
-# Create base where clause
-whereClause = """\
- WHERE t.name = 'Media'
-   AND v.dt >= '%s'
-   AND v.dt < dateadd(day, 1, '%s')
-""" % (startDate, endDate)
+# Create base query for the documents
+query = cdrdb.Query("document d", "d.id", "d.title").unique().order(2)
+query.join("doc_type t", "t.id = d.doc_type")
+query.join("doc_version v", "d.id = v.id")
+query.where("t.name = 'Media'")
+query.where(query.Condition("v.dt", start_date, ">="))
+query.where(query.Condition("v.dt", "%s 23:59:59" % end_date, "<="))
 
 # If optional criteria entered, add the requisite joins
 # One or more diagnoses
-if diagnosis and diagnosis != ['any']:
-    selQry += """\
-  JOIN query_term qdiag
-    ON qdiag.doc_id = d.id
-"""
-    diagList = ""
-    for diag in diagnosis:
-        if diagList:
-            diagList += ","
-        diagList += "%s" % diag
-    # Note: var diagnosis is a list of 1 or more integer CDR IDs
-    whereClause += """\
-   AND qdiag.path = '/Media/MediaContent/Diagnoses/Diagnosis/@cdr:ref'
-   AND qdiag.int_val IN (%s)
-""" % diagList
+if diagnosis and "any" not in diagnosis:
+    query.join("query_term q1", "q1.doc_id = d.id")
+    query.where(query.Condition("q1.path", diagnosis_path))
+    query.where(query.Condition("q1.int_val", diagnosis, "IN"))
 
 # One or more categories
-if category and category != ['any']:
-    selQry += """\
-  JOIN query_term qcat
-    ON qcat.doc_id = d.id
-"""
-    # Category is a string, not a CDR ID.  Have to make a list
-    catList = ""
-    for cat in category:
-        if catList:
-            catList += ","
-        catList += "'%s'" % cat
-    whereClause += """\
-   AND qcat.path = '/Media/MediaContent/Categories/Category'
-   AND qcat.value IN (%s)
-""" % catList
+if category and "any" not in category:
+    query.join("query_term q2", "q2.doc_id = d.id")
+    query.where(query.Condition("q2.path", category_path))
+    query.where(query.Condition("q2.value", category, "IN"))
 
 # Only one language can be specified
-if language and language != 'all':
-    selQry += """\
-  JOIN query_term qlang
-    ON qlang.doc_id = d.id
-"""
-    whereClause += """\
-   AND qlang.path = '/Media/MediaContent/Captions/MediaCaption/@language'
-   AND qlang.value = '%s'
-""" % language
+if language and language != "all":
+    query.join("query_term q3", "q3.doc_id = d.id")
+    query.where(query.Condition("q3.path", language_path))
+    query.where(query.Condition("q3.value", language))
 
 # Only one audience can be specified
-if audience and audience != 'all':
-    selQry += """\
-  JOIN query_term audience
-    ON audience.doc_id = d.id
-"""
-    whereClause += """\
-   AND audience.path = '/Media/MediaContent/Captions/MediaCaption/@audience'
-   AND audience.value = '%s'
-""" % audience
-
-# Put it all together
-selQry += whereClause + " ORDER BY d.title"
+if audience and audience != "all":
+    query.join("query_term q4", "q4.doc_id = d.id")
+    query.where(query.Condition("q4.path", audience_path))
+    query.where(query.Condition("q4.value", audience))
 
 # DEBUG
-cdr.logwrite(selQry, "d:/cdr/Log/media.log")
+query.log(logfile=cdr.DEFAULT_LOGDIR + "/media.log")
+#query_str = "QUERY:\n%s" % query
+#logfile = "d:/cdr/Log/media.log"
+#parms = ["PARAMETERS:"] + [repr(p) for p in query._parms]
+#cdr.logwrite("%s\n%s" % (query_str, "\n\t".join(parms)), logfile)
 
 # Execute query
 try:
-    cursor = conn.cursor()
-    cursor.execute(selQry)
-    rows = cursor.fetchall()
+    rows = query.execute(cursor).fetchall()
 except cdrdb.Error, info:
-    msg = "Database error executing MediaCaptionContent.py selQry<br>\n" + \
-          "selQry = %s<br>\nError: %s\n" % (selQry, str(info))
-    cdr.logwrite(msg)
-    cdrcgi.bail(msg)
+    msg = "Database error executing MediaCaptionContent.py query"
+    extra = (
+        "query = %s" % query,
+        "error = %s" % str(info),
+    )
+    cdr.logwrite(str(info))
+    cdrcgi.bail(msg, extra=extra)
 
 # If there was no data, we're done
 if len(rows) == 0:
-    cdrcgi.bail("""\
-Your selection criteria did not retrieve any documents<br />
-Please click the back button and try again.""")
+    cdrcgi.bail("Your selection criteria did not retrieve any documents",
+                extra=["Please click the back button and try again."])
 
 ######################################################################
 #                 Construct the output spreadsheet                   #
@@ -467,7 +351,7 @@ titleRow.addCell(4, value=titleText)
 
 # Coverage of the report
 coverageRow = ws.addRow(2, style=sheetNameStyle)
-coverageRow.addCell(4, "        %s   -   %s" % (startDate, endDate))
+coverageRow.addCell(4, "        %s   -   %s" % (start_date, end_date))
 
 # Column label headers
 labelRow = ws.addRow(3, colLabelStyle)
@@ -513,7 +397,7 @@ Failure retrieving filtered doc for doc ID=%d<br />
 Error: %s""" % (docId, result))
 
     xmlText = result[0]
- 
+
    # Is specific language and/or audience requested?
     getLanguage = language != 'all' and language or None
     getAudience = audience != 'all' and audience or None

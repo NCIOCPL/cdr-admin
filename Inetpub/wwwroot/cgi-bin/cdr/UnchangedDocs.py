@@ -5,20 +5,25 @@
 # Reports on documents unchanged for a specified number of days.
 #
 # BZissue::161
+# JIRA::OCECDR-3800 - Address security vulnerabilities
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, string, cdrdb
+import cgi
+import cdrcgi
+import cdrdb
+import datetime
 
 #----------------------------------------------------------------------
 # Set the form variables.
 #----------------------------------------------------------------------
-fields  = cgi.FieldStorage()
-session = cdrcgi.getSession(fields)
-request = cdrcgi.getRequest(fields)
-days    = fields and fields.getvalue("Days")    or None
-type    = fields and fields.getvalue("DocType") or None
-maxRows = fields and fields.getvalue("MaxRows") or None
-SUBMENU = 'Report Menu'
+cursor   = cdrdb.connect("CdrGuest").cursor()
+fields   = cgi.FieldStorage()
+session  = cdrcgi.getSession(fields)
+request  = cdrcgi.getRequest(fields)
+days     = fields.getvalue("days")
+doc_type = fields.getvalue("doctype")
+max_rows = fields.getvalue("max")
+SUBMENU  = 'Report Menu'
 
 #----------------------------------------------------------------------
 # Handle navigation requests.
@@ -29,129 +34,62 @@ elif request == SUBMENU:
     cdrcgi.navigateTo("reports.py", session)
 
 #----------------------------------------------------------------------
-# Create a picklist for document types.
-#----------------------------------------------------------------------
-def makePicklist(docTypes):
-    picklist = "<SELECT NAME='DocType'><OPTION>All</OPTION>"
-    selected = " SELECTED"
-    for docType in docTypes:
-        picklist += "<OPTION%s>%s</OPTION>" % (selected, docType[0])
-        selected = ""
-    return picklist + "</SELECT>"
-
-#----------------------------------------------------------------------
-# Set up a database connection and cursor.
-#----------------------------------------------------------------------
-try:
-    conn = cdrdb.connect()
-    cursor = conn.cursor()
-except cdrdb.Error, info:
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
-
-#----------------------------------------------------------------------
 # Do the report if we have a request.
 #----------------------------------------------------------------------
 if request:
-    maxRows = maxRows and int(maxRows) or 1000
-    days = days and int(days) or 365
-    if type and type != 'All':
-        query   = """\
-   SELECT TOP %d d.id AS DocId, 
-          d.title AS DocTitle, 
-          MAX(a.dt) AS LastChange
-     FROM document d, 
-          audit_trail a, 
-          doc_type t
-    WHERE d.id = a.document
-      AND d.doc_type = t.id
-      AND t.name = '%s'
- GROUP BY d.id, d.title
-   HAVING DATEDIFF(day, MAX(a.dt), GETDATE()) > %d
- ORDER BY MAX(a.dt), d.id
-""" % (maxRows, type, days)
-    else:
-        query   = """\
-   SELECT TOP %d d.id AS DocId, 
-          d.title AS DocTitle, 
-          MAX(a.dt) AS LastChange
-     FROM document d, 
-          audit_trail a
-    WHERE d.id = a.document
- GROUP BY d.id, d.title
-   HAVING DATEDIFF(day, MAX(a.dt), GETDATE()) > %d
- ORDER BY MAX(a.dt), d.id
-""" % (maxRows, days)
     try:
-        cursor.execute(query, timeout = 600)
-        rows = cursor.fetchall()
-    except cdrdb.Error, info:
-        cdrcgi.bail('Database query failure: %s' % info[1][0])
-
+        max_rows = max_rows and int(max_rows) or 1000
+        days = days and int(days) or 365
+    except:
+        max_rows = 1000
+        days = 365
+    today = datetime.date.today()
+    cutoff = today - datetime.timedelta(days)
+    query = cdrdb.Query("document d", "d.id", "d.title", "MAX(a.dt)")
+    query.join("audit_trail a", "d.id = a.document")
+    query.group("d.id", "d.title")
+    query.having("MAX(a.dt) < '%s'" % cutoff)
+    query.order(3, 1)
+    query.limit(max_rows)
+    if doc_type and doc_type != "All":
+        query.join("doc_type t", "t.id = d.doc_type")
+        query.where(query.Condition("t.name", doc_type))
+    docs    = query.execute(cursor, 600).fetchall()
     title   = "Documents Unchanged for %d Days" % days
-    instr   = "Document type: %s" % type
+    instr   = "Document type: %s" % doc_type
     buttons = (SUBMENU, cdrcgi.MAINMENU)
-    header  = cdrcgi.header(title, title, instr, "UnchangedDocs.py", buttons)
-    html    = [u"""\
-<INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-<TABLE BORDER='0' WIDTH='100%%' CELLSPACING='1' CELLPADDING='1'>
- <TR BGCOLOR='silver' VALIGN='top'>
-  <TD ALIGN='center'><FONT SIZE='-1'><B>Doc ID</B></FONT></TD>
-  <TD ALIGN='center'><FONT SIZE='-1'><B>DocTitle</B></FONT></TD>
-  <TD ALIGN='center'><FONT SIZE='-1'><B>Last Change</B></FONT></TD>
- </TR>
-""" % (cdrcgi.SESSION, session)]
-    for row in rows:
-        title = row[1]
-        shortTitle = title[:100]
-        if len(title) > 100: shortTitle += u" ..."
-        html.append(u"""\
- <TR>
-  <TD BGCOLOR='white' VALIGN='top' ALIGN='center'><FONT SIZE='-1'>CDR%010d</FONT></TD>
-  <TD BGCOLOR='white' ALIGN='left'><FONT SIZE='-1'>%s</FONT></TD>
-  <TD BGCOLOR='white' VALIGN='top' ALIGN='center'><FONT SIZE='-1'>%s</FONT></TD>
- </TR>
-""" % (row[0],
-       shortTitle,
-       row[2][:10]))
-    html.append(u"</TABLE></FORM></BODY></HTML>")
-    cdrcgi.sendPage(header + u"".join(html))
+    columns = (
+        cdrcgi.Report.Column("Doc ID"),
+        cdrcgi.Report.Column("Doc Title"),
+        cdrcgi.Report.Column("Last Change"),
+    )
+    rows = []
+    for doc_id, doc_title, last_change in docs:
+        short_title = doc_title[:100]
+        if len(doc_title) > 100:
+            short_title += u" ..."
+        row = ("CDR%010d" % doc_id, short_title, last_change[:10])
+        rows.append(row)
+    table = cdrcgi.Report.Table(columns, rows)
+    report = cdrcgi.Report(title, table, banner=title, subtitle=instr)
+    report.send()
 
 #----------------------------------------------------------------------
 # Put out the form if we don't have a request.
 #----------------------------------------------------------------------
-else:
-    try:
-        cursor.execute("""\
-SELECT DISTINCT name 
-           FROM doc_type 
-          WHERE name IS NOT NULL and name <> ''
-       ORDER BY name
-""")
-        docTypes = cursor.fetchall()
-    except cdrdb.Error, info:
-        cdrcgi.bail('Database query failure: %s' % info[1][0])
-    title   = "CDR Administration"
-    instr   = "Unchanged Documents"
-    buttons = ("Submit Request", SUBMENU, cdrcgi.MAINMENU)
-    header  = cdrcgi.header(title, title, instr, "UnchangedDocs.py", buttons)
-    form    = """\
-        <TABLE CELLSPACING='0' CELLPADDING='0' BORDER='0'>
-        <TR>
-          <TD ALIGN='right'><B>Days Since Last Change&nbsp;</B></TD>
-          <TD><INPUT NAME='Days' VALUE='365'></TD>
-        </TR>
-        <TR>
-          <TD ALIGN='right'><B>Document Type&nbsp;</B></TD>
-          <TD>%s</TD>
-        </TR>
-        <TR>
-          <TD ALIGN='right'><B>Max Rows&nbsp;</B></TD>
-          <TD><INPUT NAME='MaxRows' VALUE='1000'></TD>
-        </TR>
-       </TABLE>
-       <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-      </FORM>
-     </BODY>
-    </HTML>
-    """ % (makePicklist(docTypes), cdrcgi.SESSION, session)
-    cdrcgi.sendPage(header + form)
+query = cdrdb.Query("doc_type", "name").order(1)
+query.where("name IS NOT NULL")
+query.where("name <> ''")
+doc_types = [row[0] for row in query.execute(cursor).fetchall()]
+title   = "CDR Administration"
+section = "Unchanged Documents"
+buttons = ("Submit Request", SUBMENU, cdrcgi.MAINMENU)
+page = cdrcgi.Page(title, subtitle=section, action="UnchangedDocs.py",
+                   buttons=buttons, session=session)
+page.add("<fieldset>")
+page.add(page.B.LEGEND("Report Parameters"))
+page.add_text_field("days", "Age", value="365")
+page.add_select("doctype", "Doc Type", ["All"] + doc_types, "All")
+page.add_text_field("max", "Max Rows", value="1000")
+page.add("</fieldset>")
+page.send()

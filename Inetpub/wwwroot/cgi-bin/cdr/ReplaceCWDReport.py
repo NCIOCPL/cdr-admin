@@ -5,8 +5,11 @@
 # Filters and displays information from the CWDReplacements.log file
 # created by ReplaceCWDwithVersion.py
 #
+# JIRA::OCECDR-3800 - Address security vulnerabilities
 #--------------------------------------------------------------
-import time, cgi, cdr, cdrcgi, cdrdb
+import cgi
+import cdr
+import cdrcgi
 
 TITLE    = "Report CWD Replacements"
 SCRIPT   = "ReplaceCWDReport.py"
@@ -14,20 +17,16 @@ SRC_FILE = "%s/%s" % (cdr.DEFAULT_LOGDIR, "CWDReplacements.log")
 
 # Parse form variables
 fields = cgi.FieldStorage()
-if not fields:
-    cdrcgi.bail("Unable to load form fields - should not happen!")
 
 # Establish user session and authorization
 # No special authorization required, it's just a report
-session = cdrcgi.getSession(fields)
-if not session:
-    cdrcgi.bail("Unknown or expired CDR session.")
+session = cdrcgi.getSession(fields) or cdrcgi.bail("Please log in")
 
 # Load fields from form
-firstDate = fields.getvalue("firstDate", None)
-userId    = fields.getvalue("userId", None)
-docType   = fields.getvalue("docType", None)
-docId     = fields.getvalue("docId", None)
+firstDate = fields.getvalue("firstDate")
+userId    = fields.getvalue("userId")
+docType   = fields.getvalue("docType")
+docId     = fields.getvalue("docId")
 action    = cdrcgi.getRequest(fields)
 
 # Normalize case for later comparisons
@@ -39,72 +38,31 @@ if action and action == "Admin Menu":
     cdrcgi.navigateTo ("Admin.py", session)
 
 # Has user seen the form yet?
-if fields.getvalue("formSeen", None) is None:
-
+if fields.getvalue("formSeen") is None:
     buttons = ('Submit', 'Admin Menu')
-    html = cdrcgi.header(TITLE, TITLE, "Enter report parameters",
-                         script=SCRIPT, buttons=buttons, stylesheet="""
-""")
-
-    html += """
-<h2>Enter report parameters</h2>
-<p>Retrieve information on documents for which someone has replaced
-the current working document (CWD) with an older version.</p>
-<p>Fill in the form to select only those replacements meeting the criteria
+    page = cdrcgi.Page("CDR Administration", subtitle=TITLE, action=SCRIPT,
+                       buttons=buttons, session=session)
+    instructions = """\
+Retrieve information on documents for which someone has replaced
+the current working document (CWD) with an older version.
+Fill in the form to select only those replacements meeting the criteria
 given in the parameter values.  All parameters are optional.  If all are
 blank, all replacements will be reported for which we have logged
-information.</p>
-
-<p>Click "Submit" when done.</p>
-
-<table border='0'>
-<tr>
-  <td align='right'>Earliest date to examine (YYYY-MM-DD): </td>
-  <td><input type='text' name='firstDate' size='10' /></td>
-</tr>
-<tr>
-  <td align='right'>User id of person replacing documents: </td>
-  <td><input type='text' name='userId' size='10' /></td>
-</tr>
-<tr>
-  <td align='right'>Document type replaced: </td>
-  <td><input type='text' name='docType' size='30' /></td>
-</tr>
-<tr>
-  <td align='right'>CDR ID (to only see one document: </td>
-  <td><input type='text' name='docId' size='20' /></td>
-</tr>
-</table>
-
-<input type='hidden' name='formSeen' value='True'>
-<input type='hidden' name='%s' value='%s'>
-</form>
-</body>
-</html>""" % (cdrcgi.SESSION, session)
-
-    cdrcgi.sendPage(html)
-
+information."""
+    page.add(page.B.FIELDSET(page.B.P(instructions)))
+    page.add("<fieldset>")
+    page.add(page.B.LEGEND("Enter Report Parameters"))
+    page.add_date_field("firstDate", "Earliest Date")
+    page.add_text_field("userId", "User ID")
+    page.add_text_field("docType", "Doc Type")
+    page.add_text_field("docId", "CDR ID")
+    page.add("</fieldset>")
+    page.add(page.B.INPUT(type="hidden", name="formSeen", value="True"))
+    page.send()
 
 # If we got here, the user has already seen and submitted the form
-
-if firstDate:
-    # Validate format
-    okay = True
-    try:
-        year  = int(firstDate[0:4])
-        month = int(firstDate[5:7])
-        day   = int(firstDate[8:10])
-    except ValueError:
-        okay = False
-    else:
-        if (year < 2000 or year > 2100 or
-            month < 1 or month > 12 or
-            day < 1 or day > 31):
-           okay = False
-    if not okay:
-        cdrcgi.bail("Y=%d  M=%d  D=%d" % (year, month, day))
-        cdrcgi.bail("Please enter date in YYYY-MM-DD format, e.g., 2010-10-01")
-
+if firstDate and not cdrcgi.is_date(firstDate):
+    cdrcgi.bail("Invalid start date")
 if docId:
     # Validate doc ID format
     try:
@@ -115,70 +73,24 @@ if docId:
         docId = str(result[1])
 
 # Construct page and report headers
-buttons = ('New Report', 'Admin Menu')
-prolog = cdrcgi.header(TITLE, TITLE, "Enter report parameters",
-                     script=SCRIPT, buttons=buttons, stylesheet="""
-  <style type='text/css'>
-   P  { text-indent: 3em; font-size: 120% }
-   TABLE.legend TH { text-indent: 3em; font-size: 100%; text-align: right }
-   TABLE.data   TH { font-size: 100%; text-align: center }
-  </style>
-""")
-
-prolog += """
-<p>Column header abbreviations:</p>
-<table class='legend' border='0'>
-<tr>
-  <th>Date/time: </th><td>YYYY-MM-DD HH:MM:SS of CWD replacement</td>
-</tr>
-<tr>
-  <th>DocID: </th><td>Affected document</td>
-</tr>
-<tr>
-  <th>DocType: </th><td>Document type of document</td>
-</tr>
-<tr>
-  <th>User: </th><td>Short user ID of person promoting the version</td>
-</tr>
-<tr>
-  <th>LV: </th><td>Version number of last version at time of promotion</td>
-</tr>
-<tr>
-  <th>PV: </th><td>Version number of last publishable version at that time, -1 = None</td>
-</tr>
-<tr>
-  <th>Chg: </th><td>'Y' = CWD was different from last version, else 'N'</td>
-</tr>
-<tr>
-  <th>V#: </th><td>Version number promoted to become CWD</td>
-</tr>
-<tr>
-  <th>V: </th><td>New CWD was also versioned</td>
-</tr>
-<tr>
-  <th>P: </th><td>New CWD was also versioned as publishable</td>
-</tr>
-<tr>
-  <th>Comment: </th><td>System generated comment ':' user entered comment</td>
-</tr>
-
-<table class='data' border='1'>
-<tr>
-  <th>Date/time</th>
-  <th>DocID</th>
-  <th>Doc type</th>
-  <th>User</th>
-  <th>LV</th>
-  <th>PV</th>
-  <th>Chg</th>
-  <th>V#</th>
-  <th>V</th>
-  <th>P</th>
-  <th>Comment</th>
-</tr>
-<br />
-"""
-
+help = (
+    "When did the replacement occur?",
+    "CDR ID of the affected document",
+    "Document type for the affected document",
+    "User ID of the user promoting the version",
+    "Version number of last version at time of promotion",
+    "Version number of last publishable version at that time, -1 = None",
+    "'Y' = CWD was different from last version, else 'N'",
+    "Version number promoted to become CWD",
+    "Was new CWD also versioned? (Y/N)",
+    "Was new CWD also versioned as publishable? (Y/N)",
+    "System generated comment ':' user entered comment",
+)
+headings = ("Date/time", "DocID", "Doc type", "User", "LV", "PV", "Chg",
+            "V#", "V", "P", "Comment")
+columns = []
+for i, h in enumerate(headings):
+    columns.append(cdrcgi.Report.Column(h, title=help[i]))
 
 # Open the file
 try:
@@ -186,8 +98,7 @@ try:
 except IOError, info:
     cdrcgi.bail("Unable to open log file: %s" % info)
 
-reportRows = []
-errMsg     = ""
+rows = []
 while True:
     # Read each line
     line = fp.readline()
@@ -197,16 +108,12 @@ while True:
     # Skip lines prior to our first date
     if firstDate and line[0:10] < firstDate:
         continue
-    # cdrcgi.bail("firstDate=%s,  firstDate[0:10]=%s" % (firstDate,
-    #            firstDate[0:10]))
 
     # Parse on tabs
     data = line.split('\t')
 
     # This is a text file, it could get corrupted, ignore corrupt lines
     if len(data) != 11:
-        errMsg = "Note: One or more lines of the log file have invalid data." \
-                 " Please inform system staff."
         continue
 
     # Filters
@@ -217,26 +124,15 @@ while True:
     if userId and data[3].lower() != userId:
         continue
 
-    # Format
-    row = "<tr> "
-    for item in data:
-        row += "<td>%s</td> " % item
-    row += " </tr>\n"
-    reportRows.append(row)
+    # Include the row if we got here.
+    row = []
+    for i, d in enumerate(data):
+        row.append(cdrcgi.Report.Cell(d.strip(), title=help[i]))
+    rows.append(row)
 
-# End stuff
-suffix = """
-</table>
-<p>Number of replacements in report: %d.</p>
-<p>%s</p>
-<input type='hidden' name='%s' value='%s'>
-</form>
-</body>
-</html>
-""" % (len(reportRows), errMsg, cdrcgi.SESSION, session)
-
-# Assemble the full report
-html = prolog + "".join(reportRows) + suffix
-
-# Display
-cdrcgi.sendPage(html)
+# Assemble and send the report.
+caption = "Replaced Documents (%d)" % len(rows)
+title = "CWD Replacement Report"
+table = cdrcgi.Report.Table(columns, rows, caption=caption)
+report = cdrcgi.Report(title, [table], banner=title)
+report.send()

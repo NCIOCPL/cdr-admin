@@ -5,11 +5,12 @@
 # track the review of Term audio files.
 #
 # BZIssue::5128
+# JIRA::OCECDR-3800 - eliminated security vulnerabilities
 #----------------------------------------------------------------------
 
-import cgi, cdrdb, cdrcgi
-import cgitb
-cgitb.enable()
+import cgi
+import cdrcgi
+import cdrdb
 
 # Constants
 SCRIPT  = "GlossaryTermAudioReviewReport.py"
@@ -30,7 +31,6 @@ def bail(ctxtMsg, e=None):
         msg += "Exception Type: %s</br />\n" % type(e)
         msg += "Exception msg: %s" % str(e)
     cdrcgi.bail(msg)
-
 
 def createZipDict(cursor, language):
     """
@@ -83,11 +83,6 @@ SELECT z.filename, z.id, complete, m.review_status, count(*) as count
         if revStat == 'R':  zipRow[3] = revCount
         if revStat == 'U':  zipRow[4] = revCount
 
-    # html=u"<html><body>";
-    # html+=u"".join(str(zipData))
-    # html+=u"</body></html>"
-    # cdrcgi.sendPage(html)
-
     return zipData
 
 # Main
@@ -95,130 +90,95 @@ if __name__ == "__main__":
 
     language  = None
     revStatus = None
-    errMsg    = ""
+    errors    = []
 
     # Find any posted parameters
-    fields = cgi.FieldStorage()
-    if fields:
-        session   = cdrcgi.getSession(fields)
-        request   = cdrcgi.getRequest(fields)
-        language  = fields.getvalue("language", None)
-        revStatus = fields.getvalue("revStatus", None)
-        startDate = fields.getvalue("startDate", "2010-01-01")
-        endDate   = fields.getvalue("endDate", "2999-01-01")
-        reportType= fields.getvalue("reportType", "full")
-        beenHere  = fields.getvalue("beenHere", None)
+    fields    = cgi.FieldStorage()
+    session   = cdrcgi.getSession(fields)
+    request   = cdrcgi.getRequest(fields)
+    language  = fields.getvalue("language")
+    revStatus = fields.getvalue("revStatus")
+    startDate = fields.getvalue("startDate", "2010-01-01")
+    endDate   = fields.getvalue("endDate", "2999-01-01")
+    reportType= fields.getvalue("reportType", "full")
+    beenHere  = fields.getvalue("beenHere")
 
-        # Extend end date to cover all of the time that day, not just 0:0:0
-        endDate += " 23:59:59"
+    # Canceled?
+    if request == "Admin Menu":
+        cdrcgi.navigateTo("Admin.py", session)
 
-        # Canceled?
-        if request == "Admin Menu":
-            cdrcgi.navigateTo("Admin.py", session)
+    # Validate inputs
+    if language and language not in ("English", "Spanish"):
+        language = None
+    if revStatus and revStatus not in ("A", "R", "U"):
+        revStatus = None
+    if not cdrcgi.is_date(startDate):
+        startDate = "2010-01-01"
+    if not cdrcgi.is_date(endDate):
+        endDate = "2999-01-01"
+    if reportType != "summary":
+        reportType = "full"
+    if beenHere:
+        # Must specify langage and review status, dates can be defaulted
+        if not language:
+            errors.append("Language is required")
+        if not revStatus:
+            errors.append("Approval status is required")
 
-        # Validate inputs
-        if beenHere:
-            # Must specify langage and review status, dates can be defaulted
-            if not language:
-                errMsg += "Language is required<br />\n"
-            if not revStatus:
-                errMsg += "Approval status is required<br />\n"
+        # Dates have to make sense
+        if endDate < startDate:
+            errors.append("End date cannot be before start date")
 
-            # Dates have to make sense
-            if endDate < startDate:
-                errMsg += "End date cannot be before start date<br />\n"
-
-            if errMsg:
-                errMsg = "<p class='errmsg'>" + errMsg + "</p>\n"
-
-
-    # Stylesheet for both versions of output
-    stylesheet = """\
-    <link type='text/css' rel='stylesheet'
-          href='/stylesheets/CdrCalendar.css'>
-    <script type='text/javascript' language='JavaScript'
-             src='/js/CdrCalendar.js'></script>
-    <style type='text/css'>
-      h1         {font: 16pt 'Times New Roman'; font-weight: bold;
-                  text-align: center;}
-      .errmsg    {font: 11pt 'Times New Roman'; color: red; font-weight: bold;}
-      th         {font: 12pt 'Times New Roman'; font-weight: bold;
-                  background-color: blue; color: white; text-align: left;}
-      td         {font: 11pt 'Times New Roman';}
-      /* tr:nth-child(odd) {background-color: #ffe; } */
-      td.summary {font: 10pt 'Times New Roman'; font-weight: bold;}
-      p          {font: 14pt 'Times New Roman';}
-      p.totals   {text-align: center; font-weight: bold;}
-      table.data {margin-left: auto; margin-right: auto;
-                  margin-bottom: 2em; width: 75%;}
-     </style>"""
-
-    html = []
+    # Extend end date to cover all of the time that day, not just 0:0:0
+    endDate += " 23:59:59"
 
     #######################################################
     # Prompt for inputs if we don't have what we need
     #######################################################
-    if not fields or not language or not revStatus or errMsg:
-        # Headers
+    if not language or not revStatus or errors:
         buttons = ('Submit', 'Admin Menu')
-        html.append(cdrcgi.header(HEADER, HEADER,
-                                  "Enter report parameters",
-                                  script=SCRIPT, buttons=buttons,
-                                  stylesheet=stylesheet))
-
-        # html.append("<h1>Term Audio Pronunciation Review Report</h1>")
-
-        html.append("""\
-<p>Select a language and approval status for the term names to include in the
-report.  Optionally add start and/or end dates for the term reviews to
-limit the size of the output.</p>
-%s
-<fieldset>
- <legend> Select Language </legend>
-   <input type="radio" name="language" value="English" />
-   <label for="English">English</label>
-   <br />
-   <input type="radio" name="language" value="Spanish" />
-   <label for="Spanish">Spanish</label>
-</fieldset>
-<fieldset>
- <legend> Select Approval Status </legend>
-   <input type="radio" name="revStatus" value="A" />
-   <label for="A">Approved</label>
-   <br />
-   <input type="radio" name="revStatus" value="R" />
-   <label for="R">Rejected</label>
-   <br />
-   <input type="radio" name="revStatus" value="U" />
-   <label for="U">Unreviewed</label>
-</fieldset>
-<fieldset>
- <legend> Select Full or Summary Report </legend>
-   <input type="radio" name="reportType" value="full" checked="checked" />
-   <label for="full">Full report showing terms</label>
-   <br />
-   <input type="radio" name="reportType" value="summary" />
-   <label for="summary">Summary report with grand totals only</label>
-</fieldset>
-<fieldset>
- <legend> Optional Start and End Dates </legend>
-   <input type="text" name="startDate" id="startDate"
-          class="CdrDateField size="10" />
-   <label for="startDate">Start date</label>
-   <br />
-   <input type="text" name="endDate" id="endDate"
-          class="CdrDateField size="10" />
-   <label for="endDate">End date</label>
-</fieldset>
-
-<input type="hidden" name="beenHere" value="beenHere" />
-<input type="hidden" name="%s" value="%s" />
-</form>
-</body>
-</html>""" % (errMsg, cdrcgi.SESSION, session))
-
-        html = u"\n".join(html)
-        cdrcgi.sendPage(html)
+        page = cdrcgi.Page(HEADER, subtitle="Enter report parameters",
+                           action=SCRIPT, buttons=buttons, session=session)
+        instructions = (
+            "Select a language and approval status for the term names "
+            "to include in the report.  Optionally add start and/or "
+            "end dates for the term reviews to limit the size of the output."
+        )
+        page.add(page.B.FIELDSET(page.B.P(instructions)))
+        if errors:
+            page.add("<fieldset>")
+            page.add(page.B.LEGEND("Validation Errors", page.B.CLASS("error")))
+            page.add("<ul class='error'>")
+            for error in errors:
+                page.add(page.B.LI(error))
+            page.add("</ul>")
+            page.add("</fieldset>")
+        page.add("<fieldset>")
+        page.add(page.B.LEGEND("Select Language"))
+        page.add_radio("language", "English", "English")
+        page.add_radio("language", "Spanish", "Spanish")
+        page.add("</fieldset>")
+        page.add("<fieldset>")
+        page.add(page.B.LEGEND("Select Approval Status"))
+        page.add_radio("revStatus", "Approved", "A")
+        page.add_radio("revStatus", "Rejected", "R")
+        page.add_radio("revStatus", "Unreviewed", "U")
+        page.add("</fieldset>")
+        page.add("<fieldset>")
+        page.add(page.B.LEGEND("Select Full or Summary Report"))
+        page.add_radio("reportType", "Full report showing terms", "full",
+                       checked=True)
+        page.add_radio("reportType", "Summary report with grand totals only",
+                       "summary")
+        page.add("</fieldset>")
+        page.add("<fieldset>")
+        page.add(page.B.LEGEND("Optional Start and End Dates"))
+        page.add_date_field("startDate", "Start date")
+        page.add_date_field("endDate", "End date")
+        page.add("</fieldset>")
+        page.add(page.B.INPUT(name="beenHere", value="beenHere",
+                              type="hidden"))
+        page.send()
 
     #######################################################
     # We have input parameters.  Create the report.
@@ -253,6 +213,27 @@ SELECT z.id, m.term_name, m.review_date, u.fullname
         cursor.execute(qry, (language, revStatus, startDate, endDate))
     except Exception as e:
         bail("Error fetching term status", e)
+
+    # Formatting for report
+    stylesheet = """\
+    <link type='text/css' rel='stylesheet'
+          href='/stylesheets/CdrCalendar.css'>
+    <script type='text/javascript' language='JavaScript'
+             src='/js/CdrCalendar.js'></script>
+    <style type='text/css'>
+      h1         {font: 16pt 'Times New Roman'; font-weight: bold;
+                  text-align: center;}
+      .errmsg    {font: 11pt 'Times New Roman'; color: red; font-weight: bold;}
+      th         {font: 12pt 'Times New Roman'; font-weight: bold;
+                  background-color: blue; color: white; text-align: left;}
+      td         {font: 11pt 'Times New Roman';}
+      /* tr:nth-child(odd) {background-color: #ffe; } */
+      td.summary {font: 10pt 'Times New Roman'; font-weight: bold;}
+      p          {font: 14pt 'Times New Roman';}
+      p.totals   {text-align: center; font-weight: bold;}
+      table.data {margin-left: auto; margin-right: auto;
+                  margin-bottom: 2em; width: 75%;}
+     </style>"""
 
     html = []
     buttons = ("Another report", cdrcgi.MAINMENU)
@@ -340,7 +321,6 @@ SELECT z.id, m.term_name, m.review_date, u.fullname
 </body>
 </html>
 """ % (cdrcgi.SESSION, session))
-
 
     html = u"".join(html)
     cdrcgi.sendPage(html)

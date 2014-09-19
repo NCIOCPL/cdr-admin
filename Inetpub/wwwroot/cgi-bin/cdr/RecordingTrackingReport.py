@@ -7,157 +7,74 @@
 #
 # BZIssue::4880 - Board Meeting Recordings Tracking Report
 #                 (report adapted from Media Tracking Report)
-# BZIssue::5068 - [Media] Board Meeting Recording Tracking Report to 
-#                 display blocked documents 
-# 
+# BZIssue::5068 - [Media] Board Meeting Recording Tracking Report to
+#                 display blocked documents
+# JIRA::OCECDR-3800 - Address security vulnerabilities
+#
 #----------------------------------------------------------------------
-import cgi, cdr, cdrdb, cdrcgi, time, xml.dom.minidom
-import ExcelWriter, sys
+import cgi
+import cdr
+import cdrdb
+import cdrcgi
+import datetime
+import lxml.etree as etree
+import ExcelWriter
+import sys
 
 #----------------------------------------------------------------------
 # Set the form variables.
 #----------------------------------------------------------------------
+cursor   = cdrdb.connect("CdrGuest").cursor()
 fields   = cgi.FieldStorage()
-session  = fields and fields.getvalue("Session") or None
-fromDate = fields and fields.getvalue('FromDate') or None
-toDate   = fields and fields.getvalue('ToDate') or None
+session  = cdrcgi.getSession(fields)
 request  = cdrcgi.getRequest(fields)
+fromDate = fields.getvalue('FromDate')
+toDate   = fields.getvalue('ToDate')
+today    = datetime.date.today().strftime("%B %d, %Y")
 title    = "CDR Administration"
-instr    = "Board Meeting Recordings Tracking Report"
+instr    = "Board Meeting Recordings Tracking Report - %s" % today
 buttons  = ["Submit", "Report Menu", cdrcgi.MAINMENU, "Log Out"]
 script   = "RecordingTrackingReport.py"
 
 #----------------------------------------------------------------------
-# Build date string for header.
-#----------------------------------------------------------------------
-dateString = time.strftime("%B %d, %Y")
-
-jscript = """
-<style type="text/css">
-body {
-    font-family: sans-serif;
-    font-size: 11pt;
-    }
-legend  {
-    font-weight: bold;
-    color: teal;
-    font-family: sans-serif;
-    }
-fieldset {
-    width: 500px;
-    margin-left: auto;
-    margin-right: auto;
-    display: block;
-    }
-p.title {
-    font-family: sans-serif;
-    font-size: 11pt;
-    font-weight: bold;
-    }
-*.tablecenter {
-    margin-left: auto;
-    margin-right: auto;
-    }
-*.CdrDateField {
-    width: 100px;
-    }
-*.mittich {
-    width: 50px; 
-    margin-left: auto;
-    margin-right: auto;
-    display: block;
-    }
-td.top {
-    vertical-align: text-top;
-    }
-</style>
-
-<link   type='text/css' rel='stylesheet' href='/stylesheets/CdrCalendar.css'>
-<script type='text/javascript' language='JavaScript' src='/js/CdrCalendar.js'></script>
-
-"""
-header = cdrcgi.header(title, title, instr + ' - ' + dateString, 
-                           script, buttons, 
-                           numBreaks = 1,stylesheet = jscript)
-
-#----------------------------------------------------------------------
-# Handle requests.
+# Handle navigation requests.
 #----------------------------------------------------------------------
 if request == cdrcgi.MAINMENU:
     cdrcgi.navigateTo("Admin.py", session)
 elif request == "Report Menu":
     cdrcgi.navigateTo("Reports.py", session)
-elif request == "Log Out": 
+elif request == "Log Out":
     cdrcgi.logout(session)
 
-# ---------------------------------------------------------------------
-# Create Database connection
-# ---------------------------------------------------------------------
-conn = cdrdb.connect('CdrGuest')
-cursor = conn.cursor()
-
 #----------------------------------------------------------------------
-# Ask the user for the report parameters.
+# Ask the user for the report parameters. William asked that the start
+# date be hard-code to March 1, 2010
 #----------------------------------------------------------------------
-if not fromDate or not toDate:
-    now         = time.localtime(time.time())
-    toDateNew   = time.strftime("%Y-%m-%d", now)
-    then        = list(now)
-    then[1]    -= 1
-    then[2]    += 1
-    then        = time.localtime(time.mktime(then))
-    fromDateNew = time.strftime("%Y-%m-%d", then)
-    toDate      = toDate or toDateNew
-    fromDate    = fromDate or fromDateNew
-
-    form        = """\
-   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-    <fieldset>
-     <legend>&nbsp;Select Date Range&nbsp;</legend>
-
-    <table class="tablecenter" border="0">
-     <tr>
-      <td align="right">
-       <label for="FromDate">Start Date: </label>
-      </td>
-      <td>
-       <input id="FromDate" name="FromDate" 
-                value="2010-03-01"
-                class="CdrDateField">
-      </td>
-     </tr>
-     <tr>
-      <td align="right">
-       <label for="ToDate">End Date: </label>
-      </td>
-      <td>
-       <input id="ToDate" name="ToDate" 
-                value="%s"
-                class="CdrDateField">
-      </td>
-     </tr>
-    </table>
-    </fieldset>
-
-    <p/>
-  </FORM>
- </BODY>
-</HTML>
-""" % (cdrcgi.SESSION, session, toDateNew)
-    cdrcgi.sendPage(header + form)
+if not cdrcgi.is_date(fromDate) or not cdrcgi.is_date(toDate):
+    toDate = datetime.date.today()
+    #fromDate = toDate - datetime.timedelta(30)
+    fromDate = "2010-03-01"
+    page = cdrcgi.Page(title, subtitle=instr, action=script,
+                       buttons=buttons, session=session)
+    page.add("<fieldset>")
+    page.add(page.B.LEGEND("Select Date Range"))
+    page.add_date_field("FromDate", "Start Date", value=fromDate)
+    page.add_date_field("ToDate", "End Date", value=toDate)
+    page.add("</fieldset>")
+    page.send()
 
 class Status:
     def __init__(self, node):
         self.value = u''
         self.date = u''
         self.comment = u''
-        for child in node.childNodes:
-            if child.nodeName == 'ProcessingStatusValue':
-                self.value = cdr.getTextContent(child)
-            elif child.nodeName == 'ProcessingStatusDate':
-                self.date = cdr.getTextContent(child)
-            elif child.nodeName == 'Comment' and not self.comment:
-                self.comment = cdr.getTextContent(child).strip()
+        for child in node:
+            if child.tag == "ProcessingStatusValue":
+                self.value = child.text
+            elif child.tag == "ProcessingStatusDate":
+                self.date = child.text
+            elif child.tag == "Comment" and not self.comment:
+                self.comment = child.text.strip()
     def addToRow(self, row, dateStyle):
         row.addCell(4, self.value)
         row.addCell(5, self.date)
@@ -175,53 +92,42 @@ class MediaDoc:
         self.comment       = None
         self.dateCreated   = None
         self.dateVersioned = None
-        self.statuses  = []
+        self.statuses      = []
 
         # Get the date the document was first saved (this can be different
         # then the date of the first version)
         # ----------------------------------------------------------------
-        cursor.execute("""\
-            SELECT at.dt 
-              FROM audit_trail at
-              JOIN action ac
-                ON at.action = ac.id
-               AND name = 'Add Document'
-             WHERE document = ?""", docId)
-
-        rows = cursor.fetchall()
+        query = cdrdb.Query("audit_trail t", "t.dt")
+        query.join("action a", "a.id = t.action AND a.name = 'Add Document'")
+        query.where(query.Condition("t.document", docId))
+        rows = query.execute(cursor).fetchall()
         self.dateCreated = rows and rows[0][0] and str(rows[0][0])[:10] or None
 
         # Get the date the document was last versioned
         # ----------------------------------------------------------------
-        cursor.execute("""\
-            SELECT id, MAX(num), dt, publishable
-              FROM doc_version
-             WHERE id = ?
-             GROUP BY id, dt, publishable""", docId)
-
-        rows = cursor.fetchall()
+        query = cdrdb.Query("doc_version", "id", "MAX(num)", "dt",
+                            "publishable").group("id", "dt", "publishable")
+        query.where(query.Condition("id", docId))
+        rows = query.execute(cursor).fetchall()
         self.dateVersioned = rows and rows[0][2] \
                                   and str(rows[0][2])[:10] or None
         self.flag = rows and rows[0][3] and str(rows[0][3]) or None
 
         # Get the XML of the document to select additional data elements
         # --------------------------------------------------------------
-        cursor.execute("""\
-            SELECT xml 
-              FROM document 
-             WHERE id = ?""", docId)
-
-        docXml = cursor.fetchall()[0][0]
-        dom = xml.dom.minidom.parseString(docXml.encode('utf-8'))
-        for node in dom.documentElement.childNodes:
-            if node.nodeName == 'ProcessingStatuses':
-                for child in node.childNodes:
-                    if child.nodeName == 'ProcessingStatus':
+        query = cdrdb.Query("document", "xml")
+        query.where(query.Condition("id", docId))
+        docXml = query.execute(cursor).fetchall()[0][0]
+        tree = etree.XML(docXml.encode("utf-8"))
+        for node in tree:
+            if node.tag == "ProcessingStatuses":
+                for child in node:
+                    if child.tag == "ProcessingStatus":
                         self.statuses.append(Status(child))
-            elif node.nodeName == 'MediaTitle':
-                self.title = cdr.getTextContent(node)
-            elif node.nodeName == 'Comment':
-                self.comment = cdr.getTextContent(node)
+            elif node.tag == "MediaTitle":
+                self.title = node.text
+            elif node.tag == "Comment":
+                self.comment = node.text
 
     def addToSheet(self, sheet, dateStyle, rowNum):
         row = sheet.addRow(rowNum)
@@ -239,31 +145,25 @@ class MediaDoc:
         row.addCell(7, self.comment, mergeDown = mergeDown)
 
         return rowNum + 1
-        
+
 #----------------------------------------------------------------------
-# Create/display the report.
-# ---------------------------------------------------------------------
-cursor.execute("""\
-         SELECT d.id, d.title, r.value, MAX(v.dt)
-           -- Several Meeting Recording documents are blocked.
-           -- FROM active_doc d
-           FROM document d
-           JOIN doc_type t
-             ON t.id = d.doc_type
-           JOIN doc_version v
-             ON v.id = d.id
-           JOIN query_term c
-             ON d.id = c.doc_id
-            AND c.path = '/Media/MediaContent/Categories/Category'
-           JOIN query_term r
-             ON d.id = r.doc_id
-            AND r.path = '/Media/PhysicalMedia/SoundData/SoundEncoding'
-          WHERE t.name = 'Media'
-            AND c.value = 'Meeting Recording'
-       GROUP BY d.id, d.title, r.value
-         HAVING MAX(v.dt) BETWEEN '%s' AND DATEADD(s, -1, DATEADD(d, 1, '%s'))
-       ORDER BY d.title
-""" % (fromDate, toDate), timeout = 300)
+# Create/display the report. Can't use the active_doc view, because
+# several of the meeting recording documents are blocked. String
+# interpolation for the dates in the HAVING clause is safe, because
+# we have vetted them with calls to cdrcgi.is_date().
+#----------------------------------------------------------------------
+query = cdrdb.Query("document d", "d.id", "d.title", "r.value", "MAX(v.dt)")
+query.join("doc_type t", "t.id = d.doc_type")
+query.join("doc_version v", "v.id = d.id")
+query.join("query_term c", "d.id = c.doc_id")
+query.join("query_term r", "d.id = r.doc_id")
+query.where("c.path = '/Media/MediaContent/Categories/Category'")
+query.where("r.path = '/Media/PhysicalMedia/SoundData/SoundEncoding'")
+query.where("t.name = 'Media'")
+query.where("c.value = 'Meeting Recording'")
+query.group("d.id", "d.title", "r.value")
+query.having("MAX(v.dt) BETWEEN '%s' AND '%s 23:59:59'" % (fromDate, toDate))
+query.order("d.title").execute(cursor, 300)
 
 #----------------------------------------------------------------------
 # Set up the spreadsheet.
@@ -285,12 +185,12 @@ f         = ExcelWriter.Font(family = 'Swiss', size = 12, bold = True)
 h1Style   = wb.addStyle(font = f, alignment = a, borders = b)
 ws        = wb.addWorksheet("Board Meeting Recordings", tdStyle, frozenRows = 3)
 ws.addCol(1,  45)
-ws.addCol(2, 200)
+ws.addCol(2, 300)
 ws.addCol(3,  50)
 ws.addCol(4,  55)
 ws.addCol(5,  70)
 ws.addCol(6,  55)
-ws.addCol(7, 200)
+ws.addCol(7, 300)
 row      = ws.addRow(1, h1Style, 15.75)
 title    = 'Board Meeting Recordings Tracking Report'
 row.addCell(1, title, mergeAcross = 6, style = h1Style)
@@ -312,7 +212,8 @@ rowNum = 4
 for docId, docTitle, encoding, created in cursor.fetchall():
     mediaDoc = MediaDoc(cursor, docId, docTitle, encoding)
     rowNum = mediaDoc.addToSheet(ws, dateStyle, rowNum)
-name = 'RecordingTrackingReport-%s.xls' % time.strftime("%Y%m%d%H%M%S")
+now = datetime.datetime.now()
+name = 'RecordingTrackingReport-%s.xls' % now.strftime("%Y%m%d%H%M%S")
 if sys.platform == "win32":
     import os, msvcrt
     msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)

@@ -2,56 +2,33 @@
 #
 # $Id$
 #
-# Report to list Media documents modified between a certain time 
-# interval.  The user can select to filter by a category and/or
-# diagnosis.
+# Report to list Media documents, optionally filtered by
+# category and/or diagnosis.
 #
-# $Log: not supported by cvs2svn $
+# JIRA::OCECDR-3800 - Address security vulnerabilities
 #
 #----------------------------------------------------------------------
-import cdr, cgi, cdrcgi, time, cdrdb
+import cgi
+import cdrcgi
+import cdrdb
+import datetime
 
 #----------------------------------------------------------------------
 # Set the form variables.
 #----------------------------------------------------------------------
 fields    = cgi.FieldStorage()
 session   = cdrcgi.getSession(fields)
-showId    = fields and fields.getvalue("showId")           or "N"
-#submit    = fields and fields.getvalue("SubmitButton")     or None
-diagnoses = fields and fields.getvalue("Diagnosis")        or []
-categories= fields and fields.getvalue("Category")         or []
+show_id   = fields.getvalue("show_id") == "N"
+diagnosis = fields.getlist("diagnosis")
+category  = fields.getlist("category")
 request   = cdrcgi.getRequest(fields)
 title     = "CDR Media List"
 instr     = "Media Lists"
 script    = "MediaLists.py"
 SUBMENU   = "Report Menu"
+buttons   = ("Submit", SUBMENU, cdrcgi.MAINMENU)
 
-
-# ------------------------------------------------
-# Create the table row for the report
-# ------------------------------------------------
-def summaryRow(summary):
-    """Return the HTML code to display a Summary row"""
-    html = """\
-   <LI class="report">%s</LI>
-""" % (row[1])
-    return html
-
-
-# -------------------------------------------------
-# Create the table row with CDR-ID for the report
-# -------------------------------------------------
-def summaryRowWithID(id, summary):
-    """Return the HTML code to display a Summary row with ID"""
-    html = """\
-   <TR>
-    <TD class="report cdrid" width = "8%%">%s</TD>
-    <TD class="report">%s</TD>
-   </TR>
-""" % (id, summary)
-    return html
-
-
+#----------------------------------------------------------------------
 # Handle navigation requests.
 #----------------------------------------------------------------------
 if request == cdrcgi.MAINMENU:
@@ -69,308 +46,99 @@ except cdrdb.Error, info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
 
 #----------------------------------------------------------------------
-# Build date string for header.
+# Assemble the lists of valid values.
 #----------------------------------------------------------------------
-dateString = time.strftime("%B %d, %Y")
+query = cdrdb.Query("query_term t", "t.doc_id", "t.value").order(2).unique()
+query.join("query_term m", "m.int_val = t.doc_id")
+query.where("t.path = '/Term/PreferredName'")
+query.where("m.path = '/Media/MediaContent/Diagnoses/Diagnosis/@cdr:ref'")
+results = query.execute(cursor).fetchall()
+diagnoses = [("any", "Any Diagnosis")] + results
+query = cdrdb.Query("query_term", "value", "value").order(1).unique()
+query.where("path = '/Media/MediaContent/Categories/Category'")
+query.where("value <> ''")
+results = query.execute(cursor).fetchall()
+categories = [("any", "Any Category")] + results
 
-# ---------------------------------------------------------------------
-# Select all the existing categories in the data to be displayed in 
-# the selection window
-# ---------------------------------------------------------------------
-def getCategories():
-    query = """
-       SELECT DISTINCT value
-         FROM query_term
-        WHERE path = '/Media/MediaContent/Categories/Category'"""
-    try:
-        cursor.execute(query)
-    except cdrdb.Error, info:
-        cdrcgi.bail('Failure retrieving categories: %s' %
-                info[1][0])
-    return cursor.fetchall()
-
-# ---------------------------------------------------------------------
-# Select all the existing diagnoses names in the data to be displayed
-# on the final report
-# ---------------------------------------------------------------------
-def getDiagnosesNames(cdrIds):
-    if not cdrIds:
-        return
-
-    query = """
-       SELECT value
-         FROM query_term
-        WHERE path = '/Term/PreferredName'
-          AND doc_id in (%s)
-        ORDER BY value""" % cdrIds
-    try:
-        cursor.execute(query)
-    except cdrdb.Error, info:
-        cdrcgi.bail('Failure retrieving diagnosis names: %s' %
-                info[1][0])
-    rows = cursor.fetchall()
-    return ', '.join(['%s' % row[0] for row in rows])
-
-
-# ---------------------------------------------------------------------
-# Select all the existing diagnoses IDs in the data to be displayed in 
-# the selection box.
-# ---------------------------------------------------------------------
-def getDiagnoses():
-    query = """
-       SELECT DISTINCT t.doc_id, t.value
-         FROM query_term t
-         JOIN query_term m
-           ON t.doc_id = m.int_val
-          AND m.path = '/Media/MediaContent/Diagnoses/Diagnosis/@cdr:ref'
-        WHERE t.path = '/Term/PreferredName'
-        ORDER BY t.value"""
-    try:
-        cursor.execute(query)
-    except cdrdb.Error, info:
-        cdrcgi.bail('Failure retrieving diagnosis: %s' %
-                info[1][0])
-    return cursor.fetchall()
+#----------------------------------------------------------------------
+# Validate the form values. The expectation is that any bogus values
+# will come from someone tampering with the form, so no need to provide
+# the hacker with any useful diagnostic information.
+#----------------------------------------------------------------------
+for value, values in ((diagnosis, diagnoses), (category, categories)):
+    values = [str(v[0]).lower() for v in values]
+    for val in value:
+        if val.lower() not in values:
+            cdrcgi.bail("Corrupted form value")
 
 #----------------------------------------------------------------------
 # If we don't have a request, put up the form.
 #----------------------------------------------------------------------
-if not categories:
-    header = cdrcgi.header(title, title, instr + ' - ' + dateString, 
-                           script,
-                           ("Submit",
-                            SUBMENU,
-                            cdrcgi.MAINMENU),
-                           numBreaks = 1,
-                           stylesheet = """
-   <link type='text/css' rel='stylesheet' href='/stylesheets/CdrCalendar.css'>
-   <script language='JavaScript' src='/js/CdrCalendar.js'></script>
-
-   <STYLE type="text/css">
-    TD      { font-size:  12pt; }
-    LI.none { list-style-type: none }
-    DL      { margin-left: 0; padding-left: 0 }
-   </STYLE>
-   <script language='JavaScript'>
-    function someEnglish() {
-        document.getElementById('allEn').checked = false;
-    }
-    function someSpanish() {
-        document.getElementById('allEs').checked = false;
-    }
-    function allEnglish(widget, n) {
-        for (var i = 1; i <= n; ++i)
-            document.getElementById('E' + i).checked = false;
-    }
-    function allSpanish(widget, n) {
-        for (var i = 1; i <= n; ++i)
-            document.getElementById('S' + i).checked = false;
-    }
-   </script>
-
-"""                           )
-    form   = """\
-   <input type='hidden' name='%s' value='%s'>
- 
-   <fieldset>
-    <legend>&nbsp;Display CDR-ID?&nbsp;</legend>
-    <input name='showId' type='radio' id="idNo"
-           value='N' CHECKED>
-    <label for="idNo">Without CDR-ID</label>
-    <br>
-    <input name='showId' type='radio' id="idYes"
-           value='Y'>
-    <label for="idYes">With CDR-ID</label>
-   </fieldset>
-""" % (cdrcgi.SESSION, session)
-
-    # Build the option list for the categories
-    # -----------------------------------------
-    form  += """\
-   <fieldset>
-    <legend>&nbsp;Select Categories&nbsp;</legend>
-    <select name='Category' multiple='1' size='7'>
-     <option value='any' selected='1'>All Categories</option>
-"""
-    for category in getCategories():
-        form += "     <option value='%s'>%s</option>\n" % (category[0], 
-                                                           category[0])
-    form += """    </select>
-   </fieldset>
-"""
-
-    # Build the option list for the diagnoses
-    # -----------------------------------------
-    form  += """\
-   <fieldset>
-    <legend>&nbsp;Select Diagnoses&nbsp;</legend>
-    <select name='Diagnosis' multiple='1' size='7'>
-     <option value='any' selected='1'>All Diagnoses</option>
-"""
-    for cdrId, diagnosis in getDiagnoses():
-        form += "     <option value='%s'>%s</option>\n" % (cdrId, 
-                                                           diagnosis)
-    form += """    </select>
-   </fieldset>
-"""
-
-    form  += """\
-  </form>
- </body>
-</html>
-"""
-    cdrcgi.sendPage(header + form)
-
-# Build the string for the categories to be passed to the IN statement
-# --------------------------------------------------------------------
-if type(categories) == type([]):
-    filterCat = ", ".join(["'%s'" % x for x in categories])
-elif type(categories) == type('') and categories == 'any':
-    filterCat = ''
-else:
-    filterCat = "'%s'" % categories
-
-# Build the string for the diagnoses to be passed to the IN statement
-# --------------------------------------------------------------------
-if type(diagnoses) == type([]):
-    filterDiag = ", ".join(["%s" % x for x in diagnoses])
-elif type(diagnoses) == type('') and diagnoses == 'any':
-    filterDiag = ''
-else:
-    filterDiag = diagnoses
-
-# We need the names for the diagnoses to display on the report.
-# -------------------------------------------------------------
-textDiag = getDiagnosesNames(filterDiag)
+if not categories or not request:
+    page = cdrcgi.Page(title, subtitle=instr, action=script,
+                       buttons=buttons, session=session)
+    page.add("<fieldset>")
+    page.add(page.B.LEGEND("Report Filtering"))
+    page.add_select("diagnosis", "Diagnosis", diagnoses, "any", multiple=True)
+    page.add_select("category", "Category", categories, "any", multiple=True)
+    page.add("</fieldset>")
+    page.add("<fieldset>")
+    page.add(page.B.LEGEND("Display Options"))
+    page.add_radio("show_id", "Do not include CDR ID", "N", checked=True)
+    page.add_radio("show_id", "Include CDR ID", "Y")
+    page.add("</fieldset>")
+    page.send()
 
 #----------------------------------------------------------------------
-# Selections have been made, build the SQL query
-# If categories and diagnoses are selected they are combined with AND
+# Build the SQL query.
 #----------------------------------------------------------------------
-if filterCat:
-    cat_join = """\
-  JOIN query_term c
-    ON c.doc_id = m.doc_id
-   AND c.path = '/Media/MediaContent/Categories/Category'"""
-    cat_where = "   AND c.value in (%s)" % filterCat
+content_path = "/Media/MediaContent"
+diagnosis_path = content_path + "/Diagnoses/Diagnosis/@cdr:ref"
+category_path = content_path + "/Categories/Category"
+query = cdrdb.Query("query_term m", "m.doc_id", "m.value").unique().order(2)
+query.where("m.path = '/Media/MediaTitle'")
+if category and "any" not in category:
+    query.join("query_term c", "c.doc_id = m.doc_id")
+    query.where(query.Condition("c.path", category_path))
+    query.where(query.Condition("c.value", category, "IN"))
+    category_names = ", ".join(category)
 else:
-    cat_join = ''
-    cat_where = ''
-
-if filterDiag:
-    diag_join = """\
-   JOIN query_term d
-     ON d.doc_id = m.doc_id
-    AND d.path = '/Media/MediaContent/Diagnoses/Diagnosis/@cdr:ref'"""
-    diag_where = "   AND d.int_val in (%s)" % filterDiag
+    category_names = "Any Category"
+if diagnosis and "any" not in diagnosis:
+    query.join("query_term d", "d.doc_id = m.doc_id")
+    query.where(query.Condition("d.path", diagnosis_path))
+    query.where(query.Condition("d.int_val", diagnosis, "IN"))
+    diag_query = cdrdb.Query("query_term", "value").order(1)
+    diag_query.where("path = '/Term/PreferredName'")
+    diag_query.where(query.Condition("doc_id", diagnosis, "IN"))
+    diagnosis_names = [row[0] for row in diag_query.execute().fetchall()]
+    diagnosis_names = u", ".join(diagnosis_names)
 else:
-    diag_join = ''
-    diag_where = ''
+    diagnosis_names = "Any Diagnosis"
 
-# Put all the pieces together for the SELECT statement
-# -------------------------------------------------------------
-query = """\
-SELECT DISTINCT m.doc_id, m.value
-  FROM query_term m
-%s
-%s
- WHERE m.path = '/Media/MediaTitle'
-%s
-%s
- ORDER BY m.value
-""" % (cat_join, diag_join, cat_where, diag_where)
-
-if not query:
-    cdrcgi.bail('No query criteria specified')   
-
+#----------------------------------------------------------------------
 # Submit the query to the database.
 #----------------------------------------------------------------------
 try:
-    cursor.execute(query)
-    rows = cursor.fetchall()
+    rows = query.execute(cursor).fetchall()
 except cdrdb.Error, info:
-    cdrcgi.bail('Failure retrieving Media documents: %s' %
-                info[1][0])
-     
+    cdrcgi.bail('Failure retrieving Media documents: %s' % info[1][0])
 if not rows:
-    cdrcgi.bail('No Records Found for Selection: (%s) and (%s)' % (
-                 str(categories), str(textDiag)))
+    criteria = "Diagnosis: %s; Condition: %s" % (diagnosis_names,
+                                                 category_names)
+    cdrcgi.bail("No Records Found for Criteria: %s" % criteria)
 
-# Counting the number of summaries per board
-# ------------------------------------------
-recordCount = len(rows)
-
-# Create the results page.
 #----------------------------------------------------------------------
-instr     = 'Media List -- %s.' % (dateString)
-header    = cdrcgi.rptHeader(title, instr, 
-                          stylesheet = """\
-   <STYLE type="text/css">
-    DL             { margin-left:    0; 
-                     padding-left:   0;
-                     margin-top:    10px;
-                     margin-bottom: 30px; }
-    TABLE          { margin-top:    10px; 
-                     margin-bottom: 30px; } 
-
-    *.date         { font-size: 12pt; }
-    *.sectionHdr   { font-size: 12pt;
-                     font-weight: bold; }
-    td.report      { font-size: 11pt;
-                     padding-right: 15px; 
-                     vertical-align: top; }
-    *.cdrid        { text-align: right }
-    LI             { list-style-type: none }
-    li.report      { font-size: 11pt;
-                     font-weight: normal; }
-    div.es          { height: 10px; }
-   </STYLE>
-""")
-
-# -------------------------
-# Display the Report Title
-# -------------------------
-report    = """\
-   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-  </FORM>
-  <H3>PDQ Media Documents (%d)<br>
-  <span class="date">%s</span>
-  </H3>
-""" % (cdrcgi.SESSION, session, recordCount, dateString)
-
-report += """\
-  <span class="sectionHdr">Category: %s</span><br>
-  <span class="sectionHdr">Diagnosis: %s</span>
-""" % (filterCat.replace("'", "") or 'All', textDiag or 'All')
-
-# -------------------------------------------------------------------
-# Decision if the CDR IDs are displayed along with the Media names
-# - The report without CDR ID is displayed as a list.
-# - The report with    CDR ID is displayed in a table format.
-# -------------------------------------------------------------------
-if showId == 'N':
-    report += """\
-  <DL>
-"""
-    for row in rows:
-        report += summaryRow(row[1])
-else:
-    report += """\
-  <TABLE width = "100%%">
-"""
-
-    for row in rows:
-        report += summaryRowWithID(row[0], row[1])
-
-    report += """
-  </TABLE>
-"""
-
-footer = """\
- </BODY>
-</HTML> 
-"""     
-
-# Send the page back to the browser.
+# Assemble and return the report.
 #----------------------------------------------------------------------
-cdrcgi.sendPage(header + report + footer)
+id_column = cdrcgi.Report.Column("Doc ID", width="80px")
+title_column = cdrcgi.Report.Column("Doc Title", width="800px")
+columns = show_id and [id_column, title_column] or [title_column]
+if not show_id:
+    rows = [[row[1]] for row in rows]
+caption = ("Category: %s" % category_names, "Diagnosis: %s" % diagnosis_names)
+title = "PDQ Media Documents (%d)" % len(rows)
+subtitle = "Media List -- %s" % datetime.date.today().strftime("%B %d, %Y")
+table = cdrcgi.Report.Table(columns, rows, caption=caption)
+report = cdrcgi.Report(title, [table], banner=title, subtitle=subtitle)
+report.send()

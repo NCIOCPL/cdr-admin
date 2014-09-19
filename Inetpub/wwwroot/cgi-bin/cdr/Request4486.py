@@ -6,52 +6,35 @@
 # consistency in the wording of definitions."
 #
 # BZIssue::4745 (eliminate empty pronunciation parens; ignore case mismatch)
+# JIRA::OCECDR-3800 - Address security vulnerabilities
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrdb, cdrcgi, time, xml.dom.minidom
+import cgi
+import cdr
+import cdrdb
+import cdrcgi
+import datetime
+import xml.dom.minidom
 
 #----------------------------------------------------------------------
 # Set the form variables.
 #----------------------------------------------------------------------
+cursor    = cdrdb.connect("CdrGuest").cursor()
 fields    = cgi.FieldStorage()
-session   = cdrcgi.getSession(fields)
+session   = cdrcgi.getSession(fields) or cdrcgi.bail("Please log in.")
 request   = cdrcgi.getRequest(fields)
 termType  = fields.getvalue("type")
 termName  = fields.getvalue("name")
 defText   = fields.getvalue("text")
 status    = fields.getvalue("stat")
-spanish   = fields.getvalue("span")
+spanish   = fields.getvalue("span") == "Y"
 audience  = fields.getvalue("audi")
-noInput   = fields.getvalue("dejavu")
 title     = "CDR Administration"
 language  = spanish and "ENGLISH &amp; SPANISH" or "ENGLISH"
 section   = "Glossary Term Concept by Type Report"
 SUBMENU   = "Report Menu"
 buttons   = ["Submit", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 script    = 'Request4486.py'
-header    = cdrcgi.header(title, title, section, script, buttons,
-                            stylesheet = """\
-   <style type='text/css'>
-    th, td, input { font-size: 10pt; }
-    body          { background-color: #DFDFDF;
-                    font-family: sans-serif;
-                    font-size: 12pt; }
-    legend        { font-weight: bold;
-                    color: teal;
-                    font-family: sans-serif; }
-    fieldset      { width: 500px;
-                    margin-left: auto;
-                    margin-right: auto;
-                    display: block; }
-    .field        { width: 300px; }
-    select        { width: 305px; }
-   </style>
-""")
-
-#----------------------------------------------------------------------
-# Make sure we're logged in.
-#----------------------------------------------------------------------
-if not session: cdrcgi.bail('Unknown or expired CDR session.')
 
 #----------------------------------------------------------------------
 # Handle navigation requests.
@@ -60,21 +43,8 @@ if request == cdrcgi.MAINMENU:
     cdrcgi.navigateTo("Admin.py", session)
 elif request == SUBMENU:
     cdrcgi.navigateTo("Reports.py", session)
-
-#----------------------------------------------------------------------
-# Handle request to log out.
-#----------------------------------------------------------------------
-if request == "Log Out": 
+if request == "Log Out":
     cdrcgi.logout(session)
-
-#----------------------------------------------------------------------
-# Connect to the CDR database.
-#----------------------------------------------------------------------
-try:
-    conn = cdrdb.connect('CdrGuest')
-    cursor = conn.cursor()
-except Exception, e:
-    cdrcgi.bail('Database connection failure: %s' % e)
 
 #----------------------------------------------------------------------
 # Get XML for CDR document with revision markup resolved.
@@ -130,11 +100,11 @@ class Name:
             for node in dom.getElementsByTagName('TranslatedName'):
                 for child in node.getElementsByTagName('TermNameString'):
                     self.spanishNames.append(cdr.getTextContent(child, True))
-        
-        cursor.execute("SELECT active_status FROM document where id = ?", docId)
-        row = cursor.fetchone()
-        if row[0] == u'I': self.blocked = True
 
+        query = cdrdb.Query("document", "active_status")
+        query.where(query.Condition("id", docId))
+        if query.execute(cursor).fetchall()[0][0] == u"I":
+            self.blocked = True
 
 #----------------------------------------------------------------------
 # Object to represent a placeholder in a glossary definition.
@@ -183,13 +153,10 @@ class Concept:
     def __init__(self, docId, cursor, audience, spanish):
         self.docId = docId
         self.htmlBlocked = u"<span class='error'>[Blocked]</span>"
-        cursor.execute("""\
-            SELECT DISTINCT doc_id
-                       FROM query_term
-                      WHERE path = '/GlossaryTermName/GlossaryTermConcept'
-                                 + '/@cdr:ref'
-                        AND int_val = ?""", docId)
-        rows = cursor.fetchall()
+        query = cdrdb.Query("query_term", "doc_id").unique()
+        query.where("path = '/GlossaryTermName/GlossaryTermConcept/@cdr:ref'")
+        query.where(query.Condition("int_val", docId))
+        rows = query.execute(cursor).fetchall()
         self.names = [Name(row[0], spanish) for row in rows]
         docXml = resolveRevisionMarkup(docId)
         dom = xml.dom.minidom.parseString(docXml)
@@ -279,7 +246,7 @@ class Concept:
     <td rowspan='%d'>%s %s</td>
     <td>%s</td>
    </tr>
-""" % (nameRowspan, cgi.escape(name.englishName), termBlocked, 
+""" % (nameRowspan, cgi.escape(name.englishName), termBlocked,
                                                   cgi.escape(spName)))
                     for spName in name.spanishNames[1:]:
                         html.append(u"""\
@@ -304,7 +271,7 @@ class Concept:
             html.append(u"""\
     <td>%s %s</td>
     <td rowspan='%d'>%s</td>
-   </tr>    
+   </tr>
 """ % (cgi.escape(name), termBlocked, rowspan, enDef))
 
             # Processing all other names (except the first)
@@ -345,159 +312,89 @@ class Concept:
         return u"".join(html)
 
 #----------------------------------------------------------------------
-# Create the picklist for term type.
+# Create the valid values lists.
 #----------------------------------------------------------------------
-def makeTermTypePicklist(cursor):
-    selected = " selected='selected'"
-    cursor.execute("""\
-        SELECT DISTINCT value
-                   FROM query_term
-                  WHERE path = '/GlossaryTermConcept/TermType'
-               ORDER BY value""")
-    html = [u"<select name='type'>"]
-    rows = cursor.fetchall()
-    if not rows:
-        cdrcgi.bail("Unable to find unique glossary concept term types")
-    for row in rows:
-        if row[0] != 'Other':
-            option = cgi.escape(row[0])
-            html.append(u"<option%s>%s</option>" % (selected, option))
-            selected = u""
-    html.append(u"<option>Other</option></select>")
-    return u"".join(html)
+query = cdrdb.Query("query_term", "value").unique().order(1)
+query.where("path = '/GlossaryTermConcept/TermType'")
+query.where("value <> 'Other'")
+term_types = [row[0] for row in query.execute(cursor).fetchall()]
+term_types.append("Other")
+statuses = ("Approved", "New pending", "Revision pending", "Rejected")
+audiences = ("Patient", "Health Professional")
 
 #----------------------------------------------------------------------
-# Create the picklist for definition statuses; hard-wired from specs.
+# Validate the request parameters.
 #----------------------------------------------------------------------
-def makeDefinitionStatusPicklist():
-    return (u"<select name='stat'>"
-            u"<option selected='selected'>Approved</option>"
-            u"<option>New pending</option>"
-            u"<option>Revision pending</option>"
-            u"<option>Rejected</option>"
-            u"</select>")
-
-#----------------------------------------------------------------------
-# Create the picklist used to select an audience.
-#----------------------------------------------------------------------
-def makeAudiencePicklist():
-    return (u"<select name='audi'>"
-            u"<option selected='selected'>Patient</option>"
-            u"<option>Health Professional</option>"
-            u"</select>")
+if termType and termType not in term_types:
+    cdrcgi.bail("Corrupt form data")
+if status and status not in statuses:
+    cdrcgi.bail("Corrupt form data")
+if audience and audience not in audiences:
+    cdrcgi.bail("Corrupt form data")
 
 #----------------------------------------------------------------------
 # Display the form for the report's parameters.
 #----------------------------------------------------------------------
-def createForm(cursor):
-    form = ""
-    if noInput:
-        form += u"""\
-   <fieldset>
-    <legend>Input Error</legend>
-    <span class="error">No Term Name or Definition Text specified!!!</span>
-   </fieldset>"""
-
-    form += u"""\
-   <fieldset>
-    <legend>Report Criteria</legend>
-    <input type='hidden' name='%s' value='%s' />
-    <input type='hidden' name='dejavu' value='True' />
-    <table border='0'>
-     <tr>
-      <th align='right'>Term Type:&nbsp;</th>
-      <td>%s</td>
-     </tr>
-     <tr>
-      <th align='right'>Term Name:&nbsp;</th>
-      <td><input class='field' name='name' /></td>
-     </tr>
-     <tr>
-      <th align='right'>Definition Text:&nbsp;</th>
-      <td><input class='field' name='text' /></td>
-     </tr>
-     <tr>
-      <th align='right'>Definition Status:&nbsp;</th>
-      <td>%s</td>
-     </tr>
-     <tr>
-      <th align='right'>Audience:&nbsp;</th>
-      <td>%s</td>
-     </tr>
-     <tr>
-      <th align='right'>Display Spanish?&nbsp;</th>
-      <td align='left'><input type='checkbox' name='span' /></td>
-     </tr>
-    </table>
-   </fieldset>
-  </form>
- </body>
-</html>
-""" % (cdrcgi.SESSION, session, makeTermTypePicklist(cursor),
-       makeDefinitionStatusPicklist(), makeAudiencePicklist())
-    cdrcgi.sendPage(header + form)
+def createForm():
+    now = datetime.date.today()
+    then = now - datetime.timedelta(7)
+    page = cdrcgi.Page(title, subtitle=section, action=script,
+                       buttons=buttons, session=session)
+    instructions = u"""\
+You must specifiy either a term name start, or text from the definitions
+of the terms to be selected. All other selection criteria are required."""
+    page.add(page.B.FIELDSET(page.B.P(instructions)))
+    page.add("<fieldset>")
+    page.add(page.B.LEGEND("Selection Options"))
+    page.add_select("type", "Term Type", term_types, term_types[0])
+    page.add_text_field("name", "Term Name")
+    page.add_text_field("text", "Definition Text")
+    page.add_select("stat", "Def. Status", statuses, "Approved")
+    page.add_select("audi", "Audience", audiences, audiences[0])
+    page.add("</fieldset>")
+    page.add("<fieldset>")
+    page.add(page.B.LEGEND("Display Options"))
+    page.add_radio("span", "English Only", "N", checked=True)
+    page.add_radio("span", "Include Spanish", "Y")
+    page.add("</fieldset>")
+    page.send()
 
 #----------------------------------------------------------------------
 # Generate the Mailer Tracking Report.
 #----------------------------------------------------------------------
 def createReport(cursor, conceptType, status, audience, name, text, spanish):
-    params = [conceptType, status, audience]
-    query = """\
-SELECT DISTINCT t.doc_id
-           FROM query_term t
-           JOIN query_term s
-             ON t.doc_id = s.doc_id
-           JOIN query_term a
-             ON a.doc_id = s.doc_id
-            AND LEFT(a.node_loc, 4) = LEFT(s.node_loc, 4)
-"""
+    query = cdrdb.Query("query_term t", "t.doc_id").unique().order(1)
+    query.join("query_term s", "s.doc_id = t.doc_id")
+    query.join("query_term a", "a.doc_id = t.doc_id"
+               " AND LEFT(a.node_loc, 4) = LEFT(s.node_loc, 4)")
+    query.where("t.path = '/GlossaryTermConcept/TermType'")
+    query.where("s.path = '/GlossaryTermConcept/TermDefinition"
+                "/DefinitionStatus'")
+    query.where("a.path = '/GlossaryTermConcept/TermDefinition/Audience'")
+    query.where(query.Condition("t.value", conceptType))
+    query.where(query.Condition("s.value", status))
+    query.where(query.Condition("a.value", audience))
     if name:
-        query += """\
-           JOIN query_term c
-             ON c.int_val = t.doc_id
-           JOIN query_term n
-             ON n.doc_id = c.doc_id
-"""
+        query.join("query_term c", "c.int_val = t.doc_id")
+        query.join("query_term n", "n.doc_id = c.doc_id")
+        query.where("c.path = '/GlossaryTermName/GlossaryTermConcept/@cdr:ref'")
+        query.where("n.path = '/GlossaryTermName/TermName/TermNameString'")
+        query.where(query.Condition("n.value", name + "%", "LIKE"))
     if text:
-        query += """\
-           JOIN query_term d
-             ON d.doc_id = a.doc_id
-            AND LEFT(d.node_loc, 4) = LEFT(a.node_loc, 4)
-"""
-    query += """\
-          WHERE t.path = '/GlossaryTermConcept/TermType'
-            AND s.path = '/GlossaryTermConcept/TermDefinition'
-                       + '/DefinitionStatus'
-            AND a.path = '/GlossaryTermConcept/TermDefinition/Audience'
-            AND t.value = ?
-            AND s.value = ?
-            AND a.value = ?
-"""
-    if name:
-        query += """\
-            AND c.path = '/GlossaryTermName/GlossaryTermConcept/@cdr:ref'
-            AND n.path = '/GlossaryTermName/TermName/TermNameString'
-            AND n.value LIKE ?
-"""
-        params.append(name)
-    if text:
-        query += """\
-            AND d.path = '/GlossaryTermConcept/TermDefinition/DefinitionText'
-            AND d.value LIKE ?
-"""
-        params.append(text)
-    query += """\
-       ORDER BY t.doc_id
-"""
-    #cdrcgi.bail("QUERY: %s; PARAMS: %s" % (query, params))
-    cursor.execute(query, tuple(params), timeout = 600)
-    conceptIds = [row[0] for row in cursor.fetchall()]
-    #cdrcgi.bail(conceptIds)
+        query.join("query_term d", "d.doc_id = a.doc_id"
+                   " AND LEFT(d.node_loc, 4) = LEFT(a.node_loc, 4)")
+        query.where("d.path = '/GlossaryTermConcept/TermDefinition"
+                    "/DefinitionText'")
+        query.where(query.Condition("d.value", "%" + text + "%", "LIKE"))
+    # FOR DEBUGGING query.log(label="REQUEST4486 QUERY")
+    conceptIds = [row[0] for row in query.execute(cursor, 600).fetchall()]
     concepts = [Concept(cid, cursor, audience, spanish) for cid in conceptIds]
     title = "%s - %s" % (section, language)
     report = [u"""\
+<!DOCTYPE html>
 <html>
  <head>
+  <meta charset="utf-8">
   <title>%s</title>
   <style type='text/css'>
    body { font-family: Arial, sans-serif; }
@@ -515,7 +412,8 @@ SELECT DISTINCT t.doc_id
   <table>
    <tr>
     <th>CDR ID of GTC</th>
-""" % (title, title, conceptType, time.strftime("%Y-%m-%d %H:%M:%S"))]
+""" % (title, title, conceptType,
+       datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))]
     if spanish:
         report.append(u"""\
     <th>Term Names (English)</th>
@@ -549,4 +447,4 @@ if termName or defText:
     createReport(cursor, termType, status, audience, termName, defText,
                  spanish)
 else:
-    createForm(cursor)
+    createForm()
