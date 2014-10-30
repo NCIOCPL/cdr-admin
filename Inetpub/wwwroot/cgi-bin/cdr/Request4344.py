@@ -55,7 +55,7 @@ elif request == SUBMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if request == "Log Out": 
+if request == "Log Out":
     cdrcgi.logout(session)
 
 if request == "Submit Request" and not (start and end and status and audience):
@@ -248,7 +248,7 @@ if start and end and status and audience:
             if diff:
                 return diff
             return cmp(self.docId, other.docId)
-                
+
     class Concept:
         def toHtml(self, report, status, language, resources, notes):
             if report == ENGLISH:
@@ -314,7 +314,7 @@ if start and end and status and audience:
    </tr>
 """)
             return u"".join(html)
-                    
+
         def toHtmlSpanish(self, report, status, language, resources, notes):
             rowCount = 0
             for name in self.names:
@@ -398,7 +398,7 @@ if start and end and status and audience:
    </tr>
 """ % s.toHtml(n.blocked))
             return u"".join(html)
-            
+
         def __init__(self, docId, cursor, language, start, end, audience,
                      status):
             self.docId    = docId
@@ -474,7 +474,7 @@ if start and end and status and audience:
                         n = self.name.spanish[0].value
                 self.repNodes['TERMNAME'] = n
                 self.repNodes['CAPPEDTERMNAME'] = capitalize(n)
-            
+
     try:
         conn = cdrdb.connect('CdrGuest')
         cursor = conn.cursor()
@@ -610,7 +610,7 @@ else:
       </select>
      </td>
     </tr>
-""" % (cdrcgi.SESSION, session, report, start, end)]
+""" % (cdrcgi.SESSION, session, cgi.escape(report), start, end)]
     if report == SPANISH:
         resourceType = 'Translation'
         form.append(u"""\
