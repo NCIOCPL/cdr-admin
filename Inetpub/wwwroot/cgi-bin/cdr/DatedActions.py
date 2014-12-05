@@ -44,7 +44,7 @@ elif request == SUBMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if request == "Log Out": 
+if request == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
@@ -117,6 +117,7 @@ except:
 #----------------------------------------------------------------------
 # Start the page.
 #----------------------------------------------------------------------
+safeDocType = cgi.escape(docType)
 html = """\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>
@@ -164,8 +165,8 @@ html = """\
      </b>
     </td>
    </tr>
-""" % (docType, time.strftime("%m/%d/%Y", now), docType)
-   
+""" % (safeDocType, time.strftime("%m/%d/%Y", now), safeDocType)
+
 #----------------------------------------------------------------------
 # Extract the information from the XML so we can sort it.
 #----------------------------------------------------------------------
