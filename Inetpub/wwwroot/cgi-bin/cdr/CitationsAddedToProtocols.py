@@ -18,7 +18,7 @@ import cgi, cdr, cdrdb, cdrcgi, string, time, xml.dom.minidom
 # Set the form variables.
 #----------------------------------------------------------------------
 fields   = cgi.FieldStorage()
-session  = fields and fields.getvalue("Session") or None
+session  = cdrcgi.getSession(fields)
 request  = cdrcgi.getRequest(fields)
 fromDate = fields and fields.getvalue('FromDate') or None
 toDate   = fields and fields.getvalue('ToDate') or None
@@ -27,7 +27,7 @@ instr    = "Citations Added to Protocols Report"
 buttons  = ["Submit Request", "Report Menu", cdrcgi.MAINMENU, "Log Out"]
 script   = "CitationsAddedToProtocols.py"
 header   = cdrcgi.header(title, title, instr, script, buttons)
-   
+
 
 #----------------------------------------------------------------------
 # Handle requests.
@@ -36,7 +36,7 @@ if request == cdrcgi.MAINMENU:
     cdrcgi.navigateTo("Admin.py", session)
 elif request == "Report Menu":
     cdrcgi.navigateTo("Reports.py", session)
-elif request == "Log Out": 
+elif request == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
@@ -179,7 +179,7 @@ def makeTable(citations, html):
                citation.protocol.lastVersionPublishable and "Y" or "N"))
     html.append(u"""\
   </table>""")
-    
+
 html = [u"""\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>

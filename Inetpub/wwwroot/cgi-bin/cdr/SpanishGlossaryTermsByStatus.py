@@ -21,7 +21,7 @@ import cgi, cdr, cdrdb, cdrcgi, string, time, cdrbatch
 #----------------------------------------------------------------------
 fields   = cgi.FieldStorage()
 status   = fields and fields.getvalue("status")   or None #'Translation pending'
-session  = fields and fields.getvalue("Session")  or None #'guest'
+session  = cdrcgi.getSession(fields)                      # 'guest' if None
 request  = cdrcgi.getRequest(fields)
 fromDate = fields and fields.getvalue('FromDate') or None #'2002-01-01'
 toDate   = fields and fields.getvalue('ToDate')   or None #'2006-06-01'
@@ -41,7 +41,7 @@ if request == cdrcgi.MAINMENU:
     cdrcgi.navigateTo("Admin.py", session)
 elif request == "Report Menu":
     cdrcgi.navigateTo("Reports.py", session)
-elif request == "Log Out": 
+elif request == "Log Out":
     cdrcgi.logout(session)
 
 def getOptions():
@@ -129,7 +129,7 @@ if not fromDate or not toDate or not status or not email:
        getOptions(), cdr.getEmail(session) or '', style)
     cdrcgi.sendPage(header + form)
 
-#----------------------------------------------------------------------    
+#----------------------------------------------------------------------
 # If we get here, we're ready to queue up a request for the report.
 #----------------------------------------------------------------------
 args = (
@@ -146,7 +146,7 @@ except Exception, e:
 jobId       = batch.getJobId()
 buttons     = [SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 script      = 'SpanishGlossaryTermsByStatus.py'
-header      = cdrcgi.header(title, title, instr, script, buttons, 
+header      = cdrcgi.header(title, title, instr, script, buttons,
                             stylesheet = """\
   <style type='text/css'>
    body { font-family: Arial }

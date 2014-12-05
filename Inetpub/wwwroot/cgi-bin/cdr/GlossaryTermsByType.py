@@ -14,7 +14,7 @@ import cgi, cdr, cdrdb, cdrcgi, string, time, xml.dom.minidom, xml.sax.saxutils
 #----------------------------------------------------------------------
 fields   = cgi.FieldStorage()
 types    = fields.getlist("type") or []
-session  = fields.getvalue("Session") or None
+session  = cdrcgi.getSession(fields)
 audience = fields.getvalue("audience") or "All"
 request  = cdrcgi.getRequest(fields)
 title    = "CDR Administration"
@@ -32,7 +32,7 @@ if request == cdrcgi.MAINMENU:
     cdrcgi.navigateTo("Admin.py", session)
 elif request == "Report Menu":
     cdrcgi.navigateTo("Reports.py", session)
-elif request == "Log Out": 
+elif request == "Log Out":
     cdrcgi.logout(session)
 
 def getTermTypes(cursor):
@@ -44,7 +44,7 @@ def getTermTypes(cursor):
     return "\n".join(["""\
     <option value='%s'>%s</option>""" % (r[0], r[0])
                for r in cursor.fetchall()])
-        
+
 #----------------------------------------------------------------------
 # As the user for the report parameters.
 #----------------------------------------------------------------------

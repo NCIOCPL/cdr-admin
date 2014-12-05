@@ -19,7 +19,7 @@ WAIT_STATUS = "Waiting user approval"
 fields   = cgi.FieldStorage()
 jobId    = fields and fields.getvalue("id") or None
 dispType = fields and fields.getvalue("type") or None
-session  = fields and fields.getvalue("Session") or None
+session  = cdrcgi.getSession(fields)
 request  = cdrcgi.getRequest(fields)
 fromDate = fields and fields.getvalue('FromDate') or None
 toDate   = fields and fields.getvalue('ToDate') or None
@@ -236,7 +236,7 @@ def dispFilterFailures(flavor = 'full'):
                         '"full", "warning", "error"')
 
     html  += u'</TABLE></FORM></BODY></HTML>'
-    html   = textPattern2.sub(u'<UL style="padding: 0px; margin: 0px; margin-left: 20px">', 
+    html   = textPattern2.sub(u'<UL style="padding: 0px; margin: 0px; margin-left: 20px">',
                                        html)
     html   = textPattern3.sub(u'</UL>', html)
 
@@ -444,7 +444,7 @@ Please access from the main publishing menu""" % \
 
     HEADER1 = """
                <BR>
-               <span style="color: navy; font-weight: bold;"> Jobs 
+               <span style="color: navy; font-weight: bold;"> Jobs
                 waiting for user approval%s</span>
                <BR><TABLE BORDER=0>
               """ % msg
@@ -521,7 +521,7 @@ def dispCgWork():
 
     ###
     # The pub_proc_cg_work table only holds the data from the last
-    # push job.  If the user is trying to get the information from 
+    # push job.  If the user is trying to get the information from
     # a previous push job display a notification that this is not
     # the data he/she is looking for.
     # -------------------------------------------------------------
@@ -717,7 +717,7 @@ def dispCgWork():
 
     HEADER  = """\
                <BR>
-               <span style="color: red; font-weight: bold;">Documents 
+               <span style="color: red; font-weight: bold;">Documents
                  %s %s</span>
                <BR>
                <a NAME='%s'></a>
@@ -733,8 +733,8 @@ def dispCgWork():
                      <td class="ttext">%s</td>
                      <td class="ttext">%s</td></tr>"""
 
-    # Only if the push job hasn't finished yet will we be able to 
-    # display the newly added documents.  Once the job finished the 
+    # Only if the push job hasn't finished yet will we be able to
+    # display the newly added documents.  Once the job finished the
     # comparison between pub_proc_cg and pub_proc_cg_work will give
     # incorrect results and new documents will be listed as updated
     # once.  We want to warn the user about this fact.
@@ -775,7 +775,7 @@ def dispCgWork():
     if nUpdated:
         if jobStatus in ['Verifying', 'Success']:
             DISCLAIMER = """\
-            <b>Note:</b> The push job already finished. Any newly 
+            <b>Note:</b> The push job already finished. Any newly
             added documents are now displayed as updates.<br><br>"""
         if nUpdated > TOPDOCS:
             listCount = "(Top %s only)" % TOPDOCS
@@ -838,11 +838,11 @@ def dispJobsByDates():
     header  = cdrcgi.header(title, title, instr, script, buttons,
                             stylesheet = """
   <style type = 'text/css'>
-    th             { font: bold 16px arial; 
+    th             { font: bold 16px arial;
                      background-color:  #AFAFAF; }
-   .text           { font: bold 10pt arial; 
+   .text           { font: bold 10pt arial;
                      color: black; }
-   .link           { font: bold 10pt arial; 
+   .link           { font: bold 10pt arial;
                      color: black; }
   </style>
                             """)
@@ -898,8 +898,8 @@ def dispJobsByDates():
 
         form += """
             <span style="font: 15px arial">
-             <B>Note:</b> A 
-              <span style="background-color: #FF7F50;">Colored row</span> 
+             <B>Note:</b> A
+              <span style="background-color: #FF7F50;">Colored row</span>
                 did not complete loading to the Cancer.gov live site</span>
             <table border='1' cellspacing='0' cellpadding='2' width='100%%'>
                 <tr>
@@ -940,12 +940,12 @@ def dispJobsByDates():
                      &nbsp;
                      <a style="text-decoration: underline; color: black;"
                         href="PubStatus.py?id=%d&type=FilterFailure&flavor=error"
-                        ><span class="link">errors</span></a>, 
+                        ><span class="link">errors</span></a>,
                      &nbsp;
                      <a style="text-decoration: underline; color: black;"
                         href="PubStatus.py?id=%d&type=FilterFailure&flavor=warning"
-                        ><span class="link">warnings</span></a>, 
-                     &nbsp; 
+                        ><span class="link">warnings</span></a>,
+                     &nbsp;
                      <a style="text-decoration: underline; color: black;"
                         href="PubStatus.py?id=%d&type=FilterFailure&flavor=full"
                         ><span class="link">both</span></a>

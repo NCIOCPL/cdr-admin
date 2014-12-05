@@ -43,7 +43,7 @@ import cgi, cdr, cdrdb, cdrcgi, string, time, xml.dom.minidom, xml.sax.saxutils
 #----------------------------------------------------------------------
 fields   = cgi.FieldStorage()
 status   = fields and fields.getvalue("status") or None
-session  = fields and fields.getvalue("Session") or None
+session  = cdrcgi.getSession(fields)
 request  = cdrcgi.getRequest(fields)
 fromDate = fields and fields.getvalue('FromDate') or None
 toDate   = fields and fields.getvalue('ToDate') or None
@@ -60,7 +60,7 @@ if request == cdrcgi.MAINMENU:
     cdrcgi.navigateTo("Admin.py", session)
 elif request == "Report Menu":
     cdrcgi.navigateTo("Reports.py", session)
-elif request == "Log Out": 
+elif request == "Log Out":
     cdrcgi.logout(session)
 
 def getOptions():

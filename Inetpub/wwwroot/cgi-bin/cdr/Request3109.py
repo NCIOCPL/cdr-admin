@@ -31,7 +31,7 @@
 #
 # [Amended by Lakshmi 2007-04-09:
 #
-# "For now, let us not include the conditions. 
+# "For now, let us not include the conditions.
 #
 # Would it be possible to get both the worksheets if we drop the conditions
 # element?
@@ -232,7 +232,7 @@ class SiteOrgProtocol(ProtocolOrg):
             self.personnel.append(extractPersonName(row[0]))
 
 fields   = cgi.FieldStorage()
-session  = fields and fields.getvalue("Session") or None
+session  = cdrcgi.getSession(fields)
 request  = cdrcgi.getRequest(fields)
 orgId    = fields.getvalue('orgId')
 
@@ -243,7 +243,7 @@ if request == cdrcgi.MAINMENU:
     cdrcgi.navigateTo("Admin.py", session)
 elif request == "Report Menu":
     cdrcgi.navigateTo("Reports.py", session)
-elif request == "Log Out": 
+elif request == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
@@ -268,7 +268,7 @@ if not orgId:
 </html>
 """ % (cdrcgi.SESSION, session)
     cdrcgi.sendPage(header + form)
-    
+
 orgId  = cdr.exNormalize(orgId)[1]
 conn   = cdrdb.connect('CdrGuest')
 cursor = conn.cursor()
@@ -364,7 +364,7 @@ for docId, status, nodeLoc in rows:
                                                                   len(rows)))
 # Selecting all published, non-blocked protocols listing the given
 # organization as a lead org
-# Since we suppressed the secondary lead orgs earlier we're 
+# Since we suppressed the secondary lead orgs earlier we're
 # adding those here.
 # ----------------------------------------------------------------
 cursor.execute("""\
@@ -409,22 +409,22 @@ def addSheet(wb, styles, protocolOrgs, title, sheet = 'ws2'):
     colWidth = { 'ws1':[80, 125, 125, 100, 400,  60, 0.1, 0.1,  65, 100],
                  'ws2':[80, 125, 125, 100, 400, 0.1, 0.1, 0.1, 100,  65],
                  'ws3':[80, 125, 125, 100, 400,  60,  60,  60, 100,  65]}
-    colName  = { 'ws1':['PDQ UI', 'Primary Protocol ID', 
-                        'Alternate IDs', 'ClinicalTrials.gov ID', 
-                        'Original Title / PDQ Title (bold)', 
-                        'Completion Date (Projected/Actual)', 
+    colName  = { 'ws1':['PDQ UI', 'Primary Protocol ID',
+                        'Alternate IDs', 'ClinicalTrials.gov ID',
+                        'Original Title / PDQ Title (bold)',
+                        'Completion Date (Projected/Actual)',
                         '', '',
                         'Lead Org Personnel', 'Published?'],
                  'ws2':['PDQ UI', 'Primary Protocol ID',
-                        'Alternate IDs', 'ClinicalTrials.gov ID', 
-                        'Original Title / PDQ Title (bold)', 
-                        '', 
+                        'Alternate IDs', 'ClinicalTrials.gov ID',
+                        'Original Title / PDQ Title (bold)',
+                        '',
                         '', '',
                         'PI', 'Published?'],
-                 'ws3':['PDQ UI', 'Primary Protocol ID', 
-                        'Alternate IDs', 'ClinicalTrials.gov ID', 
-                        'Original Title / PDQ Title (bold)', 
-                        'Completion Date (Projected/Actual)', 
+                 'ws3':['PDQ UI', 'Primary Protocol ID',
+                        'Alternate IDs', 'ClinicalTrials.gov ID',
+                        'Original Title / PDQ Title (bold)',
+                        'Completion Date (Projected/Actual)',
                         'Current Prot. Status Date', 'Current Prot. Status',
                         'Lead Org Personnel', 'Published?']
                 }
@@ -448,7 +448,7 @@ def addSheet(wb, styles, protocolOrgs, title, sheet = 'ws2'):
         row.addCell(1, cdr.normalize(protocolOrg.protocol.docId),
                     style = styles.left)
 
-        # Change per request (Bug 4606) 
+        # Change per request (Bug 4606)
         # Only published protocols are being displayed
         # ----------------------------------------------------------------
         if protocolOrg.protocol.published:
@@ -474,7 +474,7 @@ def addSheet(wb, styles, protocolOrgs, title, sheet = 'ws2'):
 
         if protocolOrg.protocol.completionDate:
             row.addCell(6, "%s (%s)" % (protocolOrg.protocol.completionDate,
-                                        protocolOrg.protocol.dateType), 
+                                        protocolOrg.protocol.dateType),
                                                         style = styles.center)
 
         row.addCell(7, protocolOrg.protocol.closedDate, style = styles.center)
@@ -501,7 +501,7 @@ class Styles:
         font        = ExcelWriter.Font(name = 'Arial', size = 10, bold = True)
         align       = ExcelWriter.Alignment('Left', 'Top', True)
         self.leftb  = wb.addStyle(alignment = align, font = font)
-        
+
         # Create the style for the linking cells.
         font        = ExcelWriter.Font('blue', None, 'Arial', size = 10)
         align       = ExcelWriter.Alignment('Left', 'Top', True)
@@ -510,11 +510,11 @@ class Styles:
         # Create the style for the left-aligned cells.
         font        = ExcelWriter.Font(name = 'Arial', size = 10)
         self.left   = wb.addStyle(alignment = align, font = font)
-        
+
         # Create the style for the centered cells.
         align       = ExcelWriter.Alignment('Center', 'Top', True)
         self.center = wb.addStyle(alignment = align, font = font)
-        
+
         # Create the style for the right-aligned cells.
         align       = ExcelWriter.Alignment('Right', 'Top', True)
         self.right  = wb.addStyle(alignment = align, font = font)

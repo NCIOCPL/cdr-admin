@@ -17,7 +17,7 @@ import cgi, cdr, cdrdb, cdrcgi, string, time, xml.dom.minidom, xml.sax.saxutils
 fields   = cgi.FieldStorage()
 name     = fields and fields.getvalue("name") or None
 pron     = fields and fields.getvalue("pron") or None
-session  = fields and fields.getvalue("Session") or None
+session  = cdrcgi.getSession(fields)
 request  = cdrcgi.getRequest(fields)
 title    = "CDR Administration"
 instr    = "Pronunciation by Term Stem Report"
@@ -32,7 +32,7 @@ if request == cdrcgi.MAINMENU:
     cdrcgi.navigateTo("Admin.py", session)
 elif request == "Report Menu":
     cdrcgi.navigateTo("Reports.py", session)
-elif request == "Log Out": 
+elif request == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
