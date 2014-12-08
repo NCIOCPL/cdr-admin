@@ -27,7 +27,7 @@
 # Implmented report of audit_trail activity.
 #
 #----------------------------------------------------------------------
-import cdr, cdrdb, cdrcgi, cgi, re, time
+import cdr, cdrdb, cdrcgi, cgi, time
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -63,8 +63,22 @@ elif request == SUBMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if request == "Log Out": 
+if request == "Log Out":
     cdrcgi.logout(session)
+
+#----------------------------------------------------------------------
+# Validate some user input
+#----------------------------------------------------------------------
+# cgi.escape of dates will not be required after this validation
+if fromDate:
+    if not cdr.strptime(fromDate, '%Y-%m-%d'):
+        cdrcgi.bail('Start Date must be valid date in YYYY-MM-DD format')
+if toDate:
+    if not cdr.strptime(toDate, '%Y-%m-%d'):
+        cdrcgi.bail('End Date must be valid date in YYYY-MM-DD format')
+if docType:
+    if docType not in cdr.getDoctypes('session'):
+        cdrcgi.bail('Unknown doc type requested: "%s"' % cgi.escape(docType))
 
 #----------------------------------------------------------------------
 # If we don't have a request, put up the request form.
@@ -126,9 +140,9 @@ html = """\
   <style type 'text/css'>
    body    { font-family: Arial, Helvetica, sans-serif }
    span.ti { font-size: 14pt; font-weight: bold }
-   th      { text-align: center; vertical-align: top; 
+   th      { text-align: center; vertical-align: top;
              font-size: 12pt; font-weight: bold }
-   td      { text-align: left; vertical-align: top; 
+   td      { text-align: left; vertical-align: top;
              font-size: 12pt; font-weight: normal }
   </style>
  </head>
@@ -152,16 +166,27 @@ html = """\
     <th>Comment</th>
    </tr>
 """ % (headerDocType, time.strftime("%m/%d/%Y", now), fromDate, toDate)
-   
+
 #----------------------------------------------------------------------
 # Extract the information from the database.
 #----------------------------------------------------------------------
 if fromDate < cdrcgi.DAY_ONE: fromDate = cdrcgi.DAY_ONE
 try:
+    # Create array of question mark parameter value substitutions
+    # Avoids SQL injection vulnerability found by AppScan on previous version
+    qmarkVals = [fromDate, toDate]
+    userQual  = ""
+    if user:
+        userQual = "AND u.name = ?"
+        qmarkVals.append(user)
+    dtQual = ""
+    if docType:
+        dtQual = "AND t.name = ?"
+        qmarkVals.append(docType)
+
+    # Execute dynamically built query
     conn     = cdrdb.connect()
     cursor   = conn.cursor()
-    dtQual   = docType and ("AND t.name = '%s'" % docType) or ""
-    userQual = user and ("AND u.name = '%s'" % user) or "" 
     cursor.execute("""\
          SELECT a.document,
                 u.name,
@@ -180,14 +205,14 @@ try:
              ON t.id = d.doc_type
            JOIN action act
              ON act.id = a.action
-          WHERE a.dt BETWEEN '%s' AND DATEADD(s, -1, DATEADD(d, 1, '%s'))
+          WHERE a.dt BETWEEN ? AND DATEADD(s, -1, DATEADD(d, 1, ?))
             %s
             %s
-        ORDER BY a.dt DESC""" % (fromDate, toDate, userQual, dtQual),
-                   timeout = 120)
+        ORDER BY a.dt DESC""" % (userQual, dtQual), qmarkVals, timeout = 120)
 
     rows = cursor.fetchall()
 except cdrdb.Error, info:
+    cdr.logwrite('DB Failure: info=%s' % info)
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
 
 for row in rows:
@@ -203,7 +228,7 @@ for row in rows:
     <td nowrap='1'>%s ...</td>
     <td>%s</td>
    </tr>
-""" % (row[2], row[1], row[3], row[5], row[4], 
+""" % (row[2], row[1], row[3], row[5], row[4],
        cdrcgi.BASE, row[0], cdrcgi.SESSION, session, row[0],
        cdrcgi.unicodeToLatin1(row[6][:20]),
        row[7] and cdrcgi.unicodeToLatin1(row[7]) or "&nbsp;")
