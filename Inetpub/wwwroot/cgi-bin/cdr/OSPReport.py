@@ -86,7 +86,7 @@ if request == "Log Out":
     cdrcgi.logout(session)
 
 def listTermChoices():
-    path = "/Term/MenuInformation/MenuItem/MenuParent/@cdr:ref"
+    # path = "/Term/MenuInformation/MenuItem/MenuParent/@cdr:ref"
     try:
         # conn = cdrdb.connect('CdrGuest', dataSource=cdr.PROD_DB_NAME)
         conn = cdrdb.connect('CdrGuest')
@@ -138,6 +138,16 @@ if not begin or not end:
     now   = time.localtime()
     begin = begin or str(now[0] - 6)
     end   = end   or str(now[0] - 1)
+
+# Validate that we have numbers
+try:
+    intBegin = int(begin)
+    intEnd   = int(end)
+except:
+    cdrcgi.bail('"Active between" values must be year integers')
+if intBegin < 1980 or intEnd > 2200 or intBegin > intEnd:
+    cdrcgi.bail(
+'"Active between" values must be reasonable four digit years, begin before end')
 
 #----------------------------------------------------------------------
 # Put up the form if we don't have a request yet.
