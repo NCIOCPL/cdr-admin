@@ -77,7 +77,7 @@ if toDate:
     if not cdr.strptime(toDate, '%Y-%m-%d'):
         cdrcgi.bail('End Date must be valid date in YYYY-MM-DD format')
 if docType:
-    if docType not in cdr.getDoctypes('session'):
+    if docType not in cdr.getDoctypes(session):
         cdrcgi.bail('Unknown doc type requested: "%s"' % cgi.escape(docType))
 
 #----------------------------------------------------------------------
