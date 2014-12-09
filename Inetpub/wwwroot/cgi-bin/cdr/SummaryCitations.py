@@ -27,7 +27,7 @@
 # BZIssue::4651 - Adding PMID to citations
 # BZIssue::4786 - Fixing non-Pubmed citations
 
-import xml.dom.minidom, cgi, socket, struct, re, cdr, cdrcgi, cdrdb
+import xml.dom.minidom, cgi, re, cdr, cdrcgi, cdrdb
 import locale, time
 
 locale.setlocale(locale.LC_COLLATE, "")
@@ -64,8 +64,15 @@ elif request == SUBMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if request == "Log Out": 
+if request == "Log Out":
     cdrcgi.logout(session)
+
+# Validate input docId
+try:
+    cdr.exNormalize(docId)
+except:
+    cdrcgi.bail("Invalid CDR ID entered: %s" % cgi.escape(docId))
+
 
 #----------------------------------------------------------------------
 # Display the report if we have a document ID and version number.
@@ -133,7 +140,7 @@ def report(docId, docVersion):
                 newId = ''
             else:
                 pmid  = newId[3:-3]
-                newId = newId.replace('@@]', '?dopt=Abstract">' 
+                newId = newId.replace('@@]', '?dopt=Abstract">'
                                    + pmid + '</a>]').replace('[@@', pubMedLink)
 
             html += """\
@@ -197,7 +204,7 @@ def pickVersion(docId):
 </html>
 """
     cdrcgi.sendPage(header + form)
-        
+
 #----------------------------------------------------------------------
 # Use a title fragment submitted by the user to determine a doc ID.
 #----------------------------------------------------------------------
@@ -216,7 +223,7 @@ def getDocId(docTitle):
         rows = cursor.fetchall()
     except:
         cdrcgi.bail("Database failure getting document id(s) for %s" %
-                    docTitle)
+                     cgi.escape(docTitle))
     if not rows:
         cdrcgi.bail("No documents found matching %s" % cgi.escape(docTitle))
     elif len(rows) == 1:
@@ -235,7 +242,7 @@ def getDocId(docTitle):
 </html>
 """
     cdrcgi.sendPage(header + form)
-        
+
 #----------------------------------------------------------------------
 # Put up the main form for the report.
 #----------------------------------------------------------------------
@@ -256,7 +263,7 @@ def getSummary():
  </body>
 </html>
 """ % (cdrcgi.SESSION, session))
-    
+
 #----------------------------------------------------------------------
 # What we do depends on how much information we have.
 #----------------------------------------------------------------------
