@@ -7,7 +7,7 @@
 # JIRA::OCECDR-3731
 #
 #----------------------------------------------------------------------
-import cdr, cdrdb, cdrcgi, cgi, re, time
+import cdr, cdrdb, cdrcgi, cgi, time
 import xlwt
 import os
 import msvcrt
@@ -48,7 +48,7 @@ elif request == SUBMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if request == "Log Out": 
+if request == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
@@ -106,6 +106,11 @@ if not fromDate or not toDate:
 </HTML>
 """ % (fromDate, toDate)
     cdrcgi.sendPage(header + form)
+
+# Validate dates from the input form
+if not cdr.valFromToDates('%Y-%m-%d', fromDate, toDate):
+    cdrcgi.bail(
+      "Invalid Start or End date.  Use YYYY-MM-DD, Start no later than End.")
 
 #----------------------------------------------------------------------
 # We have a request; do it.
