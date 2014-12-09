@@ -7,16 +7,16 @@
 #
 # $Log: not supported by cvs2svn $
 #----------------------------------------------------------------------
-import cdrdb, cdrcgi, cgi, time
+import cdr, cdrdb, cdrcgi, cgi, time
 
 #----------------------------------------------------------------------
 # Set the form variables.
 #----------------------------------------------------------------------
-fields     = cgi.FieldStorage()
-session    = cdrcgi.getSession(fields)
-request    = cdrcgi.getRequest(fields)
-fromDate   = fields and fields.getvalue('FromDate') or None
-toDate     = fields and fields.getvalue('ToDate')   or None
+fields    = cgi.FieldStorage()
+session   = cdrcgi.getSession(fields)
+request   = cdrcgi.getRequest(fields)
+fromDate  = fields and fields.getvalue('FromDate') or None
+toDate    = fields and fields.getvalue('ToDate')   or None
 SUBMENU   = "Report Menu"
 buttons   = ["Submit Request", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 script    = "MailerActivityStatistics.py"
@@ -41,7 +41,7 @@ elif request == SUBMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if request == "Log Out": 
+if request == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
@@ -72,6 +72,18 @@ if not fromDate or not toDate:
 </HTML>
 """ % (cdrcgi.SESSION, session, fromDate, toDate)
     cdrcgi.sendPage(header + form)
+
+#----------------------------------------------------------------------
+# Validate input dates
+#----------------------------------------------------------------------
+if fromDate:
+    if not cdr.strptime(fromDate, '%Y-%m-%d'):
+        cdrcgi.bail('Start Date must be valid date in YYYY-MM-DD format')
+if toDate:
+    if not cdr.strptime(toDate, '%Y-%m-%d'):
+        cdrcgi.bail('End Date must be valid date in YYYY-MM-DD format')
+if fromDate > toDate:
+    cdrcgi.bail('Start Date is greater than End Date')
 
 #----------------------------------------------------------------------
 # Connect to the database.
@@ -105,7 +117,7 @@ html = """\
   <br />
   <br />
 """ % (time.strftime("%m/%d/%Y", now), fromDate, toDate)
-   
+
 #----------------------------------------------------------------------
 # Extract the information from the database.
 #----------------------------------------------------------------------
