@@ -9,7 +9,7 @@
 #
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, time, os, cdrdb, glob, sys
+import cgi, cdrcgi, os, glob, sys
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -24,17 +24,42 @@ buttons = [cdrcgi.MAINMENU, "Log Out"]
 header  = cdrcgi.rptHeader(title, section,
             stylesheet = """\
  <style type='text/css'>
-    table     { border-style: solid; 
-                border-width: thin; 
+    table     { border-style: solid;
+                border-width: thin;
                 border-collapse: collapse; }
-    td, th    { padding: 5px; 
-                border-style: solid; 
+    td, th    { padding: 5px;
+                border-style: solid;
                 border-width: thin; }
     *.center  { text-align: center; }
  </style>""")
 
 myProg  = 'GeneticsProfUploadFiles.py'
 GENPROFDIR = 'D:/cdr/uploads'
+
+#----------------------------------------------------------------------
+# Validate legal zip filename
+#----------------------------------------------------------------------
+def checkZipFileName(zipName):
+    """
+    A hacker might use this script to download things he shouldn't see
+    by tampering with the zip filename parameter.  This check reduces
+    the possibility of his getting anything he shouldn't.
+
+    Pass:
+        zipName - Name of the zip file.
+
+    Return:
+        Void.  Bail out if the name is bad.
+    """
+    zName = zipName.lower()
+    if not zName.endswith('.zip'):
+        cdrcgi.bail('Bad zip name in parameter.  Hacked?')
+
+    fullName = os.path.join(GENPROFDIR, zipName)
+    try:
+        os.stat(fullName)
+    except:
+        cdrcgi.bail('Bad zip filename in parameter.  Hacked?')
 
 #----------------------------------------------------------------------
 # Return to the main menu if requested.
@@ -53,6 +78,9 @@ os.chdir(GENPROFDIR)
 # The user selected a file name and wants to download the ZIP file
 # ----------------------------------------------------------------
 if zipFile:
+    # Don't send wrong stuff
+    checkZipFileName(zipFile)
+
     print "Content-type: application/zip"
     print "Content-Disposition: attachment; filename=%s" % zipFile
 
@@ -117,11 +145,10 @@ for file in gpFiles:
     <td>%s-%s-%s</td>
     <td>%s:%sh</td>
     <td class="center">%s</td>
-   </tr>""" % (myProg, cdrcgi.SESSION, file, file, 
+   </tr>""" % (myProg, cdrcgi.SESSION, file, file,
                file[8:12], file[12:14], file[14:16],
                file[16:18], file[18:20],
                strBytes)
-
 body += u"""
   </table>
  </body>
