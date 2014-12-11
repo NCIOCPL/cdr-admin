@@ -12,7 +12,7 @@
 # BZIssue::1793
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrdb, cdrcgi, string, time, xml.dom.minidom
+import cgi, cdr, cdrdb, cdrcgi, time, xml.dom.minidom
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -71,6 +71,13 @@ if not fromDate or not toDate:
 """ % (cdrcgi.SESSION, session, fromDate, toDate)
     cdrcgi.sendPage(header + form)
 
+# Validate dates
+fromDate = fromDate.strip()
+toDate   = toDate.strip()
+if not cdr.valFromToDates('%Y-%m-%d', fromDate, toDate):
+    cdrcgi.bail(
+      "Invalid Start or End date.  Use YYYY-MM-DD, Start no later than End.")
+
 def extractIntVal(v):
     try:
         idForms = cdr.exNormalize(v)
@@ -125,7 +132,7 @@ cursor.execute("""\
                FROM query_term
               WHERE path IN ('/InScopeProtocol/RelatedPublications/EntryDate',
                              '/InScopeProtocol/PublishedResults/EntryDate')
-                AND value BETWEEN '%s' AND '%s'""" % (fromDate, toDate))
+                AND value BETWEEN ? AND ?""", (fromDate, toDate))
 for row in cursor.fetchall():
     versions = cdr.lastVersions('guest', 'CDR%010d' % row[0])
     protocol = Protocol(row[0], versions)
