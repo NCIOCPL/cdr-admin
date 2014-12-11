@@ -2,7 +2,7 @@
 #
 # $Id$
 #
-# Reports on documents which have been changed since a previously 
+# Reports on documents which have been changed since a previously
 # publishable version without a new publishable version have been
 # created.
 #
@@ -36,7 +36,7 @@
 # New report on documents modified since their last publishable version.
 #
 #----------------------------------------------------------------------
-import cdr, cdrdb, cdrcgi, cgi, re, time, xml.dom.minidom, datetime
+import cdr, cdrdb, cdrcgi, cgi, time, datetime
 
 #----------------------------------------------------------------------
 # Change date from ISO format to US-centric form.
@@ -55,7 +55,7 @@ def mungeDate(d):
         return dateObj.strftime("%b. %d, %Y")
     except:
         return "Invalid date (%s)" % d
-    
+
 #----------------------------------------------------------------------
 # Set the form variables.
 #----------------------------------------------------------------------
@@ -90,7 +90,7 @@ elif request == SUBMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if request == "Log Out": 
+if request == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
@@ -144,11 +144,25 @@ if not request:
 #----------------------------------------------------------------------
 # We have a request; do it.
 #----------------------------------------------------------------------
+# Ensure valid input docType before using it
+if docType and docType not in cdr.getDoctypes(session):
+    cdrcgi.bail('Unknown doc type requested: "%s"' % cgi.escape(docType))
 headerDocType = docType and ("%s Documents" % docType) or "Documents"
 dtQual        = docType and ("AND t.name = '%s'" % docType) or ""
+
 if not toDate  : toDate = time.strftime("%Y-%m-%d", now)
 if not fromDate: fromDate = cdr.URDATE
 if not modUser : modUser = '%'
+
+# Ensure valid dates before using
+# Some of this duplicates mungeDate() but no harm
+fromDate = fromDate.strip()
+toDate   = toDate.strip()
+if not cdr.valFromToDates('%Y-%m-%d', fromDate, toDate):
+    cdrcgi.bail(
+      "Invalid Start or End date.  Use YYYY-MM-DD, Start no later than End.")
+
+# Security note: All format specified parameters (%s) have been validated okay
 try:
     conn   = cdrdb.connect()
     cursor = conn.cursor()
@@ -177,11 +191,11 @@ try:
                              JOIN action
                                ON action.id = a.action
                             WHERE document = d.id
-                              AND action.name IN ('ADD DOCUMENT', 
+                              AND action.name IN ('ADD DOCUMENT',
                                                   'MODIFY DOCUMENT'))
                %s""" % (fromDate, toDate, modUser, dtQual), timeout = 120)
     cursor.execute("""\
-            SELECT v.id              doc_id, 
+            SELECT v.id              doc_id,
                    MAX(v.updated_dt) pub_ver_date
               INTO #last_publishable_version
               FROM doc_version v
@@ -190,7 +204,7 @@ try:
              WHERE v.publishable = 'Y'
           GROUP BY v.id""", timeout = 120)
     cursor.execute("""\
-            SELECT v.id              doc_id, 
+            SELECT v.id              doc_id,
                    MAX(v.updated_dt) unpub_ver_date
               INTO #last_unpublishable_version
               FROM doc_version v
@@ -309,7 +323,7 @@ for row in rows:
    </tr>
 """ % docType
         curDocType = docType
-   
+
     html += """\
    <tr>
     <td align='center'><font size='3'>CDR%010d</font></td>
@@ -318,7 +332,7 @@ for row in rows:
     <td align='center'><font size='3'>%s</font></td>
     <td align='center'><font size='3'>%s</font></td>
    </tr>
-""" % (docId, mungeDate(pubDate), modBy, mungeDate(modDate), 
+""" % (docId, mungeDate(pubDate), modBy, mungeDate(modDate),
        mungeDate(nonPubVerDate))
 
 #----------------------------------------------------------------------
