@@ -18,7 +18,7 @@
 # Added New Doc Report.
 #
 #----------------------------------------------------------------------
-import cdr, cdrdb, cdrcgi, cgi, re, time, xml.dom.minidom
+import cdr, cdrdb, cdrcgi, cgi, time
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -53,7 +53,7 @@ elif request == SUBMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if request == "Log Out": 
+if request == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
@@ -99,6 +99,18 @@ if not fromDate or not toDate:
 </HTML>
 """ % (fromDate, toDate)
     cdrcgi.sendPage(header + form)
+
+#----------------------------------------------------------------------
+# Validate inputs
+#----------------------------------------------------------------------
+fromDate = fromDate.strip()
+toDate   = toDate.strip()
+if not cdr.valFromToDates('%Y-%m-%d', fromDate, toDate):
+    cdrcgi.bail(
+      "Invalid Start or End date.  Use YYYY-MM-DD, Start no later than End.")
+
+if docType and docType not in cdr.getDoctypes(session):
+    cdrcgi.bail('Unknown doc type requested: "%s"' % cgi.escape(docType))
 
 #----------------------------------------------------------------------
 # We have a request; do it.
@@ -153,7 +165,7 @@ html = u"""\
     </td>
    </tr>
 """ % (headerDocType, time.strftime("%m/%d/%Y", now), fromDate, toDate)
-   
+
 #----------------------------------------------------------------------
 # Extract the information from the database.
 #----------------------------------------------------------------------
@@ -161,6 +173,7 @@ docCounts = {}
 try:
     conn   = cdrdb.connect()
     cursor = conn.cursor()
+    # Security note: docType already checked for whitelist, data i safe
     dtQual = docType and ("AND t.name = '%s'" % docType) or ""
     cursor.execute("""\
     SELECT t.name,
@@ -199,8 +212,8 @@ try:
         ON t.id = d.doc_type
      WHERE (SELECT MIN(a.dt)
               FROM audit_trail a
-             WHERE a.document = d.id) BETWEEN '%s' 
-                                          AND DATEADD(s, -1, 
+             WHERE a.document = d.id) BETWEEN '%s'
+                                          AND DATEADD(s, -1,
                                                       DATEADD(d, 1, '%s'))
       %s
 """ % (fromDate, toDate, dtQual), timeout = 120)
@@ -252,7 +265,7 @@ for key in keys:
 """ % (col1, statuses[i], counts[i])
         col1 = "&nbsp;"
         total += counts[i]
-   
+
     html += u"""\
    <tr>
     <td nowrap='1'>
