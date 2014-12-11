@@ -1,4 +1,4 @@
-import cgi, cdr, cdrcgi, cdrdb, re, sys
+import cgi, cdrcgi, cdrdb
 
 #----------------------------------------------------------------------
 # Dynamically create the title of the menu section (request #809).
@@ -20,6 +20,9 @@ buttons  = ["Submit", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 header   = cdrcgi.header(title, title, getSectionTitle(),
                          "WarehouseBoxNumberReport.py", buttons, method = 'GET')
 warehouseBoxNumber    = fields.getvalue("WarehouseBoxNumber") or None
+if warehouseBoxNumber:
+    warehouseBoxNumber = warehouseBoxNumber.strip()
+
 #warehouseBoxNumber = "726"
 
 #----------------------------------------------------------------------
@@ -33,7 +36,7 @@ elif action == SUBMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if action == "Log Out": 
+if action == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
@@ -54,6 +57,10 @@ if not warehouseBoxNumber:
 </html>
 """)
 
+# We've got one, make sure it's an integer
+if not warehouseBoxNumber.isdigit():
+    cdrcgi.bail("Expecting a pure integer Warehouse Box Number")
+
 #----------------------------------------------------------------------
 # Class for storing the document information
 #----------------------------------------------------------------------
@@ -72,7 +79,7 @@ def DrawDocumentRow(doc):
 
 def DrawDocumentRows(documents):
     sRows = """<table border = 1><th width = 10%>Doc ID</th><th>Protocol Title</th>"""
-    
+
     keys = documents.keys()
     keys.sort(lambda a,b: cmp(documents[a].id, documents[b].id))
     for key in keys:
@@ -94,7 +101,7 @@ except cdrdb.Error, info:
 # Fetch the documents for the given Warehouse Box Number
 #----------------------------------------------------------------------
 #sQuery = """
-#SELECT d.id, d.title 
+#SELECT d.id, d.title
 #FROM query_term q
 #JOIN document d
 #ON d.id = q.doc_id
@@ -107,16 +114,16 @@ except cdrdb.Error, info:
 #""" % warehouseBoxNumber
 
 sQuery = """
-SELECT d.id, d.title 
+SELECT d.id, d.title
 FROM query_term q
 JOIN document d
 ON d.id = q.doc_id
 WHERE q.path = '/InScopeProtocol/RelatedDocuments/WarehouseBoxNumber'
-and q.int_val = %s
-""" % warehouseBoxNumber
+and q.int_val = ?
+"""
 
 try:
-    cursor.execute(sQuery)
+    cursor.execute(sQuery, warehouseBoxNumber)
     rows = cursor.fetchall()
 except cdrdb.Error, info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
@@ -134,7 +141,7 @@ header   = cdrcgi.header(title, title, getSectionTitle(),
 
 if not len(documents):
     #sQuery = """
-    #SELECT distinct(int_val) 
+    #SELECT distinct(int_val)
     #FROM query_term q
     #WHERE q.path = '/InScopeProtocol/RelatedDocuments/WarehouseBoxNumber'
     #and q.doc_id in (select doc_id from query_term where
@@ -142,9 +149,9 @@ if not len(documents):
     #and value ='Active')
     #order by int_val
     #"""
-    
+
     sQuery = """
-    SELECT distinct(int_val) 
+    SELECT distinct(int_val)
     FROM query_term q
     WHERE q.path = '/InScopeProtocol/RelatedDocuments/WarehouseBoxNumber'
     order by int_val
@@ -159,7 +166,7 @@ if not len(documents):
     for id in rows:
         sId += "<tr><td>%s</td></tr>" % id[0]
     sId += "<table>"
-    
+
     form = """\
       <input type='hidden' name='%s' value='%s'>
       <tb>%s is not a valid Warehouse Box Number</tb><br><br>
@@ -167,7 +174,7 @@ if not len(documents):
       %s
     """ % (cdrcgi.SESSION, session,warehouseBoxNumber,sId)
 
-else:    
+else:
     form = """\
       <input type='hidden' name='%s' value='%s'>
       <table border=1>
@@ -187,4 +194,4 @@ cdrcgi.sendPage(header + form + """\
  </body>
 </html>
 """)
-                    
+
