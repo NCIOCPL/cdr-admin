@@ -10,7 +10,7 @@
 # BZIssue::4475
 #
 #----------------------------------------------------------------------
-import cdr, cgi, cdrcgi, cdrdb, re
+import cgi, cdrcgi, cdrdb, re
 
 #----------------------------------------------------------------------
 # Get the parameters from the request.
@@ -516,7 +516,8 @@ if docTitle and not docId:
         cdrcgi.bail("Database failure looking up title %s: %s" %
                     (docTitle, str(info)))
     if not rows:
-        cdrcgi.bail("No summaries found containing the string %s" % docTitle)
+        cdrcgi.bail("No summaries found containing the string %s" %
+                     cgi.escape(docTitle))
     elif len(rows) == 1:
         docId = str(rows[0][0])
     else:
