@@ -41,7 +41,6 @@ try:
     import Image
     import lxml.etree
     import xlrd
-    import pyXLWriter
     import cdr
     import cdrdb
     import cdrmailcommon
@@ -50,7 +49,6 @@ try:
     show("lxml", "%d.%d.%d.%d" % lxml.etree.LXML_VERSION[:4])
     show("Image", Image.VERSION)
     show("xlrd", xlrd.__VERSION__)
-    show("pyXLWriter", "%s.%s.%s" % pyXLWriter.version_info[:3])
     show("MySQLdb", "%s.%s.%s" % MySQLdb.version_info[:3])
     show("MySQL Server", "%s.%s" % conn._server_version[:2])
     html.append("""\
