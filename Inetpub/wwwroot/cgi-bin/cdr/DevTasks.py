@@ -4,21 +4,8 @@
 #
 # Lists CDR development tasks.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.4  2001/12/01 17:57:11  bkline
-# Added support for filtering out completed and abandoned tasks.
-#
-# Revision 1.3  2001/08/22 14:42:13  bkline
-# Changed subtitle from "UI Task List" to "Task List".
-#
-# Revision 1.2  2001/08/21 20:48:52  shines
-# Added ability to sort by column headings
-#
-# Revision 1.1  2001/08/21 17:18:02  bkline
-# Initial revision
-#
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, string, dbi, cdrdb
+import cgi, cdr, cdrcgi, re, string, cdrdb
 
 #----------------------------------------------------------------------
 # Retrieve and display the user information.

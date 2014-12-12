@@ -5,7 +5,7 @@
 # Displays a table containing information about all link types.
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, string, dbi, cdrdb
+import cgi, cdr, cdrcgi, re, string, cdrdb
 
 #----------------------------------------------------------------------
 # Set the form variables.
