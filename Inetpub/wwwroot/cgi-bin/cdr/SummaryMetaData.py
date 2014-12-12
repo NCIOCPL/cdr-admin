@@ -10,7 +10,7 @@
 # BZIssue::4475
 #
 #----------------------------------------------------------------------
-import cgi, cdrcgi, cdrdb, re
+import cdr, cgi, cdrcgi, cdrdb, re
 
 #----------------------------------------------------------------------
 # Get the parameters from the request.
@@ -67,6 +67,16 @@ elif request == SUBMENU:
 #----------------------------------------------------------------------
 if request == "Log Out":
     cdrcgi.logout(session)
+
+#----------------------------------------------------------------------
+# Validate inputs
+#----------------------------------------------------------------------
+if language:
+    if language not in cdr.getSummaryLanguages():
+        cdrcgi.bail("Invalid language value '%s'" % cgi.escape(language))
+if audience:
+    if audience not in cdr.getSummaryAudiences():
+        cdrcgi.bail("Invalid audience value '%s'" % cgi.escape(audience))
 
 #----------------------------------------------------------------------
 # Returns a copy of a doc title without trailing whitespace or semicolons.
