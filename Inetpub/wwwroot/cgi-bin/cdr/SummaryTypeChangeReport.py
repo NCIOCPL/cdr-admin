@@ -149,6 +149,13 @@ class TOCConfig:
         if not self.repType:
             self.repType = 'basic'
 
+        # Dates must be present and valid
+        if not cdr.valFromToDates('%Y-%m-%d', self.startDate, self.endDate,
+                                  MIN_DATE, MAX_DATE):
+            cdrcgi.bail(
+                "Start/End dates must be in valid YYYY-MM-DD format, in "
+                "range between start of CDR (2002-01-01) and today")
+
         # Human readable forms of start and end date
         self.startShowDate = self.startDate
         if self.startDate == MIN_DATE:
@@ -646,7 +653,7 @@ class OutputReport:
             Zero or more rows for passed DocChanges object.
         """
         # DEBUG
-        debugRowCnt = 0
+        # debugRowCnt = 0
 
         # Representation of an empty cell
         EMPTY = ''
