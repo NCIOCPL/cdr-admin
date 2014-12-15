@@ -27,7 +27,7 @@
 #
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, string, cdrdb, time, sys
+import cgi, cdr, cdrcgi, cdrdb, time
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -59,11 +59,11 @@ header   = cdrcgi.header(title, title, "Summaries TOC Report",
     span.ip:hover     { background-color: #FFFFCC; }
     fieldset        { margin-bottom: 10px; }
     /* fieldset.docversion { width: 860px; */
-    fieldset.docversion 
+    fieldset.docversion
                     { width: 75%;
                       margin-left: auto;
                       margin-right: auto;
-                      margin-bottom: 0; 
+                      margin-bottom: 0;
                       display: block; }
     fieldset.wrapper{ width: 520px;
                       margin-left: auto;
@@ -72,10 +72,10 @@ header   = cdrcgi.header(title, title, "Summaries TOC Report",
     *.gogreen       { width: 95%;
                       border: 1px solid green;
                       background: #99FF66; }
-    *.gg            { border: 1px solid green; 
-                      background: #99FF66; 
+    *.gg            { border: 1px solid green;
+                      background: #99FF66;
                       color: #006600; }
-    *.comgroup      { background: #C9C9C9; 
+    *.comgroup      { background: #C9C9C9;
                       margin-bottom: 8px; }
   </style>
 """)
@@ -83,6 +83,26 @@ header   = cdrcgi.header(title, title, "Summaries TOC Report",
 # Testing
 #byCdrid = 62875
 #byTitle = 'Breast'
+
+#----------------------------------------------------------------------
+# Some input validation
+#----------------------------------------------------------------------
+if showId not in ('Y', 'N'):
+    cdrcgi.bail("Invalid showId, internal error, please inform support staff")
+
+# Audience isn't using the exact canonical forms
+if audience and audience not in ('Health Professional', 'Patient'):
+    cdrcgi.bail("Invalid audience, internal error, please inform support staff")
+
+if lang and lang not in cdr.getSummaryLanguages():
+    cdrcgi.bail("Invalid language, internal error, please inform support staff")
+
+if tocLevel and not tocLevel.isdigit():
+    cdrcgi.bail("Expecting integer table of contents (TOC) level")
+
+# Expecting '-1' or a positive integer
+if docVers and not (docVers == '-1' or docVers.isdigit()):
+    cdrcgi.bail("Internal error, document version is not in the select list")
 
 # ----------------------------------------------------
 # Functions to replace sevaral repeated HTML snippets
@@ -127,15 +147,15 @@ def showTitleChoices(choices):
 def summaryRow(id, summary, toc, docVersion = None):
     """Return the HTML code to display a Summary row"""
     if byCdrid:
-        response = cdr.filterDoc('guest', 
-                         ['name:Wrap nodes with Insertion or Deletion', 
-                          'name:Clean up Insertion and Deletion', 
-                          'name:Summaries TOC Report'], 
-                         id, 
+        response = cdr.filterDoc('guest',
+                         ['name:Wrap nodes with Insertion or Deletion',
+                          'name:Clean up Insertion and Deletion',
+                          'name:Summaries TOC Report'],
+                         id,
                          parm = filterParm, docVer = docVersion)
     else:
-        response = cdr.filterDoc('guest', ['name:Revision Markup Filter', 
-                                           'name:Summaries TOC Report'], id, 
+        response = cdr.filterDoc('guest', ['name:Revision Markup Filter',
+                                           'name:Summaries TOC Report'], id,
                                  parm = filterParm, docVer = docVersion)
     html = unicode(response[0], "utf-8")
     html += u"""\
@@ -179,7 +199,7 @@ if not lang and (not byCdrid and not byTitle):
                            #("Submit",
                            # SUBMENU,
                            # cdrcgi.MAINMENU),
-    header = cdrcgi.header(title, title, instr + ' - ' + dateString, 
+    header = cdrcgi.header(title, title, instr + ' - ' + dateString,
                            script, buttons,
                            numBreaks = 1,
                            stylesheet = """
@@ -223,7 +243,7 @@ if not lang and (not byCdrid and not byTitle):
     form   = """\
    <input type='hidden' name='%s' value='%s'>
    <input type='hidden' name='singletoc' value='N'>
- 
+
    <div class='singletoc'>
    <b>Single Summary</b>
    <fieldset>
@@ -284,7 +304,7 @@ if not lang and (not byCdrid and not byTitle):
     <tr>
      <td></td>
      <td>
-      <input type='checkbox' name='grp' value='All English' 
+      <input type='checkbox' name='grp' value='All English'
              onclick="javascript:allEnglish(this, 6)" id="allEn" CHECKED>
        <label id="allEn">All English</label><br>
       <input type='checkbox' name='grp' value='Adult Treatment'
@@ -320,7 +340,7 @@ if not lang and (not byCdrid and not byTitle):
     <tr>
      <td></td>
      <td>
-      <input type='checkbox' name='grp' value='All Spanish' 
+      <input type='checkbox' name='grp' value='All Spanish'
              onclick="javascript:allSpanish(this, 4)" id="allEs" CHECKED>
        <label id="allEs">All Spanish</label><br>
       <input type='checkbox' name='grp' value='Spanish Adult Treatment'
@@ -391,7 +411,7 @@ if byTitle:
 # of the SummaryType.
 # Based on the SummaryType selected on the form the boardPick list is
 # being created including the Editorial and Advisory board for each
-# type.  These board IDs can then be decoded into the proper 
+# type.  These board IDs can then be decoded into the proper
 # heading to be used for each selected summary type.
 # --------------------------------------------------------------------
 boardPick = ''
@@ -450,16 +470,16 @@ AND    lang.value = '%s'
 # ---------------------------------------------------------------------
 # Define the selection criteria parts that are different for English or
 # Spanish documents:
-# q_fields:  Fields to be selected, i.e. the Spanish version needs to 
+# q_fields:  Fields to be selected, i.e. the Spanish version needs to
 #            display the English translation
 # q_join:    The Spanish version has to evaluate the board and language
 #            elements differently
 # q_board:   Don't restrict on selected boards if All English/Spanish
 #            has been selected as well
 # --------------------------------------------------------------------
-if lang == 'English': 
+if lang == 'English':
     q_fields = """
-                'dummy1', 'dummy2', title.value EnglTitle, 
+                'dummy1', 'dummy2', title.value EnglTitle,
 """
     q_join = """
 JOIN  query_term board
@@ -476,7 +496,7 @@ AND    board.value in (%s)
 """ % boardPick[:-2]
 else:
     q_fields = """
-                qt.value CDRID, qt.int_val ID, translation.value EnglTitle, 
+                qt.value CDRID, qt.int_val ID, translation.value EnglTitle,
 """
     q_join = """
 JOIN  query_term board
@@ -513,7 +533,7 @@ AND audience.value = 'Health professionals'
 # Put all the pieces together for the SELECT statement
 # -------------------------------------------------------------
 query = """\
-SELECT DISTINCT qt.doc_id, title.value DocTitle, 
+SELECT DISTINCT qt.doc_id, title.value DocTitle,
 %s
 %s
 FROM  query_term qt
@@ -533,15 +553,15 @@ AND EXISTS (SELECT 'x' FROM doc_version v
             WHERE  v.id = qt.doc_id
             AND    v.val_status = 'V'
             AND    v.publishable = 'Y')
-AND qt.doc_id not in (select doc_id 
-                       from doc_info 
-                       where doc_status = 'I' 
+AND qt.doc_id not in (select doc_id
+                       from doc_info
+                       where doc_status = 'I'
                        and doc_type = 'Summary')
 ORDER BY 6, 2
 """ % (q_fields, q_case, q_join, q_trans, q_board, q_audience, q_lang)
 
 if not query:
-    cdrcgi.bail('No query criteria specified')   
+    cdrcgi.bail('No query criteria specified')
 
 #----------------------------------------------------------------------
 # If we are running the report for a single summary but we don't have
@@ -602,14 +622,14 @@ if byCdrid:
     # --------------------------------------------------
     try:
         query = """\
-    SELECT DISTINCT qt.doc_id, title.value DocTitle, 
+    SELECT DISTINCT qt.doc_id, title.value DocTitle,
                     'dummy1', 'dummy2', title.value EnglTitle, ' '
-      FROM query_term qt 
-      JOIN query_term title 
-        ON qt.doc_id = title.doc_id 
-     WHERE title.path = '/Summary/SummaryTitle' 
+      FROM query_term qt
+      JOIN query_term title
+        ON qt.doc_id = title.doc_id
+     WHERE title.path = '/Summary/SummaryTitle'
        AND qt.doc_id = %s""" % byCdrid
-        
+
         cursor.execute(query)
         rows = cursor.fetchall()
         cursor.close()
@@ -626,7 +646,7 @@ else:
     except cdrdb.Error, info:
         cdrcgi.bail('Failure retrieving Summary documents: %s' %
                     info[1][0])
-     
+
 if not rows and not vrows:
     cdrcgi.bail('No Records Found for Selection: %s ' % lang+"; "+audience+"; "+groups[0] )
 
@@ -645,25 +665,25 @@ header    = cdrcgi.rptHeader(title, instr,
     UL UL UL UL UL { margin-left: 30pt; }
     LI             { font-style: normal;
                      font-family: Arial;
-                     font-weight: normal; 
+                     font-weight: normal;
                      font-size: 12pt;
                      list-style-type: none; }
     H5             { font-weight: bold;
                      font-family: Arial;
-                     font-size: 13pt; 
+                     font-size: 13pt;
                      margin: 0pt; }
     *.ehdr         { font-size: 18pt;
                      font-weight: bold;
-                     text-align: center; 
+                     text-align: center;
                      width: 420px; }
     *.shdr         { font-size: 18pt;
                      font-weight: bold;
-                     text-align: center; 
+                     text-align: center;
                      width: 540px; }
     *.hdrDate      { font-size: 12pt;
                      font-weight: bold; }
     *.Insertion    { color: red; }
-    *.Deletion     { color: red; 
+    *.Deletion     { color: red;
                      text-decoration: line-through; }
    </STYLE>
 """)
@@ -720,33 +740,33 @@ for row in rows:
     # heading
     # ----------------------------------------------------------
     if row[5] == board_type:
-       report += summaryRow(row[0], row[1], toc = tocLevel, 
+       report += summaryRow(row[0], row[1], toc = tocLevel,
                                                docVersion = docVers)
        #if lang == 'English':
-       #   report += summaryRow(row[0], row[1], toc = tocLevel, 
+       #   report += summaryRow(row[0], row[1], toc = tocLevel,
        #                                        docVersion = docVers)
        #else:
-       #   report += summaryRow(row[0], row[1], toc = tocLevel, 
+       #   report += summaryRow(row[0], row[1], toc = tocLevel,
        #                                        docVersion = docVers)
 
-    # For the Treatment Summary Type we need to check if this is an 
+    # For the Treatment Summary Type we need to check if this is an
     # adult or pediatric summary
     # -------------------------------------------------------------
     else:
        board_type = row[5]
        report += boardHeader(board_type)
-       report += summaryRow(row[0], row[1], toc = tocLevel, 
+       report += summaryRow(row[0], row[1], toc = tocLevel,
                                                docVersion = docVers)
        #if lang == 'English':
-       #   report += summaryRow(row[0], row[1], toc = tocLevel, 
+       #   report += summaryRow(row[0], row[1], toc = tocLevel,
        #                                        docVersion = docVers)
        #else:
-       #   report += summaryRow(row[0], row[1], toc = tocLevel, 
+       #   report += summaryRow(row[0], row[1], toc = tocLevel,
        #                                        docVersion = docVers)
 footer = u"""\
  </BODY>
-</HTML> 
-"""     
+</HTML>
+"""
 
 #----------------------------------------------------------------------
 # Send the page back to the browser.
