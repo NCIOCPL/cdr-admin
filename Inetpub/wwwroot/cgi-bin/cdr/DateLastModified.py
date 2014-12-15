@@ -107,10 +107,13 @@ if not fromDate or not toDate:
 """ % (fromDate, toDate)
     cdrcgi.sendPage(header + form)
 
-# Validate dates from the input form
+# Validate dates and docType from the input form
 if not cdr.valFromToDates('%Y-%m-%d', fromDate, toDate):
     cdrcgi.bail(
       "Invalid Start or End date.  Use YYYY-MM-DD, Start no later than End.")
+
+if docType and docType not in cdr.getDoctypes(session):
+    cdrcgi.bail('Unknown document type requested: "%s"' % cgi.escape(docType))
 
 #----------------------------------------------------------------------
 # We have a request; do it.
