@@ -38,7 +38,7 @@
 # Advanced search screen for Glossary Term documents.
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, cdrdb
+import cgi, cdrcgi, cdrdb
 
 #----------------------------------------------------------------------
 # Get the form variables.
@@ -64,8 +64,14 @@ dictionaries = cdrcgi.glossaryTermDictionaryList
 subTitle   = { 'GlossaryTermName'   : 'Glossary Term Name',
                'GlossaryTermConcept': 'Glossary Term Concept' }
 
-if help: 
+if help:
     cdrcgi.bail("Sorry, help for this interface has not yet been developed.")
+
+#----------------------------------------------------------------------
+# Input validation
+#----------------------------------------------------------------------
+if boolOp not in ('AND', 'OR'):
+    cdrcgi.bail("Invalid search connector, internal error")
 
 #----------------------------------------------------------------------
 # Connect to the CDR database.
@@ -113,7 +119,7 @@ if not submit:
                                           'Glossary Term Name',
                                           conn)
 
-    # The constructAdvancedSearchQuery() function needs to know the 
+    # The constructAdvancedSearchQuery() function needs to know the
     # document type, so we're passing this as an extra parameter
     # -------------------------------------------------------------
     page += """\
@@ -121,7 +127,7 @@ if not submit:
   </FORM>\n"""
 
     # We need to have two forms for the Glossary search, one for the
-    # Term Name and one for the Term Concept.  We're closing the 
+    # Term Name and one for the Term Concept.  We're closing the
     # default form (above) and creating a new one here
     # --------------------------------------------------------------
     page += cdrcgi.addNewFormOnPage(session,
@@ -173,7 +179,7 @@ searchFields = (cdrcgi.SearchField(nameEn,
 #----------------------------------------------------------------------
 # Construct the query.
 #----------------------------------------------------------------------
-(query, strings) = cdrcgi.constructAdvancedSearchQuery(searchFields, boolOp, 
+(query, strings) = cdrcgi.constructAdvancedSearchQuery(searchFields, boolOp,
                                                        typeName)
 if not query:
     cdrcgi.bail('No query criteria specified')
@@ -188,14 +194,14 @@ try:
     cursor.close()
     cursor = None
 except cdrdb.Error, info:
-    cdrcgi.bail('Failure retrieving GlossaryTermName documents: %s' % 
+    cdrcgi.bail('Failure retrieving GlossaryTermName documents: %s' %
                 info[1][0])
 
 #----------------------------------------------------------------------
 # Create the results page.
 #----------------------------------------------------------------------
 filt = "name:Glossary Term Advanced Search Display"
-html = cdrcgi.advancedSearchResultsPage(subTitle[typeName], rows, strings, 
+html = cdrcgi.advancedSearchResultsPage(subTitle[typeName], rows, strings,
                                         filt, session = session)
 
 #----------------------------------------------------------------------
