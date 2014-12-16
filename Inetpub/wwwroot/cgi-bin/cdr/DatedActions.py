@@ -72,6 +72,10 @@ if not docType:
 """
     cdrcgi.sendPage(header + form)
 
+# If we got here, there is a docType.  Validate it.
+if docType not in cdr.getDoctypes(session):
+    cdrcgi.bail('Unknown doc type requested')
+
 #----------------------------------------------------------------------
 # We have a request; do it.
 #----------------------------------------------------------------------
