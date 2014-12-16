@@ -51,15 +51,22 @@ def checkZipFileName(zipName):
     Return:
         Void.  Bail out if the name is bad.
     """
+    # What follows is a heuristic that should catch many problems of the type
+    #  introduced in AppScan testing.
+    # Filename must have no newlines, must ".zip", must be found in the right
+    #  directory.
     zName = zipName.lower()
     if not zName.endswith('.zip'):
-        cdrcgi.bail('Bad zip name in parameter.  Hacked?')
+        cdrcgi.bail('Internal error: Bad zip name requested')
+
+    if zName.find("\n") >= 0 or zName.find("\r") > 0:
+        cdrcgi.bail('Internal error: Bad zipfile name string requetsed')
 
     fullName = os.path.join(GENPROFDIR, zipName)
     try:
         os.stat(fullName)
     except:
-        cdrcgi.bail('Bad zip filename in parameter.  Hacked?')
+        cdrcgi.bail('Internal error: Unknown zip filename requested')
 
 #----------------------------------------------------------------------
 # Return to the main menu if requested.
