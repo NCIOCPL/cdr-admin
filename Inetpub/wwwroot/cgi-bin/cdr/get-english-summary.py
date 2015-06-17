@@ -156,8 +156,7 @@ def markup(doc):
 def strip(xml):
     doomed = ('Comment', 'MediaLink', 'SectMetaData', 'ReplacementFor',
               'PdqKey', 'DateLastModified', 'ComprehensiveReviewDate',
-              #'SummaryFragmentRef'
-              )
+              'BoardMember')
     try:
         parser = etree.XMLParser(remove_blank_text=True)
         root = etree.fromstring(xml.encode('utf-8'), parser).getroottree()
@@ -177,17 +176,9 @@ def strip(xml):
             debug.append("removed summary section")
             parent = node.getparent()
             parent.remove(node)
-        
-        etree.strip_elements(root, 'Comment', 'MediaLink', 'SectMetaData',
-                             'ReplacementFor', 'PdqKey', 'DateLastModified',
-                             'ComprehensiveReviewDate', 'BoardMember')
+
+        etree.strip_elements(root, with_tail=False, *doomed)
         etree.strip_attributes(root, 'PdqKey')
-        ## etree.strip_tags(root, 'SummaryFragmentRef')
-        ## for tag in doomed:
-        ##     for node in root.findall("*//%s" % tag):
-        ##         debug.append("removing %s" % tag)
-        ##         parent = node.getparent()
-        ##         parent.remove(node)
         return etree.tostring(root, pretty_print=True, encoding="utf-8",
                               xml_declaration=True)# + "<br />".join(debug)
     except Exception, e:

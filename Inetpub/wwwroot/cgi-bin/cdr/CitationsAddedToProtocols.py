@@ -30,6 +30,14 @@ header   = cdrcgi.header(title, title, instr, script, buttons)
 
 
 #----------------------------------------------------------------------
+# Scrub date parameters.
+#----------------------------------------------------------------------
+if fromDate and not cdr.strptime(fromDate, "%Y-%m-%d"):
+    cdrcgi.bail("Invalid start date; format YYYY-MM-DD expected")
+if toDate and not cdr.strptime(toDate, "%Y-%m-%d"):
+    cdrcgi.bail("Invalid end date; format YYYY-MM-DD expected")
+
+#----------------------------------------------------------------------
 # Handle requests.
 #----------------------------------------------------------------------
 if request == cdrcgi.MAINMENU:

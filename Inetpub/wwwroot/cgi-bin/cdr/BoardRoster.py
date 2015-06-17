@@ -8,11 +8,18 @@
 # BZIssue::4909 - Board Roster Report Change
 # BZIssue::4979 - Error in Board Roster Report
 # BZIssue::5023 - Changes to Board Roster Report
-# OCECDR-3720: [Summaries] Board Roster Summary Sheet - More Options 
-# 
+# OCECDR-3720: [Summaries] Board Roster Summary Sheet - More Options
+# JIRA::OCECDR-3812 - Name change (OCPL)
+#
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, cdrdb, re, time, lxml.etree as etree
-import datetime, lxml.html
+import cdr
+import cdrcgi
+import cdrdb
+import cgi
+import datetime
+import lxml.etree as etree
+import lxml.html
+import time
 
 #----------------------------------------------------------------------
 # Initial variables.
@@ -54,7 +61,7 @@ except cdrdb.Error, info:
 #----------------------------------------------------------------------
 def show_form():
     boards = [("", "Pick a Board")] + getActiveBoards()
-    form = cdrcgi.Page(TITLE, subtitle=subtitle, buttons=buttons, 
+    form = cdrcgi.Page(TITLE, subtitle=subtitle, buttons=buttons,
                        action=action, session=session)
     form.add("<fieldset>")
     form.add(cdrcgi.Page.B.LEGEND("Select Board"))
@@ -194,13 +201,13 @@ def makeColumns(cols):
     columns = [cdrcgi.Report.Column('Name', width='%dpx' % nameWidth)]
     pageWidth = 1000
     for label, field in (
-        ("Phone", "phone"), 
-        ("Fax", "fax"), 
-        ("Email", "email"), 
-        ("CDR-ID", "cdr-id"), 
-        ("Start Date", "start-date"), 
+        ("Phone", "phone"),
+        ("Fax", "fax"),
+        ("Email", "email"),
+        ("CDR-ID", "cdr-id"),
+        ("Start Date", "start-date"),
         ("Gov. Empl.", "employee"),
-        ("Area of Exp.", "expertise"), 
+        ("Area of Exp.", "expertise"),
         ("Member Subgrp", "subgroup"),
         ("Term End Date", "end-date"),
         ("Affil. Name", "affiliation"),
@@ -210,7 +217,7 @@ def makeColumns(cols):
     ):
         if field in cols:
             columns.append(cdrcgi.Report.Column(label))
-    
+
     # Adding blank columns and adjusting the width to the number of
     # already existing columns
     # -------------------------------------------------------------
@@ -279,10 +286,10 @@ otherInfo  = "other" in full_opts and "Yes" or "No"
 assistant  = "assistant" in full_opts and "Yes" or "No"
 subgroup   = "subgroup" in full_opts and "Yes" or "No"
 
-# If blank columns are specified with a width specifier extract 
+# If blank columns are specified with a width specifier extract
 # the width and make sure we have enough values for each column
 # The width would be specified in pixels with values separated
-# by spaces, for example  '3:20 40 60' will add 3 columns with 
+# by spaces, for example  '3:20 40 60' will add 3 columns with
 # a width of 20px, 40px, and 60px respectively.
 # -------------------------------------------------------------
 blankCol = blankInfo.split(':')[0]
@@ -408,7 +415,7 @@ class BoardMember:
         if "subgroup" in cols:
             row.append(self.subgroups or "")
         if "end-date" in cols:
-            row.append(cdrcgi.Report.Cell(self.termEndDate or "", 
+            row.append(cdrcgi.Report.Cell(self.termEndDate or "",
                        classes=("emphasis", "center")))
         if "affiliation" in cols:
             row.append(self.affiliations or "")
@@ -463,11 +470,11 @@ class BoardMember:
                     elif child.tag == "MemberOfSubgroup":
                         self.subgroups.append(child.text)
                     elif child.tag == "TermRenewalFrequency":
-                        # Need to calculate the term end date from the 
+                        # Need to calculate the term end date from the
                         # start date and renewal frequency
                         # --------------------------------------------
                         termRenewal = child.text
-                        frequency = {'Every year':1, 
+                        frequency = {'Every year':1,
                                      'Every two years':2}
                         year = datetime.timedelta(365)
 
@@ -475,7 +482,7 @@ class BoardMember:
                             if self.termSdate:
                                 termStart = datetime.datetime.strptime(
                                                  self.termSdate, '%Y-%m-%d')
-                                termEnd = (termStart + 
+                                termEnd = (termStart +
                                              frequency[termRenewal] * year)
                                 self.termEndDate = termEnd.strftime('%Y-%m-%d')
                         except:
@@ -514,14 +521,14 @@ class BoardMember:
         elif self.isEic:
             return -1
         return 1
-    
+
 #----------------------------------------------------------------------
 # Select the list of board members associated to a board (passed in
 # by the selection of the user) along with start/end dates.
 #----------------------------------------------------------------------
 try:
     cursor.execute("""\
- SELECT DISTINCT member.doc_id, eic_start.value, eic_finish.value, 
+ SELECT DISTINCT member.doc_id, eic_start.value, eic_finish.value,
                  term_start.value, person_doc.title
             FROM query_term member
             JOIN query_term curmemb
@@ -537,7 +544,7 @@ try:
              AND eic_start.path   = '/PDQBoardMemberInfo/BoardMembershipDetails'
                               + '/EditorInChief/TermStartDate'
  LEFT OUTER JOIN query_term eic_finish
-              ON eic_finish.doc_id = member.doc_id  
+              ON eic_finish.doc_id = member.doc_id
              AND LEFT(eic_finish.node_loc, 4) = LEFT(member.node_loc, 4)
              AND eic_finish.path  = '/PDQBoardMemberInfo/BoardMembershipDetails'
                               + '/EditorInChief/TermEndDate'
@@ -559,7 +566,7 @@ try:
     boardMembers = []
     boardIds     = []
     for docId, eic_start, eic_finish, term_start, name in rows:
-        boardMembers.append(BoardMember(docId, eic_start, eic_finish, 
+        boardMembers.append(BoardMember(docId, eic_start, eic_finish,
                                                term_start, name))
         boardIds.append(docId)
     boardMembers.sort()
@@ -580,22 +587,22 @@ if flavor == 'full':
   <title>PDQ Board Member Roster Report - %s</title>
   <meta http-equiv='Content-Type' content='text/html; charset=UTF-8'>
   <style type='text/css'>
-   h1       { font-family: Arial, sans-serif; 
+   h1       { font-family: Arial, sans-serif;
               font-size: 16pt;
-              text-align: center; 
+              text-align: center;
               font-weight: bold; }
-   h2       { font-family: Arial, sans-serif; 
+   h2       { font-family: Arial, sans-serif;
               font-size: 14pt;
-              text-align: center; 
+              text-align: center;
               font-weight: bold; }
-   p        { font-family: Arial, sans-serif; 
+   p        { font-family: Arial, sans-serif;
               font-size: 12pt; }
    #summary td, #summary th
             { border: 1px solid black; }
-   #hdg     { font-family: Arial, sans-serif; 
+   #hdg     { font-family: Arial, sans-serif;
               font-size: 16pt;
-              font-weight: bold; 
-              text-align: center; 
+              font-weight: bold;
+              text-align: center;
               padding-bottom: 20px;
               border: 0px; }
    #summary { border: 0px; }
@@ -604,12 +611,12 @@ if flavor == 'full':
    /* template for Persons.  The italic display used for the QC   */
    /* report does therefore need to be suppressed here.           */
    /* ----------------------------------------------------------- */
-   I        { font-family: Arial, sans-serif; font-size: 12pt; 
+   I        { font-family: Arial, sans-serif; font-size: 12pt;
               font-style: normal; }
    span.SectionRef { text-decoration: underline; font-weight: bold; }
 
    .theader { background-color: #CFCFCF; }
-   .name    { font-weight: bold; 
+   .name    { font-weight: bold;
               vertical-align: top; }
    .phone, .email, .fax, .cdrid
             { vertical-align: top; }
@@ -617,13 +624,13 @@ if flavor == 'full':
    #main    { font-family: Arial, Helvetica, sans-serif;
               font-size: 12pt; }
   </style>
- </head>  
+ </head>
  <body id="main">
 """ % boardName
 
     html += """
    <h1>%s<br><span style="font-size: 12pt">%s</span></h1>
-""" % (boardName, dateString)   
+""" % (boardName, dateString)
 else:
     otherInfo = assistant = "No"
 
@@ -644,13 +651,13 @@ for boardMember in boardMembers:
     if type(response) in (str, unicode):
         cdrcgi.bail("%s: %s" % (boardMember.id, response))
 
-    # If we run the full report we just attach the resulting HTML 
-    # snippets to the previous output.  
+    # If we run the full report we just attach the resulting HTML
+    # snippets to the previous output.
     # For the summary sheet we still need to extract the relevant
     # information from the HTML snippet
     #
     # We need to wrap each person in a table in order to prevent
-    # page breaks within address blocks after the conversion to 
+    # page breaks within address blocks after the conversion to
     # MS-Word.
     # -----------------------------------------------------------
     if flavor == 'full':
@@ -662,13 +669,13 @@ for boardMember in boardMembers:
         </table>""" % unicode(response[0], 'utf-8')
     else:
         boardMember.parse(response[0])
- 
+
 # Create the HTML table for the summary sheet
 # -------------------------------------------
 if flavor == 'summary':
     rows = [member.make_row(cols, extra) for member in boardMembers]
     if "employee" in cols:
-        rows.append([cdrcgi.Report.Cell("* - Honoraria Declined", 
+        rows.append([cdrcgi.Report.Cell("* - Honoraria Declined",
                                         colspan=len(cols) + 1,
                                         classes="footer")])
     caption = [boardName, dateString]
@@ -691,8 +698,8 @@ if flavor == 'full':
         <td>
          <b><u>Board Manager Information</u></b><br>
          <b>%s</b><br>
-         Office of Cancer Content Management (OCCM)<br>
-         Office of Communications and Education<br>
+         Office of Cancer Content<br>
+         Office of Communications and Public Liaison<br>
          National Cancer Institute<br>
          9609 Medical Center Drive, MSC 9760<br>
          Rockville, MD 20850<br><br>
@@ -713,11 +720,11 @@ if flavor == 'full':
            </td>
        </tr>
       </table>
-     </body>   
-    </html>    
-    """ % (boardManagerInfo and boardManagerInfo[0][1] or 'No Board Manager', 
+     </body>
+    </html>
+    """ % (boardManagerInfo and boardManagerInfo[0][1] or 'No Board Manager',
            boardManagerInfo and boardManagerInfo[2][1] or 'TBD',
-           boardManagerInfo and boardManagerInfo[1][1] or 'TBD', 
+           boardManagerInfo and boardManagerInfo[1][1] or 'TBD',
            boardManagerInfo and boardManagerInfo[1][1] or 'TBD')
 
     # The users don't want to display the country if it's the US.

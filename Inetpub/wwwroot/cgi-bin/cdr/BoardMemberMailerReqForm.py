@@ -45,7 +45,7 @@ elif request == SUBMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if request == "Log Out": 
+if request == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
@@ -112,7 +112,7 @@ if request == "Submit":
 
     if board and letter:
         board = int(board)
-    
+
         # Find the publishing system control document.
         try:
             cursor = conn.cursor()
@@ -245,7 +245,7 @@ class Board:
             self.boardType = 'editorial'
         else:
             self.boardType = 'advisory'
-        
+
 class BoardMember:
     def __init__(self, id, docTitle):
         self.id = id
@@ -327,7 +327,7 @@ def makeBoardObjects():
         outerComma = ','
     return objects + """
    };"""
-        
+
 #----------------------------------------------------------------------
 # Put up the form if we don't have a request yet.
 #----------------------------------------------------------------------
@@ -337,12 +337,12 @@ header = cdrcgi.header(title, title, section, script, buttons,
    ul { margin-left: 20pt }
    h2 { font-size: 14pt; font-family:Arial; color:Navy }
    h3 { font-size: 13pt; font-family:Arial; color:black; font-weight:bold }
-   li, span.r { 
+   li, span.r {
         font-size: 11pt; font-family:'Arial'; color:black;
-        margin-bottom: 10pt; font-weight:normal 
+        margin-bottom: 10pt; font-weight:normal
    }
    b, th {  font-size: 11pt; font-family:'Arial'; color:black;
-        margin-bottom: 10pt; font-weight:bold 
+        margin-bottom: 10pt; font-weight:bold
    }
    .error { color: red; }
   </style>
@@ -387,12 +387,10 @@ header = cdrcgi.header(title, title, section, script, buttons,
        'editorial': [
            new Option('Editorial Board Invitation Letter', 'ed-invitation'),
            new Option('Editorial Board Welcome Letter',    'ed-welcome'),
-           new Option('Editorial Board Short Welcome Letter',
-                      'ed-short-welcome'),
            new Option('Editorial Board Renewal Letter',    'ed-renewal'),
            new Option('Editorial Board Editor-in-Chief Renewal Letter',
                       'ed-ec-renewal'),
-           new Option('Editorial Board Goodbye Letter',    'ed-goodbye'), 
+           new Option('Editorial Board Goodbye Letter',    'ed-goodbye'),
            new Option('Editorial Board Goodbye For Good Letter',
                       'ed-goodbye-forever'),
            new Option('Editorial Board Reformatted Summary Review',
@@ -402,7 +400,7 @@ header = cdrcgi.header(title, title, section, script, buttons,
                       'ed-comp-review')
       ]
    };
-       
+
    function boardChange() {
        var boardElem        = document.forms[0].board;
        var letterElem       = document.forms[0].letter;
@@ -447,7 +445,7 @@ form = """\
      Please be patient.
     </li>
     <li>
-     To receive email notification when the job is completed, enter your 
+     To receive email notification when the job is completed, enter your
      email address.
     </li>
     <li>

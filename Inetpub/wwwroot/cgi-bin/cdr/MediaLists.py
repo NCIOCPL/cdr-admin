@@ -18,7 +18,7 @@ import datetime
 #----------------------------------------------------------------------
 fields    = cgi.FieldStorage()
 session   = cdrcgi.getSession(fields)
-show_id   = fields.getvalue("show_id") == "N"
+show_id   = fields.getvalue("show_id") == "Y"
 diagnosis = fields.getlist("diagnosis")
 category  = fields.getlist("category")
 request   = cdrcgi.getRequest(fields)

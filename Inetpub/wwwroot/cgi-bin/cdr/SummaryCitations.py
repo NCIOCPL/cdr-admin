@@ -67,12 +67,14 @@ elif request == SUBMENU:
 if request == "Log Out":
     cdrcgi.logout(session)
 
+#----------------------------------------------------------------------
 # Validate input docId
-try:
-    cdr.exNormalize(docId)
-except:
-    cdrcgi.bail("Invalid CDR ID entered: %s" % cgi.escape(docId))
-
+#----------------------------------------------------------------------
+if docId:
+    try:
+        cdr.exNormalize(docId)
+    except:
+        cdrcgi.bail("Invalid CDR ID entered: %s" % cgi.escape(docId))
 
 #----------------------------------------------------------------------
 # Display the report if we have a document ID and version number.

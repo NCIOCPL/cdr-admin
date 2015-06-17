@@ -5,148 +5,27 @@
 # Transform a CDR document using an XSL/T filter and send it back to
 # the browser.
 #
+# BZIssue::1531 - Mods for GlossaryTerm docs
+# BZIssue::2310 - Changed doctype name passed to Cancer.gov
+# BZIssue::2002 - Fixes for protocol patient docs; IE6 workarounds
+# BZIssue::3973 - Adjustments to regex substitutions
+# BZIssue::3491 - Support GlossaryTermName documents
 # BZIssue::4781 - Have certain links to unpublished docs ignored
 # BZIssue::5053 - [Summaries] Pub Preview Error
 # BZIssue::5113 - Modifying PublishPreview to Work with WCMS Release 6.3
 # BZIssue::OCECDR-3618 - Audio does not play in pub preview
-#
-# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-# Revision 1.39  2008/11/20 22:44:44  venglisc
-# Modified the code to display the exception returned by Cancer.gov if a
-# document fails to be processed.  This will help programmers to identify
-# a potential problem quickly.
-#
-# Revision 1.38  2008/11/06 15:10:14  venglisc
-# Changing server name after Gatekeeper upgrade.
-#
-# Revision 1.37  2008/11/04 21:13:58  venglisc
-# Minor change to display document type.
-#
-# Revision 1.36  2008/11/03 19:06:53  venglisc
-# Modifications to allow GlossaryTermName documents to be PublishPreviewed
-# in addition to GlossaryTerm documents. (Bug 3491)
-#
-# Revision 1.35  2008/03/31 20:59:20  venglisc
-# The HTML returned by Cancer.gov is not completely consistent for different
-# document types.  I adjusted the regular expressions to accomodate the
-# differences between the Summary and Glossary documents. (Bug 3973)
-#
-# Revision 1.34  2008/03/26 20:43:57  venglisc
-# Added some regular expression replacement strings to allow some links to
-# properly work within the PP document and to change the target of the
-# images to come from our CDR servers. (Bug 3973)
-#
-# Revision 1.33  2008/02/19 22:53:44  venglisc
-# Reverting the work around allowing protocol patient publish preview
-# documents to be displayed properly.  These are now correctly handled
-# as part of the publish preview code. (Bug 2002)
-#
-# Revision 1.32  2008/01/23 20:59:53  venglisc
-# Removing previous changes in order to move to production the IE6 fix
-# for publish preview to shrink a page when printed so that its right
-# border isn't cut off. (Bug 2002)
-#
-# Revision 1.31  2008/01/09 17:53:20  venglisc
-# Made modifications to temporarily allow protocol patient publish preview
-# to work by accessing the old gatekeeper (using cdr2cg.py). (Bug 2002)
-#
-# Revision 1.30  2007/12/11 19:10:16  venglisc
-# Changes for new PublishPreview using the new gatekeeper code (Bug 2002)
-#
-# Revision 1.29  2006/11/02 00:16:01  venglisc
-# Adjusted the doctype passed to Cancer.gov to what they had implemented.
-# (Bug 2310)
-#
-# Revision 1.27  2005/12/08 16:01:32  venglisc
-# Modified the program to handle an additional parameter.  With this new
-# version parameter we are able to display a specific version of a document
-# including the cwd (current working document).
-#
-# Revision 1.26  2005/04/21 21:30:06  venglisc
-# Modified to allow running GlossaryTerm Publish Preview reports. (Bug 1531)
-#
-# Revision 1.25  2005/02/15 13:07:13  bkline
-# Added ability to override default for host from which to pull the
-# stylesheet.
-#
-# Revision 1.24  2004/12/28 16:20:55  bkline
-# Added cgHost parameter.
-#
-# Revision 1.23  2004/05/27 20:50:23  bkline
-# Replaced stylesheets as requested by Jay (email message).
-#
-# Revision 1.22  2003/12/16 15:47:14  bkline
-# Added debugging support and CTGovProtocol support.
-#
-# Revision 1.21  2003/11/25 12:47:41  bkline
-# Added support for testing from command line.
-#
-# Revision 1.20  2003/08/25 20:31:44  bkline
-# Eliminated obsolete lists of filters (replaced by named filter sets).
-#
-# Revision 1.19  2002/11/15 18:36:23  bkline
-# Fixed typo (InScopePrototocol).
-#
-# Revision 1.18  2002/11/13 20:33:37  bkline
-# Plugged in filter sets.
-#
-# Revision 1.17  2002/11/05 14:00:29  bkline
-# Updated filter lists from publication control document.
-#
-# Revision 1.16  2002/10/31 02:06:06  bkline
-# Changed www.cancer.gov to stage.cancer.gov for css url.
-#
-# Revision 1.15  2002/10/28 13:59:11  bkline
-# Added hook to debuglevel.  Added link to Cancer.gov stylesheet.
-#
-# Revision 1.14  2002/10/24 15:38:08  bkline
-# Implemented change request from issue #478 to use last publishable
-# version instead of current working version.
-#
-# Revision 1.13  2002/10/22 17:47:05  bkline
-# Added, then commented out, the debugging flag for cdr2cg.
-#
-# Revision 1.12  2002/08/29 12:32:08  bkline
-# Hooked up with Cancer.gov.
-#
-# Revision 1.11  2002/05/30 17:06:41  bkline
-# Corrected CVS log comment for previous version.
-#
-# Revision 1.10  2002/05/30 17:01:06  bkline
-# New protocol filters from Cheryl.
-#
-# Revision 1.9  2002/05/08 17:41:53  bkline
-# Updated to reflect Volker's new filter names.
-#
-# Revision 1.8  2002/04/18 21:46:59  bkline
-# Plugged in some additional filters from Cheryl.
-#
-# Revision 1.7  2002/04/12 19:57:20  bkline
-# Installed new filters.
-#
-# Revision 1.6  2002/04/11 19:41:48  bkline
-# Plugged in some new filters.
-#
-# Revision 1.5  2002/04/11 14:07:49  bkline
-# Added denormalization filter for Organization documents.
-#
-# Revision 1.4  2002/04/10 20:08:45  bkline
-# Added denormalizing filter for Person display.
-#
-# Revision 1.3  2002/01/22 21:31:41  bkline
-# Added filter for Protocols.
-#
-# Revision 1.2  2001/12/24 23:18:15  bkline
-# Replaced document IDs with filter names.
-#
-# Revision 1.1  2001/12/01 18:11:44  bkline
-# Initial revision
+# BZIssue::OCECDR-3897 - Proxy resources from unencrypted sources
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, cdrdb, re, cdr2gk, sys, time
+import cgi
+import cdr
+import cdrcgi
+import cdrdb
+import re
+import cdr2gk
+import sys
+import time
 import lxml.html
-# Interim fix to allow Protocol Patient publish preview
-##import cdr2cg
 
 #----------------------------------------------------------------------
 # Get the parameters from the request.
@@ -162,25 +41,19 @@ if not fields:
     dbgLog     = len(sys.argv) > 4 and sys.argv[4] or None
     flavor     = len(sys.argv) > 5 and sys.argv[5] or None
     cgHost     = len(sys.argv) > 6 and sys.argv[6] or None
-    ssHost     = len(sys.argv) > 7 and sys.argv[7] or 'www.cancer.gov'
-    monitor    = 1
+    cachedHtml = len(sys.argv) > 7 and sys.argv[7] or None
+    monitor    = True
 else:
     session    = cdrcgi.getSession(fields)   or cdrcgi.bail("Not logged in")
     docId      = fields.getvalue(cdrcgi.DOCID) or cdrcgi.bail("No Document",
                                                            title)
-    docVersion = fields.getvalue("Version")  or None
+    docVersion = fields.getvalue("Version")
     preserveLnk= fields.getvalue("OrigLinks") or False
-    flavor     = fields.getvalue("Flavor")   or None
-    dbgLog     = fields.getvalue("DebugLog") or None
-    cgHost     = fields.getvalue("cgHost")   or None
-    ssHost     = fields.getvalue("ssHost")   or 'www.cancer.gov'
-    monitor    = 0
-
-#----------------------------------------------------------------------
-# Point to a different host if requested.
-#----------------------------------------------------------------------
-if cgHost:
-    cdr2gk.host = cgHost
+    flavor     = fields.getvalue("Flavor")
+    dbgLog     = fields.getvalue("DebugLog")
+    cgHost     = fields.getvalue("cgHost")
+    cachedHtml = fields.getvalue("cached")
+    monitor    = False
 
 #----------------------------------------------------------------------
 # Debugging output.
@@ -190,6 +63,25 @@ def showProgress(progress):
         sys.stderr.write("[%s] %s\n" % (time.strftime("%Y-%m-%d %H:%M:%S"),
                                         progress))
 showProgress("Started...")
+
+#----------------------------------------------------------------------
+# For testing, we can skip filtering and the SOAP service.
+#----------------------------------------------------------------------
+if cachedHtml:
+    try:
+        fp = open(cachedHtml, "rb")
+        cgHtml = fp.read()
+        fp.close()
+        showProgress("Fetched cached HTML...")
+        intId = cdr.exNormalize(docId)[1]
+    except:
+        cdrcgi.bail("failure reading %s" % repr(cachedHtml))
+
+#----------------------------------------------------------------------
+# Point to a different host if requested.
+#----------------------------------------------------------------------
+if cgHost:
+    cdr2gk.host = cgHost
 
 #----------------------------------------------------------------------
 # Map for finding the filters for a given document type.
@@ -207,154 +99,157 @@ filterSets = {
 #----------------------------------------------------------------------
 # Set up a database connection and cursor.
 #----------------------------------------------------------------------
-try:
-    conn = cdrdb.connect('CdrGuest')
-    cursor = conn.cursor()
-    showProgress("Connected to CDR database...")
-except cdrdb.Error, info:
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
+if not cachedHtml:
+    try:
+        conn = cdrdb.connect('CdrGuest')
+        cursor = conn.cursor()
+        showProgress("Connected to CDR database...")
+    except cdrdb.Error, info:
+        cdrcgi.bail('Database connection failure: %s' % info[1][0])
 
-#----------------------------------------------------------------------
-# Determine the document type and version.
-#----------------------------------------------------------------------
-# We are covering three situations here.
-# a) No Version parameter is given
-#    The original behavior will be performed, namely to display the
-#    latest publishable version of the document if it exists.
-# b) The Version parameter is set to 'cwd'
-#    The current working document will be displayed
-# c) The Version parameter is set and it is not 'cwd'
-#    This means that the specified version is to be displayed in the
-#    publish preview display.
-# -------------------------------------------------------------------
-try:
-    digits = re.sub('[^\d]+', '', docId)
-    intId  = int(digits)
+    #----------------------------------------------------------------------
+    # Determine the document type and version.
+    #----------------------------------------------------------------------
+    # We are covering three situations here.
+    # a) No Version parameter is given
+    #    The original behavior will be performed, namely to display the
+    #    latest publishable version of the document if it exists.
+    # b) The Version parameter is set to 'cwd'
+    #    The current working document will be displayed
+    # c) The Version parameter is set and it is not 'cwd'
+    #    This means that the specified version is to be displayed in the
+    #    publish preview display.
+    # -------------------------------------------------------------------
+    try:
+        digits = re.sub('[^\d]+', '', docId)
+        intId  = int(digits)
 
-    # We need to select the document type
-    # -----------------------------------
-    cursor.execute("""\
-        SELECT doc_type.name
-          FROM doc_type
-          JOIN document
-            ON document.doc_type = doc_type.id
-         WHERE document.id = ?""", (intId,))
-
-    row = cursor.fetchone()
-    if not row:
-        cdrcgi.bail("Unable to find specified document %s" % docId)
-
-    docType = row[0]
-
-    # If the document is a Person document we need to ensure that
-    # it is a GeneticsProf document.
-    # -----------------------------------------------------------
-    if docType == 'Person':
+        # We need to select the document type
+        # -----------------------------------
         cursor.execute("""\
-            SELECT doc_id
-              FROM query_term
-             WHERE path = '/Person/ProfessionalInformation' +
-                          '/GeneticsProfessionalDetails'    +
-                          '/AdministrativeInformation'      +
-                          '/Directory/Include'
-               AND doc_id = ?""", (intId,))
-        row = cursor.fetchone()
-        if not row:
-            cdrcgi.bail("*** Error:  %s not a GeneticsProfessional Document" %
-                                                             docId)
-
-    # Next we need to identify the version to be displayed
-    # ----------------------------------------------------
-    if not docVersion:
-        cursor.execute("""\
-        SELECT max(doc_version.num)
-          FROM doc_version
-         WHERE doc_version.id = ?
-           AND doc_version.publishable = 'Y' """, (intId,))
+            SELECT doc_type.name
+              FROM doc_type
+              JOIN document
+                ON document.doc_type = doc_type.id
+             WHERE document.id = ?""", (intId,))
 
         row = cursor.fetchone()
         if not row:
-            cdrcgi.bail("Unable to find publishable version for %s" % docId)
-        docVer = row[0]
-    elif docVersion != 'cwd':
-        cursor.execute("""\
-        SELECT doc_version.num
-          FROM doc_version
-         WHERE doc_version.id = ?
-           AND doc_version.num = ? """, (intId, docVersion,))
+            cdrcgi.bail("Unable to find specified document %s" % docId)
 
-        row = cursor.fetchone()
-        if not row:
-            cdrcgi.bail("Unable to find specified version %s for %s" % (
-                                                            docVersion, docId))
-        docVer = row[0]
-    else:
-        docVer = None
+        docType = row[0]
 
-except cdrdb.Error, info:
-        cdrcgi.bail('Failure finding specified version for %s: %s' % (docId,
-                                                                 info[1][0]))
-showProgress("Fetched document version: %s..." % row[0])
+        # If the document is a Person document we need to ensure that
+        # it is a GeneticsProf document.
+        # -----------------------------------------------------------
+        if docType == 'Person':
+            cursor.execute("""\
+                SELECT doc_id
+                  FROM query_term
+                 WHERE path = '/Person/ProfessionalInformation' +
+                              '/GeneticsProfessionalDetails'    +
+                              '/AdministrativeInformation'      +
+                              '/Directory/Include'
+                   AND doc_id = ?""", (intId,))
+            row = cursor.fetchone()
+            if not row:
+                err = "%s not a GeneticsProfessional Document" % docId
+                cdrcgi.bail("**** Error: %s" % err)
 
-# Note: The values for flavor listed here are not the only values possible.
-#       These values are the default values but XMetaL macros may pass
-#       additional values for the flavor attribute.
-#       Currently, the additional values are implemented:
-#         Protocol_Patient
-#         Summary_Patient       (unused)
-#         CTGovProtocol_Patient (unused)
-# -------------------------------------------------------------------------
-if not flavor:
-    if docType == "Summary":                  flavor = "Summary"
-    elif docType == "DrugInformationSummary": flavor = "DrugInfoSummary"
-    elif docType == "InScopeProtocol":        flavor = "Protocol_HP"
-    elif docType == "CTGovProtocol":          flavor = "CTGovProtocol"
-    elif docType == "GlossaryTerm":           flavor = "GlossaryTerm"
-    elif docType == "GlossaryTermName":       flavor = "GlossaryTerm"
-    elif docType == "Person":                 flavor = "GeneticsProfessional"
-    else: cdrcgi.bail("Publish preview only available for Summary, "
-                      "DrugInfoSummary, Glossary and Protocol documents")
-showProgress("DocumentType: %s..." % docType)
-showProgress("Using flavor: %s..." % flavor)
-showProgress("Preserving links: %s..." % preserveLnk)
+        # Next we need to identify the version to be displayed
+        # ----------------------------------------------------
+        if not docVersion:
+            cursor.execute("""\
+            SELECT max(doc_version.num)
+              FROM doc_version
+             WHERE doc_version.id = ?
+               AND doc_version.publishable = 'Y' """, (intId,))
 
-#----------------------------------------------------------------------
-# Filter the document.
-# Submit the parameter 'isPP' to allow simulating reports that behave
-# differently for PP and publishing, i.e. denormalization of Glossary
-# links in the Drug Info Summaries.
-#----------------------------------------------------------------------
-if not filterSets.has_key(docType):
-    cdrcgi.bail("Don't have filters set up for %s documents yet" % docType)
-doc = cdr.filterDoc(session, filterSets[docType], docId = docId,
-                    parm = [['isPP', 'Y']], docVer = docVer)
+            row = cursor.fetchone()
+            if not row:
+                cdrcgi.bail("No publishable version for %s" % docId)
+            docVer = row[0]
+        elif docVersion != 'cwd':
+            cursor.execute("""\
+            SELECT doc_version.num
+              FROM doc_version
+             WHERE doc_version.id = ?
+               AND doc_version.num = ? """, (intId, docVersion,))
 
-if type(doc) == type(()):
-    doc = doc[0]
-showProgress("Document filtering complete...")
-pattern1 = re.compile("<\?xml[^?]+\?>", re.DOTALL)
-pattern2 = re.compile("<!DOCTYPE[^>]+>", re.DOTALL)
-doc = pattern1.sub("", doc)
-doc = pattern2.sub("", doc)
-showProgress("Doctype declaration stripped...")
+            row = cursor.fetchone()
+            if not row:
+                cdrcgi.bail("Unable to find specified version %s for %s" %
+                            (docVersion, docId))
+            docVer = row[0]
+        else:
+            docVer = None
 
-try:
-    if dbgLog:
-        cdr2gk.debuglevel = 1
-        showProgress("Debug logging turned on...")
-    showProgress("Submitting request to Cancer.gov...")
-    resp = cdr2gk.pubPreview(doc, flavor)
-    showProgress("Response received from Cancer.gov...")
-    #fp = open('d:/home/venglisch/temp/pp_GK.html', 'w')
-    #fp.write(resp.xmlResult)
-    #fp.close()
-except:
-    cdrcgi.bail('Error in PubPreview: ' + str(cdr2gk.pubPreview(doc, flavor)))
+    except cdrdb.Error, info:
+        cdrcgi.bail('Failure finding specified version for %s: %s' %
+                    (docId, info[1][0]))
+    showProgress("Fetched document version: %s..." % row[0])
+
+    # Note: The values for flavor listed here are not the only values possible.
+    #       These values are the default values but XMetaL macros may pass
+    #       additional values for the flavor attribute.
+    #       Currently, the additional values are implemented:
+    #         Protocol_Patient
+    #         Summary_Patient       (unused)
+    #         CTGovProtocol_Patient (unused)
+    # -------------------------------------------------------------------------
+    if not flavor:
+        flavor = {
+            "Summary":                "Summary",
+            "DrugInformationSummary": "DrugInfoSummary",
+            "InScopeProtocol":        "Protocol_HP",
+            "CTGovProtocol":          "CTGovProtocol",
+            "GlossaryTerm":           "GlossaryTerm",
+            "GlossaryTermName":       "GlossaryTerm",
+            "Person":                 "GeneticsProfessional"
+        }.get(docType)
+        if not flavor:
+            cdrcgi.bail("Publish preview only available for Summary, "
+                        "DrugInfoSummary, Glossary and Protocol documents")
+    showProgress("DocumentType: %s..." % docType)
+    showProgress("Using flavor: %s..." % flavor)
+    showProgress("Preserving links: %s..." % preserveLnk)
+
+    #----------------------------------------------------------------------
+    # Filter the document.
+    # Submit the parameter 'isPP' to allow simulating reports that behave
+    # differently for PP and publishing, i.e. denormalization of Glossary
+    # links in the Drug Info Summaries.
+    #----------------------------------------------------------------------
+    if docType not in filterSets:
+        cdrcgi.bail("Don't have filters set up for %s documents yet" % docType)
+    doc = cdr.filterDoc(session, filterSets[docType], docId = docId,
+                        parm = [['isPP', 'Y']], docVer = docVer)
+
+    if isinstance(doc, tuple):
+        doc = doc[0]
+    showProgress("Document filtering complete...")
+    pattern1 = re.compile("<\?xml[^?]+\?>", re.DOTALL)
+    pattern2 = re.compile("<!DOCTYPE[^>]+>", re.DOTALL)
+    doc = pattern1.sub("", doc)
+    doc = pattern2.sub("", doc)
+    showProgress("Doctype declaration stripped...")
+
+    cdr2gk.debuglevel = 0
+    try:
+        if dbgLog:
+            cdr2gk.debuglevel = 1
+            showProgress("Debug logging turned on...")
+        showProgress("Submitting request to Cancer.gov...")
+        resp = cdr2gk.pubPreview(doc, flavor)
+        cgHtml = resp.xmlResult.encode("utf-8")
+        showProgress("Response received from Cancer.gov...")
+    except:
+        cdrcgi.bail('Error in PubPreview: ' + str(resp))
+    showProgress("Done...")
 
 #----------------------------------------------------------------------
 # Show it.
 #----------------------------------------------------------------------
-showProgress("Done...")
 showProgress("Continue with local substitutions...")
 
 # The output from Cancer.gov is modified to add the CDR-ID to the title
@@ -370,18 +265,14 @@ showProgress("Continue with local substitutions...")
 # ----------------------------------------------------
 showProgress("Replacing title element...")
 pattern3 = re.compile('<title>CDR Preview', re.DOTALL)
-html = pattern3.sub('<title>Publish Preview: CDR%s' % intId, resp.xmlResult)
+html = pattern3.sub('<title>Publish Preview: CDR%s' % intId, cgHtml)
+if not html:
+    cdrcgi.bail('No HTML output to process: %s'% cgHtml)
+    sys.exit(0)
 
 # Parsing HTML document in order to manipulate links within the doc
 # -----------------------------------------------------------------
-#fp = open('d:/home/venglisch/temp/pp_before.html', 'w')
-#fp.write(resp.xmlResult.encode('utf-8'))
-#fp.close()
 myHtml = lxml.html.fromstring(html)
-
-url = "http://%s.%s/" % (cdr.h.host['APPC'][0], cdr.h.host['APPC'][1])
-
-#myHtml.make_links_absolute(url)
 
 # Removing the hostname from the fragment links to create a local
 # anchor target (Example: #Section_50).  This allows links within
@@ -392,20 +283,11 @@ url = "http://%s.%s/" % (cdr.h.host['APPC'][0], cdr.h.host['APPC'][1])
 ### preserveLnk = True ###
 if not preserveLnk:
     showProgress("Converting local links...")
-    #myRefs = myHtml.cssselect('a.SummaryRef')
-    # Make the internal links clickable
-    #for x in myHtml.cssselect('a.SummaryRef'):
-    #    link = x.get('href')
-    #    if link.find('#') > 0:
-    #       newLink = '#%s' % link.split('#')[1]
-    #       x.set('href', newLink)
-    #    else:
-    #       x.set('onclick', 'return false')
 
     # Modify SummaryRef links
     # These links are identified by the inlinetype attribute
     # ------------------------------------------------------
-    for x in myHtml.xpath('//a[@inlinetype = "SummaryRef"]'):
+    for x in myHtml.xpath('//a[@inlinetype="SummaryRef"]'):
         # The SummaryRef links don't contain an href attribute
         # because Percussion isn't able to add this to the PP
         # output.  Without the href attribute the text is not
@@ -415,8 +297,24 @@ if not preserveLnk:
         if not 'href' in x.attrib:
             x.set('href', '')
             iLink = x.get('objectid')
+
+            # Fragment Link
             if iLink.find('#') > 0:
-                link = '#Section_%s' % iLink.split('#_')[1]
+                # Fragment Ref for this doc
+                if iLink.find(str(intId)) > 0:
+                    #link = '#Section_%s' % iLink.split('#_')[1]
+                    myId = iLink.split('#_')[1]
+                    link = '#_%s' % myId
+                    # If the ID doesn't exist it's a TOC ID
+                    try:
+                        dada = myHtml.get_element_by_id('_%s' % myId)
+                    except:
+                        link = '#_%s_toc' % myId
+                # Fragment Ref for another doc
+                else:
+                    link  = '/cgi-bin/cdr/PublishPreview.py?Session=guest'
+                    link += '&DocId=%s' % x.get('objectid')
+            # Link to summary
             else:
                 link  = '/cgi-bin/cdr/PublishPreview.py?Session=guest'
                 link += '&DocId=%s' % x.get('objectid')
@@ -432,9 +330,11 @@ if not preserveLnk:
         # ------------------------------------------------------
         else:
             link = x.get('href')
+            showProgress(link)
             if link.find('#') > 0:
-               newLink = '#%s' % link.split('#')[1]
-               x.set('href', newLink)
+                newLink = '#%s' % link.split('#')[1]
+                x.set('href', newLink)
+                showProgress(newLink)
             # Resetting the glossary links so we don't follow
             # a dead end.
             else:
@@ -446,7 +346,8 @@ if not preserveLnk:
     for media in myHtml.cssselect('a.CDR_audiofile'):
         link = media.get('href')
         cdrid = re.search('\d+', link.replace('.mp3', '')).group(0)
-        mediaUrl = '%scgi-bin/cdr/GetCdrBlob.py?id=%s' % (url, cdrid)
+        mediaUrl = '%s/cgi-bin/cdr/GetCdrBlob.py?id=%s' % (cdr.CBIIT_NAMES[2],
+                                                           cdrid)
         media.set('href', mediaUrl)
 
     # Make the Glossary links dead
@@ -455,6 +356,30 @@ if not preserveLnk:
     for gloss in myHtml.cssselect('a.Summary-GlossaryTermRef'):
         gloss.set('href', '')
         gloss.set('onclick', 'return false')
+    for gloss in myHtml.cssselect('a.definition'):
+        gloss.set('href', '')
+        gloss.set('onclick', 'return false')
+
+    #------------------------------------------------------------------
+    # Inject proxy links for http://... URLs, because modern browsers
+    # balk at serving up mixed content.
+    # Force script tags to close explicitly; see:
+    # https://mailman-mail5.webfaction.com/pipermail/lxml/2012-June/006434.html
+    #------------------------------------------------------------------
+    proxy = "%s/cgi-bin/cdr/proxy.py" % cdr.CBIIT_NAMES[2]
+    proxy = "/cgi-bin/cdr/proxy.py"
+    for script in myHtml.findall("head/script"):
+        script.text = " "
+        src = script.get("src")
+        if src is not None and src.startswith("http://"):
+            src = "%s?url=%s" % (proxy, src)
+            script.set("src", src)
+    for link in myHtml.findall("head/link"):
+        href = link.get("href")
+        if href is not None and href.startswith("http://"):
+            href = href.replace("cancer.gov//", "cancer.gov/")
+            href = "%s?url=%s" % (proxy, href)
+            link.set("href", href)
 else:
     showProgress("Preserving original links...")
 
@@ -467,55 +392,31 @@ html = lxml.html.tostring(myHtml.getroottree(),
                           encoding = 'utf-8',
                           method = 'xml')
 
-# Replace the image links for the popup boxes to point to our production
-# server if running in production
-# --------------------------------------------------------------------------
-if html.find('gatekeeper.cancer.gov') == -1:
-    pp_host = cdr.DEV_HOST
-    # Not needed in CBIIT environment
-    # import socket
-    # if socket.gethostname().upper() == 'FRANCK':
-    #     pp_host = 'franck.nci.nih.gov'
-else:
-    pp_host = cdr.PROD_HOST
+#----------------------------------------------------------------------
+# Clean up from the kludge above to force explicit </script> closing
+# tags.
+#----------------------------------------------------------------------
+html = html.replace("> </script>", "></script>")
 
-# Not needed in CBIIT environment
-# pattern4 = re.compile(
-#        'imageName=http://mahler.nci.nih.gov/cgi-bin/cdr/GetCdrImage')
-# html = pattern4.sub(
-#        'imageName=http://%s/cgi-bin/cdr/GetCdrImage' %
-#        pp_host, html)
-
-# We need slightly different patterns depending if we're receiving a
-# summary or a glossary document
-# ---------------------------------------------------------------------
-#if html.find('class="document-title">Dictionary of Cancer Terms') == -1:
-#if html.find('<h1>Dictionary of Cancer Terms') == -1:
-#    pattern7 = re.compile(
-#               'src="http://mahler.nci.nih.gov/cgi-bin/cdr/GetCdrImage')
-#else:  # for Glossary PP
-#    pattern7 = re.compile(
-#               '  src="http://mahler.nci.nih.gov/cgi-bin/cdr/GetCdrImage')
-
-# Not needed in CBIIT environment
-# pattern5 = re.compile(
-#            'src="http://mahler.nci.nih.gov/cgi-bin/cdr/GetCdrImage')
-# html = pattern5.sub(
-#            'src="http://%s/cgi-bin/cdr/GetCdrImage' % pp_host, html)
+#----------------------------------------------------------------------
+# Cancer.gov doesn't know we're running a secure web server now.
+#----------------------------------------------------------------------
+html = re.sub("http://cdr", "https://cdr", html)
 
 # CBIIT doesn't allow access to www.cancer.gov which holds all the current
 # CSS.  We need to pick that up from www.qa.cancer.gov instead
 # Strangely, access is allowed from the DEV tier.  Can't test yet on STAGE
 # since STAGE is not setup yet.
 # ------------------------------------------------------------------------
-#if cdr.h.tier in ('QA', 'STAGE'):
-if cdr.h.tier in ('QA'):
+# if cdr.h.tier in ('QA'):
+if cdr.h.tier in ('QA', 'STAGE'):
     pattern6 = re.compile('http://www.cancer.gov/')
-    html = pattern6.sub('http://www.%s.cancer.gov/' % cdr.h.tier.lower(), html)
+    html = pattern6.sub('http://%s.%s/' % (cdr.h.host['CG'][0], 
+                                           cdr.h.host['CG'][1]), html)
 
 if not cdr.h.tier == 'PROD':
-    pattern7 = re.compile('http://cdr.cancer.gov/cgi-bin/cdr/GetCdrImage.py')
-    html = pattern7.sub('http://cdr.%s.cancer.gov/cgi-bin/cdr/GetCdrImage.py' \
-                                                    % cdr.h.tier.lower(), html)
+    pattern7 = re.compile('https://cdr.cancer.gov/cgi-bin/cdr/GetCdrImage.py')
+    html = pattern7.sub("%s/cgi-bin/cdr/GetCdrImage.py" % cdr.CBIIT_NAMES[2],
+                        html)
 
 cdrcgi.sendPage("%s" % html.decode('utf-8'))

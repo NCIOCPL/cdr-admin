@@ -22,7 +22,12 @@ IMPORT = 5
 # Get the path for the most recent CTGovProtocol download directory.
 #----------------------------------------------------------------------
 def findDownloadDirectory():
-    dirs = glob.glob('d:/cdr/Utilities/CTGovDownloads/work-20*')
+    # We're moving the downloaded files out of the directory containing code
+    CTGovDir = 'd:/cdr/Output/CTGovDownloads'
+    if not os.path.exists(CTGovDir):
+        CTGovDir = 'd:/cdr/Utilities/CTGovDownloads'
+
+    dirs = glob.glob('%s/work-20*' % CTGovDir)
     if not dirs:
         raise Exception("Unable to find CT.gov download directories")
     dirs.sort()
@@ -136,7 +141,7 @@ elif request == SUBMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if request == "Log Out": 
+if request == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------

@@ -70,6 +70,18 @@ ORDER BY u.fullname""")
     page.send()
 
 #----------------------------------------------------------------------
+# Map user name to user ID if necessary.
+#----------------------------------------------------------------------
+try:
+    user = int(user)
+except:
+    cursor.execute("SELECT id FROM usr WHERE name = ?", user)
+    rows = cursor.fetchall()
+    if not rows:
+        cdrcgi.bail("User %s not found" % repr(user))
+    user = rows[0][0]
+
+#----------------------------------------------------------------------
 # Display the report.
 #----------------------------------------------------------------------
 if fmt != "excel":

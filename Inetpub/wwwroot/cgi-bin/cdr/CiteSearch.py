@@ -148,6 +148,7 @@ def createNewCitationDoc(article):
 # Handle a request to import a citation document from PubMed.
 #----------------------------------------------------------------------
 if impReq:
+    importID = importID.strip()
     if not session: cdrcgi.bail("User not logged in")
     article = fetchCitation(importID)
     if replaceID:

@@ -13,23 +13,24 @@ import re
 import socket
 import urllib2
 
-SQL_SERVER_PORTS = { "PROD": 55733, "STAGE": 55459 }
+MYSQL_PORT = cdr.h.tier == "QA" and 3631 or 3600
+SQL_SERVER_PORTS = { "PROD": 55733, "STAGE": 55459, "QA": 53100 }
 ROLES = {
     "APP": 22,
     "APPC": 443,
     "APPWEB": 443,
-    "DBNIX": 3600,
+    "DBNIX": MYSQL_PORT,
     "DBWIN": SQL_SERVER_PORTS.get(cdr.h.tier, 55373),
     "BASTION": None,
     "BASTIONC": None,
     "GLOSSIFIER": 22,
     "GLOSSIFIERC": 80,
     "GLOSSIFIERWEB": 80,
-    "GLOSSIFIERDB": 3600,
+    "GLOSSIFIERDB": MYSQL_PORT,
     "EMAILERS": 22,
     "EMAILERSC": 443,
     "EMAILERSWEB": 443,
-    "EMAILERSDB": 3600,
+    "EMAILERSDB": MYSQL_PORT,
     "SFTP": 22,
     "GK": 80,
     "CG": 80,

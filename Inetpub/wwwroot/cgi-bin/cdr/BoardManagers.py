@@ -122,6 +122,7 @@ for choice in (
     ('BoardMeetingDates.py',       'Board Meeting Dates'          ),
     ('ChangesToSummaries.py',      'Changes to Summaries'         ),
     ('SummaryChanges.py',          'History of Changes to Summary'),
+    ('RunICRDBStatReport.py',      'PCIB Statistics Report (MB)'  ),
     ('SummaryCitations.py',        'Summaries Citations'          ),
     ('SummaryComments.py',         'Summaries Comments'           ),
     ('SummaryCRD.py',

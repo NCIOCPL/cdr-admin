@@ -1536,7 +1536,12 @@ if docType == 'MiscellaneousDocument': docType += ":rs"
 
 if version == "-1": version = None
 
+# Display error message if no filter exist for current docType
+# ------------------------------------------------------------
 if not filters.has_key(docType):
+    thisUser = cdr.idSessionUser('', session)
+    message = "QcReport - Filter for document type '%s' does not exist (%s)."
+    cdr.logwrite(message % (docType, thisUser[0]))
     doc = cdr.getDoc(session, docId, version = version or "Current",
                      getObject = 1)
     if type(doc) in (type(""), type(u"")):
@@ -1547,9 +1552,12 @@ if not filters.has_key(docType):
   <title>%s</title>
  </head>
  <body>
+  <h3 style="color: red;">Filter for document type
+    <b>'%s'</b> does not exist.</h3>
+  <p>Document follows (view source to preview XML!):</p>
   <pre>%s</pre>
  </body>
-</html>""" % (cgi.escape(doc.ctrl['DocTitle'].decode("utf-8")),
+</html>""" % (cgi.escape(doc.ctrl['DocTitle'].decode("utf-8")), docType,
               cgi.escape(doc.xml.decode('utf-8')))
     cdrcgi.sendPage(html)
 

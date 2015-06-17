@@ -146,17 +146,12 @@ def showTitleChoices(choices):
 # ----------------------------------------------------
 def summaryRow(id, summary, toc, docVersion = None):
     """Return the HTML code to display a Summary row"""
-    if byCdrid:
-        response = cdr.filterDoc('guest',
-                         ['name:Wrap nodes with Insertion or Deletion',
-                          'name:Clean up Insertion and Deletion',
-                          'name:Summaries TOC Report'],
-                         id,
-                         parm = filterParm, docVer = docVersion)
-    else:
-        response = cdr.filterDoc('guest', ['name:Revision Markup Filter',
-                                           'name:Summaries TOC Report'], id,
-                                 parm = filterParm, docVer = docVersion)
+    response = cdr.filterDoc('guest',
+                     ['name:Denormalization Filter: Summary Module',
+                      'name:Wrap nodes with Insertion or Deletion',
+                      'name:Clean up Insertion and Deletion',
+                      'name:Summaries TOC Report'],
+                     id, parm = filterParm, docVer = docVersion)
     html = unicode(response[0], "utf-8")
     html += u"""\
 """

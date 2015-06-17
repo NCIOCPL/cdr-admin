@@ -36,6 +36,11 @@ html    = cdrcgi.header(title, title, section, "", buttons) + """\
 """
 items   = (('AdvancedSearch.py', 'Advanced Search',       ''               ),
            ('FtpAudio.py',       'Audio Download',        ''               ),
+           ('ocecdr-3373.py',    'Audio Import',          ''               ),
+           ('ocecdr-3606.py',
+            'Audio Request Spreadsheet (clicking this writes to the database)',
+            ' title="Don\'t click this if you\'re not ready to generate\n'
+            'a spreadsheet for pronunciation audio requests)"'),
            ('GlossaryTermAudioReview.py', 'Audio Review Glossary Term',  ''),
            ('getBatchStatus.py', 'Batch Job Status',      ''               ),
            ('CTGov.py',          'CTGov Protocols',       ''               ),
@@ -49,7 +54,7 @@ items   = (('AdvancedSearch.py', 'Advanced Search',       ''               ),
            )
 for item in items:
     html += """\
-    <li><a href='%s/%s%s%s'>%s</a></li>
+    <li><a href='%s/%s%s'%s>%s</a></li>
 """ % (cdrcgi.BASE, item[0], session, item[2], item[1])
 
 cdrcgi.sendPage(html + """\

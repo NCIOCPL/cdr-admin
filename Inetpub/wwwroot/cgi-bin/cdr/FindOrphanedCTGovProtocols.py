@@ -12,16 +12,22 @@ import sys, cdrcgi, cgi, cdr
 
 def getFiles():
     pattern = re.compile('CTGovDownload-(\\d+).zip')
-    dirs = glob.glob('d:/cdr/Utilities/CTGovDownloads/CTGovDownload-20*.zip')
+
+    # We're moving the downloaded files out of the directory containing code
+    CTGovDir = 'd:/cdr/Import/CTGovDownloads'
+    if not os.path.exists(CTGovDir):
+        CTGovDir = 'd:/cdr/Utilities/CTGovDownloads'
+
+    dirs = glob.glob('%s/CTGovDownload-20*.zip' % CTGovDir)
     dirs.sort()
     while dirs:
         d = dirs.pop()
         match = pattern.search(d)
-        workDir = 'd:/cdr/Utilities/CTGovDownloads/work-%s' % match.group(1)
+        workDir = "%s/work-%s" % (CTGovDir, match.group(1))
         files = glob.glob("%s/*.xml" % workDir)
         if len(files) > 25000:
             return workDir, [os.path.basename(n).lower() for n in files]
-    
+
 def getNlmXml(nctId):
     import httplib
     conn = httplib.HTTPConnection("clinicaltrials.gov")
