@@ -44,7 +44,7 @@
 # systems (such as ClinicalTrials.gov) to CDR document IDs.
 #
 #----------------------------------------------------------------------
-import cdrdb, cdrcgi, cgi, re, cdr, time
+import cdrdb, cdrcgi, cgi, re, cdr
 
 #----------------------------------------------------------------------
 # Extract integer from string; uses all decimal digits.
@@ -104,6 +104,7 @@ style    = """\
 header  = cdrcgi.header(title, title, section, script, buttons,
                         stylesheet = style)
 
+
 #----------------------------------------------------------------------
 # Make sure we're logged in.
 #----------------------------------------------------------------------
@@ -126,6 +127,21 @@ if request == "Log Out":
 #----------------------------------------------------------------------
 conn = cdrdb.connect()
 cursor = conn.cursor()
+
+#----------------------------------------------------------------------
+# Input Validation
+#----------------------------------------------------------------------
+# Secure alphaStart string against XSS
+if alphaStart:
+    alphaStart = cgi.escape(alphaStart)
+
+# Notes on validation of other parameters:
+#  'usage' validated by int(usage) above
+#  'value' cgi.escaped below
+#  'pattern' sanitized by parameter substitution
+#  'docId' sanitized by extractInt(docId)
+#  'maxRowStr' sanitized by int(maxRowStr)
+#  'noMapped', 'noMappable' are never output anywhere
 
 #----------------------------------------------------------------------
 # Collect some useful names.
