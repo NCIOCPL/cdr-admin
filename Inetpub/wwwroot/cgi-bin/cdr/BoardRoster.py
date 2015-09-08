@@ -10,6 +10,7 @@
 # BZIssue::5023 - Changes to Board Roster Report
 # OCECDR-3720: [Summaries] Board Roster Summary Sheet - More Options
 # JIRA::OCECDR-3812 - Name change (OCPL)
+# Modified July 2015 as part of security tightening.
 #
 #----------------------------------------------------------------------
 import cdr
@@ -20,6 +21,39 @@ import datetime
 import lxml.etree as etree
 import lxml.html
 import time
+
+#----------------------------------------------------------------------
+# Don't give hackers any help, and don't throw more noise at the app
+# scanner than necessary.
+#----------------------------------------------------------------------
+cdrcgi.REVEAL_DEFAULT = False
+HACKER_MSG = "CGI parameter tampering detected"
+
+#----------------------------------------------------------------------
+# Columns available for the 'summary' version of the report.
+#----------------------------------------------------------------------
+class Column:
+    def __init__(self, name, label, form_label=None, checked=False):
+        self.name = name
+        self.label = label
+        self.form_label = form_label or label
+        self.checked = checked
+COLS = (
+    Column("phone", "Phone", checked=True),
+    Column("fax", "Fax"),
+    Column("email", "Email", "E-mail", True),
+    Column("cdr-id", "CDR-ID", "CDR ID"),
+    Column("start-date", "Start Date"),
+    Column("employee", "Gov. Empl.", "Government Employee"),
+    Column("expertise", "Area of Exp.", "Areas of Expertise"),
+    Column("subgroup", "Member Subgrp", "Membership in Subgroups"),
+    Column("end-date", "Term End Date",
+           "Term End Date (calculated using the term renewal frequency"),
+    Column("affiliation", "Affil. Name", "Affiliations"),
+    Column("mode", "Contact Mode"),
+    Column("assistant-name", "Assist. Name", "Assistant Name"),
+    Column("assistant-email", "Assist. Email", "Assistant E-mail")
+)
 
 #----------------------------------------------------------------------
 # Initial variables.
@@ -79,20 +113,8 @@ def show_form():
     form.add("</fieldset>")
     form.add('<fieldset id="columns" class="hidden">')
     form.add(cdrcgi.Page.B.LEGEND("Columns to Include"))
-    form.add_checkbox("columns", "Phone", "phone", checked=True)
-    form.add_checkbox("columns", "Fax", "fax")
-    form.add_checkbox("columns", "E-mail", "email", checked=True)
-    form.add_checkbox("columns", "CDR ID", "cdr-id")
-    form.add_checkbox("columns", "Start Date", "start-date")
-    form.add_checkbox("columns", "Government Employee", "employee")
-    form.add_checkbox("columns", "Areas of Expertise", "expertise")
-    form.add_checkbox("columns", "Membership in Subgroups", "subgroup")
-    termEnd = "Term End Date (calculated using the term renewal frequency)"
-    form.add_checkbox("columns", "%s" % termEnd, "end-date")
-    form.add_checkbox("columns", "Affiliations", "affiliation")
-    form.add_checkbox("columns", "Contact Mode", "mode")
-    form.add_checkbox("columns", "Assistant Name", "assistant-name")
-    form.add_checkbox("columns", "Assistant E-mail", "assistant-email")
+    for c in COLS:
+        form.add_checkbox("columns", c.form_label, c.name, checked=c.checked)
     form.add("</fieldset>")
     form.add("<fieldset id='misc-options' class='hidden'>")
     form.add(cdrcgi.Page.B.LEGEND("Miscellanous Summary Report Options"))
@@ -142,10 +164,10 @@ def getBoardName(id):
         cursor.execute("SELECT title FROM document WHERE id = ?", id)
         rows = cursor.fetchall()
         if not rows:
-            cdrcgi.bail('Failure looking up title for CDR%s' % id)
+            cdrcgi.bail(HACKER_MSG)
         return cleanTitle(rows[0][0])
-    except Exception, e:
-        cdrcgi.bail('Looking up board title: %s' % str(e))
+    except Exception:
+        cdrcgi.bail("Database failure looking up PDQ board name")
 
 
 #----------------------------------------------------------------------
@@ -178,15 +200,19 @@ SELECT DISTINCT board.id, board.title
 # Get the information for the Board Manager
 #----------------------------------------------------------------------
 def getBoardManagerInfo(orgId):
+    paths = (
+        '/Organization/PDQBoardInformation/BoardManager',
+        '/Organization/PDQBoardInformation/BoardManagerEmail',
+        '/Organization/PDQBoardInformation/BoardManagerPhone'
+    )
+    query = cdrdb.Query("query_term", "path", "value").order("path")
+    query.where(query.Condition("path", paths, "IN"))
+    query.where(query.Condition("doc_id", orgId))
     try:
-        cursor.execute("""\
-SELECT path, value
- FROM query_term
- WHERE path like '/Organization/PDQBoardInformation/BoardManager%%'
- AND   doc_id = ?
- ORDER BY path""", orgId)
-
-        return cursor.fetchall()
+        rows = query.execute(cursor).fetchall()
+        if len(rows) != 3:
+            cdrcgi.bail("board manager information missing")
+        return rows
     except cdrdb.Error, info:
         cdrcgi.bail('Database query failure for BoardManager: %s' % info[1][0])
 
@@ -195,40 +221,28 @@ SELECT path, value
 # This function creates the columns/column headings for the table.
 # We're including all headings in a list to ensure a given sort order.
 #----------------------------------------------------------------------
-def makeColumns(cols):
+def makeColumns(cols, blankCols):
     nameWidth = 250
     colWidth  = 100
     columns = [cdrcgi.Report.Column('Name', width='%dpx' % nameWidth)]
     pageWidth = 1000
-    for label, field in (
-        ("Phone", "phone"),
-        ("Fax", "fax"),
-        ("Email", "email"),
-        ("CDR-ID", "cdr-id"),
-        ("Start Date", "start-date"),
-        ("Gov. Empl.", "employee"),
-        ("Area of Exp.", "expertise"),
-        ("Member Subgrp", "subgroup"),
-        ("Term End Date", "end-date"),
-        ("Affil. Name", "affiliation"),
-        ("Contact Mode", "mode"),
-        ("Assist. Name", "assistant-name"),
-        ("Assist. Email", "assistant-email")
-    ):
-        if field in cols:
-            columns.append(cdrcgi.Report.Column(label))
+    for col in COLS:
+        if col.name in cols:
+            columns.append(cdrcgi.Report.Column(col.label))
 
     # Adding blank columns and adjusting the width to the number of
     # already existing columns
     # -------------------------------------------------------------
-    if extra > 0:
-        remainWidth = pageWidth - nameWidth - (len(columns) - 1) * colWidth
-        if remainWidth > 0:
-            blankWidth = remainWidth / extra
+    if blankCols.count > 0:
+        remainingWidth = pageWidth - nameWidth - (len(columns) - 1) * colWidth
+        if remainingWidth > 0:
+            blankWidth = remainingWidth / blankCols.count
         else:
             blankWidth = colWidth
-        for col in range(extra):
-            width = colWidths and int(colWidths[col]) or blankWidth
+        for col in range(blankCols.count):
+            width = blankWidth
+            if blankCols.widths:
+                width = blankCols.widths[col]
             columns.append(cdrcgi.Report.Column(" ", width="%dpx" % width))
 
     return columns
@@ -262,6 +276,44 @@ def email_format(cell, fmt):
         br = B.BR()
     return td
 
+#----------------------------------------------------------------------
+# Control over optional blank columns to be added to the report.
+# See help message in bail() method for details.
+#----------------------------------------------------------------------
+class BlankCols:
+    def __init__(self, fields, report_format):
+        self.count = 0
+        self.widths = None
+        blank = fields.getvalue("blank")
+        if blank:
+            pieces = blank.split(":")
+            if len(pieces) > 2:
+                self.bail()
+            elif len(pieces) == 2:
+                count, widths = pieces
+            elif len(pieces) == 1:
+                count, widths = pieces[0], ""
+            if count:
+                if not count.isdigit():
+                    self.bail()
+                self.count = int(count)
+            if widths and report_format == "html":
+                widths = widths.split()
+                if len(widths) != self.count:
+                    self.bail()
+                self.widths = []
+                for width in widths:
+                    if not width.isdigit():
+                        self.bail()
+                    self.widths.append(int(width))
+    def bail(self):
+        cdrcgi.bail("""\
+The 'Extra Cols' field's value must be an integer, specifying the number
+of additional blank column to be added to the report. You can also append
+a colon followed by a list of integers separated by spaces, one for
+each of the blank columns to be added, specifying the width of that
+column. Field widths for extra fields are only used when the report
+format is HTML.""")
 
 # *********************************************************************
 # Main program starts here
@@ -273,6 +325,8 @@ def email_format(cell, fmt):
 boardId = fields.getvalue("board")
 if not boardId:
     show_form()
+if not boardId.isdigit():
+    cdrcgi.bail(HACKER_MSG)
 
 #----------------------------------------------------------------------
 # Get the rest of request variables.
@@ -281,28 +335,20 @@ boardId    = int(boardId)
 flavor     = fields.getvalue("report-type") or "full"
 full_opts  = set(fields.getlist("full-opts"))
 cols       = set(fields.getlist("columns"))
-blankInfo  = fields.getvalue("blank")  or '0'
+report_fmt = fields.getvalue("format") or "html"
+blankCols  = BlankCols(fields, report_fmt)
 otherInfo  = "other" in full_opts and "Yes" or "No"
 assistant  = "assistant" in full_opts and "Yes" or "No"
 subgroup   = "subgroup" in full_opts and "Yes" or "No"
 
-# If blank columns are specified with a width specifier extract
-# the width and make sure we have enough values for each column
-# The width would be specified in pixels with values separated
-# by spaces, for example  '3:20 40 60' will add 3 columns with
-# a width of 20px, 40px, and 60px respectively.
-# -------------------------------------------------------------
-blankCol = blankInfo.split(':')[0]
-extra = int(blankCol)
-colWidths = None
-
-# This test only makes sense for non-Excel output of the summary sheet
-# --------------------------------------------------------------------
-if flavor == 'summary' and len(blankInfo.split(':')) == 2 \
-                       and fields.getvalue("format") == 'html':
-    colWidths = blankInfo.split(':')[1].split()
-    if len(colWidths) < extra:
-        cdrcgi.bail('Not enough values for column widths specified!')
+#----------------------------------------------------------------------
+# Check for tampering.
+#----------------------------------------------------------------------
+cdrcgi.valParmVal(flavor, val_list=("full", "summary"), msg=HACKER_MSG)
+cdrcgi.valParmVal(full_opts, val_list=("other", "subgroup", "assistant"),
+                  msg=HACKER_MSG, empty_ok=True)
+cdrcgi.valParmVal(cols, val_list=[c.name for c in COLS], msg=HACKER_MSG)
+cdrcgi.valParmVal(report_fmt, val_list=("html", "excel"), msg=HACKER_MSG)
 
 #----------------------------------------------------------------------
 # Get the board's name from its ID.
@@ -392,7 +438,7 @@ class BoardMember:
             return "No^*"
         return status
 
-    def make_row(self, cols, extra):
+    def make_row(self, cols, blankCols):
         """
         Assemble an array of cells, based on which columns are requested
         """
@@ -429,7 +475,7 @@ class BoardMember:
                 row.append(cdrcgi.Report.Cell(self.assistantEmail, href=url))
             else:
                 row.append("")
-        for col in range(extra):
+        for col in range(blankCols.count):
             row.append("")
         return row
 
@@ -567,7 +613,7 @@ try:
     boardIds     = []
     for docId, eic_start, eic_finish, term_start, name in rows:
         boardMembers.append(BoardMember(docId, eic_start, eic_finish,
-                                               term_start, name))
+                                        term_start, name))
         boardIds.append(docId)
     boardMembers.sort()
 
@@ -580,8 +626,7 @@ if flavor == 'full':
     # Create the HTML Output Page
     # ---------------------------------------------------------------
     html = """\
-<!DOCTYPE HTML PUBLIC '-//W3C//DTD HTML 4.01 Transitional//EN'
-                      'http://www.w3.org/TR/html4/loose.dtd'>
+<!DOCTYPE html>
 <html>
  <head>
   <title>PDQ Board Member Roster Report - %s</title>
@@ -626,11 +671,11 @@ if flavor == 'full':
   </style>
  </head>
  <body id="main">
-""" % boardName
+""" % cgi.escape(boardName)
 
     html += """
    <h1>%s<br><span style="font-size: 12pt">%s</span></h1>
-""" % (boardName, dateString)
+""" % (cgi.escape(boardName), dateString)
 else:
     otherInfo = assistant = "No"
 
@@ -648,8 +693,8 @@ for boardMember in boardMembers:
                                      ['subgroup',  subgroup],
                                      ['eic',
                                       boardMember.isEic and 'Yes' or 'No']])
-    if type(response) in (str, unicode):
-        cdrcgi.bail("%s: %s" % (boardMember.id, response))
+    if isinstance(response, basestring):
+        cdrcgi.bail("%s: %s" % (boardMember.id, repr(response)))
 
     # If we run the full report we just attach the resulting HTML
     # snippets to the previous output.
@@ -673,13 +718,13 @@ for boardMember in boardMembers:
 # Create the HTML table for the summary sheet
 # -------------------------------------------
 if flavor == 'summary':
-    rows = [member.make_row(cols, extra) for member in boardMembers]
+    rows = [member.make_row(cols, blankCols) for member in boardMembers]
     if "employee" in cols:
         rows.append([cdrcgi.Report.Cell("* - Honoraria Declined",
                                         colspan=len(cols) + 1,
                                         classes="footer")])
     caption = [boardName, dateString]
-    columns = makeColumns(cols)
+    columns = makeColumns(cols, blankCols)
     table = cdrcgi.Report.Table(columns, rows, caption=caption,
                                 html_callback_post=post)
     report = cdrcgi.Report('%s - %s' % (boardName, dateString), [table])

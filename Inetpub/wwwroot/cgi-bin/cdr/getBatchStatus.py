@@ -20,177 +20,149 @@
 # As with many other CDR CGI programs, the same program functions
 # both to display a form and to read its contents.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.1  2002/08/02 03:41:37  ameyer
-# Interactive viewer for status of batch jobs.
-#
-#
+# Rewritten July 2015 to eliminate security vulnerabilities.
 #----------------------------------------------------------------------
+import cdrbatch
+import cdrcgi
+import cgi
 
-import cdr, cdrbatch, cgi, cdrcgi
+class Control:
+    """
+    Collects information about the report request and generates the report.
+    """
+    statuses = [getattr(cdrbatch, n) for n in dir(cdrbatch)
+                if n.startswith("ST_")]
+    def __init__(self):
+        self.script = "getBatchStatus.py"
+        fields = cgi.FieldStorage()
+        self.session = cdrcgi.getSession(fields)
+        self.request = cdrcgi.getRequest(fields)
+        self.id = fields.getvalue("jobId")
+        self.name = fields.getvalue("jobName")
+        self.age = fields.getvalue("jobAge")
+        self.status = fields.getvalue("status")
+        self.sanitize()
+        if self.request == "Cancel":
+            cdrcgi.navigateTo("Admin.py", self.session)
 
-# Parse form variables
-fields = cgi.FieldStorage()
-if not fields:
-    cdrcgi.bail ("Unable to load form fields - should not happen!")
+    def sanitize(self):
+        """
+        Make sure the parameters haven't been tampered with.
+        We don't need to worry about the job name parameter,
+        because we're escaping it when we fold it into our
+        form, and the cdrbatch module is doing the right thing
+        with SQL placeholders to guard against an injection
+        attach. That's a good thing, because it would be a
+        challenge to come up with a regular expression which
+        accepted all possible job names but rejected dangerous
+        strings. The cdrbatch module allows for partial matches
+        of the job name strings and wildcards; otherwise we
+        could have checked against all unique strings in the
+        database. Invoked by the Control constructor.
+        """
+        if not self.session:
+            raise Exception("Missing or expired session")
+        if self.id and not self.id.isdigit():
+            raise Exception("Job ID must be an integer")
+        if self.age and not self.age.isdigit():
+            raise Exception("Job age must be an integer")
+        if self.status and self.status not in Control.statuses:
+            raise Exception("Parameter tampering detected")
 
-# Establish user session and authorization
-session = cdrcgi.getSession(fields)
-if not session:
-    cdrcgi.bail ("Unknown or expired CDR session.")
+    def run(self):
+        """
+        Shows the request form or the report as appropriate.
+        """
+        if self.request == "New Request":
+            self.show_form()
+        if self.id or self.name or self.age or self.status:
+            self.show_report()
+        self.show_form()
 
-# Is user cancelling request?
-if fields.getvalue ("cancel", None):
-    # Cancel button pressed.  Return user to admin screen
-    cdrcgi.navigateTo ("Admin.py", session)
+    def show_form(self):
+        """
+        Displays the search form for the report request.
+        """
+        self.pageopts = {
+            "action": self.script,
+            "session": self.session,
+            "subtitle": "View batch jobs",
+            "buttons": ("Submit", "Cancel")
+        }
+        page = cdrcgi.Page("CDR Batch Job Status Request", **self.pageopts)
+        page.add("<fieldset>")
+        page.add(page.B.LEGEND("Enter Job ID or Other Options"))
+        page.add_text_field("jobId", "Job ID")
+        page.add_text_field("jobName", "Job Name")
+        page.add_text_field("jobAge", "Job Age",
+                            tooltip="Number of days to look back.")
+        page.add_select("jobStatus", "Job Status", [""] + Control.statuses)
+        page.add("</fieldset>")
+        page.send()
 
-# See what we've got from user entry of calling program
-jobId     = fields.getvalue ("jobId", None)
-jobName   = fields.getvalue ("jobName", None)
-jobAge    = fields.getvalue ("jobAge", None)
-jobStatus = fields.getvalue ("jobStatus", None)
+    def show_report(self):
+        """
+        Show the information about the requested jobs. Use a custom
+        Cell object (see below) for the last column.
+        """
+        columns = (
+            cdrcgi.Report.Column("ID", width="40px"),
+            cdrcgi.Report.Column("Job Name", width="200px"),
+            cdrcgi.Report.Column("Started", width="150px"),
+            cdrcgi.Report.Column("Status", width="100px"),
+            cdrcgi.Report.Column("Last Info", width="150px"),
+            cdrcgi.Report.Column("Last Message")#, width="300px")
+        )
+        rows = cdrbatch.getJobStatus(self.id, self.name, self.age, self.status)
+        for row in rows:
+            row[0] = cdrcgi.Report.Cell(row[0], classes="right")
+            row[-1] = Cell(row[-1])
+        caption = "Batch Jobs"
+        table = cdrcgi.Report.Table(columns, rows, caption=caption)
+        report = Report(self, table)
+        report.send()
 
-# Find out if user wants a new request
-newreq = fields.getvalue ("newreq", None)
+class Cell(cdrcgi.Report.Cell):
+    """
+    The batch job software violates the rule of applying display markup
+    to information as far downstream as possible. As a result we have to
+    override the Cell method which assembles the td element so we can
+    parse the markup in the database column.
+    """
+    def to_td(self):
+        markup = "<td>%s</td>" % (self._value or "").strip()
+        td = cdrcgi.lxml.html.fragment_fromstring(markup)
+        td.set("style", "xwidth: 300px; word-wrap: break-word;")
+        return td
 
-# If new request or no input parms, we need to output a form
-if newreq or (not jobId and not jobName and not jobAge and not jobStatus):
+class Report(cdrcgi.Report):
+    """
+    Overrides the default cdrcgi.Report class so we can display our
+    report inside a CGI form with buttons and hidden form fields.
+    """
+    def __init__(self, control, table):
+        cdrcgi.Report.__init__(self, "CDR Batch Job Status Review", [table])
+        self.control = control
+    def _create_html_page(self, **opts):
+        opts["session"] = self.control.session
+        opts["action"] = self.control.script
+        opts["buttons"] = ("Refresh", "New Request", "Cancel")
+        opts["subtitle"] = "Batch status search results"
+        opts["banner"] = self._title
+        page = cdrcgi.Page(self._title, **opts)
+        page.add_hidden_field("jobId", self.control.id or "")
+        page.add_hidden_field("jobName", self.control.name or "")
+        page.add_hidden_field("jobAge", self.control.age or "")
+        page.add_hidden_field("jobStatus", self.control.status or "")
+        page.add_css("table.report { width: 90%; table-layout: fixed; }")
+        page.add_css(".right padding-right: 4px;")
+        return page
 
-    # Construct display headers in standard format
-    html = cdrcgi.header ("CDR Batch Job Status Request",
-                          "CDR Batch Job Status Request",
-                          "View batch jobs",
-                          "getBatchStatus.py")
-
-    # Add saved session
-    html += "<input type='hidden' name='%s' value='%s' />" % \
-            (cdrcgi.SESSION, session)
-
-    # Data entry form
-    html += """
-<p>Enter a job ID <i>or</i> any other parameters</p>
-<table>
- <tr>
-  <td align='right'>Job ID: </td>
-  <td><input type='text' name='jobId' width='10' /></td>
- </tr>
- <tr>
-  <td align='right'>Job name: </td>
-  <td><input type='text' name='jobName' width='30' /></td>
- </tr>
- <tr>
-  <td align='right'>Number of days to look back: </td>
-  <td><input type='text' name='jobAge' width='3' /></td>
- </tr>
- <tr>
-  <td align='right'>Job status: </td>
-  <td><select name='jobStatus'>
-       <option></option>
-       <option>%s</option>
-       <option>%s</option>
-       <option>%s</option>
-       <option>%s</option>
-       <option>%s</option>
-       <option>%s</option>
-       <option>%s</option>
-       <option>%s</option>
-       <option>%s</option>
-       <option>%s</option>
-      </select></td>
- </tr>
-</table>
-<p><p>
-<table border='0' align='center' cellpadding='6'>
- <tr>
-  <td><input type='submit' name='submit' value='Submit' /></td>
-  <td><input type='submit' name='cancel' value='Cancel' /></td>
- </tr>
-</table>
-</form>
-</body>
-</html>
-""" % (cdrbatch.ST_QUEUED, \
-       cdrbatch.ST_INITIATING, \
-       cdrbatch.ST_IN_PROCESS, \
-       cdrbatch.ST_SUSPEND, \
-       cdrbatch.ST_SUSPENDED, \
-       cdrbatch.ST_RESUME, \
-       cdrbatch.ST_STOP, \
-       cdrbatch.ST_STOPPED, \
-       cdrbatch.ST_COMPLETED, \
-       cdrbatch.ST_ABORTED)
-
-    # Display the page and exit
-    cdrcgi.sendPage (html)
-
-# If we got here, we have parameters for the status display
-# Get status information from the database
-statusRows = cdrbatch.getJobStatus (idStr=jobId, name=jobName,
-                                    ageStr=jobAge, status=jobStatus)
-
-# Display results in a form
-html = cdrcgi.header ("CDR Batch Job Status Review",
-                      "CDR Batch Job Status Review",
-                      "Batch status search results",
-                      "getBatchStatus.py")
-
-# Return current info to repeat report if requested
-html += "<input type='hidden' name='%s' value='%s' />\n" % \
-         (cdrcgi.SESSION, session)
-if jobId:
-    html += "<input type='hidden' name='jobId' value='%s' />\n" % jobId
-if jobName:
-    html += "<input type='hidden' name='jobName' value='%s' />\n" % jobName
-if jobAge:
-    html += "<input type='hidden' name='jobAge' value='%s' />\n" % jobAge
-if jobStatus:
-    html += "<input type='hidden' name='jobStatus' value='%s' />\n" % jobStatus
-
-# Tell user if nothing found
-if not len (statusRows):
-    html += "<h3>Sorry, no batch jobs matched the criteria you entered</p>\n"
-
-else:
-    # Put results in a table for display
-    html += """
-<table border='1' cellspacing='0' cellpadding='5'>
- <tr style='background-color: #D2D2D2;'>
-  <td><b>ID</b></td>
-  <td><b>Job name</b></td>
-  <td><b>Started</b></td>
-  <td><b>Status</b></td>
-  <td><b>Last info</b></td>
-  <td><b>Last message</b></td>
- </tr>
-"""
-    for row in statusRows:
-        html += """
- <tr style='background-color:#E7E7E7;'>
-  <td>%s</td>
-  <td>%s</td>
-  <td>%s</td>
-  <td>%s</td>
-  <td>%s</td>
-  <td>%s</td>
- </tr>
-""" % (row[0], row[1], row[2], row[3], row[4], row[5])
-
-    html += "</table>\n"
-
-# Whether we had results or not, close form
-html += """
-<p><p>
-<table border='0' align='center' cellpadding='6'>
- <tr>
-  <td><input type='submit' name='repeat' value='   Refresh   ' /></td>
-  <td><input type='submit' name='newreq' value=' New Request ' /></td>
-  <td><input type='submit' name='cancel' value='Back to Admin' /></td>
- </tr>
-</table>
-</form>
-</body>
-</html>
-"""
-
-# Display the page and exit
-cdrcgi.sendPage (html)
+def main():
+    """
+    Protect the top-level code so we can be imported by autodoc
+    tools and code checkers.
+    """
+    Control().run()
+if __name__ == "__main__":
+    main()

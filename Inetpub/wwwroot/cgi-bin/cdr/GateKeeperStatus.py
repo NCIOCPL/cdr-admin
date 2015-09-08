@@ -9,20 +9,30 @@
 # This program has been modified from the original GateKeeperStatus.py
 #
 # BZIssue::5015 - Documents on Cancer.gov not accounted for
+# Rewritten July 2015 as part of security sweep (lots of dead code dropped).
 #
 #----------------------------------------------------------------------
-import cdr2gk, cgi, xml.sax.saxutils, cdrcgi, cdr, cdrdb, re, sys
+import cdr
+import cdr2gk
+import cdrcgi
+import cdrdb
+import cgi
+import re
+import sys
 
 fields  = cgi.FieldStorage()
 cdrId   = fields.getvalue('cdrId') # or '525153'
 jobId   = fields.getvalue('jobId') # or '8437'
 host    = fields.getvalue('targetHost') or 'gatekeeper.cancer.gov'
-logging = fields.getvalue('debugLogging')
+logging = fields.getvalue('debugLogging') and True or False
 action  = fields.getvalue('action') # or 'yes!'
 flavor  = fields.getvalue('flavor') # or 'full'
 
+if not re.match(r"^[a-zA-Z0-9._-]+$", host):
+    cdrcgi.bail("invalid host name")
+
 cdr2gk.host = host
-cdr2gk.debuglevel = logging and True or False
+cdr2gk.debuglevel = logging
 
 # ----------------------------------------------------------------------
 # Set up a database connection and cursor.
@@ -33,6 +43,14 @@ try:
 except cdrdb.Error, info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
 
+#----------------------------------------------------------------------
+# Make a value safe for display on a web page.
+#----------------------------------------------------------------------
+def fix(me, nbsp_for_empty_values=False):
+    val = cgi.escape(str(me))
+    if not val and nbsp_for_empty_values:
+        return "&nbsp;"
+    return val
 
 # ----------------------------------------------------------------------
 # Display the input form
@@ -84,7 +102,7 @@ def showForm(extra = u""):
    report for that document.
    If both <b>Job ID</b> and <b>CDR ID</b> are omitted, you
    will receive an <b>All Documents</b> report.
-   If the <b>Display</b> option is removed only the recorded 
+   If the <b>Display</b> option is removed only the recorded
    problems are displayed.
    Debug logging can be requested when needed for tracking down
    failures and other unexpected behavior.<br /><br />
@@ -151,7 +169,7 @@ def addRow(cursor, cdrFlag):
         cdrRecord = cdrFlag and "Error" or "Removed"
     else:
         cdrRecord = cdrFlag and "OK" or "Error"
-    return(u"""\
+    return (u"""\
    <tr>
     <td>%s</td>
     <td>%s</td>
@@ -163,10 +181,10 @@ def addRow(cursor, cdrFlag):
     <td>%s</td>
     <td>%s</td>
    </tr>
-""" % (doc.packetNumber or "&nbsp;", doc.group or "&nbsp;",
-       doc.cdrId or "&nbsp;", doc.pubType or "&nbsp;",
-       doc.docType or "&nbsp;", doc.status or "&nbsp;",
-       doc.dependentStatus or "&nbsp;", doc.location or "&nbsp;",
+""" % (fix(doc.packetNumber, True), fix(doc.group, True),
+       fix(doc.cdrId, True), fix(doc.pubType, True),
+       fix(doc.docType, True), fix(doc.status, True),
+       fix(doc.dependentStatus, True), fix(doc.location, True),
        cdrRecord))
 
 
@@ -176,12 +194,15 @@ def addRow(cursor, cdrFlag):
 def makeError(error, exception):
     if logging:
         return (u"<span style='color: red; font-weight: bold'>%s: %s</span>"
-                % (error, exception))
+                % (fix(error), fix(exception)))
     else:
-        return u"<span style='color: red; font-weight: bold'>%s</span>" % error
+        return (u"<span style='color: red; font-weight: bold'>%s</span>" %
+                fix(error))
 
 
 if jobId:
+    if not jobId.isdigit():
+        cdrcgi.bail("Job ID must be an integer")
     try:
         response = cdr2gk.requestStatus('Summary', jobId)
     except Exception, e:
@@ -257,13 +278,13 @@ if jobId:
     <th>Location</th>
     <th>CDR Record</th>
    </tr>
-""" % (jobId, jobId, details.jobId, details.requestType,
-       cgi.escape(details.description), details.status, details.source,
-       details.initiated, details.completion, details.target,
-       details.expectedCount, details.actualCount)]
+""" % (fix(jobId), fix(jobId), fix(details.jobId), fix(details.requestType),
+       fix(details.description), fix(details.status), fix(details.source),
+       fix(details.initiated), fix(details.completion), fix(details.target),
+       fix(details.expectedCount), fix(details.actualCount))]
 
     iDoc = pDoc = 0
-    
+
     for doc in details.docs:
         iDoc += 1
         isRecorded = checkPubProcCg(cursor, doc.cdrId)
@@ -277,7 +298,7 @@ if jobId:
             if not isRecorded:
                 pDoc += 1
                 html.append(addRow(cursor, isRecorded))
-        
+
     html.append(u"""\
   </table>
   <p>%d Records checked, %d Records not in pub_proc_cg</p>
@@ -291,6 +312,8 @@ if jobId:
 # -------------------------------------------------------------------
 if action:
     if cdrId:
+        if not cdrId.isdigit():
+            cdrcgi.bail("CDR ID must be an integer")
         try:
             response = cdr2gk.requestStatus('SingleDocument', cdrId)
         except Exception, e:
@@ -341,7 +364,7 @@ Content-type: text/html
     iDoc = pDoc = 0
 
     for doc in docs:
-        iDoc += 1   
+        iDoc += 1
 
         # Documents that used to be on Gatekeeper but have since been
         # removed are listed as 'Not Present' on all stages
@@ -367,13 +390,13 @@ Content-type: text/html
     <td>%s</td>
     <td>%s</td>
     <td>%s</td>
-   </tr>""" % (doc.cdrId,
-               doc.gatekeeperJobId,
-               doc.gatekeeperDateTime,
-               doc.previewJobId,
-               doc.previewDateTime,
-               doc.liveJobId,
-               doc.liveDateTime,
+   </tr>""" % (fix(doc.cdrId),
+               fix(doc.gatekeeperJobId),
+               fix(doc.gatekeeperDateTime),
+               fix(doc.previewJobId),
+               fix(doc.previewDateTime),
+               fix(doc.liveJobId),
+               fix(doc.liveDateTime),
                isRecorded and 'OK' or 'Error')
 
     print u"""\
@@ -382,137 +405,5 @@ Content-type: text/html
  </body>
 </html>""" % (iDoc, pDoc)
     sys.exit(0)
-
-
-
-# -----------------------------------------------------------------
-#
-# -----------------------------------------------------------------
-def extractFaultString(exceptionObject):
-    exceptionString = unicode(exceptionObject)
-    match = FaultString.search(exceptionString)
-    return match and match.group(1) or exceptionString
-        
-# -----------------------------------------------------------------
-#
-# -----------------------------------------------------------------
-def getDocList(cursor, jobId, cdrIds):
-    if jobId and cdrIds:
-        raise Exception(u"Enter Job ID *OR* CDR ID List (not both)")
-    if cdrIds:
-        return cdrIds.split()
-    cursor.execute("""\
-        SELECT doc_id
-          FROM pub_proc_doc
-         WHERE pub_proc = ?""", jobId)
-    rows = cursor.fetchall()
-    if not rows:
-        raise Exception(u"No documents found for job %s" % jobId)
-    return [str(row[0]) for row in rows]
-    
-# -----------------------------------------------------------------
-#
-# -----------------------------------------------------------------
-def makeCdrServerPicklist(current):
-    html = [u"<select class='fw' name='cdrServer'>"]
-    for name in ('Production', 'Test', 'Development'):
-        sel = (name == current) and ' selected' or ''
-        html.append(u"<option value='%s'%s>%s</option>" % (name, sel, name))
-    html.append(u"</select>")
-    return u''.join(html)
-
-# -----------------------------------------------------------------
-#
-# -----------------------------------------------------------------
-def makeCdrSourcePicklist(current):
-    html = [u"<select class='fw' name='cdrSource'>"]
-    for v in ('CDR Development', 'CDR Testing'):
-        sel = (v == current) and ' selected' or ''
-        html.append(u"<option value='%s'%s>%s</option>" % (v, sel, v))
-    html.append(u"</select>")
-    return u"".join(html)
-
-# -----------------------------------------------------------------
-#
-# -----------------------------------------------------------------
-def quoteAttr(what):
-    return xml.sax.saxutils.quoteattr(what)
-
-# -----------------------------------------------------------------
-#
-# -----------------------------------------------------------------
-def addFaultResults(results, fault):
-    if fault:
-        results.append(Result(u"Fault Code", fault.faultcode))
-        results.append(Result(u"Fault String", fault.faultstring))
-
-# -----------------------------------------------------------------
-#
-# -----------------------------------------------------------------
-class Doc:
-    def __init__(self, cursor, docId):
-        self.id = cdr.exNormalize(docId)[1]
-        cursor.execute("""\
-            SELECT p.xml, d.doc_version, t.name
-              FROM pub_proc_cg p
-              JOIN pub_proc_doc d
-                ON d.pub_proc = p.pub_proc
-               AND d.doc_id = p.id
-              JOIN doc_version v
-                ON v.id = p.id
-               AND v.num = d.doc_version
-              JOIN doc_type t
-                ON t.id = v.doc_type
-             WHERE p.id = ?""", self.id)
-        rows = cursor.fetchall()
-        if not rows:
-            raise Exception(u"Document %s is not currently on Cancer.gov" %
-                            docId)
-        docXml, self.version, self.type = rows[0]
-        if self.type == u'InScopeProtocol':
-            self.type = u'Protocol'
-        self.xml = DocTypeLine.sub(u"", XmlDeclLine.sub(u"", docXml))
-        
-# -----------------------------------------------------------------
-#
-# -----------------------------------------------------------------
-class Server:
-    def __init__(self, dnsName, source):
-        self.dnsName = dnsName
-        self.source  = source
-
-# -----------------------------------------------------------------
-#
-# -----------------------------------------------------------------
-class Result:
-    def __init__(self, label, value):
-        self.label = label
-        self.value = value
-    def joinResults(results, jobId):
-        if not results:
-            return u""
-        if jobId:
-            title = u"Request Results for Push %s" % jobId
-        else:
-            title = u"Request Results"
-        html = [u"""\
-  <br>
-  <h1>%s</h1>
-  <br>
-  <table border='1' cellpadding='2' cellspacing='0'>
-""" % title]
-        for result in results:
-            html.append(u"""\
-   <tr>
-    <td><b>%s</b></td>
-    <td>%s</td>
-   </tr>
-""" % (cgi.escape(unicode(result.label)),
-       cgi.escape(unicode(result.value))))
-        html.append(u"""\
-  </table>
-""")
-        return u"".join(html)
-    joinResults = staticmethod(joinResults)
 
 showForm()

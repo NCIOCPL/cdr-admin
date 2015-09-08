@@ -40,7 +40,6 @@ reports = [
            ('CitationReports.py',     'Citations'),
            ('CdrDocumentation.py',    'Documentation'),
            ('DrugInfoReports.py',     'Drug Information'),
-           ('GeneticsProfReports.py', 'Genetics Professional'),
            ('GeographicReports.py',   'Geographic'),
            ('GlossaryTermReports.py', 'Glossary Terms'),
            ('MailerReports.py',       'Mailers'),

@@ -12,7 +12,7 @@
 # New report on new documents with publication status.
 #
 #----------------------------------------------------------------------
-import cdr, cdrdb, cdrcgi, cgi, re, time
+import cdr, cdrdb, cdrcgi, cgi, time
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -47,8 +47,16 @@ elif request == SUBMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if request == "Log Out": 
+if request == "Log Out":
     cdrcgi.logout(session)
+
+#----------------------------------------------------------------------
+# Validate input
+#----------------------------------------------------------------------
+if request:  cdrcgi.valParmVal(request, valList=buttons)
+if docType:  cdrcgi.valParmVal(docType, valList=cdr.getDoctypes(session))
+if toDate:   cdrcgi.valParmDate(toDate)
+if fromDate: cdrcgi.valParmDate(fromDate)
 
 #----------------------------------------------------------------------
 # If we don't have a request, put up the request form.
@@ -118,11 +126,11 @@ html = """\
   <font size = '4'>Documents Created Between:&nbsp;%s and %s</font>
   <br />
   <br />
-""" % (time.strftime("%m/%d/%Y", now), 
-       time.strftime("%B %d, %Y", now), 
-       fromDate, 
+""" % (time.strftime("%m/%d/%Y", now),
+       time.strftime("%B %d, %Y", now),
+       fromDate,
        toDate)
-   
+
 #----------------------------------------------------------------------
 # Extract the information from the database.
 #----------------------------------------------------------------------
@@ -144,9 +152,9 @@ try:
            FROM docs_with_pub_status
           WHERE cre_date BETWEEN '%s' AND DATEADD(s, -1, DATEADD(d, 1, '%s'))
             %s
-       ORDER BY doc_type, 
-                pv, 
-                cre_date, 
+       ORDER BY doc_type,
+                pv,
+                cre_date,
                 ver_date""" % (fromDate, toDate, dtQual))
     rows = cursor.fetchall()
 except cdrdb.Error, info:

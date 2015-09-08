@@ -48,7 +48,7 @@ elif request == SUBMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if request == "Log Out": 
+if request == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
@@ -76,6 +76,14 @@ def getMailerTypes():
     except cdrdb.Error, info:
         cdrcgi.bail('Failure fetching mailer types: %s' % info[1][0])
     return types
+
+#----------------------------------------------------------------------
+# Validate parameters
+#----------------------------------------------------------------------
+if request:    cdrcgi.valParmVal(request, valList=buttons)
+if fromDate:   cdrcgi.valParmDate(fromDate)
+if toDate:     cdrcgi.valParmDate(toDate)
+if mailerType: cdrcgi.valParmVal(mailerType, valList=getMailerTypes())
 
 #----------------------------------------------------------------------
 # If we don't have a request, put up the request form.
@@ -133,7 +141,7 @@ html = u"""\
    h2     { font-size: 13.5pt; font-weight: bold; text-align: center; }
    td     { font-size: 11pt; text-align: left; }
    th     { font-size: 12pt; text-align: left; font-weight: bold; }
-   td.r, 
+   td.r,
    th.r   { text-align: right; }
   </style>
   <title>Mailer Checkin Report %s %s</title>
@@ -143,7 +151,7 @@ html = u"""\
   <h2>Mailer Responses Checked In<br>From %s to %s</h2>
   <br />
 """ % (headerMailerType, time.strftime("%m/%d/%Y", now), fromDate, toDate)
-   
+
 #----------------------------------------------------------------------
 # Extract the information from the database.
 #----------------------------------------------------------------------

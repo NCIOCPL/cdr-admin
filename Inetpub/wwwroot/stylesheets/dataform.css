@@ -146,6 +146,9 @@
 /* Display visited and non-visited links identically without */
 /* underlining the link.  Change color under mouse of link.  */
 /* ========================================================= */
+   TD A.show-link   {
+        text-decoration: underline }
+
    A:link       { 
         color: Navy;
         text-decoration: none;

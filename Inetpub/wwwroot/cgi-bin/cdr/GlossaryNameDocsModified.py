@@ -6,201 +6,174 @@
 # QC report to verify which documents were changed within a given time
 # frame. The report will be separated into English and Spanish.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.1  2008/10/14 12:51:55  bkline
-# New "documents modified" reports for restructured glossary documents.
+# Rewritten as part of the 2015 security sweep.
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, cdrdb, time, ExcelWriter, sys, lxml.etree as etree
+import cgi
+import cdrcgi
+import cdrdb
+import datetime
+import lxml.etree as etree
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields    = cgi.FieldStorage()
-startDate = fields.getvalue("startdate")
-endDate   = fields.getvalue("enddate")
-language  = fields.getvalue("language")
-session   = cdrcgi.getSession(fields)
-request   = cdrcgi.getRequest(fields)
-title     = "Glossary Name Documents Modified Report"
-instr     = "Glossary Name Documents Modified Report"
-script    = "GlossaryNameDocsModified.py"
-SUBMENU   = "Report Menu"
-buttons   = ("Submit Request", SUBMENU, cdrcgi.MAINMENU, "Log Out")
-header    = cdrcgi.header(title, title, instr, script, buttons)
+class Control(cdrcgi.Control):
+    "Collect and verify the user options for the report."
 
-#----------------------------------------------------------------------
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if request == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif request == SUBMENU:
-    cdrcgi.navigateTo("reports.py", session)
+    TITLE = "Glossary Name Documents Modified Report"
+    NAME_LABELS = {"en": "Term Name", "es": "Translated Term Name" }
 
-#----------------------------------------------------------------------
-# Handle request to log out.
-#----------------------------------------------------------------------
-if request == "Log Out":
-    cdrcgi.logout(session)
+    def __init__(self):
+        "Make sure the values make sense and haven't been hacked."
+        cdrcgi.Control.__init__(self)
+        now = datetime.date.today()
+        then = now - datetime.timedelta(7)
+        self.start = self.fields.getvalue("startdate", str(then))
+        self.end = self.fields.getvalue("enddate", str(now))
+        self.language = self.fields.getvalue("language", "en")
+        msg = cdrcgi.TAMPERING
+        cdrcgi.valParmDate(self.start, msg=msg)
+        cdrcgi.valParmDate(self.end, msg=msg)
+        cdrcgi.valParmVal(self.language, val_list=("en", "es"), msg=msg)
+        if self.end < self.start:
+            cdrcgi.bail("End date cannot precede start date.")
 
-#----------------------------------------------------------------------
-# If we don't have the required parameters, ask for them.
-#----------------------------------------------------------------------
-if not startDate or not endDate or not language:
-    now = cdr.calculateDateByOffset(0)
-    then = cdr.calculateDateByOffset(-7)
-    form   = u"""\
-   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-   <TABLE>
-    <TR>
-     <TD ALIGN='right'><B>Start Date:&nbsp;</B></TD>
-     <TD><INPUT NAME='startdate' VALUE='%s' />
-      (use format YYYY-MM-DD for dates, e.g. 2005-01-01)
-     </TD>
-    </TR>
-    <TR>
-     <TD ALIGN='right'><B>End Date:&nbsp;</B></TD>
-     <TD><INPUT NAME='enddate' VALUE='%s' /></TD>
-    </TR>
-    <TR>
-     <TD ALIGN='right'><B>Language:&nbsp;</B></TD>
-     <TD>
-      English <INPUT TYPE='radio' NAME='language' VALUE='en' />
-      &nbsp;
-      Spanish <INPUT TYPE='radio' NAME='language' VALUE='es' />
-     </TD>
-    </TR>
-   </TABLE>
-  </FORM>
- </BODY>
-</HTML>
-""" % (cdrcgi.SESSION, session, then, now)
-    cdrcgi.sendPage(header + form)
+    def show_report(self):
+        "Create an Excel workbook with a single sheet."
+        table = self.build_table()
+        report = cdrcgi.Report("GlossaryNameDocumentsModified", [table])
+        report.send("excel")
 
-#----------------------------------------------------------------------
-# Set up a database connection and cursor.
-#----------------------------------------------------------------------
-try:
-    conn = cdrdb.connect("CdrGuest")
-    cursor = conn.cursor()
-except cdrdb.Error, info:
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
+    def build_table(self):
+        """
+        Collect the glossary term name docs which match the user's
+        criteria and add a row to the report table for each one.
+        """
+        columns = (
+            cdrcgi.Report.Column("CDR ID", width="70px"),
+            cdrcgi.Report.Column(self.name_label(), width="350px"),
+            cdrcgi.Report.Column("Date Last Modified", width="100px"),
+            cdrcgi.Report.Column("Publishable?", width="100px"),
+            cdrcgi.Report.Column("Date First Published (*)", width="100px"),
+            cdrcgi.Report.Column("Last Comment", width="450px")
+        )
+        query = cdrdb.Query("doc_version v", "v.id", "MAX(v.num)")
+        query.join("doc_type t", "t.id = v.doc_type")
+        query.join("active_doc a", "a.id = v.id")
+        query.where("t.name = 'GlossaryTermName'")
+        query.where(query.Condition("v.dt", self.start, ">="))
+        query.where(query.Condition("v.dt", "%s 23:59:59" % self.end, "<="))
+        query.group("v.id")
+        docs = query.execute(self.cursor, timeout=300).fetchall()
+        rows = []
+        for term in sorted([GlossaryTermName(self, *d) for d in docs]):
+            rows += term.rows()
+        return cdrcgi.Report.Table(columns, rows, sheet_name="GlossaryTerm")
 
-#----------------------------------------------------------------------
-# Object for GlossaryTerm document info we need.
-#----------------------------------------------------------------------
+    def populate_form(self, form):
+        "Put up the CGI form fields with defaults and instructions."
+        form.add("<fieldset>")
+        form.add(form.B.LEGEND("Date Range"))
+        form.add_date_field("startdate", "Start Date", value=self.start)
+        form.add_date_field("enddate", "End Date", value=self.end)
+        form.add("</fieldset>")
+        form.add("<fieldset>")
+        form.add(form.B.LEGEND("Language"))
+        form.add_radio("language", "English", "en", onclick=None, checked=True)
+        form.add_radio("language", "Spanish", "es", onclick=None)
+        form.add("</fieldset>")
+
+    def name_label(self):
+        """
+        Show a different label for the name column's label, depending
+        on the language selected for the report.
+        """
+        return self.NAME_LABELS.get(self.language)
+
 class GlossaryTermName:
+    "Information needed for a glossary terms report rows"
+    def __init__(self, control, doc_id, doc_version):
+        self.control = control
+        self.doc_id = doc_id
+        self.doc_version = doc_version
+        self.names = []
+        fields = ("v.title", "v.xml", "v.publishable", "d.first_pub")
+        query = cdrdb.Query("doc_version v", *fields)
+        query.join("document d", "d.id = v.id")
+        query.where(query.Condition("v.id", doc_id))
+        query.where(query.Condition("v.num", doc_version))
+        row = query.execute(control.cursor).fetchone()
+        self.title, doc_xml, publishable, self.first_pub = row
+        self.publishable = publishable == "Y"
+        root = etree.XML(doc_xml.encode("utf-8"))
+        names = { "en": "TermName", "es": "TranslatedName" }
+        for node in root.findall(names.get(control.language)):
+            if self.want_node(node):
+                self.names.append(self.Name(self, node))
+
+    def want_node(self, node):
+        """
+        See if the language matches for the name node. Ignore language for
+        the English report.
+        """
+        if self.control.language == "en":
+            return True
+        return self.control.language == node.get("language")
+
+    def rows(self):
+        "Create a row for each of the term's names"
+        return [name.row() for name in self.names]
+
+    def __cmp__(self, other):
+        """
+        Make the documents sortable, even though the order won't mean
+        much to the user, since the title isn't shown.
+        """
+        return cmp(self.title, other.title)
+
     class Name:
-        class Comment:
-            def __init__(self, node):
-                self.text     = node.text
-                self.date     = node.get('date', None)
-                self.audience = node.get('audience', None)
-                self.user     = node.get('user', None)
-            def __cmp__(self, other):
-                return cmp(self.date, other.date)
-            def toString(self):
-                return (u"[date: %s; user: %s; audience: %s] %s" %
-                        (self.date, self.user, self.audience, self.text))
-        def __init__(self, node):
-            self.value            = u''
-            self.comment          = None
-            self.dateLastModified = None
-            for n in node.findall('TermNameString'):
-                self.value = n.text
-            for n in node.findall('DateLastModified'):
-                self.dateLastModified = n.text
+        "A Glossary term can have multiple names."
+        def __init__(self, term, node):
+            self.term = term
+            self.value = self.comment = self.last_mod = None
+            for child in node.findall("TermNameString"):
+                self.value = child.text
+            for child in node.findall("DateLastModified"):
+                self.last_mod = child.text
             nodes = node.findall('Comment')
             if nodes:
                 self.comment = self.Comment(nodes[0])
-    def __init__(self, docId, docVersion, language, cursor):
-        cursor.execute("""\
-            SELECT v.title, v.xml, v.publishable, d.first_pub
-              FROM doc_version v
-              JOIN document d
-                ON d.id = v.id
-             WHERE v.id = ?
-               AND v.num = ?""", (docId, docVersion))
-        rows             = cursor.fetchall()
-        tree             = etree.XML(rows[0][1].encode('utf-8'))
-        self.docId       = docId
-        self.docVersion  = docVersion
-        self.publishable = rows[0][2] == 'Y'
-        self.title       = rows[0][0]
-        self.firstPub    = rows[0][3]
-        self.names       = []
-        elementName      = language == 'en' and 'TermName' or 'TranslatedName'
-        for node in tree.findall(elementName):
-            if language == 'en' or node.get('language') == language:
-                self.names.append(self.Name(node))
 
-#----------------------------------------------------------------------
-# Create the report.
-#----------------------------------------------------------------------
-cursor.execute("""\
-    SELECT v.id, MAX(v.num)
-      FROM doc_version v
-      JOIN doc_type t
-        ON t.id = v.doc_type
-      JOIN active_doc a
-        ON v.id = a.id
-     WHERE t.name = 'GlossaryTermName'
-       AND v.dt BETWEEN '%s' AND DATEADD(s, -1, DATEADD(d, 1, '%s'))
-  GROUP BY v.id""" % (startDate, endDate), timeout = 300)
-rows = cursor.fetchall()#[:100]
-terms = []
-for docId, docVersion in rows:
-    term = GlossaryTermName(docId, docVersion, language, cursor)
-    terms.append(term)
-terms.sort(lambda a, b: cmp(a.title, b.title))
-book   = ExcelWriter.Workbook('CDR', 'NCI')
-align  = ExcelWriter.Alignment(vertical = 'Top', wrap = True)
-normal = book.addStyle(alignment = align)
-align  = ExcelWriter.Alignment(vertical = 'Top', horizontal = 'Center')
-center = book.addStyle(alignment = align)
-sheet  = book.addWorksheet('GlossaryTerm')
-font   = ExcelWriter.Font('#FFFFFF', bold = True)
-bkgrd  = ExcelWriter.Interior('#0000FF')
-align  = ExcelWriter.Alignment('Center', 'Center', True)
-hdrs   = book.addStyle(alignment = align, font = font, interior = bkgrd)
-row    = sheet.addRow(1, hdrs)
-sheet.addCol(1, 50)
-sheet.addCol(2, 250)
-sheet.addCol(3, 70)
-sheet.addCol(4, 75)
-sheet.addCol(5, 70)
-sheet.addCol(6, 350)
-row.addCell(1, u'DocId')
-row.addCell(2, language == 'en' and u'Term Name' or u'Translated Term Name')
-row.addCell(3, u'Date Last Modified')
-row.addCell(4, u'Publishable?')
-row.addCell(5, u'Date First Published')
-row.addCell(6, u'Last Comment')
-rowNum = 2
-for term in terms:
-    firstPub = term.firstPub or ''
-    if firstPub:
-        firstPub = firstPub[:10]
-    for name in term.names:
-        dlm = name.dateLastModified or ''
-        if dlm:
-            dlm = dlm[:10]
-        row = sheet.addRow(rowNum, normal)
-        row.addCell(1, term.docId, 'Number', center)
-        row.addCell(2, name.value)
-        row.addCell(3, dlm, style = center)
-        row.addCell(4, term.publishable and u'Y' or u'N', style = center)
-        row.addCell(5, firstPub, style = center)
-        row.addCell(6, name.comment and name.comment.toString() or u'')
-        rowNum += 1
-try:
-    import os, msvcrt
-    msvcrt.setmode (1, os.O_BINARY)
-except:
-    cdrcgi.bail("Failure setting binary mode")
-now  = time.strftime("%Y%m%d%H%M%S")
-name = 'GlossaryNameDocumentsModified-%s.xls' % now
-print "Content-type: application/vnd.ms-excel"
-print "Content-Disposition: attachment; filename=%s" % name
-print
-book.write(sys.stdout, True)
+        def row(self):
+            """
+            Each name for a term gets its own row in the report, repeating
+            the information common to the term in each row for the term.
+            """
+            name = self.value is not None and self.value or ""
+            last_mod = self.last_mod and self.last_mod[:10] or ""
+            publishable = self.term.publishable and "Y" or "N"
+            first_pub = self.term.first_pub and self.term.first_pub[:10] or ""
+            comment = self.comment is not None and self.comment.tostring() or ""
+            return (
+                cdrcgi.Report.Cell(self.term.doc_id, center=True),
+                name,
+                cdrcgi.Report.Cell(last_mod, center=True),
+                cdrcgi.Report.Cell(publishable, center=True),
+                cdrcgi.Report.Cell(first_pub, center=True),
+                comment
+            )
+
+        class Comment:
+            "Subclass holding text and metadata for a definition comment"
+            def __init__(self, node):
+                self.text = node.text
+                self.date = node.get("date", None)
+                self.audience = node.get("audience", None)
+                self.user = node.get("user", None)
+            def tostring(self):
+                return (u"[date: %s; user: %s; audience: %s] %s" %
+                        (self.date, self.user, self.audience, self.text))
+            def __cmp__(self, other):
+                return cmp(self.date, other.date)
+
+if __name__ == "__main__":
+    "Allow documentation and code check tools to import us without side effects"
+    Control().run()

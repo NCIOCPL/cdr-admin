@@ -243,8 +243,8 @@ if not cachedHtml:
         resp = cdr2gk.pubPreview(doc, flavor)
         cgHtml = resp.xmlResult.encode("utf-8")
         showProgress("Response received from Cancer.gov...")
-    except:
-        cdrcgi.bail('Error in PubPreview: ' + str(resp))
+    except Exception, e:
+        cdrcgi.bail('Error in PubPreview: ' + str(e))
     showProgress("Done...")
 
 #----------------------------------------------------------------------
@@ -287,7 +287,8 @@ if not preserveLnk:
     # Modify SummaryRef links
     # These links are identified by the inlinetype attribute
     # ------------------------------------------------------
-    for x in myHtml.xpath('//a[@inlinetype="SummaryRef"]'):
+    #for x in myHtml.xpath('//a[@inlinetype="SummaryRef"]'):
+    for x in myHtml.xpath('//a[@objectid]'):
         # The SummaryRef links don't contain an href attribute
         # because Percussion isn't able to add this to the PP
         # output.  Without the href attribute the text is not
@@ -380,6 +381,15 @@ if not preserveLnk:
             href = href.replace("cancer.gov//", "cancer.gov/")
             href = "%s?url=%s" % (proxy, href)
             link.set("href", href)
+
+    #------------------------------------------------------------------
+    # Disable popup links: they don't work in this context.
+    #------------------------------------------------------------------
+    for link in myHtml.xpath("//a[starts-with(@onclick, "
+                             "'javascript:popWindow')]"):
+        link.set('href', '')
+        link.set('onclick', 'return false')
+
 else:
     showProgress("Preserving original links...")
 
@@ -411,7 +421,7 @@ html = re.sub("http://cdr", "https://cdr", html)
 # if cdr.h.tier in ('QA'):
 if cdr.h.tier in ('QA', 'STAGE'):
     pattern6 = re.compile('http://www.cancer.gov/')
-    html = pattern6.sub('http://%s.%s/' % (cdr.h.host['CG'][0], 
+    html = pattern6.sub('http://%s.%s/' % (cdr.h.host['CG'][0],
                                            cdr.h.host['CG'][1]), html)
 
 if not cdr.h.tier == 'PROD':

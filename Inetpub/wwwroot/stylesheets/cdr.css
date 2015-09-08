@@ -114,3 +114,8 @@ table.checkboxes td a {
     font: 10pt Arial;
 }
 .advanced-search .buttons { text-align: center; width: 100%; }
+.footnote { font-size: 9pt; font-style: italic; color: green; }
+.ui-datepicker { width: inherit; }
+.ui-datepicker * { font-size: 11pt; font-family: Arial, sans-serif; }
+.ui-datepicker-trigger { margin-left: 5px; }
+.ui-datepicker td, .ui-datepicker th { min-width: 23px; }

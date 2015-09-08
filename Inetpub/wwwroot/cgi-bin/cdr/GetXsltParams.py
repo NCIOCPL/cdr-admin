@@ -4,98 +4,76 @@
 #
 # Show all of the top-level parameters used by CDR filters.  Useful
 # for XSL/T script writers who want to avoid conflicting uses of the
-# same parameter names across more than one script, which might be 
+# same parameter names across more than one script, which might be
 # invoked as a set (the CdrFilter command expects all of the parameters
 # supplied for the command to be applicable to all filters named by
 # the command).
 #
-# $Log: not supported by cvs2svn $
 #----------------------------------------------------------------------
-import cdrdb, cdrcgi, xml.sax
+import cdrdb
+import lxml.etree as etree
+import lxml.html.builder as builder
 
-#----------------------------------------------------------------------
-# Create a SAX content handler.
-#----------------------------------------------------------------------
-class FilterHandler(xml.sax.handler.ContentHandler):
-    def __init__(self):
-        self.level = 0
-        self.params = {}
-    def startElement(self, name, attributes):
-        self.level += 1
-        if name == "xsl:param" and self.level == 2:
-            paramName = attributes.get("name")
-            if not self.params.has_key(paramName):
-                self.params[paramName] = []
-            self.params[paramName].append((self.id, self.title))
-    def endElement(self, name):
-        self.level -= 1
-handler = FilterHandler()
+TITLE = "Global Filter Parameters"
 
-#----------------------------------------------------------------------
-# Start the report HTML.
-#----------------------------------------------------------------------
-html = """\
-<html>
- <head>
-  <title>Global filter parameters</title>
- <head>
- <body>
-  <h2>Global filter parameters</h2>
-  <table border='1' cellpadding='2' cellspacing='0'>
-"""
+class Filter:
+    def __init__(self, doc_id, doc_title, doc_xml):
+        self.doc_id = doc_id
+        self.doc_title = doc_title
+        root = etree.XML(doc_xml.encode("utf-8"))
+        path = "{http://www.w3.org/1999/XSL/Transform}param"
+        names = set()
+        for node in root.findall(path):
+            name = node.get("name")
+            if name not in names:
+                names.add(name)
+                parameter = Parameter.parameters.get(name)
+                if not parameter:
+                    parameter = Parameter(name)
+                    Parameter.parameters[name] = parameter
+                parameter.filters.append(self)
+    def make_cells(self):
+        return (
+            builder.TD("CDR%010d" % self.doc_id),
+            builder.TD(self.doc_title)
+        )
 
-#----------------------------------------------------------------------
-# Find all of the filter documents.
-#----------------------------------------------------------------------
-conn = cdrdb.connect("CdrGuest")
-cursor = conn.cursor()
-cursor.execute("""\
-    SELECT document.id, 
-           document.title,
-           document.xml
-      FROM document
-      JOIN doc_type
-        ON doc_type.id = document.doc_type
-     WHERE doc_type.name = 'Filter'
-  ORDER BY document.title""")
+class Parameter:
+    parameters = {}
+    def __init__(self, name):
+        self.name = name
+        self.filters = []
+    def add_rows(self, tbody):
+        name = builder.TH(self.name)
+        if len(self.filters) > 1:
+            name.set("rowspan", str(len(self.filters)))
+        row = builder.TR(name, *self.filters[0].make_cells())
+        tbody.append(row)
+        for f in self.filters[1:]:
+            tbody.append(builder.TR(*f.make_cells()))
 
-#----------------------------------------------------------------------
-# Parse the filters, looking for "top-level" param elements.
-#----------------------------------------------------------------------
-for row in cursor.fetchall():
-    handler.id = row[0]
-    handler.title = row[1]
-    try:
-        xml.sax.parseString(row[2].encode('utf-8'), handler)
-    except:
-        handler.level = 0
+def main():
+    cursor = cdrdb.connect("CdrGuest").cursor()
+    query = cdrdb.Query("document d", "d.id", "d.title", "d.xml").order(2)
+    query.join("doc_type t", "t.id = d.doc_type")
+    query.where("t.name = 'Filter'")
+    filters = []
+    for doc_id, doc_title, doc_xml in query.execute(cursor).fetchall():
+        filters.append(Filter(doc_id, doc_title, doc_xml))
+    tbody = builder.TBODY()
+    caption = builder.CAPTION(TITLE)
+    for parm in sorted(Parameter.parameters.values()):
+        parm.add_rows(tbody)
+    page = builder.HTML(
+        builder.HEAD(
+            builder.TITLE(TITLE),
+            builder.LINK(rel="stylesheet", href="/stylesheets/cdr.css"),
+            builder.STYLE("th { text-align: right; vertical-align: top; }")
+        ),
+        builder.BODY(builder.TABLE(caption, tbody), builder.CLASS("report"))
+    )
+    print "Content-type: text/html\n"
+    print etree.tostring(page, pretty_print=True)
 
-#----------------------------------------------------------------------
-# Show the sorted parameters, each listing all filters using it.
-#----------------------------------------------------------------------
-keys = handler.params.keys()
-keys.sort()
-for key in keys:
-    html += """\
-   <tr>
-    <th align='right'>%s</th>
-    <td>CDR%010d</td>
-    <td>%s</td>
-   </tr>
-""" % (key, handler.params[key][0][0], handler.params[key][0][1])
-    for filter in handler.params[key][1:]:
-        html += """\
-   <tr>
-    <td>&nbsp;</td>
-    <td>CDR%010d</td>
-    <td>%s</td>
-""" % (filter[0], filter[1])
-
-#----------------------------------------------------------------------
-# Show the report.
-#----------------------------------------------------------------------
-cdrcgi.sendPage(html + """\
-  </table>
- </body>
-</html>
-""")
+if __name__ == "__main__":
+    main()

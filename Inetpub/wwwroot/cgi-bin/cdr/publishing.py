@@ -7,867 +7,590 @@
 # BZIssue::2533
 # BZIssue::4870
 # BZIssue::5051 - [Media] Modify Publishing Software to Process Audio Files
+# 2015-07-11 - Completely rewritten to address security vulnerabilities
 #
 #----------------------------------------------------------------------
-import cgi, cdrcgi, string, copy, urllib, cdr, xml.dom.minidom
+import cdr
+import cdr2gk
+import cdrdb
+import cdrcgi
+import cgi
 import lxml.etree as etree
-import cdrdb, socket, re
+import os
+import re
+import urllib
 
-#----------------------------------------------------------------------
-# Testing if the document to be hot-fixed is a meeting recording doc.
-#----------------------------------------------------------------------
-def isMeetingRecording(id, cursor):
+class Control:
+    """
+    Object used to determine how to respond to the client's request.
+    Collects parameters used to invoke the script and scrubs them.
+    """
 
-    # Meeting recordings have an attribute 'Internal'
-    # -----------------------------------------------
-    cursor.execute("""
-        SELECT q.doc_id
-          FROM query_term_pub q
-         WHERE q.doc_id = ?
-           AND q.value = 'Internal'   -- Meeting Recording
-           AND q.path = '/Media/@Usage' """, id)
-    row = cursor.fetchall()
-    cursor.close()
+    readonly_parms = set(["PubType", "SubSetName", "GroupEmailAddrs"])
+    "Parameters that can't be overridden by the user."
 
-    if row:
-        return True
-    return False
-
-#----------------------------------------------------------------------
-# Display Publishing System PickList
-#----------------------------------------------------------------------
-class Display:
-
-    # Class private variables
-    __cdrConn = None
-
-    #----------------------------------------------------------------
-    # Set up a connection to CDR. Abort when failed.
-    #----------------------------------------------------------------
     def __init__(self):
-        try:
-            self.__conn   = cdrdb.connect()
-            self.__cursor = self.__conn.cursor()
-        except cdrdb.Error, info:
-            reason = "Failure: %s" % info[1][0]
-            self.__addFooter("Cdr connection failed. %s" % reason)
-
-    #----------------------------------------------------------------
-    # Display the pick list of all publishing systems by PubCtrl
-    # document type.
-    # This is the main screen of the Publishing interface
-    #----------------------------------------------------------------
-    def displaySystems(self):
-        form = [u"""\
-    <h4>Publication Types</h4>
-    <ol>
-     <li><a href='%s/PubStatus.py?id=1&%s=%s&type=Manage'
-      >Manage Publishing Job Status</a></li>
-""" % (cdrcgi.BASE, cdrcgi.SESSION, session)]
-        self.__cursor.execute("""\
-            SELECT id
-              FROM doc_type
-             WHERE name = 'PublishingSystem'""")
-        rows = self.__cursor.fetchall()
-        if not rows:
-            cdrcgi.bail("Publishing control document has disappeared!")
-        self.__cursor.execute("""\
-            SELECT id, title
-              FROM active_doc
-             WHERE doc_type = ?""", rows[0][0])
-        rows = self.__cursor.fetchall()
-        for docId, docTitle in rows:
-            name = docTitle.upper().strip()
-            if name == 'MAILERS':
+        """
+        Load the control information used to process the user's requests
+        and generate the next page. Make sure the user's account is
+        authorized to use the publishing system.
+        """
+        self.confirmed = self.need_user_choices = self.need_confirmation = False
+        self.user_choices = {}
+        self.cursor = cdrdb.connect("CdrPublishing").cursor()
+        self.title = "CDR Administration"
+        self.script = "publishing.py"
+        self.systems = []
+        self.system_names = {}
+        self.system_ids = {}
+        query = cdrdb.Query("active_doc d", "d.id", "d.title")
+        query.join("doc_type t", "t.id = d.doc_type")
+        query.where(query.Condition("t.name", "PublishingSystem"))
+        rows = query.order("d.title").execute(self.cursor).fetchall()
+        for doc_id, doc_title in rows:
+            title = doc_title.upper().strip()
+            if title == "MAILERS":
                 continue
-            if cdr.isProdHost() and name == 'QCFILTERSETS':
+            if cdr.isProdHost() and title == "QCFILTERSETS":
                 continue
-            self.__cursor.execute("""\
-                SELECT MAX(num)
-                  FROM doc_version
-                 WHERE publishable = 'Y'
-                   AND val_status = 'V'
-                   AND id = ?""", docId)
-            rows = self.__cursor.fetchall()
-            if not rows:
-                continue
-            docVersion = rows[0][0]
-            self.__cursor.execute("""\
-                SELECT xml
-                  FROM doc_version
-                 WHERE id = ?
-                   AND num = ?""", (docId, docVersion))
-            docXml = self.__cursor.fetchall()[0][0]
-            tree = etree.XML(docXml.encode('utf-8'))
-            desc = u"*** NO SYSTEM DESCRIPTION FOUND ***"
-            for node in tree.findall('SystemDescription'):
-                desc = node.text.strip()
-            form.append(u"""\
-     <li><a href='%s/publishing.py?%s=%s&ctrlId=%s&version=%d'
-      >%s [Version %d]<br>%s</a></li>
-""" % (cdrcgi.BASE, cdrcgi.SESSION, session, docId, docVersion,
-       cgi.escape(docTitle), docVersion, cgi.escape(desc)))
-        form.append(u"""\
-   </ol>
-   <input type='hidden' name='%s' value='%s' />
-  </form>
- </body>
-</html>
-""" % (cdrcgi.SESSION, session))
-        form = u"".join(form).encode('utf-8')
-        cdrcgi.sendPage(header + form)
-
-    #----------------------------------------------------------------
-    # Display all subsets of the publishing system main menu.
-    #----------------------------------------------------------------
-    def displaySubsets(self, ctrlId, version):
-        subsets = []
-        subset = ["Publishing.py", "", "", "", ""]
-        pickList = self.__getPubSubsets(ctrlId, version)
-        sysName = pickList[0][0]
-        for s in pickList:
-            subset[1]  = s[1]
-            subset[2]  = s[1]
-            subset[2] += "<BR><FONT SIZE=3>%s</FONT>" % s[2]
-            subset[2] += "<BR><BR>"
-            subset[3]  = s[3] and 'Param=Yes' or ''
-            if s[4]:
-                subset[3] += '&amp;Doc=Yes'
-            if not subset[3]:
-                subset[3] = 'Confirm=Yes'
-
-            deep = copy.deepcopy(subset)
-            subsets.append(deep)
-        if type(subsets) == type(""): cdrcgi.bail(subsets)
-
-        form  = "<H4>Publishing Subsets of System:<BR>%s</H4>\n" % sysName
-        form += "<OL>\n"
-
-        for r in subsets:
-            if not r[1] == 'Republish-Export':
-                form += """ <LI><A
-                    href='%s/%s?%s=%s&amp;ctrlId=%s&amp;version=%s&amp;SubSet=%s&amp;%s'>
-                    %s</A></LI>\n""" % (cdrcgi.BASE, r[0], cdrcgi.SESSION,
-                                        session, ctrlId, version,
-                                        urllib.quote_plus(r[1]), r[3], r[2])
-
-        form += "</OL>\n"
-        form += HIDDEN % (cdrcgi.SESSION, session)
-        self.__addFooter(form)
-
-    #----------------------------------------------------------------------
-    # Display the pick list of parameters of a publishing subset.
-    # Don't want to display the SQL statement?
-    # When it is redirected from Confirm page, don't add hidden
-    #       Params and DocIds to avoid multiple values yielding
-    #       a list instead of a string. Tricky!
-    #----------------------------------------------------------------------
-    def displayDocParam(self, ctrlId, version, SubSet, Param = None,
-                        Doc = None, Redirected = None, idMethod = None):
-
-        # Initialize hidden values.
-        form = self.__initHiddenValues()
-
-        form += HIDDEN % ('idMethod', idMethod)
-
-        form += """
-<H4>User Selected Documents and Parameters for Subset:
-<BR>
-%s</H4>
-""" % SubSet
-        form += "<OL>\n"
-
-        if Doc:
-            # -------------------------------------------------------------
-            # The idMethod "MultiFieldEntry" has been selected.  Presenting
-            # a form to enter CDR-IDs one by one
-            # -------------------------------------------------------------
-            if idMethod == 'MultiFieldEntry':
-                form += """ <LI>
-  <B>Enter publishable document Id/Version [e.g.,190930 or 190930/3]:</B>
-  <BR>
-  <TABLE BORDER='1'>
-"""
-
-                # This is up to userselect element in the control document.
-                # Will revisit this.
-                docIdList = []
-                for r in range(4):
-                    form += "   <TR>\n"
-                    for i in range(5):
-                        id = 5 * r + i
-                        docIdList.append("CdrDoc%d" % id)
-                        form += """    <TD>
-     <INPUT NAME='CdrDoc%d' TYPE='TEXT' SIZE='10'>
-    </TD>
-""" % id
-                    form += "   </TR>\n"
-                if not Redirected:
-                    form += HIDDEN % ('DocIds',
-                           ','.join(["%s" % x for x in docIdList]))
-
-                form += "  </TABLE>\n  <P/>\n </LI>"
-
-            else:
-                # ---------------------------------------------------------
-                # Enter the CDR IDs by copy/pasting from e-mail to operator
-                # ---------------------------------------------------------
-                form += """  <LI>
-   <B>Paste in all CDR IDs</B>
-   <BR>
-   <TEXTAREA NAME='DocIds' rows="10" cols="40"></TEXTAREA>
-   <P/>
-  </LI>"""
-
-        # Subset parameters exist.
-        if Param:
-            params = []
-            param = ["Publishing.py", "", ""]
-            pickList = self.__getParamSQL(ctrlId, version, SubSet)
-            for s in pickList:
-                param[1] =  s[0]
-                param[2] = s[1]
-                deep = copy.deepcopy(param)
-                params.append(deep)
-
-            form += """
-  <LI>
-   <B>Modify default parameter values if applicable</B>
-
-   <TABLE BORDER='1'>
-    <TR>
-     <TD>
-      <B>Name</B>
-     </TD>
-     <TD>
-      <B>Default Value</B>
-     </TD>
-     <TD>
-      <B>Current Value</B>
-     </TD>
-    </TR>"""
-
-            paramList = ""
-            for r in params:
-                paramList += ",%s" % r[1]
-                if r[1] == "PubType":
-                    if not cdr.PUBTYPES.has_key(r[2]):
-                        self.__addFooter("The value of parameter PubType,\
-                             %s, is not supported. <BR>Please modify \
-                            the control document or the source code." % r[2])
-                    form += """
-    <TR>
-     <TD>%s</TD>
-     <TD>%s</TD>
-     <TD><INPUT NAME='%s' VALUE='%s' READONLY></TD>
-    </TR>\n""" % (r[1], r[2] or "&nbsp;", r[1], r[2])
-                elif r[1] == "SubSetName" or r[1] == "GroupEmailAddrs":
-                    form += """
-    <TR>
-     <TD>%s</TD>
-     <TD>%s</TD>
-     <TD><INPUT NAME='%s' VALUE='%s' READONLY></TD>
-    </TR>
-""" % (r[1], r[2] or "&nbsp;", r[1], r[2])
-                elif r[2] in ("Yes", "No"):
-                    # Create a picklist for parameter name/value pairs.
-                    YesNo = (r[2] == "No") and "Yes" or "No"
-                    pickList = """
-      <SELECT NAME='%s'>
-       <OPTION>%s</OPTION>
-       <OPTION>%s</OPTION>
-      </SELECT>
-     """
-                    form += """
-    <TR>
-     <TD>%s</TD>
-     <TD>%s</TD>
-     <TD>%s</TD>
-    </TR>
-""" % (r[1], r[2], pickList % (r[1], r[2], YesNo))
-                else:
-                    form += """
-    <TR>
-     <TD>%s</TD>
-     <TD>%s</TD>
-     <TD><INPUT NAME='%s' VALUE='%s'></TD>
-    </TR>
-""" % (r[1], r[2], r[1], r[2])
-            if not Redirected:
-                form += HIDDEN % ('Params', paramList)
-
-            form += "</TABLE><P/>\n"
-
-        form += "<INPUT NAME='Confirm' TYPE='SUBMIT' VALUE='Next >'></LI>"
-
-        form += "</OL>\n"
-        form += HIDDEN % (cdrcgi.SESSION, session)
-        self.__addFooter(form)
-
-
-    # -----------------------------------------------
-    # Display a confirmation page.
-    # -----------------------------------------------
-    def displayConfirm(self):
-
-        # Initialize hidden values.
-        form = self.__initHiddenValues()
-
-        # Form the parameters and documents to match the required
-        # format of argument in publish.py.
-        paramValues = ""
-        grpEmailAddr = ""
-        if fields.has_key('Params'):
-            paramList = fields.getvalue('Params')
-            names = string.split(paramList, ",")
-            for name in names:
-                if fields.has_key(name):
-                    if name == "GroupEmailAddrs":
-                        grpEmailAddr += fields.getvalue(name)
-                    else:
-                        paramValues += "," + name + ";" + \
-                            fields.getvalue(name)
-
-        form += HIDDEN % ('Parameters', paramValues)
-
-        docIdValues = []
-        if fields.has_key('DocIds'):
-            docIdList = fields.getvalue('DocIds')
-            inputMethod = fields.getvalue('idMethod')
-            names = string.split(docIdList, ",")
-
-            # CDR-IDs listed in text-area
-            # ---------------------------
-            if inputMethod == 'SingleFieldEntry':  
-                # We're not supporting to publish older versions here
-                # ---------------------------------------------------
-                if docIdList.find('/') > -1:
-                    cdrcgi.bail('Error: Publishing older versions not supported')
-                docs = re.split('\D+', docIdList)
-
-                # Prefixing 'CDR' to doc IDs to keep format of 
-                # 'MultiFieldEntry' option. If a value isn't an integer 
-                # (i.e. null), skip it.
-                # -----------------------------------------------------------
-                for doc in docs:
-                    try:
-                        docIdValues.append('CDR%d' % int(doc))
-                    except ValueError:
-                        pass
-
-                # Sort the list and reverse the list.  We want to process
-                # the newest files first.
-                # -------------------------------------------------------
-                docIdValues.sort()
-                docIdValues.reverse()
-            else:                # CDR-IDs listed in individual fields
-                for name in names:
-                    if fields.has_key(name):
-                        docIdValues.append("CDR%s" % \
-                                           fields.getvalue(name).strip())
-
-        form += HIDDEN % ('Documents',','.join(["%s" % n for n in docIdValues]))
-
-        # Display message.
-        form += """<H4>Publishing System Confirmation
-        <BR>%s</H4>""" % fields.getvalue('SubSet')
-
-        addresses = grpEmailAddr and (grpEmailAddr + ";") or ""
-        addresses += self.__getUsrAddr()
-        form += """<table>
-        <tr>
-          <td>
-            <input type="checkbox" checked name="Email" value="y">
-          </td>
-          <td>
-            Email notification of completion?
-          </td>
-        </tr>
-        <tr>
-          <td>
-            &nbsp;
-          </td>
-          <td>
-            Email to [use comma or semicolon between addresses]:<BR>
-            <input type="text" size="60" name="EmailAddr" value="%s">
-          </td>
-        </tr>
-        <tr>
-          <td>
-            <input type="checkbox" name="NoOutput" value="Y">
-          </td>
-          <td>
-            Messages only [no DB document files created]?
-          </td>
-        <tr>
-        </table>
-
-        <P/>""" % addresses
-
-        form += """Publish this subset?&nbsp;&nbsp;
-        <input type="submit" name="Publish" value="OK">"""
-
-        form += HIDDEN % (cdrcgi.SESSION, session)
-        cdrcgi.sendPage(header + form + "</FORM></BODY></HTML>")
-
-
-    # -----------------------------------------------
-    # Publish and return a link for checking status.
-    # -----------------------------------------------
-    def initPublish(self, credential, ctrlDocId, version, subsetName, params,
-                    docIds, email, no_output):
-
-        systemName = self.__getPubSubsets(ctrlDocId, version)[0][0]
-
-        form = "<H4>Publishing SubSet:<BR>%s</H4>\n" % subsetName
-
-        # Get publishing job ID.
-        if subsetName == 'Hotfix-Remove':
-            resp = cdr.publish(credential, systemName, subsetName, params, docIds,
-                            email, no_output, port = cdr.getPubPort(),
-                            allowInActive = 'Y')
-        else:
-            resp = cdr.publish(credential, systemName, subsetName, params, docIds,
-                            email, no_output, port = cdr.getPubPort())
-        jobId = resp[0]
-        if not jobId:
-            form += "<B>Failed:</B> %s\n" % resp[1]
-        else:
-            form += "<B>Started:</B> "
-            form += "<A style='text-decoration: underline;' \
-                    href='%s/%s?id=%s'>%s</A>\n" % (cdrcgi.BASE, 'PubStatus.py',
-                    jobId, "Check the status of publishing job: %s" % jobId)
-
-        form += HIDDEN % (cdrcgi.SESSION, session)
-        self.__addFooter(form)
-
-    # -------------------------------------------------------------
-    # Display screen to request SingleFieldEntry option for CDR IDs
-    # -------------------------------------------------------------
-    def displayLoadParam(self, ctrlId, version, SubSet, Param = None,
-                        Doc = None, Redirected = None):
-
-        # Initialize hidden values.
-        form = self.__initHiddenValues()
-        if fields.has_key('Param'):
-            form += HIDDEN % ('Param', fields.getvalue('Param'))
-        if fields.has_key('Doc'):
-            form += HIDDEN % ('Doc', fields.getvalue('Doc'))
-
-        form += """<H4>User Selected Documents and Parameters for Subset:
-<BR>
-%s</H4>""" % SubSet
-
-        # UserSelect is allowed.
-        form += """
-<p>
-<INPUT TYPE="radio" NAME="id-method" 
-       value="MultiFieldEntry">&nbsp; Enter CDR IDs<BR>
-<INPUT TYPE="radio" NAME="id-method" 
-       value="SingleFieldEntry" CHECKED>&nbsp; Load/Paste CDR IDs<BR>
-"""
-
-        form += "<BR>\n"
-        form += "<INPUT NAME='Load' TYPE='SUBMIT' "
-        form += "VALUE='Next >'>"
-
-        form += HIDDEN % (cdrcgi.SESSION, session)
-        self.__addFooter(form)
-
-
-    def __addFooter(self, form):
-        cdrcgi.sendPage(header + form + "</FORM></BODY></HTML>")
-
-
-    def __initHiddenValues(self):
-        form = ""
-
-        if fields.has_key('ctrlId'):
-            form += HIDDEN % ('ctrlId', fields.getvalue('ctrlId'))
-        if fields.has_key('version'):
-            form += HIDDEN % ('version', fields.getvalue('version'))
-        if fields.has_key('SubSet'):
-            form += HIDDEN % ('SubSet', fields.getvalue('SubSet'))
-        if fields.has_key('Params'):
-            form += HIDDEN % ('Params', fields.getvalue('Params'))
-        if fields.has_key('DocIds'):
-            form += HIDDEN % ('DocIds', fields.getvalue('DocIds'))
-        if fields.has_key('idMethod'):
-            form += HIDDEN % ('idMethod', fields.getvalue('idMethod'))
-        return form
-
-
-    #----------------------------------------------------------------------
-    # Log debugging message to d:/cdr/log/publish.log.
-    #----------------------------------------------------------------------
-    def __logPub(self, line):
-        file = "d:/cdr/log/publish.log"
-        open(file, "a").write("== %s\n" % line)
-
-
-    #----------------------------------------------------------------------
-    # Return a list of publishing systems.
-    #----------------------------------------------------------------------
-    def __getPubSys(self):
-        # Initialized the list of tuples: (title, id, version, desc).
-        pickList = []
-        tuple = ["", "", "", ""]
-
-        sql = """SELECT d.title, d.id, d.num, d.xml
-                   FROM doc_version d
-                   JOIN doc_type t
-                     ON d.doc_type = t.id
-                   JOIN document active
-                     ON active.id = d.id
-                  WHERE t.name = 'PublishingSystem'
-                    AND d.val_status = 'V'
-                    and d.publishable = 'Y'
-                    AND d.num = (SELECT MAX(num)
-                                   FROM doc_version
-                                  WHERE d.id = id)"""
-        rows = self.__execSQL(sql)
-
-        for row in rows:
-            tuple[0] = row[0]
-            tuple[1] = row[1]
-            tuple[2] = row[2]
-            docElem  = row[3].encode('utf-8')
-
-            docElem = xml.dom.minidom.parseString(docElem).documentElement
-            for node in docElem.childNodes:
-                if node.nodeType == xml.dom.minidom.Node.ELEMENT_NODE:
-                    if node.nodeName == 'SystemDescription':
-                        tuple[3] = ''
-                        for n in node.childNodes:
-                            if n.nodeType == xml.dom.minidom.Node.TEXT_NODE:
-                                tuple[3] = tuple[3] + n.nodeValue
-
-            deep = copy.deepcopy(tuple)
-            pickList.append(deep)
-
-        return pickList
-
-
-    #----------------------------------------------------------------
-    # Return all subsets based on ctrlId.
-    #----------------------------------------------------------------
-    def __getPubSubsets(self, ctrlId, version):
-
-        # Initialized the list of tuples: (sysName, subsetName, desc,
-        #       param, userSelect, docTypes).
-        pickList = []
-        tuple = ["", "", "", "", ""]
-
-        sql = "SELECT xml FROM doc_version \
-                WHERE id = %s AND num = %s" % (ctrlId, version)
-        rows = self.__execSQL(sql)
-
-        for row in rows:
-            docElem = row[0].encode('utf-8')
-
-            docElem = xml.dom.minidom.parseString(docElem).documentElement
-            for node in docElem.childNodes:
-                if node.nodeType == xml.dom.minidom.Node.ELEMENT_NODE:
-                    # SystemName comes first by schema. So tuple[0] will
-                    #       be initialized once for all.
-                    # We may not need this if the next page
-                    #       does not show the system name.
-                    if node.nodeName == 'SystemName':
-                        tuple[0] = cdr.getTextContent(node)
-
-                    if node.nodeName == 'SystemSubset':
-                        tuple[1] = ''
-                        tuple[2] = ''
-                        tuple[3] = ''
-                        tuple[4] = ''
-                        for n in node.childNodes:
-                            if n.nodeName == 'SubsetName':
-                                tuple[1] = cdr.getTextContent(n)
-                            if n.nodeName == 'SubsetDescription':
-                                tuple[2] = cdr.getTextContent(n)
-                            if n.nodeName == 'SubsetParameters':
-                                tuple[3] = 'Yes'
-                            if n.nodeName == 'SubsetSpecifications':
-                                for m in n.childNodes:
-                                    if m.nodeName == 'SubsetSpecification':
-                                        for l in m.childNodes:
-                                            if l.nodeName == 'SubsetSelection':
-                                                for k in l.childNodes:
-                                                    if k.nodeName == 'UserSelect':
-                                                        tuple[4] = 'Yes'
-                        deep = copy.deepcopy(tuple)
-                        pickList.append(deep)
-
-        return pickList
-
-
-    #----------------------------------------------------------------
-    # Return a SubSet node based on subsetName.
-    # Don't need to check nodeType since the schema is known
-    #    and subsetName is unique.
-    # Error checking: node not found.
-    #----------------------------------------------------------------
-    def __getSubSet(self, docElem):
-
-        pubSys = xml.dom.minidom.parseString(docElem).documentElement
-        for node in pubSys.childNodes:
-            if node.nodeName == "SystemSubset":
-                for n in node.childNodes:
-                    if n.nodeName == "SubsetName":
-                        for m in n.childNodes:
-                            if m.nodeValue == self.subsetName:
-                                return node
-
-        # not found
-        msg = "Failed in __getSubSet. SubsetName: %s." % self.subsetName
-        self.addFooter(msg)
-
-    #----------------------------------------------------------------
-    # Wanted to return the SQL statement for picking up DocIds as well,
-    # but not done yet. Only returns the parameters so far.
-    #----------------------------------------------------------------
-    def __getParamSQL(self, ctrlId, version, Subset):
-        # Initialized the list of tuples: (name, value).
-        pickList = []
-        tuple = ["", ""]
-
-        sql = "SELECT xml FROM doc_version \
-                WHERE id = %s AND num = %s" % (ctrlId, version)
-        rows = self.__execSQL(sql)
-
-        for row in rows:
-            docElem = row[0].encode('utf-8')
-
-        # Find the Subset node.
-        subsetNode = None
-        pubSys = xml.dom.minidom.parseString(docElem).documentElement
-        for node in pubSys.childNodes:
-            if subsetNode: break
-            if node.nodeName == "SystemSubset":
-                for n in node.childNodes:
-                    if n.nodeName == "SubsetName":
-                        if Subset == cdr.getTextContent(n):
-                            subsetNode = node
-
-        # Get the name/value pairs.
-        for node in subsetNode.childNodes:
-            if node.nodeName == "SubsetParameters":
-                for n in node.childNodes:
-                    if n.nodeName == "SubsetParameter":
-                        for m in n.childNodes:
-                            if m.nodeName == "ParmName":
-                                tuple[0] = cdr.getTextContent(m)
-                            elif m.nodeName == "ParmValue":
-                                tuple[1] = cdr.getTextContent(m)
-                        deep = copy.deepcopy(tuple)
-                        pickList.append(deep)
-
-        return pickList
-
-    #----------------------------------------------------------------------
-    # Return the email address of the session owner.
-    #----------------------------------------------------------------------
-    def __getUsrAddr(self):
-        sql = """SELECT u.email
-                   FROM usr u
-                   JOIN session s
-                     ON u.id = s.usr
-                  WHERE s.name = '%s'""" % session
-        rows = self.__execSQL(sql)
-
-        email = ""
-        for row in rows:
-            email = row[0] or ""
-            break
-
-        return email
-
-
-    #----------------------------------------------------------------
-    # Execute the SQL statement using ADODB.
-    #----------------------------------------------------------------
-    def __execSQL(self, sql):
-        try:
-            self.__cursor.execute(sql, timeout = 300)
-            rows = self.__cursor.fetchall()
-        except cdrdb.Error, info:
-            reason = "Failure: %s" % info[1][0]
-            self.__addFooter("Execute SQL failed. %s" % reason)
-            raise
-
-        return rows
-
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields   = cgi.FieldStorage()
-idMethod = fields and fields.getvalue("id-method") or "MultiFieldEntry"
-session  = cdrcgi.getSession(fields)
-action   = cdrcgi.getRequest(fields)
-title    = "CDR Administration"
-section  = "Publishing"
-buttons  = [cdrcgi.MAINMENU, "Log Out"]
-header   = cdrcgi.header(title, title, section, "publishing.py", buttons)
-HIDDEN   = """<INPUT TYPE='HIDDEN' NAME='%s' VALUE='%s'>\n"""
-
-#----------------------------------------------------------------------
-# Return to the main menu if requested.
-#----------------------------------------------------------------------
-if action == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-
-#----------------------------------------------------------------------
-# Handle request to log out.
-#----------------------------------------------------------------------
-if action == "Log Out":
-    cdrcgi.logout(session)
-
-# Initialize Display class.
-# This class does all the complex work.
-d = Display()
-
-# ------------------------------------------------------------------
-# Submit the publishing job
-# If the Publish variable exists we've entered Doc IDs to be
-# published.
-# Otherwise we are running a full set of documents to be published.
-# ------------------------------------------------------------------
-if fields.has_key('Session') and fields.has_key('SubSet') and \
-    fields.has_key('Publish'):
-    ctrlDocId = fields.getvalue('ctrlId')
-    version = fields.getvalue('version')
-    subsetName = fields.getvalue('SubSet')
-    credential = fields.getvalue('Session')
-    answer = fields.getvalue('Publish')
-    getCdrIds = fields.getvalue('idMethod')
-
-    if answer == 'No':
-        d.displayDocParam(ctrlDocId, subsetName, Redirected = "Redirect")
-    else:
-        docIds = None
-        # ---------------------------------------------------
-        # Process CDR IDs based on individual data entry
-        # Regular publishing jobs don't list documents.
-        # ---------------------------------------------------
-        docs = fields.getvalue('Documents')
-
-        if docs:
-            docIds = docs.split(",")
-
-            # Create DB connection to pass a cursor
-            # -------------------------------------
+            system = PublishingSystem(self.cursor, doc_id)
+            self.systems.append(system)
+            self.system_names[system.name] = system
+            self.system_ids[system.system_id] = system
+        self.load_parameters()
+        self.pageopts = {
+            "subtitle": "Publishing",
+            "action": self.script,
+            "buttons": (cdrcgi.MAINMENU, "Log Out"),
+            "session": self.session,
+            "body_classes": "admin-menu"
+        }
+
+    def load_parameters(self):
+        """
+        Load the CGI parameters, including the session ID, the
+        publishing system and subset (if selected). Abort if the
+        user is not authorized to use this script. Invoked by the
+        object's constructor. Redirect elsewhere if so requested.
+        """
+        self.fields = cgi.FieldStorage()
+        self.session = cdrcgi.getSession(self.fields)
+        self.request = cdrcgi.getRequest(self.fields)
+        if self.request == cdrcgi.MAINMENU:
+            cdrcgi.navigateTo("Admin.py", self.session)
+        elif self.request == "Log Out":
+            cdrcgi.logout(session)
+        if not cdr.canDo(self.session, "USE PUBLISHING SYSTEM"):
+            message = "You are not authorized to use the publishing system."
+            raise Exception(message)
+        self.system = self.subset = None
+        system_id = self.fields.getvalue("system")
+        if system_id:
             try:
-                conn   = cdrdb.connect()
-                cursor = conn.cursor()
-            except cdrdb.Error, info:
-                reason = "Failure: %s" % info[1][0]
-                cdr.logwrite("Cdr connection failed in isMeetingRecording(). \
-                              %s" % reason)
+                system_id = int(system_id)
+            except:
+                raise Exception("invalid publishing system ID")
+            self.system = self.system_ids.get(system_id)
+            if not self.system:
+                raise Exception("requested publishing system disappeared")
+            subset_name = self.fields.getvalue("subset")
+            if subset_name:
+                self.subset = self.system.subset_names.get(subset_name)
+                if not self.subset:
+                    raise Exception("requested publishing subset not found")
+                if self.request == "Publish":
+                    self.confirmed = True
+                else:
+                    if self.subset.parameters:
+                        self.need_user_choices = True
+                    elif control.subset.user_can_select_docs:
+                        self.need_user_choices = True
+                    else:
+                        self.need_confirmation = True
+                    if self.need_user_choices:
+                        self.user_choices = self.collect_user_choices()
+                        if self.user_choices:
+                            self.need_user_choices = False
+                            self.need_confirmation = True
 
-            for docId in docIds:
-                # At the moment the media documents include image files,
-                # audio pronunciation files, and meeting recordings.  The
-                # meeting recordings (MR) are excluded from regular
-                # publishing but the hot-fix publishing would allow a
-                # document to be published if the ID gets entered manually.
-                # We're checking the IDs here to prevent this.
-                # ---------------------------------------------------------
-                if isMeetingRecording(cdr.exNormalize(docId)[1], cursor):
-                    cdr.logwrite("Error: Internal document detected - %s" % 
-                                                                       docId)
-                    cdrcgi.bail("Error: Unable to publish Meeting \
-                                 Recordings (usage='internal') - %s" % docId)
+    def collect_user_choices(self):
+        """
+        Pack up the user choices (including an optional list of IDs for
+        documents to be published) so they can be passed along in a
+        hidden variable on the confirmation page. Make sure the values
+        haven't been tampered with. Reverse sort the document ID list
+        so newer documents get published first. Invoked by load_parameters().
+        """
+        choices = {}
+        doc_ids = re.findall(r"\d+", self.fields.getvalue("doc_ids", ""))
+        if doc_ids:
+            choices["doc_ids"] = sorted([int(d) for d in doc_ids], reverse=True)
+        for p in self.subset.parameters:
+            value = self.get_scrubbed_value(p.name)
+            if value:
+                choices[p.name] = value
+        return choices
 
-        params = None
-        listParams = []
-        parms = fields.getvalue('Parameters')
-        if parms:
-            params = string.split(parms[1:], ",")
-            for p in params:
-                deep = copy.deepcopy(tuple(string.split(p, ";")))
-                listParams.append(deep)
+    def get_scrubbed_value(self, name):
+        """
+        Get a CGI value by name and make sure it hasn't been tampered with.
+        Invoked by collect_user_choices().
+        """
+        value = self.fields.getvalue(name) or u""
+        if not value:
+            return value
+        info = self.system.param_info.get(name)
+        if not info:
+            raise Exception("Unsupported parameter %s" % repr(name))
+        info.scrub(value)
+        return value
 
-        if fields.getvalue('Email') == 'y':
-            email = fields.getvalue('EmailAddr')
+    def run(self):
+        """
+        Processing sequence (separate invocations for each step):
+          1. user selects one of the publishing systems
+          2. user selects a publishing subset from the selected system
+          3. user chooses settable options (if appropriate)
+          4. user confirms job request
+          5. publishing job is created status link is given to the user
+        """
+        if self.confirmed:
+            self.create_publishing_job()
+        elif self.need_confirmation:
+            self.request_confirmation()
+        elif self.need_user_choices:
+            self.offer_choices()
+        elif self.system:
+            self.show_subsets()
+        else:
+            self.show_publishing_systems()
+
+    def show_publishing_systems(self):
+        """
+        Put up the page from which the user will select one of the
+        publishing systems. We also include (at the top) a link to
+        the page for managing the status of an existing publishing
+        job (most frequently this is used to release the job to
+        push the results of an export job to Cancer.gov's GateKeeper).
+        The bogus parameter for a job ID on this link is needed
+        because of a bug in the PubStatus.py script. Invoked by
+        the run() method.
+        """
+        page = cdrcgi.Page(self.title, **self.pageopts)
+        page.add(page.B.H3("Publication Types"))
+        page.add("<ol>")
+        page.add_menu_link("PubStatus.py", "Manage Publishing Job Status",
+                           self.session, type="Manage", id=1)
+        args = { cdrcgi.SESSION: self.session }
+        for system in self.systems:
+            label = "%s [Version %d]" % (system.name, system.system_version)
+            args["system"] = system.system_id
+            url = "%s?%s" % (self.script, urllib.urlencode(args))
+            link = page.B.A(label, href=url)
+            br = page.B.BR()
+            br.tail = system.description
+            link.append(br)
+            page.add(page.B.LI(link))
+        page.add("</ol>")
+        page.send()
+
+    def show_subsets(self):
+        """
+        Display the page from which the user will select one of the
+        publishing job sub-types for which to request a new job.
+        Suppress the Republish-Export sub type (invoked elsewhere?).
+        Invoked by the run() method.
+        """
+        page = cdrcgi.Page(self.title, **self.pageopts)
+        page.add_css(".description { font-size: 10pt; margin: 1em 0 0 -1em; }")
+        page.add(page.B.H3("%s Publication System Subsets" % self.system.name))
+        page.add("<ol>")
+        description_class = page.B.CLASS("description")
+        args = {
+            cdrcgi.SESSION: self.session,
+            "system": self.system.system_id
+        }
+        for subset in self.system.subsets:
+            if subset.name == "Republish-Export":
+                continue
+            args["subset"] = subset.name
+            url = "%s?%s" % (self.script, urllib.urlencode(args))
+            link = page.B.A(subset.name, href=url)
+            description = subset.description.replace("\n", cdrcgi.NEWLINE)
+            description = page.B.PRE(description, description_class)
+            page.add(page.B.LI(link, description))
+        page.add("</ol>")
+        page.send()
+
+    def offer_choices(self):
+        """
+        Display the page on which the user will choose specific documents
+        to be published, or set options for the publishing job, or both.
+        The options (oddly called "SubsetParameters" in the control document)
+        are optional according to the schema, but in practice there has
+        never been a publishing sub type which didn't have some user-
+        settable options. Invoked by the run() method.
+        """
+        buttons = ("Submit",) + self.pageopts["buttons"]
+        subtitle = "Publishing Options For %s Job" % self.subset.name
+        self.pageopts["buttons"] = buttons
+        self.pageopts["subtitle"] = subtitle
+        page = cdrcgi.Page(self.title, **self.pageopts)
+        page.add_hidden_field("system", self.system.system_id)
+        page.add_hidden_field("subset", self.subset.name)
+        if self.subset.user_can_select_docs:
+            help = "Separate IDs with whitespace; 'CDR' prefix is optional"
+            selector = ".ids .labeled-field textarea"
+            page.add_css(" %s { height: 100px; width: 360px; }" % selector)
+            page.add_css(" .ids .labeled-field label { width: 115px; }")
+            page.add("<fieldset class='ids'>")
+            page.add(page.B.LEGEND("Documents to Publish"))
+            page.add_textarea_field("doc_ids", "Enter CDR IDs", tooltip=help)
+            page.add("</fieldset>")
+        if self.subset.parameters:
+            page.add_css(".opts .labeled-field label { width: 180px; }")
+            page.add("<fieldset class='opts'>")
+            page.add(page.B.LEGEND("Job Options"))
+            for p in self.subset.parameters:
+                if p.name == "PubType":
+                    if p.default not in cdr.PUBTYPES:
+                        raise Exception("PubType %s not supported" %
+                                        repr(p.default))
+                info = p.get_info()
+                help = info and info.get_help() or ""
+                if p.default in ("Yes", "No"):
+                    page.add_select(p.name, p.name, ("Yes", "No"), p.default,
+                                    tooltip=help)
+                else:
+                    readonly = p.name in Control.readonly_parms
+                    page.add_text_field(p.name, p.name, value=p.default or "",
+                                        disabled=readonly, tooltip=help)
+            page.add("</fieldset>")
+        page.send()
+
+    def request_confirmation(self):
+        """
+        Ask the user to confirm the publishing job request. We also
+        ask the user for some last-minute decisions about the job.
+        It's not clear why those decisions are not included with
+        the options displayed on the previous screen, but this is
+        the way it's always been done. :-)
+        Invoked by the run() method.
+        """
+        buttons = ("Publish",) + self.pageopts["buttons"]
+        subtitle = "Confirming Submission For %s Job" % self.subset.name
+        email = cdr.getEmail(self.session) or ""
+        if " " in email or "@" not in email:
+            email = ""
+        notify = email and "Yes" or "No"
+        self.pageopts["buttons"] = buttons
+        self.pageopts["subtitle"] = subtitle
+        page = cdrcgi.Page(self.title, **self.pageopts)
+        page.add_hidden_field("system", self.system.system_id)
+        page.add_hidden_field("subset", self.subset.name)
+        page.add_hidden_field("user-opts", repr(self.user_choices))
+        page.add("<fieldset>")
+        page.add(page.B.LEGEND("Confirmation Settings"))
+        page.add_select("notify", "Notify", ("Yes", "No"), notify,
+                        tooltip=self.system.param_info["notify"].get_help())
+        page.add_text_field("email", "Address(es)", value=email,
+                            tooltip=self.system.param_info["email"].get_help())
+        page.add_select("no-output", "No Output", ("Yes", "No"), "Yes",
+                        tooltip=self.system.param_info["no-output"].get_help())
+        page.add("</fieldset>")
+        page.send()
+
+    def create_publishing_job(self):
+        """
+        Invoke the cdr.publish command and tell the user if we succeeded.
+        If so, provide a link to the page showing the job's status.
+        Otherwise, explain what went wrong. Invoked by the run() method.
+        """
+        try:
+            user_opts = eval(self.fields.getvalue("user-opts", "{}"))
+        except Exception:
+            raise Exception("tampering with CGI parameters detected")
+        parameters = self.collect_parameters(user_opts)
+        doc_ids = self.collect_doc_ids(user_opts.get("doc_ids", []))
+        inactive_ok = self.subset.name == "Hotfix-Remove" and "Y" or "N"
+        no_output = self.fields.getvalue("no-output") == "Yes" and "Y" or "N"
+        if self.fields.getvalue("notify") == "Yes":
+            email = self.fields.getvalue("email")
         else:
             email = "Do not notify"
-        if fields.getvalue('NoOutput') == 'Y':
-            no_output = "Y"
+        response = cdr.publish(self.session, self.system.name,
+                               self.subset.name, parameters, doc_ids,
+                               email, no_output, port=cdr.getPubPort(),
+                               allowInActive=inactive_ok)
+        job_id, errors = response
+        self.pageopts["subtitle"] = self.subset.name
+        page = cdrcgi.Page(self.title, **self.pageopts)
+        if job_id:
+            page.add(page.B.H3("Job %s Started" % job_id))
+            label = "Check the status of the publishing job"
+            url = "PubStatus.py?id=%s" % job_id
+            page.add(page.B.A(label, href=url))
         else:
-            no_output = "N"
-        d.initPublish(credential, ctrlDocId, version, subsetName,
-                      listParams, docIds, email, no_output)
+            page.add(page.B.H3("Publishing Request Failed"))
+            page.add(page.B.P(errors))
+        page.send()
 
-# ------------------------------------------------------------------
-# Display the HotFix menu if the Param and Doc parameters are set
-# in addition to session, control ID, and Subset ID
-# ------------------------------------------------------------------
-elif fields.has_key('Session') and fields.has_key('SubSet') and \
-    fields.has_key('ctrlId') and fields.has_key('Load') and \
-    fields.has_key('Param') and fields.has_key('Doc'):
-    ctrlId = fields.getvalue('ctrlId')
-    version = fields.getvalue('version')
-    SubSet = fields.getvalue('SubSet')
-    param = fields.getvalue('Param')
-    doc = fields.getvalue('Doc')
-    d.displayDocParam(ctrlId, version, SubSet, param, doc, idMethod = idMethod)
+    def collect_parameters(self, user_opts):
+        """
+        Repackage the sequence of job settings to be passed to the
+        CdrPublish command. Check for invalid values (possibly caused
+        by malicious tampering). Invoked by create_publishing_job().
+        """
+        parameters = []
+        for name in user_opts:
+            if name != "doc_ids":
+                info = self.system.param_info.get(name)
+                if not info:
+                    raise Exception("Unexpected parameter %s" % repr(name))
+                value = user_opts[name]
+                info.scrub(value)
+                parameters.append((name, value))
+        return parameters
 
-# ------------------------------------------------------------------
-# Display Intermediary page to enter if CDR IDs should be entered
-# manually or entered as copy/paste
-# ------------------------------------------------------------------
-elif fields.has_key('Session') and fields.has_key('SubSet') and \
-    fields.has_key('ctrlId') and fields.has_key('Param') and \
-    fields.has_key('Doc') and not fields.has_key('Load'):
-    ctrlId = fields.getvalue('ctrlId')
-    version = fields.getvalue('version')
-    SubSet = fields.getvalue('SubSet')
-    param = fields.getvalue('Param')
-    doc = fields.getvalue('Doc')
-    d.displayLoadParam(ctrlId, version, SubSet, param, doc)
+    def collect_doc_ids(self, doc_ids):
+        """
+        Repackage the list of document IDs to be passed to the
+        CdrPublish command. Abort if we detect an attempt to
+        publish a meeting recording document or tampering with
+        the CGI parameter. Invoked by create_publishing_job().
+        """
+        id_list = []
+        for doc_id in doc_ids:
+            if not isinstance(doc_id, int):
+                raise Exception("Detected tampering with document ID list")
+            if self.is_meeting_recording(doc_id):
+                raise Exception("Attempt to publish meeting recording "
+                                "CDR%s" % doc_id)
+            id_list.append("CDR%s" % doc_id)
+        return id_list
 
-# ------------------------------------------------------------------
-# Display the Push Jobs menu if the Param and Doc parameters are set
-# in addition to session, control ID, and Subset ID
-# ------------------------------------------------------------------
-elif fields.has_key('Session') and fields.has_key('SubSet') and \
-    fields.has_key('ctrlId') and not fields.has_key('Load') and \
-    (fields.has_key('Param') or fields.has_key('Doc')):
-    ctrlId = fields.getvalue('ctrlId')
-    version = fields.getvalue('version')
-    SubSet = fields.getvalue('SubSet')
-    param = fields.getvalue('Param')
-    doc = fields.getvalue('Doc')
-    idMethod = fields.getvalue('idMethod')
-    d.displayDocParam(ctrlId, version, SubSet, param, doc)
+    def is_meeting_recording(self, doc_id):
+        """
+        We don't allow publication of meeting recordings, which are
+        for internal use only. The publishing queries in the control
+        documents exclude those documents, but we have to make sure
+        they aren't included in user-specified document lists.
+        Invoked by collect_doc_ids().
+        """
+        query = cdrdb.Query("query_term_pub", "doc_id")
+        query.where(query.Condition("doc_id", doc_id))
+        query.where(query.Condition("value", "Internal"))
+        query.where(query.Condition("path", "/Media/@Usage"))
+        return query.execute(self.cursor).fetchall() and True or False
 
-# ------------------------------------------------------------------
-# Display the confirmation page when the session parameter is
-# specified, the control ID, and the SubSet ID and the submit button
-# has been entered.
-# ------------------------------------------------------------------
-elif fields.has_key('Session') and fields.has_key('SubSet') \
-    and fields.has_key('ctrlId') and fields.has_key('Confirm'):
-    d.displayConfirm()
+class PublishingSystem:
+    """
+    Object containing instructions for each of the types of publishing
+    jobs available for a given publishing system.
+    """
 
-# ------------------------------------------------------------------
-# Display the SubMenu System when the session parameter is specified
-# and a control ID exists (identifying the parent menu item)
-# ------------------------------------------------------------------
-elif fields.has_key('Session') and fields.has_key('ctrlId'):
-    ctrlId = fields.getvalue('ctrlId')
-    version = fields.getvalue('version')
-    d.displaySubsets(ctrlId, version)
+    def __init__(self, cursor, system_id, system_version=None):
+        """
+        Load the publishing control document for the specified
+        CDR document ID and extract the information about the
+        publishing system defined therein, including the system
+        name and description, as well as the publishing job
+        sub-types (commonly referred to as "subsets"). We also
+        load the information for validating and explaining each
+        of the choices (called "parameters" here) which the user
+        make for publishing jobs.
+        """
+        self.system_id = system_id
+        self.system_version = system_version
+        self.name = self.description = None
+        self.subsets = []
+        self.subset_names = {}
+        self.param_info = {}
+        if not self.system_version:
+            query = cdrdb.Query("doc_version", "MAX(num)")
+            query.where(query.Condition("publishable", "Y"))
+            query.where(query.Condition("id", self.system_id))
+            rows = query.execute(cursor).fetchall()
+            if not rows:
+                raise Exception("No publishable version of CDR%d found" %
+                                self.system_id)
+            self.system_version = rows[0][0]
+        query = cdrdb.Query("doc_version", "xml")
+        query.where(query.Condition("id", self.system_id))
+        query.where(query.Condition("num", self.system_version))
+        rows = query.execute(cursor).fetchall()
+        if not rows:
+            raise Exception("Version %s of document %s not found" %
+                            (repr(self.system_id), repr(self.system_version)))
+        root = etree.XML(rows[0][0].encode("utf-8"))
+        self.name = root.find("SystemName").text.strip()
+        for node in root.findall("SystemDescription"):
+            self.description = node.text.strip()
+        for node in root.findall("SystemSubset"):
+            subset = PublishingSystem.Subset(self, node)
+            self.subsets.append(subset)
+            self.subset_names[subset.name] = subset
+        for node in root.findall("ParmInfoSet/ParmInfo"):
+            info = PublishingSystem.ParamInfo(node)
+            self.param_info[info.name] = info
 
-# ------------------------------------------------------------------
-# Display the Menu System if only the Session parameter is specified
-# (the program is started)
-# ------------------------------------------------------------------
-elif fields.has_key('Session'):
-    d.displaySystems()
+    class Subset:
+        """
+        A type of publishing job which can be created by the
+        publishing system represented by the control document
+        being parsed.
+        """
 
-# ------------------------------------------------------------------
-# Log off if no parameters are specified
-# ------------------------------------------------------------------
-else:
-    cdrcgi.logout(session)
+        def __init__(self, system, node):
+            """
+            Extract the publishing job type's information from
+            the control document's SystemSubset block.
+            """
+            self.system = system
+            self.name = self.description = None
+            self.user_can_select_docs = False
+            self.parameters = []
+            self.specifications = []
+            for child in node.findall("SubsetName"):
+                self.name = child.text
+            for child in node.findall("SubsetDescription"):
+                self.description = child.text
+            for child in node.findall("SubsetParameters/SubsetParameter"):
+                parameter = PublishingSystem.Subset.Parameter(self, child)
+                self.parameters.append(parameter)
+            path = "SubsetSpecifications/SubsetSpecification/SubsetSelection"
+            if node.findall("%s/UserSelect" % path):
+                self.user_can_select_docs = True
+
+        class Parameter:
+            """
+            Holds the name and default value for an option
+            available for publishing jobs of this type.
+            """
+
+            def __init__(self, subset, node):
+                """
+                Extract the information for a job option which can
+                be used by this job type from the SubsetParameter
+                block.
+                """
+                self.subset = subset
+                self.name = self.default = None
+                for child in node.findall("ParmName"):
+                    self.name = child.text
+                for child in node.findall("ParmValue"):
+                    self.default = child.text
+                if self.name == "GKServer" and not self.default:
+                    self.default = cdr2gk.host
+
+            def get_info(self):
+                """
+                Find and return the help and validation information
+                for this parameter.
+                """
+                return self.subset.system.param_info.get(self.name)
+
+    class ParamInfo:
+        """
+        Metadata about publishing job parameters. Used for displaying help
+        and for scrubbing the data to prevent malicious tampering.
+        """
+
+        def __init__(self, node):
+            "Parse the name, help, and validation info from the DOM node."
+            self.name = self.help = self.pattern = self.method = None
+            self.values = None
+            for child in node:
+                if child.tag == "ParmInfoName":
+                    self.name = child.text.strip()
+                elif child.tag == "ParmInfoHelp":
+                    self.help = child.text.strip()
+                elif child.tag == "ParmInfoPattern":
+                    self.pattern = child.text
+                elif child.tag == "ParmInfoMethod":
+                    self.method = child.text
+                elif child.tag == "ParmInfoValidValues":
+                    self.values = [v.text for v in child]
+
+        def get_help(self):
+            """
+            Return a version of the help string that will survive
+            the indenting performed by the cdrcgi.Page object.
+            """
+            if self.help:
+                help = self.help.replace("\r", "")
+                return help.replace("\n", cdrcgi.NEWLINE)
+            return ""
+
+        def scrub(self, value):
+            """
+            Make sure the parameter's value hasn't been tampered with.
+            Abort if it has.
+            """
+            failed = False
+            if self.pattern and not re.match(self.pattern, value):
+                failed = True
+            if self.values and value not in self.values:
+                failed = True
+            if self.method and not getattr(self, self.method)(value):
+                failed = True
+            if failed:
+                why = "invalid %s value %s" % (repr(self.name), repr(value))
+                raise Exception(why)
+
+        def yes_no_int(self, value):
+            "Make sure the value is 'Yes', 'No', or an integer."
+            if value in ("Yes", "No"):
+                return True
+            return value.isdigit()
+
+        def dtd(self, value):
+            """
+            Verify that the file named can be found in the CDR
+            Licensee directory in the file system.
+            """
+            try:
+                path = r"%s\%s" % (cdr.PDQDTDPATH, value)
+                return os.stat(path) and True or False
+            except Exception, e:
+                return False
+
+        def job_date(self, value):
+            """
+            Ensure that the value contains one of the following:
+              * the string 'JobStartDateTime'
+              * an ISO date
+              * an ISO date and time (with or without seconds)
+            """
+            if value == "JobStartDateTime":
+                return True
+            pattern = r"^\d{4}-\d{2}-\d{2}( \d{2}:\d{2}(:\d{2})?)?$"
+            return re.match(pattern, value) and True or False
+
+        def integer(self, value):
+            "Verify that the value is an integer string"
+            return value.isdigit()
+
+        def pubtype(self, value):
+            "Make sure the value is one of the known publishing types"
+            return value in cdr.PUBTYPES
+
+        def server_name(self, value):
+            """
+            If the value is not empty, make sure it doesn't contain
+            any unexpected characters.
+            """
+            if not value:
+                return True
+            return re.match(r"^[A-Za-z0-9._-]+$", value) and True or False
+
+def main():
+    "Wrap up the top-level driver so we can use the classes separately."
+    try:
+        control = Control()
+        control.run()
+    except Exception, e:
+        cdrcgi.bail(str(e))
+
+if __name__ == "__main__":
+    main()

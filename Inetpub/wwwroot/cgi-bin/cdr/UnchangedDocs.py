@@ -34,9 +34,21 @@ elif request == SUBMENU:
     cdrcgi.navigateTo("reports.py", session)
 
 #----------------------------------------------------------------------
+# Get the list of active document types. We'll need these both for
+# populating the form's picklist as well as scrubbing the incoming
+# parameter values.
+#----------------------------------------------------------------------
+query = cdrdb.Query("doc_type", "name").order(1)
+query.where("name IS NOT NULL")
+query.where("name <> ''")
+doc_types = [row[0] for row in query.execute(cursor).fetchall()]
+
+#----------------------------------------------------------------------
 # Do the report if we have a request.
 #----------------------------------------------------------------------
 if request:
+    cdrcgi.valParmVal(request, valList=("Submit Request", SUBMENU,
+                                         cdrcgi.MAINMENU))
     try:
         max_rows = max_rows and int(max_rows) or 1000
         days = days and int(days) or 365
@@ -52,6 +64,8 @@ if request:
     query.order(3, 1)
     query.limit(max_rows)
     if doc_type and doc_type != "All":
+        if doc_type not in doc_types:
+            cdrcgi.bail()
         query.join("doc_type t", "t.id = d.doc_type")
         query.where(query.Condition("t.name", doc_type))
     docs    = query.execute(cursor, 600).fetchall()
@@ -77,10 +91,6 @@ if request:
 #----------------------------------------------------------------------
 # Put out the form if we don't have a request.
 #----------------------------------------------------------------------
-query = cdrdb.Query("doc_type", "name").order(1)
-query.where("name IS NOT NULL")
-query.where("name <> ''")
-doc_types = [row[0] for row in query.execute(cursor).fetchall()]
 title   = "CDR Administration"
 section = "Unchanged Documents"
 buttons = ("Submit Request", SUBMENU, cdrcgi.MAINMENU)

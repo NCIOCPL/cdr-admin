@@ -7,189 +7,245 @@
 #
 # BZIssue::2561
 # BZIssue::3716
+# Rewritten July 2015 as part of a security sweep.
 #
 #----------------------------------------------------------------------
+import cdr
+import cdrcgi
+import cdrdb
+import cgi
+import difflib
+import urllib
+import urllib2
+import lxml.etree as etree
 
-#----------------------------------------------------------------------
-# Import required modules.
-#----------------------------------------------------------------------
-import cgi, cdr, cdrdb, os, re, cdrcgi, time
+class Control(cdrcgi.Control):
+    """
+    Logic for displaying a CDR filter document or comparing it
+    with the corresponding copy on another tier's CDR server.
+    """
 
-#----------------------------------------------------------------------
-# Set some initial values.
-#----------------------------------------------------------------------
-banner   = "View CDR Filter"
-title    = "View CDR Filter"
+    TIERS = ("PROD", "STAGE", "QA", "DEV")
+    VIEW = "View"
+    COMPARE = "Compare"
+    FILTERS = "Filters"
+    REQUESTS = (VIEW, COMPARE, FILTERS, cdrcgi.Control.ADMINMENU,
+                cdrcgi.Control.LOG_OUT)
 
-#----------------------------------------------------------------------
-# Load the fields from the form.
-#----------------------------------------------------------------------
-fields     = cgi.FieldStorage()
-if not fields: cdrcgi.bail("Unable to read form fields", banner)
-session    = cdrcgi.getSession(fields)
-request    = cdrcgi.getRequest(fields)
-version    = fields.getvalue('version')
-logName    = "%s/view-filter.log" % cdr.DEFAULT_LOGDIR
-debugging  = True
-if not session: cdrcgi.bail("Unable to log into CDR Server", banner)
-if not request: cdrcgi.bail("No request submitted", banner)
+    def __init__(self):
+        "Collect and validate the CGI parameters for this request."
+        cdrcgi.Control.__init__(self)
+        self.base = None
+        self.full = self.fields.getvalue("full") == "full"
+        self.normalize = self.fields.getvalue("normalize") == "normalize"
+        self.filter = Filter(self)
+        self.other_tier = self.fields.getvalue("tier")
+        if self.other_tier:
+            if self.other_tier not in self.TIERS:
+                cdrcgi.bail()
+            elif self.other_tier == cdr.h.tier:
+                cdrcgi.bail()
+            host = "cdr"
+            if self.other_tier != "PROD":
+                host += "-%s" % self.other_tier.lower()
+            self.base = "https://%s.cancer.gov/cgi-bin/cdr" % host
+        if self.request not in self.REQUESTS:
+            cdrcgi.bail()
+        elif self.request == self.FILTERS:
+            cdrcgi.navigateTo("EditFilters.py", self.session)
 
-#----------------------------------------------------------------------
-# Logging to keep an eye on problems.
-#----------------------------------------------------------------------
-def debugLog(what):
-    if debugging:
+    def show_form(self):
+        """
+        We override the base class's version of this method so we
+        can fork for the version of the form which shows the document
+        and the one which compares it with a version on another tier's
+        server.
+        """
+        if self.request == self.COMPARE:
+            self.compare()
+        self.show()
+
+    def show(self):
+        "Show the XML for the filter on our own tier."
+        banner = "View CDR Filter"
+        page = self.create_page(banner, self.REQUESTS[1:])
+        pre = page.B.PRE(self.filter.xml.strip().replace("\n", cdrcgi.NEWLINE))
+        page.add(pre)
+        page.send()
+
+    def compare(self):
+        """
+        Show the differences between our version of the filter and
+        the copy on another tier's CDR server.
+        """
+        banner = "Compare Filter With Another Tier"
+        page = self.create_page(banner, self.REQUESTS)
+        if not self.other_tier:
+            cdrcgi.bail()
         try:
-            f = open(logName, "a")
-            f.write("%s: %s\n" % (time.strftime("%Y-%m-%d %H:%M:%S"), what))
-            f.close()
-        except Exception, info:
-            cdrcgi.bail("Failure writing to %s: %s" % (logName, str(info)))
+            f1 = self.fix(self.filter.xml.encode("utf-8"))
+            f2 = self.fix(self.get_filter())
+            if self.other_tier_lower():
+                filters = (f1, f2)
+                tiers = (cdr.h.tier, self.other_tier)
+            else:
+                filters = (f2, f1)
+                tiers = (self.other_tier, cdr.h.tier)
+            differ = difflib.Differ()
+            #changes = False
+            pattern = (u'<span class="%%s">%%s %s on CDR %%s server</span>\n' %
+                       cgi.escape(self.filter.title))
+            lines = [
+                pattern % ("deleted", "-", tiers[0]),
+                pattern % ("added", "+", tiers[1]),
+                "\n"
+            ]
+            for line in differ.compare(*filters):
+                line = cgi.escape(line)
+                if not line.startswith(" "):
+                    changes = True
+                if line.startswith("-"):
+                    lines.append(self.wrap_line(line, "deleted"))
+                elif line.startswith("+"):
+                    lines.append(self.wrap_line(line, "added"))
+                elif line.startswith("?"):
+                    lines.append(self.wrap_line(line, "pointer"))
+                elif self.full:
+                    lines.append(line)
+            lines = "".join(lines).replace("\n", cdrcgi.NEWLINE)
+            page.add("<pre>%s</pre>" % lines)
+        except:
+            page.add('<p class="error">Filter &ldquo;%s&rdquo; '
+                     'not found on CDR %s server</p>' %
+                     (cgi.escape(self.filter.title), self.other_tier))
+        page.add_css("""\
+body     { background-color: #fafafa; }
+.deleted { background-color: #FAFAD2; } /* Light goldenrod yellow */
+.added   { background-color: #F0E68C; } /* Khaki */
+.pointer { background-color: #87CEFA; } /* Light sky blue */}""")
+        page.send()
 
-#----------------------------------------------------------------------
-# Display the CDR document form.
-#----------------------------------------------------------------------
-def showForm(doc):
-    hdr = cdrcgi.header(title, banner, banner, "EditFilter.py", (),
-                        numBreaks = 1)
-    html = hdr + u"""\
-   <br>
-   <textarea name='Doc' rows='40' cols='80'>%s</textarea>
-   <input type='hidden' name='%s' value='%s'>
-   <br>
-   <br>
-   <input type='submit' name='%s' value='Compare With'>&nbsp;&nbsp;
-   <input name='DiffWith' value='bach'>
-  </form>
- </body>
-</html>
-""" % (doc.replace('\r', ''),
-       cdrcgi.SESSION,
-       session,
-       cdrcgi.REQUEST)
-    cdrcgi.sendPage(html)
+    def create_page(self, banner, buttons):
+        "Common logic to build the page for viewing and for comparing."
+        opts = {
+            "buttons": buttons,
+            "session": self.session,
+            "action": self.script,
+            "banner": banner,
+            "subtitle": u"%s (%s)" % (self.filter.title, self.filter.cdr_id)
+        }
+        page = cdrcgi.Page(self.PAGE_TITLE, **opts)
+        page.add_hidden_field(cdrcgi.DOCID, str(self.filter.doc_id))
+        page.add("<fieldset>")
+        page.add(page.B.LEGEND("Select Stage For Filter Comparison"))
+        default = self.other_tier or (cdr.isProdHost() and "DEV" or "PROD")
+        for tier in self.TIERS:
+            if tier != cdr.h.tier:
+                checked = tier == default
+                page.add_radio("tier", tier, tier, checked=checked)
+        page.add("</fieldset>")
+        page.add("<fieldset>")
+        page.add(page.B.LEGEND("Comparison Options"))
+        page.add_checkbox("full", "Show all lines?", "full", checked=self.full,
+                          tooltip="Leave unchecked to see just the changes.")
+        page.add_checkbox("normalize", "Parse documents to normalize them?",
+                          "normalize", checked=self.normalize,
+                          tooltip="Not usually recommended, unless the "
+                          "formatting%sof one of the documents has been "
+                          "seriously mangled." % cdrcgi.NEWLINE)
+        page.add("</fieldset>")
+        page.add_css("""\
+pre {
+    border: solid grey 2px; font-size: 12px; padding: 5px; margin-top: 25px;
+}
+@media print {
+    h1, fieldset { display: none; }
+    h2 { font-size: 2em; }
+    pre { border: none; }
+}""")
+        return page
 
-#----------------------------------------------------------------------
-# Don't leave dross around if we can help it.
-#----------------------------------------------------------------------
-def cleanup(abspath):
-    debugLog("cleaning up %s" % abspath)
-    try:
-        os.chdir("..")
-        runCommand("rm -rf %s" % abspath)
-    except:
-        pass
+    def get_filter(self):
+        """
+        Get the other tier's server to give us the XML for its version
+        of our filter. Fastest way is the get-filter.py script, but
+        we have a fallback on screen scraping some HTML to find out
+        which document ID belongs to our filter on that server if
+        the more efficient script isn't available.
+        """
+        try:
+            url = "%s/get-filter.py" % self.base
+            data = urllib.urlencode({ "title": self.filter.title })
+            conn = urllib2.urlopen(url, data, timeout=5)
+            return conn.read()
+        except:
+            filters = self.get_filters()
+            doc_id = filters.get(self.filter.title.lower())
+            if not doc_id:
+                raise Exception("%s not found" % self.filter.title)
+            url = "%s/ShowDocXml.py?DocId=%d" % (self.base, doc_id)
+            conn = urllib2.urlopen(url, timeout=15)
+            return conn.read()
 
-#----------------------------------------------------------------------
-# Fetch a document by title for a specified server.
-#----------------------------------------------------------------------
-def getFilterXml(title, server = 'localhost'):
-    filters = ['name:Fast Denormalization Filter With Indent']
-    try:
-        conn = cdrdb.connect('CdrGuest', server)
-        cursor = conn.cursor()
-        cursor.execute("""\
-                SELECT d.xml
-                  FROM document d
-                  JOIN doc_type t
-                    ON t.id = d.doc_type
-                 WHERE t.name = 'Filter'
-                   AND d.title = ?""", title)
-        rows = cursor.fetchall()
+    def get_filters(self):
+        """
+        Get the other server to give us the list of all of its CDR
+        filters. We only need this if the server doesn't have the
+        get-filter.py script installed and working.
+        """
+        url = "%s/EditFilters.py?Session=guest" % self.base
+        conn = urllib2.urlopen(url, timeout=10)
+        root = cdrcgi.lxml.html.fromstring(conn.read())
+        table = [t for t in root.iter("table")][1]
+        filters = {}
+        for node in table.findall("tr"):
+            cells = node.findall("td")
+            cdr_id = cells[0].text
+            title = cells[2].text
+            if cdr_id is not None and cdr_id.startswith("CDR"):
+                filter_id = cdr.exNormalize(cdr_id)[1]
+                filters[title.lower()] = filter_id
+        return filters
+
+    def other_tier_lower(self):
+        """
+        Find out if the tier with which our copy of the filter is being
+        compared is "lower" than ours, where "lower" means "further from
+        production." If it is we'll make our copy the "before" copy and
+        the other one the "after" version. Otherwise, we'll switch them.
+        """
+        return self.TIERS.index(self.other_tier) > self.TIERS.index(cdr.h.tier)
+
+    def fix(self, me):
+        "Prepare the XML for a filter document for comparison"
+        if self.normalize:
+            xml = etree.tostring(etree.XML(me), pretty_print=True)
+        else:
+            xml = me
+        return xml.replace("\r", "").strip().splitlines(1)
+
+    @staticmethod
+    def wrap_line(line, line_class):
+        "Add coloring to diff lines so user can tell where they came from"
+        return '<span class="%s">%s</span>' % (line_class, line)
+
+class Filter:
+    "Collect document ID, title, and XML for the filter being viewed/compared"
+    def __init__(self, control):
+        try:
+            doc_ids = cdr.exNormalize(control.fields.getvalue(cdrcgi.DOCID))
+            self.cdr_id, self.doc_id, self.id_frag = doc_ids
+        except:
+            cdrcgi.bail()
+        query = cdrdb.Query("document d", "d.title", "d.xml")
+        query.join("doc_type t", "t.id = d.doc_type")
+        query.where("t.name = 'Filter'")
+        query.where(query.Condition("d.id", self.doc_id))
+        rows = query.execute(control.cursor).fetchall()
         if not rows:
-            cdrcgi.bail("Cannot find filter '%s' on %s" %
-                    (cgi.escape(title), server))
-        if len(rows) > 1:
-            cdrcgi.bail("Ambiguous filter document title '%s' on %s" %
-                    (cgi.escape(title), server))
-        return rows[0][0].replace('\r', '')
+            cdrcgi.bail()
+        self.title, self.xml = rows[0]
 
-    except Exception, info:
-        cdrcgi.bail("Failure retrieving '%s' from %s: %s" %
-                    (cgi.escape(title), server, str(info)))
-
-#----------------------------------------------------------------------
-# Object for results of an external command.
-#----------------------------------------------------------------------
-class CommandResult:
-    def __init__(self, code, output):
-        self.code   = code
-        self.output = output
-
-#----------------------------------------------------------------------
-# Run an external command.
-#----------------------------------------------------------------------
-def runCommand(command):
-    debugLog("runCommand(%s)" % command)
-    try:
-        commandStream = os.popen('%s 2>&1' % command)
-        output = commandStream.read()
-        code = commandStream.close()
-        return CommandResult(code, output)
-    except Exception, info:
-        debugLog("failure running command: %s" % str(info))
-
-#----------------------------------------------------------------------
-# Load an existing document.
-#----------------------------------------------------------------------
-if request == "View":
-    if not fields.has_key(cdrcgi.DOCID):
-        cdrcgi.bail("No document ID specified")
-    doc = cdr.getDoc(session, fields[cdrcgi.DOCID].value)
-    doc = cdrcgi.decode(doc)
-    if doc.find("<Errors>") >= 0:
-        cdrcgi.bail(doc)
-    showForm(cgi.escape(doc))
-
-#--------------------------------------------------------------------
-# Show the differences with a copy of the filter on another server.
-#--------------------------------------------------------------------
-elif request == 'Compare With':
-    if not fields.has_key("Doc"):
-        cdrcgi.bail("No document found to compare")
-    if not fields.has_key("DiffWith"):
-        cdrcgi.bail("No server specified for comparison")
-    doc = fields["Doc"].value
-    server = fields["DiffWith"].value
-    pattern = re.compile(r"<DocTitle[^>]*>([^<]+)</DocTitle>", re.DOTALL)
-    match = pattern.search(doc)
-    if not match: cdrcgi.bail("No DocTitle found")
-    title = match.group(1)
-    doc1 = getFilterXml(title, 'localhost')
-    doc2 = getFilterXml(title, server)
-    name1 = "localhost-copy.xml"
-    name2 = "%s-copy.xml" % server
-    cmd = "/cygwin/bin/diff -au %s %s" % (name1, name2)
-    try:
-        workDir = cdr.makeTempDir('diff')
-    except Exception, args:
-        cdrcgi.bail("%s: %s" % (args[0], args[1]))
-    f1 = open(name1, "w")
-    f1.write(doc1.encode('utf-8'))
-    f1.close()
-    f2 = open(name2, "w")
-    f2.write(doc2.encode('utf-8'))
-    f2.close()
-    result = cdr.runCommand(cmd)
-    cleanup(workDir)
-    report = cgi.escape(result.output)
-    if report.strip():
-        title = "Differences between %s and %s" % (name1, name2)
-    else:
-        title = "%s and %s are identical" % (name1, name2)
-    cdrcgi.sendPage(u"""\
-<!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
-<html>
- <head>
-  <title>%s</title>
- </head>
- <body>
-  <h3>%s</h3>
-  <pre>%s</pre>
- </body>
-</html>""" % (title, title, report.replace('\r', '')))
-
-#----------------------------------------------------------------------
-# Tell the user we don't know how to do what he asked.
-#----------------------------------------------------------------------
-else: cdrcgi.bail("Request not yet implemented: " + request)
+if __name__ == "__main__":
+    "Allow documentation and lint to import this without side effects"
+    Control().run()

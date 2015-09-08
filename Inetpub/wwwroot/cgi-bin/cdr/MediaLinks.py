@@ -28,6 +28,14 @@ conn     = cdrdb.connect('CdrGuest')
 cursor   = conn.cursor()
 
 #----------------------------------------------------------------------
+# Validate input
+#----------------------------------------------------------------------
+if docTypes:
+    cdrcgi.valParmVal(docTypes, valList=('Summary', 'GlossaryTerm'))
+if request:
+    cdrcgi.valParmVal(request, valList=buttons)
+
+#----------------------------------------------------------------------
 # Make sure we're logged in.
 #----------------------------------------------------------------------
 if not session: cdrcgi.bail('Unknown or expired CDR session.')
@@ -43,7 +51,7 @@ elif request == SUBMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if request == "Log Out": 
+if request == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
@@ -64,7 +72,7 @@ if not docTypes:
      <TD>&nbsp;</TD>
      <TD class="cellitem">
       <LABEL for='%s' accesskey='%s'>
-       <INPUT TYPE='checkbox' NAME='DocType' value='%s' 
+       <INPUT TYPE='checkbox' NAME='DocType' value='%s'
               ID='%s' CHECKED>%s</LABEL>
      </TD>
     </TR>
@@ -74,7 +82,7 @@ if not docTypes:
   </FORM>
  </BODY>
 </HTML>
-""" 
+"""
     cdrcgi.sendPage(header + form)
 
 #----------------------------------------------------------------------
@@ -89,12 +97,12 @@ html = ["""\
   <link type='text/css' rel='stylesheet' href='/stylesheets/dataform.css'>
    <style>
    *              { font-family: Arial, Helvetica, sans-serif; }
-   td.idColumn    { width: 7%%; 
+   td.idColumn    { width: 7%%;
                     text-align: center; }
    td.idHeader, td.txtHeader
                   { font-weight: bold;
                     font-size: medium; }
-   td.text        { font-size: medium; 
+   td.text        { font-size: medium;
                     vertical-align: top; }
    .tableheading  { font-weight: bold;
                     font-size: large; }
@@ -154,7 +162,7 @@ SELECT DISTINCT q1.doc_id, q1.value
     except cdrdb.Error, info:
         cdrcgi.bail('Database connection failure: %s' % info[1][0])
 
-    # Once we have all of the records per document type start 
+    # Once we have all of the records per document type start
     # returning the result in a table format
     # -------------------------------------------------------
     html.append("""\

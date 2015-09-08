@@ -7,7 +7,7 @@
 #----------------------------------------------------------------------
 # Import required modules.
 #----------------------------------------------------------------------
-import cgi, cdr, re, cdrcgi, sys
+import cgi, cdr, cdrcgi
 
 #----------------------------------------------------------------------
 # Load the fields from the form.
@@ -30,6 +30,45 @@ changed    = 0
 SUBMENU    = "DocType Menu"
 
 #----------------------------------------------------------------------
+# Validate parameters
+#----------------------------------------------------------------------
+# Server demands upper case, forcing case here can save user some aggravation
+if versioning: versioning = versioning.upper()
+
+# ISO date time format with optional milliseconds for time.strptime()
+ISO_DATE_TIME = '%Y-%m-%d %H:%M:%S.%f'
+
+# Toggle this on for testing or debugging, off for giving min info to hacker
+# cdrcgi.REVEAL_DEFAULT = True
+
+# Validation
+if doctype:
+    cdrcgi.valParmVal(doctype, valList=cdr.getDoctypes(session))
+if format:
+    cdrcgi.valParmVal(format, valList=cdr.getDocFormats())
+if schema:
+    cdrcgi.valParmVal(schema, valList=cdr.getSchemaDocs(session))
+if versioning:
+    cdrcgi.valParmVal(versioning, valList=('Y', 'N'))
+if created:
+    cdrcgi.valParmDate(created, ISO_DATE_TIME)
+if _created:
+    cdrcgi.valParmDate(_created, ISO_DATE_TIME)
+if schema_mod:
+    cdrcgi.valParmDate(schema_mod, ISO_DATE_TIME)
+if request:
+    cdrcgi.valParmVal(request, valList=('Fetch', 'Retrieve', 'Store', SUBMENU,
+                                        cdrcgi.MAINMENU))
+
+# Comment can't be validated but can at least be sanitized
+if comment:
+    comment = cgi.escape(comment)
+
+# DEBUG Don't know if this is used or not
+if dtd:
+    cdr.logwrite("EditDocType.py: dtd\n%s" % dtd)
+
+#----------------------------------------------------------------------
 # Handle navigation requests.
 #----------------------------------------------------------------------
 if request == cdrcgi.MAINMENU:
@@ -45,10 +84,10 @@ if session and doctype and request:
         if format and versioning and schema:
             changed = 1
             cmd = _created and cdr.modDoctype or cdr.addDoctype
-            dtinfo = cmd(session, cdr.dtinfo(type       = doctype, 
-                                             format     = format, 
-                                             versioning = versioning, 
-                                             schema     = schema, 
+            dtinfo = cmd(session, cdr.dtinfo(type       = doctype,
+                                             format     = format,
+                                             versioning = versioning,
+                                             schema     = schema,
                                              comment    = comment))
         else: cdrcgi.bail('Format, Versioning, and Schema data required')
     elif request == 'Fetch' or request == 'Retrieve':
@@ -71,7 +110,7 @@ if session and doctype and request:
 #----------------------------------------------------------------------
 if session:
     schemaDocs = cdr.getSchemaDocs(session)
-    if not schemaDocs: 
+    if not schemaDocs:
         cdrcgi.bail("Failure loading list of Schema documents")
     if type(schemaDocs) == type(""):
         cdrcgi.bail(schemaDocs)
@@ -160,9 +199,11 @@ if session:
      <TH ALIGN='right'>Modified</TH>
      <TD><INPUT NAME='read-only-schemamod' VALUE='%s'>&nbsp;(System supplied)</TD>
     </TR>
-""" % (format or '', versioning or '', 
-       created and created[:19] or '', 
+""" % (format or '', versioning or '',
+       created and created[:19] or '',
        schema_mod and schema_mod[:19] or '')
+    # Note on above: 'created' and 'schema_mod' are 19 character ISO dates
+    #                like '2015-07-16 15:53:08' with optional milliseconds
 
     html += """\
     <TR>
@@ -193,7 +234,7 @@ if session:
    </TABLE>
   </FORM>
 """ % (comment or '')
-    if enumSets: 
+    if enumSets:
         for enumSet in enumSets:
             html += "<H2>Valid values for %s</H2>\n<UL>" % enumSet[0]
             for vv in enumSet[1]:

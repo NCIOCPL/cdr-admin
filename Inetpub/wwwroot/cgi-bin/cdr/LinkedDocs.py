@@ -23,7 +23,7 @@ import urllib
 #----------------------------------------------------------------------
 cursor       = cdrdb.connect("CdrGuest").cursor()
 fields       = cgi.FieldStorage()
-doc_id       = fields.getvalue("doc_id")
+doc_id       = fields.getvalue("doc_id") or fields.getvalue("DocId")
 frag_id      = fields.getvalue("frag_id") or u""
 doc_title    = fields.getvalue("doc_title")
 linked_type  = fields.getvalue("linked_type")

@@ -93,7 +93,9 @@ filters = cdr.FILTERS
 #----------------------------------------------------------------------
 repTitle = "CDR QC Report"
 fields   = cgi.FieldStorage() or cdrcgi.bail("No Request Found", repTitle)
-docId    = fields.getvalue(cdrcgi.DOCID) or None ###'CDR360620' or None
+# DEBUG
+# cdrcgi.log_fields(fields, program='QcReport.py')
+docId    = fields.getvalue(cdrcgi.DOCID) or None
 session  = cdrcgi.getSession(fields) or cdrcgi.bail("Not logged in")
 action   = cdrcgi.getRequest(fields)
 qcParams = fields.getvalue('paramset') or '0'
@@ -368,8 +370,10 @@ header   = cdrcgi.header(title, title, getSectionTitle(repType),
   </script>
 """)
 docType  = fields.getvalue("DocType")    or None
+if docType: cdrcgi.valParmVal(docType, val_list=cdr.getDoctypes(session))
 docTitle = fields.getvalue("DocTitle")   or None
 version  = fields.getvalue("DocVersion") or None
+if version: cdrcgi.valParmVal(version, regex=cdrcgi.VP_SIGNED_INT)
 glossary = fields.getvalue("Glossaries") or None
 images   = fields.getvalue("Images")     or None
 citation = fields.getvalue("CitationsHP") \
@@ -1515,8 +1519,6 @@ SELECT completed
 if repType == "pp":
     cdrcgi.navigateTo("PublishPreview.py", session, ReportType='pp',
                                                     DocId=docId)
-
-    cdrcgi.sendPage(result.output)
 
 #----------------------------------------------------------------------
 # Filter the document.

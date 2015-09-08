@@ -1,430 +1,229 @@
-<!DOCTYPE HTML PUBLIC '-//W3C//DTD HTML 4.01 Transitional//EN'
-                      'http://www.w3.org/TR/html4/loose.dtd'>
-<!-- $Id: CdrFilter.html,v 1.11 2008-08-05 14:21:15 venglisc Exp $ -->
-<!-- 
+<!DOCTYPE html>
+<!-- $Id$ -->
+<!--
   BZIssue::4733 - Add option for LOERef display to Filter interface
+  Rewritten July 2015 as part of security sweep
 -->
-<HTML>
- <HEAD>
-  <TITLE>CDR Document Filtering</TITLE>
-  <meta http-equiv='Content-Type' content='text/html;charset=utf-8'>
-  <link rel='shortcut icon' href='/favicon.ico'>
-  <LINK TYPE='text/css' REL='STYLESHEET' HREF='/stylesheets/dataform.css'>
-  <style type='text/css'>
-    body      { background-color: #DFDFDF; }
-    *.banner  { background-color: silver;
-                background-image: url(/images/nav1.jpg); }
-  </style>
-  <SCRIPT TYPE='text/javascript' LANGUAGE='JavaScript'>
-   <!--
-    function filterDoc(doValidate) {
-        var base   = "/cgi-bin/cdr/Filter.py";  
-        var doc    = document.FilterRequest.DocId.value;
-        var ver    = document.FilterRequest.DocVer.value;
-        var filt   = document.FilterRequest.Filter.value;
-        var filt1  = document.FilterRequest.Filter1.value;
-        var filt2  = document.FilterRequest.Filter2.value;
-        var filt3  = document.FilterRequest.Filter3.value;
-        var filt4  = document.FilterRequest.Filter4.value;
-        var filt5  = document.FilterRequest.Filter5.value;
-        var filt6  = document.FilterRequest.Filter6.value;
-        var filt7  = document.FilterRequest.Filter7.value;
-        var filt8  = document.FilterRequest.Filter8.value;
-        var filt9  = document.FilterRequest.Filter9.value;
-        var filt10 = document.FilterRequest.Filter10.value;
-        var edt    = document.FilterRequest.editorial.checked;
-        var adv    = document.FilterRequest.advisory.checked;
-        var gpt    = document.FilterRequest.glosspatient.checked;
-        var ghp    = document.FilterRequest.glosshp.checked;
-        var pub    = document.FilterRequest.publish.checked;
-        var app    = document.FilterRequest.approved.checked;
-        var pro    = document.FilterRequest.proposed.checked;      
-        var icmt   = document.FilterRequest.internal.checked;
-        var ecmt   = document.FilterRequest.external.checked;
-        var gls    = document.FilterRequest.glossary.checked;
-        var std    = document.FilterRequest.stdword.checked;
-        var mrk    = document.FilterRequest.rsmarkup[0].checked;
-        var port   = document.FilterRequest.port.value;      
-        var newdtd = document.FilterRequest.newdtd.value;      
-        var ispp   = document.FilterRequest.ispp.checked;
-        var isqc   = document.FilterRequest.isqc.checked;
-        var loeref = document.FilterRequest.loeref.checked;
-      //var uid    = document.FilterRequest.UserName.value;
-      //var pwd    = document.FilterRequest.Password.value;
-        var url    = base + "?DocId=" + doc
-                   + "&DocVer=" + ver
-                   + "&editorial=" + edt
-                   + "&advisory=" + adv
-                   + "&glosspatient=" + gpt
-                   + "&glosshp=" + ghp
-                   + "&publish=" + pub
-                   + "&approved=" + app
-                   + "&proposed=" + pro
-                   + "&internal=" + icmt
-                   + "&external=" + ecmt
-		           + "&rsmarkup=" + mrk
-                   + "&glossary=" + gls
-                   + "&stdword=" + std
-                   + "&port=" + port 
-                   + "&newdtd=" + newdtd 
-                   + "&ispp=" + ispp 
-                   + "&isqc=" + isqc 
-                   + "&loeref=" + loeref 
-                   + "&Filter=" + filt
-                   + "&Filter1=" + filt1
-                   + "&Filter2=" + filt2
-                   + "&Filter3=" + filt3
-                   + "&Filter4=" + filt4
-                   + "&Filter5=" + filt5
-                   + "&Filter6=" + filt6
-                   + "&Filter7=" + filt7
-                   + "&Filter8=" + filt8
-                   + "&Filter9=" + filt9
-                   + "&Filter10=" + filt10
-      //          + "&UserName=" + uid + "&Password=" + pwd
-            ;
-        if (doValidate == 1) {
-            url += "&validate=Y";
-        }
-        if (doValidate == 2) {
-            url += "&qcFilterSets=Y";
-        }
-        var opts  = "standard=yes,scrollbars=yes,resizable=yes,status=yes,menubar=yes";
-        if (doc.length == 0 || url.length == 0) {
-            alert("Document and Filter IDs Required");
-        }
-        else {                      
-            wind = window.open(url, doc, opts);
-            wind.focus();
-        }
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>CDR Document Filtering</title>
+    <link href="/favicon.ico" rel="icon">
+    <link href="/stylesheets/CdrCalendar.css" rel="stylesheet">
+    <link href="/stylesheets/cdr.css" rel="stylesheet">
+    <script src="/js/jquery.js"></script>
+    <script src="/js/CdrCalendar.js"></script>
+    <script>
+function add_filter_field() {
+    var id = jQuery(".filter").length + 1;
+    jQuery("#filters").append('<div class="labeled-field filter"> ' +
+        '<label for="filter-' + id + '">Filter ' + id + '</label> ' +
+        '<input name="filter" id="filter-' + id + '"> ' +
+        '</div>');
+}
+function glossary_clicked() {
+    if (jQuery("#glossary:checked").length == 1) {
+        jQuery("#glosspatient").prop("checked", true);
+        jQuery("#glosshp").prop("checked", true);
     }
-   -->
-  </SCRIPT>
- </HEAD>
- <BODY>
-  <FORM ACTION='/cgi-bin/cdr/Filter.py' 
-        METHOD='POST' 
-        NAME='FilterRequest'>
-   <TABLE WIDTH='100%' 
-          CELLSPACING='0' 
-          CELLPADDING='0' 
-          BORDER='0'>
-    <TR>
-     <TH class='banner' NOWRAP
-         ALIGN='left'>
-      <FONT SIZE='6' 
-            COLOR='white'>&nbsp;CDR Document Filtering
-      </FONT>
-     </TH>
-     <TD class='banner'
-         VALIGN='middle'
-         ALIGN='right'
-         WIDTH='100%'>
-      <INPUT TYPE='button' 
-             VALUE='Submit Filter Request' 
-             onClick='filterDoc(0)'>&nbsp;
-      <INPUT TYPE='button' 
-             VALUE='Filter and Validate' 
-             onClick='filterDoc(1)'>&nbsp;
-      <INPUT TYPE='button' 
-             VALUE='QC FilterSets' 
-             onClick='filterDoc(2)'>&nbsp;
-     </TD>
-    </TR>
-    <TR>
-     <TD BGCOLOR='#FFFFCC' COLSPAN='3'>
-      <FONT SIZE='-1' 
-            COLOR='navy'>&nbsp;Enter document IDs<BR>
-      </FONT>
-     </TD>
-    </TR>
-   </TABLE>
-   <BR>
-   <BR>
-   <TABLE CELLSPACING='0' 
-          CELLPADDING='0' 
-          BORDER='0'>
-    <TR>     
-     <TD ALIGN='right' COLSPAN='1'>
-      <B>Display Board: </B>
-     </TD> 
-     <TD ALIGN='Left' COLSPAN='1'>
-      <TABLE border='0' width='100%'>
-       <TR>
-        <TD width='25%' align='right'>
-         <B>Editorial</B>
-	    </TD>
-	    <TD width='5%'>
-         <INPUT TYPE="checkbox" NAME="editorial" CHECKED>
-	    </TD>
-	    <TD width='25%' align='right'>
-         <B>Advisory</B>
-	    </TD>
-	    <TD width='5%'>
-         <INPUT TYPE="checkbox" NAME="advisory">
-	    </TD>
-	    <TD width='25%' align='right'></TD>
-	    <TD width='5%' align='right'></TD>
-       </TR>
-      </TABLE>
-     </TD> 
-    </TR>    
-    <TR>     
-     <TD ALIGN='right' COLSPAN='1'>
-      <B>Display Gloss Def: </B>
-     </TD> 
-     <TD ALIGN='Left' COLSPAN='1'>
-      <TABLE border='0' width='100%'>
-       <TR>
-        <TD width='25%' align='right'>
-         <B>Patient</B>
-	    </TD>
-	    <TD width='5%'>
-         <INPUT TYPE="checkbox" NAME="glosspatient" CHECKED>
-	    </TD>
-	    <TD width='25%' align='right'>
-         <B>Health Professional</B>
-	    </TD>
-	    <TD width='5%'>
-         <INPUT TYPE="checkbox" NAME="glosshp" CHECKED>
-	    </TD>
-	    <TD width='25%' align='right'></TD>
-	    <TD width='5%' align='right'></TD>
-       </TR>
-      </TABLE>
-     </TD> 
-    </TR>    
-    <TR>     
-     <TD ALIGN='right' COLSPAN='1'>
-      <B>Display RevLevels: </B>
-     </TD> 
-     <TD ALIGN='Left' COLSPAN='1'>
-      <TABLE border='0' width='100%'>
-       <TR>
-        <TD width='25%' align='right'>
-         <B>publish</B>
-	    </TD>
-	    <TD width='5%'>
-         <INPUT TYPE="checkbox" NAME="publish">
-	    </TD>
-	    <TD width='25%' align='right'>
-         <B>approved</B>
-	    </TD>
-	    <TD width='5%'>
-         <INPUT TYPE="checkbox" NAME="approved" CHECKED>
-	    </TD>
-	    <TD width='25%' align='right'>
-         <B>proposed</B>
-	    </TD>
-	    <TD width='5%'>
-         <INPUT TYPE="checkbox" NAME="proposed">     
-        </TD>
-       </TR>
-      </TABLE>
-     </TD> 
-    </TR>    
-    <TR>
-     <TD ALIGN='right' COLSPAN='1'>
-      <B>Comments: </B>
-     </TD>
-     <TD>
-      <TABLE border='0' width='100%'>
-       <TR>
-        <TD width='25%' align='right'>
-	     <B>Internal</B>
-	    </TD>
-        <TD width='5%'>
-         <INPUT TYPE="checkbox" NAME="internal" CHECKED>
-	    </TD>
-        <TD width='25%' align='right'>
-	     <B>External</B>
-	    </TD>
-        <TD width='5%'>
-         <INPUT TYPE="checkbox" NAME="external" CHECKED>
-	    </TD>
-	    <TD width='25%' align='right'></TD>
-	    <TD width='5%' align='right'></TD>
-       </TR>
-      </TABLE>
-     </TD>
-    </TR>
-    <TR>
-     <TD ALIGN='right' COLSPAN='1'>
-      <B>Include: </B>
-     </TD>
-     <TD>
-      <TABLE border='0' width='100%'>
-       <TR>
-        <TD width='25%' align='right'>
-	     <B>GlossTerms</B>
-	    </TD>
-        <TD width='5%'>
-         <INPUT TYPE="checkbox" NAME="glossary">
-	    </TD>
-        <TD width='25%' align='right'>
-	     <B>Std Wording</B>
-	    </TD>
-        <TD width='5%'>
-         <INPUT TYPE="checkbox" NAME="stdword">
-	    </TD>
-	    <TD width='25%' align='right'>
-         <B>LOE Ref</B>
-        </TD>
-	    <TD width='5%' align='right'>
-         <INPUT TYPE="checkbox" NAME="loeref">
-        </TD>
-       </TR>
-      </TABLE>
-     </TD>
-    </TR>
-    <TR>
-     <TD ALIGN='right' COLSPAN='1'>
-      <B>Report Flag: </B>
-     </TD>
-     <TD>
-      <TABLE border='0' width='100%'>
-       <TR>
-        <TD width='25%' align='right'>
-	     <B>Pub Preview</B>
-	    </TD>
-        <TD width='5%'>
-         <INPUT TYPE="checkbox" NAME="ispp">
-	    </TD>
-        <TD width='25%' align='right'>
-	     <B>QC Report</B>
-	    </TD>
-        <TD width='5%'>
-         <INPUT TYPE="checkbox" NAME="isqc">
-	    </TD>
-	    <TD width='25%' align='right'> </TD>
-	    <TD width='5%' align='right'> </TD>
-       </TR>
-      </TABLE>
-     </TD>
-    </TR>
-    <TR>
-     <TD VALIGN="top" ALIGN="right">
-      <B>Summary Markup:</B>
-     </TD>
-     <TD>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-      <INPUT TYPE="radio" NAME="rsmarkup" VALUE="RS" CHECKED>
-      <B>Redline/Strikeout, New Patient</B>
-      <BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-      <INPUT TYPE="radio" NAME="rsmarkup" VALUE="BU">
-      <B>Bold/Underline</B>
-     </TD>
-    </TR>
-    <TR>
-     <TD ALIGN='right'>
-      <B>Document ID&nbsp;</B>
-     </TD>
-     <TD><INPUT NAME='DocId' 
-                VALUE='CDR106085' SIZE = '60'>
-     </TD>     
-    </TR>
-    <TR>
-     <TD ALIGN='right'>
-      <B>Doc Version&nbsp;</B>
-     </TD>
-     <TD><INPUT NAME='DocVer' 
-                VALUE='lastp' SIZE = '10'>
-      <B>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Port&nbsp;</B>
-      <INPUT NAME='port' VALUE='' SIZE='5'>
-      <B>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DTD&nbsp;</B>
-      <INPUT NAME='newdtd' value='pdqCG.dtd' size='14'>
-     </TD>
-    </TR>
-    <TR>
-     <TD ALIGN='right'>
-      <B>Filter ID&nbsp;</B>
-     </TD>
-     <TD>
-      <INPUT NAME='Filter' 
-             VALUE='name:Passthrough Filter'
-             SIZE = '60'>
-     </TD>     
-    </TR>
-    <TR>
-     <TD ALIGN='right'>
-      &nbsp;
-     </TD>
-     <TD>
-      <INPUT NAME='Filter1' SIZE = '60'>
-     </TD>     
-    </TR>
-    <TR>
-     <TD ALIGN='right'>
-      &nbsp;
-     </TD>
-     <TD>
-      <INPUT NAME='Filter2' SIZE = '60'>
-     </TD>
-    </TR>
-    <TR>
-     <TD ALIGN='right'>
-      &nbsp;
-     </TD>
-     <TD>
-      <INPUT NAME='Filter3' SIZE = '60'>
-     </TD>
-    </TR>
-    <TR>
-     <TD ALIGN='right'>
-      &nbsp;
-     </TD>
-     <TD>
-      <INPUT NAME='Filter4' SIZE = '60'>
-     </TD>
-    </TR>
-    <TR>
-     <TD ALIGN='right'>
-      &nbsp;
-     </TD>
-     <TD>
-      <INPUT NAME='Filter5' SIZE = '60'>
-     </TD>
-    </TR>
-    <TR>
-     <TD ALIGN='right'>
-      &nbsp;
-     </TD>
-     <TD>
-      <INPUT NAME='Filter6' SIZE = '60'>
-     </TD>
-    </TR>
-    <TR>
-     <TD ALIGN='right'>
-      &nbsp;
-     </TD>
-     <TD>
-      <INPUT NAME='Filter7' SIZE = '60'>
-     </TD>
-    </TR>
-    <TR>
-     <TD ALIGN='right'>
-      &nbsp;
-     </TD>
-     <TD>
-      <INPUT NAME='Filter8' SIZE = '60'>
-     </TD>
-    </TR>
-    <TR>
-     <TD ALIGN='right'>
-      &nbsp;
-     </TD>
-     <TD>
-      <INPUT NAME='Filter9' SIZE = '60'>
-     </TD>
-    </TR>
-    <TR>
-     <TD ALIGN='right'>
-      &nbsp;
-     </TD>
-     <TD>
-      <INPUT NAME='Filter10' SIZE = '60'>
-     </TD>
-    </TR>
-   </TABLE>
-  </FORM>
- </BODY>
-</HTML>
+}
+function filter_doc(extra) {
+    var doc = jQuery("#DocId").val();
+    var filters = jQuery("#filters input");
+    if (!doc)
+        alert("Document must be specified.");
+    else if (1 > filters.length && extra != "qcFilterSets")
+        alert("No filters specified.");
+    else {
+        var url = "/cgi-bin/cdr/Filter.py?DocId="
+                + encodeURIComponent(doc);
+        jQuery.each([
+            "editorial", "advisory", "glosspatient", "glosshp", "publish",
+            /* "internal", "external", "ispp", "isqc", */
+            "approved", "proposed", "glossary", "stdword", "loeref"
+        ], function(i, name) {
+            if (jQuery("#" + name + ":checked").length)
+                url += "&" + name + "=true";
+        });
+        jQuery.each(["DocVer", "port", "newdtd"], function(i, name) {
+            var val = jQuery("#" + name).val();
+            if (val)
+                url += "&" + name + "=" + encodeURIComponent(val);
+        });
+        filters.each(function(i) {
+            var val = jQuery(this).val();
+            if (val)
+                url += "&filter=" + encodeURIComponent(val);
+        });
+        if (!jQuery("#rsmarkup:checked").length)
+            url += "&rsmarkup=false";
+        if (!jQuery("#use-cache:checked").length)
+            url += "&cache=refresh";
+        if (extra)
+            url += "&" + extra + "=Y";
+        var opts = "standard=yes,scrollbars=yes,resizable=yes,status=yes,"
+                 + "menubar=yes";
+        var w = window.open(url, doc, opts);
+        w.focus();
+    }
+}
+    </script>
+  </head>
+  <body>
+    <form action="/cgi-bin/cdr/Filter.py" method="post">
+      <header>
+        <h1>CDR Document Filtering
+          <span>
+            <input type="button" name="Request" value="Submit Filter Request"
+                   onclick="filter_doc();">
+            <input type="button" name="Request" value="Filter and Validate"
+                   onclick="filter_doc('validate');">
+            <input type="button" name="Request" value="QC Filter Sets"
+                   onclick="filter_doc('qcFilterSets');">
+          </span>
+        </h1>
+        <h2>Enter filters by document ID, name, or set</h2>
+      </header>
+      <fieldset>
+        <legend>Document</legend>
+        <div class="labeled-field">
+          <label for="DocId">Doc ID</label>
+          <input name="DocId" id="DocId" value="62902">
+        </div>
+        <div class="labeled-field">
+          <label for="DocVer">Doc Version</label>
+          <input name="DocVer" id="DocVer" value="lastp">
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Miscellaneous Options</legend>
+        <div class="labeled-field">
+          <label for="newdtd">DTD</label>
+          <input name="newdtd" id="newdtd" value="pdqCG.dtd">
+        </div>
+        <div class="labeled-field">
+          <label for="port">Port</label>
+          <input name="port" id="port">
+        </div>
+      </fieldset>
+      <fieldset id="filters">
+        <legend>Filter(s)</legend>
+        <div class="labeled-field filter">
+          <label for="filter-1">Filter 1</label>
+          <input name="filter" id="filter-1" value="name:Passthrough Filter">
+          <img src="images/add.gif" onclick="add_filter_field()"
+               title="Add another filter" class="clickable">
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Summary Markup</legend>
+        <div>
+          <input type="radio" name="rsmarkup" value="Y" id="rsmarkup" checked>
+          <label for="rsmarkup"
+                 class="clickable">Redline/Strikeout, New Patient</label>
+        </div>
+        <div>
+          <input type="radio" name="rsmarkup" value="N" id="bu">
+          <label for="bu" class="clickable">Bold/Underline</label>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Display Markup for Board</legend>
+        <div>
+          <input type="checkbox" name="editorial" value="true" id="editorial"
+                 checked>
+          <label for="editorial" class="clickable">Editorial</label>
+        </div>
+        <div>
+          <input type="checkbox" name="advisory" value="true" id="advisory">
+          <label for="advisory" class="clickable">Advisory</label>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Revision Levels</legend>
+        <div>
+          <input type="checkbox" name="publish" value="true" id="publish">
+          <label for="publish" class="clickable">publish</label>
+        </div>
+        <div>
+          <input type="checkbox" name="approved" value="true" id="approved"
+                 checked>
+          <label for="approved" class="clickable">approved</label>
+        </div>
+        <div>
+          <input type="checkbox" name="proposed" value="true" id="proposed">
+          <label for="proposed" class="clickable">proposed</label>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Glossary Definitions</legend>
+        <div>
+          <input type="checkbox" name="glosspatient" value="true"
+                 id="glosspatient" checked>
+          <label for="glosspatient" class="clickable">Patient</label>
+        </div>
+        <div>
+          <input type="checkbox" name="glosshp" value="true" id="glosshp"
+                 checked>
+          <label for="glosshp" class="clickable">Health Professional</label>
+        </div>
+      </fieldset>
+<!--
+      <fieldset>
+        <legend>Comments</legend>
+        <div>
+          <input type="checkbox" name="internal" value="true" id="internal"
+                 checked>
+          <label for="internal" class="clickable">Internal</label>
+        </div>
+        <div>
+          <input type="checkbox" name="external" value="true" id="external"
+                 checked>
+          <label for="external" class="clickable">External</label>
+        </div>
+      </fieldset>
+-->
+      <fieldset>
+        <legend>Miscellaneous Print Options</legend>
+        <div>
+          <input type="checkbox" name="glossary" value="true" id="glossary"
+                 onclick="glossary_clicked()">
+          <label for="glossary" class="clickable">Glossary Terms</label>
+        </div>
+        <div>
+          <input type="checkbox" name="stdword" value="true" id="stdword">
+          <label for="stdword" class="clickable">Standard Wording</label>
+        </div>
+        <div>
+          <input type="checkbox" name="loeref" value="true" id="loeref">
+          <label for="loeref" class="clickable">LOE Refs</label>
+        </div>
+      </fieldset>
+<!--
+      <fieldset>
+        <legend>Report</legend>
+        <div>
+          <input type="checkbox" name="ispp" value="true" id="ispp">
+          <label for="ispp" class="clickable">Publish Preview</label>
+        </div>
+        <div>
+          <input type="checkbox" name="isqc" value="true" id="isqc">
+          <label for="isqc" class="clickable">QC Report</label>
+        </div>
+      </fieldset>
+-->
+      <fieldset>
+        <legend>Filter Set Cache</legend>
+        <div>
+          <input type="radio" name="cache" value="use" id="use-cache" checked>
+          <label for="use-cache" class="clickable">Use cache</label>
+        </div>
+        <div>
+          <input type="radio" name="cache" value="refresh" id="refresh-cache">
+          <label for="refresh-cache" class="clickable">Refresh cache</label>
+        </div>
+      </fieldset>
+    </form>
+  </body>
+</html>
+

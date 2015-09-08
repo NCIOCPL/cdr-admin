@@ -81,11 +81,13 @@ def show_form():
     """
     Show the user the proposed list of zip files to be processed.
     """
+    global buttons
+
     files = get_latest_batch()
     if not files:
         cdrcgi.bail("no archives found")
     form = cdrcgi.Page(BANNER, subtitle=SUBTITLE, session=session,
-                       buttons=("Submit", "Admin"), action="ocecdr-3373.py")
+                       buttons=buttons, action="ocecdr-3373.py")
     ol = form.B.OL()
     for name_upper, name in files:
         value = "%s|%s" % (name_upper, name)
@@ -384,6 +386,11 @@ session = cdrcgi.getSession(fields)
 request = cdrcgi.getRequest(fields)
 files = fields.getlist("zipfiles")
 
+# Validate them
+buttons = ('Submit', cdrcgi.MAINMENU)
+if request: cdrcgi.valParmVal(request, valList=buttons)
+if files:   cdrcgi.valParmVal(files, regex='Week_\d{3}.*\.zip', icase=True)
+
 #----------------------------------------------------------------------
 # Make sure the user is authorized to run this script.
 #----------------------------------------------------------------------
@@ -391,6 +398,10 @@ if not cdr.canDo(session, "ADD DOCUMENT", "Media"):
     cdrcgi.bail("Sorry, you aren't authorized to create new Media documents")
 if not cdr.canDo(session, "MODIFY DOCUMENT", "GlossaryTermName"):
     cdrcgi.bail("Sorry, you aren't authorized to modify GlossaryTermName docs")
+
+# Navigate away from script?
+if request == cdrcgi.MAINMENU:
+    cdrcgi.navigateTo("Admin.py", session)
 
 #----------------------------------------------------------------------
 # If we don't have a request yet, show the page asking for confirmation.

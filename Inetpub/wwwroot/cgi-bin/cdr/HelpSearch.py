@@ -12,7 +12,7 @@
 # Added advanced search page for Documentation documents.
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, cdrdb
+import cgi, cdrcgi, cdrdb
 
 #----------------------------------------------------------------------
 # Get the form variables.
@@ -27,99 +27,78 @@ infoType  = fields and fields.getvalue("InfoType")        or None
 submit    = fields and fields.getvalue("SubmitButton")    or None
 help      = fields and fields.getvalue("HelpButton")      or None
 
-if help: 
+if help:
     cdrcgi.bail("Sorry, help for this interface has not yet been developed.")
 
 #----------------------------------------------------------------------
-# Generate picklist for documentation types.
+# Get values for validation or for generating a picklist
 #----------------------------------------------------------------------
-def docTypeList(conn, fName):
-    try:
-        cursor = conn.cursor()
-        query  = """\
+def queryForList(fName, conn=None):
+    """
+    Query the database for a list of query term values to use both
+    in populating an HTML selection list, and in subsequent validation of
+    a selection.
+
+    Pass:
+        fname - Field name, see "fields" definition later in main.
+        conn  - Optional connection object.
+
+    Return:
+        List of values.
+    """
+    # Dictionary of fName->query term path
+    fNamePath = { 'DocType':  '/Documentation/Metadata/DocType',
+                  'Function': '/Documentation/Metadata/Function',
+                  'InfoType': '/Documentation/@InfoType' }
+
+    # Specify the query
+    qry = """\
         SELECT DISTINCT value
           FROM query_term
-         WHERE path = '/Documentation/Metadata/DocType'
+         WHERE path = '%s'
       ORDER BY value
-"""
-        cursor.execute(query)
+""" % fNamePath[fName]
+
+    # Search
+    try:
+        cursor = conn.cursor()
+        cursor.execute(qry)
         rows = cursor.fetchall()
         cursor.close()
         cursor = None
     except cdrdb.Error, info:
-        cdrcgi.bail('Failure retrieving doc type list from CDR: %s' % 
-                    info[1][0])
-    html = """\
-      <SELECT NAME='%s'>
-       <OPTION VALUE='' SELECTED>&nbsp;</OPTION>
-""" % fName
-    for row in rows:
-        html += """\
-       <OPTION VALUE='%s'>%s &nbsp;</OPTION>
-""" % (row[0], row[0])
-    html += """\
-      </SELECT>
-"""
-    return html
+        cdrcgi.bail('Failure retrieving %s list from CDR: %s' %
+                    (fName, info[1][0]))
+
+    # Return flat list of found values
+    return [row[0] for row in rows]
 
 #----------------------------------------------------------------------
-# Generate picklist for functions.
+# Generate picklist for any of our types
 #----------------------------------------------------------------------
-def functionList(conn, fName):
-    try:
-        cursor = conn.cursor()
-        query  = """\
-        SELECT DISTINCT value
-          FROM query_term
-         WHERE path = '/Documentation/Metadata/Function'
-      ORDER BY value"""
-        cursor.execute(query)
-        rows = cursor.fetchall()
-        cursor.close()
-        cursor = None
-    except cdrdb.Error, info:
-        cdrcgi.bail('Failure retrieving function list from CDR: %s' % 
-                    info[1][0])
-    html = """\
-      <SELECT NAME='%s'>
-       <OPTION VALUE='' SELECTED>&nbsp;</OPTION>
-""" % fName
-    for row in rows:
-        html += """\
-       <OPTION VALUE='%s'>%s &nbsp;</OPTION>
-""" % (row[0], row[0])
-    html += """\
-      </SELECT>
-"""
-    return html
+def genSelectList(conn, fName):
+    """
+    Generate a populated HTML selection list.
 
-#----------------------------------------------------------------------
-# Generate picklist for info types.
-#----------------------------------------------------------------------
-def infoTypeList(conn, fName):
-    try:
-        cursor = conn.cursor()
-        query  = """\
-        SELECT DISTINCT value
-          FROM query_term
-         WHERE path = '/Documentation/@InfoType'
-      ORDER BY value
-"""
-        cursor.execute(query)
-        rows = cursor.fetchall()
-        cursor.close()
-        cursor = None
-    except cdrdb.Error, info:
-        cdrcgi.bail('Failure retrieving info type list from CDR: %s' % 
-                    info[1][0])
+    Pass:
+        conn  - Initialized connection object.
+        fName - The selection field.
+
+    Return:
+        HTML fragment for execution as a callback by
+        cdrcgi.startAdvancedSearchPage().
+    """
+    # Get the values to use in populating the list
+    valueList = queryForList(fName, conn)
+
     html = """\
       <SELECT NAME='%s'>
        <OPTION VALUE='' SELECTED>&nbsp;</OPTION>
 """ % fName
-    for row in rows:
+    for value in valueList:
         html += """\
        <OPTION VALUE='%s'>%s &nbsp;</OPTION>
-""" % (row[0], row[0])
+""" % (value, value)
     html += """\
       </SELECT>
 """
@@ -134,13 +113,19 @@ except cdrdb.Error, info:
     cdrcgi.bail('Failure connecting to CDR: %s' % info[1][0])
 
 #----------------------------------------------------------------------
+# Validate parameters
+#----------------------------------------------------------------------
+if boolOp:   cdrcgi.valParmVal(boolOp, valList=('AND', 'OR'))
+if docType:  pass # LEFT OFF HERE
+
+#----------------------------------------------------------------------
 # Display the search form.
 #----------------------------------------------------------------------
 if not submit:
-    fields = (('Doc Type',                'DocType', docTypeList),
-              ('Function',                'Function', functionList),
+    fields = (('Doc Type',                'DocType', genSelectList),
+              ('Function',                'Function', genSelectList),
               ('Keyword',                 'Keyword'),
-              ('Info Type',               'InfoType', infoTypeList))
+              ('Info Type',               'InfoType', genSelectList))
     buttons = (('submit', 'SubmitButton', 'Search'),
                ('submit', 'HelpButton',   'Help'),
                ('reset',  'CancelButton', 'Clear'))
@@ -174,7 +159,7 @@ searchFields = (cdrcgi.SearchField(docType,
 #----------------------------------------------------------------------
 # Construct the query.
 #----------------------------------------------------------------------
-(query, strings) = cdrcgi.constructAdvancedSearchQuery(searchFields, boolOp, 
+(query, strings) = cdrcgi.constructAdvancedSearchQuery(searchFields, boolOp,
                                                        "Documentation")
 if not query:
     cdrcgi.bail('No query criteria specified')
@@ -189,13 +174,13 @@ try:
     cursor.close()
     cursor = None
 except cdrdb.Error, info:
-    cdrcgi.bail('Failure retrieving Documentation documents: %s' % 
+    cdrcgi.bail('Failure retrieving Documentation documents: %s' %
                 info[1][0])
 
 #----------------------------------------------------------------------
 # Create the results page.
 #----------------------------------------------------------------------
-html = cdrcgi.advancedSearchResultsPage("Documentation", rows, strings, 
+html = cdrcgi.advancedSearchResultsPage("Documentation", rows, strings,
                                     'name:Documentation Help Screens Filter')
 
 #----------------------------------------------------------------------

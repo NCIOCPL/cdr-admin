@@ -7,120 +7,83 @@
 # BZIssue::4700
 # BZIssue::4804
 # BZIssue::5141
-#
+# Removed obsolete reports and tools to eliminate security holes (2015-07-15)
+# Suppressed report on orphaned CT.gov trials (summary 2015) while
+# CIAT considers whether it should be rewritten for CTRP trials.
+# It could never have worked when launched on PROD from a lower
+# tier anyway, because a session ID from one tier won't work on another.
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, string
+import cdr
+import cdrcgi
+import cgi
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields  = cgi.FieldStorage()
-session = cdrcgi.getSession(fields)
-action  = cdrcgi.getRequest(fields)
-qcFlag  = fields and fields.getvalue("qc") or 0
-title   = "CDR Administration"
-section = "ClinicalTrials.Gov Protocols"
-buttons = [cdrcgi.MAINMENU, "Log Out"]
-header  = cdrcgi.header(title, title, section, "CTGov.py", buttons)
+class Control:
+    BUTTONS = (cdrcgi.MAINMENU, "Log Out")
+    TITLE = "CDR Administration"
+    SCRIPT = "CTGov.py"
+    def __init__(self):
+        fields = cgi.FieldStorage()
+        self.session = cdrcgi.getSession(fields)
+        self.request = cdrcgi.getRequest(fields)
+        self.qc = fields.getvalue("qc")
+        msg = "CGI parameter tampering detected"
+        cdrcgi.valParmVal(self.qc, val_list=("1",), msg=msg, empty_ok=True)
+        cdrcgi.valParmVal(self.request, val_list=self.BUTTONS, msg=msg,
+                          empty_ok=True)
+    def run(self):
+        if self.request == cdrcgi.MAINMENU:
+            cdrcgi.navigateTo("Admin.py", self.session)
+        elif self.request == "Log Out":
+            cdrcgi.logout(self.session)
+        elif self.qc:
+            self.show_qc_form()
+        else:
+            self.show_menu()
+    def show_menu(self):
+        opts = {
+            "session": self.session,
+            "subtitle": "ClinicalTrials.Gov Protocols",
+            "buttons": self.BUTTONS,
+            "action": self.SCRIPT,
+            "body_classes": "admin-menu"
+        }
+        page = cdrcgi.Page(self.TITLE, **opts)
+        page.add(page.B.H3("Mapping Table"))
+        page.add("<ol>")
+        page.add_menu_link("EditExternMap.py", "Update Mapping Table",
+                           self.session)
+        page.add("</ol>")
+        page.add(page.B.H3("QC Reports"))
+        page.add("<ol>")
+        page.add_menu_link("CTGov.py", "CTGov Protocol QC Report",
+                           self.session, qc="1")
+        page.add("</ol>")
+        page.add(page.B.H3("Management Reports"))
+        page.add("<ol>")
+        for script, display in (
+            ('CTGovUpdateReport.py', 'CTGovProtocols Imported vs. CWDs'),
+            ('CTGovProtocolProcessingStatusReport.py',
+             'CTGovProtocols Processing Status Report'),
+            ('CTGovDupReport.py', 'Records Marked Duplicate'),
+            ('CTGovOutOfScope.py', 'Records Marked Out of Scope'),
+            ('CTGovDownloadReport.py', 'Statistics Report - Download'),
+            ('CTGovImportReport.py', 'Statistics Report - Import')
+        ):
+            page.add_menu_link(script, display, self.session)
+        page.add("</ol>")
+        page.send()
+    def show_qc_form(self):
+        opts = {
+            "session": self.session,
+            "subtitle": "CTGovProtocol QC Report",
+            "buttons": ("Submit",) + self.BUTTONS,
+            "action": "QcReport.py"
+        }
+        page = cdrcgi.Page(self.TITLE, **opts)
+        page.add("<fieldset>")
+        page.add(page.B.LEGEND("Select Document for QC Report"))
+        page.add_text_field(cdrcgi.DOCID, "Doc ID")
+        page.add("</fieldset>")
+        page.send()
 
-#----------------------------------------------------------------------
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if action == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-
-#----------------------------------------------------------------------
-# Handle request to log out.
-#----------------------------------------------------------------------
-if action == "Log Out":
-    cdrcgi.logout(session)
-
-#----------------------------------------------------------------------
-# Handle request for QC report.
-#----------------------------------------------------------------------
-if qcFlag:
-    header = cdrcgi.header(title, title, "CTGovProtocol QC Report",
-                           "QcReport.py", buttons)
-    form = """\
-   <input type='hidden' name='%s' value='%s'>
-   <b>Document ID:&nbsp;</b>
-   <input name='DocId'>&nbsp;
-   <input type='submit' name='Generate Report'>
-""" % (cdrcgi.SESSION, session)
-    cdrcgi.sendPage(header + form + """\
-  </form>
- </body>
-</html>
-""")
-
-#----------------------------------------------------------------------
-# Display available report choices.
-#----------------------------------------------------------------------
-form = """\
-    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-    <H3>Review/Import Protocols</H3>
-    <OL>
-""" % (cdrcgi.SESSION, session)
-reports = [
-           ('ForceCtgovImport.py?', 'Force CTGov Download'),
-           ('CTGovImport.py?which=new&', 'Review New Protocols'),
-           ('CTGovImport.py?which=cips&', 'Review Protocols Sent to CIPS'),
-           ('Task5141.py?', 'Swap NCT IDs')
-]
-for r in reports:
-    form += "<LI><A HREF='%s/%s%s=%s'>%s</A></LI>\n" % (
-            cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
-
-form += """\
-    </OL>
-    <H3>Mapping table</H3>
-    <OL>
-"""
-reports = [
-           ('EditExternMap.py', 'Update Mapping Table'),
-           ('CTGovMarkDuplicate.py', 'Mark/Remove Protocols as Duplicates'),
-           ('GlobalChangeCTGovMapping.py',
-            'Global Change Protocols to Find Mappings'),
-           ('EditNonMappablePatterns.py',
-            'Update List of Non-mappable Patterns'),
-           ('ctrp-mapping-gaps.py', 'CTRP Mapping Gaps')          ]
-for r in reports:
-    form += "<LI><A HREF='%s/%s?%s=%s'>%s</A></LI>\n" % (
-            cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
-
-form += """\
-    </OL>
-    <H3>QC Reports</H3>
-    <OL>
-"""
-reports = [
-           ('CTGov.py?qc=1', 'CTGov Protocol QC Report')
-          ]
-for r in reports:
-    form += "<LI><A HREF='%s/%s&%s=%s'>%s</A></LI>\n" % (
-            cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
-
-form += """\
-    </OL>
-    <H3>Management Reports</H3>
-    <OL>
-     <LI><A HREF='%s?%s=%s'>%s</A></LI>
-""" % (cdr.h.makeCdrCgiUrl('PROD', 'FindOrphanedCTGovProtocols.py'),
-       cdrcgi.SESSION, session, 'CTGov trials not receiving updates')
-
-reports = [
-           ('CTGovUpdateReport.py', 'CTGovProtocols Imported vs. CWDs'),
-           ('CTGovProtocolProcessingStatusReport.py',
-            'CTGovProtocols Processing Status Report'),
-           ('CTGovEntryDate.py', 'CTGovProtocols vs. Early EntryDate'),
-           ('ExternMapFailures.py', 'External Map Failures Report'),
-           ('CTGovDupReport.py', 'Records Marked Duplicate'),
-           ('CTGovOutOfScope.py', 'Records Marked Out of Scope'),
-           ('CTGovDownloadReport.py', 'Statistics Report - Download'),
-           ('CTGovImportReport.py', 'Statistics Report - Import')
-          ]
-for r in reports:
-    form += "<LI><A HREF='%s/%s?%s=%s'>%s</A></LI>\n" % (
-            cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
-
-cdrcgi.sendPage(header + form + "</OL></FORM></BODY></HTML>")
+Control().run()

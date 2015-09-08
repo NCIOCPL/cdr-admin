@@ -5,176 +5,119 @@
 #
 # Main menu for board managers.
 #
+# BZIssue::1059 - Replaced stub with link to Board Member QC report
+# BZIssue::1231 - Added Summaries TOC report
+# BZIssue::1329 - Rationalize item naming with the CIAT menu
+# BZIssue::1531 - Added Publish Preview
+# BZIssue::1853 - Modified on item label and moved another item
+# BZIssue::3666 - Added menu item
+# BZIssue::3672 - Added menu item
+# BZIssue::4205 - Add Board Meeting Dates
+# BZIssue::4243 - Add Changes to Summaries
 # BZIssue::4648
 # BZIssue::4671 - Summaries with Markup Report
 # BZIssue::4673 - Adding Board Roster (Full) option
 #
-# Revision 1.15  2008/08/26 21:16:18  venglisc
-# Added new menu item Changes to Summaries (Bug 4243)
-#
-# Revision 1.14  2008/08/22 19:40:04  venglisc
-# Adding new menu option for Board Meeting Dates. (Bug 4205)
-#
-# Revision 1.13  2007/11/05 13:10:25  kidderc
-# 3672,3666 added two items to menu under Management Reports.
-#
-# Revision 1.12  2005/10/13 21:33:16  venglisc
-# Modified title of one menu item and moved another. (Bug 1853)
-#
-# Revision 1.11  2005/04/21 21:26:11  venglisc
-# Added menu item for Publish Preview report. (Bug 1531)
-#
-# Revision 1.10  2005/02/23 14:38:01  bkline
-# Added link to board member mailer page.
-#
-# Revision 1.9  2004/09/09 19:19:44  venglisc
-# Minor changes to menu entries to have menu items match between the
-# CIAT and CIPS summary menu. (Bug 1329).
-#
-# Revision 1.8  2004/07/13 19:11:14  venglisc
-# Added menu item for Summaries TOC Report (Bug 1231).
-# Minor formatting changes to list HTML tags in upper case.
-#
-# Revision 1.7  2004/06/02 15:19:58  venglisc
-# Testing CVS server:  Adding extra comment line.
-#
-# Revision 1.6  2004/05/11 17:29:53  bkline
-# Plugged in Board Roster report.
-#
-# Revision 1.5  2004/04/16 21:56:57  venglisc
-# Removed stub to link to Board Member QC report. (Bug 1059).
-#
-# Revision 1.4  2004/04/08 20:31:10  bkline
-# Plugged in additions requested by Margaret (request #1059).
-#
-# Revision 1.3  2003/12/19 18:29:08  bkline
-# Plugged in new Summaries LIsts report.
-#
-# Revision 1.2  2003/12/18 22:16:41  bkline
-# Alphabetized first section at Volker's request (with Lakshmi's
-# concurrence).
-#
-# Revision 1.1  2003/12/16 16:02:14  bkline
-# Main menu for board managers.
-#
 #  Adding menu item for Comprehensive Review Date Report
+#
+# Switched to Page class as part of security sweep summer 2015.
+#
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, string
+import cdr
+import cdrcgi
+import cgi
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields  = cgi.FieldStorage()
-session = cdrcgi.getSession(fields)
-action  = cdrcgi.getRequest(fields)
-title   = "CDR Administration"
-section = "Board Managers"
-buttons = []
-header  = cdrcgi.header(title, title, section, "BoardManagers.py", buttons,
-                        numBreaks = 1, stylesheet = """\
-  <style type='text/css'>
-   H2 { font-family: Arial; font-size: 14pt; font-weight: bold }
-   LI { font-family: Arial; font-size: 12pt; font-weight: bold }
-  </style>
-""")
-
-#----------------------------------------------------------------------
-# Display available menu choices.
-#----------------------------------------------------------------------
-session = "%s=%s" % (cdrcgi.SESSION, session)
-form = """\
-   <H2>General Use Reports</H2>
-   <OL>
-"""
-for choice in (
-    ('GeneralReports.py', 'All General Reports'         ),
-    ('CheckedOutDocs.py', 'Checked Out Documents Report'),
-    ('ActivityReport.py', 'Document Activity Report'    ),
-    ('LinkedDocs.py',     'Linked Documents Report'     ),
-    ('UnchangedDocs.py',  'Unchanged Documents Report'  )
-    ):
-    form += """\
-    <LI><a href='%s/%s?%s'>%s</a></LI>
-""" % (cdrcgi.BASE, choice[0], session, choice[1])
-
-form += """\
-   </OL>
-   <H2>Summary QC Reports</H2>
-   <OL>
-"""
-for choice in (
-    ('bu',  'Bold/Underline (HP/Old Patient)'   ),
-    ('rs',  'Redline/Strikeout (HP/Old Patient)'),
-    ('pat', 'New Patient'                       ),
-    ('pp',  'Publish Preview'                   )
-    ):
-    form += """\
-    <LI><a href='%s/QcReport.py?DocType=Summary&ReportType=%s&%s'>%s</a></LI>
-""" % (cdrcgi.BASE, choice[0], session, choice[1])
-
-form += """\
-   </OL>
-   <H2>Management Reports</H2>
-   <OL>
-"""
-
-for choice in (
-    ('BoardMeetingDates.py',       'Board Meeting Dates'          ),
-    ('ChangesToSummaries.py',      'Changes to Summaries'         ),
-    ('SummaryChanges.py',          'History of Changes to Summary'),
-    ('RunICRDBStatReport.py',      'PCIB Statistics Report (MB)'  ),
-    ('SummaryCitations.py',        'Summaries Citations'          ),
-    ('SummaryComments.py',         'Summaries Comments'           ),
-    ('SummaryCRD.py',
-                      'Summaries Comprehensive Review Date Report'),
-    ('SummaryDateLastModified.py', 'Summaries Date Last Modified' ),
-    ('SummariesLists.py',          'Summaries Lists'              ),
-    ('SummariesWithMarkup.py',     'Summaries Markup Report'      ),
-    ('SummaryMetaData.py',         'Summaries Metadata'           ),
-    ('SummariesTocReport.py',      'Summaries TOC Lists'          ),
-    ('SummaryTypeChangeReport.py?','Summaries Type Of Change'     ),
-    ('SummariesWithProtocolLinks.py',
-                      'Summaries with Protocols Links/Refs Report'),
-    ('SummariesWithNonJournalArticleCitations.py',
-             'Summaries with Non-Journal Article Citations Report')
-    ):
-    form += """\
-    <LI><a href='%s/%s?%s'>%s</a></LI>
-""" % (cdrcgi.BASE, choice[0], session, choice[1])
-
-form += """\
-   </OL>
-   <H2>Board Member Information Reports</H2>
-   <OL>
-"""
-
-for choice in (
-    ('QcReport.py',                'Board Member Information QC Report'  ),
-    ('BoardRoster.py',             'Board Roster Reports'                ),
-    ('BoardRosterFull.py',         'Board Roster Reports (Combined)'     ),
-    ('BoardInvitationHistory.py',  'Invitation History Report'           ),
-    ('PdqBoards.py',               'PDQ Board Members and Topics'        )
-    ):
-    form += """\
-    <LI><a href='%s/%s?DocType=PDQBoardMemberInfo&%s'>%s</a></LI>
-""" % (cdrcgi.BASE, choice[0], session, choice[1])
-
-cdrcgi.sendPage(header + form + """\
-   </OL>
-   <H2>Miscellaneous Document QC Report</H2>
-   <OL>
-    <LI><a href='%s/MiscSearch.py?%s'>Miscellaneous Documents</a></LI>
-   </OL>
-   <H2>Mailers</H2>
-   <OL>
-    <LI><a href='%s/BoardMemberMailerReqForm.py?%s'>PDQ&reg; Board
-     Member Correspondence Mailers</a></LI>
-    <LI><A HREF='%s/SummaryMailerReport.py?flavor=4259&%s'
-        >Summary Mailer History Report</A></LI>
-    <LI><A HREF='%s/SummaryMailerReport.py?flavor=4258&%s'
-        >Summary Mailer Report</A></LI>
-   </OL>
-  </FORM>
- </BODY>
-</HTML>""" % (cdrcgi.BASE, session, cdrcgi.BASE, session,
-              cdrcgi.BASE, session, cdrcgi.BASE, session))
+class Control:
+    TITLE = "CDR Administration"
+    SECTION = "Board Managers"
+    def __init__(self):
+        fields  = cgi.FieldStorage()
+        self.session = cdrcgi.getSession(fields)
+        if not self.in_group("Board Manager Menu Users"):
+            cdrcgi.bail("User not authorized for this menu")
+    def in_group(self, group):
+        try:
+            name = cdr.idSessionUser(self.session, self.session)[0]
+            user = cdr.getUser(self.session, name)
+            return group in user.groups
+        except:
+            return False
+    def show_menu(self):
+        opts = { "subtitle": self.SECTION, "body_classes": "admin-menu" }
+        page = cdrcgi.Page(self.TITLE, **opts)
+        page.add(page.B.H3("General Use Reports"))
+        page.add("<ol>")
+        for script, display in (
+            ("GeneralReports.py", "All General Reports"),
+            ("CheckedOutDocs.py", "Checked Out Documents Report"),
+            ("ActivityReport.py", "Document Activity Report"),
+            ("LinkedDocs.py", "Linked Documents Report"),
+            ("UnchangedDocs.py", "Unchanged Documents Report")
+        ):
+            page.add_menu_link(script, display, self.session)
+        page.add("</ol>")
+        opts = { "DocType": "Summary", "session": self.session }
+        page.add(page.B.H3("Summary QC Reports"))
+        page.add("<ol>")
+        for report_key, display in (
+            ("bu", "Bold/Underline (HP/Old Patient)"),
+            ("rs", "Redline/Strikeout (HP/Old Patient)"),
+            ("pat","New Patient"),
+            ("pp", "Publish Preview")
+        ):
+            opts["ReportType"] = report_key
+            page.add_menu_link("QcReport.py", display, **opts)
+        page.add("</ol>")
+        page.add(page.B.H3("Management Reports"))
+        page.add("<ol>")
+        for script, display in (
+            ("BoardMeetingDates.py", "Board Meeting Dates"),
+            ("ChangesToSummaries.py", "Changes to Summaries"),
+            ("SummaryChanges.py", "History of Changes to Summary"),
+            ("RunICRDBStatReport.py", "PCIB Statistics Report (MB)"),
+            ("SummaryCitations.py", "Summaries Citations"),
+            ("SummaryComments.py", "Summaries Comments"),
+            ("SummaryCRD.py", "Summaries Comprehensive Review Date Report"),
+            ("SummaryDateLastModified.py", "Summaries Date Last Modified"),
+            ("SummariesLists.py", "Summaries Lists"),
+            ("SummariesWithMarkup.py", "Summaries Markup Report"),
+            ("SummaryMetaData.py", "Summaries Metadata"),
+            ("SummariesTocReport.py", "Summaries TOC Lists"),
+            ("SummaryTypeChangeReport.py", "Summaries Type Of Change"),
+            ("SummariesWithProtocolLinks.py",
+             "Summaries with Protocols Links/Refs Report"),
+            ("SummariesWithNonJournalArticleCitations.py",
+             "Summaries with Non-Journal Article Citations Report")
+        ):
+            page.add_menu_link(script, display, self.session)
+        page.add("</ol>")
+        page.add(page.B.H3("Board Member Information Reports"))
+        page.add("<ol>")
+        for script, display in (
+            ("QcReport.py", "Board Member Information QC Report"),
+            ("BoardRoster.py", "Board Roster Reports"),
+            ("BoardRosterFull.py", "Board Roster Reports (Combined)"),
+            ("BoardInvitationHistory.py", "Invitation History Report"),
+            ("PdqBoards.py", "PDQ Board Members and Topics")
+        ):
+            page.add_menu_link(script, display, self.session)
+        page.add("</ol>")
+        page.add(page.B.H3("Miscellaneous Document QC Report"))
+        page.add("<ol>")
+        page.add_menu_link("MiscSearch.py", "Miscellaneous Documents",
+                           self.session)
+        page.add("</ol>")
+        page.add(page.B.H3("Mailers"))
+        page.add("<ol>")
+        page.add_menu_link("BoardMemberMailerReqForm.py",
+                           u"PDQ\xAE Board Member Correspondence Mailers",
+                           self.session)
+        page.add_menu_link("SummaryMailerReport.py",
+                           "Summary Mailer History Report", self.session,
+                           flavor="4259")
+        page.add_menu_link("SummaryMailerReport.py",
+                           "Summary Mailer Report", self.session,
+                           flavor="4258")
+        page.add("</ol>")
+        page.send()
+Control().show_menu()

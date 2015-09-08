@@ -50,7 +50,7 @@
 # New summary reports.
 #
 #----------------------------------------------------------------------
-import cdr, cdrdb, cdrcgi, cgi, re, time, ExcelWriter, sys
+import cdr, cdrdb, cdrcgi, cgi, time, ExcelWriter, sys
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -120,7 +120,7 @@ elif request == SUBMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if request == "Log Out": 
+if request == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
@@ -131,6 +131,26 @@ try:
     cursor = conn.cursor()
 except cdrdb.Error, info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
+
+#----------------------------------------------------------------------
+# Validate parameters
+#----------------------------------------------------------------------
+if request:    cdrcgi.valParmVal(request, valList=buttons)
+if est:
+    if est != ['all']:
+               cdrcgi.valParmVal(est, regex=r'^\d+$')
+if sst:
+    if sst != ['all']:
+               cdrcgi.valParmVal(sst, regex=r'^\d+$')
+if uStartDate: cdrcgi.valParmDate(uStartDate)
+if uEndDate:   cdrcgi.valParmDate(uEndDate)
+if sStartDate: cdrcgi.valParmDate(sStartDate)
+if sEndDate:   cdrcgi.valParmDate(sEndDate)
+if audience:
+    if audience != 'all':
+        # Note: I'm using the cdr. version here, not refactoring the code
+        #       that generated audiences in this script
+        cdrcgi.valParmVal(audience, valList=cdr.getSummaryAudiences())
 
 #----------------------------------------------------------------------
 # Build a picklist for Summary Audience.
@@ -150,7 +170,7 @@ SELECT DISTINCT value
     &nbsp;
     <input name='Audience' type='radio' value='%s' class='choice'/> %s <br />
 """ % (value, value))
-    except Exception:
+    except Exception as e:
         cdrcgi.bail("Failure retrieving audience choices: %s" % e)
     html.append(u"""\
     &nbsp;
@@ -391,7 +411,7 @@ class Summary:
     def __getSaveUsr(docId, cursor):
         "Get the user from the last version of the document."
         cursor.execute("""\
-       SELECT fullname 
+       SELECT fullname
          FROM doc_last_save dls
          JOIN doc_save_action dsa
            ON dsa.doc_id = dls.doc_id
@@ -516,7 +536,6 @@ def collectSummaries(sqlSelect, sqlFrom, sqlJoin, sqlWhere,
         try:
             sql = (sqlSelect + sqlFrom + boardJoin + sqlJoin + sqlWhere +
                    audienceFilter + boardFilter + langFilter + dateFilter)
-            stamp = time.time()
             cursor.execute(sql, timeout = 300)
             rows = cursor.fetchall()
             for row in rows:
@@ -566,11 +585,11 @@ class Styles:
         align       = ExcelWriter.Alignment('Left', 'Top', True)
         font        = ExcelWriter.Font(name = 'Arial', size = 10)
         self.left   = wb.addStyle(alignment = align, font = font)
-        
+
         # Create the style for the centered cells.
         align       = ExcelWriter.Alignment('Center', 'Top', True)
         self.center = wb.addStyle(alignment = align, font = font)
-        
+
         # Create the style for the linking cells.
         font        = ExcelWriter.Font('blue', 'Single', 'Arial', size = 10)
         #align       = ExcelWriter.Alignment('Center', 'Top', True)

@@ -29,7 +29,7 @@ session   = cdrcgi.getSession(fields)
 request   = cdrcgi.getRequest(fields)
 from_date = fields.getvalue("start_date")
 to_date   = fields.getvalue("end_date")
-diagnosis = fields.getlist('Diagnosis') or ["any"]
+diagnosis = fields.getlist('diagnosis') or ["any"]
 title     = "CDR Administration"
 instr     = "Media Tracking Report"
 buttons   = ["Submit Request", "Report Menu", cdrcgi.MAINMENU, "Log Out"]
@@ -54,6 +54,16 @@ query.join("query_term m", "m.int_val = t.doc_id")
 query.where("t.path = '/Term/PreferredName'")
 query.where("m.path = '/Media/MediaContent/Diagnoses/Diagnosis/@cdr:ref'")
 diagnoses = [["any", "Any Diagnosis"]] + query.execute(cursor).fetchall()
+
+#----------------------------------------------------------------------
+# Parameter validation
+#----------------------------------------------------------------------
+if from_date: cdrcgi.valParmDate(from_date)
+if to_date:   cdrcgi.valParmDate(to_date)
+if request:   cdrcgi.valParmVal(request, valList=buttons)
+if diagnosis:
+    valDiagnoses = [str(diag[0]) for diag in diagnoses]
+    cdrcgi.valParmVal(diagnosis, valList=valDiagnoses)
 
 #----------------------------------------------------------------------
 # Ask the user for the report parameters.

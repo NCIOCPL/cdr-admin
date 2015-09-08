@@ -5,7 +5,7 @@
 # Prototype for duplicate-checking interface for Organization documents.
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, cdrdb
+import cgi, cdrcgi, cdrdb
 
 #----------------------------------------------------------------------
 # Get the form variables.
@@ -23,22 +23,8 @@ zip     = fields and fields.getvalue("ZipCode")         or None
 submit  = fields and fields.getvalue("SubmitButton")    or None
 help    = fields and fields.getvalue("HelpButton")      or None
 
-if help: 
+if help:
     cdrcgi.bail("Sorry, help for this interface has not yet been developed.")
-
-#----------------------------------------------------------------------
-# Generate picklist for countries.
-#----------------------------------------------------------------------
-def orgTypeList(conn, fName):
-    query  = """\
-  SELECT DISTINCT value, value
-    FROM query_term
-   WHERE path = '/Organization/OrganizationType'
-     AND value IS NOT NULL
-     AND value <> ''
-ORDER BY 1"""
-    pattern = "<option value='%s'>%s &nbsp;</option>"
-    return cdrcgi.generateHtmlPicklist(conn, fName, query, pattern)
 
 #----------------------------------------------------------------------
 # Connect to the CDR database.
@@ -49,11 +35,32 @@ except cdrdb.Error, info:
     cdrcgi.bail('Failure connecting to CDR: %s' % info[1][0])
 
 #----------------------------------------------------------------------
+# Validate parameters that can be validated
+#----------------------------------------------------------------------
+cdrcgi.valParmVal(boolOp, valList=('AND', 'OR'))
+if orgType:
+    orgTypes = cdrcgi.organizationTypeList(conn, 'OrgType', valCol=0)
+    cdrcgi.valParmVal(orgType, valList=orgTypes)
+if submit:
+    cdrcgi.valParmVal(submit, valList='Search')
+if help:
+    cdrcgi.valParmVal(submit, valList='Help')
+if state:
+    cdrcgi.valParmVal(state,
+                      valList=cdrcgi.stateList(conn, 'State', valCol=0))
+if country:
+    cdrcgi.valParmVal(country,
+                      valList=cdrcgi.countryList(conn, 'Country', valCol=0))
+if zip and country in ('U.S.A', 'United States'):
+    cdrcgi.valParmVal(zip, cdrcgi.VP_US_ZIPCODE)
+
+#----------------------------------------------------------------------
 # Display the search form.
 #----------------------------------------------------------------------
 if not submit:
     fields = (('Organization Name',       'OrgName'),
-              ('Organization Type',       'OrgType', orgTypeList),
+              ('Organization Type',       'OrgType',
+                                           cdrcgi.organizationTypeList),
               ('Street',                  'Street'),
               ('City',                    'City'),
               ('State',                   'State', cdrcgi.stateList),
@@ -114,7 +121,7 @@ searchFields = (cdrcgi.SearchField(orgName,
 #----------------------------------------------------------------------
 # Construct the query.
 #----------------------------------------------------------------------
-(query, strings) = cdrcgi.constructAdvancedSearchQuery(searchFields, boolOp, 
+(query, strings) = cdrcgi.constructAdvancedSearchQuery(searchFields, boolOp,
                                                        "Organization")
 if not query:
     cdrcgi.bail('No query criteria specified')
@@ -135,7 +142,7 @@ except cdrdb.Error, info:
 #----------------------------------------------------------------------
 # Create the results page.
 #----------------------------------------------------------------------
-html = cdrcgi.advancedSearchResultsPage("Organization", rows, strings, 
+html = cdrcgi.advancedSearchResultsPage("Organization", rows, strings,
                                         None, session)
 
 #----------------------------------------------------------------------

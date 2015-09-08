@@ -3,9 +3,13 @@
 # $Id$
 #
 # Make a blocked document active.
+# Modified July 2015 as part of security sweep.
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, cdrdb
+import cdr
+import cdrcgi
+import cgi
+import re
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -13,12 +17,18 @@ import cgi, cdr, cdrcgi, cdrdb
 fields   = cgi.FieldStorage()
 session  = cdrcgi.getSession(fields)
 request  = cdrcgi.getRequest(fields)
-id       = fields and fields.getvalue(cdrcgi.DOCID) or None
+doc_id   = fields.getvalue(cdrcgi.DOCID) or ""
 title    = "CDR Administration"
 section  = "Unblock CDR Document"
 buttons  = ["Unblock", cdrcgi.MAINMENU, "Log Out"]
 script   = "UnblockDoc.py"
-report   = u""
+message  = error = None
+
+#----------------------------------------------------------------------
+# Scrub the document ID.
+#----------------------------------------------------------------------
+matches = re.findall(r"\d+", doc_id)
+doc_id = matches and matches[0] or ""
 
 #----------------------------------------------------------------------
 # Make sure we're logged in.
@@ -28,7 +38,7 @@ if not session: cdrcgi.bail('Unknown or expired CDR session.')
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if request == "Log Out": 
+if request == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
@@ -38,45 +48,36 @@ if request == cdrcgi.MAINMENU:
     cdrcgi.navigateTo("Admin.py", session)
 
 #----------------------------------------------------------------------
-# Wrap an HTML element telling what happened.
-#----------------------------------------------------------------------
-def makeReport(what, color = 'green'):
-    report = (u"<span style='font-weight: bold; font-family: Arial; "
-              u"color: %s'>" % color)
-    if type(what) in (type(""), type(u"")):
-        what = [what]
-    for piece in what:
-        report += piece + u"<br>"
-    report += u"</span>"
-    return report
-
-#----------------------------------------------------------------------
 # Handle request to unblock the document.
 #----------------------------------------------------------------------
 if request == "Unblock":
-    if not id:
-        cdrcgi.bail("Missing required document ID.")
-    try:
-        oldStatus = cdr.getDocStatus('guest', id)
-        if oldStatus == 'I':
-            try:
-                cdr.unblockDoc(session, id)
-                report = makeReport("Successfully unblocked %s" %
-                                    cdr.normalize(id))
-            except Exception, e:
-                report = makeReport(e.args[0], "red")
-        else:
-            report = makeReport("Document %s is not blocked" % id, "red")
-    except Exception, e:
-        report = makeReport(e.args[0], "red")
-                     
+    if not doc_id:
+        error = "Missing required document ID."
+    else:
+        try:
+            oldStatus = cdr.getDocStatus('guest', doc_id)
+            if oldStatus == 'I':
+                try:
+                    cdr.unblockDoc(session, doc_id)
+                    message = "Successfully unblocked CDR%s" % doc_id
+                except Exception, e:
+                    error = e.message[0]
+            else:
+                error = "CDR%s was not blocked" % doc_id
+        except Exception, e:
+            error = e.message[0]
+
 #----------------------------------------------------------------------
-# Display the form for merging two protocol documents.
+# Display the form for requesting that a document be unblocked.
 #----------------------------------------------------------------------
-header  = cdrcgi.header(title, title, section, script, buttons)
-form = """\
-%s
-<br>Document ID:&nbsp;<input name='%s'>
-<input type='hidden' name='%s' value='%s' >
-""" % (report, cdrcgi.DOCID, cdrcgi.SESSION, session)
-cdrcgi.sendPage(header + form + "</form></body></html>")
+page = cdrcgi.Page(title, subtitle=section, action=script, buttons=buttons,
+                   session=session)
+page.add("<fieldset>")
+page.add(page.B.LEGEND("Specify document to be unblocked"))
+if message:
+    page.add(page.B.P(message, page.B.CLASS("warning")))
+if error:
+    page.add(page.B.P(error, page.B.CLASS("error")))
+page.add_text_field(cdrcgi.DOCID, "Document ID")
+page.add("</fieldset>")
+page.send()

@@ -2,14 +2,13 @@
 #
 # ReverifyJob.py
 # -------------
-# $Id: $
+# $Id$
 #
-# Web interface to allow running the ReverifyPushJob program in the 
+# Web interface to allow running the ReverifyPushJob program in the
 # CBIIT environment
 #
 #----------------------------------------------------------------------
-import sys, cdr, cgi, cdrcgi, time
-import cdr, cgi, cdrcgi, re, cdrdb, os
+import sys, os, cdr, cgi, cdrcgi, cdrdb, time
 
 LOGFILE = "%s/ReverifyJob.log" % cdr.DEFAULT_LOGDIR
 PUBPATH = os.path.join('d:\\cdr', 'publishing')
@@ -23,7 +22,6 @@ session   = cdrcgi.getSession(fields)
 job       = fields and fields.getvalue("jobid")        or 0
 jobStatus = fields and fields.getvalue("status")       or None
 jobMode   = fields and fields.getvalue("mode")         or "test"
-submit    = fields and fields.getvalue("SubmitButton") or None
 request   = cdrcgi.getRequest(fields)
 title     = "CDR Administration"
 instr     = "Reverify Gatekeeper Push Job"
@@ -33,6 +31,8 @@ buttons   = (cdrcgi.MAINMENU)
 
 if jobMode == 'test':
     runmode = '--testmode'
+elif jobMode != 'live':
+    cdrcgi.bail()
 else:
     runmode = '--livemode'
 
@@ -41,7 +41,14 @@ if job:
     try:
         jobId = int(job)
     except:
-        cdrcgi.bail('Job-ID not a number: %s' % repr(job))
+        # Removed print of invalid job ID for AppScan security
+        cdrcgi.bail('Job-ID not a number')
+
+# Validate other parms
+if request:
+    cdrcgi.valParmVal(request, valList=('Submit', cdrcgi.MAINMENU))
+if jobStatus:
+    cdrcgi.valParmVal(jobStatus, valList=('Failure','Stalled','Success'))
 
 # -------------------------------------------------------------------
 #
@@ -77,7 +84,7 @@ dateString = time.strftime("%B %d, %Y")
 # jobId = 1234
 # session = '515F47B2-EC81EB-107-AG1T8VWZU7LA'
 if not jobId and not jobStatus:
-    header = cdrcgi.header(title, title, instr + ' - ' + dateString, 
+    header = cdrcgi.header(title, title, instr + ' - ' + dateString,
                            script,
                            ("Submit",
                             cdrcgi.MAINMENU),
@@ -91,7 +98,7 @@ if not jobId and not jobStatus:
 """                           )
     form   = """\
    <input type='hidden' name='%s' value='%s'>
- 
+
    <fieldset>
     <legend>&nbsp;Enter Pub-Job Values&nbsp;</legend>
     <input name='jobid' type='text' size='10' id="jobid" >
@@ -119,18 +126,18 @@ if not jobId and not jobStatus:
 """ % (cdrcgi.SESSION, session)
     cdrcgi.sendPage(header + form)
 
-if not session: 
+if not session:
     cdrcgi.bail("Unknown or expired CDR session.")
 
 try:
-    user = getUserName(session) 
+    user = getUserName(session)
     cdr.logwrite('--------------------------------------------', LOGFILE)
     cdr.logwrite("%s: session %s" % (PROG, repr(session)), LOGFILE)
     cdr.logwrite("%s: user:   %s" % (PROG, repr(user)), LOGFILE)
     cdr.logwrite("%s: job-id: %s" % (PROG, jobId), LOGFILE)
     cdr.logwrite("%s: status: %s" % (PROG, jobStatus), LOGFILE)
     cdr.logwrite("%s: mode:   %s" % (PROG, jobMode), LOGFILE)
-    
+
     cmd = os.path.join(PUBPATH, u'%s --session=%s --jobid=%d --status=%s %s' % (
                                  PROG, session, jobId, jobStatus, runmode))
 
@@ -145,12 +152,12 @@ try:
 except TypeError:
     e = sys.exc_info()[0]
     print '*** Error: %s' % e
-    
+
     cdr.logwrite('*** Error: Submitting Publishing Job failed', LOGFILE)
     sys.exit(1)
 
 
-header = cdrcgi.header(title, title, instr + ' - ' + dateString, 
+header = cdrcgi.header(title, title, instr + ' - ' + dateString,
                            script,
                            ("Submit",
                             cdrcgi.MAINMENU),
@@ -164,8 +171,8 @@ header = cdrcgi.header(title, title, instr + ' - ' + dateString,
 """                           )
 footer = """\
      </BODY>
-    </HTML> 
-"""     
+    </HTML>
+"""
 
 # Send the page back to the browser.
 #----------------------------------------------------------------------

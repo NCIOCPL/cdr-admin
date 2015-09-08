@@ -4,22 +4,19 @@
 #
 # Form for editing named CDR filter sets.
 #
-# $Log: EditFilterSet.py,v $
-# Revision 1.3  2007/11/03 14:15:07  bkline
-# Unicode encoding cleanup (issue #3716).
-#
-# Revision 1.2  2002/11/14 13:54:21  bkline
-# Plugged in blockChange() for titles of existing filter sets.
-#
-# Revision 1.1  2002/11/13 20:38:25  bkline
-# New script for maintaining a named CDR filter set.
+# BZIssue::3716 - Unicode encoding cleanup
+# Rewritten August 2015 as part of security sweep.
 #
 #----------------------------------------------------------------------
 
 #----------------------------------------------------------------------
 # Import required modules.
 #----------------------------------------------------------------------
-import cgi, cdr, cdrdb, os, re, cdrcgi, sys, tempfile
+import cdr
+import cdrdb
+import cdrcgi
+import cgi
+import re
 
 #----------------------------------------------------------------------
 # Set some initial values.
@@ -27,6 +24,7 @@ import cgi, cdr, cdrdb, os, re, cdrcgi, sys, tempfile
 banner   = "CDR Filter Set Editing"
 title    = "Edit CDR Filter Set"
 SUBMENU  = "Filter Sets"
+REQUESTS = ("Log Out", cdrcgi.MAINMENU, SUBMENU, "Edit", "New")
 
 #----------------------------------------------------------------------
 # Load the fields from the form.
@@ -35,7 +33,6 @@ fields     = cgi.FieldStorage()
 if not fields: cdrcgi.bail("Unable to read form fields", banner)
 session    = cdrcgi.getSession(fields)
 request    = cdrcgi.getRequest(fields)
-setId      = fields.getvalue('setId') or None
 setName    = fields.getvalue('setName') or ''
 newName    = fields.getvalue('newName') or ''
 setDesc    = fields.getvalue('setDesc') or ''
@@ -44,7 +41,49 @@ setMembers = fields.getvalue('setMembers') or ''
 isNew      = fields.getvalue('isNew') or 'N'
 doWhat     = fields.getvalue('doWhat') or ''
 noMembers  = "<< No members currently assigned to the set >>"
-if not session: cdrcgi.bail("Unable to log into CDR Server", banner)
+filterSets = cdr.getFilterSets('guest')
+
+#----------------------------------------------------------------------
+# Make sure we're allowed.
+#----------------------------------------------------------------------
+def allowed(session):
+    for action in ("ADD FILTER SET", "MODIFY FILTER SET", "DELETE FILTER SET"):
+        if cdr.canDo(session, action):
+            return True
+    return False
+if not allowed(session):
+    cdrcgi.bail("Account not permitted to use this page", banner)
+
+#----------------------------------------------------------------------
+# Do some sanitizing of the parameters. The setDesc, setNotes, and
+# newName strings are escaped when inserted into HTML or CDR commmand
+# XML strings, and SQL placeholders are used in all of the database
+# queries which use the values.
+#----------------------------------------------------------------------
+if doWhat and doWhat not in ("Save", "Delete", "?"):
+    cdrcgi.bail()
+if isNew not in ("Y", "N"):
+    cdrcgi.bail()
+if request and request not in REQUESTS:
+    cdrcgi.bail()
+if setDesc and len(setDesc) > 256:
+    cdrcgi.bail("Set description cannot exceed 256 characters")
+if newName:
+    if len(newName) > 80:
+        cdrcgi.bail("Set name cannot exceed 80 characters")
+    try:
+        newName.decode("ascii")
+    except:
+        cdrcgi.bail("Set name must contain ASCII characters only")
+if setName and setName not in set([s.name for s in filterSets]):
+    cdrcgi.bail()
+if setMembers:
+    for m in setMembers.split("|"):
+        if not m or m[0] not in ("S", "F"):
+            cdrcgi.bail()
+        memberId = m[1:]
+        if not memberId or not memberId.isdigit():
+            cdrcgi.bail()
 
 #----------------------------------------------------------------------
 # Handle request to log out.
@@ -76,19 +115,18 @@ def getFilters():
             id   = int(re.sub(r'[^\d]', '', filter.id))
             name = cgi.escape(filter.name[:60])
             html += u"<option value='%d'>%s</option>\n" % (id, name)
-    return html 
+    return html
 
 #----------------------------------------------------------------------
 # Get the CDR filter sets and wrap them in <option> elements.
 #----------------------------------------------------------------------
 def getFilterSets():
     html = u""
-    filterSets = cdr.getFilterSets('guest')
     for filterSet in filterSets:
         id   = filterSet.id
         name = cgi.escape(filterSet.name[:60])
         html += u"<option value='%d'>%s</option>\n" % (id, name)
-    return html 
+    return html
 
 #----------------------------------------------------------------------
 # Create the initial <option/> elements for the set's members.
@@ -132,7 +170,7 @@ def makeDelFunction():
             ORDER BY ps.name""", setName)
         rows = cursor.fetchall()
     except cdrdb.Error, info:
-        cdrcgi.bail("Database failure finding nested memberships: %s" % 
+        cdrcgi.bail("Database failure finding nested memberships: %s" %
                 info[1][0])
     if rows:
         body = u"""\
@@ -149,17 +187,6 @@ def makeDelFunction():
             frm.submit();
         }
 """ % cdrcgi.unicodeToJavaScriptCompatible(cdr.toUnicode(setName))
-                
-# ---------------------------------------------------------------
-# Internal bail() function
-# ---------------------------------------------------------------
-def bail(str, args):
-    if args:
-        str += u"<ul>\n"
-        for arg in args:
-            str += u"<li>%s</li>\n" % cgi.escape(repr(arg))
-        str += u"</ul>\n"
-    cdrcgi.bail(str)
 
 #----------------------------------------------------------------------
 # Display the CDR document form.
@@ -379,7 +406,7 @@ def showForm(isNew, members = None):
        setName and cgi.escape(cdr.toUnicode(setName), 1) or '',
        noMembers,
        isNew != 'Y' and """\
-      <input type='button' name='DelSet' value='Delete Set' 
+      <input type='button' name='DelSet' value='Delete Set'
              onClick='doDelete();'>
        &nbsp;
 """ or "",
@@ -416,14 +443,16 @@ if request == 'New':
 # Delete the filter set.
 #----------------------------------------------------------------------
 if doWhat == 'Delete':
+    if not cdr.canDo(session, "DELETE FILTER SET"):
+        cdrcgi.bail("Action not permitted for this account.")
     try:
         cdr.delFilterSet(session, cdr.toUnicode(setName))
     except StandardError, args:
-        cdrcgi.bailnew("Failure deleting filter set", extra = args)
+        cdrcgi.bail("Failure deleting filter set")
     except UnicodeDecodeError, args:
-        cdrcgi.bail(u"Unicode decode error deleting filter set", args)
+        cdrcgi.bail(u"Unicode decode error deleting filter set")
     except:
-        cdrcgi.bailnew("Unknown failure deleting filter set")
+        cdrcgi.bail("Unknown failure deleting filter set")
     cdrcgi.navigateTo("EditFilterSets.py", session)
 
 #----------------------------------------------------------------------
@@ -431,7 +460,6 @@ if doWhat == 'Delete':
 #----------------------------------------------------------------------
 if doWhat == 'Save':
     setMemberList = []
-    #cdrcgi.bail("setMembers=[%s]" % setMembers)
     if setMembers:
         for member in setMembers.split('|'):
             idInt = int(member[1:])
@@ -440,24 +468,28 @@ if doWhat == 'Save':
             else:
                 setMemberList.append(cdr.IdAndName(idInt, ""))
     if isNew == 'Y':
+        if not cdr.canDo(session, "ADD FILTER SET"):
+            cdrcgi.bail("Action not permitted for this account.")
         newSet = cdr.FilterSet(newName, setDesc, setNotes, setMemberList)
         try:
             cdr.addFilterSet(session, newSet)
         except StandardError, args:
-            cdrcgi.bail("Failure adding new filter set", extra = args)
+            cdrcgi.bail("Failure adding new filter set")
         except UnicodeDecodeError, args:
-            cdrcgi.bail(u"Unicode decode error saving new filter set", args)
+            cdrcgi.bail(u"Unicode decode error saving new filter set")
         except:
             cdrcgi.bail("Unknown failure adding new filter set")
         setName = newName
     else:
+        if not cdr.canDo(session, "MODIFY FILTER SET"):
+            cdrcgi.bail("Action not permitted for this account.")
         oldSet = cdr.FilterSet(setName, setDesc, setNotes, setMemberList)
         try:
             cdr.repFilterSet(session, oldSet)
         except StandardError, args:
-            bail(u"Failure storing changes to filter set", args)
+            cdrcgi.bail(u"Failure storing changes to filter set")
         except UnicodeDecodeError, args:
-            cdrcgi.bail(u"Unicode decode error updating filter set", args)
+            cdrcgi.bail(u"Unicode decode error updating filter set")
         except:
             cdrcgi.bail("Unknown failure storing changes to filter set")
 

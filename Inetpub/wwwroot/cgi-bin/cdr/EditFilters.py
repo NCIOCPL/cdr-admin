@@ -7,117 +7,76 @@
 # BZIssue::3716
 #
 #----------------------------------------------------------------------
-import cgi, cdrcgi, cdrdb, sys, string, socket
+import cdr
+import cdrcgi
+import cdrdb
+import cgi
+import urllib
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields  = cgi.FieldStorage()
-session = cdrcgi.getSession(fields)
-request = cdrcgi.getRequest(fields)
-s1      = fields and fields.getvalue('s1') or None
-s2      = fields and fields.getvalue('s2') or None
-orderBy = fields and fields.getvalue('OrderBy') or None
-LABEL   = "Compare Filters With the Production Server"
-
-#----------------------------------------------------------------------
-# Make sure we're logged in.
-#----------------------------------------------------------------------
-if not session: cdrcgi.bail('Unknown or expired CDR session.')
-
-#----------------------------------------------------------------------
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if request == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-
-#----------------------------------------------------------------------
-# Show top-level filter params.
-#----------------------------------------------------------------------
-if request == "Filter Params":
-    cdrcgi.navigateTo("GetXsltParams.py", session)
-
-#----------------------------------------------------------------------
-# Handle request to log out.
-#----------------------------------------------------------------------
-if request == "Log Out": 
-    cdrcgi.logout(session)
-
-#----------------------------------------------------------------------
-# Show the differences between the filters on two servers.
-#----------------------------------------------------------------------
-if request == LABEL:
-    print "Location:http://%s%s/FilterDiffs.py\n" % (
-            cdrcgi.WEBSERVER, cdrcgi.BASE)
-
-#----------------------------------------------------------------------
-# Retrieve and display the action information.
-#----------------------------------------------------------------------
-title   = "CDR Administration"
-section = "Manage Filters"
-buttons = ["Filter Params", cdrcgi.MAINMENU, "Log Out"]
-script  = "EditFilters.py"
-header  = cdrcgi.header(title, title, section, script, buttons, numBreaks = 1)
-
-#----------------------------------------------------------------------
-# Show the list of existing filters.
-#----------------------------------------------------------------------
-if orderBy and orderBy == "DocId":
-    orderBy = "d.id, d.title"
-else:
-    orderBy = "d.title, d.id"
-
-try:
-    conn = cdrdb.connect('CdrGuest')
-    cursor = conn.cursor()
-    cursor.execute("""\
-          SELECT d.id,
-                 d.title
-            FROM document d
-            JOIN doc_type t
-              ON t.id = d.doc_type
-           WHERE t.name = 'Filter'
-        ORDER BY %s""" % orderBy)
-    rows = cursor.fetchall()
-except cdrdb.Error, info:
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
-
-sortReq = u"<A HREF='%s/EditFilters.py?%s=%s&OrderBy=%s'>%s</A>"
-form = u"""\
-   <INPUT TYPE='submit' NAME='%s' VALUE='%s'>
-   <H2>CDR Filters</H2>
-   <TABLE border='1' cellspacing='0' cellpadding='2'>
-    <TR>
-     <TD><B>%s</B></TD>
-     <TD><B>Action</B></TD>
-     <TD><B>%s</B></TD>
-    </TR>
-""" % (cdrcgi.REQUEST, LABEL,
-       sortReq % (cdrcgi.BASE, cdrcgi.SESSION, session, "DocId", "DocId"),
-       sortReq % (cdrcgi.BASE, cdrcgi.SESSION, session, "", "DocTitle")
-      )
-
-for row in rows:
-    form += u"""\
-    <TR>
-     <TD>CDR%010d</TD>
-     <TD NOALIGN='1'>
-      <A HREF='%s/EditFilter.py?%s=%s&Request=View&DocId=CDR%010d'>View</A>
-     </TD>
-     <TD VALIGN='top'>%s</TD>
-    </TR>
-""" % (row[0],
-       cdrcgi.BASE, cdrcgi.SESSION, session, row[0],
-       cgi.escape(row[1]))
-
-#----------------------------------------------------------------------
-# Send back the form.
-#----------------------------------------------------------------------
-form += u"""\
-   </TABLE>
-   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-  </FORM>
- </BODY>
-</HTML>
-""" % (cdrcgi.SESSION, session)
-cdrcgi.sendPage(header + form)
+class Control(cdrcgi.Control):
+    COMPARE = "Compare With PROD"
+    PARAMS = "Filter Params"
+    BUTTONS = (PARAMS, cdrcgi.MAINMENU, cdrcgi.Control.LOG_OUT)
+    def __init__(self):
+        cdrcgi.Control.__init__(self, "Manage Filters")
+        if not self.session:
+            cdrcgi.bail("Unknown or expired CDR session")
+        elif self.request == self.COMPARE:
+            cdrcgi.navigateTo("FilterDiffs.py", self.session)
+        elif self.request and self.request not in self.BUTTONS:
+            cdrcgi.bail()
+        elif self.request == self.PARAMS:
+            cdrcgi.navigateTo("GetXsltParams.py", self.session)
+        self.buttons = self.BUTTONS
+        if not cdr.isProdHost():
+            self.buttons = (self.COMPARE,) + self.BUTTONS
+    def populate_form(self, form):
+        try:
+            query = cdrdb.Query("document d", "d.id", "d.title").order(2)
+            query.join("doc_type t", "t.id = d.doc_type")
+            query.where("t.name = 'Filter'")
+            docs = query.execute(self.cursor).fetchall()
+        except:
+            cdrcgi.bail("Database temporarily unavailable")
+        self.add_table(form, docs)
+        self.add_table(form, sorted(docs), True)
+        form.add_css("""\
+#idsort td, #titlesort td { background-color: #e8e8e8; }
+#idsort td a, #titlesort td a { color: black; } /* text-decoration: none; }*/
+.clickable { cursor: pointer; }""")
+        form.add_script("""\
+function toggle(show, hide) {
+    jQuery(show).show();
+    jQuery(hide).hide();
+}""")
+    def add_table(self, form, docs, resorted=False):
+        if resorted:
+            form.add('<table id="idsort" class="hidden">')
+            form.add(form.B.CAPTION("%d CDR Filters (Sorted By CDR ID)" %
+                                    len(docs)))
+            form.add("<tr>")
+            form.add(form.B.TH("CDR ID"))
+            form.add(form.B.TH("Filter Title", form.B.CLASS("clickable"),
+                               onclick="toggle('#titlesort','#idsort');"))
+        else:
+            form.add('<table id="titlesort">')
+            form.add(form.B.CAPTION("%d CDR Filters (Sorted By Title)" %
+                                    len(docs)))
+            form.add("<tr>")
+            form.add(form.B.TH("CDR ID", form.B.CLASS("clickable"),
+                               onclick="toggle('#idsort','#titlesort');"))
+            form.add(form.B.TH("Filter Title"))
+        form.add("</tr>")
+        parms = {
+            cdrcgi.SESSION: self.session,
+            cdrcgi.REQUEST: "View",
+            "full": "full"
+        }
+        for doc_id, title in docs:
+            parms[cdrcgi.DOCID] = cdr_id = cdr.normalize(doc_id)
+            url = "EditFilter.py?%s" % urllib.urlencode(parms)
+            form.add("<tr>")
+            form.add(form.B.TD(form.B.A(cdr_id, href=url)))
+            form.add(form.B.TD(title))
+            form.add("</tr>")
+Control().run()

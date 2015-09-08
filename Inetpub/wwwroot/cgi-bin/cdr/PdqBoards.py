@@ -32,7 +32,7 @@
 # Initial revision
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, string, cdrdb, time
+import cgi, cdrcgi, re, cdrdb, time
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -100,12 +100,16 @@ except cdrdb.Error, info:
 def trim(s):
     return trimPat.sub("", s)
 
-#----------------------------------------------------------------------
-# Build a picklist for Summary Audience.
-#----------------------------------------------------------------------
-def getAudiencePicklist():
-    picklist = "<SELECT NAME='Audience'>"
-    selected = " SELECTED"
+def getAudiences():
+    """
+    Return a list of audiences as derived in this function.
+
+    See also cdr.getSummaryAudiences() for a different approach.
+
+    Return:
+        List of strings, e.g., ['Health professionals', 'Patients'].
+    """
+    audiences = []
     try:
         cursor.execute("""\
 SELECT DISTINCT value
@@ -114,23 +118,46 @@ SELECT DISTINCT value
        ORDER BY value""")
         for row in cursor.fetchall():
             if row[0]:
-                picklist += "<OPTION%s>%s</OPTION>" % (selected, row[0])
-            selected = ""
+                audiences.append(row[0])
+    except cdrdb.Error as e:
+        cdrcgi.bail('Database failure - Audiences: %s' % str(e))
 
-    except cdrdb.Error, info:
-        cdrcgi.bail('Database failure - Query I: %s' % info[1][0])
+    return audiences
+
+#----------------------------------------------------------------------
+# Build a picklist for Summary Audience.
+#----------------------------------------------------------------------
+def getAudiencePicklist():
+    picklist = "<SELECT NAME='Audience'>"
+    selected = " SELECTED"
+    audiences = getAudiences()
+    for audience in audiences:
+        picklist += "<OPTION%s>%s</OPTION>" % (selected, audience)
+        selected = ""
+
     return picklist + "</SELECT>"
 
-#----------------------------------------------------------------------
-# Build a picklist for PDQ Boards.
-# This function serves two purposes:
-# a)  create the picklist for the selection of the board
-# b)  create a dictionary in subsequent calles to select the board
-#     ID based on the board selected in the first call.
-#----------------------------------------------------------------------
-def getBoardPicklist(boardDict):
-    picklist = "<SELECT NAME='BoardInfo'>"
-    selected = " SELECTED"
+def getBoardIdNames(includeIds):
+    """
+    Get a list of board names and, optionally, board CDR IDs
+
+    Used by getBoardPicklist to construct a picklist, and by parameter
+    validation to ensure that the value passed back from the form is really
+    from the list and not a hacker introduced value.
+
+    Pass:
+        includeIds - True = get the Board Organization document CDR IDs as
+                     well as the names.  Format = list of tuples of
+                     (boardId, name).
+                     False = get names only.  Format = list of strings.
+    Return:
+        List of board names and optional IDs matching the query, ordered
+        alphabetically by board name.
+        Board names only contain the name, i.e. the part of the document
+        title up to but not including the semicolon.
+    """
+    global cursor
+
     try:
         cursor.execute("""\
 SELECT DISTINCT board.id, board.title
@@ -142,18 +169,50 @@ SELECT DISTINCT board.id, board.title
                                    'PDQ Advisory Board')
        ORDER BY board.title""")
     except cdrdb.Error, info:
-        cdrcgi.bail('Database failure - Query II: %s' % info[1][0])
+        cdrcgi.bail('Database failure - Board names: %s' % info[1][0])
 
+    boards = []
     for row in cursor.fetchall():
+        # Extract name part of the board
         semi = row[1].find(';')
         if semi != -1: boardTitle = trim(row[1][:semi])
         else:          boardTitle = trim(row[1])
-        picklist += "<OPTION%s>%s</OPTION>" % (selected, boardTitle)
+
+        # Save id,name or just name
+        if includeIds:
+            boards.append((row[0], boardTitle))
+        else:
+            boards.append(boardTitle)
+
+    return boards
+
+#----------------------------------------------------------------------
+# Build a picklist for PDQ Boards.
+#----------------------------------------------------------------------
+def getBoardPicklist(boardDict):
+    """
+    Create a board picklist.
+
+    Also populate a passed dictionary with name = CDR Organization doc ID.
+
+    Pass:
+        boardDict - Reference to a dictionary to update with name => ID.
+
+    Return:
+        HTML format picklist, boardDict is also updated.
+    """
+    picklist = "<SELECT NAME='BoardInfo'>"
+    selected = " SELECTED"
+
+    idNames = getBoardIdNames(True)
+
+    for docId, boardName in idNames:
+        # Top One is selected by default
+        picklist += "<OPTION%s>%s</OPTION>" % (selected, boardName)
         selected = ""
-        boardDict[boardTitle] = row[0]
+        boardDict[boardName] = docId
 
     return picklist + "</SELECT>"
-
 
 #----------------------------------------------------------------------
 # Create an HTML block listing a summary with its board members
@@ -221,6 +280,20 @@ def makeSummaryDisplay(summaryId, members, cdrId='No'):
 
     return html
 
+#----------------------------------------------------------------------
+# Validate inputs
+#----------------------------------------------------------------------
+if request:  cdrcgi.valParmVal(request,
+                               valList=('Submit', SUBMENU, cdrcgi.MAINMENU))
+if boardInfo: cdrcgi.valParmVal(boardInfo,
+                               valList=getBoardIdNames(False))
+if audience: cdrcgi.valParmVal(audience,
+                               valList=getAudiences())
+if repType: cdrcgi.valParmVal(repType,
+                               valList=('ByTopic', 'ByMember'))
+if showCdrId: cdrcgi.valParmVal(showCdrId,
+                               valList=('Yes', 'No'))
+if pubOnly: cdrcgi.valParmVal(pubOnly, valList='Yes')
 
 #----------------------------------------------------------------------
 # If we don't have a request, put up the form.
@@ -357,7 +430,7 @@ SELECT DISTINCT board_member.id, board_member.title,
         rows = cursor.fetchall()
 
     except cdrdb.Error, info:
-        cdrcgi.bail('Database failure - Query III: %s' % info[1][0])
+        cdrcgi.bail('Database failure - Board members: %s' % info[1][0])
 
     # Create a dictionary of summaries and IDs and sort
     # -------------------------------------------------
@@ -474,7 +547,7 @@ SELECT DISTINCT board_member.id, board_member.title,
                     re.sub(";", "--", trim(row[3]))))
 
 except cdrdb.Error, info:
-    cdrcgi.bail('Database failure - Query IV: %s' % info[1][0])
+    cdrcgi.bail('Database failure - Board members 2: %s' % info[1][0])
 
 keys = members.keys()
 keys.sort(lambda a, b: cmp(members[a].name, members[b].name))

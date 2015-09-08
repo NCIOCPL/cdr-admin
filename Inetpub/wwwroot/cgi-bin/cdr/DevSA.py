@@ -16,9 +16,10 @@ fields  = cgi.FieldStorage()
 session = cdrcgi.getSession(fields)
 
 #----------------------------------------------------------------------
-# Make sure the login was successful.
+# Make sure the user is allow to use this menu.
 #----------------------------------------------------------------------
-if not session: cdrcgi.bail('Unknown user id or password.')
+if not cdr.member_of_group(session, "Developer/SysAdmin Menu Users"):
+    cdrcgi.bail("User not authorized for this menu")
 
 #----------------------------------------------------------------------
 # Put up the menu.
@@ -33,7 +34,7 @@ html    = cdrcgi.header(title, title, section, "", buttons) + """\
 items   = (('EditGroups.py',           'Manage Groups'                 ),
            ('EditUsers.py',            'Manage Users'                  ),
            ('EditActions.py',          'Manage Actions'                ),
-           ('EditDoctypes.py',         'Manage Document Types'         ),
+           ('EditDocTypes.py',         'Manage Document Types'         ),
            ('EditQueryTermDefs.py',    'Manage Query Term Definitions' ),
            ('EditLinkControl.py',      'Manage Linking Tables'         ),
            ('EditFilters.py',          'Manage Filters'                ),

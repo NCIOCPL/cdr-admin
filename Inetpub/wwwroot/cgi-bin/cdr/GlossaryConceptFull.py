@@ -7,29 +7,22 @@
 # This report takes a concept and displays all of the Term Name
 # definitions that are linked to this concept document
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.7  2009/03/03 15:01:16  bkline
-# Rewritten in response to request #4482.
-#
-# Revision 1.6  2009/01/07 15:43:31  venglisc
-# Fixed so that a Spanish definition isn't being displayed if the document
-# is blocked. (Bug 4425)
-#
-# Revision 1.5  2008/11/18 18:44:25  venglisc
-# Added CSS for insertion/deletion markup. (Bug 4375)
-#
-# Revision 1.4  2008/11/17 19:47:54  venglisc
-# Modified display of blocked and none-existing GlossaryTermNames. (Bug 3948)
-#
-# Revision 1.3  2008/10/27 16:32:32  venglisc
-# Changing element names from Spanish... to Translated... (Bug 3948)
-#
-# Revision 1.2  2008/06/12 19:04:01  venglisc
-# Final version of the Glossary Concept Full report. (Bug 3948)
-#
+# BZIssue::3948 - Element name changes
+# BZIssue::3948 - Modified display of blocked/missing term names
+# BZIssue::4375 - Added CSS for insertion/deletion markup
+# BZIssue::4425 - Don't display Spanish definitions for blocked docuents
+# BZIssue::4482 - Rewritten at user request
+# Modified July 2015 as part of security sweep
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, cdrdb, re, sys, time, xml.dom.minidom
+import cgi
+import cdr
+import cdrcgi
+import cdrdb
+import re
+import sys
+import time
+import xml.dom.minidom
 
 # Setting the labels used for each element displayed
 # --------------------------------------------------
@@ -307,7 +300,7 @@ def displayMarkup(xmlString, element):
 # Get the parameters from the request.
 #----------------------------------------------------------------------
 repTitle = "CDR QC Glossary Concept Report"
-fields   = cgi.FieldStorage() or cdrcgi.bail("No Request Found", repTitle)
+fields   = cgi.FieldStorage()
 session  = cdrcgi.getSession(fields) or cdrcgi.bail("Not logged in")
 action   = cdrcgi.getRequest(fields)
 docId    = fields.getvalue("DocId")
@@ -656,7 +649,10 @@ def getNameDefinition(docId):
 # Document ID can be given for the concept or for one of its names.
 #----------------------------------------------------------------------
 if docId:
-    intId = cdr.exNormalize(docId)[1]
+    try:
+        intId = cdr.exNormalize(docId)[1]
+    except:
+        cdrcgi.bail("Malformed CDR ID")
     cursor.execute("""\
         SELECT t.name
           FROM document d
@@ -688,7 +684,10 @@ if docId:
 # If we have a term name but not a document ID, find the ID.
 #----------------------------------------------------------------------
 else:
-    cursor.execute("""\
+    if "<script" in termName.lower():
+        cdrcgi.bail()
+    try:
+        cursor.execute("""\
         SELECT c.int_val, n.value
           FROM query_term n
           JOIN query_term c
@@ -696,9 +695,11 @@ else:
          WHERE n.path = '/GlossaryTermName/TermName/TermNameString'
            AND c.path = '/GlossaryTermName/GlossaryTermConcept/@cdr:ref'
            AND n.value LIKE ?""", termName)
-    rows = cursor.fetchall()
+        rows = cursor.fetchall()
+    except Exception, e:
+        cdrcgi.bail("Database error looking up term name: %s" % e)
     if not rows:
-        cdrcgi.bail("No term names match '%s'" % termName)
+        cdrcgi.bail("No term names match %s" % repr(termName))
     if len(rows) > 1:
         showTermNameChoices(rows)
     conceptId = rows[0][0]

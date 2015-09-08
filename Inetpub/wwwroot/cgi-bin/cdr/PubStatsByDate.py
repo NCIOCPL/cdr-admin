@@ -52,6 +52,19 @@ elif request == SUBMENU:
     cdrcgi.navigateTo("reports.py", session)
 
 #----------------------------------------------------------------------
+# Validate parameters
+#----------------------------------------------------------------------
+if request:   cdrcgi.valParmVal(request, valList=buttons)
+if doc_type:  cdrcgi.valParmVal(doc_type, valList=cdr.getDoctypes(session))
+if date_from: cdrcgi.valParmDate(date_from)
+if date_to:   cdrcgi.valParmDate(date_to)
+if vol:       cdrcgi.valParmVal(vol, valList='Y')
+if audience:
+    vlist = list(cdr.getSummaryAudiences())
+    vlist.append('Both')
+    cdrcgi.valParmVal(audience, valList=vlist)
+
+#----------------------------------------------------------------------
 # Adjustments to form variables.
 #----------------------------------------------------------------------
 if not date_to:

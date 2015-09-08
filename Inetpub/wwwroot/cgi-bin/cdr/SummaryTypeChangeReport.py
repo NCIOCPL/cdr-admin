@@ -4,6 +4,8 @@
 # Report on the types of changes recorded in selected Summaries.
 #
 # BZIssue::None  (JIRA::OCECDR-3703)
+# OCECDR-3900: Modify the Summaries Type of Change report to display 
+#              Spanish CAM summaries
 #
 #                                           Alan Meyer, March 2014
 #----------------------------------------------------------------------
@@ -800,8 +802,9 @@ def createBoardLists():
     for key in sorted(boardVdict.keys()):
         pair = (key, boardVdict[key])
         EnglishBoards.append(pair)
-        if key not in ('Cancer Genetics',
-                       'Complementary and Alternative Medicine'):
+        ### if key not in ('Cancer Genetics',
+        ###                'Complementary and Alternative Medicine'):
+        if key not in ('Cancer Genetics'):
             SpanishBoards.append(pair)
 
 def createBoardsMenu():

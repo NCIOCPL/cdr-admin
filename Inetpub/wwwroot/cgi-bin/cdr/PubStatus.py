@@ -26,10 +26,23 @@ toDate   = fields and fields.getvalue('ToDate') or None
 docType  = fields and fields.getvalue('docType') or None
 cgMode   = fields and fields.getvalue('cgMode') or None
 flavor   = fields and fields.getvalue('flavor') or 'full'
-docCount = int(fields and fields.getvalue('docCount') or '0')
+docCount = fields and fields.getvalue('docCount') or '0'
 
 # Number of documents to be displayed on Pushing Information Report
 TOPDOCS  = 5000
+
+#----------------------------------------------------------------------
+# Validate parameters
+#----------------------------------------------------------------------
+if jobId:    cdrcgi.valParmVal(jobId, regex=cdrcgi.VP_UNSIGNED_INT)
+if fromDate: cdrcgi.valParmDate(fromDate)
+if toDate:   cdrcgi.valParmDate(toDate)
+if docType:  cdrcgi.valParmVal(docType, valList=cdr.getDoctypes(session))
+if cgMode:   cdrcgi.valParmVal(cgMode, valList=('Added','Updated','Removed'))
+if docCount: cdrcgi.valParmVal(docCount, regex=cdrcgi.VP_UNSIGNED_INT)
+docCount = int(docCount)
+# dispType tested later
+# flavor tested later
 
 #----------------------------------------------------------------------
 # Display the publishing overall job status.
@@ -348,7 +361,6 @@ def dispJobControl():
     #   second tab or window to accidentally resume or kill a job
     #   that was already processed.
     if action and jobs:
-        jobsOkay = True
         for job in jobs:
             jobNum = int(job)
             try:
@@ -1583,15 +1595,37 @@ def dispJobRepDetail():
            </TR>
            """ % (cdrcgi.SESSION, session, cgMode, docCount,
                   (docCount > 500 ) and "(Top 500 listed only)" or "")
-    ROW = """<TR>
-             <TD ALIGN='right' NOWRAP>%d</TD>
+    ROW = u"""<TR>
+             <TD ALIGN='right' NOWRAP>
+              %s%d%s</TD>
              <TD ALIGN='right' NOWRAP>%d</TD>
              <TD ALIGN='left'>%s</TD>
            </TR>
           """
+    URLS = u"<a class='show-link' href='%s'>"
 
+    # Adding a link to the output for summaries
+    # Put this in a function if we end up adding links to other document
+    # types.  At the moment it's just requested for summaries.
+    # ------------------------------------------------------------------
     for row in rows:
-        form += ROW % (row[0], row[1], row[2])
+        try:
+            cursor.execute("""\
+                SELECT value
+                  FROM query_term_pub
+                 WHERE doc_id = ?
+                   AND path = '/Summary/SummaryMetaData/SummaryURL/@cdr:xref'
+              """, (row[0]))
+            url = cursor.fetchone()
+        except cdrdb.Error, info:
+            cdrcgi.bail("Failure getting summary URL for %d" % (row[0]))
+
+        #cdrcgi.bail(repr(url))
+        if url:
+            URL  = URLS % url[0]
+            form += ROW % (URL, row[0], u"</a>", row[1], row[2])
+        else:
+            form += ROW % (u"", row[0], u"", row[1], row[2])
 
     form += "</TABLE></TD></TR></TABLE>"
 

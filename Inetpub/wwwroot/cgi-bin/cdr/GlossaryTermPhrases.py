@@ -31,7 +31,6 @@ buttons  = ["Submit Request", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 script   = "GlossaryTermPhrases.py"
 title    = "CDR Administration"
 section  = "Glossary Term Phrases Report"
-header   = cdrcgi.header(title, title, section, script, buttons)
 command  = 'lib/Python/CdrLongReports.py'
 
 #----------------------------------------------------------------------
@@ -56,6 +55,9 @@ if request == "Log Out":
 #----------------------------------------------------------------------
 # Parameter validation.
 #----------------------------------------------------------------------
+if hp and hp != "hp": cdrcgi.bail()
+if patient and patient != "patient": cdrcgi.bail()
+if trials and trials != "trials": cdrcgi.bail()
 if id:
     digits = re.sub('[^\d]+', '', id)
     try:

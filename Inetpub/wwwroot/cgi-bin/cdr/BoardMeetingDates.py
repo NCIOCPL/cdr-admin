@@ -17,7 +17,7 @@
 # Initial copy of Board Meeting Dates report. (Bug 4205)
 #
 #----------------------------------------------------------------------
-import cdr, cdrdb, cdrcgi, cgi, re, time, ExcelWriter, sys
+import cdrdb, cdrcgi, cgi, time
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -108,6 +108,46 @@ try:
 except cdrdb.Error, info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
 
+#----------------------------------------------------------------------
+# Custom validation function for board pick
+#----------------------------------------------------------------------
+def valBoardPick(cursor, boardPicks):
+    """
+    Tests that a CDR ID representing a Board organization document is
+    really for a board and not something else.  Makes the script safe
+    against XSS attacks on the boardPick variable.
+
+    Pass:
+        cursor     - Active database cursor.
+        boardPicks - Array of CDR IDs to validate for board doc.
+    Return:
+        True if okay, else invokes cdrcgi.bail().
+    """
+    # This is okay
+    if boardPicks[0] == 'all':
+        return True
+
+    # Find the doc IDs for organization docs
+    cursor.execute("""
+        SELECT DISTINCT doc_id
+          FROM query_term
+         WHERE value = 'PDQ Editorial Board'
+           AND path = '/Organization/OrganizationType'
+    """)
+    # Get the editorial board IDs
+    # Note this simple query also gets the PDQ Spanish Editorial Board
+    #  but I don't think we need to exclude it for this purpose.
+    rows = cursor.fetchall()
+    docIds = [row[0] for row in rows]
+
+    # Test it, bail if not in the set
+    for board in boardPicks:
+        try:
+            bdNum = int(board)
+        except ValueError:
+            # Force an invalid value
+            bdNum = -1
+        cdrcgi.valParmVal(bdNum, valList=docIds)
 
 #----------------------------------------------------------------------
 # Build a sequence of Board objects, which holds all the information
@@ -126,7 +166,7 @@ class Board:
             return diff
         return cmp(self.cdrId, other.cdrId)
 class Meeting:
-    def __init__(self, meetingDate, meetingTime, board, webEx = False, 
+    def __init__(self, meetingDate, meetingTime, board, webEx = False,
                                                         canceled = ''):
         self.date = meetingDate
         self.time = meetingTime
@@ -184,7 +224,7 @@ LEFT OUTER JOIN query_term c
         if not board:
             board = Board(cdrId, boardName)
             boards[cdrId] = board
-        board.meetings.append(Meeting(meetingDate, meetingTime, board, 
+        board.meetings.append(Meeting(meetingDate, meetingTime, board,
                                                    webEx, canceled))
     boards = boards.values()
     boards.sort()
@@ -237,6 +277,18 @@ def getDefaultDates():
 # ---------------------------------------------------------------------
 # *** Main starts here ***
 # ---------------------------------------------------------------------
+
+#----------------------------------------------------------------------
+# Validate parameters
+# Some of this is not strictly necessary but will quiet AppScan warnings
+#----------------------------------------------------------------------
+if request:   cdrcgi.valParmVal(request, valList=buttons)
+if flavor:    cdrcgi.valParmVal(flavor, valList=('Report', 'ByBoard'))
+if startDate: cdrcgi.valParmDate(startDate)
+if endDate:   cdrcgi.valParmDate(endDate)
+if boardPick: valBoardPick(cursor, boardPick)
+
+
 boards = collectBoardMeetingInfo(cursor)
 
 #----------------------------------------------------------------------
@@ -308,8 +360,8 @@ if flavor == 'ByBoard':
    <td class="dates">%s %s %s %s</td>
   </tr>
 """ % (meeting.date, meeting.time or "", meeting.webEx and ' (WebEx)' or '',
-       meeting.canceled and 
-         (' <span class="DTDerror">(Canceled: %s)</span>' % meeting.canceled) 
+       meeting.canceled and
+         (' <span class="DTDerror">(Canceled: %s)</span>' % meeting.canceled)
                         or ''))
 
              html.append("""\
@@ -385,8 +437,8 @@ else:
     <td width="200px" class="dates" align='center'>%s</td>
     <td width="60px" class="dates" align='center'>%s</td>
     <td width="330px" class="dates">%s</td>
-   </tr>""" % (bg, meeting.date, 
-                   meeting.canceled and 
+   </tr>""" % (bg, meeting.date,
+                   meeting.canceled and
          ('<br><span class="DTDerror">Canceled: %s</span>' % meeting.canceled)
                    or '',
                meeting.dayOfWeek, meeting.time,
