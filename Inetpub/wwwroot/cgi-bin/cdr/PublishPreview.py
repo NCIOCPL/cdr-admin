@@ -35,20 +35,25 @@ fields  = cgi.FieldStorage() or None
 
 if not fields:
     session    = 'guest'
-    docId      = sys.argv[1]
+    docId      = len(sys.argv) > 1 and sys.argv[1] or None
     docVersion = len(sys.argv) > 2 and sys.argv[2] or None
-    preserveLnk= len(sys.argv) > 3 and sys.argv[3] or False
+    preserveLnk= len(sys.argv) > 3 and sys.argv[3] or 'No'
     dbgLog     = len(sys.argv) > 4 and sys.argv[4] or None
     flavor     = len(sys.argv) > 5 and sys.argv[5] or None
     cgHost     = len(sys.argv) > 6 and sys.argv[6] or None
     cachedHtml = len(sys.argv) > 7 and sys.argv[7] or None
     monitor    = True
+
+    if not docId:
+       print 'Command line options'
+       print 'PublishPreview.py docId docVersion preserveLink(Y/N) debugLog(T/F) flavor cgHost filename'
+       sys.exit()
 else:
     session    = cdrcgi.getSession(fields)   or cdrcgi.bail("Not logged in")
     docId      = fields.getvalue(cdrcgi.DOCID) or cdrcgi.bail("No Document",
                                                            title)
     docVersion = fields.getvalue("Version")
-    preserveLnk= fields.getvalue("OrigLinks") or False
+    preserveLnk= fields.getvalue("OrigLinks") or 'No'
     flavor     = fields.getvalue("Flavor")
     dbgLog     = fields.getvalue("DebugLog")
     cgHost     = fields.getvalue("cgHost")
@@ -63,6 +68,46 @@ def showProgress(progress):
         sys.stderr.write("[%s] %s\n" % (time.strftime("%Y-%m-%d %H:%M:%S"),
                                         progress))
 showProgress("Started...")
+
+
+#----------------------------------------------------------------------
+# Retrieve the CDR-ID from the SummaryURL value 
+#----------------------------------------------------------------------
+def getCdrIdFromPath(url):
+    # For the SQL query we need to remove the fragment from the URL
+    # and remove a trailing slash (/) that was added in older versions
+    # of the GK code
+    # ----------------------------------------------------------------
+    ###print '*** ', url
+    baseUrl = url.split('#')[0]
+    if baseUrl:
+        if baseUrl[-1] == '/':
+            baseUrl = baseUrl[:-1]
+
+        try:
+            conn = cdrdb.connect()
+            cursor = conn.cursor()
+            cursor.execute("""\
+              SELECT doc_id
+                FROM query_term
+               WHERE (path = '/Summary/SummaryMetaData/SummaryURL/@cdr:xref'
+                     OR
+                     path = '/DrugInformationSummary/DrugInfoMetaData/URL/@cdr:xref'
+                     )
+                 AND value like '%s'""" % ('%' + baseUrl))
+            row = cursor.fetchone()
+        except cdrdb.Error, info:
+            cdrcgi.bail('Database failure: %s' % info[1][0])
+        # If the passed url is not found in the query_term table it's not a 
+        # PDQ document and we'll return None
+        try:
+            return row[0]
+        except:
+            return None
+    # If we don't have a URL we'll return None
+    else:
+        return None
+
 
 #----------------------------------------------------------------------
 # For testing, we can skip filtering and the SOAP service.
@@ -213,6 +258,10 @@ if not cachedHtml:
     showProgress("DocumentType: %s..." % docType)
     showProgress("Using flavor: %s..." % flavor)
     showProgress("Preserving links: %s..." % preserveLnk)
+    if preserveLnk.lower() == 'yes' or preserveLnk.lower() == 'y':
+        convert = False
+    else:
+        convert = True
 
     #----------------------------------------------------------------------
     # Filter the document.
@@ -280,20 +329,21 @@ myHtml = lxml.html.fromstring(html)
 # Other links are deactivated (Glossary, Summary) so that the
 # user isn't constantly bringing up an error page.
 # ---------------------------------------------------------------
-### preserveLnk = True ###
-if not preserveLnk:
+if convert:
     showProgress("Converting local links...")
 
     # Modify SummaryRef links
-    # These links are identified by the inlinetype attribute
-    # ------------------------------------------------------
-    #for x in myHtml.xpath('//a[@inlinetype="SummaryRef"]'):
-    for x in myHtml.xpath('//a[@objectid]'):
+    # These links used to be identified by the inlinetype attribute
+    # but that has changed with the NVCG update of Cancer.gov
+    # -------------------------------------------------------------
+    for x in myHtml.xpath('//a[@href]'):
         # The SummaryRef links don't contain an href attribute
         # because Percussion isn't able to add this to the PP
         # output.  Without the href attribute the text is not
         # displayed as an anchor (underlined).  Setting an
         # empty href to satisfy the display style
+        # 
+        # The above changed with NVCG.
         # ----------------------------------------------------
         if not 'href' in x.attrib:
             x.set('href', '')
@@ -327,19 +377,66 @@ if not preserveLnk:
         # With this change the local links will work.
         # Note: The first part of the 'if' broke after the last
         #       PP update on Percussion.  The links to internal
-        #       targets are now set with the if block above
+        #       targets are now set with the if block below
         # ------------------------------------------------------
         else:
             link = x.get('href')
-            showProgress(link)
-            if link.find('#') > 0:
+            cdrId = getCdrIdFromPath(link)
+            ###print '     ', cdrId, link
+            #print type(cdrId), cdrId, link
+            #showProgress(link)
+            # External links starting with http (no change)
+            if link.find('http') > -1:
+                x.set('href', link)
+                x.set('type', 'ExternalLink')
+            # Internal fragment link - citations (no change)
+            elif link.find('#cit') == 0:
+                x.set('href', link)
+                x.set('ohref', link)
+                x.set('type', 'CitationLink')
+            # Internal fragment link - SummaryRefs
+            elif link.find('#') == 0 and cdrId == intId:
                 newLink = '#%s' % link.split('#')[1]
                 x.set('href', newLink)
-                showProgress(newLink)
+                x.set('ohref', link)
+                x.set('type', 'SummaryFragRef-internal-frag')
+            # Retrieving CDR-ID or adding server name to URL
+            elif link[0] == '/':
+                if cdrId:
+                    if cdrId == intId and link.find('#') > -1:
+                        newLink = '#%s' % link.split('#')[1]
+                        x.set('href', newLink)
+                        x.set('ohref', link)
+                        x.set('type', 'SummaryFragRef-internal+url')
+                    elif link.find('#') > -1:
+                        ppLink  = '/cgi-bin/cdr/PublishPreview.py?Session=guest'
+                        ppLink += '&DocId=%d#%s' % (cdrId, link.split('#')[1])
+                        x.set('href', ppLink)
+                        x.set('ohref', link)
+                        x.set('type', 'SummaryFragRef-external')
+                    else:
+                        ppLink  = '/cgi-bin/cdr/PublishPreview.py?Session=guest'
+                        ppLink += '&DocId=%d' % cdrId
+                        x.set('href', ppLink)
+                        x.set('ohref', link)
+                        x.set('type', 'SummaryRef-external')
+                else:
+                # A link on the Cancer.gov website not PDQ, i.e. a 
+                # ProtocolRef
+                    newLink = 'http://%s.%s%s' % (cdr.h.host['CG'][0],
+                                              cdr.h.host['CG'][1],
+                                              link)
+                    x.set('href', newLink)
+                    x.set('ohref', link)
+                    x.set('type', 'Cancer.gov-link')
+                    #showProgress(newLink)
             # Resetting the glossary links so we don't follow
             # a dead end.
             else:
-               x.set('onclick', 'return false')
+                x.set('onclick', 'return false')
+                x.set('ohref', link)
+                x.set('type', 'Dead-link')
+                #showProgress('   Link disabled')
 
     # Redirect the audio files to the local server to ensure that
     # new (not yet published) audio files can be previewed
