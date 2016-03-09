@@ -5,9 +5,14 @@
 # Show a piece of a log file.
 #
 #----------------------------------------------------------------------
-import os, cgi, sys, time, re, cdr
+import os, cgi, sys, time, re, cdr, cdrcgi
 
 DEFAULT_COUNT = 2000000
+
+fields = cgi.FieldStorage()
+session = cdrcgi.getSession(fields)
+if not session or not cdr.canDo(session, "VIEW LOGS"):
+    cdrcgi.bail("Account not authorized for this action")
 
 try: # Windows needs stdio set for binary mode.
     import msvcrt
@@ -48,7 +53,6 @@ Content-type: text/html
 </html>
 """ % (info, path, start, count)
 
-fields = cgi.FieldStorage()
 p = fields.getvalue("p") or ""
 s = fields.getvalue("s") or ""
 c = fields.getvalue("c") or ""
