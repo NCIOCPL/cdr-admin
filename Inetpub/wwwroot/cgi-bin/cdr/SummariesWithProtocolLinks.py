@@ -662,10 +662,10 @@ if not lang and not cdrId:
       </label>
       <br>
       <label>
-       <input type='checkbox' id='Approved-not yet active' name='status'
-              value='Approved-not yet active' onClick="statusItemClicked();"
+       <input type='checkbox' id='Not yet active' name='status'
+              value='Not yet active' onClick="statusItemClicked();"
               class='st-cb'>
-        <b>Approved-not yet active</b>
+        <b>Not yet active</b>
        </input>
       </label>
       <br>
@@ -841,6 +841,8 @@ if not docId:
 statusPick=''
 for i in range(len(statuses)):
     statusPick += "'" + statuses[i] + "',"
+    if statuses[i] == "Not yet active":
+        statusPick += "'Approved-not yet active',"
 
 #------------------------------------
 # build the query

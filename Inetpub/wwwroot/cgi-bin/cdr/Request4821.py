@@ -43,7 +43,7 @@ SELECT DISTINCT doc_id
                          '/InScopeProtocol/ProtocolAdminInfo' +
                          '/CurrentProtocolStatus')
             AND value IN ('Enrolling by Invitation', 'Active',
-                          'Approved-Not Yet Active')""")
+                          'Approved-Not Yet Active', 'Not Yet Active')""")
 cursor.execute("""\
     INSERT INTO #links
 SELECT DISTINCT q.int_val
