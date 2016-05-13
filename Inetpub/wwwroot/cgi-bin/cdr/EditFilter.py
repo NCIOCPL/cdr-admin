@@ -200,8 +200,13 @@ pre {
         filters = {}
         for node in table.findall("tr"):
             cells = node.findall("td")
-            cdr_id = cells[0].text
-            title = cells[2].text
+            if len(cells) != 2:
+                continue
+            try:
+                cdr_id = "".join(cells[0].itertext()).strip()
+            except:
+                continue
+            title = cells[1].text
             if cdr_id is not None and cdr_id.startswith("CDR"):
                 filter_id = cdr.exNormalize(cdr_id)[1]
                 filters[title.lower()] = filter_id

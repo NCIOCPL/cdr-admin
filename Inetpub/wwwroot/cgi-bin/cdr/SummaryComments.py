@@ -6,1011 +6,619 @@
 #
 # BZIssue::4756 - Summary Comments Report
 # BZIssue::4908 - Editing Summary Comments Report in MS Word
-# BZIssue::4968 - Modification to Summaries Comments Report to 
+# BZIssue::4968 - Modification to Summaries Comments Report to
 #                 Show/Hide Certain Comments
 # BZIssue::5273 - Identifying Modules in Summary Reports
+# JIRA::OCECDR-3893 - Fix board display
 #
-# Note:
-# This report has been adapted from the SummariesLists report.
-# It is very likely that some parts/variables/etc. are a leftover
-# from that report and haven't been deleted.
-# I will take care of this with the next round of updates. VE.
 #----------------------------------------------------------------------
-import cdr, cgi, cdrcgi, time, cdrdb, xml.dom.minidom
+import cdr
+import cdrcgi
+import cdrdb
+import datetime
+import lxml.etree as etree
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields    = cgi.FieldStorage()
-session   = cdrcgi.getSession(fields)
-audience  = fields and fields.getvalue("audience")         or None
-lang      = fields and fields.getvalue("lang")             or None 
-groups    = fields and fields.getvalue("grp")              or []
-submit    = fields and fields.getvalue("SubmitButton")     or None
-columns   = fields and fields.getvalue("showCol")          or []
-comments  = fields and fields.getvalue("showComment")      or []
-cdrId     = fields and fields.getvalue("cdrid")            or ' '
-docTitle  = fields and fields.getvalue("title")            or None
-SUBMENU     = "Report Menu"
-buttons     = ["Submit Request", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-script      = "SummaryComments.py"
-title       = "CDR Administration"
-section     = "Summary Comments Report"
-header      = cdrcgi.header(title, title, section, script, buttons,
-                            method = 'GET')
-
-userCol   = False
-blankCol  = False
-displayComment = { 'internal':False,
-                   'external':False,
-                   'response':False,
-                   'permanent':False,
-                   'advisory':False}
-request   = cdrcgi.getRequest(fields)
-title     = "CDR Administration"
-instr     = "Summary Comments Report"
-script    = "SummaryComments.py"
-SUBMENU   = "Report Menu"
-buttons   = (SUBMENU, cdrcgi.MAINMENU)
-
-if type(columns) == type(""):
-    columns = [columns]
-if type(comments) == type(""):
-    comments = [comments]
-if docTitle and docTitle.startswith('Enter'): docTitle = None
-
-try:
-    docId = int(cdrId)
-except ValueError:
-    docId = None
-
-# Display extra columns
-# ---------------------
-if 'showUser' in columns:
-    userCol = True
-if 'showBlank' in columns:
-    blankCol = True
-
-# Display which comment types?
-# ----------------------------
-if 'internal' in comments or 'all' in comments:  
-    displayComment['internal'] = True
-if 'external' in comments or 'all' in comments:
-    displayComment['external'] = True
-if 'permanent' in comments or 'all' in comments:
-    displayComment['permanent'] = True
-if 'advisory' in comments or 'all' in comments:
-    displayComment['advisory'] = True
-
-# Response is set individually
-# ----------------------------
-if 'response' in comments:
-    displayComment['response'] = True
-
-# ---------------------------------------------------
-# Selecting the title of the section
-# ---------------------------------------------------
-def getTitle(nodes):
-    summarySection = 'No Section Title'
-    children = nodes
-    for child in children:
-        if child.nodeName == 'Title':
-            summarySection = cdr.getTextContent(child).strip()
-    return summarySection
-
-
-# ----------------------------------------------------------
-# Function to return True or False to indicate which of the
-# rows of comments are selected to be printed on the report.
-# Note:  For the ResponseToComment element it had been 
-#        decided that these will never be listed as Internal
-#        or External comments, so the audience has been 
-#        overloaded and is set to 'Response' for these 
-#        elements.  For Comment elements the audience is set
-#        to 'Internal' or 'External'.
-# ----------------------------------------------------------
-def printThisRow(audience, displayType, duration, source):
-    # If internal and external are both selected we want to
-    # display all comments but we still need to check if 
-    # the Response should be included in the list.
-    # ------------------------------------------------------
-    if displayType['internal'] and displayType['external']:
-        if audience == 'Response':
-            if displayType['response']:
-                return True
-            else:
-                return False
-            return True
-        return True
-
-    if duration == 'permanent' and displayType['permanent']: return True
-    if source == 'advisory-board' and displayType['advisory']: return True
-
-    # Only Internal or external are selected
-    # --------------------------------------
-    if audience == 'Internal' and displayType['internal']:
-        if duration and not displayType[duration.lower()]:
-            return False
-        return True
-    elif audience == 'External' and displayType['external']: 
-        if source and not displayType['advisory']:
-            return False
-        return True
-
-
-    # If the comment is a 'Response' we need to check this
-    # separately.
-    # -----------------------------------------------------
-    if audience == 'Response' and displayType['response']: 
-        return True
-
-    return False
-
-    
-    
-# -------------------------------------------------
-# Create the table row for the English table output
-# -------------------------------------------------
-def htmlCommentRow(info, displayType, addUserCol = True, 
-                                      addBlankCol = True, first = True):
-    """Return the HTML code to display a Comment row"""
-    #cdrcgi.bail(displayType)
-    html = ''
-    if first:
-        section = info[0]
-    else:
-        section = ''
-    comment  = info[1]
-    audience = info[2] or ''
-    duration = info[3] or ''
-    source   = info[4] or ''
-    user     = info[5] or '&nbsp;'
-    date     = info[6] or '&nbsp;'
-
-
-    # Do we print this row based on the content and the options
-    # checked?
-    # ---------------------------------------------------------
-    if not printThisRow(audience, displayType, duration, source): return html
-
-    label = audience and audience[0].upper() or '-'
-    if duration:
-        label += ' ' + duration[0].upper()
-    if source:
-        label += ' ' + source[0].upper()
-
-    # Create the table row display
-    # If a markup type hasn't been checked the table cell will be
-    # displayed with the class="nodisplay" style otherwise the 
-    # count of the markup type is being displayed.
-    # ------------------------------------------------------
-    html = """\
-   <TR>
-    <TD class="report cdrid" width = "25%%">%s</TD>
-    <TD class="%s" width="40%%">[%s] %s</TD>
-""" % (section, audience and audience.lower() or ' ', 
-                label, comment)
-
-    if addUserCol:
-        html += """\
-    <TD class="s" width="15%%">%s / %s</TD>
-""" % (user, date)
-
-    if addBlankCol:
-        html += """\
-    <TD class="s" width="20%">&nbsp;</TD>
-"""
-
-    html += """\
-   </TR>
-"""
-
-    return html
-
-
-#----------------------------------------------------------------------
-# Function to get the title of the current SummarySection
-#----------------------------------------------------------------------
-def getSummarySectionName(parentNode, lastSECTitle):
-    parentNodeName = parentNode.nodeName
-    if parentNodeName == 'SummarySection':
-        return getTitle(parentNode.childNodes)
-    else:
-        lastSECTitle = getSummarySectionName(parentNode.parentNode, 
-                                              lastSECTitle)
-    return lastSECTitle
-
-
-# =====================================================================
-# If the user only picked one summary group, put it into a list so we
-# can deal with the same data structure whether one or more were
-# selected.
-#----------------------------------------------------------------------
-if type(groups) in (type(""), type(u"")):
-    groups = [groups]
-
-if groups:
-    if lang == 'English':
-       groups = [groups[0]]
-    else:
-       groups = [groups[1]]
-
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if request == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif request == SUBMENU:
-    cdrcgi.navigateTo("reports.py", session)
-
-#----------------------------------------------------------------------
-# Set up a database connection and cursor.
-#----------------------------------------------------------------------
-try:
-    conn = cdrdb.connect("CdrGuest")
-    cursor = conn.cursor()
-except cdrdb.Error, info:
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
-
-
-#----------------------------------------------------------------------
-# If we have a title string but no ID, find the matching summary.
-#----------------------------------------------------------------------
-if docTitle and not docId:
-    try:
-        cursor.execute("""\
-            SELECT d.id, d.title
-              FROM document d
-              JOIN doc_type t
-                ON t.id = d.doc_type
-             WHERE t.name = 'Summary'
-               AND d.title LIKE ?
-          ORDER BY d.title""", '%' + docTitle + '%')
-        rows = cursor.fetchall()
-    except Exception, info:
-        cdrcgi.bail("Database failure looking up title %s: %s" %
-                    (docTitle, str(info)))
-    if not rows:
-        cdrcgi.bail("No summaries found containing the string %s" % docTitle)
-    elif len(rows) == 1:
-        docId = str(rows[0][0])
-    else:
-        form = """\
-   <input type='hidden' name ='%s' value='%s'>
-   Select Summary:&nbsp;&nbsp;
-   <select name='cdrid'>
-""" % (cdrcgi.SESSION, session)
-        for row in rows:
-            form += """\
-    <option value='%d'>%s</option>
-""" % (row[0], row[1])
-        form += """\
-   </select>"""
-
-        if displayComment['internal']:
-            form += """
-     <input id='int' name='showComment' type='hidden' value='internal'>
+class Control(cdrcgi.Control):
     """
-        if displayComment['external']:
-            form += """
-     <input id='ext' name='showComment' type='hidden' value='external'>
-    """
-        if displayComment['response']:
-            form += """
-     <input id='resp' name='showComment' type='hidden' value='response'>
-    """
-        if displayComment['permanent']:
-            form += """
-     <input id='perm' name='showComment' type='hidden' value='permanent'>
-    """
-        if displayComment['advisory']:
-            form += """
-     <input id='adv' name='showComment' type='hidden' value='advisory'>
+    Override class to generate specific report.
     """
 
-        if userCol:
-            form += """
-            <input id='user'  name='showCol' type='hidden' value='showUser'>
-    """
-        if blankCol:
-            form += """
-            <input id='blank' name='showCol' type='hidden' value='showBlank'>
-    """
-        form += """\
-  </form>
- </body>
-</html>
-"""
-        cdrcgi.sendPage(header + form)
+    AUDIENCES = ("Health Professional", "Patient")
+    LANGUAGES = ("English", "Spanish")
+    RESPONSE = "ResponseToComment"
+    BLANK = "blank"
+    USER_AND_DATE = "user-and-date"
+    BOARD_NAME = "/Organization/OrganizationNameInformation/OfficialName/Name"
+    TYPES = {
+        "C": "All Comments",
+        "I": "Internal Comments (excluding permanent comments)",
+        "P": "Permanent Comments (internal & external)",
+        "E": "External Comments (excluding advisory comments)",
+        "A": "Advisory Board Comments (internal & external)",
+        "R": "Responses to Comments"
+    }
+    TYPE_KEYS = "CIPEAR"
 
+    def __init__(self):
+        """
+        Collect and validate the form's parameters.
+        """
 
-#----------------------------------------------------------------------
-# Build date string for header.
-#----------------------------------------------------------------------
-dateString = time.strftime("%B %d, %Y")
+        cdrcgi.Control.__init__(self, "Summary Comments Report")
+        self.boards = self.get_boards()
+        self.selection_method = self.fields.getvalue("method", "board")
+        self.audience = self.fields.getvalue("audience", "Health Professional")
+        self.language = self.fields.getvalue("language", "English")
+        self.board = self.fields.getvalue("board")
+        self.cdr_id = self.fields.getvalue("cdr-id")
+        self.fragment = self.fields.getvalue("title")
+        self.comment_types = set(self.fields.getlist("comments")) or set("ER")
+        self.comment_tags = self.get_comment_tags()
+        self.extra = self.fields.getlist("extra")
+        self.widths = self.get_widths()
+        self.validate()
 
-#----------------------------------------------------------------------
-# If we don't have a request, put up the form.
-#----------------------------------------------------------------------
-if not lang and not docId:
-    header = cdrcgi.header(title, title, instr + ' - ' + dateString, 
-                           script,
-                           ("Submit",
-                            SUBMENU,
-                            cdrcgi.MAINMENU),
-                           numBreaks = 1,
-                           method = 'GET',
-                           stylesheet = """
-   <style type="text/css">
-    TD      { font-size:  12pt; }
-    LI.none { list-style-type: none }
-    DL      { margin-left: 0; padding-left: 0 }
-    P.title { font-size: 12pt;
-              font-style: italic; 
-              font-weight: bold; }
-    *.comone   { margin-bottom: 8px; }
-    *.comgroup { background: #C9C9C9; 
-                 margin-bottom: 8px; }
-   </style>
+    def populate_form(self, form, titles=None):
+        """
+        Overridden version of the method to fill in the fields for
+        the CGI request's form. In addition to being invoked by the
+        base class's run() method when the page is first requested,
+        this method is invoked by our build_tables() method below,
+        when the user has selected the "by summary title" method
+        of choosing a summary, with a title fragment which matches
+        more than one summary, so that we can put the form up again,
+        letting the user pick which of the matching summaries should
+        be used for the report.
+        """
 
-   <script type='text/javascript'>
-     function dispInternal() {
-         var checks  = ['ext', 'adv', 'all']
-         if (document.getElementById('int').checked &&
-             !document.getElementById('perm').checked) {
-             for (var j in checks) {
-                 document.getElementById(checks[j]).checked = false;
-             }
-         }
-         else if (document.getElementById('int').checked &&
-                  document.getElementById('perm').checked) {
-             for (var j in checks) {
-                 document.getElementById(checks[j]).checked = false;
-             }
-         }
-         else if (!document.getElementById('int').checked &&
-                  document.getElementById('perm').checked) {
-
-             for (var j in checks) {
-                 document.getElementById(checks[j]).checked = false;
-             }
-         }
-     }
-
-     function dispPermanent() {
-         var checks  = ['ext', 'adv', 'all']
-         if (document.getElementById('perm').checked &&
-             !document.getElementById('int').checked) {
-             for (var j in checks) {
-                 document.getElementById(checks[j]).checked = false;
-             }
-         }
-         else if (document.getElementById('perm').checked &&
-                  document.getElementById('int').checked) {
-             for (var j in checks) {
-                 document.getElementById(checks[j]).checked = false;
-             }
-         }
-         else if (!document.getElementById('perm').checked &&
-                  document.getElementById('int').checked) {
-             for (var j in checks) {
-                 document.getElementById(checks[j]).checked = false;
-             }
-         }
-     }
-
-
-     function dispExternal() {
-         var checks  = ['int', 'perm', 'all']
-         if (document.getElementById('ext').checked &&
-             !document.getElementById('adv').checked) {
-             for (var j in checks) {
-                 document.getElementById(checks[j]).checked = false;
-             }
-         }
-         else if (document.getElementById('ext').checked &&
-                  document.getElementById('adv').checked) {
-             for (var j in checks) {
-                 document.getElementById(checks[j]).checked = false;
-             }
-         }
-         else if (!document.getElementById('ext').checked &&
-                  document.getElementById('adv').checked) {
-             for (var j in checks) {
-                 document.getElementById(checks[j]).checked = false;
-             }
-         }
-     }
-
-
-     function dispAdvisory() {
-         var checks  = ['int', 'perm', 'all']
-         if (document.getElementById('adv').checked &&
-             !document.getElementById('ext').checked) {
-             for (var j in checks) {
-                 document.getElementById(checks[j]).checked = false;
-             }
-         }
-         else if (document.getElementById('adv').checked &&
-                  document.getElementById('ext').checked) {
-             for (var j in checks) {
-                 document.getElementById(checks[j]).checked = false;
-             }
-         }
-         else if (!document.getElementById('adv').checked &&
-                  document.getElementById('ext').checked) {
-             for (var j in checks) {
-                 document.getElementById(checks[j]).checked = false;
-             }
-         }
-     }
-
-
-     function dispAll() {
-         var checks  = ['int', 'perm', 'ext', 'adv']
-         if (document.getElementById('all').checked) {
-             for (var j in checks) {
-                 document.getElementById(checks[j]).checked = true;
-             }
-         }
-         else if (!document.getElementById('all').checked) {
-             for (var j in checks) {
-                 document.getElementById(checks[j]).checked = false;
-             }
-         }
-     }
-
-   </script>
-
-"""                           )
-    form   = """\
-   <input type='hidden' name='%s' value='%s'>
- 
-   <fieldset>
-    <legend>&nbsp;Select Summary Audience&nbsp;</legend>
-    <input name='audience' type='radio' id="byHp"
-           value='Health Professional' CHECKED>
-    <label for="byHp">Health Professional</label>
-    <br>
-    <input name='audience' type='radio' id="byPat"
-           value='Patient'>
-    <label for="byPat">Patient</label>
-   </fieldset>
-
-   <fieldset>
-    <legend>&nbsp;Select Summary Language and Summary Type&nbsp;</legend>
-   <p class="title">Summaries by Board</p>
-   <table border = '0' width="100%%">
-    <tr>
-     <td width=100>
-      <input name='lang' type='radio' id="en" value='English' CHECKED>
-      <label for="en">English</label>
-     </td>
-     <td valign='top'>
-      <select name='grp'>
-       <option>Adult Treatment</option>
-       <option>Cancer Genetics</option>
-       <option>Complementary and Alternative Medicine</option>
-       <option>Pediatric Treatment</option>
-       <option>Screening and Prevention</option>
-       <option>Supportive and Palliative Care</option>
-       <option selected="SELECTED">Please select a summary type ...</option>
-      </select>
-     </td>
-    </tr>
-    <tr>
-     <td width=100>
-      <input name='lang' type='radio' id="es" value='Spanish'>
-      <label for="es">Spanish</label>
-     </td>
-     <td valign='top'>
-      <select name='grp'>
-       <option>Adult Treatment</option>
-       <option>Pediatric Treatment</option>
-       <option>Screening and Prevention</option>
-       <option>Supportive and Palliative Care</option>
-       <option selected="SELECTED">Please select a summary type ...</option>
-      </select>
-     </td>
-    </tr>
-   </table>
-
-   <p class="title">Summary by ID</p>
-   <table border = '0' width="100%%">
-    <tr>
-     <td align='right' width="25%%">
-      <label for="cdrid">Document ID:&nbsp;</label>
-     </td>
-     <td width="75%%">
-      <input type="text" name='cdrid' id="cdrid" size="40"
-             value="Enter CDR-ID (i.e. CDR123456)"
-             onfocus="this.value=''">
-     </td>
-    </tr>
-   </table>
-
-   <p class="title">Summary by Title</p>
-   <table border = '0' width="100%%">
-    <tr>
-     <td align='right' width="25%%">
-      <label for="title">Summary Title:&nbsp;</label>
-     </td>
-     <td width="75%%">
-      <input type="text" name='title' id="title" size="40"
-             value="Enter Summary Title"
-             onfocus="this.value=''">
-     </td>
-    </tr>
-   </table>
-   </fieldset>
-
-   <p>
-   <fieldset>
-    <legend>&nbsp;Select Comment Types to be displayed&nbsp;</legend>
-    <div class='comgroup'>
-     <input name='showComment' type='checkbox' id='int'
-             value='internal'
-                   onclick='javascript:dispInternal()'>
-     <label for='int'>I - Internal Comments (excluding permanent comments)</label>
-     <br>
-     <input name='showComment' type='checkbox' id='perm'
-             value='permanent' 
-             onclick='javascript:dispPermanent()'>
-     <label for='perm'>P - Permanent Comments (internal & external)</label>
-    </div>
-    <div class='comgroup'>
-     <input name='showComment' type='checkbox' id='ext'
-             value='external' checked='CHECKED'
-                   onclick='javascript:dispExternal()'>
-     <label for='ext'>E - External Comments (excluding advisory comments)</label>
-     <br>
-     <input name='showComment' type='checkbox' id='adv'
-             value='advisory' 
-             onclick='javascript:dispAdvisory()'>
-     <label for='adv'>A - Advisory Board Comments (internal & external)</label>
-    </div>
-    <div class='comone'>
-     <input name='showComment' type='checkbox' id='all'
-             value='all'
-                   onclick='javascript:dispAll()'>
-     <label for='all'>All Comments</label>
-    </div>
-    <div class='comone'>
-     <input name='showComment' type='checkbox' id="resp" 
-            value='response' checked='CHECKED'>
-     <label for='resp'>R - Response to Comments</label>
-    </div>
-   </fieldset>
-
-   <fieldset>
-    <legend>&nbsp;Add Columns to Report&nbsp;</legend>
-    <label for="user">
-    <input id='user' name='showCol' type='checkbox' 
-           value='showUser'>
-    Display UserID / Date</label>
-    <br>
-    <label for='blank'>
-    <input id='blank' name='showCol' type='checkbox' 
-           value='showBlank' CHECKED>
-    Display Blank Column</label>
-   </fieldset>
-
-  </form>
- </body>
-</html>
-""" % (cdrcgi.SESSION, session)
-    cdrcgi.sendPage(header + form)
-
-#----------------------------------------------------------------------
-# Language variable has been selected
-# Building individual Queries
-# - English, HP, with CDR ID
-# - English, HP, without CDR ID
-# - English, Patient, with CDR ID ...
-#----------------------------------------------------------------------
-
-boardPick = ''
-if not docId:
-    #----------------------------------------------------------------------
-    # Create the selection criteria based on the groups picked by the user
-    # But the decision will be based on the content of the board instead
-    # of the SummaryType.
-    # Based on the SummaryType selected on the form the boardPick list is
-    # being created including the Editorial and Advisory board for each
-    # type.  These board IDs can then be decoded into the proper 
-    # heading to be used for each selected summary type.
-    # --------------------------------------------------------------------
-    for i in range(len(groups)):
-      # if i+1 == len(groups):
-      if groups[i] == 'Adult Treatment' and lang == 'English':
-          boardPick += """'CDR0000028327', 'CDR0000035049', """
-      elif groups[i] == 'Adult Treatment' and lang == 'Spanish':
-          boardPick += """'CDR0000028327', 'CDR0000035049', """
-      elif groups[i] == 'Complementary and Alternative Medicine':
-          boardPick += """'CDR0000256158', 'CDR0000423294', """
-      elif groups[i] == 'Cancer Genetics':
-          boardPick += """'CDR0000032120', 'CDR0000257061', """
-      elif groups[i] == 'Screening and Prevention' and lang == 'English':
-          boardPick += """'CDR0000028536', 'CDR0000028537', """
-      elif groups[i] == 'Screening and Prevention' and lang == 'Spanish':
-          boardPick += """'CDR0000028536', 'CDR0000028537', """
-      elif groups[i] == 'Pediatric Treatment' and lang == 'English':
-          boardPick += """'CDR0000028557', 'CDR0000028558', """
-      elif groups[i] == 'Pediatric Treatment' and lang == 'Spanish':
-          boardPick += """'CDR0000028557', 'CDR0000028558', """
-      elif groups[i] == 'Supportive and Palliative Care' and lang == 'English':
-          boardPick += """'CDR0000028579', 'CDR0000029837', """
-      elif groups[i] == 'Supportive and Palliative Care' and lang == 'Spanish':
-          boardPick += """'CDR0000028579', 'CDR0000029837', """
-      else:
-          boardPick += """'""" + groups[i] + """', """
-          cdrcgi.bail('Invalid summary type selected: %s' % boardPick)
-
-# Define the Headings under which the summaries should be listed
-# --------------------------------------------------------------
-q_case = """\
-       CASE WHEN board.value = 'CDR0000028327'  
-                 THEN 'Adult Treatment'
-            WHEN board.value = 'CDR0000035049'  
-                 THEN 'Adult Treatment'
-            WHEN board.value = 'CDR0000032120'  
-                 THEN 'Cancer Genetics'
-            WHEN board.value = 'CDR0000257061'  
-                 THEN 'Cancer Genetics'
-            WHEN board.value = 'CDR0000256158'  
-                 THEN 'Complementary and Alternative Medicine'
-            WHEN board.value = 'CDR0000423294'  
-                 THEN 'Complementary and Alternative Medicine'
-            WHEN board.value = 'CDR0000028557'  
-                 THEN 'Pediatric Treatment'
-            WHEN board.value = 'CDR0000028558'  
-                 THEN 'Pediatric Treatment'
-            WHEN board.value = 'CDR0000028536'  
-                 THEN 'Screening and Prevention'
-            WHEN board.value = 'CDR0000028537'  
-                 THEN 'Screening and Prevention'
-            WHEN board.value = 'CDR0000028579'  
-                 THEN 'Supportive and Palliative Care'
-            WHEN board.value = 'CDR0000029837'  
-                 THEN 'Supportive and Palliative Care'
-            ELSE board.value END
-"""
-
-# Create the selection criteria for the summary language (English/Spanish)
-# ------------------------------------------------------------------------
-q_lang = """\
-AND    lang.path = '/Summary/SummaryMetaData/SummaryLanguage'
-AND    lang.value = '%s'
-""" % lang
-
-# Define the selection criteria parts that are different for English or
-# Spanish documents:
-# q_fields:  Fields to be selected, i.e. the Spanish version needs to 
-#            display the English translation
-# q_join:    The Spanish version has to evaluate the board and language
-#            elements differently
-# q_board:   Don't restrict on selected boards if All English/Spanish
-#            has been selected as well
-# --------------------------------------------------------------------
-if lang == 'English': 
-    q_fields = """
-                'dummy1', 'dummy2', title.value EnglTitle, 
-"""
-    q_join = """
-JOIN  query_term board
-ON    qt.doc_id = board.doc_id
-JOIN  query_term lang
-ON    qt.doc_id    = lang.doc_id
-"""
-    q_trans = ''
-    if groups.count('All English'):
-        q_board = ''
-    else:
-        q_board = """\
-AND    board.value in (%s)
-""" % boardPick[:-2]
-else:
-    q_fields = """
-                qt.value CDRID, qt.int_val ID, translation.value EnglTitle, 
-"""
-    q_join = """
-JOIN  query_term board
-ON    qt.int_val = board.doc_id
-JOIN  query_term translation
-ON    qt.int_val = translation.doc_id
-JOIN  query_term lang
-ON    qt.doc_id    = lang.doc_id
-"""
-    q_trans = """
-AND   translation.path = '/Summary/SummaryTitle'
-AND   qt.path          = '/Summary/TranslationOf/@cdr:ref'
-"""
-    if groups.count('All Spanish'):
-        q_board = ''
-    else:
-        q_board = """\
-AND    board.value in (%s)
-""" % boardPick[:-2]
-
-# Create selection criteria for HP or Patient version
-# ---------------------------------------------------
-if audience == 'Patient':
-    q_audience = """\
-AND audience.value = 'Patients'
-"""
-else:
-    q_audience = """\
-AND audience.value = 'Health professionals'
-"""
-
-# Put all the pieces together for the SELECT statement
-# (If we have a docId we just need to get the summary title)
-# -------------------------------------------------------------
-if docId:
-    query = """\
-        SELECT DISTINCT qt.doc_id, title.value DocTitle, mod.value,
-                        aud.value
-          FROM query_term qt
-          JOIN query_term title
-            ON qt.doc_id    = title.doc_id
-          JOIN query_term aud
-            ON qt.doc_id = aud.doc_id
-           AND aud.path  = '/Summary/SummaryMetaData/SummaryAudience'
-          LEFT OUTER JOIN query_term mod
-            ON mod.doc_id = qt.doc_id
-           AND mod.path = '/Summary/@ModuleOnly'
-         WHERE qt.doc_id = %s 
-           AND title.path   = '/Summary/SummaryTitle'
-           AND qt.doc_id not in (select doc_id 
-                               from doc_info 
-                               where doc_status = 'I' 
-                               and doc_type = 'Summary')
-    """ % (docId) 
-else:
-    query = """\
-        SELECT DISTINCT qt.doc_id, title.value DocTitle, mod.value,
-        %s
-        %s
-        FROM  query_term qt
-        %s
-        JOIN  query_term title
-        ON    qt.doc_id    = title.doc_id
-        JOIN  query_term audience
-        ON    qt.doc_id    = audience.doc_id
-   LEFT OUTER JOIN query_term mod
-           ON mod.doc_id = qt.doc_id
-          AND mod.path = '/Summary/@ModuleOnly'
-        WHERE title.path   = '/Summary/SummaryTitle'
-        %s
-        AND   board.path   = '/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref'
-        %s
-        AND   audience.path = '/Summary/SummaryMetaData/SummaryAudience'
-        %s
-        %s
-        AND EXISTS (SELECT 'x' FROM doc_version v
-                    WHERE  v.id = qt.doc_id
-                    AND    v.val_status = 'V'
-                    AND    v.publishable = 'Y')
-        AND qt.doc_id not in (select doc_id 
-                               from doc_info 
-                               where doc_status = 'I' 
-                               and doc_type = 'Summary')
-        ORDER BY 6, 2
-        """ % (q_fields, q_case, q_join, q_trans, q_board, q_audience, q_lang)
-
-if not query:
-    cdrcgi.bail('No query criteria specified')   
-
-# Submit the query to the database.
-#----------------------------------------------------------------------
-try:
-    cursor = conn.cursor()
-    cursor.execute(query)
-    rows = cursor.fetchall()
-    cursor.close()
-    cursor = None
-except cdrdb.Error, info:
-    cdrcgi.bail('Failure retrieving Summary documents: %s' %
-                info[1][0])
-     
-if not rows:
-    cdrcgi.bail('No Records Found for Selection: %s ' % lang+"; "+audience+"; "+groups[0] )
-
-# Counting the number of summaries per board
-# ------------------------------------------
-boardCount = {}
-allSummaries = {}
-
-for summary in rows:
-    summaryTitle= '%s%s' % (summary[1], summary[2] and ' (Module)' or '')
-    if not audience: audience = summary[3]
-    doc = cdr.getDoc('guest', summary[0], getObject = 1)
-
-    dom = xml.dom.minidom.parseString(doc.xml)
-    
-    allElements      = dom.getElementsByTagName('*')  
-
-    # If the summary doesn't contain any Comments or Responses we can
-    # quit here
-    # ---------------------------------------------------------------
-    commentElements  = dom.getElementsByTagName('Comment')  
-    rCommentElements = dom.getElementsByTagName('ResponseToComment')  
-    if not commentElements and not rCommentElements: continue
-
-    allComments = []
-    
-    for obj in allElements:
-        if obj.nodeName == 'Comment' or obj.nodeName == 'ResponseToComment':
-            thisComment = cdr.getTextContent(obj).strip()
-            if obj.nodeName == 'Comment':
-                atAudience  = obj.getAttribute('audience')
-                atDuration  = obj.getAttribute('duration') or ''
-                atSource    = obj.getAttribute('source') or ''
-            else:
-                atAudience  = u'Response'
-                atDuration = atSource = ''
-
-            atUser      = obj.getAttribute('user')
-            atDate      = obj.getAttribute('date')
-
-            # Need to find the SummarySection title of each comment
-            # Walking the tree backwards until I find the section title
-            # ---------------------------------------------------------
-            if obj.parentNode.nodeName == 'SummarySection':
-                sectionNodes = obj.parentNode.childNodes
-                summarySection = getTitle(sectionNodes)
-            elif obj.parentNode.nodeName == 'Summary' or \
-                 obj.parentNode.parentNode.nodeName == 'Summary':
-                summarySection = 'No Section Title'
-            else:
-                secParentNode = obj.parentNode.parentNode
-                summarySection = getSummarySectionName(secParentNode, '')
-
-            allComments.append([summarySection, thisComment, atAudience,
-                                atDuration, atSource, atUser, atDate])
-
-    allSummaries[summaryTitle] = allComments
-
-
-# Create the results page.
-# 
-# Note: Since the users want to be able to convert the HTML output 
-#       to a Word document we need to specify the CSS class selectors
-#       without an asterix '*'.  MS-Word doesn't recognize
-#          *.dada { color: blue; }
-#       as a valid selector but does accept
-#           .dada { color: blue; }
-#----------------------------------------------------------------------
-instr     = '%s Summaries List -- %s.' % (lang, dateString)
-header    = cdrcgi.rptHeader(title, instr, 
-                          stylesheet = """\
-   <STYLE type="text/css">
-    DL             { margin-left:    0; 
-                     padding-left:   0;
-                     margin-top:    10px;
-                     margin-bottom: 30px; }
-    TABLE          { margin-top:    10px; 
-                     margin-bottom: 30px; } 
-
-    .date          { font-size: 12pt; }
-    .boardHdr      { font-size: 12pt;
-                     font-weight: bold;
-                     text-decoration: underline; }
-    .sectionHdr    { font-size: 12pt;
-                     font-weight: bold; 
-                     font-style: italic; }
-    td.report      { font-size: 11pt;
-                     padding-right: 15px; 
-                     vertical-align: top; }
-    td.nodisplay   { background-color: grey; }
-    td.display     { background-color: white; 
-                     font-weight: bold;
-                     text-align: center; }
-    .cdrid         { text-align: right }
-    LI             { list-style-type: none }
-    li.report      { font-size: 11pt;
-                     font-weight: normal; }
-    div.es          { height: 10px; }
-    .internal      { font-weight: bold;
-                     color: blue; }
-    .external      { font-weight: bold;
-                     color: green; }
-    .response      { font-weight: bold;
-                     color: brown; }
-   </STYLE>
-""")
-
-# -------------------------
-# Display the Report Title
-# -------------------------
-if lang == 'English' or not lang:
-    hdrLang = ''
-else:
-    hdrLang = lang
-
-#  <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-# """ % (cdrcgi.SESSION, session, hdrLang, audience, dateString)
-report    = """\
-  <H3>PDQ %s %s Summaries<br>
-  <span class="date">(%s)</span>
-  </H3>
-""" % (hdrLang, audience, dateString)
-
-if not docId: board_type = rows[0][5]
-
-# ------------------------------------------------------------------------
-# Display data
-# The columns for the section title and comment are always displayed.  
-# The display of the user/date column and blank column depends on 
-# the user input.
-# ------------------------------------------------------------------------
-if not docId:
-    report += """\
-  <span class="boardHdr">Board: %s</span><br>
-""" % (board_type)
-
-# Iterate over each summary
-# -------------------------
-for title, allComments in allSummaries.items():
-    report += """\
-      <span class="sectionHdr">Summary: %s</span>
-      <TABLE border="1" width = "90%%">
-       <tr>
-        <th>Summary Section Title</th>
-        <th>[I, E, or R] Comments</th>
-    """ % (title)
-
-    if userCol:
-        report += """\
-        <th>UserID / Date</th>
-"""
-    if blankCol:
-        report += """\
-        <th>Blank</th>
-"""
-    report += """\
-       </tr>
-"""
-    # Iterate over all comments found
-    # -------------------------------
-    first      = True
-    allRows    = 0
-    sectionTitle = ''
-    #cdrcgi.bail(displayComment)
-    #cdrcgi.bail(allComments[0:7])
-    for commentInfo in allComments:
-        # We only want to display a section title if it differs from
-        # the previous one but we need to account for the fact that
-        # some of the comment types might not get displayed so we
-        # need to keep track of when we've printed the first section
-        # heading.
-        # ----------------------------------------------------------
-        allRows += 1
-        if allRows > 1 and sectionTitle == commentInfo[0]:
-            first = False
-        #else:
-        #    allRows = 0
-            
-        addHtmlRow = htmlCommentRow(commentInfo, displayComment,
-                                     userCol, blankCol, first)
-        if addHtmlRow:
-            report += addHtmlRow
-            first = False
-            allRows += 1
-            sectionTitle = commentInfo[0]
+        #--------------------------------------------------------------
+        # Show the second stage in a cascading sequence of the form if we
+        # have invoked this method directly from build_tables(). Widen
+        # the form to accomodate the length of the title substrings
+        # we're showing.
+        #--------------------------------------------------------------
+        if titles:
+            form.add_css("fieldset { width: 600px; }")
+            form.add_hidden_field("method", "id")
+            form.add("<fieldset>")
+            form.add(form.B.LEGEND("Choose Summary"))
+            for t in titles:
+                form.add_radio("cdr-id", t.display, t.id, tooltip=t.tooltip)
+            form.add("</fieldset>")
         else:
-            if allRows == 1: allRows = 0
+            if not self.extra:
+                self.extra = ["blank"]
+            form.add("<fieldset>")
+            form.add(form.B.LEGEND("Selection Method"))
+            form.add_radio("method", "By PDQ Board", "board", checked=True)
+            form.add_radio("method", "By CDR ID", "id")
+            form.add_radio("method", "By Summary Title", "title")
+            form.add("</fieldset>")
+            form.add("<fieldset class='by-board-block'>")
+            form.add(form.B.LEGEND("Board"))
+            for board_id in sorted(self.boards, key=self.boards.get):
+                form.add_radio("board", self.boards.get(board_id), board_id)
+            form.add("</fieldset>")
+            form.add("<fieldset class='by-board-block'>")
+            form.add(form.B.LEGEND("Audience"))
+            form.add_radio("audience", "Health Professional",
+                           "Health Professional", checked=True)
+            form.add_radio("audience", "Patient", "Patient")
+            form.add("</fieldset>")
+            form.add("<fieldset class='by-board-block'>")
+            form.add(form.B.LEGEND("Language"))
+            form.add_radio("language", "English", "English", checked=True)
+            form.add_radio("language", "Spanish", "Spanish")
+            form.add("</fieldset>")
+            form.add("<fieldset class='by-id-block hidden'>")
+            form.add(form.B.LEGEND("Summary Document ID"))
+            form.add_text_field("cdr-id", "CDR ID")
+            form.add("</fieldset>")
+            form.add("<fieldset class='by-title-block hidden'>")
+            form.add(form.B.LEGEND("Summary Title"))
+            form.add_text_field("title", "Title",
+                                tooltip="Use wildcard (%) as appropriate.")
+            form.add("</fieldset>")
+        form.add("<fieldset>")
+        form.add(form.B.LEGEND("Comment Types"))
+        for key in self.TYPE_KEYS:
+            widget_class = ""
+            if key not in "CR":
+                widget_class = "specific-comment-types"
+            checked = key in self.comment_types
+            form.add_checkbox("comments", self.TYPES[key], key,
+                              checked=checked, widget_classes=[widget_class])
+        form.add("</fieldset>")
+        form.add("<fieldset>")
+        form.add(form.B.LEGEND("Extra Columns"))
+        for label, value in (
+            ("User ID and Date", Control.USER_AND_DATE),
+            ("Blank Column", Control.BLANK)
+        ):
+            checked = value in self.extra
+            form.add_checkbox("extra", label, value, checked=checked)
+        form.add("</fieldset>")
 
-        first = True
+        #--------------------------------------------------------------
+        # Dynamic management of sections of the form using local script.
+        #--------------------------------------------------------------
+        form.add_script("""\
+function check_comments(type) {
+    switch (type) {
+        case 'C':
+            jQuery('.specific-comment-types').prop('checked', false);
+            break;
+        case 'R':
+            break;
+        default:
+            jQuery('#comments-c').prop('checked', false);
+            break;
+    }
+}
+function check_method(method) {
+    switch (method) {
+        case 'id':
+            jQuery('.by-board-block').hide();
+            jQuery('.by-id-block').show();
+            jQuery('.by-title-block').hide();
+            break;
+        case 'board':
+            jQuery('.by-board-block').show();
+            jQuery('.by-id-block').hide();
+            jQuery('.by-title-block').hide();
+            break;
+        case 'title':
+            jQuery('.by-board-block').hide();
+            jQuery('.by-id-block').hide();
+            jQuery('.by-title-block').show();
+            break;
+    }
+}""")
 
-    report += """
-      </TABLE>
+    def build_tables(self):
+        """
+        Overrides the base class's version of this method to assemble
+        the tables to be displayed for this report. If the user
+        chooses the "by summary title" method for selecting which
+        summary to use for the report, and the fragment supplied
+        matches more than one summary document, display the form
+        a second time so the user can pick the summary.
+        """
+
+        if self.selection_method == "title":
+            if not self.fragment:
+                cdrcgi.bail("Title fragment is required.")
+            titles = self.summaries_for_title(self.fragment)
+            if not titles:
+                cdrcgi.bail("No summaries match that title fragment")
+            if len(titles) == 1:
+                summaries = [Summary(titles[0].id, self)]
+            else:
+                opts = {
+                    "buttons": self.buttons,
+                    "action": self.script,
+                    "subtitle": self.title,
+                    "session": self.session
+                }
+                form = cdrcgi.Page(self.PAGE_TITLE, **opts)
+                self.populate_form(form, titles)
+                form.send()
+        elif self.selection_method == "id":
+            if not self.cdr_id:
+                cdrcgi.bail("CDR ID is required.")
+            summaries = [Summary(self.cdr_id, self)]
+        else:
+            if not self.board:
+                cdrcgi.bail("Board is required.")
+            summaries = self.summaries_for_board()
+
+        #--------------------------------------------------------------
+        # While we have the Summary objects available, prepare the
+        # report title which we'll use in the set_report_options()
+        # method below, depending on whether comments for a single
+        # summary are being shown, or comments for all of the selected
+        # board's active summaries.
+        #--------------------------------------------------------------
+        if len(summaries) > 1:
+            board_name = self.boards.get(self.board)
+            self.title = "Comments for %s %s %s Summaries" % (self.language,
+                                                              self.audience,
+                                                              board_name)
+        else:
+            self.title = "Comments for %s" % summaries[0].title
+
+        #--------------------------------------------------------------
+        # Invoke the Summary objects' make_table() method to do the
+        # heavy lifting.
+        #--------------------------------------------------------------
+        return [summary.make_table() for summary in summaries]
+
+    def set_report_options(self, opts):
+        """
+        Callback to adjust the report's options:
+           * Plug in the title we created above in build_tables().
+           * Add subtitle showing the date the report is run.
+           * Override the report's default style sheet, to work around
+             some of the anomalies we run into when the users paste the
+             HTML report into Microsoft Word.
+        """
+
+        return {
+            "banner": self.title,
+            "subtitle": str(datetime.date.today()),
+            "page_opts": { "stylesheets": ["/stylesheets/html-for-word.css"] }
+        }
+
+    def get_widths(self):
+        """
+        Calculate the column widths we'll use based on which of the
+        optional extra columns have been selected by the user.
+        """
+
+        widths = [250, 500, 175, 150]
+        if self.USER_AND_DATE not in self.extra:
+            widths[1] += widths[2]
+        if self.BLANK not in self.extra:
+            widths[1] += widths[2]
+        return widths
+
+    def get_boards(self):
+        """
+        Assemble a dictionary of the PDQ board names, indexed by
+        CDR Organization document ID. Trim the names to their
+        short forms, pruning away the "PDQ" prefix and the
+        "Editorial Board" suffix.
+        """
+
+        query = cdrdb.Query("query_term n", "n.doc_id", "n.value")
+        query.join("query_term t", "t.doc_id = n.doc_id")
+        query.join("active_doc a", "a.id = n.doc_id")
+        query.where("t.path = '/Organization/OrganizationType'")
+        query.where("n.path = '%s'" % self.BOARD_NAME)
+        query.where("t.value = 'PDQ Editorial Board'")
+        rows = query.execute(self.cursor).fetchall()
+        boards = {}
+        prefix, suffix = "PDQ ", " Editorial Board"
+        for org_id, name in rows:
+            if name.startswith(prefix):
+                name = name[len(prefix):]
+            if name.endswith(suffix):
+                name = name[:-len(suffix)]
+            boards[org_id] = name
+        return boards
+
+    def summaries_for_title(self, fragment):
+        """
+        Find the summaries that match the user's title fragment. Note
+        that the user is responsible for adding any non-trailing SQL
+        wildcards to the fragment string. If the title is longer than
+        60 characters, truncate with an ellipsis, but add a tooltip
+        showing the whole title. We create a local class for the
+        resulting list.
+        """
+
+        class SummaryTitle:
+            def __init__(self, doc_id, display, tooltip=None):
+                self.id = doc_id
+                self.display = display
+                self.tooltip = tooltip
+
+        query = cdrdb.Query("document d", "d.id", "d.title")
+        query.join("doc_type t", "t.id = d.doc_type")
+        query.where("t.name = 'Summary'")
+        query.where(query.Condition("d.title", fragment + "%", "LIKE"))
+        query.order("d.title")
+        rows = query.execute(self.cursor).fetchall()
+        summaries = []
+        for doc_id, title in rows:
+            if len(title) > 60:
+                short_title = title[:57] + "..."
+                summary = SummaryTitle(doc_id, short_title, title)
+            else:
+                summary = SummaryTitle(doc_id, title)
+            summaries.append(summary)
+        return summaries
+
+    def summaries_for_board(self):
+        """
+        The user has asked for a report of multiple summaries for
+        one of the boards. Find the board's summaries whose language
+        and audience match the request parameters, and return a
+        list of Summary objects for them.
+        Use Query class to simplify SQL creation for different logic paths.
+        """
+
+        b_path = "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"
+        t_path = "/Summary/TranslationOf/@cdr:ref"
+        query = cdrdb.Query("query_term a", "a.doc_id")
+        query.where("a.path = '/Summary/SummaryMetaData/SummaryAudience'")
+        query.where(query.Condition("a.value", self.audience + "s"))
+        if self.language == "English":
+            query.join("query_term b", "b.doc_id = a.doc_id")
+        else:
+            query.join("query_term t", "t.doc_id = a.doc_id")
+            query.where(query.Condition("t.path", t_path))
+            query.join("query_term b", "b.doc_id = t.int_val")
+        query.where(query.Condition("b.path", b_path))
+        query.where(query.Condition("b.int_val", self.board))
+        query.join("active_doc d", "d.id = a.doc_id")
+        query.join("doc_version v", "v.id = d.id")
+        query.where("v.publishable = 'Y'")
+        rows = query.unique().execute(self.cursor).fetchall()
+        return sorted([Summary(row[0], self) for row in rows])
+
+    def get_comment_tags(self):
+        """
+        Figure out which comment element tags we should look for,
+        based on the user's choices.
+        """
+
+        tags = []
+        if "R" in self.comment_types:
+            tags = [Control.RESPONSE]
+        if self.comment_types - set("R"):
+            tags.append("Comment")
+        return tags
+
+    def validate(self):
+        """
+        Separate validation method, to make sure the CGI request's
+        parameters haven't been tampered with by an intruder.
+        """
+
+        if self.audience not in self.AUDIENCES:
+            cdrcgi.bail(cdrcgi.TAMPERING)
+        if self.language not in self.LANGUAGES:
+            cdrcgi.bail(cdrcgi.TAMPERING)
+        if self.board:
+            try:
+                self.board = int(self.board)
+            except:
+                cdrcgi.bail(cdrcgi.TAMPERING)
+            if self.board not in self.boards:
+                cdrcgi.bail(cdrcgi.TAMPERING)
+        if self.cdr_id:
+            try:
+                self.cdr_id = cdr.exNormalize(self.cdr_id)[1]
+            except:
+                cdrcgi.bail("Invalid format for CDR ID")
+        if set(self.extra) - set([self.BLANK, self.USER_AND_DATE]):
+            cdrcgi.bail(cdrcgi.TAMPERING)
+
+class Cell(cdrcgi.Report.Cell):
+    """
+    Custom Cell class. We need more control over the table's report
+    cells, because they will need to work around anomalies we run
+    into when the HTML for the report is pasted into Microsoft Word.
     """
 
-footer = """\
- </BODY>
-</HTML> 
-"""     
+    def __init__(self, value, width, color=None, **options):
+        """
+        Invoke the base class's method, and then capture the
+        custom attributes we need.
+        """
 
-# Send the page back to the browser.
+        cdrcgi.Report.Cell.__init__(self, value, **options)
+        self.width = width
+        self.color = color
+
+    def to_td(self):
+        """
+        Overriding this method is our incentive for deriving a custom
+        Cell class, so that we can set the style attribute directly
+        on the TD element.
+        """
+        td = cdrcgi.Page.B.TD(self._value)
+        style = "width: %s;" % self.width
+        if self.color:
+            style += " color: %s;" % self.color
+        td.set("style", style)
+        if self._rowspan:
+            td.set("rowspan", str(self._rowspan))
+        return td
+
+class Summary:
+    """
+    One of these for each summary on the report.
+    """
+
+    def __init__(self, doc_id, control):
+        """
+        Fetch the summary's document title and all of the comments which
+        match the user's criteria for comment types. Collect the comments
+        in Section objects so we only have to show the section title once
+        for all of the section's comments.
+        """
+
+        self.id = doc_id
+        self.control = control
+        self.sections = []
+        query = cdrdb.Query("document", "title", "xml")
+        query.where(query.Condition("id", doc_id))
+        self.title, xml = query.execute(control.cursor).fetchone()
+        root = etree.XML(xml.encode("utf-8"))
+        for node in root.findall("SummaryTitle"):
+            self.title = node.text
+        last_section_title = current_section = None
+        for node in root.iter(*control.comment_tags):
+            comment = Summary.Comment(node, control)
+            if comment.in_scope():
+                if comment.section_title != last_section_title:
+                    last_section_title = comment.section_title
+                    current_section = Summary.Section(comment.section_title)
+                    self.sections.append(current_section)
+                current_section.comments.append(comment)
+
+    def __cmp__(self, other):
+        "Make the Summary list sortable"
+        return cmp(self.title, other.title)
+
+    def make_table(self):
+        """
+        Generate the table for the report showing the selected comments
+        for this summary.
+        """
+
+        styles = ["width: %dpx" % width for width in self.control.widths]
+        columns = [
+            cdrcgi.Report.Column("Summary Section Title", style=styles[0]),
+            cdrcgi.Report.Column("Comments", style=styles[1])
+        ]
+        if Control.USER_AND_DATE in self.control.extra:
+            columns.append(cdrcgi.Report.Column("User ID (Date)",
+                                                style=styles[2]))
+        if Control.BLANK in self.control.extra:
+            columns.append(cdrcgi.Report.Column("Blank", style=styles[3]))
+        rows = []
+        for section in self.sections:
+            rows += section.make_rows(self.control)
+        return cdrcgi.Report.Table(columns, rows, caption=self.title,
+                                   stripe=False)
+
+    class Section:
+        """
+        Use this object to collect all of the comments in a summary
+        section to be displayed on the report, so we only have to
+        show the section's title once.
+        """
+
+        def __init__(self, title):
+            "Capture the title and start with an empty comment list."
+            self.title = title
+            self.comments = []
+
+        def make_rows(self, control):
+            """
+            Generate a list of rows for the summary section, one for
+            each comment displayed in the report, with a rowspan
+            attribute applied to the first column of the first row
+            if there is more than one comments displayed for the
+            section.
+            """
+
+            if not self.comments:
+                return []
+            opts = {}
+            if len(self.comments) > 1:
+                opts = { "rowspan": len(self.comments) }
+            cell = Cell(self.title, control.widths[0], **opts)
+            rows = [[cell] + self.comments[0].make_cells()]
+            for comment in self.comments[1:]:
+                rows.append(comment.make_cells())
+            return rows
+
+    class Comment:
+        """
+        One of these is created for each comment found in the summary,
+        whether it will be displayed or not.
+        """
+
+        NO_SECTION_TITLE = "No Section Title" # In case we don't find one.
+
+        def __init__(self, node, control):
+            """
+            Parse out all of the information we need from the comment's
+            document node. Comment elements (as well as ResponseToComment
+            elements) are constrained to have pure text content, rather
+            than mixed content, which makes this much simpler.
+            """
+
+            self.control = control
+            self.tag = node.tag
+            self.text = node.text
+            self.audience = node.get("audience")
+            self.duration = node.get("duration")
+            self.source = node.get("source")
+            self.user = node.get("user")
+            self.timestamp = node.get("date")
+            self.section_title = self.get_section_title(node.getparent())
+
+        def make_cells(self):
+            """
+            Create a list of our custom Cell objects for this comment,
+            capturing the color and width to be used for the cell.
+            Prefix the text for the comment with a bracketed set of
+            single-character flags identifying the type of comment
+            this is (audience, duration, and source).
+            """
+
+            if self.tag == Control.RESPONSE:
+                color = "brown"
+                label = "R"
+            elif self.audience == "External":
+                color = "green"
+                label = "E"
+            elif self.audience == "Internal":
+                color = "blue"
+                label = "I"
+            else:
+                color = None
+                label = "-"
+            if self.duration:
+                label += self.duration[0].upper()
+            if self.source:
+                label += self.source[0].upper()
+            text = u"[%s] %s" % (label, self.text)
+            cells = [Cell(text, self.control.widths[1], color)]
+            if Control.USER_AND_DATE in self.control.extra:
+                value = ""
+                if self.user:
+                    value = self.user
+                    if self.timestamp:
+                        value += " (%s)" % self.timestamp
+                cells.append(Cell(value, self.control.widths[2]))
+            if Control.BLANK in self.control.extra:
+                cells.append(Cell("", self.control.widths[3]))
+            return cells
+
+        def get_section_title(self, node):
+            """
+            Recursively crawl up the tree until we hit the first
+            SummarySection ancestor, and pull out the Title for
+            that section. If the comment isn't in a summary
+            section, or the section doesn't have a title, use
+            a dummy title.
+            """
+
+            if node is None:
+                return self.NO_SECTION_TITLE
+            if node.tag == "SummarySection":
+                for child in node.findall("Title"):
+                    if child.text is None:
+                        return self.NO_SECTION_TITLE
+                    title = child.text.strip()
+                    return title or self.NO_SECTION_TITLE
+                return self.NO_SECTION_TITLE
+            else:
+                return self.get_section_title(node.getparent())
+
+        def in_scope(self):
+            """
+            Return a Boolean indicating whether we should display this
+            comment, based on the choices the user made on the report's
+            request form.
+            """
+
+            wanted = self.control.comment_types
+            if self.tag == Control.RESPONSE:
+                return "R" in wanted
+            if "C" in wanted:
+                return True
+            if self.duration == "permanent" and "P" in wanted:
+                return True
+            if self.source == "advisory-board" and "A" in wanted:
+                return True
+            if self.audience == "Internal":
+                if "I" in wanted:
+                    return self.duration != "permanent"
+            if self.audience == "External":
+                if "E" in wanted:
+                    return self.source != "advisory-board"
+
 #----------------------------------------------------------------------
-cdrcgi.sendPage(header + report + footer)
+# Instantiate our custom Control class and invoke the base class's
+# run method. Wrap this in a test which let's use parse the script
+# without performing any actual processing.
+#----------------------------------------------------------------------
+if __name__ == "__main__":
+    Control().run()

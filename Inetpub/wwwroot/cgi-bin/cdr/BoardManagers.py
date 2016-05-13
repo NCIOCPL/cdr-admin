@@ -74,7 +74,7 @@ class Control:
             ("BoardMeetingDates.py", "Board Meeting Dates"),
             ("ChangesToSummaries.py", "Changes to Summaries"),
             ("SummaryChanges.py", "History of Changes to Summary"),
-            ("RunICRDBStatReport.py", "PCIB Statistics Report (MB)"),
+            ("RunPCIBStatReport.py", "PCIB Statistics Report"),
             ("SummaryCitations.py", "Summaries Citations"),
             ("SummaryComments.py", "Summaries Comments"),
             ("SummaryCRD.py", "Summaries Comprehensive Review Date Report"),

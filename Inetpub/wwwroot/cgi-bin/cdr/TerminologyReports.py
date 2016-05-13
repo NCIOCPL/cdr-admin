@@ -6,100 +6,70 @@
 #
 # BZIssue::4653 CTRO Access to CDR Admin Interface
 # BZIssue::4698 Genetics Directory Menu Information
+# JIRA::OCECDR-3987
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, string
+import cdr
+import cdrcgi
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields  = cgi.FieldStorage()
-session = cdrcgi.getSession(fields)
-action  = cdrcgi.getRequest(fields)
-title   = "CDR Administration"
-section = "Terminology Reports"
-SUBMENU = "Reports Menu"
-buttons = [SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-header  = cdrcgi.header(title, title, section, "Reports.py", buttons)
-userPair = cdr.idSessionUser(session, session)
-
-#----------------------------------------------------------------------
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if action == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif action == SUBMENU:
-    cdrcgi.navigateTo("Reports.py", session)
-
-#----------------------------------------------------------------------
-# Handle request to log out.
-#----------------------------------------------------------------------
-if action == "Log Out":
-    cdrcgi.logout(session)
-
-#----------------------------------------------------------------------
-# Display available report choices.
-#----------------------------------------------------------------------
-form = """\
-    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-    <H3>QC Reports</H3>
-    <OL>
-""" % (cdrcgi.SESSION, session)
-roReports = [
-             ('TermUsage.py',                           'Term Usage'),
-             ('TermSearch.py',               'Terminology QC Report')
-            ]
-updates   = [
-             ('TermNCITDrugUpdateAll.py',
-                    'Update all Drug/Agent Terms from NCI Thesaurus'),
-             ('TermNCITDiseaseUpdateAll.py',
-                       'Update all Disease Terms from NCI Thesaurus')
-            ]
-
-# Determining the menus to adjust for Guest users
-# -----------------------------------------------
-userInfo = cdr.getUser(session, userPair[0])
-if 'GUEST' in userInfo.groups and len(userInfo.groups) < 2:
-    reports = roReports
-else:
-    reports = roReports + updates
-
-for r in reports:
-    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI></A>\n" % (
-            cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
-
-form += """\
-    </OL>
-    <H3>Other Reports</H3>
-    <OL>
-"""
-reports = [
-           ('DiseaseDiagnosisTerms.py',
-            'Cancer Diagnosis Hierarchy', ''),
-           ('DiseaseDiagnosisTerms.py',
-            'Cancer Diagnosis Hierarchy (Without Alternate Names)',
-            '&flavor=short'),
-           ('DrugAgentReport.py', 'Drug/Agent Report', ''),
-           ('DrugAgentReport2.py', 'Drug/Agent Report - All', '&alldrugs=true'),
-           ('DrugReviewReport.py', 'Drug Review Report', ''),
-           ('GeneticConditionMenuMappingReport.py',
-            'Genetics Directory Menu Report', ''),
-           ('InterventionAndProcedureTerms.py',
-            'Intervention or Procedure Terms', '&IncludeAlternateNames=True'),
-           ('InterventionAndProcedureTerms.py',
-            'Intervention or Procedure Terms (without Alternate Names)',
-            '&IncludeAlternateNames=False'),
-           ('MenuHierarchy.py', 'Menu Hierarchy Report', ''),
-           ('SemanticTypeReport.py', 'Semantic Type Report', ''),
-           ('Stub.py', 'Term By Type', ''),
-           ('TermHierarchyTree.py', 'Term Hierarchy Tree', ''),
-           ('TermHierarchyTree.py',
-            'Terms with No Parent Term and Not a Semantic Type',
-            '&SemanticTerms=False'),
-           ('ocecdr-3588.py', 'Thesaurus Concepts Not Marked Public', ''),
-          ]
-for r in reports:
-    form += "<LI><A HREF='%s/%s?%s=%s%s'>%s</LI></A>\n" % (
-            cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[2], r[1])
-
-cdrcgi.sendPage(header + form + "</OL></FORM></BODY></HTML>")
+class Control(cdrcgi.Control):
+    def __init__(self):
+        cdrcgi.Control.__init__(self, "Terminology Reports")
+        self.buttons = (self.REPORTS_MENU, self.ADMINMENU, self.LOG_OUT)
+    def set_form_options(self, opts):
+        opts["body_classes"] = "admin-menu"
+        return opts
+    def populate_form(self, form):
+        form.add(form.B.H3("QC Reports"))
+        form.add("<ol>")
+        for script, display in (
+            ("TermUsage.py", "Term Usage"),
+            ("TermSearch.py", "Terminology QC Report")
+        ):
+            form.add_menu_link(script, display, self.session)
+        if not self.guest_user():
+            for script, display in (
+                ("TermNCITDrugUpdateAll.py",
+                 "Update all Drug/Agent Terms from NCI Thesaurus"),
+                ("TermNCITDiseaseUpdateAll.py",
+                 "Update all Disease Terms from NCI Thesaurus")
+            ):
+                form.add_menu_link(script, display, self.session)
+        form.add("</ol>")
+        form.add(form.B.H3("Other Reports"))
+        form.add("<ol>")
+        for script, display, args in (
+            ("DiseaseDiagnosisTerms.py", "Cancer Diagnosis Hierarchy", {}),
+            ("DiseaseDiagnosisTerms.py",
+             "Cancer Diagnosis Hierarchy (Without Alternate Names)",
+             { "flavor": "short" }),
+            ("RecentCTGovProtocols.py",
+             "Clinical Trials Drug Analysis Report", {}),
+            ("DrugAgentReport.py", "Drug/Agent Report", {}),
+            ("DrugAgentReport2.py", "Drug/Agent Report - All",
+             { "alldrugs": "true" }),
+            ("DrugReviewReport.py", "Drug Review Report", {}),
+            ("GeneticConditionMenuMappingReport.py",
+             "Genetics Directory Menu Report", {}),
+            ("InterventionAndProcedureTerms.py",
+             "Intervention or Procedure Terms",
+             { "IncludeAlternateNames": "True" }),
+            ("InterventionAndProcedureTerms.py",
+             "Intervention or Procedure Terms (without Alternate Names)",
+             { "IncludeAlternateNames": "False" }),
+            ("MenuHierarchy.py", "Menu Hierarchy Report", {}),
+            ("SemanticTypeReport.py", "Semantic Type Report", {}),
+            ("Stub.py", "Term By Type", {}),
+            ("TermHierarchyTree.py", "Term Hierarchy Tree", {}),
+            ("TermHierarchyTree.py",
+             "Terms with No Parent Term and Not a Semantic Type",
+             { "SemanticTerms": "False" }),
+            ("ocecdr-3588.py", "Thesaurus Concepts Not Marked Public", {}),
+        ):
+            form.add_menu_link(script, display, self.session, **args)
+        form.add("</ol>")
+    def guest_user(self):
+        name = cdr.idSessionUser(self.session, self.session)[0]
+        user = cdr.getUser(self.session, name)
+        return 'GUEST' in user.groups and len(user.groups) < 2
+Control().run()

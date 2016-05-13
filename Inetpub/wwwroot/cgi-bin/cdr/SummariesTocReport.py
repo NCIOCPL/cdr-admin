@@ -309,9 +309,9 @@ if not lang and (not byCdrid and not byTitle):
              onclick="javascript:someEnglish()" id="E2">
        <label id="E2">Cancer Genetics</label><br>
       <input type='checkbox' name='grp'
-             value='Complementary and Alternative Medicine'
+             value='Integrative, Alternative, and Complementary Therapies'
                     onclick="javascript:someEnglish()" id="E3">
-       <label id="E3">Complementary and Alternative Medicine</b><br>
+       <label id="E3">Integrative, Alternative, and Complementary Therapies</b><br>
       <input type='checkbox' name='grp' value='Pediatric Treatment'
              onclick="javascript:someEnglish()" id="E4">
        <label id="E4">Pediatric Treatment</label><br>
@@ -337,19 +337,23 @@ if not lang and (not byCdrid and not byTitle):
      <td>
       <input type='checkbox' name='grp' value='All Spanish'
              onclick="javascript:allSpanish(this, 4)" id="allEs" CHECKED>
-       <label id="allEs">All Spanish</label><br>
+         <label id="allEs">All Spanish</label><br>
       <input type='checkbox' name='grp' value='Spanish Adult Treatment'
              onclick="javascript:someSpanish()" id="S1" >
-       <label id="S1">Adult Treatment</label><br>
+         <label id="S1">Adult Treatment</label><br>
+      <input type='checkbox' name='grp'
+           value='Spanish Integrative, Alternative, and Complementary Therapies'
+                    onclick="javascript:someSpanish()" id="S2">
+         <label id="S2">Integrative, Alternative, and Complementary Therapies</b><br>
       <input type='checkbox' name='grp' value='Spanish Pediatric Treatment'
-             onclick="javascript:someSpanish()" id="S2" >
-       <label id="S2">Pediatric Treatment</label><br>
+             onclick="javascript:someSpanish()" id="S3" >
+         <label id="S3">Pediatric Treatment</label><br>
       <input type='checkbox' name='grp' value='Spanish Screening and Prevention'
-             onclick="javascript:someSpanish()" id="S3">
-       <label id="S3">Screening and Prevention</label><br>
+             onclick="javascript:someSpanish()" id="S4">
+         <label id="S4">Screening and Prevention</label><br>
       <input type='checkbox' name='grp' value='Spanish Supportive Care'
-             onclick="javascript:someSpanish()" id="S4" >
-       <label id="S4">Supportive and Palliative Care</label><br>
+             onclick="javascript:someSpanish()" id="S5" >
+         <label id="S5">Supportive and Palliative Care</label><br>
      </td>
     </tr>
    </table>
@@ -416,7 +420,7 @@ for i in range(len(groups)):
       boardPick += """'CDR0000028327', 'CDR0000035049', """
   elif groups[i] == 'Spanish Adult Treatment' and lang == 'Spanish':
       boardPick += """'CDR0000028327', 'CDR0000035049', """
-  elif groups[i] == 'Complementary and Alternative Medicine':
+  elif groups[i] == 'Integrative, Alternative, and Complementary Therapies':
       boardPick += """'CDR0000256158', 'CDR0000423294', """
   elif groups[i] == 'Genetics':
       boardPick += """'CDR0000032120', 'CDR0000257061', """
@@ -443,8 +447,8 @@ q_case = """\
             WHEN board.value = 'CDR0000035049'  THEN 'Adult Treatment'
             WHEN board.value = 'CDR0000032120'  THEN 'Cancer Genetics'
             WHEN board.value = 'CDR0000257061'  THEN 'Cancer Genetics'
-            WHEN board.value = 'CDR0000256158'  THEN 'Complementary and Alternative Medicine'
-            WHEN board.value = 'CDR0000423294'  THEN 'Complementary and Alternative Medicine'
+            WHEN board.value = 'CDR0000256158'  THEN 'Integrative, Alternative, and Complementary Therapies'
+            WHEN board.value = 'CDR0000423294'  THEN 'Integrative, Alternative, and Complementary Therapies'
             WHEN board.value = 'CDR0000028557'  THEN 'Pediatric Treatment'
             WHEN board.value = 'CDR0000028558'  THEN 'Pediatric Treatment'
             WHEN board.value = 'CDR0000028536'  THEN 'Screening and Prevention'

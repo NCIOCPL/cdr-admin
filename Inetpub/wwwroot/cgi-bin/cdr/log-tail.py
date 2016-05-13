@@ -5,79 +5,54 @@
 # Show a piece of a log file.
 #
 #----------------------------------------------------------------------
-import os, cgi, sys, time, re, cdr, cdrcgi
+import os
+import sys
+import time
+import re
+import cdr
+import cdrcgi
 
-DEFAULT_COUNT = 2000000
-
-fields = cgi.FieldStorage()
-session = cdrcgi.getSession(fields)
-if not session or not cdr.canDo(session, "VIEW LOGS"):
-    cdrcgi.bail("Account not authorized for this action")
-
-try: # Windows needs stdio set for binary mode.
-    import msvcrt
-    msvcrt.setmode (0, os.O_BINARY) # stdin  = 0
-    msvcrt.setmode (1, os.O_BINARY) # stdout = 1
-except ImportError:
-    pass
-
-def makeAscii(s):
-    return re.sub(u"[\x80-\xff%]", lambda m: "%%%02X" % ord(m.group(0)[0]), s)
-
-def showForm(info="", path="", start="", count=""):
-    print """\
-Content-type: text/html
-
-<html>
- <head>
-  <title>CDR Log Viewer</title>
-  <style type="text/css">
-   * { font-family: sans-serif }
-   label { width: 50px; padding-bottom: 5px; display: inline-block; }
-   #path, #start, #count { width: 300px; }
-  </style>
- </head>
- <body>
-  <h1>CDR Log Viewer</h1>
-  <p>%s</p>
-  <form action="log-tail.py" method="POST">
-   <label for="path">Path: </label>
-   <input id="path" name="p" value="%s"/><br />
-   <label for="start">Start: </label>
-   <input name="s" id="start" value="%s" /><br />
-   <label for="count">Count: </label>
-   <input name="c" id="count" value="%s"/><br /><br />
-   <input type="submit" />
-  </form>
- </body>
-</html>
-""" % (info, path, start, count)
-
-p = fields.getvalue("p") or ""
-s = fields.getvalue("s") or ""
-c = fields.getvalue("c") or ""
-r = fields.getvalue("r") or None # raw (binary)?
-
-if p:
-    if s.startswith('"') and s.endswith('"') and len(s) > 2:
+class Control(cdrcgi.Control):
+    DEFAULT_COUNT = "2000000"
+    DEFAULT_PATH = r"D:\cdr\Log\Jobmaster.log"
+    def __init__(self):
+        cdrcgi.Control.__init__(self, "Log Viewer")
+        self.authenticate()
+        self.set_binary()
+        self.path = self.fields.getvalue("p", "")
+        self.start = self.fields.getvalue("s", "")
+        self.count = self.fields.getvalue("c", "")
+        self.raw = self.fields.getvalue("r", None) # raw (binary)?
+        self.pattern = re.match('".+"', self.start) and self.start or None
+    def authenticate(self):
+        if not self.session or not cdr.canDo(self.session, "VIEW LOGS"):
+            cdrcgi.bail("Account not authorized for this action")
+    def populate_form(self, form):
+        path = self.path or self.DEFAULT_PATH
+        form.add("<fieldset>")
+        form.add(form.B.LEGEND("Display Parameters"))
+        form.add_text_field("p", "Path", value=path)
+        form.add_text_field("s", "Start", value=self.start)
+        form.add_text_field("c", "Count", value=self.count)
+        form.add("</fieldset>")
+        form.add_script("jQuery('#p').focus();")
+    def find(self):
         try:
-            cmd = 'find %s %s' % (s, p)
+            cmd = "find %s %s" % (self.pattern, self.path)
             result = cdr.runCommand(cmd)
             print "Content-type: text/plain\n\n%s" % result.output
         except Exception, e:
-            print "Content-type: text/plain\n\n%s\n%s" % (cmd, repr(e))
-        sys.exit(0)
-    if "*" in p or "?" in p:
+            print "Content-type: text/plain\n\n%s\n%s" % (cmd, e)
+    def dir(self):
         try:
-            result = cdr.runCommand("dir %s" % p)
+            result = cdr.runCommand("dir %s" % self.path)
             print "Content-type: text/plain\n\n%s" % result.output
         except Exception, e:
-            print "Content-type: text/plain\n\n%s" % repr(e)
-        sys.exit(0)
-    if r:
+            print "Content-type: text/plain\n\n%s" % e
+    def get_binary(self):
         try:
-            name = os.path.basename(p)
-            fp = open(p, "rb")
+            name = os.path.basename(self.path)
+            fp = open(self.path, "rb")
             bytes = fp.read()
             fp.close()
             print "Content-type: application/octet-stream"
@@ -86,44 +61,92 @@ if p:
             sys.stdout.write(bytes)
         except Exception, e:
             print "Content-type: text/plain\n\n%s" % repr(e)
-        sys.exit(0)
-    try:
-        stat = os.stat(p)
-        stamp = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(stat.st_mtime))
-        info = "%s %s bytes (%s GMT)" % (p, stat.st_size, stamp)
-        count = long(c or "100000")
-        start = long(s or "0")
-        if count < 0:
-            count = 0
-        if not start and s != "0":
-            if not count:
-                count = DEFAULT_COUNT
-            if count > stat.st_size:
-                count = stat.st_size
+    def run(self):
+        if self.path:
+            if self.pattern:
+                self.find()
+            elif "*" in self.path or "?" in self.path:
+                self.dir()
+            elif self.raw:
+                self.get_binary()
             else:
-                start = stat.st_size - count
+                self.show()
         else:
-            if start < 0:
-                if abs(start) > stat.st_size:
-                    start = 0
-                else:
-                    start = stat.st_size + start
-            elif start > stat.st_size:
-                start = stat.st_size
-            available = stat.st_size - start
-            if count > available:
-                count = available
-        if count:
-            fp = open(p, "rb")
-            if start:
-                fp.seek(start)
-            bytes = fp.read(count)
+            cdrcgi.Control.run(self)
+    def show(self):
+        try:
+            stat = os.stat(self.path)
+            info = self.get_info(self.path, stat)
+            slice = self.Slice(self, stat.st_size)
             print "Content-type: text/plain\n"
-            print "%s bytes %d-%d\n" % (info, start + 1, start + count)
-            print makeAscii(bytes)
-        else:
-            showForm(info)
-    except Exception, e:
-        print "Content-type: text/plain\n\n%s" % repr(e)
-else:
-    showForm()
+            print "%s bytes %d-%d\n" % (info, slice.start + 1,
+                                        slice.start + slice.count)
+            if slice.count:
+                fp = open(self.path, "rb")
+                if slice.start:
+                    fp.seek(slice.start)
+                bytes = fp.read(slice.count)
+                print self.make_ascii(bytes)
+            else:
+                showForm(info)
+        except Exception, e:
+            print "Content-type: text/plain\n\n%s" % e
+    @staticmethod
+    def get_info(path, stat):
+        stamp = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(stat.st_mtime))
+        return "%s %s bytes (%s GMT)" % (path, stat.st_size, stamp)
+    @staticmethod
+    def set_binary():
+        try: # Windows needs stdio set for binary mode.
+            import msvcrt
+            msvcrt.setmode (0, os.O_BINARY) # stdin  = 0
+            msvcrt.setmode (1, os.O_BINARY) # stdout = 1
+        except ImportError:
+            pass
+    @staticmethod
+    def make_ascii(s):
+        return re.sub(u"[\x80-\xff%]",
+                      lambda m: "%%%02X" % ord(m.group(0)[0]), s)
+    class Slice:
+        def __init__(self, control, filesize):
+
+            # Make sure the count is not negative.
+            self.count = long(control.count or Control.DEFAULT_COUNT)
+            if self.count < 0:
+                self.count = 0
+
+            # Handle the case where the user specified a starting position.
+            if control.start:
+                self.start = long(control.start)
+
+                # A negative starting number means count from the end of
+                # the file.
+                if self.start < 0:
+                    if abs(self.start) > filesize:
+                        self.start = 0
+                    else:
+                        self.start = filesize + self.start
+
+                # Make sure we don't start beyond the end of the file.
+                elif self.start > filesize:
+                    self.start = filesize
+
+                # Make sure our count doesn't go beyond the end of the file.
+                available = filesize - self.start
+                if self.count > available:
+                    self.count = available
+
+            # User didn't specify a starting position.
+            else:
+
+                # Start count bytes from the end of the file if the file
+                # can satisfy the count.
+                if self.count <= filesize:
+                    self.start = filesize - self.count
+
+                # Otherwise constrain the count to what's available.
+                else:
+                    self.count = filesize
+                    self.start = 0
+
+Control().run()

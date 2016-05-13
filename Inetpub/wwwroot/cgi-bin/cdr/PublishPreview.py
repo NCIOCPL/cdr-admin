@@ -77,8 +77,11 @@ def getCdrIdFromPath(url):
     # For the SQL query we need to remove the fragment from the URL
     # and remove a trailing slash (/) that was added in older versions
     # of the GK code
+    # A URL could contain a single quote('), i.e. in the string 
+    # "Hodgkin's".  If this appears the quote has to be doubled in 
+    # order for the SELECT statement to run successfully.
     # ----------------------------------------------------------------
-    ###print '*** ', url
+    ### print '*** ', url
     baseUrl = url.split('#')[0]
     if baseUrl:
         if baseUrl[-1] == '/':
@@ -88,13 +91,13 @@ def getCdrIdFromPath(url):
             conn = cdrdb.connect()
             cursor = conn.cursor()
             cursor.execute("""\
-              SELECT doc_id
-                FROM query_term
-               WHERE (path = '/Summary/SummaryMetaData/SummaryURL/@cdr:xref'
-                     OR
-                     path = '/DrugInformationSummary/DrugInfoMetaData/URL/@cdr:xref'
-                     )
-                 AND value like '%s'""" % ('%' + baseUrl))
+          SELECT doc_id
+            FROM query_term
+           WHERE (path = '/Summary/SummaryMetaData/SummaryURL/@cdr:xref'
+                 OR
+                 path = '/DrugInformationSummary/DrugInfoMetaData/URL/@cdr:xref'
+                 )
+             AND value like '%s'""" % ('%' + baseUrl.replace("'", "''")))
             row = cursor.fetchone()
         except cdrdb.Error, info:
             cdrcgi.bail('Database failure: %s' % info[1][0])

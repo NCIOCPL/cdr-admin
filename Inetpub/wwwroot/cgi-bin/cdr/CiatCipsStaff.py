@@ -43,6 +43,8 @@ items   = (('AdvancedSearch.py', 'Advanced Search',       ''               ),
             'a spreadsheet for pronunciation audio requests)"'),
            ('GlossaryTermAudioReview.py', 'Audio Review Glossary Term',  ''),
            ('getBatchStatus.py', 'Batch Job Status',      ''               ),
+           ("post-translated-summary.py",
+            "Create World Server Translated Summary", ""),
            ('CTGov.py',          'CTGov Protocols',       ''               ),
            ('ctrp-mapping-gaps.py', 'CTRP Mapping Gaps',  ''               ),
            ('Mailers.py',        'Mailers',               ''               ),
@@ -50,7 +52,7 @@ items   = (('AdvancedSearch.py', 'Advanced Search',       ''               ),
            ('EditExternMap.py',  'Update Mapping Table', '' ),
            ('ReplaceCWDwithVersion.py','Replace CWD with Older Version', ''),
            ('ReplaceDocWithNewDoc.py', 'Replace Doc with New Doc',       ''),
-           ('UpdatePreMedlineCitations.py', 'Update Pre-Medline Citations', ''),
+           ('UpdatePreMedlineCitations.py', 'Update Pre-Medline Citations', '')
            )
 for item in items:
     html += """\

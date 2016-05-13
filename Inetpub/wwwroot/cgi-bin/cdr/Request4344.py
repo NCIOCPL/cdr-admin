@@ -7,6 +7,7 @@
 #
 # BZIssue::4344
 # Rewritten July 2015 to eliminate security vulnerabilities.
+# JIRA::OCECDR-3954 - new column for Spanish version of the report
 #
 #----------------------------------------------------------------------
 import cdrcgi
@@ -34,7 +35,6 @@ class Control:
         "Collect the CGI parameters and scrub them"
         self.cursor = cdrdb.connect("CdrGuest").cursor()
         fields = cgi.FieldStorage()
-        #cdrcgi.log_fields(fields, logfile="Request4344.log")
         self.session = cdrcgi.getSession(fields)
         self.request = cdrcgi.getRequest(fields)
         self.start = fields.getvalue("start")
@@ -180,6 +180,7 @@ class Control:
             if self.language == "all":
                 cols.append(cdrcgi.Report.Column("Definition (EN)"))
             cols.append(cdrcgi.Report.Column("Definition (ES)"))
+            cols.append(cdrcgi.Report.Column("Comment"))
             if self.show_resources:
                 cols.append(cdrcgi.Report.Column("Translation Resource",
                                                  **resource))
@@ -222,6 +223,7 @@ class Cell(cdrcgi.Report.Cell):
         self.extra = None
         self.concept = None
         self.suppress_deletion_markup = False
+        self.comments = []
 
     def set_rowspan(self, rowspan):
         "Add a rowspan to the cell after the constructor has built the object"
@@ -238,6 +240,13 @@ class Cell(cdrcgi.Report.Cell):
         """
         if isinstance(self._value, etree._Element):
             td = self.populate(self.B.TD(), self._value)
+
+            # 2015-12-09: Linda changed her mind - doesn't want this after all.
+            # (see 2015-12-08 comment on
+            #  https://tracker.nci.nih.gov/browse/OCECDR-3954)
+            # for comment in self.comments:
+            #     td.append(self.B.BR())
+            #     td.append(self.B.SPAN(u"[COMMENT: %s]" % comment))
         else:
             td = self.B.TD(str(self._value))
         if self._rowspan:
@@ -330,6 +339,8 @@ class Definition(Cell):
                 self.status = child.text
             elif child.tag in ("StatusDate", "TranslatedStatusDate"):
                 self.status_date = child.text
+            elif child.tag == "Comment" and self.language == "es":
+                self.comments.append(child.text)
 
     def in_scope(self):
         "Determine whether this definition matches the options for the report"
@@ -627,6 +638,11 @@ class Concept:
             row.append(definition)
         self.sp_def.set_rowspan(rowspan)
         row.append(self.sp_def)
+        if self.sp_def.comments:
+            last_comment = self.sp_def.comments[0]
+        else:
+            last_comment = u""
+        row.append(cdrcgi.Report.Cell(last_comment, rowspan=rowspan))
         if self.control.show_resources:
             def_resources = self.sp_def.resources
             row.append(cdrcgi.Report.Cell(def_resources, rowspan=rowspan))

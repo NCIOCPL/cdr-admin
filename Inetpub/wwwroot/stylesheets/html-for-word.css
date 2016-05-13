@@ -1,0 +1,50 @@
+/*
+ * $Id: cdr.css 13426 2015-08-07 18:16:26Z bkline $
+ * Custom style rules to work around quirks in MS Word when editing
+ * reports pasted from HTML.
+ */
+body {
+    background-color: white;
+    color: black;
+    font-family: Arial, sans-serif;
+    font-size: 12pt;
+    margin: 0;
+    padding: 8px;
+}
+header { margin-bottom: 15px; }
+header h1 {
+    margin: 0;
+    font-size: 20px;
+    padding-left: 8px;
+    height: 38px;
+}
+header h2 {
+    margin: 0 0 15px 0;
+    font-size: 13px;
+    font-weight: normal;
+    padding-left: 8px;
+}
+h3 {
+    font: 16pt "Arial";
+    font-weight: bold;
+}
+table { margin: 5px; border-collapse: collapse; }
+table caption {
+    font-weight: bold;
+    font-size: 12pt;
+    padding: 5px;
+    text-align: left;
+}
+table caption p { font-weight: normal; font-size: 10pt; }
+th, td { font-size: 11pt; padding: 2px; border: 1px solid black; }
+td { vertical-align: top; }
+td.middle { vertical-align: middle; }
+.center { text-align: center; }
+.right { text-align: right; }
+.nowrap { white-space: nowrap; }
+table.report { margin-bottom: 20px; }
+.error { color: red; font-weight: bold; }
+.strong { font-weight: bold; }
+.emphasis { font-style: italic; }
+.warning { color: green; }
+.footnote { font-size: 9pt; font-style: italic; color: green; }

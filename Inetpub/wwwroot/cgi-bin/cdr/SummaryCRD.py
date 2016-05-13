@@ -36,6 +36,8 @@ class Control:
         self.show_id = fields.getvalue("show_id") == "Y"
         self.excel = fields.getvalue("format") == "excel"
         self.sets = fields.getlist("sets")
+        self.included = fields.getvalue("included") or "s"
+        self.unpub = fields.getvalue("unpub") == "Y"
         self.title = "CDR Administration"
         self.subtitle = "Summaries Comprehensive Review Dates"
         self.script = "SummaryCRD.py"
@@ -57,6 +59,7 @@ class Control:
 
     def show_report(self):
         "Generate an HTML or Excel report"
+        #cdrcgi.bail("a")
         columns = []
         if self.show_id:
             columns.append(cdrcgi.Report.Column("CDR ID", width="50px"))
@@ -72,7 +75,14 @@ class Control:
         now = datetime.date.today()
         subtitle = "%s %s Summaries (%s)" % (self.language, self.audience, now)
         boards = [Board(self, doc_id) for doc_id in doc_ids]
-        tables = [b.to_table(columns) for b in sorted(boards) if b.summaries]
+        tables = []
+        for board in sorted(boards):
+            if self.included in "sa":
+                if board.summaries:
+                    tables.append(board.to_table(columns))
+            if self.included in "ma":
+                if board.modules:
+                    tables.append(board.to_table(columns, True))
         report = cdrcgi.Report(title, tables, banner=title, subtitle=subtitle)
         report.send(self.excel and "excel" or "html")
 
@@ -103,6 +113,11 @@ class Control:
         page.add_radio("show_id", "With CDR ID", "Y")
         page.add("</fieldset>")
         page.add("<fieldset>")
+        page.add(page.B.LEGEND("Version Display"))
+        page.add_radio("unpub", "Publishable only", "N", checked=True)
+        page.add_radio("unpub", "Publishable and non-publishable", "Y")
+        page.add("</fieldset>")
+        page.add("<fieldset>")
         page.add(page.B.LEGEND("Summary Language"))
         page.add_radio("lang", Control.LANGUAGES[0], Control.LANGUAGES[0],
                        checked=True)
@@ -114,6 +129,12 @@ class Control:
         for key in sorted(self.boards, key=lambda k: self.boards[k]):
             name = self.boards[key].replace("Editorial Board", "").strip()
             page.add_checkbox("sets", name, str(key), widget_classes="some")
+        page.add("</fieldset>")
+        page.add("<fieldset>")
+        page.add(page.B.LEGEND("Included Documents"))
+        page.add_radio("included", "Summaries and modules", "a")
+        page.add_radio("included", "Summaries only", "s", checked=True)
+        page.add_radio("included", "Modules only", "m")
         page.add("</fieldset>")
         page.add_output_options("html")
         page.add_script("""\
@@ -134,6 +155,8 @@ function check_sets(val) {
         for value in self.sets:
             if not self.sets_value_ok(value):
                 raise Exception("CGI parameter tampering detected")
+        if self.included not in "asm":
+            raise Exception("CGI parameter tampering detected")
 
     def sets_value_ok(self, value):
         "Make sure a board parameter hasn't been tampered with"
@@ -151,45 +174,67 @@ class Board:
         self.name = control.boards[self.doc_id]
         self.audience = control.audience or Control.AUDIENCES[0]
         self.language = control.language or Control.LANGUAGES[0]
+        qt = control.unpub and "query_term" or "query_term_pub"
         b_path = "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"
         query = cdrdb.Query("query_term t", "t.doc_id", "t.value", "m.value")
-        query.join("query_term a", "a.doc_id = t.doc_id")
-        query.join("query_term l", "l.doc_id = t.doc_id")
-        query.join("active_doc d", "d.id = t.doc_id")
+        query.join("%s a" % qt, "a.doc_id = t.doc_id")
+        query.join("%s l" % qt, "l.doc_id = t.doc_id")
+        if not control.unpub:
+            query.join("active_doc d", "d.id = t.doc_id")
         query.where("t.path = '/Summary/SummaryTitle'")
         query.where("a.path = '/Summary/SummaryMetaData/SummaryAudience'")
         query.where("l.path = '/Summary/SummaryMetaData/SummaryLanguage'")
         query.where(query.Condition("a.value", self.audience + "s"))
         query.where(query.Condition("l.value", self.language))
         if self.language == "English":
-            query.join("query_term b", "b.doc_id = t.doc_id")
+            query.join("%s b" % qt, "b.doc_id = t.doc_id")
         else:
-            query.join("query_term e", "e.doc_id = t.doc_id")
+            query.join("%s e" % qt, "e.doc_id = t.doc_id")
             query.join("query_term b", "b.doc_id = e.int_val")
             query.where("e.path = '/Summary/TranslationOf/@cdr:ref'")
         query.where(query.Condition("b.path", b_path))
         query.where(query.Condition("b.int_val", doc_id))
-        query.outer("query_term m", "m.doc_id = t.doc_id",
-                    "m.path = '/Summary/@ModuleOnly'")
+        if control.included == "m":
+            query.join("%s m" % qt, "m.doc_id = t.doc_id",
+                       "m.path = '/Summary/@ModuleOnly' AND m.value = 'Yes'")
+        else:
+            query.outer("%s m" % qt, "m.doc_id = t.doc_id",
+                        "m.path = '/Summary/@ModuleOnly'")
+            if control.included == "s":
+                query.where("(m.value IS NULL OR m.value <> 'Yes')")
         rows = query.unique().execute(control.cursor).fetchall()
-        self.summaries = [Summary(control, *row) for row in rows]
+        summaries = [Summary(control, *row) for row in rows]
+        self.summaries = [s for s in summaries if not s.module]
+        self.modules = [s for s in summaries if s.module]
 
-    def to_table(self, columns):
-        "Create a table showing the board's metadata and comprenehsive reviews"
+    def to_table(self, columns, modules=False):
+        """
+        Create a table showing the board's metadata and comprenehsive reviews.
+        """
+
+        name = self.name.replace("Editorial Board", "").strip()
+        if modules:
+            docs = self.modules
+            what = "modules"
+        else:
+            docs = self.summaries
+            what = "summaries"
         opts = {
-            "caption": self.name,
-            "sheet_name": self.name.replace("Editorial Board", "").strip()
+            "caption": "%s Editorial Board (%s)" % (name, what),
+            "sheet_name": name
         }
-        if "Complementary" in self.name:
-            opts["sheet_name"] = "CAM" # full name is too big to fit
+        if "Complementary" in name:
+            opts["sheet_name"] = "IACT" # name is too big
+        if modules:
+            opts["sheet_name"] += " (m)"
         rows = []
-        for summary in sorted(self.summaries):
+        for doc in sorted(docs):
             reviews = []
             have_actual = False
-            i = len(summary.reviews)
+            i = len(doc.reviews)
             while i > 0:
                 i -= 1
-                review = summary.reviews[i]
+                review = doc.reviews[i]
                 if self.control.show_all or review.state != "Actual":
                     reviews.insert(0, review)
                 elif not have_actual:
@@ -200,10 +245,8 @@ class Board:
                 span = None
             row = []
             if self.control.show_id:
-                row.append(cdrcgi.Report.Cell(summary.doc_id, rowspan=span))
-            title = summary.title
-            if summary.module:
-                title += u" (Module)"
+                row.append(cdrcgi.Report.Cell(doc.doc_id, rowspan=span))
+            title = doc.title
             row.append(cdrcgi.Report.Cell(title, rowspan=span))
             if reviews:
                 review = reviews[0]

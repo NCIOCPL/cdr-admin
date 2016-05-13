@@ -38,19 +38,26 @@ try:
     import sys
     import cgi
     import MySQLdb
+    import pip
     import Image
     import lxml.etree
     import xlrd
     import xlwt
     import cdr
     import cdrdb
+    import requests
+    import apns
+    import pymssql
     import cdrmailcommon
     conn = cdrmailcommon.emailerConn('dropbox')
     show("Python", sys.version)
+    show("pip", pip.__version__)
     show("lxml", "%d.%d.%d.%d" % lxml.etree.LXML_VERSION[:4])
     show("Image", Image.VERSION)
     show("xlrd", xlrd.__VERSION__)
     show("xlwt", xlwt.__VERSION__)
+    show("requests", requests.__version__)
+    show("pymssql", pymssql.__version__)
     show("MySQLdb", "%s.%s.%s" % MySQLdb.version_info[:3])
     show("MySQL Server", "%s.%s" % conn._server_version[:2])
     html.append("""\

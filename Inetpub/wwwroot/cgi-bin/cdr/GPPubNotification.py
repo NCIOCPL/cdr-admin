@@ -7,7 +7,7 @@
 # BZIssue::4779
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, string, cdrdb, cdrpubcgi, cdrmailcommon, sys
+import cgi, cdr, cdrcgi, cdrdb, cdrmailcommon, sys
 import textwrap, time, lxml.etree as etree
 
 #----------------------------------------------------------------------
@@ -76,7 +76,7 @@ if not request:
      <td><input name='maxMails' value='No limit'/></td>
     </tr>
    </table>
-   <br />   
+   <br />
    <input type='Submit' name = 'Request' value = 'Submit'>
    <input type='hidden' name='%s' value='%s'>
   </form>
@@ -132,7 +132,7 @@ def fix(me):
     if not me:
         return ""
     return cgi.escape(me).encode('utf-8')
-    
+
 def sendPubNotificationEmail(gp, cursor, conn):
 
     addresses = [gp.email]
@@ -211,7 +211,7 @@ cursor.execute("""\
        AND t.path = '/Mailer/Type'
        AND t.value = 'GP publication notification email'""")
 alreadySent = set([row[0] for row in cursor.fetchall()])
-    
+
 #----------------------------------------------------------------------
 # Collect a list of all published GP docs.
 #----------------------------------------------------------------------
@@ -239,7 +239,7 @@ if docId:
     if docId not in pubGPs:
         cdrcgi.bail("CDR%d does not represent a published GP document")
     docIds = [docId]
-    
+
 #----------------------------------------------------------------------
 # If not, collect the GPs due for the notification.
 #----------------------------------------------------------------------

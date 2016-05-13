@@ -44,6 +44,8 @@
 # BZIssue::5249 - Standard wording in Patient QC report not displaying in green
 # BZIssue::OCECDR-3630 - Patient Summary QC Reports Missing Reference Section
 # JIRA::OCECDR-3800 - Address security vulnerabilities
+# JIRA::OCECDR-3919 - Repair the ability to run publish preview for DrugInformationSummary.
+#                     Turn off document version selection for DrugInformationSummary.
 #
 #----------------------------------------------------------------------
 import cgi
@@ -652,9 +654,6 @@ if not version:
     if docType in ('Summary', 'GlossaryTermName'):
         if repType and repType not in ('pp', 'gtnwc'):
             letUserPickVersion = True
-    ### if docType in ('DIS', 'DrugInformationSummary'):
-    if docType == 'DrugInformationSummary':
-        letUserPickVersion = True
 if letUserPickVersion:
     try:
         cursor.execute("""\
@@ -673,9 +672,9 @@ if letUserPickVersion:
   <INPUT TYPE='hidden' NAME='DocId' VALUE='CDR%010d'>
 """ % (cdrcgi.SESSION, session, docType, intId)
 
-    ### if docType != 'DIS':
-    if docType != 'DrugInformationSummary':
-        form += u"""\
+    # Include the ReportType so the "DocumentVersion" screen can differentiate
+    # the specific report type to run.
+    form += u"""\
   <INPUT TYPE='hidden' NAME='ReportType' VALUE='%s'>
 """ % (repType)
 

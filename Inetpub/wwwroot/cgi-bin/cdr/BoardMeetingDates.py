@@ -283,7 +283,7 @@ def getDefaultDates():
 # Some of this is not strictly necessary but will quiet AppScan warnings
 #----------------------------------------------------------------------
 if request:   cdrcgi.valParmVal(request, valList=buttons)
-if flavor:    cdrcgi.valParmVal(flavor, valList=('Report', 'ByBoard'))
+if flavor:    cdrcgi.valParmVal(flavor, valList=('ByDate', 'ByBoard'))
 if startDate: cdrcgi.valParmDate(startDate)
 if endDate:   cdrcgi.valParmDate(endDate)
 if boardPick: valBoardPick(cursor, boardPick)
@@ -444,7 +444,7 @@ else:
                meeting.dayOfWeek, meeting.time,
                meeting.webEx and 'Yes' or '', cgi.escape(meeting.board.name)))
 
-            lastDate = meeting.date
+                lastDate = meeting.date
 
     html.append("""
   </table>

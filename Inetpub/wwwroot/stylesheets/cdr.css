@@ -1,5 +1,6 @@
 /*
  * $Id$
+ * Common style rules for CDR web admin/reporting interface.
  */
 body {
     background-color: #e8e8e8;
@@ -56,25 +57,24 @@ body.admin-menu { background-color: #dfdfdf; }
 .admin-menu li a:hover { background: #ffc; }
 table { background-color: white; margin: 5px auto; border-collapse:collapse; }
 table caption {
-    background-color: #936;
+    /* background-color: #936; */
+    /* color: white; */
+    /* border-top: 2px solid white; */
+    /* border-bottom: 2px solid white; */
     font-weight: bold;
     font-size: 12pt;
     padding: 5px;
-    color: white;
-    border-top: 2px solid white;
-    border-bottom: 2px solid white;
 }
 table caption p { font-weight: normal; font-size: 10pt; }
-th { background-color: #936; color: white; }
-th { background-color: #696969; } /* dim grey */
-td { background-color: #e4e4e4; vertical-align: top; }
-td { background-color: #ccc; }
-th, td { font-size: 11pt; padding: 2px; border: 1px solid black; }
+td { vertical-align: top; }
+th, td {
+    background-color: white; color: black;
+    font-size: 11pt; padding: 2px; border: 1px solid black;
+}
 td.middle { vertical-align: middle; }
 .center { text-align: center; }
 .right { text-align: right; }
 .nowrap { white-space: nowrap; }
-.odd td { background-color: #eee; }
 table.report { margin-bottom: 20px; }
 fieldset { border: 2px solid #936; width: 500px; margin: 10px auto; }
 fieldset fieldset, div fieldset { width: auto; border: 1px solid black; }
@@ -94,7 +94,7 @@ label.clickable:hover { color: white; background-color: #936; }
 .warning { color: green; }
 .hidden { display: none; }
 .labeled-field input, .labeled-field select, .labeled-field textarea {
-    width: 300px;
+    width: 300px; padding-left: 2px; padding-right: 2px;
 }
 .checkbox-form { background-color: #dfdfdf; color: navy; }
 .checkbox-form h3 { font: 16pt Arial bold; }

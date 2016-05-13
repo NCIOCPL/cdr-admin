@@ -8,6 +8,7 @@
 # BZIssue::4870
 # BZIssue::5051 - [Media] Modify Publishing Software to Process Audio Files
 # 2015-07-11 - Completely rewritten to address security vulnerabilities
+# OCECDR-4034: Prevent Modules from Being Published Automatically
 #
 #----------------------------------------------------------------------
 import cdr
@@ -295,7 +296,7 @@ class Control:
                         tooltip=self.system.param_info["notify"].get_help())
         page.add_text_field("email", "Address(es)", value=email,
                             tooltip=self.system.param_info["email"].get_help())
-        page.add_select("no-output", "No Output", ("Yes", "No"), "Yes",
+        page.add_select("no-output", "No Output", ("Yes", "No"), "No",
                         tooltip=self.system.param_info["no-output"].get_help())
         page.add("</fieldset>")
         page.send()
@@ -366,6 +367,9 @@ class Control:
             if self.is_meeting_recording(doc_id):
                 raise Exception("Attempt to publish meeting recording "
                                 "CDR%s" % doc_id)
+            if self.is_module_only(doc_id):
+                raise Exception("Attempt to publish a summary module "
+                                "CDR%s" % doc_id)
             id_list.append("CDR%s" % doc_id)
         return id_list
 
@@ -383,6 +387,20 @@ class Control:
         query.where(query.Condition("path", "/Media/@Usage"))
         return query.execute(self.cursor).fetchall() and True or False
 
+
+    def is_module_only(self, doc_id):
+        """
+        We don't allow summary modules, which are
+        for internal use only. The publishing queries in the control
+        documents exclude those documents, but we have to make sure
+        they aren't included in user-specified document lists.
+        Invoked by collect_doc_ids().
+        """
+        query = cdrdb.Query("query_term_pub", "doc_id")
+        query.where(query.Condition("doc_id", doc_id))
+        query.where(query.Condition("value", "Yes"))
+        query.where(query.Condition("path", "/Summary/@ModuleOnly"))
+        return query.execute(self.cursor).fetchall() and True or False
 class PublishingSystem:
     """
     Object containing instructions for each of the types of publishing
