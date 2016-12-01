@@ -1,6 +1,7 @@
 #----------------------------------------------------------------------
 #
-# $Id$
+# Update premedline citations that have had their statuses changed
+# since they were last imported or updated.
 #
 # BZIssue::5150
 #
@@ -74,7 +75,7 @@ def displayErrors(errors):
 
 errors = []
 url = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi"
-url = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
+url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
 fields = cgi.FieldStorage()
 session = cdrcgi.getSession(fields)
 if not session:

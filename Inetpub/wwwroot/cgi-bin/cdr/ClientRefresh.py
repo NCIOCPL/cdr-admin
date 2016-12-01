@@ -1,10 +1,9 @@
 #----------------------------------------------------------------------
 #
-# $Id$
-#
 # Web service for keeping CDR client files up to date.
 #
 # OCECDR-4006: Add support for using checksums instead of time stamps.
+# OCECDR-4083: Login errors when switching between tiers.
 #
 #----------------------------------------------------------------------
 import base64
@@ -185,12 +184,15 @@ def make_delta(client_manifest):
     server_files = {}
     to_be_installed = []
     to_be_deleted = []
+    manifest_name = None
     for f in client_manifest.files:
         client_files[f.name.upper()] = f
     for f in server_manifest.files:
         server_files[f.name.upper()] = f
     for key in server_files:
         serverFile = server_files[key]
+        if "CDRMANIFEST.XML" in key:
+            manifest_name = serverFile.name
         if key not in client_files:
             debug_log("adding new client file %s" % serverFile.name, 3)
             to_be_installed.append(serverFile.name)
@@ -204,6 +206,8 @@ def make_delta(client_manifest):
             to_be_deleted.append(name)
     updates = etree.Element("Updates")
     if to_be_installed:
+        if manifest_name and manifest_name not in to_be_installed:
+            to_be_installed.append(manifest_name)
         debug_log("sending %d files to be installed" % len(to_be_installed), 2)
         zip_file = base64.encodestring(build_zip_file(to_be_installed))
         etree.SubElement(updates, "ZipFile", encoding="base64").text = zip_file

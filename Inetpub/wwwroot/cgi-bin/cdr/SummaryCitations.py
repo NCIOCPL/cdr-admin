@@ -1,31 +1,14 @@
 #----------------------------------------------------------------------
 #
-# $Id$
-#
 # Report listing all references cited in a selected version of a
 # cancer information summary.
 #
-# $Log: SummaryCitations.py,v $
-# Revision 1.5  2009/10/02 18:29:10  venglisc
-# Adding PMID link to citations (Bug 4651)
-#
-# Revision 1.4  2009/07/31 19:18:49  venglisc
-# Modified sort order to use the locale setting so that non-ASCII characters
-# are sorted within the ASCII sequence. (Bug 4598)
-#
-# Revision 1.3  2009/06/24 17:36:40  venglisc
-# Changing sort order by converting first to lower case. (Bug 4598)
-#
-# Revision 1.2  2003/10/08 18:09:09  bkline
-# Changed element name from Reference to Citation to match change in
-# denormalization filter.
-#
-# Revision 1.1  2003/05/08 20:26:42  bkline
-# New summary reports.
+# BZIssue::4598 modify sort order to use local setting and ignore case
+# BZIssue::4651 add PMID link to citations
+# BZIssue::4786 fix non-Pubmed citations
+# JIRA::OCECDR-3456 switch NCBI url to use HTTPS protocol
 #
 #----------------------------------------------------------------------
-# BZIssue::4651 - Adding PMID to citations
-# BZIssue::4786 - Fixing non-Pubmed citations
 
 import xml.dom.minidom, cgi, re, cdr, cdrcgi, cdrdb
 import locale, time
@@ -113,7 +96,7 @@ def report(docId, docVersion):
     prevRef = None
     digits = re.sub(r"[^\d]", "", docId)
     id = int(digits)
-    pubMedLink = ' [<a href="http://www.ncbi.nlm.nih.gov/pubmed/'
+    pubMedLink = ' [<a href="https://www.ncbi.nlm.nih.gov/pubmed/'
     html = """\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>

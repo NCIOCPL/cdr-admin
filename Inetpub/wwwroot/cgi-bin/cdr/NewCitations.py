@@ -1,10 +1,7 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Report of Citation documents created during a specified date range.
 #
-# Rewritten summary 2015 as part of security sweep.
+# Rewritten summer 2015 as part of security sweep.
 #----------------------------------------------------------------------
 import cdrdb
 import cdrcgi
@@ -84,7 +81,7 @@ class Control(cdrcgi.Control):
             if pmid:
                 parms["list_uids"] = pmid
                 p = "&".join(["%s=%s" % (k, parms[k]) for k in parms])
-                url = "http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?%s" % p
+                url = "https://www.ncbi.nlm.nih.gov/entrez/query.fcgi?%s" % p
                 pmid = cdrcgi.Report.Cell(pmid, href=url, target="_blank")
             else:
                 pmid = ""

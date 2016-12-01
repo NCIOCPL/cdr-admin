@@ -1,11 +1,10 @@
 #----------------------------------------------------------------------
 #
-# $Id$
-#
 # Prototype for duplicate-checking interface for Citation documents.
 #
 # BZIssue::4724
 # BZIssue::5174
+# JIRA::OCECDR-3456
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, cdrdb, urllib, sys, lxml.etree as etree
@@ -41,7 +40,7 @@ userInfo  = cdr.getUser(session, userPair[0])
 # Redirect to PubMed searching if requested (in a different window).
 #----------------------------------------------------------------------
 if srchPmed:
-    print "Location:http://www.ncbi.nlm.nih.gov/entrez/\n"
+    print "Location:https://www.ncbi.nlm.nih.gov/entrez/\n"
     sys.exit(0)
 
 #----------------------------------------------------------------------
@@ -120,7 +119,7 @@ def getArticleTitle(article):
 def fetchCitation(pmid):
     host = "eutils.ncbi.nlm.nih.gov"
     app  = "/entrez/eutils/efetch.fcgi"
-    url  = "http://" + host + app + "?db=pubmed&retmode=xml&id=" + pmid
+    url  = "https://" + host + app + "?db=pubmed&retmode=xml&id=" + pmid
     try:
         reader = urllib.urlopen(url)
     except:
