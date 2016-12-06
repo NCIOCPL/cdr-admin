@@ -9,7 +9,8 @@
 #----------------------------------------------------------------------
 import cgi
 import cdr
-import urllib2
+import requests
+import urlparse
 import re
 import sys
 import datetime
@@ -81,8 +82,8 @@ def fix_css(original, url):
 #----------------------------------------------------------------------
 def send(what, content_type=None):
     if content_type is None:
-        content_type = "Content-type: text/plain"
-    sys.stdout.write("%s\r\n\r\n" % content_type)
+        content_type = "text/plain"
+    sys.stdout.write("Content-type: %s\r\n\r\n" % content_type)
     written = 0
     while written < len(what):
         portion = what[written:written+CHUNK]
@@ -94,22 +95,20 @@ start = time.time()
 fields = cgi.FieldStorage()
 url = fields.getvalue("url")
 try:
-    conn = urllib2.urlopen(url)
-    code = conn.getcode()
+    response = requests.get(url)
+    code = response.status_code
     if code != 200:
         log(url, "code: %s" % repr(code))
         send("")
-    payload = conn.read()
-    headers = conn.headers.headers
+    payload = response.content
     content_type = None
-    for header in conn.headers.headers:
+    for header in response.headers:
         if header.lower().startswith("content-type"):
-            content_type = header.strip()
+            content_type = response.headers.get(header).strip()
             break
-    if isinstance(content_type, basestring) and "/css" in content_type:
-        proxy = "%s/cgi-bin/cdr/proxy.py" % cdr.CBIIT_NAMES[2]
+    if isinstance(content_type, basestring) and "css" in content_type:
         proxy = "/cgi-bin/cdr/proxy.py"
-        parsed_url = urllib2.urlparse.urlparse(url)
+        parsed_url = urlparse.urlparse(url)
         scheme = parsed_url.scheme
         netloc = parsed_url.netloc
         path = parsed_url.path

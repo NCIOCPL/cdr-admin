@@ -11,7 +11,7 @@ import cdrdb
 import cdrutil
 import re
 import socket
-import urllib2
+import requests
 
 MYSQL_PORT = cdr.h.tier in ("QA", "DEV") and 3631 or 3600
 SQL_SERVER_PORTS = { "PROD": 55733, "STAGE": 55459, "QA": 53100, "DEV": 52400 }
@@ -150,8 +150,8 @@ def check_server(name, tables):
     host = cdr.h.host.get("%sC" % name.upper())
     host = "%s.%s" % host
     url = "%s://%s/cgi-bin/check-cdr-tier-settings.py" % (proto, host)
-    conn = urllib2.urlopen(url)
-    roles, accounts = eval(conn.read())
+    response = requests.get(url)
+    roles, accounts = eval(response.content)
     rows = []
     for role, dns, ip, status in roles:
         if status:

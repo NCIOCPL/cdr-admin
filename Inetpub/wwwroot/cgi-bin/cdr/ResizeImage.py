@@ -7,7 +7,8 @@
 # BZIssue::5125
 #
 #----------------------------------------------------------------------
-import sys, cgi, msvcrt, os, Image, cStringIO, ImageEnhance, base64
+import sys, cgi, msvcrt, os, cStringIO, base64
+from PIL import Image, ImageEnhance
 
 DEBUG = False
 

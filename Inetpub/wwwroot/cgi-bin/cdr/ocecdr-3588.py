@@ -8,7 +8,7 @@
 # JIRA::OCECDR-3588
 #
 #----------------------------------------------------------------------
-import cdrdb, urllib2, lxml.etree as etree, lxml.html as H
+import cdrdb, requests, lxml.etree as etree, lxml.html as H
 from lxml.html import builder as B
 
 #----------------------------------------------------------------------
@@ -70,8 +70,8 @@ def checkConcept(code):
     app   = "/lexevsapi60/GetXML"
     parms = "query=org.LexGrid.concepts.Entity[@_entityCode=%s]" % code
     url   = "http://%s/%s?%s" % (host, app, parms)
-    conn  = urllib2.urlopen(url)
-    doc   = conn.read()
+    resp  = requests.get(url)
+    doc   = resp.content
     tree  = etree.XML(doc)
     for entity in tree.findall("queryResponse/class[@name='%s']" % ENTITY):
         if getFieldValue(entity, '_entityCode') == code:

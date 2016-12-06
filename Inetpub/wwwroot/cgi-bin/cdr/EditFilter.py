@@ -15,8 +15,7 @@ import cdrcgi
 import cdrdb
 import cgi
 import difflib
-import urllib
-import urllib2
+import requests
 import lxml.etree as etree
 
 class Control(cdrcgi.Control):
@@ -175,17 +174,17 @@ pre {
         """
         try:
             url = "%s/get-filter.py" % self.base
-            data = urllib.urlencode({ "title": self.filter.title })
-            conn = urllib2.urlopen(url, data, timeout=5)
-            return conn.read()
+            data = { "title": self.filter.title }
+            response = requests.get(url, data=data, timeout=5)
+            return response.content
         except:
             filters = self.get_filters()
             doc_id = filters.get(self.filter.title.lower())
             if not doc_id:
                 raise Exception("%s not found" % self.filter.title)
             url = "%s/ShowDocXml.py?DocId=%d" % (self.base, doc_id)
-            conn = urllib2.urlopen(url, timeout=15)
-            return conn.read()
+            response = requests.get(url, timeout=15)
+            return response.content
 
     def get_filters(self):
         """
@@ -194,8 +193,8 @@ pre {
         get-filter.py script installed and working.
         """
         url = "%s/EditFilters.py?Session=guest" % self.base
-        conn = urllib2.urlopen(url, timeout=10)
-        root = cdrcgi.lxml.html.fromstring(conn.read())
+        response = requests.get(url, timeout=10)
+        root = cdrcgi.lxml.html.fromstring(response.content)
         table = [t for t in root.iter("table")][1]
         filters = {}
         for node in table.findall("tr"):

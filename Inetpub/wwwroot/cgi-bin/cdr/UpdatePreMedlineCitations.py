@@ -6,7 +6,8 @@
 # BZIssue::5150
 #
 #----------------------------------------------------------------------
-import cdr, cdrdb, urllib2, lxml.etree as etree, cgi, cdrcgi, copy
+import cdr, cdrdb, lxml.etree as etree, cgi, cdrcgi, copy
+import requests
 
 class Citation:
     def __init__(self, pmId, cdrId, status):
@@ -105,9 +106,12 @@ for cdrId, status, pmId in cursor.fetchall():
                        citations[pmId].cdrId, citations[pmId].status))
     else:
         citations[pmId] = Citation(pmId, cdrId, status)
-data = "db=pubmed&id=%s&retmode=xml" % ",".join(list(pmIds))
-fp = urllib2.urlopen(url, data)
-docXml = fp.read()
+data = {
+    "db": "pubmed",
+    "id": ",".join(list(pmIds)),
+    "retmode": "xml"
+}
+docXml = requests.post(url, data).content
 ## fp = open("nlm-reply.xml", "w")
 ## fp.write(docXml)
 ## fp.close()

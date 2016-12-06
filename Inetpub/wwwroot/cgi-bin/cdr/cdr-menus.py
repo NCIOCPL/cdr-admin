@@ -7,7 +7,7 @@
 import cdr
 import re
 import urllib
-import urllib2
+import requests
 import urlparse
 import lxml.etree as etree
 import lxml.html as html
@@ -23,6 +23,7 @@ class Item:
     unique = set()
     childless = set()
     leaves = set([
+        "../scheduler",
         "activelogins.py",
         "activityreport.py",
         "boardinvitationhistory.py",
@@ -103,9 +104,11 @@ class Item:
         "listgpemailers",
         "listgpemailers.py",
         "logout.py",
+        "log-tail.py",
         "maileractivitystatistics.py",
         "mailercheckinreport.py",
         "mailerhistory.py",
+        "manage-pdq-data-partners.py",
         "mediacaptioncontent.py",
         "medialinks.py",
         "medialists.py",
@@ -130,6 +133,7 @@ class Item:
         "personsatorg.py",
         "personsearch.py",
         "politicalsubunitsearch.py",
+        "post-translated-summary.py",
         "preferredprotorgs.py",
         "pronunciationbywordstem.py",
         "pronunciationrecordings.py",
@@ -141,6 +145,7 @@ class Item:
         "pubstatsbydate.py",
         "pubstatus.py",
         "qcreport.py",
+        "recentctgovprotocols.py",
         "recordingtrackingreport.py",
         "replacecwdwithversion.py",
         "replacecwdwithversion.py",
@@ -149,6 +154,7 @@ class Item:
         "republish.py",
         "reverifyjob.py",
         "runicrdbstatreport.py",
+        "runpcibstatreport.py",
         "semantictypereport.py",
         "showglobalchangetestresults.py",
         "stub.py",
@@ -177,6 +183,7 @@ class Item:
         "unchangeddocs.py",
         "unverifiedcitations.py",
         "updatepremedlinecitations.py",
+        "upload-zip-code-file.py",
         "warehouseboxnumberreport.py",
         #"globalchangemenu.py",
     ])
@@ -184,7 +191,9 @@ class Item:
         self.label = label
         self.url = url
         self.parsed = urlparse.urlparse(url)
-        self.script = self.parsed.path.split("/")[-1]
+        self.script = self.parsed.path.split("/")[-1] or self.parsed.path
+        if self.script.endswith("/scheduler/"):
+            self.script = "../scheduler"
         self.parms = urlparse.parse_qs(self.parsed.query)
         Item.total += 1
         Item.unique.add(url.lower())
@@ -218,8 +227,8 @@ class Item:
         if parms:
             script += "?%s" % parms
         label = B.SPAN("%s - " % self.label, B.CLASS("label"))
-        script = B.SPAN(script, B.CLASS("script"))
-        li = B.LI(label, script)
+        script_span = B.SPAN(script, B.CLASS("script"))
+        li = B.LI(label, script_span)
         if not self.is_leaf():
             items = self.get_items()
             if items:
@@ -229,8 +238,8 @@ class Item:
                     #ol.append(B.LI("%s (%s)" % (item.label, item.script)))
                 li.append(ol)
             else:
-                Items.childless.add(script)
-                Items.leaves.add(self.script)
+                Item.childless.add(script)
+                Item.leaves.add(self.script)
         return li
     def get_items(self):
         host = "%s.%s" % cdr.h.host["APPC"]
@@ -248,7 +257,7 @@ class Item:
             url += "#%s" % self.parsed.fragment
         items = []
         try:
-            doc = urllib2.urlopen(url, timeout=5).read()
+            doc = requests.get(url, timeout=5).content
             root = html.fromstring(doc)
             for ol in root.iter("ol", "ul"):
                 for a in ol.findall("li/a"):

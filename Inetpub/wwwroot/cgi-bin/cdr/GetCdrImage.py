@@ -7,8 +7,8 @@
 # BZIssue::5001
 #
 #----------------------------------------------------------------------
-import cdrdb, sys, cgi, msvcrt, os, cdr, cdrcgi, Image, cStringIO
-import ImageEnhance
+import cdrdb, sys, cgi, msvcrt, os, cdr, cdrcgi, cStringIO
+from PIL import Image, ImageEnhance
 
 msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
 message = "GetCdrImage: No doc ID found"
@@ -49,7 +49,7 @@ def widthFromRes(size, res):
     else:
         cdrcgi.bail("invalid res value '%s'" % res)
 
-# If the docId comes in in the format 'CDR99999-111.jpg' it is coming 
+# If the docId comes in in the format 'CDR99999-111.jpg' it is coming
 # from the PublishPreview with a size postfix.
 # We capture the size instructions.
 # --------------------------------------------------------------------

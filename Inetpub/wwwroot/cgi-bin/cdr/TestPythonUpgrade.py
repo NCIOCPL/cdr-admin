@@ -39,7 +39,7 @@ try:
     import cgi
     import MySQLdb
     import pip
-    import Image
+    from PIL import Image
     import lxml.etree
     import xlrd
     import xlwt
@@ -60,10 +60,14 @@ try:
     show("pymssql", pymssql.__version__)
     show("MySQLdb", "%s.%s.%s" % MySQLdb.version_info[:3])
     show("MySQL Server", "%s.%s" % conn._server_version[:2])
+    distros = pip.get_installed_distributions()
+    distros = sorted(distros, key=lambda d: str(d).lower())
+    packages = "".join("<li>%s</li>" % d for d in distros)
     html.append("""\
   </table>
+  <ul>%s</ul>
  </body>
-</html>""")
+</html>""" % packages)
     sendPage("".join(html))
 except Exception, e:
     sendPage("<pre>%s</pre>" % e)

@@ -4,11 +4,13 @@
 
 import cdr
 import cdrdb
+import cgi
+import cdrcgi
 import datetime
 import msvcrt
 import os
 import sys
-import urllib2
+import requests
 import xlwt
 
 def main():
@@ -40,8 +42,10 @@ class GPMailers:
         2. Parse the information into a sequence of dictionaries, one per
            mailer
         """
-        conn = urllib2.urlopen(self.URL)
-        lines = conn.read().splitlines()
+        fields = cgi.FieldStorage()
+        session = cdrcgi.getSession(fields)
+        response = requests.get(self.URL, { "Session": session })
+        lines = response.text.splitlines()
         cols = eval(lines.pop(0))
         rows = [eval(row) for row in lines]
         self.info = [dict(zip(cols, row)) for row in rows]
