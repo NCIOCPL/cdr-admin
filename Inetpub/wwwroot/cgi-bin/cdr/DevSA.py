@@ -59,6 +59,8 @@ items   = (('EditGroups.py',           'Manage Groups'                 ),
            ('Request1931.py',
             'Guess ExpectedEnrollment from ProjectedAccrual'),
            ('ReplaceCWDwithVersion.py','Replace CWD with Older Version'),
+           ('clear-filesweeper-lockfile.py',
+            'Clear FileSweeper Lock File'),
            ('del-some-docs.py',        'Delete CDR Documents'          ),
            ('log-tail.py',             'View Logs'                     ),
            ('Logout.py',               'Log Out'                       )

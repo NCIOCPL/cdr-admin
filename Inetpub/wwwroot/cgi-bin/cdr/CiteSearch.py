@@ -1,13 +1,12 @@
 #----------------------------------------------------------------------
-#
 # Prototype for duplicate-checking interface for Citation documents.
 #
 # BZIssue::4724
 # BZIssue::5174
 # JIRA::OCECDR-3456
-#
+# JIRA::OCECDR-4201
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, cdrdb, urllib, sys, lxml.etree as etree
+import cgi, cdr, cdrcgi, cdrdb, requests, sys, lxml.etree as etree
 
 #----------------------------------------------------------------------
 # Get the form variables.
@@ -121,10 +120,10 @@ def fetchCitation(pmid):
     app  = "/entrez/eutils/efetch.fcgi"
     url  = "https://" + host + app + "?db=pubmed&retmode=xml&id=" + pmid
     try:
-        reader = urllib.urlopen(url)
+        response = requests.get(url)
     except:
         cdrcgi.bail("NLM server unavailable; please try again later")
-    article = getPubmedArticle(reader.read())
+    article = getPubmedArticle(response.content)
     if article is None: cdrcgi.bail("Article Not Found")
     return article
 

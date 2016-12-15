@@ -1,8 +1,5 @@
 #----------------------------------------------------------------------
 #
-#
-# $Id$
-#
 # Main menu for board managers.
 #
 # BZIssue::1059 - Replaced stub with link to Board Member QC report

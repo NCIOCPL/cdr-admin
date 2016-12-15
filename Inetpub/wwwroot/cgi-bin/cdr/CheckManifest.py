@@ -1,143 +1,90 @@
 #----------------------------------------------------------------------
-#
 # Preliminary test program for experimenting with methods of verifying
 # that the files in the manifest can be read by the web server.
-#
 #----------------------------------------------------------------------
-import cdr, win32file, sys, xml.dom.minidom, os, cdrcgi
+import lxml.etree as etree
+import hashlib
+import os
+import cdr
+import cdrcgi
 
-def bail(why):
-    cdrcgi.sendPage(u"""\
-<html>
- <head>
-  <title>CDR Client Manifest Check Failure</title>
- </head>
- <body>%s</body>
-</html>
-""" % why)
-    sys.exit(0)
-
+class Control(cdrcgi.Control):
+    def __init__(self):
+        cdrcgi.Control.__init__(self, "Client Manifest Check")
+    def run(self):
+        try:
+            self.show_report()
+        except Exception, e:
+            cdrcgi.bail(str(e))
+    def build_tables(self):
+        manifest_files = self.parse_manifest()
+        client_files = self.gather_files()
+        cols = [cdrcgi.Report.Column(name) for name in ("Path", "Manifest",
+                                                        "File", "Status")]
+        rows = sorted(self.find_errors(manifest_files, client_files))
+        self.subtitle = "%d error(s) found" % len(rows)
+        return [cdrcgi.Report.Table(cols, rows)]
+    def find_errors(self, manifest, client):
+        errors = []
+        MANIFEST_NAME = cdr.MANIFEST_NAME.upper()
+        for key in manifest:
+            if MANIFEST_NAME in key:
+                continue
+            f = manifest[key]
+            if key not in client:
+                errors.append((f.path, f.checksum, None, "File missing"))
+            else:
+                c = client[key]
+                if c.error:
+                    errors.append((f.path, f.checksum, None, c.error))
+                elif f.checksum != c.checksum:
+                    errors.append((f.path, f.checksum, c.checksum,
+                                   "Checksums don't match"))
+        for key in client:
+            if key not in manifest:
+                f = client[key]
+                errors.append((f.path, None, f.checksum, "Not in manifest"))
+        return errors
+    def parse_manifest(self):
+        tree = etree.parse(cdr.MANIFEST_PATH)
+        files = {}
+        for node in tree.getroot().findall("FileList/File"):
+            f = File(node)
+            files[f.path.upper()] = f
+        return files
+    def gather_files(self):
+        os.chdir(cdr.CLIENT_FILES_DIR)
+        files = {}
+        for f in self.recurse("."):
+            files[f.path.upper()] = f
+        return files
+    def recurse(self, dir_path):
+        files = []
+        for name in os.listdir(dir_path):
+            this_path = os.path.join(dir_path, name)
+            if os.path.isdir(this_path):
+                files += self.recurse(this_path)
+            else:
+                files.append(File(path=this_path))
+        return files
 class File:
-    def __init__(self, node = None, name = None):
-        self.name  = name
-        self.stamp = None
-        if node:
-            for child in node.childNodes:
-                if child.nodeName == 'Name':
-                    self.name  = cdr.getTextContent(child)
-                elif child.nodeName == 'Timestamp':
-                    self.stamp = cdr.getTextContent(child)
-    def getFileTime(self):
-        h = win32file.CreateFile(self.name,
-                                 win32file.GENERIC_READ, 0, None,
-                                 win32file.OPEN_EXISTING, 0, 0)
-        t = win32file.GetFileTime(h)
-        h.Close()
-        s = t[3].Format("%Y-%m-%dT%H:%M:%S")
-        return s
-    def getFileSize(self):
-        f = file(self.name)
-        bytes = f.read()
-        s = len(bytes)
-        f.close()
-        return s
-
-def getFiles():
-    files = []
-    dom = xml.dom.minidom.parse("./CdrManifest.xml")
-    for node in dom.getElementsByTagName('File'):
-        files.append(File(node))
-    return files
-
-try:
-    os.chdir(cdr.CLIENT_FILES_DIR)
-except Exception, e:
-    bail(u"Unable to change to %s: %s" % (cdr.CLIENT_FILES_DIR, e))
-
-try:
-    files = getFiles()
-except Exception, e:
-    bail(u"Failure parsing manifest: %s" % e)
-
-rows = []
-errors = 0
-filePaths = {}
-for f in files:
-    filePaths[f.name.upper()] = f
-    try:
-        s = f.getFileSize()
-    except:
-        errors += 1
-        s = u"Unable to get file size"
-    try:
-        t = f.getFileTime()
-        if t != f.stamp:
-            rows.append((f, s, t, u"Timestamps differ"))
-            errors += 1
+    def __init__(self, node=None, path=None):
+        self.path = path
+        self.checksum = self.error = None
+        if node is not None:
+            for child in node:
+                if child.tag == "Name":
+                    self.path = child.text
+                elif child.tag == "Checksum":
+                    self.checksum = child.text
         else:
-            rows.append((f, s, t, u"OK"))
-    except:
-        errors += 1
-        rows.append((f, s, None, u"Unable to get file timestamp"))
-def gatherFiles(dirPath):
-    files = []
-    for name in os.listdir(dirPath):
-        thisPath = os.path.join(dirPath, name)
-        if os.path.isdir(thisPath):
-            files += gatherFiles(thisPath)
-        else:
-            files.append(File(name = thisPath))
-    return files
-
-for f in gatherFiles('.'):
-    if f.name.upper() not in filePaths:
-        errors += 1
-        try:
-            t = f.getFileTime()
-        except:
-            t = u"Unable to read file timestamp"
-        try:
-            s = f.getFileSize()
-        except:
-            s = u"Unable to read file"
-        rows.append((f, t, u"Missing from manifest"))
-summary = u"Passed"
-if errors:
-    summary = u"Failed (%d errors)" % errors
-html = [u"""\
-<html>
- <head>
-  <title>CDR Client Manifest Check</title>
-  <style type='text/css'>
-   body { color: blue; font-family: Arial; }
-  </style>
- </head>
- <body>
-  <h1>CDR Client Manifest Check</h1>
-  <h2 style='color: %s'>%s</h2>
-  <table border='1' cellpadding='3' cellspacing='0'>
-   <tr>
-    <th>Filename</th>
-    <th>File Size</th>
-    <th>Manifest Stamp</th>
-    <th>File Stamp</th>
-    <th>Status</th>
-   </tr>
-""" % (errors and u'red' or u'green', summary)]
-for row in rows:
-    html.append(u"""\
-   <tr style='color: %s'>
-    <td>%s</td>
-    <td align='right'>%s</td>
-    <td>%s</td>
-    <td>%s</td>
-    <td>%s</td>
-   </tr>
-""" % (row[3] == u'OK' and u'green' or u'red',
-       row[0].name, row[1], row[0].stamp, row[2], row[3]))
-html.append(u"""\
-  </table>
- </body>
-</html>
-""")
-cdrcgi.sendPage(u"".join(html))
+            try:
+                fp = open(path, "rb")
+                bytes = fp.read()
+                fp.close()
+                m = hashlib.md5()
+                m.update(bytes)
+                self.checksum = m.hexdigest().lower()
+            except Exception, e:
+                self.error = str(e)
+Control().run()
