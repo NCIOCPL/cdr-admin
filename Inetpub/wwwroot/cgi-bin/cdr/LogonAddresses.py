@@ -1,10 +1,6 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Utility used to track down events when users get confused about
 # what they've been doing in the CDR.
-#
 #----------------------------------------------------------------------
 import cdrdb, re, cgi, cdr, cdrcgi
 

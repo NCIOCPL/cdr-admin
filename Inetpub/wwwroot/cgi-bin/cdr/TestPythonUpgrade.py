@@ -1,7 +1,6 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
+# Smoke test following an upgrade of Python on a CDR Windows server.
+# Shows versions of everything.
 #----------------------------------------------------------------------
 def sendPage(what):
     print """\

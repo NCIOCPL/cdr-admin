@@ -1,15 +1,22 @@
 #----------------------------------------------------------------------
-# $Id$
-#
 # Support review of audio pronunciations for Glossary terms in English
 # and Spanish.
-#
-#
 #----------------------------------------------------------------------
-
-import sys, os, time, glob, cgi, re, operator, zipfile, msvcrt
-import cdr, cdrdb, cdrcgi, xlrd, ExcelWriter
+import cgi
 import cgitb
+import glob
+import operator
+import os
+import sys
+import re
+import time
+import zipfile
+import msvcrt
+import xlrd
+import cdr
+import cdrdb
+import cdrcgi
+
 cgitb.enable()
 
 # Constants
@@ -1070,34 +1077,23 @@ def doneZipfileReview(session, oldZipName, mp3List):
     newXlsFileName = "%s.xls" % newXlsName
 
     # Create the output spreadsheet objects
-    book  = ExcelWriter.Workbook()
-    sheet = book.addWorksheet("Term Names")
+    styles = cdrcgi.ExcelStyles()
+    sheet = styles.add_sheet("Term Names")
 
-    # Styling
-    labelFont  = ExcelWriter.Font(bold=True)
-    labelStyle = book.addStyle(font=labelFont)
-
-    # Create the columns using auto width determination
-    sheet.addCol(1, 35)     # CDR ID
-    sheet.addCol(2, 150)    # Term
-    sheet.addCol(3, 53)     # Language
-    sheet.addCol(4, 150)    # Pronunciation
-    sheet.addCol(5, 150)    # Filename
-    sheet.addCol(6, 100)    # Notes Vanessa
-    sheet.addCol(7, 150)    # Notes NCI
+    # Set the column widths
+    widths = (10, 30, 10, 30, 30, 20, 30)
+    for col, chars in enumerate(widths):
+        sheet.col(col).width = styles.chars_to_width(chars)
 
     # Column labels
-    row = sheet.addRow(1, style=labelStyle)
-    row.addCell(1, u"CDR ID")
-    row.addCell(2, u"Term Name")
-    row.addCell(3, u"Language")
-    row.addCell(4, u"Pronunciation")
-    row.addCell(5, u"Filename")
-    row.addCell(6, u"Notes (Vanessa)")
-    row.addCell(7, u"Notes (NCI)")
+    headers = ("CDR ID", "Term Name", "Language", "Pronunciation",
+               "Filename", "Notes (Vanessa)", "Notes (NCI)")
+    assert(len(headers) == len(widths))
+    for i, header in enumerate(headers):
+        sheet.write(0, i, header, styles.header)
 
     # First row for data after labels
-    nextRow = 2
+    row = 1
 
     # Haven't found any rejected mp3s yet
     haveRejects = False
@@ -1117,16 +1113,15 @@ def doneZipfileReview(session, oldZipName, mp3List):
                                              mp3obj.cdr_id, isoLang)
 
             # Add the row
-            row = sheet.addRow(nextRow)
-            row.addCell(0, mp3obj.cdr_id, "Number")
-            row.addCell(1, mp3obj.term_name)
-            row.addCell(2, mp3obj.language)
-            row.addCell(3, mp3obj.pronunciation)
-            row.addCell(4, new_mp3_name)
-            row.addCell(5, mp3obj.reader_note)
-            row.addCell(6, mp3obj.reviewer_note)
+            sheet.write(row, 0, mp3obj.cdr_id)
+            sheet.write(row, 1, mp3obj.term_name)
+            sheet.write(row, 2, mp3obj.language)
+            sheet.write(row, 3, mp3obj.pronunciation)
+            sheet.write(row, 4, new_mp3_name)
+            sheet.write(row, 5, mp3obj.reader_note)
+            sheet.write(row, 6, mp3obj.reviewer_note)
 
-            nextRow += 1
+            row += 1
             haveRejects = True
 
     # If there were no rejects, we're done
@@ -1163,7 +1158,7 @@ for review.</p>
     except Exception as e:
         bail('Unable to open "%s" for output' % newXlsFileName, e)
     try:
-        book.write(fp, asXls=True)
+        styles.book.save(fp)
     except Exception as e:
         bail('Unable to write spreadsheet "%s"' % newXlsFileName, e)
 
@@ -1175,7 +1170,7 @@ for review.</p>
     sys.stdout.write("Content-Type: application/vnd.ms-excel\r\n")
     sys.stdout.write("Content-disposition: attachment; filename=%s\n\n" %
                       newXlsFileName)
-    book.write(sys.stdout, asXls=True)
+    styles.book.save(sys.stdout)
     sys.exit()
 
 

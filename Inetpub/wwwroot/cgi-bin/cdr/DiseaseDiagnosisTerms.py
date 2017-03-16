@@ -1,12 +1,8 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Hierarchical report (in thesaurus-like format) of terminology
 # under Disease/Diagnosis.
 #
 # BZIssue::4762 (change 'cancer' to 'Malignant Neoplasm' [per WO])
-#
 #----------------------------------------------------------------------
 import cdrcgi, cdrdb, cgi
 

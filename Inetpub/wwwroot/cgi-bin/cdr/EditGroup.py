@@ -1,9 +1,5 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
-# Prototype for editing a CDR group.
-#
+# Interface for editing a CDR group.
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi
 

@@ -1,13 +1,11 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Report identifying unpublished trials with publishable versions.
-#
 # BZIssue::5011
-#
 #----------------------------------------------------------------------
-import cdrdb, ExcelWriter, sys, time, cdrcgi
+import datetime
+import sys
+import cdrcgi
+import cdrdb
 
 class Protocol:
     def __init__(self, id, date, user, status):
@@ -20,6 +18,16 @@ class Protocol:
         self.studyCats          = []
         self.specialCats        = []
         self.sourceNames        = []
+    def sort_sets(self):
+        self.primaryIds.sort()
+        self.studyCats.sort()
+        self.specialCats.sort()
+        self.sourceNames.sort()
+    def __cmp__(self, other):
+        result = cmp(self.studyCats, other.studyCats)
+        if result:
+            return result
+        return cmp(self.id, other.id)
 
 inScope = {}
 ctGov   = {}
@@ -55,60 +63,45 @@ def getDateRange(prots):
         return low
     return "%s through %s" % (low, high)
 
-def addWorksheet(workbook, title, headers, widths, prots):
-    worksheet = workbook.addWorksheet(title)
-    for col in range(len(headers)):
-        worksheet.addCol(col + 1, widths[col])
-    row = worksheet.addRow(1, tformat1)
-    row.addCell(1, "Newly Publishable Trials", mergeAcross=len(headers) - 1)
-    row = worksheet.addRow(2, tformat1)
-    row.addCell(1, getDateRange(prots), mergeAcross=len(headers) - 1)
-    row = worksheet.addRow(4, tformat2)
-    row.addCell(1, "%s Protocols" % title, mergeAcross=1)
-    row = worksheet.addRow(6, hdrFormat)
-    for col in range(len(headers)):
-        row.addCell(col + 1, headers[col])
-    keys = prots.keys()
-    for key in keys:
-        prot = prots[key]
-        prot.primaryIds.sort()
-        prot.studyCats.sort()
-        prot.specialCats.sort()
-        prot.sourceNames.sort()
-    def sorter(a, b):
-        result = cmp(prots[a].studyCats, prots[b].studyCats)
-        if result:
-            return result
-        return cmp(a, b)
-    keys.sort(sorter)
-    r = 7
-    for key in keys:
-        prot = prots[key]
-        nRows = len(prot.studyCats) or 1
-        for rowNum in range(nRows):
-            row = worksheet.addRow(r, lformat)
-            c = 1
-            row.addCell(c, `prot.id`)
-            c += 1
-            row.addCell(c, fixList(prot.primaryIds))
-            c += 1
+def addWorksheet(styles, title, headers, widths, prots):
+    assert(len(headers) == len(widths))
+    sheet = styles.add_sheet(title)
+    for col, points in enumerate(widths):
+        sheet.col(col).width = styles.points_to_width(points)
+    banner = "Newly Publishable Trials"
+    date_range = getDateRange(prots)
+    sheet.write_merge(0, 0, 0, len(widths) - 1, banner, styles.banner)
+    sheet.write_merge(1, 1, 0, len(widths) - 1, date_range, styles.banner)
+    sheet.write_merge(3, 3, 0, 1, "%s Protocols" % title, styles.title)
+    for col, header in enumerate(headers):
+        sheet.write(5, col, header, styles.header)
+    for prot in prots.values():
+        prot.sort_sets()
+    row = 6
+    for prot in sorted(prots.values()):
+        rows = len(prot.studyCats) or 1
+        for i in range(rows):
+            sheet.write(row, 0, str(prot.id), styles.left)
+            sheet.write(row, 1, fixList(prot.primaryIds), styles.left)
             if prot.studyCats:
-                row.addCell(c, fixString(prot.studyCats[rowNum]))
-            c += 1
+                sheet.write(row, 2, fixString(prot.studyCats[i]), styles.left)
+            col = 3
             if title == 'InScope':
-                row.addCell(c, fixList(prot.specialCats))
-                c += 1
-            row.addCell(c, fixString(prot.status))
-            c += 1
+                sheet.write(row, col, fixList(prot.specialCats), styles.left)
+                col += 1
+            sheet.write(row, col, fixString(prot.status), styles.left)
+            col += 1
             if title == 'InScope':
-                row.addCell(c, fixList(prot.sourceNames))
-                c += 1
-                row.addCell(c, fixString(prot.reviewApprovalType))
-                c += 1
-            row.addCell(c, prot.date and prot.date[:10] or "")
-            c += 1
-            row.addCell(c, fixString(prot.user))
-            r += 1
+                sheet.write(row, col, fixList(prot.sourceNames), styles.left)
+                col += 1
+                approval_type = fixString(prot.reviewApprovalType)
+                sheet.write(row, col, approval_type, styles.left)
+                col += 1
+            prot_date = prot.date and prot.date[:10] or ""
+            sheet.write(row, col, prot_date, styles.left)
+            col += 1
+            sheet.write(row, col, fixString(prot.user), styles.left)
+            row += 1
 
 if sys.platform == "win32":
     import os, msvcrt
@@ -236,7 +229,7 @@ show("%d special categories fetched..." % len(rows))
 for id, value in rows:
     if value not in prots[id].specialCats:
         prots[id].specialCats.append(value)
-show("special categories inserted into protocol objects...")       
+show("special categories inserted into protocol objects...")
 cursor.execute("""\
     SELECT DISTINCT q.doc_id, q.value
                FROM query_term q
@@ -261,26 +254,18 @@ show("%d protocol sources fetched..." % len(rows))
 for id, value in rows:
     if value not in prots[id].sourceNames:
         prots[id].sourceNames.append(value)
-show("protocol sources inserted into protocol objects...")       
-t = time.strftime("%Y%m%d%H%M%S")
+show("protocol sources inserted into protocol objects...")
+t = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
 if not debug:
     print "Content-type: application/vnd.ms-excel"
     print ("Content-Disposition: attachment; "
            "filename=NewlyPublishableTrials-%s.xls" % t)
-    print 
+    print
 
-workbook = ExcelWriter.Workbook()
+styles = cdrcgi.ExcelStyles()
+styles.title = styles.style(styles.bold_font(12))
+styles.banner.font.height = 16 * 20 # 16 pt
 show("workbook created...")
-align = ExcelWriter.Alignment('Center', wrap=True)
-font = ExcelWriter.Font(bold=True)
-hdrFormat = workbook.addStyle(alignment=align, font=font)
-align = ExcelWriter.Alignment('Center')
-font = ExcelWriter.Font(bold=True, size=16)
-tformat1 = workbook.addStyle(alignment=align, font=font)
-align = ExcelWriter.Alignment('Left')
-font = ExcelWriter.Font(bold=True, size=12)
-tformat2 = workbook.addStyle(alignment=align, font=font)
-lformat = workbook.addStyle(alignment=align)
 titles  = ('InScope', 'CTGov')
 headers = (
     ('DocID', 'ProtocolID','Study Category', 'Special Category',
@@ -288,15 +273,15 @@ headers = (
      'Date Made\nPublishable', 'User'),
     ('DocID', 'ProtocolID', 'Study Category', 'Overall\nStatus',
      'Date Made\nPublishable', 'User')
-    )
+)
 widths  = (
     (50, 150, 100, 100, 100, 100, 100, 100, 75),
     (50, 150, 100, 100, 100, 75)
-    )
+)
 
-addWorksheet(workbook, titles[0], headers[0], widths[0], inScope)
-show("%s worksheet created..." % titles[0])
-addWorksheet(workbook, titles[1], headers[1], widths[1], ctGov)
+addWorksheet(styles, titles[1], headers[1], widths[1], ctGov)
 show("%s worksheet created..." % titles[1])
-workbook.write(sys.stdout, True)
+addWorksheet(styles, titles[0], headers[0], widths[0], inScope)
+show("%s worksheet created..." % titles[0])
+styles.book.save(sys.stdout)
 show("done...")

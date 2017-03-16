@@ -1,9 +1,5 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Compare filters between the current tier and the production tier.
-#
 #----------------------------------------------------------------------
 import cdr, cdrdb, cgi, cdrcgi, os, tempfile, re, shutil, glob
 
@@ -24,7 +20,7 @@ def makeTempDir():
     try: os.mkdir(abspath)
     except: cdrcgi.bail("Cannot create directory %s" % abspath)
     try: os.chdir(abspath)
-    except: 
+    except:
         cleanup(abspath)
         cdrcgi.bail("Cannot cd to %s" % abspath)
     return abspath
@@ -34,7 +30,7 @@ def makeTempDir():
 #----------------------------------------------------------------------
 def getLocalFilters(tmpDir):
     try: os.mkdir(cdr.h.tier)
-    except: 
+    except:
         cleanup(tmpDir)
         cdrcgi.bail("Cannot create directory %s" % cdr.h.tier)
     try:
@@ -100,7 +96,7 @@ def unEncode(str):
               .replace("@@SLASH@@", "/") \
               .replace("@@STAR@@", "*")  \
               .replace("@@MARK@@", "")
- 
+
 #----------------------------------------------------------------------
 # Create a banner for the report on a single filter.
 #----------------------------------------------------------------------

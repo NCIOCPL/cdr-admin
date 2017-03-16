@@ -1,11 +1,6 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Main menu for Developers and System Administrators.
-#
 # BZIssue::5296
-#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
 
@@ -41,6 +36,7 @@ items   = (('EditGroups.py',           'Manage Groups'                 ),
            ('EditFilterSets.py',       'Manage Filter Sets'            ),
            ("manage-pdq-data-partners.py",
             "Manage PDQ Data Partners"),
+           ("edit-value-table.py",     "Manage Value Tables"           ),
            ('getBatchStatus.py',       'Batch Job Status'              ),
            ('CTGov.py',                'CTGov Protocols'               ),
            ('FailBatchJob.py',         'Fail Publishing or Batch Job'  ),
@@ -56,12 +52,11 @@ items   = (('EditGroups.py',           'Manage Groups'                 ),
            ('UnblockDoc.py',           'Unblock Documents'             ),
            ('EditExternMap.py',        'Update Mapping Table'          ),
            ('upload-zip-code-file.py', 'Update ZIP Codes'              ),
-           ('Request1931.py',
-            'Guess ExpectedEnrollment from ProjectedAccrual'),
            ('ReplaceCWDwithVersion.py','Replace CWD with Older Version'),
            ('clear-filesweeper-lockfile.py',
             'Clear FileSweeper Lock File'),
            ('del-some-docs.py',        'Delete CDR Documents'          ),
+           ('fetch-tier-settings.py',  'Fetch Tier Settings'           ),
            ('log-tail.py',             'View Logs'                     ),
            ('Logout.py',               'Log Out'                       )
            )

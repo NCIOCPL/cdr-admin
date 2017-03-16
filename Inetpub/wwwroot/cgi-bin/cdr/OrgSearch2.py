@@ -1,9 +1,5 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
-# Prototype for duplicate-checking interface for Organization documents.
-#
+# Duplicate-checking interface for Organization documents.
 #----------------------------------------------------------------------
 import cgi, cdrcgi, cdrdb
 

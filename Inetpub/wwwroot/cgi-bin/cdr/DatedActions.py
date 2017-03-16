@@ -1,16 +1,6 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Reports on dated actions for a particular document type.
-#
-# $Log: not supported by cvs2svn $
-# Revision 1.2  2002/03/13 17:02:59  bkline
-# Fixed typo in report title.
-#
-# Revision 1.1  2002/03/13 16:58:07  bkline
-# New report for dated actions associated with a specified doc type.
-#
+# I'm pretty sure the users don't use this any more. (RMK 2016-12-21)
 #----------------------------------------------------------------------
 import cdr, cdrdb, cdrcgi, cgi, re, time, xml.dom.minidom
 

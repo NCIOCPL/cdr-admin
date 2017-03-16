@@ -1,11 +1,8 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Report on phrases matching specified glossary term.
 #
 # JIRA::OCECDR-3800 - eliminated security vulnerabilities
-#
+# JIRA::OCECDR-4183 - add ability to look for spanish terms
 #----------------------------------------------------------------------
 import cdr
 import cdrbatch
@@ -24,7 +21,7 @@ id       = fields.getvalue('Id')
 name     = fields.getvalue('Name')
 hp       = fields.getvalue('hp')
 patient  = fields.getvalue('patient')
-trials   = fields.getvalue('trials')
+language = fields.getvalue("language") or "English"
 email    = fields.getvalue("Email") or cdr.getEmail(session)
 SUBMENU  = "Report Menu"
 buttons  = ["Submit Request", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
@@ -57,7 +54,6 @@ if request == "Log Out":
 #----------------------------------------------------------------------
 if hp and hp != "hp": cdrcgi.bail()
 if patient and patient != "patient": cdrcgi.bail()
-if trials and trials != "trials": cdrcgi.bail()
 if id:
     digits = re.sub('[^\d]+', '', id)
     try:
@@ -68,7 +64,7 @@ if id:
 #----------------------------------------------------------------------
 # If we don't have a request, put up the request form.
 #----------------------------------------------------------------------
-if not name and not id or not email or not (hp or patient or trials):
+if not name and not id or not email or not (hp or patient):
     instructions = (
         "This report requires a few minutes to complete. "
         "A document ID or a term name must be provided. If you enter a name "
@@ -99,8 +95,12 @@ if not name and not id or not email or not (hp or patient or trials):
                       checked=hp and True or False)
     page.add_checkbox("patient", "Patient Summaries", "patient",
                       checked=patient and True or False)
-    page.add_checkbox("trials", "Patient Abstracts", "trials",
-                      checked=trials and True or False)
+    page.add("</fieldset>")
+    page.add("<fieldset>")
+    page.add(page.B.LEGEND("Language"))
+    for lang in ("English", "Spanish"):
+        checked = lang == language
+        page.add_radio("language", lang, lang, checked=checked)
     page.add("</fieldset>")
     page.add(page.B.FIELDSET(page.B.P(note, page.B.CLASS("warning"))))
     page.send()
@@ -119,10 +119,10 @@ def putUpSelection(rows):
         label = u"%s: %s" % (id_string, name)
         page.add_radio("Id", label, id_string)
     page.add("</fieldset>")
-    page.add(page.B.INPUT(name="Email", value=email or "", type="hidden"))
-    page.add(page.B.INPUT(name="hp", value=hp or "", type="hidden"))
-    page.add(page.B.INPUT(name="patient", value=patient or "", type="hidden"))
-    page.add(page.B.INPUT(name="trials", value=trials or "", type="hidden"))
+    page.add_hidden_field("Email", email or "")
+    page.add_hidden_field("language", language)
+    page.add_hidden_field("hp", hp or "")
+    page.add_hidden_field("patient", patient or "")
     page.send()
 
 #----------------------------------------------------------------------
@@ -154,12 +154,11 @@ if not id:
 #----------------------------------------------------------------------
 doctypes = []
 doctype_fields = (
-    (trials, "PatientAbstracts"),
     (hp, "HPSummaries"),
     (patient, "PatientSummaries"),
 )
 doctypes = " ".join([name for field, name in doctype_fields if field])
-args = (("id", str(id)),("types", doctypes))
+args = (("id", str(id)), ("types", doctypes), ("language", language))
 batch = cdrbatch.CdrBatch(jobName="Glossary Term Search", command=command,
                           email=email, args=args)
 try:

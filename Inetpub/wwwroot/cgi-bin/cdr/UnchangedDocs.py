@@ -1,12 +1,8 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Reports on documents unchanged for a specified number of days.
 #
 # BZissue::161
 # JIRA::OCECDR-3800 - Address security vulnerabilities
-#
 #----------------------------------------------------------------------
 import cgi
 import cdrcgi

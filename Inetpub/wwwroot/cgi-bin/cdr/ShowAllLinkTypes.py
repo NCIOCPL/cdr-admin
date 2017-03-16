@@ -1,9 +1,5 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Displays a table containing information about all link types.
-#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string, cdrdb
 

@@ -1,7 +1,5 @@
 #----------------------------------------------------------------------
 #
-# $Id$
-#
 # Tool for checking the health of the glossifier service.  The most common
 # cause of failure is someone at cancer.gov trying to connect using a
 # temporary URL (on Verdi) I set up for Bryan for a one-time test.

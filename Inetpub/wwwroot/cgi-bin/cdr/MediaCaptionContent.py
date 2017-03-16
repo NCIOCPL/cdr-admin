@@ -1,6 +1,4 @@
 #----------------------------------------------------------------------
-# $Id$
-#
 # Produce an Excel spreadsheet showing significant fields from user
 # selected Media documents.
 #
@@ -19,7 +17,6 @@ import cdrdb
 import cgi
 import copy
 import datetime
-import ExcelWriter
 import os
 import sys
 import xml.sax
@@ -275,7 +272,7 @@ query.log(logfile=cdr.DEFAULT_LOGDIR + "/media.log")
 
 # Execute query
 try:
-    rows = query.execute(cursor).fetchall()
+    docIds = [row[0] for row in query.execute(cursor).fetchall()]
 except cdrdb.Error, info:
     msg = "Database error executing MediaCaptionContent.py query"
     extra = (
@@ -286,7 +283,7 @@ except cdrdb.Error, info:
     cdrcgi.bail(msg, extra=extra)
 
 # If there was no data, we're done
-if len(rows) == 0:
+if len(docIds) == 0:
     cdrcgi.bail("Your selection criteria did not retrieve any documents",
                 extra=["Please click the back button and try again."])
 
@@ -294,74 +291,37 @@ if len(rows) == 0:
 #                 Construct the output spreadsheet                   #
 ######################################################################
 
-def fillCell(wsRow, colNum, dataList, sep):
-    """
-    Create a cell on wsRow at colNum with all of the data in dataList.
-    """
-    count = 0
-    text  = ""
-    for data in dataList:
-        if count > 0:
-            # text += "  +  "
-            text += sep
-        text += data
-        count += 1
-    wsRow.addCell(colNum, text)
-
 # Create Style objects for Excel
-colLabelInterior     = ExcelWriter.Interior("#0000FF", "Solid")
-docSeparatorInterior = ExcelWriter.Interior("#C0C0C0", "Solid")
-colLabelFont         = ExcelWriter.Font(color="#FFFFFF", bold=True)
-sheetNameFont        = ExcelWriter.Font(color="#000000", bold=True)
-centerAlign          = ExcelWriter.Alignment(horizontal="Center")
-leftAlign            = ExcelWriter.Alignment(horizontal="Left")
-dataAlign            = ExcelWriter.Alignment(horizontal="Left",
-                                             vertical="Top", wrap="1")
+styles = cdrcgi.ExcelStyles()
+styles.set_color(styles.header, "white")
+styles.set_background(styles.header, "blue")
+styles.set_size(styles.banner)
 
-# Create an Excel workbook and a worksheet
+# Create the worksheet
 audienceTag = { "Health_professionals": " - HP",
                 "Patients": " - Patient" }.get(audience, "")
 titleText = "Media Caption and Content Report%s" % audienceTag
-wb = ExcelWriter.Workbook('ahm', 'NCI')
-ws = wb.addWorksheet("Media Caption-Content", frozenRows=3)
-
+sheet = styles.add_sheet("Media Caption-Content", frozen_rows=3)
 
 # Create all the columns
-ws.addCol(1, 45)        # CDR ID
-ws.addCol(2, 100)       # Title
-ws.addCol(3, 100)       # Diagnosis
-ws.addCol(4, 125)       # Proposed Summaries
-ws.addCol(5, 125)       # Proposed Glossary Terms
-ws.addCol(6, 100)       # Label Names
-ws.addCol(7, 125)       # Content Description
-ws.addCol(8, 125)       # Caption
-
-# Setup object styles
-colLabelStyle        = wb.addStyle(name="colLabel", alignment=centerAlign,
-                          font=colLabelFont, interior=colLabelInterior)
-docSeparatorStyle    = wb.addStyle(name="docSeparator",
-                          interior=docSeparatorInterior)
-sheetNameStyle       = wb.addStyle(name="sheetName", alignment=leftAlign,
-                          font=sheetNameFont)
-dataStyle            = wb.addStyle(name="data", alignment=dataAlign)
-
-# Title row at the top
-titleRow = ws.addRow(1, style=sheetNameStyle)
-titleRow.addCell(4, value=titleText)
-
-# Coverage of the report
-coverageRow = ws.addRow(2, style=sheetNameStyle)
-coverageRow.addCell(4, "        %s   -   %s" % (start_date, end_date))
-
-# Column label headers
-labelRow = ws.addRow(3, colLabelStyle)
+widths = (10, 20, 20, 25, 25, 20, 25, 25)
 labels = ("CDR ID", "Title", "Diagnosis", "Proposed Summaries",
           "Proposed Glossary Terms", "Label Names",
           "Content Description", "Caption")
-col = 1
-for label in labels:
-    labelRow.addCell(col, label)
-    col += 1
+assert(len(widths) == len(labels))
+for col, chars in enumerate(widths):
+    sheet.col(col).width = styles.chars_to_width(chars)
+
+# Title row at the top
+sheet.write_merge(0, 0, 0, len(widths) - 1, titleText, styles.banner)
+
+# Coverage of the report
+coverage = "%s -- %s" % (start_date, end_date)
+sheet.write_merge(1, 1, 0, len(widths) - 1, coverage, styles.banner)
+
+# Column label headers
+for col, label in enumerate(labels):
+    sheet.write(2, col, label, styles.header)
 
 ######################################################################
 #                      Fill the sheet with data                      #
@@ -377,47 +337,41 @@ fieldList = (
     ("/Media/MediaContent/ContentDescriptions/ContentDescription","\n\n"),
     ("/Media/MediaContent/Captions/MediaCaption","\n\n")
 )
+assert(len(labels) - 1 == len(fieldList))
 
 # Put them in a dictionary for use by parser
 wantFields = {}
 for fld, sep in fieldList:
     wantFields[fld] = []
 
-# Data starts in worksheet row 3
-wsRowNum = 4
+# Is specific language and/or audience requested?
+getLanguage = language != 'all' and language or None
+getAudience = audience != 'all' and audience or None
 
-for row in rows:
+# Populate the data cells
+row = 3
+filters = ["name:Fast Denormalization Filter"]
+for docId in docIds:
     # Fetch the full record from the database, denormalized with data content
-    docId = row[0]
-    result = cdr.filterDoc(session,
-               filter=["name:Fast Denormalization Filter"], docId=docId)
-    if type(result) != type(()):
+    result = cdr.filterDoc(session, filter=filters, docId=docId)
+    if not isinstance(result, tuple):
         cdrcgi.bail("""\
 Failure retrieving filtered doc for doc ID=%d<br />
 Error: %s""" % (docId, result))
 
-    xmlText = result[0]
-
-   # Is specific language and/or audience requested?
-    getLanguage = language != 'all' and language or None
-    getAudience = audience != 'all' and audience or None
-
     # Parse it, getting back a list of fields
     dh = DocHandler(wantFields, getLanguage, getAudience)
+    xmlText = result[0]
     xml.sax.parseString(xmlText, dh)
     gotFields = dh.getResults()
 
-    # DEBUG
-    # cdrcgi.bail("docId=%s<br><p>%s</p>" % (docId,gotFields))
-
     # Add a new row with each piece of info
-    wsRow = ws.addRow(wsRowNum, style=dataStyle)
-    wsRow.addCell(1, docId)
-    colNum = 2
-    for fld,sep in fieldList:
-        fillCell(wsRow, colNum, gotFields[fld], sep)
-        colNum += 1
-    wsRowNum += 2
+    sheet.write(row, 0, docId, styles.left)
+    for i, field_info in enumerate(fieldList):
+        path, separator = field_info
+        values = separator.join(gotFields[path])
+        sheet.write(row, i + 1, values, styles.left)
+    row += 2
 
 # Output
 if sys.platform == "win32":
@@ -426,4 +380,4 @@ if sys.platform == "win32":
 print "Content-type: application/vnd.ms-excel"
 print "Content-Disposition: attachment; filename=MediaCaptionAndContent.xls"
 print
-wb.write(sys.stdout, True)
+styles.book.save(sys.stdout)

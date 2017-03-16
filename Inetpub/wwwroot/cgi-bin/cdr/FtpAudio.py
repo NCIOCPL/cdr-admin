@@ -1,20 +1,11 @@
 # *********************************************************************
-#
-# File Name: $RCSFile:$
-#            ======================
-# 
 # Ftp Audio files from the CIPSFTP server from the ciat/qa/Audio directory
 # and place them on the OCE network.
 #
 # Program based on similar program written earlier for image files.
 #
 # ---------------------------------------------------------------------
-# $Author: venglisc $
 # Created:          2011-04-06        Volker Englisch
-# Last Modified:    $
-# 
-# $Source: /usr/local/cvsroot/cdr/Publishing/CheckCTGovTransfer.py,v $
-# $Revision: 1.9 $
 #
 # BZIssue::5013 - [Glossary Audio] Create Audio Download Tool
 #

@@ -1,9 +1,9 @@
-  BODY { 
+  BODY {
 		text-align: left;
 		color: Teal;
 		}
 
-  P { 
+  P {
 		font: 14pt "Times New Roman";
 		color: Teal;
 		background: transparent;
@@ -53,17 +53,17 @@
 		font-weight: bold;
 		}
 
-  TD {	
+  TD {
     	font: 10pt "Arial";
 		color: teal;
 		}
 
-  LI { 
+  LI {
 		display: list-item;
 		font: 12pt "Times New Roman";
-		}	
+		}
 
-  DL {	
+  DL {
 		display: list-item;
 
 		}
@@ -81,14 +81,14 @@
 		color: black;
 		}
 
-  B, STRONG { 
+  B, STRONG {
 		font-weight: bold
-		} 
-  I, CITE, EM, VAR, ADDRESS, BLOCKQUOTE { 
-		font-style: italic 
 		}
-  PRE, TT, CODE, KBD, SAMP { 
-		font-family: monospace 
+  I, CITE, EM, VAR, ADDRESS, BLOCKQUOTE {
+		font-style: italic
+		}
+  PRE, TT, CODE, KBD, SAMP {
+		font-family: monospace
 		}
 
   A:LINK {

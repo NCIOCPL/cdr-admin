@@ -1,23 +1,14 @@
 #!/usr/bin/python
 # ******************************************************************
-#
-# $ID$
-#
-# File Name: get-pdq-partners.py
-#            -------------------
 # This script is called by the FTP Linux server during the access
-# report creation in order to retrieve all organizations to be 
+# report creation in order to retrieve all organizations to be
 # included on the report
 # ------------------------------------------------------------------
 # Created:                              Volker Englisch - 2016-04-19
-# $Author: $
-# $Date:   $
-# $Revision: $
 #
 # History:
 # --------
 # OCECDR-3852: Fix and Improve FTP Licensee Report
-#
 # ******************************************************************
 import cdrdb
 import cgi
@@ -52,4 +43,3 @@ print """\
 Content-type: text/xml
 
 %s""" % etree.tostring(root, pretty_print=True)
-

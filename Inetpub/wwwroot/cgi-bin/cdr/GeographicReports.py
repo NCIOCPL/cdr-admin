@@ -1,13 +1,5 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Submenu for geographic reports.
-#
-# $Log: not supported by cvs2svn $
-# Revision 1.1  2002/05/24 20:37:30  bkline
-# New Report Menu structure implemented.
-#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
 
@@ -34,7 +26,7 @@ elif action == SUBMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if action == "Log Out": 
+if action == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
@@ -51,5 +43,5 @@ reports = [
 for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI></A>\n" % (
             cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
-    
+
 cdrcgi.sendPage(header + form + "</OL></FORM></BODY></HTML>")

@@ -1,7 +1,4 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Web interface for requesting status from the Cancer.gov GateKeeper
 # and testing if our record in pub_proc_cg confirms that the documents
 # have been published.
@@ -10,7 +7,6 @@
 #
 # BZIssue::5015 - Documents on Cancer.gov not accounted for
 # Rewritten July 2015 as part of security sweep (lots of dead code dropped).
-#
 #----------------------------------------------------------------------
 import cdr
 import cdr2gk

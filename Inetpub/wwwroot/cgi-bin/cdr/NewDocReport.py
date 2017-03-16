@@ -1,22 +1,5 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Reports on newly created documents and their statuses.
-#
-# $Log: not supported by cvs2svn $
-# Revision 1.4  2002/04/23 22:57:01  bkline
-# Bumped up timeout for query.
-#
-# Revision 1.3  2002/03/14 04:06:24  bkline
-# Adjusted default date range.
-#
-# Revision 1.2  2002/03/14 04:03:17  bkline
-# Fixed numerical column alignment.
-#
-# Revision 1.1  2002/03/14 04:01:10  bkline
-# Added New Doc Report.
-#
 #----------------------------------------------------------------------
 import cdr, cdrdb, cdrcgi, cgi, time
 

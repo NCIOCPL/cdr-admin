@@ -1,11 +1,6 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Stub for report which hasn't been implemented yet.
-#
 # JIRA::OCECDR-3800 - Address security vulnerabilities
-#
 #----------------------------------------------------------------------
 import cgi
 import cdrcgi

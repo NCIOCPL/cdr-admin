@@ -1,10 +1,5 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Show unformatted XML; mostly useful for filters.
-#
-# $Log: not supported by cvs2svn $
 #----------------------------------------------------------------------
 import cgi, cdrdb, cdrcgi
 

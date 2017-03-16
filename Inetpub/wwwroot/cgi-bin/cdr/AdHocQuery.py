@@ -1,27 +1,5 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Displays result set for SQL query.
-#
-# $Log: not supported by cvs2svn $
-# Revision 1.5  2004/01/14 18:00:59  venglisc
-# Removed comment within query screen listing formerly used query in order
-# to preserve real estate.
-#
-# Revision 1.4  2003/03/21 16:48:41  pzhang
-# Added a new default query to find sample documents.
-# Commented out the old default query.
-#
-# Revision 1.3  2003/02/12 19:17:32  pzhang
-# Added timeout field.
-#
-# Revision 1.2  2002/07/10 19:47:32  bkline
-# Escaped tagged data.
-#
-# Revision 1.1  2002/07/10 19:33:33  bkline
-# New interface for ad hoc SQL queries.
-#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string, cdrdb
 
@@ -50,7 +28,7 @@ elif action == SUBMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if action == "Log Out": 
+if action == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
@@ -61,17 +39,17 @@ if not query:
     <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
     <b>Enter SQL query:</b><br>
     <textarea name='Query' rows='20' cols='80'>
-/* 
+/*
    Modify t.name (Term) to match your document type and
    change "%%<MenuInformation%%" to match your string such
    as "%%<Phone%%Public%%" for Person, in the documents of
    the given type. Remember to use %% as the wildcard.
 */
-SELECT TOP 10 d.id 
+SELECT TOP 10 d.id
   FROM document d
   JOIN doc_type t
     ON d.doc_type = t.id
- WHERE d.xml like '%%<MenuInformation%%' 
+ WHERE d.xml like '%%<MenuInformation%%'
    AND t.name = 'Term'
 
      </textarea>
@@ -85,7 +63,7 @@ SELECT TOP 10 d.id
 #----------------------------------------------------------------------
 try:
     conn = cdrdb.connect('CdrGuest')
-    cursor = conn.cursor()    
+    cursor = conn.cursor()
     cursor.execute(query, timeout = int(timeout))
     if not cursor.description:
         cdrcgi.bail('No result set returned')

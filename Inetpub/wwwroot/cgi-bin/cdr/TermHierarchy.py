@@ -1,23 +1,6 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
-# Prototype for display of Term hierarchy (requirement 2.6 from 
+# Prototype for display of Term hierarchy (requirement 2.6 from
 # Terminology Processing Requirements).
-#
-# $Log: not supported by cvs2svn $
-# Revision 1.4  2002/08/12 20:59:58  bkline
-# Added better error message for terms without hierarchy.
-#
-# Revision 1.3  2002/05/08 17:41:53  bkline
-# Updated to reflect Volker's new filter names.
-#
-# Revision 1.2  2002/04/25 02:58:29  bkline
-# Replaced hardwired filter ID with name.
-#
-# Revision 1.1  2001/12/01 18:11:44  bkline
-# Initial revision
-#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, cdrdb, string
 

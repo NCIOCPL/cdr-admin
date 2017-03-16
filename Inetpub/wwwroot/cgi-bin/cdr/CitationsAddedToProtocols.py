@@ -1,7 +1,4 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # We need a report to check which citations (Published Results and Related
 # Publications) have been added to protocols in a given time frame. It will
 # use the <EntryDate> within the Published Results and Related Publications
@@ -10,7 +7,6 @@
 # given time frame with a particular status set.
 #
 # BZIssue::1793
-#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrdb, cdrcgi, time, xml.dom.minidom
 

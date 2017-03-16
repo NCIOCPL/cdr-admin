@@ -1,41 +1,10 @@
 #----------------------------------------------------------------------
 #
-# $Id$
-#
 # Prototype for duplicate-checking interface for GlossaryTerm documents.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.10  2009/03/23 17:54:30  bkline
-# Fixed field definitions.
-#
-# Revision 1.9  2009/02/05 21:16:43  bkline
-# Added definition status fields at William's request (#4473).
-#
-# Revision 1.8  2008/12/15 22:51:39  venglisc
-# Modified AdvancedSearch page due to modified GlossaryTerm document
-# structure. (Bug 4381)
-#
-# Revision 1.7  2006/07/11 13:42:35  bkline
-# Added term pronunciation to searchable fields.
-#
-# Revision 1.6  2004/10/20 21:19:58  bkline
-# Added missing session parameters.
-#
-# Revision 1.5  2004/10/06 21:07:19  bkline
-# Fixed paths for definition text.
-#
-# Revision 1.4  2004/09/17 17:42:06  venglisc
-# Creating drop-down TermStatus list populated from the database (Bug 1335).
-#
-# Revision 1.3  2004/01/08 17:47:56  venglisc
-# Modified GlossaryTerm Advanced Search Screen to allow searching on the
-# Audience field.
-#
-# Revision 1.2  2002/02/28 15:51:32  bkline
-# Changed title of display filter.
-#
-# Revision 1.1  2002/02/19 13:39:05  bkline
-# Advanced search screen for Glossary Term documents.
+# BZIssue::1335 - populate TermStatus picklist from database
+# BZIssue::4381 - adjust for split of GlossaryTerm documents
+# BZIssue::4473 - added definition status fields at William's request
 #
 #----------------------------------------------------------------------
 import cgi, cdrcgi, cdrdb
@@ -198,11 +167,10 @@ except cdrdb.Error, info:
                 info[1][0])
 
 #----------------------------------------------------------------------
-# Create the results page.
+# Create the results page. Filter argument is ignored.
 #----------------------------------------------------------------------
-filt = "name:Glossary Term Advanced Search Display"
 html = cdrcgi.advancedSearchResultsPage(subTitle[typeName], rows, strings,
-                                        filt, session = session)
+                                        "ignore", session = session)
 
 #----------------------------------------------------------------------
 # Send the page back to the browser.

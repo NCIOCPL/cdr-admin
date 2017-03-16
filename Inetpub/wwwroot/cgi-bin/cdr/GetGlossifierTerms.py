@@ -1,13 +1,9 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Program to extract glossary terms for glossifier service invoked by
 # Cancer.gov.
 #
 # BZIssue::4704
 # BZIssue::5289 / JIRA::OCECDR-3590
-#
 #----------------------------------------------------------------------
 import cdrdb, re, cdr, socket, sys
 

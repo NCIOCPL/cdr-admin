@@ -1,6 +1,8 @@
 #!/usr/bin/python
-# $Id$
+#----------------------------------------------------------------------
+# GP Mailers Bounced Email Report
 # JIRA::OCECDR-3734
+#----------------------------------------------------------------------
 
 import cdr
 import cdrdb
@@ -11,7 +13,6 @@ import msvcrt
 import os
 import sys
 import requests
-import xlwt
 
 def main():
     """
@@ -82,10 +83,16 @@ class GPMailers:
         """
         Create the Excel workbook and populate it with the report data.
         """
-        book = xlwt.Workbook(encoding="UTF-8")
-        sheet = book.add_sheet("Bounced Mailers")
-        self._add_column_headers(sheet)
-        self._set_column_widths(sheet)
+        styles = cdrcgi.ExcelStyles()
+        sheet = styles.add_sheet("Bounced Mailers", frozen_rows=1)
+        widths = (15, 25, 35, 12, 25)
+        labels = ("CDR Person ID", "Full Name", "Email Address",
+                  "Mailed Date", "Date Marked as Bounced")
+        assert(len(widths) == len(labels))
+        for i, chars in enumerate(widths):
+            sheet.col(i).width = styles.chars_to_width(chars)
+        for i, label in enumerate(labels):
+            sheet.write(0, i, label, styles.header)
         row_number = 1
         prev_id = None
         for row in sorted(rows):
@@ -93,42 +100,13 @@ class GPMailers:
             bounced = row[4] and row[4].strftime("%Y-%m-%d") or ""
             doc_id = row[0] != prev_id and row[0] or ""
             prev_id = row[0]
-            sheet.write(row_number, 0, doc_id)
-            sheet.write(row_number, 1, row[2])
-            sheet.write(row_number, 2, row[3])
-            sheet.write(row_number, 3, mailed)
-            sheet.write(row_number, 4, bounced)
+            sheet.write(row_number, 0, doc_id, styles.left)
+            sheet.write(row_number, 1, row[2], styles.left)
+            sheet.write(row_number, 2, row[3],  styles.left)
+            sheet.write(row_number, 3, mailed, styles.center)
+            sheet.write(row_number, 4, bounced, styles.center)
             row_number += 1
-        return book
-
-    def _add_column_headers(self, sheet):
-        """
-        Write column headers to the first row of the spreadsheet.
-        """
-        style = self._create_header_style()
-        sheet.write(0, 0, "CDR ID Person", style)
-        sheet.write(0, 1, "Full Name", style)
-        sheet.write(0, 2, "Email Address", style)
-        sheet.write(0, 3, "Mailed Date", style)
-        sheet.write(0, 4, "Date Marked as Bounced", style)
-
-    def _create_header_style(self):
-        """
-        Create a style to make the column headers bold.
-        """
-        font = xlwt.Font()
-        font.bold = True
-        style = xlwt.XFStyle()
-        style.font = font
-        return style
-
-    def _set_column_widths(self, sheet):
-        """
-        Set the column widths for the report.
-        """
-        widths = (4000, 6000, 8000, 3000, 6000)
-        for i, width in enumerate(widths):
-            sheet.col(i).width = width
+        return styles.book
 
 #----------------------------------------------------------------------
 # Entry point.

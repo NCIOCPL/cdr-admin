@@ -1,48 +1,8 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Allows a user to edit the table which maps strings from external
 # systems (such as ClinicalTrials.gov) to CDR document IDs.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.11  2007/09/14 01:55:00  ameyer
-# Make sure that bogus'd value is not mapped.
-#
-# Revision 1.10  2006/08/29 15:46:23  ameyer
-# Changes to improve performance, including some changes to forms
-# and introduction of retrieval limiting logic enabling a user to
-# control how many map values are retrieved in a batch.
-#
-# Revision 1.9  2006/08/01 19:37:33  ameyer
-# Added "mappable" functionality - involving many changes.
-# Also added numerous comments to the code.
-#
-# Revision 1.8  2005/08/29 20:08:44  bkline
-# Added check to make sure document type of mapped document is allowed.
-#
-# Revision 1.7  2005/07/05 12:33:34  bkline
-# Added support for new 'bogus' column in external_map table.
-#
-# Revision 1.6  2004/08/27 19:07:32  bkline
-# Cosmetic changes requested by Lakshmi (comment #4, request #1297).
-#
-# Revision 1.5  2004/08/19 22:12:23  bkline
-# Added support for deleting rows from the external_map table.
-#
-# Revision 1.4  2004/08/10 15:38:19  bkline
-# Added support for separate permissions for different mapping types.
-#
-# Revision 1.3  2003/12/31 18:35:43  bkline
-# Changed type of button form widget to 'button'.
-#
-# Revision 1.2  2003/12/19 20:40:18  bkline
-# Added ability to get mapping values by mapped document ID.
-#
-# Revision 1.1  2003/12/16 15:57:45  bkline
-# Allows a user to edit the table which maps strings from external
-# systems (such as ClinicalTrials.gov) to CDR document IDs.
-#
+# BZIssue::1297 (comment #4) - make cosmetic changes requested by Lakshmi
 #----------------------------------------------------------------------
 import cdrdb, cdrcgi, cgi, re, cdr
 

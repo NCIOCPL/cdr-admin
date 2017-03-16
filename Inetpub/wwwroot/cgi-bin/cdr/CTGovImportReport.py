@@ -1,7 +1,4 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Stats on documents imported from ClinicalTrials.gov into CDR.
 #
 # BZIssue::952
@@ -11,7 +8,6 @@
 # BZIssue::4577
 # BZIssue::4665
 # Rewritten July 2015 to eliminate security flaws.
-#
 #----------------------------------------------------------------------
 import cdr
 import cdrcgi

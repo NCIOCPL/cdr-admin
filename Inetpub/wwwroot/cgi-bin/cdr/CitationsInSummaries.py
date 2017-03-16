@@ -1,103 +1,69 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Report listing all citations linked by a summary document.
-# The output format is *.xml (Excel is able to import this)
-#
-# $Log: not supported by cvs2svn $
-# Revision 1.1  2006/05/05 22:30:42  venglisc
-# Initial copy of report listing Citation documents that are linked to a
-# summary. (Bug 2040)
-#
-#
+# The output format is an Excel workbook.
+# BZIssue-2040
 #----------------------------------------------------------------------
-import cdrdb, sys, time, cdrcgi, ExcelWriter
+import sys
+import time
+import cdrcgi
+import cdrdb
+
+ROW_HEIGHT = 40 # in point size
 
 if sys.platform == "win32":
     import os, msvcrt
     msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
 
-conn = cdrdb.connect('CdrGuest')
-conn.setAutoCommit()
+conn = cdrdb.connect("CdrGuest")
 cursor = conn.cursor()
 
-# Excel is able to read XML files so that's what we create here
-# -------------------------------------------------------------
-t = time.strftime("%Y%m%d%H%M%S")
-REPORTS_BASE = 'd:/cdr/tmp'
-name = '/SummaryAllCitations.xml'
-fullname = REPORTS_BASE + name
-
 #----------------------------------------------------------------------
-# Find InScopeProtocol documents with organization in France
+# Identify the Citation documents for the report.
 #----------------------------------------------------------------------
 cursor.execute("""\
 SELECT distinct d.id CDRID, d.title
   FROM query_term q
-  JOIN document d
+  JOIN active_doc d
     ON d.id = q.int_val
-  JOIN document s
+  JOIN active_doc s
     ON s.id = q.doc_id
  WHERE path like '/Summary/%CitationLink/@cdr:ref'
---   AND d.val_status = 'V'
-   AND d.active_status = 'A'
-   AND s.active_status = 'A'
  ORDER BY d.id desc
 """, timeout = 300)
 rows = cursor.fetchall()
 
 # Create the spreadsheet and define default style, etc.
 # -----------------------------------------------------
-wb      = ExcelWriter.Workbook()
-b       = ExcelWriter.Border()
-borders = ExcelWriter.Borders(b, b, b, b)
-font    = ExcelWriter.Font(name = 'Times New Roman', size = 11)
-align   = ExcelWriter.Alignment('Left', 'Top', wrap = True)
-style1  = wb.addStyle(alignment = align, font = font)
-# style1  = wb.addStyle(alignment = align, font = font, borders = borders)
-urlFont = ExcelWriter.Font('blue', None, 'Times New Roman', size = 11)
-style4  = wb.addStyle(alignment = align, font = urlFont)
-ws      = wb.addWorksheet("Citations in Summaries", style1, 45, 1)
-style2  = wb.addStyle(alignment = align, font = font,
-                         numFormat = 'YYYY-mm-dd')
+styles = cdrcgi.ExcelStyles()
+sheet = styles.add_sheet("Citations in Summaries")
 
-# Set the colum width
+# Set the colum widths
 # -------------------
-ws.addCol( 1, 50)
-ws.addCol( 2, 550)
+sheet.col(0).width = styles.chars_to_width(10)
+sheet.col(1).width = styles.chars_to_width(100)
 
 # Create the Header row
 # ---------------------
-exRow = ws.addRow(1, style2)
-exRow.addCell(1, 'CDR-ID')
-exRow.addCell(2, 'Citation Title')
+styles.set_row_height(sheet.row(0), ROW_HEIGHT)
+sheet.write(0, 0, "CDR-ID", styles.header)
+sheet.write(0, 1, "Citation Title", styles.header)
 
 # Add the protocol data one record at a time beginning after
-# the header row
+# the header row. Link to the production server.
 # ----------------------------------------------------------
-rowNum = 1
-for row in rows:
-    rowNum += 1
-    exRow = ws.addRow(rowNum, style1, 40)
-    # Look at data on the production server
-    url = cdrdb.h.makeCdrCgiUrl('PROD', "QCReport.py") + \
-           "?Session=guest&DocId=%d" % row[0]
-    exRow.addCell(1, " %s" % row[0], href = url, style = style4)
-    exRow.addCell(2, row[1], style = style2)
+row = 1
+base = "%s?Session=guest" % cdrdb.h.makeCdrCgiUrl("PROD", "QCReport.py")
+for doc_id, doc_title in rows:
+    styles.set_row_height(sheet.row(row), ROW_HEIGHT)
+    url = "%s&DocId=%d" % (base, doc_id)
+    link = styles.link(url, doc_id)
+    sheet.write(row, 0, link, styles.url)
+    sheet.write(row, 1, doc_title, styles.left)
+    row += 1
 
-t = time.strftime("%Y%m%d%H%M%S")
+name = "CitationsInSummaries-%s.xls" % time.strftime("%Y%m%d%H%M%S")
 print("Content-type: application/vnd.ms-excel")
-print("Content-Disposition: attachment; filename=CitationsInSummaries-%s.xls" % t)
+print("Content-Disposition: attachment; filename=%s" % name)
 print("")
 
-wb.write(sys.stdout, True)
-
-# # Save the Report
-# # ---------------
-# fobj = file(fullname, "w")
-# wb.write(fobj)
-# print("")
-# print("  Report written to %s" % fullname)
-# fobj.close()
-#
+styles.book.save(sys.stdout)

@@ -1,10 +1,6 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Generate PostScript for a Summary mailer (also has some support for
 # protocol mailers).
-#
 #----------------------------------------------------------------------
 import cdrdb, cdrcgi, re, sys
 sys.path.insert(0, "d:\\cdr\\mailers")

@@ -1,24 +1,6 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Web interface for showing changes which would be made by a
 # global change.
-#
-# $Log: not supported by cvs2svn $
-# Revision 1.4  2009/02/10 19:32:28  bkline
-# Added action attribute to form element(s).
-#
-# Revision 1.3  2008/05/22 16:53:07  ameyer
-# Added some sort, count, and error reporting capability.
-#
-# Revision 1.2  2005/05/26 12:19:22  bkline
-# Listed most recent runs at top; changed heading string; fixed unicode
-# display.
-#
-# Revision 1.1  2004/10/25 16:39:12  bkline
-# Web interface to changes from proposed global change job.
-#
 #----------------------------------------------------------------------
 import cgi, glob, cdrcgi, os, xml.dom.minidom, cdr
 

@@ -1,17 +1,13 @@
 #----------------------------------------------------------------------
-#
-# $Id: $
-#
 # Report to display the Board Roster with or without assistant
 # information.
 #
 # BZIssue::4673 - Changes to PDQ Board Roster report.
 # BZIssue::5060 - [Summaries] Changes to Combined Board Roster Report
 #                 Adding summary sheet options to the program
-# 
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, cdrdb, re, time, operator
-import sys, ExcelWriter
+import sys
 import lxml.html
 
 # ---------------------------------------------------------------------
@@ -33,11 +29,11 @@ class BoardMemberInfo:
         table = myHtml.find('table')
         try:
             for element in table.iter():
-                if element.tag == 'phone':  
+                if element.tag == 'phone':
                     self.phone = element.text
-                elif element.tag == 'fax':    
+                elif element.tag == 'fax':
                     self.fax   = element.text
-                elif element.tag == 'email':  
+                elif element.tag == 'email':
                     self.email = element.text
         except:
             pass
@@ -53,7 +49,7 @@ otherInfo  = fields and fields.getvalue("oinfo") or 'Yes'
 assistant  = fields and fields.getvalue("ainfo") or 'Yes'
 flavor     = fields and fields.getvalue("sheet") and 'summary' or 'full'
 #if flavor == 'on':  flavor == 'summary'
-boardInfo  = fields and fields.getvalue("binfo") and 'Yes' or 'No' 
+boardInfo  = fields and fields.getvalue("binfo") and 'Yes' or 'No'
 phoneInfo  = fields and fields.getvalue("pinfo") and 'Yes' or 'No'
 faxInfo    = fields and fields.getvalue("finfo") and 'Yes' or 'No'
 emailInfo  = fields and fields.getvalue("einfo") and 'Yes' or 'No'
@@ -65,9 +61,9 @@ blank      = fields and fields.getvalue("blank") and 'Yes' or 'No'
 # List to define the column headings and identify which columns to be
 # displayed
 # -------------------------------------------------------------------
-columns = [('Board Name',boardInfo), 
-           ('Phone', phoneInfo), ('Fax', faxInfo), 
-           ('Email', emailInfo), ('CDR-ID', cdrIDInfo), 
+columns = [('Board Name',boardInfo),
+           ('Phone', phoneInfo), ('Fax', faxInfo),
+           ('Email', emailInfo), ('CDR-ID', cdrIDInfo),
            ('Start Date', dateInfo), ('Gov. Empl', geInfo), ('Blank', blank)]
 
 rptType    = fields and fields.getvalue("rpttype") or 'html'
@@ -78,7 +74,7 @@ instr      = u"Report on PDQ Board Roster"
 script     = u"BoardRosterFull.py"
 SUBMENU    = u"Report Menu"
 buttons    = ("Submit", SUBMENU, cdrcgi.MAINMENU)
-header     = cdrcgi.header(title, title, instr, script, buttons, 
+header     = cdrcgi.header(title, title, instr, script, buttons,
                            method = 'GET',
                            stylesheet = """
     <script type='text/javascript'>
@@ -220,20 +216,20 @@ SELECT DISTINCT board.id, board.title
 def addTableRow(person, columns):
     tableRows = {}
     for colHeader, colDisplay in columns:
-        if colHeader == 'Board Name': 
-            tableRows[colHeader] = person.boardName 
+        if colHeader == 'Board Name':
+            tableRows[colHeader] = person.boardName
         elif colHeader == 'Phone':
-            tableRows[colHeader] = person.phone 
+            tableRows[colHeader] = person.phone
         elif colHeader == 'Fax':
-            tableRows[colHeader] = person.fax 
+            tableRows[colHeader] = person.fax
         elif colHeader == 'Email':
-            tableRows[colHeader] = person.email 
+            tableRows[colHeader] = person.email
         elif colHeader == 'CDR-ID':
-            tableRows[colHeader] = person.boardMemberID 
+            tableRows[colHeader] = person.boardMemberID
         elif colHeader == 'Start Date':
-            tableRows[colHeader] = person.startDate 
+            tableRows[colHeader] = person.startDate
         elif colHeader == 'Gov. Empl':
-            tableRows[colHeader] = person.govEmpl 
+            tableRows[colHeader] = person.govEmpl
         elif colHeader == 'Blank':
             tableRows[colHeader] = ''
 
@@ -257,29 +253,6 @@ def addTableRow(person, columns):
     htmlRow += u"""
        </tr>"""
     return htmlRow
-
-
-# -------------------------------------------------
-# Create the row for the Excel output
-# -------------------------------------------------
-def addExcelTableRow(person):
-    """Return the Excel code to display a row of the report"""
-
-    exRow.addCell( 1, person[1])
-    exRow.addCell( 2, person[2])
-    exRow.addCell( 3, person[3])
-    exRow.addCell( 4, person[4])
-    exRow.addCell( 5, person[5])
-    exRow.addCell( 6, person[6])
-    exRow.addCell( 7, person[7])
-    exRow.addCell( 8, person[8])
-    exRow.addCell( 9, person[9])
-    exRow.addCell(10, person[10])
-    exRow.addCell(11, person[11])
-    exRow.addCell(12, person[12])
-    exRow.addCell(13, person[13])
-
-    return
 
 
 #----------------------------------------------------------------------
@@ -329,7 +302,7 @@ if not boardType:
       <tr>
        <td><span style="margin-left: 20px"> </span></td>
        <td class="select">
-        <input type='checkbox' name='binfo' 
+        <input type='checkbox' name='binfo'
                onclick='javascript:doSummarySheet()' id='E1' CHECKED>
         <label for="E1">Board Name</label>
        </td>
@@ -337,7 +310,7 @@ if not boardType:
       <tr>
        <td><span style="margin-left: 20px"> </span></td>
        <td class="select">
-        <input type='checkbox' name='pinfo' 
+        <input type='checkbox' name='pinfo'
                onclick='javascript:doSummarySheet()' id='E2'>
         <label for="E2">Phone</label>
        </td>
@@ -345,7 +318,7 @@ if not boardType:
       <tr>
        <td> </td>
        <td class="select">
-        <input type='checkbox' name='finfo' 
+        <input type='checkbox' name='finfo'
                onclick='javascript:doSummarySheet()' id='E3'>
         <label for="E3">Fax</label>
        </td>
@@ -353,7 +326,7 @@ if not boardType:
       <tr>
        <td> </td>
        <td class="select">
-        <input type='checkbox' name='einfo' 
+        <input type='checkbox' name='einfo'
                onclick='javascript:doSummarySheet()' id='E4'>
         <label for="E4">Email</label>
        </td>
@@ -361,7 +334,7 @@ if not boardType:
       <tr>
        <td> </td>
        <td class="select">
-        <input type='checkbox' name='cinfo' 
+        <input type='checkbox' name='cinfo'
                onclick='javascript:doSummarySheet()' id='E5'>
         <label for="E5">CDR-ID</label>
        </td>
@@ -369,7 +342,7 @@ if not boardType:
       <tr>
        <td> </td>
        <td class="select">
-        <input type='checkbox' name='dinfo' 
+        <input type='checkbox' name='dinfo'
                onclick='javascript:doSummarySheet()' id='E6'>
         <label for="E6">Start Date</label>
        </td>
@@ -377,7 +350,7 @@ if not boardType:
       <tr>
        <td> </td>
        <td class="select">
-        <input type='checkbox' name='govemp' 
+        <input type='checkbox' name='govemp'
                onclick='javascript:doSummarySheet()' id='E7'>
         <label for="E7">Government Employee</label>
        </td>
@@ -385,7 +358,7 @@ if not boardType:
       <tr>
        <td> </td>
        <td class="select">
-        <input type='checkbox' name='blank' 
+        <input type='checkbox' name='blank'
                onclick='javascript:doSummarySheet()' id='E8'>
         <label for="E8">Blank Column</label>
        </td>
@@ -435,7 +408,7 @@ try:
              AND curmemb.value = 'Yes'
              AND person_doc.active_status = 'A'
              AND member.int_val in (%s)
-           ORDER BY member.int_val""" % 
+           ORDER BY member.int_val""" %
                       ", ".join(["%s" % x for x in boardIds]), timeout = 300)
     rows = cursor.fetchall()
     cursor.close()
@@ -472,22 +445,22 @@ if rptType == 'html':
       <TITLE>PDQ Board Member Roster Report - %s</title>
       <META http-equiv='Content-Type' content='text/html; charset=UTF-8'>
       <STYLE type='text/css'>
-       H1       { font-family: Arial, sans-serif; 
+       H1       { font-family: Arial, sans-serif;
                   font-size: 16pt;
-                  text-align: center; 
+                  text-align: center;
                   font-weight: bold; }
-       H2       { font-family: Arial, sans-serif; 
+       H2       { font-family: Arial, sans-serif;
                   font-size: 14pt;
-                  text-align: center; 
+                  text-align: center;
                   font-weight: bold; }
-       P        { font-family: Arial, sans-serif; 
+       P        { font-family: Arial, sans-serif;
                   font-size: 12pt; }
        #summary td, #summary th
                 { border: 1px solid black; }
-       #hdg     { font-family: Arial, sans-serif; 
+       #hdg     { font-family: Arial, sans-serif;
                   font-size: 16pt;
-                  font-weight: bold; 
-                  text-align: center; 
+                  font-weight: bold;
+                  text-align: center;
                   padding-bottom: 20px;
                   border: 0px; }
        #summary { border: 0px; }
@@ -496,26 +469,26 @@ if rptType == 'html':
        /* template for Persons.  The italic display used for the QC   */
        /* report does therefore need to be suppressed here.           */
        /* ----------------------------------------------------------- */
-       I        { font-family: Arial, sans-serif; font-size: 12pt; 
+       I        { font-family: Arial, sans-serif; font-size: 12pt;
                   font-style: normal; }
        SPAN.SectionRef { text-decoration: underline; font-weight: bold; }
 
        .theader { background-color: #CFCFCF; }
-       .name    { font-weight: bold; 
+       .name    { font-weight: bold;
                   vertical-align: top; }
        .phone, .email, .fax, .cdrid
                 { vertical-align: top; }
        .blank   { width: 100px; }
-       .bheader { font-family: Arial, sans-serif; 
+       .bheader { font-family: Arial, sans-serif;
                   font-size: 14pt;
                   font-weight: bold; }
        #main    { font-family: Arial, Helvetica, sans-serif;
                   font-size: 12pt; }
       </STYLE>
-     </HEAD>  
+     </HEAD>
      <BODY id="main">
        <H1>All %s Boards<br>
-    """ % (boardType, boardType)   
+    """ % (boardType, boardType)
 
     # Adjusting the report title depending on the input values
     # --------------------------------------------------------
@@ -529,7 +502,7 @@ if rptType == 'html':
     """
     html += u"""
        <span style="font-size: 12pt">%s</span></H1>
-    """ % (dateString)   
+    """ % (dateString)
 
     boardTitle = None
     lastBoardTitle = None
@@ -567,11 +540,11 @@ if rptType == 'html':
         if type(response) in (str, unicode):
             cdrcgi.bail("%s: %s" % (boardMember[0], response))
 
-        # For the report we're just attaching the resulting HTML 
-        # snippets to the previous output.  
+        # For the report we're just attaching the resulting HTML
+        # snippets to the previous output.
         #
         # We need to wrap each person in a table in order to prevent
-        # page breaks within address blocks after the convertion to 
+        # page breaks within address blocks after the convertion to
         # MS-Word.
         # -----------------------------------------------------------
         if flavor == 'full':
@@ -636,8 +609,8 @@ if rptType == 'html':
 
     html += u"""
       <br>
-     </BODY>   
-    </HTML>    
+     </BODY>
+    </HTML>
     """
 
     # The users don't want to display the country if it's the US.
@@ -645,131 +618,6 @@ if rptType == 'html':
     # better off removing it in the final HTML output
     # ------------------------------------------------------------
     cdrcgi.sendPage(html.replace(u'U.S.A.<br>', u''))
-
-# ----------------------------------------------------------------
-# The users decided not to have the Excel option implemented.  This
-# is working except for the proper display of the address block but
-# is not accessible.  To run this option submit the URL with the 
-# parameter '&rptType=excel' 
-# ----------------------------------------------------------------
-elif rptType == 'excel':
-    # Create the spreadsheet and define default style, etc.
-    # -----------------------------------------------------
-    wsTitle = u'BoardRosterFull'
-    wb      = ExcelWriter.Workbook()
-    b       = ExcelWriter.Border()
-    borders = ExcelWriter.Borders(b, b, b, b)
-    font    = ExcelWriter.Font(name = 'Times New Roman', size = 11)
-    align   = ExcelWriter.Alignment('Left', 'Top', wrap = True)
-    alignS  = ExcelWriter.Alignment('Left', 'Top', wrap = False)
-    style1  = wb.addStyle(alignment = align, font = font)
-    urlFont = ExcelWriter.Font('blue', None, 'Times New Roman', size = 11)
-    style4  = wb.addStyle(alignment = align, font = urlFont)
-    style2  = wb.addStyle(alignment = align, font = font,
-                             numFormat = 'YYYY-mm-dd')
-    alignH  = ExcelWriter.Alignment('Left', 'Bottom', wrap = True)
-    alignT  = ExcelWriter.Alignment('Left', 'Bottom', wrap = False)
-    headFont= ExcelWriter.Font(bold=True, name = 'Times New Roman',
-                                                                size = 12)
-    titleFont= ExcelWriter.Font(bold=True, name = 'Times New Roman',
-                                                                size = 14)
-    boldFont= ExcelWriter.Font(bold=True, name = 'Times New Roman',
-                                                                size = 11)
-    styleH  = wb.addStyle(alignment = alignH, font = headFont)
-    styleT  = wb.addStyle(alignment = alignT, font = titleFont)
-    style1b = wb.addStyle(alignment = align,  font = boldFont)
-    styleS  = wb.addStyle(alignment = alignS, font = boldFont)
-    styleR  = wb.addStyle(alignment = alignS, font = font)
-
-    ws      = wb.addWorksheet(wsTitle, style1, 45, 1)
-
-    # CIAT wants a title row
-    # ----------------------------------------------------------
-    titleTime = time.strftime("%Y-%m-%d %H:%M:%S")
-    rowCount = 0
-    rowNum = 1
-    exRow = ws.addRow(rowNum, styleT)
-
-    rowNum = 1
-    exRow = ws.addRow(rowNum, styleS)
-    exRow.addCell(1,  'Report created: %s' % titleTime)
-
-    # Set the column width
-    # --------------------
-    ws.addCol( 1, 100)
-    ws.addCol( 2, 100)
-    ws.addCol( 3, 100)
-    ws.addCol( 4, 100)
-    ws.addCol( 5, 100)
-    ws.addCol( 6, 100)
-
-    # Set the report headers and starting cell IDs
-    # ---------------------------------------------
-    boards = []
-    iboard = 0
-
-    rowNum += 2
-    exRow = ws.addRow(rowNum, styleT)
-    exRow.addCell(2, '%s' % ('All Boards'))
-    rowNum += 1
-
-    exRow = ws.addRow(rowNum, styleH)
-    exRow.addCell( 1, 'Name')
-    exRow.addCell( 2, 'Title')
-    exRow.addCell( 3, 'Organization')
-    exRow.addCell( 4, 'Address')
-    exRow.addCell( 5, 'Phone')
-    exRow.addCell( 6, 'Fax')
-    exRow.addCell( 7, 'Email')
-    exRow.addCell( 8, 'Specific Info')
-    exRow.addCell( 9, 'Assistant')
-    exRow.addCell(10, 'Assistant Phone')
-    exRow.addCell(11, 'Assistant Fax')
-    exRow.addCell(12, 'Assistant Email')
-    exRow.addCell(13, 'SendBy')
-
-    for boardMember in sortedMembers:
-        response = cdr.filterDoc('guest',
-                                 ['set:Denormalization PDQBoardMemberInfo Set',
-                                  'name:Copy XML for Person 2',
-                                  filterType[rptType]],
-                                 boardMember[0],
-                                 parm = [['otherInfo', otherInfo],
-                                         ['assistant', assistant],
-                                         ['eic', 'No']])
-        if type(response) in (str, unicode):
-            cdrcgi.bail("%s: %s" % (boardMember[0], response))
-
-        #cdrcgi.bail(response[0].split(':'))
-        boardRecord = response[0].split(':')
-        rowCount += 1
-        rowNum += 1
-        exRow = ws.addRow(rowNum, styleR)
-        addExcelTableRow(boardRecord)
-
-
-    rowNum += 1
-    exRow = ws.addRow(rowNum, style1b)
-    exRow.addCell(1, 'Count: %d' % rowCount)
-
-    t = time.strftime("%Y%m%d%H%M%S")
-
-    # Save the report.
-    # ----------------
-    name = '/BoardRosterFullReport-%s.xls' % t
-    REPORTS_BASE = 'd:/cdr/reports'
-    f = open(REPORTS_BASE + name, 'wb')
-    wb.write(f, True)
-    f.close()
-
-    if sys.platform == "win32":
-        import os, msvcrt
-        msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
-
-    print "Content-type: application/vnd.ms-excel"
-    print "Content-Disposition: attachment; filename=%s" % name
-    print
-    wb.write(sys.stdout, True)
 
 else:
     cdrcgi.bail("Sorry, don't know report type: %s" % rptType)

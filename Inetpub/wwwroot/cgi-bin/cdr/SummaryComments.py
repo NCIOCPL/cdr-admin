@@ -1,7 +1,4 @@
 #----------------------------------------------------------------------
-#
-# $Id: $
-#
 # Report listing summaries containing specified markup.
 #
 # BZIssue::4756 - Summary Comments Report
@@ -10,7 +7,6 @@
 #                 Show/Hide Certain Comments
 # BZIssue::5273 - Identifying Modules in Summary Reports
 # JIRA::OCECDR-3893 - Fix board display
-#
 #----------------------------------------------------------------------
 import cdr
 import cdrcgi
@@ -85,6 +81,7 @@ class Control(cdrcgi.Control):
             for t in titles:
                 form.add_radio("cdr-id", t.display, t.id, tooltip=t.tooltip)
             form.add("</fieldset>")
+            self.new_tab_on_submit(form)
         else:
             if not self.extra:
                 self.extra = ["blank"]
@@ -110,11 +107,11 @@ class Control(cdrcgi.Control):
             form.add_radio("language", "English", "English", checked=True)
             form.add_radio("language", "Spanish", "Spanish")
             form.add("</fieldset>")
-            form.add("<fieldset class='by-id-block hidden'>")
+            form.add("<fieldset class='by-id-block'>")
             form.add(form.B.LEGEND("Summary Document ID"))
             form.add_text_field("cdr-id", "CDR ID")
             form.add("</fieldset>")
-            form.add("<fieldset class='by-title-block hidden'>")
+            form.add("<fieldset class='by-title-block'>")
             form.add(form.B.LEGEND("Summary Title"))
             form.add_text_field("title", "Title",
                                 tooltip="Use wildcard (%) as appropriate.")
@@ -173,7 +170,10 @@ function check_method(method) {
             jQuery('.by-title-block').show();
             break;
     }
-}""")
+}
+jQuery(function() {
+    check_method(jQuery("input[name='method']:checked").val());
+});""")
 
     def build_tables(self):
         """

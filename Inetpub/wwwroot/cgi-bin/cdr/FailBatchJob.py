@@ -1,9 +1,5 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Change the status of a batch or publishing job to a failed state.
-#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrdb, cdrcgi
 
@@ -114,7 +110,8 @@ in order to unblock further jobs.
   </div>
 
   <div style="float:right; width:300px;">
-  <input type='radio' name='JobType' value='pubJob' id='typePub' />
+  <input type='radio' name='JobType' value='pubJob' id='typePub' 
+         checked='checked'/>
   <label for='typePub'> Publishing Job</label>
   <br/>
   <input type='radio' name='JobType' value='batchJob' id='typeBatch' />

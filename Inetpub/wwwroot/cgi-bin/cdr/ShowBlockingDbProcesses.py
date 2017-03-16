@@ -1,9 +1,5 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Show SQL Server processes which are blocked or are blocking.
-#
 #----------------------------------------------------------------------
 import cdr, cdrdb, socket, time, sys, cdrcgi
 

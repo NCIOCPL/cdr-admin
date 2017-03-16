@@ -1,7 +1,4 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # "We need an adhoc report listing protocols that have terms other than
 # drug/agent terms in the Intervention Name field.  Some of the CAM
 # interventions have been entered into the Intervention Name field
@@ -15,7 +12,6 @@
 # ".... This can look like the Protocol Interventions with Title report,
 # except add in the CDR ID of the protocol in a column right before the
 # title column."
-#
 #----------------------------------------------------------------------
 import cdrdb, cdrcgi, sys, cgi
 

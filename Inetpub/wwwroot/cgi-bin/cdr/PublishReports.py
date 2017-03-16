@@ -1,13 +1,6 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Submenu for publishing reports.
-#
-# $Log: not supported by cvs2svn $
-# Revision 1.1  2007/01/05 23:18:40  venglisc
-# New publishing reports menu file. (Bug 2111)
-#
+# BZIssue::2111
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
 

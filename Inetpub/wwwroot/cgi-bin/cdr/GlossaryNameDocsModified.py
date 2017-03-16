@@ -1,13 +1,10 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # "The Glossary Term Concept - Documents Modified Report will serve as a
 # QC report to verify which documents were changed within a given time
 # frame. The report will be separated into English and Spanish.
 #
 # Rewritten as part of the 2015 security sweep.
-#
+# JIRA::OCECDR-4184 - add new column for date last made publishable
 #----------------------------------------------------------------------
 import cgi
 import cdrcgi
@@ -53,7 +50,8 @@ class Control(cdrcgi.Control):
             cdrcgi.Report.Column("Date Last Modified", width="100px"),
             cdrcgi.Report.Column("Publishable?", width="100px"),
             cdrcgi.Report.Column("Date First Published (*)", width="100px"),
-            cdrcgi.Report.Column("Last Comment", width="450px")
+            cdrcgi.Report.Column("Last Comment", width="450px"),
+            cdrcgi.Report.Column("Date Last Publishable", width="100px")
         )
         query = cdrdb.Query("doc_version v", "v.id", "MAX(v.num)")
         query.join("doc_type t", "t.id = v.doc_type")
@@ -95,6 +93,11 @@ class GlossaryTermName:
         self.doc_id = doc_id
         self.doc_version = doc_version
         self.names = []
+        query = cdrdb.Query("doc_version", "MAX(dt) AS last_pub")
+        query.where(query.Condition("id", doc_id))
+        query.where("publishable = 'Y'")
+        row = query.execute(control.cursor).fetchone()
+        self.last_pub = row and row[0] or None
         fields = ("v.title", "v.xml", "v.publishable", "d.first_pub")
         query = cdrdb.Query("doc_version v", *fields)
         query.join("document d", "d.id = v.id")
@@ -151,6 +154,7 @@ class GlossaryTermName:
             last_mod = self.last_mod and self.last_mod[:10] or ""
             publishable = self.term.publishable and "Y" or "N"
             first_pub = self.term.first_pub and self.term.first_pub[:10] or ""
+            last_pub = self.term.last_pub and self.term.last_pub[:10] or ""
             comment = self.comment is not None and self.comment.tostring() or ""
             return (
                 cdrcgi.Report.Cell(self.term.doc_id, center=True),
@@ -158,7 +162,8 @@ class GlossaryTermName:
                 cdrcgi.Report.Cell(last_mod, center=True),
                 cdrcgi.Report.Cell(publishable, center=True),
                 cdrcgi.Report.Cell(first_pub, center=True),
-                comment
+                comment,
+                cdrcgi.Report.Cell(last_pub, center=True)
             )
 
         class Comment:

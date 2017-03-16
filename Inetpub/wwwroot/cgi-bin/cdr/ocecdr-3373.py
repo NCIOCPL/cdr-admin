@@ -1,7 +1,5 @@
 #----------------------------------------------------------------------
 #
-# $Id$
-#
 # Add and link to glossary pronunciation Media documents.
 #
 # Invoked from the CDR Admin web menu.
@@ -9,7 +7,7 @@
 # If for any reason this script will not process the correct set of
 # zip files (for example, because a file name did not match the
 # agreed pattern of "Week_NNN*.zip" or the file names for a batch
-# do not sort in the order the files should be processed, then it
+# do not sort in the order the files should be processed), then it
 # will be necessary to have a developer load the batch from the
 # bastion host using DevTools/Utilities/Request4926.py.
 #
@@ -24,18 +22,18 @@ import re
 import xlrd
 import ModifyDocs
 import lxml.etree as etree
+import mutagen
 import cdrdb
-import MP3Info
 import zipfile
 import cStringIO
 
 CDRNS = "cips.nci.nih.gov/cdr"
 NSMAP = { "cdr" : CDRNS }
-LOGFILE = "%s/ocecdr-3373.log" % cdr.DEFAULT_LOGDIR
 AUDIO = cdr.BASEDIR + "/Audio_from_CIPSFTP"
+LOGFILE = cdr.DEFAULT_LOGDIR + "/ocecdr-3373.log"
 BANNER = "CDR Administration"
 SUBTITLE = "Load Glossary Audio Files"
-
+logger = cdr.Logging.get_logger("audio-import")
 
 def get_latest_batch():
     """
@@ -113,12 +111,6 @@ def show_form():
     form.add("</fieldset>")
     form.send()
 
-def log(me):
-    """
-    Record an entry in the processing log.
-    """
-    cdr.logwrite(me, LOGFILE)
-
 def getCreationDate(path, zipFile):
     """
     Find out when the audio file was created.
@@ -131,8 +123,9 @@ def getRuntime(bytes):
     Determine the duration of an audio clip.
     """
     fp = cStringIO.StringIO(bytes)
-    mp3 = MP3Info.MPEG(fp)
-    return mp3.length
+    mp3 = mutagen.File(fp)
+    logger.info("runtime is %s", mp3.info.length)
+    return int(round(mp3.info.length))
 
 def getDocTitle(docId):
     """
@@ -155,7 +148,7 @@ def getCellValue(sheet, row, col):
 #----------------------------------------------------------------------
 # Object representing a single pronunciation audio file.
 #----------------------------------------------------------------------
-class MP3:
+class AudioFile:
 
     def __init__(self, zipName, zipFile, sheet, row):
         """
@@ -167,17 +160,17 @@ class MP3:
             self.zipName = zipName
             self.nameId = int(getCellValue(sheet, row, 0))
         except Exception, e:
-            log("%s row %s: %s" % (zipName, row, e))
+            logger.exception("%s row %s", zipName, row)
             raise
         try:
             self.nameTitle = getDocTitle(self.nameId)
-        except:
-            log("CDR document %d not found" % self.nameId)
+        except Exception:
+            logger.error("CDR document %d not found", self.nameId)
             raise
         try:
             self.name = getCellValue(sheet, row, 1)
-        except Exception, e:
-            log("CDR%d row %s in %s: %s" % (self.nameId, row, zipName, e))
+        except Exception:
+            logger.exception("CDR%d row %s in %s", self.nameId, row, zipName)
             raise
         try:
             self.language = getCellValue(sheet, row, 2)
@@ -194,8 +187,8 @@ class MP3:
                 raise Exception("unexpected language value '%s'" %
                                 self.language)
         except Exception, e:
-            log("CDR%d %s (%s) row %s in %s: %s" %
-                (self.nameId, repr(self.name), self.language, row, zipName, e))
+            logger.exception("CDR%d %r (%s) row %s in %s", self.nameId,
+                             self.name, self.language, row, zipName)
             raise
 
     def makeElement(self):
@@ -321,7 +314,7 @@ class Request4926:
             self.report_rows += report_rows
             return return_value
         except Exception, e:
-            self.job.log("CDR%d: %s" % (docId, e))
+            logger.exception("CDR%d")
             self.report_rows.append(["CDR%d" % docId, str(e)])
             return docObject.xml
 
@@ -352,17 +345,17 @@ def collectInfo(zipNames):
                 sheet = book.sheet_by_index(0)
                 for row in range(sheet.nrows):
                     try:
-                        mp3 = MP3(zipName, zipFile, sheet, row)
+                        mp3 = AudioFile(zipName, zipFile, sheet, row)
                     except Exception, e:
                         continue
                     lowerName = mp3.filename.lower()
                     if lowerName in fileNames:
-                        log("multiple %s in %s" % (lowerName, zipName))
+                        logger.error("multiple %r in %s", lowerName, zipName)
                     else:
                         fileNames.add(lowerName)
                     key = (mp3.nameId, mp3.name, mp3.language)
                     if key in termNames:
-                        log("multiple %s in %s" % (repr(key), zipName))
+                        logger.error("multiple %r in %s", key, zipName)
                     else:
                         termNames.add(key)
                     nameDoc = nameDocs.get(mp3.nameId)
@@ -414,7 +407,7 @@ SELECT DISTINCT doc_id
            FROM query_term
           WHERE path LIKE '/GlossaryTermName/%/MediaLink/MediaID/@cdr:ref'""")
 alreadyDone = set([row[0] for row in cursor.fetchall()])
-log("%d documents already processed" % len(alreadyDone))
+logger.info("%d documents already processed", len(alreadyDone))
 files = ["%s/%s" % (AUDIO, f.split("|")[1]) for f in files]
 info = collectInfo(files)
 mediaDocs = {}
@@ -422,7 +415,7 @@ docs = {}
 report_rows = []
 for nameId in info:
     if nameId in alreadyDone:
-        log("skipping CDR%d: already done" % nameId)
+        logger.info("skipping CDR%d: already done", nameId)
         report_rows.append(["CDR%d" % nameId, "Skipped (already processed)"])
         continue
     mp3sForNameDoc = []
@@ -438,13 +431,14 @@ for nameId in info:
             mediaId = mediaDocs.get(key)
             if mediaId:
                 message = "%s already saved as CDR%d" % (repr(key), mediaId)
-                log(message)
+                logger.info(message)
                 report_rows.append(["", message])
                 mp3.mediaId = mediaId
             else:
                 mediaId = mp3.save(session)
                 mediaDocs[key] = mediaId
-                log("saved %s from %s as CDR%d" % (key, mp3.zipName, mediaId))
+                logger.info("saved %s from %s as CDR%d", key, mp3.zipName,
+                            mediaId)
                 message = "Media doc created for %s from %s" % (repr(key),
                                                                 mp3.zipName)
                 report_rows.append(["CDR%d" % mediaId, message])

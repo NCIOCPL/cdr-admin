@@ -1,10 +1,5 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Reports on current sessions.
-#
-# $Log: not supported by cvs2svn $
 #----------------------------------------------------------------------
 import cdr, cdrdb, cdrcgi, cgi, re, time
 

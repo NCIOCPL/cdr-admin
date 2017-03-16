@@ -1,13 +1,7 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
-# Prototype for editing CDR groups.
-#
+# Interface for editing CDR groups.
 # OCECDR-4087
-#
 #----------------------------------------------------------------------
-
 import urllib
 import cdr
 import cdrcgi

@@ -1,12 +1,8 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Running the Publishing Documents Report Count as a batch job
 #
-# BZIssue::5237 - Report for publication document counts fails on 
+# BZIssue::5237 - Report for publication document counts fails on
 #                 non-production server
-#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrdb, cdrcgi, cdrbatch
 

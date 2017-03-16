@@ -1,12 +1,8 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Report to display DrugInfoSummaries
 #
 # BZIssue::5264 - [DIS] Formatting Changes to Drug Description Report
 # Rewritten July 2015 as part of security sweep.
-#
 #----------------------------------------------------------------------
 import cdr
 import cdrcgi

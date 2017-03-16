@@ -1,9 +1,5 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Show a piece of a log file.
-#
 #----------------------------------------------------------------------
 import os
 import sys
@@ -62,7 +58,9 @@ class Control(cdrcgi.Control):
         except Exception, e:
             print "Content-type: text/plain\n\n%s" % repr(e)
     def run(self):
-        if self.path:
+        if self.request == self.SUBMIT:
+            if not self.path:
+                self.show_form()
             if self.pattern:
                 self.find()
             elif "*" in self.path or "?" in self.path:

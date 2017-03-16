@@ -1,7 +1,4 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Transform a CDR document using an XSL/T filter and send it back to
 # the browser.
 #
@@ -17,7 +14,6 @@
 # BZIssue::4781 - Have certain links to unpublished docs ignored
 # BZIssue::4800 - Glossary Term Link error
 # Rewritten July 2015 as part of security sweep.
-#
 #----------------------------------------------------------------------
 import cgi
 import cdr

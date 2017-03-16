@@ -1,7 +1,5 @@
 #----------------------------------------------------------------------
 #
-# $Id$
-#
 # Reports on documents which link to a specified document.
 #
 # BZIssue::161
@@ -24,8 +22,8 @@ import urllib
 cursor       = cdrdb.connect("CdrGuest").cursor()
 fields       = cgi.FieldStorage()
 doc_id       = fields.getvalue("doc_id") or fields.getvalue("DocId")
-frag_id      = fields.getvalue("frag_id") or u""
-doc_title    = fields.getvalue("doc_title")
+frag_id      = fields.getvalue("frag_id") or fields.getvalue("FragId") or u""
+doc_title    = unicode(fields.getvalue("doc_title", ""), "utf-8")
 linked_type  = fields.getvalue("linked_type")
 linking_type = fields.getvalue("linking_type") or u""
 with_blocked = fields.getvalue("with_blocked") or u"N"

@@ -1,7 +1,4 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Report to display the Board Roster with or without assistant
 # information.
 #
@@ -11,7 +8,6 @@
 # OCECDR-3720: [Summaries] Board Roster Summary Sheet - More Options
 # JIRA::OCECDR-3812 - Name change (OCPL)
 # Modified July 2015 as part of security tightening.
-#
 #----------------------------------------------------------------------
 import cdr
 import cdrcgi
@@ -105,18 +101,18 @@ def show_form():
     form.add(cdrcgi.Page.B.LEGEND("Select Report Type"))
     form.add_radio("report-type", "Full", "full", wrapper=None, checked=True)
     form.add_radio("report-type", "Summary", "summary", wrapper=None)
-    form.add('<fieldset id="full-options-block" class="hidden">')
+    form.add('<fieldset id="full-options-block">')
     form.add(cdrcgi.Page.B.LEGEND("Full Report Options"))
     form.add_checkbox("full-opts", "Show All Contact Information", "other")
     form.add_checkbox("full-opts", "Show Subgroup Information", "subgroup")
     form.add_checkbox("full-opts", "Show Assistant Information", "assistant")
     form.add("</fieldset>")
-    form.add('<fieldset id="columns" class="hidden">')
+    form.add('<fieldset id="columns">')
     form.add(cdrcgi.Page.B.LEGEND("Columns to Include"))
     for c in COLS:
         form.add_checkbox("columns", c.form_label, c.name, checked=c.checked)
     form.add("</fieldset>")
-    form.add("<fieldset id='misc-options' class='hidden'>")
+    form.add("<fieldset id='misc-options'>")
     form.add(cdrcgi.Page.B.LEGEND("Miscellanous Summary Report Options"))
     form.add_text_field("blank", "Extra Cols", value="0",
                       classes="blanks")

@@ -1,12 +1,8 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Report on menu information added to Term documents to support the
 # genetics directory.
 #
 # BZIssue::4696
-#
 #----------------------------------------------------------------------
 import cdrdb, cdrcgi, cgi, lxml.etree as etree, cdr
 

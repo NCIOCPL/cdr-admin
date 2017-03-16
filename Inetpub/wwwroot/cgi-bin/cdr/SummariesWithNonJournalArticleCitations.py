@@ -1,10 +1,6 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Report on summaries with citations to publications other than journal
 # articles.
-#
 #----------------------------------------------------------------------
 import cdr
 import cdrcgi
@@ -138,134 +134,63 @@ except Exception, e:
 #----------------------------------------------------------------------
 if not lang:
     jscript = """\
-function isEnglishItemChecked() {
-    return jQuery('.en-cb:checked').length > 0;
+function check_set(name, val) {
+    var all_selector = "#" + name + "-all";
+    var ind_selector = "#" + name + "-set .ind";
+    if (val == "all") {
+        if (jQuery(all_selector).prop("checked"))
+            jQuery(ind_selector).prop("checked", false);
+        else
+            jQuery(all_selector).prop("checked", true);
+    }
+    else if (jQuery(ind_selector + ":checked").length > 0)
+        jQuery(all_selector).prop("checked", false);
+    else
+        jQuery(all_selector).prop("checked", true);
 }
+function check_english(val) { check_set("english", val); }
+function check_spanish(val) { check_set("spanish", val); }
+function check_type(val) { check_set("type", val); }
 
-function isSpanishItemChecked() {
-    return jQuery('.es-cb:checked').length > 0;
-}
-
-function isTypeItemChecked() {
-    return jQuery('.ct-cb:checked').length > 0;
-}
-
-function clearEnglish() {
-    jQuery('.en-cb').prop('checked', false);
-}
-
-function clearSpanish() {
-    jQuery('.es-cb').prop('checked', false);
-}
-
-function clearTypes() {
-    jQuery('.ct-cb').prop('checked', false);
-}
-
-function englishItemClicked() {
-    jQuery('#english-all').prop('checked', false);
-    jQuery('#lang-english').prop('checked', true);
-    jQuery('#lang-spanish').prop('checked', false);
-    clearSpanish();
-    if (!isEnglishItemChecked())
-        jQuery('#english-all').prop('checked', true);
-}
-
-function spanishItemClicked() {
-    jQuery('#spanish-all').prop('checked', false);
-    jQuery('#lang-spanish').prop('checked', true);
-    jQuery('#lang-english').prop('checked', false);
-    clearEnglish();
-    if (!isSpanishItemChecked())
-        jQuery('#spanish-all').prop('checked', true);
-}
-
-function citationItemClicked(){
-    jQuery('#type-all').prop('checked', false);
-    if (!isTypeItemChecked())
-        jQuery('#type-all').prop('checked', true);
-}
-
-function langClicked(lang) {
-    clearEnglish();
-    clearSpanish();
+function check_lang(lang) {
     if (lang == 'English') {
-        jQuery('#english-all').removeAttr('disabled');
-        jQuery('#english-all').prop('checked', true);
-        jQuery('#es-boards').hide();
-        jQuery('#en-boards').show();
+        jQuery('#english-set').show();
+        jQuery('#spanish-set').hide();
     }
     else{
-        jQuery('#spanish-all').removeAttr('disabled');
-        jQuery('#spanish-all').prop('checked', true);
-        jQuery('#es-boards').show();
-        jQuery('#en-boards').hide();
+        jQuery('#spanish-set').show();
+        jQuery('#english-set').hide();
     }
 }
-
-function allEnglishClicked() {
-    clearEnglish();
-    clearSpanish();
-    jQuery('#lang-english').prop('checked', true);
-    jQuery('#english-all').prop('checked', true);
-}
-
-function allSpanishClicked() {
-    clearEnglish();
-    clearSpanish();
-    jQuery('#lang-spanish').prop('checked', true);
-    jQuery('#spanish-all').prop('checked', true);
-}
-
-function allTypesClicked() {
-    clearTypes();
-    jQuery('#type-all').prop('checked', true);
-}
-
 jQuery(function() {
-    clearEnglish();
-    clearSpanish();
-    clearTypes();
-    jQuery('#english-all').prop('checked', true);
-    jQuery('#type-all').prop('checked', true);
-    jQuery('#lang-english').prop('checked', true);
-});
-"""
+    check_lang(jQuery("input[name='lang']:checked").val());
+});"""
 
     page = cdrcgi.Page(title, subtitle=subtitle, buttons=buttons,
                        action=script, session=session)
     page.add_script(jscript)
     page.add("<fieldset>")
     page.add(page.B.LEGEND("Select Language and PDQ Summaries"))
-    page.add_radio("lang", "English", "English", checked=True, wrapper=None,
-                   onclick="langClicked('English')")
-    page.add_radio("lang", "Spanish", "Spanish", wrapper=None,
-                   onclick="langClicked('Spanish')")
-    page.add('<fieldset id="en-boards">')
+    page.add_radio("lang", "English", "English", checked=True)
+    page.add_radio("lang", "Spanish", "Spanish")
+    page.add('<fieldset id="english-set">')
     page.add(page.B.LEGEND("Select PDQ Summaries (one or more)"))
-    page.add_checkbox("english", "All English", "all", checked=True,
-                      onclick="allEnglishClicked();", widget_classes="en-cb")
+    page.add_checkbox("english", "All English", "all", checked=True)
     for label, doc_id in get_english_boards(cursor):
-        page.add_checkbox("english", label, str(doc_id), widget_classes="en-cb",
-                          onclick="englishItemClicked();")
+        page.add_checkbox("english", label, str(doc_id), widget_classes="ind")
     page.add("</fieldset>")
-    page.add('<fieldset id="es-boards" class="hidden">')
+    page.add('<fieldset id="spanish-set">')
     page.add(page.B.LEGEND("Select PDQ Summaries (one or more):"))
-    page.add_checkbox("spanish", "All Spanish", "all",
-                      onclick="allSpanishClicked();", widget_classes="es-cb")
+    page.add_checkbox("spanish", "All Spanish", "all")
     for label, doc_id in get_spanish_boards(cursor):
-        page.add_checkbox("spanish", label, str(doc_id), widget_classes="es-cb",
-                          onclick="spanishItemClicked();")
+        page.add_checkbox("spanish", label, str(doc_id), widget_classes="ind")
     page.add("</fieldset>")
     page.add("</fieldset>")
-    page.add("<fieldset>")
+    page.add('<fieldset id="type-set">')
     page.add(page.B.LEGEND("Select Citation Type (one or more)"))
-    page.add_checkbox("type", "All Types", "all", checked=True,
-                      onclick="allTypesClicked();", widget_classes="ct-cb")
+    page.add_checkbox("type", "All Types", "all", checked=True)
     for cite_type in get_citation_types(cursor):
-        page.add_checkbox("type", cite_type, cite_type,
-                          onclick="citationItemClicked();",
-                          widget_classes="ct-cb")
+        page.add_checkbox("type", cite_type, cite_type, widget_classes="ind")
     page.add("</fieldset>")
     page.send()
 
@@ -371,7 +296,7 @@ class Citation:
         if doc_id not in Citation.citations:
             Citation.citations[doc_id] = Citation.Info(doc_id)
         self.info = Citation.citations[doc_id]
-            
+
     @staticmethod
     def get_eligible_citations():
         """

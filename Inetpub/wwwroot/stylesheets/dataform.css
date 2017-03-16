@@ -1,18 +1,18 @@
-  BODY { 
+  BODY {
         text-align: left;
         color: Navy;
         }
 
-  .warning { 
+  .warning {
         font: 10pt "Arial";
-        }	
+        }
 
   *.error  {
-        color: red; 
+        color: red;
         font-weight: bold;
         }
 
-  P { 
+  P {
         font: 14pt "Arial";
         color: Navy;
         background: transparent;
@@ -59,7 +59,7 @@
         font-weight: bold;
         }
 
-  TD {	
+  TD {
         font: 10pt "Arial";
         color: Navy;
         }
@@ -75,35 +75,35 @@
         font-weight: bold;
         background: transparent;
         }
-  TR.odd { 
-        background-color: #F7F7F7; 
+  TR.odd {
+        background-color: #F7F7F7;
         }
-  TR.even { 
-        background-color: #FFFFFF; 
+  TR.even {
+        background-color: #FFFFFF;
         }
-  TR.head { 
-        background-color: #E2E2E2; 
+  TR.head {
+        background-color: #E2E2E2;
         }
 
   TR.rowitem:hover {
-        background: #DDDDDD; 
+        background: #DDDDDD;
         }
   TD.cellitem:hover {
         background: #DDDDDD;
         }
 
   .colheading {
-        color: Navy; 
+        color: Navy;
         font-weight: bold;
-        text-decoration: underline; 
+        text-decoration: underline;
         }
 
-  LI { 
+  LI {
         font: 12pt "Arial";
         font-weight: bold;
-        }	
+        }
 
-  DL {	
+  DL {
 
         }
 
@@ -133,14 +133,14 @@
         font-family: sans-serif;
         }
 
-  B, STRONG { 
+  B, STRONG {
         font-weight: bold
-        } 
-  I, CITE, EM, VAR, ADDRESS, BLOCKQUOTE { 
-        font-style: italic 
         }
-  PRE, TT, CODE, KBD, SAMP { 
-        font-family: monospace 
+  I, CITE, EM, VAR, ADDRESS, BLOCKQUOTE {
+        font-style: italic
+        }
+  PRE, TT, CODE, KBD, SAMP {
+        font-family: monospace
         }
 
 /* Display visited and non-visited links identically without */
@@ -149,7 +149,7 @@
    TD A.show-link   {
         text-decoration: underline }
 
-   A:link       { 
+   A:link       {
         color: Navy;
         text-decoration: none;
         background: transparent }
@@ -157,12 +157,11 @@
         color: Navy;
         text-decoration: none;
         background: transparent }
-   A:active     { 
+   A:active     {
         color: Navy;
         text-decoration: none;
         background: transparent }
-   A:hover      { 
+   A:hover      {
         color: Navy;
         text-decoration: none;
         background: #FFFFCC }
-

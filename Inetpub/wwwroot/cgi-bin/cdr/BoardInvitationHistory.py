@@ -1,17 +1,13 @@
 #----------------------------------------------------------------------
-#
-# $Id: $
-#
 # Creatign a HTML report to help track who had been invited to the
-# Boards in the past, what their current (and past) membership statuses 
-# are, and reasons why they left PDQ. This information will be helpful 
+# Boards in the past, what their current (and past) membership statuses
+# are, and reasons why they left PDQ. This information will be helpful
 # in discussions about inviting new members.
 #                                           Volker Englisch, 2011-09-23
 #
 # BZIssue::5061 -Board Membership and Invitation History Report
-# OCECDR-3649: PDQ Board Invitation History Report - Problem with 
+# OCECDR-3649: PDQ Board Invitation History Report - Problem with
 #              exclude current members options
-# 
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, cdrdb, re, time
 import lxml.etree as etree
@@ -38,8 +34,8 @@ instr      = "Report on Board Member History"
 script     = "BoardInvitationHistory.py"
 SUBMENU    = "Report Menu"
 buttons    = ("Submit", SUBMENU, cdrcgi.MAINMENU)
-header     = cdrcgi.header(title, title, instr, script, buttons, 
-                           method = 'GET', 
+header     = cdrcgi.header(title, title, instr, script, buttons,
+                           method = 'GET',
                            stylesheet = """
     <script type='text/javascript'>
      function doFullReport() {
@@ -120,7 +116,7 @@ class BoardMember:
         tree = etree.XML(docXml.encode('utf-8'))
 
         self.allBoardsInfo = {}
-        for boardId, boardName in self.boardInfo: 
+        for boardId, boardName in self.boardInfo:
             self.allBoardsInfo[boardId] = {'name':boardName}
             for detailsNode in tree.findall('BoardMembershipDetails'):
                 if detailsNode.findall('BoardName')[0].text == boardName:
@@ -148,10 +144,10 @@ class BoardMember:
 
 #----------------------------------------------------------------------
 # Function to decide if a board member needs to get printed.
-# If there is no exclusion criteria specified the board memeber will 
-# always get printed.  If there is a criteria 'A' specified, the 
+# If there is no exclusion criteria specified the board memeber will
+# always get printed.  If there is a criteria 'A' specified, the
 # appropriate board (Advisory or Editorial) regardless of the type
-# (Genetics, Treatment, etc) will turn off printing if the board 
+# (Genetics, Treatment, etc) will turn off printing if the board
 # member is currently active on that board.
 #----------------------------------------------------------------------
 def printRow(boardMember, includeIds, exclude):
@@ -162,7 +158,7 @@ def printRow(boardMember, includeIds, exclude):
     if not exclude:
         return printIt
 
-    # Find out if printing needs to be suppressed based on the 
+    # Find out if printing needs to be suppressed based on the
     # exclusion criteria
     # --------------------------------------------------------
     # If both current ed board and adv board members need to
@@ -174,7 +170,7 @@ def printRow(boardMember, includeIds, exclude):
             if 'current' in boardMember.allBoardsInfo[id]        and \
                boardMember.allBoardsInfo[id]['current'] == 'Yes':
                printIt = False
-    # If current ed board members need to be excluded check 
+    # If current ed board members need to be excluded check
     # to ensure the board is not an adv board.
     elif 'Editorial Board' in exclude:
         for id in boardMember.allBoardsInfo.keys():
@@ -254,7 +250,7 @@ SELECT DISTINCT board.id, board.title
 # Creating the table rows for the HTML output - one row for each member
 # and board.
 # This requires that the members are coming in sorted because all that
-# we do now is to filter the members we don't want to see and add 
+# we do now is to filter the members we don't want to see and add
 # additional information for the person that we do want to see.
 # Return:  string containing <tr>... info </tr>
 #----------------------------------------------------------------------
@@ -271,7 +267,7 @@ def makeRow(cursor, row, boardIds, dispColumn, excludeRow):
         ### for skip in excludeRow:
         ###     #cdrcgi.bail("%s - %s" % (member.boardname, skip))
         ###     if member.boardname.find(skip) > 0 and member.current == 'Yes':
-        ###         #cdrcgi.bail("%s (%s) : %s, %d" % (member.boardname, skip, 
+        ###         #cdrcgi.bail("%s (%s) : %s, %d" % (member.boardname, skip,
         ###         #     excludeRow, member.boardname.find(skip)))
         ###         return ""
 
@@ -287,8 +283,8 @@ def makeRow(cursor, row, boardIds, dispColumn, excludeRow):
          <tr class="%s">
           <td>%d</td>
           <td>%s, %s</td>
-    """ % (cssClass, member.bmId, member.lname, member.fname) 
-        
+    """ % (cssClass, member.bmId, member.lname, member.fname)
+
             if 'BoardName' in dispColumn:
                 bmrow += """
           <td>%s</td>
@@ -303,7 +299,7 @@ def makeRow(cursor, row, boardIds, dispColumn, excludeRow):
             if 'Invitation' in dispColumn:
                 bmrow += """
           <td>%s</td>
-    """ % ('invdate' in member.allBoardsInfo[boardId] and 
+    """ % ('invdate' in member.allBoardsInfo[boardId] and
                         member.allBoardsInfo[boardId]['invdate'] or "&nbsp;")
 
             if 'Response' in dispColumn:
@@ -315,7 +311,7 @@ def makeRow(cursor, row, boardIds, dispColumn, excludeRow):
             if 'Current' in dispColumn:
                 bmrow += """
           <td>%s</td>
-    """ % ('current' in member.allBoardsInfo[boardId] and 
+    """ % ('current' in member.allBoardsInfo[boardId] and
                         member.allBoardsInfo[boardId]['current'] or '&nbsp;')
 
             if 'EndDate' in dispColumn:
@@ -458,7 +454,7 @@ if not boardIds:
 #----------------------------------------------------------------------
 # Get the board's name from its ID.  If multiple boards are selected
 # we're adjusting the report title
-# If 'All Boards' is selected all board IDs are concatenated into a 
+# If 'All Boards' is selected all board IDs are concatenated into a
 # single string
 #----------------------------------------------------------------------
 # Selected single board or AllBoards entry
@@ -472,15 +468,15 @@ if not type(boardIds) == type([]):
 # Selected multiple boards
 else:
     reportTitle = "PDQ Board Invitation History"
-    
+
 #----------------------------------------------------------------------
 # Select the list of board members (Lastname, Firstname) and their
 # board affiliation.
 #----------------------------------------------------------------------
 try:
     cursor.execute("""\
-          SELECT q.doc_id, q.int_val AS PersonID, fn.value AS First, 
-                 ln.value AS Last, b.int_val AS BoardID, 
+          SELECT q.doc_id, q.int_val AS PersonID, fn.value AS First,
+                 ln.value AS Last, b.int_val AS BoardID,
                  o.value AS BoardName
             FROM query_term q
             JOIN query_term fn
@@ -509,7 +505,7 @@ try:
         if row[0] == lastMemberId:
             boardMembers[len(boardMembers)-1][4].append([row[4], row[5]])
         else:
-            boardMembers.append([row[0], row[1], row[2], row[3], 
+            boardMembers.append([row[0], row[1], row[2], row[3],
                                                        [[row[4], row[5]]]])
         lastMemberId = row[0]
 
@@ -527,22 +523,22 @@ html = """\
   <title>PDQ Board Member History Report</title>
   <meta http-equiv='Content-Type' content='text/html; charset=UTF-8'>
   <style type='text/css'>
-   h1       { font-family: Arial, sans-serif; 
+   h1       { font-family: Arial, sans-serif;
               font-size: 16pt;
-              text-align: center; 
+              text-align: center;
               font-weight: bold; }
-   h2       { font-family: Arial, sans-serif; 
+   h2       { font-family: Arial, sans-serif;
               font-size: 14pt;
-              text-align: center; 
+              text-align: center;
               font-weight: bold; }
-   p        { font-family: Arial, sans-serif; 
+   p        { font-family: Arial, sans-serif;
               font-size: 12pt; }
    #summary td, #summary th
             { border: 1px solid black; }
-   #hdg     { font-family: Arial, sans-serif; 
+   #hdg     { font-family: Arial, sans-serif;
               font-size: 16pt;
-              font-weight: bold; 
-              text-align: center; 
+              font-weight: bold;
+              text-align: center;
               padding-bottom: 20px;
               border: 0px; }
    #summary { border: 0px; }
@@ -551,12 +547,12 @@ html = """\
    /* template for Persons.  The italic display used for the QC   */
    /* report does therefore need to be suppressed here.           */
    /* ----------------------------------------------------------- */
-   I        { font-family: Arial, sans-serif; font-size: 12pt; 
+   I        { font-family: Arial, sans-serif; font-size: 12pt;
               font-style: normal; }
    span.SectionRef { text-decoration: underline; font-weight: bold; }
 
    .theader { background-color: #CFCFCF; }
-   .name    { font-weight: bold; 
+   .name    { font-weight: bold;
               vertical-align: top; }
    .phone, .email, .fax, .cdrid
             { vertical-align: top; }
@@ -565,7 +561,7 @@ html = """\
    #main    { font-family: Arial, Helvetica, sans-serif;
               font-size: 12pt; }
   </style>
- </head>  
+ </head>
  <body id="main">
 """
 
@@ -573,7 +569,7 @@ html = """\
 ###         <table width='100%%'>
 ###           <td>%s<td>
 ###         </table>""" % unicode(response[0], 'utf-8')
- 
+
 # Identify which columns to print
 # -------------------------------
 columns = []
@@ -588,25 +584,25 @@ if excludeCurrAd:
 
 # What needs to be displayed?
 # ---------------------------
-if dispBoardName: 
+if dispBoardName:
     columns.append('BoardName')
     htmlCol += '    <th>Board Name</th>\n'
-if dispAoE: 
+if dispAoE:
     columns.append('AoE')
     htmlCol += '    <th>Area of Expertise</th>\n'
-if dispInvDate: 
+if dispInvDate:
     columns.append('Invitation')
     htmlCol += '    <th>Invitation Date</th>\n'
-if dispResponse: 
+if dispResponse:
     columns.append('Response')
     htmlCol += '    <th>Response to Invitation</th>\n'
-if dispCurMember: 
+if dispCurMember:
     columns.append('Current')
     htmlCol += '    <th>Current Member</th>\n'
-if dispEndDate: 
+if dispEndDate:
     columns.append('EndDate')
     htmlCol += '    <th>Termination End Date</th>\n'
-if dispReason: 
+if dispReason:
     columns.append('Termination')
     htmlCol += '    <th>Termination Reason</th>\n'
 if blankCol:
@@ -622,7 +618,7 @@ html += u"""\
        <span style="font-size: 12pt">%s</span>
      </td>
     </tr>
-""" % (len(columns) + 2, reportTitle, dateString)   
+""" % (len(columns) + 2, reportTitle, dateString)
 
 html += u"""\
     <tr>
@@ -635,15 +631,15 @@ html += u"""\
 
 for boardMember in boardMembers:
     tableRow = makeRow(cursor, boardMember, boardIds, columns, exclude)
-    html += u"%s" % tableRow 
+    html += u"%s" % tableRow
 
 # for bmId, personID, first, last, bordId, boardName in rows:
-#     boardMembers.append(BoardMember(docId, eic_start, eic_finish, 
+#     boardMembers.append(BoardMember(docId, eic_start, eic_finish,
 #                                                term_start, name))
 html += u"""
   </table>
- </body>   
-</html>    
+ </body>
+</html>
 """
 
 # The users don't want to display the country if it's the US.

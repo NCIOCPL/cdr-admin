@@ -1,10 +1,5 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Advanced search interface for CDR Media documents.
-#
-# $Log: not supported by cvs2svn $
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, cdrdb
 

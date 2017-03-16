@@ -1,16 +1,5 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Duplicate-checking interface for Help (Documentation) documents.
-#
-# $Log: not supported by cvs2svn $
-# Revision 1.2  2002/04/05 14:00:19  bkline
-# Added DocumentationTitle to keyword search.
-#
-# Revision 1.1  2002/02/22 02:18:58  bkline
-# Added advanced search page for Documentation documents.
-#
 #----------------------------------------------------------------------
 import cgi, cdrcgi, cdrdb
 

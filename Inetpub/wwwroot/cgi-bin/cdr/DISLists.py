@@ -1,14 +1,8 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Report on lists of drug information summaries.
 #
+# BZIssue::4250 - initial revision
 # BZIssue::5198 - Adding a Table Option to Drug Summaries Lists Report
-#
-# Revision 1.1  2008/09/10 17:30:49  venglisc
-# Initial version of DrugInformationSummaries List report (Bug 4250).
-#
 #----------------------------------------------------------------------
 import cdr, cgi, cdrcgi, time, cdrdb
 

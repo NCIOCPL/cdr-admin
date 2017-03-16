@@ -1,31 +1,6 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Reports on audit trail content.
-#
-# $Log: not supported by cvs2svn $
-# Revision 1.7  2004/07/29 20:28:19  bkline
-# Added support for searching by user (request #1283).
-#
-# Revision 1.6  2002/07/18 12:38:03  bkline
-# Changed column headers from <td> to <th>.
-#
-# Revision 1.5  2002/07/18 00:55:48  bkline
-# Added column for comment; added inline CSS.
-#
-# Revision 1.4  2002/07/02 13:46:51  bkline
-# Plugged in cdrcgi.DAY_ONE.
-#
-# Revision 1.3  2002/06/27 20:30:54  bkline
-# Changed document to all_docs.
-#
-# Revision 1.2  2002/06/26 20:04:14  bkline
-# Removed bold markup from data.
-#
-# Revision 1.1  2002/06/26 16:35:16  bkline
-# Implmented report of audit_trail activity.
-#
+# BZIssue::1283 - add support for searching by user
 #----------------------------------------------------------------------
 import cdr, cdrdb, cdrcgi, cgi, time
 

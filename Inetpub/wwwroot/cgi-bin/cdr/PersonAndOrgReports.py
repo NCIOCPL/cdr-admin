@@ -1,12 +1,8 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Submenu for person and organization reports.
 #
 # BZIssue::5239 (JIRA::OCECDR-3543) - menu cleanup
 # JIRA::OCECDR-3740 - restore Persons Practicing at Organization report
-#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
 
@@ -33,7 +29,7 @@ elif action == SUBMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if action == "Log Out": 
+if action == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
@@ -58,18 +54,8 @@ form += """\
     <OL>
 """
 reports = [
-           ('InactivePersonsOrgs.py', 
-            'Inactive Persons/Organizations Linked to Protocols'),
-           ('Request3109.py', 
-            'Organization Protocols Spreadsheet'),
-           ('OrgProtocolReview.py', 
-            'Organization Protocol Review'),
-	       ('PersonProtocolReview.py', 
-            'Person Protocol Review'),
-           ('PersonsAtOrg.py', 
+           ('PersonsAtOrg.py',
             'Persons Practicing at Organizations'),
-           ('PreferredProtOrgs.py', 
-            'Preferred Protocol Organizations')
           ]
 for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI></A>\n" % (

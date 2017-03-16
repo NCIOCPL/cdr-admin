@@ -1,20 +1,15 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Excel report on links from protocol documents to terms having a
 # specified semantic type. Takes about a minute to run (depending
 # on the type).
 #
 # JIRA::OCECDR-3800 - Address security vulnerabilities
-#
 #----------------------------------------------------------------------
 import cgi
 import cdrcgi
 import cdrdb
 import sys
 import datetime
-import ExcelWriter
 
 #----------------------------------------------------------------------
 # Get the parameters from the request.
@@ -83,6 +78,8 @@ class ProtocolType:
         self.docType = docType
         self.title = title
         self.statusPath = statusPath
+    def __cmp__(self, other):
+        return cmp(self.title, other.title)
 
 #----------------------------------------------------------------------
 # Populate the protocolTypes.
@@ -161,96 +158,65 @@ t = now.strftime("%Y%m%d%H%M%S")
 
 # Create the spreadsheet and define default style, etc.
 # -----------------------------------------------------
-wb                  = ExcelWriter.Workbook()
-b                   = ExcelWriter.Border()
-borders             = ExcelWriter.Borders(b, b, b, b)
-dataFont            = ExcelWriter.Font(name='Arial', size=10)
-dataAlign           = ExcelWriter.Alignment('Left', 'Top', wrap=True)
-dataStyle           = wb.addStyle(alignment=dataAlign, font=dataFont)
-headerFont          = ExcelWriter.Font(name='Arial', size=10, color="#FFFFFF",
-                                       bold=True)
-headerInterior      = ExcelWriter.Interior("#0000FF", "Solid")
-headerAlign         = ExcelWriter.Alignment('Center', 'Top', wrap=True)
-headerStyle         = wb.addStyle(alignment=headerAlign, font=headerFont,
-                                  interior=headerInterior)
-columnTitleFont     = ExcelWriter.Font(name='Arial', size=10, color="#FFFFFF",
-                                       bold=True)
-columnTitleInterior = ExcelWriter.Interior("#000088", "Solid")
-columnTitleAlign    = ExcelWriter.Alignment('Center', 'Top', wrap=True)
-columnTitleStyle    = wb.addStyle(alignment=columnTitleAlign,
-                                  font=columnTitleFont,
-                                  interior=columnTitleInterior)
+styles = cdrcgi.ExcelStyles()
 
-for protKey in protocolTypes:
-    protocolType = protocolTypes[protKey]
-    sTmp = protocolType.title[:31]
-    ws = wb.addWorksheet(sTmp.replace('/','-'), style=dataStyle, height=45,
-                         frozenRows=5)
+CHAR_WIDTH = 4.5
+
+for protocolType in sorted(protocolTypes.values()):
+    sheet = styles.add_sheet(protocolType.title)
     numDocs = 0
 
-    # Determine the width of column 3
+    # Determine the column widths
     #---------------------------------
-    colThreeWidth = 220
-    charWidth = 4.5
+    widths = [18, 80, 40, 25]
     for doc in documents:
+        break
         if doc.docType == protocolType.docType:
             numDocs += 1
             for term in doc.terms:
-                if colThreeWidth < charWidth * len(term):
-                    colThreeWidth = charWidth * len(term)
+                width = CHAR_WIDTH * len(term)
+                if widths[2] < width:
+                    widths[2] = width
 
-    # Set the colum width
+    # Set the column widths
     # -------------------
-    ws.addCol(1, 100)
-    ws.addCol(2, 450)
-    ws.addCol(3, colThreeWidth)
-    ws.addCol(4, 140)
+    for col, width in enumerate(widths):
+        sheet.col(col).width = styles.chars_to_width(width)
 
     # Create the top rows
     # ---------------------
-    exRow = ws.addRow(1, height=15)
-    exRow.addCell(2, 'Semantic Type Report', style=headerStyle, mergeAcross=1)
-
-    sTmp = "Semantic Type : %s" % title
-    exRow = ws.addRow(2, height=15)
-    exRow.addCell(2, sTmp, style=headerStyle, mergeAcross=1)
-
-    sTmp = "Total Number of Trials: %d" % numDocs
-    exRow = ws.addRow(3, height=15)
-    exRow.addCell(2, sTmp, style=headerStyle, mergeAcross=1)
+    banners = (
+        "Semantic Type Report",
+        "Semantic Type : %s" % title,
+        "Total Number of Trials: %d" % numDocs
+    )
+    style = styles.banner
+    for row, banner in enumerate(banners):
+        sheet.write_merge(row, row, 0, 3, banner, style)
+        style = styles.header
+    sheet.write_merge(len(banners), len(banners), 0, 3, "")
+    sheet.set_panes_frozen(True)
+    sheet.set_horz_split_pos(len(banners) + 2)
 
     # Create the Header row
     # ---------------------
-    exRow = ws.addRow(5, style=columnTitleStyle, height=15)
-    exRow.addCell(1, 'CDR-ID')
-    exRow.addCell(2, 'Title')
-    exRow.addCell(3, 'Term(s)')
-    exRow.addCell(4, 'Current Protocol Status')
+    row = len(banners) + 1
+    headers = ("CDR-ID", "Title", "Term(s)", "Current Protocol Status")
+    for col, header in enumerate(headers):
+        sheet.write(row, col, header, styles.header)
 
     # Write the data
     # ---------------------
-    rowNum = 5
     for doc in documents:
         if doc.docType == protocolType.docType:
-            rowNum += 1
-            rowHeight = 45
-            # if there are more than 3 terms,
-            # set the row height based on the number of terms
-            if len(doc.terms) > 3:
-                rowHeight = 14 * len(doc.terms)
-            exRow = ws.addRow(rowNum, style=dataStyle, height=rowHeight)
-            exRow.addCell(1, doc.id, style=dataStyle)
-            exRow.addCell(2, doc.title, style=dataStyle)
-            strTerm=""
-            for term in doc.terms:
-                if len(strTerm) > 0:
-                    strTerm += '\n'
-                strTerm += term
-            exRow.addCell(3, strTerm, style=dataStyle)
-            exRow.addCell(4, doc.status, style=dataStyle)
+            row += 1
+            sheet.write(row, 0, doc.id, styles.left)
+            sheet.write(row, 1, doc.title, styles.left)
+            sheet.write(row, 2, "\n".join(doc.terms), styles.left)
+            sheet.write(row, 3, doc.status, styles.left)
 
 print "Content-type: application/vnd.ms-excel"
 print "Content-Disposition: attachment; filename=SemanticTypeReport-%s.xls" % t
 print
 
-wb.write(sys.stdout, asXls=True, big=True)
+styles.book.save(sys.stdout)

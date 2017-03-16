@@ -1,8 +1,6 @@
 <%@ WebHandler Language="C#" Class="Handler" %>
 
 /*
- * $Id$
- *
  * Passthrough to tunnel CDR client-server traffic through HTTPS instead
  * of running over custom port 2019.
  *

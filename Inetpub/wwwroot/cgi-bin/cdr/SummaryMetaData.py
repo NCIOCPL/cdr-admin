@@ -1,7 +1,5 @@
 #----------------------------------------------------------------------
 #
-# $Id$
-#
 # Report on the metadata for one or more summaries.
 #
 # BZIssue::1724
@@ -185,7 +183,7 @@ table.summary th { width: 150px; text-align: right; padding-right: 10px; }""")
         """
         if not self.doc_title:
             cdrcgi.bail("No title specified")
-        pattern = "%" + self.doc_title + "%"
+        pattern = "%" + unicode(self.doc_title, "utf-8") + "%"
         query = cdrdb.Query("active_doc d", "d.id", "d.title")
         query.join("doc_type t", "t.id = d.doc_type")
         query.where(query.Condition("t.name", "Summary"))

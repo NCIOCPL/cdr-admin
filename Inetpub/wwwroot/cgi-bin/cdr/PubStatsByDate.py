@@ -1,7 +1,5 @@
 #----------------------------------------------------------------------
 #
-# $Id$
-#
 # Report to list updated document count by document type.
 #
 # Added an option to the script (VOL=Y) to allow to pull out the
@@ -14,6 +12,7 @@
 # BZIssue::5062 - Modify Media Change Report
 # BZIssue::5173 - ICRDB Stats Report
 # JIRA::OCECDR-3800 - Address security vulnerabilities
+# JIRA::OCECDR-4165 - work around SQL Server limitation
 #
 #----------------------------------------------------------------------
 import cgi
@@ -54,8 +53,9 @@ elif request == SUBMENU:
 #----------------------------------------------------------------------
 # Validate parameters
 #----------------------------------------------------------------------
+doc_type_choices = cdr.getDoctypes(session) + ["All"]
 if request:   cdrcgi.valParmVal(request, valList=buttons)
-if doc_type:  cdrcgi.valParmVal(doc_type, valList=cdr.getDoctypes(session))
+if doc_type:  cdrcgi.valParmVal(doc_type, valList=doc_type_choices)
 if date_from: cdrcgi.valParmDate(date_from)
 if date_to:   cdrcgi.valParmDate(date_to)
 if vol:       cdrcgi.valParmVal(vol, valList='Y')
@@ -91,6 +91,8 @@ def get_pub_doc_types():
 # Function to get the Media information to be displayed in the table
 # from the CDR
 # We're selecting the information for the latest version of the doc.
+# OCECDR-4165: SQL Server can't handle the original query; do some
+# of its work for it.
 #----------------------------------------------------------------------
 def get_media_info(ids):
     if not ids:
@@ -107,11 +109,15 @@ def get_media_info(ids):
     query.where("t.path = '/Media/MediaTitle'")
     query.where("c.path = '/Media/MediaContent/Categories/Category'")
     query.where("c.value NOT IN ('pronunciation', 'meeting recording')")
-    query.where(query.Condition("d.id", ids, "IN"))
+    #query.where(query.Condition("d.id", ids, "IN"))
     query.where(query.Condition("v.num", last_ver))
     if LOG_QUERIES:
         query.log(label="MEDIA INFO QUERY")
-    return query.execute(cursor).fetchall()
+    info = []
+    for row in query.execute(cursor).fetchall():
+        if row[0] in ids:
+            info.append(row)
+    return info
 
 # ***** First Pass *****
 #----------------------------------------------------------------------

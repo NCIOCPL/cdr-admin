@@ -1,14 +1,6 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
-# Reports on Person documents which link to Organization address 
+# Reports on Person documents which link to Organization address
 # fragments.
-#
-# $Log: not supported by cvs2svn $
-# Revision 1.1  2001/12/01 18:11:44  bkline
-# Initial revision
-#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string, cdrdb
 
@@ -67,7 +59,7 @@ html    = """\
 for row in rows:
     docId = "CDR%010d" % row[0]
     title = row[1]
-    shortTitle = title[:100] 
+    shortTitle = title[:100]
     if len(title) > 100: shortTitle += " ..."
     html += u"""\
 <TR>
@@ -78,7 +70,7 @@ for row in rows:
   </TD>
   <TD BGCOLOR='white' ALIGN='left'><FONT SIZE='-1'>%s</FONT></TD>
  </TR>
-""" % (SCRIPT, 
+""" % (SCRIPT,
        docId,
        'CDR266296',
        docId,

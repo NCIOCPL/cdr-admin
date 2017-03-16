@@ -1,7 +1,5 @@
 #----------------------------------------------------------------------
 #
-# $Id$
-#
 # CGI program to list the CDR tables/views and their structures.
 #
 # BZIssue::5002 - Setting up MAHLER

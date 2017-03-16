@@ -1,9 +1,5 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Page with links to a set of PDQ Board Member Mailers.
-#
 #----------------------------------------------------------------------
 import cdrdb, cdrcgi, cgi, os, sys
 
@@ -50,8 +46,9 @@ html = header + """\
 """ % job
 for name in os.listdir(dirName):
     if name.endswith('.rtf') and not name[0] == '~':
+        name = cgi.escape(name, True)
         html += """\
- <li><a href='%s?job=%s&file=%s'>%s</a></li>
+ <li><a href="%s?job=%s&file=%s">%s</a></li>
 """ % (script, job, name, name)
 cdrcgi.sendPage(html + """\
 </ul>

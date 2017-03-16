@@ -1,28 +1,6 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Prototype for CDR reporting/formatting web wrapper.
-#
-# $Log: not supported by cvs2svn $
-# Revision 1.7  2002/08/15 19:17:46  bkline
-# Fixed report name; replaced hardcoded credentials.
-#
-# Revision 1.6  2002/06/07 13:32:12  bkline
-# Issue #255: changed report title at Margaret's request.
-#
-# Revision 1.5  2002/02/21 15:22:02  bkline
-# Added navigation buttons.
-#
-# Revision 1.4  2001/12/01 17:56:26  bkline
-# Changed FilterDoc() call to match new return value type.
-#
-# Revision 1.3  2001/04/08 22:53:54  bkline
-# First working version for inactive documents report.
-#
-# Revision 1.2  2001/03/27 21:17:40  bkline
-# Extracted some common functionality out to cdrcgi.py.
-#
+# BZIssue::255 - change report title at Margaret's request
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
 

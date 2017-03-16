@@ -1,19 +1,5 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Report of history of changes to a single summary.
-#
-# $Log: not supported by cvs2svn $
-# Revision 1.3  2007/01/23 22:09:39  bkline
-# Allowing unlimited history viewing (not just past two years).
-#
-# Revision 1.2  2003/11/05 14:50:28  bkline
-# Added font style information for HTML body element.
-#
-# Revision 1.1  2003/08/29 18:14:39  bkline
-# Report on changes made to a specified summary in the last 1 or 2 years.
-#
 #----------------------------------------------------------------------
 import cdr, cdrdb, time, cgi, cdrcgi, re
 
@@ -40,6 +26,8 @@ try:
     numYears = dateRange and int(dateRange) or 2
 except:
     cdrcgi.bail("Invalid date range: %s" % dateRange)
+if docTitle:
+    docTitle = unicode(docTitle, "utf-8")
 
 #----------------------------------------------------------------------
 # Load common style information from repository.
@@ -148,7 +136,7 @@ except Exception, info:
 # If we have a title, use it to get a document ID.
 #----------------------------------------------------------------------
 if docTitle:
-    param = "%s%%" % docTitle
+    param = u"%s%%" % docTitle
     try:
         cursor.execute("""\
             SELECT d.id, d.title
@@ -161,7 +149,7 @@ if docTitle:
     except Exception, info:
         cdrcgi.bail("Failure looking up document title: %s" % str(info))
     if not rows:
-        cdrcgi.bail("No summary documents match %s" % docTitle)
+        cdrcgi.bail(u"No summary documents match %s" % docTitle)
     if len(rows) > 1:
         showTitleChoices(rows)
 
@@ -203,7 +191,7 @@ for row in cursor.fetchall():
             section = resp[0].replace("@@PubVerDate@@", verDate)
             sections.append(unicode(section, "utf-8"))
 sections.reverse()
-html = """\
+html = u"""\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>
  <head>
@@ -227,8 +215,8 @@ html = """\
        docTitle,
        docId)
 for section in sections:
-    html += section + "<br><hr><br>\n"
-html += """
+    html += section + u"<br><hr><br>\n"
+html += u"""
  </body>
 </html>
 """

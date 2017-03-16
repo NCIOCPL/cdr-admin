@@ -1,25 +1,7 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Menu of existing filter sets.
 #
-# $Log: EditFilterSets.py,v $
-# Revision 1.5  2007/11/03 14:15:07  bkline
-# Unicode encoding cleanup (issue #3716).
-#
-# Revision 1.4  2004/05/11 17:33:18  bkline
-# Plugged in ShowFilterSets.py.
-#
-# Revision 1.3  2002/11/14 14:05:42  bkline
-# Reduced font sizes for report.
-#
-# Revision 1.2  2002/11/14 01:09:56  bkline
-# Fixed typo (missing closing parenthesis).
-#
-# Revision 1.1  2002/11/13 20:38:58  bkline
-# New script for managing named CDR filter sets.
-#
+# BZIssue::3716 - Unicode encoding cleanup
 #----------------------------------------------------------------------
 import cdr, cgi, cdrcgi, cdrdb, sys, urllib
 

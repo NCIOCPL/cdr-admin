@@ -1,10 +1,5 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Send a message to users currently logged in to the CDR.
-#
-# $Log: not supported by cvs2svn $
 #----------------------------------------------------------------------
 import cdr, cdrdb, cdrcgi, cgi
 

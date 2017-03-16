@@ -1,17 +1,10 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # "We would like a modified version of the Linked documents report for
 # Terms linked to Protocols.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.1  2008/09/02 20:44:01  bkline
-# New report for Sheri on protocols linked to a specified term
-# document (#4263).
-#
+# BZIssue::4263
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, ExcelWriter, cdrdb, time
+import cgi, cdr, cdrcgi, cdrdb, time
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -130,12 +123,12 @@ if docId:
                            'ScientificProtocolInfo')
             AND NOT d.id IN (SELECT a.doc_id
                                FROM query_term a
-                              WHERE a.path = 
+                              WHERE a.path =
                                    '/InScopeProtocol'                      +
                                    '/CTGovOwnershipTransferContactLog'     +
                                    '/CTGovOwnershipTransferContactResponse'
                                 AND a.value = 'Abandoned')"""
-    
+
     try:
         cursor.execute(query, docId, timeout = 300)
         rows = cursor.fetchall()
@@ -146,50 +139,40 @@ if docId:
     # Build the report and show it.
     now = time.strftime("%Y-%m-%d")
     title = "Protocols Linked to Terms %s" % now
-    book = ExcelWriter.Workbook()
-    sheet = book.addWorksheet("Linking Protocols")
-    
+    subtitle = "Total: %d" % len(protocols)
+    styles = cdrcgi.ExcelStyles()
+    sheet = styles.add_sheet("Linking Protocols")
+
     try:
         import msvcrt, os, sys
         msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
     except:
         pass
 
-    font      = ExcelWriter.Font(size = 12, bold = True)
-    align     = ExcelWriter.Alignment('Center', 'Bottom', wrap = True)
-    style1    = book.addStyle(font = font, alignment = align)
-    align     = ExcelWriter.Alignment('Left', 'Top', wrap = True)
-    style2    = book.addStyle(alignment = align)
-    row1      = sheet.addRow(1, style1)
-    row2      = sheet.addRow(2, style1)
-    row4      = sheet.addRow(4, style1)
-    rowNumber = 5
-    sheet.addCol(1,  70)
-    sheet.addCol(2, 300)
-    sheet.addCol(3, 150)
-    sheet.addCol(4, 150)
-    sheet.addCol(5, 100)
-    row1.addCell(1, title, mergeAcross = 4)
-    row2.addCell(1, "Total: %d" % len(protocols), mergeAcross = 4)
-    row4.addCell(1, "CDR ID")
-    row4.addCell(2, "Protocol Title")
-    row4.addCell(3, "Study Category Name")
-    row4.addCell(4, "Current Protocol Status")
-    row4.addCell(5, "Document Type")
-    protocols.sort()
-    for p in protocols:
-        row = sheet.addRow(rowNumber, style2)
-        rowNumber += 1
-        row.addCell(1, p.docId)
-        row.addCell(2, p.title)
-        row.addCell(3, u"; ".join(p.categories))
-        row.addCell(4, p.status)
-        row.addCell(5, p.docType)
+    widths = (10, 60, 30, 30, 20)
+    headers = ("CDR ID", "Protocol Title", "Study Category Name",
+               "Current Protocol Status", "Document Type")
+    assert(len(widths) == len(headers))
+    for col, chars in enumerate(widths):
+        sheet.col(col).width = styles.chars_to_width(chars)
+    sheet.write_merge(0, 0, 0, len(widths) - 1, title, styles.banner)
+    sheet.write_merge(1, 1, 0, len(widths) - 1, subtitle, styles.banner)
+    sheet.write_merge(2, 2, 0, len(widths) - 1, "")
+    for col, header in enumerate(headers):
+        sheet.write(3, col, header, styles.header)
+    row = 4
+    for p in sorted(protocols):
+        sheet.write(row, 0, p.docId, styles.left)
+        sheet.write(row, 1, p.title, styles.left)
+        sheet.write(row, 2, "; ".join(p.categories), styles.left)
+        sheet.write(row, 3, p.status, styles.left)
+        sheet.write(row, 4, p.docType, styles.left)
+        row += 1
     stamp = time.strftime("%Y%m%d%H%M%S")
     print "Content-type: application/vnd.ms-excel"
     print "Content-Disposition: attachment; filename=p2t-%s.xls" % stamp
     print
-    book.write(sys.stdout, True)
+    styles.book.save(sys.stdout)
     sys.exit(0)
 
 #----------------------------------------------------------------------

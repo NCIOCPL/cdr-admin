@@ -1,8 +1,6 @@
 #----------------------------------------------------------------------
 # coding=latin-1
 #
-# $Id$
-#
 # Glossary Term Concept report
 # This report takes a concept and displays all of the Term Name
 # definitions that are linked to this concept document
@@ -13,7 +11,6 @@
 # BZIssue::4425 - Don't display Spanish definitions for blocked docuents
 # BZIssue::4482 - Rewritten at user request
 # Modified July 2015 as part of security sweep
-#
 #----------------------------------------------------------------------
 import cgi
 import cdr

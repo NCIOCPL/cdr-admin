@@ -1,10 +1,5 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # List of ClinicalTrials.gov documents which are out of scope.
-#
-# $Log: not supported by cvs2svn $
 #----------------------------------------------------------------------
 import cdr, cdrdb, time, cgi, cdrcgi
 

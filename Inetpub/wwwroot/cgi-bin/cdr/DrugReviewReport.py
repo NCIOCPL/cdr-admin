@@ -1,6 +1,4 @@
 #----------------------------------------------------------------------
-# $Id$
-#
 # Produce an Excel spreadsheet showing problematic drug terms, divided
 # into three categories:
 #
@@ -15,777 +13,544 @@
 # and the software then produces the Excel format report.
 #
 # JIRA::OCECDR-3800
-#
+# JIRA::OCECDR-4170 - complete rewrite
 #----------------------------------------------------------------------
-
-import cdr
-import cdrcgi
-import cdrdb
-import cgi
 import datetime
-import ExcelWriter
 import os
 import sys
-import xml.sax
-import xml.sax.handler
+import lxml.etree as etree
+import cdrcgi
+import cdrdb
 
-# Global list of head node numbers of blocks of elements with an
-#   included ReviewStatus element = 'Problematic'
-# See class ProblematicHandler for details.
-g_problemBlockSet = None
+class Control(cdrcgi.Control):
+    """
+    Report-specific behavior implemented in this derived class.
+    """
 
-def logMsg(msg):
-    cdr.logwrite(msg, "d:/cdr/Log/drr.log")
-
-# Global worksheet row number, reset for each sheet in workbook
-G_wsRow = 0
-
-#----------------------------------------------------------------------
-# Form buttons.
-#----------------------------------------------------------------------
-BT_SUBMIT  = "Submit"
-BT_ADMIN   = cdrcgi.MAINMENU
-BT_REPORTS = "Reports Menu"
-BT_LOGOUT  = "Logout"
-buttons = (BT_SUBMIT, BT_REPORTS, BT_ADMIN, BT_LOGOUT)
-
-#----------------------------------------------------------------------
-# Form values.
-#----------------------------------------------------------------------
-fields     = cgi.FieldStorage()
-session    = cdrcgi.getSession(fields) or cdrcgi.bail("Please login")
-action     = cdrcgi.getRequest(fields)
-start_date = fields.getvalue("start")
-end_date   = fields.getvalue("end")
-
-#----------------------------------------------------------------------
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if action == BT_REPORTS:
-    cdrcgi.navigateTo("Reports.py", session)
-if action == BT_ADMIN:
-    cdrcgi.navigateTo("Admin.py", session)
-if action == BT_LOGOUT:
-    cdrcgi.logout(session)
-
-#----------------------------------------------------------------------
-# Show the form if we don't have a request yet.
-#----------------------------------------------------------------------
-if not cdrcgi.is_date(start_date) or not cdrcgi.is_date(end_date):
-    end = datetime.date.today()
-    start = end - datetime.timedelta(7)
-    page = cdrcgi.Page("CDR Reports", subtitle="Drug Review Report",
-                       action="DrugReviewReport.py", buttons=buttons,
-                       session=session)
-    instructions = (
+    DIVIDER = "pattern: pattern solid, fore_color gray25"
+    COMMENT_FONT = "italic true, color_index green"
+    INSTRUCTIONS = (
         "To prepare an Excel format report of Drug/Agent terms, "
         "enter a start date and an optional end date for the "
         "creation or import of Drug/Agent terms.  Terms of semantic "
         "type \"Drug/Agent\" that were created or imported in the "
         "specified date range will be included in the report."
     )
-    page.add(page.B.FIELDSET(page.B.P(instructions)))
-    page.add("<fieldset>")
-    page.add(page.B.LEGEND("Date Range"))
-    page.add_date_field("start", "Start Date", value=start)
-    page.add_date_field("end", "End Date", value=end)
-    page.add("</fieldset>")
-    page.send()
 
-# If we got here, user clicked submit with valid start and end dates
-# Create an Excel workbook
-wb = ExcelWriter.Workbook('ahm', 'NCI')
+    # Table names
+    NCI_TITLE = "New Drugs from NCI Thesaurus"
+    CDR_TITLE = "New Drugs from the CDR"
+    RVW_TITLE = "Drugs to be Reviewed"
 
-# Create Style objects for Excel
-colLabelInterior     = ExcelWriter.Interior("#0000FF", "Solid")
-docSeparatorInterior = ExcelWriter.Interior("#C0C0C0", "Solid")
-colLabelFont         = ExcelWriter.Font(color="#FFFFFF", bold=True)
-sheetNameFont        = ExcelWriter.Font(color="#000000", bold=True)
+    # Column labels
+    CDR_ID = "CDR ID"
+    PREFERRED_NAME = "Preferred Name"
+    OTHER_NAMES = "Other Names"
+    OTHER_NAME_TYPE = "Other Name Type"
+    SOURCE = "Source"
+    TERM_TYPE = "TType"
+    SOURCE_ID = "SourceID"
+    DEFS = "Definition"
+    LAST_MOD = "Last Modified"
 
-centerAlign          = ExcelWriter.Alignment(horizontal="Center")
-leftAlign            = ExcelWriter.Alignment(horizontal="Left")
-dataAlign            = ExcelWriter.Alignment(horizontal="Left",
-                                             vertical="Top", wrap="1")
-
-colLabelStyle        = wb.addStyle(name="colLabel", alignment=centerAlign,
-                          font=colLabelFont, interior=colLabelInterior)
-docSeparatorStyle    = wb.addStyle(name="docSeparator",
-                          interior=docSeparatorInterior)
-sheetNameStyle       = wb.addStyle(name="sheetName", alignment=leftAlign,
-                          font=sheetNameFont)
-dataStyle            = wb.addStyle(name="data", alignment=dataAlign)
-errorStyle           = wb.addStyle(name="errorStyle", alignment=centerAlign,
-                          font=sheetNameFont)
-
-#----------------------------------------------------------------------
-# Parser controls for the three worksheets
-#----------------------------------------------------------------------
-
-class ColControl:
-    """
-    Controls the construction of one column.
-    There is one sequence of these for each worksheet.
-    Some controls are used in more than one worksheet.
-    """
-    def __init__(self, label, element, index, width=50, funcs=()):
-        """
-        Pass:
-            label    - Column header.
-            element  - Element name as ustring.
-            index    - Column index
-            width    - Width in numeric Excel "points".
-            funcs    - Sequence of functions with following interface:
-                        Pass:
-                            Document handler, providing access to almost
-                            everything.
-                        Return:
-                            Modified or unmodifed text.
-                       Func can do whatever it needs to do.
-        """
-        self.label    = label
-        self.element  = element
-        self.index    = index
-        self.width    = width
-        self.funcs    = funcs
-        self.style    = None
-
-#------------------------------------------------------------------
-# Track where we are for the parsers
-#------------------------------------------------------------------
-class PathStack:
-    """
-    Keeps track of where we are and how we got here (ancestry).
-    Maintains several data structures:
-        Stack of paths of element names.
-        Stack of relative node numbers, where each next node is
-            the next number
-    """
     def __init__(self):
         """
-        Start with empty stacks.
+        Validate the parameters to prevent hacking.
         """
-        self.fullPath = []
-        self.nextNodeNum = 0
-        self.nodeNumStack = []
 
-    def pathPush(self, elemName):
+        cdrcgi.Control.__init__(self, "Drug Review Report")
+        self.begin = datetime.datetime.now()
+        self.start = self.fields.getvalue("start")
+        self.end = self.fields.getvalue("end")
+        self.test = self.fields.getvalue("test")
+        cdrcgi.valParmDate(self.start, empty_ok=True, msg=cdrcgi.TAMPERING)
+        cdrcgi.valParmDate(self.end, empty_ok=True, msg=cdrcgi.TAMPERING)
+
+    def populate_form(self, form):
         """
-        Add a name to the path.
+        Explain how to run the report and show the date fields.
+        """
+
+        end = datetime.date.today()
+        start = end - datetime.timedelta(7)
+        form.add(form.B.FIELDSET(form.B.P(self.INSTRUCTIONS)))
+        form.add("<fieldset>")
+        form.add(form.B.LEGEND("Date Range"))
+        form.add_date_field("start", "Start Date", value=start)
+        form.add_date_field("end", "End Date", value=end)
+        form.add("</fieldset>")
+
+    def show_report(self):
+        """
+        Generate the Excel spreadsheet and return it to the client's browser.
+        It is important to create styles before calling collect_terms()!!!
+        """
+
+        self.styles = cdrcgi.ExcelStyles()
+        self.styles.set_color(self.styles.header, "white")
+        self.styles.set_background(self.styles.header, "blue")
+        self.styles.comment_font = self.styles.font(self.COMMENT_FONT)
+        self.styles.divider = self.styles.style(self.DIVIDER)
+        self.collect_terms()
+        self.add_sheet(self.NCI_TITLE, self.nci_terms)
+        self.add_sheet(self.CDR_TITLE, self.cdr_terms)
+        self.add_sheet(self.RVW_TITLE, self.rvw_terms)
+        if sys.platform == "win32":
+            import msvcrt
+            msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
+        stamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+        secs = (datetime.datetime.now() - self.begin).total_seconds()
+        ndocs = self.ndocs
+        name = "DrugReviewReport-%s-%d_docs-%s_secs.xls" % (stamp, ndocs, secs)
+        if not self.test:
+            print "Content-type: application/vnd.ms-excel"
+            print "Content-Disposition: attachment; filename=%s" % name
+            print
+        self.styles.book.save(sys.stdout)
+
+    def collect_terms(self):
+        """
+        Find all of the drug term documents last modified in the date
+        range specified by the user. Populates three sequences of terms
+        document references, one for each of the tables in the report:
+          * terms imported from the NCI thesaurus
+          * terms created in the CDR
+          * terms requiring review because some part is marked "problematic"
+            (also appearing in one of the first two tables)
+        """
+
+        self.nci_terms = []
+        self.cdr_terms = []
+        self.rvw_terms = []
+        subquery = cdrdb.Query("query_term", "doc_id")
+        subquery.where("path = '/Term/PreferredName'")
+        subquery.where("value = 'Drug/Agent'")
+        query = cdrdb.Query("query_term t", "t.doc_id").unique()
+        query.where("t.path = '/Term/SemanticType/@cdr:ref'")
+        query.where(query.Condition("t.int_val", subquery))
+        if self.start or self.end:
+            query.join("query_term m", "m.doc_id = t.doc_id")
+            query.where("m.path = '/Term/DateLastModified'")
+            if self.start:
+                query.where("m.value >= '%s'" % self.start)
+            if self.end:
+                query.where("m.value <= '%s 23:59:59'" % self.end)
+        doc_ids = [row[0] for row in query.execute(self.cursor).fetchall()]
+        self.ndocs = len(doc_ids)
+        for doc_id in (sorted(doc_ids)):
+            term = Drug(self, doc_id)
+            if term.from_nci_thesaurus():
+                self.nci_terms.append(term)
+            else:
+                self.cdr_terms.append(term)
+            if term.problematic():
+                self.rvw_terms.append(term)
+
+    def add_sheet(self, name, terms):
+        """
+        Create and populate a sheet for one of the report's tables.
+        """
+
+        opts = { "frozen_rows": 2, "cell_overwrite_ok": True }
+        sheet = self.styles.add_sheet(name, **opts)
+        cols = self.columns(name)
+        positions = dict([(col.label, i) for i, col in enumerate(cols)])
+        sheet.write_merge(0, 0, 0, len(cols) - 1, name, self.styles.bold)
+        for i, col in enumerate(cols):
+            sheet.col(i).width = self.styles.chars_to_width(col.width)
+            sheet.write(1, i, col.label, self.styles.header)
+        row = 2
+        divider = False
+        for term in terms:
+            row = term.add_rows(sheet, row, positions, divider)
+            divider = True
+
+    def columns(self, title):
+        """
+        Assemble the sequence of column definitions for the current table.
+
+        We have the actual strings for the column and table names in a
+        central place (class-level named values) to increase the chances
+        that future changes to the arrangement and composition of the
+        tables will not break the report.
+        """
+
+        class Column:
+            def __init__(self, label, width):
+                self.label = label
+                self.width = width
+        cols = [
+            Column(self.CDR_ID, 10),
+            Column(self.PREFERRED_NAME, 30),
+            Column(self.OTHER_NAMES, 30),
+            Column(self.OTHER_NAME_TYPE, 20)
+        ]
+        if title != self.CDR_TITLE:
+            cols.append(Column(self.SOURCE, 17))
+            cols.append(Column(self.TERM_TYPE, 15))
+            cols.append(Column(self.SOURCE_ID, 10))
+            cols.append(Column(self.DEFS, 100))
+        cols.append(Column(self.LAST_MOD, 12))
+        return cols
+
+class Drug:
+    """
+    CDR drug/agent term, with definitions and other names.
+    """
+
+    PROBLEMATIC = "Problematic"
+    THESAURUS = "NCI Thesaurus"
+
+    def __init__(self, control, doc_id):
+        """
+        Fetch and parse the Term document. Perform the wrapping of
+        values with comments at object construction time so we don't
+        have to do it multiple times for terms which appear in more
+        than one table.
+        """
+
+        Drug.comment_font = control.styles.comment_font
+        self.control = control
+        self.doc_id = doc_id
+        self.other_names = []
+        self.definitions = []
+        self.comments = []
+        self.status = None
+        query = cdrdb.Query("document", "xml")
+        query.where(query.Condition("id", doc_id))
+        xml = query.execute(control.cursor).fetchone()[0]
+        root = etree.fromstring(xml.encode("utf-8"))
+        self.name = self.get_text(root.find("PreferredName"))
+        self.last_mod = self.get_text(root.find("DateLastModified"))
+        self.other_names = [self.OtherName(n) for n in root.findall("other")]
+        for node in root.findall("OtherName"):
+            self.other_names.append(self.OtherName(node))
+        for node in root.findall("Definition"):
+            self.definitions.append(self.Definition(node))
+        for node in root.findall("Comment"):
+            self.comments.append(self.Comment(node))
+        self.name = Drug.add_comments(self, "name")
+
+    def add_rows(self, sheet, row, cols, divider):
+        """
+        Add rows to the worksheet for the current table for this drug.
+
+        For the last table (drug terms which need review) suppress
+        display of other names and definitions which have not been
+        flagged individually as problematic.
 
         Pass:
-            elemName - plain element name, no path prefix, no namespace.
+            sheet      - reference to object for the current Excel worksheet
+            row        - integer for starting row number
+            cols       - map of column position integers, indexed by the
+                         column names, for those columns which should
+                         be included on this table
+            divider    - boolean indicating whether to precede the data
+                         with a blank row (True for all but the first
+                         drug term in the table)
+        Return:
+            integer for the next drug term's starting row number
+        """
+
+        self.sheet = sheet
+        other_names = self.other_names
+        definitions = self.definitions
+        if sheet.name == Control.RVW_TITLE:
+            other_names = [n for n in other_names if n.problematic()]
+            definitions = [d for d in definitions if d.problematic()]
+        definitions = self.wrap_definitions(definitions)
+        styles = self.control.styles
+        if divider:
+            sheet.write_merge(row, row, 0, len(cols) - 1, "", styles.divider)
+            row += 1
+        rows = len(other_names) or 1
+        last = row + rows - 1
+        self.write_cell(row, last, cols[Control.CDR_ID], self.doc_id)
+        self.write_cell(row, last, cols[Control.PREFERRED_NAME], self.name)
+        for i, other_name in enumerate(other_names):
+            other_name.write_cells(self, row + i, cols)
+        if Control.DEFS in cols:
+            self.write_cell(row, last, cols[Control.DEFS], definitions)
+        self.write_cell(row, last, cols[Control.LAST_MOD], self.last_mod)
+        return last + 1
+
+    def write_cell(self, first, last, col, values):
+        """
+        Write the data to a cell (or a set of merged cells).
+
+        We centralize the code for this here because many cases could
+        involved any of four different cases:
+
+          * single string value stored in a single cell
+          * rich text sequence stored in a single cell
+          * single string value stored in a set of merged cells
+          * rich text sequence stored in a set of merged cells
+
+        Note that the xlwt package does not have a method for
+        storing rich text in a multi-cell range. What you have to
+        do instead is perform the operation in two steps:
+
+          * write a styled placeholder to the range
+          * store the rich text sequence in the first cell of the range
+
+        In order to make this work, you have to suppress the block
+        which prevents overwriting the contents of a cell you've already
+        written to (see http://stackoverflow.com/questions/41770461).
+
+        Note that there is a bug in Microsoft Excel, which prevents the
+        auto-height feature from working properly. So the user may need to
+        manually expand the height of a row containing large values in
+        merged cells (see http://tinyurl.com/excel-merged-height-bug).
+        To mitigate the impact of this bug, I have made the width of the
+        affected columns larger than in the original version of this report.
+
+        Pass:
+
+            first  - integer for the first row in the range
+            last   - integer for the last for in the range
+            col    - integer for the column of the range
+            values - a sequence of values, some containing rich text; or
+                     a single value (string or integer)
+        Return:
+            No return value
+        """
+
+        left = self.control.styles.left
+        sheet = self.sheet
+        if isinstance(values, (list, tuple)):
+            if first == last:
+                sheet.write_rich_text(first, col, values, left)
+            else:
+                sheet.write_merge(first, last, col, col, "", left)
+                sheet.row(first).set_cell_rich_text(col, values, left)
+        elif first == last:
+            sheet.write(first, col, values, left)
+        else:
+            sheet.write_merge(first, last, col, col, values, left)
+
+    def wrap_definitions(self, definitions):
+        """
+        Assemble the cell contents for the drug term's definitions.
+
+        Pass:
+            definitions  - sequence of Definition objects for the drug term
 
         Return:
-            Full path as a string.
+            A sequence of values, some with rich text formatting, if any of
+            the definitions has a comment; otherwise return a concatenated
+            string containing the definitions separated by a blank line
         """
-        # Add to stack of element names
-        fullPath = self.pathGet() + '/' + elemName
-        self.fullPath.append(fullPath)
 
-        # Add to stack of node numbers
-        self.nodeNumStack.append(self.nextNodeNum)
-        self.nextNodeNum += 1
-
-        return fullPath
-
-    def pathPop(self):
-        """
-        Remove an item from the top of the fullPath stack, returning it.
-        """
-        self.nodeNumStack.pop()
-        return self.fullPath.pop()
-
-    def pathGet(self):
-        """
-        Return the current path, but without popping it off the stack.
-        Return empty string if stack is empty.
-        """
-        pathLen = len(self.fullPath)
-        if pathLen > 0:
-            return self.fullPath[len(self.fullPath)-1]
-        return ""
-
-    def getNodeNum(self, ancestor):
-        """
-        Return the node number of an element in the pathStack.
-
-        Pass:
-            ancestor - 0 = Get current node's node number
-                       1 = Get parent node's number
-                       2 = Get grandparent node's number
-                       etc.
-        Or -1 if None
-        """
-        numStackLen = len(self.nodeNumStack)
-        if numStackLen > ancestor:
-            return self.nodeNumStack[numStackLen - (ancestor+1)]
-        return -1
-
-class DocHandler(xml.sax.handler.ContentHandler):
-    """
-    Sax parser content handler for Term documents.
-    """
-    def __init__(self, docXml, ws, ctlHash, docId, dt, dtCol):
-        """
-        Content handler constructor.
-
-        Pass:
-            docXml  - Reference to the full XML string, used in
-                      findProblematicFields function.
-            ws      - ExcelWriter.Worksheet, already initialized.
-            ctlHash - Dictionary of path -> ColControl for all
-                      elements (xpaths) that have some processing.
-            docId   - Always written to column 1 of sheet.
-            dt      - Create/import date, written to dtCol column.
-            dtCol   - Column number, origin 1, for create/import date.
-        """
-        global g_problemBlockSet
-
-        self.docXml      = docXml
-        self.ws          = ws
-        self.ctlHash     = ctlHash
-        self.docId       = docId
-        self.dt          = dt[0:10]
-        self.dtCol       = dtCol
-        self.pathStack   = None
-
-        # If the global problem block set exists, pre-parse the doc
-        #   finding all of the fields with ReviewStatus='Problematic'
-        # This will populate the global with a set of nodes of fields
-        #   and parents of fields with Problematic ReviewStatus.
-        if g_problemBlockSet != None:
-            xml.sax.parseString(docXml, ProblematicHandler())
-
-    def startDocument(self):
-        """
-        Initialization needed for each new document.
-        """
-        global G_wsRow
-
-        # ColControl we're currently working on, nest them in a stack
-        self.colCtls = []
-        self.curCtl  = None
-
-        # Stack of full xpaths to current node push at start, pop at end
-        self.pathStack = PathStack()
-
-        # Many paths are ignored, curPath has content only if we're
-        #   working on one that should not be ignored
-        self.curPath = None
-
-        # Text is gathered here in characters() callback
-        self.text = ""
-
-        # Tracking count of OtherName elements
-        # 2nd and subsequent OtherName element starts a new row
-        self.otherNameCount = 0
-
-        # Next spreadsheet row we're working on
-        self.ssRow = G_wsRow
-
-        # Put docId and create/import date in the right colums
-        self.curRow = self.ws.addRow(self.ssRow, style=dataStyle)
-        # Excel likes to warn you if you send a number as a string,
-        #   even if you explicitly say it's a String!
-        self.curRow.addCell(1, self.docId, dataType='Number')
-        self.curRow.addCell(self.dtCol, str(self.dt))
-
-    def startElement(self, name, attrs):
-        """
-        When encountering a field.
-        """
-        global dataStyle
-        global g_problemBlockSet
-
-        # Construct full path to this field and maintain path stack
-        fullPath = self.pathStack.pathPush(name)
-
-        # Is it of interest?
-        if self.ctlHash.has_key(fullPath):
-            self.curCtl = self.ctlHash[fullPath]
-            self.colCtls.append(self.curCtl)
-            self.curPath = fullPath
-
-            # Save attributes
-            self.attrs = attrs
-
-        # Here's the hack for adding OtherName rows
-        if fullPath == "/Term/OtherName":
-            self.otherNameCount += 1
-            if self.otherNameCount > 1:
-                # And the hack for problematic fields
-                nodeNum = self.pathStack.getNodeNum(0)
-                if g_problemBlockSet==None or nodeNum in g_problemBlockSet:
-                    self.ssRow += 1
-                    self.curRow = self.ws.addRow(self.ssRow, dataStyle)
-
-    def characters(self, content):
-        """
-        If we're working on a field of interest, accumulate content.
-        """
-        if self.curCtl:
-            self.text += content
-
-    def endElement(self, name):
-        """
-        If we complete a field of interest, process it
-        """
-        # If there is a current field of interest
-        if self.curCtl:
-            # If this is the end of that field
-            if self.curPath == self.pathStack.pathGet():
-
-                # Execute any fancy routines
-                for func in self.curCtl.funcs:
-                    self.text = func(self)
-
-                # If there's any text (or any left after funcs)
-                #   add it to the spreadsheet in current row
-                if self.text:
-                    self.curRow.addCell(self.curCtl.index, self.text)
-
-                # We're done work on field
-                self.curCtl = None
-                self.colCtls.pop()
-                self.curPath = None
-                self.text = ""
-
-        # Whether we did anything with it or not, we're done with this field
-        self.pathStack.pathPop()
-
-    def endDocument(self):
-        """
-        Cleanup.
-        """
-        # Update global row
-        global G_wsRow
-        G_wsRow = self.ssRow + 1
-
-
-#----------------------------------------------------------------------
-# Pre-parser parser - functions and sax parser
-#
-# See coments under ProblematicHandler for explanation.
-#
-# Functions used there are also used in the DocHandler, primary
-# parser class.
-#----------------------------------------------------------------------
-class ProblematicHandler(xml.sax.handler.ContentHandler):
-    """
-    Another sax parser.
-
-    The third worksheet requires that we only display blocks of
-    information of certain types when one of the elements in that
-    block, with the name ReviewStatus, has the content 'Problematic'.
-
-    The ReviewStatus elements typically come _after_ the elements
-    they control.  So there is a look ahead problem that is easy
-    to solve in a dom based solution but not a sax solution.
-
-    Since I made the wrong choice at the beginning - using sax
-    instead of the more flexible dom, I've decided to live with it
-    and just parse the docs for worksheet 3 twice, once to find out
-    which blocks have a ReviewStatus='Problematic' and once to
-    do the rest of the processing.  The performance penalty is
-    negligible since the number of docs affected is small and their
-    size is small.
-
-    Communication is via a global.  The set g_problemBlockSet will
-    contain identifying numbers for every block that has a
-    ReviewStatus='Problematic".  The numbers are node numbers for
-    the head node for the block - managed identically in both parsing
-    passes.
-
-    Alas, once you go far enough down the road of a mistake, the
-    best choice is sometimes to go farther.
-    """
-    def startDocument(self):
-        # Clear the global set of problematic head nodes
-        global g_problemBlockSet
-        g_problemBlockSet = set()
-
-        # Stack of full xpaths to current node push at start, pop at end
-        # Must work just like DocHandler
-        self.pathStack = PathStack()
-
-    def startElement(self, name, attrs):
-        # Stack maintenance
-        self.pathStack.pathPush(name)
-
-        # New text for this element
-        self.text = ''
-
-    def characters(self, content):
-        # Cumulate text
-        self.text += content
-
-    def endElement(self, name):
-        global g_problemBlockSet
-
-        # If we have a problematic review status, save the node number
-        #   of the parent of the current node
-        if name == 'ReviewStatus':
-            if self.text == 'Problematic':
-                g_problemBlockSet.add(self.pathStack.getNodeNum(1))
-
-        # Stack maintenance
-        self.pathStack.pathPop()
-
-def addCols(sheet, colList):
-    """
-    Create columns in a worksheet using a sequence of ColControls
-
-    Pass:
-        sheet   - Worksheet to add to.
-        colList - Sequence of columns
-    """
-    if None:  # Unused for now
-        # First column gets special label styling
-        for col in colList:
-            sheet.addCol(col.index, col.width)
-
-
-def addWorksheet(session, wb, title, colList, qry, dateCol):
-    """
-    Create a complete worksheet using style for this report.
-
-    Creates the worksheet and adds all rows to it.
-
-    Pass:
-        session - Logged in session.
-        wb      - Workbook created via ExcelWriter.
-        title   - column header.
-        colList - Sequence of ColControls for sheet.
-        qry     - SQL query to select rows for the sheet.  Each row must
-                  have two columns, CDR doc ID, doc creation date.
-        dateCol - Worksheet column for create/import date.
-
-    Return:
-        Reference to sheet
-    """
-    global G_wsRow
-    global sheetNameStyle, colLabelStyle, errorStyle, docSeparatorStyle
-    global dataStyle
-
-    # ExcelWriter creates the worksheet
-    ws = wb.addWorksheet(title, frozenRows=2)
-
-    # Setup standard rows
-    sheetRow = ws.addRow(1, style=sheetNameStyle)
-    sheetRow.addCell(1, value=title)
-    labelRow = ws.addRow(2, style=colLabelStyle)
-
-    # First row for document data
-    G_wsRow = 3
-
-    # Setup column headers in 2rd row
-    for col in colList:
-        ws.addCol(col.index, col.width)
-        if col.label:
-            labelRow.addCell(col.index, col.label)
-
-    # Index the column list
-    # Also remember highest column received
-    colHash = {}
-    colHash['@@maxColIndex'] = 0
-    for col in colList:
-        colHash[col.element] = col
-        if col.index > colHash['@@maxColIndex']:
-            colHash['@@maxColIndex'] = col.index
-
-    # Perform SQL selection
-    rows = None
-    conn = cdrdb.connect("CdrGuest")
-    try:
-        cursor = conn.cursor()
-        cursor.execute(qry)
-        rows = cursor.fetchall()
-        cursor.close()
-    except cdrdb.Error, info:
-        cdrcgi.bail("Database error searching for %s:<br> %s" % (
-                    title, str(info)))
-
-    # If no rows, tell user
-    if len(rows) == 0:
-        errRow = ws.addRow(3, style=errorStyle)
-        errRow.addCell(2, "NO DOCUMENTS FOUND")
-
-        # We're done with this worksheet
-        return
-
-    # Process each document found by the query
-    docCount = 0
-    for row in rows:
-        (docId, docDate) = row
-
-        # Fetch the XML for this ID
-        dXml = cdr.getDoc(session, docId)
-        docXml = cdr.getCDATA(dXml)
-        if not docXml:
-            # Found a bad doc in database
-            logMsg("DrugReviewReport.py can't get docXml for docId=%d\n%s" \
-                         % (docId, dXml))
-            continue
-        docCount += 1
-
-        # If past the first doc, create a separator row
-        if docCount > 1:
-            row = ws.addRow(G_wsRow, style=docSeparatorStyle)
-            row.addCell(1, " ", style=docSeparatorStyle,
-                        mergeAcross=colHash['@@maxColIndex'] - 1)
-            G_wsRow += 1
-
-        # Parse and process the document
-        # Parse uses and updates G_wsRow, tracking spreadsheet rows
-        xml.sax.parseString(docXml, DocHandler(docXml, ws, colHash, docId,
-                                               docDate, dateCol))
-
-
-# Front ends, passing parameters
-def chkReviewStatus1(handler):
-    return chkReviewStatus(handler, 1)
-
-def chkReviewStatus3(handler):
-    return chkReviewStatus(handler, 3)
-
-def chkReviewStatus(handler, ancestor):
-    """
-    Called when we get a field that is only to be displayed if
-    a ReviewStatus in the same block is set to 'Problematic'.
-
-    Checks g_problemBlockSet to see if this node or its parent
-    is involved with a problematic review status.  The global
-    is set in a pre-pass parse.
-
-    Uses relative node numbers, not element names.  That way we
-    can distinguish specific occurrences of fields.
-
-    Pass:
-        handler  - DocHandler instance
-        ancestor - How far up the tree do we look?
-
-    Returns:
-        Contents of field, if problematic
-        Null string if field is not problematic
-    """
-    global g_problemBlockSet
-
-    # Is the current node in the set?
-    if handler.pathStack.getNodeNum(ancestor) in g_problemBlockSet:
-       return handler.text
-    return ""
-
-
-def addComment(handler):
-    """
-    Call this function if a comment is received.
-    It adds text to an already existing cell in the worksheet.
-    """
-    # Only add the comment if it has an attribute audience="External"
-    #DBG if True:
-    if handler.attrs.has_key("audience"):
-        if handler.attrs.getValue("audience") == "External":
-
-            # Get current value in the ColControl.index cell
-            cell = handler.curRow.getCell(handler.curCtl.index)
-            if (cell):
-                value = cell.getValue()
+        rich_text = False
+        first = True
+        pieces = []
+        for definition in definitions:
+            if not first:
+                pieces.append("\n\n")
+            if isinstance(definition.with_comments, basestring):
+                pieces.append(definition.with_comments)
             else:
-                value = ""
-                cell = handler.curRow.addCell(handler.curCtl.index, value)
+                pieces += definition.with_comments
+                rich_text = True
+            first = False
+        if rich_text:
+            return pieces
+        else:
+            return "".join(pieces)
 
-            # Style the text of the comment.
-            # Users wanted a new line, italics and different color, but
-            #   Bob found no Python/Perl/Excel interface for that
-            comment = "  **comment: [%s]" % handler.text
+    def problematic(self):
+        """
+        Determine whether drug should a appear on the list of terms to review.
+        """
 
-            # Append comment text to it
-            value += comment
+        if self.status == self.PROBLEMATIC:
+            return True
+        for other_name in self.other_names:
+            if other_name.problematic():
+                return True
+        for definition in self.definitions:
+            if definition.problematic():
+                return True
+        return False
 
-            # Replace cell content using the new value
-            cell.replaceValue(value)
+    def from_nci_thesaurus(self):
+        """
+        Determine whether the source for drug term was the NCI thesaurus.
+        """
 
-            # Don't do anything else with comment
-            return ""
+        for other_name in self.other_names:
+            if other_name.source and other_name.source.code == self.THESAURUS:
+                return True
+        return False
 
+    @classmethod
+    def add_comments(cls, obj, value_name):
+        """
+        Append the comments associated with a value for its cell display.
 
-#----------------------------------------------------------------------
-# Main
-#----------------------------------------------------------------------
+        We only show public (audience="External") comments.
 
-# Get the document id for the Term doc for semantic type = 'Drug/Agent'
-conn = cdrdb.connect("CdrGuest")
-drugAgentDocId = 0
-try:
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT doc_id
-          FROM query_term
-         WHERE path='/Term/PreferredName'
-           AND value='Drug/Agent'
-    """)
-    row = cursor.fetchone()
-    drugAgentDocId = row[0]
-    cursor.close()
-except cdrdb.Error, info:
-    cdrcgi.bail("Database error fetching Drug/Agent docId: %s" % (str(info)))
+        Pass:
+            obj        - object containing the value and associated comments
+            value_name - name of the object's attribute containing the value
 
-#----------------------------------------------------------------------
-# Worksheet 1: New drugs from NCI Thesaurus
-#----------------------------------------------------------------------
-wsCols = (
-    ColControl("CDR ID", None, 1, 45),
-    ColControl("Preferred Name", u"/Term/PreferredName", 2, 105),
-    ColControl("Other Names", u"/Term/OtherName/OtherTermName", 3, 105),
-    ColControl("Other Name Type", u"/Term/OtherName/OtherNameType", 4, 80),
-    ColControl("Source",
-        u"/Term/OtherName/SourceInformation/VocabularySource/SourceCode",
-        5, 90),
-    ColControl("TType",
-       u"/Term/OtherName/SourceInformation/VocabularySource/SourceTermType",
-       6, 70),
-    ColControl("SourceID",
-       u"/Term/OtherName/SourceInformation/VocabularySource/SourceTermId",
-       7, 45),
-    ColControl("Definition", u"/Term/Definition/DefinitionText", 8, 210),
-    ColControl("Last Modified", None, 9, 65),
+        Return:
+            single string if the object has no public comments; otherwise
+            a sequence of values, some with rich text formatting
+        """
 
-    # Special functions
-    ColControl(None, u"/Term/Comment", 2, 105, (addComment,)),
-    ColControl(None, u"/Term/OtherName/Comment", 3, 105, (addComment,)),
-    ColControl(None, u"/Term/Definition/Comment", 8, 210, (addComment,)),
-)
+        pieces = [getattr(obj, value_name)]
+        for comment in obj.comments:
+            wrapper = comment.wrap(cls.comment_font)
+            if wrapper:
+                pieces.append(wrapper)
+        if len(pieces) == 1:
+            return pieces[0]
+        return pieces
 
-qry = """
-SELECT q3.doc_id, q3.value
-  FROM query_term q1
-  JOIN query_term q2
-    ON q1.doc_id = q2.doc_id
-  JOIN query_term q3
-    ON q1.doc_id = q3.doc_id
- WHERE q1.path = '/Term/SemanticType/@cdr:ref'
-   AND q1.int_val = %d
-   AND q2.path = '/Term/OtherName/SourceInformation/VocabularySource/SourceCode'
-   AND q2.value = 'NCI Thesaurus'
-   AND q3.path = '/Term/DateLastModified'
-   AND q3.value >= '%s'
-   AND q3.value <= '%s'
- GROUP BY q3.doc_id, q3.value
-""" % (drugAgentDocId, start_date, end_date)
+    @staticmethod
+    def get_text(node):
+        """
+        Assemble the concatenated text nodes for an element of the document.
 
-# cdrcgi.bail("here")
-g_problemBlockSet = None
-ws = addWorksheet(session, wb, "New Drugs from NCI Thesaurus", wsCols,
-                  qry, 9)
+        Note that the call to node.itertext() must include the wildcard
+        string argument to specify that we want to avoid recursing into
+        nodes which are not elements. Otherwise we will get the content
+        of processing instructions, and how ugly would that be?!?
+        """
 
-#----------------------------------------------------------------------
-# Worksheet 2: New drugs from the CDR
-#----------------------------------------------------------------------
-wsCols = (
-    ColControl("CDR ID", None, 1, 45),
-    ColControl("Preferred Name", u"/Term/PreferredName", 2, 140),
-    ColControl("Other Names", u"/Term/OtherName/OtherTermName", 3, 140),
-    ColControl("Other Name Type", u"/Term/OtherName/OtherNameType", 4, 80),
-    ColControl("Last Modified", None, 5, 65),
+        if node is None:
+            return u""
+        return u"".join(node.itertext("*"))
 
-    # Special functions
-    ColControl(None, u"/Term/Comment", 2, 140, (addComment,)),
-    ColControl(None, u"/Term/OtherName/Comment", 3, 140, (addComment,)),
-)
+    class Definition:
+        """
+        One of the definitions for a drug term
+        """
 
-qry = """
-SELECT q2.doc_id, q2.value
-  FROM query_term q1
-  JOIN query_term q2
-    ON q1.doc_id = q2.doc_id
-  JOIN query_term q3
-    ON q1.doc_id = q3.doc_id
- WHERE q1.path = '/Term/SemanticType/@cdr:ref'
-   AND q1.int_val = %d
-   AND q2.path = '/Term/DateLastModified'
-   AND q2.value >= '%s'
-   AND q2.value <= '%s'
-   AND q2.doc_id NOT IN (
-    SELECT doc_id
-      FROM query_term
-     WHERE path='/Term/OtherName/SourceInformation/VocabularySource/SourceCode'
-       AND value = 'NCI Thesaurus'
-    )
- GROUP BY q2.doc_id, q2.value
-""" % (drugAgentDocId, start_date, end_date)
+        def __init__(self, node):
+            """
+            Collect the definition's text, comments and status.
 
-g_problemBlockSet = None
-ws = addWorksheet(session, wb, "New Drugs from the CDR", wsCols, qry, 5)
+            We perform the assembly of the text with comments here
+            to avoid doing it multiple times in case the definition
+            appears in more than one table.
+            """
 
-#----------------------------------------------------------------------
-# Worksheet 3: Drugs to be Reviewed
-#----------------------------------------------------------------------
-wsCols = (
-    ColControl("CDR ID", None, 1, 45),
-    ColControl("Preferred Name", u"/Term/PreferredName", 2, 105),
-    ColControl("Other Names", u"/Term/OtherName/OtherTermName", 3, 105,
-        (chkReviewStatus1,)),
-    ColControl("Other Name Type", u"/Term/OtherName/OtherNameType", 4, 80,
-        (chkReviewStatus1,)),
-    ColControl("Source",
-        u"/Term/OtherName/SourceInformation/VocabularySource/SourceCode",
-        5, 90, (chkReviewStatus3,)),
-    ColControl("TType",
-        u"/Term/OtherName/SourceInformation/VocabularySource/SourceTermType",
-        6, 70, (chkReviewStatus3,)),
-    ColControl("SourceID",
-        u"/Term/OtherName/SourceInformation/VocabularySource/SourceTermId",
-        7, 45, (chkReviewStatus3,)),
-    ColControl("Definition", u"/Term/Definition/DefinitionText", 8, 210,
-        (chkReviewStatus1,)),
-    ColControl("Last Modified", None, 9, 65),
+            self.text = Drug.get_text(node.find("DefinitionText"))
+            self.status = None
+            self.comments = []
+            for child in node.findall("ReviewStatus"):
+                self.status = Drug.get_text(child)
+            for child in node.findall("Comment"):
+                self.comments.append(Drug.Comment(child))
+            self.with_comments = Drug.add_comments(self, "text")
 
-    # Special functions
-    ColControl(None, u"/Term/Comment", 2, 105, (addComment,)),
-    ColControl(None, u"/Term/OtherName/Comment", 3, 105, (addComment,)),
-    ColControl(None, u"/Term/Definition/Comment", 8, 210, (addComment,))
-)
+        def problematic(self):
+            """
+            Determine whether this definition should appear in the
+            table of drug terms which need review.
+            """
 
-qry = """
-SELECT q3.doc_id, q3.value
-  FROM query_term q1
-  JOIN query_term q2
-    ON q1.doc_id = q2.doc_id
-  JOIN query_term q3
-    ON q1.doc_id = q3.doc_id
- WHERE q1.path = '/Term/SemanticType/@cdr:ref'
-   AND q1.int_val = %d
-   AND (
-       q2.path = '/Term/OtherName/ReviewStatus'
-      OR
-       q2.path = '/Term/Definition/ReviewStatus'
-      OR
-       q2.path = '/Term/ReviewStatus'
-       )
-   AND q2.value = 'Problematic'
-   AND q3.path = '/Term/DateLastModified'
-   AND q3.value > '%s'
-   AND q3.value <= '%s'
- GROUP BY q3.doc_id, q3.value
-""" % (drugAgentDocId, start_date, end_date)
+            return self.status == Drug.PROBLEMATIC
 
-g_problemBlockSet = set()
-ws = addWorksheet(session, wb, "Drugs to be Reviewed", wsCols, qry, 9)
+    class OtherName:
+        """
+        An alternate name for the drug term.
+        """
 
-# DEBUG
-#DBG import os.path
-#DBG fname = "d:/cdr/log/DrugTerm.xls"
-#DBG if os.path.exists(fname):
-#DBG     os.remove(fname)
-#DBG fp = open(fname, "wb")
-#DBG wb.write(fp, False)
-#DBG fp.close()
-#DBG cdr.logout(session)
-#DBG cdrcgi.bail("All done")
-if sys.platform == "win32":
-    import os, msvcrt
-    msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
-print "Content-type: application/vnd.ms-excel"
-print "Content-Disposition: attachment; filename=DrugReviewReport.xls"
-print
-wb.write(sys.stdout, True)
+        def __init__(self, node):
+            """
+            Extract the name, type, source and comments from the document node.
+
+            We perform the assembly of the name with comments here in order
+            to avoid doing it multiple times in case the name appears in more
+            than one table.
+            """
+
+            self.name = Drug.get_text(node.find("OtherTermName"))
+            self.type = Drug.get_text(node.find("OtherNameType"))
+            self.source = self.status = None
+            self.comments = []
+            for child in node.findall("SourceInformation/VocabularySource"):
+                self.source = self.Source(child)
+            for child in node.findall("ReviewStatus"):
+                self.status = Drug.get_text(child)
+            for child in node.findall("Comment"):
+                self.comments.append(Drug.Comment(child))
+            self.with_comments = Drug.add_comments(self, "name")
+
+        def problematic(self):
+            """
+            Determine whether this other name should appear in the
+            table of drug terms which need review.
+            """
+
+            return self.status == Drug.PROBLEMATIC
+
+        def write_cells(self, term, row, cols):
+            """
+            Populate the cells for the name's string, type, and
+            (optionally) the name's source's code, type, and ID.
+            """
+
+            sheet = term.sheet
+            values = {
+                Control.OTHER_NAMES: self.with_comments,
+                Control.OTHER_NAME_TYPE: self.type
+            }
+            if self.source:
+                values[Control.SOURCE] = self.source.code
+                values[Control.TERM_TYPE] = self.source.term_type
+                values[Control.SOURCE_ID] = self.source.term_id
+            for key, value in values.items():
+                col = cols.get(key)
+                if col:
+                    term.write_cell(row, row, col, value)
+
+        class Source:
+            """
+            Identification of the origin of the term's alternate name.
+            """
+
+            def __init__(self, node):
+                self.code = Drug.get_text(node.find("SourceCode"))
+                self.term_type = Drug.get_text(node.find("SourceTermType"))
+                self.term_id = Drug.get_text(node.find("SourceTermId"))
+
+    class Comment:
+        """
+        Comment attached to the drug term or one of its other names or
+        definitions. We only report on external comments.
+        """
+
+        PUBLIC = "External"
+
+        def __init__(self, node):
+            """
+            Fetch the text and audience for the comment.
+            """
+
+            self.text = Drug.get_text(node)
+            self.audience = node.get("audience")
+
+        def wrap(self, font):
+            """
+            Prepare the comment for display as rich text.
+
+            Pass:
+                font - xlwt Font object
+
+            Return:
+                sequence of comment text (on a separate line and enclosed
+                in brackets) and font if this is a public comment;
+                otherwise None
+            """
+
+            if self.audience == self.PUBLIC:
+                return (u"\n[%s]" % self.text, font)
+            return None
+
+if __name__ == "__main__":
+    "Allow the file to be loaded as a module instead of a script."
+    Control().run()

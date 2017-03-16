@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #----------------------------------------------------------------------
-# $Id$
+# Report on jobs managed by the Microsoft Windows scheduler.
 #----------------------------------------------------------------------
 import lxml.etree as etree
 import re

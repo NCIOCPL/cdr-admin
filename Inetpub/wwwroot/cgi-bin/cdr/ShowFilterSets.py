@@ -1,10 +1,5 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
-# Revision 1.1  2004/07/13 18:08:27  bkline
-# Show all filter sets.
-#
+# Interface for viewing CDR filter sets.
 #----------------------------------------------------------------------
 import cdr, cdrdb, sys, xml.dom.minidom, cdrcgi
 

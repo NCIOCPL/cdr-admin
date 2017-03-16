@@ -1,11 +1,6 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Display trials in the ctrp_import table.
-#
 # BZIssue::4942
-#
 #----------------------------------------------------------------------
 import cgi, cdrdb, lxml.etree as etree, sys, re
 
@@ -45,13 +40,14 @@ Content-type: text/html
       ON d.disp_id = i.disposition
 ORDER BY i.ctrp_id""")
     for ctrpId, disp, cdrId, nctId in cursor.fetchall():
-        print """\
+        row = u"""\
    <tr>
     <td><a href="show-ctrp-doc.py?id=%s">%s</a></td>
     <td>%s</td>
-    <td><a href="show-cdr-doc.py?id=%s">%s</a></td>
+    <td><a href="ShowCdrDocument.py?doc-id=%s&Request=Submit">%s</a></td>
     <td><a href="http://clinicaltrials.gov/ct2/show/%s">%s</a></td>
    </tr>""" % (ctrpId, ctrpId, disp, cdrId, cdrId, nctId, nctId)
+        print row.encode("utf-8")
     print """\
   </table>
  </body>

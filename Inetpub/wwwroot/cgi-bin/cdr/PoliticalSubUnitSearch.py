@@ -1,16 +1,6 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Duplicate-checking interface for Political SubUnit documents.
-#
-# $Log: not supported by cvs2svn $
-# Revision 1.2  2003/07/29 12:42:23  bkline
-# Plugged in filter set instead of single named filter.
-#
-# Revision 1.1  2002/02/14 19:36:35  bkline
 # Broken out from original GeographicEntity search pages.
-#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, cdrdb
 
@@ -23,7 +13,7 @@ state   = fields and fields.getvalue("State")           or None
 submit  = fields and fields.getvalue("SubmitButton")    or None
 help    = fields and fields.getvalue("HelpButton")      or None
 
-if help: 
+if help:
     cdrcgi.bail("Sorry, help for this interface has not yet been developed.")
 
 #----------------------------------------------------------------------
@@ -71,7 +61,7 @@ searchFields = (cdrcgi.SearchField(state,
 #----------------------------------------------------------------------
 # Construct the query.
 #----------------------------------------------------------------------
-(query, strings) = cdrcgi.constructAdvancedSearchQuery(searchFields, None, 
+(query, strings) = cdrcgi.constructAdvancedSearchQuery(searchFields, None,
                                                        "PoliticalSubUnit")
 #cdrcgi.bail(query)
 if not query:
@@ -87,13 +77,13 @@ try:
     cursor.close()
     cursor = None
 except cdrdb.Error, info:
-    cdrcgi.bail('Failure retrieving PoliticalSubUnit documents: %s' % 
+    cdrcgi.bail('Failure retrieving PoliticalSubUnit documents: %s' %
             info[1][0])
 
 #----------------------------------------------------------------------
 # Create the results page.
 #----------------------------------------------------------------------
-html = cdrcgi.advancedSearchResultsPage("PoliticalSubUnit", rows, strings, 
+html = cdrcgi.advancedSearchResultsPage("PoliticalSubUnit", rows, strings,
                                         'set:QC PoliticalSubUnit Set')
 
 #----------------------------------------------------------------------

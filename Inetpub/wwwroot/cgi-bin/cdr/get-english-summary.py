@@ -1,9 +1,6 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
+# Fetch an English summary ready for translation
 # BZIssue::4906
-#
 #----------------------------------------------------------------------
 import cgi, cdrdb, lxml.etree as etree, sys, re
 

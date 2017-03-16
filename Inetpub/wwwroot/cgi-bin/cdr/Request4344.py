@@ -1,14 +1,10 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # The Glossary Term Concept by Spanish Definition Status Report will serve
 # as a QC report for Spanish and corresponding English Definitions by Status.
 #
 # BZIssue::4344
 # Rewritten July 2015 to eliminate security vulnerabilities.
 # JIRA::OCECDR-3954 - new column for Spanish version of the report
-#
 #----------------------------------------------------------------------
 import cdrcgi
 import cgi

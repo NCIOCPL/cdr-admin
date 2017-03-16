@@ -90,8 +90,9 @@ class Control:
         page.add("</ol>")
         page.add(page.B.H3("Board Member Information Reports"))
         page.add("<ol>")
+        page.add_menu_link("QcReport.py", "Board Member Information QC Report",
+                           self.session, DocType="PDQBoardMemberInfo")
         for script, display in (
-            ("QcReport.py", "Board Member Information QC Report"),
             ("BoardRoster.py", "Board Roster Reports"),
             ("BoardRosterFull.py", "Board Roster Reports (Combined)"),
             ("BoardInvitationHistory.py", "Invitation History Report"),

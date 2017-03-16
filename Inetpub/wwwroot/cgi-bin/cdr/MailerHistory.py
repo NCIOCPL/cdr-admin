@@ -1,16 +1,5 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Reports on the history of mailers for a particular document.
-#
-# $Log: not supported by cvs2svn $
-# Revision 1.2  2002/10/09 13:00:11  bkline
-# Bumped up timeout for database query.
-#
-# Revision 1.1  2002/05/03 20:28:54  bkline
-# New Mailer reports.
-#
 #----------------------------------------------------------------------
 import cdrdb, cdrcgi, cgi, re, string
 

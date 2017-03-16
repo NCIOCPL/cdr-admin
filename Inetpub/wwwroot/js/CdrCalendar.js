@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Modeled after the calendar used in Django.
  *
  * JavaScript calendar.  In order to have a form field use the calendar
@@ -249,7 +247,7 @@ var CdrCalendar = {
         this.month     = this.fieldDate.getMonth() + 1;
         this.year      = this.fieldDate.getFullYear();
     },
-    
+
     findX: function(obj) {
         var x = 0;
         var o = obj;
@@ -329,9 +327,9 @@ CdrCalendar.debugLog("n="+n+" n.nodeName="+n.nodeName+" n.scrollTop="+n.scrollTo
         if (CdrCalendar.ie)
             target = document.body;
         calBox.style.display = 'block';
-        CdrCalendar.addEvent(target, 'click', function() { 
-            CdrCalendar.dismissCalendar(n); 
-            return true; 
+        CdrCalendar.addEvent(target, 'click', function() {
+            CdrCalendar.dismissCalendar(n);
+            return true;
         });
     },
     dismissCalendar: function(num) {

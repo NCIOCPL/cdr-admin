@@ -1,12 +1,10 @@
 #----------------------------------------------------------------------
-#
-# $Id$
+# Admin menu for reports on CDR Media documents.
 #
 # BZIssue::1653
 # BZIssue::2135
 # BZIssue::3226
 # BZIssue::3704
-#
 #----------------------------------------------------------------------
 import cgi, cdrcgi
 
@@ -57,10 +55,10 @@ page.add("</ol>")
 page.add(B.H3("Management Reports"))
 page.add("<ol>")
 for script, label in(
+    ("ocecdr-4038.py?", "Media (Images) Processing Status Report"),
     ('RecordingTrackingReport.py?', 'Board Meeting Recording Tracking Report'),
     ('MediaLists.py?',              'Media Lists'),
     ('ocecdr-3704.py?',             'Media Permissions Report'),
-    ('MediaTrackingReport.py?',     'Media Tracking Report'),
     ('MediaCaptionContent.py?',     'Media Caption and Content Report'),
     ('PubStatsByDate.py?VOL=Y&',    'Media Doc Publishing Report'),
     ('MediaLinks.py?',              'Linked Media Documents'),

@@ -1,9 +1,6 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
-# BZIssue::1779
-#
+# Show new changes of imported CT.gov protocols.
+# BZIssue::1779 - fix HTTP bug
 #----------------------------------------------------------------------
 import cdr, cdrcgi, cdrdb, sys, cgi, re, sys, os, textwrap
 

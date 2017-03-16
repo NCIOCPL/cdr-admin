@@ -1,7 +1,5 @@
 #----------------------------------------------------------------------
 #
-# $Id$
-#
 # Show version history of document.
 #
 # BZIssue::216  - explain unavailable removal dates
@@ -49,7 +47,7 @@ class Control(cdrcgi.Control):
                 return Document(self, doc_id)
             except Exception:
                 cdrcgi.bail("Not a valid document ID")
-        title = self.fields.getvalue("DocTitle")
+        title = unicode(self.fields.getvalue("DocTitle", ""), "utf-8")
         if not title:
             return None
         query = cdrdb.Query("document d", "d.id", "d.title", "t.name").order(2)

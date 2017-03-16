@@ -1,7 +1,4 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Request form for all genetics professional mailers.
 #
 # Selection criteria for documents to mail include:

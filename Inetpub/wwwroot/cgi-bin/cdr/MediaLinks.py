@@ -1,13 +1,9 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Report listing all document that link to Media documents
 #
 # BZIssue::4394  Modified report to adjust for new Glossary document structure.
 # BZIssue::3226  Initial version of report.
 # OCECDR-3619    Optimized query that was timing out; code cleanup.
-#
 #----------------------------------------------------------------------
 import cdrdb, cdrcgi, cgi, time
 

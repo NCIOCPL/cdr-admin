@@ -1,7 +1,4 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Transform a CDR document using an XSL/T filter and send it back to
 # the browser.
 #
@@ -15,7 +12,6 @@
 # BZIssue::5113 - Modifying PublishPreview to Work with WCMS Release 6.3
 # BZIssue::OCECDR-3618 - Audio does not play in pub preview
 # BZIssue::OCECDR-3897 - Proxy resources from unencrypted sources
-#
 #----------------------------------------------------------------------
 import cgi
 import cdr
@@ -71,14 +67,14 @@ showProgress("Started...")
 
 
 #----------------------------------------------------------------------
-# Retrieve the CDR-ID from the SummaryURL value 
+# Retrieve the CDR-ID from the SummaryURL value
 #----------------------------------------------------------------------
 def getCdrIdFromPath(url):
     # For the SQL query we need to remove the fragment from the URL
     # and remove a trailing slash (/) that was added in older versions
     # of the GK code
-    # A URL could contain a single quote('), i.e. in the string 
-    # "Hodgkin's".  If this appears the quote has to be doubled in 
+    # A URL could contain a single quote('), i.e. in the string
+    # "Hodgkin's".  If this appears the quote has to be doubled in
     # order for the SELECT statement to run successfully.
     # ----------------------------------------------------------------
     ### print '*** ', url
@@ -101,7 +97,7 @@ def getCdrIdFromPath(url):
             row = cursor.fetchone()
         except cdrdb.Error, info:
             cdrcgi.bail('Database failure: %s' % info[1][0])
-        # If the passed url is not found in the query_term table it's not a 
+        # If the passed url is not found in the query_term table it's not a
         # PDQ document and we'll return None
         try:
             return row[0]
@@ -345,7 +341,7 @@ if convert:
         # output.  Without the href attribute the text is not
         # displayed as an anchor (underlined).  Setting an
         # empty href to satisfy the display style
-        # 
+        #
         # The above changed with NVCG.
         # ----------------------------------------------------
         if not 'href' in x.attrib:
@@ -404,7 +400,7 @@ if convert:
                 x.set('ohref', link)
                 x.set('type', 'SummaryFragRef-internal-frag')
             # Retrieving CDR-ID or adding server name to URL
-            elif link[0] == '/':
+            elif link and link[0] == '/':
                 if cdrId:
                     if cdrId == intId and link.find('#') > -1:
                         newLink = '#%s' % link.split('#')[1]
@@ -424,7 +420,7 @@ if convert:
                         x.set('ohref', link)
                         x.set('type', 'SummaryRef-external')
                 else:
-                # A link on the Cancer.gov website not PDQ, i.e. a 
+                # A link on the Cancer.gov website not PDQ, i.e. a
                 # ProtocolRef
                     newLink = 'http://%s.%s%s' % (cdr.h.host['CG'][0],
                                               cdr.h.host['CG'][1],
@@ -528,5 +524,7 @@ if not cdr.h.tier == 'PROD':
     pattern7 = re.compile('https://cdr.cancer.gov/cgi-bin/cdr/GetCdrImage.py')
     html = pattern7.sub("%s/cgi-bin/cdr/GetCdrImage.py" % cdr.CBIIT_NAMES[2],
                         html)
-
+fp = open("d:/tmp/pp-%s.html" % docId, "wb")
+fp.write(html)
+fp.close()
 cdrcgi.sendPage("%s" % html.decode('utf-8'))

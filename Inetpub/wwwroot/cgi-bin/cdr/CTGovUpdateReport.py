@@ -1,12 +1,8 @@
 #----------------------------------------------------------------------
-#
 # Compare CTgovProtocol documents from an import job with the current
 # publishable version of the the same documents.
 #
 # BZIssue::1881
-#
-# $Id$
-#
 #----------------------------------------------------------------------
 
 import time, cgi, cdr, cdrcgi, cdrdb, cdrbatch, CTGovUpdateCommon

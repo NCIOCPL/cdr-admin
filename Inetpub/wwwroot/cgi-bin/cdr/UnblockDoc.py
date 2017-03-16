@@ -1,10 +1,6 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Make a blocked document active.
 # Modified July 2015 as part of security sweep.
-#
 #----------------------------------------------------------------------
 import cdr
 import cdrcgi

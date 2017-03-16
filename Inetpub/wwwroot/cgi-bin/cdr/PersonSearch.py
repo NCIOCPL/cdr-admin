@@ -1,37 +1,5 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Prototype for duplicate-checking interface for Person documents.
-#
-# $Log: not supported by cvs2svn $
-# Revision 1.9  2003/02/13 13:36:20  bkline
-# Fixed path to address components for private practice locations.
-#
-# Revision 1.8  2002/11/14 13:53:41  bkline
-# Adjusted paths to match schema changes.
-#
-# Revision 1.7  2002/06/26 20:05:25  bkline
-# Modified advanced Person search forms to use QcReport.py for doc display.
-#
-# Revision 1.6  2002/06/06 12:01:27  bkline
-# Added calls to cdrcgi.unicodeToLatin1().
-#
-# Revision 1.5  2002/06/04 20:19:35  bkline
-# Fixed typos in query_term paths.
-#
-# Revision 1.4  2002/05/08 17:41:51  bkline
-# Updated to reflect Volker's new filter names.
-#
-# Revision 1.3  2002/04/12 19:57:19  bkline
-# Installed new filters.
-#
-# Revision 1.2  2002/02/14 19:38:41  bkline
-# Replaced hardwired filter ID with filter name.
-#
-# Revision 1.1  2001/12/01 18:11:44  bkline
-# Initial revision
-#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, cdrdb
 

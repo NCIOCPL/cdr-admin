@@ -1,10 +1,8 @@
 #----------------------------------------------------------------------
-#
-# $Id$
+# Administrative menu for managing CDR DrugInformationSummary documents.
 #
 # BZIssue::4887 - New Drug Information Summary Report
 # BZIssue::4922 - Enhancements to the Summaries with Markup Report
-#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
 
@@ -31,19 +29,19 @@ elif action == SUBMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if action == "Log Out": 
+if action == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
 # Display available menu choices.
 #----------------------------------------------------------------------
-form = """                                                                     
+form = """
     <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
     <H3>QC Reports</H3>
-    <OL>                                                                        
-""" % (cdrcgi.SESSION, session)                                                 
+    <OL>
+""" % (cdrcgi.SESSION, session)
 QCReports = (('DISSearch.py?type=advanced', 'Advanced Search'),
-             ('QcReport.py?DocType=DrugInformationSummary', 
+             ('QcReport.py?DocType=DrugInformationSummary',
               'Drug Information QC Report'),
              ('QcReport.py?DocType=DrugInformationSummary&ReportType=pp&',
               'Publish Preview'))

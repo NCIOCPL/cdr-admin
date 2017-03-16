@@ -1,12 +1,6 @@
 #----------------------------------------------------------------------
-#
-# ReverifyJob.py
-# -------------
-# $Id$
-#
 # Web interface to allow running the ReverifyPushJob program in the
 # CBIIT environment
-#
 #----------------------------------------------------------------------
 import sys, os, cdr, cgi, cdrcgi, cdrdb, time
 

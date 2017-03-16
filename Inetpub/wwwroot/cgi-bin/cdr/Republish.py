@@ -1,15 +1,7 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # User interface for requesting republication of documents to be
 # sent to Cancer.gov.
-#
-# Revision 1.1  2007/05/16 16:03:38  bkline
-# User interface for resending documents to Cancer.gov.
-#
 # BZIssue::4855 - Add GKTarget Parameter to Re-publishing Job Interface
-#
 #----------------------------------------------------------------------
 import cdr, cdrdb, cdrcgi, cgi, RepublishDocs
 

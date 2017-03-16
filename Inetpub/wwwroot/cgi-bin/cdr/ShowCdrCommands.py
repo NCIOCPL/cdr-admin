@@ -1,8 +1,5 @@
 #----------------------------------------------------------------------
-# $Id$
-#
 # Show CDR summary of commands submitted during a specified time period.
-#
 #----------------------------------------------------------------------
 import cdr, cdrcgi, cdrdb, cgi, xml.dom.minidom
 

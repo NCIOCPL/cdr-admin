@@ -1,12 +1,8 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Reports on citation documents which have changed.
 #
 # BZIssue::161 - Changed "Title" label to "DocTitle" as requested by Eileen
 # JIRA::OCECDR-3800 - Address security vulnerabilities
-#
 #----------------------------------------------------------------------
 import cgi
 import cdrcgi

@@ -1,5 +1,4 @@
 #----------------------------------------------------------------------
-#
 # Report listing all references cited in a selected version of a
 # cancer information summary.
 #
@@ -7,257 +6,274 @@
 # BZIssue::4651 add PMID link to citations
 # BZIssue::4786 fix non-Pubmed citations
 # JIRA::OCECDR-3456 switch NCBI url to use HTTPS protocol
-#
+# JIRA::OCECDR-4179 include module refs by default (complete rewrite)
+# JIRA::OCECDR-4194 remove duplicate citations
 #----------------------------------------------------------------------
 
-import xml.dom.minidom, cgi, re, cdr, cdrcgi, cdrdb
-import locale, time
+import datetime
+import locale
+import lxml.etree as etree
+import cdr
+import cdrcgi
+import cdrdb
 
-locale.setlocale(locale.LC_COLLATE, "")
+class Control(cdrcgi.Control):
+    """
+    Report-specific behavior implemented in this derived class.
+    """
 
-#----------------------------------------------------------------------
-# Get the parameters from the request.
-#----------------------------------------------------------------------
-fields     = cgi.FieldStorage()
-session    = fields and cdrcgi.getSession(fields)     or None
-request    = fields and cdrcgi.getRequest(fields)     or None
-docId      = fields and fields.getvalue("DocId")      or None
-docTitle   = fields and fields.getvalue("DocTitle")   or None
-docVersion = fields and fields.getvalue("DocVersion") or None
-script     = "SummaryCitations.py"
-SUBMENU    = "Report Menu"
-buttons    = ["Submit", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-title      = "CDR Administration"
-section    = "Summary Citations Report"
-header     = cdrcgi.header(title, title, section, script, buttons)
+    def __init__(self):
+        """
+        Collect and validate the request parameters.
+        """
 
-#----------------------------------------------------------------------
-# Make sure we're logged in.
-#----------------------------------------------------------------------
-if not session: cdrcgi.bail('Unknown or expired CDR session.')
+        cdrcgi.Control.__init__(self, "Summary Citations Report")
+        self.parsed = set()
+        self.summary_title = None
+        self.doc_id = self.fields.getvalue("DocId")
+        self.title_fragment = self.fields.getvalue("DocTitle", "").strip()
+        self.doc_version = self.fields.getvalue("DocVersion")
+        self.modules = self.fields.getvalue("modules") and True or False
+        if self.doc_id:
+            try:
+                self.doc_id = cdr.exNormalize(self.doc_id)[1]
+            except:
+                cdrcgi.bail("invalid CDR document id format")
+        if self.doc_version:
+            try:
+                self.doc_version = int(self.doc_version)
+            except:
+                cdrcgi.bail(cdrcgi.TAMPERING)
 
-#----------------------------------------------------------------------
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if request == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif request == SUBMENU:
-    cdrcgi.navigateTo("Reports.py", session)
+    def populate_form(self, form):
+        """
+        Put up the initial report request form.
+        """
 
-#----------------------------------------------------------------------
-# Handle request to log out.
-#----------------------------------------------------------------------
-if request == "Log Out":
-    cdrcgi.logout(session)
+        if self.doc_id:
+            self.show_versions(form)
+        elif self.title_fragment:
+            self.show_titles(form)
+        else:
+            self.show_first_form(form)
 
-#----------------------------------------------------------------------
-# Validate input docId
-#----------------------------------------------------------------------
-if docId:
-    try:
-        cdr.exNormalize(docId)
-    except:
-        cdrcgi.bail("Invalid CDR ID entered: %s" % cgi.escape(docId))
+    def show_first_form(self, form):
+        """
+        Gather the preliminary information for the request.
 
-#----------------------------------------------------------------------
-# Display the report if we have a document ID and version number.
-#----------------------------------------------------------------------
-def report(docId, docVersion):
-    if docVersion == "-1":
-        docVersion = None
-    filterSet = ['set:Denormalization Summary Set']
-    response = cdr.filterDoc('guest', filterSet, docId, docVer = docVersion)
-    if type(response) in (type(""), type(u"")):
-        cdrcgi.bail(response)
-    try:
-        dom = xml.dom.minidom.parseString(response[0])
-    except:
-        cdrcgi.bail("Failure parsing filtered document")
-    refs = []
-    summaryTitle = ""
-    for refList in dom.getElementsByTagName("ReferenceList"):
-        for ref in refList.childNodes:
-            refPmid = ""
-            if ref.nodeName == "Citation":
-                refString = cdr.getTextContent(ref, recurse = True).strip()
+        User must enter either a CDR ID or a title fragment. By
+        default we recurse into linked summary modules, but the
+        user can suppress that behavior.
+        """
 
-                if u'PMID' in ref.attributes.keys():
-                    refPmid = str(ref.attributes["PMID"].value)
-                if refString:
-                    if refString[-1] != ".":
-                        refString += "."
-                    refs.append('%s [@@%s@@]' % (refString, refPmid))
-    for child in dom.documentElement.childNodes:
-        if child.nodeName == "SummaryTitle":
-            summaryTitle = cdr.getTextContent(child)
-            break
-    #refs.sort(cmp=lambda x,y: cmp(x.lower(), y.lower()))
-    refs.sort(lambda x, y: locale.strcoll(x.lower(), y.lower()))
-    prevRef = None
-    digits = re.sub(r"[^\d]", "", docId)
-    id = int(digits)
-    pubMedLink = ' [<a href="https://www.ncbi.nlm.nih.gov/pubmed/'
-    html = """\
-<!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
-<html>
- <head>
-  <title>CDR%010d %s -- %s</title>
-  <style type='text/css'>
-   h1 { text-align: left; font-size: 18pt; font-weight: bold; }
-   h2 { text-align: left; font-size: 14pt; font-weight: bold; }
-   body { font-size: 12pt; font-family: Arial,sans-serif; }
-  </style>
- </head>
- <body>
-  <h1>%s</h1>
-  <h2>References:</h2>
-  <ol>
-""" % (id, summaryTitle, time.strftime("%B %d, %Y"), summaryTitle)
+        form.add("<fieldset>")
+        form.add(form.B.LEGEND("Select a document"))
+        form.add_text_field("DocTitle", "Title")
+        form.add_text_field("DocId", "CDR ID")
+        form.add("</fieldset>")
+        form.add("<fieldset>")
+        form.add(form.B.LEGEND("Linked summary modules"))
+        form.add_radio("modules", "Include citations in linked modules",
+                       "1", checked=True)
+        form.add_radio("modules", "Exclude citations in linked modules", "")
+        form.add("</fieldset>")
 
-    for ref in refs:
-        if ref != prevRef:
-            # Building the link for the PubMedID (format is [@@12345@@])
-            # ----------------------------------------------------------
-            nn = ref.find(' [@@')
-            newRef = ref[:nn]    # slice off the PMID
-            newId  = ref[nn+1:]  # slice off the PMID
-            if newId.replace('@@', '') == '[]':
-                newId = ''
-            else:
-                pmid  = newId[3:-3]
-                newId = newId.replace('@@]', '?dopt=Abstract">'
-                                   + pmid + '</a>]').replace('[@@', pubMedLink)
+    def show_versions(self, form):
+        """
+        Let the user select the document version for the report.
+        """
 
-            html += """\
-   <li>%s%s</li>
-""" % (cgi.escape(newRef), newId)
-            prevRef = newRef
-    cdrcgi.sendPage(html + u"""\
-  </ol>
- </body>
-</html>
-""")
+        query = cdrdb.Query("doc_version v", "v.num", "v.dt", "v.comment")
+        query.join("usr u", "u.id = v.usr")
+        query.where(query.Condition("v.id", self.doc_id))
+        rows = query.order("v.num DESC").execute(self.cursor).fetchall()
+        if not rows:
+            self.doc_version = -1
+            self.show_report()
+        else:
+            query = cdrdb.Query("document", "title")
+            query.where("id = %d" % self.doc_id)
+            title = query.execute(self.cursor).fetchone()[0].split(";")[0]
+            form.add_hidden_field("modules", self.modules and "1" or "")
+            form.add_hidden_field("DocId", str(self.doc_id))
+            form.add("<fieldset>")
+            form.add(form.B.LEGEND(u"Select version for %s" % title))
+            versions = [(-1, "Current Working Version")]
+            for version, date, comment in rows:
+                comment = comment or "[No comment]"
+                label = u"[V%d %s] %s" % (version, str(date)[:10], comment)
+                versions.append((version, label))
+            form.add_select("DocVersion", "Version", versions, -1)
+            form.add("</fieldset>")
 
-#----------------------------------------------------------------------
-# Put up a selection list from which the user can select a version.
-#----------------------------------------------------------------------
-def pickVersion(docId):
-    try:
-        digits = re.sub(r"[^\d]", "", docId)
-        id = int(digits)
-    except:
-        cdrcgi.bail("Invalid value for document ID: %s" % docId)
-    if not id:
-        cdrcgi.bail("Invalid value for document ID: %s" % docId)
-    try:
-        conn = cdrdb.connect('CdrGuest')
-        cursor = conn.cursor()
-        cursor.execute("""\
-            SELECT v.num, v.dt, u.name, v.val_status, v.publishable, v.comment
-              FROM doc_version v
-              JOIN usr u
-                ON u.id = v.usr
-             WHERE v.id = ?
-          ORDER BY v.num DESC""", id)
-        rows = cursor.fetchall()
-    except:
-        raise
-        cdrcgi.bail("Database failure getting document versions for %s" %
-                    docId)
-    if not rows:
-        report(docId, None)
-    elif len(rows) == 1:
-        report(docId, rows[0][0])
-    form = u"""\
-   <input type='hidden' name='%s' value='%s'>
-   <input type='hidden' name='DocId' value='%s'>
-   Select document version:&nbsp;
-   <select name='DocVersion'>
-    <option value='-1' selected='1'>Current Working Version</option>
-""" % (cdrcgi.SESSION, session, docId)
-    for row in rows:
-        # We don't use all of this information any more (at Lakshmi's request).
-        ver, dt, usr, valStat, publishable, comment = row
-        form += u"""\
-    <option value='%d'>[V%d %s] %s</option>
-""" % (ver, ver, dt and dt[:10] or "*** NO DATE ***",
-       comment and cgi.escape(comment) or "[No comment]")
-    form += u"""
-   </select>
-  </form>
- </body>
-</html>
-"""
-    cdrcgi.sendPage(header + form)
+    def show_titles(self, form):
+        """
+        Let the user pick from a list of summaries matching the title fragment.
 
-#----------------------------------------------------------------------
-# Use a title fragment submitted by the user to determine a doc ID.
-#----------------------------------------------------------------------
-def getDocId(docTitle):
-    try:
-        conn = cdrdb.connect('CdrGuest')
-        cursor = conn.cursor()
-        cursor.execute("""\
-            SELECT d.id, d.title
-              FROM document d
-              JOIN doc_type t
-                ON t.id = d.doc_type
-             WHERE d.title LIKE ?
-               AND t.name = 'Summary'
-          ORDER BY d.id""", docTitle + '%')
-        rows = cursor.fetchall()
-    except:
-        cdrcgi.bail("Database failure getting document id(s) for %s" %
-                     cgi.escape(docTitle))
-    if not rows:
-        cdrcgi.bail("No documents found matching %s" % cgi.escape(docTitle))
-    elif len(rows) == 1:
-        pickVersion("CDR%010d" % rows[0][0])
-    form = u"""\
-   <input type='hidden' name='%s' value='%s'>
-   <h3>More than one matching document found; please choose one.</h3>
-""" % (cdrcgi.SESSION, session)
-    for row in rows:
-        form += u"""
-   <input type='radio' name='DocId' value='CDR%010d'>[CDR%010d] %s<br>
-""" % (row[0], row[0], cgi.escape(row[1]))
-    form += u"""
-  </form>
- </body>
-</html>
-"""
-    cdrcgi.sendPage(header + form)
+        If no summaries match the title fragment, bail with an error message.
+        If only one summary matches, jump straight to the version selection.
+        """
 
-#----------------------------------------------------------------------
-# Put up the main form for the report.
-#----------------------------------------------------------------------
-def getSummary():
-  cdrcgi.sendPage(header + u"""\
-   <input type='hidden' name='%s' value='%s'>
-   <table>
-    <tr>
-     <td align='right'>Document title:&nbsp;</td>
-     <td><input size='60' name='DocTitle'></td>
-    </tr>
-    <tr>
-     <td ALIGN='right'>Document ID:&nbsp;</td>
-     <td><input SIZE='60' NAME='DocId'></td>
-    </tr>
-   </table>
-  </form>
- </body>
-</html>
-""" % (cdrcgi.SESSION, session))
+        docs = self.get_docs()
+        if not docs:
+            cdrcgi.bail("No matching documents found")
+        elif len(docs) == 1:
+            self.doc_id = docs[0].id
+            self.show_versions(form)
+        else:
+            form.add_hidden_field("modules", self.modules and "1" or "")
+            form.add("<fieldset style='width: 1024px'>")
+            form.add(form.B.LEGEND("Select Summary"))
+            for doc in docs:
+                display = u"[CDR%010d] %s" % (doc.id, doc.title)
+                form.add_radio("DocId", display, str(doc.id))
+            form.add("</fieldset>")
 
-#----------------------------------------------------------------------
-# What we do depends on how much information we have.
-#----------------------------------------------------------------------
-if docId:
-    if docVersion:
-        report(docId, docVersion)
-    else:
-        pickVersion(docId)
-elif docTitle:
-    getDocId(docTitle)
-else:
-    getSummary()
+    def show_report(self):
+        """
+        Override the base class method since we have a non-tablar report
+        with intermediary forms to refine the request.
+        """
+
+        if not self.doc_id or not self.doc_version:
+            self.show_form()
+        self.parse_summary(self.doc_id, self.doc_version, self.modules)
+        locale.setlocale(locale.LC_COLLATE, "")
+        citations = sorted(Citation.citations.itervalues())
+        page = cdrcgi.Page(self.title, banner=None)
+        page.add(page.B.H1(self.summary_title))
+        page.add(page.B.H2("References"))
+        if not citations:
+            page.add("<p>No references found</p>")
+        else:
+            page.add("<ol>")
+            for citation in citations:
+                page.add(citation.li())
+            page.add("</ol>")
+        page.send()
+
+    def parse_summary(self, doc_id, doc_version=-1, recurse=False):
+        """
+        Collect the citations and the summary title from the document.
+
+        If the user has not suppressed recursion into linked summary
+        modules, parse them, too.
+        """
+
+        self.parsed.add(doc_id)
+        if doc_version == -1:
+            doc_version = None
+        filter_set = ['set:Denormalization Summary Set']
+        response = cdr.filterDoc("guest", filter_set, doc_id,
+                                 docVer=doc_version)
+        if isinstance(response, basestring):
+           cdrcgi.bail(response)
+        try:
+            root = etree.XML(response[0])
+        except:
+            cdrcgi.bail("Failure parsing filtered document")
+        for node in root.iter("ReferenceList"):
+            for child in node.findall("Citation"):
+                Citation(child)
+        if self.summary_title is None:
+            self.summary_title = ""
+            for node in root.findall("SummaryTitle"):
+                self.summary_title = node.text
+                break
+        if recurse:
+            for node in root.iter("SummaryModuleLink"):
+                cdr_id = self.extract_cdr_id(node)
+                if cdr_id and cdr_id not in self.parsed:
+                    self.parse_summary(cdr_id, recurse=recurse)
+
+    def get_docs(self):
+        """
+        Find the summaries matching the user's title fragment.
+        """
+
+        fragment = unicode(self.title_fragment, "utf-8") + "%"
+        query = cdrdb.Query("document d", "d.id", "d.title")
+        query.join("doc_type t", "t.id = d.doc_type")
+        query.where("t.name = 'Summary'")
+        query.where(query.Condition("d.title", fragment, "LIKE"))
+        rows = query.order("d.id").execute(self.cursor).fetchall()
+        class Doc:
+            def __init__(self, doc_id, doc_title):
+                self.id = doc_id
+                self.title = doc_title
+        return [Doc(*row) for row in rows]
+
+    @staticmethod
+    def extract_cdr_id(node):
+        """
+        Pull out the CDR ID as an integer from a node's cdr:ref attribute.
+        """
+
+        cdr_id = None
+        cdr_ref = node.get("{cips.nci.nih.gov/cdr}ref")
+        if cdr_ref:
+            try:
+                cdr_id = cdr.exNormalize(cdr_ref)[1]
+            except:
+                pass
+        return cdr_id
+
+class Citation:
+    """
+    Objects representing each of the unique citations found in the summaries.
+
+    Instance variables:
+
+        text  -  formatted text for the citation
+        pmid  -  optional Pubmed ID
+
+    Class variables:
+
+        citations - dictionary of unique citations found
+        BASE      - front portion of the URL for viewing the Pubmed citation
+    """
+
+    citations = {}
+    BASE = "https://www.ncbi.nlm.nih.gov/pubmed"
+
+    def __init__(self, node):
+        """
+        Extract the formatted citation and Pubmed ID.
+
+        If the citation text is not empty, and we haven't seen this one
+        yet, add the citation to the dictionary of unique citations found.
+        """
+
+        self.text = u"".join(node.itertext()).strip()
+        self.pmid = node.get("PMID")
+        if self.text:
+            if not self.text.endswith("."):
+                self.text += "."
+            key = (self.pmid, self.text)
+            if key not in Citation.citations:
+                Citation.citations[key] = self
+
+    def li(self):
+        """
+        Return the object representing the list item for the citation.
+
+        If the citation has a Pubmed ID, also include a link to the
+        citation on the Pubmed web site.
+        """
+
+        if self.pmid:
+            url = "%s/%s?dopt=Abstract" % (self.BASE, self.pmid)
+            a = cdrcgi.Page.B.A(self.pmid, href=url, target="_blank")
+            a.tail = "]"
+            return cdrcgi.Page.B.LI(self.text + " [", a)
+        return cdrcgi.Page.B.LI(self.text)
+
+    def __cmp__(self, other):
+        """
+        Use intelligent sorting for the citations, folding characters
+        with different diacritics together.
+        """
+
+        return locale.strcoll(self.text.lower(), other.text.lower())
+
+Control().run()

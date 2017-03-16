@@ -1,7 +1,4 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Submenu for summary and miscellanous document reports.
 #
 # BZIssue::545      - menu reorganization
@@ -101,6 +98,12 @@ class Control:
         page.add_menu_link("SummaryMailerReport.py",
                            "Summary Mailer Report", self.session,
                            flavor="4258")
+        page.add("</ol>")
+        page.add(page.B.H3("Translation Job Reports"))
+        page.add("<ol>")
+        page.add_menu_link("translation-job-report.py",
+                           "Translation Job Workflow Report",
+                           self.session)
         page.add("</ol>")
         page.send()
 Control().run()

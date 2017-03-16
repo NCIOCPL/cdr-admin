@@ -1,13 +1,9 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # "We need a simple 'Documents Modified' Report to be generated in an Excel
 # spreadsheet, which verifies what documents were changed within a given time
 # frame."
 #
 # JIRA::OCECDR-3800
-#
 #----------------------------------------------------------------------
 import cgi
 import cdr
@@ -15,14 +11,13 @@ import cdrcgi
 import cdrdb
 import re
 import time
-import ExcelWriter
 import sys
 
 #----------------------------------------------------------------------
 # Set the form variables.
 #----------------------------------------------------------------------
 fields     = cgi.FieldStorage()
-doc_type   = fields.getvalue("doctype")
+doc_type   = fields.getvalue("doctype") or "0"
 start_date = fields.getvalue("startdate")
 end_date   = fields.getvalue("enddate")
 session    = cdrcgi.getSession(fields)
@@ -88,9 +83,10 @@ if not cdrcgi.is_date(start_date) or not cdrcgi.is_date(end_date):
 # Create the report.
 #----------------------------------------------------------------------
 try:
-    where = "AND doc_type = %d" % int(doc_type)
+    doc_type = int(doc_type)
 except:
-    where = ""
+    cdrcgi.bail()
+where = doc_type and ("AND doc_type = %d" % doc_type) or ""
 cursor.execute("CREATE TABLE #t (id INTEGER, ver INTEGER)")
 conn.commit()
 cursor.execute("""\

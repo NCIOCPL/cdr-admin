@@ -1,9 +1,5 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Service to fetch board member information.
-#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, cdrdb, time, lxml.etree as etree
 

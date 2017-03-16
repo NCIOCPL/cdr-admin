@@ -1,6 +1,4 @@
 #----------------------------------------------------------------------
-# $Id$
-#
 # CGI program for displaying the status of batch jobs.
 #
 # Administrator may use this to see past or current batch job
@@ -115,7 +113,7 @@ class Control:
         )
         rows = cdrbatch.getJobStatus(self.id, self.name, self.age, self.status)
         for row in rows:
-            row[0] = cdrcgi.Report.Cell(row[0], classes="right")
+            row[0] = cdrcgi.Report.Cell(row[0], classes="center")
             row[-1] = Cell(row[-1])
         caption = "Batch Jobs"
         table = cdrcgi.Report.Table(columns, rows, caption=caption)

@@ -1,6 +1,4 @@
 #----------------------------------------------------------------------
-# $Id$
-#
 # Globally change all links (cdr:ref or href) of any specified type from
 # one value to one or more others.
 #

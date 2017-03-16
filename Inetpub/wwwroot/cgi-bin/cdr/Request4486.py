@@ -1,13 +1,9 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # "We need a new glossary term concept by type QC report to help us ensure
 # consistency in the wording of definitions."
 #
 # BZIssue::4745 (eliminate empty pronunciation parens; ignore case mismatch)
 # JIRA::OCECDR-3800 - Address security vulnerabilities
-#
 #----------------------------------------------------------------------
 import cgi
 import cdr

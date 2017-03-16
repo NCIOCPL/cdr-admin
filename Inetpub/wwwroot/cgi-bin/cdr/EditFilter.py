@@ -1,14 +1,10 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Original interface for editing CDR filter documents.  Now used for
 # viewing and comparing filters only.
 #
 # BZIssue::2561
 # BZIssue::3716
 # Rewritten July 2015 as part of a security sweep.
-#
 #----------------------------------------------------------------------
 import cdr
 import cdrcgi

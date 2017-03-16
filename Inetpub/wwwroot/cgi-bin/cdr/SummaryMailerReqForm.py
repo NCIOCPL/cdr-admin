@@ -1,14 +1,10 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Request form for generating PDQ Editorial Board Members Mailing.
 #
 # BZIssue::1664
 # BZIssue::3132
 # BZIssue::OCECDR-3640: Unable to run Advisory Board Summary Mailers
 # Rewritten Summer 2015 as part of security sweep.
-#
 #----------------------------------------------------------------------
 import cdr
 import cdrcgi

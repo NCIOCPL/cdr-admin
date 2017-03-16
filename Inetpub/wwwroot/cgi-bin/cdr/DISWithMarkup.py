@@ -1,12 +1,8 @@
 #----------------------------------------------------------------------
-#
-# $Id: $
-#
 # Report listing summaries containing specified markup.
 #
 # BZIssue::4671 - Summaries with Mark-up Report
 # BZIssue::4922 - Enhancements to the Summaries with Markup Report
-#
 #----------------------------------------------------------------------
 import cdr, cgi, cdrcgi, time, cdrdb, xml.dom.minidom
 
@@ -29,7 +25,7 @@ if type(markUp) == type(""):
     markUp = [markUp]
 
 # ---------------------------------------------------
-# 
+#
 # ---------------------------------------------------
 def reportHeader(disTitle = 'Drug Information Summary Markup'):
     """Return the HTML code to display the Summary Board Header with ID"""
@@ -69,7 +65,7 @@ def summaryRow(id, summary, markupCount, display):
 
     # Create the table row display
     # If a markup type hasn't been checked the table cell will be
-    # displayed with the class="nodisplay" style otherwise the 
+    # displayed with the class="nodisplay" style otherwise the
     # count of the markup type is being displayed.
     # ------------------------------------------------------
     html = """\
@@ -83,18 +79,18 @@ def summaryRow(id, summary, markupCount, display):
     <TD class="%s" width="7%%">%s</TD>
     <TD class="%s" width="7%%">%s</TD>
    </TR>
-""" % (id, id, summary, 
+""" % (id, id, summary,
            'publish' in display and 'display' or 'nodisplay',
-           ('publish' not in display or markupCount['publish']  == 0) 
-                           and '&nbsp;' or markupCount['publish'], 
+           ('publish' not in display or markupCount['publish']  == 0)
+                           and '&nbsp;' or markupCount['publish'],
            'approved' in display and 'display' or 'nodisplay',
-           ('approved' not in display or markupCount['approved'] == 0) 
+           ('approved' not in display or markupCount['approved'] == 0)
                            and '&nbsp;' or markupCount['approved'],
            'proposed' in display and 'display' or 'nodisplay',
-           ('proposed' not in display or markupCount['proposed'] == 0) 
-                           and '&nbsp;' or markupCount['proposed'], 
+           ('proposed' not in display or markupCount['proposed'] == 0)
+                           and '&nbsp;' or markupCount['proposed'],
            'rejected' in display and 'display' or 'nodisplay',
-           ('rejected' not in display or markupCount['rejected'] == 0) 
+           ('rejected' not in display or markupCount['rejected'] == 0)
                            and '&nbsp;' or markupCount['rejected'])
     return html
 
@@ -124,7 +120,7 @@ dateString = time.strftime("%B %d, %Y")
 # If we don't have a request, put up the form.
 #----------------------------------------------------------------------
 if not markUp:
-    header = cdrcgi.header(title, title, instr + ' - ' + dateString, 
+    header = cdrcgi.header(title, title, instr + ' - ' + dateString,
                            script,
                            ("Submit",
                             SUBMENU,
@@ -141,7 +137,7 @@ if not markUp:
 
     form   = """\
    <input type='hidden' name='%s' value='%s'>
- 
+
    <fieldset>
     <legend>&nbsp;Type of mark-up to Include&nbsp;</legend>
     <input name='markUp' type='checkbox' id="pub"
@@ -186,7 +182,7 @@ query = """\
 """
 
 if not query:
-    cdrcgi.bail('No query criteria specified')   
+    cdrcgi.bail('No query criteria specified')
 
 # Submit the query to the database.
 #----------------------------------
@@ -199,7 +195,7 @@ try:
 except cdrdb.Error, info:
     cdrcgi.bail('Failure retrieving Summary documents: %s' %
                 info[1][0])
-     
+
 if not rows:
     cdrcgi.bail('No Records Found for Selection: %s ' % audience+"; ")
 
@@ -211,14 +207,14 @@ for dis in rows:
 
     #if doc.xml.startswith("<Errors"):
     #    continue
-    
+
     dom = xml.dom.minidom.parseString(doc.xml)
-    markupCount[dis[0]] = {'publish':0, 
+    markupCount[dis[0]] = {'publish':0,
                             'approved':0,
                             'proposed':0,
                             'rejected':0}
-    
-    insertionElements = dom.getElementsByTagName('Insertion')  
+
+    insertionElements = dom.getElementsByTagName('Insertion')
     for obj in insertionElements:
         markupCount[dis[0]][obj.getAttribute('RevisionLevel')] += 1
 
@@ -232,29 +228,29 @@ for dis in rows:
 # Create the results page.
 #----------------------------------------------------------------------
 instr     = 'Summaries List -- %s.' % (dateString)
-header    = cdrcgi.rptHeader(title, instr, 
+header    = cdrcgi.rptHeader(title, instr,
                           stylesheet = """\
    <STYLE type="text/css">
-    DL             { margin-left:    0; 
+    DL             { margin-left:    0;
                      padding-left:   0;
                      margin-top:    10px;
                      margin-bottom: 30px; }
-    TABLE          { margin-top:    10px; 
-                     margin-bottom: 30px; } 
+    TABLE          { margin-top:    10px;
+                     margin-bottom: 30px; }
 
     .date          { font-size: 12pt; }
     .sectionHdr    { font-size: 12pt;
                      font-weight: bold;
                      text-decoration: underline; }
     td.report      { font-size: 11pt;
-                     padding-right: 15px; 
+                     padding-right: 15px;
                      vertical-align: top; }
     td.nodisplay   { background-color: grey; }
-    td.display     { background-color: white; 
+    td.display     { background-color: white;
                      font-weight: bold;
                      text-align: center; }
-    .cdrid         { text-align: right; 
-                     text-decoration: underline; 
+    .cdrid         { text-align: right;
+                     text-decoration: underline;
                      text-color: blue; }
     LI             { list-style-type: none; }
     li.report      { font-size: 11pt;
@@ -288,8 +284,8 @@ report += """
 
 footer = """\
  </BODY>
-</HTML> 
-"""     
+</HTML>
+"""
 
 # Send the page back to the browser.
 #----------------------------------------------------------------------

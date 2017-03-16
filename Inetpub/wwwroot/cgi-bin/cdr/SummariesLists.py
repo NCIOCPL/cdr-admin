@@ -1,7 +1,4 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Report on lists of summaries.
 #
 # BZIssue::1010 - Initial report
@@ -16,7 +13,6 @@
 # Rewritten July 2015 to eliminate security vulnerabilities
 # OCECDR-3991: Modify Summaries List Report to retrieve publishable summaries
 # OCECDR-4020: add option to include modules
-#
 #----------------------------------------------------------------------------
 import cdr
 import cdrcgi
@@ -128,7 +124,7 @@ class Control:
             page.add_text_field("extra-cols", "Extra Cols", default="1")
             page.add("</fieldset>")
         else:
-            page.add('<fieldset id="extra-block" class="xhidden">')
+            page.add('<fieldset id="extra-block">')
             page.add(page.B.LEGEND("Extra Blank Columns"))
             page.add_text_field("extra", "Extra Cols", value="0")
             page.add("</fieldset>")

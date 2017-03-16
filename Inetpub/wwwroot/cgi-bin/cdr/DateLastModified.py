@@ -1,18 +1,15 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Reports documents last modified during a specified time period.
-#
 # JIRA::OCECDR-3731
-#
 #----------------------------------------------------------------------
-import cdr, cdrdb, cdrcgi, cgi, time
-import xlwt
-import os
-import msvcrt
+import cgi
 import datetime
+import os
 import sys
+import msvcrt
+import cdr
+import cdrdb
+import cdrcgi
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -30,7 +27,7 @@ script  = "DateLastModified.py"
 title   = "CDR Administration"
 section = "Date Last Modified"
 header  = cdrcgi.header(title, title, section, script, buttons)
-now     = time.localtime(time.time())
+today   = datetime.date.today()
 
 #----------------------------------------------------------------------
 # Make sure we're logged in.
@@ -55,12 +52,8 @@ if request == "Log Out":
 # If we don't have a request, put up the request form.
 #----------------------------------------------------------------------
 if not fromDate or not toDate:
-    toDate   = time.strftime("%Y-%m-%d", now)
-    then     = list(now)
-    then[1] -= 1
-    then[2] += 1
-    then     = time.localtime(time.mktime(then))
-    fromDate = time.strftime("%Y-%m-%d", then)
+    toDate = datetime.date.today()
+    fromDate = toDate - datetime.timedelta(7)
     docTypes = cdr.getDoctypes(session)
     if type(docTypes) in [type(""), type(u"")]:
         cdrcgi.bail(docTypes)
@@ -139,16 +132,9 @@ if format_ == "html":
   </center>
   <br />
   <br />
-""" % (headerDocType, time.strftime("%m/%d/%Y", now), fromDate, toDate)
+""" % (headerDocType, today.strftime("%m/%d/%Y"), fromDate, toDate)
 else:
-    book = xlwt.Workbook(encoding="UTF-8")
-    font = xlwt.Font()
-    font.bold = True
-    alignment = xlwt.Alignment()
-    alignment.horz = xlwt.Alignment.HORZ_CENTER
-    headerStyle = xlwt.XFStyle()
-    headerStyle.font = font
-    headerStyle.alignment = alignment
+    styles = cdrcgi.ExcelStyles()
 
 #----------------------------------------------------------------------
 # Extract the information from the database.
@@ -220,16 +206,17 @@ try:
    </tr>
 """ % docType
             else:
-                sheet = book.add_sheet(docType)
-                widths = (5000, 4000, 25000)
-                for i, width in enumerate(widths):
-                    sheet.col(i).width = width
-                header = "%s Documents Last Modified Between %s and %s" % (
-                    docType, fromDate, toDate)
-                sheet.write_merge(0, 0, 0, 2, header, headerStyle)
-                sheet.write(2, 0, "Date Last Modified", headerStyle)
-                sheet.write(2, 1, "CDR ID", headerStyle)
-                sheet.write(2, 2, "Document Title", headerStyle)
+                sheet = styles.add_sheet(docType)
+                widths = 20, 15, 100
+                labels = "Date Last Modified", "CDR ID", "Document Title"
+                assert(len(widths) == len(labels))
+                for i, chars in enumerate(widths):
+                    sheet.col(i).width = styles.chars_to_width(chars)
+                vals = docType, fromDate, toDate
+                title = "%s Documents Last Modified Between %s and %s" % vals
+                sheet.write_merge(0, 0, 0, 2, title, styles.header)
+                for i, label in enumerate(labels):
+                    sheet.write(2, i, label, styles.header)
                 rowNumber = 3
             lastDocType = docType
         if format_ == "html":
@@ -241,9 +228,9 @@ try:
    </tr>
 """ % (lastMod, docId, title)
         else:
-            sheet.write(rowNumber, 0, lastMod)
-            sheet.write(rowNumber, 1, "CDR%010d" % docId)
-            sheet.write(rowNumber, 2, title)
+            sheet.write(rowNumber, 0, lastMod, styles.center)
+            sheet.write(rowNumber, 1, "CDR%010d" % docId, styles.center)
+            sheet.write(rowNumber, 2, title, styles.left)
             rowNumber += 1
         row = cursor.fetchone()
     if format_ == "html" and lastDocType:
@@ -266,4 +253,4 @@ else:
     print "Content-type: application/vnd.ms-excel"
     print "Content-disposition: attachment; filename=%s" % name
     print
-    book.save(sys.stdout)
+    styles.book.save(sys.stdout)

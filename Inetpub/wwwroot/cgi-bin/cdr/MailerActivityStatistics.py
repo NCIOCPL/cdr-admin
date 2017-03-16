@@ -1,11 +1,6 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Generates report of counts of mailers of each type, generated during
 # a specified date range.
-#
-# $Log: not supported by cvs2svn $
 #----------------------------------------------------------------------
 import cdr, cdrdb, cdrcgi, cgi, time
 

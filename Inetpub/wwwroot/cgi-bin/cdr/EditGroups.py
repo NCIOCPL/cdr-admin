@@ -1,17 +1,5 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Prototype for editing CDR groups.
-#
-# $Log: not supported by cvs2svn $
-# Revision 1.2  2002/02/20 23:59:44  bkline
-# Added button for returning to main Admin menu.
-#
-# Revision 1.1  2001/06/13 22:16:32  bkline
-# Initial revision
-#
-#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string, sys, urllib
 

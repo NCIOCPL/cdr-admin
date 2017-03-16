@@ -2,8 +2,6 @@
 #
 # Publishing CGI script.
 #
-# $Id$
-#
 # BZIssue::2533
 # BZIssue::4870
 # BZIssue::5051 - [Media] Modify Publishing Software to Process Audio Files

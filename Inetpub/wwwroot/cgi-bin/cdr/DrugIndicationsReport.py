@@ -1,11 +1,7 @@
 #----------------------------------------------------------------------
-#
-# $Id: DISLists.py 9673 2010-06-08 18:48:00Z volker $
-#
 # Report on lists of drug information summaries.
 #
 # BZIssue::4887 - New Drug Information Summary Report
-#
 #----------------------------------------------------------------------
 import cdr, cgi, cdrcgi, time, cdrdb
 

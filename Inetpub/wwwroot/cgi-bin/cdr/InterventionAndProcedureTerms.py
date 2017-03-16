@@ -1,17 +1,7 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Hierarchical report (in thesaurus-like format) of index terms
 # whose semantic types are some form of Intervention/procedure.
-#
-# $Log: not supported by cvs2svn $
-# Revision 1.2  2007/10/31 16:10:09  bkline
-# Modifications for request #3693.
-#
-# Revision 1.1  2002/12/11 13:02:25  bkline
-# Hierarchical report on intervention/procedure index terms.
-#
+# BZIssue::3693 - user-requested modifications
 #----------------------------------------------------------------------
 import cdrcgi, cdrdb, cgi
 

@@ -1,11 +1,8 @@
 #----------------------------------------------------------------------
-# $Id:$
-#
 # Script to copy the ZIP code zip-archive file to the CDR server and
 # load to the zip_code database table.
 # ---------------------------------------------------------------------
 # OCECDR-3848: Automate Quarterly ZIP Code Updates
-#
 #----------------------------------------------------------------------
 import sys
 import cdr

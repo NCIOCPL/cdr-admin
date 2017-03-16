@@ -1,6 +1,4 @@
 #----------------------------------------------------------------------
-# $Id$
-#
 # Report information from the term_audio... database tables that
 # track the review of Term audio files.
 #

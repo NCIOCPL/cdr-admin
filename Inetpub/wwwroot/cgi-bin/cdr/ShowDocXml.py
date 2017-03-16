@@ -1,15 +1,6 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Sends the raw XML for a document to a browser.  Useful with IE5.x,
 # which by default shows a hierarchical tree display for the data.
-#
-# $Log: not supported by cvs2svn $
-# Revision 1.1  2001/06/13 22:16:32  bkline
-# Initial revision
-#
-#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re
 

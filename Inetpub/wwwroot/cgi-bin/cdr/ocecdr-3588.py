@@ -1,94 +1,75 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Report of thesaurus concept IDs for concepts which are marked as
 # not yet public.
 #
 # JIRA::OCECDR-3588
-#
+# JIRA::OCECDR-4223 - rewritten to use new nci_thesaurus module
 #----------------------------------------------------------------------
-import cdrdb, requests, lxml.etree as etree, lxml.html as H
-from lxml.html import builder as B
+import cdrdb
+import cdrcgi
+import nci_thesaurus
 
-#----------------------------------------------------------------------
-# Macros used for parsing the NCIt concept document.
-#----------------------------------------------------------------------
-CONCEPTS = "org.LexGrid.concepts"
-COMMON   = "org.LexGrid.commonTypes"
-ENTITY   = "%s.Entity" % CONCEPTS
-PRES     = "%s.Presentation" % CONCEPTS
-DEF      = "%s.Definition" % CONCEPTS
-TEXT     = "%s.Text" % COMMON
-SOURCE   = "%s.Source" % COMMON
-PROPERTY = "%s.Property" % COMMON
-CDRNS    = "cips.nci.nih.gov/cdr"
-NSMAP    = { "cdr" : CDRNS }
-
-#----------------------------------------------------------------------
-# Find out when the term was last modified.
-#----------------------------------------------------------------------
-def getDateLastModified(cursor, cdrId):
-    cursor.execute("""\
-SELECT value
-  FROM query_term
- WHERE doc_id = ?
-   AND path = '/Term/DateLastModified'""", cdrId)
-    for row in cursor.fetchall():
-        return row[0]
-    return u"\xa0"
-
-#----------------------------------------------------------------------
-# Get the semantic types for this term.
-#----------------------------------------------------------------------
-def getSemanticTypes(cursor, cdrId):
-    cursor.execute("""\
-SELECT DISTINCT n.value
-  FROM query_term n
-  JOIN query_term t
-    ON t.int_val = n.doc_id
- WHERE n.path = '/Term/PreferredName'
-   AND t.path = '/Term/SemanticType/@cdr:ref'
-   AND t.doc_id = ?""", cdrId)
-    types = u"; ".join([row[0] for row in cursor.fetchall()])
-    return types or u"\xA0"
-
-#----------------------------------------------------------------------
-# Extract a named field from a node block.
-#----------------------------------------------------------------------
-def getFieldValue(node, name):
-    for child in node.findall("field[@name='%s']" % name):
-        return child.text
-    return None
-
-#----------------------------------------------------------------------
-# Determine whether a concept code is available publicly.
-#----------------------------------------------------------------------
-def checkConcept(code):
-    code  = code.strip()
-    host  = "lexevsapi60.nci.nih.gov"
-    app   = "/lexevsapi60/GetXML"
-    parms = "query=org.LexGrid.concepts.Entity[@_entityCode=%s]" % code
-    url   = "http://%s/%s?%s" % (host, app, parms)
-    resp  = requests.get(url)
-    doc   = resp.content
-    tree  = etree.XML(doc)
-    for entity in tree.findall("queryResponse/class[@name='%s']" % ENTITY):
-        if getFieldValue(entity, '_entityCode') == code:
-            return True
-    return False
-
+class Control(cdrcgi.Control):
+    CAPTION = "NCI Thesaurus Links Not Marked Public"
+    COLUMNS = (
+        "CDR ID",
+        "Concept ID",
+        "Available?",
+        "Date Last Modified",
+        "Semantic Types"
+    )
+    def __init__(self):
+        cdrcgi.Control.__init__(self, self.CAPTION)
+    def run(self):
+        self.show_report()
+    def set_report_options(self, opts):
+        return {}
+    def build_tables(self):
+        join_clauses = "p.doc_id = c.doc_id", "p.node_loc = c.node_loc"
+        query = cdrdb.Query("query_term c", "c.doc_id", "c.value")
+        query.outer("query_term p", *join_clauses)
+        query.where("c.path = '/Term/NCIThesaurusConcept'")
+        query.where("p.path = '/Term/NCIThesaurusConcept/@Public'")
+        query.where(query.Or("p.value IS NULL", "p.value <> 'Yes'"))
+        query.order("c.doc_id", "c.value")
+        rows = query.execute(self.cursor).fetchall()
+        terms = [Term(self, *row) for row in rows]
+        columns = [cdrcgi.Report.Column(label) for label in self.COLUMNS]
+        rows = [term.row() for term in terms]
+        return [cdrcgi.Report.Table(columns, rows, caption=self.CAPTION)]
+class Term:
+    def __init__(self, control, doc_id, concept_code):
+        self.doc_id = doc_id
+        self.concept_code = concept_code.strip().upper()
+        query = cdrdb.Query("query_term n", "n.value").unique()
+        query.join("query_term t", "t.int_val = n.doc_id")
+        query.where("n.path = '/Term/PreferredName'")
+        query.where("t.path = '/Term/SemanticType/@cdr:ref'")
+        query.where(query.Condition("t.doc_id", doc_id))
+        rows = query.execute(control.cursor).fetchall()
+        self.types = [row[0] for row in rows]
+        query = cdrdb.Query("query_term", "value")
+        query.where("path = '/Term/DateLastModified'")
+        query.where(query.Condition("doc_id", doc_id))
+        rows = query.execute(control.cursor).fetchall()
+        self.last_mod = rows and rows[0][0] or ""
+        try:
+            concept = nci_thesaurus.Concept(code=concept_code)
+            self.available = concept.code.upper() == self.concept_code
+        except Exception:
+            self.logger.exception("fetching %r" % code)
+            self.available = False
+    def row(self):
+        return (
+            "CDR%d" % self.doc_id,
+            self.concept_code,
+            self.available and "Yes" or "No",
+            self.last_mod,
+            u"; ".join(self.types)
+        )
+Control().run()
+exit(0)
 cursor = cdrdb.connect("CdrGuest").cursor()
-cursor.execute("""\
-         SELECT c.doc_id, c.value
-           FROM query_term c
-LEFT OUTER JOIN query_term p
-             ON p.doc_id = c.doc_id
-            AND p.node_loc = c.node_loc
-            AND p.path = '/Term/NCIThesaurusConcept/@Public'
-          WHERE c.path = '/Term/NCIThesaurusConcept'
-            AND (p.value IS NULL OR p.value <> 'Yes')
-       ORDER BY c.doc_id, c.value""")
 title = "NCI Thesaurus Links Not Marked Public"
 style = """
 th, td { background-color: #ecf1ef; margin: 3px; padding: 3px; }

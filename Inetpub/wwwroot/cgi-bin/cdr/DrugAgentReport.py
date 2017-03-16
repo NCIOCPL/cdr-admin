@@ -1,14 +1,14 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Report on Drug/Agent terms.
 #
 # BZIssue::1191
 # BZIssue::5011
-#
 #----------------------------------------------------------------------
-import cdrdb, ExcelWriter, sys, time, lxml.etree as etree
+import sys
+import time
+import lxml.etree as etree
+import cdrdb
+import cdrcgi
 
 if sys.platform == "win32":
     import os, msvcrt
@@ -16,9 +16,9 @@ if sys.platform == "win32":
 
 def findActiveProtocols():
     cursor.execute("""\
-SELECT doc_id 
-  INTO #active_protocols 
-  FROM query_term 
+SELECT doc_id
+  INTO #active_protocols
+  FROM query_term
  WHERE path = '/InScopeProtocol/ProtocolAdminInfo/CurrentProtocolStatus'
    AND value IN ('Active', 'Approved-not yet active')""")
 
@@ -96,40 +96,24 @@ t = time.strftime("%Y%m%d%H%M%S")
 terms.sort(lambda a,b: cmp(len(b.protocols), len(a.protocols)))
 print "Content-type: application/vnd.ms-excel"
 print "Content-Disposition: attachment; filename=DrugAgentReport-%s.xls" % t
-print 
+print
 
-workbook = ExcelWriter.Workbook()
-worksheet = workbook.addWorksheet("Terms")
-align = ExcelWriter.Alignment('Center')
-font = ExcelWriter.Font('white', bold=True)
-interior = ExcelWriter.Interior('blue')
-headerStyle = workbook.addStyle(alignment=align, font=font, interior=interior)
-centerStyle = workbook.addStyle(alignment=align)
-worksheet.addCol(1, 300)
-worksheet.addCol(2, 400)
-worksheet.addCol(3, 100)
-worksheet.addCol(4, 150)
-row = worksheet.addRow(1, headerStyle)
-row.addCell(1, "Preferred Name")
-row.addCell(2, "Other Names")
-row.addCell(3, "Count of Protocols")
-row.addCell(4, "Primary Protocol IDs")
-rowNum = 2
-leftAlign = workbook.addStyle(alignment=ExcelWriter.Alignment('Left'))
+styles = cdrcgi.ExcelStyles()
+sheet = styles.add_sheet("Terms")
+styles.data = styles.style("align: horiz left")
+widths = (60, 120, 20, 30)
+labels = ("Preferred Name", "Other Names", "Count of Protocols",
+          "Primary Protocol IDs")
+assert(len(widths) == len(labels))
+for i, chars in enumerate(widths):
+    sheet.col(i).width = styles.chars_to_width(chars)
+for i, label in enumerate(labels):
+    sheet.write(0, i, label, styles.header)
+row = 1
 for term in terms:
-    row = worksheet.addRow(rowNum)
-    row.addCell(1, term.name, leftAlign)
-    row.addCell(3, len(term.protocols))
-    i = 0
-    totalRows = max(len(term.otherNames), len(term.protocols))
-    while i < totalRows:
-        if i:
-            rowNum += 1
-            row = worksheet.addRow(rowNum)
-        if i < len(term.otherNames):
-            row.addCell(2, term.otherNames[i], style=leftAlign)
-        if i < len(term.protocols):
-            row.addCell(4, term.protocols[i], style=leftAlign)
-        i += 1
-    rowNum += 1
-workbook.write(sys.stdout, True)
+    sheet.write(row, 0, term.name, styles.left)
+    sheet.write(row, 2, len(term.protocols), styles.left)
+    sheet.write(row, 1, "\n".join(term.otherNames), styles.left)
+    sheet.write(row, 3, "\n".join(term.protocols), styles.left)
+    row += 1
+styles.book.save(sys.stdout)

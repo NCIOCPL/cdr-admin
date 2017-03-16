@@ -1,11 +1,7 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Status of a publishing job.
 #
 # OCECDR-3695: PubStatus Report Drops Push Job
-#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrdb, cdrcgi, re, string, time
 
@@ -17,6 +13,7 @@ WAIT_STATUS = "Waiting user approval"
 # Set the form variables.
 #----------------------------------------------------------------------
 fields   = cgi.FieldStorage()
+logLevel = fields.getvalue("level") or "info"
 jobId    = fields and fields.getvalue("id") or None
 dispType = fields and fields.getvalue("type") or None
 session  = cdrcgi.getSession(fields)
@@ -27,6 +24,7 @@ docType  = fields and fields.getvalue('docType') or None
 cgMode   = fields and fields.getvalue('cgMode') or None
 flavor   = fields and fields.getvalue('flavor') or 'full'
 docCount = fields and fields.getvalue('docCount') or '0'
+logger   = cdr.Logging.get_logger("PubStatus", level=logLevel)
 
 # Number of documents to be displayed on Pushing Information Report
 TOPDOCS  = 5000
@@ -806,6 +804,7 @@ def dispCgWork():
 #----------------------------------------------------------------------
 def selectPubDates():
 
+    logger.debug("putting up form for selecting pub dates")
     title   = "CDR Administration"
     instr   = "Publishing Job Activities"
     buttons = ["Submit Request", "Report Menu", cdrcgi.MAINMENU, "Log Out"]
@@ -1633,6 +1632,17 @@ def dispJobRepDetail():
 
 #----------------------------------------------------------------------
 # Handle requests.
+#
+# High-level logic:
+#
+#   IF THE USER WANTS TO NAVIGATE AWAY FROM THE PAGE:
+#      DO IT
+#   OTHERWISE, IF WE DON'T HAVE A JOB ID:
+#      PUT UP A FORM FOR SELECTING A JOB
+#   OTHERWISE, IF THE USER WANT TO MANAGE A JOB BUT ISN'T ALLOWED TO:
+#      BAIL OUT WITH AN ERROR MESSAGE
+#   OTHERWISE:
+#      RUN THE REQUESTED REPORT
 #----------------------------------------------------------------------
 if request == cdrcgi.MAINMENU:
     cdrcgi.navigateTo("Admin.py", session)
@@ -1641,15 +1651,15 @@ elif request == "Report Menu":
 elif request == "Log Out":
     cdrcgi.logout(session)
 
-if session and not dispType:
-    if not fromDate or not toDate:
-        selectPubDates()
-    else:
+if not jobId:
+    if fromDate and toDate:
         dispJobsByDates()
-elif not jobId:
-    cdrcgi.bail("Job ID not supplied")
+    else:
+        selectPubDates()
 
 jobId = int(jobId)
+logger.info("session %r running %r for job %d",
+             session, dispType or "JobStatus", jobId)
 if not dispType:
     dispJobStatus()
 elif dispType == "FilterFailure":
@@ -1659,8 +1669,8 @@ elif dispType == "Setting":
 elif dispType == "CgWork":
     dispCgWork()
 elif dispType == "Manage":
-    if not session:
-        cdrcgi.bail("A session ID must be provided for this page.")
+    if not cdr.canDo(session, "USE PUBLISHING SYSTEM"):
+        cdrcgi.bail("Permission denied")
     dispJobControl()
 elif dispType == "Report":
     dispJobReport()

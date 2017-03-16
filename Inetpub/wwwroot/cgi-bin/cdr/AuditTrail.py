@@ -1,10 +1,6 @@
 #!/usr/bin/python
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Audit Trail report (new report requested by Lakshmi).
-#
 #----------------------------------------------------------------------
 
 import sys, cgi, time, cdrcgi, cdrdb, re

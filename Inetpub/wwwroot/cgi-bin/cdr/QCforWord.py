@@ -1,17 +1,13 @@
 #-----------------------------------------------------------------------------
-#
-# $Id$
-#
-# When the users are converting a QC report to MS-Word the report is 
+# When the users are converting a QC report to MS-Word the report is
 # rerun using a GET with the URL.  However, the length of the URL that
 # Word can handle is limited to around 300 characters - not enough if
-# many parameters have been selected. 
-# This program will retrieve the parameters from a database table to 
+# many parameters have been selected.
+# This program will retrieve the parameters from a database table to
 # circumvent Word's limitation.
 #
-# BZIssue::5178 - [Summaries] Shorter URLS Needed For Successful 
+# BZIssue::5178 - [Summaries] Shorter URLS Needed For Successful
 #                 Conversion of QC Reports into Word
-#
 # ----------------------------------------------------------------------------
 import cgi, cdr, cdrcgi, cdrdb, sys
 

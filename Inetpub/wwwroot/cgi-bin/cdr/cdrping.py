@@ -3,10 +3,6 @@
 # the CDR server is up and responding properly.
 #
 # If error, reports to default log file (debug.log) and to web client.
-#
-# $Id$
-#
-# $Log: not supported by cvs2svn $
 ############
 
 import cdr

@@ -1,17 +1,23 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Prototype for duplicate-checking interface for Protocol documents.
 #
 # BZIssue::301
 # BZIssue::1165
 # BZIssue::4560
-#
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, cdrdb, os
+import re
+import cgi
+import os
+import sys
+import time
+import cdr
+import cdrcgi
+import cdrdb
 
-STATUS_PATH = '/InScopeProtocol/ProtocolAdminInfo/CurrentProtocolStatus'
+STATUS_PATHS = (
+    '/InScopeProtocol/ProtocolAdminInfo/CurrentProtocolStatus',
+    "/CTGovProtocol/OverallStatus"
+)
 
 #----------------------------------------------------------------------
 # Get the form variables.
@@ -88,6 +94,12 @@ def makeDoctypePicklist():
 """
 
 #----------------------------------------------------------------------
+# Make the status path strings ready for a SQL query.
+#----------------------------------------------------------------------
+def joinStatusPaths():
+    return ", ".join([("'%s'" % p) for p in STATUS_PATHS])
+
+#----------------------------------------------------------------------
 # Generate picklist for protocol status.
 #----------------------------------------------------------------------
 def protocolStatusList(conn, fName):
@@ -95,8 +107,8 @@ def protocolStatusList(conn, fName):
     query  = """\
 SELECT DISTINCT value, value
            FROM query_term
-          WHERE path = '%s'
-       ORDER BY 1""" % STATUS_PATH
+          WHERE path IN (%s)
+       ORDER BY 1""" % joinStatusPaths()
     pattern = "<option value='%s'>%s&nbsp;</option>"
     return cdrcgi.generateHtmlPicklist(conn, fName, query, pattern,
                                        firstOpt = defaultOpt)
@@ -164,8 +176,7 @@ searchFields = (cdrcgi.SearchField(title, selectPaths(docType,
                              "/CTGovProtocol/IDInfo/OrgStudyID",
                              "/CTGovProtocol/IDInfo/SecondaryID",
                              "/CTGovProtocol/IDInfo/NCTID"))),
-                cdrcgi.SearchField(pstat, selectPaths(docType,
-                                                      (STATUS_PATH,))))
+                cdrcgi.SearchField(pstat, selectPaths(docType, STATUS_PATHS)))
 
 #----------------------------------------------------------------------
 # Construct the query.
@@ -219,8 +230,8 @@ def getProtocolStatus(docId):
     cursor.execute("""\
         SELECT value
           FROM query_term
-         WHERE path = '%s'
-           AND doc_id = ?""" % STATUS_PATH, docId)
+         WHERE path IN (%s)
+           AND doc_id = ?""" % joinStatusPaths(), docId)
     rows = cursor.fetchall()
     return rows and rows[0][0] or "None"
 
@@ -228,29 +239,27 @@ def getProtocolStatus(docId):
 # Create the results page.
 #----------------------------------------------------------------------
 if dispFmt == 'ex':
-    import ExcelWriter, time, sys
     try:
-        import msvcrt, os
+        import msvcrt
         msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
     except:
         pass
-    book = ExcelWriter.Workbook()
-    sheet = book.addWorksheet("Protocols")
-    sheet.addCol(1, 50)
-    sheet.addCol(2, 800)
-    sheet.addCol(3, 125)
+    styles = cdrcgi.ExcelStyles()
+    sheet = styles.add_sheet("Protocols")
+    widths = (10, 150, 25)
+    for i, chars in enumerate(widths):
+        sheet.col(i).width = styles.chars_to_width(chars)
     rowNumber = 0
     for row in rows:
-        r = sheet.addRow(rowNumber)
-        r.addCell(1, row[0])
-        r.addCell(2, row[1])
-        r.addCell(3, getProtocolStatus(row[0]))
+        sheet.write(rowNumber, 0, row[0])
+        sheet.write(rowNumber, 1, row[1])
+        sheet.write(rowNumber, 2, getProtocolStatus(row[0]))
         rowNumber += 1
     stamp = time.strftime("%Y%m%d%H%M%S")
     print "Content-type: application/vnd.ms-excel"
     print "Content-Disposition: attachment; filename=search-%s.xls" % stamp
     print
-    book.write(sys.stdout, True)
+    styles.book.save(sys.stdout)
     sys.exit(0)
 
 filters = {

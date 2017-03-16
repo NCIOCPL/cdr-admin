@@ -1,13 +1,9 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Report on values found in external systems (such as ClinicalTrials.gov)
 # which have not yet been mapped to CDR documents.
 #
 # BZIssue::1339
 # JIRA::OCECDR-3800
-#
 #----------------------------------------------------------------------
 import cdrcgi
 import cdrdb

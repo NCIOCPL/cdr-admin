@@ -1,10 +1,8 @@
 #----------------------------------------------------------------------
-#
 # Update premedline citations that have had their statuses changed
 # since they were last imported or updated.
 #
 # BZIssue::5150
-#
 #----------------------------------------------------------------------
 import cdr, cdrdb, lxml.etree as etree, cgi, cdrcgi, copy
 import requests

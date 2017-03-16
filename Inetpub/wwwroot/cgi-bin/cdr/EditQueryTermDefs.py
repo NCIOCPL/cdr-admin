@@ -1,9 +1,5 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Prototype for editing CDR query term definitions.
-#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string, urllib
 

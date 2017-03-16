@@ -1,7 +1,4 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # "We would like a new Mailer report so we can track responses easier.
 #
 # Please place the report in Admin Menu/Reports/Mailers/
@@ -13,7 +10,7 @@
 # Changes Category (select "all" or a specific  Changes Category value from
 # picklist)
 # Start Date (default one month from current date)
-# End Date   (default current date) 
+# End Date   (default current date)
 #
 # The Output should be in a spreadsheet with the following columns:
 #  DocID
@@ -24,24 +21,9 @@
 #  Date Received
 #  Changes Category"
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.5  2008/10/17 15:14:36  bkline
-# Fixed date range bug and change column name at William's request.
-#
-# Revision 1.4  2008/10/02 12:16:55  bkline
-# Modifications requtested by William (#4304).
-#
-# Revision 1.3  2008/09/15 19:13:22  bkline
-# More tweaks requested by Sheri.
-#
-# Revision 1.2  2008/09/11 20:50:13  bkline
-# Tweaks requested by Sheri after the fact.
-#
-# Revision 1.1  2008/09/11 18:45:44  bkline
-# New report for Sheri on detailed mailer information.
-#
+# BZIssue::4304 - modifications requested by William
 #----------------------------------------------------------------------
-import cgi, cdr, cdrdb, cdrcgi, time, sys, ExcelWriter, lxml.etree as etree
+import cgi, cdr, cdrdb, cdrcgi, time, sys, lxml.etree as etree
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -95,7 +77,7 @@ elif request == SUBMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if request == "Log Out": 
+if request == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
@@ -115,9 +97,10 @@ class Mailer:
         def __init__(self, docId, docTitle):
             self.docId = docId
             self.docTitle = docTitle
+    all_changes = 0
     recipients = {}
     documents  = {}
-    urlBase    = (u"http://%s%s/QcReport.py?Session=guest&DocId=%%d" %
+    urlBase    = (u"https://%s%s/QcReport.py?Session=guest&DocId=%%d" %
                   (cdrcgi.WEBSERVER, cdrcgi.BASE))
     def __init__(self, mailerId, cursor):
         self.docId = mailerId
@@ -131,21 +114,21 @@ class Mailer:
         docXml = cursor.fetchall()[0][0]
         tree = etree.XML(docXml.encode('utf-8'))
         for e in tree.findall('Type'):
-            self.mailerType = e.text.strip()
+            self.mailerType = self.get_text(e)
         for e in tree.findall('Recipient'):
             self.recipient = Mailer.getRecipient(e, cursor)
         for e in tree.findall('Document'):
             self.document = Mailer.getDocument(e, cursor)
         for e in tree.findall('MailerAddress/Email'):
-            self.address = e.text.strip()
+            self.address = self.get_text(e)
         for r in tree.findall('Response'):
             for e in r.findall('Received'):
-                self.response = e.text[:10]
+                self.response = self.get_text(e)[:10]
             for e in r.findall('ChangesCategory'):
-                if e.text:
-                    change = e.text.strip()
-                    if change:
-                        self.changes.append(change)
+                change = self.get_text(e)
+                if change:
+                    self.changes.append(change)
+                    Mailer.all_changes += 1
     @classmethod
     def getDocument(cls, e, cursor):
         docId = e.get('{cips.nci.nih.gov/cdr}ref')
@@ -160,7 +143,7 @@ class Mailer:
               FROM document
              WHERE id = ?""", docId)
         rows = cursor.fetchall()
-        title = rows and rows[0][0] or u"" 
+        title = rows and rows[0][0] or u""
         cls.documents[docId] = Mailer.Doc(docId, title)
         return cls.documents[docId]
     @classmethod
@@ -186,32 +169,28 @@ class Mailer:
                 title = title[0]
         cls.recipients[docId] = Mailer.Doc(docId, title)
         return cls.recipients[docId]
-    def addToSheet(self, sheet, nextRow, style, urlStyle):
-        row = sheet.addRow(nextRow, style)
-        nextRow += 1
-        mergeDown = None
-        if len(self.changes) > 1:
-            mergeDown = len(self.changes) - 1
-        row.addCell(1, self.docId, mergeDown = mergeDown)
-        row.addCell(2, self.mailerType, mergeDown = mergeDown)
+    def addToSheet(self, styles, sheet, row):
+        sheet.write(row, 0, self.docId, styles.left)
+        sheet.write(row, 1, self.mailerType, styles.left)
         if self.recipient:
-            href = self.urlBase % self.recipient.docId
-            row.addCell(3, self.recipient.docTitle, style = urlStyle,
-                        href = href, mergeDown = mergeDown)
-        row.addCell(4, self.address or u" ", mergeDown = mergeDown)
+            url = self.urlBase % self.recipient.docId
+            link = styles.link(url, self.recipient.docTitle)
+            sheet.write(row, 2, link, styles.url)
+        sheet.write(row, 3, self.address, styles.left)
         if self.document:
-            row.addCell(5, self.document.docId, mergeDown = mergeDown)
-            href = self.urlBase % self.document.docId
-            row.addCell(6, self.document.docTitle, style = urlStyle,
-                        href = href, mergeDown = mergeDown)
-        row.addCell(7, self.response, mergeDown = mergeDown)
-        if self.changes:
-            row.addCell(8, self.changes[0])
-            for c in self.changes[1:]:
-                row = sheet.addRow(nextRow, style)
-                nextRow += 1
-                row.addCell(8, c)
-        return nextRow
+            doc_id = self.document.docId
+            url = self.urlBase % doc_id
+            link = styles.link(url, self.document.docTitle)
+            sheet.write(row, 4, doc_id, styles.left)
+            sheet.write(row, 5, link, styles.url)
+        sheet.write(row, 6, self.response, styles.left)
+        sheet.write(row, 7, "\n".join(self.changes), styles.left)
+        return row + 1
+    @staticmethod
+    def get_text(node):
+        if node is None or node.text is None:
+            return ""
+        return node.text.strip()
 
 #----------------------------------------------------------------------
 # Build a CGI form picklist for the mailer change categories.
@@ -300,33 +279,21 @@ def createForm(cursor):
 #----------------------------------------------------------------------
 # Add the title row and the column headers.
 #----------------------------------------------------------------------
-def addColumnHeaders(book, sheet, startDate, endDate, total):
-    font  = ExcelWriter.Font(size = 12, bold = True)
-    align = ExcelWriter.Alignment('Center', 'Top')
-    style = book.addStyle(font = font, alignment = align)
-    sheet.addCol(1,  70)
-    sheet.addCol(2, 150)
-    sheet.addCol(3, 200)
-    sheet.addCol(4, 200)
-    sheet.addCol(5,  70)
-    sheet.addCol(6, 300)
-    sheet.addCol(7,  70)
-    sheet.addCol(8, 200)
-    row = sheet.addRow(1, style)
-    row.addCell(1, u"Mailers Received - Detailed", mergeAcross = 6)
-    row = sheet.addRow(2, style)
-    row.addCell(1, "%s to %s" % (startDate, endDate), mergeAcross = 6)
-    row = sheet.addRow(3, style)
-    row.addCell(1, "Total: %d" % total, mergeAcross = 6)
-    row = sheet.addRow(5, style)
-    row.addCell(1, u"DocID")
-    row.addCell(2, u"Mailer Type")
-    row.addCell(3, u"Recipient")
-    row.addCell(4, u"Email Address")
-    row.addCell(5, u"CDR ID")
-    row.addCell(6, u"Document")
-    row.addCell(7, u"Date Received")
-    row.addCell(8, u"Changes Category")
+def addColumnHeaders(styles, sheet, startDate, endDate, total):
+    banner = "Mailers Received - Detailed"
+    date_range = "%s to %s" % (startDate, endDate)
+    total = "Total: %d" % total
+    widths = (10, 40, 40, 40, 10, 60, 10, 40)
+    labels = ("DocID", "Mailer Type", "Recipient", "Email Address", "CDR ID",
+              "Document", "Date Received", "Changes Category")
+    assert(len(widths) == len(labels))
+    for col, chars in enumerate(widths):
+        sheet.col(col).width = styles.chars_to_width(chars)
+    sheet.write_merge(0, 0, 0, len(labels) - 1, banner, styles.banner)
+    sheet.write_merge(1, 1, 0, len(labels) - 1, date_range, styles.header)
+    sheet.write_merge(2, 2, 0, len(labels) - 1, total, styles.header)
+    for col, label in enumerate(labels):
+        sheet.write(4, col, label, styles.header)
 
 #----------------------------------------------------------------------
 # Generate the Mailer Tracking Report.
@@ -353,17 +320,13 @@ def createReport(cursor, mailerType, changeCategory, startDate, endDate):
       ORDER BY r.doc_id""" % (join, where)
     cursor.execute(sql, parms)
     mailerIds = [row[0] for row in cursor.fetchall()]
-    book = ExcelWriter.Workbook()
-    sheet = book.addWorksheet('Mailers')
-    addColumnHeaders(book, sheet, startDate, endDate, len(mailerIds))
-    alignment = ExcelWriter.Alignment('Left', 'Top', True)
-    font = ExcelWriter.Font('blue', True)
-    style = book.addStyle(alignment = alignment)
-    urlStyle = book.addStyle(font = font, alignment = alignment)
-    nextRow = 6
+    styles = cdrcgi.ExcelStyles()
+    sheet = styles.add_sheet("Mailers")
+    addColumnHeaders(styles, sheet, startDate, endDate, len(mailerIds))
+    row = 5
     for mailerId in mailerIds:
         mailer = Mailer(mailerId, cursor)
-        nextRow = mailer.addToSheet(sheet, nextRow, style, urlStyle)
+        row = mailer.addToSheet(styles, sheet, row)
     try:
         import msvcrt, os
         msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
@@ -373,7 +336,7 @@ def createReport(cursor, mailerType, changeCategory, startDate, endDate):
     print "Content-type: application/vnd.ms-excel"
     print "Content-Disposition: attachment; filename=SummMailRep-%s.xls" % stamp
     print
-    book.write(sys.stdout, True)
+    styles.book.save(sys.stdout)
 
 #----------------------------------------------------------------------
 # Create the report or as for the report parameters.

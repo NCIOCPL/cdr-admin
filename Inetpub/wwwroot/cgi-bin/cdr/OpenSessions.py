@@ -1,14 +1,6 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Display of threads which are still running in the CDR Server (mostly
 # a debugging tool).
-#
-# $Log: not supported by cvs2svn $
-# Revision 1.1  2002/08/12 20:59:19  bkline
-# Display of threads still running in the CDR Server.
-#
 #----------------------------------------------------------------------
 import cdrdb, cdrcgi
 

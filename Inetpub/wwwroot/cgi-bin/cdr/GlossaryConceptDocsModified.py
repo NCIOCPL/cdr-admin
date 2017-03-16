@@ -1,14 +1,10 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # "The Glossary Term Concept - Documents Modified Report will serve as a
 # QC report to verify which documents were changed within a given time
 # frame. The report will be separated into English and Spanish.
 # New "documents modified" reports for restructured glossary documents.
 #
 # Rewritten July 2015 as part of security sweep.
-#
 #----------------------------------------------------------------------
 import cdrcgi
 import cdrdb

@@ -1,17 +1,15 @@
 #!/usr/bin/python
 # ******************************************************************
 #
-# $ID$
-#
 # File Name: show-PDQ-summary.py
 #            -------------------
-# Script to take our sample XML PDQ summary (PDQ-summary.xml) and 
-# apply the sample XSLT stylesheet (PDQ-summary.xsl) to create a 
+# Script to take our sample XML PDQ summary (PDQ-summary.xml) and
+# apply the sample XSLT stylesheet (PDQ-summary.xsl) to create a
 # sample HTML output file (PDQ-summary.html).
 # These files have been created in response to PDQ partner requests
 # wanting to see samples of our transformation.
 #
-# When this cgi is run it is expected that both files, the XML as 
+# When this cgi is run it is expected that both files, the XML as
 # well as the XSL documents, are located within the .../cgi-bin/cdr
 # directory.  The user can display the entire file or an individual
 # section only:
@@ -22,9 +20,6 @@
 # This file has been originally created by Bob Kline.
 # ------------------------------------------------------------------
 # Created:                              Volker Englisch - 2016-03-23
-# $Author: $
-# $Date:   $
-# $Revision: $
 #
 # History:
 # --------
@@ -55,7 +50,7 @@ def get_doc(cursor, doc_id):
 
 
 # -------------------------------------------------------------
-# Read the XSLT stylesheet and transform the passed document 
+# Read the XSLT stylesheet and transform the passed document
 # -------------------------------------------------------------
 def filter_doc(doc_xml, section):
     try:

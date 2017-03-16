@@ -1,9 +1,5 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Sanity check for CDR configuration files for a given CBIIT tier.
-#
 #----------------------------------------------------------------------
 import cdrcgi
 import cdr

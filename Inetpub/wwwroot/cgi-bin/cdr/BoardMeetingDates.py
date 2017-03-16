@@ -1,21 +1,8 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Report listing the Board meetings by date or board.
 #
-# BZIssue::4792 - Add Meeting Canceled attribute to report
-#
-# Revision 1.3  2008/11/28 15:08:23  bkline
-# Report rewritten to match new structure for board meeting information,
-# which now supports a separate meeting time for each meeting.
-#
-# Revision 1.2  2008/10/15 16:52:53  venglisc
-# Added code to include WebEx attribute on the reports. (Bug 4205)
-#
-# Revision 1.1  2008/08/22 19:45:23  venglisc
-# Initial copy of Board Meeting Dates report. (Bug 4205)
-#
+# BZIssue::4205 - initial report
+# BZIssue::4792 - add Meeting Canceled attribute to report
 #----------------------------------------------------------------------
 import cdrdb, cdrcgi, cgi, time
 

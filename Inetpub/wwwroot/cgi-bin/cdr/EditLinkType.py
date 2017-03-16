@@ -1,29 +1,13 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Prototype for editing a CDR link type.
 #
 # Script is run twice - first to create a form on screen, then
 # to read the values on the form.
-#
-# $Log: not supported by cvs2svn $
-# Revision 1.4  2002/02/21 20:09:47  ameyer
-# Replaced cgi.parse() with safer cgi.FieldStorage for url parameters.
-#
-# Revision 1.3  2002/02/21 15:22:02  bkline
-# Added navigation buttons.
-#
-# Revision 1.2  2002/02/15 06:50:11  ameyer
-# Handling add/edit differences in both uses of this module - to
-# put up an edit form and to process the form after the user fills it in.
-#
-# Revision 1.1  2001/06/13 22:16:32  bkline
-# Initial revision
-#
 #----------------------------------------------------------------------
-
-import cgi, cdr, cdrcgi, re, string, sys
+import cgi
+import pprint
+import cdr
+import cdrcgi
 
 #----------------------------------------------------------------------
 # Get the form variables.
@@ -34,8 +18,12 @@ request     = cdrcgi.getRequest(fields)
 name        = fields and fields.getvalue("name") or None
 linkChkType = fields and fields.getvalue("linkChkType") or None
 linkForm    = fields and fields.getvalue("linkform") or None
+logger      = cdr.Logging.get_logger("link-control")
+pprinter    = pprint.PrettyPrinter()
 extra       = ""
 SUBMENU     = "Link Menu"
+
+logger.info("session %s", session)
 
 # Target doc link type prompts and corresponding codes
 LINKCHKTYPES = (('Published version', 'P'),
@@ -76,16 +64,6 @@ elif request == SUBMENU:
 #----------------------------------------------------------------------
 if request == "Delete Link Type":
     cdrcgi.bail("Delete Link Type command not yet implemented")
-    unused_code = """ - MODEL FROM delUser\
-    error = cdr.delUser(session, usrName)
-    if error:
-        if error.upper().find("COLUMN REFERENCE CONSTRAINT"):
-            error = "Cannot delete user %s.  "\
-                    "System actions have already been recorded for this user."\
-                  % usrName
-        cdrcgi.bail(error)
-    cdrcgi.mainMenu(session, "Group %s Deleted Successfully" % usrName)
-    """
 
 #----------------------------------------------------------------------
 # Gather together the fields in the form name-number.
@@ -122,18 +100,16 @@ if request == "Save Changes":
     srcKeys = arrayFields["src_sel"].keys()
     srcKeys.sort()
     for srcKey in srcKeys:
+        ordKey = cdr.ordinal(srcKey)
         if arrayFields["src_sel"][srcKey] == "on":
             srcDocType = arrayFields["src_dt"][srcKey]
             if srcDocType == "Select Document Type":
-                cdrcgi.bail("Document type must be selected for link source")
-                break
-            if not arrayFields["src_elem"].has_key(srcKey):
-                cdrcgi.bail("Missing required source field")
-                break
-            srcField   = arrayFields["src_elem"][srcKey]
+                logger.error("no doctype for selection %s", srcKey)
+                logger.error("field data:\n%s", pprinter.pformat(arrayFields))
+                cdrcgi.bail("Document type missing for %s link source" % ordKey)
+            srcField = arrayFields["src_elem"].get(srcKey)
             if not srcField:
-                cdrcgi.bail("Required source field empty")
-                break
+                cdrcgi.bail("Missing element for %s link source" % ordKey)
             linkType.linkSources.append((srcDocType, srcField))
     dstKeys = arrayFields["dst_sel"].keys()
     dstKeys.sort()

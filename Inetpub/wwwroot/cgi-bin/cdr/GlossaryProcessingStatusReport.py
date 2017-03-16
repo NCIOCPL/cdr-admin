@@ -1,7 +1,4 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # "The Processing Status Report will display the documents (GTC and GTN)
 # that correspond with the Processing Status selected by the user."
 #
@@ -10,7 +7,6 @@
 # BZIssue::4705
 # BZIssue::4777
 # JIRA::OCECDR-3800
-#
 #----------------------------------------------------------------------
 import cdr
 import cdrcgi

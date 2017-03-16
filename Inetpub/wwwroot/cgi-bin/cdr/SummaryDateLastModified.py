@@ -1,56 +1,22 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Report listing specified set of Cancer Information Summaries, the date
 # they were last modified as entered by a user, and the date the last
 # Modify action was taken.
 #
-# BZIssue::4924 - Modify Summary Date Last Modified Report
-#
-# Revision 1.13  2008/07/30 17:00:23  venglisc
-# Added date to report. (Bug 4209)
-#
-# Revision 1.12  2008/07/18 15:07:27  venglisc
-# Fixed SQL query to pick up the documents DateLastModified instead of
-# (for the Spanish document) the DLM of the English summary. (Bug 4214)
-#
-# Revision 1.11  2007/11/05 17:33:52  bkline
-# Another cosmetic adjustment.
-#
-# Revision 1.10  2007/11/05 15:08:42  bkline
-# Cosmetic modifications for Margaret.
-#
-# Revision 1.9  2007/11/03 14:15:07  bkline
-# Unicode encoding cleanup (issue #3716).
-#
-# Revision 1.8  2007/10/31 17:41:52  bkline
-# Extensively rewritten for request #3635.
-#
-# Revision 1.7  2005/07/14 09:49:41  bkline
-# Changed to ignore UNLOCK rows in the audit table.
-#
-# Revision 1.6  2005/07/13 01:28:03  bkline
-# Fixed bug in test of audience for lookup of abbreviation.
-#
-# Revision 1.5  2005/05/27 17:21:03  bkline
-# Modifications requested by Sheri (issue #1698): converted to Excel
-# workbook; added three new columns for System report.
-#
-# Revision 1.4  2003/12/16 15:50:23  bkline
-# Fixed bug in title display showing which date range user specified.
-#
-# Revision 1.3  2003/12/03 20:42:14  bkline
-# Added designation of which date range was specified (user or system).
-#
-# Revision 1.2  2003/11/03 00:24:51  bkline
-# Changes requested by issue #913.
-#
-# Revision 1.1  2003/05/08 20:26:42  bkline
-# New summary reports.
-#
+# BZIssue::913 - user-requested changes
+# BZIssue::1698 - add new columns and switch to Excel report
+# BZIssue::3635 - extensive rewrite
+# BZIssue::3716 - unicode encoding cleanup
+# BZIssue::4209 - add date to report
+# BZIssue::4214 - use the document's own DateLastModified value
+# BZIssue::4924 - modify Summary Date Last Modified Report
 #----------------------------------------------------------------------
-import cdr, cdrdb, cdrcgi, cgi, time, ExcelWriter, sys
+import cgi
+import cdr
+import cdrdb
+import cdrcgi
+import time
+import sys
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -561,151 +527,98 @@ def getAudienceAbbreviation(audience):
     return 'PROFESSIONAL' in audience.upper() and 'HP' or 'PAT'
 
 #----------------------------------------------------------------------
-# Create the styles for the workbook.
-#----------------------------------------------------------------------
-class Styles:
-    def __init__(self, wb):
-
-        # Create the style for the title of a sheet.
-        font        = ExcelWriter.Font(name = 'Arial', size = 12, bold = True)
-        align       = ExcelWriter.Alignment('Center', 'Center')
-        self.title  = wb.addStyle(alignment = align, font = font)
-
-        # Create the style for the section titles.
-        font        = ExcelWriter.Font(name = 'Arial', size = 11, bold = True)
-        align       = ExcelWriter.Alignment('Left', 'Center', True)
-        self.sect   = wb.addStyle(alignment = align, font = font)
-
-        # Create the style for the column headers.
-        font        = ExcelWriter.Font(name = 'Arial', size = 10, bold = True)
-        align       = ExcelWriter.Alignment('Center', 'Bottom', True)
-        self.header = wb.addStyle(alignment = align, font = font)
-
-        # Create the style for the left-aligned cells.
-        align       = ExcelWriter.Alignment('Left', 'Top', True)
-        font        = ExcelWriter.Font(name = 'Arial', size = 10)
-        self.left   = wb.addStyle(alignment = align, font = font)
-
-        # Create the style for the centered cells.
-        align       = ExcelWriter.Alignment('Center', 'Top', True)
-        self.center = wb.addStyle(alignment = align, font = font)
-
-        # Create the style for the linking cells.
-        font        = ExcelWriter.Font('blue', 'Single', 'Arial', size = 10)
-        #align       = ExcelWriter.Alignment('Center', 'Top', True)
-        self.url    = wb.addStyle(alignment = align, font = font)
-
-        # Create the style for the date.
-        font        = ExcelWriter.Font(name = 'Arial', size = 10, bold = True)
-        align       = ExcelWriter.Alignment('Left', 'Bottom', True)
-        self.date   = wb.addStyle(alignment = align, font = font)
-
-#----------------------------------------------------------------------
 # Create the workbook.
 #----------------------------------------------------------------------
-#format1   = makeFormat(book, True, 12, merge = 1)
-#format2   = makeFormat(book, True, 12, align = 'left', merge = 1)
-#format3   = makeFormat(book, True, 12, textWrap = True)
-#format4   = makeFormat(book)
-#format5   = makeFormat(book, underscore = True, color = 'blue')
 if sys.platform == "win32":
     import os, msvcrt
     msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
-book = ExcelWriter.Workbook()
-styles = Styles(book)
-sheet = book.addWorksheet("CCB Report")
-rowNum    = 1
-sheet.addCol(1, 66.75)
-sheet.addCol(2, 266.25)
+styles = cdrcgi.ExcelStyles()
+styles.header = styles.style("align: wrap true, horz center; font: bold true")
+styles.url = styles.style(styles.HYPERLINK, styles.CENTER_TOP)
+styles.sect = styles.style(styles.LEFT, styles.bold_font(11))
+sheet = styles.add_sheet("CCB Report")
+report_date = "Report Date: %s" % today
+sheet.col(0).width = styles.chars_to_width(12)
+sheet.col(1).width = styles.chars_to_width(50)
 extraCols = 0
 if reportType == 'S':
-    sheet.addCol(3, 77.25)
-    sheet.addCol(4, 40.5)
-    sheet.addCol(5, 266.25)
+    sheet.col(2).width = styles.chars_to_width(15)
+    sheet.col(3).width = styles.chars_to_width(7)
+    sheet.col(4).width = styles.chars_to_width(50)
     extraCols = 3
-sheet.addCol(extraCols + 3, 82.5)
-sheet.addCol(extraCols + 4, 82.5)
-sheet.addCol(extraCols + 5, 56.25)
-row = sheet.addRow(1, styles.title)#, 15.75)
-row.addCell(1, bodyTitle, mergeAcross = 4 + extraCols)
-row = sheet.addRow(2, styles.title)#, 15.75)
-row.addCell(1, subtitle, mergeAcross = 4 + extraCols)
-row = sheet.addRow(3, styles.date)#, 15.75)
-row.addCell(1, 'Date: ' + str(today), mergeAcross = 2)
-rowNum = 5
+sheet.col(extraCols + 2).width = styles.chars_to_width(15)
+sheet.col(extraCols + 3).width = styles.chars_to_width(15)
+sheet.col(extraCols + 4).width = styles.chars_to_width(10)
+sheet.col(extraCols + 5).width = styles.chars_to_width(15)
+sheet.write_merge(0, 0, 0, extraCols + 5, bodyTitle, styles.banner)
+sheet.write_merge(1, 1, 0, extraCols + 5, subtitle, styles.banner)
+sheet.write_merge(2, 2, 0, extraCols + 5, report_date, styles.bold)
+rowNum = 3
 
 #----------------------------------------------------------------------
 # Add rows for one section of the report.
 #----------------------------------------------------------------------
 def addSection(sheet, summaries, board, language, audience, reportType,
-               styles, rowNum):
+               styles, row):
     audienceAndLanguage = "%s (%s)" % (audience, language)
-    mergeCells = reportType == 'S' and 8 or 5
-    row = sheet.addRow(rowNum, styles.sect)#, 15.75)
-    row.addCell(1, board, mergeAcross = mergeCells)
-    rowNum += 1
-    row = sheet.addRow(rowNum, styles.sect)#, 15.75)
-    row.addCell(1, audienceAndLanguage, mergeAcross = mergeCells)
-    rowNum += 1
-    row = sheet.addRow(rowNum, styles.header)#, 47.25)
-    row.addCell(1, 'DocID')
-    row.addCell(2, 'Summary Title')
+    lastCol = reportType == 'S' and 8 or 5
+    sheet.write_merge(row, row, 0, lastCol, "")
+    row += 1
+    sheet.write_merge(row, row, 0, lastCol, board, styles.sect)
+    row += 1
+    sheet.write_merge(row, row, 0, lastCol, audienceAndLanguage, styles.sect)
+    row += 1
+    sheet.write(row, 0, "DocID", styles.header)
+    sheet.write(row, 1, "Summary Title", styles.header)
     extraCols = 0
-    url = None
-    urlStyle = styles.center
     if reportType == 'S':
-        row.addCell(3, 'Board')
-        row.addCell(4, 'Type')
-        row.addCell(5, 'Last Comment')
+        sheet.write(row, 2, "Board", styles.header)
+        sheet.write(row, 3, "Type", styles.header)
+        sheet.write(row, 4, "Last Comment", styles.header)
         extraCols = 3
         audienceAbbreviation = getAudienceAbbreviation(audience)
-        urlStyle = styles.url
-    row.addCell(3 + extraCols, 'Date Last Modified')
-    row.addCell(4 + extraCols, 'Last Modify Action Date (System)')
-    row.addCell(5 + extraCols, 'LastV Publish?')
-    row.addCell(6 + extraCols, 'User')
-    rowNum += 1
-    summaries.sort()
-    for summary in summaries:
-        row = sheet.addRow(rowNum)
+    sheet.write(row, extraCols + 2, "Date Last Modified", styles.header)
+    sheet.write(row, extraCols + 3, "Last Modify Action Date (System)",
+                styles.header)
+    sheet.write(row, extraCols + 4, "LastV Publish?", styles.header)
+    sheet.write(row, extraCols + 5, "User", styles.header)
+    row += 1
+    for summary in sorted(summaries):
         summaryType = summary.summaryType
         if summaryType == 'Complementary and alternative medicine':
             summaryType = 'CAM'
         lastSave = ("%s" % summary.lastSave)[:10]
-        url = ("http://%s" % cdrcgi.WEBSERVER + \
-                    "/cgi-bin/cdr/DocVersionHistory.py?" + \
-                    "Session=guest&DocId=%s" % summary.docId)
-        row.addCell(1, u"CDR%d" % summary.docId, style = styles.url,
-                    href = url)
-        row.addCell(2, summary.title, style = styles.left)
+        url = ("http://%s" % cdrcgi.WEBSERVER +
+               "/cgi-bin/cdr/DocVersionHistory.py?" +
+               "Session=guest&DocId=%s" % summary.docId)
+        link = styles.link(url, "CDR%d" % summary.docId)
+        sheet.write(row, 0, link, styles.url)
+        sheet.write(row, 1, summary.title, styles.left)
+        if extraCols:
+            sheet.write(row, 2, summaryType, styles.left)
+            sheet.write(row, 3, audienceAbbreviation, styles.left)
+            sheet.write(row, 4, summary.comment, styles.left)
+        sheet.write(row, extraCols + 2, summary.lastMod, styles.center)
         if reportType == 'S':
-            row.addCell(3, summaryType, style = styles.left)
-            row.addCell(4, audienceAbbreviation, style = styles.left)
-            row.addCell(5, summary.comment, style = styles.left)
             url = ("http://%s/cgi-bin/cdr/AuditTrail.py?id=%s" %
                    (cdrcgi.WEBSERVER, summary.docId))
-        row.addCell(3 + extraCols, summary.lastMod, style = styles.center)
-        row.addCell(4 + extraCols, lastSave, style = urlStyle,
-                    href = url)
-        row.addCell(5 + extraCols, summary.lastVFlag, style = styles.center)
-        row.addCell(6 + extraCols, summary.lastSaveUsr, style = styles.center)
-        rowNum += 1
-    return rowNum + 1
+            link = styles.link(url, lastSave)
+            sheet.write(row, extraCols + 3, link, styles.url)
+        else:
+            sheet.write(row, extraCols + 3, lastSave, styles.center)
+        sheet.write(row, extraCols + 4, summary.lastVFlag, styles.center)
+        sheet.write(row, extraCols + 5, summary.lastSaveUsr, styles.center)
+        row += 1
+    return row
 
 #----------------------------------------------------------------------
 # Walk through the sections.
 #----------------------------------------------------------------------
-boards = Summary.summaries.keys()
-boards.sort()
-for boardName in boards:
+for boardName in sorted(Summary.summaries):
     board = Summary.summaries[boardName]
-    languages = board.keys()
-    languages.sort()
-    for languageName in languages:
+    for languageName in sorted(board):
         language = board[languageName]
-        audiences = language.keys()
-        audiences.sort()
-        for audienceName in audiences:
+        for audienceName in sorted(language):
             summaries = language[audienceName]
             rowNum = addSection(sheet, summaries, boardName, languageName,
                                 audienceName, reportType, styles, rowNum)
@@ -714,4 +627,4 @@ stamp = time.strftime("%Y%m%d%H%M%S")
 print "Content-type: application/vnd.ms-excel"
 print "Content-Disposition: attachment; filename=sdlm-%s.xls" % stamp
 print
-book.write(sys.stdout, True)
+styles.book.save(sys.stdout)

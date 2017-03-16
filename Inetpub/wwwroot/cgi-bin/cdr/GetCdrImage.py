@@ -1,11 +1,6 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Send JPEG version of a CDR image to the browser, possibly resized.
-#
 # BZIssue::5001
-#
 #----------------------------------------------------------------------
 import cdrdb, sys, cgi, msvcrt, os, cdr, cdrcgi, cStringIO
 from PIL import Image, ImageEnhance

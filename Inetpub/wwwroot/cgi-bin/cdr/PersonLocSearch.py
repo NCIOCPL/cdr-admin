@@ -1,38 +1,6 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Prototype for duplicate-checking interface for Person documents.
-#
-# $Log: not supported by cvs2svn $
-# Revision 1.9  2007/11/03 14:15:07  bkline
-# Unicode encoding cleanup (issue #3716).
-#
-# Revision 1.8  2003/08/25 20:20:18  bkline
-# Added support for showing home addresses on the picklist; eliminated
-# encoding problem.
-#
-# Revision 1.7  2002/06/26 20:05:25  bkline
-# Modified advanced Person search forms to use QcReport.py for doc display.
-#
-# Revision 1.6  2002/06/06 12:01:26  bkline
-# Added calls to cdrcgi.unicodeToLatin1().
-#
-# Revision 1.5  2002/05/24 18:02:11  bkline
-# Wording change requested by Lakshmi.
-#
-# Revision 1.4  2002/05/08 17:41:50  bkline
-# Updated to reflect Volker's new filter names.
-#
-# Revision 1.3  2002/04/12 19:57:19  bkline
-# Installed new filters.
-#
-# Revision 1.2  2002/02/14 19:38:53  bkline
-# Replaced hardwired filter ID with filter name.
-#
-# Revision 1.1  2001/12/01 18:11:44  bkline
-# Initial revision
-#
+# BZIssue::3716 - unicode encoding cleanup
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, cdrdb
 

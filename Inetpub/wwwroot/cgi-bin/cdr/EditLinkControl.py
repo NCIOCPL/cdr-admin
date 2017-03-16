@@ -1,17 +1,5 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
-# Prototype for editing CDR linking tables.
-#
-# $Log: not supported by cvs2svn $
-# Revision 1.2  2002/02/15 06:48:30  ameyer
-# Added URL encoded variables to distinguish calls to EditLinkType.py
-# as add or edit calls.
-#
-# Revision 1.1  2001/06/13 22:16:32  bkline
-# Initial revision
-#
+# Interface for editing CDR linking tables.
 #----------------------------------------------------------------------
 
 import cgi, cdr, cdrcgi, re, string

@@ -1,25 +1,5 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Prototype for duplicate-checking interface for Summary documents.
-#
-# $Log: not supported by cvs2svn $
-# Revision 1.5  2002/07/15 20:19:51  bkline
-# XML paths altered to match changed schemas.
-#
-# Revision 1.4  2002/05/03 20:31:02  bkline
-# New filter added.
-#
-# Revision 1.3  2002/02/20 03:58:19  bkline
-# Truncated long pulldown list strings at users' request.
-#
-# Revision 1.2  2002/02/14 19:35:24  bkline
-# Replaced hardwired filter ID with filter name.
-#
-# Revision 1.1  2001/12/01 18:11:44  bkline
-# Initial revision
-#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, cdrdb
 

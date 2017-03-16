@@ -1,7 +1,5 @@
 #----------------------------------------------------------------------
 #
-# $Id$
-#
 # Report on lists of summaries.
 #
 # BZIssue::4744 - Modify Summaries with Protocol Links/Refs report
@@ -75,8 +73,7 @@ class Control(cdrcgi.Control):
             checked = self.date_method == value
             form.add_radio("date-method", label, value, checked=checked)
         form.add("</fieldset>")
-        hidden = not self.date_method and " class='hidden'" or ""
-        form.add("<fieldset id='date-range'%s>" % hidden)
+        form.add("<fieldset id='date-range'>")
         form.add(form.B.LEGEND("Date Range for Filtering"))
         form.add_date_field("start", "Starting Date", value=self.start)
         form.add_date_field("end", "Ending Date", value=self.end)
@@ -326,7 +323,13 @@ class Control(cdrcgi.Control):
         """
         return """\
 function check_date_method(whatever) { jQuery("#date-range").show() }
-function check_status(status) { check_set("status", status); }"""
+function check_status(status) { check_set("status", status); }
+jQuery(function() {
+    if (jQuery("input[name='date-method']:checked").val())
+        jQuery("#date-range").show();
+    else
+        jQuery("#date-range").hide();
+});"""
 
 class Summary:
     """

@@ -1,12 +1,8 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Prototype for CDR reporting/formatting web wrapper.
 #
 # BZIssue::1338
 # JIRA::OCECDR-3800
-#
 #----------------------------------------------------------------------
 import cgi
 import cdr

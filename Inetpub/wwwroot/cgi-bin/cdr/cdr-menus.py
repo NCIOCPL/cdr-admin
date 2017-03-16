@@ -1,8 +1,5 @@
 #----------------------------------------------------------------------
-# $Id$
-#
 # Show CDR Admin menu hierarchy.
-#
 #----------------------------------------------------------------------
 import cdr
 import re
@@ -40,7 +37,6 @@ class Item:
         "citationsaddedtoprotocols.py",
         "citationsinsummaries.py",
         "citesearch.py",
-        "contentinventory.py",
         "countbydoctype.py",
         "countrysearch.py",
         "ctgovdownloadreport.py",
@@ -62,7 +58,6 @@ class Item:
         "documentsmodified.py",
         "docversionhistory.py",
         "drugagentreport.py",
-        "drugagentreport2.py",
         "drugdescriptionreport.py",
         "drugindicationsreport.py",
         "drugreviewreport.py",

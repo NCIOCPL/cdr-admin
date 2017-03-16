@@ -1,11 +1,6 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Administrative interface for creating or modifying a CDR user account.
-#
 # JIRA::OCECDR-3849 - Integrate CDR login with NIH Active Directory
-#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi
 
@@ -63,7 +58,8 @@ if request == "Save Changes":
     if authMode == "network":
         password = password2 = ""
     elif not password:
-        cdrcgi.bail("Password is required for local accounts")
+        if not usrName:
+            cdrcgi.bail("Password is required for local accounts")
     elif password != password2:
         cdrcgi.bail("Passwords do not match")
 

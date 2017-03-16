@@ -1,14 +1,10 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # "We need a New Published Glossary Terms Report which will serve as a
 # QC report to verify which new Glossary Term Name documents have been
 # published within the given time frame.  We would like a new Mailer
 # report so we can track responses easier."
 #
 # JIRA::OCECDR-3800 - Address security vulnerabilities
-#
 #----------------------------------------------------------------------
 import cgi
 import cdr
@@ -16,7 +12,6 @@ import cdrdb
 import cdrcgi
 import datetime
 import sys
-import ExcelWriter
 import lxml.etree as etree
 
 #----------------------------------------------------------------------
@@ -68,15 +63,12 @@ class TermName:
              WHERE path = '/GlossaryTermName/TranslatedName/TermNameString'
                AND doc_id = ?""", docId)
         self.spNames = [row[0] for row in cursor.fetchall()]
-    def addToSheet(self, sheet, nextRow, style, urlStyle):
-        spNames = u"; ".join(self.spNames)
-        row = sheet.addRow(nextRow, style)
-        nextRow += 1
-        row.addCell(1, self.docId)
-        row.addCell(2, self.enName)
-        row.addCell(3, u"; ".join(self.spNames))
-        row.addCell(4, str(self.firstPub)[:10])
-        return nextRow
+    def addToSheet(self, sheet, styles, row):
+        sheet.write(row, 0, self.docId, styles.left)
+        sheet.write(row, 1, self.enName, styles.left)
+        sheet.write(row, 2, u"; ".join(self.spNames), styles.left)
+        sheet.write(row, 3, str(self.firstPub)[:10], styles.left)
+        return row + 1
 
 #----------------------------------------------------------------------
 # Display the form for the report's parameters.
@@ -96,19 +88,15 @@ def createForm():
 #----------------------------------------------------------------------
 # Add the title row and the column headers.
 #----------------------------------------------------------------------
-def addColumnHeaders(book, sheet, startDate, endDate, total):
-    font  = ExcelWriter.Font(size = 10, bold = True, color = 'blue')
-    align = ExcelWriter.Alignment('Center', 'Top')
-    style = book.addStyle(font = font, alignment = align)
-    sheet.addCol(1,  70)
-    sheet.addCol(2, 300)
-    sheet.addCol(3, 300)
-    sheet.addCol(4, 100)
-    row = sheet.addRow(1, style)
-    row.addCell(1, u"CDR ID")
-    row.addCell(2, u"Term Name (English)")
-    row.addCell(3, u"Term Name (Spanish)")
-    row.addCell(4, u"Date First Published")
+def addColumnHeaders(styles, sheet):
+    widths = (13, 55, 55, 23)
+    labels = ("CDR ID", "Term Name (English)", "Term Name (Spanish)",
+              "Date First Published")
+    assert(len(widths) == len(labels))
+    for col, width in enumerate(widths):
+        sheet.col(col).width = styles.chars_to_width(width)
+    for col, label in enumerate(labels):
+        sheet.write(0, col, label, styles.header)
 
 #----------------------------------------------------------------------
 # Generate the Mailer Tracking Report. We have already scrubbed date
@@ -125,20 +113,14 @@ def createReport(cursor, startDate, endDate):
     names = []
     for docId, firstPub in rows:
         names.append(TermName(docId, firstPub, cursor))
-    book = ExcelWriter.Workbook()
-    sheet = book.addWorksheet('Term Names')
-    addColumnHeaders(book, sheet, startDate, endDate, len(names))
-    alignment = ExcelWriter.Alignment('Left', 'Top', True)
-    font = ExcelWriter.Font('blue', True)
-    style = book.addStyle(alignment = alignment)
-    urlStyle = book.addStyle(font = font, alignment = alignment)
-    nextRow = 2
+    styles = cdrcgi.ExcelStyles()
+    styles.set_color(styles.header, "blue")
+    sheet = styles.add_sheet("Term Names")
+    addColumnHeaders(styles, sheet)
+    row = 1
     for name in names:
-        nextRow = name.addToSheet(sheet, nextRow, style, urlStyle)
-    font = ExcelWriter.Font(size = 10, bold = True)
-    style = book.addStyle(font = font)
-    row = sheet.addRow(nextRow, style)
-    row.addCell(1, u"Total: %d" % len(names))
+        row = name.addToSheet(sheet, styles, row)
+    sheet.write(row, 0, u"Total: %d" % len(names), styles.bold)
     try:
         import msvcrt, os
         msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
@@ -149,7 +131,7 @@ def createReport(cursor, startDate, endDate):
     print "Content-type: application/vnd.ms-excel"
     print "Content-Disposition: attachment; filename=TermNames-%s.xls" % stamp
     print
-    book.write(sys.stdout, True)
+    styles.book.save(sys.stdout)
 
 #----------------------------------------------------------------------
 # Create the report or as for the report parameters.

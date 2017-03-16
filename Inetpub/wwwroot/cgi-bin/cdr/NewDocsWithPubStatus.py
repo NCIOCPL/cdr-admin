@@ -1,16 +1,6 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Reports on newly created documents and their publication statuses.
-#
-# $Log: not supported by cvs2svn $
-# Revision 1.2  2003/06/13 20:28:57  bkline
-# Implemented changes requested by Margaret in issue #754.
-#
-# Revision 1.1  2002/07/02 13:47:56  bkline
-# New report on new documents with publication status.
-#
+# BZIssue::754 - changes requested by Margaret
 #----------------------------------------------------------------------
 import cdr, cdrdb, cdrcgi, cgi, time
 

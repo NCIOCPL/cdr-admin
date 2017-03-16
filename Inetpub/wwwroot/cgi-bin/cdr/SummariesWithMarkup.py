@@ -6,6 +6,7 @@
 # BZIssue::5094 - Summ. with Markup Report - Add option to show all summaries
 # BZIssue::5273 - Identifying Modules in Summary Reports
 # JIRA::OCECDR-4062
+# JIRA::OCECDR-4059
 #----------------------------------------------------------------------
 import cdr
 import cdrcgi
@@ -68,8 +69,16 @@ class Control(cdrcgi.Control):
         else:
             board_ids = self.board
         boards = [Board(board_id, self) for board_id in board_ids]
-        if self.language == "Spanish":
-            Board.COLS[1].set_name("Summary Titles")
+        st_col = "Summary Title%s" % (self.language == "Spanish" and "s" or "")
+        Board.COLS = [
+            cdrcgi.Report.Column("Doc ID"),
+            cdrcgi.Report.Column(st_col)
+        ]
+        for level in self.LEVELS:
+            if level in self.level:
+                Board.COLS.append(cdrcgi.Report.Column(level))
+        if self.advisory:
+            Board.COLS.append(cdrcgi.Report.Column("Advisory"))
         return [board.make_table() for board in boards if board.summaries]
 
     def set_report_options(self, opts):
@@ -79,8 +88,7 @@ class Control(cdrcgi.Control):
                                                      datetime.date.today())
         opts["css"] = """\
 td { width: 60px; text-align: center; vertical-align: middle; }
-td.active, td.inactive { width: 80px; }
-td.inactive { background-color: #eee; }
+td.active { width: 80px; }
 td.title { text-align: left; vertical-aligh: top; width: 550px; }"""
         return opts
 
@@ -115,10 +123,6 @@ class Board:
         summaries - sorted list of summaries to be display in the table
                     for this board
     """
-
-    NAMES = ["Doc ID", "Summary Title"] + list(Control.LEVELS) + ["Advisory"]
-    COLS = [cdrcgi.Report.Column(name) for name in NAMES]
-    "Column names for the board's report table."
 
     def __init__(self, doc_id, control):
         "Find all the board's summaries which are in scope for this report."
@@ -247,12 +251,8 @@ class Board:
                 if level in self.control.level:
                     value = getattr(self.counts, level.lower())
                     row.append(self.make_active_cell(value))
-                else:
-                    row.append(self.make_inactive_cell())
             if self.control.advisory:
                 row.append(self.make_active_cell(self.counts.advisory))
-            else:
-                row.append(self.make_inactive_cell())
             return row
 
         def make_active_cell(self, value):
@@ -260,10 +260,6 @@ class Board:
             if not value:
                 value = ""
             return cdrcgi.Report.Cell(value, classes="active")
-
-        def make_inactive_cell(self):
-            "Create a cell for a count type which is suppressed."
-            return cdrcgi.Report.Cell("", classes="inactive")
 
         def make_url(self):
             "Let the user open the QC report for the summary in another tab."

@@ -1,12 +1,8 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Dynamic viewer for terminology hierarchy.
 #
 # BZIssue::3316
 # JIRA::OCECDR-3800 - Address security vulnerabilities
-#
 #----------------------------------------------------------------------
 import cdrcgi
 import cdrdb

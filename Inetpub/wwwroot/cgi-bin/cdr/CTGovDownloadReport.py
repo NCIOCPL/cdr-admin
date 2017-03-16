@@ -1,13 +1,5 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Stats on documents downloaded from ClinicalTrials.gov.
-#
-# $Log: not supported by cvs2svn $
-# Revision 1.1  2004/01/14 14:05:12  bkline
-# New report on download jobs from ClinicalTrials.gov.
-#
 #----------------------------------------------------------------------
 import cdr, cdrdb, time, cgi, cdrcgi, re
 

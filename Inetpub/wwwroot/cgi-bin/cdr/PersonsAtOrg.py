@@ -1,26 +1,8 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Identifieds all person documents which are linked to a specified
 # organization document.
 #
-# $Log: not supported by cvs2svn $
-# Revision 1.5  2004/02/24 12:44:59  bkline
-# Added person document IDs at Sheri's request (request #1107).
-#
-# Revision 1.4  2003/08/25 20:29:55  bkline
-# Eliminated dross left over from clone of another report.
-#
-# Revision 1.3  2003/03/10 21:05:30  bkline
-# Added support for ambiguous organization name pattern.
-#
-# Revision 1.2  2003/02/24 21:16:49  bkline
-# Added support for wildcards in org name.
-#
-# Revision 1.1  2002/03/21 20:00:28  bkline
-# Report for persons practicing at a designated organizaiton.
-#
+# BZIssue::1107 - add person document IDs at Sheri's request
 #----------------------------------------------------------------------
 
 import cdr, cdrdb, cdrcgi, cgi, re, string, time

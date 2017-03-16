@@ -1,11 +1,5 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Prototype for CDR admin main menu.
-#
-# $Log: not supported by cvs2svn $
-#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
 

@@ -1,11 +1,6 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Report of history of changes for a board's summaries
-#
 # Rewritten July 2015 as part of a security sweep.
-#
 #----------------------------------------------------------------------
 import cdr
 import cdrdb

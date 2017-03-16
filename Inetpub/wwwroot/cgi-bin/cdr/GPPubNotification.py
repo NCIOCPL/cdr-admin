@@ -1,11 +1,6 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Send out email notification to GP who has been added to the directory.
-#
 # BZIssue::4779
-#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, cdrdb, cdrmailcommon, sys
 import textwrap, time, lxml.etree as etree

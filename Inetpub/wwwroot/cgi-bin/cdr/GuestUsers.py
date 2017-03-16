@@ -1,7 +1,4 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Main menu for Guest Users
 # -------------------------
 # We want to prevent that guest users might accidentally modify data
@@ -9,7 +6,6 @@
 # options to these users that are guest group members.
 #
 # BZIssue::4653 CTRO Access to CDR Admin Interface
-#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
 
@@ -30,7 +26,7 @@ html    = cdrcgi.header(title, title, section, "", buttons,
                         stylesheet = """
         <style type='text/css'>
         </style>
-            
+
         <script language='JavaScript'>
           function setCdrId() {
              var link = document.getElementById('pp2link');
@@ -59,7 +55,7 @@ for item in items:
         if not cdr.isDevHost():
             continue
         html += """\
-    <li><a href='%s/%s%s&ReportType=pp&DocType=' 
+    <li><a href='%s/%s%s&ReportType=pp&DocType='
            id="pplink" onclick=setDocType()>%s</a> &nbsp;
     <select name="pptype" size="1" id="ppdt">
      <option value="1">CTGovProtocol</option>
@@ -73,7 +69,7 @@ for item in items:
         if not cdr.isDevHost():
             continue
         html += """\
-    <li><a href='%s/%s%s&ReportType=pp&DocId=' 
+    <li><a href='%s/%s%s&ReportType=pp&DocId='
            id="pp2link" onclick=setCdrId()>%s</a> &nbsp;
     &nbsp;
     <span style="font-weight: normal;">(Enter CDR-ID)</span>&nbsp;

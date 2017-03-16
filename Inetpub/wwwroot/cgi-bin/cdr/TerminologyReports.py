@@ -1,13 +1,9 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Submenu for terminology reports.
 #
 # BZIssue::4653 CTRO Access to CDR Admin Interface
 # BZIssue::4698 Genetics Directory Menu Information
 # JIRA::OCECDR-3987
-#
 #----------------------------------------------------------------------
 import cdr
 import cdrcgi
@@ -27,14 +23,6 @@ class Control(cdrcgi.Control):
             ("TermSearch.py", "Terminology QC Report")
         ):
             form.add_menu_link(script, display, self.session)
-        if not self.guest_user():
-            for script, display in (
-                ("TermNCITDrugUpdateAll.py",
-                 "Update all Drug/Agent Terms from NCI Thesaurus"),
-                ("TermNCITDiseaseUpdateAll.py",
-                 "Update all Disease Terms from NCI Thesaurus")
-            ):
-                form.add_menu_link(script, display, self.session)
         form.add("</ol>")
         form.add(form.B.H3("Other Reports"))
         form.add("<ol>")
@@ -46,8 +34,6 @@ class Control(cdrcgi.Control):
             ("RecentCTGovProtocols.py",
              "Clinical Trials Drug Analysis Report", {}),
             ("DrugAgentReport.py", "Drug/Agent Report", {}),
-            ("DrugAgentReport2.py", "Drug/Agent Report - All",
-             { "alldrugs": "true" }),
             ("DrugReviewReport.py", "Drug Review Report", {}),
             ("GeneticConditionMenuMappingReport.py",
              "Genetics Directory Menu Report", {}),

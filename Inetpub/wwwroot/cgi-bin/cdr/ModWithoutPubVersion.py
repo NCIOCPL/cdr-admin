@@ -1,13 +1,9 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Reports on documents which have been changed since a previously
 # publishable version without a new publishable version have been
 # created.
 #
 # Rewritten summer 2015 as part of security sweep.
-#
 #----------------------------------------------------------------------
 import cdr
 import cdrdb

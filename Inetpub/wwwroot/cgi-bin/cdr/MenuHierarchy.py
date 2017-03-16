@@ -1,7 +1,4 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Enables users to review the entire menu hierarchy for a given menu type.
 #
 # In order to sort the children of a term based on the SortOrder attribute
@@ -11,7 +8,6 @@
 # display the term name.
 #
 # JIRA::OCECDR-3800 - Address security vulnerabilities
-#
 #----------------------------------------------------------------------
 import cdr
 import cdrcgi

@@ -1,12 +1,8 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Reports on invalid or blocked CDR documents.
 #
 # BZIssue::3533
 # JIRA::OCECDR-3800
-#
 #----------------------------------------------------------------------
 import cdrcgi
 import cdrdb

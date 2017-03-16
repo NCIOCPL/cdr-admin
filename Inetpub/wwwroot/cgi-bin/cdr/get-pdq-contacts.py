@@ -1,8 +1,6 @@
 #!/usr/bin/python
 # ******************************************************************
 #
-# $ID$
-#
 # File Name: get-pdq-contacts.py
 #            -------------------
 # This script is called by the FTP Linux server during the email
@@ -11,9 +9,6 @@
 #
 # ------------------------------------------------------------------
 # Created:                              Volker Englisch - 2016-04-14
-# $Author: $
-# $Date:   $
-# $Revision: $
 #
 # History:
 # --------

@@ -1,7 +1,4 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # We need a Media Tracking report.  This spreadsheet report will keep track of
 # the development and processing statuses of the Media documents.
 #
@@ -10,7 +7,6 @@
 # BZIssue::5068 - [Media] Board Meeting Recording Tracking Report to
 #                 display blocked documents
 # JIRA::OCECDR-3800 - Address security vulnerabilities
-#
 #----------------------------------------------------------------------
 import cgi
 import cdr
@@ -18,7 +14,6 @@ import cdrdb
 import cdrcgi
 import datetime
 import lxml.etree as etree
-import ExcelWriter
 import sys
 
 #----------------------------------------------------------------------
@@ -48,7 +43,7 @@ elif request == "Log Out":
 
 #----------------------------------------------------------------------
 # Ask the user for the report parameters. William asked that the start
-# date be hard-code to March 1, 2010
+# date be hard-coded to March 1, 2010
 #----------------------------------------------------------------------
 if not cdrcgi.is_date(fromDate) or not cdrcgi.is_date(toDate):
     toDate = datetime.date.today()
@@ -75,10 +70,6 @@ class Status:
                 self.date = child.text
             elif child.tag == "Comment" and not self.comment:
                 self.comment = child.text.strip()
-    def addToRow(self, row, dateStyle):
-        row.addCell(4, self.value)
-        row.addCell(5, self.date)
-        row.addCell(6, self.comment)
 
 #----------------------------------------------------------------------
 # Media document object definition.
@@ -129,22 +120,15 @@ class MediaDoc:
             elif node.tag == "Comment":
                 self.comment = node.text
 
-    def addToSheet(self, sheet, dateStyle, rowNum):
-        row = sheet.addRow(rowNum)
-        mergeDown = len(self.statuses) - 1
-        if mergeDown < 1:
-            mergeDown = None
-
-        row.addCell(1, self.docId, 'Number', mergeDown = mergeDown)
-        row.addCell(2, self.title, mergeDown = mergeDown)
-        row.addCell(3, self.encoding, mergeDown = mergeDown)
-        row.addCell(4, self.dateCreated or u'', mergeDown = mergeDown,
-                    style = dateStyle)
-        row.addCell(5, self.flag, mergeDown = mergeDown)
-        row.addCell(6, self.dateVersioned, mergeDown = mergeDown)
-        row.addCell(7, self.comment, mergeDown = mergeDown)
-
-        return rowNum + 1
+    def addToSheet(self, sheet, styles, row):
+        sheet.write(row, 0, self.docId, styles.center)
+        sheet.write(row, 1, self.title, styles.left)
+        sheet.write(row, 2, self.encoding, styles.left)
+        sheet.write(row, 3, self.dateCreated or u'', styles.center)
+        sheet.write(row, 4, self.flag, styles.center)
+        sheet.write(row, 5, self.dateVersioned, styles.center)
+        sheet.write(row, 6, self.comment, styles.left)
+        return row + 1
 
 #----------------------------------------------------------------------
 # Create/display the report. Can't use the active_doc view, because
@@ -168,50 +152,24 @@ query.order("d.title").execute(cursor, 300)
 #----------------------------------------------------------------------
 # Set up the spreadsheet.
 #----------------------------------------------------------------------
-wb        = ExcelWriter.Workbook()
-border    = ExcelWriter.Border()
-f         = ExcelWriter.Font(family = 'Swiss')
-a         = ExcelWriter.Alignment('Left', 'Top', wrap = True)
-b         = ExcelWriter.Borders(border, border, border, border)
-tdStyle   = wb.addStyle(font = f, alignment = a, borders = b)
-d         = 'YYYY-mm-dd'
-dateStyle = wb.addStyle(font = f, alignment = a, borders = b, numFormat = d)
-f         = ExcelWriter.Font(family = 'Swiss', bold = True)
-thStyle   = wb.addStyle(font = f, alignment = a, borders = b)
-a         = ExcelWriter.Alignment('Center', 'Bottom')
-b         = ExcelWriter.Borders()
-h2Style   = wb.addStyle(font = f, alignment = a, borders = b)
-f         = ExcelWriter.Font(family = 'Swiss', size = 12, bold = True)
-h1Style   = wb.addStyle(font = f, alignment = a, borders = b)
-ws        = wb.addWorksheet("Board Meeting Recordings", tdStyle, frozenRows = 3)
-ws.addCol(1,  45)
-ws.addCol(2, 300)
-ws.addCol(3,  50)
-ws.addCol(4,  55)
-ws.addCol(5,  70)
-ws.addCol(6,  55)
-ws.addCol(7, 300)
-row      = ws.addRow(1, h1Style, 15.75)
-title    = 'Board Meeting Recordings Tracking Report'
-row.addCell(1, title, mergeAcross = 6, style = h1Style)
-row      = ws.addRow(2, h2Style)
-subtitle = 'From %s - %s' % (fromDate, toDate)
-row.addCell(1, subtitle, mergeAcross = 6, style = h2Style)
-row      = ws.addRow(3, thStyle, 27)
-headings = (
-    'CDRID',
-    'Media Title',
-    'Encoding',
-    'Date Created',
-    'Last Version Publishable',
-    'Version Date',
-    'Comments')
-for i in range(len(headings)):
-    row.addCell(i + 1, headings[i])
-rowNum = 4
+styles = cdrcgi.ExcelStyles()
+sheet = styles.add_sheet("Board Meeting Recordings", frozen_rows=3)
+widths = 10, 60, 10, 10, 15, 10, 60
+headers = ("CDRID", "Media Title", "Encoding", "Date Created",
+           "Last Version Publishable", "Version Date", "Comments")
+assert(len(widths) == len(headers))
+for i, chars in enumerate(widths):
+    sheet.col(i).width = styles.chars_to_width(chars)
+title = "Board Meeting Recordings Tracking Report"
+subtitle = "From %s - %s" % (fromDate, toDate)
+sheet.write_merge(0, 0, 0, len(headers) - 1, title, styles.banner)
+sheet.write_merge(1, 1, 0, len(headers) - 1, subtitle, styles.header)
+for i, header in enumerate(headers):
+    sheet.write(2, i, header, styles.header)
+row = 3
 for docId, docTitle, encoding, created in cursor.fetchall():
     mediaDoc = MediaDoc(cursor, docId, docTitle, encoding)
-    rowNum = mediaDoc.addToSheet(ws, dateStyle, rowNum)
+    row = mediaDoc.addToSheet(sheet, styles, row)
 now = datetime.datetime.now()
 name = 'RecordingTrackingReport-%s.xls' % now.strftime("%Y%m%d%H%M%S")
 if sys.platform == "win32":
@@ -220,4 +178,4 @@ if sys.platform == "win32":
 print "Content-type: application/vnd.ms-excel"
 print "Content-Disposition: attachment; filename=%s" % name
 print
-wb.write(sys.stdout, True)
+styles.book.save(sys.stdout)

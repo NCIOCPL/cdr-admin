@@ -1,7 +1,5 @@
 #----------------------------------------------------------------------
 #
-# $Id$
-#
 # Web front end for document deletion.  The documents aren't actually
 # deleted, but instead their active_status column is set to 'D'.
 #

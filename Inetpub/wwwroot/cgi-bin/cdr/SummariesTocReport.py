@@ -1,30 +1,12 @@
 #----------------------------------------------------------------------
 #
-# $Id$
-#
 # Report on lists of summaries.
 #
+# BZIssue::1231 - initial version; based on SummariesLists.py
+# BZIssue::3716 - unicode cleanup
+# BZIssue::4207 - board name modification; UI enhancements
 # BZIssue::5104 - [Summaries] Changes to Summaries TOC Lists report
-#
-# Revision 1.5  2008/09/29 17:48:21  venglisc
-# Fixing typo left over from testing.
-#
-# Revision 1.4  2008/09/29 17:46:41  venglisc
-# Modified Supportive Care board name. (Bug 4207)
-# Also modified user interface to use fieldsets.
-#
-# Revision 1.3  2007/11/03 14:15:07  bkline
-# Unicode encoding cleanup (issue #3716).
-#
-# Revision 1.2  2004/08/16 20:03:24  venglisc
-# Added CSS to display the TOC levels indented.  Added help message.
-# (Bug 1231)
-#
-# Revision 1.1  2004/07/13 20:11:36  venglisc
-# Initial version of program to display a list of Summary Section Titles by
-# summary board (Bug 1231).
-# The user interface has been "borrowed" from SummariesLists.py.
-#
+# JIRA::OCECDR-4078 - reduce indentation
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, cdrdb, time
@@ -83,6 +65,9 @@ header   = cdrcgi.header(title, title, "Summaries TOC Report",
 # Testing
 #byCdrid = 62875
 #byTitle = 'Breast'
+
+if byTitle:
+    byTitle = unicode(byTitle, "utf-8")
 
 #----------------------------------------------------------------------
 # Some input validation
@@ -311,7 +296,7 @@ if not lang and (not byCdrid and not byTitle):
       <input type='checkbox' name='grp'
              value='Integrative, Alternative, and Complementary Therapies'
                     onclick="javascript:someEnglish()" id="E3">
-       <label id="E3">Integrative, Alternative, and Complementary Therapies</b><br>
+       <label id="E3">Integrative, Alternative, and Complementary Therapies</label><br>
       <input type='checkbox' name='grp' value='Pediatric Treatment'
              onclick="javascript:someEnglish()" id="E4">
        <label id="E4">Pediatric Treatment</label><br>
@@ -336,15 +321,15 @@ if not lang and (not byCdrid and not byTitle):
      <td></td>
      <td>
       <input type='checkbox' name='grp' value='All Spanish'
-             onclick="javascript:allSpanish(this, 4)" id="allEs" CHECKED>
+             onclick="javascript:allSpanish(this, 5)" id="allEs" CHECKED>
          <label id="allEs">All Spanish</label><br>
       <input type='checkbox' name='grp' value='Spanish Adult Treatment'
-             onclick="javascript:someSpanish()" id="S1" >
+             onclick="javascript:someSpanish()" id="S1">
          <label id="S1">Adult Treatment</label><br>
       <input type='checkbox' name='grp'
            value='Spanish Integrative, Alternative, and Complementary Therapies'
                     onclick="javascript:someSpanish()" id="S2">
-         <label id="S2">Integrative, Alternative, and Complementary Therapies</b><br>
+         <label id="S2">Integrative, Alternative, and Complementary Therapies</label><br>
       <input type='checkbox' name='grp' value='Spanish Pediatric Treatment'
              onclick="javascript:someSpanish()" id="S3" >
          <label id="S3">Pediatric Treatment</label><br>
@@ -386,8 +371,8 @@ if byTitle:
              ORDER BY d.title""" % docType, '%' + byTitle + '%')
         rows = cursor.fetchall()
         if not rows:
-            cdrcgi.bail("Unable to find document with %s '%s'" % (lookingFor,
-                                                                  byTitle))
+            cdrcgi.bail(u"Unable to find document with %s '%s'" % (lookingFor,
+                                                                   byTitle))
         if len(rows) > 1:
             showTitleChoices(rows)
         intId = rows[0][0]
@@ -416,11 +401,15 @@ if byTitle:
 boardPick = ''
 for i in range(len(groups)):
   # if i+1 == len(groups):
-  if groups[i] == 'Adult Treatment' and lang == 'English':
+  if groups[i] == 'Adult Treatment'            and lang == 'English':
       boardPick += """'CDR0000028327', 'CDR0000035049', """
-  elif groups[i] == 'Spanish Adult Treatment' and lang == 'Spanish':
+  elif groups[i] == 'Spanish Adult Treatment'  and lang == 'Spanish':
       boardPick += """'CDR0000028327', 'CDR0000035049', """
-  elif groups[i] == 'Integrative, Alternative, and Complementary Therapies':
+  elif groups[i] == 'Integrative, Alternative, and Complementary Therapies' \
+                                               and lang == 'English':
+      boardPick += """'CDR0000256158', 'CDR0000423294', """
+  elif groups[i] == 'Spanish Integrative, Alternative, and Complementary Therapies' \
+                                               and lang == 'Spanish':
       boardPick += """'CDR0000256158', 'CDR0000423294', """
   elif groups[i] == 'Genetics':
       boardPick += """'CDR0000032120', 'CDR0000257061', """
@@ -428,13 +417,13 @@ for i in range(len(groups)):
       boardPick += """'CDR0000028536', 'CDR0000028537', """
   elif groups[i] == 'Spanish Screening and Prevention' and lang == 'Spanish':
       boardPick += """'CDR0000028536', 'CDR0000028537', """   ### XXX
-  elif groups[i] == 'Pediatric Treatment' and lang == 'English':
+  elif groups[i] == 'Pediatric Treatment'      and lang == 'English':
       boardPick += """'CDR0000028557', 'CDR0000028558', """
   elif groups[i] == 'Spanish Pediatric Treatment' and lang == 'Spanish':
       boardPick += """'CDR0000028557', 'CDR0000028558', """
-  elif groups[i] == 'Supportive Care' and lang == 'English':
+  elif groups[i] == 'Supportive Care'          and lang == 'English':
       boardPick += """'CDR0000028579', 'CDR0000029837', """
-  elif groups[i] == 'Spanish Supportive Care' and lang == 'Spanish':
+  elif groups[i] == 'Spanish Supportive Care'  and lang == 'Spanish':
       boardPick += """'CDR0000028579', 'CDR0000029837', """
   else:
       boardPick += """'""" + groups[i] + """', """
@@ -567,6 +556,7 @@ if not query:
 # a version number yet, display the intermediary screen to select the
 # version.
 #----------------------------------------------------------------------
+vrows = []
 cursor = conn.cursor()
 letUserPickVersion = True
 if byCdrid:
@@ -657,11 +647,7 @@ instr     = 'Section Titles for %s Summaries -- %s.' % (lang, dateString)
 header    = cdrcgi.rptHeader(title, instr,
                           stylesheet = """\
    <STYLE type="text/css">
-    UL             { margin: 0pt; }
-    UL UL          { margin-left: 30pt; }
-    UL UL UL       { margin-left: 30pt; }
-    UL UL UL UL    { margin-left: 30pt; }
-    UL UL UL UL UL { margin-left: 30pt; }
+    UL             { margin: 0pt; margin-left: 25px; padding-left: 5px; }
     LI             { font-style: normal;
                      font-family: Arial;
                      font-weight: normal;

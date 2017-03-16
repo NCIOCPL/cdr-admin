@@ -9,20 +9,11 @@
 #
 # Requirements and design are described in Bugzilla issue #3561.
 #
-# $Id$
-#
-# $Log: not supported by cvs2svn $
-# Revision 1.3  2008/10/09 13:57:37  ameyer
-# Small changes to screen displays to improve messages and formatting.
-#
-# Revision 1.2  2008/09/24 03:20:13  ameyer
-# Bug fixes.  Slight user interface improvements.  Slight code cleanup.
-#
-# Revision 1.1  2008/09/19 02:37:37  ameyer
-# Initial version.
-#
+# JIRA::OCECDR-4178 - adjust fragment links for table and figure numbers
 #----------------------------------------------------------------------
 
+import datetime
+import lxml.etree as etree
 import cgi, cgitb, cdr, re, cdrcgi, cdrdb
 cgitb.enable()
 
@@ -30,12 +21,27 @@ cgitb.enable()
 # Not using a banner since the program comes through here more than once
 G_log = cdr.Log("ReplaceDocWithNewDoc.log", banner=None)
 
-# Regex for find self referencing cdr:ref and cdr:href
-# Group('cdrid') is the long form CDR ID of the document, CDR0000123456
-#  which goes in the middle between the two parts
-PAT1 =  """cdr:h?ref\s*=\s*['"](?P<cdrid>"""
-PAT2 = ")#"
-refPat = None
+# Locations of attributes we must examine for possible modification
+class AttributePath:
+    NAMESPACES = { "cdr": "cips.nci.nih.gov/cdr" }
+    def __init__(self, element, local_name, prefix=None):
+        self.element = element
+        self.local_name = local_name
+        self.prefix = prefix
+    def get_canonical_name(self):
+        if self.prefix:
+            return "{%s}%s" % (self.NAMESPACES[self.prefix], self.local_name)
+        return self.local_name
+    def get_serialized_name(self):
+        if self.prefix:
+            return "%s:%s" % (self.prefix, self.local_name)
+        return self.local_name
+AttributePath.PATHS = (
+    AttributePath("*", "ref", "cdr"),
+    AttributePath("*", "href", "cdr"),
+    AttributePath("ReferencedTableNumber", "Target"),
+    AttributePath("ReferencedFigureNumber", "Target")
+)
 
 # These will contain the full documents, in cdr.getDoc CdrDoc format.
 # If they exist, the docs have been checked out and must be checked in
@@ -60,8 +66,8 @@ def fatal(msgs):
 
     # Convert messages from string to sequence, if needed and prepend
     #   fatal error string
-    msgList = ["Fatal error - aborting",]
-    if type(msgs) in (type(()), type([])):
+    msgList = ["Fatal error - aborting"]
+    if type(msgs) in (list, tuple):
         msgList += msgs
     else:
         msgList.append(msgs)
@@ -70,10 +76,7 @@ def fatal(msgs):
     log(msgList)
 
     # Bail out
-    bailMsg = ''
-    for msg in msgList:
-        bailMsg += "%s<br />\n" % msg
-    cdrcgi.bail(bailMsg)
+    cdrcgi.bail(msgList[0], extra=msgList[1:])
 
 def log(msgs):
     """
@@ -88,7 +91,7 @@ def log(msgs):
 
 def checkDoc(docId):
     """
-    Check that a document exists and find it's document type.
+    Check that a document exists and find its document type.
 
     Pass:
         CDR doc ID.
@@ -110,8 +113,7 @@ SELECT t.name
  WHERE d.id = ?""", docNum)
         row = cursor.fetchone()
     except Exception, info:
-        fatal("Error retrieving doctype for %s: %s" % \
-                    (docId, str(info)))
+        fatal("Error retrieving doctype for %s: %s" % (docId, str(info)))
 
     if row:
         return row[0]
@@ -211,7 +213,7 @@ SELECT DISTINCT t.name, d.id, d.title, n.source_elem, n.target_frag
     if len(rows) == 0:
         return None
 
-    html = """
+    html = u"""
 <table border='1'>
  <tr>
   <th>Doctype</th>
@@ -222,7 +224,7 @@ SELECT DISTINCT t.name, d.id, d.title, n.source_elem, n.target_frag
  </tr>
 """
     for row in rows:
-        html += """
+        html += u"""
  <tr>
   <td>%s</td>
   <td>%s</td>
@@ -263,74 +265,47 @@ def versionDocIfNeeded(session, docId, doc):
     except Exception, info:
         fatal("Error versioning CWD of %s: %s" % (docId, str(info)))
 
-def removeWillReplace(session, docXml):
+def prepare(xml):
     """
-    Remove the "WillReplace" element from a document.
+    Make the necessary adjustments to the new document.
+
+    These adjustments include:
+      1. Remove the WillReplace element from the document
+      2. Add or adjust the DateLastModified element
+      3. Adjust any internal fragment refs to point to the correct document
 
     Pass:
-        session - credentials
-        docXml  - Document xml (unicode or utf-8 okay)
+        xml = serialized replacement document
 
     Return:
-        Transformed doc without WillReplace.
+        same document with required modifications
     """
-    xsl = """\
-<?xml version='1.0' encoding='UTF-8'?>
 
-<xsl:transform                version = '1.0'
-                            xmlns:xsl = 'http://www.w3.org/1999/XSL/Transform'
-                            xmlns:cdr = 'cips.nci.nih.gov/cdr'>
+    global oldDocIdStr
+    global newDocIdStr
 
- <xsl:output                   method = 'xml'/>
-
- <!--
- =======================================================================
- Copy almost everything straight through.
- ======================================================================= -->
- <xsl:template                  match = '@*|node()|comment()|
-                                         processing-instruction()'>
-  <xsl:copy>
-   <xsl:apply-templates        select = '@*|node()|comment()|
-                                         processing-instruction()'/>
-  </xsl:copy>
- </xsl:template>
-
- <!-- Except this -->
- <!--
- ======================================================================
- If the DateLastModified element does not exist, we'll create it here.
- ====================================================================== -->
- <xsl:template                  match = 'WillReplace'>
-  <xsl:if                        test = "not(../DateLastModified)">
-   <DateLastModified>
-    <xsl:value-of              select = "document(concat('cdrutil:/date/',
-                                                         '%25Y-%25m-%25d'))"/>
-   </DateLastModified>
-  </xsl:if>
- </xsl:template>
-
- <!--
- =====================================================================
- If a DateLastModified element exists, set the date to today.
- ===================================================================== -->
- <xsl:template                  match = 'DateLastModified'>
-  <xsl:copy>
-   <xsl:value-of               select = "document(concat('cdrutil:/date/',
-                                                         '%25Y-%25m-%25d'))"/>
-  </xsl:copy>
- </xsl:template>
-
-</xsl:transform>
-"""
-    log("Filtering new doc to remove WillReplace element")
-    response = cdr.filterDoc(session, xsl, doc=docXml, inline=True)
-    if type(response) in (type(""), type(u"")):
-        # Docs will be unlocked later
-        fatal("Error removing WillReplace element from doc: %s" %\
-                    response)
-
-    # Return transformed doc
-    return response[0]
+    root = etree.fromstring(xml)
+    dateLastModified = root.find("DateLastModified")
+    willReplace = root.find("WillReplace")
+    if willReplace is None:
+        fatal("missing WillReplace element")
+    if dateLastModified is None:
+        dateLastModified = etree.Element("DateLastModified")
+        willReplace.addnext(dateLastModified)
+    dateLastModified.text = str(datetime.date.today())
+    root.remove(willReplace)
+    target = "%s#" % newDocIdStr
+    replacement = "%s#" % oldDocIdStr
+    for attr_path in AttributePath.PATHS:
+        serialized_name = attr_path.get_serialized_name()
+        canonical_name = attr_path.get_canonical_name()
+        path = "//%s[@%s]" % (attr_path.element, serialized_name)
+        for node in root.xpath(path, namespaces=AttributePath.NAMESPACES):
+            value = node.get(canonical_name)
+            if value is not None and value.startswith(target):
+                value = value.replace(target, replacement)
+                node.set(canonical_name, value)
+    return etree.tostring(root)
 
 
 # Constants
@@ -390,7 +365,7 @@ If they are, the program will report to the user:</p>
  <li>Remove the WillReplace element from the new document.</li>
  <li>Save the current working document for the new document as a
      non-publishable version under the old ID.</li>
- <li>Mark the now unused ID of the new document as deleted.  That ID will
+ <li>Mark the now unused ID of the new document as blocked.  That ID will
      no longer be used in the CDR.</li>
 </ol>
 """
@@ -418,7 +393,7 @@ DOCUMENT_ID_FORM = """
 
 fields = cgi.FieldStorage()
 if not fields:
-    fatal ("Unable to load form fields - should not happen!")
+    fatal("Unable to load form fields - should not happen!")
 
 # Collect form data
 session   = cdrcgi.getSession(fields)
@@ -432,20 +407,11 @@ if oldDocId:
 if newDocId:
     newDocIdStr = cdr.exNormalize(newDocId)[0]
 
-    # Here's the pattern for find the self references in the new doc
-    refPat = re.compile(PAT1 + newDocIdStr + PAT2)
-
 # Navigation away from form?
 if request in (cdrcgi.MAINMENU, START_CANCEL):
     cdrcgi.navigateTo("Admin.py", session)
 if request == "Log Out":
     cdrcgi.logout(session)
-
-# Authorization
-# if not session:
-#    fatal ("Unknown or expired CDR session.")
-# if not cdr.canDo (session, ):
-#   fatal ("Sorry, user not authorized to make global changes")
 
 # Anything we send concludes with the session value and page termination tags
 endPage = """
@@ -473,7 +439,7 @@ oldDocType = checkDoc(oldDocId)
 newDocType = checkDoc(newDocId)
 
 # Both documents must exist and, for this version, must be Summaries
-allowedTypes = ('Summary',)
+allowedTypes = set(['Summary'])
 msgs = ""
 if not oldDocType:
     msgs += "Old document %s not found in database<br>" % oldDocIdStr
@@ -550,11 +516,18 @@ if request != CONFIRM_SUBMIT:
     # Determine the number of internal references to replace
     # Requires fetching the new doc without lock for count
     newXml = cdr.getDoc(session, newDocId, checkout='N', getObject=True).xml
-    refList  = refPat.findall(newXml)
-    refCount = len(refList)
+    root = etree.fromstring(newXml)
+    refCount = 0
+    fragStart = "%s#" % newDocIdStr
+    for attr_path in AttributePath.PATHS:
+        serialized_name = attr_path.get_serialized_name()
+        path = "//%s/@%s" % (attr_path.element, serialized_name)
+        for value in root.xpath(path, namespaces=AttributePath.NAMESPACES):
+            if value is not None and value.startswith(fragStart):
+                refCount += 1
 
     # Tell user what will be done
-    html += """
+    html += u"""
 <style type='text/css'>
  td {
   font: 14pt 'Arial'; color: Blue; font-weight: bold; background transparent;
@@ -570,18 +543,18 @@ if request != CONFIRM_SUBMIT:
 </table>
 """ % (oldDocIdStr, oldDocTitle, newDocIdStr, newDocTitle)
 
-    html += """
+    html += u"""
 <hr />
 <h3>Validation Report:</h3>
 """
     if errList:
-        html += """
+        html += u"""
 <p>These errors occurred when validating the new document:</p>
 <ul>
 """
         for err in errList:
-            html += " <li>%s</li>\n" % err
-        html += """
+            html += u" <li>%s</li>\n" % err
+        html += u"""
 </ul>
 <p>Replacing an existing document with a new one that is invalid is
 allowed, but please consider whether you really want to do that.</p>
@@ -590,18 +563,18 @@ allowed, but please consider whether you really want to do that.</p>
 version.</p>
 """
     else:
-        html += """
+        html += u"""
 <p>There were no validation errors in the new document.</p>
 """
 
     # Check links to fragments in the old document
-    html += """
+    html += u"""
 <hr />
 <h3>Linked Fragments Report:</h3>
 """
     linkHtml = getFragmentLinks(oldDocId)
     if linkHtml:
-        html += """
+        html += u"""
 <p>There are links from other documents to specific fragments in the
 old document.  These are listed below.</p>
 
@@ -621,7 +594,7 @@ publishing job.</p>
 """ + linkHtml
 
     else:
-        html += """
+        html += u"""
 <p>There were no external documents with links to specific fragments that
 must be resolved.  The new document can replace the old one without
 breaking any links.</p>
@@ -632,22 +605,22 @@ version.</p>
 
     # Report how many internal references will be patched
     if refCount:
-        html += """
+        html += u"""
 <p>The new document contains %d internal references (e.g.,
-cdr:href="%s#_123) in which the new CDR ID will be replaced by the
+cdr:href="%s#_123") in which the new CDR ID will be replaced by the
 CDR ID of the old document (e.g., %s#_123).</p>""" % (refCount,
 newDocIdStr, oldDocIdStr)
 
     else:
-        html += """
-<p>There were no internal references (e.g., cdr:href="%s#_123) in which the
+        html += u"""
+<p>There were no internal references (e.g., cdr:href="%s#_123") in which the
 new CDR ID would need to be replaced by the old one.
 """ % newDocIdStr
 
     # Request confirmation
     log("Requesting confirmation, replace %s with %s" %
         (oldDocIdStr, newDocIdStr))
-    html += """
+    html += u"""
 <center>
 <table border='0' cellpadding='10'>
  <tr>
@@ -679,20 +652,8 @@ newDoc = getLockedDoc(newDocIdStr)
 # Save the current working version of the old doc, if needed
 versionDocIfNeeded(session, oldDocIdStr, str(oldDoc))
 
-# Remove the WillReplace element from the new doc
-xml = removeWillReplace(session, newDoc.xml)
-
-# Fixup internal references to use the correct CDR ID
-# Only change:
-#   cdr:ref or cdr:href, not any comments or other uses of the new ID
-#   refs with fragment IDs, not references without fragments
-# In other words, only change ID strings that fit the exact refPat regex
-while True:
-    m = refPat.search(xml)
-    if m:
-        xml = xml[:m.start('cdrid')] + oldDocIdStr + xml[m.end('cdrid'):]
-    else:
-        break
+# Make the necessary adjustments to the new document.
+xml = prepare(newDoc.xml)
 
 # Use the new XML to replace the text of the old document
 # We've still got all the CdrDocCtl fields from the new doc here

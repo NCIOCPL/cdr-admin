@@ -1,14 +1,10 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Show all of the top-level parameters used by CDR filters.  Useful
 # for XSL/T script writers who want to avoid conflicting uses of the
 # same parameter names across more than one script, which might be
 # invoked as a set (the CdrFilter command expects all of the parameters
 # supplied for the command to be applicable to all filters named by
 # the command).
-#
 #----------------------------------------------------------------------
 import cdrdb
 import lxml.etree as etree

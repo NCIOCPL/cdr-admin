@@ -1,7 +1,4 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Submenu for ClinicalTrials.gov activities.
 #
 # BZIssue::4700

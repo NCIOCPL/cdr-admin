@@ -1,14 +1,5 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Prototype for editing CDR groups.
-#
-# $Log: not supported by cvs2svn $
-# Revision 1.1  2001/06/13 22:16:32  bkline
-# Initial revision
-#
-#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
 

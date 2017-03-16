@@ -1,17 +1,6 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Generates report on mailers for which reponses have been recorded
 # during a specified date range.
-#
-# $Log: not supported by cvs2svn $
-# Revision 1.2  2003/05/08 20:22:07  bkline
-# Style cleanup; added sort of report rows.
-#
-# Revision 1.1  2002/04/25 02:58:53  bkline
-# New report for mailer checkin.
-#
 #----------------------------------------------------------------------
 import cdrdb, cdrcgi, cgi, time
 

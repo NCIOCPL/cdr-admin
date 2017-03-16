@@ -1,13 +1,9 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # New report to track the processing of audio pronunciation media
 # documents.
 #
 # BZIssue::5123
 # JIRA::OCECDR-3800 - Address security vulnerabilities
-#
 #----------------------------------------------------------------------
 import cdr
 import cdrbatch
@@ -25,7 +21,7 @@ session    = cdrcgi.getSession(fields) or cdrcgi.bail("Please log in")
 email      = cdr.getEmail(session) or cdrcgi.bail("No email for user")
 language   = fields.getvalue("language") or "all"
 start_date = fields.getvalue("start_date") or "2011-01-01"
-end_date   = fields.getvalue("end_date") or today.strftime("%Y-%m-%d")
+end_date   = fields.getvalue("end_date") or str(today)
 SUBMENU    = "Report Menu"
 buttons    = ["Submit", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 script     = "PronunciationRecordings.py"
@@ -41,6 +37,14 @@ elif request == SUBMENU:
     cdrcgi.navigateTo("Reports.py", session)
 if request == "Log Out":
     cdrcgi.logout(session)
+
+#----------------------------------------------------------------------
+# Validate the parameters.
+#----------------------------------------------------------------------
+cdrcgi.valParmDate(start_date, msg="invalid start date")
+cdrcgi.valParmDate(end_date, msg="invalid end date")
+if start_date > end_date:
+    cdrcgi.bail("end date cannot precede start date")
 
 #----------------------------------------------------------------------
 # Put up the menu if we don't have selection criteria yet.

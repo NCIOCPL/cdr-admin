@@ -1,7 +1,5 @@
 #-----------------------------------------------------------------------------
 #
-# $Id$
-#
 # Transform a CDR document using a QC XSL/T filter and send it back to
 # the browser.
 #
@@ -44,8 +42,11 @@
 # BZIssue::5249 - Standard wording in Patient QC report not displaying in green
 # BZIssue::OCECDR-3630 - Patient Summary QC Reports Missing Reference Section
 # JIRA::OCECDR-3800 - Address security vulnerabilities
-# JIRA::OCECDR-3919 - Repair the ability to run publish preview for DrugInformationSummary.
-#                     Turn off document version selection for DrugInformationSummary.
+# JIRA::OCECDR-3919 - Repair the ability to run publish preview for
+#                     DrugInformationSummary. Turn off document version
+#                     selection for DrugInformationSummary.
+# JIRA::OCECDR-4191 - Summary Publish Preview should use current working doc
+# JIRA::OCECDR-4190 - Let user pick version for DIS QC report
 #
 #----------------------------------------------------------------------
 import cgi
@@ -385,6 +386,8 @@ qd       = fields.getvalue("QD")         or None
 kpbox    = fields.getvalue("Keypoints")  or None
 learnmore= fields.getvalue("LearnMore")  or None
 
+if docTitle:
+    docTitle = unicode(docTitle, "utf-8")
 standardWording      = fields.getvalue("StandardWording") or None
 audInternComments    = fields.getvalue("AudInternalComments")  or None
 audExternComments    = fields.getvalue("AudExternalComments")  or None
@@ -620,7 +623,7 @@ if not docId:
                  WHERE title LIKE ?""", docTitle + '%')
         rows = cursor.fetchall()
         if not rows:
-            cdrcgi.bail("Unable to find document with %s %s" %
+            cdrcgi.bail(u"Unable to find document with %s %s" %
                         (lookingFor, repr(docTitle)))
         if len(rows) > 1:
             showTitleChoices(rows)
@@ -648,12 +651,15 @@ elif docType:
 
 #----------------------------------------------------------------------
 # Let the user pick the version for most Summary or Glossary reports.
+# OCECDR-4190: let the user pick the version for drug information summaries.
 #----------------------------------------------------------------------
 letUserPickVersion = False
 if not version:
     if docType in ('Summary', 'GlossaryTermName'):
         if repType and repType not in ('pp', 'gtnwc'):
             letUserPickVersion = True
+    if docType == "DrugInformationSummary":
+        letUserPickVersion = True
 if letUserPickVersion:
     try:
         cursor.execute("""\
@@ -676,7 +682,7 @@ if letUserPickVersion:
     # the specific report type to run.
     form += u"""\
   <INPUT TYPE='hidden' NAME='ReportType' VALUE='%s'>
-""" % (repType)
+""" % (repType or "")
 
     form += u"""\
   <fieldset class='docversion'>
@@ -698,17 +704,20 @@ if letUserPickVersion:
     form += u"</SELECT></div></div>"
     form += u"""
   </fieldset>
+"""
+    if docType in ("Summary", "GlossaryTermName"):
+        form += """\
   <BR>
   <fieldset class="wrapper">
    <legend>&nbsp;Select Insertion/Deletion markup to be displayed
            (one or more)&nbsp;</legend>
 """
-    # The Board Markup does not apply to the Patient Version Summaries
-    # or the GlossaryTerm reports
-    # ----------------------------------------------------------------
-    if docType == 'Summary':
-        if repType != 'pat' and repType != 'patbu' and repType != 'patrs':
-            form += u"""\
+        # The Board Markup does not apply to the Patient Version Summaries
+        # or the GlossaryTerm reports
+        # ----------------------------------------------------------------
+        if docType == 'Summary':
+            if repType not in ("pat", "patbu", "patrs"):
+                form += u"""\
      <fieldset>
       <legend>&nbsp;Board Markup&nbsp;</legend>
       <input name='Editorial-board' type='checkbox' id='eBoard'
@@ -719,9 +728,10 @@ if letUserPickVersion:
       <label for='aBoard'>Advisory board markup</label>
      </fieldset>
 """
-    # Display the check boxed for the Revision-level Markup
-    # -----------------------------------------------------
-    form += u"""\
+        # Display the check boxed for the Revision-level Markup
+        # XXX WHAT IS THIS <TD> TAG DOING???
+        # -----------------------------------------------------
+        form += u"""\
     <td valign="top">
      <fieldset>
       <legend>&nbsp;Revision-level Markup&nbsp;</legend>
@@ -1514,10 +1524,13 @@ SELECT completed
 # --------------------------------------------------------------------
 # If we want to see the publish preview report call the PublishPreview
 # script.
+# OCECDR-4191: Summary Publish Preview should always show CWD
 # --------------------------------------------------------------------
 if repType == "pp":
-    cdrcgi.navigateTo("PublishPreview.py", session, ReportType='pp',
-                                                    DocId=docId)
+    args = { "ReportType": "pp", "DocId": docId }
+    if docType == "Summary":
+        args["Version"] = "cwd"
+    cdrcgi.navigateTo("PublishPreview.py", session, **args)
 
 #----------------------------------------------------------------------
 # Filter the document.

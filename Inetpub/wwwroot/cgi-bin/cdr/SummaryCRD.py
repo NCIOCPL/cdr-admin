@@ -2,7 +2,6 @@
 #
 # SummaryCRD.py
 # -------------
-# $Id: SummaryCRD.py 9298 2009-10-21 16:58:14Z volker $
 #
 # BZIssue::4648
 #   Report to list the Comprehensive Review Dates

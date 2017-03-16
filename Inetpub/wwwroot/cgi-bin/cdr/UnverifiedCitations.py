@@ -1,16 +1,5 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Reports on citations which have not been verified.
-#
-# $Log: not supported by cvs2svn $
-# Revision 1.2  2002/03/13 16:58:42  bkline
-# Fixed order of date elements.
-#
-# Revision 1.1  2002/03/09 03:27:40  bkline
-# Added report for unverified citations.
-#
 #----------------------------------------------------------------------
 import cdr, cgi, cdrdb, cdrcgi, time, re
 

@@ -1,18 +1,6 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # List of ClinicalTrials.gov documents which are duplicates of
 # documents already in the CDR.
-#
-# $Log: not supported by cvs2svn $
-# Revision 1.2  2003/12/18 13:56:32  bkline
-# Split report into two tables at Lakshmi's request.
-#
-# Revision 1.1  2003/12/16 16:07:02  bkline
-# List of ClinicalTrials.gov documents which are duplicates of
-# documents already in the CDR.
-#
 #----------------------------------------------------------------------
 import cdr, cdrdb, time, cgi, cdrcgi, re
 

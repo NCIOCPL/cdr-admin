@@ -1,7 +1,5 @@
 #----------------------------------------------------------------------
 #
-# $Id$
-#
 # BZIssue::4258
 # BZIssue::4250
 # BZIssue::4807 - Board Member not listed on Mailer Reports
@@ -11,7 +9,7 @@
 # "We need to have a report to give us some information about the summary
 # mailers.  This report will be generated in an Excel Spreadsheet, and
 # contain columns for Mailer ID, Board Member Name, Summary Name, Mailer
-# Date Generated, Mailer Date Checked In, and Change Category. 
+# Date Generated, Mailer Date Checked In, and Change Category.
 #
 # "To run the report, we would like to be able to select a Board (Editorial
 # or Editorial Advisory), select whether we want it sorted by Board Member
@@ -34,6 +32,7 @@
 #
 #----------------------------------------------------------------------
 import cgi, cdr, cdrdb, cdrcgi, time
+import lxml.etree as etree
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -135,41 +134,30 @@ ORDER BY b.value""", timeout = 300)
 #----------------------------------------------------------------------
 # Add the title row and the column headers.
 #----------------------------------------------------------------------
-def addHeaderRows(book, sheet, cursor, board, titleStart):
+def addHeaderRows(sheet, styles, cursor, board, titleStart):
     boardName = getBoardName(cursor, board)
     now       = time.strftime(u"%Y-%m-%d")
     title     = "%s - %s  %s" % (titleStart, boardName, now)
-    font      = ExcelWriter.Font(size = 12, bold = True)
-    align     = ExcelWriter.Alignment('Center', 'Bottom', wrap = True)
-    style1    = book.addStyle(font = font, alignment = align)
-    row1      = sheet.addRow(1)
-    style3    = book.addStyle(font = font)
-    row3      = sheet.addRow(3, style3)
-    sheet.addCol(1,  70)
-    sheet.addCol(2, 150)
-    sheet.addCol(3, 300)
-    sheet.addCol(4,  70)
-    sheet.addCol(5,  70)
-    sheet.addCol(6, 200)
-    row1.addCell(1, title, mergeAcross = 5, style = style1)
-    row3.addCell(1, u"Mailer ID")
-    row3.addCell(2, u"Board Member")
-    row3.addCell(3, u"Summary")
-    row3.addCell(4, u"Sent")
-    row3.addCell(5, u"Response")
-    row3.addCell(6, u"Changes")
+    widths = (10, 30, 60, 10, 10, 40)
+    headers = ("Mailer ID", "Board Member", "Summary", "Sent", "Response",
+               "Changes")
+    for col, chars in enumerate(widths):
+        sheet.col(col).width = styles.chars_to_width(chars)
+    sheet.write_merge(0, 0, 0, len(widths) - 1, title, styles.banner)
+    for col, header in enumerate(headers):
+        sheet.write(2, col, header, styles.header)
 
 #----------------------------------------------------------------------
 # Generate the Summary Mailer Report.
 #----------------------------------------------------------------------
-def report4258(book, sheet, cursor, board, selectBy):
+def report4258(sheet, styles, cursor, board, selectBy):
     if selectBy == "lastMailer":
         dateField = "Sent"
         title = u"Summary Mailer Report (Last)"
     else:
         dateField = "Response/Received"
         title = u"Summary Mailer Report (Last Checked-In)"
-    addHeaderRows(book, sheet, cursor, board, title)
+    addHeaderRows(sheet, styles, cursor, board, title)
     dateField = selectBy == "lastMailer" and "Sent" or "Response/Received"
     cursor.execute("""\
         SELECT DISTINCT r.doc_id, r.int_val, s.int_val, d.value
@@ -191,17 +179,17 @@ def report4258(book, sheet, cursor, board, selectBy):
             key = (r, s)
             if key not in mailers or mailers[key][1] < d:
                 mailers[key] = (m, d)
-    finishReport(sheet, cursor, [value[0] for value in mailers.values()])
+    finishReport(sheet, styles, cursor, [v[0] for v in mailers.values()])
 
 #----------------------------------------------------------------------
 # Generate the Summary Mailer History Report.
 #----------------------------------------------------------------------
-def report4259(book, sheet, cursor, board, begin, end):
+def report4259(sheet, styles, cursor, board, begin, end):
     if not begin or not end:
         cdrcgi.bail("Both date range parameters are required for this report.")
     end = cdr.calculateDateByOffset(1, end)
-    addHeaderRows(book, sheet, cursor, board,
-                  u"Summary Mailer History Report (%s - %s)" % (begin, end))
+    title = u"Summary Mailer History Report (%s - %s)" % (begin, end)
+    addHeaderRows(sheet, styles, cursor, board, title)
     cursor.execute("""\
         SELECT DISTINCT mailer.doc_id, sent.value, member.person_id
           FROM query_term mailer
@@ -222,18 +210,17 @@ def report4259(book, sheet, cursor, board, begin, end):
     for mailerId, sent, personId in cursor.fetchall():
         if BoardMember.members[personId].membershipActive(sent):
             mailerIds.append(mailerId)
-    finishReport(sheet, cursor, mailerIds)
+    finishReport(sheet, styles, cursor, mailerIds)
 
 #----------------------------------------------------------------------
 # Add the data rows to the report.
 #----------------------------------------------------------------------
-def finishReport(sheet, cursor, mailerIds):
+def finishReport(sheet, styles, cursor, mailerIds):
     mailers = [Mailer(mailerId, cursor) for mailerId in mailerIds]
     mailers.sort()
-    rowNumber = 4
+    row = 3
     for mailer in mailers:
-        mailer.addRow(sheet, rowNumber)
-        rowNumber += 1
+        row = mailer.addRow(sheet, styles, row)
 
 #----------------------------------------------------------------------
 # Object that knows about all the spans of membership in a board for
@@ -279,7 +266,7 @@ class BoardMember:
                 if not term.end or term.end >= when:
                     return True
         return False
-        
+
 #----------------------------------------------------------------------
 # Object in which we collect what we need for the mailers.
 #----------------------------------------------------------------------
@@ -336,7 +323,7 @@ class Mailer:
              WHERE path = '/Summary/SummaryTitle'
                AND doc_id = ?""", docId)
         rows = cursor.fetchall()
-        title = rows and rows[0][0] or u"" 
+        title = rows and rows[0][0] or u""
         cls.summaries[docId] = title
         return title
     @classmethod
@@ -356,14 +343,14 @@ class Mailer:
         title = rows and rows[0][0] or u""
         cls.recipients[docId] = title.split(u";")[0]
         return cls.recipients[docId]
-    def addRow(self, sheet, rowNumber):
-        row = sheet.addRow(rowNumber)
-        row.addCell(1, self.docId)
-        row.addCell(2, self.recipient)
-        row.addCell(3, self.summary)
-        row.addCell(4, self.sent)
-        row.addCell(5, self.response)
-        row.addCell(6, u"".join(self.changes))
+    def addRow(self, sheet, styles, row):
+        sheet.write(row, 0, self.docId, styles.center)
+        sheet.write(row, 1, self.recipient, styles.left)
+        sheet.write(row, 2, self.summary, styles.left)
+        sheet.write(row, 3, self.sent, styles.center)
+        sheet.write(row, 4, self.response, styles.center)
+        sheet.write(row, 5, u"".join(self.changes), styles.left)
+        return row + 1
 
 #----------------------------------------------------------------------
 # Get the board name from the organization record.
@@ -382,10 +369,6 @@ def getBoardName(cursor, boardId):
 #----------------------------------------------------------------------
 if board:
 
-    try:
-        import ExcelWriter, lxml.etree as etree
-    except Exception, e:
-        cdrcgi.bail("Failure loading Excel generation module: %s" % e)
     try:
         import msvcrt, os, sys
         msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
@@ -419,19 +402,19 @@ if board:
     for personId, memberId in cursor.fetchall():
         BoardMember.members[personId] = BoardMember(cursor, personId, memberId,
                                                     int(board))
-    book = ExcelWriter.Workbook()
-    sheet = book.addWorksheet(section)
+    styles = cdrcgi.ExcelStyles()
+    sheet = styles.add_sheet(section)
     Mailer.sortBy = sortBy
 
     if flavor == "4258":
-        report4258(book, sheet, cursor, board, selectBy)
+        report4258(sheet, styles, cursor, board, selectBy)
     else:
-        report4259(book, sheet, cursor, board, begin, end)
+        report4259(sheet, styles, cursor, board, begin, end)
     stamp = time.strftime("%Y%m%d%H%M%S")
     print "Content-type: application/vnd.ms-excel"
     print "Content-Disposition: attachment; filename=SummMailRep-%s.xls" % stamp
     print
-    book.write(sys.stdout, True)
+    styles.book.save(sys.stdout)
 
 else:
     boards = makeBoardPicklist(conn.cursor())

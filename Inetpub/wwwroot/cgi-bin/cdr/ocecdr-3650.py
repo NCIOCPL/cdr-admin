@@ -1,15 +1,19 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Reports on internal links within a summary to support keeping standard
 # treatment options in sync during the HP reformat process.  Implemented
 # in a more general way in order to support other uses.
 #
 # JIRA::OCECDR-3650
-#
 #----------------------------------------------------------------------
-import cgi, cdrcgi, cdrdb, lxml.etree as etree, re, sys, xlwt, msvcrt, os, time
+import cgi
+import datetime
+import os
+import re
+import sys
+import lxml.etree as etree
+import msvcrt
+import cdrcgi
+import cdrdb
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -148,49 +152,22 @@ links = []
 elements = []
 findLinks(int(docId), tree, links, elements)
 msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
-font = xlwt.Font()
-font.colour_index = 4
-font.bold = True
-alignment = xlwt.Alignment()
-alignment.horz = xlwt.Alignment.HORZ_CENTER
-style = xlwt.XFStyle()
-style.font = font
-style.alignment = alignment
-book = xlwt.Workbook(encoding="UTF-8")
-sheet = book.add_sheet("Links")
-sheet.write_merge(0, 0, 0, 5, "Links for CDR%s (%s)" % (docId, title), style)
-sheet.write(1, 0, "FragID", style)
-sheet.write(1, 1, "Source Section/Subsection", style)
-sheet.write(1, 2, "Section/Subsection Containing Fragment Ref", style)
-sheet.write(1, 3, "Text in Fragment Ref", style)
-sheet.write(1, 4, "In Table?", style)
-sheet.write(1, 5, "In List?", style)
-sheet.col(0).width = 4000
-sheet.col(1).width = 15000
-sheet.col(2).width = 15000
-sheet.col(3).width = 15000
-#sheet.col(4).width = 100
-#sheet.col(5).width = 100
-alignment = xlwt.Alignment()
-alignment.vert = xlwt.Alignment.VERT_CENTER
-alignment.horz = xlwt.Alignment.HORZ_RIGHT
-style1 = xlwt.XFStyle()
-style1.alignment = alignment
-alignment = xlwt.Alignment()
-alignment.vert = xlwt.Alignment.VERT_CENTER
-alignment.horz = xlwt.Alignment.HORZ_LEFT
-style2 = xlwt.XFStyle()
-style2.alignment = alignment
-alignment = xlwt.Alignment()
-alignment.vert = xlwt.Alignment.VERT_TOP
-alignment.horz = xlwt.Alignment.HORZ_LEFT
-style3 = xlwt.XFStyle()
-style3.alignment = alignment
-alignment = xlwt.Alignment()
-alignment.vert = xlwt.Alignment.VERT_TOP
-alignment.horz = xlwt.Alignment.HORZ_CENTER
-style4 = xlwt.XFStyle()
-style4.alignment = alignment
+styles = cdrcgi.ExcelStyles()
+styles.set_color(styles.header, "blue")
+styles.frag = styles.style("align: horz right, vert center, wrap true")
+styles.source = styles.style("align: horz left, vert center, wrap true")
+sheet = styles.add_sheet("Links")
+banner = "Links for CDR%s (%s)" % (docId, title)
+sheet.write_merge(0, 0, 0, 5, banner, styles.header)
+labels = ("FragID", "Source Section/Subsection",
+          "Section/Subsection Containing Fragment Ref",
+          "Text in Fragment Ref", "In Table?", "In List?")
+widths = (10, 60, 60, 60, 10, 10)
+assert(len(labels) == len(widths))
+for i, chars in enumerate(widths):
+    sheet.col(i).width = styles.chars_to_width(chars)
+for i, label in enumerate(labels):
+    sheet.write(1, i, label, styles.header)
 targets = {}
 for link in links:
     target = targets.get(link.fragId)
@@ -202,20 +179,20 @@ for target in sorted(targets.values()):
     targetSectionTitle = target.section and target.section.title or "None"
     first = row
     last = row + len(target.links) - 1
-    sheet.write_merge(first, last, 0, 0, target.fragId, style1)
-    sheet.write_merge(first, last, 1, 1, targetSectionTitle, style2)
+    sheet.write_merge(first, last, 0, 0, target.fragId, styles.frag)
+    sheet.write_merge(first, last, 1, 1, targetSectionTitle, styles.source)
     for link in target.links:
         sourceSectionTitle = link.section and link.section.title or "None"
-        sheet.write(row, 2, sourceSectionTitle, style3)
-        sheet.write(row, 3, unicode(link.text), style3)
+        sheet.write(row, 2, sourceSectionTitle, styles.left)
+        sheet.write(row, 3, unicode(link.text), styles.left)
         if "/Table/" in link.path:
-            sheet.write(row, 4, "X", style4)
+            sheet.write(row, 4, "X", styles.center)
         if "/ListItem/" in link.path:
-            sheet.write(row, 5, "X", style4)
+            sheet.write(row, 5, "X", styles.center)
         row += 1
-stamp = time.strftime("%Y%m%d%H%M%S")
+stamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
 name = "SummaryInternalLinks-CDR%s-%s.xls" % (docId, stamp)
 print "Content-type: application/vnd.ms-excel"
 print "Content-Disposition: attachment; filename=%s" % name
 print
-book.save(sys.stdout)
+styles.book.save(sys.stdout)

@@ -1,24 +1,6 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Report of documents linking to a specified glossary term.
-#
-# $Log: not supported by cvs2svn $
-# Revision 1.4  2009/02/24 16:39:33  bkline
-# Updated Term Links report to match new glossary document structures.
-#
-# Revision 1.3  2003/06/02 14:18:42  bkline
-# Fixed problem with encoding of Unicode characters.
-#
-# Revision 1.2  2002/03/20 20:08:14  bkline
-# Added description to header comment.
-#
-# Revision 1.1  2002/03/20 18:39:02  bkline
-# Report of documents linking to a specified glossary term.
-#
 #----------------------------------------------------------------------
-
 import cdr, cdrdb, cdrcgi, cgi, re, string, time
 
 #----------------------------------------------------------------------

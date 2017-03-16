@@ -1,13 +1,9 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # "The Glossary Terms by Status Report will list terms and their
 # pronunciations by the user requesting a specific word stem from
 # the Glossary Term name or Term Pronunciation." (request 2643)
 #
 # BZIssue::2643
-#
 #----------------------------------------------------------------------
 import cgi, cdr, cdrdb, cdrcgi, string, time, xml.dom.minidom, xml.sax.saxutils
 

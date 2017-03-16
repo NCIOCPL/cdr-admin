@@ -1,17 +1,6 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Gets a schema document from the repository and returns it as a plain
 # text file.
-#
-# $Log: not supported by cvs2svn $
-# Revision 1.2  2007/02/27 18:16:14  bkline
-# Added Content-disposition header.
-#
-# Revision 1.1  2006/05/04 14:57:04  bkline
-# Show schema as text.
-#
 #----------------------------------------------------------------------
 import cgi, cdrdb, cdrcgi, sys
 

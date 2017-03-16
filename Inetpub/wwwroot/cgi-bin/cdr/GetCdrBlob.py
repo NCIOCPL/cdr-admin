@@ -1,13 +1,9 @@
 #----------------------------------------------------------------------
-#
-# $Id$
-#
 # Stream media blob over HTTP directly from the CDR database.  We do
 # this to avoid limitations imposed on memory usage within the CDR
 # Server.
 #
 # BZIssue::4767
-#
 #----------------------------------------------------------------------
 import cdrdb, cgi, cdrcgi, cdr, msvcrt, sys, os, time
 etree = cdr.importEtree()
