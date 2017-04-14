@@ -59,7 +59,7 @@ if testMode:
 
 # Open the SFTP connection and login
 # ----------------------------------
-FTPSERVER  = cdr.h.host['SFTP'][0]  #or '***REMOVED***-m'
+FTPSERVER  = cdr.h.host['SFTP'][0]
 PORT = 22
 transport = paramiko.Transport((FTPSERVER, PORT))
 FTPLOCK    = 'sending'
