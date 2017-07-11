@@ -4,21 +4,23 @@
 #
 # OCECDR-4006: Add support for using checksums instead of time stamps.
 # OCECDR-4083: Login errors when switching between tiers.
+# OCECDR-4265: Move glossifier service to Windows
 #
 #----------------------------------------------------------------------
+from argparse import ArgumentParser
 import base64
-import cdr
 import datetime
-import lxml.etree as etree
+import logging
 import os
 import sys
 import tempfile
+from lxml import etree
+import cdr
 import WebService
 
-WebService.USE_ETREE = True
-STANDALONE = False
-LOG_PATH = cdr.DEFAULT_LOGDIR + "/ClientRefresh.log"
-LOG_LEVEL = 1
+class Control:
+    STANDALONE = False
+    logger = cdr.Logging.get_logger("ClientRefresh")
 
 #----------------------------------------------------------------------
 # Base class for Ticket and File classes, supporting check for match
@@ -119,15 +121,15 @@ def load_server_manifest(include_file_list=True):
 #----------------------------------------------------------------------
 def check_ticket(client_ticket):
     server_ticket = load_server_manifest(include_file_list=False).ticket
-    debug_log("client_ticket.host: %s" % client_ticket.host, 2)
-    debug_log("server_ticket.host: %s" % server_ticket.host, 2)
-    debug_log("client_ticket.checksum: %s" % client_ticket.checksum, 2)
-    debug_log("server_ticket.checksum: %s" % server_ticket.checksum, 2)
-    debug_log("client_ticket.timestamp: %s" % client_ticket.timestamp, 2)
-    debug_log("server_ticket.timestamp: %s" % server_ticket.timestamp, 2)
+    Control.logger.debug("client_ticket.host: %s", client_ticket.host, 2)
+    Control.logger.debug("server_ticket.host: %s", server_ticket.host, 2)
+    Control.logger.debug("client_ticket.checksum: %s", client_ticket.checksum)
+    Control.logger.debug("server_ticket.checksum: %s" % server_ticket.checksum)
+    Control.logger.debug("client_ticket.timestamp: %s", client_ticket.timestamp)
+    Control.logger.debug("server_ticket.timestamp: %s", server_ticket.timestamp)
     response = etree.Element("Current")
     response.text = (client_ticket == server_ticket) and "Y" or "N"
-    return WebService.Response(response)
+    return WebService.Response(response, Control.logger)
 
 #----------------------------------------------------------------------
 # Create a compressed archive containing the new and/or modified files
@@ -151,18 +153,18 @@ def build_zip_file(file_names):
     list_file.close()
     os.chdir(cdr.CLIENT_FILES_DIR)
     result = cdr.runCommand("d:\\bin\\zip -@ %s < %s" % (zip_name, list_name))
-    debug_log("Creating %s" % zip_name)
+    Control.logger.debug("Creating %s", zip_name)
     if result.code:
         msg = "zip failure code %d (%s)" % (result.code, result.output)
-        debug_log(msg)
+        Control.logger.debug(msg)
         raise msg
     zip_file = file(zip_name, "rb")
     zip_bytes = zip_file.read()
     zip_file.close()
-    if LOG_LEVEL < 2:
+    Control.logger.debug("saved zip file as %r", zip_name)
+    if Control.logger.level != logging.DEBUG:
         os.unlink(list_name)
         os.unlink(zip_name)
-        debug_log("saved zip file as %s" % zip_name)
     return zip_bytes
 
 #----------------------------------------------------------------------
@@ -194,46 +196,31 @@ def make_delta(client_manifest):
         if "CDRMANIFEST.XML" in key:
             manifest_name = serverFile.name
         if key not in client_files:
-            debug_log("adding new client file %s" % serverFile.name, 3)
+            Control.logger.debug("adding new client file %s", serverFile.name)
             to_be_installed.append(serverFile.name)
         elif client_files[key] != serverFile:
-            debug_log("adding changed client file %s" % serverFile.name, 3)
+            Control.logger.debug("adding changed client file %s",
+                                 serverFile.name)
             to_be_installed.append(serverFile.name)
     for key in client_files:
         if key not in server_files:
             name = client_files[key].name
-            debug_log("client file %s to be deleted" % name)
+            Control.logger.debug("client file %s to be deleted", name)
             to_be_deleted.append(name)
     updates = etree.Element("Updates")
     if to_be_installed:
         if manifest_name and manifest_name not in to_be_installed:
             to_be_installed.append(manifest_name)
-        debug_log("sending %d files to be installed" % len(to_be_installed), 2)
+        Control.logger.debug("sending %d files to be installed",
+                             len(to_be_installed))
         zip_file = base64.encodestring(build_zip_file(to_be_installed))
         etree.SubElement(updates, "ZipFile", encoding="base64").text = zip_file
     if to_be_deleted:
-        debug_log("%d files will be removed" % len(to_be_deleted), 2)
+        Control.logger.debug("%d files will be removed", len(to_be_deleted))
         deletions = etree.SubElement(updates, "Delete")
         for name in to_be_deleted:
             etree.SubElement(deletions, "File").text = name
-    return WebService.Response(updates)
-
-#----------------------------------------------------------------------
-# Optionally (depending on the logging level specified by the caller,
-# compared with that set for this run of the program) append a log entry
-# to the log for this program.  Prepend a date/time stamp string to
-# the entry.
-#----------------------------------------------------------------------
-def debug_log(what, logLevel=1):
-    if logLevel <= LOG_LEVEL:
-        try:
-            log_file = file(LOG_PATH, "a")
-            now = str(datetime.datetime.now())[:19]
-            log_file.write("%s: %s\n" % (now, what))
-            log_file.close()
-        except:
-            if STANDALONE:
-                raise
+    return WebService.Response(updates, Control.logger)
 
 #----------------------------------------------------------------------
 # Entry point for the service's program.  Catch the client's request,
@@ -241,27 +228,31 @@ def debug_log(what, logLevel=1):
 # to the appropriate handler function.
 #----------------------------------------------------------------------
 def main():
-    global LOG_LEVEL
-    LOG_LEVEL = 1
-    global STANDALONE
-    if len(sys.argv) > 1 and sys.argv[1] == "--standalone":
-        STANDALONE = True
+    parser = ArgumentParser()
+    parser.add_argument("--standalone", action="store_true")
+    parser.add_argument("--debug", action="store_true")
+    opts = parser.parse_args()
+    if opts.standalone:
+        Control.STANDALONE = True
+    if opts.debug:
+        Control.logger.setLevel(logging.DEBUG)
     try:
-        request = WebService.Request(STANDALONE, debug_log)
-        LOG_LEVEL = request.logLevel
-        debug_log("%s request from %s" % (request.type, request.client))
-        debug_log("Request body:\n%s" % request.message, 3)
+        request = WebService.Request(Control.STANDALONE, Control.logger)
+        if request.logLevel > 1:
+            Control.logger.setLevel(logging.DEBUG)
+        Control.logger.info("%s request from %s", request.type, request.client)
+        Control.logger.debug("Request body:\n%s", request.message)
         if request.type == "Ticket":
             response = check_ticket(Ticket(request.doc))
         elif request.type == "Manifest":
             response = make_delta(Manifest(request.doc))
         else:
-            response = WebService.ErrorResponse("Don't understand %s" %
-                                                request.type)
+            error = "Don't understand %r" % request.type
+            response = WebService.ErrorResponse(error, Control.logger)
     except Exception, e:
-        response = WebService.ErrorResponse(str(e))
-    debug_log("Response:\n%s\n" % response.body, 3)
-    if STANDALONE:
+        response = WebService.ErrorResponse(str(e), Control.logger)
+    Control.logger.debug("Response:\n%s\n", response.body)
+    if Control.STANDALONE:
         sys.stdout.write(response.body)
     else:
         response.send()

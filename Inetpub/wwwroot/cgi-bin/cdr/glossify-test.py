@@ -3,81 +3,58 @@
 # Tool for checking the health of the glossifier service.  The most common
 # cause of failure is someone at cancer.gov trying to connect using a
 # temporary URL (on Verdi) I set up for Bryan for a one-time test.
-# The correct URL for the service is:
+# The correct URL for the production service is:
 #
-#     http://pdqupdate.cancer.gov/u/glossify
+#     http://glossifier.cancer.gov/cgi-bin/glossify
 #
 #----------------------------------------------------------------------
-import sys, cdrutil
-def bail(out):
-    print """\
-Content-type: text/html
+import datetime
+import suds.client
+import cdr
+import cdrcgi
 
-<pre style='color: red'>%s</pre>""" % out
-    sys.exit(0)
+class Control(cdrcgi.Control):
+    URL = "http://%s.%s/cgi-bin/glossify" % cdr.h.host["GLOSSIFIERC"]
+    FRAGMENT = u"<p>Gerota\u2019s capsule breast cancer and mama</p>"
+    DEBUG_LEVEL = "X_DEBUG_LEVEL"
+    PAGE_TITLE = "PDQ Glossifier Test"
 
-try:
-    import suds.client, cgi
-except Exception, e:
-    bail("import: %s" % e)
-env = cdrutil.getEnvironment()
-if env == "CBIIT":
-    hosts = cdrutil.AppHost(env, cdrutil.getTier())
-    host = hosts.getHostNames("GLOSSIFIERWEB").name
-    URL = "http://%s/cgi-bin/glossify" % host
-else:
-    URL = 'http://pdqupdate.cancer.gov/u/glossify'
-FRAGMENT = (u"<p>Gerota\u2019s capsule breast cancer and mammography "
-            u"as well as invasive breast cancer, too</p>")
+    def __init__(self):
+        cdrcgi.Control.__init__(self, self.PAGE_TITLE)
+        self.level = self.fields.getvalue("level") or ""
+        self.frag = self.fields.getvalue("frag") or self.FRAGMENT
+        self.lang = self.fields.getvalue("lang")
+        self.standalone = self.fields.getvalue("standalone") and True or False
+        if not isinstance(self.frag, unicode):
+            self.frag = unicode(self.frag, "utf-8")
+    def glossify(self):
+        headers = self.level and { self.DEBUG_LEVEL: self.level } or {}
+        client = suds.client.Client(self.URL, headers=headers)
+        dictionaries = client.factory.create("ArrayOfString")
+        dictionaries.string.append(u"Cancer.gov")
+        languages = client.factory.create("ArrayOfString")
+        languages.string = self.lang and [self.lang] or []
+        return client.service.glossify(self.frag, dictionaries, languages)
+    def populate_form(self, form):
+        result = self.glossify()
+        elapsed = (datetime.datetime.now() - self.started).total_seconds()
+        if self.standalone:
+            print(result)
+            print("elapsed: %f" % elapsed)
+            exit(0)
+        form.add("<fieldset>")
+        form.add(form.B.LEGEND("Test Options"))
+        languages = (("", "Any"), ("en", "English"), ("es", "Spanish"))
+        form.add_select("lang", "Language(s)", languages, self.lang)
+        form.add_textarea_field("frag", "Fragment", value=self.frag)
+        form.add_text_field("level", "Debug Level", value=self.level)
+        form.add("</fieldset>")
+        form.add("<fieldset>")
+        form.add(form.B.LEGEND("Result (elapsed %f seconds)" % elapsed))
+        form.add(form.B.PRE(str(result)))
+        form.add("</fieldset>")
+    def show_report(self):
+        self.show_form()
 
-try:
-    fields = cgi.FieldStorage()
-    frag = fields.getvalue('frag') or FRAGMENT
-    lang = fields.getlist('lang')
-    client = suds.client.Client(URL)
-    dictionaries = client.factory.create('ArrayOfString')
-    dictionaries.string.append(u'Cancer.gov')
-    languages = client.factory.create('ArrayOfString')
-    languages.string = lang
-    if type(frag) is not unicode:
-        frag = unicode(frag, 'utf-8')
-    result = client.service.glossify(frag, dictionaries, languages)
-    html = u"""\
-<html>
- <head>
-  <title>Glossifier Test</title>
-  <meta http-equiv='Content-Type' content='text/html;charset=utf-8'></meta>
-  <style type='text/css'>
-   * { font-family: Verdana, Arial, sans-serif }
-   legend { color: maroon }
-   fieldset { border: 1px maroon solid; width: 750px; }
-   textarea { width: 600px; height: 300px; }
-   label { float: left; width: 100px; clear: both; text-align: right; padding-right: 10px; }
-   select, textarea { float: left; }
-   select { width: 600px; }
-   input { clear: both; }
-   pre { width: 500px; border: green 1px solid; padding: 5px; }
-  </style>
- </head>
- <body>
-  <form method='POST' action='glossify-test.py'>
-   <fieldset>
-    <legend>Glossifier Test</legend>
-    <label for='lang'>Languages</label>
-    <select name='lang' multiple='multiple'>
-     <option value='en'>English</option>
-     <option value='es'>Spanish</option>
-    </select>
-    <label for='frag'>Fragment</label>
-    <textarea name='frag'>%s</textarea>
-   </fieldset>
-   <br />
-   <input type='submit' />
-  </form>
-  <pre>%s</pre>
- </body>
-</html>""" % (frag, result)
-    print "Content-type: text/html; charset=utf-8\n"
-    print html.encode('utf-8')
-except Exception, e:
-    bail("oops: %s" % e)
+if __name__ == "__main__":
+    Control().run()
