@@ -1,5 +1,4 @@
 #----------------------------------------------------------------------
-# $Id$
 # Extraction of just enough functionality from cdr.py to be able to
 # connect to the CDR server over port 2019 and request a CDR login
 # session. We haven't figured out all the details of what's going on,

@@ -111,10 +111,13 @@ class Control:
             cdrcgi.Report.Column("Last Info", width="150px"),
             cdrcgi.Report.Column("Last Message")#, width="300px")
         )
-        rows = cdrbatch.getJobStatus(self.id, self.name, self.age, self.status)
-        for row in rows:
-            row[0] = cdrcgi.Report.Cell(row[0], classes="center")
+        jobs = cdrbatch.getJobStatus(self.id, self.name, self.age, self.status)
+        rows = []
+        for job in jobs:
+            row = list(job)
+            row[0] = cdrcgi.Report.Cell(job[0], classes="center")
             row[-1] = Cell(row[-1])
+            rows.append(row)
         caption = "Batch Jobs"
         table = cdrcgi.Report.Table(columns, rows, caption=caption)
         report = Report(self, table)

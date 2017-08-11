@@ -1,5 +1,4 @@
 #----------------------------------------------------------------------
-# $Id$
 # Initiate a new CDR Session using the user's NIH domain account login
 # and redirects to the top level CDR Admin menu.
 # JIRA::OCECDR-3849

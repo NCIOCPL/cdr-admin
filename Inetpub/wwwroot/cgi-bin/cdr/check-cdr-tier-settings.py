@@ -19,10 +19,10 @@ ROLES = {
     "DBWIN": SQL_SERVER_PORTS.get(cdr.h.tier, 52400),
     "BASTION": None,
     "BASTIONC": None,
-    "GLOSSIFIER": 22,
-    "GLOSSIFIERC": 80,
-    "GLOSSIFIERWEB": 80,
-    "GLOSSIFIERDB": MYSQL_PORT,
+    #"GLOSSIFIER": 22,
+    #"GLOSSIFIERC": 80,
+    #"GLOSSIFIERWEB": 80,
+    #"GLOSSIFIERDB": MYSQL_PORT,
     "EMAILERS": 22,
     "EMAILERSC": 443,
     "EMAILERSWEB": 443,
@@ -36,7 +36,7 @@ ROLES = {
 DATABASES = {
     "cdr": ("cdrsqlaccount", "CdrPublishing", "CdrGuest"),
     "dropbox": ("dropbox",),
-    "glossifier": ("glossifier",),
+    #"glossifier": ("glossifier",),
     "emailers": ("emailers",),
 }
 CHECKMARK_TD = cdrcgi.Page.B.TD(
@@ -167,7 +167,7 @@ def check_server(name, tables):
     tables.append(R.Table(db_columns, rows,
                           caption="Database Credentials on %s Server" % name))
 
-for server in ("Glossifier", "Emailers"):
+for server in ("Emailers",):
     try:
         check_server(server, tables)
     except:
