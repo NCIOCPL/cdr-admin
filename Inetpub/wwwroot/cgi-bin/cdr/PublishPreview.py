@@ -89,6 +89,8 @@ def getCdrIdFromPath(url):
             cursor.execute("""\
           SELECT doc_id
             FROM query_term
+            JOIN active_doc a
+              ON a.id = doc_id
            WHERE (path = '/Summary/SummaryMetaData/SummaryURL/@cdr:xref'
                  OR
                  path = '/DrugInformationSummary/DrugInfoMetaData/URL/@cdr:xref'

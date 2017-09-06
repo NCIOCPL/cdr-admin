@@ -29,6 +29,7 @@ html    = cdrcgi.header(title, title, section, "", buttons) + """\
 items   = (('EditGroups.py',           'Manage Groups'                 ),
            ('EditUsers.py',            'Manage Users'                  ),
            ('EditActions.py',          'Manage Actions'                ),
+           ('set-ctl-value.py',        'Manage Control Values'         ),
            ('EditDocTypes.py',         'Manage Document Types'         ),
            ('EditQueryTermDefs.py',    'Manage Query Term Definitions' ),
            ('EditLinkControl.py',      'Manage Linking Tables'         ),

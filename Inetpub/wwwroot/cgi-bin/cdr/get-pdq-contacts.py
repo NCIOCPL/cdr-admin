@@ -38,6 +38,7 @@ union
                        renewal, notif_date, org_id
                   FROM pdq_contact
                  WHERE org_status = 'T'
+                   AND contact_type <> 'D'
                    AND terminated is NULL
                    AND prod_name = ?
 order by org_status, org_name""", (product, product))

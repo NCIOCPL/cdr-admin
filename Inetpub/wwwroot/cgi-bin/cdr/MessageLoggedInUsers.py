@@ -32,7 +32,7 @@ if request == cdrcgi.MAINMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if request == "Log Out": 
+if request == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
@@ -59,7 +59,7 @@ if not subject or not body or not fromAddr:
             row = cursor.fetchone()
             if row and row[0] and row[0].find('@') != -1: fromAddr = row[0]
         except cdrdb.Error, info:
-            cdrcgi.bail('Failure retrieving your email address: %s' 
+            cdrcgi.bail('Failure retrieving your email address: %s'
                     % info[1][0])
     form = """\
    <input type='hidden' name='%s' value='%s'>
@@ -104,11 +104,11 @@ except cdrdb.Error, info:
 #----------------------------------------------------------------------
 # Send the message.
 #----------------------------------------------------------------------
-if not recipients: 
+if not recipients:
     cdrcgi.bail("No one with an email address currently logged on")
 # XXX DEBUGGING XXX
 # body += "\n\nRecipients: " + str(recipients)
-# recipients = ['***REMOVED***', '***REMOVED***']
+# recipients = cdr.getEmailList("Developers Notification")
 try:
     error = cdr.sendMail(fromAddr, recipients, subject, body)
 except:

@@ -12,8 +12,8 @@ import lxml.html.builder as B
 import time
 
 USER = "menuwalker"
-PASSWORD = "***REMOVED***"
-SESSION = cdr.login(USER, PASSWORD) #"***REMOVED***"
+PASSWORD = cdr.getpw("menuwalker")
+SESSION = cdr.login(USER, PASSWORD)
 
 class Item:
     total = 0

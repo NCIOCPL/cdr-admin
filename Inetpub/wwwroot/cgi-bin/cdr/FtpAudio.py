@@ -64,8 +64,8 @@ PORT = 22
 transport = paramiko.Transport((FTPSERVER, PORT))
 FTPLOCK    = 'sending'
 username = "cdroperator"
-password = "***REMOVED***"
-transport.connect(username = username, password = password)
+password = cdr.getpw(username)
+transport.connect(username=username, password=password)
 
 #----------------------------------------------------------------------
 # Make sure we're logged in.
@@ -75,7 +75,7 @@ if not session: cdrcgi.bail('Unknown or expired CDR session.')
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if request == "Log Out": 
+if request == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
@@ -90,7 +90,7 @@ if request == cdrcgi.MAINMENU:
 if request == "Get Audio" and ftpDone != 'Y':
     if not sourceDir or not targetDir:
         cdrcgi.bail("Both, source and target are required.")
-    # Create directory path and check if directory exists. 
+    # Create directory path and check if directory exists.
     # If it does not exist, create it
     # This doesn't work because we don't have permissions to
     # access a network drive.
@@ -100,7 +100,7 @@ if request == "Get Audio" and ftpDone != 'Y':
 
     # ftp = ftplib.FTP(ftphost)
     sftp = paramiko.SFTPClient.from_transport(transport)
-    try: 
+    try:
        ftpDir = audioPath + sourceDir
        sftp.chdir(ftpDir)
        l.write("ftpDir: %s" % ftpDir)
@@ -150,7 +150,7 @@ if request == "Get Audio" and ftpDone != 'Y':
            else:
                l.write("No zip file: %s" % name)
 
-           # Copy the file to 'transferred' directory if it was 
+           # Copy the file to 'transferred' directory if it was
            # transferred from the default directory
            # This way we won't copy the file again the next time
            # around.
@@ -181,7 +181,7 @@ if request == "Get Audio" and ftpDone != 'Y':
     except Exception, info:
        cdrcgi.bail(u"FTP Error: %s (DEBUG INFO FOLLOWS)<br />%s)" %
                    (info, "<br />".join(dbgmsg)))
-    
+
 #----------------------------------------------------------------------
 # Display confirmation message when FTP is done.
 #----------------------------------------------------------------------
@@ -203,7 +203,7 @@ if ftpDone == 'Y':
  </tr>
 """ % newFile
 
-   if testMode:  
+   if testMode:
        testString = u'Test '
    else:
        testString = u''

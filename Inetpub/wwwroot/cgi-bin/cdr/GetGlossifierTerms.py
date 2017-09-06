@@ -8,12 +8,13 @@
 import cdrdb, re, cdr, socket, sys
 
 DEBUG = len(sys.argv) > 1 and sys.argv[1] == '--debug' or False
+DEV_EMAILS = cdr.getEmailList("Developers Notification")
 
 #----------------------------------------------------------------------
 # Send a report on duplicate name+language+dictionary mappings.
 #----------------------------------------------------------------------
 def reportDuplicate(name, docIds, language, dictionary):
-    recips = cdr.getEmailList('GlossaryDupGroup') or ['***REMOVED***']
+    recips = cdr.getEmailList('GlossaryDupGroup') or DEV_EMAILS
     server = socket.gethostname().split('.')[0].upper()
     sender = "CDR@%s.NCI.NIH.GOV" % server
     subject = "DUPLICATE GLOSSARY TERM NAME MAPPINGS ON %s" % server
@@ -31,7 +32,7 @@ def reportDuplicate(name, docIds, language, dictionary):
     cdr.sendMail(sender, recips, subject, u"".join(body), False, True)
 
 def reportDuplicates(allDups):
-    recips = cdr.getEmailList('GlossaryDupGroup') or ['***REMOVED***']
+    recips = cdr.getEmailList('GlossaryDupGroup') or DEV_EMAILS
     server = socket.gethostname().split('.')[0]
     sender = "cdr@%s.nci.nih.gov" % server.lower()
     subject = "DUPLICATE GLOSSARY TERM NAME MAPPINGS ON %s" % server.upper()

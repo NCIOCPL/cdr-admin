@@ -137,8 +137,7 @@ def sendPubNotificationEmail(gp, cursor, conn):
         top = u"""\
 <p>[SENT TO YOU FOR TESTING, INSTEAD OF TO %s]</p>
 """ % ", ".join(addresses)
-        addresses = ['***REMOVED***', '***REMOVED***',
-                     '***REMOVED***', '***REMOVED***']
+        addresses = cdr.getEmailList("GP Notification Test Recips")
     body = u"""\
 %s<p>Thank you for applying to be listed in the NCI Cancer Genetics Services Directory. Your application has been processed and your information has been added to the directory on NCI's Web site, <a href='http://www.cancer.gov/'>Cancer.gov</a>.</p>
 
