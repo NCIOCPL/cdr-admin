@@ -526,7 +526,7 @@ if not cdr.h.tier == 'PROD':
     pattern7 = re.compile('https://cdr.cancer.gov/cgi-bin/cdr/GetCdrImage.py')
     html = pattern7.sub("%s/cgi-bin/cdr/GetCdrImage.py" % cdr.CBIIT_NAMES[2],
                         html)
-fp = open("d:/tmp/pp-%s.html" % docId, "wb")
+fp = open(cdr.WORK_DRIVE + ":/tmp/pp-%s.html" % docId, "wb")
 fp.write(html)
 fp.close()
 cdrcgi.sendPage("%s" % html.decode('utf-8'))
