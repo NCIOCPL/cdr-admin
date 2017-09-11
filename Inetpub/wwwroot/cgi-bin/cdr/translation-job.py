@@ -242,7 +242,7 @@ jQuery("input[value='%s']").click(function(e) {
             integer for a valid value primary key if parameter is present
             otherwise None
 
-        Script exists with an error message if the parameters have been
+        Script exits with an error message if the parameters have been
         tampered with by a hacker.
         """
 
@@ -261,6 +261,10 @@ jQuery("input[value='%s']").click(function(e) {
         """
         Fetch the IDs and titles for published CDR summary documents.
 
+        OCECDR-4240: remove restriction for English summaries that
+        they must be published separately (this change is to allow
+        modules to be queued for translation jobs).
+
         Pass:
             language - string representing language of summaries to
             be returned
@@ -274,9 +278,7 @@ jQuery("input[value='%s']").click(function(e) {
         query.join("query_term l", "l.doc_id = d.id")
         query.where("l.path = '/Summary/SummaryMetaData/SummaryLanguage'")
         query.where(query.Condition("l.value", language))
-        if language == "English":
-            query.join("pub_proc_cg c", "c.id = d.id")
-        return dict(query.execute(self.cursor).fetchall())
+        return dict(query.unique().execute(self.cursor).fetchall())
 
     def have_required_values(self):
         """
