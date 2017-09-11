@@ -10,6 +10,7 @@
 # BZIssue::4209 - add date to report
 # BZIssue::4214 - use the document's own DateLastModified value
 # BZIssue::4924 - modify Summary Date Last Modified Report
+# BZIssue::4285 - add filtering by summary document state
 #----------------------------------------------------------------------
 import cgi
 import cdr
@@ -24,6 +25,7 @@ import sys
 fields      = cgi.FieldStorage()
 session     = cdrcgi.getSession(fields)
 request     = cdrcgi.getRequest(fields)
+also        = fields.getlist ('also')          or []
 est         = fields.getlist ('est')           or []
 sst         = fields.getlist ('sst')           or []
 audience    = fields.getvalue('Audience')      or None
@@ -290,6 +292,15 @@ if not audience or not (est or sst) or ((not uStartDate or not uEndDate) and
 %s
    </fieldset>
 %s
+   <fieldset>
+    <legend>Include</legend>
+     <input name='also' type='checkbox' id='AlsoMod' class='choice'
+            value='modules' /> Modules <br />
+     <input name='also' type='checkbox' id='AlsoBlocked' class='choice'
+            value='blocked' /> Blocked Documents <br />
+     <input name='also' type='checkbox' id='AlsoUnpub' class='choice'
+            value='unpub' /> Other Unpublished Documents <br />
+   </fieldset>
    <fieldset class='dates'>
     <legend>Report by Date Last Modified (User)</legend>
     <label for='ustart'>Start Date:</label>
@@ -406,6 +417,8 @@ sqlFrom = """\
                FROM query_term su
 """
 sqlJoin = """\
+               JOIN document d
+                 ON d.id = su.doc_id
                JOIN query_term st
                  ON st.doc_id = su.doc_id
                JOIN query_term bn
@@ -416,8 +429,13 @@ sqlJoin = """\
                  ON ls.doc_id = su.doc_id
                JOIN query_term la
                  ON la.doc_id = su.doc_id
+    LEFT OUTER JOIN pub_proc_cg cg
+                 ON cg.id = su.doc_id
     LEFT OUTER JOIN query_term lm
                  ON lm.doc_id = su.doc_id
+    LEFT OUTER JOIN query_term mo
+                 ON mo.doc_id = su.doc_id
+                AND mo.path = '/Summary/@ModuleOnly'
 """
 sqlWhere = """\
               WHERE su.path = '/Summary/SummaryTitle'
@@ -430,6 +448,33 @@ sqlWhere = """\
                 AND bn.path = '/Organization/OrganizationNameInformation'
                             + '/OfficialName/Name'
 """
+
+#----------------------------------------------------------------------
+# OCECDR-4285: add filtering of summary document states. By default,
+# only summaries which have been published to Cancer.gov are included
+# in the report (which would exclude all blocked documents, summaries
+# which are marked 'module only' and summaries which are new and in
+# progress). Checkboxes are provided to lift some or all of those
+# restrictions.
+#----------------------------------------------------------------------
+if "unpub" in also:
+    if "blocked" not in also:
+        sqlWhere += """\
+                AND d.active_status = 'A'
+"""
+    if "modules" not in also:
+        sqlWhere += """\
+                AND mo.doc_id IS NULL
+"""
+else:
+    also_where = ["cg.id IS NOT NULL"]
+    if "blocked" in also:
+        also_where.append("d.active_status = 'I'")
+    if "modules" in also:
+        also_where.append("mo.doc_id IS NOT NULL")
+    sqlWhere += """\
+                AND (%s)
+""" % " OR ".join(also_where)
 
 #----------------------------------------------------------------------
 # Filter on dates, depending on which flavor of the report was requested.
@@ -457,7 +502,7 @@ else:
 """ % (sStartDate, sEndDate)
 
 #----------------------------------------------------------------------
-# Filter on audience unless the user want everything.
+# Filter on audience unless the user wants everything.
 #----------------------------------------------------------------------
 if audience and audience != 'all':
     audienceFilter = """\
