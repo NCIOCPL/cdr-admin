@@ -1,0 +1,9 @@
+# Auto detect text files and perform LF normalization
+*        text=auto
+
+*.ashx   text eol=lf
+*.config text eol=lf
+*.html   text eol=lf
+*.js     text eol=lf
+*.py     text eol=lf
+*.txt    text eol=lf
