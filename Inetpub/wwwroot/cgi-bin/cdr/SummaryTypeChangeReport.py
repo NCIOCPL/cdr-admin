@@ -8,6 +8,7 @@
 #                                           Alan Meyer, March 2014
 #
 # JIRA::OCECDR-4217 - modify user interface for report
+# JIRA::OCECDR-4256 - fix date range filter bug
 #----------------------------------------------------------------------
 import datetime
 import lxml.etree as etree
@@ -443,12 +444,11 @@ class Summary:
         If we're building a separate table for each type of change,
         filter to get only the changes matching a single change type.
         Otherwise, return all the changes being reported for this
-        summary.
+        summary. The `in_scope()` method also checks date range
+        inclusion.
         """
 
-        if change_type:
-            return [c for c in self.changes if c.type == change_type]
-        return [c for c in self.changes if c.type in self.control.change_types]
+        return [c for c in self.changes if c.in_scope(change_type)]
 
     class Change:
         """
@@ -475,7 +475,7 @@ class Summary:
                         if comment:
                             self.comments.append(comment)
 
-        def in_scope(self):
+        def in_scope(self, change_type):
             """
             Find out if this change should appear on the report.
 
@@ -483,12 +483,14 @@ class Summary:
             and (if this is an historical report), the change's date.
             """
 
-            if not self.date:
+            if change_type and self.type != change_type:
                 return False
             control = self.control
             if self.type not in control.change_types:
                 return False
             if control.report_type == Control.HISTORICAL:
+                if not self.date:
+                    return False
                 if not (control.start <= self.date <= control.end):
                     return False
             return True
