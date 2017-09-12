@@ -282,7 +282,7 @@ jQuery("input[value='%s']").click(function(e) {
                         "m.path = '/Summary/@ModuleOnly'")
             query.where("(c.id IS NOT NULL OR m.value = 'Yes')")
         query.unique()
-        self.logger.info("query: %s", query)
+        self.logger.debug("query: %s", query)
         return dict(query.execute(self.cursor).fetchall())
 
     def have_required_values(self):
