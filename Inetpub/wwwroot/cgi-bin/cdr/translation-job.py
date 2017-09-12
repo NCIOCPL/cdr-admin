@@ -261,9 +261,7 @@ jQuery("input[value='%s']").click(function(e) {
         """
         Fetch the IDs and titles for published CDR summary documents.
 
-        OCECDR-4240: remove restriction for English summaries that
-        they must be published separately (this change is to allow
-        modules to be queued for translation jobs).
+        OCECDR-4240: all modules to be queued for translation jobs.
 
         Pass:
             language - string representing language of summaries to
@@ -278,7 +276,14 @@ jQuery("input[value='%s']").click(function(e) {
         query.join("query_term l", "l.doc_id = d.id")
         query.where("l.path = '/Summary/SummaryMetaData/SummaryLanguage'")
         query.where(query.Condition("l.value", language))
-        return dict(query.unique().execute(self.cursor).fetchall())
+        if language == "English":
+            query.outer("pub_proc_cg c", "c.id = d.id")
+            query.outer("query_term m", "m.doc_id = d.id",
+                        "m.path = '/Summary/@ModuleOnly'")
+            query.where("(c.id IS NOT NULL OR m.value = 'Yes')")
+        query.unique()
+        self.logger.info("query: %s", query)
+        return dict(query.execute(self.cursor).fetchall())
 
     def have_required_values(self):
         """
