@@ -58,14 +58,14 @@ class Control(cdrcgi.Control):
             self.logger.exception("Failure")
             return self.message(e, "red")
     def check_dtds(self):
-        cmd = r"python d:\cdr\build\AnthillPro\CheckDtds.py"
+        cmd = r"python d:\cdr\build\CheckDtds.py"
         result = cdr.runCommand(cmd)
         if result.code:
             raise Exception("DTD check failure: %s" % result.output)
         self.logger.info("DTDs updated")
         return "Running CheckDtds.py ...\n" + result.output
     def refresh_manifest(self):
-        cmd = r"python d:\cdr\build\AnthillPro\RefreshManifest.py"
+        cmd = r"python d:\cdr\build\RefreshManifest.py"
         result = cdr.runCommand(cmd)
         if result.code:
             raise Exception("Manifest refresh failure: %s" % result.output)
