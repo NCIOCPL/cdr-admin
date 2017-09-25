@@ -10,7 +10,7 @@
 # BZIssue::4209 - add date to report
 # BZIssue::4214 - use the document's own DateLastModified value
 # BZIssue::4924 - modify Summary Date Last Modified Report
-# BZIssue::4285 - add filtering by summary document state
+# JIRA::4285 - add filtering by summary document state
 #----------------------------------------------------------------------
 import cgi
 import cdr
@@ -294,10 +294,13 @@ if not audience or not (est or sst) or ((not uStartDate or not uEndDate) and
 %s
    <fieldset>
     <legend>Include</legend>
+    &nbsp;
      <input name='also' type='checkbox' id='AlsoMod' class='choice'
             value='modules' /> Modules <br />
+    &nbsp;
      <input name='also' type='checkbox' id='AlsoBlocked' class='choice'
             value='blocked' /> Blocked Documents <br />
+    &nbsp;
      <input name='also' type='checkbox' id='AlsoUnpub' class='choice'
             value='unpub' /> Other Unpublished Documents <br />
    </fieldset>
@@ -341,6 +344,7 @@ class Summary:
         self.lastMod     = row[5]
         self.summaryType = row[6]
         self.lastSave    = row[7]
+        self.module      = row[8]
         self.lastSaveUsr = Summary.__getSaveUsr(self.docId, cursor)
         self.comment     = None
         if self.board not in Summary.summaries:
@@ -411,7 +415,8 @@ sqlSelect = """\
                     la.value          AS language,
                     lm.value          AS last_mod_date,
                     st.value          AS summary_type,
-                    ls.last_save_date AS last_save_date
+                    ls.last_save_date AS last_save_date,
+                    mo.value          AS module
 """
 sqlFrom = """\
                FROM query_term su
@@ -435,7 +440,7 @@ sqlJoin = """\
                  ON lm.doc_id = su.doc_id
     LEFT OUTER JOIN query_term mo
                  ON mo.doc_id = su.doc_id
-                AND mo.path = '/Summary/@ModuleOnly'
+                AND mo.path = '/Summary/@AvailableAsModule'
 """
 sqlWhere = """\
               WHERE su.path = '/Summary/SummaryTitle'
@@ -453,9 +458,9 @@ sqlWhere = """\
 # OCECDR-4285: add filtering of summary document states. By default,
 # only summaries which have been published to Cancer.gov are included
 # in the report (which would exclude all blocked documents, summaries
-# which are marked 'module only' and summaries which are new and in
-# progress). Checkboxes are provided to lift some or all of those
-# restrictions.
+# which are marked 'available as module' and summaries which are new
+# and in progress). Checkboxes are provided to lift some or all of
+# those restrictions.
 #----------------------------------------------------------------------
 if "unpub" in also:
     if "blocked" not in also:
@@ -581,7 +586,7 @@ styles = cdrcgi.ExcelStyles()
 styles.header = styles.style("align: wrap true, horz center; font: bold true")
 styles.url = styles.style(styles.HYPERLINK, styles.CENTER_TOP)
 styles.sect = styles.style(styles.LEFT, styles.bold_font(11))
-sheet = styles.add_sheet("CCB Report")
+sheet = styles.add_sheet("DLM Report")
 report_date = "Report Date: %s" % today
 sheet.col(0).width = styles.chars_to_width(12)
 sheet.col(1).width = styles.chars_to_width(50)
@@ -638,7 +643,10 @@ def addSection(sheet, summaries, board, language, audience, reportType,
                "Session=guest&DocId=%s" % summary.docId)
         link = styles.link(url, "CDR%d" % summary.docId)
         sheet.write(row, 0, link, styles.url)
-        sheet.write(row, 1, summary.title, styles.left)
+        title = summary.title
+        if summary.module:
+            title += " [module]"
+        sheet.write(row, 1, title, styles.left)
         if extraCols:
             sheet.write(row, 2, summaryType, styles.left)
             sheet.write(row, 3, audienceAbbreviation, styles.left)
