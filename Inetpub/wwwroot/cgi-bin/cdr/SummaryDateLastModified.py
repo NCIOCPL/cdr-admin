@@ -10,13 +10,13 @@
 # BZIssue::4209 - add date to report
 # BZIssue::4214 - use the document's own DateLastModified value
 # BZIssue::4924 - modify Summary Date Last Modified Report
-# JIRA::4285 - add filtering by summary document state
+# JIRA::OCECDR-4285 - add filtering by summary document state
 #----------------------------------------------------------------------
 import cgi
 import cdr
 import cdrdb
 import cdrcgi
-import time
+import datetime
 import sys
 
 #----------------------------------------------------------------------
@@ -38,7 +38,7 @@ buttons     = ["Submit", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 script      = "SummaryDateLastModified.py"
 title       = "CDR Administration"
 section     = "Summary Date Last Modified"
-today       = time.strftime('%Y-%m-%d')
+today       = str(datetime.date.today())
 header      = cdrcgi.header(title, title, section, script, buttons,
                             stylesheet = """\
    <link type='text/css' rel='stylesheet' href='/stylesheets/CdrCalendar.css'>
@@ -253,38 +253,12 @@ def getSummaryTypeOptions(cursor):
     return u"".join(html)
 
 #----------------------------------------------------------------------
-# Normalize a year, month, day tuple into a standard date-time value.
-#----------------------------------------------------------------------
-def normalizeDate(y, m, d):
-    return time.localtime(time.mktime((y, m, d, 0, 0, 0, 0, 0, -1)))
-
-#----------------------------------------------------------------------
-# Generate a pair of dates suitable for seeding the user date fields.
-#----------------------------------------------------------------------
-def genDateValues():
-    import time
-    yr, mo, da, ho, mi, se, wd, yd, ds = time.localtime()
-    if wd == 4:
-        # Today is Friday; have we reached 6:00 p.m.?
-        if (ho, mi, se) >= (18, 0, 0):
-            daysToBackUp = 0
-        else:
-            daysToBackUp = 7
-    elif wd < 4:
-        daysToBackUp = wd + 3
-    else:
-        daysToBackUp = wd - 4
-    friday = normalizeDate(yr, mo, da - daysToBackUp)
-    saturday = normalizeDate(friday[0], friday[1], friday[2] - 6)
-    return (time.strftime("%Y-%m-%d", saturday),
-            time.strftime("%Y-%m-%d", friday))
-
-#----------------------------------------------------------------------
 # Put up the menu if we don't have selection criteria yet.
 #----------------------------------------------------------------------
 if not audience or not (est or sst) or ((not uStartDate or not uEndDate) and
                                         (not sStartDate or not sEndDate)):
-    startDate, endDate = genDateValues()
+    endDate = datetime.date.today()
+    startDate = endDate - datetime.timedelta(6)
     form = """\
    <input type='hidden' name='%s' value='%s' width='100%%' />
    <fieldset>
@@ -467,10 +441,6 @@ if "unpub" in also:
         sqlWhere += """\
                 AND d.active_status = 'A'
 """
-    if "modules" not in also:
-        sqlWhere += """\
-                AND mo.doc_id IS NULL
-"""
 else:
     also_where = ["cg.id IS NOT NULL"]
     if "blocked" in also:
@@ -480,6 +450,10 @@ else:
     sqlWhere += """\
                 AND (%s)
 """ % " OR ".join(also_where)
+if "modules" not in also:
+    sqlWhere += """\
+                AND mo.doc_id IS NULL
+"""
 
 #----------------------------------------------------------------------
 # Filter on dates, depending on which flavor of the report was requested.
@@ -676,7 +650,7 @@ for boardName in sorted(Summary.summaries):
             rowNum = addSection(sheet, summaries, boardName, languageName,
                                 audienceName, reportType, styles, rowNum)
 
-stamp = time.strftime("%Y%m%d%H%M%S")
+stamp = cdr.make_timestamp()
 print "Content-type: application/vnd.ms-excel"
 print "Content-Disposition: attachment; filename=sdlm-%s.xls" % stamp
 print
