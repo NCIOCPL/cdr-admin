@@ -47,7 +47,7 @@ class Control(cdrcgi.Control):
         form.add(form.B.LEGEND(legend))
         for label in ("Yes", "No"):
             value = label[0]
-            checked = action.doctypeSpecific == value
+            checked = action.doctype_specific == value
             form.add_radio("doctype-specific", label, value, checked=checked)
         form.add("</fieldset>")
     def run(self):

@@ -43,22 +43,18 @@ if request == "Delete Group":
 # Handle request to store changes to the group.
 #----------------------------------------------------------------------
 if request == "Save Changes":
-    name  = fields and fields.getvalue("name") or ""
-    group = cdr.Group(name)
-    users = fields and fields.getvalue("users") or []
-    if type(users) is list: group.users = users
-    else:                   group.users = [users]
+    name = fields.getvalue("name") or cdrcgi.bail("missing group name")
+    group = cdr.Group(name=name)
+    group.users = fields.getlist("users")
     comment = fields.getvalue("comment")
     if comment != "None": group.comment = comment
-    actions = fields.getvalue("actions")
-    if actions:
-        if isinstance(actions, basestring): actions = [actions]
-        for action in actions:
-            pair = action.split("::")
-            if len(pair) == 2: (action, doctype) = pair
-            else:              (action, doctype) = (pair[0], None)
-            if action not in group.actions: group.actions[action] = []
-            if doctype: group.actions[action].append(doctype)
+    for action in fields.getlist("actions"):
+        if "::" in action:
+            action, doctype = action.split("::")
+        else:
+            doctype = None
+        if action not in group.actions: group.actions[action] = []
+        if doctype: group.actions[action].append(doctype)
     error = cdr.putGroup(session, grpName, group)
     if error: cdrcgi.bail(error)
     grpName = name
@@ -71,12 +67,12 @@ section = "Edit Group Information"
 buttons = ["Save Changes", "Delete Group", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 script  = "EditGroup.py"
 page    = cdrcgi.Page(title, subtitle=section, action=script, buttons=buttons,
-                      session=session, body_classes="checkbox-form")
+        session=session, body_classes="checkbox-form")
 
 #----------------------------------------------------------------------
 # Populate the group object.
 #----------------------------------------------------------------------
-if not grpName: group = cdr.Group("")
+if not grpName: group = cdr.Group()
 else:           group = cdr.getGroup(session, grpName)
     
 #----------------------------------------------------------------------
