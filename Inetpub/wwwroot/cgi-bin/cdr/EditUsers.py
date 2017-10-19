@@ -3,6 +3,7 @@
 #----------------------------------------------------------------------
 import cgi
 import cdr
+import cdrdb
 import cdrcgi
 
 #----------------------------------------------------------------------
@@ -28,10 +29,11 @@ if action == cdrcgi.MAINMENU:
     cdrcgi.navigateTo("Admin.py", session)
 
 #----------------------------------------------------------------------
-# Retrieve the list of groups from the server.
+# Retrieve the list of users from the server.
 #----------------------------------------------------------------------
-users = cdr.getUsers(session)
-if type(users) == type(""): cdrcgi.bail(users)
+query = cdrdb.Query("open_usr", "name", "fullname")
+query.where("expired IS NULL OR expired > GETDATE()")
+rows = query.order("name").execute().fetchall()
 
 #----------------------------------------------------------------------
 # Put up the list of users.
@@ -42,18 +44,24 @@ menu = "<INPUT TYPE='hidden' NAME='%s' VALUE='%s'><TABLE>\n" % (cdrcgi.SESSION,
                                                                 session)
 padding = "<TD>&nbsp;&nbsp;</TD>"
 
-for user in users:
-    userInfo = cdr.getUser(session, user)
+for user, fullname in rows:
+    if fullname == "Alan Meyer":
+        colors = "red", "green", "blue", "violet", "white", "yellow", "orange"
+        letters = ['<span style="color: {}">{}</span>'
+                   .format(colors[i % len(colors)], fullname[i])
+                   for i in range(len(fullname))]
+        fullname = "".join(letters)
     if nUsers % USERS_PER_ROW == 0:
         menu += "<TR>%s" % padding
     menu += """\
   <TD><A HREF="%s/EditUser.py?%s=%s&usr=%s"><B>%s</B></A><br>%s</TD>
 """ % (cdrcgi.BASE, cdrcgi.SESSION, session, cgi.escape(user, 1),
-       user, userInfo.fullname)
+       user, fullname)
     nUsers += 1
     if nUsers % USERS_PER_ROW == 0: menu += "</TR>\n"
 if nUsers % USERS_PER_ROW > 0: menu += "</TR>\n"
 menu += """\
+<TR><TD COLSPAN="3">&nbsp;</TD></TR>
 <TR>%s<TD COLSPAN='3'><A HREF="%s/EditUser.py?%s=%s"><B>%s</B></A> %s</TD></TR>
 <TR>%s<TD COLSPAN='3'><A HREF="%s/Logout.py?%s=%s"><B>%s</B></A></TD></TR>
 """ % (padding, cdrcgi.BASE, cdrcgi.SESSION, session, "ADD NEW USER",
