@@ -151,7 +151,6 @@ if request == "Get Audio" and ftpDone != 'Y':
         for name in zipFiles:
             # First download the ZIP files...
             # -------------------------------
-            l.write("download loop: %s" % name)
             if name.endswith('.zip'):
                 l.write("Zip file found: %s" % name)
 
@@ -178,7 +177,6 @@ if request == "Get Audio" and ftpDone != 'Y':
             #
             # Copy files in testmode, move in live mode
             # ----------------------------------------------------
-            l.write("copy loop: %s" % name)
             if testMode:
                 cmd = "cp %s/%s %s/%s" % (IN_DIR, name, MV_DIR, name)
                 stdin, stdout, stderr = c.exec_command(cmd)
