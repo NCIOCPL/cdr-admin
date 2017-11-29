@@ -1,39 +1,41 @@
 # *********************************************************************
-# Ftp Audio files from the CIPSFTP server from the ciat/qa/Audio directory
-# and place them on the OCE network.
+# Download Audio files from the Cancerinfo server from the ciat/qa/Audio 
+# directory # and place them on the CDR server.
 #
 # Program based on similar program written earlier for image files.
-#
 # ---------------------------------------------------------------------
 # Created:          2011-04-06        Volker Englisch
 #
 # BZIssue::5013 - [Glossary Audio] Create Audio Download Tool
 #
 # *********************************************************************
-import cgi, cdr, cdrcgi, re, string, os, time, optparse, shutil, paramiko
-import glob#, ftplib
+import cgi, cdr, cdrcgi, os, paramiko
+import glob
 
 #----------------------------------------------------------------------
 # Set the form variables.
 #----------------------------------------------------------------------
 LOGNAME   = "FtpAudio.log"
-defTarget = "Audio_from_CIPSFTP"
-CiatTarget= "Audio_Transferred"
-defSource = "Term_Audio"
 fields    = cgi.FieldStorage()
 session   = cdrcgi.getSession(fields) or "guest"
 request   = cdrcgi.getRequest(fields) # or "Get Audio"
-ftpRoot   = '/u/ftp/cdr'
-baseDir   = '/qa/ciat/Audio/'
-audioPath = ftpRoot + baseDir
-sourceDir = fields and fields.getvalue("SourceDir") or defSource
-targetDir = fields and fields.getvalue("TargetDir") or defTarget
 testMode  = fields and fields.getvalue("TestMode") or False
 
+USER      = "cdroperator"
+SSH_KEY   = "\etc\cdroperator_rsa"
+
+TIER      = cdr.h.tier
+HOMEDIR   = "/sftp/sftphome/cdrstaging"
+AUDIOPATH = "%s/ciat/%s/Audio" % (HOMEDIR, TIER.lower())
+
+WIN_DIR   = "Audio_from_CIPSFTP"
+NIX_DIR   = "Term_Audio"
+CIAT_DIR  = "Audio_Transferred"
+IN_DIR    = "%s/%s" % (AUDIOPATH, NIX_DIR)
+MV_DIR    = "%s/%s" % (AUDIOPATH, CIAT_DIR)
+
 # For testing
-# sourceDir = "Term_Audio"
-# targetDir = "Audio_from_CIPSFTP"
-# testMode = True
+# testMode = False
 # request  = "Get Audio"
 
 title     = "CDR Administration"
@@ -41,36 +43,39 @@ section   = "FTP Audio from CIPSFTP"
 buttons   = ["Get Audio", cdrcgi.MAINMENU, "Log Out"]
 script    = "FtpAudio.py"
 
-ftpDone   = None
+ftpDone   = ''
 
 # ---------------------------------------------------------------------
 # Instantiate the Log class
 # ---------------------------------------------------------------------
 l   = cdr.Log(LOGNAME)
 l.write("FtpAudio - Started")
-
-# Running program in Test mode
-# ----------------------------
 if testMode:
-    audioPath = audioPath.replace('ciat/', 'ciat/test/')
-    targetDir = os.path.join('Testing', targetDir)
-
-    # request = "Get Audio"
+    l.write("Running in testmode")
+else:
+    l.write("Running in livemode")
 
 # Open the SFTP connection and login
 # ----------------------------------
 FTPSERVER  = cdr.h.host['SFTP'][0]
 PORT = 22
-transport = paramiko.Transport((FTPSERVER, PORT))
-FTPLOCK    = 'sending'
-username = "cdroperator"
-password = cdr.getpw(username)
-transport.connect(username=username, password=password)
+
+# Establishing a ssh connection to the server
+# -------------------------------------------
+c = paramiko.Transport((FTPSERVER, PORT))
+keyFile = paramiko.RSAKey.from_private_key_file(SSH_KEY)
+c = paramiko.SSHClient()
+c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+l.write("Connecting to %s ..." % FTPSERVER)
+c.connect(hostname = FTPSERVER, username = USER, pkey = keyFile)
+l.write("Connected")
 
 #----------------------------------------------------------------------
 # Make sure we're logged in.
 #----------------------------------------------------------------------
-if not session: cdrcgi.bail('Unknown or expired CDR session.')
+if not session or not cdr.canDo(session, "AUDIO DOWNLOAD"):
+    cdrcgi.bail("You are not authorized to download audio files")
 
 #----------------------------------------------------------------------
 # Handle request to log out.
@@ -87,100 +92,114 @@ if request == cdrcgi.MAINMENU:
 #----------------------------------------------------------------------
 # Copy the files from the FTP Server to the local network
 #----------------------------------------------------------------------
+if testMode:
+    l.write(request)
+
 if request == "Get Audio" and ftpDone != 'Y':
-    if not sourceDir or not targetDir:
-        cdrcgi.bail("Both, source and target are required.")
     # Create directory path and check if directory exists.
     # If it does not exist, create it
     # This doesn't work because we don't have permissions to
     # access a network drive.
     # ----------------------------------------------------
-    if not os.path.exists(os.path.join('d:\\cdr', targetDir)):
-       os.mkdir(os.path.join('d:\\cdr', targetDir))
+    if not os.path.exists(os.path.join('d:\\cdr', WIN_DIR)):
+       os.mkdir(os.path.join('d:\\cdr', WIN_DIR))
 
-    # ftp = ftplib.FTP(ftphost)
-    sftp = paramiko.SFTPClient.from_transport(transport)
     try:
-       ftpDir = audioPath + sourceDir
-       sftp.chdir(ftpDir)
-       l.write("ftpDir: %s" % ftpDir)
+        l.write(AUDIOPATH)
+        l.write(WIN_DIR)
+        l.write(NIX_DIR)
+        l.write(CIAT_DIR)
 
-       # Checking if any zip files are available to be downloaded
-       #  -------------------------------------------------------
-       zipFiles = sftp.listdir()
-       nZipFiles = 0
-       for zipFile in zipFiles:
-           if zipFile.endswith('.zip'): nZipFiles += 1
-       if not nZipFiles:
-           l.write("No zip files found.")
-           l.write("Ftp done!")
-           cdrcgi.bail('No Audio zip files to download')
+        # Checking if any zip files are available to be downloaded
+        #  -------------------------------------------------------
+        cmd = "ls %s" % IN_DIR
+        l.write("Checking for files in FTP-dir:")
+        l.write("%s" % IN_DIR)
+        stdin, stdout, stderr = c.exec_command(cmd)
 
-       l.write("Found files:\n%s" % zipFiles)
+        # Read the files and clean up file names
+        if not stderr.read():
+            zipFiles = stdout.readlines()
+            zipFiles = [str(x.strip()) for x in zipFiles]
+        else:
+            cdrcgi.bail(sterr.read())
 
-       # Checking which zip files have already been downloaded earlier
-       # -------------------------------------------------------------
-       os.chdir('/cdr/%s' % targetDir)
-       oldFiles = glob.glob('*.[zZ][iI][pP]')
-       l.write("Old files in .../%s:\n%s" % (targetDir, oldFiles))
+        # Count the number of ZIP files found
+        # -----------------------------------
+        nZipFiles = 0
+        for zipFile in zipFiles:
+            if zipFile.endswith('.zip'): nZipFiles += 1
+        if not nZipFiles:
+            l.write("No zip files found.")
+            l.write("Ftp done!")
+            cdrcgi.bail('No Audio zip file(s) to download')
 
-       # Download and move/rename all available Zip files
-       # ------------------------------------------------
-       newFiles = []
-       dbgmsg = []
+        l.write("Found %d zip files:" % nZipFiles)
+        l.write("%s" % zipFiles)
 
-       for name in sftp.listdir():
-           dbgmsg.append("testing %s (%s)" % (repr(name),
-                                              cgi.escape(str(type(name)))))
-           if name.endswith('.zip'):
-               l.write("Zip file found: %s" % name)
+        # Checking which zip files have already been downloaded earlier
+        # -------------------------------------------------------------
+        os.chdir('/cdr/%s' % WIN_DIR)
+        oldFiles = glob.glob('*.[zZ][iI][pP]')
+        l.write("Old files in /cdr/%s:\n%s" % (WIN_DIR, oldFiles))
 
-               # Don't overwrite files previously copied (unless in test mode)
-               # -------------------------------------------------------------
-               if name in oldFiles and not testMode:
-                   cdrcgi.bail('Error:  Local File %s already exists!' % name)
+        # Download and move/rename all available Zip files
+        # ------------------------------------------------
+        newFiles = []
 
-               bytes = []
-               targetFile = '/cdr/%s/%s' % (targetDir, name)
-               l.write("Copy from: %s/%s" % (ftpDir, name))
-               l.write("       to: %s" % targetFile)
+        ### for name in sftp.listdir():
+        for name in zipFiles:
+            # First download the ZIP files...
+            # -------------------------------
+            if name.endswith('.zip'):
+                l.write("Zip file found: %s" % name)
 
-               sftp.get('%s/%s' % (ftpDir, name), '%s' % (targetFile))
-               newFiles.append(name)
-           else:
-               l.write("No zip file: %s" % name)
+                # Don't overwrite files previously copied (unless in test mode)
+                # -------------------------------------------------------------
+                if name in oldFiles and not testMode:
+                    cdrcgi.bail('Error:  Local File %s already exists!' % name)
 
-           # Copy the file to 'transferred' directory if it was
-           # transferred from the default directory
-           # This way we won't copy the file again the next time
-           # around.
-           # ----------------------------------------------------
-           dbgmsg.append("sourceDir is %s" % sourceDir)
-           # l.write(sourceDir)
-           # l.write(audioPath)
-           # l.write(CiatTarget)
-           if sourceDir == 'Term_Audio':
-               # ciatFile = '../' + CiatTarget + '/' + name
-               # Do nothing in testmode, move the files in live mode
-               # ---------------------------------------------------
-               if testMode:
-                   sftp.rename(name, audioPath + name + 'x')
-                   sftp.rename(audioPath + name + 'x', name)
-               else:
-                   dbgmsg.append("renaming %s to %s" % (name, audioPath +
-                                                        "%s/%s" %
-                                                        (CiatTarget, name)))
-                   sftp.rename(name, audioPath + '%s/%s' %
-                                               (CiatTarget, name))
-                   dbgmsg.append("rename complete")
-               l.write("File %s moved to Term_Audio" % name)
-               l.write("-----")
+                targetFile = '/cdr/%s/%s' % (WIN_DIR, name)
+                l.write("Copy from: .../Audio/%s/%s" % (NIX_DIR, name))
+                l.write("       to: %s" % targetFile)
 
-       ftpDone = 'Y'
-       l.write("Ftp done!")
+                sftp = c.open_sftp()
+                sftp.get("%s/%s"      % (IN_DIR, name),
+                         "/cdr/%s/%s" % (WIN_DIR, name))
+                sftp.close()
+                newFiles.append(name)
+            else:
+                l.write("No zip file: %s" % name)
+
+            # ... then copy the file to the 'transferred' directory
+            # This way we won't copy the file again the next time
+            # around.
+            #
+            # Copy files in testmode, move in live mode
+            # ----------------------------------------------------
+            if testMode:
+                cmd = "cp %s/%s %s/%s" % (IN_DIR, name, MV_DIR, name)
+                stdin, stdout, stderr = c.exec_command(cmd)
+
+                if stderr.read():
+                    l.write( "Error copying file in test mode!!!")
+                    l.write(stderr.read())
+                    cdrcgi.bail("Unable to copy file: %s" % cmd)
+            else:
+                cmd = "mv %s/%s %s/%s" % (IN_DIR, name, MV_DIR, name)
+                stdin, stdout, stderr = c.exec_command(cmd)
+
+                if stderr.read():
+                    l.write( "Error moving file to CIAT directory!!!")
+                    l.write(stderr.read())
+                    cdrcgi.bail("Unable to move file: %s" % cmd)
+
+        ftpDone = 'Y'
+        c.close()
+        l.write("Ftp download completed!")
     except Exception, info:
-       cdrcgi.bail(u"FTP Error: %s (DEBUG INFO FOLLOWS)<br />%s)" %
-                   (info, "<br />".join(dbgmsg)))
+        cdrcgi.bail(u"FTP Error: %s" % info)
+
 
 #----------------------------------------------------------------------
 # Display confirmation message when FTP is done.
@@ -188,7 +207,7 @@ if request == "Get Audio" and ftpDone != 'Y':
 if ftpDone == 'Y':
    header  = cdrcgi.header(title, title, section, script, buttons)
    form = u"""\
-<INPUT TYPE='hidden' NAME='%s' VALUE='%s' >
+<input type='hidden' name='%s' value='%s' >
 """ % (cdrcgi.SESSION, session)
    form += u"""\
 <table>
@@ -213,7 +232,7 @@ if ftpDone == 'Y':
 <H4>Download %sCompleted</H4>
 """ % testString
 
-   cdrcgi.sendPage(header + form + u"</BODY></HTML>")
+   cdrcgi.sendPage(header + form + u"</body></html>")
 
 
 #----------------------------------------------------------------------
@@ -221,28 +240,20 @@ if ftpDone == 'Y':
 #----------------------------------------------------------------------
 header = cdrcgi.header(title, title, section, script, buttons)
 form = u"""\
-<H2>FTP Term Audio Files from CANCERINFO</H2>
-<TABLE border='0'>
- <TR>
-  <TD NOWRAP>
-   <B>Directory on FTP Server</B>
-   </BR>Default: /qa/ciat/Audio/Term_Audio
-  </TD>
-  <TD>&nbsp;&nbsp;</TD>
-  <TD NOWRAP>
-   <B>Directory on CDR Server</B>
-   </BR>Default: /cdr/Audio_from_CIPSFTP
-  </TD>
- </TR>
- <TR>
-  <TD><INPUT NAME='SourceDir' size='40' value='%s'></TD>
-  <TD>&nbsp;&nbsp;</TD>
-  <TD><INPUT NAME='TargetDir' size='40' value='%s'></TD>
- </TR>
- <tr>
-  <td colspan='3'><input type='checkbox' name='TestMode'>Test Mode</td>
- </tr>
-</TABLE>
-<INPUT TYPE='hidden' NAME='%s' VALUE='%s' >
-""" % (defSource, defTarget, cdrcgi.SESSION, session)
-cdrcgi.sendPage(header + form + u"</FORM></BODY></HTML>")
+<fieldset>
+ <legend>Download Term Audio Files from FTP server</legend>
+   <b>Directory on FTP Server: </b> %s
+   <br>
+   <b>Directory on CDR Server: </b> %s
+
+   <br><br>
+   Click the "Get Audio" button to start the download from
+   cancerinfo.nci.nih.gov
+   <br><br>
+
+   <input type='checkbox' name='TestMode'>Test Mode
+   <input type='hidden' name='%s' value='%s' >
+</fieldset>
+""" % (NIX_DIR, WIN_DIR, cdrcgi.SESSION, session)
+
+cdrcgi.sendPage(header + form + u"</form></body></html>")

@@ -1,6 +1,7 @@
 #----------------------------------------------------------------------
 # Interface for editing a summary translation job.
 # JIRA::OCECDR-4193
+# JIRA::OCECDR-4248 - allow the user to attach a file
 #----------------------------------------------------------------------
 import datetime
 import operator
@@ -26,6 +27,7 @@ class Control(cdrcgi.Control):
         Collect and validate the request parameters.
         """
 
+        self.set_binary_mode()
         cdrcgi.Control.__init__(self, "Translation Job")
         if not self.session:
             cdrcgi.bail("not authorized")
@@ -107,8 +109,12 @@ class Control(cdrcgi.Control):
     def set_form_options(self, opts):
         """
         Add some extra buttons and optionally replace the banner's subtitle.
+
+        OCECDR-4248: allow the user to post a file.
         """
 
+        if self.english_id:
+            opts["enctype"] = "multipart/form-data"
         opts["buttons"].insert(-3, self.JOBS)
         if self.job:
             if not self.job.new:
@@ -173,6 +179,7 @@ jQuery("input[value='%s']").click(function(e) {
         form.add_select("state", "Status", states, state_id)
         form.add_date_field("state_date", "Date", value=state_date)
         form.add_textarea_field("comments", "Comments", value=comments)
+        form.add_text_field("file", "QC Report", upload=True)
         form.add("</fieldset>")
         form.add_hidden_field("english_id", self.english_id)
 
@@ -242,7 +249,7 @@ jQuery("input[value='%s']").click(function(e) {
             integer for a valid value primary key if parameter is present
             otherwise None
 
-        Script exists with an error message if the parameters have been
+        Script exits with an error message if the parameters have been
         tampered with by a hacker.
         """
 
@@ -261,6 +268,8 @@ jQuery("input[value='%s']").click(function(e) {
         """
         Fetch the IDs and titles for published CDR summary documents.
 
+        OCECDR-4240: all modules to be queued for translation jobs.
+
         Pass:
             language - string representing language of summaries to
             be returned
@@ -275,7 +284,12 @@ jQuery("input[value='%s']").click(function(e) {
         query.where("l.path = '/Summary/SummaryMetaData/SummaryLanguage'")
         query.where(query.Condition("l.value", language))
         if language == "English":
-            query.join("pub_proc_cg c", "c.id = d.id")
+            query.outer("pub_proc_cg c", "c.id = d.id")
+            query.outer("query_term m", "m.doc_id = d.id",
+                        "m.path = '/Summary/@ModuleOnly'")
+            query.where("(c.id IS NOT NULL OR m.value = 'Yes')")
+        query.unique()
+        self.logger.debug("query: %s", query)
         return dict(query.execute(self.cursor).fetchall())
 
     def have_required_values(self):
@@ -383,12 +397,38 @@ jQuery("input[value='%s']").click(function(e) {
         body.append(u"Job status: %s" % self.states.map.get(job.state_id))
         body.append(u"Date of status transition: %s" % job.state_date)
         body.append(u"Comments: %s" % job.comments)
+        attachment = self.fetch_file()
+        attachments = attachment and [attachment] or None
         try:
-            cdr.sendMailMime(sender, recips, subject, u"\n".join(body))
+            cdr.sendMailMime(sender, recips, subject, u"\n".join(body),
+                             attachments=attachments)
         except Exception, e:
             self.logger.error("sending mail: %s", e)
             cdrcgi.bail("sending mail: %s" % e)
         self.logger.info(log_message)
+
+    def fetch_file(self):
+        """
+        If the user has posted a file, wrap it in a `cdr.EmailAttachment`
+        object and return the object. Otherwise, return None
+        """
+
+        if "file" not in self.fields.keys():
+            return None
+        f = self.fields["file"]
+        if f.file:
+            file_bytes = []
+            while True:
+                more_bytes = f.file.read()
+                if not more_bytes:
+                    break
+                file_bytes.append(more_bytes)
+            file_bytes = "".join(file_bytes)
+        else:
+            file_bytes = f.value
+        if not file_bytes:
+            return None
+        return cdr.EmailAttachment(file_bytes, f.filename)
 
     @staticmethod
     def sort_dict(d):
@@ -433,6 +473,22 @@ jQuery("input[value='%s']").click(function(e) {
             """
 
             return "%s <%s>" % (self.name, self.email)
+
+    @staticmethod
+    def set_binary_mode():
+        """
+        Make sure the user's file isn't mangled if she posts one.
+        """
+
+        try:
+            import msvcrt
+            import os
+            msvcrt.setmode(0, os.O_BINARY) # stdin = 0
+            msvcrt.setmode(1, os.O_BINARY) # stdout = 1
+        except ImportError:
+            pass
+        except:
+            cdrcgi.bail("Internal error")
 
 class Job:
     """

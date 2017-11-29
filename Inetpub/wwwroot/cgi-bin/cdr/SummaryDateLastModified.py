@@ -10,12 +10,13 @@
 # BZIssue::4209 - add date to report
 # BZIssue::4214 - use the document's own DateLastModified value
 # BZIssue::4924 - modify Summary Date Last Modified Report
+# JIRA::OCECDR-4285 - add filtering by summary document state
 #----------------------------------------------------------------------
 import cgi
 import cdr
 import cdrdb
 import cdrcgi
-import time
+import datetime
 import sys
 
 #----------------------------------------------------------------------
@@ -24,6 +25,7 @@ import sys
 fields      = cgi.FieldStorage()
 session     = cdrcgi.getSession(fields)
 request     = cdrcgi.getRequest(fields)
+also        = fields.getlist ('also')          or []
 est         = fields.getlist ('est')           or []
 sst         = fields.getlist ('sst')           or []
 audience    = fields.getvalue('Audience')      or None
@@ -36,7 +38,7 @@ buttons     = ["Submit", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 script      = "SummaryDateLastModified.py"
 title       = "CDR Administration"
 section     = "Summary Date Last Modified"
-today       = time.strftime('%Y-%m-%d')
+today       = str(datetime.date.today())
 header      = cdrcgi.header(title, title, section, script, buttons,
                             stylesheet = """\
    <link type='text/css' rel='stylesheet' href='/stylesheets/CdrCalendar.css'>
@@ -251,38 +253,12 @@ def getSummaryTypeOptions(cursor):
     return u"".join(html)
 
 #----------------------------------------------------------------------
-# Normalize a year, month, day tuple into a standard date-time value.
-#----------------------------------------------------------------------
-def normalizeDate(y, m, d):
-    return time.localtime(time.mktime((y, m, d, 0, 0, 0, 0, 0, -1)))
-
-#----------------------------------------------------------------------
-# Generate a pair of dates suitable for seeding the user date fields.
-#----------------------------------------------------------------------
-def genDateValues():
-    import time
-    yr, mo, da, ho, mi, se, wd, yd, ds = time.localtime()
-    if wd == 4:
-        # Today is Friday; have we reached 6:00 p.m.?
-        if (ho, mi, se) >= (18, 0, 0):
-            daysToBackUp = 0
-        else:
-            daysToBackUp = 7
-    elif wd < 4:
-        daysToBackUp = wd + 3
-    else:
-        daysToBackUp = wd - 4
-    friday = normalizeDate(yr, mo, da - daysToBackUp)
-    saturday = normalizeDate(friday[0], friday[1], friday[2] - 6)
-    return (time.strftime("%Y-%m-%d", saturday),
-            time.strftime("%Y-%m-%d", friday))
-
-#----------------------------------------------------------------------
 # Put up the menu if we don't have selection criteria yet.
 #----------------------------------------------------------------------
 if not audience or not (est or sst) or ((not uStartDate or not uEndDate) and
                                         (not sStartDate or not sEndDate)):
-    startDate, endDate = genDateValues()
+    endDate = datetime.date.today()
+    startDate = endDate - datetime.timedelta(6)
     form = """\
    <input type='hidden' name='%s' value='%s' width='100%%' />
    <fieldset>
@@ -290,6 +266,18 @@ if not audience or not (est or sst) or ((not uStartDate or not uEndDate) and
 %s
    </fieldset>
 %s
+   <fieldset>
+    <legend>Include</legend>
+    &nbsp;
+     <input name='also' type='checkbox' id='AlsoMod' class='choice'
+            value='modules' /> Modules <br />
+    &nbsp;
+     <input name='also' type='checkbox' id='AlsoBlocked' class='choice'
+            value='blocked' /> Blocked Documents <br />
+    &nbsp;
+     <input name='also' type='checkbox' id='AlsoUnpub' class='choice'
+            value='unpub' /> Other Unpublished Documents <br />
+   </fieldset>
    <fieldset class='dates'>
     <legend>Report by Date Last Modified (User)</legend>
     <label for='ustart'>Start Date:</label>
@@ -330,6 +318,7 @@ class Summary:
         self.lastMod     = row[5]
         self.summaryType = row[6]
         self.lastSave    = row[7]
+        self.module      = row[8]
         self.lastSaveUsr = Summary.__getSaveUsr(self.docId, cursor)
         self.comment     = None
         if self.board not in Summary.summaries:
@@ -400,12 +389,15 @@ sqlSelect = """\
                     la.value          AS language,
                     lm.value          AS last_mod_date,
                     st.value          AS summary_type,
-                    ls.last_save_date AS last_save_date
+                    ls.last_save_date AS last_save_date,
+                    mo.value          AS module
 """
 sqlFrom = """\
                FROM query_term su
 """
 sqlJoin = """\
+               JOIN document d
+                 ON d.id = su.doc_id
                JOIN query_term st
                  ON st.doc_id = su.doc_id
                JOIN query_term bn
@@ -416,8 +408,13 @@ sqlJoin = """\
                  ON ls.doc_id = su.doc_id
                JOIN query_term la
                  ON la.doc_id = su.doc_id
+    LEFT OUTER JOIN pub_proc_cg cg
+                 ON cg.id = su.doc_id
     LEFT OUTER JOIN query_term lm
                  ON lm.doc_id = su.doc_id
+    LEFT OUTER JOIN query_term mo
+                 ON mo.doc_id = su.doc_id
+                AND mo.path = '/Summary/@AvailableAsModule'
 """
 sqlWhere = """\
               WHERE su.path = '/Summary/SummaryTitle'
@@ -429,6 +426,33 @@ sqlWhere = """\
                 AND la.path = '/Summary/SummaryMetaData/SummaryLanguage'
                 AND bn.path = '/Organization/OrganizationNameInformation'
                             + '/OfficialName/Name'
+"""
+
+#----------------------------------------------------------------------
+# OCECDR-4285: add filtering of summary document states. By default,
+# only summaries which have been published to Cancer.gov are included
+# in the report (which would exclude all blocked documents, summaries
+# which are marked 'available as module' and summaries which are new
+# and in progress). Checkboxes are provided to lift some or all of
+# those restrictions.
+#----------------------------------------------------------------------
+if "unpub" in also:
+    if "blocked" not in also:
+        sqlWhere += """\
+                AND d.active_status = 'A'
+"""
+else:
+    also_where = ["cg.id IS NOT NULL"]
+    if "blocked" in also:
+        also_where.append("d.active_status = 'I'")
+    if "modules" in also:
+        also_where.append("mo.doc_id IS NOT NULL")
+    sqlWhere += """\
+                AND (%s)
+""" % " OR ".join(also_where)
+if "modules" not in also:
+    sqlWhere += """\
+                AND mo.doc_id IS NULL
 """
 
 #----------------------------------------------------------------------
@@ -457,7 +481,7 @@ else:
 """ % (sStartDate, sEndDate)
 
 #----------------------------------------------------------------------
-# Filter on audience unless the user want everything.
+# Filter on audience unless the user wants everything.
 #----------------------------------------------------------------------
 if audience and audience != 'all':
     audienceFilter = """\
@@ -536,7 +560,7 @@ styles = cdrcgi.ExcelStyles()
 styles.header = styles.style("align: wrap true, horz center; font: bold true")
 styles.url = styles.style(styles.HYPERLINK, styles.CENTER_TOP)
 styles.sect = styles.style(styles.LEFT, styles.bold_font(11))
-sheet = styles.add_sheet("CCB Report")
+sheet = styles.add_sheet("DLM Report")
 report_date = "Report Date: %s" % today
 sheet.col(0).width = styles.chars_to_width(12)
 sheet.col(1).width = styles.chars_to_width(50)
@@ -593,7 +617,10 @@ def addSection(sheet, summaries, board, language, audience, reportType,
                "Session=guest&DocId=%s" % summary.docId)
         link = styles.link(url, "CDR%d" % summary.docId)
         sheet.write(row, 0, link, styles.url)
-        sheet.write(row, 1, summary.title, styles.left)
+        title = summary.title
+        if summary.module:
+            title += " [module]"
+        sheet.write(row, 1, title, styles.left)
         if extraCols:
             sheet.write(row, 2, summaryType, styles.left)
             sheet.write(row, 3, audienceAbbreviation, styles.left)
@@ -623,7 +650,7 @@ for boardName in sorted(Summary.summaries):
             rowNum = addSection(sheet, summaries, boardName, languageName,
                                 audienceName, reportType, styles, rowNum)
 
-stamp = time.strftime("%Y%m%d%H%M%S")
+stamp = cdr.make_timestamp()
 print "Content-type: application/vnd.ms-excel"
 print "Content-Disposition: attachment; filename=sdlm-%s.xls" % stamp
 print

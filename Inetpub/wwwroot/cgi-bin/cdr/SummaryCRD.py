@@ -9,7 +9,7 @@
 # BZIssue::5273 - Identifying Modules in Summary Reports
 # OCECDR-3698 - Failure Running Comprehensive Review Date Report
 # Rewritten July 2015 to address security vulnerabilities.
-#
+# OCECDR-4286 - Fix bug in review selection
 #----------------------------------------------------------------------
 import cdr
 import cdrcgi
@@ -234,9 +234,9 @@ class Board:
             while i > 0:
                 i -= 1
                 review = doc.reviews[i]
-                if self.control.show_all or review.state != "Actual":
+                if self.control.show_all:
                     reviews.insert(0, review)
-                elif not have_actual:
+                elif not have_actual and review.state == "Actual":
                     reviews.insert(0, review)
                     have_actual = True
             span = len(reviews)

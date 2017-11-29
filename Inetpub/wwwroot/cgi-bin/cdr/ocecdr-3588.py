@@ -57,7 +57,7 @@ class Term:
             concept = nci_thesaurus.Concept(code=concept_code)
             self.available = concept.code.upper() == self.concept_code
         except Exception:
-            self.logger.exception("fetching %r" % code)
+            control.logger.exception("fetching %r" % concept_code)
             self.available = False
     def row(self):
         return (
