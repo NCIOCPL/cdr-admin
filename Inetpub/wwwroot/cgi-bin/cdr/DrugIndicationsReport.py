@@ -13,7 +13,7 @@ session   = cdrcgi.getSession(fields)
 # audience  = fields and fields.getvalue("audience")         or "Patient"
 displayType = fields and fields.getvalue("displayType")    or None
 sortType  = fields and fields.getvalue("sorting")          or "I"
-indication = fields and fields.getvalue("indication")      or []
+indication = fields and fields.getlist("indication")      or []
 singleDrug = fields and fields.getvalue("singledrug")      or None
 submit    = fields and fields.getvalue("SubmitButton")     or None
 request   = cdrcgi.getRequest(fields)
@@ -75,7 +75,7 @@ def getBrandNames():
 # -----------------------------------------------------------------
 def getIndications(drugID):
     indicationQuery = u"""
-    SELECT q.value, t.value 
+    SELECT q.value, t.value
           FROM query_term_pub q
           JOIN query_term_pub i
             ON i.doc_id = q.doc_id
@@ -84,15 +84,15 @@ def getIndications(drugID):
           JOIN query_term_pub t
             ON t.doc_id = i.int_val
            AND t.path   = '/Term/PreferredName'
-         WHERE q.doc_id = %s
+         WHERE q.doc_id = ?
            AND q.path   = '/DrugInformationSummary' +
                           '/Title'
          ORDER BY t.value
-""" % drugID
+"""
 
     try:
         cursor = conn.cursor()
-        cursor.execute(indicationQuery, timeout = 300)
+        cursor.execute(indicationQuery, (drugID,), timeout=300)
         rows = cursor.fetchall()
         cursor.close()
     except cdrdb.Error, info:
@@ -107,7 +107,7 @@ def getIndications(drugID):
 
 
 # ---------------------------------------------------
-# 
+#
 # ---------------------------------------------------
 def createByIndication2(rows, type, names):
     """Return the HTML code to display the Summary Board Header with ID"""
@@ -135,7 +135,7 @@ def createByIndication2(rows, type, names):
         else:
             html += " %s" % row[1]
         last = row[1]
-        
+
         html += """</td>
       <td valign="top">
        <span class="indrow">%s (<a href="/cgi-bin/cdr/QcReport.py?Session=guest&\
@@ -147,13 +147,13 @@ DocId=CDR%d&DocVersion=-1">CDR%d</a>)</span><br>
         query = """
         select int_val
           from query_term_pub
-         WHERE doc_id = %s
+         WHERE doc_id = ?
            AND path = '/DrugInformationSummary' +
                       '/DrugInfoMetaData' +
                       '/TerminologyLink/@cdr:ref'
-""" % row[0]
+"""
 
-        cursor.execute(query)
+        cursor.execute(query, (row[0],))
         row = cursor.fetchone()
 
         html += u"""
@@ -165,7 +165,7 @@ DocId=CDR%d&DocVersion=-1">CDR%d</a>)</span><br>
        <span class='indrow'>%s</span><br>""" % brand
         else:
             html += "&nbsp;"
-        
+
         html += u"""
       </td>
      </tr>"""
@@ -178,7 +178,7 @@ DocId=CDR%d&DocVersion=-1">CDR%d</a>)</span><br>
 
 
 # ---------------------------------------------------
-# 
+#
 # ---------------------------------------------------
 def createByIndication3(rows, type, names):
     """Return the HTML code to display the Summary Board Header with ID"""
@@ -188,10 +188,10 @@ def createByIndication3(rows, type, names):
     i = 0
     html = u""
 
-    # We need to sort the display by indication and also the drug 
+    # We need to sort the display by indication and also the drug
     # names for each indication.
     # Creating a dictionary from the rows given to list
-    #   {indication:[[CDR-ID, Drug1], [CDR-ID, Drug2], ...]} 
+    #   {indication:[[CDR-ID, Drug1], [CDR-ID, Drug2], ...]}
     # ------------------------------------------------------------
     for row in rows:
         allIndications.setdefault(row[1], []).append([row[0], row[2]])
@@ -201,7 +201,7 @@ def createByIndication3(rows, type, names):
 
     for indication in sorted(allIndications.keys()):
         html += u"""\n<span class='indlabel'>%s</span><br>""" % indication
-        
+
         drugs = sorted(allIndications[indication], key=lambda i: i[1])
 
         for drug in drugs:
@@ -215,13 +215,13 @@ DocId=CDR%d&DocVersion=-1">CDR%d</a>)</div>
                 query = """
             select int_val
               from query_term_pub
-             WHERE doc_id = %s
+             WHERE doc_id = ?
                AND path = '/DrugInformationSummary' +
                           '/DrugInfoMetaData' +
                           '/TerminologyLink/@cdr:ref'
-""" % drug[0]
+"""
 
-                cursor.execute(query)
+                cursor.execute(query, (drug[0],))
                 row = cursor.fetchone()
 
                 if row[0] in names.keys():
@@ -230,19 +230,19 @@ DocId=CDR%d&DocVersion=-1">CDR%d</a>)</div>
            <div class="brand"><span class='indrow'>%s</span><br></div>""" % brand
                 else:
                     html += "&nbsp;"
-            
+
         html += u"\n<br>"
     return html
 
 
 # ---------------------------------------------------
-# 
+#
 # ---------------------------------------------------
 def createByIndication(rows, type, name):
     """The report with brand names is displayed in table
        format, the report without brand names as a list.
        Selecting the module to create the two report types."""
-    
+
     if type == 'brand':
        html = createByIndication2(rows, type, name)
     else:
@@ -252,7 +252,7 @@ def createByIndication(rows, type, name):
 
 
 # ---------------------------------------------------
-# 
+#
 # ---------------------------------------------------
 def createByIndication1(rows, type, names):
     """Return the HTML code to display the Summary Board Header with ID"""
@@ -270,7 +270,7 @@ def createByIndication1(rows, type, names):
             html += u"""
     <br><b>Indication: </b>%s<br>""" % row[1]
         last = row[1]
-        
+
         html += u"""
        <div class="drug">%s (<a href="/cgi-bin/cdr/QcReport.py?Session=guest&\
 DocType=DrugInformationSummary&\
@@ -281,13 +281,13 @@ DocId=CDR%d&DocVersion=-1">CDR%d</a>)</div>
             query = """
         select int_val
           from query_term_pub
-         WHERE doc_id = %s
+         WHERE doc_id = ?
            AND path = '/DrugInformationSummary' +
                       '/DrugInfoMetaData' +
                       '/TerminologyLink/@cdr:ref'
-""" % row[0]
+"""
 
-            cursor.execute(query)
+            cursor.execute(query, (row[0],))
             row = cursor.fetchone()
 
             if row[0] in names.keys():
@@ -296,12 +296,12 @@ DocId=CDR%d&DocVersion=-1">CDR%d</a>)</div>
        <div class="brand"><span class='indrow'>%s</span><br></div>""" % brand
             else:
                 html += "&nbsp;"
-            
+
     return html
 
 
 # ---------------------------------------------------
-# 
+#
 # ---------------------------------------------------
 def createByDrug(rows, type, names):
     """Return the HTML code to display the Summary Board Header with ID"""
@@ -348,7 +348,7 @@ def createByDrug(rows, type, names):
 DocType=DrugInformationSummary&\
 DocId=CDR%d&DocVersion=-1">CDR%d</a></td>
       <td valign="top" class="indrow">%s""" % (i % 2 == 0 and 'even' or 'odd',
-                                               allDrugs[drug][0], 
+                                               allDrugs[drug][0],
                                                allDrugs[drug][0], drug)
 
         # Add the brand names
@@ -361,14 +361,14 @@ DocId=CDR%d&DocVersion=-1">CDR%d</a></td>
        AND i.path = '/DrugInformationSummary' +
                     '/DrugInfoMetaData'       +
                     '/ApprovedIndication'
-     WHERE q.doc_id = %d
+     WHERE q.doc_id = ?
        AND q.path = '/DrugInformationSummary' +
                   '/DrugInfoMetaData' +
                   '/TerminologyLink/@cdr:ref'
      ORDER BY i.value
-""" % allDrugs[drug][0]
+"""
 
-        cursor.execute(query)
+        cursor.execute(query, (allDrugs[drug][0],))
         bRows = cursor.fetchall()
         #cdrcgi.bail(bRows)
 
@@ -376,14 +376,14 @@ DocId=CDR%d&DocVersion=-1">CDR%d</a></td>
             if bRows[0][0] in names.keys():
                 html += " <span class='brand'>(%s)</span>" %\
                             ', '.join(x for x in names[bRows[0][0]][1])
-            
+
         html += u"""
       </td>
       <td>"""
         for ind in bRows:
             html += u"""
         <span class='indrow'>%s<br></span>""" % ind[1]
-        
+
         html += u"""
       </td>"""
 
@@ -427,21 +427,21 @@ instr = instr % dateString
 # text box.
 # -------------------------------------------------------------
 iQuery = u"""\
-         SELECT DISTINCT value 
-           FROM query_term_pub 
+         SELECT DISTINCT value
+           FROM query_term_pub
           WHERE path = '/DrugInformationSummary' +
                       '/DrugInfoMetaData/ApprovedIndication'
           ORDER BY value
 """
 
 if not iQuery:
-    cdrcgi.bail('iQuery: No query criteria specified')   
+    cdrcgi.bail('iQuery: No query criteria specified')
 
 ### # -------------------------------------------------------------
 ### # Create a drop-down list for Drug Names
 ### # -------------------------------------------------------------
 ### dQuery = u"""\
-###          SELECT distinct q.doc_id, q.value 
+###          SELECT distinct q.doc_id, q.value
 ###            FROM query_term q
 ###            JOIN active_doc d
 ###              ON d.id = q.doc_id
@@ -452,9 +452,9 @@ if not iQuery:
 ###           WHERE q.path = '/DrugInformationSummary/Title'
 ###           ORDER BY q.value
 ### """
-### 
+###
 ### if not dQuery:
-###     cdrcgi.bail('dQuery: No query criteria specified')   
+###     cdrcgi.bail('dQuery: No query criteria specified')
 
 #----------------------------------------------------------------------
 # Submit the queriew to the database.
@@ -467,7 +467,7 @@ try:
 except cdrdb.Error, info:
     cdrcgi.bail('Failure retrieving initial indications: %s' %
                 info[1][0])
-     
+
 ### try:
 ###     cursor = conn.cursor()
 ###     cursor.execute(dQuery)
@@ -476,12 +476,12 @@ except cdrdb.Error, info:
 ### except cdrdb.Error, info:
 ###     cdrcgi.bail('Failure retrieving initial drugs: %s' %
 ###                 info[1][0])
-     
+
 #----------------------------------------------------------------------
 # If we don't have a request, put up the form.
 #----------------------------------------------------------------------
 if not displayType:
-    header = cdrcgi.header(title, title, instr, 
+    header = cdrcgi.header(title, title, instr,
                            script,
                            ("Submit",
                             SUBMENU,
@@ -489,14 +489,14 @@ if not displayType:
                            numBreaks = 1,
                            stylesheet = """
    <STYLE type="text/css">
-    TD      { font-size:  12pt; 
+    TD      { font-size:  12pt;
               padding-right:     5px; }
     DL      { margin-left: 0; padding-left: 0 }
    </STYLE>
 """)
     form   = u"""\
    <input type='hidden' name='%s' value='%s'>
- 
+
    <!-- fieldset>
     <legend>&nbsp;Select Drug Name&nbsp;</legend>
     <select name="singledrug" id="singledrug">
@@ -516,7 +516,7 @@ if not displayType:
     <!-- input name='displayType' type='radio' id="single" value='single'>
     <label for="single">Single Drug with Indication(s)</label>
     <br -->
-    <input name='displayType' type='radio' id="drug" value='drug' 
+    <input name='displayType' type='radio' id="drug" value='drug'
            checked='checked'>
     <label for="drug">Indications and Drug Names only</label>
     <br>
@@ -547,8 +547,8 @@ if not displayType:
 """
 
     for row in iRows:
-        form += u"""<option value='%s'>%s</option>
-""" % (row[0], row[0])
+        form += u"""<option value="%s">%s</option>
+""" % (cgi.escape(row[0], True), row[0])
 
     form += u"""\
     </select>
@@ -566,26 +566,26 @@ if not iRows:
 #----------------------------------------------------------------------
 # Create the results page.
 #----------------------------------------------------------------------
-#    UL             { margin-left:    0; 
+#    UL             { margin-left:    0;
 #                     padding-left:   0;
 #                     margin-top:    10px;
 #                     margin-bottom: 30px; }
 header    = cdrcgi.rptHeader(title, stylesheet = """\
    <STYLE type="text/css">
-    TABLE         { margin-top:    10px; 
-                    margin-bottom: 30px; } 
+    TABLE         { margin-top:    10px;
+                    margin-bottom: 30px; }
 
-    table         { border-collapse: collapse; 
+    table         { border-collapse: collapse;
                     width: 90%; }
 
     table, th, tr, td
                   { border: 1px solid black; }
     .full         { border: none; }
 
-    th            { height: 50px; 
-                    background-color: #00FF77; 
+    th            { height: 50px;
+                    background-color: #00FF77;
                     color: navy; }
-    td            { text-align: left; 
+    td            { text-align: left;
                     vertical-align: top; }
     .col1         { width: 45%; }
     .col2         { width: 45%; }
@@ -593,15 +593,15 @@ header    = cdrcgi.rptHeader(title, stylesheet = """\
     .col4         { width: 20%; }
     tr.even       { background-color: white; }
     tr.odd        { background-color: #DDFFDD; }
-                     
+
     .date         { font-size: 12pt; }
     .sectionHdr   { font-size: 12pt;
                     font-weight: bold;
                     text-decoration: underline; }
     td.report     { font-size: 11pt;
-                    padding-right: 15px; 
+                    padding-right: 15px;
                     vertical-align: top; }
-    td, th        { padding-right: 5pt; 
+    td, th        { padding-right: 5pt;
                     padding-left:  5pt; }
     .cdrid        { width: 10%;
     .cdrid          text-align: right }
@@ -611,10 +611,10 @@ header    = cdrcgi.rptHeader(title, stylesheet = """\
     .indlabel     { font-weight: bold; }
     .indrow       { font-size: 12pt;
                     font-weight: normal; }
-    .drug         { text-indent: 2em; 
+    .drug         { text-indent: 2em;
                     margin: 0px; }
-    .brand        { text-indent: 4em; 
-                    margin: 0px; 
+    .brand        { text-indent: 4em;
+                    margin: 0px;
                     font-style: italic; }
     li            { display: list-item;
                     list-style-type: none;
@@ -627,8 +627,8 @@ header    = cdrcgi.rptHeader(title, stylesheet = """\
 
 footer = u"""\
  </BODY>
-</HTML> 
-"""     
+</HTML>
+"""
 
 # -------------------------
 # Display the Report Title
@@ -706,43 +706,26 @@ else:
 
     brandNames = getBrandNames()
 
-    query1 = u"""
-        SELECT q.doc_id, q.value AS "Indication", t.value AS "DrugName"
-          FROM query_term_pub q
-          JOIN query_term_pub t
-            ON t.doc_id = q.doc_id
-           AND t.path = '/DrugInformationSummary' +
-                        '/Title'
-         WHERE q.path = '/DrugInformationSummary' +
-                        '/DrugInfoMetaData/ApprovedIndication'
-"""
-    # adding  -- AND q.value in ('acute leukemia','dada', ...)
-    query2 = u"""
-           AND q.value in ('%s')
-""" % "', '".join(x for x in indication)
-
-    if sortType == 'I':
-        query3 = u"""
-         ORDER BY q.value
-"""
+    q_path = "/DrugInformationSummary/DrugInfoMetaData/ApprovedIndication"
+    fields = 'q.doc_id', 'q.value AS "Indication"', 't.value AS "DrugName"'
+    query = cdrdb.Query("query_term_pub q", *fields)
+    query.join("query_term_pub t", "t.doc_id = q.doc_id",
+               "t.path = '/DrugInformationSummary/Title'")
+    query.where(query.Condition("q.path", q_path))
+    if "all" not in indication:
+        query.where(query.Condition("q.value", indication, "IN"))
+    if sortType == "I":
+        query.order("q.value")
     else:
-        query3 = u"""
-         ORDER BY t.value, q.value
-"""
-    if indication[0] == 'all':
-        query = query1 + query3
-    else:
-        query = query1 + query2 + query3
+        query.order("t.value", "q.value")
 
     #----------------------------------------------------------------------
     # Submit the query to the database.
     #----------------------------------------------------------------------
     try:
-        cursor.execute(query)
-        rows = cursor.fetchall()
+        rows = query.execute(cursor).fetchall()
     except cdrdb.Error, info:
-        cdrcgi.bail('Failure retrieving indications2: %s' %
-                    info[1][0])
+        cdrcgi.bail('Failure retrieving indications2: %s' % info[1][0])
 
     # Sorting report by indication
     # ----------------------------
