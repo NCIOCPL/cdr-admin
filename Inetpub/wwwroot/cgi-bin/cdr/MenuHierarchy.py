@@ -81,12 +81,10 @@ def loadMenuItems(menuType):
     global menuItems
     global menuTypes
     global findIndex
-    parms = (("MenuType", menuType))
-    response = cdr.report('guest', 'Menu Term Tree', parms)
-    docXml = response.replace("<![CDATA[", "").replace("]]>", "")
-    tree = etree.XML(docXml)
+    parms = dict(MenuType=menuType)
     tempIndex = {}
-    for node in tree:
+    name = "Menu Term Tree"
+    for node in cdr.report("guest", name, parms=parms).findall("*"):
         if node.tag == "MenuItem":
             termId       = None
             termName     = None

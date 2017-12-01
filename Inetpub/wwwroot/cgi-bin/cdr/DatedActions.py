@@ -1,228 +1,71 @@
-#----------------------------------------------------------------------
-# Reports on dated actions for a particular document type.
-# I'm pretty sure the users don't use this any more. (RMK 2016-12-21)
-#----------------------------------------------------------------------
-import cdr, cdrdb, cdrcgi, cgi, re, time, xml.dom.minidom
+#!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields  = cgi.FieldStorage()
-session = cdrcgi.getSession(fields)
-request = cdrcgi.getRequest(fields)
-docType = fields and fields.getvalue('DocType') or None
-SUBMENU = "Report Menu"
-buttons = ["Submit Request", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-script  = "DatedActions.py"
-title   = "CDR Administration"
-section = "Dated Actions Report"
-header  = cdrcgi.header(title, title, section, script, buttons)
-
-#----------------------------------------------------------------------
-# Make sure we're logged in.
-#----------------------------------------------------------------------
-if not session: cdrcgi.bail('Unknown or expired CDR session.')
-
-#----------------------------------------------------------------------
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if request == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif request == SUBMENU:
-    cdrcgi.navigateTo("Reports.py", session)
-
-#----------------------------------------------------------------------
-# Handle request to log out.
-#----------------------------------------------------------------------
-if request == "Log Out":
-    cdrcgi.logout(session)
-
-#----------------------------------------------------------------------
-# If we don't have a request, put up the request form.
-#----------------------------------------------------------------------
-if not docType:
-    docTypes = cdr.getDoctypes(session)
-    if type(docTypes) in [type(""), type(u"")]:
-        cdrcgi.bail(docTypes)
-    form = """\
-   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-   <B>Select Document Type:&nbsp;</B>
-   <SELECT NAME='DocType'>
-    <OPTION VALUE='' SELECTED>&nbsp;</OPTION>
-""" % (cdrcgi.SESSION, session)
-    for docType in docTypes:
-        form += """\
-    <OPTION VALUE='%s'>%s &nbsp;</OPTION>
-""" % (docType, docType)
-    form += """\
-   </SELECT>
-  </FORM>
- </BODY>
-</HTML>
 """
-    cdrcgi.sendPage(header + form)
+Report on dated actions for a particular document type
+"""
 
-# If we got here, there is a docType.  Validate it.
-if docType not in cdr.getDoctypes(session):
-    cdrcgi.bail('Unknown doc type requested')
+from lxml import etree
+import cdr
+import cdrcgi
 
-#----------------------------------------------------------------------
-# We have a request; do it.
-#----------------------------------------------------------------------
-parms  = (('DocType', docType),)
-name   = 'Dated Actions'
-report = cdr.report(session, name, parms)
-report = re.sub(r"<!\[CDATA\[", "", report)
-report = re.sub(r"\]\]>", "", report)
+class Control(cdrcgi.Control):
+    "Collect and verify the user options for the report"
 
-#cdrcgi.bail(report)
-# This is to get around a bug in the XML parser, which is reporting:
-# "xml processing instruction not at start of external entity" -
-# a bogus complaint.
-piPatt = re.compile(r"<\?.*?\?>", re.DOTALL)
-report = piPatt.sub("", report)
+    TITLE = "Dated Actions Report"
 
-report = xml.dom.minidom.parseString(report).documentElement
-now    = time.localtime(time.time())
+    def __init__(self):
+        "Make sure the values make sense and haven't been hacked"
 
-#----------------------------------------------------------------------
-# Connect to the database.
-#----------------------------------------------------------------------
-try:
-    conn = cdrdb.connect()
-    cursor = conn.cursor()
-except cdrdb.Error, info:
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
+        cdrcgi.Control.__init__(self, self.TITLE)
+        self.doctypes = cdr.getDoctypes(self.session)
+        self.doctype = self.fields.getvalue("doctype")
+        if self.doctype and self.doctype not in self.doctypes:
+            cdrcgi.bail(cdrcgi.TAMPERING)
 
-#----------------------------------------------------------------------
-# Get the full name for the requesting user.
-#----------------------------------------------------------------------
-try:
-    cursor.execute("""\
-            SELECT fullname
-              FROM usr
-              JOIN session
-                ON session.usr = usr.id
-             WHERE session.name = ?""", session)
-    usr = cursor.fetchone()[0]
-except:
-    cdrcgi.bail("Unable to find current user name")
+    def populate_form(self, form):
+        "Show form with doctype selection picklist"
 
-#----------------------------------------------------------------------
-# Start the page.
-#----------------------------------------------------------------------
-safeDocType = cgi.escape(docType)
-html = """\
-<!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
-<html>
- <head>
-  <title>Dated Action Report %s %s</title>
- </head>
- <basefont face='Arial, Helvetica, sans-serif'>
- <body>
-  <center>
-   <b>
-    <font size='4'>Dated Action Report</font>
-   </b>
-   <br />
-   <b>
-    <font size='4'>Document Type: %s</font>
-   </b>
-  </center>
-  <br />
-  <br />
-  <table border='1' cellspacing='0' cellpadding='2' width='100%%'>
-   <tr>
-    <td>
-     <b>
-      <font size='3'>DocID</font>
-     </b>
-    </td>
-    <td>
-     <b>
-      <font size='3'>DocTitle</font>
-     </b>
-    </td>
-    <td nowrap='1'>
-     <b>
-      <font size='3'>Action Description</font>
-     </b>
-    </td>
-    <td nowrap='1'>
-     <b>
-      <font size='3'>Action Date</font>
-     </b>
-    </td>
-    <td>
-     <b>
-      <font size='3'>Comment</font>
-     </b>
-    </td>
-   </tr>
-""" % (safeDocType, time.strftime("%m/%d/%Y", now), safeDocType)
+        form.add("<fieldset>")
+        form.add(form.B.LEGEND("Select Document Type For Report"))
+        form.add_select("doctype", "Doc Type", self.doctypes)
+        form.add("</fieldset>")
 
-#----------------------------------------------------------------------
-# Extract the information from the XML so we can sort it.
-#----------------------------------------------------------------------
-class ReportRow:
-    def __init__(self, id, title, action): #date, desc, comment):
-        dateElems = action.getElementsByTagName("ActionDate")
-        descElems = action.getElementsByTagName("ActionDescription")
-        commElems = action.getElementsByTagName("Comment")
-        self.id      = id
-        self.title   = title
-        self.date    = dateElems and cdr.getTextContent(dateElems[0]) or ""
-        self.desc    = descElems and cdrcgi.unicodeToLatin1(
-                           cdr.getTextContent(descElems[0])) or ""
-        self.comment = commElems and cdrcgi.unicodeToLatin1(
-                           cdr.getTextContent(commElems[0])) or ""
-reportRows = []
-docs = report.getElementsByTagName("ReportRow")
-if docs:
-    for doc in docs:
-        idElems = doc.getElementsByTagName("DocId")
-        titleElems = doc.getElementsByTagName("DocTitle")
-        if not idElems: cdrcgi.bail("Missing DocId in report XML")
-        if not titleElems: cdrcgi.bail("Missing DocTitle in report XML")
-        id = cdr.getTextContent(idElems[0])
-        title = cdrcgi.unicodeToLatin1(cdr.getTextContent(titleElems[0]))
-        actions = doc.getElementsByTagName("DatedAction")
-        if actions:
-            for action in actions:
-                reportRows.append(ReportRow(id, title, action))
-    reportRows.sort(lambda a, b: cmp(a.date, b.date) or cmp(a.id, b.id))
-    for row in reportRows:
-        html += """\
-   <tr>
-    <td valign='top'>
-     <font size='3'>%s</font>
-    </td>
-    <td valign='top'>
-     <font size='3'>%s</font>
-    </td>
-    <td valign='top'>
-     <font size='3'>%s</font>
-    </td>
-    <td valign='top'>
-     <font size='3'>%s</font>
-    </td>
-    <td valign='top'>
-     <font size='3'>%s</font>
-    </td>
-   </tr>
-""" % (row.id      or "&nbsp;",
-       row.title   or "&nbsp;",
-       row.desc    or "&nbsp;",
-       row.date    or "&nbsp;",
-       row.comment or "&nbsp;")
-cdrcgi.sendPage(html + """\
-  </table>
-  <br />
-  <br />
-  <br />
-  <font size='3'>
-   <i>%s</i>
-  </font>
- </body>
-</html>
-""" % usr)
+    def build_tables(self):
+        "Show the report's only table"
+
+        columns = (
+            cdrcgi.Report.Column("Doc ID"),
+            cdrcgi.Report.Column("Doc Title"),
+            cdrcgi.Report.Column("Action Description"),
+            cdrcgi.Report.Column("Action Date"),
+            cdrcgi.Report.Column("Comment")
+        )
+        parms = dict(DocType=self.doctype)
+        report = cdr.report(self.session, "Dated Actions", parms=parms)
+        class Action:
+            def __init__(self, id, title, node):
+                self.id = id
+                self.title = title
+                self.desc = cdr.get_text(node.find("ActionDescription"), "")
+                self.date = cdr.get_text(node.find("ActionDate"), "")
+                self.comment = cdr.get_text(node.find("Comment"), "")
+            @property
+            def row(self):
+                return self.id, self.title, self.desc, self.date, self.comment
+            def __cmp__(self, other):
+                return cmp((self.date, self.id), (other.date, other.id))
+        actions = []
+        for row in report.findall("ReportRow"):
+            id = cdr.get_text(row.find("DocId"), "")
+            title = cdr.get_text(row.find("DocTitle"), "")
+            for node in row.findall("DatedAction"):
+                actions.append(Action(id, title, node))
+        rows = [action.row for action in sorted(actions)]
+        caption = "Document Type: {}".format(self.doctype)
+        return [cdrcgi.Report.Table(columns, rows, caption=caption)]
+
+if __name__ == "__main__":
+    try:
+        Control().run()
+    except Exception as e:
+        cdrcgi.bail(str(e))
