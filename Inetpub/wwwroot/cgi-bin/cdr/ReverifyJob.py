@@ -132,12 +132,12 @@ try:
     cdr.logwrite("%s: status: %s" % (PROG, jobStatus), LOGFILE)
     cdr.logwrite("%s: mode:   %s" % (PROG, jobMode), LOGFILE)
 
-    cmd = os.path.join(PUBPATH, u'%s --session=%s --jobid=%d --status=%s %s' % (
+    cmd = os.path.join(PUBPATH, '%s --session=%s --jobid=%d --status=%s %s' % (
                                  PROG, session, jobId, jobStatus, runmode))
 
-    cdr.logwrite('Submitting command...\n%s' % repr(cmd), LOGFILE)
+    cdr.logwrite('Submitting command...\n%s' % cmd, LOGFILE)
 
-    myCmd = cdr.runCommand(cmd)
+    myCmd = cdr.runCommand("%s %s" % (cdr.PYTHON, cmd))
 
     cdr.logwrite("Code: %s" % myCmd.code, LOGFILE)
     cdr.logwrite("Outp: %s" % myCmd.output, LOGFILE)

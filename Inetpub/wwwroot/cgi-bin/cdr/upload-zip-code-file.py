@@ -85,7 +85,7 @@ name = now.strftime(cdr.BASEDIR + "/uploads/zipcodes-%Y%m%d%H%M%S.zip")
 ziptxt  = now.strftime('/tmp/zip-%Y%m%d%H%M%S.txt')
 # ziptxt  = now.strftime('/tmp/zip.txt')
 zipload = '%s/utilities/bin/LoadZipCodes.py' % cdr.BASEDIR
-cmd = '%s %s' % (zipload, ziptxt)
+cmd = '%s %s %s' % (cdr.PYTHON, zipload, ziptxt)
 
 # Saving the ZIP file to disk
 # ---------------------------
