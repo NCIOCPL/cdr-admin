@@ -11,6 +11,7 @@
 # *********************************************************************
 import cgi, cdr, cdrcgi, os, paramiko
 import glob
+from cdrapi.settings import Tier
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -24,9 +25,9 @@ testMode  = fields and fields.getvalue("TestMode") or False
 USER      = "cdroperator"
 SSH_KEY   = "\etc\cdroperator_rsa"
 
-TIER      = cdr.h.tier
+TIER      = Tier()
 HOMEDIR   = "/sftp/sftphome/cdrstaging"
-AUDIOPATH = "%s/ciat/%s/Audio" % (HOMEDIR, TIER.lower())
+AUDIOPATH = "%s/ciat/%s/Audio" % (HOMEDIR, TIER.name.lower())
 
 WIN_DIR   = "Audio_from_CIPSFTP"
 NIX_DIR   = "Term_Audio"
@@ -57,7 +58,7 @@ else:
 
 # Open the SFTP connection and login
 # ----------------------------------
-FTPSERVER  = cdr.h.host['SFTP'][0]
+FTPSERVER  = TIER.hosts['SFTP'].split(".")[0]
 PORT = 22
 
 # Establishing a ssh connection to the server

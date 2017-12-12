@@ -22,6 +22,9 @@ import cdr2gk
 import sys
 import time
 import lxml.html
+from cdrapi.settings import Tier
+
+TIER = Tier()
 
 #----------------------------------------------------------------------
 # Get the parameters from the request.
@@ -424,9 +427,7 @@ if convert:
                 else:
                 # A link on the Cancer.gov website not PDQ, i.e. a
                 # ProtocolRef
-                    newLink = 'http://%s.%s%s' % (cdr.h.host['CG'][0],
-                                              cdr.h.host['CG'][1],
-                                              link)
+                    newLink = 'http://%s%s' % (TIER.hosts['CG'], link)
                     x.set('href', newLink)
                     x.set('ohref', link)
                     x.set('type', 'Cancer.gov-link')
@@ -516,13 +517,11 @@ html = re.sub("http://cdr", "https://cdr", html)
 # Strangely, access is allowed from the DEV tier.  Can't test yet on STAGE
 # since STAGE is not setup yet.
 # ------------------------------------------------------------------------
-# if cdr.h.tier in ('QA'):
-if cdr.h.tier in ('QA', 'STAGE'):
+if TIER.name in ('QA', 'STAGE'):
     pattern6 = re.compile('http://www.cancer.gov/')
-    html = pattern6.sub('http://%s.%s/' % (cdr.h.host['CG'][0],
-                                           cdr.h.host['CG'][1]), html)
+    html = pattern6.sub('http://%s/' % TIER.hosts['CG'], html)
 
-if not cdr.h.tier == 'PROD':
+if not TIER.name == 'PROD':
     pattern7 = re.compile('https://cdr.cancer.gov/cgi-bin/cdr/GetCdrImage.py')
     html = pattern7.sub("%s/cgi-bin/cdr/GetCdrImage.py" % cdr.CBIIT_NAMES[2],
                         html)

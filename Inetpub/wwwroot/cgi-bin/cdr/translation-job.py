@@ -9,6 +9,7 @@ import lxml.etree as etree
 import cdr
 import cdrcgi
 import cdrdb
+from cdrapi.settings import Tier
 
 class Control(cdrcgi.Control):
     """
@@ -27,6 +28,7 @@ class Control(cdrcgi.Control):
         Collect and validate the request parameters.
         """
 
+        self.tier = Tier()
         self.set_binary_mode()
         cdrcgi.Control.__init__(self, "Translation Job")
         if not self.session:
@@ -375,13 +377,13 @@ jQuery("input[value='%s']").click(function(e) {
         recips = [recip.email]
         sender = "cdr@cancer.gov"
         body = []
-        subject = u"[CDR-%s] Translation Queue Notification" % cdr.h.tier
+        subject = u"[CDR-%s] Translation Queue Notification" % self.tier.name
         log_message = "mailed translation job state alert to %s" % recip
         if not cdr.isProdHost():
             recips = cdr.getEmailList("Test Translation Queue Recips")
             body.append(u"[*** THIS IS A TEST MESSAGE ON THE %s TIER. "
                         u"ON PRODUCTION IT WOULD HAVE GONE TO %s. ***]\n" %
-                        (cdr.h.tier, recip))
+                        (self.tier.name, recip))
             log_message = "test alert for %s sent to %s" % (recip, recips)
         if self.job.new:
             body.append(u"A new translation job has been assigned to you.")

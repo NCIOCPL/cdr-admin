@@ -22,6 +22,7 @@ import cdrpub
 import os
 import pickle
 import urllib
+from cdrapi.settings import Tier
 
 class Control(cdrcgi.Control):
     """
@@ -38,6 +39,7 @@ class Control(cdrcgi.Control):
     CACHE = cdr.BASEDIR + "/reports/expanded-filter-sets"
     USE_CACHE = "use"
     REFRESH_CACHE = "refresh"
+    TIER = Tier()
 
     def __init__(self):
         """
@@ -50,10 +52,6 @@ class Control(cdrcgi.Control):
         self.cache = self.fields.getvalue("cache", self.USE_CACHE)
         if self.cache not in (self.USE_CACHE, self.REFRESH_CACHE):
             cdrcgi.bail()
-        try:
-            self.port = int(fields.getvalue("port") or cdr.getPubPort())
-        except:
-            cdrcgi.bail("Port value must be an integer")
         self.dtd = fields.getvalue("newdtd", cdr.DEFAULT_DTD)
         doc_id = fields.getvalue(cdrcgi.DOCID)
         if not doc_id:
@@ -66,7 +64,7 @@ class Control(cdrcgi.Control):
         if version.isdigit():
             self.version = int(version)
         else:
-            versions = cdr.lastVersions("guest", self.cdr_id, port=self.port)
+            versions = cdr.lastVersions("guest", self.cdr_id)
             if not versions:
                 cdrcgi.bail("Document is not versioned")
             if version == "last":
@@ -248,8 +246,7 @@ class Control(cdrcgi.Control):
         "Run the document through all of the selected filters."
         parms = self.parms()
         response = cdr.filterDoc(self.session, self.filters, self.cdr_id,
-                                 docVer=self.version, parm=self.parms(),
-                                 port=self.port)
+                                 docVer=self.version, parm=self.parms())
         try:
             doc, self.warnings = response
             return doc
@@ -283,12 +280,12 @@ class Control(cdrcgi.Control):
             name = spec[5:]
             if name.upper() not in self.all_filters:
                 cdrcgi.bail("%s is not a filter on the CDR %s server" %
-                            (repr(name), cdr.h.tier))
+                            (repr(name), self.TIER.name))
         elif spec.startswith("set:"):
             name = spec[4:]
             if name.upper() not in self.filter_sets:
                 cdrcgi.bail("%s is not a filter set on the CDR %s server" %
-                            (repr(name), cdr.h.tier))
+                            (repr(name), self.TIER.name))
         else:
             digits = spec
             if spec.upper().startswith("CDR"):
@@ -299,7 +296,7 @@ class Control(cdrcgi.Control):
                 cdr_id = cdr.normalize(spec)
                 if cdr_id not in self.all_filter_ids:
                     cdrcgi.bail("%s is not a filter on the CDR %s server" %
-                                (cdr_id, cdr.h.tier))
+                                (cdr_id, self.TIER.name))
             except Exception, e:
                 cdrcgi.bail("%s is not a well-formed CDR ID" % repr(spec))
 

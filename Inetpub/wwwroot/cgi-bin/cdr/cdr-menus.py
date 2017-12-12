@@ -10,7 +10,9 @@ import lxml.etree as etree
 import lxml.html as html
 import lxml.html.builder as B
 import time
+from cdrapi.settings import Tier
 
+TIER = Tier()
 USER = "menuwalker"
 PASSWORD = cdr.getpw("menuwalker")
 SESSION = cdr.login(USER, PASSWORD)
@@ -237,7 +239,7 @@ class Item:
                 Item.leaves.add(self.script)
         return li
     def get_items(self):
-        host = "%s.%s" % cdr.h.host["APPC"]
+        host = TIER.hosts["APPC"]
         query = { "Session": SESSION }
         for k in self.parms:
             val = self.parms[k]

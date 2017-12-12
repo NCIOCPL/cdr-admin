@@ -2,12 +2,14 @@
 # Compare filters between the current tier and the production tier.
 #----------------------------------------------------------------------
 import cdr, cdrdb, cgi, cdrcgi, os, tempfile, re, shutil, glob
+from cdrapi.settings import Tier
 
 #----------------------------------------------------------------------
 # Make sure we're not on the production server.
 #----------------------------------------------------------------------
 if cdr.isProdHost():
     cdrcgi.bail("Can't compare the production server to itself")
+tier_name = Tier().name
 
 #----------------------------------------------------------------------
 # Create a temporary working area.
@@ -29,10 +31,10 @@ def makeTempDir():
 # Get the filters from the local tier.
 #----------------------------------------------------------------------
 def getLocalFilters(tmpDir):
-    try: os.mkdir(cdr.h.tier)
+    try: os.mkdir(tier_name)
     except:
         cleanup(tmpDir)
-        cdrcgi.bail("Cannot create directory %s" % cdr.h.tier)
+        cdrcgi.bail("Cannot create directory %s" % tier_name)
     try:
         conn = cdrdb.connect('CdrGuest')
         curs = conn.cursor()
@@ -54,7 +56,7 @@ def getLocalFilters(tmpDir):
                          .replace("/", "@@SLASH@@") \
                          .replace("*", "@@STAR@@")
             xml = row[1].replace("\r", "")
-            filename = "%s/@@MARK@@%s@@MARK@@" % (cdr.h.tier, title)
+            filename = "%s/@@MARK@@%s@@MARK@@" % (tier_name, title)
             open(filename, "w").write(xml.encode('utf-8'))
         except:
             cleanup(tmpDir)
@@ -115,7 +117,7 @@ getProdFilters(workDir)
 #----------------------------------------------------------------------
 # Compare the filters.
 #----------------------------------------------------------------------
-result  = cdr.runCommand("diff -aur PROD %s" % cdr.h.tier)
+result  = cdr.runCommand("diff -aur PROD %s" % tier_name)
 lines   = result.output.splitlines()
 pattern = re.compile("diff -aur PROD/@@MARK@@(.*?)@@MARK@@")
 for i in range(len(lines)):
@@ -137,4 +139,4 @@ Content-type: text/html; charset: utf-8
   <h3>The following filters differ between PROD and %s</h3>
   <pre>%s</pre>
  </body>
-</html>""" % (cdr.h.tier, report)
+</html>""" % (tier_name, report)

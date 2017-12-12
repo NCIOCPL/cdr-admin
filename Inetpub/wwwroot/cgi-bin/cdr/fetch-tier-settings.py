@@ -14,8 +14,10 @@ import cdr
 import cdrdb
 import cdrcgi
 import cdrutil
+from cdrapi.settings import Tier
 
 class Settings:
+    HOSTNAMES = Tier().hosts
     LOGFILE = "D:/cdr/Log/fetch-tier-settings.log"
     WD = cdr.WORK_DRIVE
     WEBCONFIG_ROOT = "%s:/Inetpub/wwwroot/web.config" % WD
@@ -28,7 +30,7 @@ class Settings:
         self.emailers = self.get_linux_settings("EMAILERSC")
         self.windows = self.get_windows_settings()
     def get_linux_settings(self, key):
-        args = (".".join(cdr.h.host[key]), self.session)
+        args = self.HOSTNAMES[key], self.session
         url = "http://%s/cgi-bin/fetch-tier-settings.py?Session=%s" % args
         try:
             return json.loads(requests.get(url).text)

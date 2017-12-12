@@ -13,6 +13,7 @@ import cgi
 import difflib
 import requests
 import lxml.etree as etree
+from cdrapi.settings import Tier
 
 class Control(cdrcgi.Control):
     """
@@ -21,6 +22,7 @@ class Control(cdrcgi.Control):
     """
 
     TIERS = ("PROD", "STAGE", "QA", "DEV")
+    TIER = Tier().name
     VIEW = "View"
     COMPARE = "Compare"
     FILTERS = "Filters"
@@ -38,7 +40,7 @@ class Control(cdrcgi.Control):
         if self.other_tier:
             if self.other_tier not in self.TIERS:
                 cdrcgi.bail()
-            elif self.other_tier == cdr.h.tier:
+            elif self.other_tier == self.TIER:
                 cdrcgi.bail()
             host = "cdr"
             if self.other_tier != "PROD":
@@ -82,10 +84,10 @@ class Control(cdrcgi.Control):
             f2 = self.fix(self.get_filter())
             if self.other_tier_lower():
                 filters = (f1, f2)
-                tiers = (cdr.h.tier, self.other_tier)
+                tiers = (self.TIER, self.other_tier)
             else:
                 filters = (f2, f1)
-                tiers = (self.other_tier, cdr.h.tier)
+                tiers = (self.other_tier, self.TIER)
             differ = difflib.Differ()
             #changes = False
             pattern = (u'<span class="%%s">%%s %s on CDR %%s server</span>\n' %
@@ -135,7 +137,7 @@ body     { background-color: #fafafa; }
         page.add(page.B.LEGEND("Select Stage For Filter Comparison"))
         default = self.other_tier or (cdr.isProdHost() and "DEV" or "PROD")
         for tier in self.TIERS:
-            if tier != cdr.h.tier:
+            if tier != self.TIER:
                 checked = tier == default
                 page.add_radio("tier", tier, tier, checked=checked)
         page.add("</fieldset>")
@@ -214,7 +216,7 @@ pre {
         production." If it is we'll make our copy the "before" copy and
         the other one the "after" version. Otherwise, we'll switch them.
         """
-        return self.TIERS.index(self.other_tier) > self.TIERS.index(cdr.h.tier)
+        return self.TIERS.index(self.other_tier) > self.TIERS.index(self.TIER)
 
     def fix(self, me):
         "Prepare the XML for a filter document for comparison"
