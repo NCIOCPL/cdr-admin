@@ -6,7 +6,7 @@
 # BZIssue::4767
 #----------------------------------------------------------------------
 import cdrdb, cgi, cdrcgi, cdr, msvcrt, sys, os, time
-etree = cdr.importEtree()
+from lxml import etree
 
 class DocInfo:
     def __init__(self, cursor, docId, docVer = None):

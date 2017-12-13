@@ -12,7 +12,7 @@ import cdr
 import cdrcgi
 import cdrdb
 import cgi
-etree = cdr.importEtree()
+from lxml import etree
 
 #----------------------------------------------------------------------
 # Collect the CGI field data.

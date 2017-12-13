@@ -19,7 +19,7 @@
 #
 #----------------------------------------------------------------------
 import sys, cgi, cdr, cdrcgi, cdrdb, cdrmailcommon, datetime
-etree = cdr.importEtree()
+from lxml import etree
 LOGFILE = cdrmailcommon.LOGFILE
 
 #----------------------------------------------------------------------
