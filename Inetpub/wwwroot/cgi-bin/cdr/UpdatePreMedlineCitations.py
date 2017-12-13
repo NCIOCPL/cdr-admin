@@ -18,10 +18,10 @@ class Citation:
             raise Exception("PubmedArticle %s dropped" % self.pmId)
         node = copy.deepcopy(self.pubmedArticle.node)
         etree.strip_elements(node, "CommentsCorrectionsList")
-        obj = cdr.getDoc(session, self.cdrId, 'Y', getObject=True)
-        errors = cdr.checkErr(obj)
-        if errors:
-            raise Exception("getDoc(): %s" % cgi.escape(errors))
+        try:
+            obj = cdr.getDoc(session, self.cdrId, 'Y', getObject=True)
+        except Exception as e:
+            raise Exception("getDoc(): %s" % e)
         doc = etree.XML(obj.xml)
         for child in doc.findall("PubmedArticle"):
             doc.replace(child, node)
@@ -77,11 +77,6 @@ url = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi"
 url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
 fields = cgi.FieldStorage()
 session = cdrcgi.getSession(fields)
-if not session:
-    cdrcgi.bail("Not logged in")
-error = cdr.checkErr(session)
-if error:
-    cdrcgi.bail(error)
 if not cdr.canDo(session, "MODIFY DOCUMENT", "Citation"):
     cdrcgi.bail("You must be authorized to replace Citation documents "
                 "to run this script.")

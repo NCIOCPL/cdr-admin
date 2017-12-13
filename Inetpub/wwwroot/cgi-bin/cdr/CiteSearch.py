@@ -150,8 +150,9 @@ if impReq:
     if not session: cdrcgi.bail("User not logged in")
     article = fetchCitation(importID)
     if replaceID:
-        oldDoc = cdr.getDoc(session, replaceID, "Y", getObject=True)
-        if cdr.checkErr(oldDoc):
+        try:
+            oldDoc = cdr.getDoc(session, replaceID, "Y", getObject=True)
+        except:
             cdrcgi.bail("Unable to check out CDR document %s" % replaceID)
         doc = replacePubmedArticle(oldDoc, article)
         if doc is None:

@@ -17,7 +17,7 @@ submit    = fields and fields.getvalue("SubmitButton")    or None
 help      = fields and fields.getvalue("HelpButton")      or None
 pattern   = re.compile("<Data>(.*?)</Data>", re.DOTALL)
 
-if help: 
+if help:
     cdrcgi.bail("Sorry, help for this interface has not yet been developed.")
 
 #----------------------------------------------------------------------
@@ -65,11 +65,11 @@ searchFields = (cdrcgi.SearchField(surname,
 #----------------------------------------------------------------------
 # Construct the query.
 #----------------------------------------------------------------------
-(query, strings) = cdrcgi.constructAdvancedSearchQuery(searchFields, boolOp, 
+(query, strings) = cdrcgi.constructAdvancedSearchQuery(searchFields, boolOp,
                                                        "Person")
 if not query:
     cdrcgi.bail('No query criteria specified')
-                    
+
 #----------------------------------------------------------------------
 # Submit the query to the database.
 #----------------------------------------------------------------------
@@ -103,17 +103,20 @@ for i in range(len(rows)):
  <A         HREF = "%s?DocId=%s&%s=%s">%s</A>
 </TD>
 </TR>
-""" % (i + 1, cgi.escape(title, 1), cdrcgi.BASE + '/QcReport.py', 
+""" % (i + 1, cgi.escape(title, 1), cdrcgi.BASE + '/QcReport.py',
        docId, cdrcgi.SESSION, session, docId)
     parms = (('docId', docId), ('repName', 'dummy'), ('includeHomeAddresses',
                                                       'yes'))
-    response = cdr.filterDoc(session, ['name:Person Locations Picklist'],
-                              docId = docId, parm = parms)
+
+    try:
+        response = cdr.filterDoc(session, ['name:Person Locations Picklist'],
+                                 docId=docId, parm=parms)
+    except Exception as e:
+        cdrcgi.bail(str(e))
     if type(response) == type(""):
         errs = cdr.checkErr(response)
         if errs:
             cdrcgi.bail("Failure extracting addresses: %s" % errs)
-        #cdrcgi.bail("addresses = <PRE>[%s]</PRE>" % addresses[0])
     else:
         addresses = pattern.findall(response[0])
         if addresses:
