@@ -27,8 +27,7 @@ flavor  = fields.getvalue('flavor') # or 'full'
 if not re.match(r"^[a-zA-Z0-9._-]+$", host):
     cdrcgi.bail("invalid host name")
 
-cdr2gk.host = host
-cdr2gk.debuglevel = logging
+cdr2gk.DEBUGLEVEL = logging
 
 # ----------------------------------------------------------------------
 # Set up a database connection and cursor.
@@ -200,7 +199,7 @@ if jobId:
     if not jobId.isdigit():
         cdrcgi.bail("Job ID must be an integer")
     try:
-        response = cdr2gk.requestStatus('Summary', jobId)
+        response = cdr2gk.requestStatus('Summary', jobId, host=host)
     except Exception, e:
         showForm(makeError(u"Job %s not found" % jobId, e))
 
@@ -311,13 +310,13 @@ if action:
         if not cdrId.isdigit():
             cdrcgi.bail("CDR ID must be an integer")
         try:
-            response = cdr2gk.requestStatus('SingleDocument', cdrId)
+            response = cdr2gk.requestStatus('SingleDocument', cdrId, host=host)
         except Exception, e:
             showForm(makeError("Report for CDR%s not found" % cdrId, e))
         title = u"Location Status for Document CDR%s" % cdrId
     else:
         try:
-            response = cdr2gk.requestStatus('DocumentLocation')
+            response = cdr2gk.requestStatus('DocumentLocation', host=host)
         except Exception, e:
             showForm(makeError("Unable to generate report on all documents",
                                e))

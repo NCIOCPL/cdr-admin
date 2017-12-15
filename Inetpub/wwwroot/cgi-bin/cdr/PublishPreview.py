@@ -127,12 +127,6 @@ if cachedHtml:
         cdrcgi.bail("failure reading %s" % repr(cachedHtml))
 
 #----------------------------------------------------------------------
-# Point to a different host if requested.
-#----------------------------------------------------------------------
-if cgHost:
-    cdr2gk.host = cgHost
-
-#----------------------------------------------------------------------
 # Map for finding the filters for a given document type.
 #----------------------------------------------------------------------
 filterSets = {
@@ -287,14 +281,18 @@ if not cachedHtml:
     doc = pattern2.sub("", doc)
     showProgress("Doctype declaration stripped...")
 
-    cdr2gk.debuglevel = 0
+    cdr2gk.DEBUGLEVEL = 0
     try:
         if dbgLog:
-            cdr2gk.debuglevel = 1
+            try:
+                level = int(dbgLog)
+            except:
+                level = 1
+            cdr2gk.DEBUGLEVEL = level
             showProgress("Debug logging turned on...")
         showProgress("Submitting request to Cancer.gov...")
-        resp = cdr2gk.pubPreview(doc, flavor)
-        cgHtml = resp.xmlResult.encode("utf-8")
+        resp = cdr2gk.pubPreview(doc, flavor, host=cgHost)
+        cgHtml = resp.xmlResult
         showProgress("Response received from Cancer.gov...")
     except Exception, e:
         cdrcgi.bail('Error in PubPreview: ' + str(e))

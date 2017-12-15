@@ -502,7 +502,7 @@ class PublishingSystem:
                 for child in node.findall("ParmValue"):
                     self.default = child.text
                 if self.name == "GKServer" and not self.default:
-                    self.default = cdr2gk.host
+                    self.default = cdr2gk.HOST
 
             def get_info(self):
                 """
