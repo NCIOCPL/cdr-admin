@@ -124,7 +124,7 @@ form.add_text_field("password2", "Confirm", password=True)
 form.add("</fieldset>")
 form.add("<fieldset>")
 form.add(form.B.LEGEND("Group Membership for User"))
-for group in sorted(groups, key=str.lower):
+for group in sorted(groups, key=unicode.lower):
     checked = group in user.groups
     form.add_checkbox("groups", group, group, checked=checked)
 form.add("</fieldset>")

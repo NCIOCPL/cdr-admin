@@ -54,7 +54,7 @@ if request == "Save Changes":
         else:
             doctype = None
         if action not in group.actions: group.actions[action] = []
-        if doctype: group.actions[action].append(doctype)
+        group.actions[action].append(doctype)
     error = cdr.putGroup(session, grpName, group)
     if error: cdrcgi.bail(error)
     grpName = name
