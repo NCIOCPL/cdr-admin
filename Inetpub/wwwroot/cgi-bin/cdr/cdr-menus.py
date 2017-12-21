@@ -15,7 +15,7 @@ from cdrapi.settings import Tier
 TIER = Tier()
 USER = "menuwalker"
 PASSWORD = cdr.getpw("menuwalker")
-SESSION = cdr.login(USER, PASSWORD)
+SESSION = str(cdr.login(USER, PASSWORD))
 
 class Item:
     total = 0
