@@ -41,14 +41,6 @@ class Item:
         "citesearch.py",
         "countbydoctype.py",
         "countrysearch.py",
-        "ctgovdownloadreport.py",
-        "ctgovdupreport.py",
-        "ctgoventrydate.py",
-        "ctgovimportreport.py",
-        "ctgovoutofscope.py",
-        "ctgovprotocolprocessingstatusreport.py",
-        "ctgovupdatereport.py",
-        "ctrp-mapping-gaps.py",
         "datedactions.py",
         "datelastmodified.py",
         "db-tables.py",
@@ -196,10 +188,6 @@ class Item:
         Item.unique.add(url.lower())
     def is_leaf(self):
         lower = self.script.lower()
-        if lower == "ctgov.py":
-            qc = self.parms.get("qc")
-            if qc and qc[0]:
-                return True
         if lower in self.leaves:
             return True
         for name in ("request", "ocecdr-"):

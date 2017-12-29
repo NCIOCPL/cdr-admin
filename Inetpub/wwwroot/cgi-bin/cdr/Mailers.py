@@ -31,8 +31,6 @@ form = "<OL>\n"
 reports = (('GPMailerReqForm.py?',  'Genetics Professional Mailers'),
            ('GPPubNotification.py?',
             'Genetics Professional Publication Notification'),
-           ('SummaryMailerReqForm.py?BoardType=Editorial&',
-            'Summary Mailers (Editorial Board)'),
            ('SummaryMailerReqForm.py?BoardType=Advisory&',
             'Summary Mailers (Advisory Board)'),
            ('BoardMemberMailerReqForm.py?',

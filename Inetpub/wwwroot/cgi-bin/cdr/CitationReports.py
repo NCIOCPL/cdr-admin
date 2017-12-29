@@ -45,7 +45,6 @@ page.add("</ol>")
 page.add(page.B.H3("Management Reports"))
 page.add("<ol>")
 for script, display in (
-    ('CitationsAddedToProtocols.py', 'Citations Added to Protocols'),
     ('CitationsInSummaries.py',      'Citations Linked to Summaries'),
     ('ModifiedPubMedDocs.py',        'Modified PubMed Documents'),
     ('NewCitations.py',              'New Citations Report'),
