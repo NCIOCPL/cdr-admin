@@ -153,7 +153,6 @@ for pmid in citations:
             updated += 1
         except Exception, e:
             notes = '<span class="errors">%s</span>' % cgi.escape(str(e))
-        cdr.unlock(session, citation.cdrId)
         html.append(u"""\
    <tr>
     <td>%s</td>
