@@ -21,6 +21,7 @@ class Control(cdrcgi.Control):
     with the corresponding copy on another tier's CDR server.
     """
 
+    LOGNAME = "filters"
     TIERS = ("PROD", "STAGE", "QA", "DEV")
     TIER = Tier().name
     VIEW = "View"
@@ -112,6 +113,7 @@ class Control(cdrcgi.Control):
             lines = "".join(lines).replace("\n", cdrcgi.NEWLINE)
             page.add("<pre>%s</pre>" % lines)
         except:
+            self.logger.exception("filter comparison failure")
             page.add('<p class="error">Filter &ldquo;%s&rdquo; '
                      'not found on CDR %s server</p>' %
                      (cgi.escape(self.filter.title), self.other_tier))
@@ -173,16 +175,20 @@ pre {
         try:
             url = "%s/get-filter.py" % self.base
             data = { "title": self.filter.title }
-            response = requests.get(url, data=data, timeout=5)
-            return response.content
+            response = requests.post(url, data=data, timeout=5)
+            if response.ok:
+                return response.content
         except:
-            filters = self.get_filters()
-            doc_id = filters.get(self.filter.title.lower())
-            if not doc_id:
-                raise Exception("%s not found" % self.filter.title)
-            url = "%s/ShowDocXml.py?DocId=%d" % (self.base, doc_id)
-            response = requests.get(url, timeout=15)
+            pass
+        filters = self.get_filters()
+        doc_id = filters.get(self.filter.title.lower())
+        if not doc_id:
+            raise Exception("%r not found" % self.filter.title)
+        url = "%s/ShowDocXml.py?DocId=%d" % (self.base, doc_id)
+        response = requests.get(url, timeout=15)
+        if response.ok:
             return response.content
+        raise Exception(response.reason)
 
     def get_filters(self):
         """
