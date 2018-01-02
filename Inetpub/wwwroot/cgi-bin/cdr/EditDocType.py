@@ -87,8 +87,8 @@ class Control(cdrcgi.Control):
         comment = ""
         if self.doctype:
             legend = u"Edit %s Document Type" % self.doctype.type
-            created = self.doctype.created[:10]
-            modified = self.doctype.schema_mod[:10]
+            created = str(self.doctype.created)[:10]
+            modified = str(self.doctype.schema_mod)[:10]
             fmt = self.formats.lookup(self.doctype.format)
             if self.doctype.schema:
                 schema = self.schemas.lookup(self.doctype.schema)
