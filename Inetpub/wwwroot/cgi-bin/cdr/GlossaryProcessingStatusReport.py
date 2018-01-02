@@ -152,8 +152,10 @@ class Concept:
         self.comment = u""
         if self.docId:
             cursor.execute("SELECT xml FROM document WHERE id = ?", docId)
-            docXml = cursor.fetchall()[0][0]
-            tree = etree.XML(docXml.encode('utf-8'))
+            row = cursor.fetchone()
+            if not row:
+                return
+            tree = etree.XML(row[0].encode('utf-8'))
             eName = 'TermDefinition'
             if language != 'en':
                 eName = 'TranslatedTermDefinition'
