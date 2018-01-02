@@ -47,21 +47,33 @@ if request == "Log Out":
 # Process an action if the user requested one.
 #----------------------------------------------------------------------
 if delete:
-    err = cdr.delQueryTermDef(session, delete, None)
+    try:
+        err = cdr.delQueryTermDef(session, delete, None)
+    except Exception as e:
+        cdrcgi.bail("Failure deleting {!r}: {}".format(delete, e))
     if err: cdrcgi.bail(err)
 if newPath:
-    err = cdr.addQueryTermDef(session, newPath, None)
+    try:
+        err = cdr.addQueryTermDef(session, newPath, None)
+    except Exception as e:
+        cdrcgi.bail("Failure adding {!r}: {}".format(newPath, e))
     if err: cdrcgi.bail(err)
 
 #----------------------------------------------------------------------
 # Compare the definitions with another server.
 #----------------------------------------------------------------------
 if request == 'Compare' and server1 and server2:
-    defs1 = cdr.listQueryTermDefs('guest', server1)
+    try:
+        defs1 = cdr.listQueryTermDefs('guest', tier=server1)
+    except:
+        cdrcgi.bail("Unable to retrieve definitions from {!r}".format(server1))
     if type(defs1) in (type(''), type(u'')):
         cdrcgi.bail(defs1)
     defs1 = [d[0] for d in defs1]
-    defs2 = cdr.listQueryTermDefs('guest', server2)
+    try:
+        defs2 = cdr.listQueryTermDefs('guest', tier=server2)
+    except:
+        cdrcgi.bail("Unable to retrieve definitions from {!r}".format(server2))
     if type(defs2) in (type(''), type(u'')):
         cdrcgi.bail(defs2)
     defs2 = [d[0] for d in defs2]
@@ -163,9 +175,9 @@ form = [u"""\
    <input type='hidden' name='add' value=''>
    <input type='hidden' name='delete' value=''>
    <input class='fb' type='submit' name='Request' value='Compare'>
-   <input name='server1' value='mahler' />
+   <input name='server1' value='DEV' />
    <b>with</b>
-   <input name='server2' value='bach' />
+   <input name='server2' value='PROD' />
    <br /><br />
    <table>
     <tr>
