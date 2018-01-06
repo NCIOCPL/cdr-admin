@@ -10,7 +10,7 @@ import cdr
 import cdrdb
 import cdrcgi
 import datetime
-import xml.dom.minidom
+from lxml import etree
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -31,6 +31,7 @@ section   = "Glossary Term Concept by Type Report"
 SUBMENU   = "Report Menu"
 buttons   = ["Submit", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 script    = 'Request4486.py'
+start     = datetime.datetime.now()
 
 #----------------------------------------------------------------------
 # Handle navigation requests.
@@ -57,15 +58,19 @@ def resolveRevisionMarkup(docId):
 # Recursively break down a glossary definition into a chain of text
 # strings and placeholders.
 #----------------------------------------------------------------------
-def breakDownDefinition(node):
+def breakDownDefinition(node, with_tail=False):
     pieces = []
-    for child in node.childNodes:
-        if child.nodeName == 'PlaceHolder':
-            pieces.append(PlaceHolder(child.getAttribute('name')))
-        elif child.nodeType == child.ELEMENT_NODE:
-            pieces += breakDownDefinition(child)
-        elif child.nodeType in (child.TEXT_NODE, child.CDATA_SECTION_NODE):
-            pieces.append(child.nodeValue)
+    if node.text is not None:
+        pieces = [node.text]
+    for child in node.findall("*"):
+        if child.tag == "PlaceHolder":
+            pieces.append(PlaceHolder(child.get("name")))
+            if child.tail is not None:
+                pieces.append(child.tail)
+        else:
+            pieces += breakDownDefinition(child, True)
+    if with_tail and node.tail is not None:
+        pieces.append(node.tail)
     return pieces
 
 #----------------------------------------------------------------------
@@ -73,30 +78,27 @@ def breakDownDefinition(node):
 #----------------------------------------------------------------------
 class Name:
     def __init__(self, docId, spanish):
-        self.docId        = docId
-        self.englishName  = u""
-        self.replacements = {}
-        self.blocked      = False
+        self.docId         = docId
+        self.englishName   = u""
+        self.replacements  = {}
+        self.blocked       = False
+        self.pronunciation = u""
+        self.spanishNames  = []
 
-        if not spanish:
-            self.pronunciation = u""
         docXml = resolveRevisionMarkup(docId)
-        dom = xml.dom.minidom.parseString(docXml)
-        for node in dom.getElementsByTagName('TermName'):
-            for child in node.childNodes:
-                if child.nodeName == 'TermNameString':
-                    self.englishName = cdr.getTextContent(child, True)
-                elif not spanish and child.nodeName == 'TermPronunciation':
-                    self.pronunciation = cdr.getTextContent(child, True).strip()
-        for node in dom.getElementsByTagName('ReplacementText'):
-            text = cdr.getTextContent(node, True)
-            self.replacements[node.getAttribute('name')] = text
+        root = etree.fromstring(docXml)
+        for node in root.findall("TermName/TermNameString"):
+            self.englishName = cdr.get_text(node, u"")
+        if not spanish:
+            for node in root.findall("TermName/TermPronunciation"):
+                self.pronunciation = cdr.get_text(node, u"")
+        for node in root.findall("ReplacementText"):
+            self.replacements[node.get("name")] = cdr.get_text(node, u"")
         if spanish:
-            self.spanishNames = []
-            for node in dom.getElementsByTagName('TranslatedName'):
-                for child in node.getElementsByTagName('TermNameString'):
-                    self.spanishNames.append(cdr.getTextContent(child, True))
-
+            for node in root.findall("TranslatedName/TermNameString"):
+                name = cdr.get_text(node)
+                if name:
+                    self.spanishNames.append(name)
         query = cdrdb.Query("document", "active_status")
         query.where(query.Condition("id", docId))
         if query.execute(cursor).fetchall()[0][0] == u"I":
@@ -117,13 +119,12 @@ class Definition:
         self.text = []
         self.replacements = {}
         self.audiences = set()
-        for child in node.getElementsByTagName('DefinitionText'):
+        for child in node.findall("DefinitionText"):
             self.text = breakDownDefinition(child)
-        for child in node.getElementsByTagName('ReplacementText'):
-            text = cdr.getTextContent(child, True)
-            self.replacements[child.getAttribute('name')] = text
-        for child in node.getElementsByTagName('Audience'):
-            self.audiences.add(cdr.getTextContent(child).upper())
+        for child in node.findall("ReplacementText"):
+            self.replacements[child.get("name")] = cdr.get_text(child, u"")
+        for child in node.findall("Audience"):
+            self.audiences.add(cdr.get_text(child, u"").upper())
     def resolve(self, replacementsFromNameDoc, termName):
         reps = self.replacements.copy()
         reps.update(replacementsFromNameDoc)
@@ -155,15 +156,15 @@ class Concept:
         rows = query.execute(cursor).fetchall()
         self.names = [Name(row[0], spanish) for row in rows]
         docXml = resolveRevisionMarkup(docId)
-        dom = xml.dom.minidom.parseString(docXml)
+        root = etree.fromstring(docXml)
         self.definitions = []
-        for node in dom.getElementsByTagName('TermDefinition'):
+        for node in root.findall("TermDefinition"):
             definition = Definition(node)
             if audience.upper() in definition.audiences:
                 self.definitions.append(definition)
         if spanish:
             self.spanishDefinitions = []
-            for node in dom.getElementsByTagName('TranslatedTermDefinition'):
+            for node in root.findall("TranslatedTermDefinition"):
                 definition = Definition(node)
                 if audience.upper() in definition.audiences:
                     self.spanishDefinitions.append(definition)
@@ -345,7 +346,7 @@ of the terms to be selected. All other selection criteria are required."""
     page.add_select("type", "Term Type", term_types, term_types[0])
     page.add_text_field("name", "Term Name")
     page.add_text_field("text", "Definition Text")
-    page.add_select("stat", "Def. Status", statuses, "Approved")
+    page.add_select("stat", "Definition Status", statuses, "Approved")
     page.add_select("audi", "Audience", audiences, audiences[0])
     page.add("</fieldset>")
     page.add("<fieldset>")
@@ -353,6 +354,7 @@ of the terms to be selected. All other selection criteria are required."""
     page.add_radio("span", "English Only", "N", checked=True)
     page.add_radio("span", "Include Spanish", "Y")
     page.add("</fieldset>")
+    page.add_css(".labeled-field label { width: 120px; }")
     page.send()
 
 #----------------------------------------------------------------------
@@ -401,6 +403,7 @@ def createReport(cursor, conceptType, status, audience, name, text, spanish):
    .replacement  { background-color: yellow; font-weight: bold; }
    h1 { font-size: 16pt; color: maroon; text-align: center; }
    .error { color: red; font-weight: bold; }
+   .timer { color: green; font-size: 8pt; }
   </style>
  </head>
  <body>
@@ -429,11 +432,15 @@ def createReport(cursor, conceptType, status, audience, name, text, spanish):
 """)
     for concept in concepts:
         report.append(concept.toHtml(spanish))
+    elapsed = datetime.datetime.now() - start
+    args = len(conceptIds), elapsed.total_seconds()
+    timer = "Processed {:d} concepts in {:f} seconds".format(*args)
     report.append(u"""\
   </table>
+  <p class="timer">{}</p>
  </body>
 </html>
-""")
+""".format(timer))
     cdrcgi.sendPage(u"".join(report))
 
 #----------------------------------------------------------------------
