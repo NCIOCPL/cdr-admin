@@ -1673,8 +1673,11 @@ docParms = ""
 if docType.startswith('Summary'):
     docParms = "parmstring=yes&parmid=%s" % parmId
 
-doc = cdr.filterDoc(session, filters[docType], docId = docId,
-                    docVer = version or None, parm = filterParm)
+try:
+    doc = cdr.filterDoc(session, filters[docType], docId = docId,
+                        docVer = version or None, parm = filterParm)
+except Exception as e:
+    cdrcgi.bail("filtering error: {}".format(e))
 #if (type(doc) in (type(""), type(u"")):
 #    cdrcgi.bail("OOPS! %s" % doc)
 if docType == "CTGovProtocol":
