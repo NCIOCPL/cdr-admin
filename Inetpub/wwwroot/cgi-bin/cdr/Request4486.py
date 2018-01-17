@@ -25,6 +25,7 @@ defText   = fields.getvalue("text")
 status    = fields.getvalue("stat")
 spanish   = fields.getvalue("span") == "Y"
 audience  = fields.getvalue("audi")
+logger    = cdr.Logging.get_logger("Request4486")
 title     = "CDR Administration"
 language  = spanish and "ENGLISH &amp; SPANISH" or "ENGLISH"
 section   = "Glossary Term Concept by Type Report"
@@ -77,7 +78,9 @@ def breakDownDefinition(node, with_tail=False):
 # Object in which we collect what we need for a glossary term name.
 #----------------------------------------------------------------------
 class Name:
+    COUNT = 0
     def __init__(self, docId, spanish):
+        Name.COUNT += 1
         self.docId         = docId
         self.englishName   = u""
         self.replacements  = {}
@@ -147,7 +150,9 @@ class Definition:
 # Object for a glossary term concept's information.
 #----------------------------------------------------------------------
 class Concept:
+    COUNT = 0
     def __init__(self, docId, cursor, audience, spanish):
+        Concept.COUNT += 1
         self.docId = docId
         self.htmlBlocked = u"<span class='error'>[Blocked]</span>"
         query = cdrdb.Query("query_term", "doc_id").unique()
@@ -386,7 +391,9 @@ def createReport(cursor, conceptType, status, audience, name, text, spanish):
         query.where(query.Condition("d.value", "%" + text + "%", "LIKE"))
     # FOR DEBUGGING query.log(label="REQUEST4486 QUERY")
     conceptIds = [row[0] for row in query.execute(cursor, 600).fetchall()]
+    logger.info("found %d concept IDs", len(conceptIds))
     concepts = [Concept(cid, cursor, audience, spanish) for cid in conceptIds]
+    logger.info("concept objects loaded with %d names", Name.COUNT)
     title = "%s - %s" % (section, language)
     report = [u"""\
 <!DOCTYPE html>
@@ -447,7 +454,11 @@ def createReport(cursor, conceptType, status, audience, name, text, spanish):
 # Create the report or as for the report parameters.
 #----------------------------------------------------------------------
 if termName or defText:
-    createReport(cursor, termType, status, audience, termName, defText,
-                 spanish)
+    try:
+        createReport(cursor, termType, status, audience, termName, defText,
+                     spanish)
+    except Exception as e:
+        logger.exception("report failed")
+        cdrcgi.bail("report failed: {}".format(e))
 else:
     createForm()
