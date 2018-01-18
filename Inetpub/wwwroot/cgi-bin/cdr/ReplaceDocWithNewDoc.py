@@ -155,24 +155,28 @@ def unlockDocs(reason):
     Return:
         Error messages or empty string
     """
+
     # If there is no session, nothing was locked
-    oldDocErrs = ""
-    newDocErrs = ""
+    errors = []
     if session:
         # Error could occur after locking one but not the other
         # So check each individually
         if oldDoc:
             log("Unlocking old document: %s" % oldDocIdStr)
-            oldDocErrs += cdr.unlock(session, oldDocIdStr, reason=reason)
-            if oldDocErrs:
-                log("Error unlocking old doc:\n%s" % oldDocErrs)
+            try:
+                cdr.unlock(session, oldDocIdStr, reason=reason)
+            except Exception as e:
+                errors.append(str(e))
+                log("Error unlocking old doc:\n%s" % e)
         if newDoc:
             log("Unlocking new document: %s" % newDocIdStr)
-            newDocErrs += cdr.unlock(session, newDocIdStr, reason=reason)
-            if newDocErrs:
-                log("Error unlocking new doc:\n%s" % newDocErrs)
+            try:
+                cdr.unlock(session, newDocIdStr, reason=reason)
+            except Exception as e:
+                errors.append(str(e))
+                log("Error unlocking new doc:\n%s" % e)
 
-    return(oldDocErrs + newDocErrs)
+    return "; ".join(errors)
 
 
 def getFragmentLinks(targetDocId):
