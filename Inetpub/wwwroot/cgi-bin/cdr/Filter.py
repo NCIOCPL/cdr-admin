@@ -221,7 +221,7 @@ class Control(cdrcgi.Control):
             self.dtd = "%s\\%s" % (cdr.PDQDTDPATH, self.dtd)
         if not os.path.exists(self.dtd):
             cdrcgi.bail("%s not found" % repr(self.dtd.replace("\\", "/")))
-        errors = cdrpub.validateDoc(self.filter_doc(), self.doc_id, self.dtd)
+        errors = cdrpub.Control.validate_doc(self.filter_doc(), self.dtd)
         if not errors and not self.warnings:
             title += " (passed)"
         columns = (
