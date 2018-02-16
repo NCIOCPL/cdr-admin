@@ -73,8 +73,6 @@ class Control:
             ("SummaryMetaData.py", "Summaries Metadata"),
             ("SummariesTocReport.py", "Summaries TOC Lists"),
             ("SummaryTypeChangeReport.py", "Summaries Type Of Change"),
-            ("SummariesWithProtocolLinks.py",
-             "Summaries with Protocols Links/Refs Report"),
             ("SummariesWithNonJournalArticleCitations.py",
              "Summaries with Non-Journal Article Citations Report"),
             ("ocecdr-3650.py", "Summary Internal Links")

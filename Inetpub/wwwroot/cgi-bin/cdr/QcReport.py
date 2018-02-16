@@ -53,6 +53,7 @@ import cgi
 import cdr
 import cdrcgi
 import cdrdb
+import os
 import re
 
 #----------------------------------------------------------------------
@@ -96,6 +97,9 @@ filters = cdr.FILTERS
 #----------------------------------------------------------------------
 repTitle = "CDR QC Report"
 fields   = cgi.FieldStorage() or cdrcgi.bail("No Request Found", repTitle)
+debug    = fields.getvalue("debug") and True or False
+if debug:
+    os.environ["CDR_LOGGING_LEVEL"] = "DEBUG"
 # DEBUG
 # cdrcgi.log_fields(fields, program='QcReport.py')
 docId    = fields.getvalue(cdrcgi.DOCID) or None
@@ -677,6 +681,9 @@ if letUserPickVersion:
   <INPUT TYPE='hidden' NAME='DocType' VALUE='%s'>
   <INPUT TYPE='hidden' NAME='DocId' VALUE='CDR%010d'>
 """ % (cdrcgi.SESSION, session, docType, intId)
+
+    if debug:
+        form += '  <input type="hidden" name="debug" value="yes, please">\n'
 
     # Include the ReportType so the "DocumentVersion" screen can differentiate
     # the specific report type to run.
@@ -1673,8 +1680,11 @@ docParms = ""
 if docType.startswith('Summary'):
     docParms = "parmstring=yes&parmid=%s" % parmId
 
-doc = cdr.filterDoc(session, filters[docType], docId = docId,
-                    docVer = version or None, parm = filterParm)
+try:
+    doc = cdr.filterDoc(session, filters[docType], docId = docId,
+                        docVer = version or None, parm = filterParm)
+except Exception as e:
+    cdrcgi.bail("filtering error: {}".format(e))
 #if (type(doc) in (type(""), type(u"")):
 #    cdrcgi.bail("OOPS! %s" % doc)
 if docType == "CTGovProtocol":

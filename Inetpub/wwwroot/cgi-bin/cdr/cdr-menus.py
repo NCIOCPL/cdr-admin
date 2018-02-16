@@ -10,10 +10,12 @@ import lxml.etree as etree
 import lxml.html as html
 import lxml.html.builder as B
 import time
+from cdrapi.settings import Tier
 
+TIER = Tier()
 USER = "menuwalker"
 PASSWORD = cdr.getpw("menuwalker")
-SESSION = cdr.login(USER, PASSWORD)
+SESSION = str(cdr.login(USER, PASSWORD))
 
 class Item:
     total = 0
@@ -39,14 +41,6 @@ class Item:
         "citesearch.py",
         "countbydoctype.py",
         "countrysearch.py",
-        "ctgovdownloadreport.py",
-        "ctgovdupreport.py",
-        "ctgoventrydate.py",
-        "ctgovimportreport.py",
-        "ctgovoutofscope.py",
-        "ctgovprotocolprocessingstatusreport.py",
-        "ctgovupdatereport.py",
-        "ctrp-mapping-gaps.py",
         "datedactions.py",
         "datelastmodified.py",
         "db-tables.py",
@@ -194,10 +188,6 @@ class Item:
         Item.unique.add(url.lower())
     def is_leaf(self):
         lower = self.script.lower()
-        if lower == "ctgov.py":
-            qc = self.parms.get("qc")
-            if qc and qc[0]:
-                return True
         if lower in self.leaves:
             return True
         for name in ("request", "ocecdr-"):
@@ -237,7 +227,7 @@ class Item:
                 Item.leaves.add(self.script)
         return li
     def get_items(self):
-        host = "%s.%s" % cdr.h.host["APPC"]
+        host = TIER.hosts["APPC"]
         query = { "Session": SESSION }
         for k in self.parms:
             val = self.parms[k]

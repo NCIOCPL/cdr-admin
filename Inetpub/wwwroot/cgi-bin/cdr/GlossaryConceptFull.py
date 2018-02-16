@@ -84,7 +84,7 @@ def addSingleRow(data, label):
 #----------------------------------------------------------------------
 def addMediaRow(data, label):
     #cdrcgi.bail(data[label])
-    url = cdr.h.makeCdrCgiUrl("PROD", "GetCdrImage.py?id")
+    url = "https://cdr.cancer.gov/cgi-bin/cdr/GetCdrImage.py?id"
     htmlRow = ''
     for row in data['MediaLink']:
         mediaString = '''

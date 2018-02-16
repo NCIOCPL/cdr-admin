@@ -17,6 +17,7 @@ class Control(cdrcgi.Control):
         cdrcgi.Control.__init__(self, "Changes To Summaries Report")
         end = datetime.date.today()
         start = end - datetime.timedelta(7)
+        self.debug = self.fields.getvalue("debug") and True or False
         self.board = self.fields.getvalue("board", "All")
         self.audience = self.fields.getvalue("audience", self.AUDIENCES[0])
         self.start = self.fields.getvalue("start", str(start))
@@ -32,9 +33,13 @@ class Control(cdrcgi.Control):
         cdrcgi.valParmDate(self.end, msg=msg)
         if self.end < self.start:
             cdrcgi.bail("End date cannot precede start date.")
+        if self.debug:
+            self.logger.setLevel("DEBUG")
 
     def populate_form(self, form):
         "Fill in the fields for requesting the report"
+        if self.debug:
+            form.add_hidden_field("debug", "Yes,Please")
         form.add("<fieldset>")
         form.add(form.B.LEGEND("Select PDQ Board For Report"))
         form.add_select("board", "Board", ["All"] + list(self.boards))
@@ -68,6 +73,10 @@ class Control(cdrcgi.Control):
             if not board_name:
                 raise Exception(cdrcgi.TAMPERING)
             boards = [Board(self, board_id, board_name)]
+        self.logger.debug("collected %d boards", len(boards))
+        self.logger.debug("examined %d versions in %d summaries",
+                          Summary.VERSIONS_EXAMINED,
+                          Summary.SUMMARIES_EXAMINED)
         for board in boards:
             board.show(body)
         page = B.HTML(head, body)
@@ -145,21 +154,27 @@ class Board:
             summary = Summary(control, row[0])
             if summary.changes is not None:
                 self.summaries.append(summary)
+        control.logger.debug("Collected %d summaries for %s",
+                             len(self.summaries), name)
 
     def show(self, body):
         "If the board has summaries with changes in the date range, show them"
         if self.summaries:
+            self.control.logger.debug("showing summaries for %s", self.name)
             B = cdrcgi.Page.B
             audience = B.BR()
             audience.tail = self.control.audience
             body.append(B.H2(self.name, audience, B.CLASS("left board")))
             for summary in sorted(self.summaries):
                 summary.show(body)
+                self.control.logger.debug("showing CDR%s", summary.doc_id)
 
 class Summary:
     "One of the cancer topic summaries for a PDQ board"
     PATTERN = re.compile("<DateLastModified[^>]*>([^<]+)</DateLastModified>")
+    SUMMARIES_EXAMINED = VERSIONS_EXAMINED = 0
     def __init__(self, control, doc_id):
+        Summary.SUMMARIES_EXAMINED += 1
         self.doc_id = doc_id
         self.changes = None
         query = cdrdb.Query("document", "title")
@@ -168,9 +183,12 @@ class Summary:
         self.title = rows[0][0].split(";")[0]
         query = cdrdb.Query("publishable_version", "num").order("num DESC")
         query.where(query.Condition("id", doc_id))
+        #query.where(query.Condition("dt", control.start, ">="))
         versions = [row[0] for row in query.execute(control.cursor).fetchall()]
         html = ""
         for version in versions:
+            Summary.VERSIONS_EXAMINED += 1
+            control.logger.debug("examining CDR%dV%d", doc_id, version)
             query = cdrdb.Query("doc_version", "xml", "dt")
             query.where(query.Condition("id", doc_id))
             query.where(query.Condition("num", version))
@@ -178,10 +196,12 @@ class Summary:
             match = self.PATTERN.search(xml)
             if match:
                 last_modified = match.group(1)
+                control.logger.debug("DateLastModified: %r", last_modified)
                 if control.start <= last_modified <= control.end:
+                    date = str(date)
                     date = "%s/%s/%s" % (date[5:7], date[8:10], date[:4])
                     filt = ["name:Summary Changes Report"]
-                    resp = cdr.filterDoc("guest", filt, doc=xml)
+                    resp = cdr.filterDoc(control.session, filt, doc=xml)
                     if isinstance(resp, basestring):
                         error = "Failure parsing CDR%d V%d" % (doc_id, version)
                         raise Exception(error)

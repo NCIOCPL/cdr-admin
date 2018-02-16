@@ -39,8 +39,6 @@ class Control(cdrcgi.Control):
             ("getBatchStatus.py", "Batch Job Status"),
             ("post-translated-summary.py",
              "Create World Server Translated Summary"),
-            ("CTGov.py", "CTGov Protocols"),
-            ("ctrp-mapping-gaps.py", "CTRP Mapping Gaps"),
             ("Mailers.py", "Mailers"),
             ("Reports.py", "Reports"),
             ("EditExternMap.py", "Update Mapping Table"),

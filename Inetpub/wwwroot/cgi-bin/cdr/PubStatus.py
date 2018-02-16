@@ -324,197 +324,67 @@ def dispJobSetting():
 def dispJobControl():
 
     # Need CdrPublishing to update pub_proc status.
-    conn = cdrdb.connect('CdrPublishing')
-    conn.setAutoCommit(1)
+    conn = cdrdb.connect("CdrPublishing")
     cursor = conn.cursor()
 
-    # Check session validity first by getting user name.
-    try:
+    # Make any status change requested.
+    new_status = fields.getvalue("newstat")
+    if new_status in ("Failure", "In process") and jobId:
+        values = new_status, jobId
         cursor.execute("""\
-            SELECT TOP 1 u.name
-              FROM usr u
-              JOIN session s
-                ON s.usr = u.id
-             WHERE s.name = ?
-                       """, (session,))
-        row = cursor.fetchone()
-        if row and row[0]:
-            name = row and row[0]
-        else:
-            cdrcgi.bail("Invalid session, failure getting user name")
-    except cdrdb.Error, info:
-        cdrcgi.bail("Failure getting user name: %s" % info[1][0])
-
-    # Get a list of jobs to be killed or resumed.
-    jobs = fields and fields.getvalue("Jobs") or []
-    if jobs and type(jobs) != type([]):
-        jobs = [jobs]
-
-    # Kill or resume?
-    action = fields and fields.getvalue("Kill") or \
-             fields and fields.getvalue("Resume") or ""
-
-    # Check to be sure that jobs are still in wait state.
-    # This guards against using the back button, post refresh, or
-    #   second tab or window to accidentally resume or kill a job
-    #   that was already processed.
-    if action and jobs:
-        for job in jobs:
-            jobNum = int(job)
-            try:
-                cursor.execute("""
-                    SELECT status
-                      FROM pub_proc
-                     WHERE id = %d""" % jobNum)
-            except cdrdb.Error, info:
-                cdrcgi.bail("Failure checking job status: %s" % info[1][0])
-
-            jobStatus = cursor.fetchone()[0]
-            if jobStatus != WAIT_STATUS:
-                cdrcgi.bail("""
-You tried to resubmit job %d, but it is no longer "%s"<br>
-Did you accidentally press Back or Refresh?<br>
-Please access from the main publishing menu""" % \
-                (jobNum, WAIT_STATUS))
-
-    # CG job description sent to GateKeeper.
-    cgJobDesc = fields and fields.getvalue("CgJobDesc") or ""
-    cgJobDesc = "<CgJobDesc>%s</CgJobDesc>" % cgJobDesc
-    if action == "Resume checked jobs":
-        jobChecked = int(jobs[0])
-        try:
-            cursor.execute("""
-                SELECT messages
-                  FROM pub_proc
-                 WHERE id = %d
-                           """ % jobChecked
-                          )
-            row = cursor.fetchone()
-            msg = (row and row[0] or '') + cgJobDesc
-
-            cursor.execute("""
-                UPDATE pub_proc
-                   SET messages  = ?
-                 WHERE id        = ?""", (msg, jobChecked))
-            cdr.logwrite('%s updated pub_proc messages with "%s"' % \
-                         (name, msg), LOG)
-        except cdrdb.Error, info:
-            msg = 'Failure updating message: %s' % info[1][0]
-            raise Exception(msg)
-
-    # Go ahead and kill or resume!
-    msg = ""
-    if action and jobs:
-        msg += " [Jobs just "
-        if action == "Kill checked jobs":
-            msg += "killed:"
-            status = "Failure"
-        else:
-            msg += "resumed:"
-            status = "In process"
-        for job in jobs:
-            msg += "%s, " % job
-            try:
-                cursor.execute("""\
-                    UPDATE pub_proc
-                       SET status = ?
-                     WHERE id = ?
-                               """, (status, job))
-                cdr.logwrite('%s updated pub_proc status to "%s"' % \
-                             (name, status), LOG)
-            except cdrdb.Error, info:
-                cdrcgi.bail("Failure killing or resuming: %s" % info[1][0])
-        msg = msg[:-2] + "]"
-
-    # Get jobs waiting for user approval.
-    try:
-        cursor.execute("""\
-            SELECT pp.id,
-                   pp.pub_subset,
-                   pp.started,
-                   pp.status
-              FROM pub_proc pp
-              JOIN usr u
-                ON u.id = pp.usr
-              JOIN session s
-                ON s.usr = u.id
-             WHERE s.name = ?
-               AND pp.status = ?
-          ORDER BY pp.started
-                       """, (session, WAIT_STATUS))
-        rows = cursor.fetchall()
-    except cdrdb.Error, info:
-        cdrcgi.bail("Failure getting pending job: %s" % info[1][0])
-
-    title   = "CDR Publishing Job Controller"
-    script  = "PubStatus.py"
-    instr   = "User Name %s" % name
-    buttons = []
-    header  = cdrcgi.header(title, title, instr, script, buttons)
-
-    HEADER1 = """
-               <BR>
-               <span style="color: navy; font-weight: bold;"> Jobs
-                waiting for user approval%s</span>
-               <BR><TABLE BORDER=0>
-              """ % msg
-    HEADER2 = """
-                <tr><td>
-                <table border="1">
-                <tr>
-                <td class="tlabel"></td>
-                <td class="tlabel">JobId</td>
-                <td class="tlabel">JobName</td>
-                <td class="tlabel">Started</td>
-                <td class="tlabel">Status</td>
-                </tr>
-              """
-    ROW     = """<tr><td><INPUT TYPE='CHECKBOX' NAME='Jobs' VALUE='%d' CHECKED></td>
-                     <td class="ttext">%d</td>
-                     <td class="ttext">%s</td>
-                     <td class="ttext">%s</td>
-                     <td class="ttext">%s</td></tr>
-              """
-
-    if not len(rows):
-        html = "User <i>%s</i>: There are no (more) push jobs waiting for approval." % name
+            UPDATE pub_proc
+               SET status = ?
+             WHERE id = ?
+               AND status NOT IN ('Success', 'Failure')""", values)
+        conn.commit()
+        message = "Set job {:d} status to {}".format(jobId, new_status)
     else:
-        html = """
-            <INPUT TYPE='HIDDEN' NAME='id' VALUE='%d'>
-            <INPUT TYPE='HIDDEN' NAME='Session' VALUE='%s'>
-            <INPUT TYPE='HIDDEN' NAME='type' VALUE='Manage'>
-                """ % (jobId, session)
+        message = "Jobs which have not completed"
 
-        html += HEADER1
-        html += """
-                <tr>
-                 <td>
-                  <table border="0" width="100%%">
-                   <tr>
-                    <td colspan="5" align="center" valign="center">
-                    <br/>
-                    <INPUT TYPE='SUBMIT' NAME='Kill' VALUE='Kill checked jobs'>
-                    <INPUT TYPE='SUBMIT' NAME='Resume' VALUE='Resume checked jobs'>
-                    <br/>&nbsp;
-                   </td>
-                  </tr>
-                 </table>
-                </td>
-               </tr>
-                """
-        html += HEADER2
+    # Get jobs which haven't hit the finish line.
+    query = cdrdb.Query("pub_proc", "id", "pub_subset", "started", "status")
+    query.where("status NOT IN ('Success', 'Failure', 'Verifying')")
+    query.order("started")
+    try:
+        rows = query.execute(cursor).fetchall()
+    except Exception as e:
+        cdrcgi.bail("Failure getting unfinished jobs: {}".format(e))
 
-        for row in rows:
-            html += ROW % (row[0], row[0], row[1], row[2], row[3])
-        html += "</TABLE></td></tr></table>"
-        html += "<BR><span style='color: navy;'>Resume checked job(s) with "
-        html += "the following description</span><br/>"
-        html += "<TEXTAREA NAME='CgJobDesc' ROWS='5' COLS='80'>"
-        html += "Enter a brief job description for Cancer.gov.</TEXTAREA>"
+    def callback(cell, format):
+        assert format == "html", "Not an Excel report"
+        B = cdrcgi.Page.B
+        job_id, status, session = cell.values()
+        base = "PubStatus.py?type=Manage&Session={}&id={}&newstat={}"
+        href = base.format(session, job_id, "Failure")
+        onclick = "location.href='{}'".format(href)
+        kill = B.BUTTON("Fail", onclick=onclick, type="button")
+        actions = [kill]
+        if status == WAIT_STATUS:
+            href = base.format(session, job_id, "In+process")
+            onclick = "location.href='{}'".format(href)
+            resume = B.BUTTON("Resume", onclick=onclick, type="button")
+            actions.append(resume)
+        td = B.TD(*actions)
+        return td
 
-    html  += "</BODY></HTML>"
-
-    cdrcgi.sendPage(header + html)
+    jobs = []
+    for job_id, pub_subset, started, status in rows:
+        job = (
+            cdrcgi.Report.Cell(str(job_id), center=True),
+            pub_subset,
+            str(started),
+            status,
+            cdrcgi.Report.Cell((job_id, status, session), callback=callback)
+        )
+        jobs.append(job)
+    columns = "Job ID", "Job Type", "Job Started", "Job Status", "Actions"
+    columns = [cdrcgi.Report.Column(name) for name in columns]
+    table = cdrcgi.Report.Table(columns, jobs)
+    title = "CDR Publishing Job Controller"
+    css = "button { margin: 0 3px }"
+    opts = dict(banner=title, subtitle=message, css=css)
+    page = cdrcgi.Report(title, [table], **opts)
+    page.send()
 
 #----------------------------------------------------------------------
 # Display the pub_proc_cg_work table info.

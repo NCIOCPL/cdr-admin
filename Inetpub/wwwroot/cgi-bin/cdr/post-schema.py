@@ -108,8 +108,8 @@ class Control(cdrcgi.Control):
             chars = [f.value]
         return "".join(chars)
     def find_schema(self, title):
-        query = "CdrCtl/Title = '%s' and CdrCtl/DocType = 'schema'" % title
-        results = cdr.search(self.session, query)
+        query = "CdrCtl/Title = {}".format(title)
+        results = cdr.search(self.session, query, doctypes=["schema"])
         if isinstance(results, basestring):
             raise Exception(results)
         if len(results) < 1:

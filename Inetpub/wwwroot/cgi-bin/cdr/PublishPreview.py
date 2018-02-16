@@ -22,6 +22,9 @@ import cdr2gk
 import sys
 import time
 import lxml.html
+from cdrapi.settings import Tier
+
+TIER = Tier()
 
 #----------------------------------------------------------------------
 # Get the parameters from the request.
@@ -122,12 +125,6 @@ if cachedHtml:
         intId = cdr.exNormalize(docId)[1]
     except:
         cdrcgi.bail("failure reading %s" % repr(cachedHtml))
-
-#----------------------------------------------------------------------
-# Point to a different host if requested.
-#----------------------------------------------------------------------
-if cgHost:
-    cdr2gk.host = cgHost
 
 #----------------------------------------------------------------------
 # Map for finding the filters for a given document type.
@@ -284,14 +281,18 @@ if not cachedHtml:
     doc = pattern2.sub("", doc)
     showProgress("Doctype declaration stripped...")
 
-    cdr2gk.debuglevel = 0
+    cdr2gk.DEBUGLEVEL = 0
     try:
         if dbgLog:
-            cdr2gk.debuglevel = 1
+            try:
+                level = int(dbgLog)
+            except:
+                level = 1
+            cdr2gk.DEBUGLEVEL = level
             showProgress("Debug logging turned on...")
         showProgress("Submitting request to Cancer.gov...")
-        resp = cdr2gk.pubPreview(doc, flavor)
-        cgHtml = resp.xmlResult.encode("utf-8")
+        resp = cdr2gk.pubPreview(doc, flavor, host=cgHost)
+        cgHtml = resp.xmlResult
         showProgress("Response received from Cancer.gov...")
     except Exception, e:
         cdrcgi.bail('Error in PubPreview: ' + str(e))
@@ -424,9 +425,7 @@ if convert:
                 else:
                 # A link on the Cancer.gov website not PDQ, i.e. a
                 # ProtocolRef
-                    newLink = 'http://%s.%s%s' % (cdr.h.host['CG'][0],
-                                              cdr.h.host['CG'][1],
-                                              link)
+                    newLink = 'http://%s%s' % (TIER.hosts['CG'], link)
                     x.set('href', newLink)
                     x.set('ohref', link)
                     x.set('type', 'Cancer.gov-link')
@@ -516,13 +515,11 @@ html = re.sub("http://cdr", "https://cdr", html)
 # Strangely, access is allowed from the DEV tier.  Can't test yet on STAGE
 # since STAGE is not setup yet.
 # ------------------------------------------------------------------------
-# if cdr.h.tier in ('QA'):
-if cdr.h.tier in ('QA', 'STAGE'):
+if TIER.name in ('QA', 'STAGE'):
     pattern6 = re.compile('http://www.cancer.gov/')
-    html = pattern6.sub('http://%s.%s/' % (cdr.h.host['CG'][0],
-                                           cdr.h.host['CG'][1]), html)
+    html = pattern6.sub('http://%s/' % TIER.hosts['CG'], html)
 
-if not cdr.h.tier == 'PROD':
+if not TIER.name == 'PROD':
     pattern7 = re.compile('https://cdr.cancer.gov/cgi-bin/cdr/GetCdrImage.py')
     html = pattern7.sub("%s/cgi-bin/cdr/GetCdrImage.py" % cdr.CBIIT_NAMES[2],
                         html)

@@ -27,7 +27,6 @@ class Control(cdrcgi.Control):
             ("PersonSearch.py", "Person"),
             ("PersonLocSearch.py", "Person (Locations in Result Display)"),
             ("PoliticalSubUnitSearch.py", "Political SubUnit"),
-            ("ProtSearch.py", "Protocol"),
             ("SummarySearch.py", "Summary"),
             ("TermSearch.py", "Term")
         ):

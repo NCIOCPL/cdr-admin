@@ -41,10 +41,13 @@ doc_id = fields.getvalue("id") or default_help()
 #----------------------------------------------------------------------
 # Filter the document to create the HTML page.
 #----------------------------------------------------------------------
-response = cdr.filterDoc('guest', ['name:Help Table of Contents'], doc_id)
-error = cdr.checkErr(response)
-if error:
-    cdrcgi.bail(error)
+try:
+    response = cdr.filterDoc('guest', ['name:Help Table of Contents'], doc_id)
+    error = cdr.checkErr(response)
+    if error:
+        cdrcgi.bail(error)
+except Exception as e:
+    cdrcgi.bail(str(e))
 
 #----------------------------------------------------------------------
 # Send the page back to the browser after converting to Unicode.

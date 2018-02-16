@@ -10,11 +10,12 @@
 #----------------------------------------------------------------------
 import datetime
 import suds.client
-import cdr
 import cdrcgi
+from cdrapi.settings import Tier
 
 class Control(cdrcgi.Control):
-    URL = "http://%s.%s/cgi-bin/glossify" % cdr.h.host["GLOSSIFIERC"]
+    TIER = Tier()
+    URL = "http://%s/cgi-bin/glossify" % TIER.hosts["GLOSSIFIERC"]
     FRAGMENT = u"<p>Gerota\u2019s capsule breast cancer and mama</p>"
     DEBUG_LEVEL = "X_DEBUG_LEVEL"
     PAGE_TITLE = "PDQ Glossifier Test"

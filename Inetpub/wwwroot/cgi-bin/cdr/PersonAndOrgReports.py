@@ -48,17 +48,4 @@ for r in reports:
     form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI></A>\n" % (
             cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
 
-form += """\
-    </OL>
-    <H3>Other Reports</H3>
-    <OL>
-"""
-reports = [
-           ('PersonsAtOrg.py',
-            'Persons Practicing at Organizations'),
-          ]
-for r in reports:
-    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI></A>\n" % (
-            cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
-
 cdrcgi.sendPage(header + form + "</OL></FORM></BODY></HTML>")

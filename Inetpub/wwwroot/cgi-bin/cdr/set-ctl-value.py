@@ -49,12 +49,14 @@ class Control(cdrcgi.Control):
         if not (self.group and self.name and self.value):
             cdrcgi.bail("group, name, and value are all required fields")
         try:
+            opts = dict(group=self.group, name=self.name)
             if self.value == "@@INACTIVATE@@":
-                cdr.updateCtl(self.session, "Inactivate", self.group,
-                              self.name, comment=self.comment)
+                action = "Inactivate"
             else:
-                cdr.updateCtl(self.session, "Create", self.group, self.name,
-                              self.value, self.comment)
+                action = "Create"
+                opts["value"] = self.value
+                opts["comment"] = self.comment or None
+            cdr.updateCtl(self.session, action, **opts)
             self.show_form()
         except Exception as e:
             cdrcgi.bail(str(e))

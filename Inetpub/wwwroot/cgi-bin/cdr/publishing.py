@@ -317,10 +317,15 @@ class Control:
             email = self.fields.getvalue("email")
         else:
             email = "Do not notify"
-        response = cdr.publish(self.session, self.system.name,
-                               self.subset.name, parameters, doc_ids,
-                               email, no_output, port=cdr.getPubPort(),
-                               allowInActive=inactive_ok)
+        args = self.session, self.system.name, self.subset.name
+        opts = dict(
+            parms=parameters,
+            docList=doc_ids,
+            email=email,
+            noOutput=no_output,
+            allowInActive=inactive_ok
+        )
+        response = cdr.publish(*args, **opts)
         job_id, errors = response
         self.pageopts["subtitle"] = self.subset.name
         page = cdrcgi.Page(self.title, **self.pageopts)
@@ -497,7 +502,7 @@ class PublishingSystem:
                 for child in node.findall("ParmValue"):
                     self.default = child.text
                 if self.name == "GKServer" and not self.default:
-                    self.default = cdr2gk.host
+                    self.default = cdr2gk.HOST
 
             def get_info(self):
                 """

@@ -74,7 +74,8 @@ if ids:
             cdr.logwrite("%s: %s" % (repr(i), repr(e)), LOGFILE)
             continue
         try:
-            result = cdr.delDoc(session, docId, validate, reason)
+            opts = dict(validate=validate, reason=reason)
+            result = cdr.delDoc(session, docId, **opts)
         except cdr.Exception, e:
             html.append(u"<li>%s: %s</li>" % (docId, repr(e)))
             html.append(u"<li>e.message: %s</li>" % repr(e.message))

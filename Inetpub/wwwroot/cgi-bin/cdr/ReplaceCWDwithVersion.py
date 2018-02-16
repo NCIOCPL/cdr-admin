@@ -219,12 +219,11 @@ or <strong>Cancel</strong> to re-enter data.</p>
         else:
             # If we got here, we're ready to go
             # Get requested version
-            doc = cdr.getDoc(session, docIdStr, checkout='Y',
-                             version=verNum, getObject=True)
-            if type(doc) in (str, unicode):
-                errObj = cdr.checkErr(doc, asObject=True)
-                msg = errObj.getMessage(asUtf8=True)
-                cdrcgi.bail("Unable to check out version: %s" % msg)
+            try:
+                doc = cdr.getDoc(session, docIdStr, checkout='Y',
+                                 version=verNum, getObject=True)
+            except Exception as e:
+                cdrcgi.bail("Unable to check out version: {}".format(e))
 
             # Validation flag
             if savePub == 'Y':

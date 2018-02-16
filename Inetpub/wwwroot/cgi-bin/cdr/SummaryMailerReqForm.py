@@ -94,8 +94,13 @@ class Control(cdrcgi.Control):
             ("Board", cdr.normalize(self.board.id)),
             ("Person", "".join([str(r) for r in recipients.values()]))
         )
-        result = cdr.publish(self.session, "Mailers", subset, parms, docs,
-                             self.email, allowNonPub="Y")
+        opts = dict(
+            parms=parms,
+            docList=docs,
+            email=self.email,
+            allowNonPub="Y"
+        )
+        result = cdr.publish(self.session, "Mailers", subset, **opts)
         job_id, errors = result
         if not job_id:
             cdrcgi.bail("Unable to initiate publishing job: %s" % errors)
@@ -559,12 +564,11 @@ class Board:
                                   wrapper_classes="inner-cb", checked=True,
                                   onclick="inner_clicked(%d)" % o.id)
         if not count:
-            if inner_name == "members":
-                inner_name = "board members"
+            if self.control.method == "member":
+                msg = "None of the selected board members have any summaries"
             else:
-                outer_name = "board members"
-            cdrcgi.bail("None of the selected %s have any %s" %
-                        (outer_name, inner_name))
+                msg = "None of the selected summaries have any board members"
+            cdrcgi.bail(msg)
 
     def to_script(self):
         """

@@ -2,27 +2,24 @@
 # Sanity check for CDR configuration files for a given CBIIT tier.
 #----------------------------------------------------------------------
 import cdrcgi
-import cdr
 import cdrdb
 import cdrutil
 import re
 import socket
 import requests
+from cdrapi.settings import Tier
 
-MYSQL_PORT = cdr.h.tier in ("QA", "DEV") and 3631 or 3600
-SQL_SERVER_PORTS = { "PROD": 55733, "STAGE": 55459, "QA": 53100, "DEV": 52400 }
+TIER = Tier()
+MYSQL_PORT = TIER.port("emailers")
+SQL_SERVER_PORT = TIER.port("cdr")
 ROLES = {
     "APP": 22,
     "APPC": 443,
     "APPWEB": 443,
     "DBNIX": MYSQL_PORT,
-    "DBWIN": SQL_SERVER_PORTS.get(cdr.h.tier, 52400),
+    "DBWIN": SQL_SERVER_PORT,
     "BASTION": None,
     "BASTIONC": None,
-    #"GLOSSIFIER": 22,
-    #"GLOSSIFIERC": 80,
-    #"GLOSSIFIERWEB": 80,
-    #"GLOSSIFIERDB": MYSQL_PORT,
     "EMAILERS": 22,
     "EMAILERSC": 443,
     "EMAILERSWEB": 443,
@@ -36,7 +33,6 @@ ROLES = {
 DATABASES = {
     "cdr": ("cdrsqlaccount", "CdrPublishing", "CdrGuest"),
     "dropbox": ("dropbox",),
-    #"glossifier": ("glossifier",),
     "emailers": ("emailers",),
 }
 CHECKMARK_TD = cdrcgi.Page.B.TD(
@@ -55,13 +51,10 @@ def db_account_ok(db, account):
     try:
         if db == "cdr":
             conn = cdrdb.connect(account)
-            #conn.close()
         else:
             conn = cdrutil.getConnection(db)
-            #conn.close()
         return True
     except:
-        #raise
         return False
 
 def error(message):
@@ -71,11 +64,11 @@ class Host:
     checked = set()
     def __init__(self, role):
         self.aname = self.ip = self.dns = self.error = None
-        self.info = cdr.h.host.get(role)
+        self.info = TIER.hosts.get(role)
         if not self.info:
             self.error = "MISSING"
         else:
-            self.dns = ("%s.%s" % self.info).rstrip(".")
+            self.dns = self.info.rstrip(".")
             try:
                 self.ip = socket.gethostbyname(self.dns)
                 try:
@@ -90,16 +83,6 @@ class Host:
                     self.error = "CONNECTION REFUSED"
             except:
                 self.error = "NOT FOUND"
-        #response = cdr.runCommand("d:\\cygwin\\bin\\host %s" % self.dns)
-        #if not response.code:
-        #    match = re.search("\\S is an alias for (\\S+)", response.output)
-        #    if match:
-        #        self.aname = match.group(1).rstrip(".")
-        #    else:
-        #        self.aname = self.dns
-        #    match = re.search("\\S has address (\\S+)", response.output)
-        #    if match:
-        #        self.ip = match.group(1)
 
 R = cdrcgi.Report
 #cursor = cdrdb.connect('CdrGuest').cursor()
@@ -143,8 +126,7 @@ def check_server(name, tables):
     role = "%sC" % name.upper()
     port = ROLES[role]
     proto = port == 80 and "http" or "https"
-    host = cdr.h.host.get("%sC" % name.upper())
-    host = "%s.%s" % host
+    host = TIER.hosts.get("%sC" % name.upper())
     url = "%s://%s/cgi-bin/check-cdr-tier-settings.py" % (proto, host)
     response = requests.get(url)
     roles, accounts = eval(response.content)
@@ -174,5 +156,5 @@ for server in ("Emailers",):
         raise
         pass
 
-report = R('Tier Report', tables, banner="%s Tier Check" % cdr.h.tier)
+report = R('Tier Report', tables, banner="%s Tier Check" % TIER.name)
 report.send('html')
