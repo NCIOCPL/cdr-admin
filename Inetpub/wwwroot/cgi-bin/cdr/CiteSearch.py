@@ -181,7 +181,7 @@ if impReq:
         if doc.startswith("<Errors"):
             cdrcgi.bail("Unable to retrieve %s" % docId)
         resp = cdr.repDoc(session, doc=doc, val='Y', ver='Y', checkIn='Y',
-                          showWarnings=True)
+                          showWarnings=True, publishable='Y')
         if not resp[0]:
             cdrcgi.bail("Failure creating publishable version for %s:<br />%s" %
                         (docId, formatErrors(resp[1])))
