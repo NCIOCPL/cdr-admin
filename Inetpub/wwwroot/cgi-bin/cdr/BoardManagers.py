@@ -14,6 +14,7 @@
 # BZIssue::4648
 # BZIssue::4671 - Summaries with Markup Report
 # BZIssue::4673 - Adding Board Roster (Full) option
+# JIRA::OCECDR-4360 - Admin menu changes
 #
 #  Adding menu item for Comprehensive Review Date Report
 #
@@ -57,9 +58,10 @@ class Control:
         page.add(page.B.H3("Summary QC Reports"))
         page.add("<ol>")
         for report_key, display in (
-            ("bu", "Bold/Underline (HP/Old Patient)"),
-            ("rs", "Redline/Strikeout (HP/Old Patient)"),
-            ("pat","New Patient"),
+            ("bu", "Bold/Underline (HP)"),
+            ("rs", "Redline/Strikeout (HP)"),
+            ("patbu","Bold/Underline (Patient)"),
+            ("pat","Redline/Strikeout (Patient)"),
             ("pp", "Publish Preview")
         ):
             opts["ReportType"] = report_key
