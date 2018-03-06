@@ -158,7 +158,7 @@ def showForm(extra):
     <tr>
      <th align='right'>Email Address:&nbsp;</th>
      <td><input name='Email' class='field'
-                value='NCIPDQoperator@mail.nih.gov'></td>
+                value='%s'></td>
     </tr>
     <tr>
      <th align='right'>GateKeeper Host:&nbsp;</th>
@@ -166,7 +166,7 @@ def showForm(extra):
     </tr>
     <tr>
      <th align='right'>GateKeeper Target:&nbsp;</th>
-     <td><input name='GKTarget' class='field' value='Preview'></td>
+     <td><input name='GKTarget' class='field' value='Live'></td>
     </tr>
     <tr>
      <td>&nbsp;</td>
@@ -186,7 +186,7 @@ def showForm(extra):
     <tr>
      <td>&nbsp;</td>
      <td>
-      <input type='checkbox' name='FailedOnly' checked>
+      <input type='checkbox' name='FailedOnly'>
       Only include failed documents from specified publishing jobs
      </td>
     </tr>
@@ -194,8 +194,10 @@ def showForm(extra):
   </form>
  </body>
 </html>
-""" % (cdrcgi.SESSION, session, extra, makeDoctypePicklist())
+""" % (cdrcgi.SESSION, session, extra, makeDoctypePicklist(),
+       cdr.getEmail(session))
     cdrcgi.sendPage(header + form)
+
 
 #----------------------------------------------------------------------
 # If we have a request, take care of it.
