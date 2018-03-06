@@ -21,7 +21,7 @@ class Control(cdrcgi.Control):
     BUTTONS = SAVE, CANCEL, cdrcgi.Control.ADMINMENU, cdrcgi.Control.LOG_OUT
     VERSIONS = (
         ("P", "Published version"),
-        ("A", "Any version"),
+        ("V", "Any version"),
         ("C", "Current working document")
     )
 
@@ -140,7 +140,7 @@ class Control(cdrcgi.Control):
         self.linktype = self.get_linktype()
         if not self.linktype.name:
             self.errors.append("Missing rule type name")
-        if self.linktype.linkChkType not in "PAC":
+        if self.linktype.linkChkType not in "PVC":
             cdrcgi.bail(cdrcgi.TAMPERING)
         if not self.linktype.linkTargets:
             self.errors.append("No target document type(s) selected")
