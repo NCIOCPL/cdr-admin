@@ -34,7 +34,7 @@ class Control(cdrcgi.Control):
         self.doctypes = cdr.getDoctypes(self.session)
         self.ruletypes = [p.name for p in cdr.getLinkProps(self.session)]
         self.name = self.fields.getvalue("name", "")
-        self.message = "{} link type".format("Edit" if self.name else "Add")
+        self.message = None
         self.linktype = None
         self.errors = []
 
@@ -169,11 +169,12 @@ class Control(cdrcgi.Control):
            reference to the modified dictionary
         """
 
+        subtitle = "{} link type".format("Edit" if self.name else "Add")
         buttons = list(self.BUTTONS)
         if self.name:
             buttons.insert(2, self.DELETE)
         opts["buttons"] = buttons
-        opts["subtitle"] = self.message
+        opts["subtitle"] = subtitle
         return opts
 
     def populate_form(self, form):
@@ -189,6 +190,9 @@ class Control(cdrcgi.Control):
            form - reference to the `cdrcgi.Page` object
         """
 
+        classes = "center warning strong"
+        if self.message:
+            form.add(form.B.P(self.message, form.B.CLASS(classes)))
         self.show_errors(form)
         if self.linktype is None:
             self.linktype = self.get_linktype()
