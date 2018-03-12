@@ -344,12 +344,10 @@ if flavor == 'ByBoard':
                  if meeting.date >= startDate and meeting.date <= endDate:
                      html.append("""\
   <tr>
-   <td class="dates">%s %s %s %s</td>
+   <td class="dates%s">%s %s %s</td>
   </tr>
-""" % (meeting.date, meeting.time or "", meeting.webEx and ' (WebEx)' or '',
-       meeting.canceled and
-         (' <span class="DTDerror">(Canceled: %s)</span>' % meeting.canceled)
-                        or ''))
+""" % (meeting.canceled and " strikethrough" or "",
+       meeting.date, meeting.time or "", meeting.webEx and ' (WebEx)' or ''))
 
              html.append("""\
  </table>

@@ -90,6 +90,7 @@ label.clickable:hover { color: white; background-color: #936; }
 .error { color: red; font-weight: bold; }
 .strong { font-weight: bold; }
 .emphasis { font-style: italic; }
+.strikethrough { text-decoration: line-through; }
 .warning { color: green; }
 .hidden { display: none; }
 .labeled-field input, .labeled-field select, .labeled-field textarea {
