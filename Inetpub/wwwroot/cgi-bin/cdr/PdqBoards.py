@@ -241,7 +241,7 @@ class Summary:
         page.add(page.B.H4(self.get_display_title()))
         if self.members:
             page.add("<ul>")
-            for member in self.members:
+            for member in sorted(self.members):
                 page.add(page.B.LI(member.name))
             page.add("</ul>")
 
