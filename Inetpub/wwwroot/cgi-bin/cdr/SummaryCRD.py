@@ -239,14 +239,10 @@ class Board:
                 elif not have_actual and review.state == "Actual":
                     reviews.insert(0, review)
                     have_actual = True
-            span = len(reviews)
-            if span < 2:
-                span = None
             row = []
             if self.control.show_id:
-                row.append(cdrcgi.Report.Cell(doc.doc_id, rowspan=span))
-            title = doc.title
-            row.append(cdrcgi.Report.Cell(title, rowspan=span))
+                row.append(cdrcgi.Report.Cell(doc.doc_id))
+            row.append(cdrcgi.Report.Cell(doc.title))
             if reviews:
                 review = reviews[0]
                 row.extend([
@@ -258,11 +254,16 @@ class Board:
                 row.extend(["", "", ""])
             rows.append(row)
             for review in reviews[1:]:
-                rows.append([
+                row = []
+                if self.control.show_id:
+                    row.append(cdrcgi.Report.Cell(doc.doc_id))
+                row.append(cdrcgi.Report.Cell(doc.title))
+                row.extend([
                     review.date,
                     cdrcgi.Report.Cell(review.state, classes="center"),
                     review.comment or ""
                 ])
+                rows.append(row)
         return cdrcgi.Report.Table(columns, rows, **opts)
 
     def __cmp__(self, other):
