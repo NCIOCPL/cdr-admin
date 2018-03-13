@@ -19,7 +19,7 @@ import sys
 fields  = cgi.FieldStorage()
 cdrId   = fields.getvalue('cdrId') # or '525153'
 jobId   = fields.getvalue('jobId') # or '8437'
-host    = fields.getvalue('targetHost') or 'gatekeeper.cancer.gov'
+host    = fields.getvalue('targetHost') or cdr2gk.HOST
 logging = fields.getvalue('debugLogging') and True or False
 action  = fields.getvalue('action') # or 'yes!'
 flavor  = fields.getvalue('flavor') # or 'full'
@@ -27,7 +27,7 @@ flavor  = fields.getvalue('flavor') # or 'full'
 if not re.match(r"^[a-zA-Z0-9._-]+$", host):
     cdrcgi.bail("invalid host name")
 
-cdr2gk.DEBUGLEVEL = logging
+cdr2gk.DEBUGLEVEL = 2 if logging else 0
 
 # ----------------------------------------------------------------------
 # Set up a database connection and cursor.
@@ -112,7 +112,7 @@ def showForm(extra = u""):
    <table border='0' cellpadding='2' cellspacing='0'>
     <tr>
      <th align='right'>GateKeeper Host:&nbsp;</th>
-     <td><input class='fw' name='targetHost' value='gatekeeper.cancer.gov'></td>
+     <td><input class='fw' name='targetHost' value='%s'></td>
     </tr>
     <tr>
      <th align='right'>Job ID:&nbsp;</th>
@@ -137,7 +137,7 @@ def showForm(extra = u""):
   </form>
 %s </body>
 </html>
-""" % (title, title, extra)
+""" % (title, title, host, extra)
     cdrcgi.sendPage(html)
 
 
