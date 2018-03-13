@@ -117,10 +117,6 @@ elif request == SUBMENU:
     cdrcgi.navigateTo("reports.py", session)
 
 #----------------------------------------------------------------------
-# Build date string for header.
-#----------------------------------------------------------------------
-
-#----------------------------------------------------------------------
 # Connect to the database.
 #----------------------------------------------------------------------
 try:
@@ -132,26 +128,20 @@ except Exception, e:
 #----------------------------------------------------------------------
 # If we don't have a request, put up the form.
 #----------------------------------------------------------------------
-if not lang:
-    jscript = """\
-function check_set(name, val) {
-    var all_selector = "#" + name + "-all";
-    var ind_selector = "#" + name + "-set .ind";
-    if (val == "all") {
-        if (jQuery(all_selector).prop("checked"))
-            jQuery(ind_selector).prop("checked", false);
-        else
-            jQuery(all_selector).prop("checked", true);
-    }
-    else if (jQuery(ind_selector + ":checked").length > 0)
-        jQuery(all_selector).prop("checked", false);
-    else
-        jQuery(all_selector).prop("checked", true);
-}
-function check_english(val) { check_set("english", val); }
-function check_spanish(val) { check_set("spanish", val); }
-function check_type(val) { check_set("type", val); }
+def have_request():
+    if not lang:
+        return False
+    if not types:
+        return False
+    if lang == "English":
+        if not english:
+            return False
+    elif not spanish:
+        return False
+    return True
 
+if not have_request():
+    jscript = """\
 function check_lang(lang) {
     if (lang == 'English') {
         jQuery('#english-set').show();
@@ -175,20 +165,17 @@ jQuery(function() {
     page.add_radio("lang", "Spanish", "Spanish")
     page.add('<fieldset id="english-set">')
     page.add(page.B.LEGEND("Select PDQ Summaries (one or more)"))
-    page.add_checkbox("english", "All English", "all", checked=True)
     for label, doc_id in get_english_boards(cursor):
         page.add_checkbox("english", label, str(doc_id), widget_classes="ind")
     page.add("</fieldset>")
     page.add('<fieldset id="spanish-set">')
     page.add(page.B.LEGEND("Select PDQ Summaries (one or more):"))
-    page.add_checkbox("spanish", "All Spanish", "all")
     for label, doc_id in get_spanish_boards(cursor):
         page.add_checkbox("spanish", label, str(doc_id), widget_classes="ind")
     page.add("</fieldset>")
     page.add("</fieldset>")
     page.add('<fieldset id="type-set">')
     page.add(page.B.LEGEND("Select Citation Type (one or more)"))
-    page.add_checkbox("type", "All Types", "all", checked=True)
     for cite_type in get_citation_types(cursor):
         page.add_checkbox("type", cite_type, cite_type, widget_classes="ind")
     page.add("</fieldset>")
