@@ -399,7 +399,6 @@ class PublishingSystem:
         self.param_info = {}
         if not self.system_version:
             query = cdrdb.Query("doc_version", "MAX(num)")
-            query.where(query.Condition("publishable", "Y"))
             query.where(query.Condition("id", self.system_id))
             rows = query.execute(cursor).fetchall()
             if not rows:
