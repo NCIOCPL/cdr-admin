@@ -15,7 +15,7 @@ class Control(cdrcgi.Control):
     """
 
     SORT = (
-        ("s.value_name", "Processing Status"),
+        ("s.value_pos", "Processing Status"),
         ("j.state_date", "Status Date"),
         ("u.fullname", "User"),
         ("c.value_name", "Type of Change"),
