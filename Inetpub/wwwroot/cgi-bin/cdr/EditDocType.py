@@ -24,11 +24,13 @@ class Control(cdrcgi.Control):
         cdrcgi.Control.__init__(self, "CDR Document Type Editor")
         self.formats = self.load_formats()
         self.schemas = self.load_schemas()
+        self.filters = self.load_filters()
         self.doctype = self.get_doctype()
         self.name = self.get_string("name", 32)
         self.comment = self.get_string("comment", 255) or ""
         self.format = self.get_int("format", self.formats.map)
         self.schema = self.get_int("schema", self.schemas.map)
+        self.title_filter = self.get_int("filter", self.filters.map)
         self.flags = self.get_list("flags", self.FLAGS)
         self.message = None
 
@@ -59,6 +61,7 @@ class Control(cdrcgi.Control):
             doctype.type = self.name
         doctype.format = self.formats.map[self.format]
         doctype.schema = self.schemas.map.get(self.schema, "")
+        doctype.title_filter = self.filters.map.get(self.title_filter, "")
         doctype.comment = self.comment
         doctype.versioning = ("versioning" in self.flags) and "Y" or "N"
         doctype.active = ("active" in self.flags) and "Y" or "N"
@@ -85,6 +88,8 @@ class Control(cdrcgi.Control):
         schema = ""
         schemas = self.schemas.values
         comment = ""
+        filters = self.filters.values
+        title_filter = ""
         if self.doctype:
             legend = u"Edit %s Document Type" % self.doctype.type
             created = str(self.doctype.created)[:10]
@@ -92,6 +97,8 @@ class Control(cdrcgi.Control):
             fmt = self.formats.lookup(self.doctype.format)
             if self.doctype.schema:
                 schema = self.schemas.lookup(self.doctype.schema)
+            if self.doctype.title_filter:
+                title_filter = self.filters.lookup(self.doctype.title_filter)
             comment = self.doctype.comment
             for flag in self.FLAGS:
                 if getattr(self.doctype, flag) != "Y":
@@ -108,6 +115,7 @@ class Control(cdrcgi.Control):
             form.add_text_field("name", "Name")
         form.add_select("format", "Format", self.formats.values, fmt)
         form.add_select("schema", "Schema", schemas, schema)
+        form.add_select("filter", "Title Filter", filters, title_filter)
         form.add_textarea_field("comment", "Comment", value=comment)
         form.add("</fieldset>")
         form.add("<fieldset>")
@@ -187,6 +195,19 @@ class Control(cdrcgi.Control):
         query.where("t.name = 'schema'")
         rows = query.order("d.title").execute(self.cursor).fetchall()
         rows = [(row[0], row[1]) for row in rows if self.top_schema(row[0])]
+        return self.load_values(rows)
+
+    def load_filters(self):
+        """
+        Create a set of filter documents which can be used for extracting
+        the title of documents of a given type.
+        """
+
+        query = cdrdb.Query("document d", "d.id", "d.title")
+        query.join("doc_type t", "t.id = d.doc_type")
+        query.where("t.name = 'Filter'")
+        rows = query.order("d.title").execute(self.cursor).fetchall()
+        rows = [tuple(row) for row in rows if row[1].startswith("DocTitle ")]
         return self.load_values(rows)
 
     def top_schema(self, doc_id):
