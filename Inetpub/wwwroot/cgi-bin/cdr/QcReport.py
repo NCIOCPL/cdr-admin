@@ -790,7 +790,9 @@ if letUserPickVersion:
                        'LOEs':
                             'Display Level of Evidence terms',
                        'StandardWording':
-                            'Display standard wording with mark-up'
+                            'Display standard wording with mark-up',
+                       'ModuleMarkup':
+                            'Display Module Markup'
                  }
 
     # Display the Misc. Print Options check boxes for Patients
@@ -815,6 +817,8 @@ if letUserPickVersion:
                                 inputID='displayCitations', checked=1)
             form += addCheckbox(checkboxLabels, 'LearnMore',
                                 inputID='displayLearnMore', checked=1)
+            form += addCheckbox(checkboxLabels, 'ModuleMarkup',
+                                inputID='displayModuleMarkup')
 
         # End - Misc Print Options block
         # ------------------------------
@@ -1043,6 +1047,8 @@ if letUserPickVersion:
                                 inputID='displayImages', checked=0)
             form += addCheckbox(checkboxLabels, 'LOEs',
                                 inputID='displayLOEs')
+            form += addCheckbox(checkboxLabels, 'ModuleMarkup',
+                                inputID='displayModuleMarkup', checked=0)
 
         # End - Misc Print Options block
         # ------------------------------
