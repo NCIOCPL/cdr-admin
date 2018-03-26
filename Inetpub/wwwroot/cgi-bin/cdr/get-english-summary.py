@@ -152,7 +152,7 @@ def markup(doc):
 
 def strip(xml):
     doomed = ('Comment', 'MediaLink', 'SectMetaData', 'ReplacementFor',
-              'PdqKey', 'DateLastModified', 'ComprehensiveReviewDate',
+              'PdqKey', 'DateLastModified', 'ComprehensiveReview', 'PMID',
               'BoardMember', 'RelatedDocuments', 'TypeOfSummaryChange')
     try:
         parser = etree.XMLParser(remove_blank_text=True)
