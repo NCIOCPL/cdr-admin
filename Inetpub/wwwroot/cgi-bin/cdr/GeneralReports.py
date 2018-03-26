@@ -32,6 +32,7 @@ class Control(cdrcgi.Control):
         ("ModWithoutPubVersion.py",
          "Records Modified Since Last Publishable Version"),
         ("ShowCdrDocument.py", "Show CDR Document XML"),
+        ("ShowSummaryIncludes.py", "Show Summary Elements"),
         ("UnchangedDocs.py", "Unchanged Documents"),
         ("CheckUrls.py", "URL Check"),
         ("ReplaceCWDReport.py", "Versions that Replaced CWDs"),
