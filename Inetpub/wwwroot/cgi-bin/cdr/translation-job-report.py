@@ -35,6 +35,7 @@ class Control(cdrcgi.Control):
         self.translators = self.load_group("Spanish Translators")
         self.start = self.fields.getvalue("start")
         self.end = self.fields.getvalue("end")
+        self.type = self.fields.getvalue("type")
         self.state = self.get_list("state", self.states.map)
         self.change = self.get_list("change", self.changes.map)
         self.translator = self.get_list("translator", self.translators)
@@ -42,6 +43,10 @@ class Control(cdrcgi.Control):
         cdrcgi.valParmVal(self.sort, valList=self.SORT_VALS, msg=self.TAMPERING)
         cdrcgi.valParmDate(self.start, empty_ok=True, msg=self.TAMPERING)
         cdrcgi.valParmDate(self.end, empty_ok=True, msg=self.TAMPERING)
+        if self.type == "current":
+            self.title = self.PAGE_TITLE = "Translation Job Workflow Report"
+        else:
+            self.title = self.PAGE_TITLE = "Translation Job History Report"
 
     def populate_form(self, form):
         """
@@ -55,6 +60,11 @@ class Control(cdrcgi.Control):
         form.add(form.B.LEGEND("Date Range"))
         form.add_date_field("start", "Start", value=str(start))
         form.add_date_field("end", "End", value=str(end))
+        form.add("</fieldset>")
+        form.add("<fieldset>")
+        form.add(form.B.LEGEND("Report Type"))
+        form.add_radio("type", "Current Jobs", "current", checked=True)
+        form.add_radio("type", "Job History", "history")
         form.add("</fieldset>")
         form.add("<fieldset>")
         form.add(form.B.LEGEND("Statuses (all if none checked)"))
@@ -80,6 +90,19 @@ class Control(cdrcgi.Control):
         form.add("</fieldset>")
         form.add_output_options("html")
 
+    def different(self, old, new):
+        if old is None:
+            return True
+        if old[0] != new[0]:
+            return True
+        if old[2] != new[2]:
+            return True
+        if old[3] != new[3]:
+            return True
+        if old[4] != new[4]:
+            return True
+        return False
+
     def build_tables(self):
         """
         Generate the single table for the report, filtered and sorted
@@ -91,7 +114,10 @@ class Control(cdrcgi.Control):
             sort.append("d.title")
         fields = ("d.id", "d.title", "s.value_name", "c.value_name",
                   "u.fullname", "j.state_date", "j.comments")
-        query = cdrdb.Query("summary_translation_job j", *fields)
+        if self.type == "current":
+            query = cdrdb.Query("summary_translation_job j", *fields)
+        else:
+            query = cdrdb.Query("summary_translation_job_history j", *fields)
         query.join("usr u", "u.id = j.assigned_to")
         query.join("document d", "d.id = j.english_id")
         query.join("summary_translation_state s", "s.value_id = j.state_id")
@@ -108,7 +134,13 @@ class Control(cdrcgi.Control):
         if self.change:
             query.where(query.Condition("c.value_id", self.change, "IN"))
         rows = query.order(*sort).execute(self.cursor).fetchall()
-        jobs = [Job(self, *row) for row in rows]
+        jobs = []
+        previous = None
+        for row in rows:
+            if self.different(previous, row):
+                jobs.append(Job(self, *row))
+                previous = row
+        #jobs = [Job(self, *row) for row in rows]
         rows = [job.row() for job in jobs]
         columns = (
             cdrcgi.Report.Column("CDR ID"),
@@ -121,13 +153,13 @@ class Control(cdrcgi.Control):
             cdrcgi.Report.Column("TRANSLATED DOC CDR ID"),
             cdrcgi.Report.Column("Comments")
         )
-        ncols = len(columns)
-        rows.append([unichr(160)] * ncols)
-        padding = [""] * (ncols - 2)
-        rows.append(["", cdrcgi.Report.Cell("TOTALS", bold=True)] + padding)
-        for state in sorted(Job.COUNTS):
-            rows.append(["", state, Job.COUNTS[state]] + [""] * (ncols - 3))
-        self.PAGE_TITLE = "Translation Job Workflow Report"
+        if self.type == "current":
+            ncols = len(columns)
+            rows.append([unichr(160)] * ncols)
+            padding = [""] * (ncols - 2)
+            rows.append(["", cdrcgi.Report.Cell("TOTALS", bold=True)] + padding)
+            for state in sorted(Job.COUNTS):
+                rows.append(["", state, Job.COUNTS[state]] + [""] * (ncols - 3))
         return [cdrcgi.Report.Table(columns, rows)]
 
     def load_group(self, group):
