@@ -1,44 +1,78 @@
 #!/usr/bin/python
-# ******************************************************************
-# This script is called by the FTP Linux server during the access
-# report creation in order to retrieve all organizations to be
-# included on the report
-# ------------------------------------------------------------------
-# Created:                              Volker Englisch - 2016-04-19
-#
-# History:
-# --------
-# OCECDR-3852: Fix and Improve FTP Licensee Report
-# ******************************************************************
-import cdrdb
-import cgi
-import lxml.etree as etree
 
-fields = cgi.FieldStorage()
-product = fields and fields.getvalue("p") or 'TEST'
+"""
+Identify the PDQ data partners
 
-cursor = cdrdb.connect().cursor()
-cursor.execute("""\
-                SELECT org_id, org_name, org_status,
-                       activated, terminated, ftp_username
-                  FROM data_partner_org o
-                  JOIN data_partner_product p
-                    ON p.prod_id = o.prod_id
-                   AND p.prod_name = '%s'
-                   AND p.inactivated IS NULL
-                 ORDER BY org_status, org_name""" % product)
+Used by the report on SFTP retrieval activity for the PDQ data.
+"""
 
+import re
+from lxml import etree
+from cdr import get_text
+from cdrapi import db
+
+class Partner:
+    INFO = "LicenseeInformation/"
+    TYPE = INFO + "LicenseeType"
+    NAME = INFO + "LicenseeNameInformation/OfficialName/Name"
+    STATUS = INFO + "LicenseeStatus"
+    DATES = INFO + "LicenseeStatusDates/"
+    PROD_ACT = DATES + "ProductionActivation"
+    PROD_OFF = DATES + "ProductionInactivation"
+    TEST_ACT = DATES + "TestActivation"
+    TEST_OFF = DATES + "TestInactivation"
+    USERNAME = "FtpInformation/UserName"
+
+    def __init__(self, doc_id, root):
+        self.doc_id = doc_id
+        self.name = self.normalize(get_text(root.find(self.NAME)))
+        licensee_type = get_text(root.find(self.TYPE), "").lower()
+        status = get_text(root.find(self.STATUS), "").lower()
+        if status.startswith("test"):
+            self.activated = get_text(root.find(self.TEST_ACT))
+            self.deactivated = get_text(root.find(self.TEST_OFF))
+            self.status = "T"
+        else:
+            self.activated = get_text(root.find(self.PROD_ACT))
+            self.deactivated = get_text(root.find(self.PROD_OFF))
+            self.status = "S" if licensee_type == "special" else "A"
+        self.username = get_text(root.find(self.USERNAME))
+        if self.username is not None:
+            self.username = self.normalize(self.username)
+        self.key = self.status, self.name.lower()
+    def __cmp__(self, other):
+        return cmp(self.key, other.key)
+
+    @staticmethod
+    def normalize(me):
+        if me is None:
+            return ""
+        return re.sub(r"\s+", " ", me).strip()
+
+cursor = db.connect(user="CdrGuest").cursor()
+query = db.Query("document d", "d.id")
+query.join("doc_type t", "t.id = d.doc_type")
+query.where("t.name = 'Licensee'")
+doc_ids = [row.id for row in query.execute(cursor).fetchall()]
+partners = []
+select = "SELECT xml FROM document WHERE id = ?"
+for doc_id in doc_ids:
+    cursor.execute(select, (doc_id,))
+    try:
+        xml = cursor.fetchone().xml
+        root = etree.fromstring(xml.encode("utf-8"))
+        partners.append(Partner(doc_id, root))
+    except:
+        raise
+        pass
 root = etree.Element("partners")
-for oid, org_name, org_status, activated, terminated, \
-    ftp_username in cursor.fetchall():
-
-    contact = etree.SubElement(root, "org_id", oid=str(oid))
-    etree.SubElement(contact, "org_name").text = org_name
-    etree.SubElement(contact, "org_status").text = org_status
-    etree.SubElement(contact, "activated").text = activated
-    etree.SubElement(contact, "terminated").text = terminated
-    etree.SubElement(contact, "ftp_userid").text = ftp_username
-
+for partner in sorted(partners):
+    contact = etree.SubElement(root, "org_id", oid=str(partner.doc_id))
+    etree.SubElement(contact, "org_name").text = partner.name
+    etree.SubElement(contact, "org_status").text = partner.status
+    etree.SubElement(contact, "activated").text = partner.activated
+    etree.SubElement(contact, "terminated").text = partner.deactivated
+    etree.SubElement(contact, "ftp_userid").text = partner.username
 print """\
 Content-type: text/xml
 
