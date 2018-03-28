@@ -50,6 +50,8 @@ class Control(cdrcgi.Control):
         self.change_type = self.get_id("change_type", self.change_types.map)
         self.state_date = self.fields.getvalue("state_date")
         self.comments = self.fields.getvalue("comments") or None
+        if self.comments is not None:
+            self.comments = self.comments.decode("utf-8")
         self.job = self.english_id and Job(self) or None
         cdrcgi.valParmDate(self.state_date, empty_ok=True, msg=cdrcgi.TAMPERING)
 
@@ -176,6 +178,7 @@ jQuery("input[value='%s']").click(function(e) {
         state_id = self.job.state_id or states[0][0]
         state_date = self.job.state_date or str(self.today)
         comments = self.job.comments or ""
+        comments = comments.replace("\r", "").replace("\n", cdrcgi.NEWLINE)
         form.add_select("change_type", "Change Type", types, change_type)
         form.add_select("assigned_to", "Assigned To", users, user)
         form.add_select("state", "Status", states, state_id)
