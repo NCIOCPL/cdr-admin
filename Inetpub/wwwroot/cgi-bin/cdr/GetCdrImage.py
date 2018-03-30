@@ -13,6 +13,7 @@ res     = fields.getvalue("res")
 fname   = fields.getvalue("fname")
 quality = fields.getvalue("quality") or "85"
 sharpen = fields.getvalue("sharpen")
+pp      = fields.getvalue("pp") or ""
 cdrId   = fields.getvalue("id")      or cdrcgi.bail(message)
 
 conn    = cdrdb.connect()
@@ -55,12 +56,36 @@ else:
     docId = cdrId
 
 intId   = cdr.exNormalize(docId)[1]
-cursor.execute("""\
+
+# If the docId comes in the format 'CDR000999999' it is coming
+# from the QC report. If it's coming in the format 'CDR999999' it is 
+# coming from the PublishPreview report.  We're selecting the 
+# last publishable version for the PP report.
+# ------------------------------------------------------------------
+ppQuery = ""
+if pp == 'Y':
+    ppQuery = "AND publishable = 'Y'"
+elif pp == 'N':
+    ppQuery = ""
+elif cdrId.find('CDR0') < 0:
+    ppQuery= "AND publishable = 'Y'"
+
+query = """\
     SELECT b.data
       FROM doc_blob b
-      JOIN doc_blob_usage u
-        ON u.blob_id = b.id
-     WHERE u.doc_id = ?""", intId)
+      JOIN version_blob_usage v
+        ON b.id = v.blob_id
+      JOIN doc_version dv
+        ON dv.id = v.doc_id
+       AND dv.num = v.doc_version
+     WHERE v.doc_id = %d
+       AND dv.num = (SELECT max(num) 
+                       FROM doc_version 
+                      WHERE id = dv.id
+                      %s
+                    )""" % (intId, ppQuery)
+cursor.execute(query)
+
 rows = cursor.fetchall()
 if not rows:
     cdrcgi.bail("%s not found" % docId)
