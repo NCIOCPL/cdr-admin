@@ -295,7 +295,35 @@ if not cachedHtml:
         cgHtml = resp.xmlResult
         showProgress("Response received from Cancer.gov...")
     except Exception, e:
-        cdrcgi.bail('Error in PubPreview: ' + str(e))
+        #cdrcgi.bail('Error in PubPreview:' + str(e))
+        # List of previously identified Percussion errors to catch
+        # --------------------------------------------------------
+        errMsgs = {
+                    "Unknown Error":"Unspecified Error",
+                    "Validation Error":
+                     "Top-level section _\d* is missing a required Title.",
+                    "DTD Error":
+                     "The element '\w*' has invalid child element"
+                  }
+
+        # If we identified one of the nown error display it in
+        # "user friendly" format and exit
+        # ----------------------------------------------------
+        for errType, string in errMsgs.items():
+            regex = re.compile(string)
+            matches = re.search(regex, str(e))
+            if matches:
+                extraLines = ['%s: %s' % (errType, matches.group()),
+                              'Complete Error message below:',
+                              str(e)]
+                cdrcgi.bail('Error in PubPreview:', extra=extraLines)
+
+        # Nothing in our known list of error. Display default message
+        # -----------------------------------------------------------
+        extraLines = ['%s' % errMsgs['Unknown Error'],
+                          'Complete Error message below:',
+                          str(e)]
+        cdrcgi.bail('Error in PubPreview:', extra=extraLines)
     showProgress("Done...")
 
 #----------------------------------------------------------------------
