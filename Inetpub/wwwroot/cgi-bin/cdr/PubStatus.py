@@ -379,7 +379,7 @@ def dispJobControl():
         jobs.append(job)
     columns = "Job ID", "Job Type", "Job Started", "Job Status", "Actions"
     columns = [cdrcgi.Report.Column(name) for name in columns]
-    table = cdrcgi.Report.Table(columns, jobs)
+    table = cdrcgi.Report.Table(columns, jobs, caption="Test")
     title = "CDR Publishing Job Controller"
     css = "button { margin: 0 3px }"
     opts = dict(banner=title, subtitle=message, css=css)
