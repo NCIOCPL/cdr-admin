@@ -379,9 +379,15 @@ def dispJobControl():
         jobs.append(job)
     columns = "Job ID", "Job Type", "Job Started", "Job Status", "Actions"
     columns = [cdrcgi.Report.Column(name) for name in columns]
-    table = cdrcgi.Report.Table(columns, jobs, caption="Test")
+    caption = ("Note: If ALL documents need to be pushed"
+               " you need to fail this job, manually submit a push-job"
+               " and set the push-job parameter PushAllDocs=Yes.")
+    table = cdrcgi.Report.Table(columns, jobs, caption=caption)
     title = "CDR Publishing Job Controller"
-    css = "button { margin: 0 3px }"
+    css = ("button { margin: 0 3px; } "
+           """table caption { font-weight: normal; 
+                              text-align: left; 
+                              margin-bottom: 10px;}""")
     opts = dict(banner=title, subtitle=message, css=css)
     page = cdrcgi.Report(title, [table], **opts)
     page.send()
