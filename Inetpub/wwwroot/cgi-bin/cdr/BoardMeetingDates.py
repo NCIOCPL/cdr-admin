@@ -61,6 +61,7 @@ rptStyle = """\
                    text-align: center; }
    .subtitle     { font-size: 12pt; }
    .blank        { background-color: #FFFFFF; }
+   .strikethrough { text-decoration: line-through; }
   </style>"""
 rptHeader  = cdrcgi.rptHeader(title, bkgd = 'FFFFFF', stylesheet = rptStyle)
 footer     = """\
@@ -415,19 +416,18 @@ else:
                 # Display the records in a table row format
                 # -----------------------------------------
                 bg = monthBlocks % 2 == 0 and 'even' or 'odd'
+                cls = "dates strikethrough" if meeting.canceled else "dates"
                 html.append("""
    <tr class="%s">
-    <td width="150px" class="dates" align='center'>%s %s</td>
-    <td width="70px" class="dates" align='center'>%s</td>
-    <td width="200px" class="dates" align='center'>%s</td>
-    <td width="60px" class="dates" align='center'>%s</td>
-    <td width="330px" class="dates">%s</td>
-   </tr>""" % (bg, meeting.date,
-                   meeting.canceled and
-         ('<br><span class="DTDerror">Canceled: %s</span>' % meeting.canceled)
-                   or '',
-               meeting.dayOfWeek, meeting.time,
-               meeting.webEx and 'Yes' or '', cgi.escape(meeting.board.name)))
+    <td width="150px" class="%s" align='center'>%s</td>
+    <td width="70px" class="%s" align='center'>%s</td>
+    <td width="200px" class="%s" align='center'>%s</td>
+    <td width="60px" class="%s" align='center'>%s</td>
+    <td width="330px" class="%s">%s</td>
+   </tr>""" % (bg, cls, meeting.date,
+               cls, meeting.dayOfWeek, cls, meeting.time,
+               cls, meeting.webEx and 'Yes' or '',
+               cls, cgi.escape(meeting.board.name)))
 
                 lastDate = meeting.date
 
