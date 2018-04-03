@@ -16,24 +16,23 @@ import lxml.etree as etree
 # Create HTML list item by summary to be included in report
 # --------------------------------------------------------------------
 def addRow(summary):
-    #print summary.id
-    #print summary.modules
-    #print summary.miscdocs
+    #print summary.elemInfo
     html = """\
    <li class='summary'>%s (%s)
     <ul>
 """ % (summary.title, summary.id)
-    for element in summary.elements.keys():
-        if element == 'SummaryModuleLink' and len(summary.elements[element]) > 0:
+    for element in summary.elemInfo.keys():
+        if (element == 'SummaryModuleLink' and 
+            len(summary.elements[element]) > 0):
             for module in summary.elements[element]:
                 html += """\
      <li class='%s'>%s (%s)</li>
-""" % (element.lower(), module, element)
+""" % (summary.elemInfo[element], module, element)
         else:
             if len(summary.elements[element]) > 0:
                 html += """\
      <li class='%s'>%s %s(s)</li>
-""" % (element.lower(), len(summary.elements[element]), element)
+""" % (summary.elemInfo[element], len(summary.elements[element]), element)
 
     html += """\
     </ul>
@@ -49,17 +48,18 @@ class SummaryInclude:
     def __init__(self, id, title, docXml):
         self.id = id
         self.title = title
-        self.elements = {}
         self.error = None
-        elements = ['Table', 
-                    'SummaryModuleLink',
-                    'MiscellaneousDocLink',
-                    'MediaLink',
-                    'EmbeddedVideo']
+        self.elemInfo = {'Table':'table', 
+                         'SummaryModuleLink':'module-link',
+                         'MiscellaneousDocLink':'misc-doc-link',
+                         'MediaLink':'media-link',
+                         'EmbeddedVideo':'embedded-video'}
+        self.elements = {}
 
         # Create empty list for each element
-        for i in elements:
-            self.elements[i] = []
+        elements = list(self.elemInfo.keys())
+        for elem in elements:
+            self.elements[elem] = []
 
         try:
             dom = etree.fromstring(docXml.encode('utf-8'))
