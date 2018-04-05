@@ -389,6 +389,7 @@ loe      = fields.getvalue("LOEs")       or None
 qd       = fields.getvalue("QD")         or None
 kpbox    = fields.getvalue("Keypoints")  or None
 learnmore= fields.getvalue("LearnMore")  or None
+modMarkup= fields.getvalue("ModuleMarkup")     or None
 
 if docTitle:
     docTitle = unicode(docTitle, "utf-8")
@@ -1614,6 +1615,7 @@ if docType.startswith('Summary'):
     filterParm.append(['SourceComments', sourceComments ])
     filterParm.append(['IncludeExtPerm', includeExtPerm ])
     filterParm.append(['IncludeIntAdv', includeIntAdv ])
+    filterParm.append(['DisplayModuleMarkup', modMarkup and 'Y' or 'N'])
 
     # Patient Summaries are displayed like editorial board markup
     # -----------------------------------------------------------
