@@ -422,7 +422,7 @@ report    = """\
 audienceHeader = ""
 if vol and audience != 'Both':
     audienceHeader = "%s<br />" % {
-        "Health Professionals": "Health Professional",
+        "Health_professionals": "Health Professional",
         "Patients": "Patient" }.get(audience, "Unrecognized audience")
 report += """\
   <center>
