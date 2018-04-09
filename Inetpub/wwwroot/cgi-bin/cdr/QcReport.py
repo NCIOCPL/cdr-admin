@@ -1096,40 +1096,31 @@ if not docType:
                                                                  info[1][0]))
     #----------------------------------------------------------------------
     # Determine the report type if the document is a summary.
-    # Reformatted patient summaries contain a KeyPoint element
-    # The element of the list creating the output is given as a string
-    # similar to this:  "Treatment Patients KeyPoint KeyPoint KeyPoint"
-    # which will be used to set the propper report type for reformatted
-    # patient summaries.
+    # The the resulting text output is given as a string similar to this:  
+    #      "Treatment Patients KeyPoint KeyPoint KeyPoint"
+    # which will be used to set the propper report type for patient or HP
+    # 
+    # In the past there used to be new (including KeyPoints) and old (not
+    # including KeyPoints) summaries and the old versions had to use HP
+    # QC report filters.
     #----------------------------------------------------------------------
     if docType == 'Summary':
-        isPatient = hasKeyPoint = False
         inspectSummary = cdr.filterDoc(session,
                   """<?xml version="1.0" ?>
 <xsl:transform version="1.1" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
  <xsl:template          match = "Summary">
-  <xsl:apply-templates select = "SummaryMetaData/SummaryAudience |
-                                 SummaryMetaData/SummaryType     |
-                                 //KeyPoint"/>
+  <xsl:apply-templates select = "SummaryMetaData/SummaryAudience"/>
  </xsl:template>
 
- <xsl:template          match = "SummaryAudience | SummaryType">
+ <xsl:template          match = "SummaryAudience">
   <xsl:value-of        select = "."/>
   <xsl:text> </xsl:text>
  </xsl:template>
+</xsl:transform>""", inline = 1, docId = docId, docVer = version or None)
 
- <xsl:template          match = "KeyPoint">
-  <xsl:text>KeyPoint</xsl:text>
-  <xsl:text> </xsl:text>
- </xsl:template>
-</xsl:transform>
-                  """, inline = 1,
-                        docId = docId, docVer = version or None)
-        if inspectSummary[0].find('Patients') > 0:  isPatient   = True
-        if inspectSummary[0].find('KeyPoint') > 0:  hasKeyPoint = True
-
-        if hasKeyPoint and isPatient:
+        if inspectSummary[0].find('Patients') > 0:  
             repType = 'pat'
+
 
 #----------------------------------------------------------------------
 # Get count of links to a person document from protocols and summaries.
