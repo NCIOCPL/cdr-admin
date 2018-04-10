@@ -92,7 +92,7 @@ def addMediaRow(data, label):
         <Root xmlns:cdr="cips.nci.nih.gov/cdr">
         %s
         </Root>''' % row
-        dom = xml.dom.minidom.parseString(mediaString)
+        dom = xml.dom.minidom.parseString(mediaString.encode('utf-8'))
         docElem = dom.documentElement
 
         for node in docElem.childNodes:
@@ -126,11 +126,12 @@ def addVideoRow(data, label):
     url = "https://www.youtube.com/watch?v"
     htmlRow = ''
     for row in data['EmbeddedVideo']:
-        mediaString = '''
+        specificTitle = ''
+        videoString = '''
         <Root xmlns:cdr="cips.nci.nih.gov/cdr">
         %s
         </Root>''' % row
-        dom = xml.dom.minidom.parseString(mediaString)
+        dom = xml.dom.minidom.parseString(videoString.encode('utf-8'))
         docElem = dom.documentElement
 
         for node in docElem.childNodes:
@@ -145,7 +146,9 @@ def addVideoRow(data, label):
                            cdrcgi.bail("Error converting videoID: " % videoID)
 
                     if child.nodeName == 'SpecificMediaTitle':
-                        specificTitle = str(cdr.getTextContent(child).strip())
+                        #specificTitle = str(cdr.getTextContent(child).strip())
+                        specificTitle = cdr.getTextContent(child).strip()
+                        specificTitleBytes = specificTitle.encode('utf-8')
         dom.unlink()
 
         # Retrieve the hosting ID for YouTube from the Media document
@@ -288,36 +291,6 @@ def resolvePlaceHolder(language, termData, definitionText):
          doc = doc[0].decode('utf-8')
 
      return doc
-
-
-# #-----------------------------------------------------------------------
-# # Module to create a small XML snippet that can be submitted to a filter
-# # in order to substitute the PlaceHolder elements with the appropriate
-# # text from the ReplacementText elements.
-# #-----------------------------------------------------------------------
-# def displayComment(commentList):
-#      # Create the Glossary Definition
-#      tmpdoc  = u"\n<GlossaryTermDef xmlns:cdr = 'cips.nci.nih.gov/cdr'>\n"
-#
-#      # Add the CommentText and attributes
-#      for comment in commentList:
-#          tmpdoc += u"  %s\n" % comment
-#
-#      tmpdoc += u"</GlossaryTermDef>\n"
-#
-#      # Need to encode the unicode string to UTF-8 since that's what the
-#      # filter module expects.  Decoding it back to unicode once the
-#      # filtered document comes back.
-#      # --------------------------------------------------------------------
-#      doc = cdr.filterDoc('guest', ['name:Glossary Term Definition Update'],
-#                          doc = tmpdoc.encode('utf-8'))
-#
-#      if type(doc) in (type(""), type(u"")):
-#          cdrcgi.bail(doc)
-#      if type(doc) == type(()):
-#          doc = doc[0].decode('utf-8')
-#
-#      return doc
 
 
 #-----------------------------------------------------------------------
