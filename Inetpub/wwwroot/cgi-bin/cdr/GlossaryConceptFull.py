@@ -791,6 +791,7 @@ html = """\
                    background-color: #FFFFFF; }
    .insertapproved { color: red; }
    .deleteapproved { text-decoration: line-through; }
+   img           { width: 300px; }
   </STYLE>
  </HEAD>
  <BODY>
