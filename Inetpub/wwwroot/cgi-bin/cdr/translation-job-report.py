@@ -40,6 +40,7 @@ class Control(cdrcgi.Control):
         self.change = self.get_list("change", self.changes.map)
         self.translator = self.get_list("translator", self.translators)
         self.sort = self.fields.getvalue("sort") or self.SORT[0][0]
+        self.comments = self.fields.getvalue("comments")
         cdrcgi.valParmVal(self.sort, valList=self.SORT_VALS, msg=self.TAMPERING)
         cdrcgi.valParmDate(self.start, empty_ok=True, msg=self.TAMPERING)
         cdrcgi.valParmDate(self.end, empty_ok=True, msg=self.TAMPERING)
@@ -65,6 +66,11 @@ class Control(cdrcgi.Control):
         form.add(form.B.LEGEND("Report Type"))
         form.add_radio("type", "Current Jobs", "current", checked=True)
         form.add_radio("type", "Job History", "history")
+        form.add("</fieldset>")
+        form.add("<fieldset>")
+        form.add(form.B.LEGEND("Comment Display"))
+        form.add_radio("comments", "Shortened", "short", checked=True)
+        form.add_radio("comments", "Full", "full")
         form.add("</fieldset>")
         form.add("<fieldset>")
         form.add(form.B.LEGEND("Statuses (all if none checked)"))
@@ -253,7 +259,11 @@ class Job:
         self.change = change
         self.user = user
         self.date = date
-        self.comments = cmt
+        self.comments = cmt or ""
+        if control.comments == "short" and len(self.comments) > 40:
+            self.comments = self.comments[:40] + "..."
+        else:
+            self.comments = self.comments.split("\n")
         Job.COUNTS[state] = self.COUNTS.get(state, 0) + 1
         self.spanish_id = self.spanish_title = self.spanish_audience = None
         query = cdrdb.Query("query_term q", "d.id", "d.title")
@@ -272,9 +282,6 @@ class Job:
         Generate a row for the report's table.
         """
 
-        comments = self.comments or ""
-        if len(comments) > 40:
-            comments = comments[:40] + "..."
         return [
             self.doc_id,
             self.title,
@@ -284,7 +291,7 @@ class Job:
             cdrcgi.Report.Cell(str(self.date)[:10], classes="nowrap"),
             self.change,
             self.spanish_id or "",
-            comments
+            self.comments
         ]
 
 if __name__ == "__main__":
