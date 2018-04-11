@@ -379,9 +379,11 @@ def dispJobControl():
         jobs.append(job)
     columns = "Job ID", "Job Type", "Job Started", "Job Status", "Actions"
     columns = [cdrcgi.Report.Column(name) for name in columns]
-    caption = ("Note: If ALL documents need to be pushed"
-               " you need to fail this job, manually submit a push-job"
-               " and set the push-job parameter PushAllDocs=Yes.")
+    caption = ""
+    if jobs:
+        caption = ("Note: If ALL documents need to be pushed"
+                   " you need to fail this job, manually submit a push-job"
+                   " and set the push-job parameter PushAllDocs=Yes.")
     table = cdrcgi.Report.Table(columns, jobs, caption=caption)
     title = "CDR Publishing Job Controller"
     css = ("button { margin: 0 3px; } "
