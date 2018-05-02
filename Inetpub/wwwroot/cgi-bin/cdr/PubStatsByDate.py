@@ -60,8 +60,7 @@ if date_from: cdrcgi.valParmDate(date_from)
 if date_to:   cdrcgi.valParmDate(date_to)
 if vol:       cdrcgi.valParmVal(vol, valList='Y')
 if audience:
-    vlist = list(cdr.getSummaryAudiences())
-    vlist.append('Both')
+    vlist = "Both", "Patients", "Health_professionals"
     cdrcgi.valParmVal(audience, valList=vlist)
 
 #----------------------------------------------------------------------
@@ -139,7 +138,7 @@ if not doc_type or not cdrcgi.is_date(date_from) or not cdrcgi.is_date(date_to):
         page.add_radio("audience", "Both", "Both", checked=True)
         page.add_radio("audience", "Patient", "Patients")
         page.add_radio("audience", "Health Professional",
-                       "Health_Professionals")
+                       "Health_professionals")
         page.add("</fieldset>")
         page.add(page.B.INPUT(name="doc_type", value="Media", type="hidden"))
         page.add(page.B.INPUT(name="VOL", value="Y", type="hidden"))
@@ -320,7 +319,7 @@ if vol and audience != 'Both':
     query.where(query.Condition("path", paths, "IN"))
     if LOG_QUERIES:
         query.log(label="AUDIENCES QUERY")
-    audiences = set([row[0] for row in query.execute(cursor, 300)])
+    audiences = set([row[0] for row in query.execute(cursor, 300).fetchall()])
 
 # Collect all doc-ids in one list and get the information for the
 # report for each of the documents from the database
@@ -423,7 +422,7 @@ report    = """\
 audienceHeader = ""
 if vol and audience != 'Both':
     audienceHeader = "%s<br />" % {
-        "Health_Professionals": "Health Professional",
+        "Health_professionals": "Health Professional",
         "Patients": "Patient" }.get(audience, "Unrecognized audience")
 report += """\
   <center>
@@ -521,7 +520,8 @@ if vol:
     <td align="center">%s</td>
     <td align="center">%s</td>
    </tr>
-""" % (id, id, title, first[:10], verDt[:16], publishable,
+""" % (id, id, title, first and first[:10] or "",
+       verDt and verDt[:16] or "", publishable,
        volFlag and volFlag[:1] or "")
 
 

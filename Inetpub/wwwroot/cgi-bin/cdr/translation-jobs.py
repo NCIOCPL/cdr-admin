@@ -81,7 +81,7 @@ DELETE FROM summary_translation_job
         query.join("summary_change_type c", "c.value_id = j.change_type")
         query.order("s.value_pos", "u.fullname", "j.state_date")
         rows = query.execute(self.cursor).fetchall()
-        jobs = sorted([Job(self, *row) for row in rows])
+        jobs = [Job(self, *row) for row in rows]
         body = form.B.TBODY()
         for job in jobs:
             body.append(job.tr())

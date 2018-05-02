@@ -389,6 +389,7 @@ loe      = fields.getvalue("LOEs")       or None
 qd       = fields.getvalue("QD")         or None
 kpbox    = fields.getvalue("Keypoints")  or None
 learnmore= fields.getvalue("LearnMore")  or None
+modMarkup= fields.getvalue("ModuleMarkup")     or None
 
 if docTitle:
     docTitle = unicode(docTitle, "utf-8")
@@ -790,7 +791,9 @@ if letUserPickVersion:
                        'LOEs':
                             'Display Level of Evidence terms',
                        'StandardWording':
-                            'Display standard wording with mark-up'
+                            'Display standard wording with mark-up',
+                       'ModuleMarkup':
+                            'Display Module Markup'
                  }
 
     # Display the Misc. Print Options check boxes for Patients
@@ -815,6 +818,8 @@ if letUserPickVersion:
                                 inputID='displayCitations', checked=1)
             form += addCheckbox(checkboxLabels, 'LearnMore',
                                 inputID='displayLearnMore', checked=1)
+            form += addCheckbox(checkboxLabels, 'ModuleMarkup',
+                                inputID='displayModuleMarkup')
 
         # End - Misc Print Options block
         # ------------------------------
@@ -1043,6 +1048,8 @@ if letUserPickVersion:
                                 inputID='displayImages', checked=0)
             form += addCheckbox(checkboxLabels, 'LOEs',
                                 inputID='displayLOEs')
+            form += addCheckbox(checkboxLabels, 'ModuleMarkup',
+                                inputID='displayModuleMarkup', checked=0)
 
         # End - Misc Print Options block
         # ------------------------------
@@ -1089,40 +1096,31 @@ if not docType:
                                                                  info[1][0]))
     #----------------------------------------------------------------------
     # Determine the report type if the document is a summary.
-    # Reformatted patient summaries contain a KeyPoint element
-    # The element of the list creating the output is given as a string
-    # similar to this:  "Treatment Patients KeyPoint KeyPoint KeyPoint"
-    # which will be used to set the propper report type for reformatted
-    # patient summaries.
+    # The the resulting text output is given as a string similar to this:  
+    #      "Treatment Patients KeyPoint KeyPoint KeyPoint"
+    # which will be used to set the propper report type for patient or HP
+    # 
+    # In the past there used to be new (including KeyPoints) and old (not
+    # including KeyPoints) summaries and the old versions had to use HP
+    # QC report filters.
     #----------------------------------------------------------------------
     if docType == 'Summary':
-        isPatient = hasKeyPoint = False
         inspectSummary = cdr.filterDoc(session,
                   """<?xml version="1.0" ?>
 <xsl:transform version="1.1" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
  <xsl:template          match = "Summary">
-  <xsl:apply-templates select = "SummaryMetaData/SummaryAudience |
-                                 SummaryMetaData/SummaryType     |
-                                 //KeyPoint"/>
+  <xsl:apply-templates select = "SummaryMetaData/SummaryAudience"/>
  </xsl:template>
 
- <xsl:template          match = "SummaryAudience | SummaryType">
+ <xsl:template          match = "SummaryAudience">
   <xsl:value-of        select = "."/>
   <xsl:text> </xsl:text>
  </xsl:template>
+</xsl:transform>""", inline = 1, docId = docId, docVer = version or None)
 
- <xsl:template          match = "KeyPoint">
-  <xsl:text>KeyPoint</xsl:text>
-  <xsl:text> </xsl:text>
- </xsl:template>
-</xsl:transform>
-                  """, inline = 1,
-                        docId = docId, docVer = version or None)
-        if inspectSummary[0].find('Patients') > 0:  isPatient   = True
-        if inspectSummary[0].find('KeyPoint') > 0:  hasKeyPoint = True
-
-        if hasKeyPoint and isPatient:
+        if inspectSummary[0].find('Patients') > 0:  
             repType = 'pat'
+
 
 #----------------------------------------------------------------------
 # Get count of links to a person document from protocols and summaries.
@@ -1608,6 +1606,7 @@ if docType.startswith('Summary'):
     filterParm.append(['SourceComments', sourceComments ])
     filterParm.append(['IncludeExtPerm', includeExtPerm ])
     filterParm.append(['IncludeIntAdv', includeIntAdv ])
+    filterParm.append(['DisplayModuleMarkup', modMarkup and 'Y' or 'N'])
 
     # Patient Summaries are displayed like editorial board markup
     # -----------------------------------------------------------

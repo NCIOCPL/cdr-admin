@@ -10,7 +10,7 @@ import cdrcgi
 
 class Control(cdrcgi.Control):
     DEFAULT_COUNT = "2000000"
-    DEFAULT_PATH = r"D:\cdr\Log\Jobmaster.log"
+    DEFAULT_PATH = r"D:\cdr\Log\PubJob.log"
     def __init__(self):
         cdrcgi.Control.__init__(self, "Log Viewer")
         self.authenticate()

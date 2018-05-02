@@ -11,6 +11,7 @@
 # JIRA::OCECDR-3650 - added Summary Internal Links report
 # Removed unused parameter July 2015 as part of security sweep (and
 # modified the script to use the cdrcgi.Page class in the process).
+# JIRA::OCECDR-4360 - Admin menu changes
 #----------------------------------------------------------------------
 import cdr
 import cdrcgi
@@ -52,9 +53,10 @@ class Control:
             cdrcgi.SESSION: self.session
         }
         for report_type, label in (
-            ("bu", "Bold/Underline (HP/Old Patient)"),
-            ("rs", "Redline/Strikeout (HP/Old Patient)"),
-            ("pat", "New Patient"),
+            ("bu", "Bold/Underline (HP)"),
+            ("rs", "Redline/Strikeout (HP)"),
+            ("patbu","Bold/Underline (Patient)"),
+            ("pat","Redline/Strikeout (Patient)"),
             ("pp", "Publish Preview")
         ):
             args["ReportType"] = report_type

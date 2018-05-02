@@ -35,8 +35,6 @@ items   = (('EditGroups.py',           'Manage Groups'                 ),
            ('EditLinkControl.py',      'Manage Linking Tables'         ),
            ('EditFilters.py',          'Manage Filters'                ),
            ('EditFilterSets.py',       'Manage Filter Sets'            ),
-           ("manage-pdq-data-partners.py",
-            "Manage PDQ Data Partners"),
            ("edit-value-table.py",     "Manage Value Tables"           ),
            ('getBatchStatus.py',       'Batch Job Status'              ),
            ('FailBatchJob.py',         'Fail Publishing or Batch Job'  ),
@@ -51,6 +49,7 @@ items   = (('EditGroups.py',           'Manage Groups'                 ),
            ('../scheduler/',           'Scheduled Jobs'                ),
            ('MessageLoggedInUsers.py', 'Send Email to Users Currently '
                                        'Logged in to the CDR'          ),
+           ('SetNextJobId.py',         'Set Next Job-ID'               ),
            ('UnblockDoc.py',           'Unblock Documents'             ),
            ('EditExternMap.py',        'Update Mapping Table'          ),
            ('upload-zip-code-file.py', 'Update ZIP Codes'              ),
@@ -63,6 +62,8 @@ items   = (('EditGroups.py',           'Manage Groups'                 ),
            ('Logout.py',               'Log Out'                       )
            )
 for item in items:
+    if cdr.isProdHost() and item[0] == 'SetNextJobId.py':
+        continue
     html += """\
     <li><a href='%s/%s%s'>%s</a></li>
 """ % (cdrcgi.BASE, item[0], session, item[1])

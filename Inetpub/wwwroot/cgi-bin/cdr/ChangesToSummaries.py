@@ -105,7 +105,7 @@ class Control(cdrcgi.Control):
                          xmlns:cdr = "cips.nci.nih.gov/cdr"
            exclude-result-prefixes = "cdr">
  <xsl:output                method = "html"/>
- <xsl:include                 href = "cdr:name:Module: STYLE Default"/>
+ <xsl:include                 href = "cdr:name:Module:+STYLE+Default"/>
  <xsl:template               match = "/">
   <style type='text/css'>
    <xsl:call-template         name = "defaultStyle"/>
@@ -183,7 +183,10 @@ class Summary:
         self.title = rows[0][0].split(";")[0]
         query = cdrdb.Query("publishable_version", "num").order("num DESC")
         query.where(query.Condition("id", doc_id))
-        #query.where(query.Condition("dt", control.start, ">="))
+        start = datetime.datetime.strptime(control.start, "%Y-%m-%d")
+        cutoff = start - datetime.timedelta(365)
+        query.where(query.Condition("dt", str(cutoff), ">="))
+        query.where(query.Condition("dt", control.end, "<"))
         versions = [row[0] for row in query.execute(control.cursor).fetchall()]
         html = ""
         for version in versions:

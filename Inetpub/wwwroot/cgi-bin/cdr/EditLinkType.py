@@ -1,390 +1,582 @@
-#----------------------------------------------------------------------
-# Prototype for editing a CDR link type.
-#
-# Script is run twice - first to create a form on screen, then
-# to read the values on the form.
-#----------------------------------------------------------------------
-import cgi
-import pprint
+"""
+Create a new CDR link type or edit an existing one
+
+Rewritten for OCECDR-4319 - Fix link type management interface
+"""
+
+import lxml.html
 import cdr
 import cdrcgi
 
-#----------------------------------------------------------------------
-# Get the form variables.
-#----------------------------------------------------------------------
-fields      = cgi.FieldStorage()
-session     = cdrcgi.getSession(fields)
-request     = cdrcgi.getRequest(fields)
-name        = fields and fields.getvalue("name") or None
-linkChkType = fields and fields.getvalue("linkChkType") or None
-linkForm    = fields and fields.getvalue("linkform") or None
-logger      = cdr.Logging.get_logger("link-control")
-pprinter    = pprint.PrettyPrinter()
-extra       = ""
-SUBMENU     = "Link Menu"
+class Control(cdrcgi.Control):
+    """
+    Top-level processing logic for form
+    """
 
-logger.info("session %s", session)
+    LOGNAME = "link-control"
+    SAVE = "Save"
+    CANCEL = "Cancel"
+    DELETE = "Delete"
+    SKIP = "Filter", "schema", "PublishingSystem", "TermSet", "xxtest"
+    BUTTONS = SAVE, CANCEL, cdrcgi.Control.ADMINMENU, cdrcgi.Control.LOG_OUT
+    VERSIONS = (
+        ("P", "Published version"),
+        ("V", "Any version"),
+        ("C", "Current working document")
+    )
 
-# Target doc link type prompts and corresponding codes
-LINKCHKTYPES = (('Published version', 'P'),
-                ('Any version', 'V'),
-                ('Current working document', 'C'))
+    def __init__(self):
+        """
+        Assemble the lookup table and initialize control variables
+        """
 
-#----------------------------------------------------------------------
-# If no linkForm, this is first time through, setup subsequent action.
-# Initialize linkAct to value from form variable or URL parameter.
-#----------------------------------------------------------------------
-linkAct = linkForm
-if linkForm is None:
-    linkAct = fields and fields.getvalue("linkact") or None;
-    if (linkAct != "addlink" and linkAct != "modlink"):
-        cdrcgi.bail("Invalid form linkact='%s' - can't happen" % linkAct)
+        cdrcgi.Control.__init__(self, "Link Control")
+        self.doctypes = cdr.getDoctypes(self.session)
+        self.ruletypes = [p.name for p in cdr.getLinkProps(self.session)]
+        self.name = self.fields.getvalue("name", "")
+        self.message = None
+        self.linktype = None
+        self.errors = []
 
-#----------------------------------------------------------------------
-# Make sure we're logged in.
-#----------------------------------------------------------------------
-if not session: cdrcgi.bail('Unknown or expired CDR session.')
+    def run(self):
+        """
+        Override the top-level entry point, as this isn't a report
+        """
 
-#----------------------------------------------------------------------
-# Handle request to log out.
-#----------------------------------------------------------------------
-if request == "Log Out":
-    cdrcgi.logout(session)
+        try:
+            if self.request == self.SAVE:
+                self.save()
+            elif self.request == self.CANCEL:
+                cdrcgi.navigateTo("EditLinkControl.py", self.session)
+            elif self.request == self.DELETE:
+                cdr.delLinkType(self.session, self.name)
+                cdrcgi.navigateTo("EditLinkControl.py", self.session)
+            else:
+                cdrcgi.Control.run(self)
+        except Exception as e:
+            self.logger.exception("link type editing failure")
+            cdrcgi.bail(str(e))
 
-#----------------------------------------------------------------------
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if request == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif request == SUBMENU:
-    cdrcgi.navigateTo("EditLinkControl.py", session)
+    def get_linktype(self):
+        """
+        Assemble the values for this link type
 
-#----------------------------------------------------------------------
-# Handle request to delete the link type - Future.
-#----------------------------------------------------------------------
-if request == "Delete Link Type":
-    cdrcgi.bail("Delete Link Type command not yet implemented")
+        The first step is to collect the form values. Then, if the
+        form values are empty and we are editing an existing link
+        type, we load that type's information from the database.
+        If the form values are not empty, instantiate an object
+        holding those values.
 
-#----------------------------------------------------------------------
-# Gather together the fields in the form name-number.
-#----------------------------------------------------------------------
-def getArrayFields(baseNames):
-    arrayFields = {}
-    for baseName in baseNames:
-        arrayFields[baseName] = {}
-    for fieldName in fields.keys():
-        nameParts = fieldName.split("-")
-        if len(nameParts) == 2:
-            name = nameParts[0]
-            num  = int(nameParts[1])
-            if name in baseNames:
-                arrayFields[name][num] = fields.getvalue(fieldName)
-    return arrayFields
+        Return:
+            reference to a `cdr.LinkType` object
+        """
 
-#----------------------------------------------------------------------
-# Handle request to store changes to the link type.
-#----------------------------------------------------------------------
-if request == "Save Changes":
-    linkTypeName = fields and fields.getvalue("name") or ""
-    # linkChkType  = fields and fields.getvalue("linkChkType") or ""
-    linkType     = cdr.LinkType(linkTypeName)
-    comment      = fields.getvalue("comment")
-    if comment: linkType.comment = comment
-    if linkChkType: linkType.linkChkType = linkChkType
+        # Fetch the straightforward field values
+        new_name = self.fields.getvalue("newname", "")
+        target_version = self.fields.getvalue("version", "")
+        comment = self.fields.getvalue("desc")
+        targets = self.fields.getlist("target")
 
-    # So much for the easy fields; now get the multi-occurence values.
-    arrayFields = getArrayFields(("src_sel", "src_dt", "src_elem",
-                                  "dst_sel", "dst_dt",
-                                  "prop_sel", "prop_name", "prop_value",
-                                  "prop_comment"))
-    srcKeys = arrayFields["src_sel"].keys()
-    srcKeys.sort()
-    for srcKey in srcKeys:
-        ordKey = cdr.ordinal(srcKey)
-        if arrayFields["src_sel"][srcKey] == "on":
-            srcDocType = arrayFields["src_dt"][srcKey]
-            if srcDocType == "Select Document Type":
-                logger.error("no doctype for selection %s", srcKey)
-                logger.error("field data:\n%s", pprinter.pformat(arrayFields))
-                cdrcgi.bail("Document type missing for %s link source" % ordKey)
-            srcField = arrayFields["src_elem"].get(srcKey)
-            if not srcField:
-                cdrcgi.bail("Missing element for %s link source" % ordKey)
-            linkType.linkSources.append((srcDocType, srcField))
-    dstKeys = arrayFields["dst_sel"].keys()
-    dstKeys.sort()
-    for dstKey in dstKeys:
-        if arrayFields["dst_sel"][dstKey] == "on":
-            dstDocType = arrayFields["dst_dt"][dstKey]
-            if dstDocType == "Select Document Type":
-                cdrcgi.bail("Document type must be selected for link target")
-                break
-            linkType.linkTargets.append(dstDocType)
-    propKeys = arrayFields["prop_sel"].keys()
-    propKeys.sort()
-    for propKey in propKeys:
-        if arrayFields["prop_sel"][propKey] == "on":
-            propValue   = ""
-            propComment = ""
-            propName    = arrayFields["prop_name"][propKey]
-            if propName == "Select Property":
-                cdrcgi.bail("Property name not selected")
-                break
-            if arrayFields["prop_value"].has_key(propKey):
-                propValue   = arrayFields["prop_value"][propKey]
-                if propValue == "None": propValue = ""
-            if arrayFields["prop_comment"].has_key(propKey):
-                propComment = arrayFields["prop_comment"][propKey]
-                if propComment == "None": propComment = ""
-            linkType.linkProps.append((propName, propValue, propComment))
-    error = cdr.putLinkType(session, name, linkType, linkForm)
-    if error: cdrcgi.bail(error)
-    name = linkTypeName
-    extra = "\n<H4>(Successfully Updated)</H4>"
+        # Collect all the multiply-occurring blocks' field values
+        value_sets = {}
+        for key in self.fields.keys():
+            if "-" in key:
+                name, number = key.split("-", 1)
+                if number.isdigit():
+                    if number not in value_sets:
+                        value_sets[number] = {}
+                    value_sets[number][name] = self.fields.getvalue(key)
 
-#----------------------------------------------------------------------
-# Retrieve and display the link type information.
-#----------------------------------------------------------------------
-title   = "CDR Administration"
-if linkAct == "addlink":
-    section = "Add Link Type"
-else:
-    section = "Edit Link Type"
+        # Populate the list of link sources and custom rules from those fields
+        sources = []
+        rules = []
+        for key in value_sets:
+            values = value_sets[key]
+            if "element" in values or "doctype" in values:
+                element = values.get("element", "")
+                doctype = values.get("doctype", "")
+                if element or doctype:
+                    if not element:
+                        self.errors.append("Missing element")
+                    if not doctype:
+                        self.errors.append("Linking doctype not selected")
+                    sources.append((doctype, element))
+            else:
+                ruletype = values.get("ruletype", "")
+                ruletext = values.get("ruletext", "")
+                rulecomment = values.get("rulecomment")
+                if ruletype or ruletext:
+                    if not ruletype:
+                        self.errors.append("Rule type not selected")
+                    if not ruletext:
+                        self.errors.append("Missing rule text")
+                    rules.append((ruletype, ruletext, rulecomment))
 
-buttons = ["Save Changes", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-#script  = "DumpParams.pl"
-script  = "EditLinkType.py"
-header  = cdrcgi.header(title, title, section, script, buttons)
+        # Handle the case where no editing has been performed
+        if not (new_name or target_version or comment or targets or
+                sources or rules):
+            if self.name:
+                return cdr.getLinkType(self.session, self.name)
+            else:
+                return cdr.LinkType("")
 
-#----------------------------------------------------------------------
-# Retrieve the link types's information from the server.
-#----------------------------------------------------------------------
-if not name: linkType = cdr.LinkType("")
-else:        linkType = cdr.getLinkType(session, name)
-doctypes              = cdr.getDoctypes(session)
-props                 = cdr.getLinkProps(session)
+        # Create an object reflecting edited values
+        opts = dict(
+            linkSources=sources,
+            linkTargets=targets,
+            linkProps=rules,
+            comment=comment,
+            linkChkType=target_version
+        )
+        return cdr.LinkType(new_name, **opts)
 
-#print "Content-type: text/plain\n\n"
-#print str(linkType)
-#sys.exit(0)
+    def save(self):
+        """
+        Check the type's values for errors and save them if no errors
 
-#----------------------------------------------------------------------
-# Any strings returned by those functions are error messages.
-#----------------------------------------------------------------------
-if type(linkType) == type(""): cdrcgi.bail(linkType)
-if type(doctypes) == type(""): cdrcgi.bail(doctypes)
-if type(props)    == type(""): cdrcgi.bail(props)
+        Chain into displaying the editing form again.
+        """
 
-#----------------------------------------------------------------------
-# Create a flag field to indicate whether this row is enabled.
-#----------------------------------------------------------------------
-def checkbox(nameBase, rowNum, selected):
-    flag = selected and " CHECKED" or ""
-    return "<INPUT TYPE='checkbox' NAME='%s-%d'%s>" % (nameBase,
-                                                       rowNum,
-                                                       flag)
+        self.linktype = self.get_linktype()
+        if not self.linktype.name:
+            self.errors.append("Missing rule type name")
+        if self.linktype.linkChkType not in "PVC":
+            cdrcgi.bail(cdrcgi.TAMPERING)
+        if not self.linktype.linkTargets:
+            self.errors.append("No target document type(s) selected")
+        if not self.linktype.linkSources:
+            self.errors.append("No link sources specified")
+        if not self.errors:
+            action = "modlink" if self.name else "addlink"
+            name = self.linktype.name
+            cdr.putLinkType(self.session, self.name, self.linktype, action)
+            self.linktype = cdr.getLinkType(self.session, name)
+            if self.name:
+                self.message = "Saved changes to link type {}".format(name)
+            else:
+                self.message = "Added new link type {}".format(name)
+            self.name = name
+        self.show_form()
 
-#----------------------------------------------------------------------
-# Create a dropdown list of document types, possibly with one selected.
-#----------------------------------------------------------------------
-def dtList(doctype, nameBase, rowNum):
-    str = "<SELECT NAME='%s-%d'>\n" % (nameBase, rowNum)
-    str += "<OPTION>Select Document Type</OPTION>\n"
-    for dt in doctypes:
-        str += "<OPTION%s>%s</OPTION>\n" % (dt == doctype and " SELECTED" or "",
-                                            dt)
-    return str + "</SELECT>\n"
+    def set_form_options(self, opts):
+        """
+        Adjust the form's buttons and subtitle
 
-#----------------------------------------------------------------------
-# Create a dropdown list of link properties, possibly with one selected.
-#----------------------------------------------------------------------
-def propList(prop, nameBase, rowNum):
-    str = "<SELECT NAME='%s-%d'>\n" % (nameBase, rowNum)
-    str += "<OPTION>Select Property</OPTION>\n"
-    for p in props:
-        n = p.name
-        str += "<OPTION%s>%s</OPTION>\n" % (n == prop and " SELECTED" or "", n)
-    return str + "</SELECT>\n"
+        Pass:
+           opts - dictionary of options for the form
 
-#----------------------------------------------------------------------
-# Create a text data entry field.
-#----------------------------------------------------------------------
-def textField(elemName, nameBase, rowNum):
-    return "<INPUT NAME='%s-%d' VALUE='%s' SIZE='45'>" % (nameBase,
-                                                          rowNum,
-                                                          elemName)
+        Return:
+           reference to the modified dictionary
+        """
 
-#----------------------------------------------------------------------
-# Create a text area entry field.
-#----------------------------------------------------------------------
-def textArea(value, nameBase, rowNum):
-    return "<TEXTAREA COLS='60' ROWS='3' NAME='%s-%d'>%s</TEXTAREA>" % (
-            nameBase,
-            rowNum,
-            value)
+        subtitle = "{} link type".format("Edit" if self.name else "Add")
+        buttons = list(self.BUTTONS)
+        if self.name:
+            buttons.insert(2, self.DELETE)
+        opts["buttons"] = buttons
+        opts["subtitle"] = subtitle
+        return opts
 
-#----------------------------------------------------------------------
-# Create a form with a hidden field to indicate add or modify
-#----------------------------------------------------------------------
-form = """<INPUT type='hidden' name='linkform' value='%s' />""" % linkAct
+    def populate_form(self, form):
+        """
+        Add the fields to the editing form
 
-#----------------------------------------------------------------------
-# Display the information for the user.
-#----------------------------------------------------------------------
-form += """\
-<H2>%s</H2>%s
-<TABLE>
-<TR>
-<TD ALIGN='right' NOWRAP><B>Link Type Name:</B></TD>
-<TD><INPUT NAME='name' VALUE='%s' SIZE='80'><TD>
-</TR>
-""" % (name, extra, name)
+        More complicated than the standard form, because some of the
+        field sets can have more than one instance. Therefore we
+        build some fields directly from the lxml Builder instead of
+        using the cdrcgi wrappers.
 
-#----------------------------------------------------------------------
-# List the document types and elements from which links of this type
-# can be made.
-#----------------------------------------------------------------------
-leftCol = "<TD ALIGN='right' NOWRAP><B>Can Link From:</B></TD>"
-rowNum = 1
-for linkSource in linkType.linkSources:
-    form += """\
-    <TR>%s
-    <TD><TABLE><TR><TD>%s</TD><TD>%s</TD><TD>%s</TD></TR></TABLE></TD>
-    </TR>""" % (
-            leftCol,
-            checkbox("src_sel", rowNum, 1),
-            dtList(linkSource[0], "src_dt", rowNum),
-            textField(linkSource[1], "src_elem", rowNum))
-    leftCol = "<TD>&nbsp;</TD>"
-    rowNum += 1
+        Pass:
+           form - reference to the `cdrcgi.Page` object
+        """
 
-#----------------------------------------------------------------------
-# Add rows for additional link sources.
-#----------------------------------------------------------------------
-for i in range(3):
-    form += """\
-    <TR>%s
-    <TD><TABLE><TR><TD>%s</TD><TD>%s</TD><TD>%s</TD></TR></TABLE></TD>
-    </TR>
-    """ % (
-            leftCol,
-            checkbox("src_sel", rowNum, 0),
-            dtList("", "src_dt", rowNum),
-            textField("", "src_elem", rowNum))
-    rowNum += 1
+        classes = "center warning strong"
+        if self.message:
+            form.add(form.B.P(self.message, form.B.CLASS(classes)))
+        self.show_errors(form)
+        if self.linktype is None:
+            self.linktype = self.get_linktype()
+        name = self.name or ""
+        form.add_hidden_field("name", name)
+        name = self.linktype.name or name
+        desc = self.fix(self.linktype.comment or "")
+        ver = self.linktype.linkChkType or "P"
+        form.add("<fieldset>")
+        form.add(form.B.LEGEND("Link Type Properties"))
+        form.add_text_field("newname", "Name", value=name)
+        form.add_textarea_field("desc", "Description", value=desc)
+        form.add_select("version", "Version", self.VERSIONS, default=ver)
+        form.add("</fieldset>")
+        counter = 1
+        for source in sorted(self.linktype.linkSources):
+            form.add(self.make_linking_element(form, counter, *source))
+            counter += 1
+        if not self.linktype.linkSources:
+            form.add(self.make_linking_element(form, counter))
+            counter += 1
+        form.add(self.make_target_block(form))
+        for rule in sorted(self.linktype.linkProps):
+            form.add(self.make_rule_block(form, counter, *rule))
+            counter += 1
+        if not self.linktype.linkProps:
+            form.add(self.make_rule_block(form, counter))
+            counter += 1
+        element_template = self.make_linking_element(form, "@@COUNTER@@")
+        rule_template = self.make_rule_block(form, "@@COUNTER@@")
+        form.add_script("""\
+var next_counter = %s;
+var templates = {'e': `%s`, 'r': `%s`};
+var descs = {'e': 'linking element', 'r': 'custom rule'};
+function add_block(n, t) {
+    block = templates[t].replace(/@@COUNTER@@/g, next_counter);
+    jQuery(block).insertAfter('#block-' + n);
+    ++next_counter;
+}
+function del_block(n, t) {
+    if (confirm("Do you really want to delete this " + descs[t] + " block?")) {
+        if (jQuery('.' + t + '-block').length < 2)
+            add_block(n, t);
+        jQuery('#block-' + n).remove();
+    }
+}
+jQuery("h1 input[value='Cancel']").attr("title",
+                                        "Return to menu of link types");
+""" % (counter, element_template, rule_template))
+        if self.name:
+            form.add_script("""\
+jQuery("h1 input[value='Delete']").click(function(e) {
+    if (confirm("Are you sure?"))
+        return true;
+    e.preventDefault();
+});""")
+        form.add_css("""
+.labeled-field img { padding-left: 15px; }
+#target-block label { width: 220px; display: inline-block; padding-left: 5px; }
+fieldset.errors { border-color: red; }
+fieldset.errors legend { color: red; font-weight: bold; }
+fieldset.errors li { color: red; font-weight: bold; }
+""")
 
-#----------------------------------------------------------------------
-# List the document types to which links of this type can be made.
-#----------------------------------------------------------------------
-leftCol = "<TD ALIGN='right' NOWRAP><B>Can Link To:</B></TD>"
-rowNum = 1
-for linkTarget in linkType.linkTargets:
-    form += """\
-    <TR>%s
-    <TD><TABLE><TR><TD>%s</TD><TD>%s</TD></TR></TABLE>
-    </TR>""" % (
-            leftCol,
-            checkbox("dst_sel", rowNum, 1),
-            dtList(linkTarget, "dst_dt", rowNum))
-    leftCol = "<TD>&nbsp;</TD>"
-    rowNum += 1
+    def make_target_block(self, form):
+        """
+        Create the fieldset for allowable link targets
 
-#----------------------------------------------------------------------
-# Add rows for additional link targets.
-#----------------------------------------------------------------------
-for i in range(3):
-    form += """\
-    <TR>%s
-    <TD><TABLE><TR><TD>%s</TD><TD>%s</TD></TR></TABLE></TD>
-    </TR>""" % (
-            leftCol,
-            checkbox("dst_sel", rowNum, 0),
-            dtList("", "dst_dt", rowNum))
-    rowNum += 1
+        Pass:
+           form - reference to the `cdrcgi.Page` object
 
-#----------------------------------------------------------------------
-# Show selection of link target version type
-#----------------------------------------------------------------------
-optCnt = len(LINKCHKTYPES)
-selectedOption = ['','','']
-for opt in range(optCnt):
-    if linkType.linkChkType == LINKCHKTYPES[opt][1]:
-        selectedOption[opt] = " selected='1'"
+        Return:
+           serialized HTML fieldset element
+        """
 
-form += """
-    <TR>
-     <TD ALIGN='right' NOWRAP><B>Link Target Is:</B></TD>
-     <TD>
-      <SELECT NAME='linkChkType'>
-"""
-for opt in range(optCnt):
-    form += "<OPTION VALUE=%s%s>%s</OPTION>" % \
-             (LINKCHKTYPES[opt][1], selectedOption[opt], LINKCHKTYPES[opt][0])
-form += """
-      </SELECT>
-     </TD>
-    </TR>
-"""
-#----------------------------------------------------------------------
-# List the properties attached to this link type.
-#----------------------------------------------------------------------
-rowNum = 1
-for prop in linkType.linkProps:
-    form += """\
-    <TR>
-     <TD ALIGN='right' NOWRAP><B>Property:</B></TD>
-     <TD><TABLE><TR><TD>%s</TD><TD>%s</TD></TR></TABLE></TD>
-    </TR>
-    <TR>
-     <TD ALIGN='right' VALIGN='top'><B>Property Value:</B></TD>
-     <TD>%s</TD>
-    </TR>
-    <TR>
-     <TD ALIGN='right' VALIGN='top'><B>Property Comment:</B></TD>
-     <TD>%s</TD>
-    </TR>
-""" % ( checkbox("prop_sel", rowNum, 1),
-        propList(prop[0], "prop_name", rowNum),
-        textArea(prop[1], "prop_value", rowNum),
-        textArea(prop[2], "prop_comment", rowNum))
-    rowNum += 1
+        wrapper = form.B.DIV(id="target-block")
+        doctypes = list(self.doctypes)
+        for t in self.SKIP:
+            doctypes.remove(t)
+        for t in self.linktype.linkTargets:
+            if t not in doctypes:
+                doctypes.append(t)
+        doctypes = sorted(doctypes)
+        ndoctypes = len(doctypes)
+        rows = ndoctypes / 2
+        if ndoctypes % 2:
+            rows += 1
+        j = rows
+        for i in range(rows):
+            self.add_target(form, wrapper, doctypes[i])
+            if j < ndoctypes:
+                self.add_target(form, wrapper, doctypes[j])
+                j += 1
+        fieldset = form.B.FIELDSET(
+            form.B.LEGEND("Allowed Link Targets"),
+            wrapper
+        )
+        return lxml.html.tostring(fieldset)
 
-#----------------------------------------------------------------------
-# Add an empty slot for the user to add a new property.
-#----------------------------------------------------------------------
-form += """\
-    <TR>
-     <TD ALIGN='right' NOWRAP><B>Property:</B></TD>
-     <TD><TABLE><TR><TD>%s</TD><TD>%s</TD></TR></TABLE></TD>
-    </TR>
-    <TR>
-     <TD ALIGN='right' VALIGN='top'><B>Property Value:</B></TD>
-     <TD>%s</TD>
-    </TR>
-    <TR>
-     <TD ALIGN='right' VALIGN='top'><B>Property Comment:</B></TD>
-     <TD>%s</TD>
-    </TR>
-""" % ( checkbox("prop_sel", rowNum, 0),
-        propList("", "prop_name", rowNum),
-        textArea("", "prop_value", rowNum),
-        textArea("", "prop_comment", rowNum))
+    def add_target(self, form, wrapper, doctype):
+        """
+        Add a checkbox and its label for an allowed target document type
 
-#----------------------------------------------------------------------
-# Add the text box for the comment.
-#----------------------------------------------------------------------
-form += """\
-<TR>
-<TD ALIGN='right' NOWRAP VALIGN='top'><B>Description:</B></TD>
-<TD><TEXTAREA COLS='60' ROWS='4' NAME='comment'>%s</TEXTAREA></TD>
-</TR>
-</TABLE>
-""" % linkType.comment
+        Pass:
+           form - reference to the `cdrcgi.Page` object
+           wrapper - reference to object for HTML div wrapper
+           doctype - string naming a CDR document type
+        """
 
-#----------------------------------------------------------------------
-# Add the session key and send back the form.
-#----------------------------------------------------------------------
-form += """\
-<INPUT TYPE='hidden' NAME='%s' VALUE='%s' >
-""" % (cdrcgi.SESSION, session)
-cdrcgi.sendPage(header + form + "</FORM></BODY></HTML>")
+        elem_id = "target-{}".format(doctype.lower())
+        opts = {
+            "type": "checkbox",
+            "name": "target",
+            "value": doctype,
+            "id": elem_id
+        }
+        if doctype in self.linktype.linkTargets:
+            opts["checked"] = "checked"
+        wrapper.append(form.B.INPUT(**opts))
+        wrapper.append(form.B.LABEL(form.B.FOR(elem_id), doctype))
+
+    def make_rule_block(self, form, counter, ruletype="", text="", comment=""):
+        """
+        Create the fieldset block for a link type custom rule
+
+        Pass:
+           form - reference to the `cdrcgi.Page` object
+           counter - suffix identifying which block we are creating
+           ruletype - string identifying the type of this custom rule
+           text - string containing the rule's constraints
+           comment - optional string describing this custom rule
+
+        Return:
+           serialized HTML fieldset element
+        """
+
+        fieldset = form.B.FIELDSET(
+            form.B.LEGEND("Custom Rule"),
+            self.make_ruletype_field(form, counter, ruletype),
+            self.make_ruletext_field(form, counter, text),
+            self.make_rulecomment_field(form, counter, comment),
+            form.B.CLASS("r-block"),
+            id="block-{}".format(counter)
+        )
+        return lxml.html.tostring(fieldset)
+
+    def make_linking_element(self, form, counter, doctype="", element=""):
+        """
+        Create the fieldset block for an allowable link source element
+
+        Pass:
+           form - reference to the `cdrcgi.Page` object
+           counter - suffix identifying which block we are creating
+           doctype - string identifying the selected document type, if any
+           element - string naming one of the elements from which links
+                     are allowed from this document type
+
+        Return:
+           serialized HTML fieldset element
+        """
+
+        fieldset = form.B.FIELDSET(
+            form.B.LEGEND("Allowed Link Source"),
+            self.make_doctype_field(form, counter, doctype),
+            self.make_element_field(form, counter, element),
+            form.B.CLASS("e-block"),
+            id="block-{}".format(counter)
+        )
+        return lxml.html.tostring(fieldset)
+
+    def make_doctype_field(self, form, counter, doctype=""):
+        """
+        Create the picklist for an allowed link source's document type
+
+        Pass:
+           form - reference to the `cdrcgi.Page` object
+           counter - suffix identifying block in which the field occurs
+           doctype - string identifying the selected document type, if any
+
+        Return:
+           reference to object representing an HTML div wrapper containing
+           the field elements
+        """
+
+        name = "doctype-{}".format(counter)
+        select = form.B.SELECT(name=name, id=name)
+        option = form.B.OPTION("Select Document Type", value="")
+        if not doctype:
+            option.set("selected", "selected")
+        select.append(option)
+        if doctype and doctype not in self.doctypes:
+            option = form.B.OPTION(doctype, value=doctype, selected="selected")
+            select.append(option)
+        for t in sorted(self.doctypes):
+            if not t:
+                t = ""
+            option = form.B.OPTION(t, value=t)
+            if t == doctype:
+                option.set("selected", "selected")
+            select.append(option)
+        return form.B.DIV(
+            form.B.LABEL(form.B.FOR(name), "Doc Type"),
+            select,
+            form.B.IMG(
+                src="/images/add.gif",
+                onclick="add_block({}, 'e')".format(counter),
+                alt="add element block",
+                title="Add another target element block"
+            ),
+            form.B.IMG(
+                src="/images/del.gif",
+                onclick="del_block({}, 'e')".format(counter),
+                alt="drop element block",
+                title="Remove this target element block"
+            ),
+            form.B.CLASS("labeled-field")
+        )
+
+    def make_element_field(self, form, counter, value=""):
+        """
+        Create the text field for an element allowed as a link source
+
+        Pass:
+           form - reference to the `cdrcgi.Page` object
+           counter - suffix identifying block in which the field occurs
+           value - name of the element from which links are allowed
+
+        Return:
+           reference to object representing an HTML div wrapper containing
+           the field elements
+        """
+
+        if not value:
+            value = ""
+        name = "element-{}".format(counter)
+        return form.B.DIV(
+            form.B.LABEL(
+                form.B.FOR(name),
+                "Element",
+                form.B.CLASS("clickable")
+            ),
+            form.B.INPUT(id=name, name=name, value=value),
+            form.B.CLASS("labeled-field")
+        )
+
+    def make_ruletype_field(self, form, counter, ruletype=""):
+        """
+        Create the picklist for the custom rule type
+
+        There is currently only one supported custom rule type, named
+        LinkTargetContains.
+
+        Pass:
+           form - reference to the `cdrcgi.Page` object
+           counter - suffix identifying block in which the field occurs
+           ruletype - optional string for currently selected rule type
+
+        Return:
+           reference to object representing an HTML div wrapper containing
+           the field elements
+        """
+
+        name = "ruletype-{}".format(counter)
+        select = form.B.SELECT(name=name, id=name)
+        option = form.B.OPTION("Select Rule Type", value="")
+        if not ruletype:
+            option.set("selected", "selected")
+        select.append(option)
+        for t in sorted(self.ruletypes):
+            option = form.B.OPTION(t, value=t)
+            if t == ruletype:
+                option.set("selected", "selected")
+            select.append(option)
+        return form.B.DIV(
+            form.B.LABEL(form.B.FOR(name), "Rule Type"),
+            select,
+            form.B.IMG(
+                src="/images/add.gif",
+                onclick="add_block({}, 'r')".format(counter),
+                alt="add rule block",
+                title="Add another custom rule block"
+            ),
+            form.B.IMG(
+                src="/images/del.gif",
+                onclick="del_block({}, 'r')".format(counter),
+                alt="drop rule block",
+                title="Remove this custom rule block"
+            ),
+            form.B.CLASS("labeled-field")
+        )
+
+    def make_ruletext_field(self, form, counter, value=""):
+        """
+        Create the textarea field for this rule's constraints
+
+        For the syntax of the only custom rule type currently
+        supported, refer to the class documentation for the
+        LinkTargetContains class in cdrapi/docs.py.
+
+        Pass:
+           form - reference to the `cdrcgi.Page` object
+           counter - suffix identifying block in which the field occurs
+           value - optional string for the field's current value
+
+        Return:
+           reference to object representing an HTML div wrapper containing
+           the field elements
+        """
+
+        if not value:
+            value = ""
+        else:
+            value = self.fix(value)
+        name = "ruletext-{}".format(counter)
+        help_text = 'E.g. /Term/TermType/TermTypeName == "Index term"'
+        return form.B.DIV(
+            form.B.LABEL(
+                form.B.FOR(name),
+                "Rule Text",
+                form.B.CLASS("clickable")
+            ),
+            form.B.TEXTAREA(value, id=name, name=name, title=help_text),
+            form.B.CLASS("labeled-field")
+        )
+
+    def make_rulecomment_field(self, form, counter, value=""):
+        """
+        Create the textarea field for this rule's optional description
+
+        Pass:
+           form - reference to the `cdrcgi.Page` object
+           counter - suffix identifying block in which the field occurs
+           value - optional string for the field's current value
+
+        Return:
+           reference to object representing an HTML div wrapper containing
+           the field elements
+        """
+
+        if not value:
+            value = ""
+        name = "rulecomment-{}".format(counter)
+        return form.B.DIV(
+            form.B.LABEL(
+                form.B.FOR(name),
+                "Comment",
+                form.B.CLASS("clickable")
+            ),
+            form.B.TEXTAREA(self.fix(value), id=name, name=name),
+            form.B.CLASS("labeled-field")
+        )
+
+    def show_errors(self, form):
+        """
+        Add a box at the top to display error messages if there are any
+
+        Pass:
+           form - reference to the `cdrcgi.Page` object
+        """
+
+        if not self.errors:
+            return
+        errors = form.B.UL()
+        for error in self.errors:
+            errors.append(form.B.LI(error))
+        fieldset = form.B.FIELDSET(
+            form.B.LEGEND("Errors"),
+            errors,
+            form.B.CLASS("errors")
+        )
+        form.add(fieldset)
+
+    @staticmethod
+    def fix(string):
+        """
+        Protect textarea value from garbling by cdrcgi's indenting code
+
+        Pass:
+           string - field value to be protected
+
+        Return:
+           value with newlines replaced by placeholders
+        """
+
+        return string.replace("\r", "").replace("\n", cdrcgi.NEWLINE)
+
+Control().run()

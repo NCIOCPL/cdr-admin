@@ -38,7 +38,8 @@ LABEL = { 'DateLastModified'      :'Date Last Modified',
           'StatusDate'            :'Status Date',
           'TermType'              :'Term Type',
           'TranslatedStatus'      :'Translated Status',
-          'TranslationResource'   :'Translation Resource' }
+          'TranslationResource'   :'Translation Resource',
+          'EmbeddedVideo'         :'Video Link'}
 
 #----------------------------------------------------------------------
 # More than one matching term name; let the user choose one.
@@ -91,7 +92,7 @@ def addMediaRow(data, label):
         <Root xmlns:cdr="cips.nci.nih.gov/cdr">
         %s
         </Root>''' % row
-        dom = xml.dom.minidom.parseString(mediaString)
+        dom = xml.dom.minidom.parseString(mediaString.encode('utf-8'))
         docElem = dom.documentElement
 
         for node in docElem.childNodes:
@@ -111,6 +112,69 @@ def addMediaRow(data, label):
     </td>
    </tr>
 """ % (LABEL[label], mediaValue, url, mediaID)
+
+    return htmlRow
+
+#----------------------------------------------------------------------
+# Create a single row for the Video link such that an image is being
+# displayed and a link to YouTube to watch the video.
+# We're creating a small DOM that we can parse in order to extract the
+# CDR-ID of the video document.
+#----------------------------------------------------------------------
+def addVideoRow(data, label):
+    imgUrl = "https://img.youtube.com/vi"
+    url = "https://www.youtube.com/watch?v"
+    htmlRow = ''
+    for row in data['EmbeddedVideo']:
+        specificTitle = ''
+        videoString = '''
+        <Root xmlns:cdr="cips.nci.nih.gov/cdr">
+        %s
+        </Root>''' % row
+        dom = xml.dom.minidom.parseString(videoString.encode('utf-8'))
+        docElem = dom.documentElement
+
+        for node in docElem.childNodes:
+            if node.nodeName == 'EmbeddedVideo':
+                for child in node.childNodes:
+                    if child.nodeName == 'VideoID':
+                        videoValue = str(cdr.getTextContent(child).strip())
+                        videoID = child.getAttribute('cdr:ref')[3:]
+                        try:
+                           docId = int(videoID)
+                        except:
+                           cdrcgi.bail("Error converting videoID: " % videoID)
+
+                    if child.nodeName == 'SpecificMediaTitle':
+                        #specificTitle = str(cdr.getTextContent(child).strip())
+                        specificTitle = cdr.getTextContent(child).strip()
+                        specificTitleBytes = specificTitle.encode('utf-8')
+        dom.unlink()
+
+        # Retrieve the hosting ID for YouTube from the Media document
+        # -----------------------------------------------------------
+        cursor.execute("SELECT xml FROM document WHERE id = ?", docId)
+        row = cursor.fetchone()
+        dom = xml.dom.minidom.parseString(row[0].encode('utf-8'))
+        docElem = dom.documentElement
+
+        hostingElem = docElem.getElementsByTagName("HostingID")[0]    
+        youtubeID = cdr.getTextContent(hostingElem)
+
+        # Overwrite media title if specific title exists
+        if specificTitle: videoValue = specificTitle
+
+        htmlRow += """
+   <tr>
+    <td width="30%%" valign="top">
+     <b>%s</b>
+    </td>
+    <td width="70%%">%s  <br>
+     <img src="%s/%s/hqdefault.jpg"><br>
+     <a href="%s=%s">Watch video on YouTube</a>
+    </td>
+   </tr>
+""" % (LABEL[label], videoValue, imgUrl, youtubeID, url, youtubeID)
 
     return htmlRow
 
@@ -227,36 +291,6 @@ def resolvePlaceHolder(language, termData, definitionText):
          doc = doc[0].decode('utf-8')
 
      return doc
-
-
-# #-----------------------------------------------------------------------
-# # Module to create a small XML snippet that can be submitted to a filter
-# # in order to substitute the PlaceHolder elements with the appropriate
-# # text from the ReplacementText elements.
-# #-----------------------------------------------------------------------
-# def displayComment(commentList):
-#      # Create the Glossary Definition
-#      tmpdoc  = u"\n<GlossaryTermDef xmlns:cdr = 'cips.nci.nih.gov/cdr'>\n"
-#
-#      # Add the CommentText and attributes
-#      for comment in commentList:
-#          tmpdoc += u"  %s\n" % comment
-#
-#      tmpdoc += u"</GlossaryTermDef>\n"
-#
-#      # Need to encode the unicode string to UTF-8 since that's what the
-#      # filter module expects.  Decoding it back to unicode once the
-#      # filtered document comes back.
-#      # --------------------------------------------------------------------
-#      doc = cdr.filterDoc('guest', ['name:Glossary Term Definition Update'],
-#                          doc = tmpdoc.encode('utf-8'))
-#
-#      if type(doc) in (type(""), type(u"")):
-#          cdrcgi.bail(doc)
-#      if type(doc) == type(()):
-#          doc = doc[0].decode('utf-8')
-#
-#      return doc
 
 
 #-----------------------------------------------------------------------
@@ -399,7 +433,8 @@ def getTermNameStatus(termList):
 #----------------------------------------------------------------------
 # Passing a CDR-ID
 # This function returns an HTML snippet in case a MediaLink element
-# exists that's being shared between English and Spanish definitions.
+# or an EmbeddedVideo link exists that's being shared between English 
+# and Spanish definitions.
 #----------------------------------------------------------------------
 def getSharedInfo(docId):
     try:
@@ -408,9 +443,11 @@ def getSharedInfo(docId):
         dom = xml.dom.minidom.parseString(row[0].encode('utf-8'))
         docElem = dom.documentElement
 
-        sharedElements = ['MediaLink', 'TermType', 'PDQTerm',
-                          'NCIThesaurusID', 'RelatedDrugSummaryLink',
-                          'RelatedExternalRef', 'RelatedSummaryRef',
+        sharedElements = ['MediaLink', 'EmbeddedVideo', 'TermType', 
+                          'PDQTerm', 'NCIThesaurusID', 
+                          'RelatedDrugSummaryLink',
+                          'RelatedExternalRef', 
+                          'RelatedSummaryRef',
                           'RelatedGlossaryTermNameLink']
         sharedContent = {}
         for sharedElement in sharedElements:
@@ -420,6 +457,8 @@ def getSharedInfo(docId):
         for node in docElem.childNodes:
             if node.nodeName == 'MediaLink':
                 sharedContent['MediaLink'].append(node.toxml())
+            if node.nodeName == 'EmbeddedVideo':
+                sharedContent['EmbeddedVideo'].append(node.toxml())
             if node.nodeName == 'TermType':
                 sharedContent['TermType'].append(
                                        cdr.getTextContent(node).strip())
@@ -532,6 +571,18 @@ def getConcept(docId):
                             definition = child
                             concept['%s-%s' % (language, audience)][
                                'MediaLink'].append(definition.toxml())
+
+                    # Same as above for EmbeddedVideo.
+                    # -----------------------------------------------------
+                    if (child.nodeName == 'EmbeddedVideo'):
+                        if child.previousSibling.nodeName != 'EmbeddedVideo':
+                            definition = child
+                            concept['%s-%s' % (language, audience)].update(
+                              {child.nodeName:[definition.toxml()]})
+                        else:
+                            definition = child
+                            concept['%s-%s' % (language, audience)][
+                               'EmbeddedVideo'].append(definition.toxml())
 
                     # Adding all values that are multiply occuring
                     # Creating entry 'key':[listitem, listitem, ...]
@@ -740,6 +791,7 @@ html = """\
                    background-color: #FFFFFF; }
    .insertapproved { color: red; }
    .deleteapproved { text-decoration: line-through; }
+   img           { width: 300px; }
   </STYLE>
  </HEAD>
  <BODY>
@@ -945,6 +997,10 @@ for lang in languages:
                 #cdrcgi.bail(conceptInfo['%s-%s' % (lang, aud)]['MediaLink'])
                 html += addMediaRow(conceptInfo['%s-%s' % (lang, aud)],
                                     'MediaLink')
+            # Adding row for EmbeddedVideo
+            if conceptInfo['%s-%s' % (lang, aud)].has_key('EmbeddedVideo'):
+                html += addVideoRow(conceptInfo['%s-%s' % (lang, aud)],
+                                    'EmbeddedVideo')
             # Adding row for Dictionary
             if conceptInfo['%s-%s' % (lang, aud)].has_key('Dictionary'):
                 html += addMultipleRow(conceptInfo['%s-%s' % (lang, aud)],

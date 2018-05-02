@@ -34,8 +34,7 @@ class Control:
         and generate the next page. Make sure the user's account is
         authorized to use the publishing system.
         """
-        self.confirmed = self.need_user_choices = self.need_confirmation = False
-        self.user_choices = {}
+
         self.cursor = cdrdb.connect("CdrPublishing").cursor()
         self.title = "CDR Administration"
         self.script = "publishing.py"
@@ -72,6 +71,7 @@ class Control:
         user is not authorized to use this script. Invoked by the
         object's constructor. Redirect elsewhere if so requested.
         """
+
         self.fields = cgi.FieldStorage()
         self.session = cdrcgi.getSession(self.fields)
         self.request = cdrcgi.getRequest(self.fields)
@@ -97,29 +97,17 @@ class Control:
                 self.subset = self.system.subset_names.get(subset_name)
                 if not self.subset:
                     raise Exception("requested publishing subset not found")
-                if self.request == "Publish":
-                    self.confirmed = True
-                else:
-                    if self.subset.parameters:
-                        self.need_user_choices = True
-                    elif control.subset.user_can_select_docs:
-                        self.need_user_choices = True
-                    else:
-                        self.need_confirmation = True
-                    if self.need_user_choices:
-                        self.user_choices = self.collect_user_choices()
-                        if self.user_choices:
-                            self.need_user_choices = False
-                            self.need_confirmation = True
 
     def collect_user_choices(self):
         """
         Pack up the user choices (including an optional list of IDs for
-        documents to be published) so they can be passed along in a
-        hidden variable on the confirmation page. Make sure the values
-        haven't been tampered with. Reverse sort the document ID list
-        so newer documents get published first. Invoked by load_parameters().
+        documents to be published) so they can be passed along as the
+        parameters to the method for creating the publishing job. Make
+        sure the values haven't been tampered with. Reverse sort the
+        document ID list so newer documents get published first. Invoked
+        by load_parameters().
         """
+
         choices = {}
         doc_ids = re.findall(r"\d+", self.fields.getvalue("doc_ids", ""))
         if doc_ids:
@@ -149,15 +137,13 @@ class Control:
         Processing sequence (separate invocations for each step):
           1. user selects one of the publishing systems
           2. user selects a publishing subset from the selected system
-          3. user chooses settable options (if appropriate)
-          4. user confirms job request
-          5. publishing job is created status link is given to the user
+          3. user chooses settable options
+          4. publishing job is created status link is given to the user
         """
-        if self.confirmed:
+
+        if self.request == "Publish":
             self.create_publishing_job()
-        elif self.need_confirmation:
-            self.request_confirmation()
-        elif self.need_user_choices:
+        elif self.subset:
             self.offer_choices()
         elif self.system:
             self.show_subsets()
@@ -230,7 +216,8 @@ class Control:
         never been a publishing sub type which didn't have some user-
         settable options. Invoked by the run() method.
         """
-        buttons = ("Submit",) + self.pageopts["buttons"]
+
+        buttons = ("Publish",) + self.pageopts["buttons"]
         subtitle = "Publishing Options For %s Job" % self.subset.name
         self.pageopts["buttons"] = buttons
         self.pageopts["subtitle"] = subtitle
@@ -246,56 +233,35 @@ class Control:
             page.add(page.B.LEGEND("Documents to Publish"))
             page.add_textarea_field("doc_ids", "Enter CDR IDs", tooltip=help)
             page.add("</fieldset>")
-        if self.subset.parameters:
-            page.add_css(".opts .labeled-field label { width: 180px; }")
-            page.add("<fieldset class='opts'>")
-            page.add(page.B.LEGEND("Job Options"))
-            for p in self.subset.parameters:
-                if p.name == "PubType":
-                    if p.default not in cdr.PUBTYPES:
-                        raise Exception("PubType %s not supported" %
-                                        repr(p.default))
-                info = p.get_info()
-                help = info and info.get_help() or ""
-                if p.default in ("Yes", "No"):
-                    page.add_select(p.name, p.name, ("Yes", "No"), p.default,
-                                    tooltip=help)
-                else:
-                    readonly = p.name in Control.readonly_parms
-                    page.add_text_field(p.name, p.name, value=p.default or "",
-                                        disabled=readonly, tooltip=help)
-            page.add("</fieldset>")
-        page.send()
-
-    def request_confirmation(self):
-        """
-        Ask the user to confirm the publishing job request. We also
-        ask the user for some last-minute decisions about the job.
-        It's not clear why those decisions are not included with
-        the options displayed on the previous screen, but this is
-        the way it's always been done. :-)
-        Invoked by the run() method.
-        """
-        buttons = ("Publish",) + self.pageopts["buttons"]
-        subtitle = "Confirming Submission For %s Job" % self.subset.name
+        page.add("<fieldset class='opts'>")
+        page.add(page.B.LEGEND("Job Options"))
+        page.add_css(".opts .labeled-field label { width: 180px; }")
+        yes_no = "Yes", "No"
+        for p in self.subset.parameters:
+            if p.name == "PubType":
+                if p.default not in cdr.PUBTYPES:
+                    raise Exception("PubType %r not supported" % p.default)
+            info = p.get_info()
+            help = info and info.get_help() or ""
+            if p.default in yes_no:
+                page.add_select(p.name, p.name, yes_no, p.default,
+                                tooltip=help)
+            else:
+                readonly = p.name in Control.readonly_parms
+                page.add_text_field(p.name, p.name, value=p.default or "",
+                                    disabled=readonly, tooltip=help)
         email = cdr.getEmail(self.session) or ""
         if " " in email or "@" not in email:
             email = ""
         notify = email and "Yes" or "No"
-        self.pageopts["buttons"] = buttons
-        self.pageopts["subtitle"] = subtitle
-        page = cdrcgi.Page(self.title, **self.pageopts)
-        page.add_hidden_field("system", self.system.system_id)
-        page.add_hidden_field("subset", self.subset.name)
-        page.add_hidden_field("user-opts", repr(self.user_choices))
-        page.add("<fieldset>")
-        page.add(page.B.LEGEND("Confirmation Settings"))
-        page.add_select("notify", "Notify", ("Yes", "No"), notify,
-                        tooltip=self.system.param_info["notify"].get_help())
-        page.add_text_field("email", "Address(es)", value=email,
-                            tooltip=self.system.param_info["email"].get_help())
-        page.add_select("no-output", "No Output", ("Yes", "No"), "No",
-                        tooltip=self.system.param_info["no-output"].get_help())
+        help = self.system.param_info["notify"].get_help()
+        page.add_select("notify", "Notify", yes_no, notify, tooltip=help)
+        label = "Address(es)"
+        help = self.system.param_info["email"].get_help()
+        page.add_text_field("email", label, value=email, tooltip=help)
+        help = self.system.param_info["no-output"].get_help()
+        page.add_select("no-output", "No Output", yes_no, "No",
+                        tooltip=help)
         page.add("</fieldset>")
         page.send()
 
@@ -305,10 +271,8 @@ class Control:
         If so, provide a link to the page showing the job's status.
         Otherwise, explain what went wrong. Invoked by the run() method.
         """
-        try:
-            user_opts = eval(self.fields.getvalue("user-opts", "{}"))
-        except Exception:
-            raise Exception("tampering with CGI parameters detected")
+
+        user_opts = self.collect_user_choices()
         parameters = self.collect_parameters(user_opts)
         doc_ids = self.collect_doc_ids(user_opts.get("doc_ids", []))
         inactive_ok = self.subset.name == "Hotfix-Remove" and "Y" or "N"
@@ -363,6 +327,7 @@ class Control:
         publish a meeting recording document or tampering with
         the CGI parameter. Invoked by create_publishing_job().
         """
+
         id_list = []
         for doc_id in doc_ids:
             if not isinstance(doc_id, int):
@@ -384,6 +349,7 @@ class Control:
         they aren't included in user-specified document lists.
         Invoked by collect_doc_ids().
         """
+
         query = cdrdb.Query("query_term_pub", "doc_id")
         query.where(query.Condition("doc_id", doc_id))
         query.where(query.Condition("value", "Internal"))
@@ -399,11 +365,14 @@ class Control:
         they aren't included in user-specified document lists.
         Invoked by collect_doc_ids().
         """
+
         query = cdrdb.Query("query_term_pub", "doc_id")
         query.where(query.Condition("doc_id", doc_id))
         query.where(query.Condition("value", "Yes"))
         query.where(query.Condition("path", "/Summary/@ModuleOnly"))
         return query.execute(self.cursor).fetchall() and True or False
+
+
 class PublishingSystem:
     """
     Object containing instructions for each of the types of publishing
@@ -421,6 +390,7 @@ class PublishingSystem:
         of the choices (called "parameters" here) which the user
         make for publishing jobs.
         """
+
         self.system_id = system_id
         self.system_version = system_version
         self.name = self.description = None
@@ -429,7 +399,6 @@ class PublishingSystem:
         self.param_info = {}
         if not self.system_version:
             query = cdrdb.Query("doc_version", "MAX(num)")
-            query.where(query.Condition("publishable", "Y"))
             query.where(query.Condition("id", self.system_id))
             rows = query.execute(cursor).fetchall()
             if not rows:
@@ -455,6 +424,7 @@ class PublishingSystem:
             info = PublishingSystem.ParamInfo(node)
             self.param_info[info.name] = info
 
+
     class Subset:
         """
         A type of publishing job which can be created by the
@@ -467,6 +437,7 @@ class PublishingSystem:
             Extract the publishing job type's information from
             the control document's SystemSubset block.
             """
+
             self.system = system
             self.name = self.description = None
             self.user_can_select_docs = False
@@ -483,6 +454,7 @@ class PublishingSystem:
             if node.findall("%s/UserSelect" % path):
                 self.user_can_select_docs = True
 
+
         class Parameter:
             """
             Holds the name and default value for an option
@@ -495,6 +467,7 @@ class PublishingSystem:
                 be used by this job type from the SubsetParameter
                 block.
                 """
+
                 self.subset = subset
                 self.name = self.default = None
                 for child in node.findall("ParmName"):
@@ -509,6 +482,7 @@ class PublishingSystem:
                 Find and return the help and validation information
                 for this parameter.
                 """
+
                 return self.subset.system.param_info.get(self.name)
 
     class ParamInfo:
@@ -538,6 +512,7 @@ class PublishingSystem:
             Return a version of the help string that will survive
             the indenting performed by the cdrcgi.Page object.
             """
+
             if self.help:
                 help = self.help.replace("\r", "")
                 return help.replace("\n", cdrcgi.NEWLINE)
@@ -548,6 +523,7 @@ class PublishingSystem:
             Make sure the parameter's value hasn't been tampered with.
             Abort if it has.
             """
+
             failed = False
             if self.pattern and not re.match(self.pattern, value):
                 failed = True
@@ -570,6 +546,7 @@ class PublishingSystem:
             Verify that the file named can be found in the CDR
             Licensee directory in the file system.
             """
+
             try:
                 path = r"%s\%s" % (cdr.PDQDTDPATH, value)
                 return os.stat(path) and True or False
@@ -583,6 +560,7 @@ class PublishingSystem:
               * an ISO date
               * an ISO date and time (with or without seconds)
             """
+
             if value == "JobStartDateTime":
                 return True
             pattern = r"^\d{4}-\d{2}-\d{2}( \d{2}:\d{2}(:\d{2})?)?$"
@@ -601,6 +579,7 @@ class PublishingSystem:
             If the value is not empty, make sure it doesn't contain
             any unexpected characters.
             """
+
             if not value:
                 return True
             return re.match(r"^[A-Za-z0-9._-]+$", value) and True or False

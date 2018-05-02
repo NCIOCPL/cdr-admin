@@ -40,7 +40,7 @@ def getCommonCssStyle():
                          xmlns:cdr = "cips.nci.nih.gov/cdr"
            exclude-result-prefixes = "cdr">
  <xsl:output                method = "html"/>
- <xsl:include                 href = "cdr:name:Module: STYLE Default"/>
+ <xsl:include                 href = "cdr:name:Module:+STYLE+Default"/>
  <xsl:template               match = "/">
   <style type='text/css'>
    <xsl:call-template         name = "defaultStyle"/>

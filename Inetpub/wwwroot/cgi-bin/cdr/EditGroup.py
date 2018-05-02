@@ -28,7 +28,7 @@ elif request == SUBMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if request == "Log Out": 
+if request == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
@@ -74,7 +74,7 @@ page    = cdrcgi.Page(title, subtitle=section, action=script, buttons=buttons,
 #----------------------------------------------------------------------
 if not grpName: group = cdr.Group()
 else:           group = cdr.getGroup(session, grpName)
-    
+
 #----------------------------------------------------------------------
 # Retrieve the related information we need from the server.
 #----------------------------------------------------------------------
@@ -90,12 +90,13 @@ if isinstance(doctypes, basestring): cdrcgi.bail(doctypes)
 # Display the information for the group.
 #----------------------------------------------------------------------
 B = page.B
-page.add(B.INPUT(type="hidden", name="grp", value=group.name))
-page.add(B.H2(group.name, style="font: 20pt Arial bold;"))
+name = group.name or ""
+page.add(B.INPUT(type="hidden", name="grp", value=name))
+page.add(B.H2(name, style="font: 20pt Arial bold;"))
 if request == "Save Changes":
     page.add(B.H4("(Successfully Updated)"))
 page.add(B.H3("Group Name"))
-page.add(B.INPUT(name="name", value=group.name, style="width: 200px;"))
+page.add(B.INPUT(name="name", value=name, style="width: 200px;"))
 page.add(B.H3("Description"))
 page.add(B.TEXTAREA(group.comment or "", name="comment", rows="4", cols="80"))
 

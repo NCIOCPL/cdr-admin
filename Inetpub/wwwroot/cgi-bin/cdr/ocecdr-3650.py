@@ -142,7 +142,8 @@ def findLinks(docId, node, links, elements):
     for child in node:
         findLinks(docId, child, links, list(elements))
 
-cursor.execute("SELECT title, xml FROM document WHERE id = ?", docId)
+intId = int(re.sub("[^0-9]*", "", docId))
+cursor.execute("SELECT title, xml FROM document WHERE id = ?", intId)
 rows = cursor.fetchall()
 if not rows:
     cdrcgi.bail("can't find document %s" % docId)
@@ -150,14 +151,14 @@ tree = etree.XML(rows[0][1].encode("utf-8"))
 title = rows[0][0]
 links = []
 elements = []
-findLinks(int(docId), tree, links, elements)
+findLinks(intId, tree, links, elements)
 msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
 styles = cdrcgi.ExcelStyles()
 styles.set_color(styles.header, "blue")
 styles.frag = styles.style("align: horz right, vert center, wrap true")
 styles.source = styles.style("align: horz left, vert center, wrap true")
 sheet = styles.add_sheet("Links")
-banner = "Links for CDR%s (%s)" % (docId, title)
+banner = "Links for CDR%s (%s)" % (intId, title)
 sheet.write_merge(0, 0, 0, 5, banner, styles.header)
 labels = ("FragID", "Source Section/Subsection",
           "Section/Subsection Containing Fragment Ref",
@@ -191,7 +192,7 @@ for target in sorted(targets.values()):
             sheet.write(row, 5, "X", styles.center)
         row += 1
 stamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
-name = "SummaryInternalLinks-CDR%s-%s.xls" % (docId, stamp)
+name = "SummaryInternalLinks-CDR%s-%s.xls" % (intId, stamp)
 print "Content-type: application/vnd.ms-excel"
 print "Content-Disposition: attachment; filename=%s" % name
 print
