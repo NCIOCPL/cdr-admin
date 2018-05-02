@@ -6,6 +6,7 @@
 # JIRA::OCECDR-3456
 # JIRA::OCECDR-4201
 # JIRA::OCECDR-4434
+# JIRA::OCECDR-4463
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, cdrdb, requests, sys, lxml.etree as etree
 
@@ -120,7 +121,7 @@ def getPubmedArticle(doc):
 #----------------------------------------------------------------------
 def getArticleTitle(article):
     for node in article.findall("MedlineCitation/Article/ArticleTitle"):
-        return node.text
+        return cdr.get_text(node)
 
 #----------------------------------------------------------------------
 # Retrieve an XML document for a Pubmed article from NLM.
