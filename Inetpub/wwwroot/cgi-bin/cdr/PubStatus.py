@@ -20,6 +20,7 @@ session  = cdrcgi.getSession(fields)
 request  = cdrcgi.getRequest(fields)
 fromDate = fields and fields.getvalue('FromDate') or None
 toDate   = fields and fields.getvalue('ToDate') or None
+jobType  = fields and fields.getvalue('PubJobType') or None
 docType  = fields and fields.getvalue('docType') or None
 cgMode   = fields and fields.getvalue('cgMode') or None
 flavor   = fields and fields.getvalue('flavor') or 'full'
@@ -35,6 +36,9 @@ TOPDOCS  = 5000
 if jobId:    cdrcgi.valParmVal(jobId, regex=cdrcgi.VP_UNSIGNED_INT)
 if fromDate: cdrcgi.valParmDate(fromDate)
 if toDate:   cdrcgi.valParmDate(toDate)
+if jobType:  cdrcgi.valParmVal(jobType, valList=('All','Export', 
+                                'Interim-Export', 'Hotfix-Export', 
+                                'Hotfix-Remove', 'Republish-Export'))
 if docType:  cdrcgi.valParmVal(docType, valList=cdr.getDoctypes(session))
 if cgMode:   cdrcgi.valParmVal(cgMode, valList=('Added','Updated','Removed'))
 if docCount: cdrcgi.valParmVal(docCount, regex=cdrcgi.VP_UNSIGNED_INT)
@@ -708,6 +712,17 @@ def selectPubDates():
      <TD><B>End Date:&nbsp;</B></TD>
      <TD><INPUT NAME='ToDate' VALUE='%s'>&nbsp;</TD>
     </TR>
+    <TR>
+     <TD><B>Publishing Job Type:&nbsp;</B></TD>
+     <TD><select name="PubJobType">
+          <option VALUE='All'>All</option>
+          <option VALUE='Export'>Export</option>
+          <option VALUE='Interim-Export'>Interim-Export</option>
+          <option VALUE='Hotfix-Export'>Hotfix-Export</option>
+          <option VALUE='Hotfix-Remove'>Hotfix-Remove</option>
+          <option VALUE='Republish-Export'>Republish-Export</option>
+     </TD>
+    </TR>
    </TABLE>
   </FORM>
  </BODY>
@@ -724,6 +739,15 @@ def dispJobsByDates():
     instr   = "Publishing Job Summary"
     buttons = ["Report Menu", cdrcgi.MAINMENU, "Log Out"]
     script  = "PubStatus.py"
+
+    pubJobType = ""
+    if jobType and jobType != 'All':
+       pubJobType  = "AND pp.pub_subset in "
+       pubJobType += "('%s', 'Push_Documents_To_Cancer.Gov_%s')" % (jobType, 
+                                                                    jobType)
+    else:
+        pubJobType = ""
+
     header  = cdrcgi.header(title, title, instr, script, buttons,
                             stylesheet = """
   <style type = 'text/css'>
@@ -769,10 +793,11 @@ def dispJobsByDates():
                               AND t.name = 'PublishingSystem'
                               AND d.title = 'Primary'
                                      )
+              %s
               GROUP BY pp.id, pp.pub_subset, pp.started, pp.completed,
                        pp.status
               ORDER BY pp.id DESC
-                       """ % (fromDate, toDate)
+                       """ % (fromDate, toDate, pubJobType)
                       )
 
         row        = cursor.fetchone()
