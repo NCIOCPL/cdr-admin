@@ -5,6 +5,8 @@
 # BZIssue::5174
 # JIRA::OCECDR-3456
 # JIRA::OCECDR-4201
+# JIRA::OCECDR-4434
+# JIRA::OCECDR-4463
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, cdrdb, requests, sys, lxml.etree as etree
 
@@ -103,6 +105,15 @@ def getPubmedArticle(doc):
         cdrcgi.bail("unable to parse document from NLM")
     for node in tree.findall("PubmedArticle"):
         etree.strip_elements(node, "CommentsCorrectionsList")
+        namespace = "http://www.w3.org/1998/Math/MathML"
+        mml_math = "{{{}}}math".format(namespace)
+        namespaces = dict(mml=namespace)
+        for child in node.xpath("//mml:math", namespaces=namespaces):
+            if child.tail is None:
+                child.tail = "[formula]"
+            else:
+                child.tail = "[formula]" + child.tail
+        etree.strip_elements(node, mml_math, with_tail=False)
         return node
 
 #----------------------------------------------------------------------
@@ -110,7 +121,7 @@ def getPubmedArticle(doc):
 #----------------------------------------------------------------------
 def getArticleTitle(article):
     for node in article.findall("MedlineCitation/Article/ArticleTitle"):
-        return node.text
+        return cdr.get_text(node)
 
 #----------------------------------------------------------------------
 # Retrieve an XML document for a Pubmed article from NLM.
