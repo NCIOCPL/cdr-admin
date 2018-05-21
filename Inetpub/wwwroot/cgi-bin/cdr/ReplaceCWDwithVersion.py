@@ -221,7 +221,7 @@ or <strong>Cancel</strong> to re-enter data.</p>
             # Get requested version
             try:
                 doc = cdr.getDoc(session, docIdStr, checkout='Y',
-                                 version=verNum, getObject=True)
+                                 version=verNum, getObject=True, blob="Y")
             except Exception as e:
                 cdrcgi.bail("Unable to check out version: {}".format(e))
 
@@ -237,7 +237,8 @@ or <strong>Cancel</strong> to re-enter data.</p>
             # Save it
             resp = cdr.repDoc(session, doc=str(doc), checkIn='Y', val=valDoc,
                               ver=saveNewVer, verPublishable=savePub,
-                              comment=comment, showWarnings=True)
+                              comment=comment, showWarnings=True,
+                              blob=doc.blob)
 
             # Expecting (docId, error string)
             # If no docId, there were errors
