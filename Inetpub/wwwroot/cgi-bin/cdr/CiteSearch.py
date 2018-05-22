@@ -144,15 +144,14 @@ def fetchCitation(pmid):
 def createNewCitationDoc(article):
     title = getArticleTitle(article)
     if not title: cdrcgi.bail("Unable to find article title")
-    ctrl = { "DocType": "Citation", "DocTitle": title[:255].encode("utf-8") }
+    ctrl = dict(DocType="Citation", DocTitle=title[:255].encode("utf-8"))
     root = etree.Element("Citation")
     details = etree.SubElement(root, "VerificationDetails")
     etree.SubElement(details, "Verified").text = "Yes"
     etree.SubElement(details, "VerifiedIn").text = "PubMed"
     root.append(article)
-    docXml = etree.tostring(root)
-    opts = {"type": "Citation", "ctrl": ctrl, "encoding": "utf-8"}
-    return cdr.Doc(docXml, **opts)
+    docXml = etree.tostring(root, encoding="utf-8")
+    return cdr.Doc(docXml, doctype="Citation", ctrl=ctrl)
 
 #----------------------------------------------------------------------
 # Handle a request to import a citation document from PubMed.

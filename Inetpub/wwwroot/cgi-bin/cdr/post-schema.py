@@ -72,16 +72,15 @@ class Control(cdrcgi.Control):
         self.logger.info("Manifest updated")
         return "Running RefreshManifest.py ...\n" + result.output
     def add_doc(self, schema):
-        ctrl = { "DocTitle": self.filename }
-        opts = {"type": "schema", "ctrl": ctrl, "encoding": "utf-8"}
-        doc = cdr.Doc(schema, **opts)
-        opts = {
-            "doc": str(doc),
-            "ver": "Y",
-            "comment": self.comment,
-            "reason": self.comment,
-            "show_warnings": True
-        }
+        ctrl = dict(DocTitle=self.filename)
+        doc = cdr.Doc(schema, doctype="schema", ctrl=ctrl)
+        opts = dict(
+            doc=str(doc),
+            ver="Y",
+            comment=self.comment,
+            reason=self.comment,
+            show_warnings=True
+        )
         doc_id, warnings = cdr.addDoc(self.session, **opts)
         if doc_id:
             cdr.unlock(self.session, doc_id)
