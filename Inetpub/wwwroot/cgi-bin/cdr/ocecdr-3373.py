@@ -258,9 +258,18 @@ class AudioFile:
         comment = "document created for CDR request OCECDR=3373"
         docTitle = u"%s; pronunciation; mp3" % self.title
         ctrl = { 'DocType': 'Media', 'DocTitle': docTitle.encode('utf-8') }
-        doc = cdr.Doc(self.toXml(), 'Media', ctrl, self.bytes, encoding='utf-8')
-        result = cdr.addDoc(session, doc=str(doc), comment=comment, val='Y',
-                            reason=comment, ver='Y', verPublishable='Y')
+        opts = {"type": "Media", "ctrl": ctrl, "encoding": "utf-8"}
+        doc = cdr.Doc(self.toXml(), **opts)
+        opts = {
+            "doc": str(doc),
+            "comment": comment,
+            "reason": comment,
+            "val": "Y",
+            "ver": "Y",
+            "publishable": "Y",
+            "blob": self.bytes
+        }
+        result = cdr.addDoc(session, **opts)
         self.mediaId = cdr.exNormalize(result)[1]
         cdr.unlock(session, self.mediaId)
         return self.mediaId

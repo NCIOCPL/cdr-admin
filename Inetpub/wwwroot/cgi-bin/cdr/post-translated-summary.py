@@ -39,13 +39,19 @@ class Control(cdrcgi.Control):
         except Exception, e:
             return self.message(e, "red")
     def add_doc(self, xml):
-        doc = cdr.Doc(xml, "Summary", encoding="utf-8")
+        opts = {"type": "Summary", "encoding": "utf-8"}
+        doc = cdr.Doc(xml, **opts)
         reason = "Creating document translated in Trados"
         reason = self.fields.getvalue("comment", reason)
-        doc_id, warnings = cdr.addDoc(self.session, doc=str(doc), ver="Y",
-                                      comment=reason, reason=reason,
-                                      checkIn="Y", verPublishable="N",
-                                      showWarnings=True)
+        opts = {
+            "doc": str(doc),
+            "ver": "Y",
+            "comment": reason,
+            "reason": reason,
+            "check_in": "Y",
+            "show_warnings": True
+        }
+        doc_id, warnings = cdr.addDoc(self.session, **opts)
         if doc_id:
             return "Created %s." % doc_id
         raise Exception(cdr.checkErr(warnings) or "Unexpected error")

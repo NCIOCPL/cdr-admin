@@ -151,7 +151,8 @@ def createNewCitationDoc(article):
     etree.SubElement(details, "VerifiedIn").text = "PubMed"
     root.append(article)
     docXml = etree.tostring(root)
-    return cdr.Doc(docXml, "Citation", ctrl, encoding="utf-8")
+    opts = {"type": "Citation", "ctrl": ctrl, "encoding": "utf-8"}
+    return cdr.Doc(docXml, **opts)
 
 #----------------------------------------------------------------------
 # Handle a request to import a citation document from PubMed.
