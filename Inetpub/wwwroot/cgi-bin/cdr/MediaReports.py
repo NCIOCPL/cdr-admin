@@ -62,6 +62,8 @@ for script, label in(
     ('MediaCaptionContent.py?',     'Media Caption and Content Report'),
     ('PubStatsByDate.py?VOL=Y&',    'Media Doc Publishing Report'),
     ('MediaLinks.py?',              'Linked Media Documents'),
+    ('media-translation-job-report.py?',
+     'Media Translation Job Workflow Report',)
 ):
     url = "%s/%s%s" % (cdrcgi.BASE, script, session)
     page.add(B.LI(B.A(label, href=url)))
