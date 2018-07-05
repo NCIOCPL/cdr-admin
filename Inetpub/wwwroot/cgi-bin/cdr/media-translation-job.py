@@ -305,8 +305,6 @@ class Job:
     KEY = "english_id"
     FIELDS = "state_id", "assigned_to", "comments"
     REQUIRED = "english_id", "state_id", "assigned_to"
-    FROM_OBJECT_PATH = "/Media/MediaSource/DerivedFrom/FromObject"
-    SPANISH_PATH = FROM_OBJECT_PATH + "/FromCdrMedia/MediaID/@cdr:ref"
 
     def __init__(self, control):
         """
@@ -344,7 +342,7 @@ class Job:
             self.banner = self.banner[:40] + " ..."
         query = db.Query("document d", "d.id", "d.title")
         query.join("query_term q", "q.doc_id = d.id")
-        query.where(query.Condition("q.path", self.SPANISH_PATH))
+        query.where("q.path = '/Media/TranslationOf/@cdr:ref'")
         query.where(query.Condition("q.int_val", self.english_id))
         row = query.execute(control.cursor).fetchone()
         if row:

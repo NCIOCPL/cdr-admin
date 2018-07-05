@@ -174,8 +174,6 @@ class Job:
     """
 
     URL = "media-translation-job.py?Session={}&english_id={}"
-    FROM_OBJECT_PATH = "/Media/MediaSource/DerivedFrom/FromObject"
-    SPANISH_PATH = FROM_OBJECT_PATH + "/FromCdrMedia/MediaID/@cdr:ref"
 
     def __init__(self, control, row):
         """
@@ -194,7 +192,7 @@ class Job:
         self.date = row.state_date
         self.comments = row.comments
         query = db.Query("query_term", "doc_id")
-        query.where(query.Condition("path", self.SPANISH_PATH))
+        query.where("path = '/Media/TranslationOf/@cdr:ref'")
         query.where(query.Condition("int_val", self.english_id))
         row = query.execute(control.cursor).fetchone()
         self.spanish_id = row.doc_id if row else None
