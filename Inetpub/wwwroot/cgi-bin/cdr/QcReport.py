@@ -63,21 +63,21 @@ def getSectionTitle(repType):
     if not repType:
         return "QC Report"
     elif repType == "bu":
-        return "Bold/Underline QC Report"
+        return "HP Bold/Underline QC Report"
     elif repType == "but":
-        return "Bold/Underline QC Report (Test)"
+        return "HP Bold/Underline QC Report (Test)"
     elif repType == "rs":
-        return "Redline/Strikeout QC Report"
+        return "HP Redline/Strikeout QC Report"
     elif repType == "rst":
-        return "Redline/Strikeout QC Report (Test)"
+        return "HP Redline/Strikeout QC Report (Test)"
     elif repType == "nm":
         return "QC Report (No Markup)"
     elif repType == "pat":
-        return "Patient QC Report"
+        return "PT Redline/Strikeout QC Report"
     elif repType == "patrs":
-        return "Patient Redline/Strikeout QC Report"
+        return "PT Redline/Strikeout QC Report"
     elif repType == "patbu":
-        return "Patient Bold/Underline QC Report"
+        return "PT Bold/Underline QC Report"
     elif repType == "pp":
         return "Publish Preview Report"
     elif repType == "img":
@@ -134,6 +134,7 @@ header   = cdrcgi.header(title, title, getSectionTitle(repType),
                         color: #006600; }
     *.comgroup          { background: #C9C9C9;
                           margin-bottom: 8px; }
+    *.radio-button    { margin-left: 40px; }
   </style>
 
   <script language = 'JavaScript'>
@@ -356,10 +357,23 @@ header   = cdrcgi.header(title, title, getSectionTitle(repType),
      function showOptions(obj) {
          var el = document.getElementById(obj);
          if (el.style.display == 'none') {
-             el.style.display = '';
+             el.style.display = 'block';
          }
          else {
              el.style.display = 'none';
+         }
+     }
+     function selectImageVersion(obj) {
+         // Display the radio button for selecting the version of image
+         // to use if the checkbox gets selected.
+
+         var checkBox = document.getElementById(obj);
+         var radioBtn = document.getElementById('pub-image');
+         if (checkBox.checked == true) {
+             radioBtn.style.display = 'block';
+         }
+         else {
+             radioBtn.style.display = 'none';
          }
      }
      function checkGreen() {
@@ -383,6 +397,7 @@ version  = fields.getvalue("DocVersion") or None
 if version: cdrcgi.valParmVal(version, regex=cdrcgi.VP_SIGNED_INT)
 glossary = fields.getvalue("Glossaries") or None
 images   = fields.getvalue("Images")     or None
+pubImages = fields.getvalue("PubImages") or 'Y'
 citation = fields.getvalue("CitationsHP") \
              or fields.getvalue("CitationsPat") or None
 loe      = fields.getvalue("LOEs")       or None
@@ -580,16 +595,50 @@ def showTitleChoices(choices):
 """ % (cdrcgi.SESSION, session, docType or '', repType or ''))
 
 # ---------------------------------------------------------------------
-#
+# Adding a line to add on/off checkbox options
 # ---------------------------------------------------------------------
 def addCheckbox(inputLabels, inputName, inputID='', checked=0):
     isChecked = checked and "checked='1'" or ""
+    showImages = ''
+
+    # Adding on-click trigger when 'Images' are selected so that the
+    # user can decide to include publishable versions of images or 
+    # non-publishable versions.
+    # ---------------------------------------------------------------
+    if inputName == 'Images':
+       showImages = 'onclick="selectImageVersion(\'displayImages\')"'
+
     cbHtml = u"""\
-      <input name='%s' type='checkbox' id='%s'
+      <input name='%s' type='checkbox' id='%s' %s
              %s>&nbsp;
       <label for='%s'>%s</label>
       <br>
-""" % (inputName, inputID, isChecked, inputID, inputLabels[inputName])
+""" % (inputName, inputID, showImages, isChecked, inputID, 
+       inputLabels[inputName])
+    return cbHtml
+
+# ---------------------------------------------------------------------
+# Adding a set of radio buttons
+# Users want to be able to display either the last publishable version
+# of an image or the last version (if exists).
+# The default is to display the last publishable version of the image.
+# ---------------------------------------------------------------------
+def addImageRadioBtn(inputLabels, inputName, inputID=''):
+    id1 = 'pubYes'
+    id2 = 'pubNo'
+    cbHtml = u"""\
+      <div id="pub-image" class="radio-button" style="display:none;">
+       <input type='radio' name='%s' id='%s'
+              value="Y" checked>&nbsp;
+       <label for='%s'>%s</label>
+       <br>
+       <input type='radio' name='%s' id='%s'
+              value="N" >&nbsp;
+       <label for='%s'>%s</label>
+       <br>
+      </div>
+""" % (inputName, id1, id1, inputLabels['PubImages'][id1], 
+       inputName, id2, id2, inputLabels['PubImages'][id2])
     return cbHtml
 
 #----------------------------------------------------------------------
@@ -739,8 +788,8 @@ if letUserPickVersion:
         # Display the check boxed for the Revision-level Markup
         # XXX WHAT IS THIS <TD> TAG DOING???
         # -----------------------------------------------------
+    ### <td valign="top">
         form += u"""\
-    <td valign="top">
      <fieldset>
       <legend>&nbsp;Revision-level Markup&nbsp;</legend>
       <input name='publish' type='checkbox' id='pup'>
@@ -784,7 +833,7 @@ if letUserPickVersion:
     checkboxLabels = { 'CitationsPat':'Display Reference section',
                        'CitationsHP':'Display HP Reference section',
                        'Glossaries':'Display glossary terms at end of report',
-                       'Images':'Display images',
+                       'Images':'Display images ...',
                        'Keypoints':'Display Key Point boxes',
                        'LearnMore':
                             'Display To Learn More section',
@@ -794,6 +843,10 @@ if letUserPickVersion:
                             'Display standard wording with mark-up',
                        'ModuleMarkup':
                             'Display Module Markup'
+                 }
+
+    radioBtnLabels = { 'PubImages':{'pubYes':'... use publishable version', 
+                                    'pubNo':'... use non-publishable version'}
                  }
 
     # Display the Misc. Print Options check boxes for Patients
@@ -810,6 +863,8 @@ if letUserPickVersion:
                                 inputID='displayGlossaries')
             form += addCheckbox(checkboxLabels, 'Images',
                                 inputID='displayImages', checked=0)
+            form += addImageRadioBtn(radioBtnLabels, 'PubImages',
+                                inputID='displayPubImages')
             form += addCheckbox(checkboxLabels, 'Keypoints',
                                 inputID='displayKeypoints', checked=1)
             form += addCheckbox(checkboxLabels, 'StandardWording',
@@ -1046,6 +1101,8 @@ if letUserPickVersion:
                                 inputID='displayCitations', checked=1)
             form += addCheckbox(checkboxLabels, 'Images',
                                 inputID='displayImages', checked=0)
+            form += addImageRadioBtn(radioBtnLabels, 'PubImages',
+                                inputID='displayPubImages')
             form += addCheckbox(checkboxLabels, 'LOEs',
                                 inputID='displayLOEs')
             form += addCheckbox(checkboxLabels, 'ModuleMarkup',
@@ -1637,6 +1694,8 @@ filterParm.append(['DisplayGlossaryTermList',
                        glossary and "Y" or "N"])
 filterParm.append(['DisplayImages',
                        images and "Y" or "N"])
+if images:
+    filterParm.append(['DisplayPubImages', pubImages ])
 filterParm.append(['DisplayCitations',
                        citation and "Y" or "N"])
 filterParm.append(['DisplayLOETermList',
@@ -1684,6 +1743,7 @@ try:
                         docVer = version or None, parm = filterParm)
 except Exception as e:
     cdrcgi.bail("filtering error: {}".format(e))
+
 #if (type(doc) in (type(""), type(u"")):
 #    cdrcgi.bail("OOPS! %s" % doc)
 if docType == "CTGovProtocol":
