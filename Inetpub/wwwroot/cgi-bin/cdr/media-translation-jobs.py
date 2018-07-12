@@ -18,9 +18,13 @@ class Control(cdrcgi.Control):
     jobs in bulk.
     """
 
-    ADD = "Add Job"
+    ADD = "Add" # Job"
     ASSIGN = "Assign"
-    PURGE = "Purge Completed Jobs"
+    PURGE = "Purge" # Completed Jobs"
+    SUMMARY = "Summary" # Queue"
+    GLOSSARY = "Glossary" # Queue"
+    REPORTS_MENU = SUBMENU = "Reports"
+    ADMINMENU = "Admin"
 
     def __init__(self):
         """
@@ -44,6 +48,10 @@ class Control(cdrcgi.Control):
 
         if self.request == self.ADD:
             cdrcgi.navigateTo("media-translation-job.py", self.session)
+        elif self.request == self.SUMMARY:
+            cdrcgi.navigateTo("translation-jobs.py", self.session)
+        elif self.request == self.GLOSSARY:
+            cdrcgi.navigateTo("glossary-translation-jobs.py", self.session)
         elif self.request == self.PURGE:
             if not cdr.canDo(self.session, "PRUNE TRANSLATION QUEUE"):
                 cdrcgi.bail("not authorized")
@@ -51,7 +59,7 @@ class Control(cdrcgi.Control):
 DELETE FROM media_translation_job
       WHERE state_id = (SELECT value_id
                           FROM media_translation_state
-                         WHERE value_name = 'Translation Complete')""")
+                         WHERE value_name = 'Translation Made Publishable')""")
             count = self.cursor.rowcount
             self.conn.commit()
             message = "Purged jobs for {:d} published translations."
@@ -102,6 +110,8 @@ DELETE FROM media_translation_job
         """
 
         opts["buttons"][0] = self.PURGE
+        opts["buttons"].insert(1, self.SUMMARY)
+        opts["buttons"].insert(1, self.GLOSSARY)
         opts["buttons"].insert(0, self.ASSIGN)
         opts["buttons"].insert(0, self.ADD)
         return opts

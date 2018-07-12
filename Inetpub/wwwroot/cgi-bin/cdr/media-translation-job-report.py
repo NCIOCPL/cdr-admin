@@ -25,6 +25,10 @@ class Control(cdrcgi.Control):
     )
     SORT_VALS = [s[0] for s in SORT]
     TAMPERING = cdrcgi.TAMPERING
+    SUMMARY = "Summary"
+    GLOSSARY = "Glossary"
+    REPORTS_MENU = SUBMENU = "Reports"
+    ADMINMENU = "Admin"
 
     def __init__(self):
         """
@@ -49,6 +53,35 @@ class Control(cdrcgi.Control):
             self.title = self.PAGE_TITLE = "Translation Job Workflow Report"
         else:
             self.title = self.PAGE_TITLE = "Translation Job History Report"
+
+    def run(self):
+        """
+        Override the base class method to handle additional buttons.
+        """
+
+        if self.request == self.GLOSSARY:
+            cdrcgi.navigateTo("glossary-translation-jobs.py", self.session)
+        elif self.request == self.SUMMARY:
+            cdrcgi.navigateTo("translation-jobs.py", self.session)
+        cdrcgi.Control.run(self)
+
+    def set_form_options(self, opts):
+        """
+        Add some extra buttons
+        """
+
+        opts["buttons"].insert(-3, self.SUMMARY)
+        opts["buttons"].insert(-3, self.GLOSSARY)
+        return opts
+
+    def set_report_options(self, opts):
+        """
+        Add some extra buttons
+        """
+
+        opts["page_opts"]["buttons"].insert(0, self.SUMMARY)
+        opts["page_opts"]["buttons"].insert(0, self.GLOSSARY)
+        return opts
 
     def populate_form(self, form):
         """

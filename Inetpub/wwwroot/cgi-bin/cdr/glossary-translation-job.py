@@ -19,6 +19,10 @@ class Control(cdrcgi.Control):
     JOBS = "Jobs"
     DELETE = "Delete"
     LOGNAME = "glossary-translation-workflow"
+    SUMMARY = "Summary"
+    MEDIA = "Media"
+    REPORTS_MENU = SUBMENU = "Reports"
+    ADMINMENU = "Admin"
 
     def __init__(self):
         """
@@ -81,6 +85,7 @@ class Control(cdrcgi.Control):
                     query.join("query_term q", "q.doc_id = d.id")
                     query.where(query.Condition("q.path", path))
                     query.where(query.Condition("q.int_val", self.doc_id))
+                    query.where("d.active_status = 'A'")
                     query.order("d.title")
                     row = query.execute(self.cursor).fetchone()
                     if row:
@@ -99,8 +104,12 @@ class Control(cdrcgi.Control):
 
         if self.request == self.JOBS:
             cdrcgi.navigateTo("glossary-translation-jobs.py", self.session)
-        if self.request == self.DELETE:
+        elif self.request == self.DELETE:
             self.delete_job()
+        elif self.request == self.MEDIA:
+            cdrcgi.navigateTo("media-translation-jobs.py", self.session)
+        elif self.request == self.SUMMARY:
+            cdrcgi.navigateTo("translation-jobs.py", self.session)
         cdrcgi.Control.run(self)
 
     def show_report(self):
@@ -154,6 +163,8 @@ class Control(cdrcgi.Control):
             if not self.job.new:
                 opts["buttons"].insert(-3, self.DELETE)
             opts["banner"] = self.job.banner
+        opts["buttons"].insert(-3, self.SUMMARY)
+        opts["buttons"].insert(-3, self.MEDIA)
         return opts
 
     def populate_form(self, form):
@@ -217,7 +228,7 @@ jQuery("input[value='{}']").click(function(e) {{
         self.cursor.execute(query, self.doc_id)
         self.conn.commit()
         self.logger.info("removed translation job for CDR%d", self.doc_id)
-        cdrcgi.navigateTo("translation-jobs.py", self.session)
+        cdrcgi.navigateTo("glossary-translation-jobs.py", self.session)
 
     def load_values(self, table_name):
         """

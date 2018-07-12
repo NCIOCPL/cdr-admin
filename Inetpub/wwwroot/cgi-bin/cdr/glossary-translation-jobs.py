@@ -20,7 +20,11 @@ class Control(cdrcgi.Control):
 
     ADD = "Add Job"
     ASSIGN = "Assign"
-    PURGE = "Purge Completed Jobs"
+    PURGE = "Purge" # Completed Jobs"
+    SUMMARY = "Summary" # Queue"
+    MEDIA = "Media" # Queue"
+    REPORTS_MENU = SUBMENU = "Reports"
+    ADMINMENU = "Admin"
 
     def __init__(self):
         """
@@ -44,6 +48,10 @@ class Control(cdrcgi.Control):
 
         if self.request == self.ADD:
             cdrcgi.navigateTo("glossary-translation-job.py", self.session)
+        elif self.request == self.SUMMARY:
+            cdrcgi.navigateTo("translation-jobs.py", self.session)
+        elif self.request == self.MEDIA:
+            cdrcgi.navigateTo("media-translation-jobs.py", self.session)
         elif self.request == self.PURGE:
             if not cdr.canDo(self.session, "PRUNE TRANSLATION QUEUE"):
                 cdrcgi.bail("not authorized")
@@ -103,6 +111,8 @@ DELETE FROM glossary_translation_job
         """
 
         opts["buttons"][0] = self.PURGE
+        opts["buttons"].insert(1, self.SUMMARY)
+        opts["buttons"].insert(1, self.MEDIA)
         opts["buttons"].insert(0, self.ASSIGN)
         opts["buttons"].insert(0, self.ADD)
         return opts
@@ -216,11 +226,12 @@ class Job:
                 path = "/GlossaryTermName/GlossaryTermConcept/@cdr:ref"
                 query = db.Query("document d", "d.title")#.limit(1)
                 query.join("query_term q", "q.doc_id = d.id")
+                query.join("glossary_translation_job j", "j.doc_id = d.id")
                 query.where(query.Condition("q.path", path))
                 query.where(query.Condition("q.int_val", self.doc_id))
                 query.order("d.title")
-                rows = query.execute(self.control.cursor).fetchall()
-                if rows:
+                rows = query.execute(self.control.cursor).fetchall() or []
+                if True or rows:
                     titles = [row.title.split(";")[0] for row in rows]
                     #title = row.title.split(";")[0]
                     pattern = u"GTC for {}"

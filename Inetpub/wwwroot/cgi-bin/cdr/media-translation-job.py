@@ -19,6 +19,10 @@ class Control(cdrcgi.Control):
     JOBS = "Jobs"
     DELETE = "Delete"
     LOGNAME = "media-translation-workflow"
+    SUMMARY = "Summary"
+    GLOSSARY = "Glossary"
+    REPORTS_MENU = SUBMENU = "Reports"
+    ADMINMENU = "Admin"
 
     def __init__(self):
         """
@@ -51,8 +55,12 @@ class Control(cdrcgi.Control):
 
         if self.request == self.JOBS:
             cdrcgi.navigateTo("media-translation-jobs.py", self.session)
-        if self.request == self.DELETE:
+        elif self.request == self.DELETE:
             self.delete_job()
+        elif self.request == self.GLOSSARY:
+            cdrcgi.navigateTo("glossary-translation-jobs.py", self.session)
+        elif self.request == self.SUMMARY:
+            cdrcgi.navigateTo("translation-jobs.py", self.session)
         cdrcgi.Control.run(self)
 
     def show_report(self):
@@ -108,6 +116,8 @@ class Control(cdrcgi.Control):
             opts["banner"] = self.job.banner
             if self.job.subtitle:
                 opts["subtitle"] = self.job.subtitle
+        opts["buttons"].insert(-3, self.SUMMARY)
+        opts["buttons"].insert(-3, self.GLOSSARY)
         return opts
 
     def populate_form(self, form):
@@ -171,7 +181,7 @@ jQuery("input[value='{}']").click(function(e) {{
         self.cursor.execute(query, self.english_id)
         self.conn.commit()
         self.logger.info("removed translation job for CDR%d", self.english_id)
-        cdrcgi.navigateTo("translation-jobs.py", self.session)
+        cdrcgi.navigateTo("media-translation-jobs.py", self.session)
 
     def load_values(self, table_name):
         """
