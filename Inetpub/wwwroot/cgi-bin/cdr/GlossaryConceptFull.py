@@ -251,26 +251,35 @@ def addAttributeRow(data, label, indent = False):
 # Module to create a small XML snippet that can be submitted to a filter
 # in order to substitute the PlaceHolder elements with the appropriate
 # text from the ReplacementText elements.
+#
+# The XML snippet has the following structure:
+# <GlossaryTermDef>
+#    <TermNameString/>
+#    <DefinitionText>
+#      <Insertion or Deletion> [optional]
+#      <PlaceHolder/>          [optional]
+#    </DefinitionText>
+#    <GlossaryTermPlaceHolder> [optional]
+#      <ReplacementText/>
+#    </GlossaryTermPlaceHolder>
+#  </GlossaryTermDef>
 #-----------------------------------------------------------------------
 def resolvePlaceHolder(language, termData, definitionText):
      # Create the Glossary Definition
      tmpdoc  = u"\n<GlossaryTermDef xmlns:cdr = 'cips.nci.nih.gov/cdr'>\n"
      tmpdoc += termData.get(language, u"@S@%s (en inglés)@E@" % termData['en'])\
                   + u"\n"
-     #tmpdoc += u" <TermNameString>" + \
-     #         termData.get(language, u"@S@%s (en inglés)@E@" % termData['en'])\
-     #             + u"</TermNameString>\n"
      tmpdoc += u" %s\n" % definitionText['DefinitionText']
 
      # Add the ReplacementText from the GlossaryTermName documents
-     if termData.has_key('ReplacementText'):
+     if 'ReplacementText' in termData:
          tmpdoc += u" <GlossaryTermPlaceHolder>\n"
          for gtText in termData['ReplacementText']:
              tmpdoc += u"  %s\n" % gtText
          tmpdoc += u" </GlossaryTermPlaceHolder>\n"
 
      # Add the ReplacementText from the GlossaryTermConcept document
-     if definitionText.has_key('ReplacementText'):
+     if 'ReplacementText' in definitionText:
          tmpdoc += u" <GlossaryConceptPlaceHolder>\n"
          for gcText in definitionText['ReplacementText']:
              tmpdoc += u"  %s\n" % gcText
@@ -789,9 +798,9 @@ html = """\
    .attribute    { font-weight: normal;
                    font-style: italic;
                    background-color: #FFFFFF; }
-   img           { width: 300px; }
    .insertapproved { color: red; }
    .deleteapproved { text-decoration: line-through; }
+   img           { width: 300px; }
   </STYLE>
  </HEAD>
  <BODY>
