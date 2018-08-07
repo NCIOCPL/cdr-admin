@@ -3,7 +3,7 @@
 #
 # OCECDR-3695: PubStatus Report Drops Push Job
 #----------------------------------------------------------------------
-import cgi, cdr, cdrdb, cdrcgi, re, string, time
+import cgi, cdr, cdrdb, cdrcgi, re, time
 
 # Logfile is same as that used in cdrpub.py
 LOG         = "d:/cdr/log/publish.log"
@@ -20,6 +20,7 @@ session  = cdrcgi.getSession(fields)
 request  = cdrcgi.getRequest(fields)
 fromDate = fields and fields.getvalue('FromDate') or None
 toDate   = fields and fields.getvalue('ToDate') or None
+jobType  = fields and fields.getvalue('PubJobType') or None
 docType  = fields and fields.getvalue('docType') or None
 cgMode   = fields and fields.getvalue('cgMode') or None
 flavor   = fields and fields.getvalue('flavor') or 'full'
@@ -35,8 +36,11 @@ TOPDOCS  = 5000
 if jobId:    cdrcgi.valParmVal(jobId, regex=cdrcgi.VP_UNSIGNED_INT)
 if fromDate: cdrcgi.valParmDate(fromDate)
 if toDate:   cdrcgi.valParmDate(toDate)
+if jobType:  cdrcgi.valParmVal(jobType, valList=('All', 'Export',
+                                'Interim-Export', 'Hotfix-Export',
+                                'Hotfix-Remove', 'Republish-Export'))
 if docType:  cdrcgi.valParmVal(docType, valList=cdr.getDoctypes(session))
-if cgMode:   cdrcgi.valParmVal(cgMode, valList=('Added','Updated','Removed'))
+if cgMode:   cdrcgi.valParmVal(cgMode, valList=('Added', 'Updated', 'Removed'))
 if docCount: cdrcgi.valParmVal(docCount, regex=cdrcgi.VP_UNSIGNED_INT)
 docCount = int(docCount)
 # dispType tested later
@@ -136,11 +140,35 @@ def dispJobStatus():
 #----------------------------------------------------------------------
 # Add a table row for an published documents.
 #----------------------------------------------------------------------
+"""
+            SELECT ppd.doc_id, 0
+                   ppd.doc_version, 1
+                   t.name, 2
+                   d.title, 3
+                   ppd.messages, 4
+                   pp.pub_subset, 5
+                   u.name, 6
+                   ppd.failure 7
+"""
 def addRow(row):
     # Replacing the ";" for the document title since this caused the
-    # table formatting to be off due to too words that couldn't be
+    # table formatting to be off due to too many words that couldn't be
     # wrapped within the given column width.
     # --------------------------------------------------------------
+    messages = row[4]
+    failure = row[7] == "Y"
+    try:
+        messages = eval(messages)
+    except:
+        messages = [messages] if messages else [u"No message"]
+    if failure:
+        messages = [u"[ERROR] {}".format(message) for message in messages]
+    li = u'<li style="font-size: 10pt; font-weight: normal">'
+    messages = [u"{}{}".format(li, message) for message in messages]
+    style = "padding: 0px; margin: 0px; margin-left: 20px;"
+    open = u'<ul style="{}">'.format(style)
+    close = "</ul>"
+    messages = "{}{}".format(open, u"".join(messages), close)
     return u"""\
    <tr>
     <td valign='top'>%d</td>
@@ -149,7 +177,7 @@ def addRow(row):
     <td valign='top'>%s</td>
     <td valign='top'>%s</td>
    </tr>
-""" % (row[0], row[1], row[2], string.replace(row[3], ";", "; "), row[4])
+""" % (row[0], row[1], row[2], row[3].replace(";", "; "), messages)
 
 #----------------------------------------------------------------------
 # Display the filter failures: docId, docVer, docType, docTitle, Message.
@@ -169,7 +197,8 @@ def dispFilterFailures(flavor = 'full'):
                    d.title,
                    ppd.messages,
                    pp.pub_subset,
-                   u.name
+                   u.name,
+                   ppd.failure
               FROM pub_proc_doc ppd
               JOIN document d
                 ON ppd.doc_id = d.id
@@ -209,47 +238,50 @@ def dispFilterFailures(flavor = 'full'):
     html   += u"<BR><TABLE BORDER=1>"
     html   += u"""\
    <tr>
-    <td width='10%%' valign='top'><B>Id</B></td>
-    <td width='5%%'  valign='top'><B>Ver</B></td>
-    <td width='15%%' valign='top'><B>Type</B></td>
-    <td width='40%%' valign='top'><B>Title</B></td>
-    <td width='35%%' valign='top'><B>Message</B></td>
+    <td width='10%' valign='top'><B>Id</B></td>
+    <td width='5%'  valign='top'><B>Ver</B></td>
+    <td width='15%' valign='top'><B>Type</B></td>
+    <td width='40%' valign='top'><B>Title</B></td>
+    <td width='35%' valign='top'><B>Message(s)</B></td>
     </tr>
 """
     # The warnings have been formatted with a "class=warning"
     # attribute for the LI element.
     # -------------------------------------------------------
-    textPattern = re.compile(u'<LI class="(.*)</LI>')
+    #textPattern = re.compile(u'<LI class="(.*)</LI>')
     textPattern2 = re.compile(u'<Messages><message>')
     textPattern3 = re.compile(u'</message></Messages>')
     ### errorPattern = re.compile(u'DTDerror')
-    errorPattern = re.compile(u'error')
+    #errorPattern = re.compile(u'error')
 
     for row in rows:
-        text = textPattern.search(row[4])    # searching for warnings
-        eText = errorPattern.search(row[4])  # searching for errors
+        failure = row[7] == "Y"
+        #text = textPattern.search(row[4])    # searching for warnings
+        #eText = errorPattern.search(row[4])  # searching for errors
 
         if flavor == 'full':
             html += addRow(row)
         elif flavor == 'warning':
             # Only print the row if the pattern was found
             # -------------------------------------------
-            if text and not eText:
+            #if text and not eText:
+            if not failure:
                html += addRow(row)
         elif flavor == 'error':
             # Print the row if the error pattern was found
             # (it might also contain warnings)
             # --------------------------------------------
-            if eText:
+            #if eText:
+            if failure:
                html += addRow(row)
         else:
             cdrcgi.bail('Error: Valid values for flavor are: '
                         '"full", "warning", "error"')
 
     html  += u'</TABLE></FORM></BODY></HTML>'
-    html   = textPattern2.sub(u'<UL style="padding: 0px; margin: 0px; margin-left: 20px">',
-                                       html)
-    html   = textPattern3.sub(u'</UL>', html)
+    #html   = textPattern2.sub(u'<UL style="padding: 0px; margin: 0px; margin-left: 20px">',
+    #                                   html)
+    #html   = textPattern3.sub(u'</UL>', html)
 
     cdrcgi.sendPage(header + html)
 
@@ -387,8 +419,8 @@ def dispJobControl():
     table = cdrcgi.Report.Table(columns, jobs, caption=caption)
     title = "CDR Publishing Job Controller"
     css = ("button { margin: 0 3px; } "
-           """table caption { font-weight: normal; 
-                              text-align: left; 
+           """table caption { font-weight: normal;
+                              text-align: left;
                               margin-bottom: 10px;}""")
     opts = dict(banner=title, subtitle=message, css=css)
     page = cdrcgi.Report(title, [table], **opts)
@@ -649,7 +681,7 @@ def dispCgWork():
             listCount = "(Top %s only)" % TOPDOCS
         html   += HEADER % ('Removed', listCount, 'Removed', DISCLAIMER)
         for row in rowsRemoved:
-            html += ROW % (row[0], row[1], string.replace(row[2], ';', '; '))
+            html += ROW % (row[0], row[1], row[2].replace(';', '; '))
         html  += "</TABLE></BODY>"
 
     if nAdded:
@@ -657,7 +689,7 @@ def dispCgWork():
             listCount = "(Top %s only)" % TOPDOCS
         html   += HEADER % ('Added', listCount, 'Added', DISCLAIMER)
         for row in rowsAdded:
-            html += ROW % (row[0], row[1], string.replace(row[2], ';', '; '))
+            html += ROW % (row[0], row[1], row[2].replace(';', '; '))
         html  += "</TABLE></BODY>"
 
     if nUpdated:
@@ -670,7 +702,7 @@ def dispCgWork():
         html   += HEADER % ('Updated', listCount, 'Updated', DISCLAIMER)
 
         for row in rowsUpdated:
-            html += ROW % (row[0], row[1], string.replace(row[2], ';', '; '))
+            html += ROW % (row[0], row[1], row[2].replace(';', '; '))
         html  += "</TABLE></BODY>"
 
     html  += "</HTML>"
@@ -708,6 +740,17 @@ def selectPubDates():
      <TD><B>End Date:&nbsp;</B></TD>
      <TD><INPUT NAME='ToDate' VALUE='%s'>&nbsp;</TD>
     </TR>
+    <TR>
+     <TD><B>Publishing Job Type:&nbsp;</B></TD>
+     <TD><select name="PubJobType">
+          <option VALUE='All'>All</option>
+          <option VALUE='Export'>Export</option>
+          <option VALUE='Interim-Export'>Interim-Export</option>
+          <option VALUE='Hotfix-Export'>Hotfix-Export</option>
+          <option VALUE='Hotfix-Remove'>Hotfix-Remove</option>
+          <option VALUE='Republish-Export'>Republish-Export</option>
+     </TD>
+    </TR>
    </TABLE>
   </FORM>
  </BODY>
@@ -724,6 +767,15 @@ def dispJobsByDates():
     instr   = "Publishing Job Summary"
     buttons = ["Report Menu", cdrcgi.MAINMENU, "Log Out"]
     script  = "PubStatus.py"
+
+    pubJobType = ""
+    if jobType and jobType != 'All':
+       pubJobType  = "AND pp.pub_subset in "
+       pubJobType += "('%s', 'Push_Documents_To_Cancer.Gov_%s')" % (jobType,
+                                                                    jobType)
+    else:
+        pubJobType = ""
+
     header  = cdrcgi.header(title, title, instr, script, buttons,
                             stylesheet = """
   <style type = 'text/css'>
@@ -769,10 +821,11 @@ def dispJobsByDates():
                               AND t.name = 'PublishingSystem'
                               AND d.title = 'Primary'
                                      )
+              %s
               GROUP BY pp.id, pp.pub_subset, pp.started, pp.completed,
                        pp.status
               ORDER BY pp.id DESC
-                       """ % (fromDate, toDate)
+                       """ % (fromDate, toDate, pubJobType)
                       )
 
         row        = cursor.fetchone()

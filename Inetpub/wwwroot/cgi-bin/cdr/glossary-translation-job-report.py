@@ -1,29 +1,30 @@
-#----------------------------------------------------------------------
-# Generate parameterized reports on the CDR summary translation job queue.
-# JIRA::OCECDR-4193
-#----------------------------------------------------------------------
+"""
+Generate parameterized reports on the CDR glossary translation job queue.
+
+https://tracker.nci.nih.gov/browse/OCECDR-4487
+"""
+
 import datetime
 import operator
 import cdrcgi
-import cdrdb
+from cdrapi import db
 
 class Control(cdrcgi.Control):
     """
     Let the user specify filtering, sorting, and output format for
-    a report on the CDR summary translation queue jobs, and then
+    a report on the CDR glossary translation queue jobs, and then
     generate and return that report.
     """
 
     SORT = (
-        ("s.value_pos", "Processing Status"),
-        ("j.state_date", "Status Date"),
-        ("u.fullname", "User"),
-        ("c.value_name", "Type of Change"),
-        ("d.title", "English Summary Title")
+        "Processing Status",
+        "Status Date",
+        "User",
+        "Glossary CDR ID",
+        "Glossary Title"
     )
-    SORT_VALS = [s[0] for s in SORT]
     TAMPERING = cdrcgi.TAMPERING
-    GLOSSARY = "Glossary"
+    SUMMARY = "Summary"
     MEDIA = "Media"
     REPORTS_MENU = SUBMENU = "Reports"
     ADMINMENU = "Admin"
@@ -34,18 +35,17 @@ class Control(cdrcgi.Control):
         """
 
         cdrcgi.Control.__init__(self, "Translation Job Workflow Report")
-        self.states = self.load_values("summary_translation_state")
-        self.changes = self.load_values("summary_change_type")
-        self.translators = self.load_group("Spanish Translators")
+        self.cursor = db.connect().cursor()
+        self.states = self.load_values("glossary_translation_state")
+        self.translators = self.load_group("Spanish Glossary Translators")
         self.start = self.fields.getvalue("start")
         self.end = self.fields.getvalue("end")
         self.type = self.fields.getvalue("type")
         self.state = self.get_list("state", self.states.map)
-        self.change = self.get_list("change", self.changes.map)
         self.translator = self.get_list("translator", self.translators)
-        self.sort = self.fields.getvalue("sort") or self.SORT[0][0]
+        self.sort = self.fields.getvalue("sort") or self.SORT[0]
         self.comments = self.fields.getvalue("comments")
-        cdrcgi.valParmVal(self.sort, valList=self.SORT_VALS, msg=self.TAMPERING)
+        cdrcgi.valParmVal(self.sort, valList=self.SORT, msg=self.TAMPERING)
         cdrcgi.valParmDate(self.start, empty_ok=True, msg=self.TAMPERING)
         cdrcgi.valParmDate(self.end, empty_ok=True, msg=self.TAMPERING)
         if self.type == "current":
@@ -60,8 +60,8 @@ class Control(cdrcgi.Control):
 
         if self.request == self.MEDIA:
             cdrcgi.navigateTo("media-translation-jobs.py", self.session)
-        elif self.request == self.GLOSSARY:
-            cdrcgi.navigateTo("glossary-translation-jobs.py", self.session)
+        elif self.request == self.SUMMARY:
+            cdrcgi.navigateTo("translation-jobs.py", self.session)
         cdrcgi.Control.run(self)
 
     def set_form_options(self, opts):
@@ -69,8 +69,8 @@ class Control(cdrcgi.Control):
         Add some extra buttons
         """
 
+        opts["buttons"].insert(-3, self.SUMMARY)
         opts["buttons"].insert(-3, self.MEDIA)
-        opts["buttons"].insert(-3, self.GLOSSARY)
         return opts
 
     def set_report_options(self, opts):
@@ -78,8 +78,8 @@ class Control(cdrcgi.Control):
         Add some extra buttons
         """
 
+        opts["page_opts"]["buttons"].insert(0, self.SUMMARY)
         opts["page_opts"]["buttons"].insert(0, self.MEDIA)
-        opts["page_opts"]["buttons"].insert(0, self.GLOSSARY)
         return opts
 
     def populate_form(self, form):
@@ -111,11 +111,6 @@ class Control(cdrcgi.Control):
             form.add_checkbox("state", label, value)
         form.add("</fieldset>")
         form.add("<fieldset>")
-        form.add(form.B.LEGEND("Types of Change (all if none checked)"))
-        for value, label in self.changes.values:
-            form.add_checkbox("change", label, value)
-        form.add("</fieldset>")
-        form.add("<fieldset>")
         form.add(form.B.LEGEND("Users (all if none checked)"))
         for value, label in self.sort_dict(self.translators):
             form.add_checkbox("translator", label, value)
@@ -123,8 +118,8 @@ class Control(cdrcgi.Control):
         form.add("<fieldset>")
         form.add(form.B.LEGEND("Sort By"))
         checked = True
-        for value, label in self.SORT:
-            form.add_radio("sort", label, value, checked=checked)
+        for value in self.SORT:
+            form.add_radio("sort", value, value, checked=checked)
             checked = False
         form.add("</fieldset>")
         form.add_output_options("html")
@@ -132,13 +127,15 @@ class Control(cdrcgi.Control):
     def different(self, old, new):
         if old is None:
             return True
-        if old[0] != new[0]:
+        if old.doc_id != new.doc_id:
             return True
-        if old[2] != new[2]:
+        if old.value_name != new.value_name:
             return True
-        if old[3] != new[3]:
+        if old.fullname != new.fullname:
             return True
-        if old[4] != new[4]:
+        if old.state_date != new.state_date:
+            return True
+        if old.comments != new.comments:
             return True
         return False
 
@@ -148,19 +145,15 @@ class Control(cdrcgi.Control):
         as requested.
         """
 
-        sort = [self.sort]
-        if self.sort != "d.title":
-            sort.append("d.title")
-        fields = ("d.id", "d.title", "s.value_name", "c.value_name",
-                  "u.fullname", "j.state_date", "j.comments")
+        fields = ("j.doc_id", "s.value_name", "u.fullname", "j.state_date",
+                  "j.comments")
         if self.type == "current":
-            query = cdrdb.Query("summary_translation_job j", *fields)
+            query = db.Query("glossary_translation_job j", *fields)
         else:
-            query = cdrdb.Query("summary_translation_job_history j", *fields)
+            query = db.Query("glossary_translation_job_history j", *fields)
         query.join("usr u", "u.id = j.assigned_to")
-        query.join("document d", "d.id = j.english_id")
-        query.join("summary_translation_state s", "s.value_id = j.state_id")
-        query.join("summary_change_type c", "c.value_id = j.change_type")
+        query.join("document d", "d.id = j.doc_id")
+        query.join("glossary_translation_state s", "s.value_id = j.state_id")
         # dates have been sanitized above
         if self.start:
             query.where("j.state_date >= '%s'" % self.start)
@@ -170,29 +163,24 @@ class Control(cdrcgi.Control):
             query.where(query.Condition("u.id", self.translator, "IN"))
         if self.state:
             query.where(query.Condition("s.value_id", self.state, "IN"))
-        if self.change:
-            query.where(query.Condition("c.value_id", self.change, "IN"))
-        rows = query.order(*sort).execute(self.cursor).fetchall()
+        rows = query.execute(self.cursor).fetchall()
         jobs = []
         previous = None
         for row in rows:
             if self.different(previous, row):
-                jobs.append(Job(self, *row))
+                jobs.append(Job(self, row))
                 previous = row
-        #jobs = [Job(self, *row) for row in rows]
-        rows = [job.row() for job in jobs]
+        rows = [job.row() for job in sorted(jobs)]
         columns = (
             cdrcgi.Report.Column("CDR ID"),
-            cdrcgi.Report.Column("Title", width="500px"),
-            cdrcgi.Report.Column("Audience", width="150px"),
-            cdrcgi.Report.Column("Assigned To", width="175px"),
-            cdrcgi.Report.Column("Translation Status", width="175px"),
-            cdrcgi.Report.Column("Translation Status Date", width="100px"),
-            cdrcgi.Report.Column("Type of Change", width="175px"),
-            cdrcgi.Report.Column("TRANSLATED DOC CDR ID"),
-            cdrcgi.Report.Column("Comments")
+            cdrcgi.Report.Column("TITLE", width="500px"),
+            cdrcgi.Report.Column("STATUS", width="175px"),
+            cdrcgi.Report.Column("STATUS DATE", width="100px"),
+            cdrcgi.Report.Column("ASSIGNED TO", width="175px"),
+            cdrcgi.Report.Column("COMMENT", width="250px")
         )
-        if self.type == "current":
+        # There are no requirements for this report to include totals (yet)
+        if False and self.type == "current":
             ncols = len(columns)
             rows.append([unichr(160)] * ncols)
             padding = [""] * (ncols - 2)
@@ -212,7 +200,7 @@ class Control(cdrcgi.Control):
             dictionary of user names indexed by user ID
         """
 
-        query = cdrdb.Query("usr u", "u.id", "u.fullname")
+        query = db.Query("usr u", "u.id", "u.fullname")
         query.join("grp_usr gu", "gu.usr = u.id")
         query.join("grp g", "g.id = gu.grp")
         query.where("u.expired IS NULL")
@@ -230,7 +218,7 @@ class Control(cdrcgi.Control):
         Returns a populated Values object.
         """
 
-        query = cdrdb.Query(table_name, "value_id", "value_name")
+        query = db.Query(table_name, "value_id", "value_name")
         rows = query.order("value_pos").execute(self.cursor).fetchall()
         class Values:
             def __init__(self, rows):
@@ -240,6 +228,15 @@ class Control(cdrcgi.Control):
                     self.map[value_id] = value_name
                     self.values.append((value_id, value_name))
         return Values(rows)
+
+    @property
+    def state_sequence(self):
+        if not hasattr(self, "_state_sequence"):
+            self._state_sequence = {}
+            for i, state in enumerate(self.states.values):
+                state_id, state_name = state
+                self._state_sequence[state_name] = i
+        return self._state_sequence
 
     def get_list(self, name, all_values):
         """
@@ -270,62 +267,105 @@ class Control(cdrcgi.Control):
 
 class Job:
     """
-    Represents a translation job for the currently selected English
-    CDR summary document.
+    Represents a translation job for the currently selected CDR
+    Glossary document.
     """
 
-    URL = "translation-job.py?Session=%s&english_id=%s"
+    URL = "glossary-translation-job.py?Session=%s&doc_id=%s"
     COUNTS = {}
 
-    def __init__(self, control, doc_id, title, state, change, user, date, cmt):
+    def __init__(self, control, row):
         """
-        Collect the information about the English CDR summary document
-        being translated, as well as about the corresponding translated
-        Spanish document (if it exists). Also collect information about
-        the ongoing translation job.
+        Collect the information about the CDR Glossary document being
+        translated, as well as information about the ongoing translation
+        job.
         """
 
-        self.doc_id = doc_id
-        self.title = title.split(";")[0]
-        self.audience = title.split(";")[-1]
-        self.state = state
-        self.change = change
-        self.user = user
-        self.date = date
-        self.comments = cmt or ""
-        if control.comments == "short" and len(self.comments) > 40:
-            self.comments = self.comments[:40] + "..."
-        else:
-            self.comments = self.comments.split("\n")
-        Job.COUNTS[state] = self.COUNTS.get(state, 0) + 1
-        self.spanish_id = self.spanish_title = self.spanish_audience = None
-        query = cdrdb.Query("query_term q", "d.id", "d.title")
-        query.join("document d", "d.id = q.doc_id")
-        query.where("path = '/Summary/TranslationOf/@cdr:ref'")
-        query.where(query.Condition("int_val", doc_id))
-        row = query.execute(control.cursor).fetchone()
-        if row:
-            self.spanish_id, title = row
-            title_parts = title.split(";")
-            self.spanish_title = title = title_parts[0]
-            self.spanish_audience = title_parts[-1]
+        self.control = control
+        self.doc_id = row.doc_id
+        self.state = row.value_name
+        self.user = row.fullname
+        self.date = row.state_date
+        self.comments = row.comments
+        Job.COUNTS[self.state] = self.COUNTS.get(self.state, 0) + 1
+
+    @property
+    def doc_type(self):
+        if not hasattr(self, "_doc_type"):
+            query = db.Query("doc_type t", "t.name")
+            query.join("document d", "d.doc_type = t.id")
+            query.where(query.Condition("d.id", self.doc_id))
+            row = query.execute(self.control.cursor).fetchone()
+            self._doc_type = row.name
+        return self._doc_type
+
+    @property
+    def title(self):
+        if not hasattr(self, "_title"):
+            if not self.doc_type:
+                self._title = None
+            elif self.doc_type.lower() == "glossarytermname":
+                query = db.Query("document", "title")
+                query.where(query.Condition("id", self.doc_id))
+                row = query.execute(self.control.cursor).fetchone()
+                self._title = row.title.split(";")[0] if row else None
+            else:
+                path = "/GlossaryTermName/GlossaryTermConcept/@cdr:ref"
+                query = db.Query("document d", "d.title").limit(1)
+                query.join("query_term q", "q.doc_id = d.id")
+                query.where(query.Condition("q.path", path))
+                query.where(query.Condition("q.int_val", self.doc_id))
+                query.order("d.title")
+                row = query.execute(self.control.cursor).fetchone()
+                if row:
+                    title = row.title.split(";")[0]
+                    pattern = u"GTC for {}"
+                    self._title = pattern.format(title)
+                else:
+                    pattern = u"GTC CDR{:d}"
+                    self._title = pattern.format(self.doc_id)
+        return self._title
 
     def row(self):
         """
         Generate a row for the report's table.
         """
 
+        if self.control.comments == "short":
+            full = display = self.comments or ""
+            full = full.replace("\r", "").replace("\n", cdrcgi.NEWLINE)
+            if len(display) > 40:
+                display = display[:40] + "..."
+            comments = cdrcgi.Report.Cell(display, title=full)
+        else:
+            comments = (self.comments or "").split("\n")
         return [
             self.doc_id,
             self.title,
-            self.audience,
-            self.user,
             self.state,
             cdrcgi.Report.Cell(str(self.date)[:10], classes="nowrap"),
-            self.change,
-            self.spanish_id or "",
-            self.comments
+            self.user,
+            comments
         ]
+
+    @property
+    def key(self):
+        if self.control.sort == "Glossary CDR ID":
+            return self.doc_id
+        elif self.control.sort == "Processing Status":
+            return self.control.state_sequence[self.state], self.title.lower()
+        elif self.control.sort == "Status Date":
+            return str(self.date)[:10], self.title.lower()
+        elif self.control.sort == "User":
+            return self.user, self.title.lower()
+        else:
+            return self.title.lower()
+
+    def __cmp__(self, other):
+        #key1 = self.key
+        #key2 = other.key
+        #self.control.logger.info("comparing %r against %r", key1, key2)
+        return cmp(self.key, other.key)
 
 if __name__ == "__main__":
     """

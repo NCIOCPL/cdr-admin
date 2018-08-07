@@ -22,6 +22,10 @@ class Control(cdrcgi.Control):
     JOBS = "Jobs"
     DELETE = "Delete"
     LOGNAME = "translation-workflow"
+    MEDIA = "Media"
+    GLOSSARY = "Glossary"
+    REPORTS_MENU = SUBMENU = "Reports"
+    ADMINMENU = "Admin"
 
     def __init__(self):
         """
@@ -62,8 +66,12 @@ class Control(cdrcgi.Control):
 
         if self.request == self.JOBS:
             cdrcgi.navigateTo("translation-jobs.py", self.session)
-        if self.request == self.DELETE:
+        elif self.request == self.DELETE:
             self.delete_job()
+        elif self.request == self.GLOSSARY:
+            cdrcgi.navigateTo("glossary-translation-jobs.py", self.session)
+        elif self.request == self.MEDIA:
+            cdrcgi.navigateTo("media-translation-jobs.py", self.session)
         cdrcgi.Control.run(self)
 
     def show_report(self):
@@ -126,6 +134,8 @@ class Control(cdrcgi.Control):
             opts["banner"] = self.job.banner
             if self.job.subtitle:
                 opts["subtitle"] = self.job.subtitle
+        opts["buttons"].insert(-3, self.MEDIA)
+        opts["buttons"].insert(-3, self.GLOSSARY)
         return opts
 
     def populate_form(self, form):

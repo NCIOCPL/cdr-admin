@@ -15,8 +15,12 @@ class Control(cdrcgi.Control):
     the complete processing course.
     """
 
-    ADD = "Add Job"
-    PURGE = "Purge Completed Jobs"
+    ADD = "Add" # Job"
+    PURGE = "Purge" # Completed Jobs"
+    GLOSSARY = "Glossary" # Queue"
+    MEDIA = "Media" # Queue"
+    REPORTS_MENU = SUBMENU = "Reports"
+    ADMINMENU = "Admin"
 
     def __init__(self):
         """
@@ -37,6 +41,10 @@ class Control(cdrcgi.Control):
 
         if self.request == self.ADD:
             cdrcgi.navigateTo("translation-job.py", self.session)
+        elif self.request == self.GLOSSARY:
+            cdrcgi.navigateTo("glossary-translation-jobs.py", self.session)
+        elif self.request == self.MEDIA:
+            cdrcgi.navigateTo("media-translation-jobs.py", self.session)
         if self.request == self.PURGE:
             if not cdr.canDo(self.session, "PRUNE TRANSLATION QUEUE"):
                 cdrcgi.bail("not authorized")
@@ -58,6 +66,8 @@ DELETE FROM summary_translation_job
         """
 
         opts["buttons"][0] = self.PURGE
+        opts["buttons"].insert(1, self.MEDIA)
+        opts["buttons"].insert(1, self.GLOSSARY)
         opts["buttons"].insert(0, self.ADD)
         return opts
 

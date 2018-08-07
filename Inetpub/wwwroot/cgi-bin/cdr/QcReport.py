@@ -63,21 +63,21 @@ def getSectionTitle(repType):
     if not repType:
         return "QC Report"
     elif repType == "bu":
-        return "Bold/Underline QC Report"
+        return "HP Bold/Underline QC Report"
     elif repType == "but":
-        return "Bold/Underline QC Report (Test)"
+        return "HP Bold/Underline QC Report (Test)"
     elif repType == "rs":
-        return "Redline/Strikeout QC Report"
+        return "HP Redline/Strikeout QC Report"
     elif repType == "rst":
-        return "Redline/Strikeout QC Report (Test)"
+        return "HP Redline/Strikeout QC Report (Test)"
     elif repType == "nm":
         return "QC Report (No Markup)"
     elif repType == "pat":
-        return "Patient QC Report"
+        return "PT Redline/Strikeout QC Report"
     elif repType == "patrs":
-        return "Patient Redline/Strikeout QC Report"
+        return "PT Redline/Strikeout QC Report"
     elif repType == "patbu":
-        return "Patient Bold/Underline QC Report"
+        return "PT Bold/Underline QC Report"
     elif repType == "pp":
         return "Publish Preview Report"
     elif repType == "img":

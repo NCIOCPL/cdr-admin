@@ -129,7 +129,9 @@ for r in (
     ('GlossaryConceptDocsModified.py?', 
      'Glossary Term Concept Documents Modified Report'),
     ('GlossaryNameDocsModified.py?', 
-     'Glossary Term Name Documents Modified Report')
+     'Glossary Term Name Documents Modified Report'),
+    ('glossary-translation-job-report.py?',
+     'Glossary Translation Job Workflow Report',)
 ):
     form.append("""\
       <li><a href='%s/%s%s=%s'>%s</a></li>

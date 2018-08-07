@@ -159,9 +159,9 @@ SELECT id
     msecs = msecs & 0xFFFFFF
     suffix = db.generate_random_string(12)
     name = "{:08X}-{:06X}-{:03d}-{}".format(secs, msecs, uid, suffix)
-    cols = "name, usr, comment, initiated, last_act"
-    vals = "?, ?, 'Login through IIS secure page', GETDATE(), GETDATE()"
+    cols = "name, usr, comment, initiated, last_act, ip_address"
+    vals = "?, ?, 'Login through IIS secure page', GETDATE(), GETDATE(), ?"
     insert = "INSERT INTO session({}) VALUES({})".format(cols, vals)
-    db.cursor.execute(insert, (name, uid))
+    db.cursor.execute(insert, (name, uid, os.environ.get("REMOTE_ADDR")))
     db.conn.commit()
     return name
