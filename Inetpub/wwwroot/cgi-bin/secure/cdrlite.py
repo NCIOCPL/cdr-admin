@@ -24,7 +24,7 @@ JIRA::OCECDR-3849
 import os
 import string
 import time
-import adodbapi
+import pyodbc
 
 
 class DatabaseWrapper:
@@ -41,15 +41,15 @@ class DatabaseWrapper:
     @property
     def conn(self):
         if not hasattr(self, "_conn"):
-            parms = {
-                "Provider": "SQLOLEDB",
-                "Data Source": "{},{}".format(self.host, self.port),
-                "Initial Catalog": self.DB,
-                "User ID": self.CDRSQLACCOUNT,
-                "Password": self.password
-            }
-            parms = ";".join(["{}={}".format(*p) for p in parms.items()])
-            self._conn = adodbapi.connect(parms)
+            parms = dict(
+                Driver="{ODBC Driver 13 for SQL Server}",
+                Server="{},{}".format(self.host, self.port),
+                Database=self.DB,
+                Uid=self.CDRSQLACCOUNT,
+                Pwd=self.password
+            )
+            conn_string = ";".join(["{}={}".format(*p) for p in parms.items()])
+            self._conn = pyodbc.connect(conn_string)
         return self._conn
 
     @property
@@ -69,7 +69,7 @@ class DatabaseWrapper:
         if self._drive is None:
             raise Exception("CDR host file not found")
         return self._drive
-            
+
     @property
     def tier(self):
         if not hasattr(self, "_tier"):
