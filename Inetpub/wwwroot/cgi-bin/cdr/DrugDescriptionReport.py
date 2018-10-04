@@ -3,6 +3,7 @@
 #
 # BZIssue::5264 - [DIS] Formatting Changes to Drug Description Report
 # Rewritten July 2015 as part of security sweep.
+# JIRA::OCECDR-4453 - Add options to view all single-agent drugs or all combos
 #----------------------------------------------------------------------
 import cdr
 import cdrcgi
@@ -22,6 +23,8 @@ class Control(cdrcgi.Control):
     Otherwise, put up the request form with the default choices.
     """
 
+    METADATA = "/DrugInformationSummary/DrugInfoMetaData"
+    COMBO = METADATA + "/DrugInfoType/@Combination"
     REFTYPES = ("NCI", "FDA", "NLM")
     METHODS = (
         ("By Drug Name", "name"),
@@ -46,7 +49,11 @@ class Control(cdrcgi.Control):
 
     def populate_form(self, form):
         "Add the fields for a DIS report request to the page's form."
-        drugs = [("all", "All Drugs")]
+        drugs = [
+            ("all-drugs", "All Drugs"),
+            ("all-single-agent-drugs", "All Single-Agent Drugs"),
+            ("all-drug-combinations", "All Drug Combinations")
+        ]
         for drug in self.drugs:
             title = drug.name or "[Unnamed Drug CDR%d]" % drug.id
             drugs.append((str(drug.id), title))
@@ -91,14 +98,29 @@ class Control(cdrcgi.Control):
         query.group("v.id")
         criteria = ""
         if self.method == "name":
-            if "all" not in self.selected_drugs:
-                selected = [int(d) for d in self.selected_drugs]
-                query.where(query.Condition("v.id", selected, "IN"))
-                criteria = " by name"
-            else:
+            if "all-drugs" in self.selected_drugs:
                 query.join("doc_type t", "t.id = v.doc_type")
                 query.join("document d", "d.id = v.id")
                 query.where("t.name = 'DrugInformationSummary'")
+            elif "all-drug-combinations" in self.selected_drugs:
+                criteria = " for drug combinations"
+                query.join("query_term c", "c.doc_id = v.id")
+                query.where("c.path = '%s'" % self.COMBO)
+                query.where("c.value = 'Yes'")
+            elif "all-single-agent-drugs" in self.selected_drugs:
+                criteria = " for single-agent drugs"
+                query.join("doc_type t", "t.id = v.doc_type")
+                query.join("document d", "d.id = v.id")
+                query.where("t.name = 'DrugInformationSummary'")
+                #query.where("d.active_status = 'A'")
+                subquery = cdrdb.Query("query_term", "doc_id")
+                subquery.where("path = '%s'" % self.COMBO)
+                subquery.where("value = 'Yes'")
+                query.where(query.Condition("v.id", subquery, "NOT IN"))
+            else:
+                selected = [int(d) for d in self.selected_drugs]
+                query.where(query.Condition("v.id", selected, "IN"))
+                criteria = " by name"
         elif self.method == "type":
             path = "/DrugInformationSummary/DrugReference/DrugReferenceType"
             subquery = cdrdb.Query("query_term", "doc_id")
@@ -170,8 +192,12 @@ class Control(cdrcgi.Control):
             self.start = self.end = str(datetime.date.today())
         if self.start > self.end:
             raise Exception("Date range can't start before it ends! :-)")
-        if not self.selected_drugs or "all" in self.selected_drugs:
-            self.selected_drugs = ["all"]
+        if not self.selected_drugs or "all-drugs" in self.selected_drugs:
+            self.selected_drugs = ["all-drugs"]
+        elif "all-single-agent-drugs" in self.selected_drugs:
+            self.selected_drugs = ["all-single-agent-drugs"]
+        elif "all-drug-combinations" in self.selected_drugs:
+            self.selected_drugs = ["all-drug-combinations"]
         elif set(self.selected_drugs) - set([str(d.id) for d in self.drugs]):
             raise Exception(msg)
         cdrcgi.valParmVal(self.reftype, val_list=self.REFTYPES, msg=msg)
@@ -238,10 +264,29 @@ hr { margin: 0 auto 25px; }
         form.add_script("""\
 jQuery(document).ready(function($) {
     $('#drugs option').click(function() {
-        if ($(this).val() == 'all')
-            $('#drugs option[value!="all"]').prop('selected', false);
-        else
-            $('#drugs option[value="all"]').prop('selected', false);
+        switch ($(this).val()) {
+        case 'all-drugs':
+            $('#drugs option').prop('selected', false);
+            $('#drugs option[value="all-drugs"]').prop('selected', true);
+            break;
+        case 'all-single-agent-drugs':
+            $('#drugs option').prop('selected', false);
+            $('#drugs option[value="all-single-agent-drugs"]')
+                .prop('selected', true);
+            break;
+        case 'all-drug-combinations':
+            $('#drugs option').prop('selected', false);
+            $('#drugs option[value="all-drug-combinations"]')
+                .prop('selected', true);
+            break;
+        default:
+            $('#drugs option[value="all-drugs"]').prop('selected', false);
+            $('#drugs option[value="all-single-agent-drugs"]')
+                .prop('selected', false);
+            $('#drugs option[value="all-drug-combinations"]')
+                .prop('selected', false);
+            break;
+        }
     });
     check_method($('input[name=method]:checked').val());
 });

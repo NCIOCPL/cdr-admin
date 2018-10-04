@@ -44,7 +44,9 @@ class Control(cdrcgi.Control):
             ("EditExternMap.py", "Update Mapping Table"),
             ("ReplaceCWDwithVersion.py","Replace CWD with Older Version"),
             ("ReplaceDocWithNewDoc.py", "Replace Doc with New Doc"),
-            ("translation-jobs.py", "Translation Job Queue"),
+            ("glossary-translation-jobs.py", "Glossary Translation Job Queue"),
+            ("media-translation-jobs.py", "Media Translation Job Queue"),
+            ("translation-jobs.py", "Summary Translation Job Queue"),
             ("UpdatePreMedlineCitations.py", "Update Pre-Medline Citations")
         ):
             if display == audio_label:

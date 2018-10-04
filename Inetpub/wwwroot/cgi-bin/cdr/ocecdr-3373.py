@@ -30,7 +30,6 @@ import cStringIO
 CDRNS = "cips.nci.nih.gov/cdr"
 NSMAP = { "cdr" : CDRNS }
 AUDIO = cdr.BASEDIR + "/Audio_from_CIPSFTP"
-LOGFILE = cdr.DEFAULT_LOGDIR + "/ocecdr-3373.log"
 BANNER = "CDR Administration"
 SUBTITLE = "Load Glossary Audio Files"
 logger = cdr.Logging.get_logger("audio-import")
@@ -258,10 +257,18 @@ class AudioFile:
         """
         comment = "document created for CDR request OCECDR=3373"
         docTitle = u"%s; pronunciation; mp3" % self.title
-        ctrl = { 'DocType': 'Media', 'DocTitle': docTitle.encode('utf-8') }
-        doc = cdr.Doc(self.toXml(), 'Media', ctrl, self.bytes, encoding='utf-8')
-        result = cdr.addDoc(session, doc=str(doc), comment=comment, val='Y',
-                            reason=comment, ver='Y', verPublishable='Y')
+        ctrl = dict(DocType="Media", DocTitle=docTitle.encode("utf-8"))
+        doc = cdr.Doc(self.toXml(), doctype="Media", ctrl=ctrl)
+        opts = dict(
+            doc=str(doc),
+            comment=comment,
+            reason=comment,
+            val="Y",
+            ver="Y",
+            publishable="Y",
+            blob=self.bytes
+        )
+        result = cdr.addDoc(session, **opts)
         self.mediaId = cdr.exNormalize(result)[1]
         cdr.unlock(session, self.mediaId)
         return self.mediaId
@@ -289,34 +296,39 @@ class NameNode:
 # module, returning the list of IDs for the documents to be modified,
 # and performing the actual document modifications.
 #----------------------------------------------------------------------
-class Request4926:
-    def __init__(self, docs, report_rows):
-        self.docs = docs
+class Request4926(ModifyDocs.Job):
+
+    LOGNAME = "ocecdr-3373"
+    COMMENT = "OCECDR-3373"
+    MESSAGE = "Added link from this document to Media document CDR{:d}"
+
+    def __init__(self, mp3s, report_rows, **opts):
+        ModifyDocs.Job.__init__(**opts)
+        self.mp3s = mp3s
         self.report_rows = report_rows
-    def getDocIds(self):
-        docIds = self.docs.keys()
-        docIds.sort()
-        return docIds
-    def run(self, docObject):
-        docId = cdr.exNormalize(docObject.id)[1]
+
+    def select(self):
+        return sorted(self.mp3s)
+
+    def transform(self, doc):
+        int_id = cdr.exNormalize(doc.id)[1]
+        string_id = "CDR{:d}".format(int_id)
         try:
-            docXml = docObject.xml
-            tree = etree.XML(docXml)
-            mp3s = self.docs[docId]
+            root = etree.fromstring(doc.xml)
+            mp3s = self.mp3s[int_id]
             report_rows = []
             for mp3 in mp3s:
-                node = mp3.findNameNode(tree)
+                node = mp3.findNameNode(root)
                 node.node.insert(node.insertPosition, mp3.makeElement())
-                message = ("Added link from this document to Media "
-                           "document CDR%d") % mp3.mediaId
-                report_rows.append(["CDR%d" % docId, message])
-            return_value = etree.tostring(tree)
+                message = self.MESSAGE.format(mp3.mediaId)
+                report_rows.append([string_id, message])
+            return_value = etree.tostring(root)
             self.report_rows += report_rows
             return return_value
         except Exception, e:
-            logger.exception("CDR%d")
-            self.report_rows.append(["CDR%d" % docId, str(e)])
-            return docObject.xml
+            logger.exception(string_id)
+            self.report_rows.append([string_id, str(e)])
+            return doc.xml
 
 def collectInfo(zipNames):
     """
@@ -444,14 +456,11 @@ for nameId in info:
                 report_rows.append(["CDR%d" % mediaId, message])
     if mp3sForNameDoc:
         docs[nameId] = mp3sForNameDoc
-obj = Request4926(docs, report_rows)
-job = ModifyDocs.Job(session, None, obj, obj, "OCECDR-3373", validate=True,
-                     testMode=False, logFile=LOGFILE)
-job.suppressStdErrLogging()
-obj.job = job
+opts = dict(session=session, mode="live", console=False)
+job = Request4926(docs, report_rows, **opts)
 job.run()
 columns = (cdrcgi.Report.Column("CDR ID"), cdrcgi.Report.Column("Processing"))
-table = cdrcgi.Report.Table(columns, report_rows)
-report = cdrcgi.Report("Pronunciation Media Document Imports", [table],
-                       banner=BANNER, subtitle=SUBTITLE)
+table = cdrcgi.Report.Table(columns, job.report_rows)
+opts = dict(banner=BANNER, subtitle=SUBTITLE)
+report = cdrcgi.Report("Pronunciation Media Document Imports", [table], **opts)
 report.send()

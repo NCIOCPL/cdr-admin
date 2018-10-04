@@ -58,11 +58,11 @@ class Control:
         page.add(page.B.H3("Summary QC Reports"))
         page.add("<ol>")
         for report_key, display in (
-            ("bu", "Bold/Underline (HP)"),
-            ("rs", "Redline/Strikeout (HP)"),
-            ("patbu","Bold/Underline (Patient)"),
-            ("pat","Redline/Strikeout (Patient)"),
-            ("pp", "Publish Preview")
+            ("bu", "HP Bold/Underline QC Report"),
+            ("rs", "HP Redline/Strikeout QC Report"),
+            ("patbu","PT Bold/Underline QC Report"),
+            ("pat","PT Redline/Strikeout QC Report"),
+            ("pp", "Publish Preview Report")
         ):
             opts["ReportType"] = report_key
             page.add_menu_link("QcReport.py", display, **opts)
