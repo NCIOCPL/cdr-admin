@@ -3,7 +3,9 @@
 # Audit Trail report (new report requested by Lakshmi).
 #----------------------------------------------------------------------
 
-import sys, cgi, time, cdrcgi, cdrdb, re
+import sys, cgi, time, cdrcgi, re
+from cdrapi import db as cdrdb
+#import cdrdb
 
 fields = cgi.FieldStorage()
 docId  = fields.getvalue("id") or ""
@@ -16,7 +18,8 @@ try:
 except:
     cdrcgi.bail("Invalid id value: %s" % docId)
 try:
-    conn = cdrdb.connect('CdrGuest')
+    #conn = cdrdb.connect('CdrGuest')
+    conn = cdrdb.connect(user='CdrGuest')
 except:
     cdrcgi.bail("Unable to connect to CDR database")
 cursor = conn.cursor()
@@ -24,7 +27,7 @@ try:
     cursor.execute("""\
       SELECT title
         FROM document
-       WHERE id = ?""", id)
+       WHERE id = ?""", (id,))
     row = cursor.fetchone()
     if not row:
         cdrcgi.bail("Can't find document %d" % id)
@@ -45,20 +48,21 @@ try:
                  ON usr.id = audit_trail.usr
                JOIN action
                  ON action.id = audit_trail.action
-              WHERE audit_trail.document = ?""", id, timeout = 300)
+              WHERE audit_trail.document = ?""", (id,))
     cursor.execute("""\
         INSERT INTO #audit
              SELECT c.dt_out, u.fullname, 'LOCK'
                FROM checkout c
                JOIN usr u
                  ON u.id = c.usr
-              WHERE c.id = ?""", id, timeout = 300)
+              WHERE c.id = ?""", (id,) )
     cursor.execute("""\
     SELECT TOP %s CONVERT(VARCHAR(23), dt, 121), usr, action
              FROM #audit
          ORDER BY dt DESC""" % nRows)
     rows = cursor.fetchall()
 except:
+    #raise
     cdrcgi.bail("Failure retrieving rows for Audit Trail")
 html = """\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
