@@ -303,7 +303,7 @@ class Request4926(ModifyDocs.Job):
     MESSAGE = "Added link from this document to Media document CDR{:d}"
 
     def __init__(self, mp3s, report_rows, **opts):
-        ModifyDocs.Job.__init__(**opts)
+        ModifyDocs.Job.__init__(self, **opts)
         self.mp3s = mp3s
         self.report_rows = report_rows
 
