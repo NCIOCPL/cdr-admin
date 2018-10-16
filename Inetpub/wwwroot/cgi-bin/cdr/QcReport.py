@@ -1655,6 +1655,12 @@ else:
 if docType == 'DrugInformationSummary' or docType == 'Media:img':
     filterParm.append(['isQC', 'Y'])
 
+# Force the display of comments for DIS.  All comments should be
+# displayed and all attributes should be ignored.
+# ---------------------------------------------------------------
+if docType == 'DrugInformationSummary':
+    filterParm.append(['DisplayComments', 'A' ])
+
 # Supply the summary comments and board display parameters
 # --------------------------------------------------------
 if docType.startswith('Summary'):
