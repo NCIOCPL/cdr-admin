@@ -104,7 +104,7 @@ def getPubmedArticle(doc):
     except:
         cdrcgi.bail("unable to parse document from NLM")
     for node in tree.findall("PubmedArticle"):
-        etree.strip_elements(node, "CommentsCorrectionsList")
+        etree.strip_elements(node, "CommentsCorrectionsList", "ReferenceList")
         namespace = "http://www.w3.org/1998/Math/MathML"
         mml_math = "{{{}}}math".format(namespace)
         namespaces = dict(mml=namespace)
