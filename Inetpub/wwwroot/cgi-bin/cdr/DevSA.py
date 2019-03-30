@@ -1,76 +1,88 @@
-#----------------------------------------------------------------------
-# Main menu for Developers and System Administrators.
-# BZIssue::5296
-#----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, string
-
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields  = cgi.FieldStorage()
-session = cdrcgi.getSession(fields)
-
-#----------------------------------------------------------------------
-# Make sure the user is allow to use this menu.
-#----------------------------------------------------------------------
-if not cdr.member_of_group(session, "Developer/SysAdmin Menu Users"):
-    cdrcgi.bail("User not authorized for this menu")
-
-#----------------------------------------------------------------------
-# Put up the menu.
-#----------------------------------------------------------------------
-session = "?%s=%s" % (cdrcgi.SESSION, session)
-title   = "CDR Administration"
-section = "Developers/System Administrators"
-buttons = []
-html    = cdrcgi.header(title, title, section, "", buttons) + """\
-   <ol>
 """
-items   = (('EditGroups.py',           'Manage Groups'                 ),
-           ('EditUsers.py',            'Manage Users'                  ),
-           ('EditActions.py',          'Manage Actions'                ),
-           ('set-ctl-value.py',        'Manage Control Values'         ),
-           ('EditDocTypes.py',         'Manage Document Types'         ),
-           ('EditQueryTermDefs.py',    'Manage Query Term Definitions' ),
-           ('EditLinkControl.py',      'Manage Linking Tables'         ),
-           ('EditFilters.py',          'Manage Filters'                ),
-           ('EditFilterSets.py',       'Manage Filter Sets'            ),
-           ("edit-value-table.py",     "Manage Value Tables"           ),
-           ('getBatchStatus.py',       'Batch Job Status'              ),
-           ('FailBatchJob.py',         'Fail Publishing or Batch Job'  ),
-           ('GlobalChangeMenu.py',     'Global Changes'                ),
-           ('Mailers.py',              'Mailers'                       ),
-           ('GetSchema.py',            'Show Schema'                   ),
-           ('post-schema.py',          'Post Schema'                   ),
-           ('Publishing.py',           'Publishing'                    ),
-           ('Reports.py',              'Reports'                       ),
-           ('ReverifyJob.py',          'Reverify Push Job'             ),
-           ('Republish.py',            'Re-Publishing'                 ),
-           ('../scheduler/',           'Scheduled Jobs'                ),
-           ('MessageLoggedInUsers.py', 'Send Email to Users Currently '
-                                       'Logged in to the CDR'          ),
-           ('SetNextJobId.py',         'Set Next Job-ID'               ),
-           ('UnblockDoc.py',           'Unblock Documents'             ),
-           ('EditExternMap.py',        'Update Mapping Table'          ),
-           ('upload-zip-code-file.py', 'Update ZIP Codes'              ),
-           ('ReplaceCWDwithVersion.py','Replace CWD with Older Version'),
-           ('clear-filesweeper-lockfile.py',
-            'Clear FileSweeper Lock File'),
-           ('del-some-docs.py',        'Delete CDR Documents'          ),
-           ('fetch-tier-settings.py',  'Fetch Tier Settings'           ),
-           ('log-tail.py',             'View Logs'                     ),
-           ('Logout.py',               'Log Out'                       )
-           )
-for item in items:
-    if cdr.isProdHost() and item[0] == 'SetNextJobId.py':
-        continue
-    html += """\
-    <li><a href='%s/%s%s'>%s</a></li>
-""" % (cdrcgi.BASE, item[0], session, item[1])
+Main menu for Developers and System Administrators.
+BZIssue::5296
+"""
 
-cdrcgi.sendPage(html + """\
-   </ol>
-  </form>
- </body>
-</html>
-""")
+import cgi
+import os
+import sys
+import cdr
+import cdrcgi
+
+class Control:
+
+    TITLE = "CDR Administration"
+    SECTION = "Developers/System Administrators"
+    MENU_USERS = "Developer/SysAdmin Menu Users"
+    SET_NEXT_JOB_ID = "SetNextJobId.py"
+    LOG_OUT = "Log Out"
+
+    def __init__(self):
+        fields  = cgi.FieldStorage()
+        self.session = cdrcgi.getSession(fields)
+        self.request = cdrcgi.getRequest(fields)
+        self.buttons = cdrcgi.MAINMENU, self.LOG_OUT
+        if not cdr.member_of_group(self.session, self.MENU_USERS):
+            cdrcgi.bail("User not authorized for this menu")
+
+    def run(self):
+        try:
+            if self.request == cdrcgi.MAINMENU:
+                cdrcgi.navigateTo("Admin.py", self.session)
+            elif self.request == self.LOG_OUT:
+                cdrcgi.logout(self.session)
+            else:
+                self.show_menu()
+        except Exception as e:
+            cdrcgi.bail(e)
+
+    def show_menu(self):
+        opts = dict(
+            subtitle=self.SECTION,
+            body_classes="admin-menu",
+            buttons=self.buttons,
+            action=os.path.basename(sys.argv[0]),
+            session=self.session,
+        )
+        page = cdrcgi.Page(self.TITLE, **opts)
+        page.add("<ol>")
+        for title, script in (
+            ("Batch Job Status", "getBatchStatus.py"),
+            ("Clear FileSweeper Lock File", "clear-filesweeper-lockfile.py"),
+            ("Delete CDR Documents", "del-some-docs.py"),
+            ("Email Logged-in Users", "MessageLoggedInUsers.py"),
+            ("Fetch Tier Settings", "fetch-tier-settings.py"),
+            ("Global Changes", "GlobalChangeMenu.py"),
+            ("Mailers", "Mailers.py"),
+            ("Manage Actions", "EditActions.py"),
+            ("Manage Control Values", "set-ctl-value.py"),
+            ("Manage Document Types", "EditDocTypes.py"),
+            ("Manage Filter Sets", "EditFilterSets.py"),
+            ("Manage Filters", "EditFilters.py"),
+            ("Manage Glossary Servers", "glossary-servers.py"),
+            ("Manage Groups", "EditGroups.py"),
+            ("Manage Linking Tables", "EditLinkControl.py"),
+            ("Manage Query Term Definitions", "EditQueryTermDefs.py"),
+            ("Manage Users", "EditUsers.py"),
+            ("Manage Value Tables", "edit-value-table.py"),
+            ("Publishing - Create Job", "Publishing.py"),
+            ("Publishing - Fail Job", "FailBatchJob.py"),
+            ("Publishing - Reverify Push Job", "ReverifyJob.py"),
+            ("Publishing - Set Next Job ID", self.SET_NEXT_JOB_ID),
+            ("Re-Publishing", "Republish.py"),
+            ("Replace CWD with Older Version", "ReplaceCWDwithVersion.py"),
+            ("Reports", "Reports.py"),
+            ("Scheduled Jobs", "../scheduler/"),
+            ("Schema - Post", "post-schema.py"),
+            ("Schema - Show", "GetSchema.py"),
+            ("Unblock Documents", "UnblockDoc.py"),
+            ("Update Mapping Table", "EditExternMap.py"),
+            ("Update ZIP Codes", "upload-zip-code-file.py"),
+            ("View Logs", "log-tail.py"),
+        ):
+            if not cdr.isProdHost() or script != self.SET_NEXT_JOB_ID:
+                page.add_menu_link(script, title, self.session)
+        page.add("</ol>")
+        page.send()
+
+Control().run()
