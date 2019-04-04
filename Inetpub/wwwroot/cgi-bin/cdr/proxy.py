@@ -17,6 +17,10 @@ try:
 except:
     pass
 
+# TODO: Get Acquia to fix their broken certificates.
+from urllib3.exceptions import InsecureRequestWarning
+requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
+
 CHUNK = 32000
 
 #----------------------------------------------------------------------
@@ -90,7 +94,7 @@ start = time.time()
 fields = cgi.FieldStorage()
 url = fields.getvalue("url")
 try:
-    response = requests.get(url)
+    response = requests.get(url, verify=False)
     code = response.status_code
     if code != 200:
         log(url, "code: %s" % repr(code))
