@@ -66,6 +66,8 @@ class Control:
         ):
             opts["ReportType"] = report_key
             page.add_menu_link("QcReport.py", display, **opts)
+        label = "Publish Preview Report Using Drupal CMS"
+        page.add_menu_link("QcReport2.py", label, **opts)
         page.add("</ol>")
         page.add(page.B.H3("Management Reports"))
         page.add("<ol>")
