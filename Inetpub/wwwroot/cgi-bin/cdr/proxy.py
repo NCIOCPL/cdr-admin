@@ -70,7 +70,7 @@ def src_replacer(match):
 def fix_css(original, url):
     try:
         return re.sub(r"url\s*\(([^)]+)\)", src_replacer, original)
-    except Exception, e:
+    except Exception as e:
         log(url, e)
         return original
 
@@ -117,7 +117,7 @@ try:
         payload = fix_css(payload, url)
     elapsed = time.time() - start
     log(url, "elapsed: %s" % elapsed)
-except Exception, e:
+except Exception as e:
     log(url, e)
     send("")
 send(payload, content_type)
