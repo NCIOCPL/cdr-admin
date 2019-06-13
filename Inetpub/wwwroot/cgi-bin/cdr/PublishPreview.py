@@ -461,9 +461,12 @@ if convert:
             # Resetting the glossary links so we don't follow
             # a dead end.
             else:
-                x.set('onclick', 'return false')
+                #x.set('onclick', 'return false')
+                ppLink  = '/cgi-bin/cdr/PublishPreview.py?Session=guest'
+                ppLink += '&DocId=%s' % link.split('=')[1]
+                x.set('href', ppLink)
                 x.set('ohref', link)
-                x.set('type', 'Dead-link')
+                x.set('type', 'Gloss-link')
                 #showProgress('   Link disabled')
 
     # Redirect the audio files to the local server to ensure that
@@ -551,7 +554,12 @@ if not TIER.name == 'PROD':
     pattern7 = re.compile('https://cdr.cancer.gov/cgi-bin/cdr/GetCdrImage.py')
     html = pattern7.sub("%s/cgi-bin/cdr/GetCdrImage.py" % cdr.CBIIT_NAMES[2],
                         html)
-fp = open(cdr.WORK_DRIVE + ":/tmp/pp-%s.html" % docId, "wb")
-fp.write(html)
-fp.close()
+
+# Write out the HTML file for debugging purposes
+# ----------------------------------------------
+if dgbLog:
+    fp = open(cdr.WORK_DRIVE + ":/tmp/pp-%s.html" % docId, "wb")
+    fp.write(html)
+    fp.close()
+
 cdrcgi.sendPage("%s" % html.decode('utf-8'))
