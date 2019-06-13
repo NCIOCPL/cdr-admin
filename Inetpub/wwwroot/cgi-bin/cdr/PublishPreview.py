@@ -557,7 +557,7 @@ if not TIER.name == 'PROD':
 
 # Write out the HTML file for debugging purposes
 # ----------------------------------------------
-if dgbLog:
+if dbgLog:
     fp = open(cdr.WORK_DRIVE + ":/tmp/pp-%s.html" % docId, "wb")
     fp.write(html)
     fp.close()
