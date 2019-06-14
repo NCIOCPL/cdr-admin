@@ -6,7 +6,7 @@ import cdrcgi
 class Control(cdrcgi.Control):
     def __init__(self):
         cdrcgi.Control.__init__(self, "Reports")
-        self.buttons = (cdrcgi.MAINMENU, "Log Out")
+        self.buttons = (cdrcgi.DEVTOP, cdrcgi.MAINMENU, "Log Out")
     def set_form_options(self, opts):
         opts["body_classes"] = "admin-menu"
         return opts
