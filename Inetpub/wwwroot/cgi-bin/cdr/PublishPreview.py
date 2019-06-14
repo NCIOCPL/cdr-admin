@@ -466,7 +466,7 @@ if convert:
                 ppLink += '&DocId=%s' % link.split('=')[1]
                 x.set('href', ppLink)
                 x.set('ohref', link)
-                x.set('type', 'Gloss-link')
+                x.set('type', 'related-link')
                 #showProgress('   Link disabled')
 
     # Redirect the audio files to the local server to ensure that
