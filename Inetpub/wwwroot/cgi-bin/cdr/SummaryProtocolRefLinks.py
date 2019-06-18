@@ -1,7 +1,7 @@
 #----------------------------------------------------------------------
 # Finding ProtocolRef elements in Summary documents and testing its
 # final location (Cancer.gov or ClinicalTrials.gov).  Some of the 
-# links may have been removed my vendor filters if the linked document
+# links may have been removed by vendor filters if the linked document
 # has been blocked.  Those links will be listed as 'None'.
 #
 #----------------------------------------------------------------------
@@ -31,6 +31,8 @@ else:
 
 
 #----------------------------------------------------------------------
+# Document class holding all protocol IDs, and links/URLs
+#----------------------------------------------------------------------
 class SummaryDoc:
     """ Class to extract the ProtocolRef elements and URL for the link
         It creates the list of rows for each ProtocolRef link found
@@ -51,11 +53,6 @@ class SummaryDoc:
         row = cursor.fetchall()
         cursor.close()
 
-        #cursor = conn.cursor()
-        #cursor.execute(qry)
-        #row = cursor.fetchall()
-        #cursor.close()
-
         docXml = row[0][0]
         tree = etree.XML(docXml.encode('utf-8'))
 
@@ -65,8 +62,8 @@ class SummaryDoc:
             title = "CDR%d - %s" % (docId, titleNode.text)
             sumRow = (self.docId, titleNode.text)
 
-        # Finding the summary URL
-        # -------------------------
+        # Finding the summary URL (currently not used)
+        # --------------------------------------------
         for urlNode in tree.findall('.//SummaryURL'):
             summaryUrl = urlNode.attrib['{cips.nci.nih.gov/cdr}xref']
 
@@ -81,8 +78,12 @@ class SummaryDoc:
                 nctId = attribs['nct_id']
 
                 url = 'https://www.cancer.gov/clinicaltrials/%s' % nctId
-                endUrl = requests.head(url, timeout=100.0, headers={'Accept-Encoding':'identity'}).headers.get('location', url)
-                row = [self.docId, titleNode.text, node.text, endUrl]
+                #endUrl = requests.head(url, timeout=100.0, 
+                #          headers={'Accept-Encoding':'identity'})
+                #                                     .headers
+                #                                     .get('location', url)
+                endUrl = requests.head(url, allow_redirects=True, timeout=100.0)
+                row = [self.docId, titleNode.text, node.text, endUrl.url]
             else:
                 row = [self.docId, titleNode.text, node.text, "None"]
 
@@ -128,23 +129,12 @@ if __name__ == "__main__":
     rows = cursor.fetchall()
     cursor.close()
 
-    # Connecting to the DB and executing the query
-    # ----------------------------------------------------
-    #try:
-    #    conn = cdrdb.connect()
-    #    cursor = conn.cursor()
-    #    cursor.execute(qry)
-    #    rows = cursor.fetchall()
-    #    cursor.close()
-    #except:
-    #    cdrcgi.bail(qry)
-    #    sys.exit('*** clinical_trials.py: Error connecting to DB ***')
 
     #for docId in [62753, 62779]:
     docIds = [row[0] for row in rows ]
     rows = []
 
-    for docId in docIds[0:10]:
+    for docId in docIds:
         try:
             doc = SummaryDoc(docId)
             rows.extend(doc.rows)
