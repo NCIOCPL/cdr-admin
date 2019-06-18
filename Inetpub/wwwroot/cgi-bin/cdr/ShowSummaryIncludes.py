@@ -25,7 +25,7 @@ def addRow(summary):
     <ul>
 """ % (summary.title, summary.id)
     for element in summary.elemInfo.keys():
-        if (element == 'SummaryModuleLink' and 
+        if (element == 'SummaryModuleLink' and
             len(summary.elements[element]) > 0):
             for module in summary.elements[element]:
                 html += """\
@@ -52,7 +52,7 @@ class SummaryInclude:
         self.id = id
         self.title = title
         self.error = None
-        self.elemInfo = {'Table':'table', 
+        self.elemInfo = {'Table':'table',
                          'SummaryModuleLink':'module-link',
                          'MiscellaneousDocLink':'misc-doc-link',
                          'MediaLink':'media-link',
@@ -143,13 +143,13 @@ report = u"""\
  </head>
  <body>
   <h1>Elements Included in PDQ Summaries</h1>
-  <p>Elements included: 
-     <span class="comment">Comment</span>, 
-     <span class="embedded-video">EmbeddedVideo</span>, 
-     <span class="media-link">MediaLink</span>, 
+  <p>Elements included:
+     <span class="comment">Comment</span>,
+     <span class="embedded-video">EmbeddedVideo</span>,
+     <span class="media-link">MediaLink</span>,
      <span class="misc-doc-link">MiscellaneousDocLink</span>,
-     <span class="standard-wording">StandardWording</span>, 
-     <span class="module-link">SummaryModuleLink</span>, 
+     <span class="standard-wording">StandardWording</span>,
+     <span class="module-link">SummaryModuleLink</span>,
      <span class="table">Table</span></p>
   <ul>
 """
