@@ -30,7 +30,8 @@ class Citation:
             comment = "pre-medline citation updated (issue #5150)"
             response = cdr.repDoc(session, doc=str(obj), val="Y", ver="Y",
                                   checkIn="Y", showWarnings=True,
-                                  reason=comment, comment=comment)
+                                  reason=comment, comment=comment,
+                                  publishable=True)
             if response[0]:
                 return "updated"
             raise Exception("repDoc(): %s" % repr(response[1]))
