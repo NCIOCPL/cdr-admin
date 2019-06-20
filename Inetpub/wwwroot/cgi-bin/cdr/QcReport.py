@@ -762,7 +762,7 @@ if letUserPickVersion:
     form += u"""
   </fieldset>
 """
-    if docType in ("Summary", "GlossaryTermName"):
+    if docType in ("Summary", "DrugInformationSummary", "GlossaryTermName"):
         form += """\
   <BR>
   <fieldset class="wrapper">
@@ -770,7 +770,7 @@ if letUserPickVersion:
            (one or more)&nbsp;</legend>
 """
         # The Board Markup does not apply to the Patient Version Summaries
-        # or the GlossaryTerm reports
+        # or the DrugInfoSummary or GlossaryTerm reports
         # ----------------------------------------------------------------
         if docType == 'Summary':
             if repType not in ("pat", "patbu", "patrs"):
@@ -1301,30 +1301,30 @@ def fixPersonReport(doc):
                     session, doc)
     return doc
 
-#----------------------------------------------------------------------
-# Plug in last update info for CTGovProtocol.
-#----------------------------------------------------------------------
-def fixCTGovProtocol(doc):
-    cursor.execute("""\
-    SELECT TOP 1 t.dt, u.name
-      FROM audit_trail t
-      JOIN action a
-        ON a.id = t.action
-      JOIN usr u
-        ON u.id = t.usr
-     WHERE a.name = 'MODIFY DOCUMENT'
-       AND u.name <> 'CTGovImport'
-       AND t.document = ?
-  ORDER BY t.dt DESC""", intId)
-    row = cursor.fetchone()
-    if row:
-        doc = doc.replace("@@UPDATEDBY@@", row[1])
-        doc = doc.replace("@@UPDATEDDATE@@", row[0][:10])
-    else:
-        doc = doc.replace("@@UPDATEDBY@@", "&nbsp;")
-        doc = doc.replace("@@UPDATEDDATE@@", "&nbsp;")
-    #cdrcgi.bail("NPI=" + noPdqIndexing)
-    return doc.replace("@@NOPDQINDEXING@@", noPdqIndexing)
+# #----------------------------------------------------------------------
+# # Plug in last update info for CTGovProtocol.
+# #----------------------------------------------------------------------
+# def fixCTGovProtocol(doc):
+#     cursor.execute("""\
+#     SELECT TOP 1 t.dt, u.name
+#       FROM audit_trail t
+#       JOIN action a
+#         ON a.id = t.action
+#       JOIN usr u
+#         ON u.id = t.usr
+#      WHERE a.name = 'MODIFY DOCUMENT'
+#        AND u.name <> 'CTGovImport'
+#        AND t.document = ?
+#   ORDER BY t.dt DESC""", intId)
+#     row = cursor.fetchone()
+#     if row:
+#         doc = doc.replace("@@UPDATEDBY@@", row[1])
+#         doc = doc.replace("@@UPDATEDDATE@@", row[0][:10])
+#     else:
+#         doc = doc.replace("@@UPDATEDBY@@", "&nbsp;")
+#         doc = doc.replace("@@UPDATEDDATE@@", "&nbsp;")
+#     #cdrcgi.bail("NPI=" + noPdqIndexing)
+#     return doc.replace("@@NOPDQINDEXING@@", noPdqIndexing)
 
 
 #----------------------------------------------------------------------
@@ -1641,14 +1641,14 @@ filterParm = []
 
 # Setting the markup display level based on the selected check
 # boxes.
-# The DrugInfoSummaries are displayed without having to select the
-# display type, therefore we need to set the revision level manually
+# # The DrugInfoSummaries are displayed without having to select the
+# # display type, therefore we need to set the revision level manually
 # ------------------------------------------------------------------
 if insRevLvls:
     filterParm = [['insRevLevels', insRevLvls]]
-else:
-    if docType == 'DrugInformationSummary':
-        filterParm = [['insRevLevels', 'publish|approved|proposed']]
+# else:
+#     if docType == 'DrugInformationSummary':
+#         filterParm = [['insRevLevels', 'publish|approved|proposed']]
 
 # Allow certain QC reports to succeed even without valid GlossaryLink
 # -------------------------------------------------------------------
@@ -1785,8 +1785,8 @@ elif docType == 'Organization':
     # -----------------------------------------------------
     doc = fixPersonReport(doc)
     doc = fixOrgReport(doc)
-elif docType == 'CTGovProtocol':
-    doc = fixCTGovProtocol(doc)
+# elif docType == 'CTGovProtocol':
+#     doc = fixCTGovProtocol(doc)
 elif docType == 'PDQBoardMemberInfo':
     doc = fixBoardMemberReport(doc)
 # cdrcgi.bail("docType = %s" % docType)
