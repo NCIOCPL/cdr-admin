@@ -126,7 +126,29 @@ if request == "Get Audio" and ftpDone != 'Y':
             zipFiles = stdout.readlines()
             zipFiles = [str(x.strip()) for x in zipFiles]
         else:
-            cdrcgi.bail(sterr.read())
+            cdrcgi.bail(repr(sterr.read()))
+
+
+        # Read all files. We need this to be able and display the 
+        # files with incorrect file names
+        # -------------------------------------------------------
+        allFiles = "ls {}/* | sed 's/.*Term_Audio\///'".format(IN_DIR)
+        stdin, stdout, stderr = c.exec_command(allFiles)
+
+        if not stderr.read():
+            allFiles = stdout.readlines()
+            allFiles = [str(x.strip()) for x in allFiles]
+
+            badFiles = []
+            l.write("Files found...")
+            for name in allFiles:
+                l.write(name)
+                if name not in zipFiles:
+                    badFiles.append(name)
+            l.write("Bad files found...")
+            l.write(repr(badFiles))
+        else:
+            cdrcgi.bail(repr(stderr.read()))
 
         # Count the number of ZIP files found
         # -----------------------------------
@@ -214,9 +236,9 @@ if ftpDone == 'Y':
 <input type='hidden' name='{}' value='{}' >
 """.format(cdrcgi.SESSION, session)
    form += u"""\
-<table>
+<table style="margin-bottom: 10pt;">
  <tr>
-  <th>Files Retrieved:</th>
+  <th style="font-size: 14pt;">Files Retrieved:</th>
  </tr>
 """
    for newFile in newFiles:
@@ -232,7 +254,33 @@ if ftpDone == 'Y':
        testString = u''
 
    form += u"""
-</table>
+</table>"""
+
+   # Display files with bad file name format if those exist
+   # ------------------------------------------------------
+   if badFiles:
+       form += u"""\
+<table>
+ <tr>
+  <th style="font-size: 14pt;">Files NOT Retrieved:</th>
+ </tr>
+"""
+       for badFile in badFiles:
+           form += u"""
+ <tr>
+  <td>{}</td>
+ </tr>
+""".format(badFile)
+
+   if testMode:
+       testString = u'Test '
+   else:
+       testString = u''
+
+   form += u"""
+</table>"""
+
+   form += u"""
 <H4>Download {}Completed</H4>
 """.format(testString)
 
