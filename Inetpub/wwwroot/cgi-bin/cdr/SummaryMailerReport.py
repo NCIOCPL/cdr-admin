@@ -31,8 +31,9 @@
 # Request form for generating RTF letters to board members."
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrdb, cdrcgi, time
+import cgi, cdr, cdrcgi, time
 import lxml.etree as etree
+from cdrapi import db as cdrdb
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -102,7 +103,7 @@ if flavor not in ("4258", "4259"):
 # Connect to the CDR database.
 #----------------------------------------------------------------------
 try:
-    conn = cdrdb.connect('CdrGuest')
+    conn = cdrdb.connect(user='CdrGuest', timeout=300)
 except Exception, e:
     cdrcgi.bail('Database connection failure: %s' % e)
 
@@ -118,7 +119,7 @@ def makeBoardPicklist(cursor):
    WHERE s.path = '/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref'
      AND b.path = '/Organization/OrganizationNameInformation'
                 + '/OfficialName/Name'
-ORDER BY b.value""", timeout = 300)
+ORDER BY b.value""")
     html = [u"""\
 <select name='board'>
 """]
@@ -172,7 +173,7 @@ def report4258(sheet, styles, cursor, board, selectBy):
             ON b.doc_id = s.int_val
          WHERE r.path = '/Mailer/Recipient/@cdr:ref'
            AND s.path = '/Mailer/Document/@cdr:ref'
-           AND d.path = '/Mailer/%s'""" % dateField, timeout = 300)
+           AND d.path = '/Mailer/%s'""" % dateField)
     mailers = {}
     for m, r, s, d in cursor.fetchall():
         if d and BoardMember.members[r].membershipActive(d):
@@ -205,7 +206,7 @@ def report4259(sheet, styles, cursor, board, begin, end):
            AND sent.path = '/Mailer/Sent'
            AND recip.path = '/Mailer/Recipient/@cdr:ref'
            AND sent.value BETWEEN '%s' AND '%s'""" %
-                   (begin, end), timeout = 300)
+                   (begin, end))
     mailerIds = []
     for mailerId, sent, personId in cursor.fetchall():
         if BoardMember.members[personId].membershipActive(sent):
