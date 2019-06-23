@@ -45,8 +45,6 @@ QCReports = (('DISSearch.py?type=advanced', 'Advanced Search'),
               'Drug Information QC Report'),
              ('QcReport.py?DocType=DrugInformationSummary&ReportType=pp&',
               'Publish Preview'),
-             ('QcReport2.py?DocType=DrugInformationSummary&ReportType=pp&',
-              'Publish Preview Using Drupal CMS'),
 )
 
 for r in QCReports:
