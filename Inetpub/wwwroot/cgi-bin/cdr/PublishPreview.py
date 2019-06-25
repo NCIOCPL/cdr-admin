@@ -16,7 +16,7 @@ import cdr
 import cdrcgi
 import cdr2gk
 from cdrapi.settings import Tier
-from cdrapi.db import Query
+from cdrapi import db
 from cdrapi.docs import Doc
 from cdrapi.users import Session
 from cdrapi.publishing import DrupalClient
@@ -112,6 +112,8 @@ class Summary:
             if src.startswith(self.IMAGE_PATH):
                 src = src.replace(self.IMAGE_PATH, replacement)
                 img.set("src", src)
+            elif not src.startswith("http"):
+                img.set("src", u"{}{}".format(self.url, src))
         for a in page.xpath("//a[@href]"):
             if "nav-item-xxtitle" in (a.getparent().get("class") or ""):
                 continue
@@ -159,7 +161,7 @@ class Summary:
         urls = dict()
         session = self.doc.session
         for path in self.URL_PATHS:
-            query = Query("query_term q", "q.doc_id", "q.value")
+            query = db.Query("query_term q", "q.doc_id", "q.value")
             query.join("active_doc a", "a.id = q.doc_id")
             query.where(query.Condition("q.path", path))
             for doc_id, url in query.execute(session.cursor).fetchall():
