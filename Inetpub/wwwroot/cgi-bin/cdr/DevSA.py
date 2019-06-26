@@ -55,6 +55,7 @@ class Control:
             ("Global Changes", "GlobalChangeMenu.py"),
             ("Mailers", "Mailers.py"),
             ("Manage Actions", "EditActions.py"),
+            ("Manage Configuration Files", "manage-cdr-config-files.py"),
             ("Manage Control Values", "set-ctl-value.py"),
             ("Manage Document Types", "EditDocTypes.py"),
             ("Manage Filter Sets", "EditFilterSets.py"),
