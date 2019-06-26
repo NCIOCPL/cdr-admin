@@ -1,5 +1,5 @@
 # *********************************************************************
-# Download Audio files from the Cancerinfo server from the ciat/qa/Audio 
+# Download Audio files from the Cancerinfo server from the ciat/qa/Audio
 # directory # and place them on the CDR server.
 #
 # Program based on similar program written earlier for image files.
@@ -129,7 +129,7 @@ if request == "Get Audio" and ftpDone != 'Y':
             cdrcgi.bail(repr(sterr.read()))
 
 
-        # Read all files. We need this to be able and display the 
+        # Read all files. We need this to be able and display the
         # files with incorrect file names
         # -------------------------------------------------------
         allFiles = "ls {}/* | sed 's/.*Term_Audio\///'".format(IN_DIR)
