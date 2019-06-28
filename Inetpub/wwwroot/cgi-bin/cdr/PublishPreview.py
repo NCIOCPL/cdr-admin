@@ -1,30 +1,211 @@
-#----------------------------------------------------------------------
-# Transform a CDR document using an XSL/T filter and send it back to
-# the browser.
-#
-# BZIssue::1531 - Mods for GlossaryTerm docs
-# BZIssue::2310 - Changed doctype name passed to Cancer.gov
-# BZIssue::2002 - Fixes for protocol patient docs; IE6 workarounds
-# BZIssue::3973 - Adjustments to regex substitutions
-# BZIssue::3491 - Support GlossaryTermName documents
-# BZIssue::4781 - Have certain links to unpublished docs ignored
-# BZIssue::5053 - [Summaries] Pub Preview Error
-# BZIssue::5113 - Modifying PublishPreview to Work with WCMS Release 6.3
-# BZIssue::OCECDR-3618 - Audio does not play in pub preview
-# BZIssue::OCECDR-3897 - Proxy resources from unencrypted sources
-#----------------------------------------------------------------------
+"""
+Transform a CDR document using an XSL/T filter and send it back to
+the browser.
+"""
+
 import cgi
+import datetime
+import re
+import sys
+
+from lxml import etree
+import lxml.html
+import requests
+
 import cdr
 import cdrcgi
-import cdrdb
-import re
 import cdr2gk
-import sys
-import time
-import lxml.html
 from cdrapi.settings import Tier
+from cdrapi import db
+from cdrapi.docs import Doc
+from cdrapi.users import Session
+from cdrapi.publishing import DrupalClient
+import cdrpub
+
+# TODO: Get Acquia to fix their broken certificates.
+from urllib3.exceptions import InsecureRequestWarning
+requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
 TIER = Tier()
+
+class Summary:
+    """
+    Base class for PDQ summary documents (cancer and drug information)
+    """
+
+    SCRIPT = "PublishPreviewNew.py"
+    PROXY = "/cgi-bin/cdr/proxy.py"
+    TIER_SUFFIXES = dict(DEV="-blue-dev", PROD="")
+    IMAGE_PATH = "/images/cdr/live"
+    URL_PATHS = (
+        "/Summary/SummaryMetaData/SummaryURL/@cdr:xref",
+        "/DrugInformationSummary/DrugInfoMetaData/URL/@cdr:xref"
+    )
+
+    def __init__(self, doc, debug=False):
+        self.client = DrupalClient(doc.session)
+        self.start = datetime.datetime.now()
+        self.url = self.client.base
+        self.doc = doc
+        self.urls = self.load_urls()
+        suffix = self.TIER_SUFFIXES.get(doc.session.tier.name, "-qa")
+        self.image_host = "www{}.cancer.gov".format(suffix)
+        url = "{}/user/login?_format=json".format(self.url)
+        name, password = self.client.auth
+        data = {"name": name, "pass": password}
+        response = requests.post(url, json=data, verify=False)
+        self.cookies = response.cookies
+        opts = dict(parms=dict(DateFirstPub="", isPP="Y"))
+        result = doc.filter(self.VENDOR_FILTERS, **opts)
+        root = result.result_tree
+        xsl = Doc.load_single_filter(doc.session, self.CMS_FILTER)
+        values = self.ASSEMBLE(doc.session, doc.id, xsl, root)
+        if debug:
+            doc.session.logger.setLevel("DEBUG")
+        self.page = self.generate_preview(values)
+
+    def generate_preview(self, values):
+        parser = etree.HTMLParser()
+        values["cdr_id"] = -values["cdr_id"]
+        nid = None
+        try:
+            espanol = ""
+            if values.get("language") == "es":
+                espanol = "/espanol"
+                if False:
+                    values["language"] = "en"
+                    nid = self.client.push(values)
+                    values["nid"] = nid
+                    values["language"] = "es"
+            nid = self.client.push(values)
+            url = "{}{}/node/{}".format(self.url, espanol, nid)
+            response = requests.get(url, cookies=self.cookies, verify=False)
+            page = etree.fromstring(response.content, parser=parser)
+            self.postprocess(page)
+            return page
+        except Exception as e:
+            cdrcgi.bail("Failure generating preview: {}".format(e))
+        finally:
+            if nid is not None:
+                self.client.remove(values["cdr_id"])
+
+    def postprocess(self, page):
+        for script in page.iter("script"):
+            if script.text is None:
+                script.text = u" "
+            url = script.get("src")
+            if url is not None and not url.startswith(u"https:"):
+                if not url.startswith(u"http"):
+                    url = u"{}{}".format(self.url, url)
+                src = u"{}?url={}".format(self.PROXY, url)
+                script.set(u"src", src)
+        for link in page.findall("head/link"):
+            url = link.get("href")
+            if url is not None and not url.startswith("https://"):
+                if not url.startswith(u"http"):
+                    url = u"{}{}".format(self.url, url)
+                href = u"{}?url={}".format(self.PROXY, url)
+                link.set("href", href)
+        replacement = "https://{}{}".format(self.image_host, self.IMAGE_PATH)
+        for img in page.iter("img"):
+            src = img.get("src")
+            if src.startswith(self.IMAGE_PATH):
+                src = src.replace(self.IMAGE_PATH, replacement)
+                img.set("src", src)
+            elif not src.startswith("http"):
+                img.set("src", u"{}{}".format(self.url, src))
+        for a in page.xpath("//a[@href]"):
+            if "nav-item-xxtitle" in (a.getparent().get("class") or ""):
+                continue
+            link_type = "unknown"
+            fixed = href = (a.get("href") or "").strip()
+            if "Common/PopUps" in href:
+                continue
+            self.doc.session.logger.debug("@href=%r", href)
+            if href.startswith("http"):
+                link_type = "ExternalLink"
+            elif href.startswith("#cit"):
+                link_type = "CitationLink"
+            else:
+                doc_id = self.extract_id_from_url(href)
+                if href.startswith("#"): # and doc_id == self.doc.id:
+                    link_type = "SummaryFragRef-internal-frag"
+                elif href.startswith("/"):
+                    if doc_id:
+                        if "#" in href:
+                            frag = href.split("#")[1]
+                            if doc_id == self.doc.id:
+                                fixed = "#" + frag
+                                link_type = "SummaryFragRef-internal+uri"
+                            else:
+                                args = self.SCRIPT, cdrcgi.DOCID, doc_id, frag
+                                fixed = "{}?{}={:d}#{}".format(*args)
+                                link_type = "SummaryFragRef-external"
+                        else:
+                            args = self.SCRIPT, cdrcgi.DOCID, doc_id
+                            fixed = "{}?{}={:d}".format(*args)
+                            link_type = "SummaryRef-external"
+                    else:
+                        fixed = "{}{}".format(self.url, href)
+                        # fixed = u"{}?url={}".format(self.PROXY, fixed)
+                        link_type = "Cancer.gov-link"
+                else:
+                    link_type = "Dead-link"
+                    self.doc.session.logger.info("glossary popup %r", href)
+                    # a.set("onclick", "return false")
+            a.set("href", fixed)
+            a.set("ohref", href)
+            a.set("type", link_type)
+
+    def load_urls(self):
+        urls = dict()
+        session = self.doc.session
+        for path in self.URL_PATHS:
+            query = db.Query("query_term q", "q.doc_id", "q.value")
+            query.join("active_doc a", "a.id = q.doc_id")
+            query.where(query.Condition("q.path", path))
+            for doc_id, url in query.execute(session.cursor).fetchall():
+                url = url.replace("https://www.cancer.gov", "")
+                url = url.replace("http://www.cancer.gov", "")
+                urls[url.lower().strip()] = doc_id
+        session.logger.info("loaded %d urls", len(urls))
+        return urls
+
+    def extract_id_from_url(self, url):
+        """
+        If the URL matches a PDQ summary return its CDR ID
+        """
+
+        self.doc.session.logger.debug("checking URL %r", url)
+        url = url.split("#")[0].rstrip("/").lower()
+        if url:
+            doc_id = self.urls.get(url)
+            if doc_id:
+                self.doc.session.logger.debug("found %d", doc_id)
+            return doc_id
+        return None
+
+    def send(self):
+        elapsed = (datetime.datetime.now() - self.start).total_seconds()
+        page = lxml.html.tostring(self.page)
+        args = len(page), elapsed
+        message = "Assembled %d bytes in %f seconds"
+        self.doc.session.logger.info(message, *args)
+        print("Content-type: text/html; charset=utf-8")
+        print("")
+        print(page)
+
+
+class CIS(Summary):
+    VENDOR_FILTERS = "set:Vendor Summary Set"
+    CMS_FILTER = "Cancer Information Summary for Drupal CMS"
+    ASSEMBLE = cdrpub.Control.assemble_values_for_cis
+
+
+class DIS(Summary):
+    VENDOR_FILTERS = "set:Vendor DrugInfoSummary Set"
+    CMS_FILTER = "Drug Information Summary for Drupal CMS"
+    ASSEMBLE = cdrpub.Control.assemble_values_for_dis
 
 #----------------------------------------------------------------------
 # Get the parameters from the request.
@@ -46,7 +227,7 @@ if not fields:
     if not docId:
        print 'Command line options'
        print 'PublishPreview.py docId docVersion preserveLink(Y/N) debugLog(T/F) flavor cgHost filename'
-       sys.exit()
+       sys.exit(1)
 else:
     session    = cdrcgi.getSession(fields)   or cdrcgi.bail("Not logged in")
     docId      = fields.getvalue(cdrcgi.DOCID) or cdrcgi.bail("No Document",
@@ -64,13 +245,16 @@ else:
 #----------------------------------------------------------------------
 def showProgress(progress):
     if monitor:
-        sys.stderr.write("[%s] %s\n" % (time.strftime("%Y-%m-%d %H:%M:%S"),
-                                        progress))
+        now = datetime.datetime.now()
+        sys.stderr.write("[{}] {}\n".format(now, progress))
 showProgress("Started...")
 
 
 #----------------------------------------------------------------------
 # Retrieve the CDR-ID from the SummaryURL value
+#
+# Get rid of this if we can, or do it like we do for publish preview
+# of summary document, if this is needed for Glossary Terms.
 #----------------------------------------------------------------------
 def getCdrIdFromPath(url):
     # For the SQL query we need to remove the fragment from the URL
@@ -87,7 +271,7 @@ def getCdrIdFromPath(url):
             baseUrl = baseUrl[:-1]
 
         try:
-            conn = cdrdb.connect()
+            conn = db.connect()
             cursor = conn.cursor()
             cursor.execute("""\
           SELECT doc_id
@@ -100,8 +284,8 @@ def getCdrIdFromPath(url):
                  )
              AND value like '%s'""" % ('%' + baseUrl.replace("'", "''")))
             row = cursor.fetchone()
-        except cdrdb.Error, info:
-            cdrcgi.bail('Database failure: %s' % info[1][0])
+        except Exception as e:
+            cdrcgi.bail("Database failure: {}".format(e))
         # If the passed url is not found in the query_term table it's not a
         # PDQ document and we'll return None
         try:
@@ -124,17 +308,15 @@ if cachedHtml:
         showProgress("Fetched cached HTML...")
         intId = cdr.exNormalize(docId)[1]
     except:
-        cdrcgi.bail("failure reading %s" % repr(cachedHtml))
+        cdrcgi.bail("failure reading {!r}".format(cachedHtml))
 
 #----------------------------------------------------------------------
 # Map for finding the filters for a given document type.
 #----------------------------------------------------------------------
 filterSets = {
-    'CTGovProtocol'         : ['set:Vendor CTGovProtocol Set'],
     'DrugInformationSummary': ['set:Vendor DrugInfoSummary Set'],
     'GlossaryTerm'          : ['set:Vendor GlossaryTerm Set'],
     'GlossaryTermName'      : ['set:Vendor GlossaryTerm Set'],
-    'InScopeProtocol'       : ['set:Vendor InScopeProtocol Set'],
     'Person'                : ['set:Vendor GeneticsProfessional Set'],
     'Summary'               : ['set:Vendor Summary Set']
 }
@@ -144,11 +326,11 @@ filterSets = {
 #----------------------------------------------------------------------
 if not cachedHtml:
     try:
-        conn = cdrdb.connect('CdrGuest')
+        conn = db.connect(user="CdrGuest")
         cursor = conn.cursor()
         showProgress("Connected to CDR database...")
-    except cdrdb.Error, info:
-        cdrcgi.bail('Database connection failure: %s' % info[1][0])
+    except Exception as e:
+        cdrcgi.bail("Database connection failure: {}".format(e))
 
     #----------------------------------------------------------------------
     # Determine the document type and version.
@@ -164,8 +346,7 @@ if not cachedHtml:
     #    publish preview display.
     # -------------------------------------------------------------------
     try:
-        digits = re.sub('[^\d]+', '', docId)
-        intId  = int(digits)
+        intId  = Doc.extract_id(docId)
 
         # We need to select the document type
         # -----------------------------------
@@ -232,6 +413,15 @@ if not cachedHtml:
                     (docId, info[1][0]))
     showProgress("Fetched document version: %s..." % row[0])
 
+    # Branch off to the new code using the Drupal CMS for summaries.
+    if "Summary" in docType:
+        session = Session(session)
+        debug = dbgLog and True or False
+        doc = Doc(session, id=docId, version=docVer)
+        summary = CIS(doc, debug) if docType == "Summary" else DIS(doc, debug)
+        summary.send()
+        exit(0)
+
     # Note: The values for flavor listed here are not the only values possible.
     #       These values are the default values but XMetaL macros may pass
     #       additional values for the flavor attribute.
@@ -244,19 +434,17 @@ if not cachedHtml:
         flavor = {
             "Summary":                "Summary",
             "DrugInformationSummary": "DrugInfoSummary",
-            "InScopeProtocol":        "Protocol_HP",
-            "CTGovProtocol":          "CTGovProtocol",
             "GlossaryTerm":           "GlossaryTerm",
             "GlossaryTermName":       "GlossaryTerm",
             "Person":                 "GeneticsProfessional"
         }.get(docType)
         if not flavor:
             cdrcgi.bail("Publish preview only available for Summary, "
-                        "DrugInfoSummary, Glossary and Protocol documents")
+                        "DrugInfoSummary, Glossary and GP documents")
     showProgress("DocumentType: %s..." % docType)
     showProgress("Using flavor: %s..." % flavor)
     showProgress("Preserving links: %s..." % preserveLnk)
-    if preserveLnk.lower() == 'yes' or preserveLnk.lower() == 'y':
+    if preserveLnk.lower() in ("yes", "y"):
         convert = False
     else:
         convert = True
@@ -269,8 +457,8 @@ if not cachedHtml:
     #----------------------------------------------------------------------
     if docType not in filterSets:
         cdrcgi.bail("Don't have filters set up for %s documents yet" % docType)
-    doc = cdr.filterDoc(session, filterSets[docType], docId = docId,
-                        parm = [['isPP', 'Y']], docVer = docVer)
+    opts = dict(docId=docId, parm=[["isPP", "Y"]], docVer=docVer)
+    doc = cdr.filterDoc(session, filterSets[docType], **opts)
 
     if isinstance(doc, tuple):
         doc = doc[0]
@@ -294,7 +482,7 @@ if not cachedHtml:
         resp = cdr2gk.pubPreview(doc, flavor, host=cgHost)
         cgHtml = resp.xmlResult
         showProgress("Response received from Cancer.gov...")
-    except Exception, e:
+    except Exception as e:
         #cdrcgi.bail('Error in PubPreview:' + str(e))
         # List of previously identified Percussion errors to catch
         # --------------------------------------------------------
@@ -306,14 +494,14 @@ if not cachedHtml:
                      "The element '\w*' has invalid child element"
                   }
 
-        # If we identified one of the nown error display it in
+        # If we identified one of the known errors display it in
         # "user friendly" format and exit
         # ----------------------------------------------------
-        for errType, string in errMsgs.items():
-            regex = re.compile(string)
+        for errType, pattern in errMsgs.items():
+            regex = re.compile(pattern)
             matches = re.search(regex, str(e))
             if matches:
-                extraLines = ['%s: %s' % (errType, matches.group()),
+                extraLines = ["{}: {}".format(errType, matches.group()),
                               'Complete Error message below:',
                               str(e)]
                 cdrcgi.bail('Error in PubPreview:', extra=extraLines)

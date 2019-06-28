@@ -17,6 +17,10 @@ try:
 except:
     pass
 
+# TODO: Get Acquia to fix their broken certificates.
+from urllib3.exceptions import InsecureRequestWarning
+requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
+
 CHUNK = 32000
 
 #----------------------------------------------------------------------
@@ -66,7 +70,7 @@ def src_replacer(match):
 def fix_css(original, url):
     try:
         return re.sub(r"url\s*\(([^)]+)\)", src_replacer, original)
-    except Exception, e:
+    except Exception as e:
         log(url, e)
         return original
 
@@ -90,7 +94,7 @@ start = time.time()
 fields = cgi.FieldStorage()
 url = fields.getvalue("url")
 try:
-    response = requests.get(url)
+    response = requests.get(url, verify=False)
     code = response.status_code
     if code != 200:
         log(url, "code: %s" % repr(code))
@@ -113,7 +117,7 @@ try:
         payload = fix_css(payload, url)
     elapsed = time.time() - start
     log(url, "elapsed: %s" % elapsed)
-except Exception, e:
+except Exception as e:
     log(url, e)
     send("")
 send(payload, content_type)

@@ -9,10 +9,10 @@ import cdrdb
 class Control(cdrcgi.Control):
     def __init__(self):
         cdrcgi.Control.__init__(self, "CDR Control Values")
-        self.name = self.fields.getvalue("name") or ""
         self.group = self.fields.getvalue("group") or ""
-        self.value = self.fields.getvalue("value") or ""
-        self.comment = self.fields.getvalue("comment") or ""
+        self.name = self.get_unicode_parameter("name")
+        self.value = self.get_unicode_parameter("value")
+        self.comment = self.get_unicode_parameter("comment")
         if not self.session or not cdr.canDo(self.session, "SET_SYS_VALUE"):
             cdrcgi.bail("Not authorized to manage control values")
     def populate_form(self, form):
