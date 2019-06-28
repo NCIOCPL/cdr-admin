@@ -44,7 +44,8 @@ QCReports = (('DISSearch.py?type=advanced', 'Advanced Search'),
              ('QcReport.py?DocType=DrugInformationSummary',
               'Drug Information QC Report'),
              ('QcReport.py?DocType=DrugInformationSummary&ReportType=pp&',
-              'Publish Preview'))
+              'Publish Preview'),
+)
 
 for r in QCReports:
     form += "<LI><A HREF='%s/%s&%s=%s'>%s</LI></A>\n" % (

@@ -18,6 +18,7 @@ import lxml.etree as etree
 import os
 import re
 import urllib
+from cdrapi.settings import Tier
 
 class Control:
     """
@@ -461,6 +462,8 @@ class PublishingSystem:
             available for publishing jobs of this type.
             """
 
+            TIER = Tier()
+
             def __init__(self, subset, node):
                 """
                 Extract the information for a job option which can
@@ -476,6 +479,8 @@ class PublishingSystem:
                     self.default = child.text
                 if self.name == "GKServer" and not self.default:
                     self.default = cdr2gk.HOST
+                if self.name == "DrupalServer" and not self.default:
+                    self.default = self.TIER.hosts.get("DRUPAL")
 
             def get_info(self):
                 """
