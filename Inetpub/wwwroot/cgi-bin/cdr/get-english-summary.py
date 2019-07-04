@@ -1,24 +1,22 @@
 #----------------------------------------------------------------------
 # Fetch an English summary ready for translation
 # BZIssue::4906
+# JIRA::OCECDR-4587 - apply revision markup
 #----------------------------------------------------------------------
-import cgi, cdrdb, lxml.etree as etree, sys, re
 
-fields  = cgi.FieldStorage()
-docId   = fields.getvalue('id')
-version = fields.getvalue('ver')
-fmt     = fields.getvalue('format')
-cursor  = cdrdb.connect('CdrGuest').cursor()
+import cgi
+import re
+from lxml import etree
+from cdrapi.docs import Doc
+from cdrapi.users import Session
+from cdr import Logging
+from cdrcgi import bail
 
-def bail(message):
-    print """\
-Content-type: text/html
+def show_form():
+    """
+    Let the user select the document and its version and output format
+    """
 
-<p style='font-weight: bold; font-size: 12pt; color: red'>%s</p>
-""" % repr(message)
-    sys.exit(0)
-
-if not docId:
     print """\
 Content-type: text/html
 
@@ -31,8 +29,8 @@ Content-type: text/html
    }
   </script>
  </head>
- <body style='font-family: Arial, sans-serif' onload="javascript:setfocus()">
-  <h1 style='color: maroon'>CDR Document Display</h1>
+ <body style="font-family: Arial, sans-serif" onload="javascript:setfocus()">
+  <h1 style="color: maroon">CDR Document Display</h1>
   <form method="POST" action="get-english-summary.py">
    <table>
     <tr>
@@ -54,9 +52,9 @@ Content-type: text/html
    <br />
    <input type="submit">
   </form>
-  <p style='border: 1px green solid; width: 80%; padding: 5px; color: green'>
+  <p style="border: 1px green solid; width: 80%; padding: 5px; color: green">
      Document ID is required, and must be an integer.  Version is optional,
-     and can be a positive or negative integer (negative number count back
+     and can be a positive or negative integer (negative number counts back
      from the most recent version, so -1 means last version, -2 is the one
      before that, etc.).
      If the version is omitted, the current working copy of the document
@@ -68,152 +66,259 @@ Content-type: text/html
      Trados for translation.</p>
  </body>
 </html>"""
-    sys.exit(0)
-if version:
-    if version.lower() in ('last', 'cur', 'current'):
-        cursor.execute("SELECT MAX(num) FROM doc_version WHERE id = ?", docId)
-        rows = cursor.fetchall()
-        if not rows:
-            bail("No versions found for CDR%s" % docId)
-        ver = rows[0][0]
-    elif version.lower() in ('pub', 'lastpub'):
-        cursor.execute("""\
-SELECT MAX(num)
-  FROM publishable_version
- WHERE id = ?""", docId)
-        rows = cursor.fetchall()
-        if not rows:
-            bail("No publishable versions found for CDR%s" % docId)
-        ver = rows[0][0]
-    elif version.startswith("-"):
-        try:
-            n = int(version[1:])
-        except:
-            bail("Invalid version %s" % version)
-        cursor.execute("""\
-  SELECT TOP %d num
-    FROM doc_version
-   WHERE id = ?
-ORDER BY num DESC""" % n, docId)
-        rows = cursor.fetchall()
-        if not rows:
-            bail("No versions found for CDR%s" % docId)
-        elif len(rows) < n:
-            bail("Only %d versions found for CDR%s" % (len(rows), docId))
-        ver = rows[-1][0]
-    else:
-        try:
-            ver = int(version)
-        except:
-            bail("invalid version %s" % version)
-    cursor.execute("""\
-SELECT xml
-  FROM doc_version
- WHERE id = ?
-   AND num = ?""", (docId, ver))
-    rows = cursor.fetchall()
-    if not rows:
-        bail("Version %d for CDR%s not found" % (ver, docId))
-else:
-    cursor.execute("SELECT xml FROM document WHERE id = ?", docId)
-    rows = cursor.fetchall()
-    if not rows:
-        bail("CDR%d not found" % docId)
 
-def markupTag(match):
+def markup_tag(match):
+    """
+    Replace XML tags with placeholders
+
+    This is a callback used by `markup()` below, so what we can apply
+    color formatting to make the XML tags easier to find and read in
+    the display (i.e., not raw) version of the document.
+
+    Pass:
+      match - regex SRE_Match object
+
+    Return:
+      replacement Unicode string with placeholders for tags
+    """
+
     s = match.group(1)
-    if s.startswith('/'):
-        return "</@@TAG-START@@%s@@END-SPAN@@>" % s[1:]
-    trailingSlash = ''
-    if s.endswith('/'):
+    if s.startswith(u"/"):
+        return u"</@@TAG-START@@{}@@END-SPAN@@>".format(s[1:])
+    trailingSlash = u""
+    if s.endswith(u"/"):
         s = s[:-1]
-        trailingSlash = '/'
-    pieces = re.split("\\s", s, 1)
+        trailingSlash = u"/"
+    pieces = re.split(u"\\s", s, 1)
     if len(pieces) == 1:
-        return "<@@TAG-START@@%s@@END-SPAN@@%s>" % (s, trailingSlash)
+        return u"<@@TAG-START@@{}@@END-SPAN@@{}>".format(s, trailingSlash)
     tag, attrs = pieces
-    pieces = ["<@@TAG-START@@%s@@END-SPAN@@" % tag]
-    for attr, delim in re.findall("(\\S+=(['\"]).*?\\2)", attrs):
-        name, value = attr.split('=', 1)
-        pieces.append(" @@NAME-START@@%s=@@END-SPAN@@"
-                      "@@VALUE-START@@%s@@END-SPAN@@" % (name, value))
+    pieces = [u"<@@TAG-START@@{}@@END-SPAN@@".format(tag)]
+    for attr, delim in re.findall(u"(\\S+=(['\"]).*?\\2)", attrs):
+        name, value = attr.split(u"=", 1)
+        pieces.append(u" @@NAME-START@@{}=@@END-SPAN@@"
+                      u"@@VALUE-START@@{}@@END-SPAN@@".format(name, value))
     pieces.append(trailingSlash)
-    pieces.append('>')
-    return "".join(pieces)
+    pieces.append(u">")
+    return u"".join(pieces)
 
 def markup(doc):
-    doc = re.sub("<([^>]+)>", markupTag, doc)
+    """
+    Make the display version easier to view, using color markup
+
+    Pass:
+      doc - Unicode string for serialized document XML
+    """
+
+    doc = re.sub(u"<([^>]+)>", markup_tag, doc)
     doc = cgi.escape(doc)
-    doc = doc.replace('@@TAG-START@@', '<span class="tag">')
-    doc = doc.replace('@@NAME-START@@', '<span class="name">')
-    doc = doc.replace('@@VALUE-START@@', '<span class="value">')
-    doc = doc.replace('@@END-SPAN@@', '</span>')
+    doc = doc.replace(u"@@TAG-START@@", u'<span class="tag">')
+    doc = doc.replace(u"@@NAME-START@@", u'<span class="name">')
+    doc = doc.replace(u"@@VALUE-START@@", u'<span class="value">')
+    doc = doc.replace(u"@@END-SPAN@@", u"</span>")
     return doc
 
 def strip(xml):
-    doomed = ('Comment', 'MediaLink', 'SectMetaData', 'ReplacementFor',
-              'PdqKey', 'DateLastModified', 'ComprehensiveReview', 'PMID',
-              'BoardMember', 'RelatedDocuments', 'TypeOfSummaryChange')
+    """
+    Get rid of parts of the document the users don't want to translate
+
+    Pass:
+      xml - UTF-8 bytes for the document's XML
+
+    Return:
+      XML for stripped document, UTF-8 encoding
+    """
+
+    doomed = ("Comment", "MediaLink", "SectMetaData", "ReplacementFor",
+              "PdqKey", "DateLastModified", "ComprehensiveReview", "PMID",
+              "BoardMember", "RelatedDocuments", "TypeOfSummaryChange")
     try:
         parser = etree.XMLParser(remove_blank_text=True)
-        root = etree.fromstring(xml.encode('utf-8'), parser).getroottree()
-        debug = []
+        root = etree.fromstring(xml, parser).getroottree()
         first = True
         for node in root.findall("SummaryMetaData/MainTopics"):
             if first:
                 first = False
-                debug.append("keeping first main topic")
             else:
                 parent = node.getparent()
                 parent.remove(node)
-                debug.append("dropped subsequent main topics")
         for node in root.xpath("SummarySection["
                                "SectMetaData/SectionType="
                                "'Changes to summary']"):
-            debug.append("removed summary section")
             parent = node.getparent()
             parent.remove(node)
 
         etree.strip_elements(root, with_tail=False, *doomed)
-        etree.strip_attributes(root, 'PdqKey')
+        etree.strip_attributes(root, "PdqKey")
         return etree.tostring(root, pretty_print=True, encoding="utf-8",
-                              xml_declaration=True)# + "<br />".join(debug)
+                              xml_declaration=True)
     except Exception, e:
-        bail("processing XML document: %s" % e)
+        bail("processing XML document: {}".format(e))
 
-docXml = strip(rows[0][0])
-if fmt == "raw":
-    name = "CDR%s" % docId
-    if version:
-        name += "V%d" % ver
+def get_version(session, doc_id, version_string):
+    """
+    Map a negative version number to the actual version number
+
+    Negative numbers wrap from the end, much the way Python
+    sequences do. So -1 means the last version, -2 the penultimate,
+    and so on.
+
+    Pass:
+      session - Session object for CDR requests
+      doc_id - string version for CDR document ID
+      version_string - a number, a token (e.g., "last") or an empty string
+
+    Return:
+      Integer for actual document version if version_string is a negative int;
+      otherwise echo back version_string
+    """
+
+    try:
+        version_number = int(version_string)
+    except:
+        return version_string
+    if not version_number:
+        return None
+    elif version_number >= 0:
+        return version_number
+    try:
+        doc = Doc(session, id=docId, version="last")
+    except:
+        bail("No version found for document {!r}".format(doc_id))
+    version = doc.version + version_number + 1
+    if version < 1:
+        bail("Invalid version number for document {!r}".format(doc_id))
+    return version
+
+def fetch_doc(doc_id, version, logger):
+    """
+    Get the Doc object for the requested document/version
+
+    Pass:
+      doc_id - string version for CDR document ID
+      version - a number string, a token (e.g., "last") or an empty string
+      logger - object for capturing details of failures
+
+    Return:
+      `Doc` object
+    """
+
+    session = Session("guest")
+    version = get_version(session, doc_id, version)
+    try:
+        doc = Doc(session, id=doc_id, version=version)
+        assert doc.xml
+        return doc
+    except:
+        logger.exception("failure loading document")
+        message = "Document {!r}".format(doc_id)
+        if version:
+            message += " version {!r}".format(version)
+        message += " not found"
+        bail(message)
+
+def filter_doc(doc, logger):
+    """
+    Apply the standard rules for resolving revision markup
+
+    Changes which have not been marked published or approved will be rejected.
+
+    Pass:
+      doc - `Doc` object to be filtered
+      logger - object for capturing details of failures
+
+    Return:
+      Unicode string for serialization of filtered XML
+    """
+
+    try:
+        parms = dict(useLevel="2")
+        result = doc.filter("name:Revision Markup Filter", parms=parms)
+        if isinstance(result.result_tree, etree._Element):
+            xml = strip(etree.tostring(result.result_tree, encoding="utf-8"))
+        else:
+            xml = strip(unicode(result.result_tree).encode("utf-8"))
+        return xml.decode("utf-8")
+    except:
+        logger.exception("failure filtering document")
+        bail("failure filtering document")
+
+def send_raw(doc, xml):
+    """
+    Send the XML document to be given to Trados
+
+    Pass:
+      doc - `Doc` object
+      xml - Unicode string for serialization of filtered XML
+    """
+
+    name = doc.cdr_id
+    if doc.version:
+        name += "V{:d}".format(doc.version)
     name += ".xml"
-    print """\
+    print(u"""\
 ContentType: text/xml;charset=utf-8
-Content-disposition: attachment; filename=%s
+Content-disposition: attachment; filename={}
 
-%s""" % (name, docXml)
-    sys.exit(0)
-try:
-    title = "CDR Document %s" % docId
-    if version:
-        title += " (version %d)" % ver
-    print """\
+{}""".format(name, xml).encode("utf-8"))
+
+def send_formatted(doc, xml, logger):
+    """
+    Send the document in a format the user can look at
+
+    Pass:
+      doc - `Doc` object
+      xml - Unicode string for serialization of filtered XML
+      logger - object for capturing details of failures
+    """
+
+    try:
+        title = "CDR Document {}".format(doc.cdr_id)
+        if doc.version:
+            title += " (version {:d})".format(doc.version)
+        print(u"""\
 Content-type: text/html;charset=utf-8
 
 <html>
  <head>
-  <title>%s</title>
-  <style type='text/css'>
-.tag { color: blue; font-weight: bold }
-.name { color: brown }
-.value { color: red }
-h1 { color: maroon; font-size: 14pt; font-family: Verdana, Arial, sans-serif; }
+  <title>{}</title>
+  <style type="text/css">
+.tag {{ color: blue; font-weight: bold }}
+.name {{ color: brown }}
+.value {{ color: red }}
+h1 {{ color: maroon; font-size: 14pt; font-family: Verdana, Arial; }}
   </style>
  </head>
  <body>
-  <h1>%s</h1>
-  <pre>%s</pre>
+  <h1>{}</h1>
+  <pre>{}</pre>
  </body>
-</html>""" % (title, title, markup(docXml))
-except Exception, e:
-    bail(e)
+</html>""".format(title, title, markup(xml)).encode("utf-8"))
+    except Exception, e:
+        logger.exception("rendering formatted xml")
+        bail(e)
+
+def main():
+    """
+    Top-level processing starts here
+    """
+
+    fields = cgi.FieldStorage()
+    doc_id = fields.getvalue("id")
+    version = fields.getvalue("ver")
+    fmt = fields.getvalue("format")
+    logger = Logging.get_logger("get-english-summary")
+    logger.info("doc_id=%r version=%r format=%r", doc_id, version, fmt)
+
+    if doc_id:
+        doc = fetch_doc(doc_id, version, logger)
+        xml = filter_doc(doc, logger)
+        if fmt == "raw":
+            send_raw(doc, xml)
+        else:
+            send_formatted(doc, xml, logger)
+    else:
+        show_form()
+
+if __name__ == "__main__":
+    main()
