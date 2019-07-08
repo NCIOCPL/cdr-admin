@@ -153,8 +153,12 @@ class Document:
         self.mod_date = mod_date
         self.non_pub_ver_date = np_date
     def report(self):
+        cdr_id = cdr.normalize(self.doc_id)
+        if self.doc_type in cdr.FILTERS:
+            url = "QcReport.py?DocId={:d}".format(self.doc_id)
+            cdr_id = cdrcgi.Report.Cell(cdr_id, href=url, target="_blank")
         return (
-            cdr.normalize(self.doc_id),
+            cdr_id,
             self.pub_date,
             self.mod_by,
             self.mod_date,
