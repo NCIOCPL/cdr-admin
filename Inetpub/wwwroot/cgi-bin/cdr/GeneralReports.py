@@ -35,6 +35,7 @@ class Control(cdrcgi.Control):
         ("ShowSummaryIncludes.py", "Show Summary Elements"),
         ("UnchangedDocs.py", "Unchanged Documents"),
         ("CheckUrls.py", "URL Check"),
+        ("UrlListReport.py", "URL List Report"),
         ("ReplaceCWDReport.py", "Versions that Replaced CWDs"),
         ("xmetal-icons.py", "XMetaL CDR Icons"),
     )
