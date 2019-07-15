@@ -35,17 +35,6 @@ from cdr import get_image
 from cdrapi.docs import Doc
 from cdrapi.users import Session
 
-import openpyxl
-from openpyxl.drawing.image import Image
-import PIL
-from openpyxl.styles import Border, Side, PatternFill, Font, Alignment
-from openpyxl.styles.colors import WHITE, RED, BLUE
-
-
-#class Control:
-#    STANDALONE = False
-#    logger = cdr.Logging.get_logger("ClientRefresh")
-
 #----------------------------------------------------------------------
 # CGI form variables
 #----------------------------------------------------------------------
@@ -123,8 +112,8 @@ query.where("value <> ''")
 results = query.unique().order(1).execute(cursor).fetchall()
 
 categories = [("any", "Any Category")] + results
-languages = (("all", "All Languages"), 
-             ("en", "English"), 
+languages = (("all", "All Languages"),
+             ("en", "English"),
              ("es", "Spanish"))
 audiences = (("all", "All Audiences"),
              ("Health_professionals", "HP"),
@@ -402,7 +391,7 @@ fieldList = (
     ("/Media/ProposedUse/Glossary","\n"),
     ("/Media/PhysicalMedia/ImageData/LabelName","\n"),
     ("/Media/MediaContent/ContentDescriptions/ContentDescription","\n\n"),
-    ("/Media/MediaContent/Captions/MediaCaption","\n\n"), 
+    ("/Media/MediaContent/Captions/MediaCaption","\n\n"),
     ("/Media/PhysicalMedia/ImageData/ImageEncoding","\n")
 )
 
@@ -445,7 +434,7 @@ Error: %s""" % (docId, result))
     # fieldlist but skipping the first item indicating media type
     # -----------------------------------------------------------
     sheet.write(row, 0, docId, cell_format)
-    
+
     for i, field_info in enumerate(fieldList[:-1], start=1):
         path, separator = field_info
         values = separator.join(gotFields[path])
@@ -467,7 +456,7 @@ Error: %s""" % (docId, result))
                 #args = doc.cdr_id, doc.has_blob, e
                 #sys.stderr.write("{} ({}) failed: {}\n".format(*args))
                 continue
-            
+
             OPTS["url"] = URL.format(doc.id)
             OPTS["image_data"] = image
             #OPTS["tip"] = doc.title
