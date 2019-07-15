@@ -100,12 +100,41 @@ def show_report(rows):
                 cdrcgi.Report.Column("Protocol ID"),
                 cdrcgi.Report.Column("Protocol Link")
               )
-    title = "ProtocolRef links in Summaries"
+    repTitle = "ProtocolRef links in Summaries"
     now = datetime.date.today()
     subtitle = "Report Date: {}".format(now)
 
-    table = cdrcgi.Report.Table(columns, rows)
-    report = cdrcgi.Report(title, [table], banner=title, subtitle=subtitle)
+    allLinks = { "CT": 0, 
+                 "CG": 0,
+                 "None":0 }
+
+    # Counting the protocol links by "type" to create summary table
+    # -------------------------------------------------------------
+    for cdrId, title, protId, link in rows:
+        if link.find('clinicaltrials.gov') > -1:
+            allLinks['CT'] += 1 
+        elif link.find('cancer.gov') > -1:
+            allLinks['CG'] += 1 
+        else:
+            allLinks['None'] += 1
+        
+    # Preparing the summary table
+    # ---------------------------
+    countCols = ( cdrcgi.Report.Column("Protocol Links including..."),
+                  cdrcgi.Report.Column("Count") )
+    countRows = ( ("clinicaltrials.gov", allLinks['CT']), 
+                  ("www.cancer.gov", allLinks['CG']),
+                  ("None", allLinks['None']) )
+    countHeader = "Total Count by Link Type"
+    countTable = cdrcgi.Report.Table(countCols, countRows, 
+                                     caption = countHeader)
+
+    # Preparing main protocol link table
+    # ----------------------------------
+    header = "Links to Clinical Trials"
+    table = cdrcgi.Report.Table(columns, rows, caption = header)
+    report = cdrcgi.Report(repTitle, [countTable, table], banner=repTitle, 
+                           subtitle=subtitle)
     report.send()
 
 
@@ -129,9 +158,7 @@ if __name__ == "__main__":
     rows = cursor.fetchall()
     cursor.close()
 
-
-    #for docId in [62753, 62779]:
-    docIds = [row[0] for row in rows ]
+    docIds = [row[0] for row in rows]
     rows = []
 
     for docId in docIds:
