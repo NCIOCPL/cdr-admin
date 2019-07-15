@@ -5,6 +5,8 @@
 # Users enter date, diagnosis, category, and language selection criteria.
 # The program selects those documents and outputs the requested fields,
 # one document per row.
+# Enhancing report to include an additional, optional column with a
+# thumbnail image.
 #
 # BZIssue::4717 (add audience selection criterion)
 # BZIssue::4931 Media Caption and Content Report: Bug in Date Selections
@@ -22,6 +24,28 @@ import sys
 import xml.sax
 import xml.sax.handler
 
+from datetime import datetime as dt
+from io import BytesIO
+from os import O_BINARY
+from sys import stdout
+from msvcrt import setmode
+from xlsxwriter import Workbook
+from cdr import get_image
+#from cdrapi.db import Query
+from cdrapi.docs import Doc
+from cdrapi.users import Session
+
+import openpyxl
+from openpyxl.drawing.image import Image
+import PIL
+from openpyxl.styles import Border, Side, PatternFill, Font, Alignment
+from openpyxl.styles.colors import WHITE, RED, BLUE
+
+
+#class Control:
+#    STANDALONE = False
+#    logger = cdr.Logging.get_logger("ClientRefresh")
+
 #----------------------------------------------------------------------
 # CGI form variables
 #----------------------------------------------------------------------
@@ -32,8 +56,28 @@ diagnosis  = fields.getlist("diagnosis") or ["any"]
 category   = fields.getlist("category") or ["any"]
 language   = fields.getvalue("language") or "all"
 audience   = fields.getvalue("audience") or "all"
+addImage   = fields.getvalue("image") or "N"
+
 start_date = fields.getvalue("start_date")
 end_date   = fields.getvalue("end_date")
+
+# ------------------------
+# Testing - Setting values
+#start_date = '2019-01-01'
+#end_date =   '2019-07-09'
+#diagnosis = ["any"]
+#category  = ["any"]
+#language  = "all"
+#audience  = "all"
+#addImage  = "Y"
+# ------------------------
+
+cdr.logwrite("*** MediaCaptionContent.py started")
+URL = "https://cdr-dev.cancer.gov/cgi-bin/cdr/GetCdrImage.py?id={}"
+FILENAME = "{}.xlsx".format(dt.now().strftime("%Y%m%d%H%M%S"))
+
+setmode(stdout.fileno(), O_BINARY)  # Needed on Windows machines
+output = BytesIO()                  # ^^^
 
 #----------------------------------------------------------------------
 # Form buttons
@@ -72,17 +116,20 @@ query.where("t.path = '/Term/PreferredName'")
 query.where("m.path = '/Media/MediaContent/Diagnoses/Diagnosis/@cdr:ref'")
 results = query.unique().order(2).execute(cursor).fetchall()
 diagnoses = [("any", "Any Diagnosis")] + results
+
 query = cdrdb.Query("query_term", "value", "value")
 query.where("path = '/Media/MediaContent/Categories/Category'")
 query.where("value <> ''")
 results = query.unique().order(1).execute(cursor).fetchall()
+
 categories = [("any", "Any Category")] + results
-languages = (("all", "All Languages"), ("en", "English"), ("es", "Spanish"))
-audiences = (
-    ("all", "All Audiences"),
-    ("Health_professionals", "HP"),
-    ("Patients", "Patient"),
-)
+languages = (("all", "All Languages"), 
+             ("en", "English"), 
+             ("es", "Spanish"))
+audiences = (("all", "All Audiences"),
+             ("Health_professionals", "HP"),
+             ("Patients", "Patient"))
+images    = (("Y", "Yes"), ("N", "No"))
 
 #----------------------------------------------------------------------
 # Validate the form values. The expectation is that any bogus values
@@ -91,7 +138,8 @@ audiences = (
 # scrubbed in the test below.
 #----------------------------------------------------------------------
 for value, values in ((diagnosis, diagnoses), (audience, audiences),
-                      (language, languages), (category, categories)):
+                      (language, languages), (category, categories),
+                      (addImage, images)):
     if isinstance(value, basestring):
         value = [value]
     values = [str(v[0]).lower() for v in values]
@@ -134,6 +182,7 @@ if not cdrcgi.is_date(start_date) or not cdrcgi.is_date(end_date):
     page.add_select("category", "Category", categories, "any", multiple=True)
     page.add_select("language", "Language", languages, "all")
     page.add_select("audience", "Audience", audiences, "all")
+    page.add_select("image", "Images", images, "N")
     page.add("</fieldset>")
     page.send()
 
@@ -265,14 +314,11 @@ if audience and audience != "all":
 
 # DEBUG
 query.log(logfile=cdr.DEFAULT_LOGDIR + "/media.log")
-#query_str = "QUERY:\n%s" % query
-#logfile = "d:/cdr/Log/media.log"
-#parms = ["PARAMETERS:"] + [repr(p) for p in query._parms]
-#cdr.logwrite("%s\n%s" % (query_str, "\n\t".join(parms)), logfile)
 
 # Execute query
 try:
     docIds = [row[0] for row in query.execute(cursor).fetchall()]
+    #print("docs: {}".format(docIds))
 except cdrdb.Error, info:
     msg = "Database error executing MediaCaptionContent.py query"
     extra = (
@@ -291,37 +337,58 @@ if len(docIds) == 0:
 #                 Construct the output spreadsheet                   #
 ######################################################################
 
-# Create Style objects for Excel
-styles = cdrcgi.ExcelStyles()
-styles.set_color(styles.header, "white")
-styles.set_background(styles.header, "blue")
-styles.set_size(styles.banner)
+# Create a spreadsheet with images (using XlsxWriter)
+# ---------------------------------------------------
+book = Workbook(output, {"in_memory": True})   # open workbook
 
-# Create the worksheet
 audienceTag = { "Health_professionals": " - HP",
                 "Patients": " - Patient" }.get(audience, "")
-titleText = "Media Caption and Content Report%s" % audienceTag
-sheet = styles.add_sheet("Media Caption-Content", frozen_rows=3)
 
-# Create all the columns
-widths = (10, 20, 20, 25, 25, 20, 25, 25)
+# Creating a sheet with tab caption
+titleText = "Media Caption and Content Report%s" % audienceTag
+tabText = "Media Caption-Content"
+sheet = book.add_worksheet(tabText)          # create worksheet
+
+sheet.freeze_panes(3, 0)                     # Freeze first 3 rows
+
+# Specify columns and column headers, adjust if image is displayed
+# ----------------------------------------------------------------
+last_col = 7
+widths = (10, 25, 25, 25, 25, 25, 25, 25)
 labels = ("CDR ID", "Title", "Diagnosis", "Proposed Summaries",
           "Proposed Glossary Terms", "Label Names",
           "Content Description", "Caption")
-assert(len(widths) == len(labels))
-for col, chars in enumerate(widths):
-    sheet.col(col).width = styles.chars_to_width(chars)
 
-# Title row at the top
-sheet.write_merge(0, 0, 0, len(widths) - 1, titleText, styles.banner)
+if addImage == 'Y':
+    last_col = 8
+    widths += (30,)
+    labels += ('Image',)
 
-# Coverage of the report
+# First header row - Report title
+merge_format = book.add_format({'align': 'center',
+                                 'bold': True})
+header_format = book.add_format({'bold': True,
+                                 'align': 'center',
+                                 'fg_color': '#0000FF',
+                                 'font_color': '#FFFFFF'})
+cell_format = book.add_format({'text_wrap': True,
+                               'align': 'left',
+                               'valign': 'top'})
+sheet.merge_range(0, 0, 0, last_col, titleText, merge_format)
+
+# Second header row - Date range
 coverage = "%s -- %s" % (start_date, end_date)
-sheet.write_merge(1, 1, 0, len(widths) - 1, coverage, styles.banner)
+sheet.merge_range(1, 0, 1, last_col, coverage, merge_format)
 
-# Column label headers
+for i, width in enumerate(widths):
+    sheet.set_column(i, i, width)
+
+# Adding the header row with formatting
 for col, label in enumerate(labels):
-    sheet.write(2, col, label, styles.header)
+    sheet.write(2, col, label, header_format)
+
+#assert(len(widths) == len(labels))
+
 
 ######################################################################
 #                      Fill the sheet with data                      #
@@ -335,9 +402,14 @@ fieldList = (
     ("/Media/ProposedUse/Glossary","\n"),
     ("/Media/PhysicalMedia/ImageData/LabelName","\n"),
     ("/Media/MediaContent/ContentDescriptions/ContentDescription","\n\n"),
-    ("/Media/MediaContent/Captions/MediaCaption","\n\n")
+    ("/Media/MediaContent/Captions/MediaCaption","\n\n"), 
+    ("/Media/PhysicalMedia/ImageData/ImageEncoding","\n")
 )
-assert(len(labels) - 1 == len(fieldList))
+
+if addImage == 'Y':
+    assert(len(labels) - 1 == len(fieldList))
+else:
+    assert(len(labels)     == len(fieldList))
 
 # Put them in a dictionary for use by parser
 wantFields = {}
@@ -351,7 +423,10 @@ getAudience = audience != 'all' and audience or None
 # Populate the data cells
 row = 3
 filters = ["name:Fast Denormalization Filter"]
+OPTS = dict(x_offset=10, y_offset=10)
+
 for docId in docIds:
+    # print(docId)
     # Fetch the full record from the database, denormalized with data content
     result = cdr.filterDoc(session, filter=filters, docId=docId)
     if not isinstance(result, tuple):
@@ -360,24 +435,58 @@ Failure retrieving filtered doc for doc ID=%d<br />
 Error: %s""" % (docId, result))
 
     # Parse it, getting back a list of fields
+    # ---------------------------------------
     dh = DocHandler(wantFields, getLanguage, getAudience)
     xmlText = result[0]
     xml.sax.parseString(xmlText, dh)
     gotFields = dh.getResults()
 
-    # Add a new row with each piece of info
-    sheet.write(row, 0, docId, styles.left)
-    for i, field_info in enumerate(fieldList):
+    # Write the CDR-ID first, then add the summary info from the
+    # fieldlist but skipping the first item indicating media type
+    # -----------------------------------------------------------
+    sheet.write(row, 0, docId, cell_format)
+    
+    for i, field_info in enumerate(fieldList[:-1], start=1):
         path, separator = field_info
         values = separator.join(gotFields[path])
-        sheet.write(row, i + 1, values, styles.left)
+        sheet.write(row, i, values, cell_format)
+
+    # Add the image thumbnail
+    # -----------------------
+    if addImage == 'Y':
+        path, separator = fieldList[-1]
+        values = gotFields[path]
+
+        if values and values[0] == 'JPEG':
+            doc = Doc(session, id=docId)
+            try:
+                image = get_image(doc.id, height=200, width=200, return_stream=True)
+            except Exception as e:
+                cdr.logwrite("No blob found for CDR document {}".format(doc.id))
+
+                #args = doc.cdr_id, doc.has_blob, e
+                #sys.stderr.write("{} ({}) failed: {}\n".format(*args))
+                continue
+            
+            OPTS["url"] = URL.format(doc.id)
+            OPTS["image_data"] = image
+            #OPTS["tip"] = doc.title
+
+            sheet.insert_image(row, 8, "dummy", OPTS)
+            sheet.set_row(row, 100)
+            sheet.set_column(8, 8, 60)
+
     row += 2
 
+cdr.logwrite("*** MediaCaptionContent.py finished")
+#sys.exit()
 # Output
-if sys.platform == "win32":
-    import os, msvcrt
-    msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
-print "Content-type: application/vnd.ms-excel"
-print "Content-Disposition: attachment; filename=MediaCaptionAndContent.xls"
-print
-styles.book.save(sys.stdout)
+book.close()
+output.seek(0)
+book_bytes = output.read()
+stdout.write("""\
+Content-type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+Content-Disposition: attachment; filename={}
+Content-length: {:d}
+
+{}""".format(FILENAME, len(book_bytes), book_bytes))
