@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------
 # Finding ProtocolRef elements in Summary documents and testing its
-# final location (Cancer.gov or ClinicalTrials.gov).  Some of the 
+# final location (Cancer.gov or ClinicalTrials.gov).  Some of the
 # links may have been removed by vendor filters if the linked document
 # has been blocked.  Those links will be listed as 'None'.
 #
@@ -69,7 +69,7 @@ class SummaryDoc:
 
         # Searching for all ProtocolRef elements within the document
         # and testing the URL final location
-        # Cancer.gov will re-direct the link depending if the 
+        # Cancer.gov will re-direct the link depending if the
         # protocol is part of the CTRO.
         # ----------------------------------------------------------
         for node in tree.findall('.//ProtocolRef'):
@@ -78,7 +78,7 @@ class SummaryDoc:
                 nctId = attribs['nct_id']
 
                 url = 'https://www.cancer.gov/clinicaltrials/%s' % nctId
-                #endUrl = requests.head(url, timeout=100.0, 
+                #endUrl = requests.head(url, timeout=100.0,
                 #          headers={'Accept-Encoding':'identity'})
                 #                                     .headers
                 #                                     .get('location', url)
@@ -104,7 +104,7 @@ def show_report(rows):
     now = datetime.date.today()
     subtitle = "Report Date: {}".format(now)
 
-    allLinks = { "CT": 0, 
+    allLinks = { "CT": 0,
                  "CG": 0,
                  "None":0 }
 
@@ -112,34 +112,34 @@ def show_report(rows):
     # -------------------------------------------------------------
     for cdrId, title, protId, link in rows:
         if link.find('clinicaltrials.gov') > -1:
-            allLinks['CT'] += 1 
+            allLinks['CT'] += 1
         elif link.find('cancer.gov') > -1:
-            allLinks['CG'] += 1 
+            allLinks['CG'] += 1
         else:
             allLinks['None'] += 1
-        
+
     # Preparing the summary table
     # ---------------------------
     countCols = ( cdrcgi.Report.Column("Protocol Links including..."),
                   cdrcgi.Report.Column("Count") )
-    countRows = ( ("clinicaltrials.gov", allLinks['CT']), 
+    countRows = ( ("clinicaltrials.gov", allLinks['CT']),
                   ("www.cancer.gov", allLinks['CG']),
                   ("None", allLinks['None']) )
     countHeader = "Total Count by Link Type"
-    countTable = cdrcgi.Report.Table(countCols, countRows, 
+    countTable = cdrcgi.Report.Table(countCols, countRows,
                                      caption = countHeader)
 
     # Preparing main protocol link table
     # ----------------------------------
     header = "Links to Clinical Trials"
     table = cdrcgi.Report.Table(columns, rows, caption = header)
-    report = cdrcgi.Report(repTitle, [countTable, table], banner=repTitle, 
+    report = cdrcgi.Report(repTitle, [countTable, table], banner=repTitle,
                            subtitle=subtitle)
     report.send()
 
 
 if __name__ == "__main__":
-    # Connecting to DB and selecting all published summaries 
+    # Connecting to DB and selecting all published summaries
     # with ProtocolRefs
     # --------------------------------------------------------
     qry = """
@@ -150,7 +150,7 @@ if __name__ == "__main__":
          WHERE path like '/Summary/%ProtocolRef%'
          ORDER BY p.doc_id
     """
-    query = cdrdb.Query("query_term_pub p", 
+    query = cdrdb.Query("query_term_pub p",
                         "DISTINCT p.doc_id").order("p.doc_id")
     query.join("pub_proc_cg c", "c.id = p.doc_id")
     query.where("path like '/Summary/%ProtocolRef%'")
