@@ -77,6 +77,8 @@ class Control:
             ("SummaryTypeChangeReport.py", "Summaries Type Of Change"),
             ("SummariesWithNonJournalArticleCitations.py",
              "Summaries with Non-Journal Article Citations Report"),
+            ("SummaryProtocolRefLinks.py", "Summaries with ProtocolRef Links"
+                                           " (> 5min)"),
             ("ocecdr-3650.py", "Summary Internal Links")
         ):
             page.add_menu_link(script, display, self.session)
