@@ -68,6 +68,7 @@ class Control:
             ("ChangesToSummaries.py", "Changes to Summaries"),
             ("SummaryChanges.py", "History of Changes to Summary"),
             ("PdqBoards.py", "PDQ Board Listings"),
+            ("SummaryStandardWording.py", "Standard Wording"),
             ("SummarySectionCleanup.py", "Summaries Cleanup"),
             ("SummaryCitations.py", "Summaries Citations"),
             ("SummaryDateLastModified.py", "Summaries Date Last Modified"),
