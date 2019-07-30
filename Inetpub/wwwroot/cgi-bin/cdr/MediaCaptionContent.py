@@ -62,7 +62,7 @@ end_date   = fields.getvalue("end_date")
 # ------------------------
 
 cdr.logwrite("*** MediaCaptionContent.py started")
-URL = "https://cdr-dev.cancer.gov/cgi-bin/cdr/GetCdrImage.py?id={}"
+URL = "{}/cgi-bin/cdr/GetCdrImage.py?id={}"
 FILENAME = "{}.xlsx".format(dt.now().strftime("%Y%m%d%H%M%S"))
 
 setmode(stdout.fileno(), O_BINARY)  # Needed on Windows machines
@@ -457,7 +457,7 @@ Error: %s""" % (docId, result))
                 #sys.stderr.write("{} ({}) failed: {}\n".format(*args))
                 continue
 
-            OPTS["url"] = URL.format(doc.id)
+            OPTS["url"] = URL.format(cdr.CBIIT_NAMES[2], doc.id)
             OPTS["image_data"] = image
             #OPTS["tip"] = doc.title
 
