@@ -5,24 +5,30 @@
 # BZIssue::3132
 # BZIssue::OCECDR-3640: Unable to run Advisory Board Summary Mailers
 # Rewritten Summer 2015 as part of security sweep.
+# JIRA::OCECDR-4573 - generate tracking documents without mailer jobs
 #----------------------------------------------------------------------
-import cdr
+
+from datetime import datetime
+from operator import attrgetter
+from lxml import etree
+from cdr import canDo as can_do
+from cdrapi import db
+from cdrapi.docs import Doc
+from cdrapi.users import Session
 import cdrcgi
-import cdrdb
 import cdrmailcommon
-import cgi
-import sys
 
 class Control(cdrcgi.Control):
     """
     Controls script processing, presenting the user with request options,
     collection the user's choices, and creating a job to generate the
-    requested mailers.
+    requested tracking documents.
     """
 
     SUBMENU = "Mailer Menu"
     TITLE = "CDR Administration"
     BUTTONS = ("Submit", SUBMENU, cdrcgi.MAINMENU, "Log Out")
+    LOGNAME = "advisory-board-trackers"
 
     def __init__(self):
         """
@@ -30,16 +36,14 @@ class Control(cdrcgi.Control):
         """
 
         cdrcgi.Control.__init__(self)
-        self.board_type = bt = self.fields.getvalue("BoardType") or "Editorial"
         self.boards = self.collect_boards()
         self.board = self.get_board()
-        self.email = self.fields.getvalue("email")
-        self.max_docs = self.fields.getvalue("max_docs") or "No limit"
         self.members = self.fields.getlist("members") or ["all"]
         self.summaries = self.fields.getlist("summaries") or ["all"]
         self.pairs = self.fields.getlist("pairs")
         self.method = self.fields.getvalue("method") or "all"
-        self.section = "PDQ %s Board Members Mailer Request Form" % bt
+        self.section = "PDQ Advisory Board Members Tracking Request Form"
+        self.cursor = db.connect(user="CdrGuest").cursor()
         self.sanitize()
 
     def run(self):
@@ -54,69 +58,61 @@ class Control(cdrcgi.Control):
         elif not self.board:
             self.show_form()
         elif self.method == "all" or self.pairs:
-            self.submit_mailer_request()
+            self.show_report()
         else:
             self.show_candidates()
 
-    def submit_mailer_request(self):
+    def build_tables(self):
         """
-        Queue up the mailer job, possibly with instructions about
-        who gets mailers for which summaries.
+        Create the tracking documents and show them
         """
 
-        recipients = {}
+        session = Session(self.session)
+        trackers = []
+        attrs = "reviewer.title", "summary.title"
+        labels = "Tracker", "Reviewer", "Summary"
+        cols = [cdrcgi.Report.Column(label) for label in labels]
+        if self.method == "summary":
+            attrs = "summary.title", "reviewer.title"
+            labels = "Tracker", "Summary", "Reviewer"
         if self.method == "all":
-            docs = []
-            for doc_id in sorted(self.board.summaries):
-                if len(docs) >= self.max_docs:
-                    break
-                summary = MailerRecipient.Summary(self.cursor, doc_id)
-                docs.append((summary.id, summary.version))
+            for summary in self.board.summaries.values():
+                for recip_id in summary.get_checkbox_ids():
+                    tracker = Tracker(session, summary.id, recip_id)
+                    #print("{}-{}".format(summary.id, recip_id))
+                    trackers.append(tracker)
         else:
             for pair in self.pairs:
-                ids = pair.split("-")
-                if self.method == "summary":
+                ids = [int(string) for string in pair.split("-")]
+                if self.method == "member":
                     ids.reverse()
-                recip_id = int(ids[0])
-                summary_id = int(ids[1])
-                recip = recipients.get(recip_id)
-                if not recip:
-                    recip = recipients[recip_id] = MailerRecipient(recip_id)
-                summary = MailerRecipient.Summary(self.cursor, summary_id)
-                recip.summaries.append(summary)
-            versions = MailerRecipient.Summary.versions
-            docs = [(id, versions[id]) for id in sorted(versions)]
-        if not docs:
-            cdrcgi.bail("No documents found")
-        docs = ["%s/%d" % (cdr.normalize(id), ver) for id, ver in docs]
-        subset = "Summary-PDQ %s Board" % self.board_type
-        parms = (
-            ("Board", cdr.normalize(self.board.id)),
-            ("Person", "".join([str(r) for r in recipients.values()]))
-        )
-        opts = dict(
-            parms=parms,
-            docList=docs,
-            email=self.email,
-            allowNonPub="Y"
-        )
-        result = cdr.publish(self.session, "Mailers", subset, **opts)
-        job_id, errors = result
-        if not job_id:
-            cdrcgi.bail("Unable to initiate publishing job: %s" % errors)
-        msgs = ["Started directory mailer job - id = %s" % job_id,
-                "                      Mailer type = %s" % subset,
-                "          Number of docs selected = %d" % len(docs),
-                "                        First doc = %s" % docs[0]]
-        if len(docs) > 1:
-            msgs.append("                       Second doc = %s" % docs[1])
-        cdr.logwrite(msgs, cdrmailcommon.LOGFILE)
-        page = cdrcgi.Page(Control.TITLE, subtitle=subset)
-        page.add(page.B.H3("Job Number %s Submitted" % job_id))
-        label = "Check the status of the mailer job"
-        url = "PubStatus.py?id=%s" % job_id
-        page.add(page.B.A(label, href=url))
-        page.send()
+                trackers.append(Tracker(session, *ids))
+        msg = "queued %d tracker documents for creation"
+        self.logger.info(msg, len(trackers))
+        rows = []
+        opts = dict(target="_blank")
+        for tracker in sorted(trackers, key=attrgetter(*attrs)):
+            try:
+                tracker.save()
+                url = "ShowCdrDocument.py?doc-id={:d}".format(tracker.id)
+                cdr_id = Doc.normalize_id(tracker.id)
+                tracker_link = cdrcgi.Report.Cell(cdr_id, href=url, **opts)
+            except Exception as e:
+                tracker_link = str(e)
+            title = tracker.reviewer.title
+            url = "QcReport.py?DocId={:d}".format(tracker.reviewer.id)
+            reviewer_link = cdrcgi.Report.Cell(title, href=url, **opts)
+            title = tracker.summary.title
+            url = "QcReport.py?DocId={:d}".format(tracker.summary.id)
+            summary_link = cdrcgi.Report.Cell(title, href=url, **opts)
+            if self.method == "summary":
+                rows.append((tracker_link, summary_link, reviewer_link))
+            else:
+                rows.append((tracker_link, reviewer_link, summary_link))
+            #print(repr(rows[-1]))
+        self.subtitle = "Tracker Documents Generated"
+        self.title = self.TITLE
+        return [cdrcgi.Report.Table(cols, rows, caption="Trackers")]
 
     def show_form(self):
         "Put up the request form for PDQ summary mailer generation."
@@ -128,14 +124,9 @@ class Control(cdrcgi.Control):
             "session": self.session
         }
         page = cdrcgi.Page(Control.TITLE, **opts)
-        page.add_hidden_field("BoardType", self.board_type)
         self.add_instructions(page)
         page.add("<fieldset>")
         page.add(page.B.LEGEND("Common Options"))
-        page.add_text_field("email", "Email",
-                            value=cdr.getEmail(self.session) or "")
-        page.add_text_field("max_docs", "Max Docs", value="No limit",
-                            tooltip="Don't send more than this many documents")
         page.add_select("board", "Board", self.make_board_list(),
                         onchange="board_change()")
         page.add("</fieldset>")
@@ -179,10 +170,8 @@ class Control(cdrcgi.Control):
             "session": self.session
         }
         form = cdrcgi.Page(self.TITLE, **opts)
-        form.add_hidden_field("BoardType", self.board_type)
         form.add_hidden_field("method", self.method)
         form.add_hidden_field("board", self.board.id)
-        form.add_hidden_field("email", self.email)
         form.add("<fieldset>")
         form.add(form.B.LEGEND(self.board.name))
         form.add('<div id="extra-buttons">')
@@ -229,38 +218,32 @@ fieldset { width: 750px; padding-bottom: 25px; }
         page.add('<fieldset id="instructions" title="%s">' % tooltip)
         page.add(page.B.LEGEND("Instructions [More]", onclick="toggle_help()"))
         page.add_css("#instructions legend { cursor: pointer }")
-        page.add(page.B.P("To generate mailers for an %s board, first "
-                          "select the board's name from the picklist "
-                          "below." % self.board_type))
-        page.add(page.B.P("If you check 'Send All Summaries to all Board "
-                          "Members', all summaries will be sent to all "
-                          "appropriate board members.",
-                          page.B.CLASS("more hidden")))
-        page.add(page.B.P("If you want to select specific summaries to send "
-                          "to specific board members check one of the other "
+        page.add(page.B.P("To generate tracking documents for an Advisory "
+                          "board, first select the board's name from the "
+                          "picklist below."))
+        page.add(page.B.P("If you check 'Create Trackers for All Summaries "
+                          "and All Board Members', tracking documents will be "
+                          "created immediately.", page.B.CLASS("more hidden")))
+        page.add(page.B.P("If you want to select specific summaries and/or "
+                          "specific board members, check one of the other "
                           "two radio buttons.", page.B.CLASS("more hidden")))
         page.add(page.B.P("If you check 'Select by Summary', you can select "
-                          "from the list below the radio buttons, the "
-                          "specific summaries you want to include in the "
-                          "mailer. You will be sent to a new page that "
-                          "contains the members who can receive the mailer, "
-                          "grouped by summary.", page.B.CLASS("more hidden")))
+                          "from the list below the radio buttons the "
+                          "specific summaries for which you want tracking "
+                          "documents created. You will be sent to a new page "
+                          "which lets you select the members for which the "
+                          "tracking documents should be created for each "
+                          "of the selected summaries.",
+                          page.B.CLASS("more hidden")))
         page.add(page.B.P("If you check 'Select by Board Member', you can "
-                          "select from the list below the radio buttons, "
-                          "the specific members you want to include in the "
-                          "mailer. You will be sent to a new page that "
-                          "contains the summaries that can be sent, grouped "
-                          "by Board Member.", page.B.CLASS("more hidden")))
-        page.add(page.B.P("It may take a minute to select documents to be "
-                          "included in the mailing. Please be patient. If "
-                          "you want to, you can limit the number of summary "
-                          "documents for which mailers will be generated "
-                          "in a given job, by entering a maximum number.",
+                          "select from the list below the radio buttons "
+                          "the specific members for which you want tracking "
+                          "documents to be created. You will be taken to a "
+                          "second page which will let you select the "
+                          "summaries for which the tracking documents should "
+                          "be created for each of the selected members.",
                           page.B.CLASS("more hidden")))
-        page.add(page.B.P("To receive email notification when the job is "
-                          "completed, enter your email address.",
-                          page.B.CLASS("more hidden")))
-        page.add(page.B.P("Click Submit to start the mailer job.",
+        page.add(page.B.P("Click Submit when your selections are ready.",
                           page.B.CLASS("more hidden")))
         page.add("</fieldset>")
 
@@ -349,26 +332,14 @@ jQuery(document).ready(function() { board_change(); });""")
     def sanitize(self):
         "Make sure the CGI parameters haven't been tampered with."
         msg = cdrcgi.TAMPERING
-        if not self.session or not cdr.canDo(self.session, "SUMMARY MAILERS"):
+        if not self.session or not can_do(self.session, "SUMMARY MAILERS"):
             cdrcgi.bail("User not authorized to create Summary mailers")
         cdrcgi.valParmVal(self.request, val_list=self.BUTTONS, empty_ok=True,
-                          msg=msg)
-        cdrcgi.valParmEmail(self.email, empty_ok=True,
-                            msg="Invalid email address")
-        cdrcgi.valParmVal(self.board_type, val_list=("Editorial", "Advisory"),
                           msg=msg)
         cdrcgi.valParmVal(self.method, val_list=("all", "summary", "member"),
                           msg=msg)
         self.all_or_digits(self.members)
         self.all_or_digits(self.summaries)
-        if self.max_docs == "No limit":
-            self.max_docs = sys.maxint
-        else:
-            if not self.max_docs.isdigit():
-                cdrcgi.bail("Invalid value for max docs")
-            self.max_docs = int(self.max_docs)
-        if self.max_docs < 1:
-            cdrcgi.bail("Invalid value for max docs")
         for pair in self.pairs:
             ids = pair.split("-")
             if len(ids) != 2 or not ids[0].isdigit() or not ids[1].isdigit():
@@ -388,8 +359,7 @@ jQuery(document).ready(function() { board_change(); });""")
         c_path = "/PDQBoardMemberInfo/BoardMembershipDetails/CurrentMember"
         b_path = "/PDQBoardMemberInfo/BoardMembershipDetails/BoardName/@cdr:ref"
         t_path = "/Organization/OrganizationType"
-        board_type = "PDQ %s Board" % self.board_type
-        query = cdrdb.Query("active_doc d", "p.int_val", "b.int_val", "d.title")
+        query = db.Query("active_doc d", "p.int_val", "b.int_val", "d.title")
         query.join("doc_version v", "v.id = d.id")
         query.join("query_term c", "c.doc_id = d.id")
         query.join("query_term b", "b.doc_id = c.doc_id "
@@ -403,7 +373,7 @@ jQuery(document).ready(function() { board_change(); });""")
         query.where(query.Condition("t.path", t_path))
         query.where(query.Condition("p.path", p_path))
         query.where(query.Condition("c.value", "Yes"))
-        query.where(query.Condition("t.value", board_type))
+        query.where("t.value = 'PDQ Advisory Board'")
         query.unique()
         rows = query.execute(self.cursor, timeout=300).fetchall()
         for member_id, board_id, doc_title in rows:
@@ -417,12 +387,12 @@ jQuery(document).ready(function() { board_change(); });""")
         # string values being tested.
         b_path = "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"
         a_path = "/Summary/SummaryMetaData/SummaryAudience"
-        subquery = cdrdb.Query("document d", "d.id").unique()
+        subquery = db.Query("document d", "d.id").unique()
         subquery.join("query_term t", "t.doc_id = d.id")
         subquery.where("t.path = '%s'" % t_path)
-        subquery.where("t.value = '%s'" % board_type)
-        query = cdrdb.Query("active_doc d", "d.id", "MAX(v.num)",
-                            "b.int_val", "d.title")
+        subquery.where("t.value = 'PDQ Advisory Board'")
+        cols = "d.id", "MAX(v.num)", "b.int_val", "d.title"
+        query = db.Query("active_doc d", *cols)
         query.join("doc_version v", "v.id = d.id")
         query.join("query_term b", "b.doc_id = d.id")
         query.join("active_doc active_board", "active_board.id = b.int_val")
@@ -496,15 +466,15 @@ class Board:
         self.members = {}
         self.summaries = {}
         path = "/Organization/OrganizationNameInformation/OfficialName/Name"
-        query = cdrdb.Query("query_term", "value")
+        query = db.Query("query_term", "value")
         query.where(query.Condition("path", path))
         query.where(query.Condition("doc_id", doc_id))
         rows = query.execute(control.cursor, timeout=300).fetchall()
         if not rows:
-            cdrcgi.bail("No name found for board document CDR%d" % id)
+            cdrcgi.bail("No name found for board document CDR%d" % doc_id)
         self.name = rows[0][0]
         org_types = ("PDQ Editorial Board", "PDQ Advisory Board")
-        query = cdrdb.Query("query_term", "value")
+        query = db.Query("query_term", "value")
         query.where(query.Condition("path", "/Organization/OrganizationType"))
         query.where(query.Condition("value", org_types))
         query.where(query.Condition("doc_id", doc_id))
@@ -630,7 +600,7 @@ class BoardMember(Choice):
         the user can check or clear to customize the set of mailers
         which will be generated (see Board.show_choices() above).
         """
-        query = cdrdb.Query("query_term m", "m.doc_id").unique()
+        query = db.Query("query_term m", "m.doc_id").unique()
         query.join("query_term b", "b.doc_id = m.doc_id",
                    "LEFT(b.node_loc, 8) = LEFT(m.node_loc, 8)")
         query.where(query.Condition("m.path", Board.M_PATH))
@@ -653,7 +623,7 @@ class BoardSummary(Choice):
         to customize the set of mailers which will be generated
         (see Board.show_choices() above).
         """
-        query = cdrdb.Query("query_term m", "m.int_val").unique()
+        query = db.Query("query_term m", "m.int_val").unique()
         query.join("query_term b", "b.doc_id = m.doc_id",
                    "LEFT(b.node_loc, 8) = LEFT(m.node_loc, 8)")
         query.where(query.Condition("m.path", Board.M_PATH))
@@ -663,6 +633,7 @@ class BoardSummary(Choice):
         rows = query.execute(self.board.control.cursor).fetchall()
         return [row[0] for row in rows]
 
+'''
 class MailerRecipient:
     """
     Used to collect mailer recipients when we're creating the mailer
@@ -697,7 +668,7 @@ class MailerRecipient:
             self.id = id
             self.version = self.versions.get(id)
             if not self.version:
-                query = cdrdb.Query("doc_version", "MAX(num)")
+                query = db.Query("doc_version", "MAX(num)")
                 query.where("publishable = 'Y'")
                 query.where(query.Condition("id", id))
                 rows = query.execute(cursor).fetchall()
@@ -708,6 +679,89 @@ class MailerRecipient:
         def __str__(self):
             "Serialize this summary's ID/version for the mailer job request."
             return "%d/%d" % (self.id, self.version)
+'''
+
+
+class Tracker:
+    """
+    CDR document used to track review of a summary by an advisory board member
+    """
+
+    NS = "cips.nci.nih.gov/cdr"
+    NSMAP = dict(cdr=NS)
+    NOW = datetime.now().isoformat().split(".")[0]
+    TYPE = "Summary-PDQ Advisory Board"
+    MODE = "Web-based"
+    OPTS = dict(encoding="utf-8", xml_declaration=True, pretty_print=True)
+
+    summaries = {}
+    reviewers = {}
+
+    def __init__(self, session, summary_id, reviewer_id):
+        """
+        Capture the information for the new tracker document
+
+        Pass:
+          session - Session object for the logged-in user
+          summary - Doc object for the CDR PDQ Cancer Information Summary
+          reviewer - Doc object for the board member
+        """
+
+        self.__session = session
+        self.__summary = summary_id
+        self.__reviewer = reviewer_id
+
+    @property
+    def session(self):
+        return self.__session
+
+    @property
+    def summary(self):
+        if not hasattr(self, "_summary"):
+            self._summary = Tracker.summaries.get(self.__summary)
+        if not self._summary:
+            doc = Doc(self.session, id=self.__summary)
+            self._summary = Tracker.summaries[self.__summary] = doc
+        return self._summary
+
+    @property
+    def reviewer(self):
+        if not hasattr(self, "_reviewer"):
+            self._reviewer = Tracker.reviewers.get(self.__reviewer)
+        if not self._reviewer:
+            doc = Doc(self.session, id=self.__reviewer)
+            self._reviewer = Tracker.summaries[self.__reviewer] = doc
+        return self._reviewer
+
+    @property
+    def xml(self):
+        """
+        Serialized XML for the new CDR document encoded as UTF-8
+        """
+
+        root = etree.Element("Mailer", nsmap=self.NSMAP)
+        etree.SubElement(root, "Type", Mode=self.MODE).text = self.TYPE
+        child = etree.Element("Recipient")
+        child.text = self.reviewer.title
+        child.set("{{{}}}ref".format(self.NS), self.reviewer.cdr_id)
+        root.append(child)
+        child = etree.Element("Document")
+        child.text = self.summary.title
+        child.set("{{{}}}ref".format(self.NS), self.summary.cdr_id)
+        root.append(child)
+        etree.SubElement(root, "Sent").text = self.NOW
+        return etree.tostring(root, **self.OPTS)
+
+    def save(self):
+        """
+        Create and store a new CDR document to track the review
+        """
+
+        doc = Doc(self.session, xml=self.xml, doctype="Mailer")
+        doc.save(val_types=["links", "schema"])
+        #self.id = 999999
+        self.id = doc.id
+
 
 if __name__ == "__main__":
     Control().run()
