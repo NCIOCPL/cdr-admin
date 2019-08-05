@@ -17,7 +17,7 @@ class Citation:
         if not self.pubmedArticle:
             raise Exception("PubmedArticle %s dropped" % self.pmId)
         node = copy.deepcopy(self.pubmedArticle.node)
-        etree.strip_elements(node, "CommentsCorrectionsList")
+        node = cdr.prepare_pubmed_article_for_import(node)
         try:
             obj = cdr.getDoc(session, self.cdrId, 'Y', getObject=True)
         except Exception as e:
@@ -31,7 +31,7 @@ class Citation:
             response = cdr.repDoc(session, doc=str(obj), val="Y", ver="Y",
                                   checkIn="Y", showWarnings=True,
                                   reason=comment, comment=comment,
-                                  publishable=True)
+                                  publishable="Y")
             if response[0]:
                 return "updated"
             raise Exception("repDoc(): %s" % repr(response[1]))
@@ -82,14 +82,26 @@ if not cdr.canDo(session, "MODIFY DOCUMENT", "Citation"):
     cdrcgi.bail("You must be authorized to replace Citation documents "
                 "to run this script.")
 cursor = cdrdb.connect('CdrGuest').cursor()
-cursor.execute("""\
+query = """\
 SELECT DISTINCT s.doc_id, s.value, i.value
            FROM query_term s
            JOIN query_term i
              ON i.doc_id = s.doc_id
           WHERE s.path = '/Citation/PubmedArticle/MedlineCitation/@Status'
             AND i.path = '/Citation/PubmedArticle/MedlineCitation/PMID'
-            AND s.value IN ('In-Process', 'Publisher', 'In-data-review')""")
+            AND s.value IN ('In-Process', 'Publisher', 'In-data-review')"""
+debugging_query = """\
+SELECT DISTINCT v.id, s.value + '-DEBUG', i.value
+  FROM doc_version v
+  JOIN query_term s
+    ON s.doc_id = v.id
+  JOIN query_term i
+    ON i.doc_id = s.doc_id
+ WHERE s.path = '/Citation/PubmedArticle/MedlineCitation/@Status'
+   AND i.path = '/Citation/PubmedArticle/MedlineCitation/PMID'
+   AND v.comment = 'pre-medline citation updated (issue #5150)'
+   AND v.dt > '2019-08-01'"""
+cursor.execute(query)
 citations = {}
 pmIds = set()
 for cdrId, status, pmId in cursor.fetchall():

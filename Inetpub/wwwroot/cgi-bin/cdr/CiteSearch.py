@@ -103,29 +103,12 @@ def replacePubmedArticle(doc, article):
 #----------------------------------------------------------------------
 def getPubmedArticle(doc):
     try:
-        tree = etree.XML(doc)
+        root = etree.XML(doc)
     except:
         cdrcgi.bail("unable to parse document from NLM")
-    for node in tree.findall("PubmedArticle/MedlineCitation"):
-        namespace = "http://www.w3.org/1998/Math/MathML"
-        mml_math = "{{{}}}math".format(namespace)
-        namespaces = dict(mml=namespace)
-        for child in node.xpath("//mml:math", namespaces=namespaces):
-            if child.tail is None:
-                child.tail = "[formula]"
-            else:
-                child.tail = "[formula]" + child.tail
-        etree.strip_elements(node, mml_math, with_tail=False)
-        filters = ["name:Import Citation"]
-        xml = etree.tostring(node)
-        result = cdr.filterDoc(session, filters, doc=xml)
-        if isinstance(result, basestring):
-            cdrcgi.bail(result)
-        else:
-            xml, messages = result
-            article = etree.Element("PubmedArticle")
-            article.append(etree.fromstring(xml))
-            return article
+    for node in root.findall("PubmedArticle"):
+        return cdr.prepare_pubmed_article_for_import(node)
+    return None
 
 #----------------------------------------------------------------------
 # Extract the text content of the ArticleTitle element.
