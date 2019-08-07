@@ -1,6 +1,7 @@
 #----------------------------------------------------------------------
 # Finding ProtocolRef elements in Summary documents and testing its
-# final location (Cancer.gov or ClinicalTrials.gov).  Some of the
+# final location (Cancer.gov or ClinicalTrials.gov) by following
+# redirects.  Some of the
 # links may have been removed by vendor filters if the linked document
 # has been blocked.  Those links will be listed as 'None'.
 #
@@ -10,9 +11,10 @@ from cdrapi import db as cdrdb
 import cdr
 import cdrcgi
 import cgi
-import requests
-import sys
+import grequests
+#import sys
 import datetime
+#import time
 
 from cdrapi.settings import Tier
 TIER = Tier()
@@ -31,18 +33,26 @@ else:
 
 
 #----------------------------------------------------------------------
-# Document class holding all protocol IDs, and links/URLs
+# Document class holding all CDR-IDs, and rows to display on report
 #----------------------------------------------------------------------
 class SummaryDoc:
     """ Class to extract the ProtocolRef elements and URL for the link
         It creates the list of rows for each ProtocolRef link found
 
         This didn't have to be a class.  Should be rewritten.
+
+        Modified to use grequests allowing to submit multiple URLs
+        at the same time.
+        Using grequests didn't safe much time, so I'm additionally
+        removing duplicates within summaries.
     """
 
     def __init__(self, docId):
         self.docId = docId
+        # Rows to be displayed on the report
         self.rows = []
+        # Rows with original URLs
+        protRefRows = []
 
         # Retrieve the XML of the summary
         # ----------------------------------------------------
@@ -70,7 +80,9 @@ class SummaryDoc:
         # Searching for all ProtocolRef elements within the document
         # and testing the URL final location
         # Cancer.gov will re-direct the link depending if the
-        # protocol is part of the CTRO.
+        # protocol is part of the CTRO or not.
+        # We're creating the rows with the original URL first and
+        # are replacing the final URL after the "grequests" call.
         # ----------------------------------------------------------
         for node in tree.findall('.//ProtocolRef'):
             attribs = node.attrib
@@ -78,16 +90,52 @@ class SummaryDoc:
                 nctId = attribs['nct_id']
 
                 url = 'https://www.cancer.gov/clinicaltrials/%s' % nctId
-                #endUrl = requests.head(url, timeout=100.0,
-                #          headers={'Accept-Encoding':'identity'})
-                #                                     .headers
-                #                                     .get('location', url)
-                endUrl = requests.head(url, allow_redirects=True, timeout=100.0)
-                row = [self.docId, titleNode.text, node.text, endUrl.url]
+                row = [self.docId, titleNode.text, node.text, url]
             else:
-                row = [self.docId, titleNode.text, node.text, "None"]
+                row = [self.docId, titleNode.text, node.text, 'None']
 
-            self.rows.append(row)
+            protRefRows.append(row)
+
+        # We have all ProtocolRef links for this summary.  Now we want
+        # to dedup those. No need to follow the same link multiple times
+        # --------------------------------------------------------------
+
+        # Build a set out of the list of lists (rows)
+        # -------------------------------------------
+        rowsTuple = [tuple(lst) for lst in protRefRows]
+        uniqueRows = set(rowsTuple)
+
+        # Convert back to a list so we can iterate over it and update
+        # the original URL with the redirected URL retrieved with
+        # the grequests call
+        # --------------------------------------------------------------
+        uniqueLst = list(uniqueRows)
+
+        # Building list of URLs from the rows to be tested all at once.
+        # -------------------------------------------------------------
+        urls = []
+        for row in uniqueLst:
+            try:
+                urls.append(row[3])
+            except:
+                urls.append('Missing URL value')
+
+        # Sending the requests
+        # --------------------
+        endUrls = (grequests.head(u, allow_redirects=True) for u in urls)
+        sumUrls = grequests.map(endUrls)
+
+        # Creating the rows to be displayed and updating the URL with the
+        # result from the grequests call
+        # ---------------------------------------------------------------
+        self.rows = [list(row) for row in uniqueLst]
+        for i, row in enumerate(self.rows):
+            try:
+                #print(sumUrls[i].url)
+                row[3] = sumUrls[i].url
+            except:
+                if row[3] != 'None':
+                    row[3] += ' *** URL timed out'
 
 
 # -------------------------------------------------------------------
@@ -161,11 +209,15 @@ if __name__ == "__main__":
     docIds = [row[0] for row in rows]
     rows = []
 
+    #start_time = time.time()
+
     for docId in docIds:
         try:
             doc = SummaryDoc(docId)
             rows.extend(doc.rows)
         except Exception as e:
             cdrcgi.bail("CDR%d: %s" % (docId, e))
+
+    #print("--- {} seconds ---".format(time.time() - start_time))
 
     show_report(rows)
