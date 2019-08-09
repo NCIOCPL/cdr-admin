@@ -11,7 +11,7 @@ from cdrapi import db as cdrdb
 import cdr
 import cdrcgi
 import cgi
-import grequests
+import requests
 #import sys
 import datetime
 #import time
@@ -41,10 +41,9 @@ class SummaryDoc:
 
         This didn't have to be a class.  Should be rewritten.
 
-        Modified to use grequests allowing to submit multiple URLs
-        at the same time.
-        Using grequests didn't safe much time, so I'm additionally
-        removing duplicates within summaries.
+        Using grequests didn't safe much time, so I'm reverting the
+        calls back to requests but I'm now removing duplicates
+        protocols within summaries.
     """
 
     def __init__(self, docId):
@@ -82,7 +81,7 @@ class SummaryDoc:
         # Cancer.gov will re-direct the link depending if the
         # protocol is part of the CTRO or not.
         # We're creating the rows with the original URL first and
-        # are replacing the final URL after the "grequests" call.
+        # are replacing the final URL after the "requests" call.
         # ----------------------------------------------------------
         for node in tree.findall('.//ProtocolRef'):
             attribs = node.attrib
@@ -107,32 +106,18 @@ class SummaryDoc:
 
         # Convert back to a list so we can iterate over it and update
         # the original URL with the redirected URL retrieved with
-        # the grequests call
+        # the requests call
         # --------------------------------------------------------------
         uniqueLst = list(uniqueRows)
 
-        # Building list of URLs from the rows to be tested all at once.
-        # -------------------------------------------------------------
-        urls = []
-        for row in uniqueLst:
-            try:
-                urls.append(row[3])
-            except:
-                urls.append('Missing URL value')
-
-        # Sending the requests
-        # --------------------
-        endUrls = (grequests.head(u, allow_redirects=True) for u in urls)
-        sumUrls = grequests.map(endUrls)
-
         # Creating the rows to be displayed and updating the URL with the
-        # result from the grequests call
+        # result from the requests call
         # ---------------------------------------------------------------
         self.rows = [list(row) for row in uniqueLst]
-        for i, row in enumerate(self.rows):
+        for row in self.rows:
             try:
-                #print(sumUrls[i].url)
-                row[3] = sumUrls[i].url
+                request = requests.head(row[3], allow_redirects=True)
+                row[3] = request.url
             except:
                 if row[3] != 'None':
                     row[3] += ' *** URL timed out'
@@ -186,6 +171,9 @@ def show_report(rows):
     report.send()
 
 
+# -------------------------------------------------------------------
+# Starting Main
+# -------------------------------------------------------------------
 if __name__ == "__main__":
     # Connecting to DB and selecting all published summaries
     # with ProtocolRefs
@@ -219,5 +207,4 @@ if __name__ == "__main__":
             cdrcgi.bail("CDR%d: %s" % (docId, e))
 
     #print("--- {} seconds ---".format(time.time() - start_time))
-
     show_report(rows)
