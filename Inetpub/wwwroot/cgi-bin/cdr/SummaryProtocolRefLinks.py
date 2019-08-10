@@ -1,6 +1,7 @@
 #----------------------------------------------------------------------
 # Finding ProtocolRef elements in Summary documents and testing its
-# final location (Cancer.gov or ClinicalTrials.gov).  Some of the
+# final location (Cancer.gov or ClinicalTrials.gov) by following
+# redirects.  Some of the
 # links may have been removed by vendor filters if the linked document
 # has been blocked.  Those links will be listed as 'None'.
 #
@@ -11,8 +12,9 @@ import cdr
 import cdrcgi
 import cgi
 import requests
-import sys
+#import sys
 import datetime
+#import time
 
 from cdrapi.settings import Tier
 TIER = Tier()
@@ -31,18 +33,25 @@ else:
 
 
 #----------------------------------------------------------------------
-# Document class holding all protocol IDs, and links/URLs
+# Document class holding all CDR-IDs, and rows to display on report
 #----------------------------------------------------------------------
 class SummaryDoc:
     """ Class to extract the ProtocolRef elements and URL for the link
         It creates the list of rows for each ProtocolRef link found
 
         This didn't have to be a class.  Should be rewritten.
+
+        Using grequests didn't safe much time, so I'm reverting the
+        calls back to requests but I'm now removing duplicates
+        protocols within summaries.
     """
 
     def __init__(self, docId):
         self.docId = docId
+        # Rows to be displayed on the report
         self.rows = []
+        # Rows with original URLs
+        protRefRows = []
 
         # Retrieve the XML of the summary
         # ----------------------------------------------------
@@ -70,7 +79,9 @@ class SummaryDoc:
         # Searching for all ProtocolRef elements within the document
         # and testing the URL final location
         # Cancer.gov will re-direct the link depending if the
-        # protocol is part of the CTRO.
+        # protocol is part of the CTRO or not.
+        # We're creating the rows with the original URL first and
+        # are replacing the final URL after the "requests" call.
         # ----------------------------------------------------------
         for node in tree.findall('.//ProtocolRef'):
             attribs = node.attrib
@@ -78,16 +89,38 @@ class SummaryDoc:
                 nctId = attribs['nct_id']
 
                 url = 'https://www.cancer.gov/clinicaltrials/%s' % nctId
-                #endUrl = requests.head(url, timeout=100.0,
-                #          headers={'Accept-Encoding':'identity'})
-                #                                     .headers
-                #                                     .get('location', url)
-                endUrl = requests.head(url, allow_redirects=True, timeout=100.0)
-                row = [self.docId, titleNode.text, node.text, endUrl.url]
+                row = [self.docId, titleNode.text, node.text, url]
             else:
-                row = [self.docId, titleNode.text, node.text, "None"]
+                row = [self.docId, titleNode.text, node.text, 'None']
 
-            self.rows.append(row)
+            protRefRows.append(row)
+
+        # We have all ProtocolRef links for this summary.  Now we want
+        # to dedup those. No need to follow the same link multiple times
+        # --------------------------------------------------------------
+
+        # Build a set out of the list of lists (rows)
+        # -------------------------------------------
+        rowsTuple = [tuple(lst) for lst in protRefRows]
+        uniqueRows = set(rowsTuple)
+
+        # Convert back to a list so we can iterate over it and update
+        # the original URL with the redirected URL retrieved with
+        # the requests call
+        # --------------------------------------------------------------
+        uniqueLst = list(uniqueRows)
+
+        # Creating the rows to be displayed and updating the URL with the
+        # result from the requests call
+        # ---------------------------------------------------------------
+        self.rows = [list(row) for row in uniqueLst]
+        for row in self.rows:
+            try:
+                request = requests.head(row[3], allow_redirects=True)
+                row[3] = request.url
+            except:
+                if row[3] != 'None':
+                    row[3] += ' *** URL timed out'
 
 
 # -------------------------------------------------------------------
@@ -138,6 +171,9 @@ def show_report(rows):
     report.send()
 
 
+# -------------------------------------------------------------------
+# Starting Main
+# -------------------------------------------------------------------
 if __name__ == "__main__":
     # Connecting to DB and selecting all published summaries
     # with ProtocolRefs
@@ -161,6 +197,8 @@ if __name__ == "__main__":
     docIds = [row[0] for row in rows]
     rows = []
 
+    #start_time = time.time()
+
     for docId in docIds:
         try:
             doc = SummaryDoc(docId)
@@ -168,4 +206,5 @@ if __name__ == "__main__":
         except Exception as e:
             cdrcgi.bail("CDR%d: %s" % (docId, e))
 
+    #print("--- {} seconds ---".format(time.time() - start_time))
     show_report(rows)
