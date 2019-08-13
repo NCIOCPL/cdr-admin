@@ -633,54 +633,6 @@ class BoardSummary(Choice):
         rows = query.execute(self.board.control.cursor).fetchall()
         return [row[0] for row in rows]
 
-'''
-class MailerRecipient:
-    """
-    Used to collect mailer recipients when we're creating the mailer
-    job, and the user is cherry-picking who gets which summary.
-    """
-    def __init__(self, id):
-        self.id = id
-        self.summaries = []
-
-    def __str__(self):
-        """
-        Serialize this recipient and the summaries for which she is
-        to receive mailers.
-        """
-        return "%d [%s]" % (self.id, " ".join([str(s) for s in self.summaries]))
-
-    class Summary:
-        """
-        Summary for which mailers are about to be requested. We
-        cache the latest publishable versions so we don't have to
-        look them up repeatedly for each summary.
-        """
-
-        versions = {}
-
-        def __init__(self, cursor, id):
-            """
-            Store the document ID and latest publishable version for the
-            summary. Use the cached version number if we've already
-            looked it up.
-            """
-            self.id = id
-            self.version = self.versions.get(id)
-            if not self.version:
-                query = db.Query("doc_version", "MAX(num)")
-                query.where("publishable = 'Y'")
-                query.where(query.Condition("id", id))
-                rows = query.execute(cursor).fetchall()
-                if not rows:
-                    cdrcgi.bail("No publishable version found for CDR%d" % id)
-                self.versions[id] = self.version = rows[0][0]
-
-        def __str__(self):
-            "Serialize this summary's ID/version for the mailer job request."
-            return "%d/%d" % (self.id, self.version)
-'''
-
 
 class Tracker:
     """
@@ -758,8 +710,7 @@ class Tracker:
         """
 
         doc = Doc(self.session, xml=self.xml, doctype="Mailer")
-        doc.save(val_types=["links", "schema"])
-        #self.id = 999999
+        doc.save(unlock=True, val_types=["links", "schema"])
         self.id = doc.id
 
 
