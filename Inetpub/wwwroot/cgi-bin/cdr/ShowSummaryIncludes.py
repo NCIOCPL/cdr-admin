@@ -84,7 +84,7 @@ class SummaryInclude:
                         self.elements[element].append(id)
 
         except Exception, e:
-            print '*** Error ***'
+            # print '*** Error ***'
             self.error = "Failure parsing filter: %s" % str(e)
 
 # -------------------------------------------------------------------
