@@ -11,6 +11,7 @@
 # *********************************************************************
 import cgi, cdr, cdrcgi, os, paramiko
 import glob
+from datetime import datetime as dt
 from cdrapi.settings import Tier
 
 #----------------------------------------------------------------------
@@ -41,8 +42,10 @@ MV_DIR    = "{}/{}".format(AUDIOPATH, CIAT_DIR)
 
 title     = "CDR Administration"
 section   = "FTP Audio from CIPSFTP"
-buttons   = ["Get Audio", cdrcgi.MAINMENU, "Log Out"]
+stdButtons   = [cdrcgi.MAINMENU, "Log Out"]
+getButtons   = ["Get Audio"] + stdButtons
 script    = "FtpAudio.py"
+now       = dt.now().strftime("%Y-%m-%d_%H:%M:%S")
 
 ftpDone   = ''
 
@@ -122,11 +125,14 @@ if request == "Get Audio" and ftpDone != 'Y':
         stdin, stdout, stderr = c.exec_command(cmd)
 
         # Read the files and clean up file names
-        if not stderr.read():
+        if not stderr.readlines():
             zipFiles = stdout.readlines()
             zipFiles = [str(x.strip()) for x in zipFiles]
         else:
-            cdrcgi.bail(repr(sterr.read()))
+            if not stdout.readlines():
+                cdrcgi.bail("No files available for download!")
+            else:
+                cdrcgi.bail("Error: {}".format(repr(stderr.readlines())))
 
 
         # Read all files. We need this to be able and display the
@@ -135,7 +141,7 @@ if request == "Get Audio" and ftpDone != 'Y':
         allFiles = "ls {}/* | sed 's/.*Term_Audio\///'".format(IN_DIR)
         stdin, stdout, stderr = c.exec_command(allFiles)
 
-        if not stderr.read():
+        if not stderr.readlines():
             allFiles = stdout.readlines()
             allFiles = [str(x.strip()) for x in allFiles]
 
@@ -148,7 +154,7 @@ if request == "Get Audio" and ftpDone != 'Y':
             l.write("Bad files found...")
             l.write(repr(badFiles))
         else:
-            cdrcgi.bail(repr(stderr.read()))
+            cdrcgi.bail("Error checking file names: {}".format(repr(stderr.readlines())))
 
         # Count the number of ZIP files found
         # -----------------------------------
@@ -183,16 +189,21 @@ if request == "Get Audio" and ftpDone != 'Y':
                 # Don't overwrite files previously copied (unless in test mode)
                 # -------------------------------------------------------------
                 if name in oldFiles and not testMode:
-                    cdrcgi.bail('Error:  Local File {} already exists!'.format(name))
+                    msg = 'Error:  Download file {} already exists on CDR server!'
+                    cdrcgi.bail(msg.format(name))
 
                 targetFile = "/cdr/{}/{}".format(WIN_DIR, name)
                 l.write("Copy from: .../Audio/{}/{}".format(NIX_DIR, name))
                 l.write("       to: {}".format(targetFile))
 
-                sftp = c.open_sftp()
-                sftp.get("{}/{}".format(IN_DIR, name),
-                         "/cdr/{}/{}".format(WIN_DIR, name))
-                sftp.close()
+                if not testMode:
+                    sftp = c.open_sftp()
+                    sftp.get("{}/{}".format(IN_DIR, name),
+                             "/cdr/{}/{}".format(WIN_DIR, name))
+                    sftp.close()
+                else:
+                    l.write("*** Test mode: file not downloaded")
+
                 newFiles.append(name)
             else:
                 l.write("No zip file: {}".format(name))
@@ -207,17 +218,28 @@ if request == "Get Audio" and ftpDone != 'Y':
                 cmd = "cp {}/{} {}/{}".format(IN_DIR, name, MV_DIR, name)
                 stdin, stdout, stderr = c.exec_command(cmd)
 
-                if stderr.read():
+                if stderr.readlines():
                     l.write( "Error copying file in test mode!!!")
-                    l.write(stderr.read())
+                    l.write(stderr.readlines())
                     cdrcgi.bail("Unable to copy file: {}".format(cmd))
+
+                # In test mode move the copied files or a 'live' run will fail
+                # ------------------------------------------------------------
+                newName = "{}.{}".format(name, now)
+                cmd = "mv {}/{} {}/{}".format(MV_DIR, name, MV_DIR, newName) 
+                stdin, stdout, stderr = c.exec_command(cmd)
+
+                if stderr.readlines():
+                    l.write( "Error moving test files in test mode!!!")
+                    l.write(stderr.readlines())
+                    cdrcgi.bail("Unable to move file: {}".format(cmd))
             else:
                 cmd = "mv {}/{} {}/{}".format(IN_DIR, name, MV_DIR, name)
                 stdin, stdout, stderr = c.exec_command(cmd)
 
-                if stderr.read():
+                if stderr.readlines():
                     l.write( "Error moving file to CIAT directory!!!")
-                    l.write(stderr.read())
+                    l.write(stderr.readlines())
                     cdrcgi.bail("Unable to move file: {}".format(cmd))
 
         ftpDone = 'Y'
@@ -231,7 +253,7 @@ if request == "Get Audio" and ftpDone != 'Y':
 # Display confirmation message when FTP is done.
 #----------------------------------------------------------------------
 if ftpDone == 'Y':
-   header  = cdrcgi.header(title, title, section, script, buttons)
+   header  = cdrcgi.header(title, title, section, script, stdButtons)
    form = u"""\
 <input type='hidden' name='{}' value='{}' >
 """.format(cdrcgi.SESSION, session)
@@ -288,9 +310,9 @@ if ftpDone == 'Y':
 
 
 #----------------------------------------------------------------------
-# Display the form for merging two protocol documents.
+# Display the form for downloading audio files
 #----------------------------------------------------------------------
-header = cdrcgi.header(title, title, section, script, buttons)
+header = cdrcgi.header(title, title, section, script, getButtons)
 form = u"""\
 <fieldset>
  <legend>Download Term Audio Files from FTP server</legend>
