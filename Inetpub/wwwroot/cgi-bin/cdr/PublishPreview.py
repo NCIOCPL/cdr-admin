@@ -33,7 +33,7 @@ class Summary:
     Base class for PDQ summary documents (cancer and drug information)
     """
 
-    SCRIPT = "PublishPreviewNew.py"
+    SCRIPT = "PublishPreview.py"
     PROXY = "/cgi-bin/cdr/proxy.py"
     TIER_SUFFIXES = dict(DEV="-blue-dev", PROD="")
     IMAGE_PATH = "/images/cdr/live"
