@@ -21,20 +21,12 @@ class Control(cdrcgi.Control):
         opts["body_classes"] = "admin-menu"
         return opts
     def populate_form(self, form):
-        audio_label = (
-            "Audio Request Spreadsheet"
-            " (clicking this writes to the database)"
-        )
-        audio_popup = (
-            "Don't click this if you're not ready to generate\n"
-            "a spreadsheet for pronunciation audio requests)"
-        )
         form.add("<ol>")
         for script, display in (
             ("AdvancedSearch.py", "Advanced Search"),
             ("FtpAudio.py", "Audio Download"),
             ("ocecdr-3373.py", "Audio Import"),
-            ("ocecdr-3606.py", audio_label),
+            ("ocecdr-3606.py", "Audio Request Spreadsheet"),
             ("GlossaryTermAudioReview.py", "Audio Review Glossary Term"),
             ("getBatchStatus.py", "Batch Job Status"),
             ("post-translated-summary.py",
@@ -49,10 +41,6 @@ class Control(cdrcgi.Control):
             ("translation-jobs.py", "Summary Translation Job Queue"),
             ("UpdatePreMedlineCitations.py", "Update Pre-Medline Citations")
         ):
-            if display == audio_label:
-                form.add_menu_link(script, display, self.session,
-                                   title=audio_popup)
-            else:
-                form.add_menu_link(script, display, self.session)
+            form.add_menu_link(script, display, self.session)
         form.add("</ol>")
 Control().run()

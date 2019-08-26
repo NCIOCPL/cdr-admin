@@ -68,6 +68,7 @@ class Control:
             ("ChangesToSummaries.py", "Changes to Summaries"),
             ("SummaryChanges.py", "History of Changes to Summary"),
             ("PdqBoards.py", "PDQ Board Listings"),
+            ("SummaryStandardWording.py", "Standard Wording"),
             ("SummarySectionCleanup.py", "Summaries Cleanup"),
             ("SummaryCitations.py", "Summaries Citations"),
             ("SummaryDateLastModified.py", "Summaries Date Last Modified"),
@@ -77,6 +78,8 @@ class Control:
             ("SummaryTypeChangeReport.py", "Summaries Type Of Change"),
             ("SummariesWithNonJournalArticleCitations.py",
              "Summaries with Non-Journal Article Citations Report"),
+            ("SummaryProtocolRefLinks.py", "Summaries with ProtocolRef Links"
+                                           " (> 5min)"),
             ("ocecdr-3650.py", "Summary Internal Links")
         ):
             page.add_menu_link(script, display, self.session)

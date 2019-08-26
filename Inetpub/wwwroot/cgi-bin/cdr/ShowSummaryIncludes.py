@@ -1,10 +1,13 @@
 """
    Report to display all summaries including a list of special elements.
    The elements currently included are:
-     - Table
-     - SummaryModuleLink
-     - MediaLink
+     - Comment
      - EmbeddedVideo
+     - MediaLink
+     - MiscellaneousDocLink
+     - StandardWording
+     - SummaryModuleLink
+     - Table
    This report can help answering questions like: Give me a summary
    including a video? or "I need a summary with multiple tables"
 """
@@ -22,7 +25,7 @@ def addRow(summary):
     <ul>
 """ % (summary.title, summary.id)
     for element in summary.elemInfo.keys():
-        if (element == 'SummaryModuleLink' and 
+        if (element == 'SummaryModuleLink' and
             len(summary.elements[element]) > 0):
             for module in summary.elements[element]:
                 html += """\
@@ -49,11 +52,13 @@ class SummaryInclude:
         self.id = id
         self.title = title
         self.error = None
-        self.elemInfo = {'Table':'table', 
+        self.elemInfo = {'Table':'table',
                          'SummaryModuleLink':'module-link',
                          'MiscellaneousDocLink':'misc-doc-link',
                          'MediaLink':'media-link',
-                         'EmbeddedVideo':'embedded-video'}
+                         'EmbeddedVideo':'embedded-video',
+                         'StandardWording':'standard-wording',
+                         'Comment':'comment'}
         self.elements = {}
 
         # Create empty list for each element
@@ -72,12 +77,14 @@ class SummaryInclude:
                     if element in ('SummaryModuleLink', 'MiscellaneousDocLink'):
                         ref = child.attrib['{cips.nci.nih.gov/cdr}ref']
                         self.elements[element].append(ref)
+                    elif element in ('StandardWording', 'Comment'):
+                        self.elements[element].append(1)
                     else:
                         id = child.attrib['{cips.nci.nih.gov/cdr}id']
                         self.elements[element].append(id)
 
         except Exception, e:
-            print '*** Error ***'
+            # print '*** Error ***'
             self.error = "Failure parsing filter: %s" % str(e)
 
 # -------------------------------------------------------------------
@@ -120,6 +127,8 @@ report = u"""\
    .media-link     { color: green; }
    .table          { color: purple; }
    .embedded-video { color: deeppink; }
+   .standard-wording { color: lime; }
+   .comment        { color: fuchsia; }
    span.error { color: red; }
   </style>
   <script language='JavaScript'>
@@ -134,11 +143,13 @@ report = u"""\
  </head>
  <body>
   <h1>Elements Included in PDQ Summaries</h1>
-  <p>Elements included: 
-     <span class="embedded-video">EmbeddedVideo</span>, 
-     <span class="media-link">MediaLink</span>, 
+  <p>Elements included:
+     <span class="comment">Comment</span>,
+     <span class="embedded-video">EmbeddedVideo</span>,
+     <span class="media-link">MediaLink</span>,
      <span class="misc-doc-link">MiscellaneousDocLink</span>,
-     <span class="module-link">SummaryModuleLink</span>, 
+     <span class="standard-wording">StandardWording</span>,
+     <span class="module-link">SummaryModuleLink</span>,
      <span class="table">Table</span></p>
   <ul>
 """

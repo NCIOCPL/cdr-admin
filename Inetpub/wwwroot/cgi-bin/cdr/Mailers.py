@@ -15,7 +15,7 @@ session = cdrcgi.getSession(fields)
 action  = cdrcgi.getRequest(fields)
 title   = "CDR Administration"
 section = "Mailers"
-buttons = [cdrcgi.MAINMENU]
+buttons = [cdrcgi.DEVTOP, cdrcgi.MAINMENU]
 header  = cdrcgi.header(title, title, section, "Mailers.py", buttons)
 
 #----------------------------------------------------------------------
@@ -23,6 +23,8 @@ header  = cdrcgi.header(title, title, section, "Mailers.py", buttons)
 #----------------------------------------------------------------------
 if action == cdrcgi.MAINMENU:
     cdrcgi.navigateTo("Admin.py", session)
+elif action == cdrcgi.DEVTOP:
+    cdrcgi.navigateTo("DevSA.py", session)
 
 #----------------------------------------------------------------------
 # List the available options.

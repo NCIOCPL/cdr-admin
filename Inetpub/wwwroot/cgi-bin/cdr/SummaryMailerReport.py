@@ -31,8 +31,9 @@
 # Request form for generating RTF letters to board members."
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrdb, cdrcgi, time
+import cgi, cdr, cdrcgi, time
 import lxml.etree as etree
+from cdrapi import db as cdrdb
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -89,7 +90,7 @@ elif request == SUBMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if request == "Log Out": 
+if request == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
@@ -102,7 +103,7 @@ if flavor not in ("4258", "4259"):
 # Connect to the CDR database.
 #----------------------------------------------------------------------
 try:
-    conn = cdrdb.connect('CdrGuest')
+    conn = cdrdb.connect(user='CdrGuest', timeout=300)
 except Exception, e:
     cdrcgi.bail('Database connection failure: %s' % e)
 
@@ -118,7 +119,7 @@ def makeBoardPicklist(cursor):
    WHERE s.path = '/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref'
      AND b.path = '/Organization/OrganizationNameInformation'
                 + '/OfficialName/Name'
-ORDER BY b.value""", timeout = 300)
+ORDER BY b.value""")
     html = [u"""\
 <select name='board'>
 """]
@@ -138,9 +139,9 @@ def addHeaderRows(sheet, styles, cursor, board, titleStart):
     boardName = getBoardName(cursor, board)
     now       = time.strftime(u"%Y-%m-%d")
     title     = "%s - %s  %s" % (titleStart, boardName, now)
-    widths = (10, 30, 60, 10, 10, 40)
+    widths = (10, 30, 60, 10, 10, 40, 50)
     headers = ("Mailer ID", "Board Member", "Summary", "Sent", "Response",
-               "Changes")
+               "Changes", "Comments")
     for col, chars in enumerate(widths):
         sheet.col(col).width = styles.chars_to_width(chars)
     sheet.write_merge(0, 0, 0, len(widths) - 1, title, styles.banner)
@@ -172,7 +173,7 @@ def report4258(sheet, styles, cursor, board, selectBy):
             ON b.doc_id = s.int_val
          WHERE r.path = '/Mailer/Recipient/@cdr:ref'
            AND s.path = '/Mailer/Document/@cdr:ref'
-           AND d.path = '/Mailer/%s'""" % dateField, timeout = 300)
+           AND d.path = '/Mailer/%s'""" % dateField)
     mailers = {}
     for m, r, s, d in cursor.fetchall():
         if d and BoardMember.members[r].membershipActive(d):
@@ -205,7 +206,7 @@ def report4259(sheet, styles, cursor, board, begin, end):
            AND sent.path = '/Mailer/Sent'
            AND recip.path = '/Mailer/Recipient/@cdr:ref'
            AND sent.value BETWEEN '%s' AND '%s'""" %
-                   (begin, end), timeout = 300)
+                   (begin, end))
     mailerIds = []
     for mailerId, sent, personId in cursor.fetchall():
         if BoardMember.members[personId].membershipActive(sent):
@@ -281,6 +282,7 @@ class Mailer:
         self.sent = u""
         self.response = u""
         self.changes = []
+        self.comments = []
         cursor.execute("SELECT xml FROM document WHERE id = ?", mailerId)
         docXml = cursor.fetchall()[0][0]
         tree = etree.XML(docXml.encode('utf-8'))
@@ -298,6 +300,11 @@ class Mailer:
                     change = e.text.strip()
                     if change:
                         self.changes.append(change)
+            for e in r.findall("Comment"):
+                if e.text is not None:
+                    comment = e.text.strip()
+                    if comment:
+                        self.comments.append(comment)
     def __cmp__(self, other):
         if Mailer.sortBy == "member":
             diff = cmp(self.recipient, other.recipient)
@@ -349,7 +356,8 @@ class Mailer:
         sheet.write(row, 2, self.summary, styles.left)
         sheet.write(row, 3, self.sent, styles.center)
         sheet.write(row, 4, self.response, styles.center)
-        sheet.write(row, 5, u"".join(self.changes), styles.left)
+        sheet.write(row, 5, u"\n".join(self.changes), styles.left)
+        sheet.write(row, 6, u"\n".join(self.comments), styles.left)
         return row + 1
 
 #----------------------------------------------------------------------

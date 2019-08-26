@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------
-# Prototype for duplicate-checking interface for Citation documents.
+# Search for citations, and optionally import them from NLM.
 #
 # BZIssue::4724
 # BZIssue::5174
@@ -7,8 +7,14 @@
 # JIRA::OCECDR-4201
 # JIRA::OCECDR-4434
 # JIRA::OCECDR-4463
+# JIRA::OCECDR-4561
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, cdrdb, requests, sys, lxml.etree as etree
+import cgi
+from lxml import etree
+import requests
+import cdr
+import cdrcgi
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Get the form variables.
@@ -42,7 +48,7 @@ userInfo  = cdr.getUser(session, userPair[0])
 #----------------------------------------------------------------------
 if srchPmed:
     print "Location:https://www.ncbi.nlm.nih.gov/entrez/\n"
-    sys.exit(0)
+    exit(0)
 
 #----------------------------------------------------------------------
 # Show help screen for advanced search.
@@ -54,19 +60,16 @@ if help:
 # Connect to the CDR database.
 #----------------------------------------------------------------------
 try:
-    conn = cdrdb.connect('CdrGuest')
-except cdrdb.Error, info:
-    cdrcgi.bail('Failure connecting to CDR: %s' % info[1][0])
+    conn = db.connect(user="CdrGuest", timeout=300)
+except Exception as e:
+    cdrcgi.bail("Failure connecting to CDR: {}".format(e))
 
 #----------------------------------------------------------------------
 # Parse out the errors for display.
 #----------------------------------------------------------------------
-def formatErrors(errorsString):
-    result = ""
-    for error in cdr.getErrors(errorsString, errorsExpected = False,
-                               asSequence = True):
-        result += (cgi.escape("%s") % error) + "<br />\n"
-    return result
+def parseErrors(errorString):
+    opts = dict(errorsExpected=False, asSequence=True, asUtf8=False)
+    return cdr.getErrors(errorString, **opts)
 
 #----------------------------------------------------------------------
 # See if citation already exists.
@@ -82,8 +85,8 @@ def findExistingCitation(pmid):
         rows = cursor.fetchall()
         if not rows: return None
         return rows[0][0]
-    except cdrdb.Error, info:
-        cdrcgi.bail('Failure checking for existing document: %s' % info[1][0])
+    except Exception as e:
+        cdrcgi.bail("Failure checking for existing document: {}".format(e))
 
 #----------------------------------------------------------------------
 # Replace PubmedArticle element in document with new version.
@@ -100,21 +103,12 @@ def replacePubmedArticle(doc, article):
 #----------------------------------------------------------------------
 def getPubmedArticle(doc):
     try:
-        tree = etree.XML(doc)
+        root = etree.XML(doc)
     except:
         cdrcgi.bail("unable to parse document from NLM")
-    for node in tree.findall("PubmedArticle"):
-        etree.strip_elements(node, "CommentsCorrectionsList", "ReferenceList")
-        namespace = "http://www.w3.org/1998/Math/MathML"
-        mml_math = "{{{}}}math".format(namespace)
-        namespaces = dict(mml=namespace)
-        for child in node.xpath("//mml:math", namespaces=namespaces):
-            if child.tail is None:
-                child.tail = "[formula]"
-            else:
-                child.tail = "[formula]" + child.tail
-        etree.strip_elements(node, mml_math, with_tail=False)
-        return node
+    for node in root.findall("PubmedArticle"):
+        return cdr.prepare_pubmed_article_for_import(node)
+    return None
 
 #----------------------------------------------------------------------
 # Extract the text content of the ArticleTitle element.
@@ -164,59 +158,58 @@ if impReq:
         try:
             oldDoc = cdr.getDoc(session, replaceID, "Y", getObject=True)
         except:
-            cdrcgi.bail("Unable to check out CDR document %s" % replaceID)
+            cdrcgi.bail("Unable to check out CDR document {}".format(replaceID))
         doc = replacePubmedArticle(oldDoc, article)
         if doc is None:
             cdr.unlock(session, replaceID)
-            cdrcgi.bail("%s is not a Citation document" % replaceID)
-        resp = cdr.repDoc(session, doc=str(doc), val='Y', showWarnings=True)
+            cdrcgi.bail("{} is not a Citation document".format(replaceID))
+        resp = cdr.repDoc(session, doc=str(doc), val="Y", showWarnings=True)
     else:
         docId = findExistingCitation(importID)
         if docId:
-            cdrcgi.bail("Citation already imported as CDR%010d" % docId)
+            cdrcgi.bail("Citation already imported as CDR{:010d}".format(docId))
         doc = createNewCitationDoc(article)
-        resp = cdr.addDoc(session, doc=str(doc), val='Y', showWarnings=True)
+        resp = cdr.addDoc(session, doc=str(doc), val="Y", showWarnings=True)
     docId, errors = resp
     if not docId:
-        fp = open("d:/tmp/%s.xml" % importID, "w")
-        fp.write(str(doc))
-        fp.close()
-        cdrcgi.bail("Failure saving PubMed citation %s: %s" %
-                    (importID, cdr.checkErr(errors)))
+        with open("d:/tmp/{}.xml".format(importID), "w") as fp:
+            fp.write(str(doc))
+        args = importID, cdr.checkErr(errors)
+        cdrcgi.bail("Failure saving PubMed citation {}: {}".format(*args))
     if errors:
-        valErrors = formatErrors(errors)
+        valErrors = parseErrors(errors)
     if valErrors:
         pubVerNote = "(with validation errors)"
     else:
-        doc = cdr.getDoc(session, docId, 'Y')
+        doc = cdr.getDoc(session, docId, "Y")
         if doc.startswith("<Errors"):
-            cdrcgi.bail("Unable to retrieve %s" % docId)
-        resp = cdr.repDoc(session, doc=doc, val='Y', ver='Y', checkIn='Y',
-                          showWarnings=True, publishable='Y')
+            cdrcgi.bail("Unable to retrieve {}".format(docId))
+        resp = cdr.repDoc(session, doc=doc, val="Y", ver="Y", checkIn="Y",
+                          showWarnings=True, publishable="Y")
         if not resp[0]:
-            cdrcgi.bail("Failure creating publishable version for %s:<br />%s" %
-                        (docId, formatErrors(resp[1])))
+            msg = "Failure creating publishable version for {}".format(docId)
+            cdrcgi.bail(msg, extra=parseErrors(resp[1]))
         pubVerNote = "(with publishable version)"
     if replaceID:
-        subtitle = "Citation %s updated %s" % (docId, pubVerNote)
+        subtitle = "Citation {} updated {}".format(docId, pubVerNote)
     else:
-        subtitle = "Citation added as %s %s" % (docId, pubVerNote)
+        subtitle = "Citation added as {} {}".format(docId, pubVerNote)
     # Continue with search form display
 
 #----------------------------------------------------------------------
 # Display the search form.
 #----------------------------------------------------------------------
 if not submit:
-    fields = (('Title',                        'Title'),
-              ('Author',                       'Author'),
-              ('Published In',                 'Journal'),
-              ('Publication Year',             'Year'),
-              ('Volume',                       'Volume'),
-              ('Issue',                        'Issue'))
-    buttons = (('submit', 'SubmitButton', 'Search'),
-               ('submit', 'HelpButton',   'Help'),
-               ('reset',  'CancelButton', 'Clear'),
-               ('submit', 'SearchPubMed', 'Search Pub Med'))
+    fields = (("Title",                        "Title"),
+              ("Author",                       "Author"),
+              ("Published In",                 "Journal"),
+              ("Publication Year",             "Year"),
+              ("Volume",                       "Volume"),
+              ("Issue",                        "Issue"))
+    buttons = (("submit", "SubmitButton", "Search"),
+               ("submit", "HelpButton",   "Help"),
+               ("reset",  "CancelButton", "Clear"),
+               ("submit", "SearchPubMed", "Search Pub Med"))
     errors = ""
     if valErrors:
         errors = """\
@@ -234,14 +227,14 @@ if not submit:
                                           "CiteSearch.py",
                                           fields,
                                           buttons,
-                                          subtitle, # 'Citation',
+                                          subtitle,
                                           conn,
                                           errors)
     pubMedImport = """\
    <CENTER>
     <TABLE>
      <TR>
-      <TD ALIGN='right'>
+      <TD ALIGN="right">
        <INPUT      TYPE        = "submit"
                    NAME        = "ImportButton"
                    VALUE       = "Import">
@@ -254,7 +247,7 @@ if not submit:
       </TD>
      </TR>
      <TR>
-      <TD ALIGN='right'>
+      <TD ALIGN="right">
        <SPAN       CLASS       = "Page">
         &nbsp;CDR ID of Document to Replace (Optional):&nbsp;&nbsp;
        </SPAN>
@@ -274,14 +267,14 @@ if not submit:
 """
     # Suppress the display for PubMed Import for Guest accounts
     # ---------------------------------------------------------
-    if 'GUEST' in userInfo.groups and len(userInfo.groups) < 2:
+    if "GUEST" in userInfo.groups and len(userInfo.groups) < 2:
         html = page + footer
     else:
         html = page + pubMedImport + footer
 
     # sendPage() expects unicode: decoding page string
     # ------------------------------------------------
-    html = html.decode('utf-8')
+    html = html.decode("utf-8")
     cdrcgi.sendPage(html)
 
 #----------------------------------------------------------------------
@@ -301,8 +294,6 @@ searchFields = (cdrcgi.SearchField(title,
                 cdrcgi.SearchField(year,
                             ("/Citation/PDQCitation/PublicationDetails"
                              "/PublicationYear",
-                             #"/Citation/PubmedArticle/PubmedData/History"
-                             #"/PubMedPubDate/Year")),
                              "/Citation/PubmedArticle/MedlineCitation"
                              "/Article/Journal/JournalIssue/PubDate/Year")),
                 cdrcgi.SearchField(volume,
@@ -315,29 +306,28 @@ searchFields = (cdrcgi.SearchField(title,
 #----------------------------------------------------------------------
 # Construct the query.
 #----------------------------------------------------------------------
-(query, strings) = cdrcgi.constructAdvancedSearchQuery(searchFields, boolOp,
-                                                       "Citation")
+args = searchFields, boolOp, "Citation"
+query, strings = cdrcgi.constructAdvancedSearchQuery(*args)
 if not query:
-    cdrcgi.bail('No query criteria specified')
-#cdrcgi.bail("QUERY: [%s]" % query)
+    cdrcgi.bail("No query criteria specified")
+
 #----------------------------------------------------------------------
 # Submit the query to the database.
 #----------------------------------------------------------------------
 try:
     cursor = conn.cursor()
-    cursor.execute(query, timeout = 300)
+    cursor.execute(query)
     rows = cursor.fetchall()
     cursor.close()
     cursor = None
-except cdrdb.Error, info:
-    cdrcgi.bail('Failure retrieving Citation documents: %s' %
-                info[1][0])
+except Exception as e:
+    cdrcgi.bail("Failure retrieving Citation documents: {}".format(e))
 
 #----------------------------------------------------------------------
 # Create the results page.
 #----------------------------------------------------------------------
-html = cdrcgi.advancedSearchResultsPage("Citation", rows, strings,
-                                        "set:QC Citation Set")
+args = "Citation", rows, strings, "set:QC Citation Set"
+html = cdrcgi.advancedSearchResultsPage(*args)
 
 #----------------------------------------------------------------------
 # Send the page back to the browser.

@@ -54,6 +54,7 @@ for r in QCReports:
 form += """</OL><H3>Other Reports</H3><OL>"""
 
 OtherReports = [
+           ('DrugDateLastModified.py?', 'Drug Date Last Modified'),
            ('DrugDescriptionReport.py?', 'Drug Description Report'),
            ('DrugIndicationsReport.py?', 'Drug Indications Report'),
            ('DISLists.py?',              'Drug Information Summaries Lists'),

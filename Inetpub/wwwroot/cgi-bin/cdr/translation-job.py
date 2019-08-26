@@ -1,8 +1,10 @@
-#----------------------------------------------------------------------
-# Interface for editing a summary translation job.
-# JIRA::OCECDR-4193
-# JIRA::OCECDR-4248 - allow the user to attach a file
-#----------------------------------------------------------------------
+"""
+Edit a summary translation job.
+JIRA::OCECDR-4193
+JIRA::OCECDR-4248 - allow the user to attach a file
+JIRA::OCECDR-4504 - make the status date field read-only
+"""
+
 import datetime
 import operator
 import lxml.etree as etree
@@ -192,7 +194,7 @@ jQuery("input[value='%s']").click(function(e) {
         form.add_select("change_type", "Change Type", types, change_type)
         form.add_select("assigned_to", "Assigned To", users, user)
         form.add_select("state", "Status", states, state_id)
-        form.add_date_field("state_date", "Date", value=state_date)
+        form.add_hidden_field("state_date", state_date)
         form.add_textarea_field("comments", "Comments", value=comments)
         form.add_text_field("file", "QC Report", upload=True)
         form.add("</fieldset>")

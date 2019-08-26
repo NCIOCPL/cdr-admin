@@ -56,7 +56,7 @@ def termTypeList(conn, fName):
         values = [row[0] for row in query.execute(cursor).fetchall()]
     except Exception, e:
         cdrcgi.bail('Failure retrieving term type list from CDR: %s' % e)
-    select = B.SELECT(name="%s")
+    select = B.SELECT(name=fName)
     select.append(B.OPTION(u"\xa0", value="", checked="checked"))
     for value in values:
         select.append(B.OPTION(value + u" \xa0", value=value))
@@ -76,7 +76,7 @@ def semanticTypeList(conn, fName):
         cursor.close()
     except Exception, e:
         cdrcgi.bail('Failure retrieving semantic type list from CDR: %s' % e)
-    select = B.SELECT(name="%s")
+    select = B.SELECT(name=fName)
     select.append(B.OPTION(u"\xa0", value="", checked="checked"))
     for id, title in rows:
         id = cdr.normalize(id)

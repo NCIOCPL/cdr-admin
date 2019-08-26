@@ -2,11 +2,17 @@
 # Status of a publishing job.
 #
 # OCECDR-3695: PubStatus Report Drops Push Job
+# OCECDR-4545: Work around Microsoft ADO/DB bug
 #----------------------------------------------------------------------
-import cgi, cdr, cdrdb, cdrcgi, re, time
+import cgi
+import re
+import time
+import cdr
+from cdrapi import db as cdrdb
+import cdrcgi
 
 # Logfile is same as that used in cdrpub.py
-LOG         = "d:/cdr/log/publish.log"
+LOG         = cdr.WORK_DRIVE + ":/cdr/log/publish.log"
 WAIT_STATUS = "Waiting user approval"
 
 #----------------------------------------------------------------------
@@ -55,7 +61,7 @@ def dispJobStatus():
     # Find some interesting information.
     #----------------------------------------------------------------------
     try:
-        conn = cdrdb.connect('CdrGuest')
+        conn = cdrdb.connect(user="CdrGuest")
         cursor = conn.cursor()
         cursor.execute("""\
             SELECT d.title,
@@ -84,8 +90,8 @@ def dispJobStatus():
         except:
             cdrcgi.bail('Job%d does not exist!' % jobId)
 
-    except cdrdb.Error, info:
-        cdrcgi.bail("Failure retrieving job information: %s" % info[1][0])
+    except Exception as e:
+        cdrcgi.bail("Failure retrieving job information: {}".format(e))
 
     title   = "CDR Publishing Job Status"
     instr   = "Job Number %d" % jobId
@@ -188,7 +194,7 @@ def dispFilterFailures(flavor = 'full'):
     # Find some interesting information.
     #----------------------------------------------------------------------
     try:
-        conn = cdrdb.connect('CdrGuest')
+        conn = cdrdb.connect(user="CdrGuest")
         cursor = conn.cursor()
         cursor.execute("""\
             SELECT ppd.doc_id,
@@ -213,8 +219,8 @@ def dispFilterFailures(flavor = 'full'):
           ORDER BY t.name, d.title
     """, (jobId,))
         rows = cursor.fetchall()
-    except cdrdb.Error, info:
-        cdrcgi.bail("Failure retrieving job information: %s" % info[1][0])
+    except Exception as e:
+        cdrcgi.bail("Failure retrieving job information: {}".format(e))
 
     title   = u'CDR Publishing Filter Failures'
     instr   = u'Job Number %d' % jobId
@@ -294,7 +300,7 @@ def dispJobSetting():
     # Find some interesting information.
     #----------------------------------------------------------------------
     try:
-        conn = cdrdb.connect('CdrGuest')
+        conn = cdrdb.connect(user="CdrGuest")
         cursor = conn.cursor()
         cursor.execute("""\
             SELECT ppp.parm_name,
@@ -310,8 +316,8 @@ def dispJobSetting():
           ORDER BY ppp.parm_name
     """, (jobId,))
         row = cursor.fetchone()
-    except cdrdb.Error, info:
-        cdrcgi.bail("Failure retrieving job information: %s" % info[1][0])
+    except Exception as e:
+        cdrcgi.bail("Failure retrieving job information: {}".format(e))
 
     title   = "CDR Publishing Job Settings"
     instr   = "Job Number %d" % jobId
@@ -356,7 +362,7 @@ def dispJobSetting():
 def dispJobControl():
 
     # Need CdrPublishing to update pub_proc status.
-    conn = cdrdb.connect("CdrPublishing")
+    conn = cdrdb.connect(user="CdrPublishing")
     cursor = conn.cursor()
 
     # Make any status change requested.
@@ -436,7 +442,7 @@ def dispCgWork():
     buttons = []
     header  = cdrcgi.header(title, title, instr, None, buttons)
 
-    conn = cdrdb.connect('CdrGuest')
+    conn = cdrdb.connect(user="CdrGuest")
     cursor = conn.cursor()
 
     ###
@@ -456,8 +462,8 @@ def dispCgWork():
         if lastPushJob and lastPushJob[0] > jobId:
             cdrcgi.bail("Sorry, but another push job (Job%s) already removed \
                          the data you're looking for!" % lastPushJob[0])
-    except cdrdb.Error, info:
-        cdrcgi.bail("Failure getting latest push job ID: %s" % info[1][0])
+    except Exception as e:
+        cdrcgi.bail("Failure getting latest push job ID: {}".format(e))
 
     ###
 
@@ -470,8 +476,8 @@ def dispCgWork():
         numRows = cursor.fetchone()
         if numRows and numRows[0] == 0:
             cdrcgi.bail("No rows in pub_proc_cg_work. No docs to be pushed.")
-    except cdrdb.Error, info:
-        cdrcgi.bail("Failure getting row count in PPCW: %s." % info[1][0])
+    except Exception as e:
+        cdrcgi.bail("Failure getting row count in PPCW: {}.".format(e))
 
     #----------------------------------------------------------------------
     # Find vendor and push jobs.
@@ -486,7 +492,7 @@ def dispCgWork():
                 ON ppp.id = ppcw.cg_job
                        """)
         (vendor, push) = cursor.fetchone()
-    except cdrdb.Error, info:
+    except Exception:
         cdrcgi.bail("Failure getting vendor and push job info from PPCW.")
 
     #----------------------------------------------------------------------
@@ -502,7 +508,7 @@ def dispCgWork():
         nRemoved = 0
 	if oneRow and oneRow[0]:
 	    nRemoved = oneRow[0]
-    except cdrdb.Error, info:
+    except Exception:
         cdrcgi.bail("Failure getting removed count from PPCW.")
 
     #----------------------------------------------------------------------
@@ -519,7 +525,7 @@ def dispCgWork():
           ORDER BY ppcw.doc_type, d.title
                        """ % numDocs)
         rowsRemoved = cursor.fetchall()
-    except cdrdb.Error, info:
+    except Exception:
         cdrcgi.bail("Failure getting removed info from PPCW.")
 
     #----------------------------------------------------------------------
@@ -537,7 +543,7 @@ def dispCgWork():
         nUpdated = 0
 	if oneRow and oneRow[0]:
 	    nUpdated = oneRow[0]
-    except cdrdb.Error, info:
+    except Exception:
         cdrcgi.bail("Failure getting updated count from PPCW.")
 
     #----------------------------------------------------------------------
@@ -556,7 +562,7 @@ def dispCgWork():
           ORDER BY ppcw.doc_type, d.title
                        """ % numDocs)
         rowsUpdated = cursor.fetchall()
-    except cdrdb.Error, info:
+    except Exception:
         cdrcgi.bail("Failure getting updated info from PPCW.")
 
     #----------------------------------------------------------------------
@@ -579,7 +585,7 @@ def dispCgWork():
         nAdded = 0
 	if oneRow and oneRow[0]:
 	    nAdded = oneRow[0]
-    except cdrdb.Error, info:
+    except Exception:
         cdrcgi.bail("Failure getting added count from PPCW.")
 
     #----------------------------------------------------------------------
@@ -601,7 +607,7 @@ def dispCgWork():
           ORDER BY ppcw.doc_type, d.title
                        """ % numDocs)
         rowsAdded = cursor.fetchall()
-    except cdrdb.Error, info:
+    except Exception:
         cdrcgi.bail("Failure getting added info from PPCW.")
 
     # Create links when appropriate.
@@ -668,8 +674,8 @@ def dispCgWork():
                 AND id = ?
                        """, jobId)
         jobStatus = cursor.fetchone()[0]
-    except cdrdb.Error, info:
-        cdrcgi.bail("Failure getting latest push job ID: %s" % info[1][0])
+    except Exception as e:
+        cdrcgi.bail("Failure getting latest push job ID: {}".format(e))
 
     # Inserting a space after ';' to allow line breaks between
     # protocol numbers in HTML output.        VE, 2005-03-25
@@ -788,7 +794,7 @@ def dispJobsByDates():
   </style>
                             """)
 
-    conn   = cdrdb.connect("CdrGuest")
+    conn   = cdrdb.connect(user="CdrGuest")
     cursor = conn.cursor()
 
     form = """
@@ -910,8 +916,8 @@ def dispJobsByDates():
             row = cursor.fetchone()
 
         form += "</table>"
-    except cdrdb.Error, info:
-        cdrcgi.bail('Failure executing query: %s' % info[1][0])
+    except Exception as e:
+        cdrcgi.bail('Failure executing query: {}'.format(e))
 
     cdrcgi.sendPage(header + form + "</BODY></HTML>")
 
@@ -945,8 +951,8 @@ def createTemporaryPubInfoTables(cursor, conn, latestFullLoad, cgJob):
                      AND d.failure IS NULL
                 GROUP BY d.doc_id""" % (latestFullLoad, cgJob - 1))
         conn.commit()
-    except cdrdb.Error, info:
-        cdrcgi.bail("Failure getting previous push job ids: %s" % info[1][0])
+    except Exception as e:
+        cdrcgi.bail("Failure getting previous push job ids: {}".format(e))
 
     #------------------------------------------------------------------
     # Now, for each of those documents, get the flag indicating
@@ -966,9 +972,9 @@ def createTemporaryPubInfoTables(cursor, conn, latestFullLoad, cgJob):
                       ON p.job_id = d.pub_proc
                      AND d.doc_id = p.doc_id""")
         conn.commit()
-    except cdrdb.Error, info:
-        cdrcgi.bail("Failure collecting removed flags for previous push jobs"
-                    ": %s" % info[1][0])
+    except Exception as e:
+        msg = "Failure collecting removed flags for previous push jobs: {}"
+        cdrcgi.bail(msg.format(e))
 
     #------------------------------------------------------------------
     # Get the document IDs for the documents that were removed by
@@ -985,8 +991,8 @@ def createTemporaryPubInfoTables(cursor, conn, latestFullLoad, cgJob):
                     AND removed = 'Y'
                     AND failure IS NULL""", cgJob)
         conn.commit()
-    except cdrdb.Error, info:
-        cdrcgi.bail("Failure getting IDs for removed docs: %s" % info[1][0])
+    except Exception as e:
+        cdrcgi.bail("Failure getting IDs for removed docs: {}".format(e))
 
     #------------------------------------------------------------------
     # Get the document IDs for the documents that were sent to
@@ -1004,8 +1010,8 @@ def createTemporaryPubInfoTables(cursor, conn, latestFullLoad, cgJob):
                     AND removed = 'N'
                     AND failure IS NULL""", cgJob)
         conn.commit()
-    except cdrdb.Error, info:
-        cdrcgi.bail("Failure getting IDs for docs sent to CG: %s" % info[1][0])
+    except Exception as e:
+        cdrcgi.bail("Failure getting IDs for docs sent to CG: {}".format(e))
 
     #------------------------------------------------------------------
     # Get the IDs for the documents that were changed.  These are the
@@ -1026,9 +1032,8 @@ def createTemporaryPubInfoTables(cursor, conn, latestFullLoad, cgJob):
                     AND d.removed = 'N'
                     AND f.removed = 'N'""", cgJob)
         conn.commit()
-    except cdrdb.Error, info:
-        cdrcgi.bail("Failure getting IDs for docs modified on CG: %s" %
-                    info[1][0])
+    except Exception as e:
+        cdrcgi.bail("Failure getting IDs for docs modified on CG: {}".format(e))
 
     #------------------------------------------------------------------
     # Now get the IDs for the documents which we sent to Cancer.gov
@@ -1048,9 +1053,9 @@ def createTemporaryPubInfoTables(cursor, conn, latestFullLoad, cgJob):
                   WHERE doc_id NOT IN (SELECT doc_id
                                          FROM #changed_docs)""")
         conn.commit()
-    except cdrdb.Error, info:
-        cdrcgi.bail("Failure getting IDs for docs new to Cancer.gov: %s" %
-                    info[1][0])
+    except Exception as e:
+        msg = "Failure getting IDs for docs new to Cancer.gov: {}"
+        cdrcgi.bail(msg.format(e))
 
 #----------------------------------------------------------------------
 # Report what has been added, removed, and updated in this job.
@@ -1063,7 +1068,7 @@ def dispJobReport():
     script  = "PubStatus.py"
     header  = cdrcgi.header(title, title, instr, script, buttons)
 
-    conn = cdrdb.connect('CdrGuest')
+    conn = cdrdb.connect(user="CdrGuest")
     cursor = conn.cursor()
 
 
@@ -1092,8 +1097,8 @@ def dispJobReport():
         else:
             cdrcgi.bail("Job%d is not a successful publishing job." % jobId)
 
-    except cdrdb.Error, info:
-        cdrcgi.bail("Failure in query for Job%d: %s." % (jobId, info[1][0]))
+    except Exception as e:
+        cdrcgi.bail("Failure in query for Job{:d}: {}.".format(jobId, e))
 
     #----------------------------------------------------------------------
     # If subSet is for a Vendor job, find the CG job.
@@ -1125,8 +1130,8 @@ def dispJobReport():
             else:
                 cdrcgi.bail("No Vendor job for CG Job%d." % jobId)
 
-        except cdrdb.Error, info:
-            cdrcgi.bail("No Vendor job for CG Job%d: %s" % (jobId, info[1][0]))
+        except Exception as e:
+            cdrcgi.bail("No Vendor job for CG Job{:d}: {}".format(jobId, e))
     else:
         cg_job_name = pushJobName + subSet
         vendor_job_name = subSet
@@ -1147,9 +1152,8 @@ def dispJobReport():
             else:
                 cdrcgi.bail("No CG job for Vendor Job%d." % jobId)
 
-        except cdrdb.Error, info:
-            cdrcgi.bail("No CG job for Vendor Job%d: %s." % (
-                    jobId, info[1][0]))
+        except Exception as e:
+            cdrcgi.bail("No CG job for Vendor Job{:d}: {}.".format(jobId, e))
 
     # Get the latest Full Load.
     try:
@@ -1167,9 +1171,9 @@ def dispJobReport():
             latestFullLoad = row[0]
         else:
             cdrcgi.bail("No latest full load for job %s." % cg_job)
-    except cdrdb.Error, info:
-        cdrcgi.bail("Failure getting latest full load for job %s: %s." % (
-            cg_job, info[1][0]))
+    except Exception as e:
+        msg = "Failure getting latest full load for job {}: {}."
+        cdrcgi.bail(msg.format(cg_job, e))
 
     # See comments for this function.
     createTemporaryPubInfoTables(cursor, conn, latestFullLoad, cg_job)
@@ -1189,9 +1193,9 @@ def dispJobReport():
         for row in rowsPublished:
             numPublished += row[1]
 
-    except cdrdb.Error, info:
-        cdrcgi.bail("Failure getting vendor_count for %d: %s." % (
-                    vendor_job, info[1][0]))
+    except Exception as e:
+        msg = "Failure getting vendor_count for {:d}: {}."
+        cdrcgi.bail(msg.format(vendor_job, e))
 
     #------------------------------------------------------------------
     # Get the counts (by doc type) of documents removed from Cancer.gov.
@@ -1210,9 +1214,9 @@ def dispJobReport():
         for row in rowsRemoved:
             numRemoved += row[1]
 
-    except cdrdb.Error, info:
-        cdrcgi.bail("Failure getting removed doc counts for job %d: %s." % (
-                    cg_job, info[1][0]))
+    except Exception as e:
+        msg = "Failure getting removed doc counts for job {:d}: {}."
+        cdrcgi.bail(msg.format(cg_job, e))
 
     #------------------------------------------------------------------
     # Get the counts (by doc type) of documents updated on Cancer.gov.
@@ -1230,9 +1234,9 @@ def dispJobReport():
         numUpdated = 0
         for row in rowsUpdated:
             numUpdated += row[1]
-    except cdrdb.Error, info:
-        cdrcgi.bail("Failure getting updated doc counts for job %d: %s." % (
-            cg_job, info[1][0]))
+    except Exception as e:
+        msg = "Failure getting updated doc counts for job {:d}: {}."
+        cdrcgi.bail(msg.format(cg_job, e))
 
     #------------------------------------------------------------------
     # Get the counts (by doc type) of all documents sent to Cancer.gov
@@ -1251,9 +1255,9 @@ def dispJobReport():
         numAdded = 0
         for row in rowsAdded:
             numAdded += row[1]
-    except cdrdb.Error, info:
+    except Exception as e:
         cdrcgi.bail("Failure getting counts of new documents sent to CG "
-                    "by job %d: %s" % (cg_job, info[1][0]))
+                    "by job {:d}: {}".format(cg_job, e))
 
     #------------------------------------------------------------------
     # Get the list of document types.
@@ -1293,7 +1297,7 @@ def dispJobReport():
         for row in cursor.fetchall():
             if row[0]:
                docTypes.append(row[0])
-    except cdrdb.Error, info:
+    except Exception:
         cdrcgi.bail("Failure getting list of document types from pub_proc ")
 
     #------------------------------------------------------------------
@@ -1408,7 +1412,7 @@ def dispJobRepDetail():
     script  = "PubStatus.py"
     header  = cdrcgi.header(title, title, instr, script, buttons)
 
-    conn = cdrdb.connect('CdrGuest')
+    conn = cdrdb.connect(user="CdrGuest")
     cursor = conn.cursor()
     pushJobName = "Push_Documents_To_Cancer.Gov_"
 
@@ -1428,9 +1432,9 @@ def dispJobRepDetail():
             latestFullLoad = row[0]
         else:
             cdrcgi.bail("No latest full load for job %s." % jobId)
-    except cdrdb.Error, info:
-        cdrcgi.bail("Failure getting latest full load for job %s: %s." % (
-            jobId, info[1][0]))
+    except Exception as e:
+        msg = "Failure getting latest full load for job {}: {}."
+        cdrcgi.bail(msg.format(jobId, e))
 
     if cgMode in ('Updated', 'Added'):
         createTemporaryPubInfoTables(cursor, conn, latestFullLoad, jobId)
@@ -1452,9 +1456,9 @@ def dispJobRepDetail():
                           )
             rows = cursor.fetchall()
 
-        except cdrdb.Error, info:
-            cdrcgi.bail("Failure getting removed for %d: %s." % (
-                        jobId, info[1][0]))
+        except Exception as e:
+            msg = "Failure getting removed for {:d}: {}."
+            cdrcgi.bail(msg.format(jobId, e))
 
     # What documents are updated by cg job?
     elif cgMode == 'Updated':
@@ -1473,9 +1477,9 @@ def dispJobRepDetail():
               ORDER BY d.title""", (docType, jobId))
             rows = cursor.fetchall()
 
-        except cdrdb.Error, info:
-            cdrcgi.bail("Failure getting updated for job %d: %s." % (
-                jobId, info[1][0]))
+        except Exception as e:
+            msg = "Failure getting updated for job {:d}: {}."
+            cdrcgi.bail(msg.format(jobId, e))
 
     # What documents are newly added by cg job?
     elif cgMode == 'Added':
@@ -1494,9 +1498,9 @@ def dispJobRepDetail():
               ORDER BY d.title""", (docType, jobId))
             rows = cursor.fetchall()
 
-        except cdrdb.Error, info:
-            cdrcgi.bail("Failure getting added for job %d: %s." % (
-                jobId, info[1][0]))
+        except Exception as e:
+            msg = "Failure getting added for job {:d}: {}."
+            cdrcgi.bail(msg.format(jobId, e))
 
     form = """
        <center>
@@ -1547,8 +1551,8 @@ def dispJobRepDetail():
                    AND path = '/Summary/SummaryMetaData/SummaryURL/@cdr:xref'
               """, (row[0]))
             url = cursor.fetchone()
-        except cdrdb.Error, info:
-            cdrcgi.bail("Failure getting summary URL for %d" % (row[0]))
+        except Exception:
+            cdrcgi.bail("Failure getting summary URL for {:d}".format(row[0]))
 
         #cdrcgi.bail(repr(url))
         if url:
