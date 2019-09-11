@@ -49,7 +49,7 @@ if request == "Log Out":
 #----------------------------------------------------------------------
 try:
     conn = cdrdb.connect('CdrPublishing')
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
 
 #----------------------------------------------------------------------
@@ -120,7 +120,7 @@ if request == "Submit":
              WHERE t.name  = 'PublishingSystem'
                AND d.title = 'Mailers'""")
             rows = cursor.fetchall()
-        except cdrdb.Error, info:
+        except cdrdb.Error as info:
             cdrcgi.bail('Database failure looking up control document: %s' %
                         info[1][0])
         if len(rows) < 1:
@@ -156,7 +156,7 @@ if request == "Submit":
              WHERE id = ?
                AND val_status = 'V'""", member)
                     docList.append((member, cursor.fetchall()[0][0]))
-        except cdrdb.Error, info:
+        except cdrdb.Error as info:
             cdrcgi.bail("Failure retrieving document IDs: %s" % info[1][0])
         #showDocsAndRun(docList)
 

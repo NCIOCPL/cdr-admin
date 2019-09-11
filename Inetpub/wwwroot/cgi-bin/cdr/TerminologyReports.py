@@ -7,6 +7,7 @@
 #----------------------------------------------------------------------
 import cdr
 import cdrcgi
+from cdrapi.users import Session
 
 class Control(cdrcgi.Control):
     def __init__(self):
@@ -55,7 +56,7 @@ class Control(cdrcgi.Control):
             form.add_menu_link(script, display, self.session, **args)
         form.add("</ol>")
     def guest_user(self):
-        name = cdr.idSessionUser(self.session, self.session)[0]
+        name = Session(self.session).user_name
         user = cdr.getUser(self.session, name)
         return 'GUEST' in user.groups and len(user.groups) < 2
 Control().run()

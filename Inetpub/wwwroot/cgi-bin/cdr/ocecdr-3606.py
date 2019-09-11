@@ -91,7 +91,7 @@ for doc_id in doc_ids:
     try:
         doc = TermNameDoc(doc_id, cursor)
         row_number = add_doc(sheet, doc, row_number)
-    except Exception, e:
+    except Exception as e:
         cdrcgi.bail("CDR{:d}: {}".format(docId, e))
 today = datetime.date.today()
 name = "Report4926-{}.xls".format(today.strftime("%Y%m%d"))

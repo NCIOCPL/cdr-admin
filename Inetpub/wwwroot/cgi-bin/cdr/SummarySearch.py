@@ -37,7 +37,7 @@ SELECT DISTINCT value
         rows = cursor.fetchall()
         cursor.close()
         cursor = None
-    except cdrdb.Error, info:
+    except cdrdb.Error as info:
         cdrcgi.bail('Failure retrieving summary section types from CDR: %s' 
                 % info[1][0])
     html = """\
@@ -74,7 +74,7 @@ def sectionDiagList(conn, fName):
         rows = cursor.fetchall()
         cursor.close()
         cursor = None
-    except cdrdb.Error, info:
+    except cdrdb.Error as info:
         cdrcgi.bail('Failure retrieving diagnosis list from CDR: %s' 
                     % info[1][0])
     html = """\
@@ -115,7 +115,7 @@ def topicList(conn, fName):
         rows = cursor.fetchall()
         cursor.close()
         cursor = None
-    except cdrdb.Error, info:
+    except cdrdb.Error as info:
         cdrcgi.bail('Failure retrieving diagnosis list from CDR: %s' 
                 % info[1][0])
     html = """\
@@ -152,7 +152,7 @@ SELECT DISTINCT value
         rows = cursor.fetchall()
         cursor.close()
         cursor = None
-    except cdrdb.Error, info:
+    except cdrdb.Error as info:
         cdrcgi.bail('Failure retrieving summary section types from CDR: %s' 
                 % info[1][0])
     html = """\
@@ -174,7 +174,7 @@ SELECT DISTINCT value
 #----------------------------------------------------------------------
 try:
     conn = cdrdb.connect('CdrGuest')
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Failure connecting to CDR: %s' % info[1][0])
 
 #----------------------------------------------------------------------
@@ -240,7 +240,7 @@ try:
     rows = cursor.fetchall()
     cursor.close()
     cursor = None
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Failure retrieving Summary documents: %s' % 
                 info[1][0])
 

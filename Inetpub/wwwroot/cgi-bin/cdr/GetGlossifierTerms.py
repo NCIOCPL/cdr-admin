@@ -320,7 +320,7 @@ for key in keys:
     checkForDuplicates(key, names, allDups)
 if allDups:
     reportDuplicates(allDups)
-print """\
+print("""\
 Content-type: text/plain
 
-%s""" % repr(names)
+%s""" % repr(names))

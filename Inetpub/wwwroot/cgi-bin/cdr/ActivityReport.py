@@ -2,7 +2,8 @@
 # Reports on audit trail content.
 # BZIssue::1283 - add support for searching by user
 #----------------------------------------------------------------------
-import cdr, cdrdb, cdrcgi, cgi, time
+import cdr, cdrcgi, cgi, time
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -68,69 +69,69 @@ if not fromDate or not toDate:
     if type(docTypes) in [type(""), type(u"")]:
         cdrcgi.bail(docTypes)
     if fromDate < cdrcgi.DAY_ONE: fromDate = cdrcgi.DAY_ONE
-    form = """\
-   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-   <TABLE BORDER='0'>
-    <TR>
-     <TD><B>User:&nbsp;</B></TD>
-     <TD><INPUT NAME='User' VALUE=''>&nbsp;</TD>
-    </TR>
-    <TR>
-     <TD><B>Document Type:&nbsp;</B></TD>
-     <TD>
-      <SELECT NAME='DocType'>
-      <OPTION VALUE='' SELECTED>All Types</OPTION>
-""" % (cdrcgi.SESSION, session)
+    form = f"""\
+   <input type="hidden" name="{cdrcgi.SESSION}" value="{session}">
+   <table border="0">
+    <tr>
+     <td><b>User:&nbsp;</b></td>
+     <td><input name="User" value="">&nbsp;</TD>
+    </tr>
+    <tr>
+     <td><b>Document Type:&nbsp;</b></td>
+     <td>
+      <select name="DocType">
+      <option value="" selected>All Types</option>
+"""
     for docType in docTypes:
-        form += """\
-      <OPTION VALUE='%s'>%s &nbsp;</OPTION>
-""" % (docType, docType)
-    form += """\
-    </TR>
-    <TR>
-     <TD><B>Start Date:&nbsp;</B></TD>
-     <TD><INPUT NAME='FromDate' VALUE='%s'>&nbsp;
-         (use format YYYY-MM-DD for dates, e.g. %s)</TD>
-    </TR>
-    <TR>
-     <TD><B>End Date:&nbsp;</B></TD>
-     <TD><INPUT NAME='ToDate' VALUE='%s'>&nbsp;</TD>
-    </TR>
-   </TABLE>
-  </FORM>
- </BODY>
-</HTML>
-""" % (fromDate, cdrcgi.DAY_ONE, toDate)
-    cdrcgi.sendPage(header + form)
+        form += f"""\
+      <option value="{docType}">{docType} &nbsp;</option>
+"""
+    form += f"""\
+    </tr>
+    <tr>
+     <td><b>Start Date:&nbsp;</b></td>
+     <td><input name="FromDate" value="{fromDate}">&nbsp;
+         (use format YYYY-MM-DD for dates, e.g. {cdrcgi.DAY_ONE})</td>
+    </tr>
+    <tr>
+     <td><b>End Date:&nbsp;</b></td>
+     <td><input name="ToDate" value="{toDate}">&nbsp;</td>
+    </tr>
+   </table>
+  </form>
+ </body>
+</html>
+"""
+    cdrcgi.sendPage(header+form)
 
 #----------------------------------------------------------------------
 # Start the page.
 #----------------------------------------------------------------------
 headerDocType = docType and ("%s Documents" % docType) or "All Document Types"
-html = """\
-<!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
+reportDate = time.strftime("%m/%d/%Y", now)
+html = [f"""\
+<!DOCTYPE html>
 <html>
  <head>
-  <title>Document Activity Report %s -- %s</title>
-  <style type 'text/css'>
-   body    { font-family: Arial, Helvetica, sans-serif }
-   span.ti { font-size: 14pt; font-weight: bold }
-   th      { text-align: center; vertical-align: top;
-             font-size: 12pt; font-weight: bold }
-   td      { text-align: left; vertical-align: top;
-             font-size: 12pt; font-weight: normal }
+  <title>Document Activity Report {headerDocType} -- {reportDate}</title>
+  <style>
+   body    {{ font-family: Arial, Helvetica, sans-serif }}
+   span.ti {{ font-size: 14pt; font-weight: bold }}
+   th      {{ text-align: center; vertical-align: top;
+             font-size: 12pt; font-weight: bold }}
+   td      {{ text-align: left; vertical-align: top;
+             font-size: 12pt; font-weight: normal }}
   </style>
  </head>
- <basefont face='Arial, Helvetica, sans-serif'>
  <body>
   <center>
-   <span class='ti'>CDR Document Activity</span>
+   <span class="ti">CDR Document Activity</span>
    <br />
-   <span class='ti'>From %s to %s</span>
+   <span class="ti">From {fromDate} to {toDate}</span>
   </center>
   <br />
   <br />
-  <table border='1' cellspacing='0' cellpadding='2'>
+  <table border="1" cellspacing="0" cellpadding="2">
    <tr>
     <th>Who</th>
     <th>When</th>
@@ -140,7 +141,7 @@ html = """\
     <th>DocTitle</th>
     <th>Comment</th>
    </tr>
-""" % (headerDocType, time.strftime("%m/%d/%Y", now), fromDate, toDate)
+"""]
 
 #----------------------------------------------------------------------
 # Extract the information from the database.
@@ -160,7 +161,7 @@ try:
         qmarkVals.append(docType)
 
     # Execute dynamically built query
-    conn     = cdrdb.connect()
+    conn     = db.connect()
     cursor   = conn.cursor()
     cursor.execute("""\
          SELECT a.document,
@@ -183,36 +184,32 @@ try:
           WHERE a.dt BETWEEN ? AND DATEADD(s, -1, DATEADD(d, 1, ?))
             %s
             %s
-        ORDER BY a.dt DESC""" % (userQual, dtQual), qmarkVals, timeout = 120)
+        ORDER BY a.dt DESC""" % (userQual, dtQual), qmarkVals)
 
     rows = cursor.fetchall()
-except cdrdb.Error, info:
-    cdr.logwrite('DB Failure: info=%s' % info)
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
+except Exception as e:
+    cdr.logwrite('DB Failure: info=%s' % e)
+    cdrcgi.bail('Database connection failure: %s' % e)
 
-for row in rows:
-    html += """\
+template = f"{cdcgi.BASE}/QcReport.py?docId={{}}&{cdrcgi.SESSION}={session}"
+for doc_id, user, fullname, when, doctype, action, title, comment in rows:
+    cdr_id = cdr.normalize(doc_id)
+    url = template.format(cdr_id)
+    comment = cgi.escape(comment) if comment else "&nbsp;"
+    html.append(f"""\
    <tr>
-    <td nowrap='1'>%s (%s)</td>
-    <td nowrap='1'>%s</td>
-    <td nowrap='1'>%s</td>
-    <td nowrap='1'>%s</td>
-    <td nowrap='1'>
-     <a href='%s/QcReport.py?DocId=CDR%010d&%s=%s'>CDR%010d</a>
-    </td>
-    <td nowrap='1'>%s ...</td>
-    <td>%s</td>
+    <td nowrap="1">{fullname} ({user})</td>
+    <td nowrap="1">{when}</td>
+    <td nowrap="1">{action}</td>
+    <td nowrap="1">{doctype}</td>
+    <td nowrap="1"><a href="{url}">{cdr_id}</a></td>
+    <td nowrap="1">{cgi.escape(title[:20])} ...</td>
+    <td>{comment}</td>
    </tr>
-""" % (row[2], row[1], row[3], row[5], row[4],
-       cdrcgi.BASE, row[0], cdrcgi.SESSION, session, row[0],
-       cdrcgi.unicodeToLatin1(row[6][:20]),
-       row[7] and cdrcgi.unicodeToLatin1(row[7]) or "&nbsp;")
-
-# Converting html since sendPage() expects a unicode string.
-# ----------------------------------------------------------
-html = html.decode('utf-8')
-cdrcgi.sendPage(html + u"""\
+""")
+html.append("""\
   </table>
  </body>
 </html>
 """)
+cdrcgi.sendPage("".join(html))

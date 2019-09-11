@@ -106,13 +106,13 @@ class Control(cdrcgi.Control):
             else:
                 from CdrLongReports import PageTitleMismatches as Report
             report = Report(job).create_html_report()
-            print "Content-type: text/html\n\n%s" % report
+            print("Content-type: text/html\n\n%s" % report)
         else:
             if not self.email:
                 cdrcgi.bail("Missing required email address")
             try:
                 job.queue()
-            except Exception, e:
+            except Exception as e:
                 cdrcgi.bail("Could not start job: " + str(e))
             job.show_status_page(self.session, self.PAGE_TITLE, self.title,
                                  self.script, self.REPORTS_MENU)
@@ -378,6 +378,6 @@ batch = cdrbatch.CdrBatch(jobName="URL Check", command=command,
                           email=email.strip(), args=args)
 try:
     batch.queue()
-except Exception, e:
+except Exception as e:
     cdrcgi.bail("Could not start job: " + str(e))
 batch.show_status_page(session, title, section, script, SUBMENU)

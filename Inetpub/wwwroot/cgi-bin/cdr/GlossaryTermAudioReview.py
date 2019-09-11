@@ -16,6 +16,7 @@ import xlrd
 import cdr
 import cdrdb
 import cdrcgi
+from cdrapi.users import Session
 
 cgitb.enable()
 
@@ -115,7 +116,7 @@ def getUserId(session, cursor=None, userName=None):
         Cursor, or create one
     """
     if userName is None:
-        userName, pw = cdr.idSessionUser(session, session)
+        userName = Session(session).user_name
 
     if not cursor:
         try:

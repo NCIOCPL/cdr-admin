@@ -164,7 +164,7 @@ for pmid in citations:
         try:
             notes = citation.updateDoc()
             updated += 1
-        except Exception, e:
+        except Exception as e:
             notes = '<span class="errors">%s</span>' % cgi.escape(str(e))
         html.append(u"""\
    <tr>

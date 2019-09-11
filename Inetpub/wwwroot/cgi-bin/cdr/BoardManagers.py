@@ -24,6 +24,7 @@
 import cdr
 import cdrcgi
 import cgi
+from cdrapi import Session
 
 class Control:
     TITLE = "CDR Administration"
@@ -35,7 +36,7 @@ class Control:
             cdrcgi.bail("User not authorized for this menu")
     def in_group(self, group):
         try:
-            name = cdr.idSessionUser(self.session, self.session)[0]
+            name = Session(self.session).user_name
             user = cdr.getUser(self.session, name)
             return group in user.groups
         except:

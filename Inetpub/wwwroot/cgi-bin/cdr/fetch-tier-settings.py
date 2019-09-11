@@ -18,7 +18,7 @@ from cdrapi.settings import Tier
 
 class Settings:
     HOSTNAMES = Tier().hosts
-    LOGFILE = "D:/cdr/Log/fetch-tier-settings.log"
+    LOGFILE = f"{cdr.DEFAULT_LOGDIR}/fetch-tier-settings.log"
     WD = cdr.WORK_DRIVE
     WEBCONFIG_ROOT = "%s:/Inetpub/wwwroot/web.config" % WD
     WEBCONFIG_SECURE = "%s:/Inetpub/wwwroot/cgi-bin/secure/web.config" % WD
@@ -34,8 +34,8 @@ class Settings:
         url = "http://%s/cgi-bin/fetch-tier-settings.py?Session=%s" % args
         try:
             return json.loads(requests.get(url).text)
-        except Exception, e:
-            print url, e
+        except Exception as e:
+            print(url, e)
             cdr.logwrite("%s: %s" % (url, e), self.LOGFILE)
             return {}
     def get_iis_settings(self):
@@ -127,7 +127,7 @@ class Settings:
             md5 = hashlib.md5()
             md5.update(bytes)
             md5 = md5.hexdigest().lower()
-        except Exception, e:
+        except Exception as e:
             md5 = "unreadable"
         files[name] = md5
 
@@ -152,11 +152,11 @@ class Settings:
             "emailers": self.emailers
         }, indent=2)
     def run(self):
-        print "Content-type: application/json\n\n%s" % self.serialize()
+        print("Content-type: application/json\n\n%s" % self.serialize())
 if __name__ == "__main__":
     fields = cgi.FieldStorage()
     session = cdrcgi.getSession(fields)
     if not session or not cdr.canDo(session, "GET SYS CONFIG"):
-        print "Status: 403\n\nUser not authorized for viewing system settings"
+        print("Status: 403\n\nUser not authorized for viewing system settings")
         sys.exit(0)
     Settings(session).run()

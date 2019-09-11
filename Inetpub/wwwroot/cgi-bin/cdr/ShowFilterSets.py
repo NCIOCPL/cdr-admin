@@ -85,7 +85,7 @@ class Filter:
                 if child.nodeName in ('xsl:include', 'xsl:import'):
                     href = child.getAttribute('href')
                     self.includes.append(self.Include(child.nodeName, href))
-        except Exception, e:
+        except Exception as e:
             self.error = "Failure parsing filter: %s" % str(e)
 conn = cdrdb.connect('CdrGuest')
 cursor = conn.cursor()

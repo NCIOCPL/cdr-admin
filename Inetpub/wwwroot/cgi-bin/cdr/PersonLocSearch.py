@@ -1,145 +1,107 @@
-#----------------------------------------------------------------------
-# Prototype for duplicate-checking interface for Person documents.
-# BZIssue::3716 - unicode encoding cleanup
-#----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, cdrdb
+#!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# Get the form variables.
-#----------------------------------------------------------------------
-fields    = cgi.FieldStorage()
-session   = cdrcgi.getSession(fields)
-boolOp    = fields and fields.getvalue("Boolean")         or "AND"
-surname   = fields and fields.getvalue("Surname")         or None
-givenName = fields and fields.getvalue("GivenName")       or None
-initials  = fields and fields.getvalue("Initials")        or None
-submit    = fields and fields.getvalue("SubmitButton")    or None
-help      = fields and fields.getvalue("HelpButton")      or None
-pattern   = re.compile("<Data>(.*?)</Data>", re.DOTALL)
-
-if help:
-    cdrcgi.bail("Sorry, help for this interface has not yet been developed.")
-
-#----------------------------------------------------------------------
-# Connect to the CDR database.
-#----------------------------------------------------------------------
-try:
-    conn = cdrdb.connect('CdrGuest')
-except cdrdb.Error, info:
-    cdrcgi.bail('Failure connecting to CDR: %s' % info[1][0])
-
-#----------------------------------------------------------------------
-# Display the search form.
-#----------------------------------------------------------------------
-if not submit:
-    fields = (('Surname',                 'Surname'),
-              ('Given Name',              'GivenName'),
-              ('Initials',                'Initials'))
-    buttons = (('submit', 'SubmitButton', 'Search'),
-               ('submit', 'HelpButton',   'Help'),
-               ('reset',  'CancelButton', 'Clear'))
-    page = cdrcgi.startAdvancedSearchPage(session,
-                          "Person (Locations in Result Display) Search Form",
-                          "PersonLocSearch.py",
-                          fields,
-                          buttons,
-                          'Person',
-                          conn)
-    page += u"""\
-  </FORM>
- </BODY>
-</HTML>
+"""Search for CDR Person documents with addresses displayed in the results.
 """
-    cdrcgi.sendPage(page)
 
-#----------------------------------------------------------------------
-# Define the search fields used for the query.
-#----------------------------------------------------------------------
-searchFields = (cdrcgi.SearchField(surname,
-                            ("/Person/PersonNameInformation/SurName",)),
-                cdrcgi.SearchField(givenName,
-                            ("/Person/PersonNameInformation/GivenName",)),
-                cdrcgi.SearchField(initials,
-                            ("/Person/PersonNameInformation/MiddleInitial",)))
+import cgi
+import cdrcgi
+from cdrapi.docs import Doc
+from cdrapi.users import Session
 
-#----------------------------------------------------------------------
-# Construct the query.
-#----------------------------------------------------------------------
-(query, strings) = cdrcgi.constructAdvancedSearchQuery(searchFields, boolOp,
-                                                       "Person")
-if not query:
-    cdrcgi.bail('No query criteria specified')
+class Control:
+    """Coordination of the processing flow."""
 
-#----------------------------------------------------------------------
-# Submit the query to the database.
-#----------------------------------------------------------------------
-try:
-    cursor = conn.cursor()
-    cursor.execute(query)
-    rows = cursor.fetchall()
-    cursor.close()
-    cursor = None
-except cdrdb.Error, info:
-    cdrcgi.bail('Failure retrieving Person documents: %s' % info[1][0])
+    def __init__(self):
+        fields = cgi.FieldStorage()
+        self.session = Session(cdrcgi.getSession(fields) or "guest")
+        self.surname = fields.getvalue("surname")
+        self.forename = fields.getvalue("forename")
+        self.initials = fields.getvalue("initials")
+        self.request = fields.getvalue("Request")
+        self.match_all = True if fields.getvalue("match_all") else False
 
-#----------------------------------------------------------------------
-# Create the results page.
-#----------------------------------------------------------------------
-html = u"".join(cdrcgi.advancedSearchResultsPageTop("Person", len(rows), strings))
-for i in range(len(rows)):
-    docId = "CDR%010d" % rows[i][0]
-    title = rows[i][1]
-    html += u"""\
-<TR>
-<TD       NOWRAP
-           WIDTH = "10"
-          VALIGN = "top">
- <DIV      ALIGN = "right">%d.</DIV>
-</TD>
-<TD        WIDTH = "75%%">%s</TD>
-<TD>&nbsp;</TD>
-<TD        WIDTH = "20"
-          VALIGN = "top">
- <A         HREF = "%s?DocId=%s&%s=%s">%s</A>
-</TD>
-</TR>
-""" % (i + 1, cgi.escape(title, 1), cdrcgi.BASE + '/QcReport.py',
-       docId, cdrcgi.SESSION, session, docId)
-    parms = (('docId', docId), ('repName', 'dummy'), ('includeHomeAddresses',
-                                                      'yes'))
+    def run(self):
+        if self.request == "Search":
+            self.show_report()
+        else:
+            self.show_form()
 
+    def show_form(self):
+        Page = cdrcgi.AdvancedSearchPage
+        fields = (
+            Page.text_field("surname"),
+            Page.text_field("given", label="Given Name"),
+            Page.text_field("initials"),
+        )
+        page = Page(self.session.name, "Person (with locations)", fields)
+        cdrcgi.sendPage(page.tostring())
+
+    def show_report(self):
+        """Assemble the query, execute it, and show the results."""
+
+        # Assemble the advanced search query.
+        Field = cdrcgi.SearchField
+        fields = (
+            Field(surname, ["/Person/PersonNameInformation/SurName"]),
+            Field(givenName, ["/Person/PersonNameInformation/GivenName"]),
+            Field(initials, ["/Person/PersonNameInformation/MiddleInitial"]),
+        )
+        query = cdrcgi.AdvancedSearchQuery(fields, "Person", match_all)
+
+        # Get the results from the query.
+        try:
+            rows = query.execute().fetchall()
+        except Exception as e:
+            cdrcgi.bail(f"Failure retrieving Person documents: {e}")
+
+        # Create the shell for the results page.
+        strings = " ".join(query.criteria)
+        opts = dict(search_strings=strings, count=len(rows))
+        page = cdrcgi.AdvancedSearchResultsPage("Person", **opts)
+
+        # Housekeeping before we get into the loop for the search results.
+        table = page.body.find("table")
+        table.set("class", "person-loc-search-results")
+        session_parm = f"&{cdrcgi.SESSION}={self.session.name}"
+        filter_parms = dict(repName="dummy", includeHomeAddresses="yes")
+        filtre = "name:Person Locations Picklist"
+
+        # Walk through each row in the results set.
+        for i, row  in enumerate(rows):
+            doc = Doc(self.session, id=row[0])
+            title = row[1]
+            url = f"{cdrcgi.BASE}/QcReport.py?DocId={doc.cdr_id}{session_parm}"
+            link = page.B.A(doc.cdr_id, href=url)
+
+            # Create the first table row for this result.
+            tr = page.B.TR(page.B.CLASS("row-item"))
+            tr.append(page.B.TD(f"{i+1}.", page.B.CLASS("row-number")))
+            tr.append(page.B.TD(link, page.B.CLASS("doc-link")))
+            tr.append(page.B.TD(title, page.B.CLASS("doc-title")))
+            table.append(tr)
+
+            # Add a second row to the table if there are any addresses.
+            filter_parms["docId"] = doc.cdr_id
+            try:
+                response = doc.filter(filtre, parms=filter_parms)
+                tree = response.result_tree
+            except Exception as e:
+                cdrcgi.bail(str(e))
+            addresses = [node for node in tree.iter("Data")]
+            if addresses:
+                ul = page.B.UL()
+                td = page.B.TD(ul, colspan="3")
+                tr = page.B.TR(page.B.CLASS("person-addresses"))
+                for node in addresses:
+                    ul.append(page.B.LI(Doc.get_text(node, default="")))
+                table.append(tr)
+
+        # Send the page back to the browser.
+        cdrcgi.sendPage(page.tostring())
+
+
+if __name__ == "__main__":
     try:
-        response = cdr.filterDoc(session, ['name:Person Locations Picklist'],
-                                 docId=docId, parm=parms)
+        Control().run()
     except Exception as e:
         cdrcgi.bail(str(e))
-    if type(response) == type(""):
-        errs = cdr.checkErr(response)
-        if errs:
-            cdrcgi.bail("Failure extracting addresses: %s" % errs)
-    else:
-        addresses = pattern.findall(response[0])
-        if addresses:
-            html += u"""
-<TR>
-<TD>&nbsp;</TD>
-<TD WIDTH="75%%">
-<UL>
-"""
-            for address in addresses:
-                html += u"<LI>%s</LI>" % unicode(address, "utf-8")
-            html += u"""\
-</UL>
-</TD>
-<TD COLSPAN="2">&nbsp;</TD>
-</TR>
-"""
-
-#----------------------------------------------------------------------
-# Send the page back to the browser.
-#----------------------------------------------------------------------
-cdrcgi.sendPage(html + u"""\
-  </TABLE>
- </BODY>
-</HTML>
-""")

@@ -147,7 +147,7 @@ def build_zip_file(file_names):
     base_name = tempfile.mktemp()
     zip_name  = base_name + ".zip"
     list_name = base_name + ".txt"
-    list_file = file(list_name, "w")
+    list_file = open(list_name, "w")
     for name in file_names:
         list_file.write("%s\n" % name)
     list_file.close()
@@ -158,7 +158,7 @@ def build_zip_file(file_names):
         msg = "zip failure code %d (%s)" % (result.code, result.output)
         Control.logger.debug(msg)
         raise msg
-    zip_file = file(zip_name, "rb")
+    zip_file = open(zip_name, "rb")
     zip_bytes = zip_file.read()
     zip_file.close()
     Control.logger.debug("saved zip file as %r", zip_name)
@@ -249,7 +249,7 @@ def main():
         else:
             error = "Don't understand %r" % request.type
             response = WebService.ErrorResponse(error, Control.logger)
-    except Exception, e:
+    except Exception as e:
         response = WebService.ErrorResponse(str(e), Control.logger)
     Control.logger.debug("Response:\n%s\n", response.body)
     if Control.STANDALONE:

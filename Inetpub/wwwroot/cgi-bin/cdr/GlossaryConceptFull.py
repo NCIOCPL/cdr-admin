@@ -1,6 +1,4 @@
 #----------------------------------------------------------------------
-# coding=latin-1
-#
 # Glossary Term Concept report
 # This report takes a concept and displays all of the Term Name
 # definitions that are linked to this concept document
@@ -267,7 +265,7 @@ def addAttributeRow(data, label, indent = False):
 def resolvePlaceHolder(language, termData, definitionText):
      # Create the Glossary Definition
      tmpdoc  = u"\n<GlossaryTermDef xmlns:cdr = 'cips.nci.nih.gov/cdr'>\n"
-     tmpdoc += termData.get(language, u"@S@%s (en inglés)@E@" % termData['en'])\
+     tmpdoc += termData.get(language, u"@S@%s (en ingl\xe9s)@E@" % termData['en'])\
                   + u"\n"
      tmpdoc += u" %s\n" % definitionText['DefinitionText']
 
@@ -401,7 +399,7 @@ if not docId and not termName:
 try:
     conn = cdrdb.connect('CdrGuest')
     cursor = conn.cursor()
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
 
 #----------------------------------------------------------------------
@@ -429,7 +427,7 @@ def getTermNameStatus(termList):
                          WHERE id in (%s)""" % termNameIds)
         rows = cursor.fetchall()
 
-    except cdrdb.Error, info:
+    except cdrdb.Error as info:
         cdrcgi.bail("Error selecting term name status: %s" % info[1][0])
 
     statusList = {}
@@ -505,7 +503,7 @@ def getSharedInfo(docId):
                 sharedContent['NCIThesaurusID'].append(
                                        cdr.getTextContent(node).strip())
 
-    except cdrdb.Error, info:
+    except cdrdb.Error as info:
         cdrcgi.bail("Error extracting shared Info: %s" % info[1][0])
 
     #cdrcgi.bail(sharedContent)
@@ -627,7 +625,7 @@ def getConcept(docId):
 
         dom.unlink()
 
-    except cdrdb.Error, info:
+    except cdrdb.Error as info:
         cdrcgi.bail("Error extracting Concept: %s" % info[1][0])
 
     return concept
@@ -697,7 +695,7 @@ def getNameDefinition(docId):
                                {'ReplacementText':[rText.toxml()]})
         dom.unlink()
 
-    except cdrdb.Error, info:
+    except cdrdb.Error as info:
         cdrcgi.bail("Error extracting Term Name: %s" % info[1][0])
 
     return termName
@@ -753,7 +751,7 @@ else:
            AND c.path = '/GlossaryTermName/GlossaryTermConcept/@cdr:ref'
            AND n.value LIKE ?""", termName)
         rows = cursor.fetchall()
-    except Exception, e:
+    except Exception as e:
         cdrcgi.bail("Database error looking up term name: %s" % e)
     if not rows:
         cdrcgi.bail("No term names match %s" % repr(termName))
@@ -929,12 +927,12 @@ for lang in languages:
                 if termNameStatus[id] == 'A':
                     html += u"""\
     <td width="70%%">
-     <span class='special'>%s (en inglés)</span> (CDR%s)""" % (
+     <span class='special'>%s (en ingl\xe9s)</span> (CDR%s)""" % (
                                                         termData['en'], id)
                 else:
                     html += u"""\
     <td class="blocked" width="70%%">BLOCKED -
-     <span class='special'>%s (en inglés)</span> (CDR%s)""" % (
+     <span class='special'>%s (en ingl\xe9s)</span> (CDR%s)""" % (
                                                         termData['en'], id)
                     continue
 

@@ -506,8 +506,8 @@ def dispCgWork():
                        """)
         oneRow = cursor.fetchone()
         nRemoved = 0
-	if oneRow and oneRow[0]:
-	    nRemoved = oneRow[0]
+        if oneRow and oneRow[0]:
+            nRemoved = oneRow[0]
     except Exception:
         cdrcgi.bail("Failure getting removed count from PPCW.")
 
@@ -541,8 +541,8 @@ def dispCgWork():
                        """)
         oneRow = cursor.fetchone()
         nUpdated = 0
-	if oneRow and oneRow[0]:
-	    nUpdated = oneRow[0]
+        if oneRow and oneRow[0]:
+            nUpdated = oneRow[0]
     except Exception:
         cdrcgi.bail("Failure getting updated count from PPCW.")
 
@@ -583,8 +583,8 @@ def dispCgWork():
                        """)
         oneRow = cursor.fetchone()
         nAdded = 0
-	if oneRow and oneRow[0]:
-	    nAdded = oneRow[0]
+        if oneRow and oneRow[0]:
+            nAdded = oneRow[0]
     except Exception:
         cdrcgi.bail("Failure getting added count from PPCW.")
 
@@ -812,7 +812,7 @@ def dispJobsByDates():
     try:
         cursor.execute("""\
                 SELECT pp.id, pp.pub_subset, pp.started,
-		               pp.completed, count(ppd.pub_proc) AS numDocs, pp.status
+                       pp.completed, count(ppd.pub_proc) AS numDocs, pp.status
                   FROM pub_proc pp
        LEFT OUTER JOIN pub_proc_doc ppd
                     ON pp.id = ppd.pub_proc

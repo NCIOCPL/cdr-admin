@@ -44,7 +44,7 @@ elif request == SUBMENU:
 try:
     conn = cdrdb.connect("CdrGuest")
     cursor = conn.cursor()
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
 
 #----------------------------------------------------------------------
@@ -193,7 +193,7 @@ for target in sorted(targets.values()):
         row += 1
 stamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
 name = "SummaryInternalLinks-CDR%s-%s.xls" % (intId, stamp)
-print "Content-type: application/vnd.ms-excel"
-print "Content-Disposition: attachment; filename=%s" % name
-print
+print("Content-type: application/vnd.ms-excel")
+print("Content-Disposition: attachment; filename=%s" % name)
+print()
 styles.book.save(sys.stdout)

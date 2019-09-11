@@ -94,9 +94,9 @@ for row in rows:
         terms.append(Term(termId, protocolIds, primaryIds))
 t = time.strftime("%Y%m%d%H%M%S")
 terms.sort(lambda a,b: cmp(len(b.protocols), len(a.protocols)))
-print "Content-type: application/vnd.ms-excel"
-print "Content-Disposition: attachment; filename=DrugAgentReport-%s.xls" % t
-print
+print("Content-type: application/vnd.ms-excel")
+print("Content-Disposition: attachment; filename=DrugAgentReport-%s.xls" % t)
+print()
 
 styles = cdrcgi.ExcelStyles()
 sheet = styles.add_sheet("Terms")

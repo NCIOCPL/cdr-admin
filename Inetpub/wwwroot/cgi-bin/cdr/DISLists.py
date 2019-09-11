@@ -138,7 +138,7 @@ elif request == SUBMENU:
 try:
     conn = cdrdb.connect("CdrGuest")
     cursor = conn.cursor()
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
 
 #----------------------------------------------------------------------
@@ -241,7 +241,7 @@ try:
     rows = cursor.fetchall()
     cursor.close()
     cursor = None
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Failure retrieving DIS documents: %s' %
                 info[1][0])
      

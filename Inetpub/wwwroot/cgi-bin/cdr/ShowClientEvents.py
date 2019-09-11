@@ -58,6 +58,6 @@ html.append(u"""\
  </body>
 </html>""")
 html = u"".join(html)
-print "Content-type: text/html; charset=utf-8"
-print ""
-print html.encode('utf-8')
+print("Content-type: text/html; charset=utf-8")
+print("")
+print(html.encode('utf-8'))

@@ -371,7 +371,7 @@ def addTerm(t,parent):
         cdrids = {}
         addLeafIDsToList(t,cdrids)
         cbText.append(u"%s:" % t.id)
-        cbText.append(u" ".join([`id` for id in cdrids]))
+        cbText.append(u" ".join([str(id) for id in cdrids]))
         cbText = u"".join(cbText)
         html.append(u"""\
    <li id="%s" class="parent %s" onclick="clickOnName(event,this);"

@@ -18,7 +18,7 @@ def makeTempDir():
     tempfile.tempdir = "d:\\tmp"
     where = tempfile.mktemp("diff")
     abspath = os.path.abspath(where)
-    print abspath
+    print(abspath)
     try: os.mkdir(abspath)
     except: cdrcgi.bail("Cannot create directory %s" % abspath)
     try: os.chdir(abspath)
@@ -45,7 +45,7 @@ def getLocalFilters(tmpDir):
                 ON t.id = d.doc_type
              WHERE t.name = 'Filter'""", timeout=300)
         rows = curs.fetchall()
-    except Exception, e:
+    except Exception as e:
         cleanup(tmpDir)
         cdrcgi.bail('Database failure: %s' % e)
     for row in rows:
@@ -127,7 +127,7 @@ for i in range(len(lines)):
 report = cgi.escape(unEncode("\n".join(lines)))
 cleanup(workDir)
 
-print """\
+print("""\
 Content-type: text/html; charset: utf-8
 
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
@@ -139,4 +139,4 @@ Content-type: text/html; charset: utf-8
   <h3>The following filters differ between PROD and %s</h3>
   <pre>%s</pre>
  </body>
-</html>""" % (tier_name, report)
+</html>""" % (tier_name, report))

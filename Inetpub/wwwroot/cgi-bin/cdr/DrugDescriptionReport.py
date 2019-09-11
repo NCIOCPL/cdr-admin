@@ -148,7 +148,7 @@ class Control(cdrcgi.Control):
             cdrcgi.bail("Internal error") # can't happen, given validation above
         try:
             rows = query.execute(self.cursor, timeout=300).fetchall()
-        except Exception, e:
+        except Exception as e:
             raise Exception("Database failure: %s" % e)
         summaries = [DrugInfoSummary(self, *row) for row in rows]
         self.buttons[0] = "Back"
@@ -324,12 +324,12 @@ class DrugInfoSummary:
         query.where(query.Condition("num", doc_version))
         try:
             title, xml = query.execute(control.cursor, timeout=300).fetchone()
-        except Exception, e:
+        except Exception as e:
             raise Exception("Database failure fetching CDR%d version %d: %s" %
                             (doc_id, doc_version, e))
         try:
             root = etree.XML(xml.encode("utf-8"))
-        except Exception, e:
+        except Exception as e:
             raise Exception("Failure parsing CDR%d version %d: %s" %
                             (doc_id, doc_version, e))
         self.name = title.split(";")[0].strip()

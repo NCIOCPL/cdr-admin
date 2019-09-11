@@ -63,7 +63,7 @@ for doc_id, doc_title in rows:
 
 name = "CitationsInSummaries-%s.xls" % time.strftime("%Y%m%d%H%M%S")
 print("Content-type: application/vnd.ms-excel")
-print("Content-Disposition: attachment; filename=%s" % name)
+print(("Content-Disposition: attachment; filename=%s" % name))
 print("")
 
 styles.book.save(sys.stdout)

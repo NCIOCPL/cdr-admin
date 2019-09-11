@@ -54,7 +54,7 @@ class Control(cdrcgi.Control):
             messages.append(self.refresh_manifest())
             messages.append("Schema posted successfully.")
             return self.message("\n".join(messages), "green")
-        except Exception, e:
+        except Exception as e:
             self.logger.exception("Failure")
             return self.message(e, "red")
     def check_dtds(self):

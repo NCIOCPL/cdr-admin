@@ -105,6 +105,6 @@ for docId, conceptId in cursor.fetchall():
     table.append(row)
 body.append(B.DIV(table))
 html.append(body)
-print "Content-type: text/html\n"
-print "<!DOCTYPE html>"
-print H.tostring(html, pretty_print=True)
+print("Content-type: text/html\n")
+print("<!DOCTYPE html>")
+print(H.tostring(html, pretty_print=True))

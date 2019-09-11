@@ -8,6 +8,7 @@ import cdr
 import cdrcgi
 import cdrdb
 import nci_thesaurus
+from cdrapi.users import Session
 
 SEARCH = "https://nciterms.nci.nih.gov"
 
@@ -31,8 +32,7 @@ ckPrefNm    = fields.getvalue("CkPrefNm")        or None
 updateDefs  = fields.getvalue("UpdateDefs")      or False
 updateNames = fields.getvalue("UpdateNames")     or False
 updateCDRID = fields.getvalue("UpdateCDRID")     or None
-userPair    = cdr.idSessionUser(session, session)
-userInfo    = cdr.getUser(session, userPair[0])
+userInfo    = cdr.getUser(session, Session(session).user_name)
 subtitle    = "Term"
 logger      = cdr.Logging.get_logger("TermSearch")
 updates     = None
@@ -54,7 +54,7 @@ def termTypeList(conn, fName):
         query = cdrdb.Query("query_term", "value").unique()
         query.where("path = '/Term/TermType/TermTypeName'")
         values = [row[0] for row in query.execute(cursor).fetchall()]
-    except Exception, e:
+    except Exception as e:
         cdrcgi.bail('Failure retrieving term type list from CDR: %s' % e)
     select = B.SELECT(name=fName)
     select.append(B.OPTION(u"\xa0", value="", checked="checked"))
@@ -74,7 +74,7 @@ def semanticTypeList(conn, fName):
         query.where("t.path = '/Term/SemanticType/@cdr:ref'")
         rows = query.order("d.title").execute(cursor).fetchall()
         cursor.close()
-    except Exception, e:
+    except Exception as e:
         cdrcgi.bail('Failure retrieving semantic type list from CDR: %s' % e)
     select = B.SELECT(name=fName)
     select.append(B.OPTION(u"\xa0", value="", checked="checked"))
@@ -109,7 +109,7 @@ if impReq:
         cdrcgi.bail("User not logged in")
     try:
         concept = nci_thesaurus.Concept(code=conceptCode)
-    except Exception, e:
+    except Exception as e:
         logger.exception("unable to load %r", conceptCode)
         cdrcgi.bail("importing concept from NCI Thesaurus: %s" % e)
     opts = {
@@ -126,7 +126,7 @@ if impReq:
                 subtitle = "No changes found to save"
         else:
             subtitle = concept.add(session)#, **opts)
-    except Exception, e:
+    except Exception as e:
         logger.exception("unabled to add/update %r", conceptCode)
         cdrcgi.bail(str(e))
     finally:
@@ -234,7 +234,7 @@ try:
     rows = cursor.fetchall()
     cursor.close()
     cursor = None
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Failure retrieving Term documents: %s' %
                 info[1][0])
 

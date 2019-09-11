@@ -73,7 +73,7 @@ for partner in sorted(partners):
     etree.SubElement(contact, "activated").text = partner.activated
     etree.SubElement(contact, "terminated").text = partner.deactivated
     etree.SubElement(contact, "ftp_userid").text = partner.username
-print """\
+print("""\
 Content-type: text/xml
 
-%s""" % etree.tostring(root, pretty_print=True)
+%s""" % etree.tostring(root, pretty_print=True))

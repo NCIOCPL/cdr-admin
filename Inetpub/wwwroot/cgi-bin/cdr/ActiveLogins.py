@@ -56,7 +56,7 @@ try:
             ORDER BY s.last_act""")
 ###            ORDER BY s.initiated""") # original sort order changed - VE
     rows = cursor.fetchall()
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Database failure: %s' % info[1][0])
 
 #----------------------------------------------------------------------

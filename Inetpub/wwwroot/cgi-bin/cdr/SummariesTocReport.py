@@ -164,7 +164,7 @@ elif request == SUBMENU:
 try:
     conn = cdrdb.connect("CdrGuest")
     cursor = conn.cursor()
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
 
 #----------------------------------------------------------------------
@@ -377,7 +377,7 @@ if byTitle:
             showTitleChoices(rows)
         intId = rows[0][0]
         docId = "CDR%010d" % intId
-    except cdrdb.Error, info:
+    except cdrdb.Error as info:
         cdrcgi.bail('Failure looking up document %s: %s' % (lookingFor,
                                                             info[1][0]))
 
@@ -571,7 +571,7 @@ if byCdrid:
                  WHERE id = ?
               ORDER BY num DESC""", byCdrid)
             vrows = cursor.fetchall()
-        except cdrdb.Error, info:
+        except cdrdb.Error as info:
             cdrcgi.bail('Failure retrieving document versions: %s' % info[1][0])
         form = u"""\
       <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
@@ -623,7 +623,7 @@ if byCdrid:
         rows = cursor.fetchall()
         cursor.close()
         cursor = None
-    except cdrdb.Error, info:
+    except cdrdb.Error as info:
         cdrcgi.bail('Failure retrieving single Summary document: %s' %
                     info[1][0])
 else:
@@ -632,7 +632,7 @@ else:
         rows = cursor.fetchall()
         cursor.close()
         cursor = None
-    except cdrdb.Error, info:
+    except cdrdb.Error as info:
         cdrcgi.bail('Failure retrieving Summary documents: %s' %
                     info[1][0])
 

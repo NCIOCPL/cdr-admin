@@ -82,7 +82,7 @@ elif request == SUBMENU:
 try:
     conn = cdrdb.connect("CdrGuest")
     cursor = conn.cursor()
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
 
 
@@ -188,7 +188,7 @@ SELECT DISTINCT board.id, board.title
                                    'PDQ Advisory Board')
        ORDER BY board.title""")
         return [(row[0], cleanTitle(row[1])) for row in cursor.fetchall()]
-    except cdrdb.Error, info:
+    except cdrdb.Error as info:
         cdrcgi.bail('Database query failure: %s' % info[1][0])
 
 
@@ -209,7 +209,7 @@ def getBoardManagerInfo(orgId):
         if len(rows) != 3:
             cdrcgi.bail("board manager information missing")
         return rows
-    except cdrdb.Error, info:
+    except cdrdb.Error as info:
         cdrcgi.bail('Database query failure for BoardManager: %s' % info[1][0])
 
 
@@ -613,7 +613,7 @@ try:
         boardIds.append(docId)
     boardMembers.sort()
 
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Database query failure: %s' % info[1][0])
 
 

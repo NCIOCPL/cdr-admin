@@ -225,8 +225,8 @@ if not fields:
     monitor    = True
 
     if not docId:
-       print 'Command line options'
-       print 'PublishPreview.py docId docVersion preserveLink(Y/N) debugLog(T/F) flavor cgHost filename'
+       print('Command line options')
+       print('PublishPreview.py docId docVersion preserveLink(Y/N) debugLog(T/F) flavor cgHost filename')
        sys.exit(1)
 else:
     session    = cdrcgi.getSession(fields)   or cdrcgi.bail("Not logged in")
@@ -408,7 +408,7 @@ if not cachedHtml:
         else:
             docVer = None
 
-    except cdrdb.Error, info:
+    except cdrdb.Error as info:
         cdrcgi.bail('Failure finding specified version for %s: %s' %
                     (docId, info[1][0]))
     showProgress("Fetched document version: %s..." % row[0])
@@ -746,8 +746,7 @@ if not TIER.name == 'PROD':
 # Write out the HTML file for debugging purposes
 # ----------------------------------------------
 if dbgLog:
-    fp = open(cdr.WORK_DRIVE + ":/tmp/pp-%s.html" % docId, "wb")
-    fp.write(html)
-    fp.close()
+    with open(f"{cdr.TMP}/pp-%s.html" % docId, "wb") as fp:
+        fp.write(html)
 
 cdrcgi.sendPage("%s" % html.decode('utf-8'))

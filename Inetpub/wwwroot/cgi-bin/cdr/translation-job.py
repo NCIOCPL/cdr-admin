@@ -105,7 +105,7 @@ class Control(cdrcgi.Control):
                 try:
                     cursor.execute(query, params)
                     conn.commit()
-                except Exception, e:
+                except Exception as e:
                     if "duplicate key" in str(e).lower():
                         self.logger.error("duplicate translation job ID")
                         cdrcgi.bail("attempt to create duplicate job")
@@ -419,7 +419,7 @@ jQuery("input[value='%s']").click(function(e) {
         try:
             cdr.sendMailMime(sender, recips, subject, u"\n".join(body),
                              attachments=attachments)
-        except Exception, e:
+        except Exception as e:
             self.logger.error("sending mail: %s", e)
             cdrcgi.bail("sending mail: %s" % e)
         self.logger.info(log_message)

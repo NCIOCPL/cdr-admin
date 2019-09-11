@@ -15,4 +15,4 @@ for line in open("d:/cdr/sftp_log/cumulative.log"):
         sids[sid] = user
 print("Content-type: text/plain\n")
 for user in sorted(users):
-    print("{} {}".format(user, users[user]))
+    print(("{} {}".format(user, users[user])))

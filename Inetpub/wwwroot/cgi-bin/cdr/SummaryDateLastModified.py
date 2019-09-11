@@ -97,7 +97,7 @@ if request == "Log Out":
 try:
     conn   = cdrdb.connect('CdrGuest')
     cursor = conn.cursor()
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
 
 #----------------------------------------------------------------------
@@ -530,7 +530,7 @@ def collectSummaries(sqlSelect, sqlFrom, sqlJoin, sqlWhere,
             rows = cursor.fetchall()
             for row in rows:
                 Summary(row, language, reportType, cursor)
-        except cdrdb.Error, info:
+        except cdrdb.Error as info:
             cdrcgi.bail('Failure retrieving report information: %s' %
                         info[1][0])
         return sql
@@ -651,7 +651,7 @@ for boardName in sorted(Summary.summaries):
                                 audienceName, reportType, styles, rowNum)
 
 stamp = cdr.make_timestamp()
-print "Content-type: application/vnd.ms-excel"
-print "Content-Disposition: attachment; filename=sdlm-%s.xls" % stamp
-print
+print("Content-type: application/vnd.ms-excel")
+print("Content-Disposition: attachment; filename=sdlm-%s.xls" % stamp)
+print()
 styles.book.save(sys.stdout)

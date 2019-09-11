@@ -68,11 +68,11 @@ elif request == "Report":
 # Handle request for creating a new filter set.
 #----------------------------------------------------------------------
 if request == "New Filter Set": 
-    print "Location:http://%s%s/EditFilterSet.py?%s=%s&Request=New\n" % (
+    print("Location:http://%s%s/EditFilterSet.py?%s=%s&Request=New\n" % (
             cdrcgi.WEBSERVER,
             cdrcgi.BASE,
             cdrcgi.SESSION,
-            session)
+            session))
     sys.exit(0)
 
 
@@ -95,7 +95,7 @@ try:
               FROM filter_set
           ORDER BY name""")
     rows = cursor.fetchall()
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail("Database failure retrieving filter sets: %s" % info[1][0])
 
 form = u"""\

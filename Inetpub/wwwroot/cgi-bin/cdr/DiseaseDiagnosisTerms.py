@@ -4,6 +4,8 @@
 #
 # BZIssue::4762 (change 'cancer' to 'Malignant Neoplasm' [per WO])
 #----------------------------------------------------------------------
+
+from operator import attrgetter
 import cdrcgi, cdrdb, cgi
 
 class Term:
@@ -100,33 +102,29 @@ def addTerm(t):
         cls = 'st'
     else:
         cls = 't'
-    html = """\
-    <li class = '%s'>%s</li>
-""" % (cls, cgi.escape(cdrcgi.unicodeToLatin1(t.name)))
+    html = [f'<li class="{cls}">{cgi.escape(t.name)}</li>']
     if t.aliases or t.children:
-        html += "<ul>\n"
+        html.append("<ul>")
         t.aliases.sort()
         for alias in t.aliases:
-            html += "<li class = 'a'>x %s</li>\n" % cgi.escape(
-                cdrcgi.unicodeToLatin1(alias))
-        t.children.sort(lambda a,b: cmp(a.name, b.name))
-        for child in t.children:
-            html += addTerm(child)
-        html += "</ul>\n"
-    return html
+            html.append(f'<li class="a">x {cgi.escape(alias)}</li>\n')
+        for child in sorted(t.children, key=attrgetter("name")):
+            html.append(addTerm(child))
+        html.append("</ul>")
+    return "\n".join(html)
 
-html = """\
+html = f"""\
 <html>
  <head>
   <title>CDR Cancer Diagnosis Hierarchy Report</title>
   <style type = 'text/css'>
-   h1 { color: navy; font-size: 14: font-weight: bold; 
+   h1 { color: navy; font-size: 14: font-weight: bold;
         font-family: Arial, Helvetica, sans-serif; }
    li.st { color: green; font-size: 14; font-weight: bold; list-style: none;
           font-family: serif; font-variant: small-caps; }
    li.t { color: blue; font-size: 14; list-style: none; font-weight: normal;
           font-family: Arial, Helvetica, sans-serif; font-variant: normal }
-   li.a { color: #FF2222; font-size: 12;  list-style: none; 
+   li.a { color: #FF2222; font-size: 12;  list-style: none;
           font-variant: normal;
           font-family: Arial, Helvetica, sans-serif; font-style: italic }
   </style>
@@ -134,12 +132,8 @@ html = """\
  <body>
   <h1>CDR Cancer Diagnosis Hierarchy Report</h1>
   <ul>
-""" + addTerm(terms[patriarch]) + """\
+{addTerm(terms[patriarch])}
   </ul>
  </body>
 </html>"""
-
-# Need to send a unicode string to sendPage()
-# -------------------------------------------
-html = html.decode('utf-8')
 cdrcgi.sendPage(html)

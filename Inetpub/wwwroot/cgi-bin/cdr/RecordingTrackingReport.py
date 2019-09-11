@@ -175,7 +175,7 @@ name = 'RecordingTrackingReport-%s.xls' % now.strftime("%Y%m%d%H%M%S")
 if sys.platform == "win32":
     import os, msvcrt
     msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
-print "Content-type: application/vnd.ms-excel"
-print "Content-Disposition: attachment; filename=%s" % name
-print
+print("Content-type: application/vnd.ms-excel")
+print("Content-Disposition: attachment; filename=%s" % name)
+print()
 styles.book.save(sys.stdout)

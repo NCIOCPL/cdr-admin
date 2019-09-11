@@ -133,7 +133,7 @@ class Doc:
         self.last_version_publishable = False
         try:
             self.root = self.control.get_parsed_doc_xml(doc_id)
-        except Exception, e:
+        except Exception as e:
             cdrcgi.bail(e)
         self.title = (self.root.find("MediaTitle").text or "").strip()
         self.status = None

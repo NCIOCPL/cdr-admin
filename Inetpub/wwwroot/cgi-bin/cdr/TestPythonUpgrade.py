@@ -3,10 +3,10 @@
 # Shows versions of everything.
 #----------------------------------------------------------------------
 def sendPage(what):
-    print """\
+    print("""\
 Content-type: text/html
 
-%s""" % what
+%s""" % what)
 
 def show(component, version):
     html.append(u"""\
@@ -68,5 +68,5 @@ try:
  </body>
 </html>""" % packages)
     sendPage("".join(html))
-except Exception, e:
+except Exception as e:
     sendPage("<pre>%s</pre>" % e)

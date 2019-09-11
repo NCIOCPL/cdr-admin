@@ -207,7 +207,7 @@ def show_report(doc_id, frag_id):
 if doc_id:
     try:
         show_report(doc_id, frag_id)
-    except Exception, e:
+    except Exception as e:
         cdrcgi.bail("%s" % e)
 
 #----------------------------------------------------------------------
@@ -222,7 +222,7 @@ SELECT DISTINCT name
        ORDER BY name
 """)
         return cursor.fetchall()
-    except cdrdb.Error, info:
+    except cdrdb.Error as info:
         cdrcgi.bail('Database query failure: %s' % info[1][0])
 
 #----------------------------------------------------------------------

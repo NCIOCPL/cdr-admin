@@ -18,8 +18,7 @@ import cgi, cgitb, cdr, re, cdrcgi, cdrdb
 cgitb.enable()
 
 # Prepare a log file for what we're about to do
-# Not using a banner since the program comes through here more than once
-G_log = cdr.Log("ReplaceDocWithNewDoc.log", banner=None)
+LOGGER = cdr.Logging.get_logger("ReplaceDocWithNewDoc")
 
 # Locations of attributes we must examine for possible modification
 class AttributePath:
@@ -73,21 +72,11 @@ def fatal(msgs):
         msgList.append(msgs)
 
     # Log what we're doing
-    log(msgList)
+    for message in msgList:
+        LOGGER.error(message)
 
     # Bail out
     cdrcgi.bail(msgList[0], extra=msgList[1:])
-
-def log(msgs):
-    """
-    Wrapper for Log.write()
-
-    Pass:
-        msgs - Single message string or sequence of message strings.
-    """
-    global G_log
-
-    G_log.write(msgs)
 
 def checkDoc(docId):
     """
@@ -112,7 +101,7 @@ SELECT t.name
     ON d.doc_type = t.id
  WHERE d.id = ?""", docNum)
         row = cursor.fetchone()
-    except Exception, info:
+    except Exception as info:
         fatal("Error retrieving doctype for %s: %s" % (docId, str(info)))
 
     if row:
@@ -162,19 +151,19 @@ def unlockDocs(reason):
         # Error could occur after locking one but not the other
         # So check each individually
         if oldDoc:
-            log("Unlocking old document: %s" % oldDocIdStr)
+            LOGGER.info("Unlocking old document: %s", oldDocIdStr)
             try:
                 cdr.unlock(session, oldDocIdStr, reason=reason)
             except Exception as e:
                 errors.append(str(e))
-                log("Error unlocking old doc:\n%s" % e)
+                LOGGER.exception("Failure unlocking old doc")
         if newDoc:
-            log("Unlocking new document: %s" % newDocIdStr)
+            LOGGER.info("Unlocking new document: %s", newDocIdStr)
             try:
                 cdr.unlock(session, newDocIdStr, reason=reason)
             except Exception as e:
                 errors.append(str(e))
-                log("Error unlocking new doc:\n%s" % e)
+                LOGGER.exception("Failure unlocking new doc")
 
     return "; ".join(errors)
 
@@ -206,7 +195,7 @@ SELECT DISTINCT t.name, d.id, d.title, n.source_elem, n.target_frag
             AND d.id <> n.target_doc
        ORDER BY t.name, d.id, n.source_elem, n.target_frag
 """, cdr.exNormalize(targetDocId)[1])
-    except Exception, info:
+    except Exception as info:
         fatal("Error retrieving links to fragments in old doc: %s" % \
                     info)
 
@@ -257,7 +246,7 @@ def versionDocIfNeeded(session, docId, doc):
         isChanged = cdr.lastVersions(session, docId)[2]
 
         if isChanged == 'Y':
-            log("Creating non-publishable version of doc %s" % docId)
+            LOGGER.info("Creating non-publishable version of doc %s", docId)
             reason='Versioning last CWD of replaced document'
             resp = cdr.repDoc(session, doc=doc, checkIn='N', ver='Y',
                        verPublishable='N', comment=reason)
@@ -266,7 +255,7 @@ def versionDocIfNeeded(session, docId, doc):
             if errList:
                 raise Exception(errList)
 
-    except Exception, info:
+    except Exception as info:
         fatal("Error versioning CWD of %s: %s" % (docId, str(info)))
 
 def prepare(xml):
@@ -313,7 +302,6 @@ def prepare(xml):
 
 
 # Constants
-LF      = "ReplaceDocWithNewDoc.log"
 TITLE   = "Replace Old Document with New One"
 SCRIPT  = "ReplaceDocWithNewDoc.py"
 
@@ -425,12 +413,12 @@ endPage = """
 </HTML>
 """ % (cdrcgi.SESSION, session)
 
-log("Before check, request=%s" % request)
+LOGGER.info("Before check, request=%s", request)
 # If first time through, or if insufficient data, put up initial form
 if not oldDocId or not newDocId or request == CONFIRM_CANCEL:
 
     # Send the initial explanation and input form
-    log("Putting up initial input form")
+    LOGGER.info("Putting up initial input form")
     html = cdrcgi.header(TITLE, TITLE, 'Initial screen',
                          script=SCRIPT, buttons=MENUBAR_BUTTONS) + \
            DESCRIPTIVE_HTML + DOCUMENT_ID_FORM + endPage
@@ -478,7 +466,7 @@ SELECT value
  WHERE path = '/Summary/WillReplace/@cdr:ref'
    AND doc_id = ?""", newDocId)
     row = cursor.fetchone()
-except Exception, info:
+except Exception as info:
     fatal("Error retrieving WillReplace@cdr:ref for new doc=%s: %s" % \
           (newDocIdStr, info))
 
@@ -514,7 +502,7 @@ if request != CONFIRM_SUBMIT:
         cursor.execute("SELECT title FROM document WHERE id = %d" %
                         cdr.exNormalize(newDocId)[1])
         newDocTitle = cursor.fetchone()[0]
-    except Exception, info:
+    except Exception as info:
         fatal("Error retrieving titles for docs: %s" % info)
 
     # Determine the number of internal references to replace
@@ -622,8 +610,8 @@ new CDR ID would need to be replaced by the old one.
 """ % newDocIdStr
 
     # Request confirmation
-    log("Requesting confirmation, replace %s with %s" %
-        (oldDocIdStr, newDocIdStr))
+    LOGGER.info("Requesting confirmation, replace %s with %s",
+                oldDocIdStr, newDocIdStr)
     html += u"""
 <center>
 <table border='0' cellpadding='10'>
@@ -668,7 +656,7 @@ reason = "Replacing old version with content of replacement doc ID=%s" % \
           newDocIdStr
 
 # Decision of users was to only make a non-publishable version
-log("Saving non-publishable version of new doc using old docId")
+LOGGER.info("Saving non-publishable version of new doc using old docId")
 resp = cdr.repDoc(session, doc=str(oldDoc), checkIn='N', ver='Y',
                   verPublishable='N', comment=reason, showWarnings=True)
 
@@ -701,15 +689,15 @@ if errors:
     msgs += "</ul\n"
 
 # Block the new document from being re-used by accident
-log("Blocking new docId: %s" % newDocIdStr)
+LOGGER.info("Blocking new docId: %s", newDocIdStr)
 reason = "This doc replaced %s.  Use that doc now, not this one." % oldDocIdStr
 try:
     cdr.setDocStatus(session, newDocIdStr, 'I', comment=reason)
-except cdr.Exception, info:
+except Exception as info:
     # Report error, but don't stop
-    log("Blocking raised exception: %s" % str(info))
+    LOGGER.exception("Blocking raised exception")
     msgs += "<p><strong>Warning: Failed to block new document:\n</strong></p>"
-    msgs += "<p>%s</p>\n" % str(info)
+    msgs += f"<p>{info}</p>\n"
 
 errs = unlockDocs("Completed replacement of %s with %s" %
                   (oldDocIdStr, newDocIdStr))
@@ -722,7 +710,7 @@ Please check the status of the documents.</p>
 
 msgs += "<p>Processing is complete.</p>"
 
-log("Reporting final confirmation to user")
+LOGGER.info("Reporting final confirmation to user")
 html = cdrcgi.header(TITLE, "Processing complete", 'Final confirmation',
                      script=SCRIPT, buttons=MENUBAR_BUTTONS)
 html += msgs

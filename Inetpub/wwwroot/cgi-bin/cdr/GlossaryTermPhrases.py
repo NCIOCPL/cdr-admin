@@ -142,7 +142,7 @@ if not id:
                             AND d.title LIKE ?""", namePattern,
                        timeout = 300)
         rows = cursor.fetchall()
-    except cdrdb.Error, info:
+    except cdrdb.Error as info:
         cdrcgi.bail("Failure looking up GlossaryTermName '%s': %s" %
                     (name, info[1][0]))
     if len(rows) > 1: putUpSelection(rows)
@@ -163,6 +163,6 @@ batch = cdrbatch.CdrBatch(jobName="Glossary Term Search", command=command,
                           email=email, args=args)
 try:
     batch.queue()
-except Exception, e:
+except Exception as e:
     cdrcgi.bail("Could not start job: " + str(e))
 batch.show_status_page(session, title, section, script, SUBMENU)

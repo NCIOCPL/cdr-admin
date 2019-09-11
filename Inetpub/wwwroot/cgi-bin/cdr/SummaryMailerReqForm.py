@@ -9,6 +9,7 @@
 #----------------------------------------------------------------------
 
 from datetime import datetime
+from json import dumps
 from operator import attrgetter
 from lxml import etree
 from cdr import canDo as can_do
@@ -576,8 +577,7 @@ class Choice:
     def __cmp__(self, other):
         return cmp(self.name, other.name)
     def to_script(self):
-        name = cdrcgi.unicodeToJavaScriptCompatible(self.name)
-        return "new Choice('%s', '%s')" % (name.replace("'", "\\'"), self.id)
+        return """new Choice({}, "{}")""".format(dumps(self.name), self.id)
     def get_checkbox_ids(self):
         cdrcgi.bail("Internal error: "
                     "get_checkbox_ids method must be overridden.")

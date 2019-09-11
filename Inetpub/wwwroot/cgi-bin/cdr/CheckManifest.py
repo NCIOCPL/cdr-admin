@@ -14,7 +14,7 @@ class Control(cdrcgi.Control):
     def run(self):
         try:
             self.show_report()
-        except Exception, e:
+        except Exception as e:
             cdrcgi.bail(str(e))
     def build_tables(self):
         manifest_files = self.parse_manifest()
@@ -85,6 +85,6 @@ class File:
                 m = hashlib.md5()
                 m.update(bytes)
                 self.checksum = m.hexdigest().lower()
-            except Exception, e:
+            except Exception as e:
                 self.error = str(e)
 Control().run()

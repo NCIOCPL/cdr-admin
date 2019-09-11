@@ -36,27 +36,27 @@ class Control(cdrcgi.Control):
         try:
             cmd = "find %s %s" % (self.pattern, self.path)
             result = cdr.runCommand(cmd)
-            print "Content-type: text/plain\n\n%s" % result.output
-        except Exception, e:
-            print "Content-type: text/plain\n\n%s\n%s" % (cmd, e)
+            print("Content-type: text/plain\n\n%s" % result.output)
+        except Exception as e:
+            print("Content-type: text/plain\n\n%s\n%s" % (cmd, e))
     def dir(self):
         try:
             result = cdr.runCommand("dir %s" % self.path)
-            print "Content-type: text/plain\n\n%s" % result.output
-        except Exception, e:
-            print "Content-type: text/plain\n\n%s" % e
+            print("Content-type: text/plain\n\n%s" % result.output)
+        except Exception as e:
+            print("Content-type: text/plain\n\n%s" % e)
     def get_binary(self):
         try:
             name = os.path.basename(self.path)
             fp = open(self.path, "rb")
             bytes = fp.read()
             fp.close()
-            print "Content-type: application/octet-stream"
-            print "Content-disposition: attachment;filename=%s" % name
-            print ""
+            print("Content-type: application/octet-stream")
+            print("Content-disposition: attachment;filename=%s" % name)
+            print("")
             sys.stdout.write(bytes)
-        except Exception, e:
-            print "Content-type: text/plain\n\n%s" % repr(e)
+        except Exception as e:
+            print("Content-type: text/plain\n\n%s" % repr(e))
     def run(self):
         if self.request == self.SUBMIT:
             if not self.path:
@@ -76,19 +76,19 @@ class Control(cdrcgi.Control):
             stat = os.stat(self.path)
             info = self.get_info(self.path, stat)
             slice = self.Slice(self, stat.st_size)
-            print "Content-type: text/plain\n"
-            print "%s bytes %d-%d\n" % (info, slice.start + 1,
-                                        slice.start + slice.count)
+            print("Content-type: text/plain\n")
+            print("%s bytes %d-%d\n" % (info, slice.start + 1,
+                                        slice.start + slice.count))
             if slice.count:
                 fp = open(self.path, "rb")
                 if slice.start:
                     fp.seek(slice.start)
                 bytes = fp.read(slice.count)
-                print self.make_ascii(bytes)
+                print(self.make_ascii(bytes))
             else:
                 showForm(info)
-        except Exception, e:
-            print "Content-type: text/plain\n\n%s" % e
+        except Exception as e:
+            print("Content-type: text/plain\n\n%s" % e)
     @staticmethod
     def get_info(path, stat):
         stamp = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(stat.st_mtime))

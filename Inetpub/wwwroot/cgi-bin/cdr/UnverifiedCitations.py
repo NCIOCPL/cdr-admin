@@ -15,7 +15,7 @@ session = cdrcgi.getSession(fields)
 try:
     conn = cdrdb.connect()
     cursor = conn.cursor()
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
 
 #----------------------------------------------------------------------
@@ -37,7 +37,7 @@ except:
 # Start the page.
 #----------------------------------------------------------------------
 html = """\
-<!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
+<!DOCTYPE html>
 <html>
  <head>
   <title>Unverified Citations Report %s %s</title>
@@ -66,7 +66,7 @@ html = """\
     </td>
    </tr>
 """ % (time.strftime("%m/%d/%Y", now), usr, time.strftime("%B %d, %Y", now))
-   
+
 #----------------------------------------------------------------------
 # Find out which citations are unverified.
 #----------------------------------------------------------------------
@@ -78,7 +78,7 @@ try:
                         AND value = 'No'
                    ORDER BY doc_id""")
     rows = cursor.fetchall()
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Failure selecting citation IDs: %s' % info[1][0])
 
 #----------------------------------------------------------------------
@@ -88,12 +88,12 @@ textPattern    = re.compile("<FormattedReference>(.*)</FormattedReference>")
 commentPattern = re.compile("<Comment>(.*)</Comment>")
 for row in rows:
     resp = cdr.filterDoc(session, ['set:Denormalization Citation Set',
-                                   'name:Copy XML for Citation QC Report'], 
+                                   'name:Copy XML for Citation QC Report'],
 				   row[0])
     text = textPattern.search(resp[0])
     cmnt = commentPattern.search(resp[0])
     text = text and text.group(1) or 'Unable to retrieve citation title'
-    cmnt = cmnt and cmnt.group(1) or '&nbsp;'
+    cmnt = cmnt and cgi.escape(cmnt.group(1)) or '&nbsp;'
     html += """\
    <tr>
     <td valign='top'>
@@ -106,7 +106,7 @@ for row in rows:
      <font size='3'>%s</font>
     </td>
    </tr>
-""" % (row[0], cdrcgi.decode(text), cdrcgi.decode(cmnt))
+""" % (row[0], cgi.escape(text), cmnt)
 
 #----------------------------------------------------------------------
 # Display the report.

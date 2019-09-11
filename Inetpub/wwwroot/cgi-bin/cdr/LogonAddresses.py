@@ -98,5 +98,5 @@ html.append("""\
   </table>
  </body>
 </html>""")
-print "Content-type: text/html\n"
-print "".join(html)
+print("Content-type: text/html\n")
+print("".join(html))

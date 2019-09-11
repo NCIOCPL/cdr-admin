@@ -110,7 +110,7 @@ for partner in sorted(partners):
         etree.SubElement(wrapper, "renewal_date").text = partner.renewed
         etree.SubElement(wrapper, "notified_date").text = notified
         etree.SubElement(wrapper, "org_id").text = str(partner.doc_id)
-print """\
+print("""\
 Content-type: text/xml
 
-%s""" % etree.tostring(root, pretty_print=True)
+%s""" % etree.tostring(root, pretty_print=True))

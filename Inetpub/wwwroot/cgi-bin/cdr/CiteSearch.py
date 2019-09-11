@@ -15,6 +15,7 @@ import requests
 import cdr
 import cdrcgi
 from cdrapi import db
+from cdrapi.users import Session
 
 #----------------------------------------------------------------------
 # Get the form variables.
@@ -37,17 +38,14 @@ srchPmed  = fields.getvalue("SearchPubMed") or None
 subtitle  = "Citation"
 valErrors = ""
 
-# Get user name
-userPair  = cdr.idSessionUser(session, session)
-
-# Use it to get info about his groups
-userInfo  = cdr.getUser(session, userPair[0])
+# Use the user's name to get info about his groups
+userInfo  = cdr.getUser(session, Session(session).user_name)
 
 #----------------------------------------------------------------------
 # Redirect to PubMed searching if requested (in a different window).
 #----------------------------------------------------------------------
 if srchPmed:
-    print "Location:https://www.ncbi.nlm.nih.gov/entrez/\n"
+    print("Location:https://www.ncbi.nlm.nih.gov/entrez/\n")
     exit(0)
 
 #----------------------------------------------------------------------

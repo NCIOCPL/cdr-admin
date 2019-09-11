@@ -10,10 +10,10 @@ import cdrdb
 LOGFILE = cdr.DEFAULT_LOGDIR + "/check-auth.log"
 
 def answer(yn):
-    print """\
+    print("""\
 Content-type: text/plain
 
-%s""" % yn
+%s""" % yn)
 
 fields = cgi.FieldStorage()
 try:
@@ -26,7 +26,7 @@ try:
         answer("Y")
     else:
         answer("N")
-except Exception, e:
+except Exception as e:
     try:
         cdr.logwrite("failure: %s" % e, LOGFILE, True, True)
     except:

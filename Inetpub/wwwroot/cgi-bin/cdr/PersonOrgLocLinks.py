@@ -21,7 +21,7 @@ fragLink = fields and fields.getvalue("FragLink") or None
 try:
     conn = cdrdb.connect()
     cursor = conn.cursor()
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
 
 #----------------------------------------------------------------------
@@ -42,7 +42,7 @@ SELECT DISTINCT document.id,
 try:
     cursor.execute(query, fragLink)
     rows = cursor.fetchall()
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Database query failure: %s' % info[1][0])
 
 title   = "Person Documents Linking to Fragment %s" % fragLink

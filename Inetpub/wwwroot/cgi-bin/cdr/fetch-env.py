@@ -12,4 +12,4 @@ session = cdrcgi.getSession(fields)
 if not session or not cdr.canDo(session, "GET SYS CONFIG"):
     cdrcgi.bail("go away")
 environ = dict(os.environ)
-print "Content-type: application/json\n\n%s" % json.dumps(environ, indent=2)
+print("Content-type: application/json\n\n%s" % json.dumps(environ, indent=2))

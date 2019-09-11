@@ -295,7 +295,7 @@ class Proxy(object):
         code = response.status_code
 
         # Report a 404 as a 404 and terminate, else pass the status.
-        print "status: %s" % code
+        print("status: %s" % code)
         logger.debug("Return status: %d", code)
         if code == 404:
             sys.exit(0)
@@ -306,13 +306,13 @@ class Proxy(object):
         # Headers.
         if "Content-Type" in response.headers:
             logger.debug("Returning content type: '%s'", response.headers["Content-Type"])
-            print "Content-Type: " + response.headers["Content-Type"]
+            print("Content-Type: " + response.headers["Content-Type"])
         else:
             logger.debug("No content type. Returning 'text/plain'.")
-            print "Content-Type: text/plain"
+            print("Content-Type: text/plain")
 
         # Blank separator before page body.
-        print
+        print()
 
         # Send the page body.  This is done in slices because of a Windows bug
         # See https://bugs.python.org/issue11395.
@@ -360,11 +360,11 @@ try:
         proxy = Proxy(incomingRequest, PROXIED_URL_BASE)
         proxy.do_proxy_request()
     else:
-        print "Status: 403\n\n<h1>Not allowed.</h1>"
+        print("Status: 403\n\n<h1>Not allowed.</h1>")
 
 
 except Exception:
-    print "Status: 500\n<h1>Error servicing request.</h1>"
+    print("Status: 500\n<h1>Error servicing request.</h1>")
     logger.error('Error servicing request.', exc_info=True)
     raise
 finally:

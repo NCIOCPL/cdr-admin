@@ -41,7 +41,7 @@ if request == "Log Out":
 try:
     conn = cdrdb.connect('CdrGuest')
     cursor = conn.cursor()
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
 
 #----------------------------------------------------------------------
@@ -58,7 +58,7 @@ if not subject or not body or not fromAddr:
                      WHERE s.name = ?""", session)
             row = cursor.fetchone()
             if row and row[0] and row[0].find('@') != -1: fromAddr = row[0]
-        except cdrdb.Error, info:
+        except cdrdb.Error as info:
             cdrcgi.bail('Failure retrieving your email address: %s'
                     % info[1][0])
     form = """\
@@ -98,7 +98,7 @@ try:
     recipients = []
     for row in cursor.fetchall():
         recipients.append(row[0])
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Failure retrieving email addresses: %s' % info[1][0])
 
 #----------------------------------------------------------------------

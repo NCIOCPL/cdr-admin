@@ -46,7 +46,7 @@ if request == "Log Out":
 try:
     conn   = cdrdb.connect()
     cursor = conn.cursor()
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
 
 #----------------------------------------------------------------------
@@ -62,7 +62,7 @@ def getMailerTypes():
                    ORDER BY value""", timeout = 300)
         for row in cursor.fetchall():
             types.append(row[0])
-    except cdrdb.Error, info:
+    except cdrdb.Error as info:
         cdrcgi.bail('Failure fetching mailer types: %s' % info[1][0])
     return types
 
@@ -221,7 +221,7 @@ try:
 """ % (mailerTypeLabel, changeCategory, count)
         mailerTypeLabel = "&nbsp;"
         row = cursor.fetchone()
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Failure executing query: %s' % info[1][0])
 
 if lastMailerType:

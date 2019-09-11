@@ -57,7 +57,7 @@ class DocFileInfo:
         try:
             fullpath = "%s/%s" % (baseDir, filename)
             self.fsize = os.stat(fullpath).st_size
-        except Exception, info:
+        except Exception as info:
             # Won't always exist
             self.fname = None
 

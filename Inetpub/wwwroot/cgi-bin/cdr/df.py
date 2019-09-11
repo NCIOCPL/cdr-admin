@@ -28,20 +28,20 @@ class Disk:
         self.used = self.total - self.free
 
     def show(self):
-        print "%s DRIVE" % self.drive
-        print "  TOTAL: %13s (%s)" % (self.total, human(self.total))
-        print "   USED: %13s (%s)" % (self.used, human(self.used))
-        print "   FREE: %13s (%s)" % (self.free, human(self.free))
-        print ""
+        print("%s DRIVE" % self.drive)
+        print("  TOTAL: %13s (%s)" % (self.total, human(self.total)))
+        print("   USED: %13s (%s)" % (self.used, human(self.used)))
+        print("   FREE: %13s (%s)" % (self.free, human(self.free)))
+        print("")
 
-print "Content-type: text/plain"
-print ""
+print("Content-type: text/plain")
+print("")
 
 try:
     import ctypes
     Disk("C").show()
     Disk("D").show()
-except Exception, e:
-    print e
+except Exception as e:
+    print(e)
 except:
-    print "Unexpected error"
+    print("Unexpected error")

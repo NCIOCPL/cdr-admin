@@ -57,7 +57,7 @@ if not docId:
 try:
     conn   = cdrdb.connect()
     cursor = conn.cursor()
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
 
 #----------------------------------------------------------------------
@@ -81,7 +81,7 @@ try:
     if not row:
         cdrcgi.bail("No such document CDR%010d" % id)
     title = row[0]
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Failure retrieving document title: %s' % info[1][0])
 
 #----------------------------------------------------------------------
@@ -198,7 +198,7 @@ try:
        row[2] or "&nbsp;",
        row[3] or "&nbsp;")
         row = cursor.fetchone()
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Failure executing query: %s' % info[1][0])
 
 cdrcgi.sendPage(html + """\

@@ -155,7 +155,7 @@ SELECT DISTINCT q1.doc_id, q1.value
             AND q2.path LIKE '%MediaID/@cdr:ref'
        ORDER BY q1.value""")
         rows = cursor.fetchall()
-    except cdrdb.Error, info:
+    except cdrdb.Error as info:
         cdrcgi.bail('Database connection failure: %s' % info[1][0])
 
     # Once we have all of the records per document type start

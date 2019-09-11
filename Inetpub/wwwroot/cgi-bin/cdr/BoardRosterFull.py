@@ -147,7 +147,7 @@ elif request == SUBMENU:
 try:
     conn = cdrdb.connect("CdrGuest")
     cursor = conn.cursor()
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
 
 # ---------------------------------------------------------------------
@@ -171,7 +171,7 @@ def getBoardName(id):
         if not rows:
             cdrcgi.bail('Failure looking up title for CDR%s' % id)
         return cleanTitle(rows[0][0])
-    except Exception, e:
+    except Exception as e:
         cdrcgi.bail('Looking up board title: %s' % str(e))
 
 #----------------------------------------------------------------------
@@ -205,7 +205,7 @@ SELECT DISTINCT board.id, board.title
         for id, title in rows:
             if id != 256088:
                 allBoards[id] = cleanTitle(title)
-    except cdrdb.Error, info:
+    except cdrdb.Error as info:
         cdrcgi.bail('Database query failure: %s' % info[1][0])
     return allBoards
 
@@ -418,7 +418,7 @@ try:
         boardName = getBoardName(boardId)
         boardMembers.append([docId, boardId, boardName, term_start, name, ge])
 
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Database query failure: %s' % info[1][0])
 
 # Sorting the list alphabetically by board member

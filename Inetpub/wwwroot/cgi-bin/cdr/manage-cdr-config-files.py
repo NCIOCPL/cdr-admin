@@ -4,14 +4,16 @@
 Admin interface for managing CDR configuration in the /etc directory.
 """
 
+import os
 import cdr
 import cdrcgi
 
 class Control(cdrcgi.Control):
 
     LOGNAME = "config-files"
-    DIRECTORY = r"{}:\etc".format(cdr.WORK_DRIVE)
-    FIX_PERMISSIONS = r"{}:\cdr\bin\fix-permissions.cmd".format(cdr.WORK_DRIVE)
+    DIRECTORY = cdr.ETC.replace("/", os.path.sep)
+    FIX_PERMISSIONS = f"{cdr.BASEDIR}/bin/fix-permissions.cmd"
+    FIX_PERMISSIONS = FIX_PERMISSIONS.replace("/", os.path.sep)
     FILES = "apphosts.rc", "env.rc", "dbports", "dbpw", "pw", "tier.rc"
 
     def __init__(self):
@@ -24,7 +26,7 @@ class Control(cdrcgi.Control):
     def content(self):
         if not hasattr(self, "_content"):
             content = self.fields.getvalue("content", self.original)
-            self._content = content.decode("utf-8").replace("\r", "")
+            self._content = content.replace("\r", "")
         return self._content
 
     @property
@@ -42,8 +44,8 @@ class Control(cdrcgi.Control):
     @property
     def original(self):
         if not hasattr(self, "_original"):
-            with open(self.filepath, "rb") as fp:
-                self._original = fp.read().decode("utf-8").replace("\r", "")
+            with open(self.filepath, encoding="utf-8", newline="\n") as fp:
+                self._original = fp.read()
         return self._original
 
     def populate_form(self, form):
@@ -63,8 +65,8 @@ class Control(cdrcgi.Control):
 
     def show_report(self):
         if self.content.strip() and self.content != self.original:
-            with open(self.filepath, "wb") as fp:
-                fp.write(self.content.encode("utf-8"))
+            with open(self.filepath, "w", encoding="utf-8") as fp:
+                fp.write(self.content)
             self.extra = "Saved new values for {}".format(self.filepath)
             cmd = r"{} {}".format(self.FIX_PERMISSIONS, self.filepath)
             result = cdr.runCommand(cmd)
@@ -90,8 +92,7 @@ function change_file() {{
         var url = "/cgi-bin/cdr/{}?Session={}&filename=" + filename;
         window.location.href = url;
     }}
-}}""".format(#cdr.HOST_NAMES[2],
-    self.script, self.session))
+}}""".format(self.script, self.session))
         self.populate_form(form)
         form.send()
 

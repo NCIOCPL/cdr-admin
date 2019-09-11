@@ -21,7 +21,7 @@ def getParms(id):
      SELECT longURL from url_parm_set
       WHERE id = ?""", id)
         rows = cursor.fetchall()
-    except cdrdb.Error, info:
+    except cdrdb.Error as info:
         cdrcgi.bail('Failure selecting parms: %s' % (info[1][0]))
 
     return eval(rows[0][0])
@@ -38,10 +38,10 @@ def sendPage(page, textType='html', location='', docType=''):
     Return:
         No return.  After writing to the browser, the process exits.
     """
-    print """\
+    print("""\
 Content-type: text/%s
 
-%s""" % (textType, page[0])
+%s""" % (textType, page[0]))
     sys.exit(0)
 
 
@@ -71,7 +71,7 @@ version  = fields.getvalue("DocVersion") or None
 try:
     conn = cdrdb.connect('CdrGuest')
     cursor = conn.cursor()
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
 
 if qcParms == 'yes':

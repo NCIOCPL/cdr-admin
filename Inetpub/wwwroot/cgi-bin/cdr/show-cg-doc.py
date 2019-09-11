@@ -8,11 +8,11 @@ cursor   = cdrdb.connect('CdrGuest').cursor()
 titles   = ""
 
 def bail(message):
-    print """\
+    print("""\
 Content-type: text/html
 
 <p style='font-weight: bold; font-size: 12pt; color: red'>%s</p>
-""" % repr(message)
+""" % repr(message))
     sys.exit(0)
 
 def makeDoctypeList():
@@ -78,7 +78,7 @@ ORDER BY title""" % extra, docTitle)
                   cgi.escape(docTitle)).encode("utf-8")
         
 if not docId:
-    print """\
+    print("""\
 Content-type: text/html
 
 <html>
@@ -117,7 +117,7 @@ Content-type: text/html
    If you specify a title you may also optionally select a docuemnt type.
   </p>
  </body>
-</html>""" % (titles, makeDoctypeList())
+</html>""" % (titles, makeDoctypeList()))
     sys.exit(0)
 cursor.execute("SELECT xml FROM pub_proc_cg WHERE id = ?", docId)
 rows = cursor.fetchall()
@@ -161,7 +161,7 @@ try:
     doc = markup(etree.tostring(tree, pretty_print=True))
     #title = "CDR%010d" % int(docId)
     title = "CDR Vendor Document %s" % docId
-    print """\
+    print("""\
 Content-type: text/html;charset=utf-8
 
 <html>
@@ -178,6 +178,6 @@ h1 { color: maroon; font-size: 14pt; font-family: Verdana, Arial, sans-serif; }
   <h1>%s</h1>
   <pre>%s</pre>
  </body>
-</html>""" % (title, title, doc)
-except Exception, e:
+</html>""" % (title, title, doc))
+except Exception as e:
     bail(e)

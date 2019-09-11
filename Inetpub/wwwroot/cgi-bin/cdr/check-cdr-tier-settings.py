@@ -102,7 +102,7 @@ for role in sorted(ROLES):
         else:
             status = CHECK
         rows.append((role, host.dns or "", host.ip or "", status))
-    except Exception, e:
+    except Exception as e:
         rows.append((role, "", "", error(e)))
 tables.append(R.Table(host_columns, rows,
                       caption='Host Name Mappings on Windows Server',

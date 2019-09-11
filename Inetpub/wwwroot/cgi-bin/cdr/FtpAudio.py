@@ -52,12 +52,12 @@ ftpDone   = ''
 # ---------------------------------------------------------------------
 # Instantiate the Log class
 # ---------------------------------------------------------------------
-l   = cdr.Log(LOGNAME)
-l.write("FtpAudio - Started")
+logger = cdr.Logging.get_logger("FtpAudio")
+logger.info("FtpAudio - Started")
 if testMode:
-    l.write("Running in testmode")
+    logger.info("Running in testmode")
 else:
-    l.write("Running in livemode")
+    logger.info("Running in livemode")
 
 # Open the SFTP connection and login
 # ----------------------------------
@@ -71,9 +71,9 @@ keyFile = paramiko.RSAKey.from_private_key_file(SSH_KEY)
 c = paramiko.SSHClient()
 c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
-l.write("Connecting to {} ...".format(FTPSERVER))
+logger.info("Connecting to %s ...", FTPSERVER)
 c.connect(hostname = FTPSERVER, username = USER, pkey = keyFile)
-l.write("Connected")
+logger.info("Connected")
 
 #----------------------------------------------------------------------
 # Make sure we're logged in.
@@ -97,7 +97,7 @@ if request == cdrcgi.MAINMENU:
 # Copy the files from the FTP Server to the local network
 #----------------------------------------------------------------------
 if testMode:
-    l.write(request)
+    logger.info(request)
 
 if request == "Get Audio" and ftpDone != 'Y':
     # Create directory path and check if directory exists.
@@ -109,10 +109,10 @@ if request == "Get Audio" and ftpDone != 'Y':
        os.mkdir(os.path.join('d:\\cdr', WIN_DIR))
 
     try:
-        l.write(AUDIOPATH)
-        l.write(WIN_DIR)
-        l.write(NIX_DIR)
-        l.write(CIAT_DIR)
+        logger.info(AUDIOPATH)
+        logger.info(WIN_DIR)
+        logger.info(NIX_DIR)
+        logger.info(CIAT_DIR)
 
         # Checking if any zip files are available to be downloaded
         # but only include files following the naming convention
@@ -120,19 +120,20 @@ if request == "Get Audio" and ftpDone != 'Y':
         #  - Week_NNN_RevN.zip
         # --------------------------------------------------------
         cmd = "ls {}/Week_[0-9][0-9][0-9]{{_Rev[0-9],}}.zip | xargs -n 1 basename".format(IN_DIR)
-        l.write("Checking for files in FTP-dir:")
-        l.write("{}".format(IN_DIR))
+        logger.info("Checking for files in FTP-dir:")
+        logger.info(IN_DIR)
         stdin, stdout, stderr = c.exec_command(cmd)
 
         # Read the files and clean up file names
-        if not stderr.readlines():
+        errors = stderr.readlines()
+        if not errors:
             zipFiles = stdout.readlines()
             zipFiles = [str(x.strip()) for x in zipFiles]
         else:
             if not stdout.readlines():
                 cdrcgi.bail("No files available for download!")
             else:
-                cdrcgi.bail("Error: {}".format(repr(stderr.readlines())))
+                cdrcgi.bail("Error: {}".format(repr(errors)))
 
 
         # Read all files. We need this to be able and display the
@@ -141,20 +142,21 @@ if request == "Get Audio" and ftpDone != 'Y':
         allFiles = "ls {}/* | sed 's/.*Term_Audio\///'".format(IN_DIR)
         stdin, stdout, stderr = c.exec_command(allFiles)
 
-        if not stderr.readlines():
+        errors = stderr.readlines()
+        if not errors:
             allFiles = stdout.readlines()
             allFiles = [str(x.strip()) for x in allFiles]
 
             badFiles = []
-            l.write("Files found...")
+            logger.info("Files found...")
             for name in allFiles:
-                l.write(name)
+                logger.info(name)
                 if name not in zipFiles:
                     badFiles.append(name)
-            l.write("Bad files found...")
-            l.write(repr(badFiles))
+            logger.info("Bad files found...")
+            logger.info(repr(badFiles))
         else:
-            cdrcgi.bail("Error checking file names: {}".format(repr(stderr.readlines())))
+            cdrcgi.bail("Error checking file names: {}".format(repr(errors)))
 
         # Count the number of ZIP files found
         # -----------------------------------
@@ -162,18 +164,18 @@ if request == "Get Audio" and ftpDone != 'Y':
         for zipFile in zipFiles:
             if zipFile.endswith('.zip'): nZipFiles += 1
         if not nZipFiles:
-            l.write("No zip files found.")
-            l.write("Ftp done!")
+            logger.info("No zip files found.")
+            logger.info("Ftp done!")
             cdrcgi.bail('No Audio zip file(s) to download')
 
-        l.write("Found %d zip files:" % nZipFiles)
-        l.write("{}".format(zipFiles))
+        logger.info("Found %d zip files:", nZipFiles)
+        logger.info("%s", zipFiles)
 
         # Checking which zip files have already been downloaded earlier
         # -------------------------------------------------------------
         os.chdir("/cdr/{}".format(WIN_DIR))
         oldFiles = glob.glob('*.[zZ][iI][pP]')
-        l.write("Old files in /cdr/{}:\n{}".format(WIN_DIR, oldFiles))
+        logger.info("Old files in /cdr/%s:\n%s", WIN_DIR, oldFiles)
 
         # Download and move/rename all available Zip files
         # ------------------------------------------------
@@ -184,7 +186,7 @@ if request == "Get Audio" and ftpDone != 'Y':
             # First download the ZIP files...
             # -------------------------------
             if name.endswith('.zip'):
-                l.write("Zip file found: {}".format(name))
+                logger.info("Zip file found: %s", name)
 
                 # Don't overwrite files previously copied (unless in test mode)
                 # -------------------------------------------------------------
@@ -193,8 +195,8 @@ if request == "Get Audio" and ftpDone != 'Y':
                     cdrcgi.bail(msg.format(name))
 
                 targetFile = "/cdr/{}/{}".format(WIN_DIR, name)
-                l.write("Copy from: .../Audio/{}/{}".format(NIX_DIR, name))
-                l.write("       to: {}".format(targetFile))
+                logger.info("Copy from: .../Audio/%s/%s", NIX_DIR, name)
+                logger.info("       to: %s", targetFile)
 
                 if not testMode:
                     sftp = c.open_sftp()
@@ -202,11 +204,11 @@ if request == "Get Audio" and ftpDone != 'Y':
                              "/cdr/{}/{}".format(WIN_DIR, name))
                     sftp.close()
                 else:
-                    l.write("*** Test mode: file not downloaded")
+                    logger.info("*** Test mode: file not downloaded")
 
                 newFiles.append(name)
             else:
-                l.write("No zip file: {}".format(name))
+                logger.info("No zip file: %s", name)
 
             # ... then copy the file to the 'transferred' directory
             # This way we won't copy the file again the next time
@@ -217,10 +219,11 @@ if request == "Get Audio" and ftpDone != 'Y':
             if testMode:
                 cmd = "cp {}/{} {}/{}".format(IN_DIR, name, MV_DIR, name)
                 stdin, stdout, stderr = c.exec_command(cmd)
-
-                if stderr.readlines():
-                    l.write( "Error copying file in test mode!!!")
-                    l.write(stderr.readlines())
+                errors = stderr.readlines()
+                if errors:
+                    logger.error("Error copying file in test mode!!!")
+                    for error in errors:
+                        logger.error(error.rstrip())
                     cdrcgi.bail("Unable to copy file: {}".format(cmd))
 
                 # In test mode move the copied files or a 'live' run will fail
@@ -228,23 +231,25 @@ if request == "Get Audio" and ftpDone != 'Y':
                 newName = "{}.{}".format(name, now)
                 cmd = "mv {}/{} {}/{}".format(MV_DIR, name, MV_DIR, newName) 
                 stdin, stdout, stderr = c.exec_command(cmd)
-
-                if stderr.readlines():
-                    l.write( "Error moving test files in test mode!!!")
-                    l.write(stderr.readlines())
+                errors = stderr.readlines()
+                if errors:
+                    logger.error( "Error moving test files in test mode!!!")
+                    for error in errors:
+                        logger.error(error.rstrip())
                     cdrcgi.bail("Unable to move file: {}".format(cmd))
             else:
                 cmd = "mv {}/{} {}/{}".format(IN_DIR, name, MV_DIR, name)
                 stdin, stdout, stderr = c.exec_command(cmd)
-
-                if stderr.readlines():
-                    l.write( "Error moving file to CIAT directory!!!")
-                    l.write(stderr.readlines())
+                errors = stderr.readlines()
+                if errors:
+                    logger.error( "Error moving file to CIAT directory!!!")
+                    for error in errors:
+                        logger.error(error.rstrip())
                     cdrcgi.bail("Unable to move file: {}".format(cmd))
 
         ftpDone = 'Y'
         c.close()
-        l.write("Ftp download completed!")
+        logger.info("Ftp download completed!")
     except Exception as info:
         cdrcgi.bail(u"FTP Error: {}".format(info))
 

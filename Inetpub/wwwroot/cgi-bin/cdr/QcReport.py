@@ -55,6 +55,7 @@ import cdrcgi
 import cdrdb
 import os
 import re
+from cdrapi import Session
 
 #----------------------------------------------------------------------
 # Dynamically create the title of the menu section (request #809).
@@ -571,7 +572,7 @@ if not docId and not docTitle and not glossaryDefinition:
 try:
     conn = cdrdb.connect('CdrGuest')
     cursor = conn.cursor()
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
 
 #----------------------------------------------------------------------
@@ -683,7 +684,7 @@ if not docId:
             showTitleChoices(rows)
         intId = rows[0][0]
         docId = "CDR%010d" % intId
-    except cdrdb.Error, info:
+    except cdrdb.Error as info:
         cdrcgi.bail('Failure looking up document %s: %s' % (lookingFor,
                                                             info[1][0]))
 
@@ -724,7 +725,7 @@ if letUserPickVersion:
              WHERE id = ?
           ORDER BY num DESC""", intId)
         rows = cursor.fetchall()
-    except cdrdb.Error, info:
+    except cdrdb.Error as info:
         cdrcgi.bail('Failure retrieving document versions: %s' % info[1][0])
     form = u"""\
   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
@@ -1148,7 +1149,7 @@ if not docType:
         if not row:
             cdrcgi.bail("Unable to find document type for %s" % docId)
         docType = row[0]
-    except cdrdb.Error, info:
+    except cdrdb.Error as info:
             cdrcgi.bail('Unable to find document type for %s: %s' % (docId,
                                                                  info[1][0]))
     #----------------------------------------------------------------------
@@ -1215,7 +1216,7 @@ def getDocsLinkingToPerson(docId):
                AND path LIKE '/CTGovProtocol/%/@cdr:ref'""", docId)
         counts[4] = cursor.fetchall()[0][0]
 
-    except cdrdb.Error, info:
+    except cdrdb.Error as info:
         cdrcgi.bail('Failure retrieving link counts: %s' % info[1][0])
     return counts
 
@@ -1261,7 +1262,7 @@ def fixMailerInfo(doc):
                         mailerTypeOfChange = "Unable to retrieve change type"
                 else:
                     mailerResponseReceived = "Response not yet received"
-    except cdrdb.Error, info:
+    except cdrdb.Error as info:
         cdrcgi.bail('Failure retrieving mailer info for %s: %s' % (docId,
                                                                    info[1][0]))
     doc = re.sub("@@MAILER_DATE_SENT@@",         mailerDateSent,         doc)
@@ -1352,7 +1353,7 @@ def fixOrgReport(doc):
            AND org.int_val = ?
            AND org.path like '%@cdr:ref'
          GROUP BY prot.value""", intId)
-    except cdrdb.Error, info:
+    except cdrdb.Error as info:
         cdrcgi.bail('Failure retrieving Protocol info for %s: %s' % (intId,
                                                                    info[1][0]))
 
@@ -1412,7 +1413,7 @@ SELECT int_val
  WHERE doc_id = ?
    AND path = '/PDQBoardMemberInfo/BoardMemberName/@cdr:ref'""", intId)
 
-    except cdrdb.Error, info:
+    except cdrdb.Error as info:
         cdrcgi.bail('Failure retrieving Person ID for %s: %s' % (intId,
                                                                    info[1][0]))
 
@@ -1450,7 +1451,7 @@ SELECT person.doc_id, summary.value, audience.value, max(ppd.pub_proc) as jobid
    AND pp.pub_subset = 'Summary-PDQ Editorial Board'
  GROUP BY summary.value, person.doc_id, audience.value""", personId)
 
-    except cdrdb.Error, info:
+    except cdrdb.Error as info:
         cdrcgi.bail('Failure retrieving Summary info for CDR%s: %s' % (intId,
                                                                    info[1][0]))
 
@@ -1520,7 +1521,7 @@ SELECT mailer.doc_id, mailer.int_val, summary.value, response.value,
 
     try:
        cursor.execute(query)
-    except cdrdb.Error, info:
+    except cdrdb.Error as info:
        cdrcgi.bail('Failure retrieving Mailer info for batch ID %d: %s' % (batchId,
                                                                    info[1][0]))
 
@@ -1555,13 +1556,13 @@ SELECT mailer.doc_id, mailer.int_val, summary.value, response.value,
     # Database query to select the time of the mailers send
     # -----------------------------------------------------------------
     try:
-	query = """
+        query = """
 SELECT completed
   FROM pub_proc
  WHERE id = %d""" % batchId
         cursor.execute(query)
 
-    except cdrdb.Error, info:
+    except cdrdb.Error as info:
         cdrcgi.bail('Failure retrieving Mailer Date for batch %d: %s' % (batchId,
                                                                    info[1][0]))
     row = cursor.fetchone()
@@ -1615,9 +1616,9 @@ if version == "-1": version = None
 # Display error message if no filter exist for current docType
 # ------------------------------------------------------------
 if not filters.has_key(docType):
-    thisUser = cdr.idSessionUser('', session)
+    user_name = Session(session).user_name
     message = "QcReport - Filter for document type '%s' does not exist (%s)."
-    cdr.logwrite(message % (docType, thisUser[0]))
+    cdr.logwrite(message % (docType, user_name))
     doc = cdr.getDoc(session, docId, version = version or "Current",
                      getObject = 1)
     if type(doc) in (type(""), type(u"")):
@@ -1729,7 +1730,7 @@ def saveParms(parms):
      SELECT max(id) from url_parm_set""")
         row = cursor.fetchone()
 
-    except cdrdb.Error, info:
+    except cdrdb.Error as info:
         cdrcgi.bail('Failure inserting parms: %s' % (info[1][0]))
 
     return row[0]
@@ -1775,7 +1776,7 @@ if type(doc) == type(()):
 
 # Replace all utf-8 unicode chars with &#x...; character entities
 # Allows our macro substitutions to work without ascii decode errs
-doc = cdrcgi.decode(doc)
+doc = str(doc, "utf-8")
 
 # Perform any required macro substitions
 doc = re.sub("@@DOCID@@", docId, doc)

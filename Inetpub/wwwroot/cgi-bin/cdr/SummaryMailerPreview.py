@@ -61,11 +61,11 @@ where = tempfile.mktemp("mailerwork")
 abspath = os.path.abspath(where)
 try:
     os.mkdir(abspath)
-except Exception, info:
+except Exception as info:
     cdrcgi.bail("Cannot create directory %s" % abspath)
 try:
     os.chdir(abspath)
-except Exception, info:
+except Exception as info:
     cdrcgi.bail("Cannot cd to %s" % abspath)
 latex   = cdrxmllatex.makeLatex (resp[0], docType, "")
 filename = docId + ".tex"
@@ -107,7 +107,7 @@ try:
     psFile.close()
 except:
     cdrcgi.bail("Failure reading %s.ps" % docId)
-print """\
+print("""\
 Content-type: application/postscript
 
-%s""" % psDoc
+%s""" % psDoc)

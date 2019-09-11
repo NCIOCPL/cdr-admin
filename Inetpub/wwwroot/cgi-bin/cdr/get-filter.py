@@ -34,4 +34,4 @@ else:
     if doctype.lower() != "filter":
         print("Status: 400 not a filter document\n")
     else:
-        print("Content-type: text/xml\n\n" + xml.encode("utf-8"))
+        print(("Content-type: text/xml\n\n" + xml.encode("utf-8")))

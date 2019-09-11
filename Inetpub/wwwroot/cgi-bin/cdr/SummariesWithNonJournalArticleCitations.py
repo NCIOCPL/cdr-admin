@@ -122,7 +122,7 @@ elif request == SUBMENU:
 try:
     conn = cdrdb.connect('CdrGuest')
     cursor = conn.cursor()
-except Exception, e:
+except Exception as e:
     cdrcgi.bail("Unable to connect to the CDR database: %s" % e)
 
 #----------------------------------------------------------------------
@@ -259,7 +259,7 @@ class Citation:
             xml = response[0]
             try:
                 tree = etree.XML(xml)
-            except Exception, e:
+            except Exception as e:
                 debug_log("failure parsing %s: %s" % (repr(xml), e))
                 cdrcgi.bail("failure parsing %s: %s" % (repr(xml), e))
             for node in tree.iter("FormattedReference"):

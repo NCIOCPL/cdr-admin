@@ -17,7 +17,7 @@ def show_form():
     Let the user select the document and its version and output format
     """
 
-    print """\
+    print("""\
 Content-type: text/html
 
 <html>
@@ -65,7 +65,7 @@ Content-type: text/html
      which you can save to your local file system and pass on to
      Trados for translation.</p>
  </body>
-</html>"""
+</html>""")
 
 def markup_tag(match):
     """
@@ -152,7 +152,7 @@ def strip(xml):
         etree.strip_attributes(root, "PdqKey")
         return etree.tostring(root, pretty_print=True, encoding="utf-8",
                               xml_declaration=True)
-    except Exception, e:
+    except Exception as e:
         bail("processing XML document: {}".format(e))
 
 def get_version(session, doc_id, version_string):
@@ -256,11 +256,11 @@ def send_raw(doc, xml):
     if doc.version:
         name += "V{:d}".format(doc.version)
     name += ".xml"
-    print(u"""\
+    print((u"""\
 ContentType: text/xml;charset=utf-8
 Content-disposition: attachment; filename={}
 
-{}""".format(name, xml).encode("utf-8"))
+{}""".format(name, xml).encode("utf-8")))
 
 def send_formatted(doc, xml, logger):
     """
@@ -276,7 +276,7 @@ def send_formatted(doc, xml, logger):
         title = "CDR Document {}".format(doc.cdr_id)
         if doc.version:
             title += " (version {:d})".format(doc.version)
-        print(u"""\
+        print((u"""\
 Content-type: text/html;charset=utf-8
 
 <html>
@@ -293,8 +293,8 @@ h1 {{ color: maroon; font-size: 14pt; font-family: Verdana, Arial; }}
   <h1>{}</h1>
   <pre>{}</pre>
  </body>
-</html>""".format(title, title, markup(xml)).encode("utf-8"))
-    except Exception, e:
+</html>""".format(title, title, markup(xml)).encode("utf-8")))
+    except Exception as e:
         logger.exception("rendering formatted xml")
         bail(e)
 

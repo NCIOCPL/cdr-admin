@@ -171,7 +171,7 @@ class Control(cdrcgi.Control):
                 fp = open(self.CACHE, "w")
                 pickle.dump(filter_sets, fp)
                 fp.close()
-            except Exception, e:
+            except Exception as e:
                 cache_warning = "Failure refreshing filter set cache: %s" % e
         opts = {
             cdrcgi.DOCID: self.cdr_id,
@@ -297,7 +297,7 @@ class Control(cdrcgi.Control):
                 if cdr_id not in self.all_filter_ids:
                     cdrcgi.bail("%s is not a filter on the CDR %s server" %
                                 (cdr_id, self.TIER.name))
-            except Exception, e:
+            except Exception as e:
                 cdrcgi.bail("%s is not a well-formed CDR ID" % repr(spec))
 
     @staticmethod

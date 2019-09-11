@@ -34,6 +34,6 @@ if session:
         target = "https://%s/%s" % (webserver, target.lstrip("/"))
     delimiter = ("?" in target) and "&" or "?"
     url = "%s%sSession=%s" % (target, delimiter, session)
-    print "Location: %s\n" % url
+    print("Location: %s\n" % url)
 else:
-    print "Status: 401 Unauthorized\n"
+    print("Status: 401 Unauthorized\n")

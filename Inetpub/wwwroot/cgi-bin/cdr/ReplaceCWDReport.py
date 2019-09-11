@@ -67,7 +67,7 @@ if docId:
     # Validate doc ID format
     try:
         result = cdr.exNormalize(docId.upper())
-    except cdr.Exception, info:
+    except cdr.Exception as info:
         cdrcgi.bail('Doc ID "%s" is not a recognized CDR ID format' % docId)
     else:
         docId = str(result[1])
@@ -95,7 +95,7 @@ for i, h in enumerate(headings):
 # Open the file
 try:
     fp = open(SRC_FILE, "r")
-except IOError, info:
+except IOError as info:
     cdrcgi.bail("Unable to open log file: %s" % info)
 
 rows = []

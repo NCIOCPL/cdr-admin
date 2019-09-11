@@ -215,8 +215,8 @@ for protocolType in sorted(protocolTypes.values()):
             sheet.write(row, 2, "\n".join(doc.terms), styles.left)
             sheet.write(row, 3, doc.status, styles.left)
 
-print "Content-type: application/vnd.ms-excel"
-print "Content-Disposition: attachment; filename=SemanticTypeReport-%s.xls" % t
-print
+print("Content-type: application/vnd.ms-excel")
+print("Content-Disposition: attachment; filename=SemanticTypeReport-%s.xls" % t)
+print()
 
 styles.book.save(sys.stdout)

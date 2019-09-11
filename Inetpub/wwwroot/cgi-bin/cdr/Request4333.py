@@ -128,9 +128,9 @@ def createReport(cursor, startDate, endDate):
         pass
     now = datetime.datetime.now()
     stamp = now.strftime("%Y%m%d%H%M%S")
-    print "Content-type: application/vnd.ms-excel"
-    print "Content-Disposition: attachment; filename=TermNames-%s.xls" % stamp
-    print
+    print("Content-type: application/vnd.ms-excel")
+    print("Content-Disposition: attachment; filename=TermNames-%s.xls" % stamp)
+    print()
     styles.book.save(sys.stdout)
 
 #----------------------------------------------------------------------

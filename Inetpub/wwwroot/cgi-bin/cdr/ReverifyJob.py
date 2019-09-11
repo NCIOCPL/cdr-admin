@@ -145,7 +145,7 @@ try:
 
 except TypeError:
     e = sys.exc_info()[0]
-    print '*** Error: %s' % e
+    print('*** Error: %s' % e)
 
     cdr.logwrite('*** Error: Submitting Publishing Job failed', LOGFILE)
     sys.exit(1)

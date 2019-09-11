@@ -56,11 +56,11 @@ if request == "Unblock":
                 try:
                     cdr.unblockDoc(session, doc_id)
                     message = "Successfully unblocked CDR%s" % doc_id
-                except Exception, e:
+                except Exception as e:
                     error = e.message[0]
             else:
                 error = "CDR%s was not blocked" % doc_id
-        except Exception, e:
+        except Exception as e:
             error = e.message[0]
 
 #----------------------------------------------------------------------

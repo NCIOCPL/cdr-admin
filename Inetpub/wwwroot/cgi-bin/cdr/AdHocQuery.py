@@ -108,6 +108,6 @@ try:
 </html>
 """
 
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Database failure: %s' % info[1][0])
 cdrcgi.sendPage(u"".join(html))

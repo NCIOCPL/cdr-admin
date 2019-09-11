@@ -58,7 +58,7 @@ def showTree(node, level = 0):
     global html, docId
     if not level:
         html += "<H3>Hierarchy from %s</H3><PRE>\n" % node.name
-    showTerm(node, level, node.id == `docId`)
+    showTerm(node, level, node.id == str(docId))
     if node.children:
         for child in node.children:
             showTree(child, level + 1)
@@ -103,7 +103,7 @@ SELECT DISTINCT d.id, d.title
             docId = str(rows[0][0])
         else:
             showTermList(rows)
-    except cdrdb.Error, info:
+    except cdrdb.Error as info:
         cdrcgi.bail('Failure connecting to CDR: %s' % info[1][0])
 
 #----------------------------------------------------------------------
@@ -133,7 +133,7 @@ else:
                                       "documents.")
     roots = []
     terms = termSet.terms
-    html  = "<H2>%s</H2>\n" % terms[`docId`].name
+    html  = "<H2>%s</H2>\n" % terms[str(docId)].name
     html += "<FONT COLOR='black'>"
     html += "<I>Click term to view formatted term document.<BR>\n"
     html += "Click document ID to navigate tree.</I></FONT><BR>\n"

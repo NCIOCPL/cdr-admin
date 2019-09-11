@@ -36,7 +36,7 @@ class Control(cdrcgi.Control):
                 return None
             doc_id = self.add_doc(xml)
             return self.message(doc_id, "green")
-        except Exception, e:
+        except Exception as e:
             return self.message(e, "red")
     def add_doc(self, xml):
         doc = cdr.Doc(xml, doctype="Summary")

@@ -94,7 +94,7 @@ try:
     for segment in bytes:
         fp.write(segment)
     fp.close()
-except Exception, e:
+except Exception as e:
     cdrcgi.bail("failure storing %s: %s" % (name, e))
 
 # Access the saved ZIP file and read the ZIP Code archive
@@ -114,13 +114,13 @@ try:
         try:
             result = cdr.runCommand(cmd)
             # print "Content-type: text/plain\n\n%s" % result.output
-        except Exception, e:
-            print "Content-type: text/plain\n\n%s\n%s" % (cmd, repr(e))
+        except Exception as e:
+            print("Content-type: text/plain\n\n%s\n%s" % (cmd, repr(e)))
         # sys.exit(0)
         
     else:
         payload = u"\n".join(names)
-except Exception, e:
+except Exception as e:
     cdrcgi.bail("failure opening %s: %s" % (name, e))
 
 #-----------------------------------------------

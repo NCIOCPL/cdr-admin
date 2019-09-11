@@ -555,7 +555,7 @@ class PublishingSystem:
             try:
                 path = r"%s\%s" % (cdr.PDQDTDPATH, value)
                 return os.stat(path) and True or False
-            except Exception, e:
+            except Exception as e:
                 return False
 
         def job_date(self, value):
@@ -594,7 +594,7 @@ def main():
     try:
         control = Control()
         control.run()
-    except Exception, e:
+    except Exception as e:
         cdrcgi.bail(str(e))
 
 if __name__ == "__main__":

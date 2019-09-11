@@ -56,7 +56,7 @@ def getBrandNames():
         cursor.execute(brandNameQuery, timeout = 300)
         rows = cursor.fetchall()
         cursor.close()
-    except cdrdb.Error, info:
+    except cdrdb.Error as info:
         cdrcgi.bail('Failure retrieving brand names: %s' %
                     info[1][0])
 
@@ -95,7 +95,7 @@ def getIndications(drugID):
         cursor.execute(indicationQuery, (drugID,), timeout=300)
         rows = cursor.fetchall()
         cursor.close()
-    except cdrdb.Error, info:
+    except cdrdb.Error as info:
         cdrcgi.bail('Failure retrieving indications: %s' %
                     info[1][0])
 
@@ -413,7 +413,7 @@ elif request == SUBMENU:
 try:
     conn = cdrdb.connect("CdrGuest")
     cursor = conn.cursor()
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
 
 #----------------------------------------------------------------------
@@ -464,7 +464,7 @@ try:
     cursor.execute(iQuery)
     iRows = cursor.fetchall()
     cursor.close()
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Failure retrieving initial indications: %s' %
                 info[1][0])
 
@@ -724,7 +724,7 @@ else:
     #----------------------------------------------------------------------
     try:
         rows = query.execute(cursor).fetchall()
-    except cdrdb.Error, info:
+    except cdrdb.Error as info:
         cdrcgi.bail('Failure retrieving indications2: %s' % info[1][0])
 
     # Sorting report by indication

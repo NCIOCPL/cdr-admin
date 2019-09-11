@@ -93,7 +93,7 @@ if action == BT_LOGOUT:
 try:
     conn = cdrdb.connect("CdrGuest")
     cursor = conn.cursor()
-except Exception, e:
+except Exception as e:
     cdrcgi.bail("Unable to connect to database", extra=[str(e)])
 
 #----------------------------------------------------------------------
@@ -308,7 +308,7 @@ query.log(logfile=cdr.DEFAULT_LOGDIR + "/media.log")
 try:
     docIds = [row[0] for row in query.execute(cursor).fetchall()]
     #print("docs: {}".format(docIds))
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     msg = "Database error executing MediaCaptionContent.py query"
     extra = (
         "query = %s" % query,

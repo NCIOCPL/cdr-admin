@@ -29,7 +29,7 @@ if help:
 #----------------------------------------------------------------------
 try:
     conn = cdrdb.connect('CdrGuest')
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Failure connecting to CDR: %s' % info[1][0])
 
 #----------------------------------------------------------------------
@@ -122,7 +122,7 @@ try:
     rows = cursor.fetchall()
     cursor.close()
     cursor = None
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Failure retrieving Drug documents: %s' % info[1][0])
 
 #----------------------------------------------------------------------

@@ -6,6 +6,7 @@
 # we wish to revert to an earlier version.
 #--------------------------------------------------------------
 import time, cgi, cdr, cdrcgi, cdrdb
+from cdrapi.users import Session
 
 TITLE   = "Replace CWD with Older Version"
 SCRIPT  = "ReplaceCWDwithVersion.py"
@@ -35,10 +36,10 @@ def logReplacement(session, docIdNum, docType, verStat, verNum,
     dateTime = time.strftime("%Y-%m-%d %H:%M:%S")
 
     # User ID
-    result = cdr.idSessionUser(session, session)
-    if type(result) not in (type(()), type([])):
-        cdrcgi.bail("Unable to generate logging info: %s" % result)
-    userId = result[0].encode('ascii', 'ignore')
+    try:
+        userId = Session(session).user_name
+    except Exception as e:
+        cdrcgi.bail(f"Unable to generate logging info: {e}")
 
     # Full message
     msg = "%s\t%d\t%s\t%s\t%d\t%d\t%s\t%s\t%s\t%s\t%s\n" % \
@@ -50,7 +51,7 @@ def logReplacement(session, docIdNum, docType, verStat, verNum,
         fp = open(LOGFILE, "a")
         fp.write(msg)
         fp.close()
-    except IOError, info:
+    except IOError as info:
         cdrcgi.bail("Error writing logfile %s: %s" % (LOGFILE, info))
 
 
@@ -124,7 +125,7 @@ if docIdStr and verStr:
             docType  = row[0]
             docTitle = row[1]
 
-    except cdrdb.Error, info:
+    except cdrdb.Error as info:
         cdrcgi.bail("Database error fetching doc type: %s" % str(info))
 
     # Did we find a doc type?  Also means we found a doc

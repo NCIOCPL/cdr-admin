@@ -103,9 +103,9 @@ class Control(cdrcgi.Control):
         ndocs = self.ndocs
         name = "DrugReviewReport-%s-%d_docs-%s_secs.xls" % (stamp, ndocs, secs)
         if not self.test:
-            print "Content-type: application/vnd.ms-excel"
-            print "Content-Disposition: attachment; filename=%s" % name
-            print
+            print("Content-type: application/vnd.ms-excel")
+            print("Content-Disposition: attachment; filename=%s" % name)
+            print()
         self.styles.book.save(sys.stdout)
 
     def collect_terms(self):

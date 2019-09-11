@@ -55,7 +55,7 @@ def queryForList(fName, conn=None):
         rows = cursor.fetchall()
         cursor.close()
         cursor = None
-    except cdrdb.Error, info:
+    except cdrdb.Error as info:
         cdrcgi.bail('Failure retrieving %s list from CDR: %s' %
                     (fName, info[1][0]))
 
@@ -98,7 +98,7 @@ def genSelectList(conn, fName):
 #----------------------------------------------------------------------
 try:
     conn = cdrdb.connect('CdrGuest')
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Failure connecting to CDR: %s' % info[1][0])
 
 #----------------------------------------------------------------------
@@ -162,7 +162,7 @@ try:
     rows = cursor.fetchall()
     cursor.close()
     cursor = None
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Failure retrieving Documentation documents: %s' %
                 info[1][0])
 

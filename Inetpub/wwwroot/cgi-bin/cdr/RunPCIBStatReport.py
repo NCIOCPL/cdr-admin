@@ -111,7 +111,7 @@ class Control(cdrcgi.Control):
         }
         try:
             cdr_stats.Control(opts).run()
-        except Exception, e:
+        except Exception as e:
             cdrcgi.bail("failure: %s" % e)
         page = cdrcgi.Page("CDR Administration",
                            subtitle="PCIB Statistics Report submitted",

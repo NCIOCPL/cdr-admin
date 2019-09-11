@@ -86,7 +86,7 @@ if fromDate > toDate:
 try:
     conn   = cdrdb.connect()
     cursor = conn.cursor()
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
 
 #----------------------------------------------------------------------
@@ -190,7 +190,7 @@ try:
         groupTotal += count
         grandTotal += count
         row = cursor.fetchone()
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Failure executing query: %s' % info[1][0])
 
 if groupTotal:

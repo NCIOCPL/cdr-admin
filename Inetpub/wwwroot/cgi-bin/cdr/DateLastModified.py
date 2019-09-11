@@ -238,7 +238,7 @@ try:
   </table>
 """
 
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Database failure: %s' % info[1][0])
 
 if format_ == "html":
@@ -250,7 +250,7 @@ else:
     now = datetime.datetime.now()
     name = "DateLastModified-%s.xls" % now.strftime("%Y%m%d%H%M%S")
     msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
-    print "Content-type: application/vnd.ms-excel"
-    print "Content-disposition: attachment; filename=%s" % name
-    print
+    print("Content-type: application/vnd.ms-excel")
+    print("Content-disposition: attachment; filename=%s" % name)
+    print()
     styles.book.save(sys.stdout)

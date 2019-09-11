@@ -158,7 +158,7 @@ class AudioFile:
         try:
             self.zipName = zipName
             self.nameId = int(getCellValue(sheet, row, 0))
-        except Exception, e:
+        except Exception as e:
             logger.exception("%s row %s", zipName, row)
             raise
         try:
@@ -185,7 +185,7 @@ class AudioFile:
             if self.language not in ('English', 'Spanish'):
                 raise Exception("unexpected language value '%s'" %
                                 self.language)
-        except Exception, e:
+        except Exception as e:
             logger.exception("CDR%d %r (%s) row %s in %s", self.nameId,
                              self.name, self.language, row, zipName)
             raise
@@ -325,7 +325,7 @@ class Request4926(ModifyDocs.Job):
             return_value = etree.tostring(root)
             self.report_rows += report_rows
             return return_value
-        except Exception, e:
+        except Exception as e:
             logger.exception(string_id)
             self.report_rows.append([string_id, str(e)])
             return doc.xml
@@ -358,7 +358,7 @@ def collectInfo(zipNames):
                 for row in range(sheet.nrows):
                     try:
                         mp3 = AudioFile(zipName, zipFile, sheet, row)
-                    except Exception, e:
+                    except Exception as e:
                         continue
                     lowerName = mp3.filename.lower()
                     if lowerName in fileNames:

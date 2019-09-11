@@ -147,7 +147,7 @@ try:
                 cre_date,
                 ver_date""" % (fromDate, toDate, dtQual))
     rows = cursor.fetchall()
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
 
 curDocType = None

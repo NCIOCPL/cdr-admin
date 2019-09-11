@@ -211,7 +211,7 @@ if (docList or jobList or docType):
                                failed, email, gkHost, gkPubTarget)
         extra = """
    <p>Export job %d created successfully</p><br>""" % jobId
-    except Exception, e:
+    except Exception as e:
         extra = """
    <p class='error'>Failure: %s</p><br>""" % e
 

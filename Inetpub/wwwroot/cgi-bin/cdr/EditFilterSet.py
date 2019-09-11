@@ -12,6 +12,7 @@ import cdr
 import cdrdb
 import cdrcgi
 import cgi
+import json
 import re
 
 #----------------------------------------------------------------------
@@ -165,7 +166,7 @@ def makeDelFunction():
                WHERE ms.name = ?
             ORDER BY ps.name""", setName)
         rows = cursor.fetchall()
-    except cdrdb.Error, info:
+    except cdrdb.Error as info:
         cdrcgi.bail("Database failure finding nested memberships: %s" %
                 info[1][0])
     if rows:
@@ -175,6 +176,7 @@ def makeDelFunction():
             body += '\\n"\n            + "%s' % row[0]
         return body + '");\n';
     else:
+        # Strip quote marks from around setName.
         return u"""\
         response = confirm("Are you sure you want to delete %s?");
         if (response) {
@@ -182,7 +184,7 @@ def makeDelFunction():
             frm.doWhat.value = 'Delete';
             frm.submit();
         }
-""" % cdrcgi.unicodeToJavaScriptCompatible(cdr.toUnicode(setName))
+""" % json.dumps(setName)[1:-1]
 
 #----------------------------------------------------------------------
 # Display the CDR document form.
@@ -443,9 +445,9 @@ if doWhat == 'Delete':
         cdrcgi.bail("Action not permitted for this account.")
     try:
         cdr.delFilterSet(session, cdr.toUnicode(setName))
-    except StandardError, args:
+    except StandardError as args:
         cdrcgi.bail("Failure deleting filter set")
-    except UnicodeDecodeError, args:
+    except UnicodeDecodeError as args:
         cdrcgi.bail(u"Unicode decode error deleting filter set")
     except:
         cdrcgi.bail("Unknown failure deleting filter set")
@@ -469,9 +471,9 @@ if doWhat == 'Save':
         newSet = cdr.FilterSet(newName, setDesc, setNotes, setMemberList)
         try:
             cdr.addFilterSet(session, newSet)
-        except StandardError, args:
+        except StandardError as args:
             cdrcgi.bail("Failure adding new filter set")
-        except UnicodeDecodeError, args:
+        except UnicodeDecodeError as args:
             cdrcgi.bail(u"Unicode decode error saving new filter set")
         except:
             cdrcgi.bail("Unknown failure adding new filter set")
@@ -482,9 +484,9 @@ if doWhat == 'Save':
         oldSet = cdr.FilterSet(setName, setDesc, setNotes, setMemberList)
         try:
             cdr.repFilterSet(session, oldSet)
-        except StandardError, args:
+        except StandardError as args:
             cdrcgi.bail(u"Failure storing changes to filter set")
-        except UnicodeDecodeError, args:
+        except UnicodeDecodeError as args:
             cdrcgi.bail(u"Unicode decode error updating filter set")
         except:
             cdrcgi.bail("Unknown failure storing changes to filter set")

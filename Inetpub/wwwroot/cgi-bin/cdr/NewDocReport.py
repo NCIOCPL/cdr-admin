@@ -206,7 +206,7 @@ try:
   GROUP BY name, dstat
   ORDER BY name, dstat""")
     rows = cursor.fetchall()
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
 
 for row in rows:

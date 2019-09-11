@@ -247,7 +247,7 @@ class Item:
             for ol in root.iter("ol", "ul"):
                 for a in ol.findall("li/a"):
                     items.append(Item(a.text, a.get("href")))
-        except Exception, e:
+        except Exception as e:
             pass
         return items
 
@@ -284,6 +284,6 @@ page = B.HTML(
         etree.Comment("\n".join(list(Item.childless)))
     )
 )
-print "Content-type: text/html\n"
-print etree.tostring(page, method="html", doctype="<!DOCTYPE html>",
-                     pretty_print=True, encoding="utf-8")
+print("Content-type: text/html\n")
+print(etree.tostring(page, method="html", doctype="<!DOCTYPE html>",
+                     pretty_print=True, encoding="utf-8"))

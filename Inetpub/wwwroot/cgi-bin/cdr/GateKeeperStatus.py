@@ -35,7 +35,7 @@ cdr2gk.DEBUGLEVEL = 2 if logging else 0
 try:
     conn = cdrdb.connect("CdrGuest")
     cursor = conn.cursor()
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
 
 #----------------------------------------------------------------------
@@ -200,7 +200,7 @@ if jobId:
         cdrcgi.bail("Job ID must be an integer")
     try:
         response = cdr2gk.requestStatus('Summary', jobId, host=host)
-    except Exception, e:
+    except Exception as e:
         showForm(makeError(u"Job %s not found" % jobId, e))
 
     details = response.details
@@ -311,20 +311,20 @@ if action:
             cdrcgi.bail("CDR ID must be an integer")
         try:
             response = cdr2gk.requestStatus('SingleDocument', cdrId, host=host)
-        except Exception, e:
+        except Exception as e:
             showForm(makeError("Report for CDR%s not found" % cdrId, e))
         title = u"Location Status for Document CDR%s" % cdrId
     else:
         try:
             response = cdr2gk.requestStatus('DocumentLocation', host=host)
-        except Exception, e:
+        except Exception as e:
             showForm(makeError("Unable to generate report on all documents",
                                e))
         title = u"Location Status for All Documents"
 
     details = response.details
     docs = details and details.docs or []
-    print u"""\
+    print(u"""\
 Content-type: text/html
 
 <html>
@@ -353,7 +353,7 @@ Content-type: text/html
     <th>Date/Time</th>
     <th>Job ID</th>
     <th>Date/Time</th>
-   </tr>""" % (title, title)
+   </tr>""" % (title, title))
     docs.sort(lambda a,b: cmp(a.cdrId, b.cdrId))
 
     iDoc = pDoc = 0
@@ -375,7 +375,7 @@ Content-type: text/html
         if cdrId or not isRecorded:
             if not isRecorded:
                 pDoc += 1
-            print u"""\
+            print(u"""\
    <tr>
     <td>%s</td>
     <td>%s</td>
@@ -392,13 +392,13 @@ Content-type: text/html
                fix(doc.previewDateTime),
                fix(doc.liveJobId),
                fix(doc.liveDateTime),
-               isRecorded and 'OK' or 'Error')
+               isRecorded and 'OK' or 'Error'))
 
-    print u"""\
+    print(u"""\
   </table>
   <p>%d Records checked, %d Records not in pub_proc_cg</p>
  </body>
-</html>""" % (iDoc, pDoc)
+</html>""" % (iDoc, pDoc))
     sys.exit(0)
 
 showForm()

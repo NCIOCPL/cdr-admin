@@ -60,7 +60,7 @@ class MenuItem:
         self.menuTypeName = menuTypeName
         self.name         = name
         self.status       = status
-	self.sortString   = sortString
+        self.sortString   = sortString
         self.parents      = []
         self.children     = []
     def __cmp__(self, other):
@@ -92,7 +92,7 @@ def loadMenuItems(menuType):
             menuStatus   = None
             displayName  = None
             parentId     = None
-	    sortString   = None
+            sortString   = None
             for child in node:
                 if child.tag == "TermId":
                     termId = int(child.text)
@@ -106,8 +106,8 @@ def loadMenuItems(menuType):
                     displayName = child.text
                 elif child.tag == "ParentId":
                     parentId = int(child.text)
-		elif child.tag == "SortString":
-		    sortString = child.text
+                elif child.tag == "SortString":
+                    sortString = child.text
 
             if termId and termName and menuTypeName:
                 if menuTypeName not in menuTypes:

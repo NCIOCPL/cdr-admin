@@ -85,11 +85,11 @@ if not email or "@" not in email:
 try:
     batch = cdrbatch.CdrBatch(jobName=section, email=email, args=args,
                               command="lib/Python/CdrLongReports.py")
-except Exception, e:
+except Exception as e:
     cdrcgi.bail("Failure creating batch job: %s" % repr(e))
 try:
     batch.queue()
-except Exception, e:
+except Exception as e:
     cdrcgi.bail("Unable to start job: %s" % repr(e))
 jobId = batch.getJobId()
 batch.show_status_page(session, title, section, script, SUBMENU)

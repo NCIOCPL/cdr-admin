@@ -136,7 +136,7 @@ def lookupValueByMapId(mapRowId):
             cdrcgi.bail("Error: unable to find value row for id %d" \
                         "<br>Was it already deleted?"
                         % mapRowId)
-    except Exception, info:
+    except Exception as info:
         cdrcgi.bail("Database error looking up value by map row id=%d: %s" \
                      % (mapRowId, str(info)))
 
@@ -301,7 +301,7 @@ if request == "Save Changes":
                      WHERE id = ?""", (newValue, rowId))
                 conn.commit()
                 numChanges += 1
-            except Exception, e:
+            except Exception as e:
                 errors.append("failure setting external_map.bogus column "
                               "to '%s' for row %s: %s" % (newValue,
                                         lookupValueByMapId(rowId), str(e)))
@@ -330,7 +330,7 @@ if request == "Save Changes":
                          WHERE id = ?""", (newValue, rowId))
                     conn.commit()
                     numChanges += 1
-                except Exception, e:
+                except Exception as e:
                     errors.append(\
                         "failure setting external_map.mappable column "
                         "to '%s' for row %d: %s" % (newValue, rowId, str(e)))
@@ -376,7 +376,7 @@ if request == "Save Changes":
                                  "deleted by %s" % (key, usageName, mapValue,
                                                     docId, uName), logFile)
                     numDeletions += 1
-                except Exception,info:
+                except Exception as info:
                     error = "Failure deleting row %d = %s<br>%s" % \
                              (key, mapValue, str(info))
                     cdr.logwrite(error, logFile)

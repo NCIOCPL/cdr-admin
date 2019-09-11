@@ -68,8 +68,8 @@ def main():
         ),
         builder.BODY(builder.TABLE(caption, tbody), builder.CLASS("report"))
     )
-    print "Content-type: text/html\n"
-    print etree.tostring(page, pretty_print=True)
+    print("Content-type: text/html\n")
+    print(etree.tostring(page, pretty_print=True))
 
 if __name__ == "__main__":
     main()

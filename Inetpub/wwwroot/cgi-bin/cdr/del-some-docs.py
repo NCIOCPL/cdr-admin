@@ -69,14 +69,14 @@ if ids:
     for i in ids:
         try:
             docId = cdr.normalize(i)
-        except Exception, e:
+        except Exception as e:
             html.append(u"<li>%s: %s</li>" % (cgi.escape(i), repr(e)))
             cdr.logwrite("%s: %s" % (repr(i), repr(e)), LOGFILE)
             continue
         try:
             opts = dict(validate=validate, reason=reason)
             result = cdr.delDoc(session, docId, **opts)
-        except cdr.Exception, e:
+        except cdr.Exception as e:
             html.append(u"<li>%s: %s</li>" % (docId, repr(e)))
             html.append(u"<li>e.message: %s</li>" % repr(e.message))
             html.append(u"<li>e.args: %s</li>" % repr(e.args))

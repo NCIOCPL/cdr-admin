@@ -65,9 +65,9 @@ class GPMailers:
         now = datetime.datetime.now()
         name = "BouncedGPMailer-%s.xls" % now.strftime("%Y%m%d%H%M%S")
         msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
-        print "Content-type: application/vnd.ms-excel"
-        print "Content-disposition: attachment; filename=%s" % name
-        print
+        print("Content-type: application/vnd.ms-excel")
+        print("Content-disposition: attachment; filename=%s" % name)
+        print()
         book.save(sys.stdout)
 
     def _active(self, cdr_id):

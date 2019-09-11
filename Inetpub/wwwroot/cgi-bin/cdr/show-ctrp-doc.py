@@ -9,15 +9,15 @@ docId   = fields.getvalue('id')
 cursor  = cdrdb.connect('CdrGuest').cursor()
 
 def bail(message):
-    print """\
+    print("""\
 Content-type: text/html
 
 <p style='font-weight: bold; font-size: 12pt; color: red'>%s</p>
-""" % repr(message)
+""" % repr(message))
     sys.exit(0)
 
 if not docId:
-    print """\
+    print("""\
 Content-type: text/html
 
 <html>
@@ -32,7 +32,7 @@ Content-type: text/html
     <th>Disposition</th>
     <th>CDR ID</th>
     <th>NCT ID</th>
-   </tr>"""
+   </tr>""")
     cursor.execute("""\
   SELECT i.ctrp_id, d.disp_name, i.cdr_id, i.nct_id
     FROM ctrp_import i
@@ -47,11 +47,11 @@ ORDER BY i.ctrp_id""")
     <td><a href="ShowCdrDocument.py?doc-id=%s&Request=Submit">%s</a></td>
     <td><a href="http://clinicaltrials.gov/ct2/show/%s">%s</a></td>
    </tr>""" % (ctrpId, ctrpId, disp, cdrId, cdrId, nctId, nctId)
-        print row.encode("utf-8")
-    print """\
+        print(row.encode("utf-8"))
+    print("""\
   </table>
  </body>
-</html>"""
+</html>""")
     sys.exit(0)
 
 cursor.execute("SELECT doc_xml FROM ctrp_import WHERE ctrp_id = ?", docId)
@@ -96,7 +96,7 @@ try:
     doc = markup(etree.tostring(tree, pretty_print=True, encoding='utf-8',
                                 xml_declaration=True))
     title = "CTRP Document %s" % docId
-    print """\
+    print("""\
 Content-type: text/html;charset=utf-8
 
 <html>
@@ -113,6 +113,6 @@ h1 { color: maroon; font-size: 14pt; font-family: Verdana, Arial, sans-serif; }
   <h1>%s</h1>
   <pre>%s</pre>
  </body>
-</html>""" % (title, title, doc)
-except Exception, e:
+</html>""" % (title, title, doc))
+except Exception as e:
     bail(e)

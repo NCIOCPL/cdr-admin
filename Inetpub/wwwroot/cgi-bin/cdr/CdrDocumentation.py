@@ -42,7 +42,7 @@ def get_help_sections():
    WHERE path = '/DocumentationToC/ToCTitle'
 ORDER BY value""")
         return cursor.fetchall()
-    except Exception, e:
+    except Exception as e:
         cdrcgi.bail("Unable to connect to CDR database")
 
 #----------------------------------------------------------------------

@@ -16,7 +16,7 @@ memberId   = fields.getvalue("member")
 try:
     conn = cdrdb.connect("CdrGuest")
     cursor = conn.cursor()
-except Exception, e:
+except Exception as e:
     cdrcgi.sendPage(u'<Failure>%s</Failure>' % e, 'xml')
 
 #----------------------------------------------------------------------
@@ -29,7 +29,7 @@ def getBoardName(id):
         if not rows:
             cdrcgi.bail('Failure looking up title for CDR%s' % id)
         return cleanTitle(rows[0][0])
-    except Exception, e:
+    except Exception as e:
         cdrcgi.sendPage(u'<Failure>%s</Failure' % e, 'xml')
 
 #----------------------------------------------------------------------
@@ -53,7 +53,7 @@ SELECT path, value
  AND   doc_id = ?
  ORDER BY path""", orgId)
 
-    except cdrdb.Error, info:
+    except cdrdb.Error as info:
         cdrcgi.bail('Database query failure for BoardManager: %s' % info[1][0])
     return cursor.fetchall()
 
@@ -85,7 +85,7 @@ LEFT OUTER JOIN query_term q
      WHERE g.doc_id IN (%s)
        AND g.path = '/PDQBoardMemberInfo/GovernmentEmployee'
   ORDER BY q.path""" % ','.join(["'%d'" % id for id in boardIds]))
-    except cdrdb.Error, info:
+    except cdrdb.Error as info:
         cdrcgi.bail('Database query failure for SpecificInfo: %s' % info[1][0]+
                     '<br>Board has No Board Members')
 
@@ -386,7 +386,7 @@ def allBoardMembers():
                                       term_start, name, boardId)
             root.append(boardMember.toNode())
         return etree.tostring(root, pretty_print=True)
-    except Exception, e:
+    except Exception as e:
         raise
         cdrcgi.sendPage(u'<Failure>%s</Failure>' % e, 'xml')
 
@@ -421,7 +421,7 @@ def collectMembersForBoard(boardId):
         for docId in docIds:
             root.append(MemberDetails(docId).toNode())
         return etree.tostring(root, pretty_print=True)
-    except Exception, e:
+    except Exception as e:
         cdrcgi.sendPage(u"<Failure>%s</Failure>" % e, 'xml')
 
 if memberId:

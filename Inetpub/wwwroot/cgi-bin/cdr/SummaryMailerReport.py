@@ -104,7 +104,7 @@ if flavor not in ("4258", "4259"):
 #----------------------------------------------------------------------
 try:
     conn = cdrdb.connect(user='CdrGuest', timeout=300)
-except Exception, e:
+except Exception as e:
     cdrcgi.bail('Database connection failure: %s' % e)
 
 #----------------------------------------------------------------------
@@ -419,9 +419,9 @@ if board:
     else:
         report4259(sheet, styles, cursor, board, begin, end)
     stamp = time.strftime("%Y%m%d%H%M%S")
-    print "Content-type: application/vnd.ms-excel"
-    print "Content-Disposition: attachment; filename=SummMailRep-%s.xls" % stamp
-    print
+    print("Content-type: application/vnd.ms-excel")
+    print("Content-Disposition: attachment; filename=SummMailRep-%s.xls" % stamp)
+    print()
     styles.book.save(sys.stdout)
 
 else:

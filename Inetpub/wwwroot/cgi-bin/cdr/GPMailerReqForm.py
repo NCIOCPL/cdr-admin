@@ -308,7 +308,7 @@ try:
     conn = cdrdb.connect('CdrPublishing')
     conn.setAutoCommit(True)
     cursor = conn.cursor()
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
 
 #----------------------------------------------------------------------
@@ -324,7 +324,7 @@ if not check:
          WHERE t.name  = 'PublishingSystem'
            AND d.title = 'Mailers'""", timeout=90)
         rows = cursor.fetchall()
-    except cdrdb.Error, info:
+    except cdrdb.Error as info:
         cdrcgi.bail('Database failure looking up control document: %s' %
                     info[1][0])
     if len(rows) < 1:
@@ -341,7 +341,7 @@ if docId:
     # Simple case - user submitted single document id, isolate the digits
     try:
         intId = cdr.exNormalize(docId)[1]
-    except Exception, e:
+    except Exception as e:
         cdrcgi.bail(e)
 
     # Make sure the corresponding document exists in version control
@@ -360,7 +360,7 @@ if docId:
         # Document list contains one tuple of doc id + version number
         docVersion = row[0]
         docList = ((intId, docVersion),)
-    except cdrdb.Error, info:
+    except cdrdb.Error as info:
         cdrcgi.bail("Database error finding version for document %d: %s" % \
                     (intId, info[1][0]))
 
@@ -369,7 +369,7 @@ if docId:
         gp = GP(intId, docVersion, cursor)
         if not gp.email:
             cdrcgi.bail("No email address found in mailer contact block")
-    except Exception, e:
+    except Exception as e:
         cdrcgi.bail("Failure looking for email address in mailer contact "
                     "block: %s" % e)
 
@@ -381,7 +381,7 @@ if docId:
         try:
             if not rms.select("'%s'" % getOriginalMailType(), singleId=intId):
                 remailerFound = False
-        except Exception, e:
+        except Exception as e:
             cdrcgi.bail("failure finding original mailer for remail: %s" % e)
         if not remailerFound:
             cdrcgi.bail("Can't remail document - "
@@ -439,7 +439,7 @@ else:
                     docList.append(gp)
                     if len(docList) >= maxMailers:
                         break
-            except Exception, e:
+            except Exception as e:
                 if check:
                     problems.append(Problem(docId, docVersion, cursor))
                 else:
@@ -510,7 +510,7 @@ else:
                         docList.append(gp)
                         if len(docList) >= maxMailers:
                             break
-                except Exception, e:
+                except Exception as e:
                     if check:
                         problems.append(Problem(docId, docVersion, cursor))
                     else:
@@ -537,7 +537,7 @@ else:
             cursor.execute(rms.getDocIdVerQuery())
             docList = cursor.fetchall()
 
-        except cdrdb.Error, info:
+        except cdrdb.Error as info:
             cdrcgi.bail('Database failure selecting remailers: %s' % info[1][0])
 
 # Do we have any results?

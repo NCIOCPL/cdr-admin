@@ -92,10 +92,10 @@ def main():
     #filtered_doc = filter_doc(doc_xml, section)
     # <DB-section End>
 
-    print """\
+    print("""\
 Content-type: text/html; charset=utf-8
 
 <!DOCTYPE html>
-%s""" % lxml.html.tostring(filtered_doc, pretty_print=True)
+%s""" % lxml.html.tostring(filtered_doc, pretty_print=True))
 
 main()

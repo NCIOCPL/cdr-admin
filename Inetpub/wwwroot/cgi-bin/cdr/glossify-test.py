@@ -41,7 +41,7 @@ class Control(cdrcgi.Control):
         elapsed = (datetime.datetime.now() - self.started).total_seconds()
         if self.standalone:
             print(result)
-            print("elapsed: %f" % elapsed)
+            print(("elapsed: %f" % elapsed))
             exit(0)
         form.add("<fieldset>")
         form.add(form.B.LEGEND("Test Options"))

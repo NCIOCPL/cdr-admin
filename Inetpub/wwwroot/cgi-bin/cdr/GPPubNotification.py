@@ -158,7 +158,7 @@ National Cancer Institute</p>
 """ % (top, url, url)
     try:
         cdr.sendMailMime(GP.sender, addresses, GP.subject, body, 'html')
-    except Exception, e:
+    except Exception as e:
         raise Exception("failure sending email notice to %s: %s" %
                         (", ".join(addresses), e))
     mailerMode, mailerType = 'Email', 'GP publication notification email'
@@ -172,7 +172,7 @@ National Cancer Institute</p>
         tId = cdrmailcommon.recordMailer(session, gp.docId, gp.docId,
                                          mailerMode, mailerType, sent,
                                          address)
-    except Exception, e:
+    except Exception as e:
         raise Exception("Failure recording mailer to %s for CDR%d: %s" %
                         (gp.email, gp.docId, e))
     return tId
@@ -248,7 +248,7 @@ else:
 #----------------------------------------------------------------------
 # Show the user what we've done as we're sending out the mailers.
 #----------------------------------------------------------------------
-print """\
+print("""\
 Content-type: text/html
 
 <html>
@@ -272,37 +272,37 @@ Content-type: text/html
     <th>Name</th>
     <th>Email</th>
     <th>Mailer Tracking Doc</th>
-   </tr>"""
+   </tr>""")
 for docId in docIds:
     try:
         gp = GP(cursor, docId)
-    except Exception, e:
-        print """\
+    except Exception as e:
+        print("""\
    <tr>
     <td colspan='4' class='err'>Failure parsing CDR%d: %s</td>
-   </tr>""" % (docId, e)
+   </tr>""" % (docId, e))
         continue
     if not gp.email:
-        print """\
+        print("""\
    <tr>
     <td colspan='4' class='err'>CDR%d has no email address</td>
-   </tr>""" % gp.docId
+   </tr>""" % gp.docId)
     else:
         try:
             mailerId = sendPubNotificationEmail(gp, cursor, conn)
-            print (u"""\
+            print((u"""\
    <tr>
     <td>%d</td>
     <td>%s</td>
     <td>%s</td>
     <td>%s</td>
-   </tr>""" % (gp.docId, fix(gp.name), fix(gp.email), mailerId)).encode('utf-8')
-        except Exception, e:
-            print """\
+   </tr>""" % (gp.docId, fix(gp.name), fix(gp.email), mailerId)).encode('utf-8'))
+        except Exception as e:
+            print("""\
    <tr>
     <td colspan='5' class='err'>CDR%d: %s</td>
-   </tr>""" % (docId, e)
-print """\
+   </tr>""" % (docId, e))
+print("""\
   </table>
  </body>
-</html>"""
+</html>""")

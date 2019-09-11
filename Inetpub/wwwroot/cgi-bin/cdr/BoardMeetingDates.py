@@ -93,7 +93,7 @@ if request == "Log Out":
 try:
     conn   = cdrdb.connect('CdrGuest')
     cursor = conn.cursor()
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
 
 #----------------------------------------------------------------------
@@ -166,7 +166,7 @@ class Meeting:
             normalizedDate = normalizeDate(y, m, d)
             self.englishDate = time.strftime("%B %d, %Y", normalizedDate)
             self.dayOfWeek = time.strftime("%A", normalizedDate)
-        except Exception, e:
+        except Exception as e:
             # cdrcgi.bail("%s: %s" % (date, e))
             self.prettyDate = self.dayOfWeek = "???"
     def __cmp__(self, other):

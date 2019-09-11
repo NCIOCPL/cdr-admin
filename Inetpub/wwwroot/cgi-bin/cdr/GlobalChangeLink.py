@@ -76,7 +76,7 @@ if __name__ == "__main__":
     # Queue it up for starting
     try:
         batchJob.queue()
-    except Exception, info:
+    except Exception as info:
         cdrcgi.bail("Unable to start batch job: %s" % str(info))
 
     # Report to user

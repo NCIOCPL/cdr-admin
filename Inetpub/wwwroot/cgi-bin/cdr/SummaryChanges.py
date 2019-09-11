@@ -129,7 +129,7 @@ if not docId and not docTitle:
 try:
     conn = cdrdb.connect('CdrGuest')
     cursor = conn.cursor()
-except Exception, info:
+except Exception as info:
     cdrcgi.bail("Exception connecting to database: %s" % str(info))
 
 #----------------------------------------------------------------------
@@ -146,7 +146,7 @@ if docTitle:
              WHERE d.title LIKE ?
                AND t.name = 'Summary'""", param)
         rows = cursor.fetchall()
-    except Exception, info:
+    except Exception as info:
         cdrcgi.bail("Failure looking up document title: %s" % str(info))
     if not rows:
         cdrcgi.bail(u"No summary documents match %s" % docTitle)

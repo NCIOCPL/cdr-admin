@@ -27,4 +27,4 @@ if not rows:
 # Send it.
 #----------------------------------------------------------------------
 docXml = rows[0][0]
-print "Content-type: text/xml; charset=utf-8\n\n" + docXml.encode('utf-8')
+print("Content-type: text/xml; charset=utf-8\n\n" + docXml.encode('utf-8'))

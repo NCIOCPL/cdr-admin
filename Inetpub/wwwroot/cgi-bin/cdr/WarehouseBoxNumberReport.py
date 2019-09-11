@@ -94,7 +94,7 @@ def DrawDocumentRows(documents):
 try:
     conn = cdrdb.connect('CdrGuest')
     cursor = conn.cursor()
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
 
 #----------------------------------------------------------------------
@@ -125,7 +125,7 @@ and q.int_val = ?
 try:
     cursor.execute(sQuery, warehouseBoxNumber)
     rows = cursor.fetchall()
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
 for id, docTitle in rows:
     if id not in documents:
@@ -159,7 +159,7 @@ if not len(documents):
     try:
         cursor.execute(sQuery)
         rows = cursor.fetchall()
-    except cdrdb.Error, info:
+    except cdrdb.Error as info:
         cdrcgi.bail('Database connection failure: %s' % info[1][0])
 
     sId = "<table border =1><th>Allowable Warehouse Box Numbers<th>"

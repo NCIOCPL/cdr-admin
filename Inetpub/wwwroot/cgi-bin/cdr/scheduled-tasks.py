@@ -241,7 +241,7 @@ for node in tree:
     else:
         name = node.text.strip()[1:]
 if Task.HTML:
-    print """\
+    print("""\
 Content-type: text/html
 
 <!DOCTYPE html>
@@ -257,11 +257,11 @@ padding-top: 15px; }
   </style>
  </head>
  <body>
-  <h1>CDR Scheduled Tasks as of %s</h1>""" % when
+  <h1>CDR Scheduled Tasks as of %s</h1>""" % when)
 else:
-    print "Content-type: text/plain\n"
+    print("Content-type: text/plain\n")
 for task in tasks:
     if task.is_cdr_task():
-        print task
+        print(task)
 if Task.HTML:
-    print " </body>\n</html>"
+    print(" </body>\n</html>")

@@ -72,7 +72,7 @@ batch = cdrbatch.CdrBatch(jobName = "Published Documents Count",
                           command = command, email = email)
 try:
     batch.queue()
-except Exception, e:
+except Exception as e:
     cdrcgi.bail("Could not start job: " + str(e))
 jobId       = batch.getJobId()
 buttons     = [SUBMENU, cdrcgi.MAINMENU, "Log Out"]

@@ -33,7 +33,7 @@ class DocInfo:
                 raise cdr.Exception("Cannot find CDR%s" % docId)
         try:
             tree = etree.XML(rows[0][0].encode('utf-8'))
-        except Exception, e:
+        except Exception as e:
             raise cdr.Exception("parsing CDR%s: %s" % (docId, e))
         if tree.tag == 'Media':
             for medium in ('Image', 'Sound', 'Video'):
@@ -107,7 +107,7 @@ docId  = fields.getvalue('id') or cdrcgi.bail("Missing required 'id' parameter")
 docVer = fields.getvalue('ver') or ''
 try:
     info = DocInfo(cursor, docId, docVer)
-except Exception, e:
+except Exception as e:
     cdrcgi.bail(u"%s" % e)
 msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
 if info.docVer:

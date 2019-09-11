@@ -12,6 +12,7 @@ list managed by this script.
 import cdr
 import cdrcgi
 from cdrapi.settings import Tier
+from cdrapi.users import Session
 
 class Control(cdrcgi.Control):
     GROUP = LOGNAME = "glossary-servers"
@@ -32,7 +33,7 @@ class Control(cdrcgi.Control):
     def __init__(self):
         cdrcgi.Control.__init__(self, "Manage Glossary Servers")
         self.tier = Tier()
-        self.user = cdr.idSessionUser(self.session, self.session)[0]
+        self.user = Session(self.session).user_name
         self.buttons = self.SUBMIT, self.ADMINMENU, self.LOG_OUT
 
     @property

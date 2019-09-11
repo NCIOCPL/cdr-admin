@@ -1,7 +1,8 @@
 #----------------------------------------------------------------------
 # Report of documents linking to a specified glossary term.
 #----------------------------------------------------------------------
-import cdr, cdrdb, cdrcgi, cgi, re, string, time
+import cdr, cdrcgi, cgi, re, string, time
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -35,7 +36,7 @@ elif request == SUBMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if request == "Log Out": 
+if request == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
@@ -64,10 +65,10 @@ if not name and not id:
 # Connect to the CDR database.
 #----------------------------------------------------------------------
 try:
-    conn   = cdrdb.connect()
+    conn   = db.connect()
     cursor = conn.cursor()
-except cdrdb.Error, info:
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
+except Exception as e:
+    cdrcgi.bail('Database connection failure: %s' % e)
 
 #----------------------------------------------------------------------
 # Get the document ID.
@@ -84,9 +85,8 @@ else:
                                       + '/TermNameString'
                             AND value = ?""", name)
         rows = cursor.fetchall()
-    except cdrdb.Error, info:
-        cdrcgi.bail("Failure looking up glossary term '%s': %s" % (name,
-                                                                   info[1][0]))
+    except Exception as e:
+        cdrcgi.bail("Failure looking up glossary term '%s': %s" % (name, e))
     if len(rows) > 1: cdrcgi.bail("Ambiguous term name: '%s'" % name)
     if len(rows) < 1: cdrcgi.bail("Unknown term '%s'" % name)
     id = rows[0][0]
@@ -111,9 +111,8 @@ try:
     if not rows:
         cdrcgi.bail("Can't find GlossaryTermName document for CDR%s" % id)
     (name, source) = rows[0]
-except cdrdb.Error, info:
-    cdrcgi.bail('Failure fetching term name and source for CDR%s: %s' %
-                (id, info[1][0]))
+except Exception as e:
+    cdrcgi.bail(f'Failure fetching term name and source for CDR{id}: {e}')
 
 #----------------------------------------------------------------------
 # Get the list of documents which link to this glossary term.
@@ -131,15 +130,15 @@ try:
                       WHERE query_term.value = 'CDR%010d'
                    ORDER BY doc_type.name,
                             query_term.doc_id""" % id)
-except cdrdb.Error, info:
-    cdrcgi.bail('Failure fetching list of linking documents: %s' % info[1][0])
+except Exception as e:
+    cdrcgi.bail('Failure fetching list of linking documents: %s' % e)
 
 #----------------------------------------------------------------------
 # Start the page.
 #----------------------------------------------------------------------
 ellipsis = '.' * 70
 html = """\
-<!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
+<!DOCTYPE html>
 <html>
  <head>
   <title>%s - %s - CDR%010d</title>
@@ -188,9 +187,9 @@ html = """\
     <font size='3'>Documents Linked to Term Name</font>
    </i>
   </b>
-""" % (name, time.strftime("%B %d, %Y", now), id, ellipsis, name, ellipsis, 
+""" % (name, time.strftime("%B %d, %Y", now), id, ellipsis, name, ellipsis,
        source)
-   
+
 #----------------------------------------------------------------------
 # Display the report rows.
 #----------------------------------------------------------------------
@@ -240,14 +239,13 @@ try:
 
         resp = cdr.filterDoc(session, ['name:Glossary Link Report Filter'],
                              docId, parm = filterParms)
-        #cdrcgi.bail(resp[0])
         if type(resp) in (type(''), type(u'')):
             cdrcgi.bail(resp)
-        html += cdrcgi.decode(resp[0])
+        html += str(resp[0], "utf-8")
         row = cursor.fetchone()
 
-except cdrdb.Error, info:
-    cdrcgi.bail('Failure fetching linking document: %s' % info[1][0])
+except Exception as e:
+    cdrcgi.bail('Failure fetching linking document: %s' % e)
 
 if currentDoctype:
     html += """\

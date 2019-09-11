@@ -337,7 +337,7 @@ class Summary:
                             self.advisory_board = name
                         else:
                             self.editorial_board = name
-                    except Exception, e:
+                    except Exception as e:
                         self.advisory_board = "oops! (%s)" % e
             elif node.tag in ("MainTopics", "SecondaryTopics"):
                 self.topics.append(self.get_topic(node))
@@ -492,7 +492,7 @@ class Summary:
             for child in node.findall("SectMetaData/Diagnosis"):
                 try:
                     self.diagnoses.append(self.get_diagnosis_name(child))
-                except Exception, e:
+                except Exception as e:
                     self.diagnoses.append("oops: %s" % e)
             for child in node.findall("SectMetaData/SectionType"):
                 self.types.append(child.text)

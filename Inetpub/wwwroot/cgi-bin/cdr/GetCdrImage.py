@@ -108,7 +108,7 @@ if width:
             ratio = 1.0 * iHeight / iWidth
             height = int(round(width * ratio))
             image = image.resize((width, height), Image.ANTIALIAS)
-    except Exception, e:
+    except Exception as e:
         cdrcgi.bail("Failure resizing %s: %s" % (docId, str(e)))
 newImageFile = cStringIO.StringIO()
 if sharpen:

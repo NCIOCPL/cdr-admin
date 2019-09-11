@@ -86,7 +86,7 @@ if request == "Log Out":
 try:
     conn = cdrdb.connect('CdrGuest')
     cursor = conn.cursor()
-except Exception, e:
+except Exception as e:
     cdrcgi.bail('Database connection failure: %s' % e)
 
 #----------------------------------------------------------------------
@@ -333,9 +333,9 @@ def createReport(cursor, mailerType, changeCategory, startDate, endDate):
     except:
         pass
     stamp = time.strftime("%Y%m%d%H%M%S")
-    print "Content-type: application/vnd.ms-excel"
-    print "Content-Disposition: attachment; filename=SummMailRep-%s.xls" % stamp
-    print
+    print("Content-type: application/vnd.ms-excel")
+    print("Content-Disposition: attachment; filename=SummMailRep-%s.xls" % stamp)
+    print()
     styles.book.save(sys.stdout)
 
 #----------------------------------------------------------------------

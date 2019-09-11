@@ -27,6 +27,7 @@ header h1 span {
 header h1 span input {
     position: relative;
     bottom: 6px;
+    margin-left: 4px;
 }
 header h2 {
     background-color: #ffc;
@@ -96,6 +97,7 @@ label.clickable:hover { color: white; background-color: #936; }
 .labeled-field input, .labeled-field select, .labeled-field textarea {
     width: 300px; padding-left: 2px; padding-right: 2px;
 }
+.labeled-field textarea { width: 303px; }
 .checkbox-form { background-color: #dfdfdf; color: navy; }
 .checkbox-form h3 { font: 16pt Arial bold; }
 .checkbox-form h4 { font: 14pt Arial bold; }
@@ -119,3 +121,7 @@ table.checkboxes td a {
 .ui-datepicker * { font-size: 11pt; font-family: Arial, sans-serif; }
 .ui-datepicker-trigger { margin-left: 5px; }
 .ui-datepicker td, .ui-datepicker th { min-width: 23px; }
+
+form header h1 span input { margin-right: 5px; }
+.date-range.labeled-field input.CdrDateField { width: 100px; }
+.date-range span.date-range-sep { padding: 0 31px; }

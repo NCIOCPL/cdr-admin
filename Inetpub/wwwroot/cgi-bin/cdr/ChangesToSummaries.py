@@ -80,9 +80,9 @@ class Control(cdrcgi.Control):
         for board in boards:
             board.show(body)
         page = B.HTML(head, body)
-        print "Content-type: text/html\n"
-        print etree.tostring(page, method="html", pretty_print=True,
-                             doctype=self.DOCTYPE, encoding="utf-8")
+        print("Content-type: text/html\n")
+        print(etree.tostring(page, method="html", pretty_print=True,
+                             doctype=self.DOCTYPE, encoding="utf-8"))
     def get_boards(self):
         "Fetch IDs and names of the PDQ editorial boards (for piclist)"
         n_path = "/Organization/OrganizationNameInformation/OfficialName/Name"

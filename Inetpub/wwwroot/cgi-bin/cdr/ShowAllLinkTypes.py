@@ -45,7 +45,7 @@ header  = cdrcgi.header(title, title, section, script, buttons)
 #----------------------------------------------------------------------
 try:
     conn = cdrdb.connect('CdrGuest')
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Database failure: %s' % info[1][0])
 cursor = conn.cursor()
 query  = """\
@@ -66,7 +66,7 @@ SELECT DISTINCT link_type.name,
 """
 try:
     cursor.execute(query)
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Database query failure: %s' % info[1][0])
 
 #----------------------------------------------------------------------
@@ -88,7 +88,7 @@ try:
         form += " <TR>\n"
         for col in rec:
             form += "  <TD>%s</TD>\n" % col
-except cdrdb.Error, info:
+except cdrdb.Error as info:
     cdrcgi.bail('Failure fetching query results: %s' % info[1][0])
 
 form += "</TABLE>\n"

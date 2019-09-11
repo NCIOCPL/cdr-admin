@@ -83,7 +83,7 @@ class SummaryInclude:
                         id = child.attrib['{cips.nci.nih.gov/cdr}id']
                         self.elements[element].append(id)
 
-        except Exception, e:
+        except Exception as e:
             # print '*** Error ***'
             self.error = "Failure parsing filter: %s" % str(e)
 
