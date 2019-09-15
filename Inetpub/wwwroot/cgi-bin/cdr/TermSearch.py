@@ -1,250 +1,241 @@
-#----------------------------------------------------------------------
-# Prototype for duplicate-checking interface for Term documents.
-#
-# BZIssue::4714 (change URL and label for searching Thesaurus)
-#----------------------------------------------------------------------
-import cgi
-import cdr
-import cdrcgi
-import cdrdb
-import nci_thesaurus
-from cdrapi.users import Session
+#!/usr/bin/env python
 
-SEARCH = "https://nciterms.nci.nih.gov"
-
-#----------------------------------------------------------------------
-# Get the form variables.
-#----------------------------------------------------------------------
-conn        = cdrdb.connect("CdrGuest")
-fields      = cgi.FieldStorage()
-session     = cdrcgi.getSession(fields)
-boolOp      = fields.getvalue("Boolean")         or "AND"
-prefTerm    = fields.getvalue("PrefTerm")        or None
-otherName   = fields.getvalue("OtherName")       or None
-termType    = fields.getvalue("TermType")        or None
-semType     = fields.getvalue("SemType")         or None
-submit      = fields.getvalue("SubmitButton")    or None
-impReq      = fields.getvalue("ImportButton")    or None
-help        = fields.getvalue("HelpButton")      or None
-srchThes    = fields.getvalue("SearchThesaurus") or None
-conceptCode = fields.getvalue("ConceptCode")     or None
-ckPrefNm    = fields.getvalue("CkPrefNm")        or None
-updateDefs  = fields.getvalue("UpdateDefs")      or False
-updateNames = fields.getvalue("UpdateNames")     or False
-updateCDRID = fields.getvalue("UpdateCDRID")     or None
-userInfo    = cdr.getUser(session, Session(session).user_name)
-subtitle    = "Term"
-logger      = cdr.Logging.get_logger("TermSearch")
-updates     = None
-
-if help:
-    cdrcgi.bail("Sorry, help for this interface has not yet "
-                "been developed.")
-
-def to_html(node):
-    return cdrcgi.etree.tostring(node, pretty_print=True, method="html")
-
-#----------------------------------------------------------------------
-# Callback to generate picklist for term types.
-#----------------------------------------------------------------------
-def termTypeList(conn, fName):
-    B = cdrcgi.Page.B
-    try:
-        cursor = conn.cursor()
-        query = cdrdb.Query("query_term", "value").unique()
-        query.where("path = '/Term/TermType/TermTypeName'")
-        values = [row[0] for row in query.execute(cursor).fetchall()]
-    except Exception as e:
-        cdrcgi.bail('Failure retrieving term type list from CDR: %s' % e)
-    select = B.SELECT(name=fName)
-    select.append(B.OPTION(u"\xa0", value="", checked="checked"))
-    for value in values:
-        select.append(B.OPTION(value + u" \xa0", value=value))
-    return to_html(select)
-
-#----------------------------------------------------------------------
-# Callback to generate picklist for semantic types.
-#----------------------------------------------------------------------
-def semanticTypeList(conn, fName):
-    B = cdrcgi.Page.B
-    try:
-        cursor = conn.cursor()
-        query = cdrdb.Query("document d", "d.id", "d.title").unique()
-        query.join("query_term t", "t.int_val = d.id")
-        query.where("t.path = '/Term/SemanticType/@cdr:ref'")
-        rows = query.order("d.title").execute(cursor).fetchall()
-        cursor.close()
-    except Exception as e:
-        cdrcgi.bail('Failure retrieving semantic type list from CDR: %s' % e)
-    select = B.SELECT(name=fName)
-    select.append(B.OPTION(u"\xa0", value="", checked="checked"))
-    for id, title in rows:
-        id = cdr.normalize(id)
-        select.append(B.OPTION(title + u" \xa0", value=id))
-    return to_html(select)
-
-#----------------------------------------------------------------------
-# Show the changes made to the updated Term document.
-#----------------------------------------------------------------------
-def make_change_list(changes):
-    logger.info("changes: %s", changes)
-    B = cdrcgi.Page.B
-    ul = B.UL()
-    for change in changes:
-        if "definition" not in change.lower():
-            ul.append(B.LI(change))
-    for change in changes:
-        if "definition" in change.lower():
-            ul.append(B.LI(change))
-    td = B.TD(ul, style="border: solid black 2px; padding: 15px 15px 0 0")
-    return to_html(B.TABLE(B.TR(td), style="margin-bottom: 25px"))
-
-#----------------------------------------------------------------------
-# Import a citation document from NCI Thesaurus.
-#----------------------------------------------------------------------
-if impReq:
-    if not conceptCode:
-        cdrcgi.bail("No concept code provided")
-    if not session:
-        cdrcgi.bail("User not logged in")
-    try:
-        concept = nci_thesaurus.Concept(code=conceptCode)
-    except Exception as e:
-        logger.exception("unable to load %r", conceptCode)
-        cdrcgi.bail("importing concept from NCI Thesaurus: %s" % e)
-    opts = {
-        "skip_other_names": False, # XXX not updateNames,
-        "skip_definitions": False # XXX not updateDefs
-    }
-    try:
-        if updateCDRID:
-            changes = concept.update(session, updateCDRID, **opts)
-            if changes:
-                subtitle = "New version created"
-                updates = make_change_list(changes)
-            else:
-                subtitle = "No changes found to save"
-        else:
-            subtitle = concept.add(session)#, **opts)
-    except Exception as e:
-        logger.exception("unabled to add/update %r", conceptCode)
-        cdrcgi.bail(str(e))
-    finally:
-        if updateCDRID:
-            cdr.unlock(session, updateCDRID)
-
-#----------------------------------------------------------------------
-# Create additional fields for importing/updating Term documents.
-#----------------------------------------------------------------------
-def make_import_fields():
-    B = cdrcgi.Page.B
-    table = B.TABLE()
-    import_fields = (
-        ("ConceptCode", "Concept Code of Term to Import:"),
-        ("UpdateCDRID", "CDR ID of Document to Update:")
-    )
-    for name, label in import_fields:
-        label = B.SPAN(label, B.CLASS("import-label page"))
-        field = B.INPUT(name=name, id=name)
-        table.append(B.TR(B.TD(label, align="right"), B.TD(field)))
-    note = "(Concept Code also required to Update)"
-    table.append(B.TR(B.TD(B.SPAN(note, B.CLASS("import-note page")))))
-    options = (
-        ("UpdateDefs", "Update Definitions"),
-        ("UpdateNames", "Update Names")
-    )
-    opts = { "type": "checkbox", "value": "true", "checked": "checked" }
-    for name, label in options:
-        checkbox = B.INPUT(id=name, name=name, **opts)
-        checkbox.tail = label
-        # XXX table.append(B.TR(B.TD(), B.TD(checkbox)))
-    button = B.INPUT(type="submit", name="ImportButton", value="Import")
-    table.append(B.TR(B.TD(), B.TD(button)))
-    rules = (
-        "* { font-family: Arial, sans-serif; }",
-        ".import-label { text-align: right; padding-right: 10px; }",
-        ".import-note.page  { font-size: 10pt; }",
-        "input[type=checkbox] { margin-right: 10px; }"
-    )
-    style = B.STYLE("\n".join(rules))
-    return to_html(B.CENTER(style, table))
-
-#----------------------------------------------------------------------
-# Display the search form.
-#----------------------------------------------------------------------
-if not submit:
-    search_button = "javascript:window.open('%s', 'st')" % SEARCH
-    fields = (('Preferred Name',          'PrefTerm'),
-              ('Other Name',              'OtherName'),
-              ('Term Type',               'TermType', termTypeList),
-              ('Semantic Type',           'SemType', semanticTypeList))
-    buttons = (('submit', 'SubmitButton', 'Search'),
-               ('submit', 'HelpButton',   'Help'),
-               ('reset',  'CancelButton', 'Clear'),
-               ('button', search_button,  'Search NCI Thesaurus'))
-    page = cdrcgi.startAdvancedSearchPage(session,
-                                          "Term Search Form",
-                                          "TermSearch.py",
-                                          fields,
-                                          buttons,
-                                          subtitle,
-                                          conn,
-                                          updates)
-
-    footer = u"""\
-  </FORM>
- </BODY>
-</HTML>
+"""Search for CDR Term documents.
 """
 
-    # Suppress the display for Concept Code Import for Guest accounts
-    # ---------------------------------------------------------------
-    if 'GUEST' in userInfo.groups and len(userInfo.groups) < 2:
-        html = page + footer
-    else:
-        html = page + make_import_fields() + footer
+from cdr import unlock
+from cdrcgi import AdvancedSearch, bail
+from cdrapi.docs import Doc
+from nci_thesaurus import Concept
 
-    cdrcgi.sendPage(html)
+class TermSearch(AdvancedSearch):
+    """Customize search for this document type."""
 
-#----------------------------------------------------------------------
-# Define the search fields used for the query.
-#----------------------------------------------------------------------
-searchFields = (
-    cdrcgi.SearchField(prefTerm,  ("/Term/PreferredName",)),
-    cdrcgi.SearchField(otherName, ("/Term/OtherName/OtherTermName",)),
-    cdrcgi.SearchField(termType,  ("/Term/TermType/TermTypeName",)),
-    cdrcgi.SearchField(semType,   ("/Term/SemanticType/@cdr:ref",)),
-)
+    DOCTYPE = "Term"
+    SUBTITLE = DOCTYPE
+    FILTER = "set:QC Term Set"
+    NCIT = "https://nciterms.nci.nih.gov"
+    PATHS = dict(
+        name="/Term/PreferredName",
+        other_name="/Term/OtherName/OtherTermName",
+        term_type="/Term/TermType/TermTypeName",
+        sem_type="/Term/SemanticType/@cdr:ref",
+    )
 
-#----------------------------------------------------------------------
-# Construct the query.
-#----------------------------------------------------------------------
-(query, strings) = cdrcgi.constructAdvancedSearchQuery(searchFields,
-                                                       boolOp,
-                                                       "Term")
-if not query:
-    cdrcgi.bail('No query criteria specified')
+    # Add some javascript to monitor the import/update fields.
+    IMP_BTN = "term-import-button"
+    JS = """\
+function chk_cdrid() {
+    if (jQuery("#cdrid").val().replace(/\D/g, "").length === 0)
+        jQuery("#term-import-button input").val("Import");
+    else
+        jQuery("#term-import-button input").val("Update");
+}
+function chk_code() {
+    if (jQuery("#code").val().trim().length === 0)
+        jQuery("#term-import-button input").prop("disabled", true);
+    else
+        jQuery("#term-import-button input").prop("disabled", false);
+}
+$(function() { chk_cdrid(); chk_code(); });
+"""
 
-#----------------------------------------------------------------------
-# Submit the query to the database.
-#----------------------------------------------------------------------
-try:
-    cursor = conn.cursor()
-    cursor.execute(query)
-    rows = cursor.fetchall()
-    cursor.close()
-    cursor = None
-except cdrdb.Error as info:
-    cdrcgi.bail('Failure retrieving Term documents: %s' %
-                info[1][0])
+    def __init__(self):
+        """Set the stage for showing the search form or the search results."""
 
-#----------------------------------------------------------------------
-# Create the results page.
-#----------------------------------------------------------------------
-html = cdrcgi.advancedSearchResultsPage("Term", rows, strings,
-                                        'set:QC Term Set')
+        AdvancedSearch.__init__(self)
+        for name in self.PATHS:
+            setattr(self, name, self.fields.getvalue(name))
+        self.changes = None
+        if self.term_type and self.term_type not in self.term_types:
+            raise Exception("Tampering with form values")
+        if self.sem_type:
+            if self.sem_type not in [st[0] for st in self.semantic_types]:
+                raise Exception("Tampering with form values")
+        self.search_fields = (
+            self.text_field("name"),
+            self.text_field("other_name"),
+            self.select("term_type", options=[""]+self.term_types),
+            self.select("sem_type", options=[""]+self.semantic_types),
+        )
+        self.query_fields = []
+        for name, path in self.PATHS.items():
+            field = self.QueryField(getattr(self, name), [path])
+            self.query_fields.append(field)
 
-#----------------------------------------------------------------------
-# Send the page back to the browser.
-#----------------------------------------------------------------------
-cdrcgi.sendPage(html)
+    def run(self):
+        """Override the run() method of the base class.
+
+        We need to handle requests to import or update PubMed
+        articles from NLM.
+        """
+
+        if self.request in ("Import", "Update"):
+            try:
+                term = Term(self)
+                term.save()
+                self.changes = term.changes
+                self.show_form(term.message)
+            except Exception as e:
+                self.session.logger.exception("%s from NCIT", self.request)
+                error = f"Unable to import {self.code!r} from NCIT: {e}"
+                bail(error)
+        else:
+            AdvancedSearch.run(self)
+
+    def customize_form(self, page):
+        """Add a button for browsing the NCI Thesaurus.
+
+        If the user has sufficient permissions, also add fields for
+        importing a new thesaurus concept or updating one we have imported
+        in the past.
+        """
+
+        ncit = f"window.open('{self.NCIT}', 'ncit');"
+        buttons = page.body.xpath("//*[@id='header-buttons']")
+        buttons[0].append(self.button("Search NCI Thesaurus", onclick=ncit))
+        if self.session.can_do("ADD DOCUMENT", "Term"):
+            self.add_import_form(page)
+        if self.changes:
+            self.show_changes(page)
+
+    def show_changes(self, page):
+        """Add another box listing the changes made when we updated.
+
+        Show name changes first, then definition changes.
+        """
+
+        ul = self.B.UL(id="ncit-changes")
+        for change in self.changes:
+            if "definition" not in change.lower():
+                ul.append(self.B.LI(change))
+        for change in self.changes:
+            if "definition" in change.lower():
+                ul.append(self.B.LI(change))
+        box = self.fieldset("Changes")
+        box.append(ul)
+        page.form.append(box)
+
+    def add_import_form(self, page):
+        """Add another fieldset with fields for importing an NCIT concept."""
+
+        # Create the fields and the button.
+        help = "Optionally enter the CDR ID of a document to be updated."
+        cdrid_field = self.text_field("cdrid", label="CDR ID", tooltip=help)
+        cdrid_field.set("oninput", "chk_cdrid()")
+        code_field = self.text_field("code")
+        code_field.set("oninput", "chk_code()")
+        button = self.button("Import")
+        button.set("disabled")
+
+        # Wrap them in a fieldset and plug in script for updating the button.
+        fieldset = self.fieldset("Import or Update a Concept From NCIT")
+        fieldset.append(code_field)
+        fieldset.append(cdrid_field)
+        fieldset.append(self.B.DIV(button, id=self.IMP_BTN))
+        page.form.append(fieldset)
+        page.head.append(self.B.SCRIPT(self.JS))
+
+    @property
+    def cdrid(self):
+        """ID of an existing Term document to be updated."""
+        cdrid = self.fields.getvalue("cdrid")
+        return Doc.extract_id(cdrid) if cdrid else None
+
+    @property
+    def code(self):
+        """Unique code of an NCI Thesaurus concept to be imported."""
+        return self.fields.getvalue("code", "").strip()
+
+    @property
+    def semantic_types(self):
+        """Valid values for the semantic types piclist."""
+
+        fields = "d.id", "d.title"
+        query = self.DBQuery("document d", *fields).unique().order("d.title")
+        query.join("query_term t", "t.int_val = d.id")
+        query.where(query.Condition("t.path", self.PATHS["sem_type"]))
+        rows = query.execute(self.session.cursor).fetchall()
+        return [(f"CDR{row.id:010d}", row.title) for row in rows]
+
+    @property
+    def term_types(self):
+        """Valid values for the term types picklist."""
+        return self.values_for_paths([self.PATHS["term_type"]])
+
+
+class Term:
+    """Logic for assembling and saving a new or updated Term document."""
+
+    UPDATE_OPTS = dict(skip_other_name=False, skip_definitions=False)
+
+    def __init__(self, control):
+        """Save the caller's object referencd.
+
+        Most of the work is done while assembling this object's properties.
+        """
+
+        self.__control = control
+        self.changes = self.message = None
+
+    def save(self):
+        """Save the new or updated Term document.
+
+        The `Concept` object takes care of making sure the document
+        gets unlocked if exceptions are raised.
+
+        We save the message string to be displayed in the sub-banner
+        to let the user know the outcome of the request. We also
+        capture the list of changes made to the concept for an update
+        of an existing Term doc.
+        """
+
+        # Update the document if we have already imported the concept.
+        if self.cdrid:
+            opts = self.UPDATE_OPTS
+            args = self.session, self.cdrid
+            self.changes = self.concept.update(*args, **opts)
+            if self.changes:
+                self.message = "New version created"
+            else:
+                self.message = "No changes found to save"
+
+        # Otherwise, create a new Term document.
+        else:
+            self.message = self.concept.add(self.session)
+
+    @property
+    def concept(self):
+        """Load the concept document from NCI Thesaurus service."""
+
+        if not hasattr(self, "_concept"):
+            try:
+                self._concept = Concept(code=self.code)
+            except Exception as e:
+                self.logger.exception("unable to load %r", self.code)
+                bail(f"Failure importing concept from NCI Thesaurus: {e}")
+        return self._concept
+
+    @property
+    def session(self):
+        """CDR login session object"""
+        return self.__control.session
+
+    @property
+    def cdrid(self):
+        """ID of an existing Term document to be updated."""
+        return self.__control.cdrid
+
+    @property
+    def code(self):
+        """Unique code of an NCI Thesaurus concept to be imported."""
+        return self.__control.code
+
+    @property
+    def logger(self):
+        """Access to session logging."""
+        return self.__control.session.logger
+
+
+if __name__ == "__main__":
+    TermSearch().run()

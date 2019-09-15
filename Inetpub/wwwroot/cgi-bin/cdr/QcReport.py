@@ -52,10 +52,10 @@
 import cgi
 import cdr
 import cdrcgi
-import cdrdb
 import os
 import re
-from cdrapi import Session
+from cdrapi import db
+from cdrapi.users import Session
 
 #----------------------------------------------------------------------
 # Dynamically create the title of the menu section (request #809).
@@ -570,10 +570,10 @@ if not docId and not docTitle and not glossaryDefinition:
 # Set up a database connection and cursor.
 #----------------------------------------------------------------------
 try:
-    conn = cdrdb.connect('CdrGuest')
+    conn = db.connect(user='CdrGuest')
     cursor = conn.cursor()
-except cdrdb.Error as info:
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
+except Exception as e:
+    cdrcgi.bail(f"Database connection failure: {e}")
 
 #----------------------------------------------------------------------
 # More than one matching title; let the user choose one.
@@ -603,7 +603,7 @@ def addCheckbox(inputLabels, inputName, inputID='', checked=0):
     showImages = ''
 
     # Adding on-click trigger when 'Images' are selected so that the
-    # user can decide to include publishable versions of images or 
+    # user can decide to include publishable versions of images or
     # non-publishable versions.
     # ---------------------------------------------------------------
     if inputName == 'Images':
@@ -614,7 +614,7 @@ def addCheckbox(inputLabels, inputName, inputID='', checked=0):
              %s>&nbsp;
       <label for='%s'>%s</label>
       <br>
-""" % (inputName, inputID, showImages, isChecked, inputID, 
+""" % (inputName, inputID, showImages, isChecked, inputID,
        inputLabels[inputName])
     return cbHtml
 
@@ -638,7 +638,7 @@ def addImageRadioBtn(inputLabels, inputName, inputID=''):
        <label for='%s'>%s</label>
        <br>
       </div>
-""" % (inputName, id1, id1, inputLabels['PubImages'][id1], 
+""" % (inputName, id1, id1, inputLabels['PubImages'][id1],
        inputName, id2, id2, inputLabels['PubImages'][id2])
     return cbHtml
 
@@ -684,9 +684,8 @@ if not docId:
             showTitleChoices(rows)
         intId = rows[0][0]
         docId = "CDR%010d" % intId
-    except cdrdb.Error as info:
-        cdrcgi.bail('Failure looking up document %s: %s' % (lookingFor,
-                                                            info[1][0]))
+    except Exception as e:
+        cdrcgi.bail(f"Failure looking up document {lookingFor}: {e}")
 
 #----------------------------------------------------------------------
 # We have a document ID.  Check added at William's request.
@@ -725,8 +724,8 @@ if letUserPickVersion:
              WHERE id = ?
           ORDER BY num DESC""", intId)
         rows = cursor.fetchall()
-    except cdrdb.Error as info:
-        cdrcgi.bail('Failure retrieving document versions: %s' % info[1][0])
+    except Exception as e:
+        cdrcgi.bail(f"Failure retrieving document versions: {e}")
     form = u"""\
   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
   <INPUT TYPE='hidden' NAME='DocType' VALUE='%s'>
@@ -846,7 +845,7 @@ if letUserPickVersion:
                             'Display Module Markup'
                  }
 
-    radioBtnLabels = { 'PubImages':{'pubYes':'... use publishable version', 
+    radioBtnLabels = { 'PubImages':{'pubYes':'... use publishable version',
                                     'pubNo':'... use non-publishable version'}
                  }
 
@@ -1149,15 +1148,15 @@ if not docType:
         if not row:
             cdrcgi.bail("Unable to find document type for %s" % docId)
         docType = row[0]
-    except cdrdb.Error as info:
-            cdrcgi.bail('Unable to find document type for %s: %s' % (docId,
-                                                                 info[1][0]))
+    except Exception as e:
+            cdrcgi.bail(f"Unable to find document type for {docId}: {e}")
+
     #----------------------------------------------------------------------
     # Determine the report type if the document is a summary.
-    # The the resulting text output is given as a string similar to this:  
+    # The the resulting text output is given as a string similar to this:
     #      "Treatment Patients KeyPoint KeyPoint KeyPoint"
     # which will be used to set the propper report type for patient or HP
-    # 
+    #
     # In the past there used to be new (including KeyPoints) and old (not
     # including KeyPoints) summaries and the old versions had to use HP
     # QC report filters.
@@ -1176,7 +1175,7 @@ if not docType:
  </xsl:template>
 </xsl:transform>""", inline = 1, docId = docId, docVer = version or None)
 
-        if inspectSummary[0].find('Patients') > 0:  
+        if b"Patients" in inspectSummary[0]:
             repType = 'pat'
 
 
@@ -1198,7 +1197,9 @@ def getDocsLinkingToPerson(docId):
                    ]
 
     try:
-        cursor.callproc('cdr_get_count_of_links_to_persons', docId)
+        #cursor.callproc('cdr_get_count_of_links_to_persons', docId)
+        parms = (docId,)
+        cursor.execute("{CALL cdr_get_count_of_links_to_persons (?)}", parms)
         for row in cursor.fetchall():
             if row[1] in statusValues[0]:        counts[0] += row[0]
             if row[1] in statusValues[1]:        counts[1] += row[0]
@@ -1216,8 +1217,8 @@ def getDocsLinkingToPerson(docId):
                AND path LIKE '/CTGovProtocol/%/@cdr:ref'""", docId)
         counts[4] = cursor.fetchall()[0][0]
 
-    except cdrdb.Error as info:
-        cdrcgi.bail('Failure retrieving link counts: %s' % info[1][0])
+    except Exception as e:
+        cdrcgi.bail(f"Failure retrieving link counts: {e}")
     return counts
 
 #----------------------------------------------------------------------
@@ -1262,9 +1263,9 @@ def fixMailerInfo(doc):
                         mailerTypeOfChange = "Unable to retrieve change type"
                 else:
                     mailerResponseReceived = "Response not yet received"
-    except cdrdb.Error as info:
-        cdrcgi.bail('Failure retrieving mailer info for %s: %s' % (docId,
-                                                                   info[1][0]))
+    except Exception as e:
+        cdrcgi.bail(f"Failure retrieving mailer info for {docId}: {e}")
+
     doc = re.sub("@@MAILER_DATE_SENT@@",         mailerDateSent,         doc)
     doc = re.sub("@@MAILER_RESPONSE_RECEIVED@@", mailerResponseReceived, doc)
     doc = re.sub("@@MAILER_TYPE_OF_CHANGE@@",    mailerTypeOfChange,     doc)
@@ -1353,9 +1354,8 @@ def fixOrgReport(doc):
            AND org.int_val = ?
            AND org.path like '%@cdr:ref'
          GROUP BY prot.value""", intId)
-    except cdrdb.Error as info:
-        cdrcgi.bail('Failure retrieving Protocol info for %s: %s' % (intId,
-                                                                   info[1][0]))
+    except Exception as e:
+        cdrcgi.bail(f"Failure retrieving Protocol info for {intId:d}: {e}")
 
     # -------------------------------------------------------
     # Assign protocol count to counts list items
@@ -1413,9 +1413,8 @@ SELECT int_val
  WHERE doc_id = ?
    AND path = '/PDQBoardMemberInfo/BoardMemberName/@cdr:ref'""", intId)
 
-    except cdrdb.Error as info:
-        cdrcgi.bail('Failure retrieving Person ID for %s: %s' % (intId,
-                                                                   info[1][0]))
+    except Exception as e:
+        cdrcgi.bail(f"Failure retrieving Person ID for {intId:d}: {e}")
 
     row = cursor.fetchone()
     if not row:
@@ -1451,9 +1450,8 @@ SELECT person.doc_id, summary.value, audience.value, max(ppd.pub_proc) as jobid
    AND pp.pub_subset = 'Summary-PDQ Editorial Board'
  GROUP BY summary.value, person.doc_id, audience.value""", personId)
 
-    except cdrdb.Error as info:
-        cdrcgi.bail('Failure retrieving Summary info for CDR%s: %s' % (intId,
-                                                                   info[1][0]))
+    except Exception as e:
+        cdrcgi.bail(f"Failure retrieving Summary info for CDR{intId:d}: {e}")
 
     # -------------------------------------------------------
     # Display the summaries reviewed by this person.
@@ -1520,10 +1518,10 @@ SELECT mailer.doc_id, mailer.int_val, summary.value, response.value,
  ORDER BY title.value""" % (batchId, summaryIds, personId)
 
     try:
-       cursor.execute(query)
-    except cdrdb.Error as info:
-       cdrcgi.bail('Failure retrieving Mailer info for batch ID %d: %s' % (batchId,
-                                                                   info[1][0]))
+        cursor.execute(query)
+    except Exception as e:
+        message = f"Failure retrieving Mailer info for batch ID {batchId}: {e}"
+        cdrcgi.bail(message)
 
     rows = cursor.fetchall()
 
@@ -1550,21 +1548,22 @@ SELECT mailer.doc_id, mailer.int_val, summary.value, response.value,
        </TD>
       </TR>
 """ % (cgi.escape(row[4]), row[3])
-    doc    = re.sub("@@SUMMARY_MAILER_SENT@@", html, doc)
+    doc = re.sub("@@SUMMARY_MAILER_SENT@@", html, doc)
 
     # -----------------------------------------------------------------
     # Database query to select the time of the mailers send
     # -----------------------------------------------------------------
     try:
-        query = """
+        query = """\
 SELECT completed
   FROM pub_proc
  WHERE id = %d""" % batchId
         cursor.execute(query)
 
-    except cdrdb.Error as info:
-        cdrcgi.bail('Failure retrieving Mailer Date for batch %d: %s' % (batchId,
-                                                                   info[1][0]))
+    except Exception as e:
+        message = f"Failure retrieving Mailer Date for batch {batchId:d}: {e}"
+        cdrcgi.bail(message)
+
     row = cursor.fetchone()
     # -----------------------------------------------------------------
     # Substitute @@...@@ strings for job ID and date send
@@ -1615,7 +1614,7 @@ if version == "-1": version = None
 
 # Display error message if no filter exist for current docType
 # ------------------------------------------------------------
-if not filters.has_key(docType):
+if docType not in filters:
     user_name = Session(session).user_name
     message = "QcReport - Filter for document type '%s' does not exist (%s)."
     cdr.logwrite(message % (docType, user_name))
@@ -1730,8 +1729,8 @@ def saveParms(parms):
      SELECT max(id) from url_parm_set""")
         row = cursor.fetchone()
 
-    except cdrdb.Error as info:
-        cdrcgi.bail('Failure inserting parms: %s' % (info[1][0]))
+    except Exception as e:
+        cdrcgi.bail(f"Failure inserting parms: {e}")
 
     return row[0]
 

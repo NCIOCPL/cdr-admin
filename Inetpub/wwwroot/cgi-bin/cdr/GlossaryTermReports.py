@@ -40,7 +40,7 @@ elif action == SUBMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if action == "Log Out": 
+if action == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
@@ -126,9 +126,9 @@ for r in (
      'Glossary Term Concept by English Definition Status Report'),
     ('Request4344.py?report=4344&',
      'Glossary Term Concept by Spanish Definition Status Report'),
-    ('GlossaryConceptDocsModified.py?', 
+    ('GlossaryConceptDocsModified.py?',
      'Glossary Term Concept Documents Modified Report'),
-    ('GlossaryNameDocsModified.py?', 
+    ('GlossaryNameDocsModified.py?',
      'Glossary Term Name Documents Modified Report'),
     ('glossary-translation-job-report.py?',
      'Glossary Translation Job Workflow Report',)

@@ -9,7 +9,11 @@
 # BZIssue::5178 - [Summaries] Shorter URLS Needed For Successful
 #                 Conversion of QC Reports into Word
 # ----------------------------------------------------------------------------
-import cgi, cdr, cdrcgi, cdrdb, sys
+import cgi
+import sys
+import cdr
+import cdrcgi
+from cdrapi import db
 
 # ----------------------------------------------------------------
 # Retrieve row of parameters from DB table to pass to filter a
@@ -21,8 +25,8 @@ def getParms(id):
      SELECT longURL from url_parm_set
       WHERE id = ?""", id)
         rows = cursor.fetchall()
-    except cdrdb.Error as info:
-        cdrcgi.bail('Failure selecting parms: %s' % (info[1][0]))
+    except Exception as e:
+        cdrcgi.bail(f"Failure selecting parms: {e}")
 
     return eval(rows[0][0])
 
@@ -38,10 +42,10 @@ def sendPage(page, textType='html', location='', docType=''):
     Return:
         No return.  After writing to the browser, the process exits.
     """
-    print("""\
-Content-type: text/%s
+    sys.stdout.buffer.write(f"""\
+Content-type: text/{textType};charset=utf-8
 
-%s""" % (textType, page[0]))
+{page}""".encode("utf-8"))
     sys.exit(0)
 
 
@@ -49,19 +53,14 @@ Content-type: text/%s
 # Get the parameters from the request.
 #----------------------------------------------------------------------
 repTitle = "CDR QC Report"
-fields   = cgi.FieldStorage() #or cdrcgi.bail("No Request Found", repTitle)
+fields   = cgi.FieldStorage()
 docId    = fields.getvalue(cdrcgi.DOCID) or None
-session  = cdrcgi.getSession(fields) or "guest" #cdrcgi.bail("Not logged in")
-#action   = cdrcgi.getRequest(fields)
+session  = cdrcgi.getSession(fields) or "guest"
 qcParms  = fields.getvalue('parmstring') or 'no'
 qcParmId = fields.getvalue('parmid') or '-1'
-#title    = "CDR Administration"
-#repType  = fields.getvalue("ReportType") or None
 
 
-#section  = "QC Report"
 SUBMENU  = "Reports Menu"
-#buttons  = ["Submit", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 docType  = fields.getvalue("DocType")    or None
 version  = fields.getvalue("DocVersion") or None
 
@@ -69,16 +68,16 @@ version  = fields.getvalue("DocVersion") or None
 # Set up a database connection and cursor.
 #----------------------------------------------------------------------
 try:
-    conn = cdrdb.connect('CdrGuest')
+    conn = db.connect(user='CdrGuest')
     cursor = conn.cursor()
-except cdrdb.Error as info:
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
+except Exception as e:
+    cdrcgi.bail(f"Database connection failure: {e}")
 
 if qcParms == 'yes':
     myParm = getParms(int(qcParmId))
     doc = cdr.filterDoc(session, cdr.FILTERS[docType], docId = docId,
                     docVer = version or None, parm = myParm)
-    sendPage(doc)
+    sendPage(doc[0].decode("utf-8"))
 else:
     cdrcgi.bail('No parameters found for qcParmId=%s' % qcParmId)
 

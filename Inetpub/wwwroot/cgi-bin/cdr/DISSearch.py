@@ -1,137 +1,63 @@
-#----------------------------------------------------------------------
-# Advanced search interface for CDR DrugInformationSummary documents.
-#----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, cdrdb
+#!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# Get the form variables.
-#----------------------------------------------------------------------
-fields    = cgi.FieldStorage()
-session   = cdrcgi.getSession(fields)
-op        = fields.getvalue("op")              or "AND"
-title     = fields.getvalue("title")           or None
-fdaAppr   = fields.getvalue("fdaAppr")         or None
-apprInd   = fields.getvalue("apprInd")         or None
-drugRef   = fields.getvalue("drugRef")         or None
-lastMod   = fields.getvalue("lastMod")         or None
-submit    = fields.getvalue("SubmitButton")    or None
-help      = fields.getvalue("HelpButton")      or None
-typeName  = "DrugInformationSummary"
-docType   = cdr.getDoctype('guest', typeName)
-script    = "DISSearch.py"
-validVals = dict(docType.vvLists)
-
-if help: 
-    cdrcgi.bail("Sorry, help for this interface has not yet been developed.")
-
-#----------------------------------------------------------------------
-# Connect to the CDR database.
-#----------------------------------------------------------------------
-try:
-    conn = cdrdb.connect('CdrGuest')
-except cdrdb.Error as info:
-    cdrcgi.bail('Failure connecting to CDR: %s' % info[1][0])
-
-#----------------------------------------------------------------------
-# Create an HTML picklist from a valid values list.
-#----------------------------------------------------------------------
-def generateHtmlPicklist(vvList, fieldName):
-    html = ["""\
-      <select name='%s'>
-       <option value='' selected>&nbsp;</option>""" % fieldName]
-    for vv in vvList:
-        html.append("""\
-       <option value="%s">%s &nbsp;</option>""" % (vv, vv))
-    html.append("""\
-      </select>
-""")
-    return "\n".join(html)
-
-def fdaApprovedList(conn, fName):
-    return generateHtmlPicklist(validVals['FDAApproved'], fName)
-
-def drugRefList(conn, fName):
-    return generateHtmlPicklist(validVals['DrugReferenceType'], fName)
-
-def apprIndList(conn, fName):
-    query  = """\
-    SELECT DISTINCT t.doc_id, t.value
-               FROM query_term t
-               JOIN query_term a
-                 ON a.int_val = t.doc_id
-              WHERE a.path = '/DrugInformationSummary/DrugInfoMetaData'
-                           + '/ApprovedIndication/@cdr:ref'
-                AND t.path = '/Term/PreferredName'
-           ORDER BY t.value"""
-    pattern = u"<option value='CDR%010d'>%s &nbsp;</option>"
-    return cdrcgi.generateHtmlPicklist(conn, fName, query, pattern)
-
-#----------------------------------------------------------------------
-# Display the search form.
-#----------------------------------------------------------------------
-if not submit:
-    fields = (('Title',                   'title'),
-              ('FDA Approved',            'fdaAppr', fdaApprovedList),
-              ('Date Last Modified',      'lastMod'),
-              ('Approved Indication',     'apprInd', apprIndList),
-              ('Drug Reference',          'drugRef', drugRefList))
-    buttons = (('submit', 'SubmitButton', 'Search'),
-               ('submit', 'HelpButton',   'Help'),
-               ('reset',  'CancelButton', 'Clear'))
-    pageTitle = "Drug Information Summary Search Form"
-    page = cdrcgi.startAdvancedSearchPage(session, pageTitle, script, fields,
-                                          buttons, typeName, conn)
-    page += """\
-  </FORM>
- </BODY>
-</HTML>
+"""Search for CDR DrugInformationSummary documents.
 """
-    cdrcgi.sendPage(page)
 
-#----------------------------------------------------------------------
-# Define the search fields used for the query.
-#----------------------------------------------------------------------
-searchFields = (cdrcgi.SearchField(title,
-                            ("/DrugInformationSummary/Title",)),
-                cdrcgi.SearchField(fdaAppr,
-                            ("/DrugInformationSummary/DrugInfoMetaData"
-                             "/FDAApproved",)),
-                cdrcgi.SearchField(apprInd,
-                            ("/DrugInformationSummary/DrugInfoMetaData"
-                             "/ApprovedIndication/@cdr:ref",)),
-                cdrcgi.SearchField(drugRef,
-                            ("/DrugInformationSummary/DrugReference"
-                             "/DrugReferenceType",)),
-                cdrcgi.SearchField(lastMod,
-                            ("/DrugInformationSummary/DateLastModified",)))
+from cdrcgi import AdvancedSearch
 
-#----------------------------------------------------------------------
-# Construct the query.
-#----------------------------------------------------------------------
-(query, strings) = cdrcgi.constructAdvancedSearchQuery(searchFields, op, 
-                                                       "DrugInformationSummary")
-if not query:
-    cdrcgi.bail('No query criteria specified')
-                    
-#----------------------------------------------------------------------
-# Submit the query to the database.
-#----------------------------------------------------------------------
-try:
-    cursor = conn.cursor()
-    cursor.execute(query)
-    rows = cursor.fetchall()
-    cursor.close()
-    cursor = None
-except cdrdb.Error as info:
-    cdrcgi.bail('Failure retrieving Drug documents: %s' % info[1][0])
+class DrugInformationSummarySearch(AdvancedSearch):
+    """Customize search for this document type."""
 
-#----------------------------------------------------------------------
-# Create the results page.
-#----------------------------------------------------------------------
-filt = "set:QC+DrugInfoSummary+Set"
-html = cdrcgi.advancedSearchResultsPage(typeName, rows, strings, filt, session)
+    DOCTYPE = "DrugInformationSummary"
+    SUBTITLE = "Drug Information Summary"
+    FILTER = "set:QC DrugInfoSummary Set"
+    PATHS = dict(
+        title=f"/{DOCTYPE}/Title",
+        fda_appr=f"/{DOCTYPE}/DrugInfoMetaData/FDAApproved",
+        appr_ind=f"/{DOCTYPE}/DrugInfoMetaData/ApprovedIndication/@cdr:ref",
+        drug_ref=f"/{DOCTYPE}/DrugReference/DrugReferenceType",
+        last_mod=f"/{DOCTYPE}/DateLastModified",
+    )
 
-#----------------------------------------------------------------------
-# Send the page back to the browser.
-#----------------------------------------------------------------------
-cdrcgi.sendPage(html)
+    def __init__(self):
+        AdvancedSearch.__init__(self)
+        for name in self.PATHS:
+            setattr(self, name, self.fields.getvalue(name))
+        fda_appr_vals = self.valid_values["FDAApproved"]
+        drug_ref_vals = self.valid_values["DrugReferenceType"]
+        appr_ind_vals = self.approved_indication_terms
+        if self.fda_appr and self.fda_appr not in fda_appr_vals:
+            raise Exception("Tampering with form values")
+        fda_appr_vals = [""] + fda_appr_vals
+        if self.drug_ref and self.drug_ref not in drug_ref_vals:
+            raise Exception("Tampering with form values")
+        drug_ref_vals = [""] + drug_ref_vals
+        if self.appr_ind:
+            if self.appr_ind not in [v[0] for v in appr_ind_vals]:
+                raise Exception("Tampering with form values")
+        appr_ind_vals = [""] + appr_ind_vals
+        self.search_fields = (
+            self.text_field("title"),
+            self.select("fda_appr", label="FDA Appr", options=fda_appr_vals),
+            self.text_field("last_mod", label="Last Mod"),
+            self.select("appr_ind", label="Appr Ind", options=appr_ind_vals),
+            self.select("drug_ref", label="Drug Ref", options=drug_ref_vals),
+        )
+        self.query_fields = []
+        for name, path in self.PATHS.items():
+            field = self.QueryField(getattr(self, name), [path])
+            self.query_fields.append(field)
+
+    @property
+    def approved_indication_terms(self):
+        query = self.DBQuery("query_term t", "t.doc_id", "t.value").unique()
+        query.join("query_term a", "a.int_val = t.doc_id")
+        query.where(query.Condition("a.path", self.PATHS["appr_ind"]))
+        query.where("t.path = '/Term/PreferredName'")
+        query.order("t.value")
+        rows = query.execute(self.session.cursor).fetchall()
+        return [(f"CDR{row.doc_id:010d}", row.value) for row in rows]
+
+
+if __name__ == "__main__":
+    DrugInformationSummarySearch().run()

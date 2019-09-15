@@ -165,3 +165,61 @@
         color: Navy;
         text-decoration: none;
         background: #FFFFCC }
+
+
+body#legacy-page { background-color: #DFDFDF; }
+#legacy-page *.banner {
+    background-color: silver;
+    background-image: url(/images/nav1.jpg);
+}
+#legacy-page *.DTDerror { color: red; font-weight: bold; }
+#legacy-page *.DTDwarning { color: green; }
+#legacy-page TD.ttext { color: black; }
+#legacy-page TD.tlabel {
+    font-weight: bold;
+    text-align: right;
+    white-space: nowrap;
+    vertical-align: top;
+}
+#legacy-page TH.theader {
+    font-weight: bold;
+    font-size: small;
+    text-align: left;
+    white-space: nowrap;
+    vertical-align: top;
+}
+body {
+    background-color: #e8e8e8;
+    color: black;
+    font-family: Arial, sans-serif;
+    font-size: 12pt;
+    margin: 0;
+    padding: 8px;
+}
+body.report { background-color: white; }
+header { margin-bottom: 15px; }
+header h1 {
+    color: white;
+    margin: 0;
+    font-size: 32px;
+    padding-left: 8px;
+    background-color: #936;
+    height: 38px;
+}
+header h1 span {
+    float: right;
+    margin: 0 6px;
+    position: relative;
+}
+header h1 span input {
+    position: relative;
+    bottom: 6px;
+    margin-left: 4px;
+}
+header h2 {
+    background-color: #ffc;
+    margin: 0 0 15px 0;
+    font-size: 13px;
+    font-weight: normal;
+    padding-left: 8px;
+}

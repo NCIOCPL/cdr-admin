@@ -39,6 +39,7 @@ class Control(cdrcgi.Control):
     CACHE = cdr.BASEDIR + "/reports/expanded-filter-sets"
     USE_CACHE = "use"
     REFRESH_CACHE = "refresh"
+    LOGNAME = "filter"
     TIER = Tier()
 
     def __init__(self):
@@ -206,9 +207,10 @@ class Control(cdrcgi.Control):
 
     def show_filtered_doc(self):
         "Filter the document and display the results."
-        doc = self.filter_doc().replace("@@DOCID@@", self.cdr_id)
+        doc = self.filter_doc()
+        doc = str(self.filter_doc(), "utf-8").replace("@@DOCID@@", self.cdr_id)
         text_type = "<?xml" in doc and "xml" or "html"
-        cdrcgi.sendPage(unicode(doc, "utf-8"), text_type)
+        cdrcgi.sendPage(doc, text_type)
 
     def filter_and_validate(self):
         """
@@ -268,7 +270,7 @@ class Control(cdrcgi.Control):
             ("displayLOETermList",      self.loeref and "Y" or "N")]
         if self.vendor_or_qc:
             parms.append(("vendorOrQC", 'QC'))
-        cdr.logwrite(repr(parms))
+        self.logger.info("Filter.py(parms=%r)", parms)
         return parms
 
     def check_filter(self, spec):

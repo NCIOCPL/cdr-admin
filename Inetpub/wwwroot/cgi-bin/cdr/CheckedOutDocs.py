@@ -5,7 +5,7 @@
 # JIRA::OCECDR-3800
 #----------------------------------------------------------------------
 import cgi
-import cdrdb
+from cdrapi import db
 import cdrcgi
 
 #----------------------------------------------------------------------
@@ -32,7 +32,7 @@ elif request == SUBMENU:
 # Set up a database connection and cursor.
 #----------------------------------------------------------------------
 try:
-    cursor = cdrdb.connect("CdrGuest").cursor()
+    cursor = db.connect(user="CdrGuest").cursor()
 except:
     cdrcgi.bail("Unable to connect to the CDR database")
 
@@ -51,18 +51,19 @@ GROUP BY u.id, u.fullname
 ORDER BY u.fullname""")
     rows = cursor.fetchall()
     if rows:
-        pageopts["buttons"] = ("Submit", SUBMENU, cdrcgi.MAINMENU)
-        page = cdrcgi.Page(TITLE, **pageopts)
-        page.add("<fieldset>")
-        page.add(page.B.LEGEND("Select User"))
+        buttons = "Submit", SUBMENU, cdrcgi.MAINMENU
+        pageopts["buttons"] = [cdrcgi.HTMLPage.button(b) for b in buttons]
+        page = cdrcgi.HTMLPage(TITLE, **pageopts)
+        fieldset = page.fieldset("Select User")
+        page.form.append(fieldset)
         values = [(r[1], u"%s (%d locks)" % (r[2], r[0])) for r in rows]
-        page.add_select("User", "User", values)
-        page.add("</fieldset>")
+        fieldset.append(page.select("User", options=values))
         page.add_output_options("html")
     else:
-        pageopts["buttons"] = (SUBMENU, cdrcgi.MAINMENU)
-        page = cdrcgi.Page(TITLE, **pageopts)
-        page.add(page.B.P("No CDR documents are locked."))
+        buttons = SUBMENU, cdrcgi.MAINMENU
+        pageopts["buttons"] = [cdrcgi.HTMLPage.button(b) for b in buttons]
+        page = cdrcgi.HTMLPage(TITLE, **pageopts)
+        page.form.append(page.B.P("No CDR documents are locked."))
     page.send()
 
 #----------------------------------------------------------------------
@@ -94,13 +95,16 @@ cursor.execute("""\
    WHERE u.id = ?
      AND c.dt_in IS NULL
 ORDER BY c.dt_out, t.name, d.id""", user)
-rows = cursor.fetchall()
+rows = []
+for dt_out, user, doc_id, title in cursor.fetchall():
+    row = [str(dt_out)[:19], user, doc_id, title]
+    rows.append(row)
 columns = (
     cdrcgi.Report.Column("Checked Out", width="140px"),
     cdrcgi.Report.Column("Type", width="150px"),
     cdrcgi.Report.Column("CDR ID", width="70px"),
     cdrcgi.Report.Column("Document Title", width="700px"),
 )
-table = cdrcgi.Report.Table(columns, rows)
-report = cdrcgi.Report(TITLE, [table], **pageopts)
+table = cdrcgi.Reporter.Table(columns, rows)
+report = cdrcgi.Reporter(TITLE, table, **pageopts)
 report.send(fmt)

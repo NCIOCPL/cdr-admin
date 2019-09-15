@@ -1,333 +1,266 @@
-#----------------------------------------------------------------------
-# Search for citations, and optionally import them from NLM.
-#
-# BZIssue::4724
-# BZIssue::5174
-# JIRA::OCECDR-3456
-# JIRA::OCECDR-4201
-# JIRA::OCECDR-4434
-# JIRA::OCECDR-4463
-# JIRA::OCECDR-4561
-#----------------------------------------------------------------------
-import cgi
+#!/usr/bin/env python
+
+"""Search for CDR Citation documents.
+"""
+
 from lxml import etree
 import requests
-import cdr
-import cdrcgi
-from cdrapi import db
-from cdrapi.users import Session
+from cdr import prepare_pubmed_article_for_import
+from cdrcgi import AdvancedSearch, bail
+from cdrapi.docs import Doc
 
-#----------------------------------------------------------------------
-# Get the form variables.
-#----------------------------------------------------------------------
-fields    = cgi.FieldStorage()
-session   = cdrcgi.getSession(fields)
-boolOp    = fields.getvalue("Boolean")      or "AND"
-title     = fields.getvalue("Title")        or None
-author    = fields.getvalue("Author")       or None
-journal   = fields.getvalue("Journal")      or None
-year      = fields.getvalue("Year")         or None
-volume    = fields.getvalue("Volume")       or None
-issue     = fields.getvalue("Issue")        or None
-importID  = fields.getvalue("ImportID")     or ""
-replaceID = fields.getvalue("ReplaceID")    or None
-submit    = fields.getvalue("SubmitButton") or None
-help      = fields.getvalue("HelpButton")   or None
-impReq    = fields.getvalue("ImportButton") or None
-srchPmed  = fields.getvalue("SearchPubMed") or None
-subtitle  = "Citation"
-valErrors = ""
+class CitationSearch(AdvancedSearch):
+    """Customize search for this document type."""
 
-# Use the user's name to get info about his groups
-userInfo  = cdr.getUser(session, Session(session).user_name)
+    DOCTYPE = "Citation"
+    SUBTITLE = DOCTYPE
+    FILTER = "set:QC Citation Set"
+    PUBMED = "https://www.ncbi.nlm.nih.gov/entrez/"
+    MEDLINE_CITATION = "/Citation/PubmedArticle/MedlineCitation"
+    PUB_DETAILS = "/Citation/PDQCitation/PublicationDetails"
+    PATHS = {
+        "title": [
+            "/Citation/PubmedArticle/%/Article/%Title",
+            "/Citation/PDQCitation/CitationTitle",
+        ],
+        "author": [
+            "/Citation/PDQCitation/AuthorList/Author/%Name",
+            "/Citation/PubmedArticle/%/AuthorList/Author/%Name",
+        ],
+        "pub_in": [
+            f"{MEDLINE_CITATION}/MedlineJournalInfo/MedlineTA",
+            f"{PUB_DETAILS}/PublishedIn/@cdr:ref[int_val]",
+        ],
+        "pub_year": [
+            f"{MEDLINE_CITATION}/Article/Journal/JournalIssue/PubDate/Year",
+            f"{PUB_DETAILS}/PublicationYear",
+        ],
+        "volume": [
+            f"{MEDLINE_CITATION}/Article/Journal/JournalIssue/Volume",
+        ],
+        "issue": [
+            f"{MEDLINE_CITATION}/Article/Journal/JournalIssue/Issue",
+        ],
+    }
 
-#----------------------------------------------------------------------
-# Redirect to PubMed searching if requested (in a different window).
-#----------------------------------------------------------------------
-if srchPmed:
-    print("Location:https://www.ncbi.nlm.nih.gov/entrez/\n")
-    exit(0)
-
-#----------------------------------------------------------------------
-# Show help screen for advanced search.
-#----------------------------------------------------------------------
-if help:
-    cdrcgi.bail("Sorry, help for this interface has not yet been developed.")
-
-#----------------------------------------------------------------------
-# Connect to the CDR database.
-#----------------------------------------------------------------------
-try:
-    conn = db.connect(user="CdrGuest", timeout=300)
-except Exception as e:
-    cdrcgi.bail("Failure connecting to CDR: {}".format(e))
-
-#----------------------------------------------------------------------
-# Parse out the errors for display.
-#----------------------------------------------------------------------
-def parseErrors(errorString):
-    opts = dict(errorsExpected=False, asSequence=True, asUtf8=False)
-    return cdr.getErrors(errorString, **opts)
-
-#----------------------------------------------------------------------
-# See if citation already exists.
-#----------------------------------------------------------------------
-def findExistingCitation(pmid):
-    try:
-        cursor = conn.cursor()
-        cursor.execute("""\
-                SELECT doc_id
-                  FROM query_term
-                 WHERE path LIKE '/Citation/PubmedArticle/%/PMID'
-                   AND value = ?""", pmid)
-        rows = cursor.fetchall()
-        if not rows: return None
-        return rows[0][0]
-    except Exception as e:
-        cdrcgi.bail("Failure checking for existing document: {}".format(e))
-
-#----------------------------------------------------------------------
-# Replace PubmedArticle element in document with new version.
-#----------------------------------------------------------------------
-def replacePubmedArticle(doc, article):
-    tree = etree.XML(doc.xml)
-    for node in tree.findall("PubmedArticle"):
-        tree.replace(node, article)
-        doc.xml = etree.tostring(tree)
-        return doc
-
-#----------------------------------------------------------------------
-# Extract the PubmedArticle element from the document.
-#----------------------------------------------------------------------
-def getPubmedArticle(doc):
-    try:
-        root = etree.XML(doc)
-    except:
-        cdrcgi.bail("unable to parse document from NLM")
-    for node in root.findall("PubmedArticle"):
-        return cdr.prepare_pubmed_article_for_import(node)
-    return None
-
-#----------------------------------------------------------------------
-# Extract the text content of the ArticleTitle element.
-#----------------------------------------------------------------------
-def getArticleTitle(article):
-    for node in article.findall("MedlineCitation/Article/ArticleTitle"):
-        return cdr.get_text(node)
-
-#----------------------------------------------------------------------
-# Retrieve an XML document for a Pubmed article from NLM.
-#----------------------------------------------------------------------
-def fetchCitation(pmid):
-    host = "eutils.ncbi.nlm.nih.gov"
-    app  = "/entrez/eutils/efetch.fcgi"
-    url  = "https://" + host + app + "?db=pubmed&retmode=xml&id=" + pmid
-    try:
-        response = requests.get(url)
-    except:
-        cdrcgi.bail("NLM server unavailable; please try again later")
-    article = getPubmedArticle(response.content)
-    if article is None: cdrcgi.bail("Article Not Found")
-    return article
-
-#----------------------------------------------------------------------
-# Create a new CDR Doc object, using the information retrieved from NLM.
-#----------------------------------------------------------------------
-def createNewCitationDoc(article):
-    title = getArticleTitle(article)
-    if not title: cdrcgi.bail("Unable to find article title")
-    ctrl = dict(DocType="Citation", DocTitle=title[:255].encode("utf-8"))
-    root = etree.Element("Citation")
-    details = etree.SubElement(root, "VerificationDetails")
-    etree.SubElement(details, "Verified").text = "Yes"
-    etree.SubElement(details, "VerifiedIn").text = "PubMed"
-    root.append(article)
-    docXml = etree.tostring(root, encoding="utf-8")
-    return cdr.Doc(docXml, doctype="Citation", ctrl=ctrl)
-
-#----------------------------------------------------------------------
-# Handle a request to import a citation document from PubMed.
-#----------------------------------------------------------------------
-if impReq:
-    importID = importID.strip()
-    if not session: cdrcgi.bail("User not logged in")
-    article = fetchCitation(importID)
-    if replaceID:
-        try:
-            oldDoc = cdr.getDoc(session, replaceID, "Y", getObject=True)
-        except:
-            cdrcgi.bail("Unable to check out CDR document {}".format(replaceID))
-        doc = replacePubmedArticle(oldDoc, article)
-        if doc is None:
-            cdr.unlock(session, replaceID)
-            cdrcgi.bail("{} is not a Citation document".format(replaceID))
-        resp = cdr.repDoc(session, doc=str(doc), val="Y", showWarnings=True)
-    else:
-        docId = findExistingCitation(importID)
-        if docId:
-            cdrcgi.bail("Citation already imported as CDR{:010d}".format(docId))
-        doc = createNewCitationDoc(article)
-        resp = cdr.addDoc(session, doc=str(doc), val="Y", showWarnings=True)
-    docId, errors = resp
-    if not docId:
-        with open("d:/tmp/{}.xml".format(importID), "w") as fp:
-            fp.write(str(doc))
-        args = importID, cdr.checkErr(errors)
-        cdrcgi.bail("Failure saving PubMed citation {}: {}".format(*args))
-    if errors:
-        valErrors = parseErrors(errors)
-    if valErrors:
-        pubVerNote = "(with validation errors)"
-    else:
-        doc = cdr.getDoc(session, docId, "Y")
-        if doc.startswith("<Errors"):
-            cdrcgi.bail("Unable to retrieve {}".format(docId))
-        resp = cdr.repDoc(session, doc=doc, val="Y", ver="Y", checkIn="Y",
-                          showWarnings=True, publishable="Y")
-        if not resp[0]:
-            msg = "Failure creating publishable version for {}".format(docId)
-            cdrcgi.bail(msg, extra=parseErrors(resp[1]))
-        pubVerNote = "(with publishable version)"
-    if replaceID:
-        subtitle = "Citation {} updated {}".format(docId, pubVerNote)
-    else:
-        subtitle = "Citation added as {} {}".format(docId, pubVerNote)
-    # Continue with search form display
-
-#----------------------------------------------------------------------
-# Display the search form.
-#----------------------------------------------------------------------
-if not submit:
-    fields = (("Title",                        "Title"),
-              ("Author",                       "Author"),
-              ("Published In",                 "Journal"),
-              ("Publication Year",             "Year"),
-              ("Volume",                       "Volume"),
-              ("Issue",                        "Issue"))
-    buttons = (("submit", "SubmitButton", "Search"),
-               ("submit", "HelpButton",   "Help"),
-               ("reset",  "CancelButton", "Clear"),
-               ("submit", "SearchPubMed", "Search Pub Med"))
-    errors = ""
-    if valErrors:
-        errors = """\
-    <SPAN STYLE="color: red; font-size: 14pt; font-family:
-                Arial; font-weight: Bold">
-     *** IMPORTED WITH ERRORS ***  PUBLISHABLE VERSION NOT CREATED<BR>
-    </SPAN>
-    <SPAN STYLE="color: red; font-size: 12pt; font-family:
-                Arial; font-weight: Normal">
-     %s
-    </SPAN>
-""" % valErrors
-    page = cdrcgi.startAdvancedSearchPage(session,
-                                          "Citation Search Form",
-                                          "CiteSearch.py",
-                                          fields,
-                                          buttons,
-                                          subtitle,
-                                          conn,
-                                          errors)
-    pubMedImport = """\
-   <CENTER>
-    <TABLE>
-     <TR>
-      <TD ALIGN="right">
-       <INPUT      TYPE        = "submit"
-                   NAME        = "ImportButton"
-                   VALUE       = "Import">
-       <SPAN       CLASS       = "Page">
-        &nbsp;PubMed Citation ID to Import:&nbsp;&nbsp;
-       </SPAN>
-      </TD>
-      <TD>
-       <INPUT      NAME        = "ImportID">
-      </TD>
-     </TR>
-     <TR>
-      <TD ALIGN="right">
-       <SPAN       CLASS       = "Page">
-        &nbsp;CDR ID of Document to Replace (Optional):&nbsp;&nbsp;
-       </SPAN>
-      </TD>
-      <TD>
-       <INPUT      NAME        = "ReplaceID">
-      </TD>
-     </TR>
-    </TABLE>
-   </CENTER>
+    # Add some JavaScript to monitor the Import/Update fields.
+    IMP_BTN = "pubmed-import-button"
+    JS = """\
+function chk_cdrid() {
+    if (jQuery("#cdrid").val().replace(/\D/g, "").length === 0)
+        jQuery("#pubmed-import-button input").val("Import");
+    else
+        jQuery("#pubmed-import-button input").val("Update");
+}
+function chk_pmid() {
+    if (jQuery("#pmid").val().trim().length === 0)
+        jQuery("#pubmed-import-button input").prop("disabled", true);
+    else
+        jQuery("#pubmed-import-button input").prop("disabled", false);
+}
+$(function() { chk_cdrid(); chk_pmid(); });
 """
 
-    footer = """\
-  </FORM>
- </BODY>
-</HTML>
-"""
-    # Suppress the display for PubMed Import for Guest accounts
-    # ---------------------------------------------------------
-    if "GUEST" in userInfo.groups and len(userInfo.groups) < 2:
-        html = page + footer
-    else:
-        html = page + pubMedImport + footer
+    def __init__(self):
+        """Set the stage for showing the search form or the search results."""
 
-    # sendPage() expects unicode: decoding page string
-    # ------------------------------------------------
-    html = html.decode("utf-8")
-    cdrcgi.sendPage(html)
+        AdvancedSearch.__init__(self)
+        for name in self.PATHS:
+            setattr(self, name, self.fields.getvalue(name))
+        self.search_fields = []
+        self.query_fields = []
+        for name, paths in self.PATHS.items():
+            field = self.QueryField(getattr(self, name), paths)
+            self.query_fields.append(field)
+            self.search_fields.append(self.text_field(name))
 
-#----------------------------------------------------------------------
-# Define the search fields used for the query.
-#----------------------------------------------------------------------
-searchFields = (cdrcgi.SearchField(title,
-                        ("/Citation/PubmedArticle/%/Article/%Title",
-                         "/Citation/PDQCitation/CitationTitle")),
-                cdrcgi.SearchField(author,
-                        ("/Citation/PDQCitation/AuthorList/Author/%Name",
-                         "/Citation/PubmedArticle/%/AuthorList/Author/%Name")),
-                cdrcgi.SearchField(journal,
-                            ("/Citation/PubmedArticle/MedlineCitation"
-                             "/MedlineJournalInfo/MedlineTA",
-                             "/Citation/PDQCitation/PublicationDetails"
-                             "/PublishedIn/@cdr:ref[int_val]")),
-                cdrcgi.SearchField(year,
-                            ("/Citation/PDQCitation/PublicationDetails"
-                             "/PublicationYear",
-                             "/Citation/PubmedArticle/MedlineCitation"
-                             "/Article/Journal/JournalIssue/PubDate/Year")),
-                cdrcgi.SearchField(volume,
-                            ("/Citation/PubmedArticle/MedlineCitation"
-                             "/Article/Journal/JournalIssue/Volume",)),
-                cdrcgi.SearchField(issue,
-                            ("/Citation/PubMedArticle/MedlineCitation"
-                             "/Article/Journal/JournalIssue/Issue",)))
+    def run(self):
+        """Override the run() method of the base class.
 
-#----------------------------------------------------------------------
-# Construct the query.
-#----------------------------------------------------------------------
-args = searchFields, boolOp, "Citation"
-query, strings = cdrcgi.constructAdvancedSearchQuery(*args)
-if not query:
-    cdrcgi.bail("No query criteria specified")
+        We need to handle requests to import or update PubMed
+        articles from NLM.
+        """
 
-#----------------------------------------------------------------------
-# Submit the query to the database.
-#----------------------------------------------------------------------
-try:
-    cursor = conn.cursor()
-    cursor.execute(query)
-    rows = cursor.fetchall()
-    cursor.close()
-    cursor = None
-except Exception as e:
-    cdrcgi.bail("Failure retrieving Citation documents: {}".format(e))
+        if self.request in ("Import", "Update"):
+            try:
+                citation = Citation(self)
+                citation.save()
+                self.show_form(citation.message, citation.error)
+            except Exception as e:
+                self.session.logger.exception("%s from PubMed", self.request)
+                error = f"Unable to import {self.pmid!r} from PubMed: {e}"
+                bail(error)
+        else:
+            AdvancedSearch.run(self)
 
-#----------------------------------------------------------------------
-# Create the results page.
-#----------------------------------------------------------------------
-args = "Citation", rows, strings, "set:QC Citation Set"
-html = cdrcgi.advancedSearchResultsPage(*args)
+    @property
+    def pmid(self):
+        """ID of a PubMed article to be imported."""
+        return self.fields.getvalue("pmid", "").strip()
 
-#----------------------------------------------------------------------
-# Send the page back to the browser.
-#----------------------------------------------------------------------
-cdrcgi.sendPage(html)
+    @property
+    def cdrid(self):
+        """ID of an existing Citation document to be updated."""
+        cdrid = self.fields.getvalue("cdrid")
+        return Doc.extract_id(cdrid) if cdrid else None
+
+    def customize_form(self, page):
+        """Add a button for browsing Pubmed.
+
+        If the user has sufficient permissions, also add fields for
+        importing a new PubMed citation or updating one we have imported
+        in the past.
+        """
+
+        pubmed = f"window.open('{self.PUBMED}', 'pm');"
+        buttons = page.body.xpath("//*[@id='header-buttons']")
+        buttons[0].append(self.button("Search PubMed", onclick=pubmed))
+        if self.session.can_do("ADD DOCUMENT", "Citation"):
+            self.add_import_form(page)
+
+    def add_import_form(self, page):
+        """Add another fieldset with fields for importing a PubMed document."""
+
+        help = "Optionally enter the CDR ID of a document to be updated."
+        cdrid_field = self.text_field("cdrid", label="CDR ID", tooltip=help)
+        cdrid_field.set("oninput", "chk_cdrid()")
+        pmid_field = self.text_field("pmid", label="PMID")
+        pmid_field.set("oninput", "chk_pmid()")
+        button = self.button("Import")
+        button.set("disabled")
+        fieldset = self.fieldset("Import or Update Citation From PubMed")
+        fieldset.append(pmid_field)
+        fieldset.append(cdrid_field)
+        fieldset.append(self.B.DIV(button, id=self.IMP_BTN))
+        page.form.append(fieldset)
+        page.head.append(self.B.SCRIPT(self.JS))
+
+
+class Citation:
+    """Logic for assembling and saving a new or updated Citation document."""
+
+    EUTILS = "https://eutils.ncbi.nlm.nih.gov"
+    EFETCH = f"{EUTILS}/entrez/eutils/efetch.fcgi?db=pubmed&retmode=xml&id="
+    ERRORS = "*** IMPORTED WITH ERRORS ***  PUBLISHABLE VERSION NOT CREATED"
+    VAL_TYPES = "schema", "links"
+    COMMENT = "Saved from the Citation Advanced Search page"
+    SAVE_OPTS = dict(
+        version=True,
+        publishable=True,
+        val_types=VAL_TYPES,
+        unlock=True,
+        comment=COMMENT,
+        reason=COMMENT,
+    )
+
+    def __init__(self, control):
+        """Save the caller's object referencd.
+
+        Most of the work is done while assembling this object's properties.
+        """
+        self.control = control
+
+    @property
+    def error(self):
+        """If there were validation errors, log them and show a big warning."""
+
+        if not self.doc.errors:
+            return None
+        for error in self.doc.errors:
+            self.control.session.logger.error(str(error))
+        return self.ERRORS
+
+    @property
+    def message(self):
+        """Prepare a subtitle showing what we just did."""
+
+        cdrid = self.doc.cdr_id
+        pmid = self.control.pmid
+        if self.doc.errors:
+            suffix = "with validation errors"
+        else:
+            suffix = "with a publishable version"
+        if self.control.cdrid:
+            return f"Updated {cdrid} from PMID {pmid} ({suffix})"
+        return f"Imported PMID {pmid} as {cdrid} ({suffix})"
+
+    def save(self):
+        """Save the new or updated Citation document."""
+        self.doc.save(**self.SAVE_OPTS)
+
+    @property
+    def doc(self):
+        """Prepare a `cdrapi.Doc` object for saving in the CDR"""
+
+        # We may have already done the work and cached the object.
+        if not hasattr(self, "_doc"):
+
+            # If we're updating an existing Citation doc, fetch and modify it.
+            if self.control.cdrid:
+                cdrid = self.control.cdrid
+                doc = Doc(self.control.session, id=cdrid)
+                doc.check_out()
+                root = doc.root
+                old_node = root.find("PubmedArticle")
+                if old_node is None:
+                    raise Exception(f"{cdrid} is not a PubMed article")
+                root.replace(old_node, self.pubmed_article)
+                doc.xml = etree.tostring(root)
+
+            # Otherwise, build up a new document and insert NLM's info.
+            else:
+                pmid = self.control.pmid
+                cdrid = self.lookup(pmid)
+                if cdrid:
+                    raise Exception(f"PMID {pmid} already imported as {cdrid}")
+                root = etree.Element("Citation")
+                details = etree.SubElement(root, "VerificationDetails")
+                etree.SubElement(details, "Verified").text = "Yes"
+                etree.SubElement(details, "VerifiedIn").text = "PubMed"
+                root.append(self.pubmed_article)
+                opts = dict(xml=etree.tostring(root), doctype="Citation")
+                doc = Doc(self.control.session, **opts)
+            self._doc = doc
+        return self._doc
+
+    @property
+    def pubmed_article(self):
+        """Fetch and prepare PubmedArticle element for import into the CDR
+
+        Note that we no longer import everything in the documents we get
+        from NLM, but instead cherry-pick just the information we need,
+        in order to avoid the whiplash of keeping up with all of their
+        DTD changes.
+        """
+
+        if not hasattr(self, "_pubmed_article"):
+            pmid = self.control.pmid
+            url = f"{self.EFETCH}{pmid}"
+            self.control.session.logger.info("Fetching %r", url)
+            response = requests.get(url)
+            root = etree.fromstring(response.content)
+            node = root.find("PubmedArticle")
+            if node is None:
+                raise Exception(f"PubmedArticle for {self.pmid} not found")
+            self._pubmed_article = prepare_pubmed_article_for_import(node)
+        return self._pubmed_article
+
+    def lookup(self, pmid):
+        """See if we have already imported this article.
+
+        Pass:
+            pmid - unique string identifier for the PubMed record
+
+        Return:
+            canonical form of the CDR ID for an existing Citation document
+            (or None if we don't already have it)
+        """
+
+        query = self.control.DBQuery("query_term", "doc_id")
+        query.where("path LIKE '/Citation/PubmedArticle/%/PMID'")
+        query.where(query.Condition("value", pmid))
+        rows = query.execute(self.control.session.cursor).fetchall()
+        return f"{rows[0].doc_id:010d}" if rows else None
+
+if __name__ == "__main__":
+    CitationSearch().run()

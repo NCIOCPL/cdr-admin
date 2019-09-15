@@ -1,141 +1,75 @@
-#----------------------------------------------------------------------
-# Prototype for duplicate-checking interface for Person documents.
-#----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, cdrdb
+#!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# Get the form variables.
-#----------------------------------------------------------------------
-fields    = cgi.FieldStorage()
-session   = cdrcgi.getSession(fields)
-boolOp    = fields and fields.getvalue("Boolean")         or "AND"
-surname   = fields and fields.getvalue("Surname")         or None
-givenName = fields and fields.getvalue("GivenName")       or None
-initials  = fields and fields.getvalue("Initials")        or None
-street    = fields and fields.getvalue("Street")          or None
-city      = fields and fields.getvalue("City")            or None
-state     = fields and fields.getvalue("State")           or None
-zip       = fields and fields.getvalue("ZipCode")         or None
-country   = fields and fields.getvalue("Country")         or None
-submit    = fields and fields.getvalue("SubmitButton")    or None
-help      = fields and fields.getvalue("HelpButton")      or None
-
-if help: 
-    cdrcgi.bail("Sorry, help for this interface has not yet been developed.")
-
-#----------------------------------------------------------------------
-# Connect to the CDR database.
-#----------------------------------------------------------------------
-try:
-    conn = cdrdb.connect('CdrGuest')
-except cdrdb.Error as info:
-    cdrcgi.bail('Failure connecting to CDR: %s' % info[1][0])
-
-#----------------------------------------------------------------------
-# Display the search form.
-#----------------------------------------------------------------------
-if not submit:
-    fields = (('Surname',                 'Surname'),
-              ('Given Name',              'GivenName'),
-              ('Initials',                'Initials'),
-              ('Street',                  'Street'),
-              ('City',                    'City'),
-              ('State',                   'State', cdrcgi.stateList),
-              ('ZIP Code',                'ZipCode'),
-              ('Country',                 'Country', cdrcgi.countryList))
-    buttons = (('submit', 'SubmitButton', 'Search'),
-               ('submit', 'HelpButton',   'Help'),
-               ('reset',  'CancelButton', 'Clear'))
-    page = cdrcgi.startAdvancedSearchPage(session,
-                                          "Person Search Form",
-                                          "PersonSearch.py",
-                                          fields,
-                                          buttons,
-                                          'Person',
-                                          conn)
-    page += """\
-  </FORM>
- </BODY>
-</HTML>
+"""Search for CDR Person documents.
 """
-    cdrcgi.sendPage(page)
 
-#----------------------------------------------------------------------
-# Define the search fields used for the query.
-#----------------------------------------------------------------------
-searchFields = (cdrcgi.SearchField(surname,
-                            ("/Person/PersonNameInformation/SurName",)),
-                cdrcgi.SearchField(givenName,
-                            ("/Person/PersonNameInformation/GivenName",)),
-                cdrcgi.SearchField(initials,
-                            ("/Person/PersonNameInformation/MiddleInitial",)),
-                cdrcgi.SearchField(street,
-                            ("/Person/PersonLocations/Home/PostalAddress/"
-                             "Street",
-                             "/Person/PersonLocations/PrivatePractice/"
-                             "PrivatePracticeLocation/PostalAddress/Street",
-                             "/Person/PersonLocations/OtherPracticeLocation/"
-                             "SpecificPostalAddress/Street")),
-                cdrcgi.SearchField(city,
-                            ("/Person/PersonLocations/Home/PostalAddress/"
-                             "City",
-                             "/Person/PersonLocations/PrivatePractice/"
-                             "PrivatePracticeLocation/PostalAddress/City",
-                             "/Person/PersonLocations/OtherPracticeLocation/"
-                             "SpecificPostalAddress/City")),
-                cdrcgi.SearchField(state,
-                            ("/Person/PersonLocations/Home/PostalAddress/"
-                             "PoliticalSubUnit_State/@cdr:ref",
-                             "/Person/PersonLocations/PrivatePractice/"
-                             "PrivatePracticeLocation/"
-                             "PostalAddress/PoliticalSubUnit_State/@cdr:ref",
-                             "/Person/PersonLocations/OtherPracticeLocation/"
-                             "SpecificPostalAddress/"
-                             "PoliticalSubUnit_State/@cdr:ref")),
-                cdrcgi.SearchField(zip,
-                            ("/Person/PersonLocations/Home/PostalAddress/"
-                             "PostalCode_ZIP",
-                             "/Person/PersonLocations/PrivatePractice/"
-                             "PrivatePracticeLocation/"
-                             "PostalAddress/PostalCode_ZIP",
-                             "/Person/PersonLocations/OtherPracticeLocation/"
-                             "SpecificPostalAddress/PostalCode_ZIP")),
-                cdrcgi.SearchField(country,
-                            ("/Person/PersonLocations/Home/PostalAddress/"
-                             "Country/@cdr:ref",
-                             "/Person/PersonLocations/PrivatePractice/"
-                             "PrivatePracticeLocation/"
-                             "PostalAddress/Country/@cdr:ref",
-                             "/Person/PersonLocations/OtherPracticeLocation/"
-                             "SpecificPostalAddress/"
-                             "Country/@cdr:ref")))
+from cdrcgi import AdvancedSearch
 
-#----------------------------------------------------------------------
-# Construct the query.
-#----------------------------------------------------------------------
-(query, strings) = cdrcgi.constructAdvancedSearchQuery(searchFields, boolOp, 
-                                                       "Person")
-if not query:
-    cdrcgi.bail('No query criteria specified')
-                    
-#----------------------------------------------------------------------
-# Submit the query to the database.
-#----------------------------------------------------------------------
-try:
-    cursor = conn.cursor()
-    cursor.execute(query)
-    rows = cursor.fetchall()
-    cursor.close()
-    cursor = None
-except cdrdb.Error as info:
-    cdrcgi.bail('Failure retrieving Person documents: %s' % info[1][0])
+class PersonSearch(AdvancedSearch):
+    """Customize search for this document type."""
 
-#----------------------------------------------------------------------
-# Create the results page.
-#----------------------------------------------------------------------
-html = cdrcgi.advancedSearchResultsPage("Person", rows, strings, None, session)
+    DOCTYPE = "Person"
+    SUBTITLE = DOCTYPE
+    LOCATIONS = "/Person/PersonLocations"
+    HOME_ADDRESS = f"{LOCATIONS}/Home/PostalAddress"
+    PRIVATE_PRACTICE = f"{LOCATIONS}/PrivatePractice/PrivatePracticeLocation"
+    PRIVATE_PRACTICE_ADDRESS = f"{PRIVATE_PRACTICE}/PostalAddress"
+    OTHER_ADDRESS = f"{LOCATIONS}/OtherPracticeLocation/SpecificPostalAddress"
+    PATHS = {
+        "surname": ["/Person/PersonNameInformation/SurName"],
+        "forname": ["/Person/PersonNameInformation/GivenName"],
+        "initials": ["/Person/PersonNameInformation/MiddleInitial"],
+        "street": [
+            f"{HOME_ADDRESS}/Street",
+            f"{PRIVATE_PRACTICE_ADDRESS}/Street",
+            f"{OTHER_ADDRESS}/Street"
+        ],
+        "city": [
+            f"{HOME_ADDRESS}/City",
+            f"{PRIVATE_PRACTICE_ADDRESS}/City",
+            f"{OTHER_ADDRESS}/City"
+        ],
+        "state": [
+            f"{HOME_ADDRESS}/PoliticalSubUnit_State/@cdr:ref",
+            f"{PRIVATE_PRACTICE_ADDRESS}/PoliticalSubUnit_State/@cdr:ref",
+            f"{OTHER_ADDRESS}/PoliticalSubUnit_State/@cdr:ref"
+        ],
+        "zipcode": [
+            f"{HOME_ADDRESS}/PostalCode_ZIP",
+            f"{PRIVATE_PRACTICE_ADDRESS}/PostalCode_ZIP",
+            f"{OTHER_ADDRESS}/PostalCode_ZIP"
+        ],
+        "country": [
+            f"{HOME_ADDRESS}/Country/@cdr:ref",
+            f"{PRIVATE_PRACTICE_ADDRESS}/Country/@cdr:ref",
+            f"{OTHER_ADDRESS}/Country/@cdr:ref"
+        ],
+    }
 
-#----------------------------------------------------------------------
-# Send the page back to the browser.
-#----------------------------------------------------------------------
-cdrcgi.sendPage(html)
+    def __init__(self):
+        """Add the fields for this search type."""
+        AdvancedSearch.__init__(self)
+        for name in self.PATHS:
+            setattr(self, name, self.fields.getvalue(name))
+        if self.state and self.state not in [s[0] for s in self.states]:
+            raise Exception("Tampering with form values")
+        if self.country and self.country not in [c[0] for c in self.countries]:
+            raise Exception("Tampering with form values")
+        self.search_fields = (
+            self.text_field("surname"),
+            self.text_field("forename", label="Given Name"),
+            self.text_field("initials"),
+            self.text_field("street"),
+            self.text_field("city"),
+            self.select("state", options=[""]+self.states),
+            self.text_field("zipcode", label="ZIP Code"),
+            self.select("country", options=[""]+self.countries),
+        )
+        self.query_fields = []
+        for name, paths in self.PATHS.items():
+            field = self.QueryField(getattr(self, name), paths)
+            self.query_fields.append(field)
+
+
+if __name__ == "__main__":
+    PersonSearch().run()

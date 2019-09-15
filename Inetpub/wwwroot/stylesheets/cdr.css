@@ -115,7 +115,6 @@ table.checkboxes td a {
     text-decoration: none;
     font: 10pt Arial;
 }
-.advanced-search .buttons { text-align: center; width: 100%; }
 .footnote { font-size: 9pt; font-style: italic; color: green; }
 .ui-datepicker { width: inherit; }
 .ui-datepicker * { font-size: 11pt; font-family: Arial, sans-serif; }
@@ -125,3 +124,17 @@ table.checkboxes td a {
 form header h1 span input { margin-right: 5px; }
 .date-range.labeled-field input.CdrDateField { width: 100px; }
 .date-range span.date-range-sep { padding: 0 31px; }
+
+#advanced-search-results p {
+    border-bottom: 2px solid black;
+    font-size: 1.2em;
+    text-align: center;
+}
+#advanced-search-results table { width: 100%; }
+#advanced-search-results td { border: none; background: #e8e8e8; }
+#advanced-search-results .row-number { width: 50px; text-align: right; }
+#advanced-search-results .doc-link { width: 125px; }
+#pubmed-import-button, #term-import-button { text-align: center; }
+#ncit-changes { margin-top: 10px; }
+#activity-report td, #activity-report th { white-space: nowrap; }
+#activity-report td:last-child { white-space: normal; }

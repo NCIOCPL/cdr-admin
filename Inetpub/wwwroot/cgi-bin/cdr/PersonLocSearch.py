@@ -3,74 +3,58 @@
 """Search for CDR Person documents with addresses displayed in the results.
 """
 
-import cgi
-import cdrcgi
 from cdrapi.docs import Doc
-from cdrapi.users import Session
+from cdrcgi import AdvancedSearch, BASE, SESSION
 
-class Control:
+class PersonSearch(AdvancedSearch):
     """Coordination of the processing flow."""
 
+    DOCTYPE = "Person"
+    SUBTITLE = "Persons With Locations"
+    ADDRESS_FILTER = "name:Person Locations Picklist"
+    PATHS = {
+        "surname": "/Person/PersonNameInformation/SurName",
+        "forname": "/Person/PersonNameInformation/GivenName",
+        "initials": "/Person/PersonNameInformation/MiddleInitial",
+    }
+
+    # Tell the base class to let us populate the report's table.
+    INCLUDE_ROWS = False
+
     def __init__(self):
-        fields = cgi.FieldStorage()
-        self.session = Session(cdrcgi.getSession(fields) or "guest")
-        self.surname = fields.getvalue("surname")
-        self.forename = fields.getvalue("forename")
-        self.initials = fields.getvalue("initials")
-        self.request = fields.getvalue("Request")
-        self.match_all = True if fields.getvalue("match_all") else False
+        """Add the fields for this search type."""
 
-    def run(self):
-        if self.request == "Search":
-            self.show_report()
-        else:
-            self.show_form()
-
-    def show_form(self):
-        Page = cdrcgi.AdvancedSearchPage
-        fields = (
-            Page.text_field("surname"),
-            Page.text_field("given", label="Given Name"),
-            Page.text_field("initials"),
+        AdvancedSearch.__init__(self)
+        for name in self.PATHS:
+            setattr(self, name, self.fields.getvalue(name))
+        self.search_fields = (
+            self.text_field("surname"),
+            self.text_field("forename", label="Given Name"),
+            self.text_field("initials"),
         )
-        page = Page(self.session.name, "Person (with locations)", fields)
-        cdrcgi.sendPage(page.tostring())
+        self.query_fields = []
+        for name, path in self.PATHS.items():
+            field = self.QueryField(getattr(self, name), [path])
+            self.query_fields.append(field)
 
-    def show_report(self):
-        """Assemble the query, execute it, and show the results."""
+    def customize_report(self, page):
+        """Create a custom version of the report with address information."""
 
-        # Assemble the advanced search query.
-        Field = cdrcgi.SearchField
-        fields = (
-            Field(surname, ["/Person/PersonNameInformation/SurName"]),
-            Field(givenName, ["/Person/PersonNameInformation/GivenName"]),
-            Field(initials, ["/Person/PersonNameInformation/MiddleInitial"]),
-        )
-        query = cdrcgi.AdvancedSearchQuery(fields, "Person", match_all)
-
-        # Get the results from the query.
-        try:
-            rows = query.execute().fetchall()
-        except Exception as e:
-            cdrcgi.bail(f"Failure retrieving Person documents: {e}")
-
-        # Create the shell for the results page.
-        strings = " ".join(query.criteria)
-        opts = dict(search_strings=strings, count=len(rows))
-        page = cdrcgi.AdvancedSearchResultsPage("Person", **opts)
+        # Styling for the custom portion of the table.
+        rule = ".person-addresses td { padding: 0 50px; }"
+        page.head.append(page.B.STYLE(rule))
 
         # Housekeeping before we get into the loop for the search results.
         table = page.body.find("table")
         table.set("class", "person-loc-search-results")
-        session_parm = f"&{cdrcgi.SESSION}={self.session.name}"
+        session_parm = f"&{SESSION}={self.session.name}"
         filter_parms = dict(repName="dummy", includeHomeAddresses="yes")
-        filtre = "name:Person Locations Picklist"
 
         # Walk through each row in the results set.
-        for i, row  in enumerate(rows):
+        for i, row  in enumerate(self.rows):
             doc = Doc(self.session, id=row[0])
             title = row[1]
-            url = f"{cdrcgi.BASE}/QcReport.py?DocId={doc.cdr_id}{session_parm}"
+            url = f"{BASE}/QcReport.py?DocId={doc.cdr_id}{session_parm}"
             link = page.B.A(doc.cdr_id, href=url)
 
             # Create the first table row for this result.
@@ -82,26 +66,17 @@ class Control:
 
             # Add a second row to the table if there are any addresses.
             filter_parms["docId"] = doc.cdr_id
-            try:
-                response = doc.filter(filtre, parms=filter_parms)
-                tree = response.result_tree
-            except Exception as e:
-                cdrcgi.bail(str(e))
-            addresses = [node for node in tree.iter("Data")]
+            response = doc.filter(self.ADDRESS_FILTER, parms=filter_parms)
+            root = response.result_tree.getroot()
+            addresses = [node for node in root.iter("Data")]
             if addresses:
                 ul = page.B.UL()
                 td = page.B.TD(ul, colspan="3")
-                tr = page.B.TR(page.B.CLASS("person-addresses"))
+                tr = page.B.TR(td, page.B.CLASS("person-addresses"))
                 for node in addresses:
                     ul.append(page.B.LI(Doc.get_text(node, default="")))
                 table.append(tr)
 
-        # Send the page back to the browser.
-        cdrcgi.sendPage(page.tostring())
-
 
 if __name__ == "__main__":
-    try:
-        Control().run()
-    except Exception as e:
-        cdrcgi.bail(str(e))
+    PersonSearch().run()

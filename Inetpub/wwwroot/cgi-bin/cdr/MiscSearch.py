@@ -1,13 +1,51 @@
-#----------------------------------------------------------------------
-# Find Miscellaneous documents and display QC reports for them.
-# JIRA::OCECDR-4115 - support searching titles with non-ascii characters
-#----------------------------------------------------------------------
+#!/usr/bin/env python
+
+"""Find Miscellaneous documents and display QC reports for them.
+
+JIRA::OCECDR-4115 - support searching titles with non-ascii characters
+"""
+
+from cdrcgi import AdvancedSearch
+
+class MiscSearch(AdvancedSearch):
+    """Customize search for this document type."""
+
+    DOCTYPE = "MiscellaneousDocument"
+    SUBTITLE = "Miscellaneous Documents"
+    FILTER = "name:Miscellaneous Document Report Filter"
+    META_DATA = "/MiscellaneousDocument/MiscellaneousDocumentMetadata"
+    TYPE_PATH = f"{META_DATA}/MiscellaneousDocumentType"
+
+    def __init__(self):
+        """Add the fields for this search type."""
+        AdvancedSearch.__init__(self)
+        self.title = self.fields.getvalue("title")
+        self.type = self.fields.getvalue("type")
+        if self.type and self.type not in self.types:
+            raise Exception("Tampering with form values")
+        self.search_fields = (
+            self.text_field("title"),
+            self.select("type", options=[""]+self.types)
+        )
+        self.query_fields = (
+            self.QueryField(self.title, "title"),
+            self.QueryField(self.type, [self.TYPE_PATH]),
+        )
+
+    @property
+    def types(self):
+        """Valid miscellaneous document type names."""
+        return self.values_for_paths([self.TYPE_PATH])
+
+if __name__ == "__main__":
+    MiscSearch().run()
+'''
 import cdrcgi
 import cdrdb
 import datetime
 import urllib
 
-class Control(cdrcgi.Control):
+class MiscSearch(cdrcgi.Controller):
     """
     Select Miscellaneous documents for QC report display.
     """
@@ -16,7 +54,6 @@ class Control(cdrcgi.Control):
     TYPE_PATH = ("/MiscellaneousDocument/MiscellaneousDocumentMetadata"
                  "/MiscellaneousDocumentType")
     BOOLS = ("and", "or")
-    FILTER = "name:Miscellaneous Document Report Filter"
     URL = "/cgi-bin/cdr/Filter.py"
 
     def __init__(self):
@@ -28,7 +65,7 @@ class Control(cdrcgi.Control):
         self.today = datetime.date.today()
         self.types = self.get_types()
         self.type = self.fields.getvalue("type") or ""
-        self.fragment = unicode(self.fields.getvalue("title") or "", "utf-8")
+        self.fragment = self.fields.getvalue("title") or ""
         self.bool = self.fields.getvalue("bool") or "and"
         cdrcgi.valParmVal(self.type, val_list=self.types, msg=cdrcgi.TAMPERING)
         cdrcgi.valParmVal(self.bool, val_list=self.BOOLS, msg=cdrcgi.TAMPERING)
@@ -106,23 +143,4 @@ class Control(cdrcgi.Control):
         opts["css"] = "caption { min-width: 1024px; }"
         return opts
 
-    def get_types(self):
-        """
-        Get the list of valid values for miscellaneous document types.
-        """
-
-        query = cdrdb.Query("query_term", "value").unique()
-        query.where(query.Condition("path", self.TYPE_PATH))
-        query.order("value")
-        values = [""]
-        for row in query.execute(self.cursor).fetchall():
-            value = row[0] and row[0].strip() or ""
-            if value:
-                values.append(value)
-        return values
-
-#----------------------------------------------------------------------
-# Make it possible to load this script as a module (e.g., for lint).
-#----------------------------------------------------------------------
-if __name__ == "__main__":
-    Control().run()
+'''
