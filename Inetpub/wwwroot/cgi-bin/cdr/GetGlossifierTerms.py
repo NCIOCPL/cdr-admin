@@ -5,7 +5,8 @@
 # BZIssue::4704
 # BZIssue::5289 / JIRA::OCECDR-3590
 #----------------------------------------------------------------------
-import cdrdb, re, cdr, socket, sys
+import re, cdr, socket, sys
+from cdrapi import db
 
 DEBUG = len(sys.argv) > 1 and sys.argv[1] == '--debug' or False
 DEV_EMAILS = cdr.getEmailList("Developers Notification")
@@ -67,7 +68,7 @@ def checkForDuplicate(docId, key, keys, duplicates):
             duplicates[key] = [keys[key], docId]
     else:
         keys[key] = docId
-    
+
 #----------------------------------------------------------------------
 # Make sure we don't have any duplicate name+language+dictionary
 # combinations.  If we find any, we report them, and we replace
@@ -113,7 +114,7 @@ def checkForDuplicates(name, names, allDups):
             names[name] = newMap
         else:
             del names[name]
-        
+
 #----------------------------------------------------------------------
 # Convert whitespace sequences to single space, and typesetting single
 # quote to apostrophe (CG team didn't want to map typesetting double
@@ -131,7 +132,7 @@ def normalize(me):
 #----------------------------------------------------------------------
 # Get the dictionaries for the English glossary terms.
 #----------------------------------------------------------------------
-cursor = cdrdb.connect('CdrGuest').cursor()
+cursor = db.connect(user='CdrGuest').cursor()
 cursor.execute("""\
     SELECT doc_id, value
       FROM query_term_pub

@@ -3,7 +3,8 @@
 #
 # BZIssue::3716 - Unicode encoding cleanup
 #----------------------------------------------------------------------
-import cdr, cgi, cdrcgi, cdrdb, sys, urllib
+import cdr, cgi, cdrcgi, sys, urllib
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -31,7 +32,7 @@ if request == cdrcgi.MAINMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if request == "Log Out": 
+if request == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
@@ -67,7 +68,7 @@ elif request == "Report":
 #----------------------------------------------------------------------
 # Handle request for creating a new filter set.
 #----------------------------------------------------------------------
-if request == "New Filter Set": 
+if request == "New Filter Set":
     print("Location:http://%s%s/EditFilterSet.py?%s=%s&Request=New\n" % (
             cdrcgi.WEBSERVER,
             cdrcgi.BASE,
@@ -87,7 +88,7 @@ header  = cdrcgi.header(title, title, section, script, buttons, numBreaks = 1)
 # Show the list of existing filter sets.
 #----------------------------------------------------------------------
 try:
-    conn = cdrdb.connect('CdrGuest')
+    conn = db.connect(user='CdrGuest')
     cursor = conn.cursor()
     cursor.execute("""\
             SELECT name,
@@ -95,8 +96,8 @@ try:
               FROM filter_set
           ORDER BY name""")
     rows = cursor.fetchall()
-except cdrdb.Error as info:
-    cdrcgi.bail("Database failure retrieving filter sets: %s" % info[1][0])
+except Exception as e:
+    cdrcgi.bail("Database failure retrieving filter sets: %s" % e)
 
 form = u"""\
    <h2>CDR Filter Sets</h2>

@@ -2,11 +2,12 @@
 # Display trials in the ctrp_import table.
 # BZIssue::4942
 #----------------------------------------------------------------------
-import cgi, cdrdb, lxml.etree as etree, sys, re
+import cgi, lxml.etree as etree, sys, re
+from cdrapi import db
 
 fields  = cgi.FieldStorage()
 docId   = fields.getvalue('id')
-cursor  = cdrdb.connect('CdrGuest').cursor()
+cursor  = db.connect(user='CdrGuest').cursor()
 
 def bail(message):
     print("""\

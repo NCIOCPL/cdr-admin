@@ -11,9 +11,9 @@
    This report can help answering questions like: Give me a summary
    including a video? or "I need a summary with multiple tables"
 """
-import cdr, cdrdb, sys, xml.dom.minidom, cdrcgi
-import lxml.etree as etree
-
+import cdrcgi
+from lxml import etree
+from cdrapi import db
 
 # --------------------------------------------------------------------
 # Create HTML list item by summary to be included in report
@@ -91,7 +91,7 @@ class SummaryInclude:
 # Select the summaries to be included in the report (exlude blocked
 # documents)
 # -------------------------------------------------------------------
-conn = cdrdb.connect('CdrGuest')
+conn = db.connect(user='CdrGuest')
 cursor = conn.cursor()
 cursor.execute("""
     SELECT d.id, d.title, d.xml
@@ -104,8 +104,6 @@ cursor.execute("""
 row = cursor.fetchone()
 sumIncludes = []
 while row:
-    #print "%s (%d)" % (row[1], row[0])
-    #sys.stderr.write("%s (%d)\n" % (row[1], row[0]))
     nameKey = row[1].upper().strip()
     sumInclude = SummaryInclude(row[0], row[1], row[2])
 

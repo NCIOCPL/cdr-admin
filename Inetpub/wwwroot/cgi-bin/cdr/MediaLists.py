@@ -4,10 +4,11 @@
 #
 # JIRA::OCECDR-3800 - Address security vulnerabilities
 #----------------------------------------------------------------------
+
+import datetime
 import cgi
 import cdrcgi
-import cdrdb
-import datetime
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -36,21 +37,21 @@ elif request == SUBMENU:
 # Set up a database connection and cursor.
 #----------------------------------------------------------------------
 try:
-    conn = cdrdb.connect("CdrGuest")
+    conn = db.connect(user="CdrGuest")
     cursor = conn.cursor()
-except cdrdb.Error as info:
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
+except Exception as e:
+    cdrcgi.bail('Database connection failure: %s' % e)
 
 #----------------------------------------------------------------------
 # Assemble the lists of valid values.
 #----------------------------------------------------------------------
-query = cdrdb.Query("query_term t", "t.doc_id", "t.value").order(2).unique()
+query = db.Query("query_term t", "t.doc_id", "t.value").order(2).unique()
 query.join("query_term m", "m.int_val = t.doc_id")
 query.where("t.path = '/Term/PreferredName'")
 query.where("m.path = '/Media/MediaContent/Diagnoses/Diagnosis/@cdr:ref'")
 results = query.execute(cursor).fetchall()
 diagnoses = [("any", "Any Diagnosis")] + results
-query = cdrdb.Query("query_term", "value", "value").order(1).unique()
+query = db.Query("query_term", "value", "value").order(1).unique()
 query.where("path = '/Media/MediaContent/Categories/Category'")
 query.where("value <> ''")
 results = query.execute(cursor).fetchall()
@@ -91,7 +92,7 @@ if not categories or not request:
 content_path = "/Media/MediaContent"
 diagnosis_path = content_path + "/Diagnoses/Diagnosis/@cdr:ref"
 category_path = content_path + "/Categories/Category"
-query = cdrdb.Query("query_term m", "m.doc_id", "m.value").unique().order(2)
+query = db.Query("query_term m", "m.doc_id", "m.value").unique().order(2)
 query.where("m.path = '/Media/MediaTitle'")
 if category and "any" not in category:
     query.join("query_term c", "c.doc_id = m.doc_id")
@@ -104,7 +105,7 @@ if diagnosis and "any" not in diagnosis:
     query.join("query_term d", "d.doc_id = m.doc_id")
     query.where(query.Condition("d.path", diagnosis_path))
     query.where(query.Condition("d.int_val", diagnosis, "IN"))
-    diag_query = cdrdb.Query("query_term", "value").order(1)
+    diag_query = db.Query("query_term", "value").order(1)
     diag_query.where("path = '/Term/PreferredName'")
     diag_query.where(query.Condition("doc_id", diagnosis, "IN"))
     diagnosis_names = [row[0] for row in diag_query.execute().fetchall()]
@@ -117,8 +118,8 @@ else:
 #----------------------------------------------------------------------
 try:
     rows = query.execute(cursor).fetchall()
-except cdrdb.Error as info:
-    cdrcgi.bail('Failure retrieving Media documents: %s' % info[1][0])
+except Exception as e:
+    cdrcgi.bail('Failure retrieving Media documents: %s' % e)
 if not rows:
     criteria = "Diagnosis: %s; Condition: %s" % (diagnosis_names,
                                                  category_names)

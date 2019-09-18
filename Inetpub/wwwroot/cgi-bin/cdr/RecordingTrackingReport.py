@@ -10,16 +10,16 @@
 #----------------------------------------------------------------------
 import cgi
 import cdr
-import cdrdb
 import cdrcgi
 import datetime
 import lxml.etree as etree
 import sys
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Set the form variables.
 #----------------------------------------------------------------------
-cursor   = cdrdb.connect("CdrGuest").cursor()
+cursor   = db.connect(user="CdrGuest").cursor()
 fields   = cgi.FieldStorage()
 session  = cdrcgi.getSession(fields)
 request  = cdrcgi.getRequest(fields)
@@ -88,7 +88,7 @@ class MediaDoc:
         # Get the date the document was first saved (this can be different
         # then the date of the first version)
         # ----------------------------------------------------------------
-        query = cdrdb.Query("audit_trail t", "t.dt")
+        query = db.Query("audit_trail t", "t.dt")
         query.join("action a", "a.id = t.action AND a.name = 'Add Document'")
         query.where(query.Condition("t.document", docId))
         rows = query.execute(cursor).fetchall()
@@ -96,8 +96,8 @@ class MediaDoc:
 
         # Get the date the document was last versioned
         # ----------------------------------------------------------------
-        query = cdrdb.Query("doc_version", "id", "MAX(num)", "dt",
-                            "publishable").group("id", "dt", "publishable")
+        query = db.Query("doc_version", "id", "MAX(num)", "dt",
+                         "publishable").group("id", "dt", "publishable")
         query.where(query.Condition("id", docId))
         rows = query.execute(cursor).fetchall()
         self.dateVersioned = rows and rows[0][2] \
@@ -106,7 +106,7 @@ class MediaDoc:
 
         # Get the XML of the document to select additional data elements
         # --------------------------------------------------------------
-        query = cdrdb.Query("document", "xml")
+        query = db.Query("document", "xml")
         query.where(query.Condition("id", docId))
         docXml = query.execute(cursor).fetchall()[0][0]
         tree = etree.XML(docXml.encode("utf-8"))
@@ -136,7 +136,7 @@ class MediaDoc:
 # interpolation for the dates in the HAVING clause is safe, because
 # we have vetted them with calls to cdrcgi.is_date().
 #----------------------------------------------------------------------
-query = cdrdb.Query("document d", "d.id", "d.title", "r.value", "MAX(v.dt)")
+query = db.Query("document d", "d.id", "d.title", "r.value", "MAX(v.dt)")
 query.join("doc_type t", "t.id = d.doc_type")
 query.join("doc_version v", "v.id = d.id")
 query.join("query_term c", "d.id = c.doc_id")

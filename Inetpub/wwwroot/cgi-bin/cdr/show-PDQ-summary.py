@@ -30,8 +30,9 @@ import lxml.html
 import lxml.etree as etree
 import cgi
 import cdrcgi
-import cStringIO
-import cdrdb
+from sys import stdout
+from cdrapi import db
+from io import BytesIO
 
 fields = cgi.FieldStorage()
 doc_id = fields.getvalue("doc-id") or 62843 #62779
@@ -63,7 +64,7 @@ def filter_doc(doc_xml, section):
     xslt_root = etree.XML("%s" % myXslt)
 
     transform = etree.XSLT(xslt_root)
-    fp = cStringIO.StringIO(doc_xml.encode("utf-8"))
+    fp = BytesIO(doc_xml.encode("utf-8"))
     doc = etree.parse(fp)
     return transform(doc, section=section)
 
@@ -87,15 +88,16 @@ def main():
     # Use the following section to select CDR documents from the DB
     # -------------------------------------------------------------
     # <DB-section Start>
-    #cursor = cdrdb.connect("CdrGuest").cursor()
+    #cursor = db.connect(user="CdrGuest").cursor()
     #doc_xml = get_doc(cursor, doc_id)
     #filtered_doc = filter_doc(doc_xml, section)
     # <DB-section End>
-
-    print("""\
+    opts = dict(pretty_print=True, encoding="unicode")
+    xml = lxml.html.tostring(filtered_doc, **opts)
+    stdout.buffer.write(f"""\
 Content-type: text/html; charset=utf-8
 
 <!DOCTYPE html>
-%s""" % lxml.html.tostring(filtered_doc, pretty_print=True))
+{xml}""".encode("utf-8"))
 
 main()

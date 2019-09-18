@@ -8,7 +8,7 @@
 
 import cgi
 import cdrcgi
-import cdrdb
+from cdrapi import db
 
 # Constants
 SCRIPT  = "GlossaryTermAudioReviewReport.py"
@@ -184,7 +184,7 @@ if __name__ == "__main__":
 
     # Connect to the database
     try:
-        conn = cdrdb.connect()
+        conn = db.connect()
         cursor = conn.cursor()
     except Exception as e:
         bail("Unable to access database", e)

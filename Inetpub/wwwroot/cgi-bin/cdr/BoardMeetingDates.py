@@ -4,7 +4,8 @@
 # BZIssue::4205 - initial report
 # BZIssue::4792 - add Meeting Canceled attribute to report
 #----------------------------------------------------------------------
-import cdrdb, cdrcgi, cgi, time
+import cdrcgi, cgi, time
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -91,10 +92,10 @@ if request == "Log Out":
 # Connect to the CDR database.
 #----------------------------------------------------------------------
 try:
-    conn   = cdrdb.connect('CdrGuest')
+    conn   = db.connect(user='CdrGuest', timeout=600)
     cursor = conn.cursor()
-except cdrdb.Error as info:
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
+except Exception as e:
+    cdrcgi.bail('Database connection failure: %s' % e)
 
 #----------------------------------------------------------------------
 # Custom validation function for board pick
@@ -204,7 +205,7 @@ LEFT OUTER JOIN query_term c
             AND d.path = '/Organization/PDQBoardInformation/BoardMeetings' +
                          '/BoardMeeting/MeetingDate'
             AND t.path = '/Organization/PDQBoardInformation/BoardMeetings' +
-                         '/BoardMeeting/MeetingTime'""", timeout = 600)
+                         '/BoardMeeting/MeetingTime'""")
     boards = {}
     for cdrId, boardName, meetingDate, meetingTime, webEx, \
                                           canceled in cursor.fetchall():

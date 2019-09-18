@@ -1,7 +1,8 @@
 #----------------------------------------------------------------------
 # Service to fetch board member information.
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, cdrdb, time, lxml.etree as etree
+import cgi, cdr, cdrcgi, time, lxml.etree as etree
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -14,7 +15,7 @@ memberId   = fields.getvalue("member")
 # Set up a database connection and cursor.
 #----------------------------------------------------------------------
 try:
-    conn = cdrdb.connect("CdrGuest")
+    conn = db.connect(user="CdrGuest")
     cursor = conn.cursor()
 except Exception as e:
     cdrcgi.sendPage(u'<Failure>%s</Failure>' % e, 'xml')
@@ -53,8 +54,8 @@ SELECT path, value
  AND   doc_id = ?
  ORDER BY path""", orgId)
 
-    except cdrdb.Error as info:
-        cdrcgi.bail('Database query failure for BoardManager: %s' % info[1][0])
+    except Exception as e:
+        cdrcgi.bail('Database query failure for BoardManager: %s' % e)
     return cursor.fetchall()
 
 #----------------------------------------------------------------------
@@ -85,8 +86,8 @@ LEFT OUTER JOIN query_term q
      WHERE g.doc_id IN (%s)
        AND g.path = '/PDQBoardMemberInfo/GovernmentEmployee'
   ORDER BY q.path""" % ','.join(["'%d'" % id for id in boardIds]))
-    except cdrdb.Error as info:
-        cdrcgi.bail('Database query failure for SpecificInfo: %s' % info[1][0]+
+    except Exception as e:
+        cdrcgi.bail('Database query failure for SpecificInfo: %s' % e +
                     '<br>Board has No Board Members')
 
     rows = cursor.fetchall()
@@ -378,7 +379,7 @@ def allBoardMembers():
                               + '/CurrentMember'
              AND person.path  = '/PDQBoardMemberInfo/BoardMemberName/@cdr:ref'
              AND curmemb.value = 'Yes'
-             AND person_doc.active_status = 'A'""", timeout = 300)
+             AND person_doc.active_status = 'A'""")
         rows = cursor.fetchall()
         root = etree.Element('BoardMembers')
         for docId, eic_start, eic_finish, term_start, name, boardId in rows:
@@ -413,7 +414,7 @@ def collectMembersForBoard(boardId):
              AND c.path = '/PDQBoardMemberInfo/BoardMembershipDetails'
                         + '/CurrentMember'
              AND c.value = 'Yes'
-             AND b.int_val = ?""", boardId, timeout=300)
+             AND b.int_val = ?""", boardId)
         docIds = [row[0] for row in cursor.fetchall()]
         root = etree.Element('Board')
         etree.SubElement(root, 'BoardId').text = unicode(boardId)

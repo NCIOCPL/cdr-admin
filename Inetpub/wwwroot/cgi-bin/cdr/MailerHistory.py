@@ -1,7 +1,8 @@
 #----------------------------------------------------------------------
 # Reports on the history of mailers for a particular document.
 #----------------------------------------------------------------------
-import cdrdb, cdrcgi, cgi, re, string
+import cdrcgi, cgi, re, string
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -33,7 +34,7 @@ elif request == SUBMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if request == "Log Out": 
+if request == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
@@ -55,10 +56,10 @@ if not docId:
 # Connect to the database.
 #----------------------------------------------------------------------
 try:
-    conn   = cdrdb.connect()
+    conn   = db.connect()
     cursor = conn.cursor()
-except cdrdb.Error as info:
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
+except Exception as e:
+    cdrcgi.bail('Database connection failure: %s' % e)
 
 #----------------------------------------------------------------------
 # Extract the document ID as an integer.
@@ -81,8 +82,8 @@ try:
     if not row:
         cdrcgi.bail("No such document CDR%010d" % id)
     title = row[0]
-except cdrdb.Error as info:
-    cdrcgi.bail('Failure retrieving document title: %s' % info[1][0])
+except Exception as e:
+    cdrcgi.bail('Failure retrieving document title: %s' % e)
 
 #----------------------------------------------------------------------
 # Build the report.
@@ -107,7 +108,7 @@ html = """\
   <br />
   <br />
 """ % (id, id, title)
-   
+
 #----------------------------------------------------------------------
 # Extract the information from the database.
 #----------------------------------------------------------------------
@@ -198,8 +199,8 @@ try:
        row[2] or "&nbsp;",
        row[3] or "&nbsp;")
         row = cursor.fetchone()
-except cdrdb.Error as info:
-    cdrcgi.bail('Failure executing query: %s' % info[1][0])
+except Exception as e:
+    cdrcgi.bail('Failure executing query: %s' % e)
 
 cdrcgi.sendPage(html + """\
   </table>

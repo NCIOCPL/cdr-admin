@@ -1,7 +1,8 @@
 #----------------------------------------------------------------------
 # Change the status of a batch or publishing job to a failed state.
 #----------------------------------------------------------------------
-import cgi, cdr, cdrdb, cdrcgi
+import cgi, cdr, cdrcgi
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -42,7 +43,7 @@ if jobId:
         cdrcgi.bail("Job ID must be a positive integer");
 
 # Connect to database
-conn = cdrdb.connect()
+conn = db.connect()
 cursor = conn.cursor()
 
 # Build form body here

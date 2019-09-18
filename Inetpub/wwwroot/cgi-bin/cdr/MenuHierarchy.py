@@ -9,12 +9,13 @@
 #
 # JIRA::OCECDR-3800 - Address security vulnerabilities
 #----------------------------------------------------------------------
+from operator import attrgetter
 import cdr
 import cdrcgi
-import cdrdb
 import cgi
 import lxml.etree as etree
 import time
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Get the parameters from the request.
@@ -44,7 +45,7 @@ if request == "Log Out":
 # If not, we have a hacker, in which case we avoid showing any helpful
 # information.
 #----------------------------------------------------------------------
-query = cdrdb.Query("query_term", "value").unique().order(1)
+query = db.Query("query_term", "value").unique().order(1)
 query.where("path = '/Term/MenuInformation/MenuItem/MenuType'")
 menuTypes = [row[0] for row in query.execute().fetchall()]
 if not menuTypes:
@@ -164,11 +165,9 @@ def displayMenuItem(item, level=0):
     # Sort the children of the terms by the sortString not the terms itself
     # ---------------------------------------------------------------------
     if level == 1:
-        item.children.sort(lambda a,b: cmp(menuItems[a].sortString,
-                                           menuItems[b].sortString))
+        item.children.sort(key=lambda a:menuItems[a].sortString)
     else:
-        item.children.sort(lambda a,b: cmp(menuItems[a].name,
-                                           menuItems[b].name))
+        item.children.sort(key=lambda a:menuItems[a].name)
 
     if level < 2:
         for child in item.children:
@@ -178,10 +177,10 @@ def displayMenuItem(item, level=0):
 menuItems = {}
 menuTypes = {}
 loadMenuItems(menuType)
-if not menuTypes.has_key(menuType):
+if menuType not in menuTypes:
     cdrcgi.bail("INTERNAL ERROR: No terms for menu type '%s' found" % menuType)
 topItems = menuTypes[menuType].topTerms
-topItems.sort(lambda a,b: cmp(menuItems[a].name, menuItems[b].name))
+topItems.sort(key=lambda a: menuItems[a].name)
 html = u"""\
 <!DOCTYPE html>
 <html>

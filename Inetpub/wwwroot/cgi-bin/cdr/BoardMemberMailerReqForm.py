@@ -6,7 +6,8 @@
 # JIRA::OCECDR-3679 - workaround for IE Javascript bug
 # JIRA::OCECDR-3736 - added Editorial Board Reformatted Summary Review mailer
 #----------------------------------------------------------------------
-import cgi, cdr, cdrdb, cdrpub, cdrcgi, re, string, cdrmailcommon, sys
+import cgi, cdr, cdrpub, cdrcgi, re, string, cdrmailcommon, sys
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -14,10 +15,10 @@ import cgi, cdr, cdrdb, cdrpub, cdrcgi, re, string, cdrmailcommon, sys
 fields    = cgi.FieldStorage()
 session   = cdrcgi.getSession(fields)
 request   = cdrcgi.getRequest(fields)
-board     = fields and fields.getvalue("board") or None
-letter    = fields and fields.getvalue("letter") or None
-email     = fields and fields.getvalue("email") or None
-members   = fields and fields.getlist("member") or []
+board     = fields.getvalue("board") or None
+letter    = fields.getvalue("letter") or None
+email     = fields.getvalue("email") or None
+members   = fields.getlist("member") or []
 title     = "CDR Administration"
 section   = "PDQ Board Member Correspondence Mailers"
 SUBMENU   = "Mailer Menu"
@@ -48,9 +49,9 @@ if request == "Log Out":
 # Connect to the CDR database.
 #----------------------------------------------------------------------
 try:
-    conn = cdrdb.connect('CdrPublishing')
-except cdrdb.Error as info:
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
+    conn = db.connect(user='CdrPublishing')
+except Exception as e:
+    cdrcgi.bail('Database connection failure: %s' % e)
 
 #----------------------------------------------------------------------
 # Just for testing.
@@ -120,9 +121,8 @@ if request == "Submit":
              WHERE t.name  = 'PublishingSystem'
                AND d.title = 'Mailers'""")
             rows = cursor.fetchall()
-        except cdrdb.Error as info:
-            cdrcgi.bail('Database failure looking up control document: %s' %
-                        info[1][0])
+        except Exception as e:
+            cdrcgi.bail('Database failure looking up control document: %s' % e)
         if len(rows) < 1:
             cdrcgi.bail('Unable to find control document for Mailers')
         if len(rows) > 1:
@@ -144,7 +144,7 @@ if request == "Submit":
                 AND v.val_status = 'V'
                 AND q.int_val = ?
                 AND d.active_status = 'A'
-           GROUP BY v.id""", board, timeout = 300)
+           GROUP BY v.id""", board)
                 docList = cursor.fetchall()
             else:
                 docList = []
@@ -156,8 +156,8 @@ if request == "Submit":
              WHERE id = ?
                AND val_status = 'V'""", member)
                     docList.append((member, cursor.fetchall()[0][0]))
-        except cdrdb.Error as info:
-            cdrcgi.bail("Failure retrieving document IDs: %s" % info[1][0])
+        except Exception as e:
+            cdrcgi.bail("Failure retrieving document IDs: %s" % e)
         #showDocsAndRun(docList)
 
         # Check to make sure we have at least one mailer to send out.
@@ -195,7 +195,7 @@ if request == "Submit":
         if docCount > 1:
             msgs.append("                            Second doc = %s" %
                         docs[1])
-        cdr.logwrite (msgs, cdrmailcommon.LOGFILE)
+        cdr.logwrite (msgs, cdr.MAILER_LOGFILE)
 
         # Tell user how to get status
         header = cdrcgi.header(title, title, section, None, [])
@@ -220,7 +220,7 @@ class Board:
       FROM query_term
      WHERE path = '/Organization/OrganizationNameInformation'
                 + '/OfficialName/Name'
-       AND doc_id = ?""", id, timeout = 300)
+       AND doc_id = ?""", id)
         rows = cursor.fetchall()
         if not rows:
             cdrcgi.bail("No name found for board %d" % id)
@@ -230,8 +230,7 @@ class Board:
       FROM query_term
      WHERE doc_id = ?
        AND path = '/Organization/OrganizationType'
-       AND value IN ('PDQ Editorial Board', 'PDQ Advisory Board')""", id,
-                       timeout = 300)
+       AND value IN ('PDQ Editorial Board', 'PDQ Advisory Board')""", id)
         rows = cursor.fetchall()
         if not rows:
             cdrcgi.bail("Can't find board type for '%s'" % self.name)
@@ -267,7 +266,7 @@ cursor.execute("""\
               WHERE path = '/PDQBoardMemberInfo/BoardMembershipDetails'
                          + '/BoardName/@cdr:ref'
                 AND v.val_status = 'V'
-                AND d.active_status = 'A'""", timeout = 300)
+                AND d.active_status = 'A'""")
 rows = cursor.fetchall()
 for memberId, boardId, docTitle in rows:
     if boardId not in boards:

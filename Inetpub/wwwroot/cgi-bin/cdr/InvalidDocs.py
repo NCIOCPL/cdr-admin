@@ -5,8 +5,8 @@
 # JIRA::OCECDR-3800
 #----------------------------------------------------------------------
 import cdrcgi
-import cdrdb
 import cgi
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -16,7 +16,7 @@ session = cdrcgi.getSession(fields)
 request = cdrcgi.getRequest(fields)
 docType = fields.getvalue('docType')
 docType = docType and int(docType) or None
-cursor  = cdrdb.connect('CdrGuest').cursor()
+cursor  = db.connect(user='CdrGuest').cursor()
 SUBMENU = "Report Menu"
 buttons = ["Submit Request", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 script  = "InvalidDocs.py"
@@ -45,7 +45,7 @@ if request == "Log Out":
 #----------------------------------------------------------------------
 # Get the list of active document types.
 #----------------------------------------------------------------------
-query = cdrdb.Query("doc_type", "id", "name")
+query = db.Query("doc_type", "id", "name")
 query.where("active = 'Y'")
 query.where("xml_schema IS NOT NULL")
 query.where("name NOT IN ('Filter', 'xxtest', 'schema')")
@@ -68,8 +68,8 @@ if not docType:
 docTypeName = dict(docTypes).get(docType)
 invalidCaption = "Invalid %s Documents" % docTypeName
 blockedCaption = "Blocked %s Documents" % docTypeName
-subquery = cdrdb.Query("doc_version", "MAX(num)").where("id = v.id")
-query = cdrdb.Query("doc_version v", "v.id", "v.title", "d.active_status")
+subquery = db.Query("doc_version", "MAX(num)").where("id = v.id")
+query = db.Query("doc_version v", "v.id", "v.title", "d.active_status")
 query.join("document d", "d.id = v.id")
 query.join("doc_type t", "t.id = d.doc_type")
 query.where(query.Condition("t.id", docType))

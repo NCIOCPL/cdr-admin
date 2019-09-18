@@ -67,7 +67,7 @@ if docId:
     # Validate doc ID format
     try:
         result = cdr.exNormalize(docId.upper())
-    except cdr.Exception as info:
+    except Exception:
         cdrcgi.bail('Doc ID "%s" is not a recognized CDR ID format' % docId)
     else:
         docId = str(result[1])

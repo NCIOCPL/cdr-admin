@@ -2,9 +2,10 @@
 # Display of threads which are still running in the CDR Server (mostly
 # a debugging tool).
 #----------------------------------------------------------------------
-import cdrdb, cdrcgi
+import cdrcgi
+from cdrapi import db
 
-conn = cdrdb.connect('CdrGuest')
+conn = db.connect()
 cursor = conn.cursor()
 cursor.execute("""\
         SELECT s.id,

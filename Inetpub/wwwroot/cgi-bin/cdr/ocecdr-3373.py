@@ -23,9 +23,9 @@ import xlrd
 import ModifyDocs
 import lxml.etree as etree
 import mutagen
-import cdrdb
 import zipfile
 import cStringIO
+from cdrapi import db
 
 CDRNS = "cips.nci.nih.gov/cdr"
 NSMAP = { "cdr" : CDRNS }
@@ -413,7 +413,7 @@ if request == cdrcgi.MAINMENU:
 #----------------------------------------------------------------------
 if request != "Submit" or not files:
     show_form()
-cursor = cdrdb.connect('CdrGuest').cursor()
+cursor = db.connect(user='CdrGuest').cursor()
 cursor.execute("""\
 SELECT DISTINCT doc_id
            FROM query_term

@@ -4,7 +4,8 @@
 #
 # BZIssue::4696
 #----------------------------------------------------------------------
-import cdrdb, cdrcgi, cgi, lxml.etree as etree, cdr
+import cdrcgi, cgi, lxml.etree as etree, cdr
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Constant values we look for in the MenuType element.
@@ -24,7 +25,7 @@ class Term:
         if diff:
             return diff
         return cmp(self.cdrId, other.cdrId)
-    
+
 #----------------------------------------------------------------------
 # Term document representing what the genprof DB calls a "cancer site."
 #----------------------------------------------------------------------
@@ -176,7 +177,7 @@ html = [u"""\
 #----------------------------------------------------------------------
 # Collect all the terms with semantic type of "Genetic condition."
 #----------------------------------------------------------------------
-cursor = cdrdb.connect('CdrGuest').cursor()
+cursor = db.connect(user='CdrGuest').cursor()
 cursor.execute("""\
     SELECT DISTINCT doc_id
                FROM query_term

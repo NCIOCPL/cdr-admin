@@ -4,7 +4,9 @@
 # BZIssue::4671 - Summaries with Mark-up Report
 # BZIssue::4922 - Enhancements to the Summaries with Markup Report
 #----------------------------------------------------------------------
-import cdr, cgi, cdrcgi, time, cdrdb, xml.dom.minidom
+import cdr, cgi, cdrcgi, time
+from cdrapi import db
+from lxml import etree
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -106,10 +108,10 @@ elif request == SUBMENU:
 # Set up a database connection and cursor.
 #----------------------------------------------------------------------
 try:
-    conn = cdrdb.connect("CdrGuest")
+    conn = db.connect(user="CdrGuest")
     cursor = conn.cursor()
-except cdrdb.Error as info:
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
+except Exception as e:
+    cdrcgi.bail('Database connection failure: %s' % e)
 
 #----------------------------------------------------------------------
 # Build date string for header.
@@ -192,9 +194,8 @@ try:
     rows = cursor.fetchall()
     cursor.close()
     cursor = None
-except cdrdb.Error as info:
-    cdrcgi.bail('Failure retrieving Summary documents: %s' %
-                info[1][0])
+except Exception as e:
+    cdrcgi.bail('Failure retrieving Summary documents: %s' % e)
 
 if not rows:
     cdrcgi.bail('No Records Found for Selection: %s ' % audience+"; ")
@@ -203,26 +204,15 @@ if not rows:
 # ------------------------------------------
 markupCount = {}
 for dis in rows:
-    doc = cdr.getDoc('guest', dis[0], getObject = 1)
-
-    #if doc.xml.startswith("<Errors"):
-    #    continue
-
-    dom = xml.dom.minidom.parseString(doc.xml)
+    doc = cdr.getDoc('guest', dis[0], getObject=True)
+    root = etree.fromstring(doc.xml)
     markupCount[dis[0]] = {'publish':0,
-                            'approved':0,
-                            'proposed':0,
-                            'rejected':0}
-
-    insertionElements = dom.getElementsByTagName('Insertion')
-    for obj in insertionElements:
-        markupCount[dis[0]][obj.getAttribute('RevisionLevel')] += 1
-
-    deletionElements  = dom.getElementsByTagName('Deletion')
-    for obj in deletionElements:
-        markupCount[dis[0]][obj.getAttribute('RevisionLevel')] += 1
-
-#cdrcgi.bail(dis)
+                           'approved':0,
+                           'proposed':0,
+                           'rejected':0}
+    for tag in ("Insertion", "Deletion"):
+        for node in root.iter(tag):
+            markupCount[dis[0]][node.get("RevisionLevel")] += 1
 
 
 # Create the results page.

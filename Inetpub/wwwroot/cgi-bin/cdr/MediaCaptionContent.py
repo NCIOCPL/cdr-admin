@@ -15,7 +15,6 @@
 
 import cdr
 import cdrcgi
-import cdrdb
 import cgi
 import copy
 import datetime
@@ -34,6 +33,7 @@ from cdr import get_image
 #from cdrapi.db import Query
 from cdrapi.docs import Doc
 from cdrapi.users import Session
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # CGI form variables
@@ -91,7 +91,7 @@ if action == BT_LOGOUT:
 # Connection to database
 #----------------------------------------------------------------------
 try:
-    conn = cdrdb.connect("CdrGuest")
+    conn = db.connect(user="CdrGuest")
     cursor = conn.cursor()
 except Exception as e:
     cdrcgi.bail("Unable to connect to database", extra=[str(e)])
@@ -99,14 +99,14 @@ except Exception as e:
 #----------------------------------------------------------------------
 # Assemble the lists of valid values.
 #----------------------------------------------------------------------
-query = cdrdb.Query("query_term t", "t.doc_id", "t.value")
+query = db.Query("query_term t", "t.doc_id", "t.value")
 query.join("query_term m", "m.int_val = t.doc_id")
 query.where("t.path = '/Term/PreferredName'")
 query.where("m.path = '/Media/MediaContent/Diagnoses/Diagnosis/@cdr:ref'")
 results = query.unique().order(2).execute(cursor).fetchall()
 diagnoses = [("any", "Any Diagnosis")] + results
 
-query = cdrdb.Query("query_term", "value", "value")
+query = db.Query("query_term", "value", "value")
 query.where("path = '/Media/MediaContent/Categories/Category'")
 query.where("value <> ''")
 results = query.unique().order(1).execute(cursor).fetchall()
@@ -269,7 +269,7 @@ language_path = caption_path + "/@language"
 audience_path = caption_path + "/@audience"
 
 # Create base query for the documents
-query = cdrdb.Query("document d", "d.id", "d.title").unique().order(2)
+query = db.Query("document d", "d.id", "d.title").unique().order(2)
 query.join("doc_type t", "t.id = d.doc_type")
 query.join("doc_version v", "d.id = v.id")
 query.where("t.name = 'Media'")
@@ -308,13 +308,10 @@ query.log(logfile=cdr.DEFAULT_LOGDIR + "/media.log")
 try:
     docIds = [row[0] for row in query.execute(cursor).fetchall()]
     #print("docs: {}".format(docIds))
-except cdrdb.Error as info:
+except Exception as e:
     msg = "Database error executing MediaCaptionContent.py query"
-    extra = (
-        "query = %s" % query,
-        "error = %s" % str(info),
-    )
-    cdr.logwrite(str(info))
+    extra = f"query = {query}", f"error = {e}"
+    cdr.logwrite(str(e))
     cdrcgi.bail(msg, extra=extra)
 
 # If there was no data, we're done

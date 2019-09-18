@@ -1,4 +1,5 @@
-import cgi, cdrcgi, cdrdb
+import cgi, cdrcgi
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Dynamically create the title of the menu section (request #809).
@@ -92,10 +93,10 @@ def DrawDocumentRows(documents):
 # Set up a database connection and cursor.
 #----------------------------------------------------------------------
 try:
-    conn = cdrdb.connect('CdrGuest')
+    conn = db.connect(user='CdrGuest')
     cursor = conn.cursor()
-except cdrdb.Error as info:
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
+except Exception as e:
+    cdrcgi.bail('Database connection failure: %s' % e)
 
 #----------------------------------------------------------------------
 # Fetch the documents for the given Warehouse Box Number
@@ -125,7 +126,7 @@ and q.int_val = ?
 try:
     cursor.execute(sQuery, warehouseBoxNumber)
     rows = cursor.fetchall()
-except cdrdb.Error as info:
+except db.Error as info:
     cdrcgi.bail('Database connection failure: %s' % info[1][0])
 for id, docTitle in rows:
     if id not in documents:
@@ -159,8 +160,8 @@ if not len(documents):
     try:
         cursor.execute(sQuery)
         rows = cursor.fetchall()
-    except cdrdb.Error as info:
-        cdrcgi.bail('Database connection failure: %s' % info[1][0])
+    except Exception as e:
+        cdrcgi.bail('Database connection failure: %s' % e)
 
     sId = "<table border =1><th>Allowable Warehouse Box Numbers<th>"
     for id in rows:

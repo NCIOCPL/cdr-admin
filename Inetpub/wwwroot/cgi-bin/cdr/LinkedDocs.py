@@ -11,15 +11,15 @@
 #----------------------------------------------------------------------
 import cdr
 import cdrcgi
-import cdrdb
 import cgi
 import datetime
 import urllib
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Set the form variables.
 #----------------------------------------------------------------------
-cursor       = cdrdb.connect("CdrGuest").cursor()
+cursor       = db.connect(user="CdrGuest").cursor()
 fields       = cgi.FieldStorage()
 doc_id       = fields.getvalue("doc_id") or fields.getvalue("DocId")
 frag_id      = fields.getvalue("frag_id") or fields.getvalue("FragId") or u""
@@ -68,7 +68,7 @@ def put_up_selection(rows):
 # Search for linked document by title, if so requested.
 #----------------------------------------------------------------------
 if doc_title and not doc_id:
-    query = cdrdb.Query("document d", "d.id", "d.title")
+    query = db.Query("document d", "d.id", "d.title")
     if linked_type:
         query.join("doc_type t", "t.id = d.doc_type")
         query.where(query.Condition("t.name", linked_type))
@@ -112,7 +112,7 @@ def show_target_info(table, page):
 #----------------------------------------------------------------------
 def show_footer(table, page):
     try:
-        query = cdrdb.Query("usr u", "u.fullname")
+        query = db.Query("usr u", "u.fullname")
         query.join("session s", "u.id = s.usr")
         query.where(query.Condition("s.name", session))
         user = query.execute().fetchall()[0][0]
@@ -132,7 +132,7 @@ def show_report(doc_id, frag_id):
         frag_id = id_pieces[2]
 
     # Get the target doc info.
-    query = cdrdb.Query("document d", "d.title", "t.name")
+    query = db.Query("document d", "d.title", "t.name")
     query.join("doc_type t", "t.id = d.doc_type")
     query.where(query.Condition("d.id", doc_id))
     rows = query.execute(cursor).fetchall()
@@ -144,7 +144,7 @@ def show_report(doc_id, frag_id):
 
     # Find the links.
     columns = ("d.id", "d.title", "t.name", "n.source_elem", "n.target_frag")
-    query = cdrdb.Query("document d", *columns)
+    query = db.Query("document d", *columns)
     query.join("doc_type t", "t.id = d.doc_type")
     query.join("link_net n", "d.id = n.source_doc")
     query.where(query.Condition("n.target_doc", doc_id))
@@ -222,8 +222,8 @@ SELECT DISTINCT name
        ORDER BY name
 """)
         return cursor.fetchall()
-    except cdrdb.Error as info:
-        cdrcgi.bail('Database query failure: %s' % info[1][0])
+    except Exception as e:
+        cdrcgi.bail('Database query failure: %s' % e)
 
 #----------------------------------------------------------------------
 # Put up the main request form.

@@ -1,7 +1,8 @@
 #----------------------------------------------------------------------
 # Compare filters between the current tier and the production tier.
 #----------------------------------------------------------------------
-import cdr, cdrdb, cgi, cdrcgi, os, tempfile, re, shutil, glob
+import cdr, cgi, cdrcgi, os, tempfile, re, shutil, glob
+from cdrapi import db
 from cdrapi.settings import Tier
 
 #----------------------------------------------------------------------
@@ -36,14 +37,14 @@ def getLocalFilters(tmpDir):
         cleanup(tmpDir)
         cdrcgi.bail("Cannot create directory %s" % tier_name)
     try:
-        conn = cdrdb.connect('CdrGuest')
+        conn = db.connect(user='CdrGuest')
         curs = conn.cursor()
         curs.execute("""\
             SELECT d.title, d.xml
               FROM document d
               JOIN doc_type t
                 ON t.id = d.doc_type
-             WHERE t.name = 'Filter'""", timeout=300)
+             WHERE t.name = 'Filter'""")
         rows = curs.fetchall()
     except Exception as e:
         cleanup(tmpDir)

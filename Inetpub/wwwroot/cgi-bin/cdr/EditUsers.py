@@ -2,8 +2,9 @@
 # Interface for managing CDR user accounts
 #----------------------------------------------------------------------
 import cgi
+from html import escape
 import cdr
-import cdrdb
+from cdrapi import db
 import cdrcgi
 
 #----------------------------------------------------------------------
@@ -31,7 +32,7 @@ if action == cdrcgi.MAINMENU:
 #----------------------------------------------------------------------
 # Retrieve the list of users from the server.
 #----------------------------------------------------------------------
-query = cdrdb.Query("open_usr", "name", "fullname")
+query = db.Query("open_usr", "name", "fullname")
 query.where("expired IS NULL OR expired > GETDATE()")
 rows = query.order("name").execute().fetchall()
 
@@ -55,7 +56,7 @@ for user, fullname in rows:
         menu += "<TR>%s" % padding
     menu += """\
   <TD><A HREF="%s/EditUser.py?%s=%s&usr=%s"><B>%s</B></A><br>%s</TD>
-""" % (cdrcgi.BASE, cdrcgi.SESSION, session, cgi.escape(user, 1),
+""" % (cdrcgi.BASE, cdrcgi.SESSION, session, escape(user, 1),
        user, fullname)
     nUsers += 1
     if nUsers % USERS_PER_ROW == 0: menu += "</TR>\n"

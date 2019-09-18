@@ -3,7 +3,7 @@
 #
 # Rewritten summer 2015 as part of security sweep.
 #----------------------------------------------------------------------
-import cdrdb
+from cdrapi import db
 import cdrcgi
 import datetime
 
@@ -48,8 +48,8 @@ class Control(cdrcgi.Control):
         )
         self.PAGE_TITLE = "New Citation Documents"
         self.subtitle = str(self.today)
-        subquery = cdrdb.Query("document d", "d.id", "c.dt", "c.usr",
-                               "MAX(v.num) AS ver")
+        subquery = db.Query("document d", "d.id", "c.dt", "c.usr",
+                            "MAX(v.num) AS ver")
         subquery.join("doc_type t", "t.id = d.doc_type")
         subquery.join("audit_trail c", "c.document = d.id")
         subquery.join("action a", "a.id = c.action")
@@ -63,8 +63,8 @@ class Control(cdrcgi.Control):
         pattern = "/Citation/PubmedArticle/%s/PMID"
         paths = [pattern % name for name in ("MedlineCitation", "NCBIArticle")]
         paths = ",".join(["'%s'" % path for path in paths])
-        query = cdrdb.Query("document d", "d.id", "d.title", "u.name", "t.dt",
-                            "v.publishable", "p.value")
+        query = db.Query("document d", "d.id", "d.title", "u.name", "t.dt",
+                         "v.publishable", "p.value")
         query.join(subquery, "t.id = d.id")
         query.join("open_usr u", "u.id = t.usr")
         query.outer("doc_version v", "v.id = d.id", "v.num = t.ver")

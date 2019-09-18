@@ -5,7 +5,8 @@
 # Used when the most recent copy of a document has problems and
 # we wish to revert to an earlier version.
 #--------------------------------------------------------------
-import time, cgi, cdr, cdrcgi, cdrdb
+import time, cgi, cdr, cdrcgi
+from cdrapi import db
 from cdrapi.users import Session
 
 TITLE   = "Replace CWD with Older Version"
@@ -110,7 +111,7 @@ if docIdStr and verStr:
         saveNewVer = 'Y'
 
     # Validate docId and get type
-    conn = cdrdb.connect()
+    conn = db.connect()
     cursor = conn.cursor()
     docType = None
     docTitle = None
@@ -125,8 +126,8 @@ if docIdStr and verStr:
             docType  = row[0]
             docTitle = row[1]
 
-    except cdrdb.Error as info:
-        cdrcgi.bail("Database error fetching doc type: %s" % str(info))
+    except Exception as e:
+        cdrcgi.bail("Database error fetching doc type: %s" % e)
 
     # Did we find a doc type?  Also means we found a doc
     if docType:

@@ -4,7 +4,7 @@
 #----------------------------------------------------------------------
 import cdr
 import cdrcgi
-import cdrdb
+from cdrapi import db
 
 class Control(cdrcgi.Control):
     """
@@ -48,7 +48,7 @@ class Control(cdrcgi.Control):
         if self.request == self.PURGE:
             if not cdr.canDo(self.session, "PRUNE TRANSLATION QUEUE"):
                 cdrcgi.bail("not authorized")
-            conn = cdrdb.connect()
+            conn = db.connect()
             cursor = conn.cursor()
             cursor.execute("""\
 DELETE FROM summary_translation_job
@@ -84,7 +84,7 @@ DELETE FROM summary_translation_job
                               style="color: green; font-weight: bold"))
         fields = ("d.id", "d.title", "s.value_name", "c.value_name",
                   "u.fullname", "j.state_date", "j.comments")
-        query = cdrdb.Query("summary_translation_job j", *fields)
+        query = db.Query("summary_translation_job j", *fields)
         query.join("usr u", "u.id = j.assigned_to")
         query.join("document d", "d.id = j.english_id")
         query.join("summary_translation_state s", "s.value_id = j.state_id")

@@ -4,7 +4,7 @@
 # BZIssue::5237 - Report for publication document counts fails on
 #                 non-production server
 #----------------------------------------------------------------------
-import cgi, cdr, cdrdb, cdrcgi, cdrbatch
+import cgi, cdr, cdrcgi, cdrbatch
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -33,7 +33,7 @@ elif request == SUBMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if request == "Log Out": 
+if request == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
@@ -65,7 +65,7 @@ if not email:
 </HTML>
 """)
 
-#----------------------------------------------------------------------    
+#----------------------------------------------------------------------
 # If we get here, we're ready to queue up a request for the report.
 #----------------------------------------------------------------------
 batch = cdrbatch.CdrBatch(jobName = "Published Documents Count",
@@ -93,7 +93,7 @@ cdrcgi.sendPage(header + """\
     <a href='%s/getBatchStatus.py?%s=%s&jobId=%s'>
      <span style="text-decoration:underline;color:blue;">link</span>
     </a>
-    or use the CDR Administration menu option 
+    or use the CDR Administration menu option
     <span style="font-style:italic;">View Batch Job Status</span>.
    </p>
    </fieldset>

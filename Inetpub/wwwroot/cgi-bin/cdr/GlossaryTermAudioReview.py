@@ -14,8 +14,8 @@ import zipfile
 import msvcrt
 import xlrd
 import cdr
-import cdrdb
 import cdrcgi
+from cdrapi import db
 from cdrapi.users import Session
 
 cgitb.enable()
@@ -120,7 +120,7 @@ def getUserId(session, cursor=None, userName=None):
 
     if not cursor:
         try:
-            conn = cdrdb.connect()
+            conn = db.connect()
             cursor = conn.cursor()
         except Exception as e:
             bail("Unable to get cursor to fetch userId")
@@ -143,7 +143,7 @@ def getSqlDate(cursor=None):
     """
     if not cursor:
         try:
-            conn = cdrdb.connect()
+            conn = db.connect()
             cursor = conn.cursor()
         except Exception as e:
             bail("Unable to get cursor to fetch userId", e)
@@ -174,7 +174,7 @@ def loadZipTable():
     sql = "SELECT id,filename,filedate,complete FROM term_audio_zipfile"
 
     try:
-        conn = cdrdb.connect()
+        conn = db.connect()
         cursor = conn.cursor()
         cursor.execute(sql)
         rows = cursor.fetchall()
@@ -205,7 +205,7 @@ def getZipfileName(zipId):
         File name, without path.
     """
     try:
-        conn = cdrdb.connect()
+        conn = db.connect()
         cursor = conn.cursor()
         cursor.execute("SELECT filename FROM term_audio_zipfile WHERE id = ?",
                        zipId)
@@ -237,7 +237,7 @@ def loadMp3Table(zipId):
       WHERE zipfile_id = %d
      """ % zipId
     try:
-        conn = cdrdb.connect()
+        conn = db.connect()
         cursor = conn.cursor()
         cursor.execute(sql)
         rows = cursor.fetchall()
@@ -336,7 +336,7 @@ def installZipFile(zipName):
     """
     # Connect to the database
     try:
-        conn = cdrdb.connect()
+        conn = db.connect()
         cursor = conn.cursor()
     except Exception as e:
         bail("Unable to connect to installZipFile in database", e)
@@ -546,7 +546,7 @@ def updateZipfileCompletion(zipFilename, status):
         New status
     """
     try:
-        conn = cdrdb.connect()
+        conn = db.connect()
         cursor = conn.cursor()
         cursor.execute("""
          UPDATE term_audio_zipfile
@@ -828,7 +828,7 @@ def sendMp3(mp3Id):
     """
     # Find the stored zip and mp3 filenames in the database
     try:
-        conn = cdrdb.connect()
+        conn = db.connect()
         cursor = conn.cursor()
         cursor.execute("""
          SELECT zip.filename, mp3.mp3_name
@@ -985,7 +985,7 @@ def saveChanges(fields, session):
 
     # Get SQL Server connection and datetime stamp for updates.
     try:
-        conn = cdrdb.connect()
+        conn = db.connect()
         cursor = conn.cursor()
     except Exception as e:
         bail("Unable to connect to SQL Server to save changes", e)

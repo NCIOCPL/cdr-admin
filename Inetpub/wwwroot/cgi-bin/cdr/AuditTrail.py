@@ -18,7 +18,6 @@ try:
 except:
     cdrcgi.bail("Invalid id value: %s" % docId)
 try:
-    #conn = cdrdb.connect('CdrGuest')
     conn = cdrdb.connect(user='CdrGuest')
 except:
     cdrcgi.bail("Unable to connect to CDR database")

@@ -9,7 +9,8 @@
 # JIRA::OCECDR-4078 - reduce indentation
 #
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, cdrdb, time
+import cgi, cdr, cdrcgi, time
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -162,10 +163,10 @@ elif request == SUBMENU:
 # Set up a database connection and cursor.
 #----------------------------------------------------------------------
 try:
-    conn = cdrdb.connect("CdrGuest")
+    conn = db.connect(user="CdrGuest")
     cursor = conn.cursor()
-except cdrdb.Error as info:
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
+except Exception as e:
+    cdrcgi.bail('Database connection failure: %s' % e)
 
 #----------------------------------------------------------------------
 # Build date string for header.
@@ -377,9 +378,8 @@ if byTitle:
             showTitleChoices(rows)
         intId = rows[0][0]
         docId = "CDR%010d" % intId
-    except cdrdb.Error as info:
-        cdrcgi.bail('Failure looking up document %s: %s' % (lookingFor,
-                                                            info[1][0]))
+    except Exception as e:
+        cdrcgi.bail('Failure looking up document %s: %s' % (lookingFor, e))
 
 #----------------------------------------------------------------------
 # Language variable has been selected
@@ -571,8 +571,8 @@ if byCdrid:
                  WHERE id = ?
               ORDER BY num DESC""", byCdrid)
             vrows = cursor.fetchall()
-        except cdrdb.Error as info:
-            cdrcgi.bail('Failure retrieving document versions: %s' % info[1][0])
+        except Exception as e:
+            cdrcgi.bail('Failure retrieving document versions: %s' % e)
         form = u"""\
       <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
       <INPUT TYPE='hidden' NAME='DocType' VALUE='%s'>
@@ -623,18 +623,16 @@ if byCdrid:
         rows = cursor.fetchall()
         cursor.close()
         cursor = None
-    except cdrdb.Error as info:
-        cdrcgi.bail('Failure retrieving single Summary document: %s' %
-                    info[1][0])
+    except Exception as e:
+        cdrcgi.bail('Failure retrieving single Summary document: %s' % e)
 else:
     try:
         cursor.execute(query)
         rows = cursor.fetchall()
         cursor.close()
         cursor = None
-    except cdrdb.Error as info:
-        cdrcgi.bail('Failure retrieving Summary documents: %s' %
-                    info[1][0])
+    except Exception as e:
+        cdrcgi.bail('Failure retrieving Summary documents: %s' % e)
 
 if not rows and not vrows:
     cdrcgi.bail('No Records Found for Selection: %s ' % lang+"; "+audience+"; "+groups[0] )

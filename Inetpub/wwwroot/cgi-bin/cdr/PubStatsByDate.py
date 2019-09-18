@@ -18,15 +18,15 @@
 import cgi
 import cdr
 import cdrcgi
-import cdrdb
 import datetime
+from cdrapi import db
 
 LOG_QUERIES = False
 
 #----------------------------------------------------------------------
 # Set the form variables.
 #----------------------------------------------------------------------
-conn      = cdrdb.connect()
+conn      = db.connect()
 cursor    = conn.cursor()
 fields    = cgi.FieldStorage()
 session   = cdrcgi.getSession(fields)
@@ -79,7 +79,7 @@ if vol:
 # set speeds up the query by orders of magnitude.
 #----------------------------------------------------------------------
 def get_pub_doc_types():
-    query = cdrdb.Query("doc_type t", "t.name", "d.doc_type").unique().order(1)
+    query = db.Query("doc_type t", "t.name", "d.doc_type").unique().order(1)
     query.join("document d", "d.doc_type = t.id")
     query.join("pub_proc_cg c", "c.id = d.id")
     if LOG_QUERIES:
@@ -96,8 +96,8 @@ def get_pub_doc_types():
 def get_media_info(ids):
     if not ids:
         return []
-    last_ver = cdrdb.Query("doc_version", "MAX(num)").where("id = v.id")
-    query = cdrdb.Query("query_term t", "t.doc_id", "t.value", "d.first_pub",
+    last_ver = db.Query("doc_version", "MAX(num)").where("id = v.id")
+    query = db.Query("query_term t", "t.doc_id", "t.value", "d.first_pub",
                         "v.dt", "v.updated_dt", "b.value", "v.num",
                         "v.publishable").unique().order("t.value")
     query.join("doc_version v", "t.doc_id = v.id")
@@ -167,7 +167,7 @@ function clear_others() { jQuery(".dt-cb").prop("checked", false); }""")
 
 # Create #removed table
 # ---------------------
-query = cdrdb.Query("pub_proc_doc d", "d.doc_id", "MAX(p.started) AS started")
+query = db.Query("pub_proc_doc d", "d.doc_id", "MAX(p.started) AS started")
 query.join("pub_proc p", "p.id = d.pub_proc")
 query.where(query.Condition("p.started", "%s 23:59:59" % date_to, "<="))
 query.where("p.pub_subset LIKE 'Push_%'")
@@ -182,7 +182,7 @@ conn.commit()
 
 # Create #prevpub table
 # ----------------------
-query = cdrdb.Query("pub_proc_doc d", "d.doc_id").unique()
+query = db.Query("pub_proc_doc d", "d.doc_id").unique()
 query.join("pub_proc p", "p.id = d.pub_proc")
 query.where(query.Condition("p.started", date_from, "<"))
 query.where("p.pub_subset LIKE 'Push_%'")
@@ -195,8 +195,8 @@ conn.commit()
 
 # Create #brandnew table
 # ----------------------
-subquery = cdrdb.Query("##prevpub", "doc_id")
-query = cdrdb.Query("pub_proc_doc d", "d.doc_id", "MIN(p.started) AS started")
+subquery = db.Query("##prevpub", "doc_id")
+query = db.Query("pub_proc_doc d", "d.doc_id", "MIN(p.started) AS started")
 query.join("pub_proc p", "p.id = d.pub_proc")
 query.where(query.Condition("p.started", date_from, ">="))
 query.where(query.Condition("p.started", "%s 23:59:59" % date_to, "<="))
@@ -212,7 +212,7 @@ conn.commit()
 
 # Create #phoenix table
 # ---------------------
-query = cdrdb.Query("pub_proc_doc d", "d.doc_id", "MIN(p.started) AS started")
+query = db.Query("pub_proc_doc d", "d.doc_id", "MIN(p.started) AS started")
 query.join("pub_proc p", "p.id = d.pub_proc")
 query.join("##removed r", "r.doc_id = d.doc_id")
 query.where("p.started > r.started")
@@ -228,10 +228,10 @@ conn.commit()
 
 def get_docs_or_counts(cursor, temp_table, date_from, date_to, vol):
     if vol:
-        query = cdrdb.Query("%s p" % temp_table, "p.doc_id")
+        query = db.Query("%s p" % temp_table, "p.doc_id")
         query.where("t.name = 'Media'")
     else:
-        query = cdrdb.Query("%s p" % temp_table, "t.name", "COUNT(*)")
+        query = db.Query("%s p" % temp_table, "t.name", "COUNT(*)")
         query.group("t.name")
     query.join("document d", "d.id = p.doc_id")
     query.join("doc_type t", "d.doc_type = t.id")
@@ -260,10 +260,10 @@ renews = get_docs_or_counts(cursor, "##phoenix", date_from, date_to, vol)
 #       in each category.
 # -----------------------------------------------------
 if vol:
-    query = cdrdb.Query("pub_proc_doc pd", "d.id").unique()
+    query = db.Query("pub_proc_doc pd", "d.id").unique()
     query.where("t.name = 'Media'")
 else:
-    query = cdrdb.Query("pub_proc_doc pd", "t.name", "COUNT(DISTINCT d.id)")
+    query = db.Query("pub_proc_doc pd", "t.name", "COUNT(DISTINCT d.id)")
     query.group("t.name")
 query.join("pub_proc p", "p.id = pd.pub_proc")
 query.join("document d", "d.id = pd.doc_id")
@@ -283,10 +283,10 @@ updates2 = query.execute(cursor).fetchall()
 #       during the given time period it's only been
 #       counted as an added document.
 # -----------------------------------------------------
-subquery1 = cdrdb.Query("##phoenix", "doc_id")
+subquery1 = db.Query("##phoenix", "doc_id")
 subquery1.where("started >= '%s'" % date_from)
 subquery1.where("started <= '%s 23:59:59'" % date_to)
-subquery2 = cdrdb.Query("##brandnew", "doc_id")
+subquery2 = db.Query("##brandnew", "doc_id")
 subquery2.where("started >= '%s'" % date_from)
 subquery2.where("started <= '%s 23:59:59'" % date_to)
 query.where(query.Condition("d.id", subquery1, "NOT IN"))
@@ -314,7 +314,7 @@ if vol and audience != 'Both':
         "/Media/MediaContent/Captions/MediaCaption/@audience",
         "/Media/MediaContent/ContentDescriptions/ContentDescription/@audience",
     )
-    query = cdrdb.Query("query_term_pub", "doc_id").unique()
+    query = db.Query("query_term_pub", "doc_id").unique()
     query.where(query.Condition("value", audience))
     query.where(query.Condition("path", paths, "IN"))
     if LOG_QUERIES:

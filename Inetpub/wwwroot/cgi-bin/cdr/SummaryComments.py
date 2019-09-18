@@ -10,9 +10,9 @@
 #----------------------------------------------------------------------
 import cdr
 import cdrcgi
-import cdrdb
 import datetime
 import lxml.etree as etree
+from cdrapi import db
 
 class Control(cdrcgi.Control):
     """
@@ -270,7 +270,7 @@ jQuery(function() {
         "Editorial Board" suffix.
         """
 
-        query = cdrdb.Query("query_term n", "n.doc_id", "n.value")
+        query = db.Query("query_term n", "n.doc_id", "n.value")
         query.join("query_term t", "t.doc_id = n.doc_id")
         query.join("active_doc a", "a.id = n.doc_id")
         query.where("t.path = '/Organization/OrganizationType'")
@@ -303,7 +303,7 @@ jQuery(function() {
                 self.display = display
                 self.tooltip = tooltip
 
-        query = cdrdb.Query("document d", "d.id", "d.title")
+        query = db.Query("document d", "d.id", "d.title")
         query.join("doc_type t", "t.id = d.doc_type")
         query.where("t.name = 'Summary'")
         query.where(query.Condition("d.title", fragment + "%", "LIKE"))
@@ -330,7 +330,7 @@ jQuery(function() {
 
         b_path = "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"
         t_path = "/Summary/TranslationOf/@cdr:ref"
-        query = cdrdb.Query("query_term a", "a.doc_id")
+        query = db.Query("query_term a", "a.doc_id")
         query.where("a.path = '/Summary/SummaryMetaData/SummaryAudience'")
         query.where(query.Condition("a.value", self.audience + "s"))
         if self.language == "English":
@@ -433,7 +433,7 @@ class Summary:
         self.id = doc_id
         self.control = control
         self.sections = []
-        query = cdrdb.Query("document", "title", "xml")
+        query = db.Query("document", "title", "xml")
         query.where(query.Condition("id", doc_id))
         self.title, xml = query.execute(control.cursor).fetchone()
         root = etree.XML(xml.encode("utf-8"))

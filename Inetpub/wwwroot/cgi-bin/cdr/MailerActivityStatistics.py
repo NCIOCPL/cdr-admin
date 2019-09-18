@@ -2,7 +2,8 @@
 # Generates report of counts of mailers of each type, generated during
 # a specified date range.
 #----------------------------------------------------------------------
-import cdr, cdrdb, cdrcgi, cgi, time
+import cdr, cdrcgi, cgi, time
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -84,10 +85,10 @@ if fromDate > toDate:
 # Connect to the database.
 #----------------------------------------------------------------------
 try:
-    conn   = cdrdb.connect()
+    conn   = db.connect()
     cursor = conn.cursor()
-except cdrdb.Error as info:
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
+except Exception as e:
+    cdrcgi.bail('Database connection failure: %s' % e)
 
 #----------------------------------------------------------------------
 # We have a request; do it.
@@ -190,8 +191,8 @@ try:
         groupTotal += count
         grandTotal += count
         row = cursor.fetchone()
-except cdrdb.Error as info:
-    cdrcgi.bail('Failure executing query: %s' % info[1][0])
+except Exception as e:
+    cdrcgi.bail('Failure executing query: %s' % e)
 
 if groupTotal:
     html += """\

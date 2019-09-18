@@ -3,10 +3,10 @@
 # Shows versions of everything.
 #----------------------------------------------------------------------
 def sendPage(what):
-    print("""\
+    sys.stdout.buffer.write(f"""\
 Content-type: text/html
 
-%s""" % what)
+{what}""".encode("utf-8"))
 
 def show(component, version):
     html.append(u"""\
@@ -18,6 +18,7 @@ def show(component, version):
 html = ["""\
 <html>
  <head>
+  <meta charset="utf-8">
   <title>Python Upgrade Information</title>
   <style type='text/css'>
    body { font-family: Arial, sans-serif; }
@@ -34,39 +35,48 @@ html = ["""\
    </tr>
 """]
 try:
+    import pkg_resources
     import sys
     import cgi
-    import MySQLdb
     import pip
     from PIL import Image
     import lxml.etree
     import xlrd
     import xlwt
     import cdr
-    import cdrdb
     import requests
-    import apns
-    import pymssql
-    import cdrmailcommon
-    conn = cdrmailcommon.emailerConn('dropbox')
+    import apscheduler
+    import tornado
+    import pyodbc
+    #import pymssql
+    from cdrapi import db
+    from cdrapi import docs
+    from cdrapi import publishing
+    from cdrapi import reports
+    from cdrapi import searches
+    from cdrapi import settings
+    from cdrapi import users
     show("Python", sys.version)
     show("pip", pip.__version__)
     show("lxml", "%d.%d.%d.%d" % lxml.etree.LXML_VERSION[:4])
-    show("Image", Image.VERSION)
+    show("Image", Image.__version__)
     show("xlrd", xlrd.__VERSION__)
     show("xlwt", xlwt.__VERSION__)
     show("requests", requests.__version__)
-    show("pymssql", pymssql.__version__)
-    show("MySQLdb", "%s.%s.%s" % MySQLdb.version_info[:3])
-    show("MySQL Server", "%s.%s" % conn._server_version[:2])
-    distros = pip.get_installed_distributions()
-    distros = sorted(distros, key=lambda d: str(d).lower())
-    packages = "".join("<li>%s</li>" % d for d in distros)
+    #show("pymssql", pymssql.__version__)
+    show("pyodbc", pyodbc.version)
+    show("apscheduler", apscheduler.version)
+    show("tornado", tornado.version)
+    env = pkg_resources.Environment()
+    packages = []
+    for name in sorted(env, key=str.lower):
+        for package in env[name]:
+            packages.append(f"<li>{package}</li>")
     html.append("""\
   </table>
   <ul>%s</ul>
  </body>
-</html>""" % packages)
+</html>""" % "\n".join(packages))
     sendPage("".join(html))
 except Exception as e:
     sendPage("<pre>%s</pre>" % e)

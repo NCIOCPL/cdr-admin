@@ -7,14 +7,14 @@
 #----------------------------------------------------------------------
 import cgi
 import cdrcgi
-import cdrdb
 import sys
 import datetime
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Get the parameters from the request.
 #----------------------------------------------------------------------
-cursor   = cdrdb.connect("CdrGuest").cursor()
+cursor   = db.connect(user="CdrGuest").cursor()
 repTitle = "Semantic Type Report"
 fields   = cgi.FieldStorage()
 session  = cdrcgi.getSession(fields) or cdrcgi.bail("Not logged in")
@@ -51,7 +51,7 @@ class SemanticType:
     def __cmp__(self, other):
         return cmp(self.title, other.title)
 semanticTypes = {}
-query = cdrdb.Query("document d", "d.id", "d.title").unique()
+query = db.Query("document d", "d.id", "d.title").unique()
 query.join("query_term t", "t.int_val = d.id")
 query.where("t.path = '/Term/SemanticType/@cdr:ref'")
 for doc_id, doc_title in query.execute(cursor).fetchall():
@@ -121,10 +121,10 @@ document_ids = {}
 keys = protocolTypes.keys()
 for key in keys:
     protocolType = protocolTypes[key]
-    subquery = cdrdb.Query("query_term", "doc_id")
+    subquery = db.Query("query_term", "doc_id")
     subquery.where("path = '/Term/SemanticType/@cdr:ref'")
     subquery.where("int_val = %d" % semanticType)
-    query = cdrdb.Query("document d", "d.id", "d.title", "s.value", "t.value")
+    query = db.Query("document d", "d.id", "d.title", "s.value", "t.value")
     query.join("query_term s", "s.doc_id = d.id")
     query.join("query_term q", "q.doc_id = d.id")
     query.join("query_term t", "t.doc_id = q.int_val")

@@ -8,7 +8,7 @@
 #----------------------------------------------------------------------
 import cgi
 import cdrcgi
-import cdrdb
+from cdrapi import db
 import datetime
 import lxml.etree as etree
 
@@ -53,14 +53,14 @@ class Control(cdrcgi.Control):
             cdrcgi.Report.Column("Last Comment", width="450px"),
             cdrcgi.Report.Column("Date Last Publishable", width="100px")
         )
-        query = cdrdb.Query("doc_version v", "v.id", "MAX(v.num)")
+        query = db.Query("doc_version v", "v.id", "MAX(v.num)")
         query.join("doc_type t", "t.id = v.doc_type")
         query.join("active_doc a", "a.id = v.id")
         query.where("t.name = 'GlossaryTermName'")
         query.where(query.Condition("v.dt", self.start, ">="))
         query.where(query.Condition("v.dt", "%s 23:59:59" % self.end, "<="))
         query.group("v.id")
-        docs = query.execute(self.cursor, timeout=300).fetchall()
+        docs = query.execute(self.cursor).fetchall()
         rows = []
         for term in sorted([GlossaryTermName(self, *d) for d in docs]):
             rows += term.rows()
@@ -93,13 +93,13 @@ class GlossaryTermName:
         self.doc_id = doc_id
         self.doc_version = doc_version
         self.names = []
-        query = cdrdb.Query("doc_version", "MAX(dt) AS last_pub")
+        query = db.Query("doc_version", "MAX(dt) AS last_pub")
         query.where(query.Condition("id", doc_id))
         query.where("publishable = 'Y'")
         row = query.execute(control.cursor).fetchone()
         self.last_pub = row and row[0] or None
         fields = ("v.title", "v.xml", "v.publishable", "d.first_pub")
-        query = cdrdb.Query("doc_version v", *fields)
+        query = db.Query("doc_version v", *fields)
         query.join("document d", "d.id = v.id")
         query.where(query.Condition("v.id", doc_id))
         query.where(query.Condition("v.num", doc_version))

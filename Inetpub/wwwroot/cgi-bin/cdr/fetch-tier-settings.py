@@ -11,9 +11,9 @@ import pkg_resources
 import lxml.etree as etree
 import requests
 import cdr
-import cdrdb
 import cdrcgi
 import cdrutil
+from cdrapi import db
 from cdrapi.settings import Tier
 
 class Settings:
@@ -139,7 +139,7 @@ class Settings:
                 settings[package.project_name] = package.version
         return settings
     def get_mssql_settings(self):
-        cursor = cdrdb.connect().cursor()
+        cursor = db.connect().cursor()
         cursor.execute("EXEC sp_server_info")
         settings = {}
         for attr_id, attr_name, attr_value in cursor.fetchall():

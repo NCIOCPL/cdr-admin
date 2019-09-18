@@ -7,15 +7,15 @@
 #----------------------------------------------------------------------
 import cgi
 import cdr
-import cdrdb
 import cdrcgi
 import datetime
 from lxml import etree
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Set the form variables.
 #----------------------------------------------------------------------
-cursor    = cdrdb.connect("CdrGuest").cursor()
+cursor    = db.connect(user="CdrGuest").cursor()
 fields    = cgi.FieldStorage()
 session   = cdrcgi.getSession(fields) or cdrcgi.bail("Please log in.")
 request   = cdrcgi.getRequest(fields)
@@ -102,7 +102,7 @@ class Name:
                 name = cdr.get_text(node)
                 if name:
                     self.spanishNames.append(name)
-        query = cdrdb.Query("document", "active_status")
+        query = db.Query("document", "active_status")
         query.where(query.Condition("id", docId))
         if query.execute(cursor).fetchall()[0][0] == u"I":
             self.blocked = True
@@ -155,7 +155,7 @@ class Concept:
         Concept.COUNT += 1
         self.docId = docId
         self.htmlBlocked = u"<span class='error'>[Blocked]</span>"
-        query = cdrdb.Query("query_term", "doc_id").unique()
+        query = db.Query("query_term", "doc_id").unique()
         query.where("path = '/GlossaryTermName/GlossaryTermConcept/@cdr:ref'")
         query.where(query.Condition("int_val", docId))
         rows = query.execute(cursor).fetchall()
@@ -316,7 +316,7 @@ class Concept:
 #----------------------------------------------------------------------
 # Create the valid values lists.
 #----------------------------------------------------------------------
-query = cdrdb.Query("query_term", "value").unique().order(1)
+query = db.Query("query_term", "value").unique().order(1)
 query.where("path = '/GlossaryTermConcept/TermType'")
 query.where("value <> 'Other'")
 term_types = [row[0] for row in query.execute(cursor).fetchall()]
@@ -366,7 +366,7 @@ of the terms to be selected. All other selection criteria are required."""
 # Generate the Mailer Tracking Report.
 #----------------------------------------------------------------------
 def createReport(cursor, conceptType, status, audience, name, text, spanish):
-    query = cdrdb.Query("query_term t", "t.doc_id").unique().order(1)
+    query = db.Query("query_term t", "t.doc_id").unique().order(1)
     query.join("query_term s", "s.doc_id = t.doc_id")
     query.join("query_term a", "a.doc_id = t.doc_id"
                " AND LEFT(a.node_loc, 4) = LEFT(s.node_loc, 4)")

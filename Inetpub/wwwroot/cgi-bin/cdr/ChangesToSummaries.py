@@ -3,7 +3,7 @@
 # Rewritten July 2015 as part of a security sweep.
 #----------------------------------------------------------------------
 import cdr
-import cdrdb
+from cdrapi import db
 import datetime
 import cgi
 import cdrcgi
@@ -87,13 +87,13 @@ class Control(cdrcgi.Control):
         "Fetch IDs and names of the PDQ editorial boards (for piclist)"
         n_path = "/Organization/OrganizationNameInformation/OfficialName/Name"
         t_path = "/Organization/OrganizationType"
-        query = cdrdb.Query("query_term n", "n.doc_id", "n.value")
+        query = db.Query("query_term n", "n.doc_id", "n.value")
         query.join("query_term t", "t.doc_id = n.doc_id")
         query.where(query.Condition("n.path", n_path))
         query.where(query.Condition("t.path", t_path))
         query.where(query.Condition("t.value", "PDQ Editorial Board"))
         query.order("n.value")
-        return query.execute(self.cursor, timeout=300).fetchall()
+        return query.execute(self.cursor).fetchall()
 
     @staticmethod
     def get_common_css():
@@ -144,7 +144,7 @@ class Board:
         self.summaries = []
         a_path = "/Summary/SummaryMetaData/SummaryAudience"
         b_path = "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"
-        query = cdrdb.Query("query_term a", "a.doc_id")
+        query = db.Query("query_term a", "a.doc_id")
         query.join("query_term b", "b.doc_id = a.doc_id")
         query.where(query.Condition("a.path", a_path))
         query.where(query.Condition("b.path", b_path))
@@ -177,11 +177,11 @@ class Summary:
         Summary.SUMMARIES_EXAMINED += 1
         self.doc_id = doc_id
         self.changes = None
-        query = cdrdb.Query("document", "title")
+        query = db.Query("document", "title")
         query.where(query.Condition("id", doc_id))
         rows = query.execute(control.cursor).fetchall()
         self.title = rows[0][0].split(";")[0]
-        query = cdrdb.Query("publishable_version", "num").order("num DESC")
+        query = db.Query("publishable_version", "num").order("num DESC")
         query.where(query.Condition("id", doc_id))
         start = datetime.datetime.strptime(control.start, "%Y-%m-%d")
         cutoff = start - datetime.timedelta(365)
@@ -192,7 +192,7 @@ class Summary:
         for version in versions:
             Summary.VERSIONS_EXAMINED += 1
             control.logger.debug("examining CDR%dV%d", doc_id, version)
-            query = cdrdb.Query("doc_version", "xml", "dt")
+            query = db.Query("doc_version", "xml", "dt")
             query.where(query.Condition("id", doc_id))
             query.where(query.Condition("num", version))
             xml, date = query.execute(control.cursor).fetchone()

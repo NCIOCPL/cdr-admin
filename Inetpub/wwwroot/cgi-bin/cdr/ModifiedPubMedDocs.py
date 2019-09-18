@@ -6,7 +6,7 @@
 #----------------------------------------------------------------------
 import cgi
 import cdrcgi
-import cdrdb
+from cdrapi import db
 import urllib
 
 #----------------------------------------------------------------------
@@ -33,7 +33,7 @@ elif request == SUBMENU:
 #----------------------------------------------------------------------
 # Submit the query to the database.
 #----------------------------------------------------------------------
-query = cdrdb.Query("document d", "d.id", "d.title").unique().order(2)
+query = db.Query("document d", "d.id", "d.title").unique().order(2)
 query.join("query_term q", "q.doc_id = d.id")
 query.where("q.path = '/Citation/PubmedArticle/ModifiedRecord'")
 query.where("q.value = 'Yes'")

@@ -11,13 +11,13 @@
 #----------------------------------------------------------------------
 import cdr
 import cdr2gk
-import cdrdb
 import cdrcgi
 import cgi
 import lxml.etree as etree
 import os
 import re
 import urllib
+from cdrapi import db
 from cdrapi.settings import Tier
 
 class Control:
@@ -36,13 +36,13 @@ class Control:
         authorized to use the publishing system.
         """
 
-        self.cursor = cdrdb.connect("CdrPublishing").cursor()
+        self.cursor = db.connect(user="CdrPublishing").cursor()
         self.title = "CDR Administration"
         self.script = "publishing.py"
         self.systems = []
         self.system_names = {}
         self.system_ids = {}
-        query = cdrdb.Query("active_doc d", "d.id", "d.title")
+        query = db.Query("active_doc d", "d.id", "d.title")
         query.join("doc_type t", "t.id = d.doc_type")
         query.where(query.Condition("t.name", "PublishingSystem"))
         rows = query.order("d.title").execute(self.cursor).fetchall()
@@ -351,7 +351,7 @@ class Control:
         Invoked by collect_doc_ids().
         """
 
-        query = cdrdb.Query("query_term_pub", "doc_id")
+        query = db.Query("query_term_pub", "doc_id")
         query.where(query.Condition("doc_id", doc_id))
         query.where(query.Condition("value", "Internal"))
         query.where(query.Condition("path", "/Media/@Usage"))
@@ -367,7 +367,7 @@ class Control:
         Invoked by collect_doc_ids().
         """
 
-        query = cdrdb.Query("query_term_pub", "doc_id")
+        query = db.Query("query_term_pub", "doc_id")
         query.where(query.Condition("doc_id", doc_id))
         query.where(query.Condition("value", "Yes"))
         query.where(query.Condition("path", "/Summary/@ModuleOnly"))
@@ -399,14 +399,14 @@ class PublishingSystem:
         self.subset_names = {}
         self.param_info = {}
         if not self.system_version:
-            query = cdrdb.Query("doc_version", "MAX(num)")
+            query = db.Query("doc_version", "MAX(num)")
             query.where(query.Condition("id", self.system_id))
             rows = query.execute(cursor).fetchall()
             if not rows:
                 raise Exception("No publishable version of CDR%d found" %
                                 self.system_id)
             self.system_version = rows[0][0]
-        query = cdrdb.Query("doc_version", "xml")
+        query = db.Query("doc_version", "xml")
         query.where(query.Condition("id", self.system_id))
         query.where(query.Condition("num", self.system_version))
         rows = query.execute(cursor).fetchall()

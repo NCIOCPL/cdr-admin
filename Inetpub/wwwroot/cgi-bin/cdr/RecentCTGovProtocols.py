@@ -3,9 +3,9 @@
 # JIRA::OCECDR-3877
 #----------------------------------------------------------------------
 import cdrcgi
-import cdrdb
 import cgi
 import datetime
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Collect the request's parameters.
@@ -41,9 +41,9 @@ if not cdrcgi.is_date(start_date) or not cdrcgi.is_date(end_date):
 #----------------------------------------------------------------------
 # Create the report.
 #----------------------------------------------------------------------
-cursor = cdrdb.connect("CdrGuest").cursor()
-query = cdrdb.Query("ctgov_trial", "nct_id", "first_received", "trial_title",
-                    "trial_phase")
+cursor = db.connect(user="CdrGuest").cursor()
+query = db.Query("ctgov_trial", "nct_id", "first_received", "trial_title",
+                 "trial_phase")
 query.where(query.Condition("first_received", start_date, ">="))
 query.where(query.Condition("first_received", "%s 23:59:59" % end_date, "<="))
 query.order(1)
@@ -63,10 +63,10 @@ columns = (
 )
 rows = []
 for nct_id, received, title, phase in results:
-    query = cdrdb.Query("ctgov_trial_other_id", "other_id").order("position")
+    query = db.Query("ctgov_trial_other_id", "other_id").order("position")
     query.where(query.Condition("nct_id", nct_id))
     ids = u"; ".join([row[0] for row in query.execute(cursor).fetchall()])
-    query = cdrdb.Query("ctgov_trial_sponsor", "sponsor").order("position")
+    query = db.Query("ctgov_trial_sponsor", "sponsor").order("position")
     query.where(query.Condition("nct_id", nct_id))
     sponsors = u"; ".join([row[0] for row in query.execute(cursor).fetchall()])
     href = "https://clinicaltrials.gov/ct2/show/%s" % nct_id

@@ -5,7 +5,8 @@
 # BZIssue::3226  Initial version of report.
 # OCECDR-3619    Optimized query that was timing out; code cleanup.
 #----------------------------------------------------------------------
-import cdrdb, cdrcgi, cgi, time
+import cdrcgi, cgi, time
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Set the form (and other initial) variables.
@@ -20,7 +21,7 @@ script   = "MediaLinks.py"
 title    = "CDR Administration"
 section  = "Documents that Link to Media Documents"
 header   = cdrcgi.header(title, title, section, script, buttons)
-conn     = cdrdb.connect('CdrGuest')
+conn     = db.connect(user='CdrGuest')
 cursor   = conn.cursor()
 
 #----------------------------------------------------------------------
@@ -155,8 +156,8 @@ SELECT DISTINCT q1.doc_id, q1.value
             AND q2.path LIKE '%MediaID/@cdr:ref'
        ORDER BY q1.value""")
         rows = cursor.fetchall()
-    except cdrdb.Error as info:
-        cdrcgi.bail('Database connection failure: %s' % info[1][0])
+    except Exception as e:
+        cdrcgi.bail('Database connection failure: %s' % e)
 
     # Once we have all of the records per document type start
     # returning the result in a table format

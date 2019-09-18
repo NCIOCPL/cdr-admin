@@ -9,7 +9,7 @@
 #----------------------------------------------------------------------
 import cdr
 import cdrcgi
-import cdrdb
+from cdrapi import db
 import datetime
 
 class Control(cdrcgi.Control):
@@ -43,14 +43,14 @@ class Control(cdrcgi.Control):
         doc_id = self.fields.getvalue(cdrcgi.DOCID)
         if doc_id:
             try:
-                doc_id = cdr.exNormalize(doc_id)[1]
-                return Document(self, doc_id)
-            except Exception:
+                int_id = cdr.exNormalize(doc_id)[1]
+                return Document(self, int_id)
+            except Exception as e:
                 cdrcgi.bail("Not a valid document ID")
-        title = unicode(self.fields.getvalue("DocTitle", ""), "utf-8")
+        title = self.fields.getvalue("DocTitle", "")
         if not title:
             return None
-        query = cdrdb.Query("document d", "d.id", "d.title", "t.name").order(2)
+        query = db.Query("document d", "d.id", "d.title", "t.name").order(2)
         query.join("doc_type t", "t.id = d.doc_type")
         query.where(query.Condition("title", title + "%", "LIKE"))
         rows = query.execute(self.cursor).fetchall()
@@ -111,7 +111,7 @@ class Document:
         self.doc_id = doc_id
         fields = ("doc_title", "doc_type", "doc_status", "created_by",
                   "created_date", "mod_by", "mod_date")
-        query = cdrdb.Query("doc_info", *fields)
+        query = db.Query("doc_info", *fields)
         query.where(query.Condition("doc_id", doc_id))
         row = query.execute(control.cursor).fetchone()
         if not row:
@@ -149,7 +149,7 @@ class Document:
 
     def published(self):
         "Find out if the document is currently on the web site"
-        query = cdrdb.Query("pub_proc_cg", "id")
+        query = db.Query("pub_proc_cg", "id")
         query.where(query.Condition("id", self.doc_id))
         rows = query.execute(self.control.cursor).fetchall()
         return rows and True or False
@@ -163,18 +163,18 @@ class Document:
         """
         if not self.last_pub_job:
             return None
-        query = cdrdb.Query("pub_proc", "MIN(started)")
+        query = db.Query("pub_proc", "MIN(started)")
         query.where("status = 'Success'")
         query.where("pub_subset = 'Full-Load'")
         query.where(query.Condition("id", self.last_pub_job, ">"))
         rows = query.execute(self.control.cursor).fetchall()
-        return rows and rows[0][0] and rows[0][0][:10] or None
+        return rows and rows[0][0] and str(rows[0][0])[:10] or None
 
     def load_versions(self):
         "Collect information on all of the versions created for this doc"
         fields = ("v.num", "v.comment", "u.fullname", "v.dt",
                   "v.val_status", "v.publishable")
-        query = cdrdb.Query("doc_version v", *fields)
+        query = db.Query("doc_version v", *fields)
         query.join("open_usr u", "u.id = v.usr")
         query.where(query.Condition("v.id", self.doc_id))
         versions = {}
@@ -185,13 +185,13 @@ class Document:
 
         # Fold in the publication events.
         fields = ("doc_version", "started", "pub_proc", "removed", "output_dir")
-        query = cdrdb.Query("primary_pub_doc", *fields)
+        query = db.Query("primary_pub_doc", *fields)
         query.where(query.Condition("doc_id", self.doc_id))
         query.order("started")
         for row in query.execute(self.control.cursor).fetchall():
             num, started, pub_job, removed, output_dir = row
             job_type = output_dir and "V" or "C"
-            pub_date = started[:10]
+            pub_date = str(started)[:10]
             versions[num].add_pub_event(pub_date, job_type, pub_job, removed)
             if removed == "Y" and self.blocked:
                 self.remove_date = pub_date
@@ -216,9 +216,10 @@ class Document:
         not specific to any given version.
         """
         cdr_id = cdr.normalize(self.doc_id)
-        created = self.created_date and self.created_date[:10] or cdr.URDATE
+        default = cdr.URDATE
+        created = str(self.created_date)[:10] if self.created_date else default
         created_by = self.created_by or u"[Conversion]"
-        modified = self.mod_date and self.mod_date[:10] or None
+        modified = str(self.mod_date)[:10] if self.mod_date else None
         modified_by = self.modified_by or "N/A"
         removal = self.get_removal_info()
         page.add('<table class="doc-info">')
@@ -305,7 +306,7 @@ class Document:
             self.num = num
             self.comment = comment
             self.user = user
-            self.date = date[:16]
+            self.date = str(date)[:16]
             self.status = status
             self.publishable = publishable
             self.pub_events = []
@@ -342,6 +343,10 @@ class Document:
                 cdrcgi.Report.Cell(self.pub_events,
                                    callback=self.show_pub_events)
             ]
+
+        def __lt__(self, other):
+            """Support sorting versions by version number."""
+            return self.num < other.num
 
         class PubEvent:
             "Information about a publication of this document"

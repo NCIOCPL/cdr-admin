@@ -10,7 +10,7 @@
 #----------------------------------------------------------------------
 import cdr
 import cdrcgi
-import cdrdb
+from cdrapi import db
 import cgi
 from lxml import etree
 
@@ -248,7 +248,7 @@ if not status or not language or not audience:
 # Collect all the concepts with matching processing statuses.
 #----------------------------------------------------------------------
 concepts = {}
-cursor = cdrdb.connect('CdrGuest').cursor()
+cursor = db.connect(user='CdrGuest').cursor()
 cursor.execute("""\
     SELECT DISTINCT doc_id
                FROM query_term

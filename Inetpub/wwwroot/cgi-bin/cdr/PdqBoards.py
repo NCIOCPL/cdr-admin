@@ -11,7 +11,7 @@ import datetime
 
 # Custom/application-specific modules
 import cdrcgi
-import cdrdb
+from cdrapi import db
 
 class Control(cdrcgi.Control):
     "Master processing object"
@@ -95,7 +95,7 @@ class Control(cdrcgi.Control):
         "Collect objects for all of the summaries connected to our board."
 
         qt = self.unpub and "query_term" or "query_term_pub"
-        query = cdrdb.Query("%s b" % qt, "b.doc_id", "m.value")
+        query = db.Query("%s b" % qt, "b.doc_id", "m.value")
         query.join("%s a" % qt, "a.doc_id = b.doc_id")
         if not self.unpub:
             query.join("active_doc d", "d.id = b.doc_id")
@@ -134,7 +134,7 @@ class Control(cdrcgi.Control):
         m_path = "/%s/BoardMemberName/@cdr:ref" % doctype
         b_path = "%s/BoardName/@cdr:ref" % details
         c_path = "%s/CurrentMember" % details
-        query = cdrdb.Query("query_term m", "m.int_val")
+        query = db.Query("query_term m", "m.int_val")
         query.join("query_term b", "b.doc_id = m.doc_id")
         query.join("query_term c",
                    " AND ".join(("c.doc_id = m.doc_id",
@@ -173,7 +173,7 @@ class Control(cdrcgi.Control):
     def get_boards(self):
         "Get a dictionary of the active boards (indexed by CDR document ID)."
 
-        query = cdrdb.Query("query_term n", "n.doc_id", "n.value")
+        query = db.Query("query_term n", "n.doc_id", "n.value")
         query.join("query_term t", "t.doc_id = n.doc_id")
         query.join("active_doc a", "a.id = n.doc_id")
         query.where("t.path = '/Organization/OrganizationType'")
@@ -202,12 +202,12 @@ class Summary:
         self.is_module = is_module
         self.control = control
         self.doc_id = doc_id
-        query = cdrdb.Query("query_term", "value")
+        query = db.Query("query_term", "value")
         query.where(query.Condition("doc_id", doc_id))
         query.where("path = '/Summary/SummaryTitle'")
         rows = query.execute(control.cursor).fetchall()
         self.title = rows and rows[0][0] or "NO TITLE FOUND"
-        query = cdrdb.Query("query_term m", "m.int_val")
+        query = db.Query("query_term m", "m.int_val")
         query.join("query_term b",
                    " AND ".join(("b.doc_id = m.doc_id",
                                  "LEFT(b.node_loc, 8) = LEFT(m.node_loc, 8)")))
@@ -263,7 +263,7 @@ class Summary:
             self.doc_id = person_id
             self.summaries = []
             self.name = "NO NAME FOUND"
-            query = cdrdb.Query("document", "title")
+            query = db.Query("document", "title")
             query.where(query.Condition("id", person_id))
             rows = query.execute(control.cursor).fetchall()
             if rows:

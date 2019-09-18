@@ -3,7 +3,8 @@
 # sent to Cancer.gov.
 # BZIssue::4855 - Add GKTarget Parameter to Re-publishing Job Interface
 #----------------------------------------------------------------------
-import cdr, cdrdb, cdrcgi, cgi, RepublishDocs
+import cdr, cdrcgi, cgi, RepublishDocs
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -62,14 +63,14 @@ elif request == SUBMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if request == "Log Out": 
+if request == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------
 # Create a picklist for document types published to Cancer.gov.
 #----------------------------------------------------------------------
 def makeDoctypePicklist():
-    cursor = cdrdb.connect('CdrGuest').cursor()
+    cursor = db.connect(user='CdrGuest').cursor()
     cursor.execute("""\
         SELECT DISTINCT t.name
           FROM doc_type t
@@ -77,7 +78,7 @@ def makeDoctypePicklist():
             ON d.doc_type = t.id
           JOIN pub_proc_cg c
             ON c.id = d.id
-      ORDER BY t.name""", timeout = 300)
+      ORDER BY t.name""")
     html = ["""\
       <select name='DocType' class='field'>
        <option value='' selected>&nbsp;</option>

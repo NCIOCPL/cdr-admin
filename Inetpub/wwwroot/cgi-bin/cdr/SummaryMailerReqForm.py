@@ -17,7 +17,6 @@ from cdrapi import db
 from cdrapi.docs import Doc
 from cdrapi.users import Session
 import cdrcgi
-import cdrmailcommon
 
 class Control(cdrcgi.Control):
     """
@@ -44,7 +43,7 @@ class Control(cdrcgi.Control):
         self.pairs = self.fields.getlist("pairs")
         self.method = self.fields.getvalue("method") or "all"
         self.section = "PDQ Advisory Board Members Tracking Request Form"
-        self.cursor = db.connect(user="CdrGuest").cursor()
+        self.cursor = db.connect(user="CdrGuest", timeout=300).cursor()
         self.sanitize()
 
     def run(self):
@@ -376,7 +375,7 @@ jQuery(document).ready(function() { board_change(); });""")
         query.where(query.Condition("c.value", "Yes"))
         query.where("t.value = 'PDQ Advisory Board'")
         query.unique()
-        rows = query.execute(self.cursor, timeout=300).fetchall()
+        rows = query.execute(self.cursor).fetchall()
         for member_id, board_id, doc_title in rows:
             board = boards.get(board_id)
             if not board:
@@ -404,7 +403,7 @@ jQuery(document).ready(function() { board_change(); });""")
         query.where("a.path = '%s'" % a_path)
         query.where("a.value = 'Health professionals'")
         query.group("d.id", "d.title", "b.int_val")
-        rows = query.execute(self.cursor, timeout=300).fetchall()
+        rows = query.execute(self.cursor).fetchall()
         for doc_id, doc_version, board_id, doc_title in rows:
             board = boards.get(board_id)
             if not board:
@@ -470,7 +469,7 @@ class Board:
         query = db.Query("query_term", "value")
         query.where(query.Condition("path", path))
         query.where(query.Condition("doc_id", doc_id))
-        rows = query.execute(control.cursor, timeout=300).fetchall()
+        rows = query.execute(control.cursor).fetchall()
         if not rows:
             cdrcgi.bail("No name found for board document CDR%d" % doc_id)
         self.name = rows[0][0]

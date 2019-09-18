@@ -2,13 +2,14 @@
 # Tools used for tracking down what really happened when a user
 # reports anomalies in stored versions of CDR documents.
 #----------------------------------------------------------------------
-import cdrdb, cgi, cdr
+import cgi, cdr
+from cdrapi import db
 
 fields = cgi.FieldStorage()
 start  = fields.getvalue('start') or str(cdr.calculateDateByOffset(-7))
 end    = fields.getvalue('end')   or str(cdr.calculateDateByOffset(0))
 user   = fields.getvalue('user')  or '%'
-cursor = cdrdb.connect('CdrGuest').cursor()
+cursor = db.connect(user='CdrGuest').cursor()
 sqlEnd = len(end) == 10 and ("%s 23:59:59" % end) or end
 
 cursor.execute("""\

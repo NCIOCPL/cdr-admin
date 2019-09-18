@@ -5,7 +5,7 @@
 import urllib
 import cdr
 import cdrcgi
-import cdrdb
+from cdrapi import db
 
 class Control(cdrcgi.Control):
     """
@@ -47,7 +47,7 @@ class Control(cdrcgi.Control):
         self.table = self.get_table()
         self.value_id = self.get_value_id()
         self.warning = self.message = None
-        self.conn = cdrdb.connect()
+        self.conn = db.connect()
         self.cursor = self.conn.cursor()
 
     def run(self):
@@ -135,7 +135,7 @@ class Control(cdrcgi.Control):
         if table:
             if table not in self.TABLES:
                 cdrcgi.bail()
-            query = cdrdb.Query(table, *self.FIELDS)
+            query = db.Query(table, *self.FIELDS)
             self.rows = query.order("value_pos").execute(self.cursor).fetchall()
             self.map = {}
             for row in self.rows:

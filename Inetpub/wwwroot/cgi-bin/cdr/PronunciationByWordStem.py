@@ -5,7 +5,8 @@
 #
 # BZIssue::2643
 #----------------------------------------------------------------------
-import cgi, cdr, cdrdb, cdrcgi, string, time, xml.dom.minidom, xml.sax.saxutils
+import cgi, cdr, cdrcgi, string, time, xml.dom.minidom, xml.sax.saxutils
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -132,7 +133,7 @@ class GlossaryTerm:
 #----------------------------------------------------------------------
 # Create/display the report.
 #----------------------------------------------------------------------
-conn = cdrdb.connect('CdrGuest')
+conn = db.connect(user='CdrGuest')
 cursor = conn.cursor()
 nameVal = name and name.strip() or u""
 pronVal = pron and pron.strip() or u""

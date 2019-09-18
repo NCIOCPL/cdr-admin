@@ -5,14 +5,14 @@
 import cdr
 import cgi
 import cdrcgi
-import cdrdb
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Fallback when id parameter is not supplied.
 #----------------------------------------------------------------------
 def default_help():
     try:
-        cursor = cdrdb.connect('CdrGuest').cursor()
+        cursor = db.connect(user='CdrGuest').cursor()
         cursor.execute("""\
 SELECT doc_id
   FROM query_term

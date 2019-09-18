@@ -5,7 +5,7 @@
 # JIRA::OCECDR-3588
 # JIRA::OCECDR-4223 - rewritten to use new nci_thesaurus module
 #----------------------------------------------------------------------
-import cdrdb
+from cdrapi import db
 import cdrcgi
 import nci_thesaurus
 
@@ -26,7 +26,7 @@ class Control(cdrcgi.Control):
         return {}
     def build_tables(self):
         join_clauses = "p.doc_id = c.doc_id", "p.node_loc = c.node_loc"
-        query = cdrdb.Query("query_term c", "c.doc_id", "c.value")
+        query = db.Query("query_term c", "c.doc_id", "c.value")
         query.outer("query_term p", *join_clauses)
         query.where("c.path = '/Term/NCIThesaurusConcept'")
         query.where("p.path = '/Term/NCIThesaurusConcept/@Public'")
@@ -41,14 +41,14 @@ class Term:
     def __init__(self, control, doc_id, concept_code):
         self.doc_id = doc_id
         self.concept_code = concept_code.strip().upper()
-        query = cdrdb.Query("query_term n", "n.value").unique()
+        query = db.Query("query_term n", "n.value").unique()
         query.join("query_term t", "t.int_val = n.doc_id")
         query.where("n.path = '/Term/PreferredName'")
         query.where("t.path = '/Term/SemanticType/@cdr:ref'")
         query.where(query.Condition("t.doc_id", doc_id))
         rows = query.execute(control.cursor).fetchall()
         self.types = [row[0] for row in rows]
-        query = cdrdb.Query("query_term", "value")
+        query = db.Query("query_term", "value")
         query.where("path = '/Term/DateLastModified'")
         query.where(query.Condition("doc_id", doc_id))
         rows = query.execute(control.cursor).fetchall()
@@ -69,7 +69,7 @@ class Term:
         )
 Control().run()
 exit(0)
-cursor = cdrdb.connect("CdrGuest").cursor()
+cursor = db.connect(user="CdrGuest").cursor()
 title = "NCI Thesaurus Links Not Marked Public"
 style = """
 th, td { background-color: #ecf1ef; margin: 3px; padding: 3px; }

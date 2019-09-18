@@ -7,13 +7,11 @@
 #----------------------------------------------------------------------
 import cgi
 import datetime
-import os
 import re
 import sys
 import lxml.etree as etree
-import msvcrt
 import cdrcgi
-import cdrdb
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -42,10 +40,10 @@ elif request == SUBMENU:
 # Set up a database connection and cursor.
 #----------------------------------------------------------------------
 try:
-    conn = cdrdb.connect("CdrGuest")
+    conn = db.connect(user="CdrGuest")
     cursor = conn.cursor()
-except cdrdb.Error as info:
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
+except Exception as e:
+    cdrcgi.bail('Database connection failure: %s' % e)
 
 #----------------------------------------------------------------------
 # Put up the form if we don't have a document ID.
@@ -127,12 +125,12 @@ class Target:
                 self.section = SummarySection(e)
                 break
             e = e.getparent()
-    def __cmp__(self, other):
+    def __lt__(self, other):
         if self.fragNum is not None:
             if other.fragNum is not None:
-                return cmp(self.fragNum, other.fragNum)
+                return self.fragNum < other.fragNum
             return -1
-        return cmp(self.fragId, other.fragId)
+        return self.fragId < other.fragId
 
 def findLinks(docId, node, links, elements):
     elements.append(node.tag)
@@ -152,7 +150,6 @@ title = rows[0][0]
 links = []
 elements = []
 findLinks(intId, tree, links, elements)
-msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
 styles = cdrcgi.ExcelStyles()
 styles.set_color(styles.header, "blue")
 styles.frag = styles.style("align: horz right, vert center, wrap true")
@@ -185,7 +182,7 @@ for target in sorted(targets.values()):
     for link in target.links:
         sourceSectionTitle = link.section and link.section.title or "None"
         sheet.write(row, 2, sourceSectionTitle, styles.left)
-        sheet.write(row, 3, unicode(link.text), styles.left)
+        sheet.write(row, 3, str(link.text), styles.left)
         if "/Table/" in link.path:
             sheet.write(row, 4, "X", styles.center)
         if "/ListItem/" in link.path:
@@ -193,7 +190,9 @@ for target in sorted(targets.values()):
         row += 1
 stamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
 name = "SummaryInternalLinks-CDR%s-%s.xls" % (intId, stamp)
-print("Content-type: application/vnd.ms-excel")
-print("Content-Disposition: attachment; filename=%s" % name)
-print()
-styles.book.save(sys.stdout)
+sys.stdout.buffer.write(f"""\
+Content-type: application/vnd.ms-excel
+Content-Disposition: attachment; filename={name}
+
+""".encode("utf-8"))
+styles.book.save(sys.stdout.buffer)

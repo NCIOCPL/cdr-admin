@@ -7,7 +7,7 @@
 #----------------------------------------------------------------------
 import cdr
 import cdrcgi
-import cdrdb
+from cdrapi import db
 import cgi
 import datetime
 import json
@@ -94,7 +94,7 @@ class Control(cdrcgi.Control):
         These are safe in this case because of the parameter validations
         performed above.
         """
-        query = cdrdb.Query("doc_version v", "v.id", "MAX(v.num)")
+        query = db.Query("doc_version v", "v.id", "MAX(v.num)")
         query.group("v.id")
         criteria = ""
         if self.method == "name":
@@ -113,7 +113,7 @@ class Control(cdrcgi.Control):
                 query.join("document d", "d.id = v.id")
                 query.where("t.name = 'DrugInformationSummary'")
                 #query.where("d.active_status = 'A'")
-                subquery = cdrdb.Query("query_term", "doc_id")
+                subquery = db.Query("query_term", "doc_id")
                 subquery.where("path = '%s'" % self.COMBO)
                 subquery.where("value = 'Yes'")
                 query.where(query.Condition("v.id", subquery, "NOT IN"))
@@ -123,7 +123,7 @@ class Control(cdrcgi.Control):
                 criteria = " by name"
         elif self.method == "type":
             path = "/DrugInformationSummary/DrugReference/DrugReferenceType"
-            subquery = cdrdb.Query("query_term", "doc_id")
+            subquery = db.Query("query_term", "doc_id")
             subquery.where("path = '%s'" % path)
             subquery.where("value = '%s'" % self.reftype)
             query.where(query.Condition("v.id", subquery, "IN"))
@@ -132,14 +132,14 @@ class Control(cdrcgi.Control):
             # Different approach for date range.
             start = self.start
             end = "%s 23:59:59" % self.end
-            subquery = cdrdb.Query("publishable_version p",
+            subquery = db.Query("publishable_version p",
                                    "p.id", "MAX(p.num) AS num")
             subquery.join("doc_type t", "t.id = p.doc_type")
             subquery.join("document d", "d.id = p.id")
             subquery.where("t.name = 'DrugInformationSummary'")
             subquery.group("p.id")
             subquery.alias("lastp")
-            query = cdrdb.Query("doc_version v", "v.id", "v.num")
+            query = db.Query("doc_version v", "v.id", "v.num")
             query.join(subquery, "lastp.id = v.id", "lastp.num = v.num")
             query.where("v.dt BETWEEN '%s' AND '%s'" % (start, end))
             criteria = (" with last publishable versions "
@@ -147,7 +147,7 @@ class Control(cdrcgi.Control):
         else:
             cdrcgi.bail("Internal error") # can't happen, given validation above
         try:
-            rows = query.execute(self.cursor, timeout=300).fetchall()
+            rows = query.execute(self.cursor).fetchall()
         except Exception as e:
             raise Exception("Database failure: %s" % e)
         summaries = [DrugInfoSummary(self, *row) for row in rows]
@@ -174,7 +174,7 @@ class Control(cdrcgi.Control):
 
     def load_drugs(self):
         "Find all of the DIS docs which have at least one version."
-        query = cdrdb.Query("document d", "d.id", "d.title").order(2, 1)
+        query = db.Query("document d", "d.id", "d.title").order(2, 1)
         query.join("doc_type t", "t.id = d.doc_type")
         query.join("doc_version v", "v.id = d.id")
         query.where("t.name = 'DrugInformationSummary'")
@@ -319,11 +319,11 @@ class DrugInfoSummary:
 
         # XXX This report used to join on doc_version but take the
         #     XML from the document table. Surely that was a mistake.
-        query = cdrdb.Query("doc_version", "title", "xml")
+        query = db.Query("doc_version", "title", "xml")
         query.where(query.Condition("id", doc_id))
         query.where(query.Condition("num", doc_version))
         try:
-            title, xml = query.execute(control.cursor, timeout=300).fetchone()
+            title, xml = query.execute(control.cursor).fetchone()
         except Exception as e:
             raise Exception("Database failure fetching CDR%d version %d: %s" %
                             (doc_id, doc_version, e))

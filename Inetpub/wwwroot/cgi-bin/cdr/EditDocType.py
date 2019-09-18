@@ -5,7 +5,7 @@
 import lxml.etree as etree
 import cdr
 import cdrcgi
-import cdrdb
+from cdrapi import db
 
 class Control(cdrcgi.Control):
     """
@@ -181,7 +181,7 @@ class Control(cdrcgi.Control):
         formats other than 'xml' in the CDR.
         """
 
-        query = cdrdb.Query("format", "id", "name").order("name")
+        query = db.Query("format", "id", "name").order("name")
         return self.load_values(query.execute(self.cursor).fetchall(), "xml")
 
     def load_schemas(self):
@@ -190,7 +190,7 @@ class Control(cdrcgi.Control):
         validation of documents of a given type.
         """
 
-        query = cdrdb.Query("document d", "d.id", "d.title")
+        query = db.Query("document d", "d.id", "d.title")
         query.join("doc_type t", "t.id = d.doc_type")
         query.where("t.name = 'schema'")
         rows = query.order("d.title").execute(self.cursor).fetchall()
@@ -203,7 +203,7 @@ class Control(cdrcgi.Control):
         the title of documents of a given type.
         """
 
-        query = cdrdb.Query("document d", "d.id", "d.title")
+        query = db.Query("document d", "d.id", "d.title")
         query.join("doc_type t", "t.id = d.doc_type")
         query.where("t.name = 'Filter'")
         rows = query.order("d.title").execute(self.cursor).fetchall()
@@ -218,7 +218,7 @@ class Control(cdrcgi.Control):
         schema documents which are appropriate).
         """
 
-        query = cdrdb.Query("document", "xml")
+        query = db.Query("document", "xml")
         query.where(query.Condition("id", doc_id))
         row = query.execute(self.cursor).fetchone()
         if row and row[0]:

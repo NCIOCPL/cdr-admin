@@ -570,7 +570,7 @@ if not docId and not docTitle and not glossaryDefinition:
 # Set up a database connection and cursor.
 #----------------------------------------------------------------------
 try:
-    conn = db.connect(user='CdrGuest')
+    conn = db.connect(user='CdrGuest', timeout=300)
     cursor = conn.cursor()
 except Exception as e:
     cdrcgi.bail(f"Database connection failure: {e}")
@@ -660,8 +660,7 @@ if not docId:
                                   '/DefinitionText',
                                   '/GlossaryTermConcept' +
                                   '/TranslatedTermDefinition/DefinitionText')
-                   AND q.value LIKE ?""", u"%" + glossaryDefinition + u"%",
-                           timeout = 300)
+                   AND q.value LIKE ?""", u"%" + glossaryDefinition + u"%")
         elif docType:
             cursor.execute("""\
                 SELECT document.id, document.title

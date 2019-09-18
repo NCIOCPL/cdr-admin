@@ -7,7 +7,7 @@
 import cgi
 import cdr
 import cdrcgi
-import cdrdb
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Get the form variables.
@@ -35,7 +35,7 @@ elif request == SUBMENU:
 #----------------------------------------------------------------------
 def get_help_sections():
     try:
-        cursor = cdrdb.connect("CdrGuest").cursor()
+        cursor = db.connect(user="CdrGuest").cursor()
         cursor.execute("""\
   SELECT doc_id, value
     FROM query_term

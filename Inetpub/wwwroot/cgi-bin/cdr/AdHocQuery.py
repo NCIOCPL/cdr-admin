@@ -1,7 +1,8 @@
 #----------------------------------------------------------------------
 # Displays result set for SQL query.
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, string, cdrdb
+import cgi, cdr, cdrcgi, re, string
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -62,9 +63,9 @@ SELECT TOP 10 d.id
 # Create the report.
 #----------------------------------------------------------------------
 try:
-    conn = cdrdb.connect('CdrGuest')
+    conn = db.connect(user='CdrGuest', timeout=int(timeout))
     cursor = conn.cursor()
-    cursor.execute(query, timeout = int(timeout))
+    cursor.execute(query)
     if not cursor.description:
         cdrcgi.bail('No result set returned')
     html = u"""\
@@ -108,6 +109,6 @@ try:
 </html>
 """
 
-except cdrdb.Error as info:
-    cdrcgi.bail('Database failure: %s' % info[1][0])
+except Exception as e:
+    cdrcgi.bail('Database failure: %s' % e)
 cdrcgi.sendPage(u"".join(html))

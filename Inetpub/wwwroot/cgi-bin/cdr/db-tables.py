@@ -5,7 +5,8 @@
 # BZIssue::5002 - Setting up MAHLER
 #
 #----------------------------------------------------------------------
-import cdrdb, cdrcgi
+import cdrcgi
+from cdrapi import db
 
 class Column:
     def __init__(self, n, t, p, nullable):
@@ -97,7 +98,7 @@ def showTables(tables, label, html):
         html.append("")
 
 if __name__ == '__main__':
-    conn    = cdrdb.connect('CdrGuest')
+    conn    = db.connect(user='CdrGuest')
     cursor  = conn.cursor()
     catalog = Catalog(cursor)
     dbNames = catalog.databases.keys()

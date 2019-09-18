@@ -10,7 +10,7 @@
 #----------------------------------------------------------------------
 import cdr
 import cdrcgi
-import cdrdb
+from cdrapi import db
 import datetime
 import lxml.etree as etree
 
@@ -142,7 +142,7 @@ class Board:
         cols = ["d.id"]
         if self.control.language == "Spanish":
             cols.append("t.int_val")
-        query = cdrdb.Query("active_doc d", *cols)
+        query = db.Query("active_doc d", *cols)
         query.join("query_term_pub a", "a.doc_id = d.id")
         query.where("a.path = '/Summary/SummaryMetaData/SummaryAudience'")
         query.where(query.Condition("a.value", self.control.audience + "s"))
@@ -203,13 +203,13 @@ class Board:
             if len(row) > 1:
                 self.english_title = self.get_summary_title(row[1])
             self.counts = self.Counts(control)
-            query = cdrdb.Query("query_term", "value")
+            query = db.Query("query_term", "value")
             query.where("path = '/Summary/@ModuleOnly'")
             query.where(query.Condition("doc_id", self.id))
             rows = query.execute(control.cursor).fetchall()
             if rows and rows[0][0] == "Yes":
                 self.title += " (Module)"
-            query = cdrdb.Query("document", "xml")
+            query = db.Query("document", "xml")
             query.where(query.Condition("id", self.id))
             xml = query.execute(control.cursor).fetchone()[0]
             if "<Insertion" in xml or "<Deletion" in xml:
@@ -225,7 +225,7 @@ class Board:
 
         def get_summary_title(self, doc_id):
             "Pull the summary's title from the query_term table."
-            query = cdrdb.Query("query_term", "value")
+            query = db.Query("query_term", "value")
             query.where("path = '/Summary/SummaryTitle'")
             query.where(query.Condition("doc_id", doc_id))
             rows = query.execute(self.control.cursor).fetchall()

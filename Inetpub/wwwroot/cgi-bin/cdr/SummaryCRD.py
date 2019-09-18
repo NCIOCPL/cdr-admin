@@ -13,9 +13,9 @@
 #----------------------------------------------------------------------
 import cdr
 import cdrcgi
-import cdrdb
 import cgi
 import datetime
+from cdrapi import db
 
 class Control:
     "One master class to rule them all."
@@ -41,7 +41,7 @@ class Control:
         self.subtitle = "Summaries Comprehensive Review Dates"
         self.script = "SummaryCRD.py"
         self.buttons = ("Submit", Control.SUBMENU, cdrcgi.MAINMENU)
-        self.cursor = cdrdb.connect("CdrGuest").cursor()
+        self.cursor = db.connect(user="CdrGuest").cursor()
         self.boards = cdr.getBoardNames("editorial", "short")
         self.sanitize()
 
@@ -175,7 +175,7 @@ class Board:
         self.language = control.language or Control.LANGUAGES[0]
         qt = control.unpub and "query_term" or "query_term_pub"
         b_path = "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"
-        query = cdrdb.Query("query_term t", "t.doc_id", "t.value", "m.value")
+        query = db.Query("query_term t", "t.doc_id", "t.value", "m.value")
         query.join("%s a" % qt, "a.doc_id = t.doc_id")
         query.join("%s l" % qt, "l.doc_id = t.doc_id")
         if not control.unpub:
@@ -282,7 +282,7 @@ class Summary:
         c_path = "/Summary/ComprehensiveReview/Comment"
         d_path = "/Summary/ComprehensiveReview/ComprehensiveReviewDate"
         t_path = d_path + "/@DateType"
-        query = cdrdb.Query("query_term d", "d.value", "t.value", "c.value")
+        query = db.Query("query_term d", "d.value", "t.value", "c.value")
         query.join("query_term t", "t.doc_id = d.doc_id",
                    "LEFT(t.node_loc, 4) = LEFT(d.node_loc, 4)")
         query.outer("query_term c", "c.doc_id = d.doc_id",

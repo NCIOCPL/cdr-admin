@@ -4,7 +4,8 @@
 #
 # BZIssue::1297 (comment #4) - make cosmetic changes requested by Lakshmi
 #----------------------------------------------------------------------
-import cdrdb, cdrcgi, cgi, re, cdr
+import cdrcgi, cgi, re, cdr
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Extract integer from string; uses all decimal digits.
@@ -85,7 +86,7 @@ if request == "Log Out":
 #----------------------------------------------------------------------
 # Establish a database connection.
 #----------------------------------------------------------------------
-conn = cdrdb.connect()
+conn = db.connect()
 cursor = conn.cursor()
 
 #----------------------------------------------------------------------

@@ -2,7 +2,8 @@
 # Reports on Person documents which link to Organization address
 # fragments.
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, string, cdrdb
+import cgi, cdr, cdrcgi, re, string
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Named constants.
@@ -19,10 +20,10 @@ fragLink = fields and fields.getvalue("FragLink") or None
 # Set up a database connection and cursor.
 #----------------------------------------------------------------------
 try:
-    conn = cdrdb.connect()
+    conn = db.connect()
     cursor = conn.cursor()
-except cdrdb.Error as info:
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
+except Exception as e:
+    cdrcgi.bail('Database connection failure: %s' % e)
 
 #----------------------------------------------------------------------
 # Submit the query to the database.
@@ -42,8 +43,8 @@ SELECT DISTINCT document.id,
 try:
     cursor.execute(query, fragLink)
     rows = cursor.fetchall()
-except cdrdb.Error as info:
-    cdrcgi.bail('Database query failure: %s' % info[1][0])
+except Exception as e:
+    cdrcgi.bail('Database query failure: %s' % e)
 
 title   = "Person Documents Linking to Fragment %s" % fragLink
 instr   = "Number of linking documents: %d" % len(rows)

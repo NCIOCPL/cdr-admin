@@ -5,7 +5,7 @@ import datetime
 import re
 import cdr
 import cdrcgi
-import cdrdb
+from cdrapi import db
 
 class Control(cdrcgi.Control):
     """
@@ -43,7 +43,7 @@ class Control(cdrcgi.Control):
         return diagnosis
     def get_diagnoses(self):
         diagnosis_path = "/Media/MediaContent/Diagnoses/Diagnosis/@cdr:ref"
-        query = cdrdb.Query("query_term t", "t.doc_id", "t.value")
+        query = db.Query("query_term t", "t.doc_id", "t.value")
         query.unique().order(2)
         query.join("query_term m", "m.int_val = t.doc_id")
         query.where("t.path = '/Term/PreferredName'")
@@ -86,7 +86,7 @@ class Control(cdrcgi.Control):
         """
         if not self.status:
             cdrcgi.bail("missing required status value")
-        query = cdrdb.Query("query_term i", "i.doc_id")
+        query = db.Query("query_term i", "i.doc_id")
         query.where("i.path = '/Media/PhysicalMedia/ImageData/ImageType'")
         if self.diagnosis:
             query.join("query_term d", "d.doc_id = i.doc_id")
@@ -177,7 +177,7 @@ class Doc:
         #cdrcgi.bail("versions: %s" % versions)
         if versions[1] > 0:
             self.last_version_publishable = versions[0] == versions[1]
-            query = cdrdb.Query("doc_version", "dt")
+            query = db.Query("doc_version", "dt")
             query.where(query.Condition("id", self.doc_id))
             query.where(query.Condition("num", versions[1]))
             row = query.execute(self.control.cursor).fetchone()

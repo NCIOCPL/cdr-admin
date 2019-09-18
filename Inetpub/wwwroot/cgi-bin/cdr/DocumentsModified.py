@@ -8,7 +8,7 @@
 import cgi
 import cdr
 import cdrcgi
-import cdrdb
+from cdrapi import db
 import re
 import time
 import sys
@@ -45,7 +45,7 @@ if request == "Log Out":
 # Connect to the database.
 #----------------------------------------------------------------------
 try:
-    conn = cdrdb.connect("CdrGuest")
+    conn = db.connect(user="CdrGuest")
     cursor = conn.cursor()
 except:
     cdrcgi.bail("Unable to connect to the CDR database")

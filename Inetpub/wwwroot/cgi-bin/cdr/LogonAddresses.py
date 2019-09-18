@@ -2,19 +2,20 @@
 # Utility used to track down events when users get confused about
 # what they've been doing in the CDR.
 #----------------------------------------------------------------------
-import cdrdb, re, cgi, cdr, cdrcgi
+import re, cgi, cdr, cdrcgi
+from cdrapi import db
 
 fields = cgi.FieldStorage()
 start  = fields.getvalue('start') or ("%s" % cdr.calculateDateByOffset(-7))
 end    = fields.getvalue('end')   or ("%s" % cdr.calculateDateByOffset(0))
-cursor = cdrdb.connect('CdrGuest').cursor()
+cursor = db.connect(user='CdrGuest').cursor()
 cursor.execute("""\
     SELECT u.name, u.fullname, s.name, s.initiated, s.ended
       FROM usr u
       JOIN session s
         ON s.usr = u.id
      WHERE s.initiated BETWEEN '%s' AND '%s 23:59:59'
-  ORDER BY s.id""" % (start, end), timeout = 300)
+  ORDER BY s.id""" % (start, end))
 rows = cursor.fetchall()
 if not rows:
     cdrcgi.bail("no rows for range '%s' to '%s'" % (start, end))

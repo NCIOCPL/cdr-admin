@@ -5,8 +5,9 @@
 #
 # BZIssue::4767
 #----------------------------------------------------------------------
-import cdrdb, cgi, cdrcgi, cdr, msvcrt, sys, os, time
+import cgi, cdrcgi, cdr, msvcrt, sys, os, time
 from lxml import etree
+from cdrapi import db
 
 class DocInfo:
     def __init__(self, cursor, docId, docVer = None):
@@ -27,14 +28,14 @@ class DocInfo:
         rows = cursor.fetchall()
         if not rows:
             if docVer:
-                raise cdr.Exception("Cannot find version %s of CDR%s" %
-                                    (docVer, docId))
+                raise Exception("Cannot find version %s of CDR%s" %
+                                (docVer, docId))
             else:
-                raise cdr.Exception("Cannot find CDR%s" % docId)
+                raise Exception("Cannot find CDR%s" % docId)
         try:
             tree = etree.XML(rows[0][0].encode('utf-8'))
         except Exception as e:
-            raise cdr.Exception("parsing CDR%s: %s" % (docId, e))
+            raise Exception("parsing CDR%s: %s" % (docId, e))
         if tree.tag == 'Media':
             for medium in ('Image', 'Sound', 'Video'):
                 xpath = 'PhysicalMedia/%sData/%sEncoding' % (medium, medium)
@@ -84,15 +85,15 @@ class DocInfo:
                 self.filename = DocInfo.makeFilename(self.docId, docVer,
                                                      suffix)
         else:
-            raise cdr.Exception("don't know about '%s' documents" % tree.tag)
+            raise Exception("don't know about '%s' documents" % tree.tag)
         if not self.mimeType:
             if docVer:
-                raise cdr.Exception("unable to determine mime type for "
-                                    "version %s of CDR%d" %
-                                    (docVer, self.docId))
+                raise Exception("unable to determine mime type for "
+                                "version %s of CDR%d" %
+                                (docVer, self.docId))
             else:
-                raise cdr.Exception("unable to determine mime type for "
-                                    "CDR%d" % self.docId)
+                raise Exception("unable to determine mime type for "
+                                "CDR%d" % self.docId)
 
     @staticmethod
     def makeFilename(docId, docVer, suffix):
@@ -101,7 +102,7 @@ class DocInfo:
         else:
             return "CDR%d.%s" % (docId, suffix)
 
-cursor = cdrdb.connect('CdrGuest').cursor()
+cursor = db.connect(user='CdrGuest').cursor()
 fields = cgi.FieldStorage()
 docId  = fields.getvalue('id') or cdrcgi.bail("Missing required 'id' parameter")
 docVer = fields.getvalue('ver') or ''
@@ -132,9 +133,11 @@ if not rows:
             info.docId))
     else:
         cdrcgi.bail("No blob found for CDR document %d" % info.docId)
-bytes = rows[0][0]
-sys.stdout.write("Content-Type: %s\r\n" % info.mimeType)
-sys.stdout.write("Content-Disposition: attachment; filename=%s\r\n" %
-                 info.filename)
-sys.stdout.write("Content-Length: %d\r\n\r\n" % len(bytes))
-sys.stdout.write(bytes)
+blob_bytes = rows[0][0]
+sys.stdout.buffer.write(f"""\
+Content-Type: {info.mimeType}
+Content-Disposition: attachment; filename={info.filename}
+Content-Length: {len(blob_bytes)}
+
+""".encode("utf-8"))
+sys.stdout.buffer.write(blob_bytes)

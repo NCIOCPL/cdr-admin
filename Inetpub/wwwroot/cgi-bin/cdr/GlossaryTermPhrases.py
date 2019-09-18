@@ -7,7 +7,7 @@
 import cdr
 import cdrbatch
 import cdrcgi
-import cdrdb
+from cdrapi import db
 import cgi
 import re
 
@@ -131,7 +131,7 @@ def putUpSelection(rows):
 if not id:
     try:
         namePattern = name + "%"
-        conn   = cdrdb.connect()
+        conn   = db.connect(timeout=300)
         cursor = conn.cursor()
         cursor.execute("""\
                 SELECT DISTINCT d.id, d.title
@@ -139,12 +139,10 @@ if not id:
                            JOIN doc_type t
                              ON t.id = d.doc_type
                           WHERE t.name = 'GlossaryTermName'
-                            AND d.title LIKE ?""", namePattern,
-                       timeout = 300)
+                            AND d.title LIKE ?""", namePattern)
         rows = cursor.fetchall()
-    except cdrdb.Error as info:
-        cdrcgi.bail("Failure looking up GlossaryTermName '%s': %s" %
-                    (name, info[1][0]))
+    except Exception as e:
+        cdrcgi.bail("Failure looking up GlossaryTermName '%s': %s" % (name, e))
     if len(rows) > 1: putUpSelection(rows)
     if len(rows) < 1: cdrcgi.bail("Unknown GlossaryTermName '%s'" % name)
     id = rows[0][0]

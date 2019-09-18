@@ -11,10 +11,10 @@
 import cdr
 import cdr2gk
 import cdrcgi
-import cdrdb
 import cgi
 import re
 import sys
+from cdrapi import db
 
 fields  = cgi.FieldStorage()
 cdrId   = fields.getvalue('cdrId') # or '525153'
@@ -33,10 +33,10 @@ cdr2gk.DEBUGLEVEL = 2 if logging else 0
 # Set up a database connection and cursor.
 # ----------------------------------------------------------------------
 try:
-    conn = cdrdb.connect("CdrGuest")
+    conn = db.connect(user="CdrGuest")
     cursor = conn.cursor()
-except cdrdb.Error as info:
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
+except Exception as e:
+    cdrcgi.bail('Database connection failure: %s' % e)
 
 #----------------------------------------------------------------------
 # Make a value safe for display on a web page.

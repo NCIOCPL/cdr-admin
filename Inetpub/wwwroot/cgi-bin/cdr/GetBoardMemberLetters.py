@@ -1,7 +1,8 @@
 #----------------------------------------------------------------------
 # Page with links to a set of PDQ Board Member Mailers.
 #----------------------------------------------------------------------
-import cdrdb, cdrcgi, cgi, os, sys
+import cdrcgi, cgi, os, sys
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Look for the mailer job first in the new location, then in the old.

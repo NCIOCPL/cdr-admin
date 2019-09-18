@@ -1,7 +1,9 @@
 #----------------------------------------------------------------------
 # Show unformatted XML; mostly useful for filters.
 #----------------------------------------------------------------------
-import cgi, cdrdb, cdrcgi
+import cgi, cdrcgi
+from cdrapi import db
+from html import escape
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -9,11 +11,11 @@ import cgi, cdrdb, cdrcgi
 fields  = cgi.FieldStorage()
 id      = fields and fields.getvalue("id") or cdrcgi.bail("No ID")
 
-conn = cdrdb.connect('CdrGuest')
+conn = db.connect(user='CdrGuest')
 cursor = conn.cursor()
 cursor.execute("SELECT xml FROM document WHERE id = %s" % id)
-rows = cursor.fetchall()
-if not rows:
+row = cursor.fetchone()
+if not row:
     cdrcgi.bail("Can't retrieve XML for document %s" % id)
 cdrcgi.sendPage("""\
 <html>
@@ -28,4 +30,4 @@ cdrcgi.sendPage("""\
   <h1>CDR Document %s</h1>
   <pre>%s</pre>
  </body>
-</html>""" % (id, id, cgi.escape(rows[0][0])))
+</html>""" % (id, id, escape(row.xml)))

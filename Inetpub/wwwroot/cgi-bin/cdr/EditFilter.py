@@ -8,11 +8,11 @@
 #----------------------------------------------------------------------
 import cdr
 import cdrcgi
-import cdrdb
 import cgi
 import difflib
 import requests
 import lxml.etree as etree
+from cdrapi import db
 from cdrapi.settings import Tier
 
 class Control(cdrcgi.Control):
@@ -245,7 +245,7 @@ class Filter:
             self.cdr_id, self.doc_id, self.id_frag = doc_ids
         except:
             cdrcgi.bail()
-        query = cdrdb.Query("document d", "d.title", "d.xml")
+        query = db.Query("document d", "d.title", "d.xml")
         query.join("doc_type t", "t.id = d.doc_type")
         query.where("t.name = 'Filter'")
         query.where(query.Condition("d.id", self.doc_id))

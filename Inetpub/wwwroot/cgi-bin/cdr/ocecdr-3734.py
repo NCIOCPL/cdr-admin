@@ -5,7 +5,7 @@
 #----------------------------------------------------------------------
 
 import cdr
-import cdrdb
+from cdrapi import db
 import cgi
 import cdrcgi
 import datetime
@@ -55,7 +55,7 @@ class GPMailers:
         """
         Generate and send the report as an Excel workbook.
         """
-        self.cursor = cdrdb.connect("CdrGuest").cursor()
+        self.cursor = db.connect(user="CdrGuest").cursor()
         rows = []
         for mailer in self.info:
             if mailer["bounced"] and self._active(mailer["cdr_id"]):

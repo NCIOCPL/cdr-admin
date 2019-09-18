@@ -6,9 +6,10 @@
 # supplied for the command to be applicable to all filters named by
 # the command).
 #----------------------------------------------------------------------
-import cdrdb
-import lxml.etree as etree
-import lxml.html.builder as builder
+
+from lxml import etree
+from lxml.html import builder
+from cdrapi import db
 
 TITLE = "Global Filter Parameters"
 
@@ -49,8 +50,8 @@ class Parameter:
             tbody.append(builder.TR(*f.make_cells()))
 
 def main():
-    cursor = cdrdb.connect("CdrGuest").cursor()
-    query = cdrdb.Query("document d", "d.id", "d.title", "d.xml").order(2)
+    cursor = db.connect(user="CdrGuest").cursor()
+    query = db.Query("document d", "d.id", "d.title", "d.xml").order(2)
     query.join("doc_type t", "t.id = d.doc_type")
     query.where("t.name = 'Filter'")
     filters = []

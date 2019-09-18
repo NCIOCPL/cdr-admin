@@ -9,11 +9,11 @@
 # Import required modules.
 #----------------------------------------------------------------------
 import cdr
-import cdrdb
 import cdrcgi
 import cgi
 import json
 import re
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Set some initial values.
@@ -154,7 +154,7 @@ def getSetMemberHtml(members = None):
 def makeDelFunction():
     if not setName: return "return;\n"
     try:
-        conn = cdrdb.connect('CdrGuest')
+        conn = db.connect(user='CdrGuest')
         cursor = conn.cursor()
         cursor.execute("""\
               SELECT ps.name
@@ -166,9 +166,8 @@ def makeDelFunction():
                WHERE ms.name = ?
             ORDER BY ps.name""", setName)
         rows = cursor.fetchall()
-    except cdrdb.Error as info:
-        cdrcgi.bail("Database failure finding nested memberships: %s" %
-                info[1][0])
+    except Exception as e:
+        cdrcgi.bail("Database failure finding nested memberships: %s" % e)
     if rows:
         body = u"""\
         alert("Filter set cannot be deleted; it is used as a member of:"""

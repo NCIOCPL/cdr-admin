@@ -6,7 +6,8 @@
 #----------------------------------------------------------------------
 
 from operator import attrgetter
-import cdrcgi, cdrdb, cgi
+from cdrapi import db
+import cdrcgi, cgi
 
 class Term:
     def __init__(self, name):
@@ -17,7 +18,7 @@ class Term:
         self.uname = name.upper()
 
 patriarch = None
-conn = cdrdb.connect('CdrGuest')
+conn = db.connect(user='CdrGuest')
 cursor = conn.cursor()
 fields = cgi.FieldStorage()
 flavor = fields and fields.getvalue("flavor") or None

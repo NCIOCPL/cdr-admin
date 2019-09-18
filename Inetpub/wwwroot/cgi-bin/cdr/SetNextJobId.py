@@ -2,25 +2,26 @@
 # Filename: SetNextJobId.py
 # --------------------------
 # Web interface for resetting the Next Job-ID
-# 
+#
 # When the WCMS/Gatekeeper database gets refreshed from PROD the ID
 # created as the next Job-ID on the lower tiers has likely already been
-# used.  As a result the CDR publishing jobs can't be verified 
+# used.  As a result the CDR publishing jobs can't be verified
 # anymore against the GK database.
 #
 # Example:
 # On DEV the latest Job-ID is 1000, the PROD Job-ID is 1500. When the
 # database for gatekeeper is updated the PROD Job-ID becomes the latest
 # GK Job-ID.  The CDR sends a new publishing job with the next Job-ID
-# 1002.  At this point *two* jobs exist in the GK DB, the job 1002 
+# 1002.  At this point *two* jobs exist in the GK DB, the job 1002
 # submitted in PROD *and* the job 1002 submitted from DEV.
-# Trying to verify the DEV job will fail and therefore every successively 
+# Trying to verify the DEV job will fail and therefore every successively
 # submitted publishing jobs will fail as well.
-# In this case we can reset the Job-ID value on DEV to the highest 
+# In this case we can reset the Job-ID value on DEV to the highest
 # value found on PROD.
-# 
+#
 #----------------------------------------------------------------------
-import cgi, cdr, cdrdb, cdrcgi
+import cgi, cdr, cdrcgi
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -38,7 +39,7 @@ header  = cdrcgi.header(title, title, section, "SetNextJobId.py", buttons)
 #----------------------------------------------------------------------
 def getCurrentId():
     # Connect to database
-    conn = cdrdb.connect()
+    conn = db.connect()
     cursor = conn.cursor()
 
     query = "select IDENT_CURRENT( 'pub_proc' )"
@@ -57,13 +58,15 @@ def getCurrentId():
 #----------------------------------------------------------------------
 def setNewIdValue(newId):
     # Connect to database
-    conn = cdrdb.connect()
+    conn = db.connect()
     cursor = conn.cursor()
 
     try:
-        query = ("EXEC cdr_set_next_job_ID @newID = %d" % newId)
-        cursor.execute(query)
-    except:
+        cursor.execute("{CALL cdr_set_next_job_ID (?)}", newId)
+        # cursor.execute("EXEC cdr_set_next_job_ID ?", newId) also works
+        conn.commit()
+    except Exception as e:
+        cdrcgi.bail(f"Unable to set next job ID: {e}")
         return False
 
     return True
@@ -74,7 +77,7 @@ def setNewIdValue(newId):
 #----------------------------------------------------------------------
 def getLastJobId():
     # Connect to database
-    conn = cdrdb.connect()
+    conn = db.connect()
     cursor = conn.cursor()
 
     query = "Select max(id) from pub_proc"
@@ -94,7 +97,7 @@ if not session: cdrcgi.bail('Unknown or expired CDR session.')
 
 # This tool can only be used by authorized users
 if not cdr.canDo(session, "SET_SYS_VALUE"):
-    cdrcgi.bail("Sorry, you are not authorized to set the max Job ID %s" % 
+    cdrcgi.bail("Sorry, you are not authorized to set the max Job ID %s" %
                                                                    session)
 
 # We don't allow the update on the production server.  It's only needed
@@ -161,11 +164,11 @@ fieldset {
   font-color: red;
   padding: 60px;
 }
- span.label   { display: block; 
-                float: left; 
+ span.label   { display: block;
+                float: left;
                 width: 25%%; }
- label  { display: block; 
-          float: left; 
+ label  { display: block;
+          float: left;
                 width: 25%%; }
 
 </style>
@@ -173,9 +176,9 @@ fieldset {
 
 <fieldset>
 <h3>Setting Next Job-ID (reseeding pub_proc)</h3>
-<b>Note</b>:<br> 
+<b>Note</b>:<br>
 This program can be used to set the next job-id used
-after a Gatekeeper database has been refreshed from PROD.  
+after a Gatekeeper database has been refreshed from PROD.
 This tool is only needed on the lower tiers.
 
 </fieldset>
@@ -198,4 +201,4 @@ html += """
 <input type='hidden' name='%s' value='%s' />
 """ % (cdrcgi.SESSION, session)
 
-cdrcgi.sendPage(header + html + "</FORM></BODY></HTML>")
+cdrcgi.sendPage(header + html + "</form></body></html>")

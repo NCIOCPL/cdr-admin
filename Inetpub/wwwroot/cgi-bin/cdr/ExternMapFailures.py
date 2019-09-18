@@ -6,9 +6,9 @@
 # JIRA::OCECDR-3800
 #----------------------------------------------------------------------
 import cdrcgi
-import cdrdb
 import cgi
 import datetime
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -47,7 +47,7 @@ if request == "Log Out":
 #----------------------------------------------------------------------
 # Establish a database connection.
 #----------------------------------------------------------------------
-conn = cdrdb.connect("CdrGuest")
+conn = db.connect(user="CdrGuest")
 cursor = conn.cursor()
 
 #----------------------------------------------------------------------

@@ -13,7 +13,7 @@
 import cgi
 import cdr
 import cdrcgi
-import cdrdb
+from cdrapi import db
 import re
 import sys
 import time
@@ -156,7 +156,7 @@ def addVideoRow(data, label):
         dom = xml.dom.minidom.parseString(row[0].encode('utf-8'))
         docElem = dom.documentElement
 
-        hostingElem = docElem.getElementsByTagName("HostingID")[0]    
+        hostingElem = docElem.getElementsByTagName("HostingID")[0]
         youtubeID = cdr.getTextContent(hostingElem)
 
         # Overwrite media title if specific title exists
@@ -397,10 +397,10 @@ if not docId and not termName:
 # Set up a database connection and cursor.
 #----------------------------------------------------------------------
 try:
-    conn = cdrdb.connect('CdrGuest')
+    conn = db.connect(user='CdrGuest', timeout=300)
     cursor = conn.cursor()
-except cdrdb.Error as info:
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
+except Exception as e:
+    cdrcgi.bail('Database connection failure: %s' % e)
 
 #----------------------------------------------------------------------
 # Passing a CDR-ID and the document type
@@ -411,7 +411,7 @@ def getAllTermNames(conceptId):
         SELECT DISTINCT doc_id
                    FROM query_term
                   WHERE path = '/GlossaryTermName/GlossaryTermConcept/@cdr:ref'
-                    AND int_val = ?""", conceptId, timeout = 300)
+                    AND int_val = ?""", conceptId)
     return [row[0] for row in cursor.fetchall()]
 
 #----------------------------------------------------------------------
@@ -427,8 +427,8 @@ def getTermNameStatus(termList):
                          WHERE id in (%s)""" % termNameIds)
         rows = cursor.fetchall()
 
-    except cdrdb.Error as info:
-        cdrcgi.bail("Error selecting term name status: %s" % info[1][0])
+    except Exception as e:
+        cdrcgi.bail("Error selecting term name status: %s" % e)
 
     statusList = {}
     for id, status in rows:
@@ -440,7 +440,7 @@ def getTermNameStatus(termList):
 #----------------------------------------------------------------------
 # Passing a CDR-ID
 # This function returns an HTML snippet in case a MediaLink element
-# or an EmbeddedVideo link exists that's being shared between English 
+# or an EmbeddedVideo link exists that's being shared between English
 # and Spanish definitions.
 #----------------------------------------------------------------------
 def getSharedInfo(docId):
@@ -450,10 +450,10 @@ def getSharedInfo(docId):
         dom = xml.dom.minidom.parseString(row[0].encode('utf-8'))
         docElem = dom.documentElement
 
-        sharedElements = ['MediaLink', 'EmbeddedVideo', 'TermType', 
-                          'PDQTerm', 'NCIThesaurusID', 
+        sharedElements = ['MediaLink', 'EmbeddedVideo', 'TermType',
+                          'PDQTerm', 'NCIThesaurusID',
                           'RelatedDrugSummaryLink',
-                          'RelatedExternalRef', 
+                          'RelatedExternalRef',
                           'RelatedSummaryRef',
                           'RelatedGlossaryTermNameLink']
         sharedContent = {}
@@ -503,8 +503,8 @@ def getSharedInfo(docId):
                 sharedContent['NCIThesaurusID'].append(
                                        cdr.getTextContent(node).strip())
 
-    except cdrdb.Error as info:
-        cdrcgi.bail("Error extracting shared Info: %s" % info[1][0])
+    except Exception as e:
+        cdrcgi.bail("Error extracting shared Info: %s" % e)
 
     #cdrcgi.bail(sharedContent)
     return sharedContent
@@ -625,8 +625,8 @@ def getConcept(docId):
 
         dom.unlink()
 
-    except cdrdb.Error as info:
-        cdrcgi.bail("Error extracting Concept: %s" % info[1][0])
+    except Exception as e:
+        cdrcgi.bail("Error extracting Concept: %s" % e)
 
     return concept
 
@@ -695,8 +695,8 @@ def getNameDefinition(docId):
                                {'ReplacementText':[rText.toxml()]})
         dom.unlink()
 
-    except cdrdb.Error as info:
-        cdrcgi.bail("Error extracting Term Name: %s" % info[1][0])
+    except Exception as e:
+        cdrcgi.bail("Error extracting Term Name: %s" % e)
 
     return termName
 
@@ -1058,11 +1058,11 @@ for lang in languages:
 
 # Create the table rows for the elements that include an attribute
 # ----------------------------------------------------------------
-relDSRHtml   = addAttributeRow(sharedXml, 'RelatedDrugSummaryLink', 
+relDSRHtml   = addAttributeRow(sharedXml, 'RelatedDrugSummaryLink',
                                                                    indent=True)
 relSRHtml    = addAttributeRow(sharedXml, 'RelatedSummaryRef',     indent=True)
 relERHtml    = addAttributeRow(sharedXml, 'RelatedExternalRef',    indent=True)
-relGLHtml    = addAttributeRow(sharedXml, 'RelatedGlossaryTermNameLink', 
+relGLHtml    = addAttributeRow(sharedXml, 'RelatedGlossaryTermNameLink',
                                                                    indent=True)
 pdqTermHtml  = addAttributeRow(sharedXml, 'PDQTerm')
 

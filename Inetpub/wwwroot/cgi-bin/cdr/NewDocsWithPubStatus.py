@@ -2,7 +2,8 @@
 # Reports on newly created documents and their publication statuses.
 # BZIssue::754 - changes requested by Margaret
 #----------------------------------------------------------------------
-import cdr, cdrdb, cdrcgi, cgi, time
+import cdr, cdrcgi, cgi, time
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -126,7 +127,7 @@ html = """\
 #----------------------------------------------------------------------
 if fromDate < cdrcgi.DAY_ONE: fromDate = cdrcgi.DAY_ONE
 try:
-    conn   = cdrdb.connect()
+    conn   = db.connect()
     cursor = conn.cursor()
     dtQual = docType and ("AND doc_type = '%s'" % docType) or ""
     cursor.execute("""\
@@ -147,8 +148,8 @@ try:
                 cre_date,
                 ver_date""" % (fromDate, toDate, dtQual))
     rows = cursor.fetchall()
-except cdrdb.Error as info:
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
+except Exception as e:
+    cdrcgi.bail('Database connection failure: %s' % e)
 
 curDocType = None
 for row in rows:

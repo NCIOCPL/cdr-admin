@@ -5,7 +5,7 @@
 #----------------------------------------------------------------------
 import cdr
 import cdrcgi
-import cdrdb
+from cdrapi import db
 import datetime
 import lxml.etree as etree
 
@@ -106,7 +106,7 @@ class Control(cdrcgi.Control):
 
         b_path = "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"
         t_path = "/Summary/TranslationOf/@cdr:ref"
-        query = cdrdb.Query("active_doc d", "d.id")
+        query = db.Query("active_doc d", "d.id")
         query.join("query_term_pub a", "a.doc_id = d.id")
         query.where("a.path = '/Summary/SummaryMetaData/SummaryAudience'")
         query.where(query.Condition("a.value", self.audience + "s"))
@@ -195,7 +195,7 @@ class Summary:
         self.id = doc_id
         self.control = control
         self.changes = []
-        query = cdrdb.Query("document", "title", "xml")
+        query = db.Query("document", "title", "xml")
         query.where(query.Condition("id", doc_id))
         self.title, xml = query.execute(control.cursor).fetchone()
         root = etree.XML(xml.encode("utf-8"))

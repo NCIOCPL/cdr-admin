@@ -26,7 +26,6 @@ html    = cdrcgi.header(title, title, section, "", buttons) + """\
    <ol>
 """
 items   = (
-           ('GlobalChangeLink.py',     'Global Change Links'           ),
            ('ShowGlobalChangeTestResults.py','Global Change Test Results'),
            ('Logout.py',               'Log Out'                       )
            )

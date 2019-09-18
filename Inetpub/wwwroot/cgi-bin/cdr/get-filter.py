@@ -8,7 +8,7 @@ Used for comparing filters across tiers
 
 import cgi
 import cdr
-import cdrdb
+from cdrapi import db
 
 logger = cdr.Logging.get_logger("filters")
 fields = cgi.FieldStorage()
@@ -18,7 +18,7 @@ if not title:
     exit(0)
 logger.info("Fetch %r", title)
 try:
-    query = cdrdb.Query("document d", "d.xml", "t.name")
+    query = db.Query("document d", "d.xml", "t.name")
     query.join("doc_type t", "t.id = d.doc_type")
     query.where(query.Condition("d.title", title))
     rows = query.execute().fetchall()

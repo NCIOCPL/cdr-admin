@@ -1,7 +1,8 @@
 #----------------------------------------------------------------------
 # Reports on newly created documents and their statuses.
 #----------------------------------------------------------------------
-import cdr, cdrdb, cdrcgi, cgi, time
+import cdr, cdrcgi, cgi, time
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -154,7 +155,7 @@ html = u"""\
 #----------------------------------------------------------------------
 docCounts = {}
 try:
-    conn   = cdrdb.connect()
+    conn   = db.connect()
     cursor = conn.cursor()
     # Security note: docType already checked for whitelist, data i safe
     dtQual = docType and ("AND t.name = '%s'" % docType) or ""
@@ -199,15 +200,15 @@ try:
                                           AND DATEADD(s, -1,
                                                       DATEADD(d, 1, '%s'))
       %s
-""" % (fromDate, toDate, dtQual), timeout = 120)
+""" % (fromDate, toDate, dtQual))
     cursor.execute("""\
     SELECT name, dstat, COUNT(*)
       FROM #doc_statuses
   GROUP BY name, dstat
   ORDER BY name, dstat""")
     rows = cursor.fetchall()
-except cdrdb.Error as info:
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
+except Exception as e:
+    cdrcgi.bail('Database connection failure: %s' % e)
 
 for row in rows:
     if not docCounts.has_key(row[0]):

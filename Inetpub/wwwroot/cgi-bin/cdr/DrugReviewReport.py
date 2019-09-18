@@ -20,7 +20,7 @@ import os
 import sys
 import lxml.etree as etree
 import cdrcgi
-import cdrdb
+from cdrapi import db
 
 class Control(cdrcgi.Control):
     """
@@ -122,10 +122,10 @@ class Control(cdrcgi.Control):
         self.nci_terms = []
         self.cdr_terms = []
         self.rvw_terms = []
-        subquery = cdrdb.Query("query_term", "doc_id")
+        subquery = db.Query("query_term", "doc_id")
         subquery.where("path = '/Term/PreferredName'")
         subquery.where("value = 'Drug/Agent'")
-        query = cdrdb.Query("query_term t", "t.doc_id").unique()
+        query = db.Query("query_term t", "t.doc_id").unique()
         query.where("t.path = '/Term/SemanticType/@cdr:ref'")
         query.where(query.Condition("t.int_val", subquery))
         if self.start or self.end:
@@ -216,7 +216,7 @@ class Drug:
         self.definitions = []
         self.comments = []
         self.status = None
-        query = cdrdb.Query("document", "xml")
+        query = db.Query("document", "xml")
         query.where(query.Condition("id", doc_id))
         xml = query.execute(control.cursor).fetchone()[0]
         root = etree.fromstring(xml.encode("utf-8"))

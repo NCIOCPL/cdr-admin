@@ -5,7 +5,7 @@
 import cgi
 import cdr
 import cdrcgi
-import cdrdb
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -52,7 +52,7 @@ if not term_ids:
 # Find the documents using the specified terms.
 #----------------------------------------------------------------------
 columns = ("doc_type.name", "doc.id", "doc.title", "term.id", "term.title")
-query = cdrdb.Query("doc_type", *columns).unique()
+query = db.Query("doc_type", *columns).unique()
 query.join("document doc", "doc_type.id = doc.doc_type")
 query.join("query_term cdr_ref", "doc.id = cdr_ref.doc_id")
 query.join("document term", "term.id = cdr_ref.int_val")

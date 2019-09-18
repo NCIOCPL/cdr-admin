@@ -7,12 +7,8 @@
 import sys
 import time
 import lxml.etree as etree
-import cdrdb
 import cdrcgi
-
-if sys.platform == "win32":
-    import os, msvcrt
-    msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
+from cdrapi import db
 
 def findActiveProtocols():
     cursor.execute("""\
@@ -62,7 +58,7 @@ class Term:
             self.name = node.text
         for node in tree.findall('OtherName/OtherTermName'):
             self.otherNames.append(node.text)
-        self.otherNames.sort(lambda a,b: cmp(a.upper(), b.upper()))
+        self.otherNames.sort(key=str.upper)
         if protocolIds:
             for protocolId in protocolIds:
                 primaryId = primaryIds.get(protocolId,
@@ -71,7 +67,7 @@ class Term:
                 self.protocols.append(primaryId)
         self.protocols.sort(lambda a,b: cmp(a.upper(), b.upper()))
 
-conn = cdrdb.connect('CdrGuest')
+conn = db.connect(user='CdrGuest')
 cursor = conn.cursor()
 cursor.execute("""\
     SELECT DISTINCT doc_id
@@ -93,10 +89,11 @@ for row in rows:
     if protocolIds:
         terms.append(Term(termId, protocolIds, primaryIds))
 t = time.strftime("%Y%m%d%H%M%S")
-terms.sort(lambda a,b: cmp(len(b.protocols), len(a.protocols)))
-print("Content-type: application/vnd.ms-excel")
-print("Content-Disposition: attachment; filename=DrugAgentReport-%s.xls" % t)
-print()
+sys.stdout.buffer.write(f"""\
+Content-type: application/vnd.ms-excel
+Content-Disposition: attachment; filename=DrugAgentReport-{t}.xls
+
+""".encode("utf-8"))
 
 styles = cdrcgi.ExcelStyles()
 sheet = styles.add_sheet("Terms")
@@ -110,10 +107,10 @@ for i, chars in enumerate(widths):
 for i, label in enumerate(labels):
     sheet.write(0, i, label, styles.header)
 row = 1
-for term in terms:
+for term in sorted(terms, key=lambda t: len(t.protocols)):
     sheet.write(row, 0, term.name, styles.left)
     sheet.write(row, 2, len(term.protocols), styles.left)
     sheet.write(row, 1, "\n".join(term.otherNames), styles.left)
     sheet.write(row, 3, "\n".join(term.protocols), styles.left)
     row += 1
-styles.book.save(sys.stdout)
+styles.book.save(sys.stdout.buffer)

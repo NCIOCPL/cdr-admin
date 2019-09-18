@@ -6,10 +6,10 @@
 # Rewritten summer 2015 as part of security sweep.
 #----------------------------------------------------------------------
 import cdr
-import cdrdb
 import cdrcgi
 import cgi
 import datetime
+from cdrapi import db
 
 class Control(cdrcgi.Control):
     TITLE = "Documents Modified Since Last Publishable Version"
@@ -37,13 +37,13 @@ class Control(cdrcgi.Control):
         actions = ("ADD DOCUMENT", "MODIFY DOCUMENT")
         actions = ", ".join(["'%s'" % action for action in actions])
         tables = []
-        subquery = cdrdb.Query("audit_trail a", "MAX(dt)")
+        subquery = db.Query("audit_trail a", "MAX(dt)")
         subquery.join("action", "action.id = a.action")
         subquery.where("a.document = d.id")
         subquery.where("action.name IN (%s)" % actions)
-        query = cdrdb.Query("active_doc d", "t.name AS doc_type",
-                            "d.id AS doc_id", "u.fullname AS user_name",
-                            "a.dt AS mod_date").into("#last_mod")
+        query = db.Query("active_doc d", "t.name AS doc_type",
+                         "d.id AS doc_id", "u.fullname AS user_name",
+                         "a.dt AS mod_date").into("#last_mod")
         query.join("doc_type t", "d.doc_type = t.id")
         query.join("audit_trail a", "a.document = d.id")
         query.join("open_usr u", "u.id = a.usr")
@@ -59,23 +59,23 @@ class Control(cdrcgi.Control):
         if self.doc_type:
             query.where("t.name = '%s'" % self.doc_type)
         query.execute(self.cursor)
-        query = cdrdb.Query("doc_version v", "v.id AS doc_id",
-                            "MAX(v.updated_dt) AS pub_ver_date")
+        query = db.Query("doc_version v", "v.id AS doc_id",
+                         "MAX(v.updated_dt) AS pub_ver_date")
         query.into("#last_publishable_version")
         query.join("#last_mod m", "m.doc_id = v.id")
         query.where("v.publishable = 'Y'")
         query.group("v.id")
         query.execute(self.cursor)
-        query = cdrdb.Query("doc_version v", "v.id AS doc_id",
-                            "MAX(v.updated_dt) AS unpub_ver_date")
+        query = db.Query("doc_version v", "v.id AS doc_id",
+                         "MAX(v.updated_dt) AS unpub_ver_date")
         query.into("#last_unpublishable_version")
         query.join("#last_mod m", "m.doc_id = v.id")
         query.where("v.publishable = 'N'")
         query.group("v.id")
         query.execute(self.cursor)
-        query = cdrdb.Query("#last_mod d", "d.doc_type", "d.doc_id",
-                            "p.pub_ver_date", "d.user_name", "d.mod_date",
-                            "u.unpub_ver_date")
+        query = db.Query("#last_mod d", "d.doc_type", "d.doc_id",
+                         "p.pub_ver_date", "d.user_name", "d.mod_date",
+                         "u.unpub_ver_date")
         query.join("#last_publishable_version p", "p.doc_id = d.doc_id")
         query.outer("#last_unpublishable_version u", "u.doc_id = d.doc_id")
         query.where("p.pub_ver_date < d.mod_date")
@@ -140,7 +140,7 @@ class Control(cdrcgi.Control):
             if self.doc_type.lower() not in self.get_names("doc_type"):
                 cdrcgi.bail()
     def get_names(self, table):
-        query = cdrdb.Query(table, "name")
+        query = db.Query(table, "name")
         rows = query.execute(self.cursor).fetchall()
         return set([row[0].lower() for row in rows])
 

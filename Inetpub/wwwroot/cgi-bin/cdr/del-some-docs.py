@@ -6,12 +6,13 @@
 # BZIssue::5296
 #
 #----------------------------------------------------------------------
-import cdr, cgi, cdrcgi, re, cdrdb
+import cdr, cgi, cdrcgi, re
+from cdrapi import db
 
 LOGFILE = "%s/del-some-docs.log" % cdr.DEFAULT_LOGDIR
 
 def getUserName(session):
-    cursor = cdrdb.connect("CdrGuest").cursor()
+    cursor = db.connect(user="CdrGuest").cursor()
     cursor.execute("""\
 SELECT u.name
   FROM usr u
@@ -76,7 +77,7 @@ if ids:
         try:
             opts = dict(validate=validate, reason=reason)
             result = cdr.delDoc(session, docId, **opts)
-        except cdr.Exception as e:
+        except Exception as e:
             html.append(u"<li>%s: %s</li>" % (docId, repr(e)))
             html.append(u"<li>e.message: %s</li>" % repr(e.message))
             html.append(u"<li>e.args: %s</li>" % repr(e.args))

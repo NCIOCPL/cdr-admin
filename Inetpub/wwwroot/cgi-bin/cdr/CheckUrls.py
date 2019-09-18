@@ -11,7 +11,6 @@
 #----------------------------------------------------------------------
 import cgi
 import cdr
-import cdrdb
 import cdrcgi
 from cdrbatch import CdrBatch
 

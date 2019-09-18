@@ -14,7 +14,8 @@
 
 import datetime
 import lxml.etree as etree
-import cgi, cgitb, cdr, re, cdrcgi, cdrdb
+import cgi, cgitb, cdr, re, cdrcgi
+from cdrapi import db
 cgitb.enable()
 
 # Prepare a log file for what we're about to do
@@ -92,7 +93,7 @@ def checkDoc(docId):
     docNum = cdr.exNormalize(docId)[1]
 
     try:
-        conn   = cdrdb.connect()
+        conn   = db.connect()
         cursor = conn.cursor()
         cursor.execute("""
 SELECT t.name
@@ -181,7 +182,7 @@ def getFragmentLinks(targetDocId):
         None if there are no fragment links
     """
     try:
-        conn   = cdrdb.connect()
+        conn   = db.connect()
         cursor = conn.cursor()
         cursor.execute("""
 SELECT DISTINCT t.name, d.id, d.title, n.source_elem, n.target_frag
@@ -458,7 +459,7 @@ if msgs:
 
 # The new document must have a WillReplace@cdr:ref referencing the old one
 try:
-    conn   = cdrdb.connect()
+    conn   = db.connect()
     cursor = conn.cursor()
     cursor.execute("""
 SELECT value
@@ -494,7 +495,7 @@ if request != CONFIRM_SUBMIT:
 
     # Get info for display
     try:
-        conn   = cdrdb.connect()
+        conn   = db.connect()
         cursor = conn.cursor()
         cursor.execute("SELECT title FROM document WHERE id = %d" %
                         cdr.exNormalize(oldDocId)[1])

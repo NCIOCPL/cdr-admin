@@ -1,17 +1,17 @@
 import cdr
-import cdrdb
+from cdrapi import db
 import cdrcgi
 import cgi
 import datetime
 
 class Control:
     def __init__(self):
-        cursor = cdrdb.connect().cursor()
+        cursor = db.connect().cursor()
         fields = cgi.FieldStorage()
-        query = cdrdb.Query("grp", "id", "name").order("name")
+        query = db.Query("grp", "id", "name").order("name")
         rows = query.execute(cursor).fetchall()
         self.groups = [Group(cursor, id, name) for id, name in rows]
-        query = cdrdb.Query("usr", "id", "fullname").order("fullname")
+        query = db.Query("usr", "id", "fullname").order("fullname")
         query.where("expired IS NULL")
         query.where("(password IS NULL OR password = '')")
         rows = query.execute(cursor).fetchall()
@@ -42,7 +42,7 @@ class Group:
     def __init__(self, cursor, id, name):
         self.id = id
         self.name = name
-        query = cdrdb.Query("grp_usr", "usr")
+        query = db.Query("grp_usr", "usr")
         query.where(query.Condition("grp", id))
         self.members = set([row[0] for row in query.execute(cursor).fetchall()])
     def row(self, users):

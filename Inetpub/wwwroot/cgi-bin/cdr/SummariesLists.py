@@ -16,7 +16,7 @@
 #----------------------------------------------------------------------------
 import cdr
 import cdrcgi
-import cdrdb
+from cdrapi import db
 import cgi
 import datetime
 
@@ -41,7 +41,7 @@ class Control:
         self.script = "SummariesLists.py"
         self.buttons = ("Submit", Control.SUBMENU, cdrcgi.MAINMENU)
         self.boards = cdr.getBoardNames("editorial", "short")
-        self.cursor = cdrdb.connect("CdrGuest").cursor()
+        self.cursor = db.connect(user="CdrGuest").cursor()
         self.sanitize()
 
     def run(self):
@@ -193,7 +193,7 @@ class Board:
         else:
            pub = ''
 
-        query = cdrdb.Query("query_term%s t" % pub, *cols).unique()
+        query = db.Query("query_term%s t" % pub, *cols).unique()
         query.join("query_term%s a" % pub, "a.doc_id = t.doc_id")
         query.join("query_term%s l" % pub, "l.doc_id = t.doc_id")
         query.join("active_doc d", "d.id = t.doc_id")
@@ -241,8 +241,8 @@ class Board:
                 row.append(u"")
             rows.append(row)
         return cdrcgi.Report.Table(columns, rows, **opts)
-    def __cmp__(self, other):
-        return cmp(self.name.lower(), other.name.lower())
+    def __lt__(self, other):
+        return self.name.lower() < other.name.lower()
 
 class Summary:
     logged = False
@@ -254,8 +254,8 @@ class Summary:
         self.module = module == "Yes"
         self.original_title = original_title
 
-    def __cmp__(self, other):
-        return cmp(self.title.upper(), other.title.upper())
+    def __lt__(self, other):
+        return self.title.upper() < other.title.upper()
 
 if __name__ == "__main__":
     "Allow import (by doc or lint tools, for example) without side effects"

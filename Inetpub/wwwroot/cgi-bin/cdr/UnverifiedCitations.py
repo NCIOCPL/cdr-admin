@@ -1,7 +1,8 @@
 #----------------------------------------------------------------------
 # Reports on citations which have not been verified.
 #----------------------------------------------------------------------
-import cdr, cgi, cdrdb, cdrcgi, time, re
+import cdr, cgi, cdrcgi, time, re
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -13,10 +14,10 @@ session = cdrcgi.getSession(fields)
 # Connect to the database.
 #----------------------------------------------------------------------
 try:
-    conn = cdrdb.connect()
+    conn = db.connect()
     cursor = conn.cursor()
-except cdrdb.Error as info:
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
+except Exception as e:
+    cdrcgi.bail('Database connection failure: %s' % e)
 
 #----------------------------------------------------------------------
 # Get some general values.
@@ -78,8 +79,8 @@ try:
                         AND value = 'No'
                    ORDER BY doc_id""")
     rows = cursor.fetchall()
-except cdrdb.Error as info:
-    cdrcgi.bail('Failure selecting citation IDs: %s' % info[1][0])
+except Exception as e:
+    cdrcgi.bail('Failure selecting citation IDs: %s' % e)
 
 #----------------------------------------------------------------------
 # Add one row to the table for each unverified citation.

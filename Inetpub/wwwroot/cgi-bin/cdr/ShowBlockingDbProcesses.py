@@ -1,13 +1,14 @@
 #----------------------------------------------------------------------
 # Show SQL Server processes which are blocked or are blocking.
 #----------------------------------------------------------------------
-import cdr, cdrdb, socket, time, sys, cdrcgi
+import cdr, socket, time, sys, cdrcgi
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Collect some values we'll need for the entire run.
 #----------------------------------------------------------------------
 host   = socket.gethostname()
-conn   = cdrdb.connect()
+conn   = db.connect()
 cursor = conn.cursor()
 LOG    = cdr.DEFAULT_LOGDIR + "/blocking.log"
 

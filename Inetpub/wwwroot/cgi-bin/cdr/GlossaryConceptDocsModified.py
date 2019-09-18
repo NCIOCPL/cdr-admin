@@ -7,9 +7,9 @@
 # Rewritten July 2015 as part of security sweep.
 #----------------------------------------------------------------------
 import cdrcgi
-import cdrdb
 import datetime
 import lxml.etree as etree
+from cdrapi import db
 
 class Control(cdrcgi.Control):
     "Collect and verify the user options for the report."
@@ -52,14 +52,14 @@ class Control(cdrcgi.Control):
             cdrcgi.Report.Column("Date First Published (*)", width="100px"),
             cdrcgi.Report.Column("Last Comment", width="450px")
         )
-        query = cdrdb.Query("doc_version v", "v.id", "MAX(v.num)")
+        query = db.Query("doc_version v", "v.id", "MAX(v.num)")
         query.join("doc_type t", "t.id = v.doc_type")
         query.join("active_doc a", "a.id = v.id")
         query.where("t.name = 'GlossaryTermConcept'")
         query.where(query.Condition("v.dt", self.start, ">="))
         query.where(query.Condition("v.dt", "%s 23:59:59" % self.end, "<="))
         query.group("v.id")
-        docs = query.execute(self.cursor, timeout=300).fetchall()
+        docs = query.execute(self.cursor).fetchall()
         rows = []
         for concept in sorted([GlossaryTermConcept(self, *d) for d in docs]):
             rows.append(concept.row())
@@ -107,13 +107,13 @@ class GlossaryTermConcept:
         self.control = control
         self.doc_id = doc_id
         self.doc_version = doc_version
-        query = cdrdb.Query("document d", "MIN(d.first_pub)")
+        query = db.Query("document d", "MIN(d.first_pub)")
         query.join("query_term q", "q.doc_id = d.id")
         query.where("q.path = '/GlossaryTermName/GlossaryTermConcept/@cdr:ref'")
         query.where(query.Condition("q.int_val", doc_id))
         self.first_pub = query.execute(control.cursor).fetchone()[0]
-        query = cdrdb.Query("doc_version v", "v.title", "v.xml",
-                            "v.publishable")
+        query = db.Query("doc_version v", "v.title", "v.xml",
+                         "v.publishable")
         query.join("document d", "d.id = v.id")
         query.where(query.Condition("v.id", doc_id))
         query.where(query.Condition("v.num", doc_version))

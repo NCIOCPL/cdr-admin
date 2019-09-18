@@ -2,7 +2,8 @@
 # Prototype for display of Term hierarchy (requirement 2.6 from
 # Terminology Processing Requirements).
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, cdrdb, string
+import cgi, cdr, cdrcgi, re, string
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Named constants.
@@ -47,8 +48,8 @@ def showTerm(term, offset, primaryTerm = 0):
         html = html + "%s%s (<A href='%s?DocId=%d'>%s</A>)\n" % (
                 offset and (' ' * (offset - 1) * 2 + '+-') or '',
                 termName,
-                SCRIPT, 
-                idInt, 
+                SCRIPT,
+                idInt,
                 coloredId)
 
 #----------------------------------------------------------------------
@@ -86,11 +87,11 @@ SELECT DISTINCT d.id, d.title
            FROM document d
            JOIN query_term t
              ON t.doc_id = d.id
-          WHERE t.path IN ('/Term/PreferredName', 
+          WHERE t.path IN ('/Term/PreferredName',
                            '/Term/OtherName/OtherTermName')
             AND t.value %s '%s'
 """ % (cdrcgi.getQueryOp(name), cdrcgi.getQueryVal(name))
-        conn = cdrdb.connect('CdrGuest')
+        conn = db.connect(user='CdrGuest')
         cursor = conn.cursor()
         cursor.execute(query)
         rows = cursor.fetchall()
@@ -103,13 +104,13 @@ SELECT DISTINCT d.id, d.title
             docId = str(rows[0][0])
         else:
             showTermList(rows)
-    except cdrdb.Error as info:
-        cdrcgi.bail('Failure connecting to CDR: %s' % info[1][0])
+    except Exception as e:
+        cdrcgi.bail('Failure connecting to CDR: %s' % e)
 
 #----------------------------------------------------------------------
 # Create the top of the page.
 #----------------------------------------------------------------------
-header = cdrcgi.header(title, banner, "Hierarchical Display", SCRIPT, 
+header = cdrcgi.header(title, banner, "Hierarchical Display", SCRIPT,
         buttons)
 if message:
     header += "<H2>%s</H2>" % message

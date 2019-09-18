@@ -11,12 +11,12 @@
 #----------------------------------------------------------------------
 import cdr
 import cdrcgi
-import cdrdb
 import cgi
 import datetime
 import lxml.etree as etree
 import lxml.html
 import time
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Don't give hackers any help, and don't throw more noise at the app
@@ -80,10 +80,10 @@ elif request == SUBMENU:
 # Set up a database connection and cursor.
 #----------------------------------------------------------------------
 try:
-    conn = cdrdb.connect("CdrGuest")
+    conn = db.connect(user="CdrGuest")
     cursor = conn.cursor()
-except cdrdb.Error as info:
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
+except Exception as e:
+    cdrcgi.bail('Database connection failure: %s' % e)
 
 
 #----------------------------------------------------------------------
@@ -188,8 +188,8 @@ SELECT DISTINCT board.id, board.title
                                    'PDQ Advisory Board')
        ORDER BY board.title""")
         return [(row[0], cleanTitle(row[1])) for row in cursor.fetchall()]
-    except cdrdb.Error as info:
-        cdrcgi.bail('Database query failure: %s' % info[1][0])
+    except Exception as e:
+        cdrcgi.bail('Database query failure: %s' % e)
 
 
 #----------------------------------------------------------------------
@@ -201,7 +201,7 @@ def getBoardManagerInfo(orgId):
         '/Organization/PDQBoardInformation/BoardManagerEmail',
         '/Organization/PDQBoardInformation/BoardManagerPhone'
     )
-    query = cdrdb.Query("query_term", "path", "value").order("path")
+    query = db.Query("query_term", "path", "value").order("path")
     query.where(query.Condition("path", paths, "IN"))
     query.where(query.Condition("doc_id", orgId))
     try:
@@ -209,8 +209,8 @@ def getBoardManagerInfo(orgId):
         if len(rows) != 3:
             cdrcgi.bail("board manager information missing")
         return rows
-    except cdrdb.Error as info:
-        cdrcgi.bail('Database query failure for BoardManager: %s' % info[1][0])
+    except Exception as e:
+        cdrcgi.bail('Database query failure for BoardManager: %s' % e)
 
 
 #----------------------------------------------------------------------
@@ -603,7 +603,7 @@ try:
              AND curmemb.value = 'Yes'
              AND person_doc.active_status = 'A'
              AND member.int_val = ?
-""", boardId, timeout = 300)
+""", boardId)
     rows = cursor.fetchall()
     boardMembers = []
     boardIds     = []
@@ -613,8 +613,8 @@ try:
         boardIds.append(docId)
     boardMembers.sort()
 
-except cdrdb.Error as info:
-    cdrcgi.bail('Database query failure: %s' % info[1][0])
+except Exception as e:
+    cdrcgi.bail('Database query failure: %s' % e)
 
 
 if flavor == 'full':

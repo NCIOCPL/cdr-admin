@@ -6,15 +6,16 @@
 import sys
 import time
 import cdrcgi
-import cdrdb
+from cdrapi import db
+from cdrapi.settings import Tier
 
 ROW_HEIGHT = 40 # in point size
 
-if sys.platform == "win32":
-    import os, msvcrt
-    msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
+#if sys.platform == "win32":
+#    import os, msvcrt
+#    msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
 
-conn = cdrdb.connect("CdrGuest")
+conn = db.connect(user="CdrGuest")
 cursor = conn.cursor()
 
 #----------------------------------------------------------------------
@@ -29,7 +30,7 @@ SELECT distinct d.id CDRID, d.title
     ON s.id = q.doc_id
  WHERE path like '/Summary/%CitationLink/@cdr:ref'
  ORDER BY d.id desc
-""", timeout = 300)
+""")
 rows = cursor.fetchall()
 
 # Create the spreadsheet and define default style, etc.
@@ -52,18 +53,20 @@ sheet.write(0, 1, "Citation Title", styles.header)
 # the header row. Link to the production server.
 # ----------------------------------------------------------
 row = 1
-base = "%s?Session=guest" % cdrdb.h.makeCdrCgiUrl("PROD", "QCReport.py")
+base = f"https://{Tier('PROD').hosts['APPC']}{cdrcgi.BASE}/QcReport.py"
+#"%s?Session=guest" % db.h.makeCdrCgiUrl("PROD", "QCReport.py")
 for doc_id, doc_title in rows:
     styles.set_row_height(sheet.row(row), ROW_HEIGHT)
-    url = "%s&DocId=%d" % (base, doc_id)
+    url = f"{base}?Session=guest&DocId={doc_id:d}"
     link = styles.link(url, doc_id)
     sheet.write(row, 0, link, styles.url)
     sheet.write(row, 1, doc_title, styles.left)
     row += 1
 
 name = "CitationsInSummaries-%s.xls" % time.strftime("%Y%m%d%H%M%S")
-print("Content-type: application/vnd.ms-excel")
-print(("Content-Disposition: attachment; filename=%s" % name))
-print("")
+sys.stdout.buffer.write(f"""\
+Content-type: application/vnd.ms-excel
+Content-Disposition: attachment; filename={name}
 
-styles.book.save(sys.stdout)
+""".encode("utf-8"))
+styles.book.save(sys.stdout.buffer)

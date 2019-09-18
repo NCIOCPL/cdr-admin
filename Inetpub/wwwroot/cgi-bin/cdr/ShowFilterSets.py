@@ -1,7 +1,13 @@
 #----------------------------------------------------------------------
 # Interface for viewing CDR filter sets.
 #----------------------------------------------------------------------
-import cdr, cdrdb, sys, xml.dom.minidom, cdrcgi
+import cdr, sys, xml.dom.minidom, cdrcgi
+from lxml import etree
+from cdrapi import db
+from cdrapi.docs import Filter as APIFilter
+
+XSL_INCLUDE = f"{{{APIFilter.NS}}}include"
+XSL_IMPORT = f"{{{APIFilter.NS}}}import"
 
 def showFilterSet(filterSet, setName):
     #sys.stderr.write("showFilterSet(%s)\n" % setName)
@@ -80,14 +86,21 @@ class Filter:
         self.includes = []
         self.error = None
         try:
+            for child in etree.fromstring(docXml.encode("utf-8")):
+                if child.tag in (XSL_INCLUDE, XSL_IMPORT):
+                    tag = child.tag.replace(f"{{{APIFilter.NS}}}", "xsl:")
+                    href = child.get("href")
+                    self.includes.append(self.Include(tag, href))
+            '''
             dom = xml.dom.minidom.parseString(docXml)
             for child in dom.documentElement.childNodes:
                 if child.nodeName in ('xsl:include', 'xsl:import'):
                     href = child.getAttribute('href')
                     self.includes.append(self.Include(child.nodeName, href))
+            '''
         except Exception as e:
             self.error = "Failure parsing filter: %s" % str(e)
-conn = cdrdb.connect('CdrGuest')
+conn = db.connect(user='CdrGuest')
 cursor = conn.cursor()
 cursor.execute("""
     SELECT d.id, d.title, d.xml
@@ -109,8 +122,7 @@ setDict = {}
 for set in sets:
     filterSet = cdr.getFilterSet('guest', set.name)
     setDict[set.name] = filterSet
-keys = setDict.keys()
-keys.sort()
+keys = sorted(setDict)
 
 # Creating the HTML output page
 # -----------------------------

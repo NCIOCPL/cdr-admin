@@ -5,7 +5,7 @@
 import cgi
 import cdr
 import cdrcgi
-import cdrdb
+from cdrapi import db
 
 LOGFILE = cdr.DEFAULT_LOGDIR + "/check-auth.log"
 
@@ -20,7 +20,7 @@ try:
     session = fields.getvalue("Session")
     action = fields.getvalue("action")
     doctype = fields.getvalue("doctype", "")
-    query = cdrdb.Query("action", "name")
+    query = db.Query("action", "name")
     actions = set([row[0] for row in query.execute().fetchall()])
     if action in actions and cdr.canDo(session, action, doctype):
         answer("Y")

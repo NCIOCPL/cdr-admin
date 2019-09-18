@@ -23,7 +23,8 @@
 #
 # BZIssue::4304 - modifications requested by William
 #----------------------------------------------------------------------
-import cgi, cdr, cdrdb, cdrcgi, time, sys, lxml.etree as etree
+import cgi, cdr, cdrcgi, time, sys, lxml.etree as etree
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -84,7 +85,7 @@ if request == "Log Out":
 # Connect to the CDR database.
 #----------------------------------------------------------------------
 try:
-    conn = cdrdb.connect('CdrGuest')
+    conn = db.connect(user='CdrGuest')
     cursor = conn.cursor()
 except Exception as e:
     cdrcgi.bail('Database connection failure: %s' % e)
@@ -202,7 +203,7 @@ def makeChangeCategoryPicklist(cursor):
    WHERE path = '/Mailer/Response/ChangesCategory'
      AND value IS NOT NULL
      AND value <> ''
-ORDER BY value""", timeout = 300)
+ORDER BY value""")
     html = [u"""\
 <select name='category'>
  <option value=''>All</option>
@@ -226,7 +227,7 @@ def makeMailerTypePicklist(cursor):
    WHERE path = '/Mailer/Type'
      AND value IS NOT NULL
      AND value <> ''
-ORDER BY value""", timeout = 300)
+ORDER BY value""")
     html = [u"""\
 <select name='mailerType'>
  <option value=''>All</option>

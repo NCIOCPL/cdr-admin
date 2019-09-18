@@ -9,9 +9,9 @@
 import cdrcgi
 import cgi
 import cdr
-import cdrdb
 import datetime
 import lxml.etree as etree
+from cdrapi import db
 
 class Control:
     """
@@ -29,7 +29,7 @@ class Control:
 
     def __init__(self):
         "Collect the CGI parameters and scrub them"
-        self.cursor = cdrdb.connect("CdrGuest").cursor()
+        self.cursor = db.connect(user="CdrGuest").cursor()
         fields = cgi.FieldStorage()
         self.session = cdrcgi.getSession(fields)
         self.request = cdrcgi.getRequest(fields)
@@ -68,7 +68,7 @@ class Control:
         caption = "%s Concepts With %s Status" % (self.audience, self.status)
         trans = (self.report == Control.SPANISH and "Translated" or "",) * 2
         path = "/GlossaryTermConcept/%sTermDefinition/%sStatusDate" % trans
-        query = cdrdb.Query("query_term", "doc_id").unique()
+        query = db.Query("query_term", "doc_id").unique()
         query.where(query.Condition("path", path))
         query.where(query.Condition("value", self.start, ">="))
         query.where(query.Condition("value", "%s 23:59:59" % self.end, "<="))
@@ -395,14 +395,14 @@ class Name:
         self.english = self.last_pub = self.pub_ver = self.blocked = None
         self.spanish  = []
         self.rep_nodes = {}
-        query = cdrdb.Query("pub_proc_cg c", "d.doc_version", "p.completed")
+        query = db.Query("pub_proc_cg c", "d.doc_version", "p.completed")
         query.join("pub_proc_doc d", "d.doc_id = c.id")
         query.join("pub_proc p", "p.id = c.pub_proc")
         query.where(query.Condition("d.doc_id", doc_id))
-        rows = query.execute(self.control.cursor, timeout=300).fetchall()
+        rows = query.execute(self.control.cursor).fetchall()
         if rows:
             self.pub_ver, self.last_pub = rows[0]
-        query = cdrdb.Query("document", "xml", "active_status")
+        query = db.Query("document", "xml", "active_status")
         query.where(query.Condition("id", doc_id))
         rows = query.execute(self.control.cursor).fetchall()
         if not rows:
@@ -426,7 +426,7 @@ class Name:
         we last exported to cancer.gov and our content distribution
         partners.
         """
-        query = cdrdb.Query("pub_proc_cg", "xml")
+        query = db.Query("pub_proc_cg", "xml")
         query.where(query.Condition("id", self.doc_id))
         rows = query.execute(self.control.cursor).fetchall()
         if not rows:
@@ -482,7 +482,7 @@ class Concept:
         self.name = self.blocked = None
         self.names = []
         self.rep_nodes = {}
-        query = cdrdb.Query("document", "xml", "active_status")
+        query = db.Query("document", "xml", "active_status")
         query.where(query.Condition("id", doc_id))
         doc_xml, active_status = query.execute(control.cursor).fetchone()
         self.blocked = active_status != "A"
@@ -511,7 +511,7 @@ class Concept:
                 if d.audience == control.audience:
                     self.en_def = d
         path = "/GlossaryTermName/GlossaryTermConcept/@cdr:ref"
-        query = cdrdb.Query("query_term", "doc_id").unique()
+        query = db.Query("query_term", "doc_id").unique()
         query.where(query.Condition("path", path))
         query.where(query.Condition("int_val", doc_id))
         for row in query.execute(control.cursor).fetchall():

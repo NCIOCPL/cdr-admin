@@ -2,7 +2,8 @@
 # Gets a schema document from the repository and returns it as a plain
 # text file.
 #----------------------------------------------------------------------
-import cgi, cdrdb, cdrcgi, sys
+import cgi, cdrcgi, sys
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -10,7 +11,7 @@ import cgi, cdrdb, cdrcgi, sys
 fields  = cgi.FieldStorage()
 id      = fields and fields.getvalue("id")
 
-conn = cdrdb.connect('CdrGuest')
+conn = db.connect(user='CdrGuest')
 cursor = conn.cursor()
 
 if id:

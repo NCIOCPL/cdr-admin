@@ -1,7 +1,8 @@
 #----------------------------------------------------------------------
 # Send a message to users currently logged in to the CDR.
 #----------------------------------------------------------------------
-import cdr, cdrdb, cdrcgi, cgi
+import cdr, cdrcgi, cgi
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -39,10 +40,10 @@ if request == "Log Out":
 # Log into the database.
 #----------------------------------------------------------------------
 try:
-    conn = cdrdb.connect('CdrGuest')
+    conn = db.connect(user='CdrGuest')
     cursor = conn.cursor()
-except cdrdb.Error as info:
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
+except Exception as e:
+    cdrcgi.bail('Database connection failure: %s' % e)
 
 #----------------------------------------------------------------------
 # Put up the form if no message yet.
@@ -58,9 +59,8 @@ if not subject or not body or not fromAddr:
                      WHERE s.name = ?""", session)
             row = cursor.fetchone()
             if row and row[0] and row[0].find('@') != -1: fromAddr = row[0]
-        except cdrdb.Error as info:
-            cdrcgi.bail('Failure retrieving your email address: %s'
-                    % info[1][0])
+        except Exception as e:
+            cdrcgi.bail('Failure retrieving your email address: %s' % e)
     form = """\
    <input type='hidden' name='%s' value='%s'>
    <table>
@@ -98,8 +98,8 @@ try:
     recipients = []
     for row in cursor.fetchall():
         recipients.append(row[0])
-except cdrdb.Error as info:
-    cdrcgi.bail('Failure retrieving email addresses: %s' % info[1][0])
+except Exception as e:
+    cdrcgi.bail('Failure retrieving email addresses: %s' % e)
 
 #----------------------------------------------------------------------
 # Send the message.

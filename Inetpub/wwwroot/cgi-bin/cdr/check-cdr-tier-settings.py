@@ -2,11 +2,11 @@
 # Sanity check for CDR configuration files for a given CBIIT tier.
 #----------------------------------------------------------------------
 import cdrcgi
-import cdrdb
 import cdrutil
 import re
 import socket
 import requests
+from cdrapi import db
 from cdrapi.settings import Tier
 
 TIER = Tier()
@@ -32,8 +32,6 @@ ROLES = {
 
 DATABASES = {
     "cdr": ("cdrsqlaccount", "CdrPublishing", "CdrGuest"),
-    "dropbox": ("dropbox",),
-    "emailers": ("emailers",),
 }
 CHECKMARK_TD = cdrcgi.Page.B.TD(
     cdrcgi.Page.B.IMG(src="/images/checkmark.gif", alt="check mark"),
@@ -49,10 +47,7 @@ xxtable caption { border: none; border-bottom: 2px solid white; }""")
 
 def db_account_ok(db, account):
     try:
-        if db == "cdr":
-            conn = cdrdb.connect(account)
-        else:
-            conn = cdrutil.getConnection(db)
+        conn = db.connect(user=account)
         return True
     except:
         return False
@@ -85,7 +80,6 @@ class Host:
                 self.error = "NOT FOUND"
 
 R = cdrcgi.Report
-#cursor = cdrdb.connect('CdrGuest').cursor()
 host_columns = (
     R.Column("Role", width="125px"),
     R.Column("Name", width="300px"),

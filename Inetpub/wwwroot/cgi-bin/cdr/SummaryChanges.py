@@ -1,7 +1,8 @@
 #----------------------------------------------------------------------
 # Report of history of changes to a single summary.
 #----------------------------------------------------------------------
-import cdr, cdrdb, time, cgi, cdrcgi, re
+import cdr, time, cgi, cdrcgi, re
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Get the parameters from the request.
@@ -127,7 +128,7 @@ if not docId and not docTitle:
 # Connect to the database.
 #----------------------------------------------------------------------
 try:
-    conn = cdrdb.connect('CdrGuest')
+    conn = db.connect(user='CdrGuest')
     cursor = conn.cursor()
 except Exception as info:
     cdrcgi.bail("Exception connecting to database: %s" % str(info))
@@ -162,7 +163,7 @@ commonStyle = getCommonCssStyle()
 startDate = list(time.localtime())
 startDate[0] -= numYears
 startDate = time.strftime("%Y-%m-%d", time.localtime(time.mktime(startDate)))
-conn = cdrdb.connect('CdrGuest')
+conn = db.connect(user='CdrGuest')
 cursor = conn.cursor()
 cursor.execute("SELECT title FROM document WHERE id = ?", docId)
 docTitle = cursor.fetchall()[0][0]

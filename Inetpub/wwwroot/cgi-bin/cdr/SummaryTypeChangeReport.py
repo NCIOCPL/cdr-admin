@@ -14,7 +14,7 @@ import datetime
 import lxml.etree as etree
 import cdr
 import cdrcgi
-import cdrdb
+from cdrapi import db
 
 class Control(cdrcgi.Control):
     """
@@ -204,7 +204,7 @@ jQuery(function() {
 
         b_path = "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"
         t_path = "/Summary/TranslationOf/@cdr:ref"
-        query = cdrdb.Query("active_doc d", "d.id")
+        query = db.Query("active_doc d", "d.id")
         #query.join("pub_proc_cg c", "c.id = d.id")
         query.join("query_term_pub a", "a.doc_id = d.id")
         query.where("a.path = '/Summary/SummaryMetaData/SummaryAudience'")
@@ -376,7 +376,7 @@ class Summary:
         self.doc_id = doc_id
         self.control = control
         self.changes = []
-        query = cdrdb.Query("document", "xml", "title")
+        query = db.Query("document", "xml", "title")
         query.where(query.Condition("id", doc_id))
         xml, title = query.execute(control.cursor).fetchone()
         title = title.split(";")[0]

@@ -4,8 +4,9 @@
 #
 # BZIssue::5150
 #----------------------------------------------------------------------
-import cdr, cdrdb, lxml.etree as etree, cgi, cdrcgi, copy
+import cdr, lxml.etree as etree, cgi, cdrcgi, copy
 import requests
+from cdrapi import db
 
 class Citation:
     def __init__(self, pmId, cdrId, status):
@@ -81,7 +82,7 @@ session = cdrcgi.getSession(fields)
 if not cdr.canDo(session, "MODIFY DOCUMENT", "Citation"):
     cdrcgi.bail("You must be authorized to replace Citation documents "
                 "to run this script.")
-cursor = cdrdb.connect('CdrGuest').cursor()
+cursor = db.connect(user='CdrGuest').cursor()
 query = """\
 SELECT DISTINCT s.doc_id, s.value, i.value
            FROM query_term s

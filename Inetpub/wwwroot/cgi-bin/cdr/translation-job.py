@@ -10,7 +10,7 @@ import operator
 import lxml.etree as etree
 import cdr
 import cdrcgi
-import cdrdb
+from cdrapi import db
 from cdrapi.settings import Tier
 
 class Control(cdrcgi.Control):
@@ -85,7 +85,7 @@ class Control(cdrcgi.Control):
 
         if self.have_required_values():
             if self.job.changed():
-                conn = cdrdb.connect()
+                conn = db.connect()
                 cursor = conn.cursor()
                 params = [getattr(self, name) for name in Job.FIELDS]
                 params.append(getattr(self, Job.KEY))
@@ -206,7 +206,7 @@ jQuery("input[value='%s']").click(function(e) {
         """
 
         temp = self.sort_dict(self.english_summaries)
-        query = cdrdb.Query(Job.TABLE, Job.KEY)
+        query = db.Query(Job.TABLE, Job.KEY)
         rows = query.execute(self.cursor).fetchall()
         jobs = set([row[0] for row in rows])
         summaries = []
@@ -225,7 +225,7 @@ jQuery("input[value='%s']").click(function(e) {
         """
 
         query = "DELETE FROM %s WHERE english_id = ?" % Job.TABLE
-        conn = cdrdb.connect()
+        conn = db.connect()
         cursor = conn.cursor()
         cursor.execute(query, self.english_id)
         conn.commit()
@@ -242,7 +242,7 @@ jQuery("input[value='%s']").click(function(e) {
         Returns a populated Values object.
         """
 
-        query = cdrdb.Query(table_name, "value_id", "value_name")
+        query = db.Query(table_name, "value_id", "value_name")
         rows = query.order("value_pos").execute(self.cursor).fetchall()
         class Values:
             def __init__(self, rows):
@@ -296,7 +296,7 @@ jQuery("input[value='%s']").click(function(e) {
             indexed by the summary document IDs
         """
 
-        query = cdrdb.Query("active_doc d", "d.id", "d.title")
+        query = db.Query("active_doc d", "d.id", "d.title")
         query.join("query_term l", "l.doc_id = d.id")
         query.where("l.path = '/Summary/SummaryMetaData/SummaryLanguage'")
         query.where(query.Condition("l.value", language))
@@ -330,7 +330,7 @@ jQuery("input[value='%s']").click(function(e) {
         group.
         """
 
-        query = cdrdb.Query("usr", "id", "fullname")
+        query = db.Query("usr", "id", "fullname")
         query.where("fullname IS NOT NULL")
         rows = query.execute(self.cursor).fetchall()
         return dict([(row[0], row[1]) for row in rows])
@@ -346,7 +346,7 @@ jQuery("input[value='%s']").click(function(e) {
             dictionary of user names indexed by user ID
         """
 
-        query = cdrdb.Query("usr u", "u.id", "u.fullname")
+        query = db.Query("usr u", "u.id", "u.fullname")
         query.join("grp_usr gu", "gu.usr = u.id")
         query.join("grp g", "g.id = gu.grp")
         query.where("u.expired IS NULL")
@@ -476,11 +476,11 @@ jQuery("input[value='%s']").click(function(e) {
             """
 
             if not user_id:
-                query = cdrdb.Query("session", "usr")
+                query = db.Query("session", "usr")
                 query.where(query.Condition("name", control.session))
                 user_id = query.execute(control.cursor).fetchone()[0]
             self.id = user_id
-            query = cdrdb.Query("open_usr", "email", "fullname")
+            query = db.Query("open_usr", "email", "fullname")
             query.where(query.Condition("id", user_id))
             self.email, self.name = query.execute(control.cursor).fetchone()
 
@@ -542,7 +542,7 @@ class Job:
         self.subtitle = None
         for name in self.FIELDS:
             setattr(self, name, None)
-        query = cdrdb.Query(self.TABLE, *self.FIELDS)
+        query = db.Query(self.TABLE, *self.FIELDS)
         query.where(query.Condition(self.KEY, self.english_id))
         row = query.execute(control.cursor).fetchone()
         if row:
@@ -555,7 +555,7 @@ class Job:
             if self.state_date:
                 self.state_date = str(self.state_date)[:10]
         else:
-            query = cdrdb.Query("document", "xml")
+            query = db.Query("document", "xml")
             query.where(query.Condition("id", self.english_id))
             try:
                 xml = query.execute(control.cursor).fetchone()[0]
@@ -581,7 +581,7 @@ class Job:
                             break
             except:
                 pass
-        query = cdrdb.Query("query_term", "doc_id")
+        query = db.Query("query_term", "doc_id")
         query.where("path = '/Summary/TranslationOf/@cdr:ref'")
         query.where(query.Condition("int_val", self.english_id))
         row = query.execute(control.cursor).fetchone()

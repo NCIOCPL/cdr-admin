@@ -8,7 +8,7 @@
 #----------------------------------------------------------------------
 import cgi
 import cdr
-import cdrdb
+from cdrapi import db
 import cdrcgi
 import datetime
 import sys
@@ -17,7 +17,7 @@ import lxml.etree as etree
 #----------------------------------------------------------------------
 # Set the form variables.
 #----------------------------------------------------------------------
-cursor    = cdrdb.connect("CdrGuest").cursor()
+cursor    = db.connect(user="CdrGuest").cursor()
 fields    = cgi.FieldStorage()
 session   = cdrcgi.getSession(fields)
 request   = cdrcgi.getRequest(fields)
@@ -103,7 +103,7 @@ def addColumnHeaders(styles, sheet):
 # parameters, so they're safe.
 #----------------------------------------------------------------------
 def createReport(cursor, startDate, endDate):
-    query = cdrdb.Query("document d", "d.id", "d.first_pub").order(1)
+    query = db.Query("document d", "d.id", "d.first_pub").order(1)
     query.join("doc_type t", "t.id = d.doc_type")
     query.where("t.name = 'GlossaryTermName'")
     query.where("d.first_pub >= '%s'" % startDate)

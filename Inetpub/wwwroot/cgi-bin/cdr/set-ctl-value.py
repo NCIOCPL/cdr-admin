@@ -4,7 +4,7 @@ Add a row to the ctl table.
 
 import cdr
 import cdrcgi
-import cdrdb
+from cdrapi import db
 
 class Control(cdrcgi.Control):
     def __init__(self):
@@ -24,7 +24,7 @@ class Control(cdrcgi.Control):
         form.add_textarea_field("value", "Value", value=self.value, tooltip=tip)
         form.add_textarea_field("comment", "Comment", value=self.comment)
         form.add("</fieldset>")
-        query = cdrdb.Query("ctl", "grp", "name", "val", "comment")
+        query = db.Query("ctl", "grp", "name", "val", "comment")
         query.where("inactivated IS NULL")
         query.order("grp", "name")
         rows = query.execute().fetchall()

@@ -4,9 +4,9 @@
 #----------------------------------------------------------------------
 import cdr
 import cdrcgi
-import cdrdb
 import cgi
 import urllib
+from cdrapi import db
 
 class Control(cdrcgi.Control):
     COMPARE = "Compare With PROD"
@@ -27,7 +27,7 @@ class Control(cdrcgi.Control):
             self.buttons = (self.COMPARE,) + self.BUTTONS
     def populate_form(self, form):
         try:
-            query = cdrdb.Query("document d", "d.id", "d.title").order(2)
+            query = db.Query("document d", "d.id", "d.title").order(2)
             query.join("doc_type t", "t.id = d.doc_type")
             query.where("t.name = 'Filter'")
             docs = query.execute(self.cursor).fetchall()

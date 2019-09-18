@@ -15,7 +15,7 @@ import locale
 import lxml.etree as etree
 import cdr
 import cdrcgi
-import cdrdb
+from cdrapi import db
 
 class Control(cdrcgi.Control):
     """
@@ -83,7 +83,7 @@ class Control(cdrcgi.Control):
         Let the user select the document version for the report.
         """
 
-        query = cdrdb.Query("doc_version v", "v.num", "v.dt", "v.comment")
+        query = db.Query("doc_version v", "v.num", "v.dt", "v.comment")
         query.join("usr u", "u.id = v.usr")
         query.where(query.Condition("v.id", self.doc_id))
         rows = query.order("v.num DESC").execute(self.cursor).fetchall()
@@ -91,7 +91,7 @@ class Control(cdrcgi.Control):
             self.doc_version = -1
             self.show_report()
         else:
-            query = cdrdb.Query("document", "title")
+            query = db.Query("document", "title")
             query.where("id = %d" % self.doc_id)
             title = query.execute(self.cursor).fetchone()[0].split(";")[0]
             form.add_hidden_field("modules", self.modules and "1" or "")
@@ -192,7 +192,7 @@ class Control(cdrcgi.Control):
         """
 
         fragment = unicode(self.title_fragment, "utf-8") + "%"
-        query = cdrdb.Query("document d", "d.id", "d.title")
+        query = db.Query("document d", "d.id", "d.title")
         query.join("doc_type t", "t.id = d.doc_type")
         query.where("t.name = 'Summary'")
         query.where(query.Condition("d.title", fragment, "LIKE"))

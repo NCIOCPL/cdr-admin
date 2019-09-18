@@ -8,8 +8,8 @@ import os
 import sys
 import msvcrt
 import cdr
-import cdrdb
 import cdrcgi
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -140,7 +140,7 @@ else:
 # Extract the information from the database.
 #----------------------------------------------------------------------
 try:
-    conn   = cdrdb.connect()
+    conn   = db.connect()
     cursor = conn.cursor()
     dtQual = docType and ("AND t.name = '%s'" % docType) or ""
     cursor.execute("""\
@@ -238,8 +238,8 @@ try:
   </table>
 """
 
-except cdrdb.Error as info:
-    cdrcgi.bail('Database failure: %s' % info[1][0])
+except Exception as e:
+    cdrcgi.bail('Database failure: %s' % e)
 
 if format_ == "html":
     cdrcgi.sendPage(html + u"""\
@@ -249,8 +249,8 @@ if format_ == "html":
 else:
     now = datetime.datetime.now()
     name = "DateLastModified-%s.xls" % now.strftime("%Y%m%d%H%M%S")
-    msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
+    #msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
     print("Content-type: application/vnd.ms-excel")
     print("Content-disposition: attachment; filename=%s" % name)
     print()
-    styles.book.save(sys.stdout)
+    styles.book.save(sys.stdout.buffer)

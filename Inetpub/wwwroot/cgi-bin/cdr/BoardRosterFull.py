@@ -6,9 +6,10 @@
 # BZIssue::5060 - [Summaries] Changes to Combined Board Roster Report
 #                 Adding summary sheet options to the program
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, cdrdb, re, time, operator
+import cgi, cdr, cdrcgi, re, time, operator
 import sys
 import lxml.html
+from cdrapi import db
 
 # ---------------------------------------------------------------------
 # Class to collect all of the information for a single board member
@@ -145,10 +146,10 @@ elif request == SUBMENU:
 # Set up a database connection and cursor.
 #----------------------------------------------------------------------
 try:
-    conn = cdrdb.connect("CdrGuest")
+    conn = db.connect(user="CdrGuest")
     cursor = conn.cursor()
-except cdrdb.Error as info:
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
+except Exception as e:
+    cdrcgi.bail('Database connection failure: %s' % e)
 
 # ---------------------------------------------------------------------
 # Counting how many columns are to be printed. We need to know this
@@ -205,8 +206,8 @@ SELECT DISTINCT board.id, board.title
         for id, title in rows:
             if id != 256088:
                 allBoards[id] = cleanTitle(title)
-    except cdrdb.Error as info:
-        cdrcgi.bail('Database query failure: %s' % info[1][0])
+    except Exception as e:
+        cdrcgi.bail('Database query failure: %s' % e)
     return allBoards
 
 
@@ -409,7 +410,7 @@ try:
              AND person_doc.active_status = 'A'
              AND member.int_val in (%s)
            ORDER BY member.int_val""" %
-                      ", ".join(["%s" % x for x in boardIds]), timeout = 300)
+                      ", ".join(["%s" % x for x in boardIds]))
     rows = cursor.fetchall()
     cursor.close()
     boardMembers = []
@@ -418,8 +419,8 @@ try:
         boardName = getBoardName(boardId)
         boardMembers.append([docId, boardId, boardName, term_start, name, ge])
 
-except cdrdb.Error as info:
-    cdrcgi.bail('Database query failure: %s' % info[1][0])
+except Exception as e:
+    cdrcgi.bail('Database query failure: %s' % e)
 
 # Sorting the list alphabetically by board member
 # or by board member grouped by board name

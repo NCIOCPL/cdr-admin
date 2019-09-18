@@ -2,10 +2,11 @@
 # Send JPEG version of a CDR image to the browser, possibly resized.
 # BZIssue::5001
 #----------------------------------------------------------------------
-import cdrdb, sys, cgi, msvcrt, os, cdr, cdrcgi, cStringIO
+import sys, cgi, cdr, cdrcgi
+from io import BytesIO
 from PIL import Image, ImageEnhance
+from cdrapi import db
 
-msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
 message = "GetCdrImage: No doc ID found"
 fields  = cgi.FieldStorage()
 width   = fields.getvalue("width")
@@ -16,7 +17,7 @@ sharpen = fields.getvalue("sharpen")
 pp      = fields.getvalue("pp") or ""
 cdrId   = fields.getvalue("id")      or cdrcgi.bail(message)
 
-conn    = cdrdb.connect()
+conn    = db.connect()
 cursor  = conn.cursor()
 
 #----------------------------------------------------------------------
@@ -58,8 +59,8 @@ else:
 intId   = cdr.exNormalize(docId)[1]
 
 # If the docId comes in the format 'CDR000999999' it is coming
-# from the QC report. If it's coming in the format 'CDR999999' it is 
-# coming from the PublishPreview report.  We're selecting the 
+# from the QC report. If it's coming in the format 'CDR999999' it is
+# coming from the PublishPreview report.  We're selecting the
 # last publishable version for the PP report.
 # ------------------------------------------------------------------
 ppQuery = ""
@@ -79,8 +80,8 @@ query = """\
         ON dv.id = v.doc_id
        AND dv.num = v.doc_version
      WHERE v.doc_id = %d
-       AND dv.num = (SELECT max(num) 
-                       FROM doc_version 
+       AND dv.num = (SELECT max(num)
+                       FROM doc_version
                       WHERE id = dv.id
                       %s
                     )""" % (intId, ppQuery)
@@ -89,8 +90,8 @@ cursor.execute(query)
 rows = cursor.fetchall()
 if not rows:
     cdrcgi.bail("%s not found" % docId)
-bytes = rows[0][0]
-iFile = cStringIO.StringIO(bytes)
+image_bytes = rows[0][0]
+iFile = BytesIO(image_bytes)
 image = Image.open(iFile)
 if image.mode == 'P':
     image = image.convert('RGB')
@@ -110,7 +111,7 @@ if width:
             image = image.resize((width, height), Image.ANTIALIAS)
     except Exception as e:
         cdrcgi.bail("Failure resizing %s: %s" % (docId, str(e)))
-newImageFile = cStringIO.StringIO()
+newImageFile = BytesIO()
 if sharpen:
     try:
         sharpen = float(sharpen)
@@ -119,11 +120,13 @@ if sharpen:
     except:
         pass
 image.save(newImageFile, "JPEG", quality=quality)
-bytes = newImageFile.getvalue()
+image_bytes = newImageFile.getvalue()
 if fname:
-    f = open(fname, "wb")
-    f.write(bytes)
-    f.close
-sys.stdout.write("Content-Type: image/jpeg\r\n")
-sys.stdout.write("Content-Length: %d\r\n\r\n" % len(bytes))
-sys.stdout.write(bytes)
+    with open(fname, "wb") as fp:
+        fp.write(image_bytes)
+sys.stdout.buffer.write(f"""\
+Content-Type: image/jpeg
+Content-Length: {len(image_bytes)}
+
+""".encode("utf-8"))
+sys.stdout.buffer.write(image_bytes)

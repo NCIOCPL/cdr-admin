@@ -9,8 +9,9 @@
 # OCECDR-3649: PDQ Board Invitation History Report - Problem with
 #              exclude current members options
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, cdrdb, re, time
+import cgi, cdr, cdrcgi, re, time
 import lxml.etree as etree
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -78,10 +79,10 @@ elif request == SUBMENU:
 # Set up a database connection and cursor.
 #----------------------------------------------------------------------
 try:
-    conn = cdrdb.connect("CdrGuest")
+    conn = db.connect(user="CdrGuest")
     cursor = conn.cursor()
-except cdrdb.Error as info:
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
+except Exception as e:
+    cdrcgi.bail('Database connection failure: %s' % e)
 
 #----------------------------------------------------------------------
 # Object for one PDQ board member.
@@ -237,8 +238,8 @@ SELECT DISTINCT board.id, board.title
             allBoards.append(id)
             title = cleanTitle(title)
             options += "      <OPTION value='%d'>%s</OPTION>\n" % (id, title)
-    except cdrdb.Error as info:
-        cdrcgi.bail('Database query failure: %s' % info[1][0])
+    except Exception as e:
+        cdrcgi.bail('Database query failure: %s' % e)
 
     allIds = ",".join(["%s" % b for b in allBoards])
     allOpt  = "     <OPTION value='%s' SELECTED='SELECTED'>" % allIds
@@ -496,7 +497,7 @@ try:
            WHERE q.path    = '/PDQBoardMemberInfo/BoardMemberName/@cdr:ref'
  -- and q.doc_id in (639551, 404154) -- 410773, 404154, 369926, 369860)
            ORDER BY ln.value, fn.value, o.value
-""", timeout = 300)
+""")
     rows = cursor.fetchall()
 
     boardMembers = []
@@ -509,8 +510,8 @@ try:
                                                        [[row[4], row[5]]]])
         lastMemberId = row[0]
 
-except cdrdb.Error as info:
-    cdrcgi.bail('Database query failure: %s' % info[1][0])
+except Exception as e:
+    cdrcgi.bail('Database query failure: %s' % e)
 
 # ---------------------------------------------------------------
 # Create the HTML Output Page

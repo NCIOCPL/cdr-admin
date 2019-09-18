@@ -1,10 +1,12 @@
-import cgi, cdrdb, lxml.etree as etree, sys, re
+import cgi, lxml.etree as etree, sys, re
+from cdrapi import db
+from html import escape as html_escape
 
 fields   = cgi.FieldStorage()
 docId    = fields.getvalue('id')
 docType  = fields.getvalue('dt')
 docTitle = fields.getvalue('ti')
-cursor   = cdrdb.connect('CdrGuest').cursor()
+cursor   = db.connect(user='CdrGuest').cursor()
 titles   = ""
 
 def bail(message):
@@ -17,20 +19,18 @@ Content-type: text/html
 
 def makeDoctypeList():
     # takes too long to run the query to find doc types sent to CG
-    return '''\
+    return """\
 <select name="dt">
  <option value="">Optionally select one</option>
- <option value="34">CTGovProtocol</option>
  <option value="38">DrugInformationSummary</option>
  <option value="44">GlossaryTermName</option>
- <option value="18">InScopeProtocol</option>
  <option value="36">Media</option>
  <option value="22">Organization</option>
  <option value="2">Person</option>
  <option value="31">PoliticalSubUnit</option>
  <option value="19">Summary</option>
  <option value="11">Term</option>
-</select>'''
+</select>"""
 
     cursor.execute("""\
 SELECT DISTINCT t.id, t.name
@@ -44,7 +44,7 @@ SELECT DISTINCT t.id, t.name
     html.append('<option value="">Optionally select one</option>')
     for row in cursor.fetchall():
         value = row[0]
-        name = cgi.escape(row[1])
+        name = html_escape(row[1])
         html.append('<option value="%d">%s</option>' % (value, name))
     html.append('</select>')
     return "".join(html)
@@ -52,47 +52,50 @@ SELECT DISTINCT t.id, t.name
 if docTitle and not docId:
     extra = docType and (" AND doc_type = %s" % docType) or ""
     cursor.execute("""\
-  SELECT id, title
-    FROM document
-   WHERE title LIKE ?
+  SELECT d.id, d.title
+    FROM document d
+    JOIN pub_proc_cg c
+      ON c.id = d.id
+   WHERE d.title LIKE ?
     %s
-ORDER BY title""" % extra, docTitle)
+ORDER BY d.title""" % extra, docTitle)
     rows = cursor.fetchall()
     if len(rows) == 1:
         docId = rows[0][0]
     elif rows:
-        html = [u"<ul>"]
+        html = ["<ul>"]
         for row in rows:
             url = "show-cg-doc.py?id=%d" % row[0]
-            title = cgi.escape(row[1])
+            title = html_escape(row[1])
             html.append('<li><a href="%s">%s</a></li>' % (url, title))
-        html.append(u"</ul>")
-        titles = u"\n".join(html).encode("utf-8")
+        html.append("</ul>")
+        titles = "\n".join(html)
     elif docTitle:
         cursor.execute("SELECT name FROM doc_type WHERE id = ?", docType)
         typeName = cursor.fetchall()[0][0]
-        titles = (u'<p style="color: red">No %s documents match %s</p>' %
-                  (typeName, cgi.escape(docTitle))).encode("utf-8")
+        titles = ('<p style="color: red">No %s documents match %s</p>' %
+                  (typeName, html_escape(docTitle)))
     else:
-        titles = (u'<p style="color: red">No documents match %s</p>' %
-                  cgi.escape(docTitle)).encode("utf-8")
-        
+        titles = ('<p style="color: red">No documents match %s</p>' %
+                  html_escape(docTitle))
+
 if not docId:
-    print("""\
+    sys.stdout.buffer.write(f"""\
 Content-type: text/html
 
 <html>
  <head>
+  <meta charset="utf-8">
   <title>CDR Document Display</title>
   <script type="text/javascript">
-   function setfocus() {
+   function setfocus() {{
        document.getElementById("docid").focus();
-   }
+   }}
   </script>
  </head>
  <body style='font-family: Arial, sans-serif' onload="javascript:setfocus()">
   <h1 style='color: maroon'>CDR Document Display</h1>
-  %s
+  {titles}
   <form method="GET" action="show-cg-doc.py">
    <table>
     <tr>
@@ -105,24 +108,24 @@ Content-type: text/html
     </tr>
     <tr>
      <th align="right">Document Type</th>
-     <td>%s</td>
+     <td>{makeDoctypeList()}</td>
     </tr>
    </table>
    <br />
    <input type="submit">
   </form>
-  <p style='border: 1px green solid; width: 80%%; padding: 5px; color: green'>
+  <p style='border: 1px green solid; width: 80%; padding: 5px; color: green'>
    You may specify a document ID directly (as an integer) or a document
-   title pattern (using %% as a wildcard for unknown portions of the title).
+   title pattern (using % as a wildcard for unknown portions of the title).
    If you specify a title you may also optionally select a docuemnt type.
   </p>
  </body>
-</html>""" % (titles, makeDoctypeList()))
+</html>""".encode("utf-8"))
     sys.exit(0)
 cursor.execute("SELECT xml FROM pub_proc_cg WHERE id = ?", docId)
 rows = cursor.fetchall()
 if not rows:
-    bail("CDR%d not found" % docId)
+    bail("CDR%s not found" % docId)
 
 def markupTag(match):
     s = match.group(1)
@@ -147,7 +150,7 @@ def markupTag(match):
 
 def markup(doc):
     doc = re.sub("<([^>]+)>", markupTag, doc)
-    doc = cgi.escape(doc)
+    doc = html_escape(doc)
     doc = doc.replace('@@TAG-START@@', '<span class="tag">')
     doc = doc.replace('@@NAME-START@@', '<span class="name">')
     doc = doc.replace('@@VALUE-START@@', '<span class="value">')
@@ -158,26 +161,30 @@ docXml = rows[0][0]
 try:
     parser = etree.XMLParser(remove_blank_text=True)
     tree = etree.fromstring(docXml.encode('utf-8'), parser)
-    doc = markup(etree.tostring(tree, pretty_print=True))
+    doc = markup(etree.tostring(tree, pretty_print=True, encoding="unicode"))
     #title = "CDR%010d" % int(docId)
     title = "CDR Vendor Document %s" % docId
-    print("""\
+    sys.stdout.buffer.write(f"""\
 Content-type: text/html;charset=utf-8
 
 <html>
  <head>
-  <title>%s</title>
+  <title>{title}</title>
   <style type='text/css'>
-.tag { color: blue; font-weight: bold }
-.name { color: brown }
-.value { color: red }
-h1 { color: maroon; font-size: 14pt; font-family: Verdana, Arial, sans-serif; }
+.tag {{ color: blue; font-weight: bold }}
+.name {{ color: brown }}
+.value {{ color: red }}
+h1 {{
+    color: maroon;
+    font-size: 14pt;
+    font-family: Verdana, Arial, sans-serif;
+}}
   </style>
  </head>
  <body>
-  <h1>%s</h1>
-  <pre>%s</pre>
+  <h1>{title}</h1>
+  <pre>{doc}</pre>
  </body>
-</html>""" % (title, title, doc))
+</html>""".encode("utf-8"))
 except Exception as e:
     bail(e)

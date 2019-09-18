@@ -4,9 +4,9 @@
 # BZIssue::3316
 # JIRA::OCECDR-3800 - Address security vulnerabilities
 #----------------------------------------------------------------------
-import cdrcgi
-import cdrdb
 import cgi
+import cdrcgi
+from cdrapi import db
 
 LOG_QUERIES = False
 
@@ -52,7 +52,7 @@ class Term:
         self.sign = "+"
         self.selectedTerm = "False"
 
-conn = cdrdb.connect('CdrGuest')
+conn = db.connect(user='CdrGuest')
 cursor = conn.cursor()
 
 def log_query(q, label):
@@ -70,19 +70,19 @@ boolSemanticType INTEGER)
     conn.commit()
 
     # Subqueries
-    obsolete = cdrdb.Query("query_term", "doc_id")
+    obsolete = db.Query("query_term", "doc_id")
     obsolete.where("path = '/Term/TermType/TermTypeName'")
     obsolete.where("value = 'Obsolete term'")
-    not_obsolete = cdrdb.Query.Condition("doc_id", obsolete, "NOT IN")
-    parents = cdrdb.Query("#terms", "id")
+    not_obsolete = db.Query.Condition("doc_id", obsolete, "NOT IN")
+    parents = db.Query("#terms", "id")
     parents.where("id = p.doc_id")
     parents.where("parent = p.int_val")
     not_already_inserted = "NOT EXISTS (%s)" % parents
-    semantic_types = cdrdb.Query("query_term", "doc_id")
+    semantic_types = db.Query("query_term", "doc_id")
     semantic_types.where("path = '/Term/TermType/TermTypeName'")
     semantic_types.where("value = 'Semantic type'")
     semantic_types.where(not_obsolete)
-    non_semantic_types = cdrdb.Query("query_term", "doc_id")
+    non_semantic_types = db.Query("query_term", "doc_id")
     non_semantic_types.where("path = '/Term/TermType/TermTypeName'")
     non_semantic_types.where("value <> 'Semantic type'")
     non_semantic_types.where(not_obsolete)
@@ -103,7 +103,7 @@ INSERT INTO #terms
      WHERE path = '/Term/TermType/TermTypeName'
        AND value = 'Obsolete term')
 """)'''
-    select = cdrdb.Query("query_term", "doc_id", "NULL", "1")
+    select = db.Query("query_term", "doc_id", "NULL", "1")
     select.where("path = '/Term/TermType/TermTypeName'")
     select.where("value = 'Semantic type'")
     select.where(not_obsolete)
@@ -123,7 +123,7 @@ INSERT INTO #terms
      WHERE path = '/Term/TermType/TermTypeName'
        AND value = 'Obsolete term')
 """)'''
-    select = cdrdb.Query("query_term", "doc_id", "NULL", "0")
+    select = db.Query("query_term", "doc_id", "NULL", "0")
     select.where("path = '/Term/TermType/TermTypeName'")
     select.where("value <> 'Semantic type'")
     select.where(not_obsolete)
@@ -163,7 +163,7 @@ INSERT INTO #terms
                                    WHERE path = '/Term/TermType/TermTypeName'
                                      AND value = 'Obsolete term'))
                                 """)'''
-        query = cdrdb.Query("query_term p", "p.doc_id", "p.int_val", "1")
+        query = db.Query("query_term p", "p.doc_id", "p.int_val", "1")
         query.join("#terms t", "t.id = p.int_val")
         query.where(is_parent)
         query.where(not_already_inserted)
@@ -202,7 +202,7 @@ INSERT INTO #terms
                                    WHERE path = '/Term/TermType/TermTypeName'
                                      AND value = 'Obsolete term'))
                                             """)'''
-        query = cdrdb.Query("query_term p", "p.doc_id", "p.int_val", "0")
+        query = db.Query("query_term p", "p.doc_id", "p.int_val", "0")
         query.join("#terms t", "t.id = p.int_val")
         query.where(is_parent)
         query.where(not_already_inserted)
@@ -242,11 +242,11 @@ INSERT INTO #terms
                                    WHERE path = '/Term/TermType/TermTypeName'
                                      AND value = 'Obsolete term'))
                                             """)'''
-        non_semantic_orphans = cdrdb.Query("#terms", "id")
+        non_semantic_orphans = db.Query("#terms", "id")
         non_semantic_orphans.where("parent IS NULL")
         non_semantic_orphans.where("boolSemanticType = 0")
-        non_orphans = cdrdb.Query("#terms", "id").where("parent IS NOT NULL")
-        query = cdrdb.Query("query_term p", "p.doc_id", "p.int_val", "0")
+        non_orphans = db.Query("#terms", "id").where("parent IS NOT NULL")
+        query = db.Query("query_term p", "p.doc_id", "p.int_val", "0")
         #query.where(is_parent)
         #query.where("p.path = '/Term/SemanticType/@cdr:ref'")
         query.where(not_already_inserted)
@@ -267,7 +267,7 @@ INSERT INTO #terms
          WHERE n.path = '/Term/PreferredName'
       ORDER BY d.parent desc""")'''
     columns = ("t.id", "n.value", "t.parent", "t.boolSemanticType")
-    query = cdrdb.Query("#terms t", *columns)
+    query = db.Query("#terms t", *columns)
     query.join("query_term n", "n.doc_id = t.id").order("t.parent DESC")
     query.where("n.path = '/Term/PreferredName'")
     log_query(query, "TERM HIERARCHY TREE QUERY")

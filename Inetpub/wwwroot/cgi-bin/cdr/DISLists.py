@@ -4,7 +4,8 @@
 # BZIssue::4250 - initial revision
 # BZIssue::5198 - Adding a Table Option to Drug Summaries Lists Report
 #----------------------------------------------------------------------
-import cdr, cgi, cdrcgi, time, cdrdb
+import cdr, cgi, cdrcgi, time
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -37,7 +38,7 @@ def summaryTableRow(id, summary, addCdrID='Y', addBlank='N'):
 
     # Setting the class and column headers for table display
     # ------------------------------------------------------
-    if addBlank == 'Y': 
+    if addBlank == 'Y':
         showGrid = 'blankCol'
     else:
         showGrid = ''
@@ -87,7 +88,7 @@ def disHeader(listHeader, disCount):
 
 
 ## ---------------------------------------------------
-## 
+##
 ## ---------------------------------------------------
 #def drugHeaderWithID(listHeader, type):
 #    """Return the HTML code to display the Summary Board Header with ID"""
@@ -136,10 +137,10 @@ elif request == SUBMENU:
 # Set up a database connection and cursor.
 #----------------------------------------------------------------------
 try:
-    conn = cdrdb.connect("CdrGuest")
+    conn = db.connect(user="CdrGuest")
     cursor = conn.cursor()
-except cdrdb.Error as info:
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
+except Exception as e:
+    cdrcgi.bail('Database connection failure: %s' % e)
 
 #----------------------------------------------------------------------
 # Build date string for header.
@@ -154,7 +155,7 @@ instr = instr % dateString
 # If we don't have a request, put up the form.
 #----------------------------------------------------------------------
 if not drugType:
-    header = cdrcgi.header(title, title, instr, 
+    header = cdrcgi.header(title, title, instr,
                            script,
                            ("Submit",
                             SUBMENU,
@@ -169,7 +170,7 @@ if not drugType:
 """)
     form   = u"""\
    <input type='hidden' name='%s' value='%s'>
- 
+
    <fieldset>
     <legend>&nbsp;Display CDR-ID?&nbsp;</legend>
     <input name='showId' type='radio' id="idNo"
@@ -230,7 +231,7 @@ LEFT OUTER JOIN query_term s
 """
 
 if not query:
-    cdrcgi.bail('No query criteria specified')   
+    cdrcgi.bail('No query criteria specified')
 
 #----------------------------------------------------------------------
 # Submit the query to the database.
@@ -241,17 +242,16 @@ try:
     rows = cursor.fetchall()
     cursor.close()
     cursor = None
-except cdrdb.Error as info:
-    cdrcgi.bail('Failure retrieving DIS documents: %s' %
-                info[1][0])
-     
+except Exception as e:
+    cdrcgi.bail('Failure retrieving DIS documents: %s' % e)
+
 if not rows:
     cdrcgi.bail('No Records Found for Selection: %s ' % drugType   + "; ")
 
 # Counting the number of summaries per board
 # ------------------------------------------
-combiCount = {'All'   :len(rows), 
-              'Combi' :0, 
+combiCount = {'All'   :len(rows),
+              'Combi' :0,
               'Single':0}
 for row in rows:
     if row[4] == 'Yes':
@@ -264,20 +264,20 @@ for row in rows:
 #----------------------------------------------------------------------
 header    = cdrcgi.rptHeader(title, stylesheet = """\
    <STYLE type="text/css">
-    UL             { margin-left:    0; 
+    UL             { margin-left:    0;
                      padding-left:   0;
                      margin-top:    10px;
                      margin-bottom: 30px; }
     TABLE          { border-collapse:collapse;
-                     margin-top:    10px; 
-                     margin-bottom: 30px; } 
+                     margin-top:    10px;
+                     margin-bottom: 30px; }
 
     *.date         { font-size: 12pt; }
     *.sectionHdr   { font-size: 12pt;
                      font-weight: bold;
                      text-decoration: underline; }
     *.report       { font-size: 11pt;
-                     padding-right: 15px; 
+                     padding-right: 15px;
                      vertical-align: top; }
     *.blankCol     { empty-cells: show;
                      border: 1px solid black; }
@@ -311,7 +311,7 @@ report    = u"""\
 reportS = disHeader('Single Agent Drug', combiCount['Single'])
 reportD = disHeader('Combination Drug', combiCount['Combi'])
 
-if showTable == 'Y': 
+if showTable == 'Y':
     if showId == 'Y':
         showHeader = """\
    <TR>
@@ -339,10 +339,10 @@ for row in rows:
     # type.
     # ----------------------------------------------------------
     if row[4] != 'Yes':
-        reportS += summaryTableRow(row[0], row[1], addCdrID=showId, 
+        reportS += summaryTableRow(row[0], row[1], addCdrID=showId,
                                    addBlank=showTable)
     if row[4] == 'Yes':
-        reportD += summaryTableRow(row[0], row[1], addCdrID=showId, 
+        reportD += summaryTableRow(row[0], row[1], addCdrID=showId,
                                   addBlank=showTable)
 reportS += """
   </TABLE>
@@ -360,8 +360,8 @@ if drugType == 'All' or drugType == 'Combi':
 
 footer = u"""\
  </BODY>
-</HTML> 
-"""     
+</HTML>
+"""
 
 # Send the page back to the browser.
 #----------------------------------------------------------------------

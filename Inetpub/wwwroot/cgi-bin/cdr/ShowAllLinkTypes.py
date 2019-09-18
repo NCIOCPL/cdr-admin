@@ -1,7 +1,8 @@
 #----------------------------------------------------------------------
 # Displays a table containing information about all link types.
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, string, cdrdb
+import cgi, cdr, cdrcgi, re, string
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -44,9 +45,9 @@ header  = cdrcgi.header(title, title, section, script, buttons)
 # Retrieve the information directly from the database.
 #----------------------------------------------------------------------
 try:
-    conn = cdrdb.connect('CdrGuest')
-except cdrdb.Error as info:
-    cdrcgi.bail('Database failure: %s' % info[1][0])
+    conn = db.connect(user='CdrGuest')
+except Exception as e:
+    cdrcgi.bail('Database failure: %s' % e)
 cursor = conn.cursor()
 query  = """\
 SELECT DISTINCT link_type.name,
@@ -66,8 +67,8 @@ SELECT DISTINCT link_type.name,
 """
 try:
     cursor.execute(query)
-except cdrdb.Error as info:
-    cdrcgi.bail('Database query failure: %s' % info[1][0])
+except Exception as e:
+    cdrcgi.bail('Database query failure: %s' % e)
 
 #----------------------------------------------------------------------
 # Display the information in a table.
@@ -88,8 +89,8 @@ try:
         form += " <TR>\n"
         for col in rec:
             form += "  <TD>%s</TD>\n" % col
-except cdrdb.Error as info:
-    cdrcgi.bail('Failure fetching query results: %s' % info[1][0])
+except Exception as e:
+    cdrcgi.bail('Failure fetching query results: %s' % e)
 
 form += "</TABLE>\n"
 

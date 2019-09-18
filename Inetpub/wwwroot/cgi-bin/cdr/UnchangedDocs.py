@@ -6,13 +6,13 @@
 #----------------------------------------------------------------------
 import cgi
 import cdrcgi
-import cdrdb
 import datetime
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Set the form variables.
 #----------------------------------------------------------------------
-cursor   = cdrdb.connect("CdrGuest").cursor()
+cursor   = db.connect(user="CdrGuest").cursor()
 fields   = cgi.FieldStorage()
 session  = cdrcgi.getSession(fields)
 request  = cdrcgi.getRequest(fields)
@@ -34,7 +34,7 @@ elif request == SUBMENU:
 # populating the form's picklist as well as scrubbing the incoming
 # parameter values.
 #----------------------------------------------------------------------
-query = cdrdb.Query("doc_type", "name").order(1)
+query = db.Query("doc_type", "name").order(1)
 query.where("name IS NOT NULL")
 query.where("name <> ''")
 doc_types = [row[0] for row in query.execute(cursor).fetchall()]
@@ -53,7 +53,7 @@ if request:
         days = 365
     today = datetime.date.today()
     cutoff = today - datetime.timedelta(days)
-    query = cdrdb.Query("document d", "d.id", "d.title", "MAX(a.dt)")
+    query = db.Query("document d", "d.id", "d.title", "MAX(a.dt)")
     query.join("audit_trail a", "d.id = a.document")
     query.group("d.id", "d.title")
     query.having("MAX(a.dt) < '%s'" % cutoff)

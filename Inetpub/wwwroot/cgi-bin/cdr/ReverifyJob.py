@@ -2,7 +2,8 @@
 # Web interface to allow running the ReverifyPushJob program in the
 # CBIIT environment
 #----------------------------------------------------------------------
-import sys, os, cdr, cgi, cdrcgi, cdrdb, time
+import sys, os, cdr, cgi, cdrcgi, time
+from cdrapi import db
 
 LOGFILE = "%s/ReverifyJob.log" % cdr.DEFAULT_LOGDIR
 PUBPATH = os.path.join('d:\\cdr', 'publishing')
@@ -48,7 +49,7 @@ if jobStatus:
 #
 # -------------------------------------------------------------------
 def getUserName(session):
-    cursor = cdrdb.connect("CdrGuest").cursor()
+    cursor = db.connect(user="CdrGuest").cursor()
     cursor.execute("""\
 SELECT u.name
   FROM usr u

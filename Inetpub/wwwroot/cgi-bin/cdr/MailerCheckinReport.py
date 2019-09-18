@@ -2,7 +2,8 @@
 # Generates report on mailers for which reponses have been recorded
 # during a specified date range.
 #----------------------------------------------------------------------
-import cdrdb, cdrcgi, cgi, time
+import cdrcgi, cgi, time
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -44,10 +45,10 @@ if request == "Log Out":
 # Connect to the database.
 #----------------------------------------------------------------------
 try:
-    conn   = cdrdb.connect()
+    conn   = db.connect()
     cursor = conn.cursor()
-except cdrdb.Error as info:
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
+except Exception as e:
+    cdrcgi.bail('Database connection failure: %s' % e)
 
 #----------------------------------------------------------------------
 # Gather the list of mailer types from the query_term table.
@@ -59,11 +60,11 @@ def getMailerTypes():
             SELECT DISTINCT value
                        FROM query_term
                       WHERE path = '/Mailer/Type'
-                   ORDER BY value""", timeout = 300)
+                   ORDER BY value""")
         for row in cursor.fetchall():
             types.append(row[0])
-    except cdrdb.Error as info:
-        cdrcgi.bail('Failure fetching mailer types: %s' % info[1][0])
+    except Exception as e:
+        cdrcgi.bail('Failure fetching mailer types: %s' % e)
     return types
 
 #----------------------------------------------------------------------
@@ -221,8 +222,8 @@ try:
 """ % (mailerTypeLabel, changeCategory, count)
         mailerTypeLabel = "&nbsp;"
         row = cursor.fetchone()
-except cdrdb.Error as info:
-    cdrcgi.bail('Failure executing query: %s' % info[1][0])
+except Exception as e:
+    cdrcgi.bail('Failure executing query: %s' % e)
 
 if lastMailerType:
     total = totals.get(lastMailerType, 0)

@@ -3,7 +3,8 @@
 # whose semantic types are some form of Intervention/procedure.
 # BZIssue::3693 - user-requested modifications
 #----------------------------------------------------------------------
-import cdrcgi, cdrdb, cgi
+import cdrcgi, cgi
+from cdrapi import db
 
 fields = cgi.FieldStorage()
 session  = cdrcgi.getSession(fields) or cdrcgi.bail("Not logged in")
@@ -23,7 +24,7 @@ class Term:
         self.top = top
 
 patriarch = None
-conn = cdrdb.connect('CdrGuest')
+conn = db.connect(user='CdrGuest')
 cursor = conn.cursor()
 try:
     # get the root element

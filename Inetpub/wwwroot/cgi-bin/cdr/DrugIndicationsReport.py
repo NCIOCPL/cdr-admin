@@ -3,7 +3,8 @@
 #
 # BZIssue::4887 - New Drug Information Summary Report
 #----------------------------------------------------------------------
-import cdr, cgi, cdrcgi, time, cdrdb
+import cdr, cgi, cdrcgi, time
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -53,12 +54,11 @@ def getBrandNames():
 
     try:
         cursor = conn.cursor()
-        cursor.execute(brandNameQuery, timeout = 300)
+        cursor.execute(brandNameQuery)
         rows = cursor.fetchall()
         cursor.close()
-    except cdrdb.Error as info:
-        cdrcgi.bail('Failure retrieving brand names: %s' %
-                    info[1][0])
+    except Exception as e:
+        cdrcgi.bail('Failure retrieving brand names: %s' % e)
 
     for row in rows:
         brands = []
@@ -92,12 +92,11 @@ def getIndications(drugID):
 
     try:
         cursor = conn.cursor()
-        cursor.execute(indicationQuery, (drugID,), timeout=300)
+        cursor.execute(indicationQuery, (drugID,))
         rows = cursor.fetchall()
         cursor.close()
-    except cdrdb.Error as info:
-        cdrcgi.bail('Failure retrieving indications: %s' %
-                    info[1][0])
+    except Exception as e:
+        cdrcgi.bail('Failure retrieving indications: %s' % e)
 
     indicationNames = []
     for row in rows:
@@ -411,10 +410,10 @@ elif request == SUBMENU:
 # Set up a database connection and cursor.
 #----------------------------------------------------------------------
 try:
-    conn = cdrdb.connect("CdrGuest")
+    conn = db.connect(user="CdrGuest")
     cursor = conn.cursor()
-except cdrdb.Error as info:
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
+except Exception as e:
+    cdrcgi.bail('Database connection failure: %s' % e)
 
 #----------------------------------------------------------------------
 # Build date string for header.
@@ -464,18 +463,16 @@ try:
     cursor.execute(iQuery)
     iRows = cursor.fetchall()
     cursor.close()
-except cdrdb.Error as info:
-    cdrcgi.bail('Failure retrieving initial indications: %s' %
-                info[1][0])
+except Exception as e:
+    cdrcgi.bail('Failure retrieving initial indications: %s' % e)
 
 ### try:
 ###     cursor = conn.cursor()
 ###     cursor.execute(dQuery)
 ###     dRows = cursor.fetchall()
 ###     cursor.close()
-### except cdrdb.Error, info:
-###     cdrcgi.bail('Failure retrieving initial drugs: %s' %
-###                 info[1][0])
+### except Exception as e:
+###     cdrcgi.bail('Failure retrieving initial drugs: %s' % e)
 
 #----------------------------------------------------------------------
 # If we don't have a request, put up the form.
@@ -708,7 +705,7 @@ else:
 
     q_path = "/DrugInformationSummary/DrugInfoMetaData/ApprovedIndication"
     fields = 'q.doc_id', 'q.value AS "Indication"', 't.value AS "DrugName"'
-    query = cdrdb.Query("query_term_pub q", *fields)
+    query = db.Query("query_term_pub q", *fields)
     query.join("query_term_pub t", "t.doc_id = q.doc_id",
                "t.path = '/DrugInformationSummary/Title'")
     query.where(query.Condition("q.path", q_path))
@@ -724,8 +721,8 @@ else:
     #----------------------------------------------------------------------
     try:
         rows = query.execute(cursor).fetchall()
-    except cdrdb.Error as info:
-        cdrcgi.bail('Failure retrieving indications2: %s' % info[1][0])
+    except Exception as e:
+        cdrcgi.bail('Failure retrieving indications2: %s' % e)
 
     # Sorting report by indication
     # ----------------------------

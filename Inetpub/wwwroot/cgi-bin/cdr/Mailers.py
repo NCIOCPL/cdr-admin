@@ -30,13 +30,12 @@ elif action == cdrcgi.DEVTOP:
 # List the available options.
 #----------------------------------------------------------------------
 form = "<OL>\n"
-reports = (('GPMailerReqForm.py?',  'Genetics Professional Mailers'),
-           ('GPPubNotification.py?',
-            'Genetics Professional Publication Notification'),
-           ('SummaryMailerReqForm.py?BoardType=Advisory&',
-            'Summary Mailers (Advisory Board)'),
-           ('BoardMemberMailerReqForm.py?',
-            'PDQ&reg; Board Member Correspondence Mailers'))
+reports = (
+    ('SummaryMailerReqForm.py?BoardType=Advisory&',
+     'Summary Mailers (Advisory Board)'),
+    ('BoardMemberMailerReqForm.py?',
+     'PDQ&reg; Board Member Correspondence Mailers'),
+)
 
 for r in reports:
     form += "<LI><A HREF='%s/%s%s=%s'>%s</A></LI>\n" % (
