@@ -14,6 +14,7 @@ import cgi
 import json
 import re
 from cdrapi import db
+from html import escape as html_escape
 
 #----------------------------------------------------------------------
 # Set some initial values.
@@ -105,12 +106,12 @@ def getFilters():
     for filter in filters:
         if len(filter.name) and filter.name[0] != '[':
             id   = int(re.sub(r'[^\d]', '', filter.id))
-            name = cgi.escape(filter.name[:60])
+            name = html_escape(filter.name[:60])
             html += u"<option value='%d'>%s</option>\n" % (id, name)
     for filter in filters:
         if len(filter.name) and filter.name[0] == '[':
             id   = int(re.sub(r'[^\d]', '', filter.id))
-            name = cgi.escape(filter.name[:60])
+            name = html_escape(filter.name[:60])
             html += u"<option value='%d'>%s</option>\n" % (id, name)
     return html
 
@@ -121,7 +122,7 @@ def getFilterSets():
     html = u""
     for filterSet in filterSets:
         id   = filterSet.id
-        name = cgi.escape(filterSet.name[:60])
+        name = html_escape(filterSet.name[:60])
         html += u"<option value='%d'>%s</option>\n" % (id, name)
     return html
 
@@ -131,11 +132,11 @@ def getFilterSets():
 def getSetMemberHtml(members = None):
     html = u""
     if not members:
-        html = u"<option value='0'>%s</option>" % cgi.escape(noMembers, 1)
+        html = u"<option value='0'>%s</option>" % html_escape(noMembers, 1)
     else:
         for member in members:
             id = member.id
-            name = cgi.escape(member.name)
+            name = html_escape(member.name)
             if type(id) == type(9):
                 name = u"[S]%s" % name
                 value = u"S%d" % id
@@ -400,7 +401,7 @@ def showForm(isNew, members = None):
 </html>
 """ % (makeDelFunction(),
        isNew == 'Y' and "return;" or "",
-       setName and cgi.escape(cdr.toUnicode(setName), 1) or '',
+       setName and html_escape(cdr.toUnicode(setName), 1) or '',
        noMembers,
        isNew != 'Y' and """\
       <input type='button' name='DelSet' value='Delete Set'
@@ -409,16 +410,16 @@ def showForm(isNew, members = None):
 """ or "",
        SUBMENU,
        cdrcgi.MAINMENU,
-       setName and cgi.escape(cdr.toUnicode(setName), 1) or '',
-       setDesc and cgi.escape(setDesc, 1) or '',
-       setNotes and cgi.escape(setNotes, 1) or '',
+       setName and html_escape(cdr.toUnicode(setName), 1) or '',
+       setDesc and html_escape(setDesc, 1) or '',
+       setNotes and html_escape(setNotes, 1) or '',
        getSetMemberHtml(members),
        getFilters(),
        getFilterSets(),
        cdrcgi.SESSION,
        session,
        isNew,
-       setName and cgi.escape(cdr.toUnicode(setName), 1) or '')
+       setName and html_escape(cdr.toUnicode(setName), 1) or '')
     cdrcgi.sendPage(html)
 
 #----------------------------------------------------------------------

@@ -11,6 +11,7 @@
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, time
 from cdrapi import db
+from html import escape as html_escape
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -115,7 +116,7 @@ def showTitleChoices(choices):
     <INPUT TYPE='radio' NAME='byCdrid' VALUE='CDR%010d' id='byCdrid%d'>
     <label for='byCdrid%d'>%s (CDR%06d)</label><br>
    </span>
-""" % (choice[0], i, i, cgi.escape(choice[1]), choice[0])
+""" % (choice[0], i, i, html_escape(choice[1]), choice[0])
     cdrcgi.sendPage(header + form + u"""\
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
    <INPUT TYPE='hidden' NAME='DocType' VALUE='%s'>

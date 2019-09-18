@@ -25,6 +25,7 @@
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, time, sys, lxml.etree as etree
 from cdrapi import db
+from html import escape as html_escape
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -211,7 +212,7 @@ ORDER BY value""")
     for row in cursor.fetchall():
         html.append(u"""\
  <option>%s</option>
-""" % (cgi.escape(row[0])))
+""" % (html_escape(row[0])))
     html.append(u"""\
 </select>
 """)
@@ -235,7 +236,7 @@ ORDER BY value""")
     for row in cursor.fetchall():
         html.append(u"""\
 <option>%s</option>
-""" % (cgi.escape(row[0])))
+""" % (html_escape(row[0])))
     html.append(u"""\
 </select>
 """)

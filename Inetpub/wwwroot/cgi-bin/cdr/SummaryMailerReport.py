@@ -34,6 +34,7 @@
 import cgi, cdr, cdrcgi, time
 import lxml.etree as etree
 from cdrapi import db as cdrdb
+from html import escape as html_escape
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -126,7 +127,7 @@ ORDER BY b.value""")
     for docId, boardName in cursor.fetchall():
         html.append(u"""\
 <option value='%d'>%s</option>
-""" % (docId, cgi.escape(boardName)))
+""" % (docId, html_escape(boardName)))
     html.append(u"""\
 </select>
 """)

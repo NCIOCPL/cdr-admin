@@ -14,7 +14,7 @@ def show(component, version):
     <td>%s</td>
     <td>%s</td>
    </tr>
-""" % (cgi.escape(component), cgi.escape(version)))
+""" % (html_escape(component), html_escape(version)))
 html = ["""\
 <html>
  <head>
@@ -35,6 +35,7 @@ html = ["""\
    </tr>
 """]
 try:
+    from html import escape as html_escape
     import pkg_resources
     import sys
     import cgi

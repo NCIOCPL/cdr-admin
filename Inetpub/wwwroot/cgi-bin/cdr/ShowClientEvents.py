@@ -4,6 +4,7 @@
 #----------------------------------------------------------------------
 import cgi, cdr
 from cdrapi import db
+from html import escape as html_escape
 
 fields = cgi.FieldStorage()
 start  = fields.getvalue('start') or str(cdr.calculateDateByOffset(-7))
@@ -52,8 +53,8 @@ for uId, uName, eTime, eDesc, sId, sName in cursor.fetchall():
     <td>%s</td>
     <!-- <td>%s</td> -->
    </tr>
-""" % (cgi.escape(uId), cgi.escape(uName), eTime, cgi.escape(eDesc), sId,
-       cgi.escape(sName)))
+""" % (html_escape(uId), html_escape(uName), eTime, html_escape(eDesc), sId,
+       html_escape(sName)))
 html.append(u"""\
   </table>
  </body>

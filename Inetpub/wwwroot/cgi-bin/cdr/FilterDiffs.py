@@ -4,6 +4,7 @@
 import cdr, cgi, cdrcgi, os, tempfile, re, shutil, glob
 from cdrapi import db
 from cdrapi.settings import Tier
+from html import escape as html_escape
 
 #----------------------------------------------------------------------
 # Make sure we're not on the production server.
@@ -125,7 +126,7 @@ for i in range(len(lines)):
     match = pattern.match(lines[i])
     if match:
         lines[i] = makeBanner(unEncode(match.group(1)))
-report = cgi.escape(unEncode("\n".join(lines)))
+report = html_escape(unEncode("\n".join(lines)))
 cleanup(workDir)
 
 print("""\

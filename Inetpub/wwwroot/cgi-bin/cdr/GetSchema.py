@@ -4,6 +4,7 @@
 #----------------------------------------------------------------------
 import cgi, cdrcgi, sys
 from cdrapi import db
+from html import escape as html_escape
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -29,7 +30,7 @@ Content-type: text/html; charset: utf-8
  </body>
 </html>
 """ % (rows[0][0],
-       cgi.escape(rows[0][1]).encode('utf-8')))
+       html_escape(rows[0][1]).encode('utf-8')))
     sys.exit(0)
 
 cursor.execute("""\
@@ -51,7 +52,7 @@ html = [u"""\
   <h1>CDR Schemas</h1>"""]
 for row in cursor.fetchall():
     line = (u"  <a href='GetSchema.py?id=%d'>%s</a><br />" %
-            (row[0], cgi.escape(row[1])))
+            (row[0], html_escape(row[1])))
     html.append(line)
 html.append(u"""\
  </body>

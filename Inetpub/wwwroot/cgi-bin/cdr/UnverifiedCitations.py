@@ -3,6 +3,7 @@
 #----------------------------------------------------------------------
 import cdr, cgi, cdrcgi, time, re
 from cdrapi import db
+from html import escape as html_escape
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -94,7 +95,7 @@ for row in rows:
     text = textPattern.search(resp[0])
     cmnt = commentPattern.search(resp[0])
     text = text and text.group(1) or 'Unable to retrieve citation title'
-    cmnt = cmnt and cgi.escape(cmnt.group(1)) or '&nbsp;'
+    cmnt = cmnt and html_escape(cmnt.group(1)) or '&nbsp;'
     html += """\
    <tr>
     <td valign='top'>
@@ -107,7 +108,7 @@ for row in rows:
      <font size='3'>%s</font>
     </td>
    </tr>
-""" % (row[0], cgi.escape(text), cmnt)
+""" % (row[0], html_escape(text), cmnt)
 
 #----------------------------------------------------------------------
 # Display the report.

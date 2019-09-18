@@ -4,9 +4,9 @@
 #       module functions instead of escaping the strings here.
 #----------------------------------------------------------------------
 
-import cgi # for espacing strings XXX fix cdr.py so we don't need to do this!
 import cdr
 import cdrcgi
+from html import escape as html_escape
 
 class Control(cdrcgi.Control):
     EDIT_ACTIONS = "EditActions.py"
@@ -59,7 +59,7 @@ class Control(cdrcgi.Control):
             self.save_action()
         cdrcgi.Control.run(self)
     def delete_action(self):
-        error = cdr.delAction(self.session, cgi.escape(self.action_name))
+        error = cdr.delAction(self.session, html_escape(self.action_name))
         if error:
             cdrcgi.bail(error)
         cdrcgi.navigateTo(self.EDIT_ACTIONS, self.session)
@@ -72,9 +72,9 @@ class Control(cdrcgi.Control):
         if flag not in ("Y", "N"):
             cdrcgi.bail(cdrcgi.TAMPERING)
         if comment:
-            comment = cgi.escape(comment)
-        action = cdr.Action(cgi.escape(name), flag, comment)
-        action_name = self.action_name and cgi.escape(self.action_name) or None
+            comment = html_escape(comment)
+        action = cdr.Action(html_escape(name), flag, comment)
+        action_name = self.action_name and html_escape(self.action_name) or None
         error = cdr.putAction(self.session, action_name, action)
         if error:
             cdrcgi.bail(error)

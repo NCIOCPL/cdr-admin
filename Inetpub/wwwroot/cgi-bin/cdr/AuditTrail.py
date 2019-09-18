@@ -5,7 +5,7 @@
 
 import sys, cgi, time, cdrcgi, re
 from cdrapi import db as cdrdb
-#import cdrdb
+from html import escape as html_escape
 
 fields = cgi.FieldStorage()
 docId  = fields.getvalue("id") or ""
@@ -30,7 +30,7 @@ try:
     row = cursor.fetchone()
     if not row:
         cdrcgi.bail("Can't find document %d" % id)
-    title = cgi.escape(row[0])
+    title = html_escape(row[0])
 except:
     cdrcgi.bail("Database failure retrieving title for document %d" % id)
 try:
@@ -107,7 +107,7 @@ for when, who, what in rows:
      <font size='3'>%s</font>
     </td>
    </tr>
-""" % (when, who, cgi.escape(what))
+""" % (when, who, html_escape(what))
 cdrcgi.sendPage(html +  """\
   </table>
  </body>

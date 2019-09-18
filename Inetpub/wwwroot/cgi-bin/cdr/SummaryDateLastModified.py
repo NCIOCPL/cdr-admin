@@ -18,6 +18,7 @@ import cdrcgi
 import datetime
 import sys
 from cdrapi import db
+from html import escape as html_escape
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -215,7 +216,7 @@ def getSummaryTypeOptions(cursor):
      &nbsp;
      <input name='est' type='checkbox' value='%d' class='choice'
             onclick='javascript:someEnglish()' id='E%d' /> %s <br />
-""" % (docId, i, cgi.escape(docTitle)))
+""" % (docId, i, html_escape(docTitle)))
         i += 1
     cursor.execute("""\
         SELECT DISTINCT b.doc_id, b.title
@@ -245,7 +246,7 @@ def getSummaryTypeOptions(cursor):
      &nbsp;
      <input name='sst' type='checkbox' value='%d' class='choice'
             onclick='javascript:someSpanish()' id='S%d' /> %s <br />
-""" % (docId, i, cgi.escape(docTitle)))
+""" % (docId, i, html_escape(docTitle)))
         i += 1
     html.append(u"""\
     </fieldset>

@@ -3,6 +3,7 @@
 #----------------------------------------------------------------------
 import cdr, cdrcgi, cgi
 from cdrapi import db
+from html import escape as html_escape
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -80,8 +81,8 @@ if not subject or not body or not fromAddr:
   </form>
  </body>
 </html>
-""" % (cdrcgi.SESSION, session, fromAddr, cgi.escape(subject, 1),
-       cgi.escape(body.replace('\r', '')))
+""" % (cdrcgi.SESSION, session, fromAddr, html_escape(subject, 1),
+       html_escape(body.replace('\r', '')))
     cdrcgi.sendPage(header + form)
 
 #----------------------------------------------------------------------

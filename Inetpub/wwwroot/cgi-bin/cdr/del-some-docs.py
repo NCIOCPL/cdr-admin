@@ -8,6 +8,7 @@
 #----------------------------------------------------------------------
 import cdr, cgi, cdrcgi, re
 from cdrapi import db
+from html import escape as html_escape
 
 LOGFILE = "%s/del-some-docs.log" % cdr.DEFAULT_LOGDIR
 
@@ -71,7 +72,7 @@ if ids:
         try:
             docId = cdr.normalize(i)
         except Exception as e:
-            html.append(u"<li>%s: %s</li>" % (cgi.escape(i), repr(e)))
+            html.append(u"<li>%s: %s</li>" % (html_escape(i), repr(e)))
             cdr.logwrite("%s: %s" % (repr(i), repr(e)), LOGFILE)
             continue
         try:
@@ -89,7 +90,7 @@ if ids:
         elif type(result) is list:
             html.append(u"<li>%s:<ul>" % docId)
             for error in result:
-                html.append(u"<li>%s</li>" % cgi.escape(error))
+                html.append(u"<li>%s</li>" % html_escape(error))
                 cdr.logwrite("%s: %s" % (docId, error), LOGFILE)
             html.append(u"</ul></li>")
         else:

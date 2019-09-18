@@ -17,6 +17,7 @@ import cdr
 import cdrcgi
 from cdrapi import db
 from cdrapi.users import Session
+from html import escape as html_escape
 
 cgitb.enable()
 
@@ -731,11 +732,11 @@ that have not yet been completely reviewed are hyperlinked.</p>
 
 def escape(str):
     """
-    cgi.escape a value, or return "" for an empty value.
+    html_escape a value, or return "" for an empty value.
     """
     val = ""
     if str:
-        val = cgi.escape(str, True)
+        val = html_escape(str, True)
     return val
 
 

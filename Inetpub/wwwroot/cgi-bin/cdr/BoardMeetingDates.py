@@ -6,6 +6,7 @@
 #----------------------------------------------------------------------
 import cdrcgi, cgi, time
 from cdrapi import db
+from html import escape as html_escape
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -239,7 +240,7 @@ def makeBoardSelectionFields(boards):
      &nbsp;
      <input name='boardpick' type='checkbox' value='%d' class='choice'
             onclick='javascript:someBoards()' id='E%d'> %s <br>
-""" % (board.cdrId, i, cgi.escape(board.name)))
+""" % (board.cdrId, i, html_escape(board.name)))
         i += 1
     html.append(u"""\
     </fieldset>
@@ -340,7 +341,7 @@ if flavor == 'ByBoard':
   <tr>
    <td class="board">%s</td>
   </tr>
-""" % cgi.escape(board.name))
+""" % html_escape(board.name))
              board.meetings.sort()
              for meeting in board.meetings:
                  if meeting.date >= startDate and meeting.date <= endDate:
@@ -428,7 +429,7 @@ else:
    </tr>""" % (bg, cls, meeting.date,
                cls, meeting.dayOfWeek, cls, meeting.time,
                cls, meeting.webEx and 'Yes' or '',
-               cls, cgi.escape(meeting.board.name)))
+               cls, html_escape(meeting.board.name)))
 
                 lastDate = meeting.date
 

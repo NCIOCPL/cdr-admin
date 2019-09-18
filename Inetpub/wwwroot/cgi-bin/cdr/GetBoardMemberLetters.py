@@ -3,6 +3,7 @@
 #----------------------------------------------------------------------
 import cdrcgi, cgi, os, sys
 from cdrapi import db
+from html import escape as html_escape
 
 #----------------------------------------------------------------------
 # Look for the mailer job first in the new location, then in the old.
@@ -47,7 +48,7 @@ html = header + """\
 """ % job
 for name in os.listdir(dirName):
     if name.endswith('.rtf') and not name[0] == '~':
-        name = cgi.escape(name, True)
+        name = html_escape(name, True)
         html += """\
  <li><a href="%s?job=%s&file=%s">%s</a></li>
 """ % (script, job, name, name)

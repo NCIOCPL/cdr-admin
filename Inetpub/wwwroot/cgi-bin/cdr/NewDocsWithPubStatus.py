@@ -4,6 +4,7 @@
 #----------------------------------------------------------------------
 import cdr, cdrcgi, cgi, time
 from cdrapi import db
+from html import escape as html_escape
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -239,7 +240,7 @@ for row in rows:
     </td>
    </tr>
 """ % (docId,
-       cgi.escape(docTitle),
+       html_escape(docTitle),
        creUser.upper(),
        creDate[:10],
        verDate and verDate[:10] or "None",

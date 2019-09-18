@@ -7,6 +7,7 @@
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, string, time, xml.dom.minidom, xml.sax.saxutils
 from cdrapi import db
+from html import escape as html_escape
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -141,7 +142,7 @@ if nameVal and u'%' not in nameVal: nameVal = u"%%%s%%" % nameVal
 if pronVal and u'%' not in pronVal: pronVal = u"%%%s%%" % pronVal
 if nameVal and pronVal:
     stems = (u"Name Stem: %s<br />Pronunciation Stem: %s" %
-             (cgi.escape(name), cgi.escape(pron)))
+             (html_escape(name), html_escape(pron)))
     cursor.execute("""\
 SELECT DISTINCT doc_id
            FROM query_term
@@ -153,7 +154,7 @@ else:
     val   = nameVal or pronVal
     elem  = nameVal and 'NameString' or 'Pronunciation'
     stems = u"%s Stem: %s" % (elem,
-                              nameVal and cgi.escape(name) or cgi.escape(pron))
+                              nameVal and html_escape(name) or html_escape(pron))
     cursor.execute("""\
 SELECT DISTINCT doc_id
            FROM query_term

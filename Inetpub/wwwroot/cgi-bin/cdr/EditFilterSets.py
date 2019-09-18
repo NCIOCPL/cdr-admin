@@ -5,6 +5,7 @@
 #----------------------------------------------------------------------
 import cdr, cgi, cdrcgi, sys, urllib
 from cdrapi import db
+from html import escape as html_escape
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -58,10 +59,10 @@ elif request == "Report":
     keys = setDict.keys()
     keys.sort()
     for key in keys:
-        report += u"<h2>%s</h2><ul>\n" % cgi.escape(key)
+        report += u"<h2>%s</h2><ul>\n" % html_escape(key)
         for member in setDict[key].members:
             report += u"<li>%s %s</li>\n" % (type(member.id) == type(9) and
-                    "[S]" or "[F]", cgi.escape(member.name))
+                    "[S]" or "[F]", html_escape(member.name))
         report += u"</ul>\n"
     cdrcgi.sendPage(header + report + u"</form></body></html>")
 
@@ -111,8 +112,8 @@ form = u"""\
 for row in rows:
     ### name1 = urllib.quote_plus(row[0])
     name1 = urllib.quote_plus(row[0].encode('utf-8'))
-    name2 = cgi.escape(row[0], 1)
-    desc  = cgi.escape(row[1], 1).replace("'", "&apos;")
+    name2 = html_escape(row[0], 1)
+    desc  = html_escape(row[1], 1).replace("'", "&apos;")
     form += u"""\
     <li>
      <a href="%s/EditFilterSet.py?%s=%s&Request=Edit&setName=%s"

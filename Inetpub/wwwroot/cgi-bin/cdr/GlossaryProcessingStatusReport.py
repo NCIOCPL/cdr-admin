@@ -13,6 +13,7 @@ import cdrcgi
 from cdrapi import db
 import cgi
 from lxml import etree
+from html import escape as html_escape
 
 #----------------------------------------------------------------------
 # Collect the CGI field data.
@@ -85,9 +86,9 @@ class SpanishName:
         for s in node.findall('TermNameString'):
             self.string = getText(s)
     def __unicode__(self):
-        # Can't call cgi.escape() if string = None
+        # Can't call html_escape() if string = None
         if self.string:
-            name = cgi.escape(self.string)
+            name = html_escape(self.string)
         else:
             name = u""
         if self.alternate:
@@ -137,7 +138,7 @@ class Name:
             self.conceptId = rows and rows[0][0] or u""
     def __unicode__(self):
         if 'spanish' not in status.lower():
-            return u"%s (CDR%d)" % (cgi.escape(self.string), self.docId)
+            return u"%s (CDR%d)" % (html_escape(self.string), self.docId)
         return u"%s (CDR%d)" % (u"; ".join([u"%s" % n for n in self.spanish]),
                                 self.docId)
 
@@ -190,8 +191,8 @@ class Comment:
             text = u"[NO TEXT ENTERED FOR COMMENT]"
         return u"[audience=%s; date=%s; user=%s] %s" % (self.audience,
                                                         self.date,
-                                                        cgi.escape(self.user),
-                                                        cgi.escape(text))
+                                                        html_escape(self.user),
+                                                        html_escape(text))
 
 #----------------------------------------------------------------------
 # Scrub the values to make sure they haven't been tampered with.

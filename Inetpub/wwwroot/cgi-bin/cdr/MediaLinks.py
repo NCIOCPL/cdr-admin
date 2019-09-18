@@ -7,6 +7,7 @@
 #----------------------------------------------------------------------
 import cdrcgi, cgi, time
 from cdrapi import db
+from html import escape as html_escape
 
 #----------------------------------------------------------------------
 # Set the form (and other initial) variables.
@@ -186,7 +187,7 @@ SELECT DISTINCT q1.doc_id, q1.value
        <td class='text' align='right'>%d</td>
        <td class='text'>%s</td>
       </tr>
-""" % (rowClass, row[0], cgi.escape(row[1])))
+""" % (rowClass, row[0], html_escape(row[1])))
 
     # Done with the document type.  Pick up the next one.
     # ---------------------------------------------------

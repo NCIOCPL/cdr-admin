@@ -17,6 +17,7 @@ import lxml.etree as etree
 import lxml.html
 import time
 from cdrapi import db
+from html import escape as html_escape
 
 #----------------------------------------------------------------------
 # Don't give hackers any help, and don't throw more noise at the app
@@ -667,11 +668,11 @@ if flavor == 'full':
   </style>
  </head>
  <body id="main">
-""" % cgi.escape(boardName)
+""" % html_escape(boardName)
 
     html += """
    <h1>%s<br><span style="font-size: 12pt">%s</span></h1>
-""" % (cgi.escape(boardName), dateString)
+""" % (html_escape(boardName), dateString)
 else:
     otherInfo = assistant = "No"
 

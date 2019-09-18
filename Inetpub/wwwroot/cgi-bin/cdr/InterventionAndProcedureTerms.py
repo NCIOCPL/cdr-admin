@@ -5,6 +5,7 @@
 #----------------------------------------------------------------------
 import cdrcgi, cgi
 from cdrapi import db
+from html import escape as html_escape
 
 fields = cgi.FieldStorage()
 session  = cdrcgi.getSession(fields) or cdrcgi.bail("Not logged in")
@@ -84,8 +85,8 @@ try:
     # Get all the terms including the top level terms off the root.
     # Not including the roo term
     cursor.execute("""\
-        SELECT ist.doc_id SemanticTypeId, 
-               it.doc_id IndexTermId, 
+        SELECT ist.doc_id SemanticTypeId,
+               it.doc_id IndexTermId,
                pname.value IndexTermName
           INTO #index_terms
           FROM #intervention_semantic_types ist
@@ -124,7 +125,7 @@ try:
         if terms.has_key(parentId):
             terms[parentId].children[termId] = 1
             terms[termId].parents[parentId] = 1
- 
+
     #get the other term names
     cursor.execute("""\
         SELECT qt.doc_id, qt.value
@@ -135,7 +136,7 @@ try:
     for row in cursor.fetchall():
         id, name = row
         terms[id].aliases[name] = 1
-        
+
 except:
     raise
     cdrcgi.bail("Database failure reading terminology information")
@@ -149,7 +150,7 @@ def addTerm(t):
         classname = 'st'
     html = """\
     <li class = '%s'>%s</li>
-""" % (classname, cgi.escape(t.name))
+""" % (classname, html_escape(t.name))
 
     if t.children or (t.aliases and IncludeAlternateNames == "True"):
         html += "<ul>\n"
@@ -157,7 +158,7 @@ def addTerm(t):
             keys = t.aliases.keys()
             keys.sort()
             for key in keys:
-                html += "<li class = 'a'>x %s</li>\n" % cgi.escape(key)
+                html += "<li class = 'a'>x %s</li>\n" % html_escape(key)
         if t.children:
             keys = t.children.keys()
             keys.sort(sorter)
@@ -171,13 +172,13 @@ altTitleExtension = ""
 if IncludeAlternateNames == "False":
     altNameDisplay = "none"
     altTitleExtension = "(without Alternate Names)"
-    
+
 html = """\
 <html>
  <head>
   <title>CDR Intervention and Procedure Index Terms</title>
   <style type = 'text/css'>
-   h1 { color: navy; font-size: 14: font-weight: bold; 
+   h1 { color: navy; font-size: 14: font-weight: bold;
         font-family: Arial, Helvetica, sans-serif; }
    li.st { color: green; font-size: 14; font-weight: bold; list-style: none;
           font-family: serif; font-variant: small-caps; }

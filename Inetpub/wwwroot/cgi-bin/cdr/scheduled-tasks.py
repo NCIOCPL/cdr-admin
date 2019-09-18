@@ -7,6 +7,7 @@ import re
 import cgi
 import os
 import time
+from html import escape as html_escape
 
 REPORT = "d:/cdr/Reports/schtasks.xml"
 
@@ -195,17 +196,17 @@ class Task:
             if not self.enabled():
                 disabled = " (disabled)"
             if self.description:
-                description = "<br><i>%s</i>" % cgi.escape(self.description)
+                description = "<br><i>%s</i>" % html_escape(self.description)
             triggers = "<br>".join([str(trigger) for trigger in self.triggers])
             actions = []
             for action in self.actions:
-                actions.append("<li>%s</li>" % cgi.escape(str(action)))
+                actions.append("<li>%s</li>" % html_escape(str(action)))
             return """\
 <div class="%s">
 <b>%s</b>%s%s<br>
 Runs %s
 <ol>%s</ol>
-</div>""" % (status, cgi.escape(self.name), disabled, description,
+</div>""" % (status, html_escape(self.name), disabled, description,
            triggers, "\n".join(actions))
         line = "-" * 100
         actions = []

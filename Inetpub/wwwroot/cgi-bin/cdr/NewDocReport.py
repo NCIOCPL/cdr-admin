@@ -3,6 +3,7 @@
 #----------------------------------------------------------------------
 import cdr, cdrcgi, cgi, time
 from cdrapi import db
+from html import escape as html_escape
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -94,7 +95,7 @@ if not cdr.valFromToDates('%Y-%m-%d', fromDate, toDate):
       "Invalid Start or End date.  Use YYYY-MM-DD, Start no later than End.")
 
 if docType and docType not in cdr.getDoctypes(session):
-    cdrcgi.bail('Unknown doc type requested: "%s"' % cgi.escape(docType))
+    cdrcgi.bail('Unknown doc type requested: "%s"' % html_escape(docType))
 
 #----------------------------------------------------------------------
 # We have a request; do it.

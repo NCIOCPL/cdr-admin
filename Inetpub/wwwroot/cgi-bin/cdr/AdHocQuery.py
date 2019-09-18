@@ -3,6 +3,7 @@
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string
 from cdrapi import db
+from html import escape as html_escape
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -95,7 +96,7 @@ try:
         for col in row:
             if col is None: col = "NULL"
             elif not col: col = "&nbsp;"
-            elif type(col) in (type(""), type(u"")): col = cgi.escape(col)
+            elif type(col) in (type(""), type(u"")): col = html_escape(col)
             html += u"""\
     <td valign='top'>%s</td>
 """ % col

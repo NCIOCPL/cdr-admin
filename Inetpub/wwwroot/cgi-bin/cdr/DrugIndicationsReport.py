@@ -5,6 +5,7 @@
 #----------------------------------------------------------------------
 import cdr, cgi, cdrcgi, time
 from cdrapi import db
+from html import escape as html_escape
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -545,7 +546,7 @@ if not displayType:
 
     for row in iRows:
         form += u"""<option value="%s">%s</option>
-""" % (cgi.escape(row[0], True), row[0])
+""" % (html_escape(row[0], True), row[0])
 
     form += u"""\
     </select>

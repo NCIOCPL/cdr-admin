@@ -3,6 +3,7 @@
 # global change.
 #----------------------------------------------------------------------
 import cgi, glob, cdrcgi, os, xml.dom.minidom, cdr
+from html import escape as html_escape
 
 BASE      = 'd:/cdr/GlobalChange/'
 script    = 'ShowGlobalChangeTestResults.py'
@@ -39,7 +40,7 @@ if file and directory:
   </pre>
  </body>
 </html>
-""" % cgi.escape(unicode(doc, "utf-8")))
+""" % html_escape(unicode(doc, "utf-8")))
 
 class DocFileInfo:
     """

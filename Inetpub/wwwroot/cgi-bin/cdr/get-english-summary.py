@@ -11,6 +11,7 @@ from cdrapi.docs import Doc
 from cdrapi.users import Session
 from cdr import Logging
 from cdrcgi import bail
+from html import escape as html_escape
 
 def show_form():
     """
@@ -111,7 +112,7 @@ def markup(doc):
     """
 
     doc = re.sub(u"<([^>]+)>", markup_tag, doc)
-    doc = cgi.escape(doc)
+    doc = html_escape(doc)
     doc = doc.replace(u"@@TAG-START@@", u'<span class="tag">')
     doc = doc.replace(u"@@NAME-START@@", u'<span class="name">')
     doc = doc.replace(u"@@VALUE-START@@", u'<span class="value">')

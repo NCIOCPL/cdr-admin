@@ -4,6 +4,7 @@
 #----------------------------------------------------------------------
 import cgi, lxml.etree as etree, sys, re
 from cdrapi import db
+from html import escape as html_escape
 
 fields  = cgi.FieldStorage()
 docId   = fields.getvalue('id')
@@ -83,7 +84,7 @@ def markupTag(match):
 
 def markup(doc):
     doc = re.sub("<([^>]+)>", markupTag, doc)
-    doc = cgi.escape(doc)
+    doc = html_escape(doc)
     doc = doc.replace('@@TAG-START@@', '<span class="tag">')
     doc = doc.replace('@@NAME-START@@', '<span class="name">')
     doc = doc.replace('@@VALUE-START@@', '<span class="value">')

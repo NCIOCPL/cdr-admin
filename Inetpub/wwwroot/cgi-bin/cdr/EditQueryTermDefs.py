@@ -2,6 +2,7 @@
 # Prototype for editing CDR query term definitions.
 #----------------------------------------------------------------------
 import cgi, cdr, cdrcgi, re, string, urllib
+from html import escape as html_escape
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -109,7 +110,7 @@ if request == 'Compare' and server1 and server2:
         for extra in extra1:
             html += u"""\
    <li>%s</li>
-""" % cgi.escape(extra)
+""" % html_escape(extra)
         html += """\
   </ul>
   <br>
@@ -122,7 +123,7 @@ if request == 'Compare' and server1 and server2:
         for extra in extra2:
             html += u"""\
    <li>%s</li>
-""" % cgi.escape(extra)
+""" % html_escape(extra)
         html += u"""\
   </ul>
 """
@@ -142,7 +143,7 @@ defs.sort()
 # Create a button for deleting a specific query term definition.
 #----------------------------------------------------------------------
 def makeDeleteButton(path):
-    onclick = 'javascript:delPath("%s");' % cgi.escape(path, True)
+    onclick = 'javascript:delPath("%s");' % html_escape(path, True)
     return ("<input class='fb' type='button' onclick='%s' "
             "value='Delete Definition' />"
             % onclick.replace("'", "&apos;"))
@@ -193,7 +194,7 @@ for path, rule in defs:
      <td>%s</td>
      <td class='path' nowrap='nowrap'>%s</td>
     </tr>
-""" % (makeDeleteButton(path), cgi.escape(path)))
+""" % (makeDeleteButton(path), html_escape(path)))
 form.append(u"""\
    </table>
   </form>

@@ -56,6 +56,7 @@ import os
 import re
 from cdrapi import db
 from cdrapi.users import Session
+from html import escape as html_escape
 
 #----------------------------------------------------------------------
 # Dynamically create the title of the menu section (request #809).
@@ -585,7 +586,7 @@ def showTitleChoices(choices):
     for choice in choices:
         form += u"""\
    <INPUT TYPE='radio' NAME='DocId' VALUE='CDR%010d'>[CDR%d] %s<BR>
-""" % (choice[0], choice[0], cgi.escape(choice[1]))
+""" % (choice[0], choice[0], html_escape(choice[1]))
     cdrcgi.sendPage(header + form + u"""\
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
    <INPUT TYPE='hidden' NAME='DocType' VALUE='%s'>
@@ -755,7 +756,7 @@ if letUserPickVersion:
         form += u"""\
    <OPTION VALUE='%d'>[V%d %s] %s</OPTION>
 """ % (row[0], row[0], row[2][:10],
-       not row[1] and "[No comment]" or cgi.escape(row[1][:120]))
+       not row[1] and "[No comment]" or html_escape(row[1][:120]))
         selected = ""
     form += u"</SELECT></div></div>"
     form += u"""
@@ -1546,7 +1547,7 @@ SELECT mailer.doc_id, mailer.int_val, summary.value, response.value,
         %s
        </TD>
       </TR>
-""" % (cgi.escape(row[4]), row[3])
+""" % (html_escape(row[4]), row[3])
     doc = re.sub("@@SUMMARY_MAILER_SENT@@", html, doc)
 
     # -----------------------------------------------------------------
@@ -1632,8 +1633,8 @@ if docType not in filters:
   <p>Document follows (view source to preview XML!):</p>
   <pre>%s</pre>
  </body>
-</html>""" % (cgi.escape(doc.ctrl['DocTitle'].decode("utf-8")), docType,
-              cgi.escape(doc.xml.decode('utf-8')))
+</html>""" % (html_escape(doc.ctrl['DocTitle'].decode("utf-8")), docType,
+              html_escape(doc.xml.decode('utf-8')))
     cdrcgi.sendPage(html)
 
 filterParm = []

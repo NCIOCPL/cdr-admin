@@ -16,6 +16,7 @@ import cgi
 import lxml.etree as etree
 import time
 from cdrapi import db
+from html import escape as html_escape
 
 #----------------------------------------------------------------------
 # Get the parameters from the request.
@@ -160,7 +161,7 @@ if not menuType:
 def displayMenuItem(item, level=0):
     b1 = level == 1 and "<b>" or ""
     b2 = level == 1 and "</b>" or ""
-    html = " " * level * 5 + b1 + cgi.escape(item.name) + b2 + "\n"
+    html = " " * level * 5 + b1 + html_escape(item.name) + b2 + "\n"
 
     # Sort the children of the terms by the sortString not the terms itself
     # ---------------------------------------------------------------------

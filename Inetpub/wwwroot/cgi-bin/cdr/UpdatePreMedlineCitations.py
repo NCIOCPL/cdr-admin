@@ -7,6 +7,7 @@
 import cdr, lxml.etree as etree, cgi, cdrcgi, copy
 import requests
 from cdrapi import db
+from html import escape as html_escape
 
 class Citation:
     def __init__(self, pmId, cdrId, status):
@@ -68,7 +69,7 @@ def displayErrors(errors):
     html = [u'<p class="errors">']
     sep = u""
     for error in errors:
-        html.append(cgi.escape(error))
+        html.append(html_escape(error))
         html.append(sep)
         sep = u"<br />"
     html.append(u"</p>")
@@ -166,7 +167,7 @@ for pmid in citations:
             notes = citation.updateDoc()
             updated += 1
         except Exception as e:
-            notes = '<span class="errors">%s</span>' % cgi.escape(str(e))
+            notes = '<span class="errors">%s</span>' % html_escape(str(e))
         html.append(u"""\
    <tr>
     <td>%s</td>

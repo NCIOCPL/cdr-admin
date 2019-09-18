@@ -6,6 +6,7 @@
 #----------------------------------------------------------------------
 import cdrcgi, cgi, lxml.etree as etree, cdr
 from cdrapi import db
+from html import escape as html_escape
 
 #----------------------------------------------------------------------
 # Constant values we look for in the MenuType element.
@@ -71,9 +72,9 @@ class RelatedTerm(Term):
             elif displayName is not None and menuType == GP_CS:
                 self.cancerSite = displayName
     def toHtml(self):
-        pn = self.preferredName and cgi.escape(self.preferredName) or u"&nbsp;"
-        cs = self.cancerSite and cgi.escape(self.cancerSite) or u"&nbsp;"
-        ct = self.cancerType and cgi.escape(self.cancerType) or u"&nbsp;"
+        pn = self.preferredName and html_escape(self.preferredName) or u"&nbsp;"
+        cs = self.cancerSite and html_escape(self.cancerSite) or u"&nbsp;"
+        ct = self.cancerType and html_escape(self.cancerType) or u"&nbsp;"
         return u"""\
     <td>%s</td>
     <td>CDR%d</td>
@@ -125,9 +126,9 @@ class GeneticCondition(Term):
     <td%s>%s (CDR%d)</td>
     <td%s>%s</td>
 """ % (rowspan,
-       self.preferredName and cgi.escape(self.preferredName) or u"&nbsp;",
+       self.preferredName and html_escape(self.preferredName) or u"&nbsp;",
        self.cdrId, rowspan,
-       self.displayName and cgi.escape(self.displayName) or u"&nbsp;")]
+       self.displayName and html_escape(self.displayName) or u"&nbsp;")]
         if self.relatedTerms:
             html.append(self.relatedTerms[0].toHtml())
         else:

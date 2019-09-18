@@ -3,6 +3,7 @@
 #----------------------------------------------------------------------
 import cdr, time, cgi, cdrcgi, re
 from cdrapi import db
+from html import escape as html_escape
 
 #----------------------------------------------------------------------
 # Get the parameters from the request.
@@ -74,7 +75,7 @@ def showTitleChoices(choices):
     for choice in choices:
         form += """\
    <INPUT TYPE='radio' NAME='DocId' VALUE='CDR%010d'>[CDR%010d] %s<BR>
-""" % (choice[0], choice[0], cgi.escape(choice[1]))
+""" % (choice[0], choice[0], html_escape(choice[1]))
     cdrcgi.sendPage(header + form + """\
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
    <INPUT TYPE='hidden' NAME='DateRange' VALUE='%d'>
@@ -94,7 +95,7 @@ elif action == SUBMENU:
 #----------------------------------------------------------------------
 # Handle request to log out.
 #----------------------------------------------------------------------
-if action == "Log Out": 
+if action == "Log Out":
     cdrcgi.logout(session)
 
 #----------------------------------------------------------------------

@@ -8,6 +8,7 @@
 from operator import attrgetter
 from cdrapi import db
 import cdrcgi, cgi
+from html import escape as html_escape
 
 class Term:
     def __init__(self, name):
@@ -103,12 +104,12 @@ def addTerm(t):
         cls = 'st'
     else:
         cls = 't'
-    html = [f'<li class="{cls}">{cgi.escape(t.name)}</li>']
+    html = [f'<li class="{cls}">{html_escape(t.name)}</li>']
     if t.aliases or t.children:
         html.append("<ul>")
         t.aliases.sort()
         for alias in t.aliases:
-            html.append(f'<li class="a">x {cgi.escape(alias)}</li>\n')
+            html.append(f'<li class="a">x {html_escape(alias)}</li>\n')
         for child in sorted(t.children, key=attrgetter("name")):
             html.append(addTerm(child))
         html.append("</ul>")

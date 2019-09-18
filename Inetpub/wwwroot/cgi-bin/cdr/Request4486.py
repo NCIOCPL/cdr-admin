@@ -11,6 +11,7 @@ import cdrcgi
 import datetime
 from lxml import etree
 from cdrapi import db
+from html import escape as html_escape
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -136,14 +137,14 @@ class Definition:
             if isinstance(piece, PlaceHolder):
                 default = u"[UNRESOLVED PLACEHOLDER %s]" % piece.name
                 if piece.name == 'TERMNAME' and termName:
-                    rep = cgi.escape(termName)
+                    rep = html_escape(termName)
                 elif piece.name == 'CAPPEDTERMNAME' and termName:
-                    rep = cgi.escape(termName[0].upper() + termName[1:])
+                    rep = html_escape(termName[0].upper() + termName[1:])
                 else:
-                    rep = cgi.escape(reps.get(piece.name, default))
+                    rep = html_escape(reps.get(piece.name, default))
                 pieces.append(u"<span class='replacement'>%s</span>" % rep)
             else:
-                pieces.append(cgi.escape(piece))
+                pieces.append(html_escape(piece))
         return u"".join(pieces)
 
 #----------------------------------------------------------------------
@@ -228,7 +229,7 @@ class Concept:
     <td rowspan='%d'>%s</td>
     <td rowspan='%d'>%s</td>
    </tr>
-""" % (nameRowspan, cgi.escape(name), termBlocked, cgi.escape(spName),
+""" % (nameRowspan, html_escape(name), termBlocked, html_escape(spName),
        rowspan, enDef, rowspan, spDef))
             if self.names:
                 for spName in self.names[0].spanishNames[1:]:
@@ -236,7 +237,7 @@ class Concept:
    <tr>
     <td>%s</td>
    </tr>
-""" % cgi.escape(spName))
+""" % html_escape(spName))
                 for name in self.names[1:]:
                     nameRowspan = len(name.spanishNames) or 1
                     spName = name.spanishNames and name.spanishNames[0] or u""
@@ -248,14 +249,14 @@ class Concept:
     <td rowspan='%d'>%s %s</td>
     <td>%s</td>
    </tr>
-""" % (nameRowspan, cgi.escape(name.englishName), termBlocked,
-                                                  cgi.escape(spName)))
+""" % (nameRowspan, html_escape(name.englishName), termBlocked,
+                                                  html_escape(spName)))
                     for spName in name.spanishNames[1:]:
                         html.append(u"""\
    <tr>
     <td>%s</td>
    </tr>
-""" % cgi.escape(spName))
+""" % html_escape(spName))
         # Processing the Terms if only English names are requested
         # --------------------------------------------------------
         else:
@@ -274,7 +275,7 @@ class Concept:
     <td>%s %s</td>
     <td rowspan='%d'>%s</td>
    </tr>
-""" % (cgi.escape(name), termBlocked, rowspan, enDef))
+""" % (html_escape(name), termBlocked, rowspan, enDef))
 
             # Processing all other names (except the first)
             # ---------------------------------------------
@@ -288,7 +289,7 @@ class Concept:
    <tr>
     <td>%s %s</td>
    </tr>
-""" % (cgi.escape(enName), termBlocked))
+""" % (html_escape(enName), termBlocked))
 
         i = 1
         while i < definitionRows:

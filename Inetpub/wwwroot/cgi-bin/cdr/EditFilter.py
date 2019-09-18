@@ -14,6 +14,7 @@ import requests
 import lxml.etree as etree
 from cdrapi import db
 from cdrapi.settings import Tier
+from html import escape as html_escape
 
 class Control(cdrcgi.Control):
     """
@@ -92,14 +93,14 @@ class Control(cdrcgi.Control):
             differ = difflib.Differ()
             #changes = False
             pattern = (u'<span class="%%s">%%s %s on CDR %%s server</span>\n' %
-                       cgi.escape(self.filter.title))
+                       html_escape(self.filter.title))
             lines = [
                 pattern % ("deleted", "-", tiers[0]),
                 pattern % ("added", "+", tiers[1]),
                 "\n"
             ]
             for line in differ.compare(*filters):
-                line = cgi.escape(line)
+                line = html_escape(line)
                 if not line.startswith(" "):
                     changes = True
                 if line.startswith("-"):
@@ -116,7 +117,7 @@ class Control(cdrcgi.Control):
             self.logger.exception("filter comparison failure")
             page.add('<p class="error">Filter &ldquo;%s&rdquo; '
                      'not found on CDR %s server</p>' %
-                     (cgi.escape(self.filter.title), self.other_tier))
+                     (html_escape(self.filter.title), self.other_tier))
         page.add_css("""\
 body     { background-color: #fafafa; }
 .deleted { background-color: #FAFAD2; } /* Light goldenrod yellow */

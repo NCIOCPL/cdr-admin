@@ -6,6 +6,7 @@
 #----------------------------------------------------------------------
 import cdrcgi, cgi, re, cdr
 from cdrapi import db
+from html import escape as html_escape
 
 #----------------------------------------------------------------------
 # Extract integer from string; uses all decimal digits.
@@ -94,11 +95,11 @@ cursor = conn.cursor()
 #----------------------------------------------------------------------
 # Secure alphaStart string against XSS
 if alphaStart:
-    alphaStart = cgi.escape(alphaStart)
+    alphaStart = html_escape(alphaStart)
 
 # Notes on validation of other parameters:
 #  'usage' validated by int(usage) above
-#  'value' cgi.escaped below
+#  'value' html_escaped below
 #  'pattern' sanitized by parameter substitution
 #  'docId' sanitized by extractInt(docId)
 #  'maxRowStr' sanitized by int(maxRowStr)
@@ -419,7 +420,7 @@ if request == "Save Changes":
                             errors.append("Failure setting DocId to %s "
                                           "for value %s%s" % \
                                           (pair[1] or "NULL",
-                                           cgi.escape(row[0]), question))
+                                           html_escape(row[0]), question))
                     except:
                         cdrcgi.bail("Database failure looking up row %s" % key)
 
@@ -472,7 +473,7 @@ for row in rows:
         selected = " selected='1'"
     form += """\
        <option value='%d'%s>%s</option>
-""" % (row[0], selected, cgi.escape(row[1]))
+""" % (row[0], selected, html_escape(row[1]))
 
 
 # Encoding for non-English patterns
@@ -554,7 +555,7 @@ form += u"""\
     </tr>
    </table>
    <input type='hidden' name='%s' value='%s'>
-""" % (pattern and cgi.escape(pattern, 1) or "", docId, alphaStart,
+""" % (pattern and html_escape(pattern, 1) or "", docId, alphaStart,
        maxRows, includeUnmappedChecked, includeUnmappableChecked,
        cdrcgi.SESSION, session)
 # Back to standard form for web browser
@@ -642,7 +643,7 @@ if request in ("Save Changes", "Get Values"):
                           "View</button>" % (row[2], row[2]))
             extra = allUsage and (" [%s]" % row[3]) or ""
             value = "%s%s" % (mapVal, extra)
-            value = cgi.escape(value, 1)
+            value = html_escape(value, 1)
             bogus = row[4] == 'Y' and " checked='1'" or ""
             mapOk = row[5] == 'Y' and " checked='1'" or ""
             # value = ("<input class='r' readonly='1' size='80' "

@@ -18,6 +18,7 @@ import re
 import sys
 import time
 import xml.dom.minidom
+from html import escape as html_escape
 
 # Setting the labels used for each element displayed
 # --------------------------------------------------
@@ -49,7 +50,7 @@ def showTermNameChoices(choices):
     for choice in choices:
         form += """\
    <INPUT TYPE='radio' NAME='DocId' VALUE='CDR%010d'>[CDR%d] %s<BR>
-""" % (choice[0], choice[0], cgi.escape(choice[1]))
+""" % (choice[0], choice[0], html_escape(choice[1]))
     cdrcgi.sendPage(header + form + """\
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
   </FORM>
@@ -669,7 +670,7 @@ def getNameDefinition(docId):
                         if child.nodeName == 'TermNameString':
                             termName[docId].update(
                                {language:child.toxml()})
-                #              {language:cgi.escape(
+                #              {language:html_escape(
                 #                        cdr.getTextContent(child).strip())})
                 else:
                     for child in node.childNodes:

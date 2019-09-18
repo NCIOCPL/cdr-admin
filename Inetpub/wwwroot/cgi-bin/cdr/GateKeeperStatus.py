@@ -15,6 +15,7 @@ import cgi
 import re
 import sys
 from cdrapi import db
+from html import escape as html_escape
 
 fields  = cgi.FieldStorage()
 cdrId   = fields.getvalue('cdrId') # or '525153'
@@ -42,7 +43,7 @@ except Exception as e:
 # Make a value safe for display on a web page.
 #----------------------------------------------------------------------
 def fix(me, nbsp_for_empty_values=False):
-    val = cgi.escape(str(me))
+    val = html_escape(str(me))
     if not val and nbsp_for_empty_values:
         return "&nbsp;"
     return val
