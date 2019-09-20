@@ -5,7 +5,7 @@
 #
 # BZIssue::4767
 #----------------------------------------------------------------------
-import cgi, cdrcgi, cdr, msvcrt, sys, os, time
+import cgi, cdrcgi, cdr, sys, time
 from lxml import etree
 from cdrapi import db
 
@@ -110,7 +110,6 @@ try:
     info = DocInfo(cursor, docId, docVer)
 except Exception as e:
     cdrcgi.bail(u"%s" % e)
-msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
 if info.docVer:
     cursor.execute("""\
             SELECT b.data

@@ -30,16 +30,15 @@ dirName   = findJob(job)
 header    = cdrcgi.header(title, title, section, script)
 
 if fileName:
-    import msvcrt
-    msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
-    f = open("%s/%s" % (dirName, fileName), "rb")
-    bytes = f.read()
-    f.close
-    sys.stdout.write("Content-Type: application/rtf\r\n")
-    sys.stdout.write("Content-Length: %d\r\n" % len(bytes))
-    sys.stdout.write("Content-Disposition: attachment; filename=%s\r\n\r\n" %
-                     fileName)
-    sys.stdout.write(bytes)
+    with open("%s/%s" % (dirName, fileName), "rb") as fp:
+        file_bytes = fp.read()
+    sys.stdout.buffer.write(f"""\
+Content-Type: application/rtf
+Content-Length: {len(file_bytes)}
+Content-Disposition: attachment; filename={fileName}
+
+""")
+    sys.stdout.buffer.write(file_bytes)
     sys.exit(0)
 
 html = header + """\

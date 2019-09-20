@@ -22,12 +22,6 @@ session = cdrcgi.getSession(fields)
 if not cdr.canDo(session, "AUDIO IMPORT"):
     cdrcgi.bail("You are not authorized to generate this spreadsheet")
 
-try:
-    import msvcrt
-    msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
-except:
-    pass
-
 def make_sheet(styles, name):
     sheet = styles.add_sheet(name)
     labels = ("CDR ID", "Term Name", "Language", "Pronunciation", "Filename",
@@ -94,7 +88,7 @@ for doc_id in doc_ids:
     except Exception as e:
         cdrcgi.bail("CDR{:d}: {}".format(docId, e))
 today = datetime.date.today()
-name = "Report4926-{}.xls".format(today.strftime("%Y%m%d"))
+name = "Report4926-{}.xls".format(today.strftime("%Y%m%d%H%M%S"))
 with open("{}/{}".format(REPORTS, name), "wb") as fp:
     styles.book.save(fp)
 url = "/cdrReports/{}".format(name)

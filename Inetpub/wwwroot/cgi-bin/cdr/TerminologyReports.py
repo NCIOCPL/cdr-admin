@@ -45,12 +45,7 @@ class Control(cdrcgi.Control):
              "Intervention or Procedure Terms (without Alternate Names)",
              { "IncludeAlternateNames": "False" }),
             ("MenuHierarchy.py", "Menu Hierarchy Report", {}),
-            ("SemanticTypeReport.py", "Semantic Type Report", {}),
-            ("Stub.py", "Term By Type", {}),
             ("TermHierarchyTree.py", "Term Hierarchy Tree", {}),
-            ("TermHierarchyTree.py",
-             "Terms with No Parent Term and Not a Semantic Type",
-             { "SemanticTerms": "False" }),
             ("ocecdr-3588.py", "Thesaurus Concepts Not Marked Public", {}),
         ):
             form.add_menu_link(script, display, self.session, **args)

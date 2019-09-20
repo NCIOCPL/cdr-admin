@@ -7,7 +7,7 @@
 # JIRA::OCECDR-3734
 # JIRA::OCECDR-4092 - fix bug in link to GP Emailers List; use Control class
 #----------------------------------------------------------------------
-import cdr
+
 import cdrcgi
 
 class Control(cdrcgi.Control):
@@ -21,7 +21,6 @@ class Control(cdrcgi.Control):
         form.add("<ol>")
         for script, display in (
             ("ocecdr-3734.py", "Bounced GP Emailers"),
-            ("%s/ListGPEmailers" % cdr.emailerCgi(), "GP Emailers List"),
             ("MailerActivityStatistics.py", "Mailer Activity Counts"),
             ("MailerCheckinReport.py", "Mailer Check-In Count"),
             ("MailerHistory.py", "Mailer History"),

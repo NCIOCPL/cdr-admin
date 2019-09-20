@@ -35,7 +35,6 @@ class Control(cdrcgi.Control):
         """
 
         self.tier = Tier()
-        self.set_binary_mode()
         cdrcgi.Control.__init__(self, "Translation Job")
         if not self.session:
             cdrcgi.bail("not authorized")
@@ -491,21 +490,6 @@ jQuery("input[value='%s']").click(function(e) {
 
             return "%s <%s>" % (self.name, self.email)
 
-    @staticmethod
-    def set_binary_mode():
-        """
-        Make sure the user's file isn't mangled if she posts one.
-        """
-
-        try:
-            import msvcrt
-            import os
-            msvcrt.setmode(0, os.O_BINARY) # stdin = 0
-            msvcrt.setmode(1, os.O_BINARY) # stdout = 1
-        except ImportError:
-            pass
-        except:
-            cdrcgi.bail("Internal error")
 
 class Job:
     """

@@ -11,7 +11,6 @@ import sys
 import re
 import time
 import zipfile
-import msvcrt
 import xlrd
 import cdr
 import cdrcgi
@@ -859,7 +858,6 @@ def sendMp3(mp3Id):
         bail("Failed to read mp3 file named '%s'" % mp3Name, e)
 
     # Write binary mp3 audio data back to the browser
-    msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
     sys.stdout.write("Content-Type: audio/mpeg\r\n")
     sys.stdout.write("Content-disposition: inline; filename=%s\n\n" % mp3Name)
     sys.stdout.write("Content-Length: %d\r\n" % len(mp3Buf))
@@ -1168,11 +1166,12 @@ for review.</p>
     updateZipfileCompletion(oldZipName, 'Y')
 
     # Download the spreadsheet to the user's workstation
-    msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
-    sys.stdout.write("Content-Type: application/vnd.ms-excel\r\n")
-    sys.stdout.write("Content-disposition: attachment; filename=%s\n\n" %
-                      newXlsFileName)
-    styles.book.save(sys.stdout)
+    sys.stdout.buffer.write(f"""\
+Content-Type: application/vnd.ms-excel
+Content-disposition: attachment; filename={newXlsFileName}
+
+""".encode("utf-8"))
+    styles.book.save(sys.stdout.buffer)
     sys.exit()
 
 

@@ -4,9 +4,7 @@
 #----------------------------------------------------------------------
 import cgi
 import datetime
-import os
 import sys
-import msvcrt
 import cdr
 import cdrcgi
 from cdrapi import db
@@ -250,7 +248,6 @@ if format_ == "html":
 else:
     now = datetime.datetime.now()
     name = "DateLastModified-%s.xls" % now.strftime("%Y%m%d%H%M%S")
-    #msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
     print("Content-type: application/vnd.ms-excel")
     print("Content-disposition: attachment; filename=%s" % name)
     print()

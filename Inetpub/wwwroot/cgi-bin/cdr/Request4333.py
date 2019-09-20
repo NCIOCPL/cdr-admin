@@ -121,17 +121,14 @@ def createReport(cursor, startDate, endDate):
     for name in names:
         row = name.addToSheet(sheet, styles, row)
     sheet.write(row, 0, u"Total: %d" % len(names), styles.bold)
-    try:
-        import msvcrt, os
-        msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
-    except:
-        pass
     now = datetime.datetime.now()
     stamp = now.strftime("%Y%m%d%H%M%S")
-    print("Content-type: application/vnd.ms-excel")
-    print("Content-Disposition: attachment; filename=TermNames-%s.xls" % stamp)
-    print()
-    styles.book.save(sys.stdout)
+    sys.stdout.buffer.write(f"""\
+Content-type: application/vnd.ms-excel
+Content-Disposition: attachment; filename=TermNames-{stamp}.xls
+
+""".encode("utf-8"))
+    styles.book.save(sys.stdout.buffer)
 
 #----------------------------------------------------------------------
 # Create the report or as for the report parameters.

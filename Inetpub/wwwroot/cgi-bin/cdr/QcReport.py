@@ -408,8 +408,6 @@ kpbox    = fields.getvalue("Keypoints")  or None
 learnmore= fields.getvalue("LearnMore")  or None
 modMarkup= fields.getvalue("ModuleMarkup")     or None
 
-if docTitle:
-    docTitle = unicode(docTitle, "utf-8")
 standardWording      = fields.getvalue("StandardWording") or None
 audInternComments    = fields.getvalue("AudInternalComments")  or None
 audExternComments    = fields.getvalue("AudExternalComments")  or None
@@ -543,7 +541,7 @@ if not docId and not docTitle and not glossaryDefinition:
     if repType:
         extra += "\n   "
         extra += "<INPUT TYPE='hidden' NAME='ReportType' VALUE='%s'>" % repType
-    form = u"""\
+    form = """\
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
    %s
    <TABLE>
@@ -561,7 +559,7 @@ if not docId and not docTitle and not glossaryDefinition:
     </TR>
    </TABLE>
 """ % (cdrcgi.SESSION, session, extra, label[0], fieldName, label[1])
-    cdrcgi.sendPage(header + form + u"""\
+    cdrcgi.sendPage(header + form + """\
   </FORM>
  </BODY>
 </HTML>
@@ -580,14 +578,14 @@ except Exception as e:
 # More than one matching title; let the user choose one.
 #----------------------------------------------------------------------
 def showTitleChoices(choices):
-    form = u"""\
+    form = """\
    <H3>More than one matching document found; please choose one.</H3>
 """
     for choice in choices:
-        form += u"""\
+        form += """\
    <INPUT TYPE='radio' NAME='DocId' VALUE='CDR%010d'>[CDR%d] %s<BR>
 """ % (choice[0], choice[0], html_escape(choice[1]))
-    cdrcgi.sendPage(header + form + u"""\
+    cdrcgi.sendPage(header + form + """\
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
    <INPUT TYPE='hidden' NAME='DocType' VALUE='%s'>
    <INPUT TYPE='hidden' NAME='ReportType' VALUE='%s'>
@@ -610,7 +608,7 @@ def addCheckbox(inputLabels, inputName, inputID='', checked=0):
     if inputName == 'Images':
        showImages = 'onclick="selectImageVersion(\'displayImages\')"'
 
-    cbHtml = u"""\
+    cbHtml = """\
       <input name='%s' type='checkbox' id='%s' %s
              %s>&nbsp;
       <label for='%s'>%s</label>
@@ -628,7 +626,7 @@ def addCheckbox(inputLabels, inputName, inputID='', checked=0):
 def addImageRadioBtn(inputLabels, inputName, inputID=''):
     id1 = 'pubYes'
     id2 = 'pubNo'
-    cbHtml = u"""\
+    cbHtml = """\
       <div id="pub-image" class="radio-button" style="display:none;">
        <input type='radio' name='%s' id='%s'
               value="Y" checked>&nbsp;
@@ -661,7 +659,7 @@ if not docId:
                                   '/DefinitionText',
                                   '/GlossaryTermConcept' +
                                   '/TranslatedTermDefinition/DefinitionText')
-                   AND q.value LIKE ?""", u"%" + glossaryDefinition + u"%")
+                   AND q.value LIKE ?""", "%" + glossaryDefinition + "%")
         elif docType:
             cursor.execute("""\
                 SELECT document.id, document.title
@@ -678,7 +676,7 @@ if not docId:
                  WHERE title LIKE ?""", docTitle + '%')
         rows = cursor.fetchall()
         if not rows:
-            cdrcgi.bail(u"Unable to find document with %s %s" %
+            cdrcgi.bail("Unable to find document with %s %s" %
                         (lookingFor, repr(docTitle)))
         if len(rows) > 1:
             showTitleChoices(rows)
@@ -691,7 +689,7 @@ if not docId:
 # We have a document ID.  Check added at William's request.
 #----------------------------------------------------------------------
 elif docType:
-    cursor.execute(u"""\
+    cursor.execute("""\
         SELECT t.name
           FROM doc_type t
           JOIN document d
@@ -726,7 +724,7 @@ if letUserPickVersion:
         rows = cursor.fetchall()
     except Exception as e:
         cdrcgi.bail(f"Failure retrieving document versions: {e}")
-    form = u"""\
+    form = """\
   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
   <INPUT TYPE='hidden' NAME='DocType' VALUE='%s'>
   <INPUT TYPE='hidden' NAME='DocId' VALUE='CDR%010d'>
@@ -737,11 +735,11 @@ if letUserPickVersion:
 
     # Include the ReportType so the "DocumentVersion" screen can differentiate
     # the specific report type to run.
-    form += u"""\
+    form += """\
   <INPUT TYPE='hidden' NAME='ReportType' VALUE='%s'>
 """ % (repType or "")
 
-    form += u"""\
+    form += """\
   <fieldset class='docversion'>
    <legend>&nbsp;Select document version&nbsp;</legend>
   <div style="width: 100%; text-align: center;">
@@ -753,13 +751,13 @@ if letUserPickVersion:
     # Limit display of version comment to 120 chars (if exists)
     # ---------------------------------------------------------
     for row in rows:
-        form += u"""\
+        form += """\
    <OPTION VALUE='%d'>[V%d %s] %s</OPTION>
 """ % (row[0], row[0], row[2][:10],
        not row[1] and "[No comment]" or html_escape(row[1][:120]))
         selected = ""
-    form += u"</SELECT></div></div>"
-    form += u"""
+    form += "</SELECT></div></div>"
+    form += """
   </fieldset>
 """
     if docType in ("Summary", "DrugInformationSummary", "GlossaryTermName"):
@@ -774,7 +772,7 @@ if letUserPickVersion:
         # ----------------------------------------------------------------
         if docType == 'Summary':
             if repType not in ("pat", "patbu", "patrs"):
-                form += u"""\
+                form += """\
      <fieldset>
       <legend>&nbsp;Board Markup&nbsp;</legend>
       <input name='Editorial-board' type='checkbox' id='eBoard'
@@ -789,7 +787,7 @@ if letUserPickVersion:
         # XXX WHAT IS THIS <TD> TAG DOING???
         # -----------------------------------------------------
     ### <td valign="top">
-        form += u"""\
+        form += """\
      <fieldset>
       <legend>&nbsp;Revision-level Markup&nbsp;</legend>
       <input name='publish' type='checkbox' id='pup'>
@@ -808,7 +806,7 @@ if letUserPickVersion:
     # Display the check boxes for the HP or Patient version sections
     # --------------------------------------------------------------
     if docType == 'GlossaryTermName':
-        form += u"""\
+        form += """\
      <table>
       <tr>
        <td class="colheading">Display Audience Definition</td>
@@ -853,7 +851,7 @@ if letUserPickVersion:
     # --------------------------------------------------------
     if docType == 'Summary':
         if repType == 'pat' or repType == 'patbu' or repType == 'patrs':
-            form += u"""\
+            form += """\
          <p>
          <fieldset>
           <legend>&nbsp;Misc Print Options&nbsp;</legend>
@@ -878,7 +876,7 @@ if letUserPickVersion:
 
         # End - Misc Print Options block
         # ------------------------------
-            form += u"""\
+            form += """\
              </fieldset>
         """
 
@@ -891,7 +889,7 @@ if letUserPickVersion:
     #                        X  O  X
     # -----------------------------------------------------------
     if docType == 'Summary':
-        form += u"""\
+        form += """\
      <p>
      <fieldset>
       <legend>&nbsp;Select Comment Types to be displayed&nbsp;</legend>
@@ -899,13 +897,13 @@ if letUserPickVersion:
       <input name='internal' type='checkbox' id='int'
 """
         if repType != 'pat' and repType != 'patbu' and repType != 'patrs':
-            form += u"""\
+            form += """\
 """
         else:
-            form += u"""\
+            form += """\
                    CHECKED="1"
 """
-        form += u"""\
+        form += """\
                    onclick='javascript:dispInternal()'>
       <label for='int'>Internal Comments (excluding permanent comments)</label>
       <br>
@@ -923,7 +921,7 @@ if letUserPickVersion:
         # -----------------------------------------------------------
         # XXX
         if repType != 'pat' and repType != 'patbu' and repType != 'patrs':
-            form += u"""\
+            form += """\
       <div class='comgroup'>
       <input name='external' type='checkbox' id='ext'
                    CHECKED="1"
@@ -936,7 +934,7 @@ if letUserPickVersion:
       </div>
 """
         else:
-            form += u"""\
+            form += """\
       <div class='comgroup'>
       <input name='external' type='checkbox' id='ext'
                    onclick='javascript:dispExternal()'>
@@ -949,7 +947,7 @@ if letUserPickVersion:
       </div>
 """
 
-        form += u"""\
+        form += """\
       <div class='comgroup'>
       <input name='all' type='checkbox' id='allcomment'
                    onclick='javascript:dispAll()'>
@@ -983,14 +981,14 @@ if letUserPickVersion:
 """
 
         if repType != 'pat' and repType != 'patbu' and repType != 'patrs':
-            form += u"""\
+            form += """\
 """
         else:
-            form += u"""\
+            form += """\
                CHECKED = "1"
 """
 
-        form += u"""\
+        form += """\
                ID      = "ai">&nbsp; Internal
        </td>
       </tr>
@@ -1001,14 +999,14 @@ if letUserPickVersion:
 """
 
         if repType != 'pat' and repType != 'patbu' and repType != 'patrs':
-            form += u"""\
+            form += """\
                CHECKED = "1"
 """
         else:
-            form += u"""\
+            form += """\
 """
 
-        form += u"""\
+        form += """\
                ID      = "ae">&nbsp; External
        </td>
        </tr>
@@ -1034,14 +1032,14 @@ if letUserPickVersion:
 """
 
         if repType != 'pat' and repType != 'patbu' and repType != 'patrs':
-            form += u"""\
+            form += """\
 """
         else:
-            form += u"""\
+            form += """\
                CHECKED = "1"
 """
 
-        form += u"""\
+        form += """\
                ID      = "sa">&nbsp; Advisory
        </td>
        </tr>
@@ -1059,14 +1057,14 @@ if letUserPickVersion:
 """
 
         if repType != 'pat' and repType != 'patbu' and repType != 'patrs':
-            form += u"""\
+            form += """\
                CHECKED = "1"
 """
         else:
-            form += u"""\
+            form += """\
 """
 
-        form += u"""\
+        form += """\
                ID      = "dp">&nbsp; Permanent
        </td>
       </tr>
@@ -1089,7 +1087,7 @@ if letUserPickVersion:
     # --------------------------------------------------
     if docType == 'Summary':
         if repType != 'pat' and repType != 'patbu' and repType != 'patrs':
-            form += u"""\
+            form += """\
          <p>
          <fieldset>
           <legend>&nbsp;Misc Print Options&nbsp;</legend>
@@ -1110,14 +1108,14 @@ if letUserPickVersion:
 
         # End - Misc Print Options block
         # ------------------------------
-            form += u"""\
+            form += """\
              </fieldset>
         """
 
     # Display the Quick&Dirty option checkbox
     # ---------------------------------------
     if docType == 'Summary':
-        form += u"""\
+        form += """\
   <p>
      <fieldset>
       <legend>&nbsp;911 Options&nbsp;</legend>
@@ -1125,10 +1123,10 @@ if letUserPickVersion:
       <label for='dispQD'>Run Quick &amp; Dirty report</label>
       <br>
      </fieldset>"""
-#    form += u"""
+#    form += """
 #     </table>"""
 
-    cdrcgi.sendPage(header + form + u"""
+    cdrcgi.sendPage(header + form + """
  </BODY>
 </HTML>
 """)
@@ -1620,9 +1618,9 @@ if docType not in filters:
     cdr.logwrite(message % (docType, user_name))
     doc = cdr.getDoc(session, docId, version = version or "Current",
                      getObject = 1)
-    if type(doc) in (type(""), type(u"")):
+    if isinstance(doc, (str, bytes)):
         cdrcgi.bail(doc)
-    html = u"""\
+    html = """\
 <html>
  <head>
   <title>%s</title>
@@ -1750,11 +1748,12 @@ try:
 except Exception as e:
     cdrcgi.bail("filtering error: {}".format(e))
 
-#if (type(doc) in (type(""), type(u"")):
+#if (type(doc) in (type(""), type("")):
 #    cdrcgi.bail("OOPS! %s" % doc)
 if docType == "CTGovProtocol":
-    if (type(doc) in (type(""), type(u"")) and
-        doc.find("undefined/lastp") != -1):
+    if isinstance(doc, bytes):
+        doc = str(doc, "utf-8")
+    if isinstance(doc, str) and "undefined/lastp" in doc:
         # cdrcgi.bail("CTGovProtocol QC Report cannot be run until "
         #             "PDQIndexing block has been completed")
         filterParm.append(['skipPdqIndexing', 'Y'])
@@ -1768,7 +1767,7 @@ if docType == "CTGovProtocol":
 """
     else:
         noPdqIndexing = ""
-if type(doc) in (type(""), type(u"")):
+if isinstance(doc, (str, bytes)):
     cdrcgi.bail(doc)
 if type(doc) == type(()):
     doc = doc[0]
@@ -1798,8 +1797,8 @@ elif docType == 'PDQBoardMemberInfo':
 # cdrcgi.bail("docType = %s" % docType)
 
 # If not already changed to unicode by a fix.. routine, change it
-if type(doc) != type(u""):
-    doc = unicode(doc, 'utf-8')
+if isinstance(doc, bytes):
+    doc = str(doc, 'utf-8')
 
 # cdrcgi.bail('%s - %s' % (docParms, type(docParms)))
 #----------------------------------------------------------------------

@@ -25,12 +25,9 @@ import xml.sax.handler
 
 from datetime import datetime as dt
 from io import BytesIO
-from os import O_BINARY
 from sys import stdout
-from msvcrt import setmode
 from xlsxwriter import Workbook
 from cdr import get_image
-#from cdrapi.db import Query
 from cdrapi.docs import Doc
 from cdrapi.users import Session
 from cdrapi import db
@@ -61,12 +58,11 @@ end_date   = fields.getvalue("end_date")
 #addImage  = "Y"
 # ------------------------
 
-cdr.logwrite("*** MediaCaptionContent.py started")
+LOGGER = cdr.Logging.get_logger("MediaCaptionContent")
+LOGGER.info("*** started")
 URL = "{}/cgi-bin/cdr/GetCdrImage.py?id={}"
 FILENAME = "{}.xlsx".format(dt.now().strftime("%Y%m%d%H%M%S"))
-
-setmode(stdout.fileno(), O_BINARY)  # Needed on Windows machines
-output = BytesIO()                  # ^^^
+output = BytesIO()
 
 #----------------------------------------------------------------------
 # Form buttons
@@ -103,15 +99,15 @@ query = db.Query("query_term t", "t.doc_id", "t.value")
 query.join("query_term m", "m.int_val = t.doc_id")
 query.where("t.path = '/Term/PreferredName'")
 query.where("m.path = '/Media/MediaContent/Diagnoses/Diagnosis/@cdr:ref'")
-results = query.unique().order(2).execute(cursor).fetchall()
-diagnoses = [("any", "Any Diagnosis")] + results
+rows = query.unique().order(2).execute(cursor).fetchall()
+diagnoses = [("any", "Any Diagnosis")] + [tuple(row) for row in rows]
 
 query = db.Query("query_term", "value", "value")
 query.where("path = '/Media/MediaContent/Categories/Category'")
 query.where("value <> ''")
 results = query.unique().order(1).execute(cursor).fetchall()
 
-categories = [("any", "Any Category")] + results
+categories = [("any", "Any Category")] + [tuple(row) for row in results]
 languages = (("all", "All Languages"),
              ("en", "English"),
              ("es", "Spanish"))
@@ -129,7 +125,7 @@ images    = (("Y", "Yes"), ("N", "No"))
 for value, values in ((diagnosis, diagnoses), (audience, audiences),
                       (language, languages), (category, categories),
                       (addImage, images)):
-    if isinstance(value, basestring):
+    if isinstance(value, str):
         value = [value]
     values = [str(v[0]).lower() for v in values]
     for val in value:
@@ -311,7 +307,7 @@ try:
 except Exception as e:
     msg = "Database error executing MediaCaptionContent.py query"
     extra = f"query = {query}", f"error = {e}"
-    cdr.logwrite(str(e))
+    LOGGER.exception("Report database query failure")
     cdrcgi.bail(msg, extra=extra)
 
 # If there was no data, we're done
@@ -448,7 +444,7 @@ Error: %s""" % (docId, result))
             try:
                 image = get_image(doc.id, height=200, width=200, return_stream=True)
             except Exception as e:
-                cdr.logwrite("No blob found for CDR document {}".format(doc.id))
+                LOGGER.exception("Fetching blob for %s", doc.id)
 
                 #args = doc.cdr_id, doc.has_blob, e
                 #sys.stderr.write("{} ({}) failed: {}\n".format(*args))
@@ -464,15 +460,16 @@ Error: %s""" % (docId, result))
 
     row += 2
 
-cdr.logwrite("*** MediaCaptionContent.py finished")
+LOGGER.info("*** finished")
 #sys.exit()
 # Output
 book.close()
 output.seek(0)
 book_bytes = output.read()
-stdout.write("""\
+stdout.buffer.write(f"""\
 Content-type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
-Content-Disposition: attachment; filename={}
-Content-length: {:d}
+Content-Disposition: attachment; filename={FILENAME}
+Content-length: {len(book_bytes):d}
 
-{}""".format(FILENAME, len(book_bytes), book_bytes))
+""".encode("utf-8"))
+stdout.buffer.write(book_bytes)

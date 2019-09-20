@@ -3,6 +3,9 @@
 #
 # BZIssue::3316
 # JIRA::OCECDR-3800 - Address security vulnerabilities
+#
+# As of 2019-09-20 the "Terms with No Parent Term and Not a Semantic
+# Type" version of this report has been retired.
 #----------------------------------------------------------------------
 import cgi
 import cdrcgi

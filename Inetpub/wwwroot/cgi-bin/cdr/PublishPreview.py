@@ -92,19 +92,19 @@ class Summary:
     def postprocess(self, page):
         for script in page.iter("script"):
             if script.text is None:
-                script.text = u" "
+                script.text = " "
             url = script.get("src")
-            if url is not None and not url.startswith(u"https:"):
-                if not url.startswith(u"http"):
-                    url = u"{}{}".format(self.url, url)
-                src = u"{}?url={}".format(self.PROXY, url)
-                script.set(u"src", src)
+            if url is not None and not url.startswith("https:"):
+                if not url.startswith("http"):
+                    url = "{}{}".format(self.url, url)
+                src = "{}?url={}".format(self.PROXY, url)
+                script.set("src", src)
         for link in page.findall("head/link"):
             url = link.get("href")
             if url is not None and not url.startswith("https://"):
-                if not url.startswith(u"http"):
-                    url = u"{}{}".format(self.url, url)
-                href = u"{}?url={}".format(self.PROXY, url)
+                if not url.startswith("http"):
+                    url = "{}{}".format(self.url, url)
+                href = "{}?url={}".format(self.PROXY, url)
                 link.set("href", href)
         replacement = "https://{}{}".format(self.image_host, self.IMAGE_PATH)
         for img in page.iter("img"):
@@ -113,7 +113,7 @@ class Summary:
                 src = src.replace(self.IMAGE_PATH, replacement)
                 img.set("src", src)
             elif not src.startswith("http"):
-                img.set("src", u"{}{}".format(self.url, src))
+                img.set("src", "{}{}".format(self.url, src))
         for a in page.xpath("//a[@href]"):
             if "nav-item-xxtitle" in (a.getparent().get("class") or ""):
                 continue
@@ -147,7 +147,7 @@ class Summary:
                             link_type = "SummaryRef-external"
                     else:
                         fixed = "{}{}".format(self.url, href)
-                        # fixed = u"{}?url={}".format(self.PROXY, fixed)
+                        # fixed = "{}?url={}".format(self.PROXY, fixed)
                         link_type = "Cancer.gov-link"
                 else:
                     link_type = "Dead-link"
@@ -191,9 +191,8 @@ class Summary:
         args = len(page), elapsed
         message = "Assembled %d bytes in %f seconds"
         self.doc.session.logger.info(message, *args)
-        print("Content-type: text/html; charset=utf-8")
-        print("")
-        print(page)
+        sys.stdout.buffer.write(b"Content-type: text/html; charset=utf-8\n\n")
+        sys.stdout.buffer.write(page)
 
 
 class CIS(Summary):

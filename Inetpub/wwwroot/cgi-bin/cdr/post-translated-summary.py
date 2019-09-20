@@ -13,7 +13,6 @@ class Control(cdrcgi.Control):
             cdrcgi.bail("Invalid or missing session.")
         if not cdr.canDo(self.session, "CREATE WS SUMMARIES"):
             cdrcgi.bail("Account not authorized for adding WS summaries.")
-        self.set_binary_mode()
     def set_form_options(self, opts):
         opts["enctype"] = "multipart/form-data"
         return opts
@@ -59,26 +58,17 @@ class Control(cdrcgi.Control):
             return None
         f = self.fields[name]
         if f.file:
-            bytes = []
+            file_bytes = []
             while True:
                 more_bytes = f.file.read()
                 if not more_bytes:
                     break
-                bytes.append(more_bytes)
+                file_bytes.append(more_bytes)
         else:
-            bytes = [f.value]
-        return "".join(bytes)
+            file_bytes = [f.value]
+        return b"".join(file_bytes)
     def message(self, what, color):
         style = "text-align: center; font-weight: bold; color: %s;" % color
         return self.B.P(str(what), style=style)
-    def set_binary_mode(self):
-        try:
-            import msvcrt
-            import os
-            msvcrt.setmode(0, os.O_BINARY) # stdin = 0
-            msvcrt.setmode(1, os.O_BINARY) # stdout = 1
-        except ImportError:
-            pass
-        except:
-            cdrcgi.bail("Internal error")
+
 Control().run()

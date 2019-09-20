@@ -16,7 +16,6 @@
 # JIRA::OCECDR-4170 - complete rewrite
 #----------------------------------------------------------------------
 import datetime
-import os
 import sys
 import lxml.etree as etree
 import cdrcgi
@@ -95,18 +94,17 @@ class Control(cdrcgi.Control):
         self.add_sheet(self.NCI_TITLE, self.nci_terms)
         self.add_sheet(self.CDR_TITLE, self.cdr_terms)
         self.add_sheet(self.RVW_TITLE, self.rvw_terms)
-        if sys.platform == "win32":
-            import msvcrt
-            msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
         stamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
         secs = (datetime.datetime.now() - self.begin).total_seconds()
         ndocs = self.ndocs
         name = "DrugReviewReport-%s-%d_docs-%s_secs.xls" % (stamp, ndocs, secs)
         if not self.test:
-            print("Content-type: application/vnd.ms-excel")
-            print("Content-Disposition: attachment; filename=%s" % name)
-            print()
-        self.styles.book.save(sys.stdout)
+            sys.stdout.buffer.write(f"""\
+Content-type: application/vnd.ms-excel
+Content-Disposition: attachment; filename={name}
+
+""".encode("utf-8"))
+        self.styles.book.save(sys.stdout.buffer)
 
     def collect_terms(self):
         """

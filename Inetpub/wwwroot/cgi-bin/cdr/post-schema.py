@@ -18,7 +18,6 @@ class Control(cdrcgi.Control):
             cdrcgi.bail("Account not authorized for posting schemas.")
         self.comment = self.fields.getvalue("comment") or self.REASON
         self.action = self.fields.getvalue("action")
-        #self.set_binary_mode()
     def set_form_options(self, opts):
         opts["enctype"] = "multipart/form-data"
         return opts
@@ -63,14 +62,15 @@ class Control(cdrcgi.Control):
         if result.code:
             raise Exception("DTD check failure: %s" % result.output)
         self.logger.info("DTDs updated")
-        return "Running CheckDtds.py ...\n" + result.output
+        return "Running CheckDtds.py ...\n" + str(result.output, "utf-8")
     def refresh_manifest(self):
         cmd = r"python d:\cdr\build\RefreshManifest.py"
         result = cdr.runCommand(cmd)
         if result.code:
-            raise Exception("Manifest refresh failure: %s" % result.output)
+            output = str(result.output, "utf-8")
+            raise Exception(f"Manifest refresh failure: {output}")
         self.logger.info("Manifest updated")
-        return "Running RefreshManifest.py ...\n" + result.output
+        return "Running RefreshManifest.py ...\n" + str(result.output, "utf-8")
     def add_doc(self, schema):
         ctrl = dict(DocTitle=self.filename)
         doc = cdr.Doc(schema, doctype="schema", ctrl=ctrl)
@@ -110,11 +110,11 @@ class Control(cdrcgi.Control):
                 chars.append(more_chars)
         else:
             chars = [f.value]
-        return "".join(chars)
+        return b"".join(chars)
     def find_schema(self, title):
         query = "CdrCtl/Title = {}".format(title)
         results = cdr.search(self.session, query, doctypes=["schema"])
-        if isinstance(results, basestring):
+        if isinstance(results, (str, bytes)):
             raise Exception(results)
         if len(results) < 1:
             self.logger.info("Search found no documents for %r", title)
@@ -127,7 +127,7 @@ class Control(cdrcgi.Control):
             raise Exception("Schema document %r already exists" % title)
         self.logger.info("Found schema document %s", results[0].docId)
         doc = cdr.getDoc(self.session, results[0].docId, "Y", getObject=True)
-        if isinstance(doc, basestring):
+        if isinstance(doc, (str, bytes)):
             raise Exception("Failure fetching schema document: %r" % doc)
         return doc
     def message(self, what, color):
@@ -139,14 +139,4 @@ class Control(cdrcgi.Control):
         else:
             what = str(what.replace("\n", cdrcgi.NEWLINE).replace("\r", ""))
             return self.B.PRE(what, style=style)
-    def set_binary_mode(self):
-        try:
-            import msvcrt
-            import os
-            msvcrt.setmode(0, os.O_BINARY) # stdin = 0
-            msvcrt.setmode(1, os.O_BINARY) # stdout = 1
-        except ImportError:
-            pass
-        except:
-            cdrcgi.bail("Internal error")
 Control().run()

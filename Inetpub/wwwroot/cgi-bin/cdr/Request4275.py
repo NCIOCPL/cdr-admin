@@ -329,16 +329,13 @@ def createReport(cursor, mailerType, changeCategory, startDate, endDate):
     for mailerId in mailerIds:
         mailer = Mailer(mailerId, cursor)
         row = mailer.addToSheet(styles, sheet, row)
-    try:
-        import msvcrt, os
-        msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
-    except:
-        pass
     stamp = time.strftime("%Y%m%d%H%M%S")
-    print("Content-type: application/vnd.ms-excel")
-    print("Content-Disposition: attachment; filename=SummMailRep-%s.xls" % stamp)
-    print()
-    styles.book.save(sys.stdout)
+    sys.stdout.buffer.write(f"""\
+Content-type: application/vnd.ms-excel
+Content-Disposition: attachment; filename=SummMailRep-{stamp}.xls
+
+""".encode("utf-8"))
+    styles.book.save(sys.stdout.buffer)
 
 #----------------------------------------------------------------------
 # Create the report or as for the report parameters.

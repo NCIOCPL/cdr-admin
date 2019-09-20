@@ -8,7 +8,6 @@ JIRA::OCECDR-4568
 
 import datetime
 from io import BytesIO
-from os import O_BINARY
 import re
 from sys import stdout
 from lxml import etree
@@ -200,7 +199,6 @@ jQuery(add_button());
           subtitle - expanded list of search terms
         """
 
-        setmode(stdout.fileno(), O_BINARY)
         stamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
         filename = "standard-wording-{}.xlsx".format(stamp)
         output = BytesIO()
@@ -230,12 +228,13 @@ jQuery(add_button());
         book.close()
         output.seek(0)
         book_bytes = output.read()
-        stdout.write("""\
+        stdout.buffer.write(f"""\
 Content-type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
-Content-Disposition: attachment; filename={}
-Content-length: {:d}
+Content-Disposition: attachment; filename={filename}
+Content-length: {len(book_bytes)}
 
-{}""".format(filename, len(book_bytes), book_bytes))
+""".encode("utf-8"))
+        stdout.buffer.write(book_bytes)
 
     def collect_terms(self):
         """
@@ -265,7 +264,7 @@ Content-length: {:d}
             if term and term.strip():
 
                 # See if the term matches a glossary term name document.
-                term = Summary.normalize(term.decode("utf-8")).strip()
+                term = Summary.normalize(term).strip()
                 query = db.Query("query_term", "doc_id")
                 query.where(query.Condition("path", path))
                 query.where(query.Condition("value", term))
@@ -474,7 +473,7 @@ Content-length: {:d}
             .replace("|",  r"\|")
             .replace("(",  r"\(")
             .replace(")",  r"\)")
-            .replace("'",  u"['\u2019]"))
+            .replace("'",  "['\u2019]"))
 
 
 class Summary:

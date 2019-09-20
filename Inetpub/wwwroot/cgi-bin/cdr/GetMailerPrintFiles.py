@@ -28,8 +28,6 @@ except Exception as e:
         print(str(e))
         sys.exit(0)
 
-import msvcrt, os
-msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
-bytes = fobj.read()
-sys.stdout.write("Content-type: application/binary\n\n")
-sys.stdout.write(bytes)
+file_bytes = fobj.read()
+sys.stdout.buffer.write(b"Content-type: application/binary\n\n")
+sys.stdout.buffer.write(bytes)

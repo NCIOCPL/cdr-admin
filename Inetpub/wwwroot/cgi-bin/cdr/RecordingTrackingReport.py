@@ -172,10 +172,9 @@ for docId, docTitle, encoding, created in cursor.fetchall():
     row = mediaDoc.addToSheet(sheet, styles, row)
 now = datetime.datetime.now()
 name = 'RecordingTrackingReport-%s.xls' % now.strftime("%Y%m%d%H%M%S")
-if sys.platform == "win32":
-    import os, msvcrt
-    msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
-print("Content-type: application/vnd.ms-excel")
-print("Content-Disposition: attachment; filename=%s" % name)
-print()
-styles.book.save(sys.stdout)
+sys.stdout.buffer.write(f"""\
+Content-type: application/vnd.ms-excel
+Content-Disposition: attachment; filename={name}
+
+""".encode("utf-8"))
+styles.book.save(sys.stdout.buffer)

@@ -31,6 +31,7 @@
 # Request form for generating RTF letters to board members."
 #
 #----------------------------------------------------------------------
+import sys
 import cgi, cdr, cdrcgi, time
 import lxml.etree as etree
 from cdrapi import db as cdrdb
@@ -306,16 +307,14 @@ class Mailer:
                     comment = e.text.strip()
                     if comment:
                         self.comments.append(comment)
-    def __cmp__(self, other):
+    def __lt__(self, other):
         if Mailer.sortBy == "member":
-            diff = cmp(self.recipient, other.recipient)
-            if diff:
-                return diff
-            return cmp(self.summary, other.summary)
-        diff = cmp(self.summary, other.summary)
-        if diff:
-            return diff
-        return cmp(self.recipient, other.recipient)
+            a = self.recipient, self.summary
+            b = other.recipient, other.summary
+        else:
+            a = self.summary, self.recipient
+            b = other.summary, other.recipient
+        return a < b
     @classmethod
     def getSummary(cls, e, cursor):
         docId = e.get('{cips.nci.nih.gov/cdr}ref')
@@ -378,12 +377,6 @@ def getBoardName(cursor, boardId):
 #----------------------------------------------------------------------
 if board:
 
-    try:
-        import msvcrt, os, sys
-        msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
-    except:
-        pass
-
     cursor = conn.cursor()
     cursor.execute("CREATE TABLE #board_member (person_id INT, member_id INT)")
     cursor.execute("CREATE TABLE #board_summary (doc_id INT)")
@@ -420,10 +413,12 @@ if board:
     else:
         report4259(sheet, styles, cursor, board, begin, end)
     stamp = time.strftime("%Y%m%d%H%M%S")
-    print("Content-type: application/vnd.ms-excel")
-    print("Content-Disposition: attachment; filename=SummMailRep-%s.xls" % stamp)
-    print()
-    styles.book.save(sys.stdout)
+    sys.stdout.buffer.write(f"""\
+Content-type: application/vnd.ms-excel
+Content-Disposition: attachment; filename=SummMailRep-{stamp}.xls
+
+""".encode("utf-8"))
+    styles.book.save(sys.stdout.buffer)
 
 else:
     boards = makeBoardPicklist(conn.cursor())

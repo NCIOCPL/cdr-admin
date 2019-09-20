@@ -11,14 +11,6 @@ import cdrcgi
 import datetime
 import zipfile
 
-try: # Windows needs stdio set for binary mode.
-    import msvcrt
-    import os
-    msvcrt.setmode (0, os.O_BINARY) # stdin  = 0
-    msvcrt.setmode (1, os.O_BINARY) # stdout = 1
-except ImportError:
-    pass
-
 fields = cgi.FieldStorage()
 session = cdrcgi.getSession(fields)
 if not session or not cdr.canDo(session, "UPLOAD ZIP CODES"):
@@ -54,7 +46,7 @@ input { display: block; }
         <input type="file" name="codes">
         <input type="submit" value="Submit" name="Request" id="submit">
         <hr>
-        <p><strong>Note</strong>:<br>The load will take several minutes. 
+        <p><strong>Note</strong>:<br>The load will take several minutes.
            Don't press <em>Submit</em> twice.</p>
       </fieldset>
     </form>
@@ -64,18 +56,18 @@ input { display: block; }
 # Read the zip file
 # -----------------
 if codes.file:
-    bytes = []
+    filebytes = []
     while True:
         more_bytes = codes.file.read()
         if not more_bytes:
             break
-        bytes.append(more_bytes)
+        filebytes.append(more_bytes)
 else:
-    bytes = [codes.value]
+    filebytes = [codes.value]
 
 # We don't like empty files
 # -------------------------
-if not bytes:
+if not filebytes:
     cdrcgi.bail("Empty file")
 
 # Save a copy of the uploaded files in the uploads directory
@@ -90,10 +82,9 @@ cmd = '%s %s %s' % (cdr.PYTHON, zipload, ziptxt)
 # Saving the ZIP file to disk
 # ---------------------------
 try:
-    fp = open(name, "wb")
-    for segment in bytes:
-        fp.write(segment)
-    fp.close()
+    with open(name, "wb") as fp:
+        for segment in filebytes:
+            fp.write(segment)
 except Exception as e:
     cdrcgi.bail("failure storing %s: %s" % (name, e))
 
@@ -104,9 +95,8 @@ try:
     names = zf.namelist()
     if "z5max.txt" in names:
         payload = zf.read("z5max.txt")
-        fzip = open("%s" % ziptxt, "w")
-        fzip.write(payload)
-        fzip.close()
+        with open("%s" % ziptxt, "w") as fzip:
+            fzip.write(payload)
 
         # Now that we have the data file on the server we're ready
         # to run the load script
@@ -117,7 +107,7 @@ try:
         except Exception as e:
             print("Content-type: text/plain\n\n%s\n%s" % (cmd, repr(e)))
         # sys.exit(0)
-        
+
     else:
         payload = u"\n".join(names)
 except Exception as e:

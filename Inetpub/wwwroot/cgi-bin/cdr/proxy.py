@@ -4,18 +4,13 @@
 #----------------------------------------------------------------------
 import cgi
 import cdr
+import os
 import requests
-import urlparse
+import urllib.parse
 import re
 import sys
 import datetime
 import time
-try:
-    import os
-    import msvcrt
-    msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
-except:
-    pass
 
 # TODO: Get Acquia to fix their broken certificates.
 from urllib3.exceptions import InsecureRequestWarning
@@ -81,12 +76,13 @@ def fix_css(original, url):
 #----------------------------------------------------------------------
 def send(what, content_type=None):
     if content_type is None:
-        content_type = "text/plain"
-    sys.stdout.write("Content-type: %s\r\n\r\n" % content_type)
+        content_type = "text/plain;charset=utf-8"
+    header = f"Content-type: {content_type}\r\n\r\n"
+    sys.stdout.buffer.write(header.encode("utf-8"))
     written = 0
     while written < len(what):
         portion = what[written:written+CHUNK]
-        sys.stdout.write(portion)
+        sys.stdout.buffer.write(portion)
         written += CHUNK
     sys.exit(0)
 
@@ -105,9 +101,9 @@ try:
         if header.lower().startswith("content-type"):
             content_type = response.headers.get(header).strip()
             break
-    if isinstance(content_type, basestring) and "css" in content_type:
+    if isinstance(content_type, str) and "css" in content_type:
         proxy = "/cgi-bin/cdr/proxy.py"
-        parsed_url = urlparse.urlparse(url)
+        parsed_url = urllib.parse.urlparse(url)
         scheme = parsed_url.scheme
         netloc = parsed_url.netloc
         path = parsed_url.path

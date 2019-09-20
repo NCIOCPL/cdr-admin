@@ -1,9 +1,8 @@
 #----------------------------------------------------------------------
 # Sends back Excel workbook report to client.
 #----------------------------------------------------------------------
-import cgi, cdrcgi, os, msvcrt, sys
+import cgi, cdrcgi, sys
 
-msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
 fields = cgi.FieldStorage()
 name   = fields and fields.getvalue('name') or cdrcgi.bail('Missing name')
 try:
@@ -12,8 +11,9 @@ try:
 except:
     cdrcgi.bail('Report %s not found' % name)
 
-print("""\
+sys.stdout.buffer.write(f"""\
 Content-type: application/vnd.ms-excel
-Content-disposition: attachment;filename=%s
-""" % name)
-sys.stdout.write(book)
+Content-disposition: attachment;filename={name}
+
+""".encode("utf-8"))
+sys.stdout.buffer.write(book)
