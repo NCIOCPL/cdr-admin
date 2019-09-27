@@ -76,7 +76,7 @@ class Control(cdrcgi.Control):
             attrs = "summary.title", "reviewer.title"
             labels = "Tracker", "Summary", "Reviewer"
         if self.method == "all":
-            for summary in self.board.summaries.values():
+            for summary in list(self.board.summaries.values()):
                 for recip_id in summary.get_checkbox_ids():
                     tracker = Tracker(session, summary.id, recip_id)
                     #print("{}-{}".format(summary.id, recip_id))
@@ -507,7 +507,7 @@ class Board:
             selected = self.control.summaries
             self.outer, self.inner = self.summaries, self.members
         if "all" in selected:
-            outer = self.outer.values()
+            outer = list(self.outer.values())
         else:
             outer = []
             for id in selected:
@@ -546,8 +546,8 @@ class Board:
         adjust the composition of the summary and board member picklists.
         """
         glue = ",\n        "
-        members = self.members.values()
-        summaries = self.summaries.values()
+        members = list(self.members.values())
+        summaries = list(self.summaries.values())
         if members:
             members = glue.join([m.to_script() for m in sorted(members)])
             members = "\n        %s" % members
@@ -559,9 +559,9 @@ class Board:
     ], [%s
     ])""" % (self.id, self.id, self.type, members, summaries)
 
-    def __cmp__(self, other):
+    def __lt__(self, other):
         "Support sorting the boards alphabetically by name."
-        return cmp(self.name, other.name)
+        return self.name < other.name
 
 class Choice:
     """
@@ -573,8 +573,8 @@ class Choice:
         self.board = board
         self.id = id
         self.name = doc_title.split(";")[0].strip()
-    def __cmp__(self, other):
-        return cmp(self.name, other.name)
+    def __lt__(self, other):
+        return self.name < other.name
     def to_script(self):
         return """new Choice({}, "{}")""".format(dumps(self.name), self.id)
     def get_checkbox_ids(self):
@@ -643,7 +643,7 @@ class Tracker:
     NOW = datetime.now().isoformat().split(".")[0]
     TYPE = "Summary-PDQ Advisory Board"
     MODE = "Web-based"
-    OPTS = dict(encoding="utf-8", xml_declaration=True, pretty_print=True)
+    OPTS = dict(encoding="unicode", pretty_print=True)
 
     summaries = {}
     reviewers = {}

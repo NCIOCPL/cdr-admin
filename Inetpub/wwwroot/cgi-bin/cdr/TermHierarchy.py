@@ -30,7 +30,7 @@ message   = ""
 #----------------------------------------------------------------------
 def showTerm(term, offset, primaryTerm = 0):
     global html
-    idInt = string.atoi(term.id)
+    idInt = int(term.id)
     idStr = "CDR%010d" % idInt
     coloredId = "<FONT COLOR='%s'>%s</FONT>" % (
                     primaryTerm and 'red' or 'blue', idStr)
@@ -126,7 +126,7 @@ if not docId:
 #----------------------------------------------------------------------
 else:
     if docId[:3] == "CDR": docId = docId[3:]
-    docId = string.atoi(docId)
+    docId = int(docId)
     termSet = cdr.getTree('guest', "CDR%010d" % docId)
     if termSet.error: cdrcgi.bail(tree.error)
     if not termSet.terms: cdrcgi.bail("Term document does not specify "

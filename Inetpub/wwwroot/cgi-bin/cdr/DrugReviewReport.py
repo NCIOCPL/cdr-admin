@@ -217,7 +217,7 @@ class Drug:
         query = db.Query("document", "xml")
         query.where(query.Condition("id", doc_id))
         xml = query.execute(control.cursor).fetchone()[0]
-        root = etree.fromstring(xml.encode("utf-8"))
+        root = etree.fromstring(xml)
         self.name = self.get_text(root.find("PreferredName"))
         self.last_mod = self.get_text(root.find("DateLastModified"))
         self.other_names = [self.OtherName(n) for n in root.findall("other")]
@@ -345,7 +345,7 @@ class Drug:
         for definition in definitions:
             if not first:
                 pieces.append("\n\n")
-            if isinstance(definition.with_comments, basestring):
+            if isinstance(definition.with_comments, str):
                 pieces.append(definition.with_comments)
             else:
                 pieces += definition.with_comments
@@ -418,8 +418,8 @@ class Drug:
         """
 
         if node is None:
-            return u""
-        return u"".join(node.itertext("*"))
+            return ""
+        return "".join(node.itertext("*"))
 
     class Definition:
         """
@@ -546,7 +546,7 @@ class Drug:
             """
 
             if self.audience == self.PUBLIC:
-                return (u"\n[%s]" % self.text, font)
+                return ("\n[%s]" % self.text, font)
             return None
 
 if __name__ == "__main__":

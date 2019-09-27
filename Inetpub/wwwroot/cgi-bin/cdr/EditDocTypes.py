@@ -2,7 +2,7 @@
 # Interface for editing CDR document types.
 # JIRA::OCECDR-4091
 #----------------------------------------------------------------------
-import urllib
+import urllib.request, urllib.parse, urllib.error
 import cdr
 import cdrcgi
 
@@ -50,11 +50,11 @@ a:hover { text-decoration: underline; }
         return self.B.TR(*cells)
     def make_cell(self, doctype):
         self.parms["doctype"] = doctype
-        url = "%s?%s" % (self.EDIT_DOCTYPE, urllib.urlencode(self.parms))
+        url = "%s?%s" % (self.EDIT_DOCTYPE, urllib.parse.urlencode(self.parms))
         return self.B.TD(self.B.A(doctype, href=url))
     def get_doctypes(self):
         doctypes = cdr.getDoctypes(self.session)
-        if isinstance(doctypes, basestring):
+        if isinstance(doctypes, (str, bytes)):
             cdrcgi.bail(doctypes)
         return sorted(doctypes)
 

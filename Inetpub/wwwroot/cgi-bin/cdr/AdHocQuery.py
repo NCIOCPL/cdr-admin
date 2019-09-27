@@ -37,8 +37,8 @@ if action == "Log Out":
 # Request the query.
 #----------------------------------------------------------------------
 if not query:
-    form = u"""\
-    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
+    form = """\
+    <input type='hidden' name='%s' value='%s'>
     <b>Enter SQL query:</b><br>
     <textarea name='Query' rows='20' cols='80'>
 /*
@@ -56,9 +56,9 @@ SELECT TOP 10 d.id
 
      </textarea>
      <br><b>Enter timeout in seconds:</b><br>
-    <INPUT TYPE='text' NAME='TimeOut' VALUE='20'>
+    <input type='text' name='TimeOut' value='20'>
 """ % (cdrcgi.SESSION, session)
-    cdrcgi.sendPage(header + form + u"</FORM></BODY></HTML>")
+    cdrcgi.sendPage(header + form + "</form></body></html>")
 
 #----------------------------------------------------------------------
 # Create the report.
@@ -69,7 +69,7 @@ try:
     cursor.execute(query)
     if not cursor.description:
         cdrcgi.bail('No result set returned')
-    html = u"""\
+    html = """\
 <html>
  <head>
   <title>Ad Hoc Query</title>
@@ -82,29 +82,30 @@ try:
    <tr>
 """ % (query.replace("\r", "").rstrip()).replace("<", "&lt;")
     for col in cursor.description:
-        html += u"""\
+        html += """\
     <th align='center'>%s</th>
 """ % (col[0] or "-")
-    html += u"""\
+    html += """\
    </tr>
 """
     row = cursor.fetchone()
     while row:
-        html += u"""\
+        html += """\
    <tr>
 """
         for col in row:
             if col is None: col = "NULL"
+            elif col == 0: col = "0"
             elif not col: col = "&nbsp;"
-            elif type(col) in (type(""), type(u"")): col = html_escape(col)
-            html += u"""\
+            elif isinstance(col, str): col = html_escape(col)
+            html += """\
     <td valign='top'>%s</td>
 """ % col
-        html += u"""\
+        html += """\
    </tr>
 """
         row = cursor.fetchone()
-    html += u"""\
+    html += """\
   </table>
  </body>
 </html>
@@ -112,4 +113,4 @@ try:
 
 except Exception as e:
     cdrcgi.bail('Database failure: %s' % e)
-cdrcgi.sendPage(u"".join(html))
+cdrcgi.sendPage("".join(html))

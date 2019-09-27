@@ -753,7 +753,7 @@ if letUserPickVersion:
     for row in rows:
         form += """\
    <OPTION VALUE='%d'>[V%d %s] %s</OPTION>
-""" % (row[0], row[0], row[2][:10],
+""" % (row[0], row[0], str(row[2])[:10],
        not row[1] and "[No comment]" or html_escape(row[1][:120]))
         selected = ""
     form += "</SELECT></div></div>"
@@ -1173,7 +1173,7 @@ if not docType:
  </xsl:template>
 </xsl:transform>""", inline = 1, docId = docId, docVer = version or None)
 
-        if b"Patients" in inspectSummary[0]:
+        if "Patients" in inspectSummary[0]:
             repType = 'pat'
 
 
@@ -1570,7 +1570,7 @@ SELECT completed
     # in this case.
     # -----------------------------------------------------------------
     if row:
-       dateSent = row[0][:10]
+       dateSent = str(row[0])[:10]
        html = "%s" % (dateSent)
        doc    = re.sub("@@SUMMARY_DATE_SENT@@", html, doc)
        html = "%s" % (batchId)
@@ -1748,8 +1748,10 @@ try:
 except Exception as e:
     cdrcgi.bail("filtering error: {}".format(e))
 
-#if (type(doc) in (type(""), type("")):
-#    cdrcgi.bail("OOPS! %s" % doc)
+if isinstance(doc, (str, bytes)):
+    cdrcgi.bail(doc)
+doc = doc[0]
+
 if docType == "CTGovProtocol":
     if isinstance(doc, bytes):
         doc = str(doc, "utf-8")
@@ -1767,14 +1769,6 @@ if docType == "CTGovProtocol":
 """
     else:
         noPdqIndexing = ""
-if isinstance(doc, (str, bytes)):
-    cdrcgi.bail(doc)
-if type(doc) == type(()):
-    doc = doc[0]
-
-# Replace all utf-8 unicode chars with &#x...; character entities
-# Allows our macro substitutions to work without ascii decode errs
-doc = str(doc, "utf-8")
 
 # Perform any required macro substitions
 doc = re.sub("@@DOCID@@", docId, doc)

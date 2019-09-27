@@ -5,7 +5,9 @@
 import sys, os, cdr, cgi, cdrcgi, time
 from cdrapi import db
 
-LOGFILE = "%s/ReverifyJob.log" % cdr.DEFAULT_LOGDIR
+LOGNAME = "ReverifyJob"
+LOGGER  = cdr.Logging.get_logger(LOGNAME)
+LOGFILE = f"{cdr.DEFAULT_LOGDIR}/ReverifyJob.log"
 PUBPATH = os.path.join('d:\\cdr', 'publishing')
 PROG    = 'ReverifyPushJob.py'
 
@@ -126,29 +128,28 @@ if not session:
 
 try:
     user = getUserName(session)
-    cdr.logwrite('--------------------------------------------', LOGFILE)
-    cdr.logwrite("%s: session %s" % (PROG, repr(session)), LOGFILE)
-    cdr.logwrite("%s: user:   %s" % (PROG, repr(user)), LOGFILE)
-    cdr.logwrite("%s: job-id: %s" % (PROG, jobId), LOGFILE)
-    cdr.logwrite("%s: status: %s" % (PROG, jobStatus), LOGFILE)
-    cdr.logwrite("%s: mode:   %s" % (PROG, jobMode), LOGFILE)
+    LOGGER.info('--------------------------------------------')
+    LOGGER.info("%s: session %r", PROG, session)
+    LOGGER.info("%s: user:   %r", PROG, user)
+    LOGGER.info("%s: job-id: %s", PROG, jobId)
+    LOGGER.info("%s: status: %s", PROG, jobStatus)
+    LOGGER.info("%s: mode:   %s", PROG, jobMode)
 
-    cmd = os.path.join(PUBPATH, '%s --session=%s --jobid=%d --status=%s %s' % (
-                                 PROG, session, jobId, jobStatus, runmode))
+    args = PROG, session, jobId, jobStatus, runmode
+    cmd = "{} --session={} --jobid={} --status={} {}".format(*args)
+    cmd = os.path.join(PUBPATH, cmd)
 
-    cdr.logwrite('Submitting command...\n%s' % cmd, LOGFILE)
+    LOGGER.info('Submitting command...\n%s', cmd)
 
-    myCmd = cdr.runCommand("%s %s" % (cdr.PYTHON, cmd))
+    process = cdr.run_command(f"{cdr.PYTHON} {cmd}", merge_output=True)
 
-    cdr.logwrite("Code: %s" % myCmd.code, LOGFILE)
-    cdr.logwrite("Outp: %s" % myCmd.output, LOGFILE)
-    report = myCmd.output
+    LOGGER.info("Code: %s" % process.returncode)
+    LOGGER.info("Outp: %s" % process.stdout)
+    report = process.stdout
 
-except TypeError:
-    e = sys.exc_info()[0]
-    print('*** Error: %s' % e)
-
-    cdr.logwrite('*** Error: Submitting Publishing Job failed', LOGFILE)
+except TypeError as e:
+    print(f"*** Error: {e}")
+    LOGGER.exception('*** Error: Submitting Publishing Job failed')
     sys.exit(1)
 
 

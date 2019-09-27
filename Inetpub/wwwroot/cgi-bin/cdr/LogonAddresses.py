@@ -60,12 +60,11 @@ while rowIndex < len(rows):
     nextLogon = "3000-01-01"
     if rowIndex < len(rows):
         nextLogon = "%s" % rows[rowIndex][3]
+    pair = "", ""
     if pairIndex < len(pairs):
         pair = pairs[pairIndex]
         if pair[0] < nextLogon:
             pairIndex += 1
-        else:
-            pair = ("", "")
     html.append("""\
    <tr>
     <td>%s</td>

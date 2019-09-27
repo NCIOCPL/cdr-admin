@@ -152,15 +152,15 @@ def build_zip_file(file_names):
         list_file.write("%s\n" % name)
     list_file.close()
     os.chdir(cdr.CLIENT_FILES_DIR)
-    result = cdr.runCommand("d:\\bin\\zip -@ %s < %s" % (zip_name, list_name))
     Control.logger.debug("Creating %s", zip_name)
-    if result.code:
-        msg = "zip failure code %d (%s)" % (result.code, result.output)
+    command = f"d:\\bin\\zip -@ {zip_name} < {list_name}"
+    process = cdr.run_command(command, merge_output=True)
+    if process.resultcode:
+        msg = f"zip failure code {process.resultcode} ({result.stdout})"
         Control.logger.debug(msg)
         raise msg
-    zip_file = open(zip_name, "rb")
-    zip_bytes = zip_file.read()
-    zip_file.close()
+    with open(zip_name, "rb") as fp:
+        zip_bytes = fp.read()
     Control.logger.debug("saved zip file as %r", zip_name)
     if Control.logger.level != logging.DEBUG:
         os.unlink(list_name)

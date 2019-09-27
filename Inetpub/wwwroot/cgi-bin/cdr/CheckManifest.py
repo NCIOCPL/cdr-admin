@@ -11,7 +11,9 @@ import cdrcgi
 class Control(cdrcgi.Control):
     def __init__(self):
         cdrcgi.Control.__init__(self, "Client Manifest Check")
-    def run(self):
+    def populate_form(self, form):
+        self.show_report()
+    def xrun(self):
         try:
             self.show_report()
         except Exception as e:

@@ -6,7 +6,7 @@
 #----------------------------------------------------------------------
 import cgi
 import re
-import time
+import datetime
 import cdr
 from cdrapi import db as cdrdb
 import cdrcgi
@@ -166,16 +166,16 @@ def addRow(row):
     try:
         messages = eval(messages)
     except:
-        messages = [messages] if messages else [u"No message"]
+        messages = [messages] if messages else ["No message"]
     if failure:
-        messages = [u"[ERROR] {}".format(message) for message in messages]
-    li = u'<li style="font-size: 10pt; font-weight: normal">'
-    messages = [u"{}{}".format(li, message) for message in messages]
+        messages = ["[ERROR] {}".format(message) for message in messages]
+    li = '<li style="font-size: 10pt; font-weight: normal">'
+    messages = ["{}{}".format(li, message) for message in messages]
     style = "padding: 0px; margin: 0px; margin-left: 20px;"
-    open = u'<ul style="{}">'.format(style)
+    open = '<ul style="{}">'.format(style)
     close = "</ul>"
-    messages = "{}{}".format(open, u"".join(messages), close)
-    return u"""\
+    messages = "{}{}".format(open, "".join(messages), close)
+    return """\
    <tr>
     <td valign='top'>%d</td>
     <td valign='top'>%d</td>
@@ -222,13 +222,13 @@ def dispFilterFailures(flavor = 'full'):
     except Exception as e:
         cdrcgi.bail("Failure retrieving job information: {}".format(e))
 
-    title   = u'CDR Publishing Filter Failures'
-    instr   = u'Job Number %d' % jobId
+    title   = 'CDR Publishing Filter Failures'
+    instr   = 'Job Number %d' % jobId
     buttons = []
     header  = cdrcgi.header(title, title, instr, None, buttons)
     if not rows:
         cdrcgi.bail("Job%s finished without Failure" % jobId)
-    html    = u"""\
+    html    = """\
        <TABLE>
         <TR>
          <TD ALIGN='right' NOWRAP><B>System Subset: &nbsp;</B></TD>
@@ -241,8 +241,8 @@ def dispFilterFailures(flavor = 'full'):
        </TABLE>
     """ % (rows[0][5], rows[0][6])
 
-    html   += u"<BR><TABLE BORDER=1>"
-    html   += u"""\
+    html   += "<BR><TABLE BORDER=1>"
+    html   += """\
    <tr>
     <td width='10%' valign='top'><B>Id</B></td>
     <td width='5%'  valign='top'><B>Ver</B></td>
@@ -254,11 +254,11 @@ def dispFilterFailures(flavor = 'full'):
     # The warnings have been formatted with a "class=warning"
     # attribute for the LI element.
     # -------------------------------------------------------
-    #textPattern = re.compile(u'<LI class="(.*)</LI>')
-    textPattern2 = re.compile(u'<Messages><message>')
-    textPattern3 = re.compile(u'</message></Messages>')
-    ### errorPattern = re.compile(u'DTDerror')
-    #errorPattern = re.compile(u'error')
+    #textPattern = re.compile('<LI class="(.*)</LI>')
+    textPattern2 = re.compile('<Messages><message>')
+    textPattern3 = re.compile('</message></Messages>')
+    ### errorPattern = re.compile('DTDerror')
+    #errorPattern = re.compile('error')
 
     for row in rows:
         failure = row[7] == "Y"
@@ -284,10 +284,10 @@ def dispFilterFailures(flavor = 'full'):
             cdrcgi.bail('Error: Valid values for flavor are: '
                         '"full", "warning", "error"')
 
-    html  += u'</TABLE></FORM></BODY></HTML>'
-    #html   = textPattern2.sub(u'<UL style="padding: 0px; margin: 0px; margin-left: 20px">',
+    html  += '</TABLE></FORM></BODY></HTML>'
+    #html   = textPattern2.sub('<UL style="padding: 0px; margin: 0px; margin-left: 20px">',
     #                                   html)
-    #html   = textPattern3.sub(u'</UL>', html)
+    #html   = textPattern3.sub('</UL>', html)
 
     cdrcgi.sendPage(header + html)
 
@@ -391,7 +391,7 @@ def dispJobControl():
     def callback(cell, format):
         assert format == "html", "Not an Excel report"
         B = cdrcgi.Page.B
-        job_id, status, session = cell.values()
+        job_id, status, session = list(cell.values())
         base = "PubStatus.py?type=Manage&Session={}&id={}&newstat={}"
         href = base.format(session, job_id, "Failure")
         onclick = "location.href='{}'".format(href)
@@ -727,13 +727,9 @@ def selectPubDates():
     script  = "PubStatus.py"
     header  = cdrcgi.header(title, title, instr, script, buttons)
 
-    now         = time.localtime(time.time())
-    toDate      = time.strftime("%Y-%m-%d", now)
-    then        = list(now)
-    then[1]    -= 1
-    then[2]    += 1
-    then        = time.localtime(time.mktime(then))
-    fromDate    = time.strftime("%Y-%m-%d", then)
+    today       = datetime.date.today()
+    toDate      = str(today)
+    fromDate    = str(today - datetime.timedelta(7))
     form = """\
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
    <TABLE BORDER='0'>
@@ -816,8 +812,8 @@ def dispJobsByDates():
                   FROM pub_proc pp
        LEFT OUTER JOIN pub_proc_doc ppd
                     ON pp.id = ppd.pub_proc
-                 WHERE pp.started >= '%s'
-                   AND pp.completed <= DATEADD(s, -1, DATEADD(d, 1, '%s'))
+                 WHERE pp.started >= ?
+                   AND pp.completed <= ?
                    AND pp.status in ('Success','Verifying')
                    AND ppd.failure IS NULL
                    AND pp.pub_system IN (
@@ -826,13 +822,12 @@ def dispJobsByDates():
                             WHERE d.doc_type = t.id
                               AND t.name = 'PublishingSystem'
                               AND d.title = 'Primary'
-                                     )
+                       )
               %s
               GROUP BY pp.id, pp.pub_subset, pp.started, pp.completed,
                        pp.status
               ORDER BY pp.id DESC
-                       """ % (fromDate, toDate, pubJobType)
-                      )
+                       """ % pubJobType, (fromDate, toDate + " 23:59:59"))
 
         row        = cursor.fetchone()
         if not row:
@@ -1529,14 +1524,14 @@ def dispJobRepDetail():
            </TR>
            """ % (cdrcgi.SESSION, session, cgMode, docCount,
                   (docCount > 500 ) and "(Top 500 listed only)" or "")
-    ROW = u"""<TR>
+    ROW = """<TR>
              <TD ALIGN='right' NOWRAP>
               %s%d%s</TD>
              <TD ALIGN='right' NOWRAP>%d</TD>
              <TD ALIGN='left'>%s</TD>
            </TR>
           """
-    URLS = u"<a class='show-link' href='%s'>"
+    URLS = "<a class='show-link' href='%s'>"
 
     # Adding a link to the output for summaries
     # Put this in a function if we end up adding links to other document
@@ -1557,9 +1552,9 @@ def dispJobRepDetail():
         #cdrcgi.bail(repr(url))
         if url:
             URL  = URLS % url[0]
-            form += ROW % (URL, row[0], u"</a>", row[1], row[2])
+            form += ROW % (URL, row[0], "</a>", row[1], row[2])
         else:
-            form += ROW % (u"", row[0], u"", row[1], row[2])
+            form += ROW % ("", row[0], "", row[1], row[2])
 
     form += "</TABLE></TD></TR></TABLE>"
 

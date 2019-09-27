@@ -1,7 +1,7 @@
 #----------------------------------------------------------------------
 # Report of documents linking to a specified glossary term.
 #----------------------------------------------------------------------
-import cdr, cdrcgi, cgi, re, string, time
+import cdr, cdrcgi, cgi, re, time
 from cdrapi import db
 
 #----------------------------------------------------------------------
@@ -75,7 +75,7 @@ except Exception as e:
 #----------------------------------------------------------------------
 if id:
     digits = re.sub('[^\d]', '', id)
-    id     = string.atoi(digits)
+    id     = int(digits)
 else:
     try:
         cursor.execute("""\
@@ -239,9 +239,9 @@ try:
 
         resp = cdr.filterDoc(session, ['name:Glossary Link Report Filter'],
                              docId, parm = filterParms)
-        if type(resp) in (type(''), type(u'')):
+        if isinstance(resp, (str, bytes)):
             cdrcgi.bail(resp)
-        html += str(resp[0], "utf-8")
+        html += resp[0]
         row = cursor.fetchone()
 
 except Exception as e:

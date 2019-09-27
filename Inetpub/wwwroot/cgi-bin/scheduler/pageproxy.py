@@ -1,46 +1,51 @@
 """
     Pass through proxy for HTTP requests.
 
-    Allows requests sent to one server to be transparently serviced by a different
-    server with a differnt base path.
+    Allows requests sent to one server to be transparently serviced by
+    a different server with a differnt base path.
 
     Configuration Points:
-        PROXIED_URL_BASE    Base URL for the remote server. (Proxied pages need not
-                            be on the same base path as the request, though it does
-                            help if the HTML avoids paths beginning with a /.)
+        PROXIED_URL_BASE
+            Base URL for the remote server. (Proxied pages need not
+            be on the same base path as the request, though it does
+            help if the HTML avoids paths beginning with a /.)
 
-        PROXIED_PATH_PARAM  Name of the query string parameter (provided via a rewrite rule)
-                            containg the path relative to PROXIED_URL_BASE which is to be
-                            retrieved.
+        PROXIED_PATH_PARAM
+            Name of the query string parameter (provided via a rewrite rule)
+            containg the path relative to PROXIED_URL_BASE which is to be
+            retrieved.
 
-        SESSIONLESS_STEMS   List of path bases which do not require validation before
-                            proxied.  Paths must NOT start a leading slash.  It is a
-                            best practice for directory names to end with a slash to
-                            avoid conflicts with partial file names.
+        SESSIONLESS_STEMS
+            List of path bases which do not require validation before
+            proxied.  Paths must NOT start a leading slash.  It is a
+            best practice for directory names to end with a slash to
+            avoid conflicts with partial file names.
 
         (Rarely modified items)
 
-        CDR_SESSION_PARAM   The name of the query string parameter which contains the
-                            CDR Session ID.
+        CDR_SESSION_PARAM
+            The name of the query string parameter which contains the
+            CDR Session ID.
 
-        SCHEDULER_PERMISSION_NAME   The name of the permission/action name used by the
-                                    CDR to manage access to the scheduler.
+        SCHEDULER_PERMISSION_NAME
+            The name of the permission/action name used by the
+            CDR to manage access to the scheduler.
 
-        RESPONSE_CHUNK_SIZE Size of the largest chunk of data to transmit in a packet.
-                            See https://bugs.python.org/issue11395.
+        RESPONSE_CHUNK_SIZE
+            Size of the largest chunk of data to transmit in a packet.
+            See https://bugs.python.org/issue11395.
 
-        REQUEST_CHUNK_SIZE  Maximum number of bytes to read at a time
+        REQUEST_CHUNK_SIZE
+            Maximum number of bytes to read at a time
 """
+
 import json
 import logging
 import logging.handlers
 import os
 import sys
-import urlparse
-
-import msvcrt # Windows-specific for setting binary output
+import urllib.parse
 import requests
-
 import cdr
 
 
@@ -48,8 +53,10 @@ PROXIED_URL_BASE = 'http://localhost:8888/'
 PROXIED_PATH_PARAM = 'path' # Query string param containing the
                             # URL to retrieve.
 
-# Paths beginning with names in this list are not checked for a session.  All other paths are
-# required to have a valid, logged in, session ID. (Note: Paths do NOT begin with a leading /.)
+# Paths beginning with names in this list are not checked for a session.
+# All other paths are required to have a valid, logged in, session ID.
+# (Note: Paths do NOT begin with a leading /.)
+
 SESSIONLESS_STEMS = ["static/"]
 
 CDR_SESSION_PARAM = "Session"
@@ -61,23 +68,17 @@ REQUEST_CHUNK_SIZE = 4096
 
 
 # Configure logging for the entire module.
-logging.basicConfig(level=logging.DEBUG,
-                    filename='d:\\cdr\\Log\\pageproxy.log',
-                    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-
+LOGPATH = f"{cdr.DEFAULT_LOGDIR}/pageproxy.log"
+FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+logging.basicConfig(level=logging.DEBUG, filename=LOGPATH, format=FORMAT)
 logger = logging.getLogger(__name__)
 
 
 # Set standard out to binary mode.  (Standard IN is reported as an invalid
 # file descriptor, so it's deliberately left out.)
-try:
-    msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
-    #msvcrt.setmode(sys.stdin.fileno(), os.O_BINARY)
-except:
-    logger.error('Error when setting output to binary.', exc_info=True)
 
 class IncomingRequest(object):
-    "Encapsulates the logic for gathering details of the incoming HTTP request."
+    """Encapsulate information about the HTTP request."""
 
     def __init__(self):
         self.form_data = IncomingRequest._get_form_data()
@@ -88,23 +89,23 @@ class IncomingRequest(object):
 
     @staticmethod
     def _get_form_data():
-        "Retrieve request body as a raw blob of text."
+        """Retrieve request body as a raw blob of text."""
 
         formdata = {}
 
         if "CONTENT_LENGTH" in os.environ:
             remaining = int(os.environ['CONTENT_LENGTH'])
             logger.debug("Reading '%d' bytes", remaining)
-            rawString = '' # JSON blob.
+            rawString = b'' # JSON blob.
             while remaining > 0:
                 bitesize = min(remaining, REQUEST_CHUNK_SIZE)
-                data = sys.stdin.read(bitesize)
+                data = sys.stdin.buffer.read(bitesize)
                 rawString += data
                 remaining -= bitesize
 
-                # Tricky bit. We have the JSON data as a blob of text. It shouldn't
-                # be sent as an encoded string, wo first it has to be turned into
-                # a proper JSON structure.
+                # Tricky bit. We have the JSON data as a blob of text.
+                # It shouldn't be sent as an encoded string, so first
+                # it has to be turned into a proper JSON structure.
                 formdata = json.loads(rawString.strip())
 
         logger.debug("Data: '%s'.", repr(formdata))
@@ -117,13 +118,12 @@ class IncomingRequest(object):
         if 'QUERY_STRING' in os.environ:
             query_string = os.environ['QUERY_STRING']
 
-        args = urlparse.parse_qs(query_string, True)
+        args = urllib.parse.parse_qs(query_string, True)
         return args
 
     def _get_path_to_proxy(self):
-        """
-            Retrieves the path to be proxied from the query string parameter
-            identified by the PROXIED_PATH_PARAM setting.
+        """Retrieve the path to be proxied from the query string parameter
+        identified by the PROXIED_PATH_PARAM setting.
         """
 
         # Handle the possibility of future refactoring putting
@@ -191,10 +191,10 @@ class IncomingRequest(object):
 
     @staticmethod
     def _path_is_unguarded(path):
+        """Check whether the value of the 'path' parameter begins with
+        a value which appears in the SESSIONLESS_STEMS list.
         """
-            Checks whether the value of the 'path' parameter begins with a value which
-            appears in the SESSIONLESS_STEMS list.
-        """
+
         # Force the path to lowercase in order to ensure case insensitivity.
         if path:
             path = path.lower()
@@ -252,7 +252,8 @@ class Proxy(object):
 
     def __init__(self, incoming, base_url):
         if not isinstance(incoming, IncomingRequest):
-            message = ("Parameter 'incoming' must be an instance of IncomingRequest. Got '%s' instead."
+            message = ("Parameter 'incoming' must be an instance of "
+                       "IncomingRequest. Got '%s' instead."
                        % type(incoming).__name__)
             logger.error(message)
             raise TypeError(message)
@@ -295,7 +296,7 @@ class Proxy(object):
         code = response.status_code
 
         # Report a 404 as a 404 and terminate, else pass the status.
-        print("status: %s" % code)
+        sys.stdout.buffer.write(f"status: {code}".encode("utf-8"))
         logger.debug("Return status: %d", code)
         if code == 404:
             sys.exit(0)
@@ -305,22 +306,24 @@ class Proxy(object):
 
         # Headers.
         if "Content-Type" in response.headers:
-            logger.debug("Returning content type: '%s'", response.headers["Content-Type"])
-            print("Content-Type: " + response.headers["Content-Type"])
+            content_type = response.headers["Content-Type"]
         else:
-            logger.debug("No content type. Returning 'text/plain'.")
-            print("Content-Type: text/plain")
+            content_type = "text/plain"
+        logger.debug("Returning content type: %r", content_type)
+        header = f"Content-Type: {content_type}\n"
+        sys.stdout.buffer.write(header.encode("utf-8"))
 
         # Blank separator before page body.
-        print()
+        sys.stdout.buffer.write(b"\n")
 
         # Send the page body.  This is done in slices because of a Windows bug
         # See https://bugs.python.org/issue11395.
         body = response.content
+        logger.debug("payload has %d bytes", len(body))
         written = 0
         while written < len(body):
             portion = body[written:written + RESPONSE_CHUNK_SIZE]
-            sys.stdout.write(portion)
+            sys.stdout.buffer.write(portion)
             written += RESPONSE_CHUNK_SIZE
         sys.exit(0)
 
@@ -332,8 +335,9 @@ class Proxy(object):
         # Do the actual request.
         logger.debug("Performing '%s' request to '%s'.", method, requestURL)
         if method == 'GET':
-            logger.debug("Params: '%s'", repr(self.incoming.get_filtered_query_string()))
-            response = requests.get(requestURL, params=self.incoming.get_filtered_query_string())
+            params = self.incoming.get_filtered_query_string()
+            logger.debug("Params: '%r'", params)
+            response = requests.get(requestURL, params=params)
         elif method == 'POST':
             logger.debug("POST Data: '%s'", repr(self.incoming.form_data))
             response = requests.post(requestURL, json=self.incoming.form_data)
@@ -347,7 +351,8 @@ class Proxy(object):
             response = requests.delete(requestURL)
         else:
             logger.error("Unknown request type: '%s'", method)
-            raise NotImplementedError("Don't know how to handle request type: '%s'." % method)
+            raise NotImplementedError("Don't know how to handle request type:"
+                                      " '%s'." % method)
 
         self._send_return(response)
 
@@ -360,12 +365,12 @@ try:
         proxy = Proxy(incomingRequest, PROXIED_URL_BASE)
         proxy.do_proxy_request()
     else:
-        print("Status: 403\n\n<h1>Not allowed.</h1>")
+        sys.stdout.buffer.write(b"Status: 403\n\n<h1>Not allowed.</h1>")
 
 
 except Exception:
-    print("Status: 500\n<h1>Error servicing request.</h1>")
-    logger.error('Error servicing request.', exc_info=True)
+    sys.stdout.buffer.write(b"Status: 500\n<h1>Error servicing request.</h1>")
+    logger.exception("Failure proxying request")
     raise
 finally:
     logger.debug("End Request")

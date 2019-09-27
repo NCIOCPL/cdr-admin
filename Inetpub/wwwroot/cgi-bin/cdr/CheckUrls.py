@@ -10,6 +10,7 @@
 # JIRA::OCECDR-3800 - Appscan vulnerability remediation
 #----------------------------------------------------------------------
 import cgi
+from sys import stdout
 import cdr
 import cdrcgi
 from cdrbatch import CdrBatch
@@ -98,14 +99,15 @@ class Control(cdrcgi.Control):
         command = "lib/Python/CdrLongReports.py"
         args = self.get_args()
         job = CdrBatch(jobName=self.report_type, command=command,
-                       args=args.items(), email=self.email)
+                       args=list(args.items()), email=self.email)
         if self.quick:
             if self.report_type == self.BROKEN_URLS:
                 from CdrLongReports import BrokenExternalLinks as Report
             else:
                 from CdrLongReports import PageTitleMismatches as Report
             report = Report(job).create_html_report()
-            print("Content-type: text/html\n\n%s" % report)
+            stdout.buffer.write(b"Content-type: text/html\n\n")
+            stdout.buffer.write(report.encode("utf-8"))
         else:
             if not self.email:
                 cdrcgi.bail("Missing required email address")

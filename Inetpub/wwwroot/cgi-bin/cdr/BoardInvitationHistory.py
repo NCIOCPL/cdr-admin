@@ -167,14 +167,14 @@ def printRow(boardMember, includeIds, exclude):
     # one.
     if 'Editorial Board' in exclude and \
          'Editorial Advisory Board' in exclude:
-        for id in boardMember.allBoardsInfo.keys():
+        for id in boardMember.allBoardsInfo:
             if 'current' in boardMember.allBoardsInfo[id]        and \
                boardMember.allBoardsInfo[id]['current'] == 'Yes':
                printIt = False
     # If current ed board members need to be excluded check
     # to ensure the board is not an adv board.
     elif 'Editorial Board' in exclude:
-        for id in boardMember.allBoardsInfo.keys():
+        for id in boardMember.allBoardsInfo:
             if 'current' in boardMember.allBoardsInfo[id]        and \
                boardMember.allBoardsInfo[id]['current'] == 'Yes' and \
                boardMember.allBoardsInfo[id]['name'].find('Advisory') == -1:
@@ -182,7 +182,7 @@ def printRow(boardMember, includeIds, exclude):
     # If current adv board members need to be excluded check
     # to ensure the board is not an ed board.
     elif 'Editorial Advisory Board' in exclude:
-        for id in boardMember.allBoardsInfo.keys():
+        for id in boardMember.allBoardsInfo:
             if 'current' in boardMember.allBoardsInfo[id]        and \
                boardMember.allBoardsInfo[id]['current'] == 'Yes' and \
                boardMember.allBoardsInfo[id]['name'].find('Advisory') > 0:
@@ -259,9 +259,9 @@ def makeRow(cursor, row, boardIds, dispColumn, excludeRow):
     if not type(boardIds) == type([]):
         boardIds = [boardIds]
     member = BoardMember(cursor, row)
-    bmrow = u""
+    bmrow = ""
 
-    for boardId in member.allBoardsInfo.keys():
+    for boardId in member.allBoardsInfo:
         # Check if this row needs to be printed
         if not printRow(member, boardIds, excludeRow):
             return bmrow
@@ -273,13 +273,13 @@ def makeRow(cursor, row, boardIds, dispColumn, excludeRow):
         ###         return ""
 
         if str(boardId) in boardIds:
-            cssClass = u"%s" % boardId
+            cssClass = "%s" % boardId
 
             if 'current' in member.allBoardsInfo[boardId] and \
                             member.allBoardsInfo[boardId]['current'] == 'Yes':
-                cssClass += u" current"
+                cssClass += " current"
             else:
-                cssClass += u" notcurrent"
+                cssClass += " notcurrent"
             bmrow += """
          <tr class="%s">
           <td>%d</td>
@@ -330,7 +330,7 @@ def makeRow(cursor, row, boardIds, dispColumn, excludeRow):
             # If a blank column is printed
             # ----------------------------
             if 'BlankCol' in dispColumn:
-                bmrow += u"""
+                bmrow += """
              <td class="blank">&nbsp;</td>"""
 
             bmrow += """
@@ -612,7 +612,7 @@ if blankCol:
 
 # Create the HTML table for the summary sheet
 # -------------------------------------------
-html += u"""\
+html += """\
    <table id="summary" cellspacing="0" cellpadding="5">
     <tr>
      <td id="hdg" colspan="%d">%s<br>
@@ -621,23 +621,23 @@ html += u"""\
     </tr>
 """ % (len(columns) + 2, reportTitle, dateString)
 
-html += u"""\
+html += """\
     <tr>
      <th>ID</th>
      <th>Name</th>
 %s""" % htmlCol
 
-html += u"""\
+html += """\
     </tr>"""
 
 for boardMember in boardMembers:
     tableRow = makeRow(cursor, boardMember, boardIds, columns, exclude)
-    html += u"%s" % tableRow
+    html += "%s" % tableRow
 
 # for bmId, personID, first, last, bordId, boardName in rows:
 #     boardMembers.append(BoardMember(docId, eic_start, eic_finish,
 #                                                term_start, name))
-html += u"""
+html += """
   </table>
  </body>
 </html>

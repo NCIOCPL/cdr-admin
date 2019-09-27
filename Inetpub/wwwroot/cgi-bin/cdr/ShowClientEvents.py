@@ -2,6 +2,7 @@
 # Tools used for tracking down what really happened when a user
 # reports anomalies in stored versions of CDR documents.
 #----------------------------------------------------------------------
+from sys import stdout
 import cgi, cdr
 from cdrapi import db
 from html import escape as html_escape
@@ -20,10 +21,10 @@ cursor.execute("""\
         ON c.session = s.id
       JOIN usr u
         ON u.id = s.usr
-     WHERE c.event_time BETWEEN '%s' AND '%s'
-       AND u.name LIKE '%s'
-  ORDER BY c.event_id""" % (start, sqlEnd, user))
-html = [u"""\
+     WHERE c.event_time BETWEEN ? AND ?
+       AND u.name LIKE ?
+  ORDER BY c.event_id""", (start, sqlEnd, user))
+html = ["""\
 <html>
  <head>
   <title>CDR Client Events</title>
@@ -44,7 +45,7 @@ html = [u"""\
    </tr>
 """ % (start, end)]
 for uId, uName, eTime, eDesc, sId, sName in cursor.fetchall():
-    html.append(u"""\
+    html.append("""\
    <tr>
     <td>%s</td>
     <td>%s</td>
@@ -53,13 +54,13 @@ for uId, uName, eTime, eDesc, sId, sName in cursor.fetchall():
     <td>%s</td>
     <!-- <td>%s</td> -->
    </tr>
-""" % (html_escape(uId), html_escape(uName), eTime, html_escape(eDesc), sId,
-       html_escape(sName)))
-html.append(u"""\
+""" % (html_escape(uId or ""), html_escape(uName or ""),
+       eTime, html_escape(eDesc or ""), sId,
+       html_escape(sName or "")))
+html.append("""\
   </table>
  </body>
 </html>""")
-html = u"".join(html)
-print("Content-type: text/html; charset=utf-8")
-print("")
-print(html.encode('utf-8'))
+html = "".join(html)
+stdout.buffer.write(b"Content-type: text/html; charset=utf-8\n\n")
+stdout.buffer.write(html.encode('utf-8'))

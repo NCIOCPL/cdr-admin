@@ -69,7 +69,7 @@ class Control:
             cdrcgi.Report.Column("Comment", width="400px")
         ])
         sets = self.sets
-        doc_ids = (not sets or "all" in sets) and self.boards.keys() or sets
+        doc_ids = (not sets or "all" in sets) and list(self.boards) or sets
         title = "PDQ Summary Comprehensive Review Report"
         now = datetime.date.today()
         subtitle = "%s %s Summaries (%s)" % (self.language, self.audience, now)
@@ -266,9 +266,9 @@ class Board:
                 rows.append(row)
         return cdrcgi.Report.Table(columns, rows, **opts)
 
-    def __cmp__(self, other):
+    def __lt__(self, other):
         "Support sorting by board name"
-        return cmp(self.name, other.name)
+        return self.name < other.name
 
 class Summary:
     logged = False
@@ -294,8 +294,8 @@ class Summary:
         rows = query.execute(control.cursor).fetchall()
         self.reviews = sorted([Review(*row) for row in rows])
 
-    def __cmp__(self, other):
-        return cmp(self.title.upper(), other.title.upper())
+    def __lt__(self, other):
+        return self.title.upper() < other.title.upper()
 
 class Review:
     "Information about a single proposed or actual comprehensive review"
@@ -304,9 +304,9 @@ class Review:
         self.state = state
         self.comment = comment
 
-    def __cmp__(self, other):
+    def __lt__(self, other):
         "Support sorting reviews in chronological order"
-        return cmp((self.date, self.state), (other.date, other.state))
+        return (self.date, self.state) < (other.date, other.state)
 
 if __name__ == "__main__":
     "Allow import (by doc or lint tools, for example) without side effects"

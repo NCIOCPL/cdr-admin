@@ -3,7 +3,11 @@
 #
 # BZIssue::3716 - Unicode encoding cleanup
 #----------------------------------------------------------------------
-import cdr, cgi, cdrcgi, sys, urllib
+import cdr
+import cgi
+import cdrcgi
+import sys
+import urllib.parse
 from cdrapi import db
 from html import escape as html_escape
 
@@ -13,8 +17,8 @@ from html import escape as html_escape
 fields  = cgi.FieldStorage()
 session = cdrcgi.getSession(fields)
 request = cdrcgi.getRequest(fields)
-s1      = fields and fields.getvalue('s1') or None
-s2      = fields and fields.getvalue('s2') or None
+s1      = fields.getvalue('s1') or None
+s2      = fields.getvalue('s2') or None
 title   = "CDR Administration"
 section = "Manage Filters"
 script  = "EditFilterSets.py"
@@ -52,19 +56,17 @@ elif request == "Report":
 """)
     sets = cdr.getFilterSets('guest')
     setDict = {}
-    report = u""
-    for set in sets:
-        filterSet = cdr.getFilterSet('guest', set.name)
-        setDict[set.name] = filterSet
-    keys = setDict.keys()
-    keys.sort()
-    for key in keys:
-        report += u"<h2>%s</h2><ul>\n" % html_escape(key)
+    report = ""
+    for filter_set in sets:
+        setDict[set.name] = cdr.getFilterSet('guest', filter_set.name)
+    for key in sorted(setDict):
+        report += "<h2>%s</h2><ul>\n" % html_escape(key)
         for member in setDict[key].members:
-            report += u"<li>%s %s</li>\n" % (type(member.id) == type(9) and
-                    "[S]" or "[F]", html_escape(member.name))
-        report += u"</ul>\n"
-    cdrcgi.sendPage(header + report + u"</form></body></html>")
+            which = "S" if isinstance(member.id, int) else "F"
+            name = html_escape(member.name)
+            report += f"<li>[{which}] {html_escape(member.name)}</li>\n"
+        report += "</ul>\n"
+    cdrcgi.sendPage(header + report + "</form></body></html>")
 
 #----------------------------------------------------------------------
 # Handle request for creating a new filter set.
@@ -100,7 +102,7 @@ try:
 except Exception as e:
     cdrcgi.bail("Database failure retrieving filter sets: %s" % e)
 
-form = u"""\
+form = """\
    <h2>CDR Filter Sets</h2>
    <script language='JavaScript'>
     function showTip(tip) {
@@ -111,10 +113,10 @@ form = u"""\
 """
 for row in rows:
     ### name1 = urllib.quote_plus(row[0])
-    name1 = urllib.quote_plus(row[0].encode('utf-8'))
+    name1 = urllib.parse.quote_plus(row[0])
     name2 = html_escape(row[0], 1)
     desc  = html_escape(row[1], 1).replace("'", "&apos;")
-    form += u"""\
+    form += """\
     <li>
      <a href="%s/EditFilterSet.py?%s=%s&Request=Edit&setName=%s"
         onMouseOver="window.status='%s'; return true">%s</a>
@@ -124,7 +126,7 @@ for row in rows:
 #----------------------------------------------------------------------
 # Send back the form.
 #----------------------------------------------------------------------
-form += u"""\
+form += """\
    </ul>
    <input type='hidden' name='%s' value='%s'>
   </form>

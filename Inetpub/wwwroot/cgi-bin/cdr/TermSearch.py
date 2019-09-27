@@ -193,7 +193,7 @@ class Term:
         # Update the document if we have already imported the concept.
         if self.cdrid:
             opts = self.UPDATE_OPTS
-            args = self.session, self.cdrid
+            args = self.session.name, self.cdrid
             self.changes = self.concept.update(*args, **opts)
             if self.changes:
                 self.message = "New version created"
@@ -202,7 +202,7 @@ class Term:
 
         # Otherwise, create a new Term document.
         else:
-            self.message = self.concept.add(self.session)
+            self.message = self.concept.add(self.session.name)
 
     @property
     def concept(self):

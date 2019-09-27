@@ -2,7 +2,7 @@
 # Interface for editing CDR groups.
 # OCECDR-4087
 #----------------------------------------------------------------------
-import urllib
+import urllib.request, urllib.parse, urllib.error
 import cdr
 import cdrcgi
 
@@ -65,11 +65,11 @@ a:hover { text-decoration: underline; }
         return self.B.TR(*cells)
     def make_cell(self, action):
         self.parms["action"] = action
-        url = "%s?%s" % (self.EDIT_ACTION, urllib.urlencode(self.parms))
+        url = "%s?%s" % (self.EDIT_ACTION, urllib.parse.urlencode(self.parms))
         return self.B.TD(self.B.A(action, href=url))
     def get_actions(self):
         actions = cdr.getActions(self.session)
-        if isinstance(actions, basestring):
+        if isinstance(actions, (str, bytes)):
             cdrcgi.bail(actions)
         return sorted(actions)
 

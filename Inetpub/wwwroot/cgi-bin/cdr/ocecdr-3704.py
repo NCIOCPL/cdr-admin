@@ -88,7 +88,7 @@ class Request:
             if doc.spanish_response:
                 col4 += " (%s)" % doc.spanish_response
             rows.append((col1, col2, col3, col4, col5))
-        rows.sort(lambda a,b: cmp(a[0].lower(), b[0].lower()))
+        rows.sort(key=lambda row:row[0].lower())
         caption = "Media Permission Denials"
         opts = { "caption": caption, "sheet_name": "Denials" }
         table = Report.Table(columns, rows, **opts)
@@ -136,7 +136,7 @@ class Request:
             if doc.spanish_response:
                 col5 += " (%s)" % doc.spanish_response
             rows.append((col1, col2, col3, col4, col5, col6, col7))
-        rows.sort(lambda a,b: cmp(a[0].lower(), b[0].lower()))
+        rows.sort(key=lambda row:row[0].lower())
         langs = { "en": "English", "es": "Spanish" }
         langs = " and ".join([langs[key] for key in self.option1])
         caption = "%s Permission Requests" % langs
@@ -175,7 +175,7 @@ class Request:
             for approval in doc.approved:
                 col1 = "%s (CDR%d)" % (approval.title, approval.doc_id)
                 rows.append((col1, col2, col3, col4, col5, col6, col7))
-        rows.sort(lambda a,b: cmp(a[0].lower(), b[0].lower()))
+        rows.sort(key=lambda row:row[0].lower())
         opts = { "caption": results.caption, "sheet_name": "Permissions" }
         table = Report.Table(columns, rows, **opts)
         return Report(table)
@@ -277,7 +277,7 @@ class Form(cdrcgi.Page):
         settings = {
             "subtitle": "Media Permissions Report",
             "action": "ocecdr-3704.py",
-            "buttons": (u"Submit", u"Report Menu", cdrcgi.MAINMENU),
+            "buttons": ("Submit", "Report Menu", cdrcgi.MAINMENU),
             "session": self._session
         }
         cdrcgi.Page.__init__(self, "CDR Administration", **settings)

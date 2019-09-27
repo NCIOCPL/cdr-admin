@@ -442,7 +442,8 @@ Error: %s""" % (docId, result))
         if values and values[0] == 'JPEG':
             doc = Doc(session, id=docId)
             try:
-                image = get_image(doc.id, height=200, width=200, return_stream=True)
+                image = get_image(doc.id, height=200, width=200,
+                                  return_stream=True)
             except Exception as e:
                 LOGGER.exception("Fetching blob for %s", doc.id)
 
@@ -461,8 +462,6 @@ Error: %s""" % (docId, result))
     row += 2
 
 LOGGER.info("*** finished")
-#sys.exit()
-# Output
 book.close()
 output.seek(0)
 book_bytes = output.read()

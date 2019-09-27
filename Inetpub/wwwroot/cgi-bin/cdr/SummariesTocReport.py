@@ -23,7 +23,7 @@ audience  = fields and fields.getvalue("audience")         or None
 lang      = fields and fields.getvalue("lang")             or None
 showId    = fields and fields.getvalue("showId")           or "N"
 tocLevel  = fields and fields.getvalue("tocLevel")         or "9"
-groups    = fields and fields.getvalue("grp")              or []
+groups    = fields and fields.getlist("grp")               or []
 byCdrid   = fields and fields.getvalue("byCdrid")          or None
 docVers   = fields and fields.getvalue("DocVersion")       or None
 byTitle   = fields and fields.getvalue("byTitle")          or None
@@ -68,9 +68,6 @@ header   = cdrcgi.header(title, title, "Summaries TOC Report",
 #byCdrid = 62875
 #byTitle = 'Breast'
 
-if byTitle:
-    byTitle = unicode(byTitle, "utf-8")
-
 #----------------------------------------------------------------------
 # Some input validation
 #----------------------------------------------------------------------
@@ -105,19 +102,19 @@ def boardHeader(header):
 # More than one matching title; let the user choose one.
 #----------------------------------------------------------------------
 def showTitleChoices(choices):
-    form = u"""\
+    form = """\
    <H3>More than one matching document found; please choose one.</H3>
 """
     i = 0
     for choice in choices:
         i += 1
-        form += u"""\
+        form += """\
    <span class="ip">
     <INPUT TYPE='radio' NAME='byCdrid' VALUE='CDR%010d' id='byCdrid%d'>
     <label for='byCdrid%d'>%s (CDR%06d)</label><br>
    </span>
 """ % (choice[0], i, i, html_escape(choice[1]), choice[0])
-    cdrcgi.sendPage(header + form + u"""\
+    cdrcgi.sendPage(header + form + """\
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
    <INPUT TYPE='hidden' NAME='DocType' VALUE='%s'>
    <INPUT TYPE='hidden' NAME='ReportType' VALUE='%s'>
@@ -139,8 +136,8 @@ def summaryRow(id, summary, toc, docVersion = None):
                       'name:Clean up Insertion and Deletion',
                       'name:Summaries TOC Report'],
                      id, parm = filterParm, docVer = docVersion)
-    html = unicode(response[0], "utf-8")
-    html += u"""\
+    html = response[0]
+    html += """\
 """
     return html
 
@@ -149,7 +146,7 @@ def summaryRow(id, summary, toc, docVersion = None):
 # can deal with the same data structure whether one or more were
 # selected.
 #----------------------------------------------------------------------
-if type(groups) in (type(""), type(u"")):
+if isinstance(groups, str):
     groups = [groups]
 
 #----------------------------------------------------------------------
@@ -373,7 +370,7 @@ if byTitle:
              ORDER BY d.title""" % docType, '%' + byTitle + '%')
         rows = cursor.fetchall()
         if not rows:
-            cdrcgi.bail(u"Unable to find document with %s '%s'" % (lookingFor,
+            cdrcgi.bail("Unable to find document with %s '%s'" % (lookingFor,
                                                                    byTitle))
         if len(rows) > 1:
             showTitleChoices(rows)
@@ -574,7 +571,7 @@ if byCdrid:
             vrows = cursor.fetchall()
         except Exception as e:
             cdrcgi.bail('Failure retrieving document versions: %s' % e)
-        form = u"""\
+        form = """\
       <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
       <INPUT TYPE='hidden' NAME='DocType' VALUE='%s'>
       <INPUT TYPE='hidden' NAME='byCdrid' VALUE='CDR%010d'>
@@ -582,7 +579,7 @@ if byCdrid:
       <INPUT TYPE='hidden' NAME='tocLevel' VALUE='%s'>
     """ % (cdrcgi.SESSION, session, docType, byCdrid, showId, tocLevel)
 
-        form += u"""\
+        form += """\
       <fieldset class='docversion'>
        <legend>&nbsp;Select document version&nbsp;</legend>
       <div style="width: 100%; text-align: center;">
@@ -594,13 +591,13 @@ if byCdrid:
         # Limit display of version comment to 120 chars (if exists)
         # ---------------------------------------------------------
         for row in vrows:
-            form += u"""\
+            form += """\
        <OPTION VALUE='%d'>[V%d %s] %s</OPTION>
-    """ % (row[0], row[0], row[2][:10],
+    """ % (row[0], row[0], str(row[2])[:10],
            not row[1] and "[No comment]" or row[1][:120])
             selected = ""
-        form += u"</SELECT></div></div>"
-        form += u"""
+        form += "</SELECT></div></div>"
+        form += """
       </fieldset>
     """
         cdrcgi.sendPage(header + form)
@@ -715,7 +712,7 @@ board_type = rows[0][5] or None
 # ------------------------------------------------------------------------
 filterParm = []
 filterParm = [['showLevel', tocLevel], ['showId', showId ]]
-report += u"""\
+report += """\
   <U><H4>%s</H4></U>
 """ % board_type
 
@@ -747,7 +744,7 @@ for row in rows:
        #else:
        #   report += summaryRow(row[0], row[1], toc = tocLevel,
        #                                        docVersion = docVers)
-footer = u"""\
+footer = """\
  </BODY>
 </HTML>
 """

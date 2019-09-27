@@ -2,32 +2,21 @@
 # Sanity check for CDR configuration files for a given CBIIT tier.
 #----------------------------------------------------------------------
 import cdrcgi
-import cdrutil
 import re
 import socket
 import requests
-from cdrapi import db
+from cdrapi import db as cdrdb
 from cdrapi.settings import Tier
 
 TIER = Tier()
-MYSQL_PORT = TIER.port("emailers")
 SQL_SERVER_PORT = TIER.port("cdr")
 ROLES = {
-    "APP": 22,
     "APPC": 443,
     "APPWEB": 443,
-    "DBNIX": MYSQL_PORT,
     "DBWIN": SQL_SERVER_PORT,
-    "BASTION": None,
-    "BASTIONC": None,
-    "EMAILERS": 22,
-    "EMAILERSC": 443,
-    "EMAILERSWEB": 443,
-    "EMAILERSDB": MYSQL_PORT,
     "SFTP": 22,
-    "GK": 80,
-    "CG": 80,
-    "CGMOBILE": 80
+    "CG": 443,
+    "DRUPAL": 443,
 }
 
 DATABASES = {
@@ -45,9 +34,9 @@ def custom_style(table, page):
     page.add_css("""\
 xxtable caption { border: none; border-bottom: 2px solid white; }""")
 
-def db_account_ok(db, account):
+def db_account_ok(database, account):
     try:
-        conn = db.connect(user=account)
+        conn = cdrdb.connect(user=account, database=database)
         return True
     except:
         return False
@@ -142,13 +131,6 @@ def check_server(name, tables):
         rows.append((db, account, status))
     tables.append(R.Table(db_columns, rows,
                           caption="Database Credentials on %s Server" % name))
-
-for server in ("Emailers",):
-    try:
-        check_server(server, tables)
-    except:
-        raise
-        pass
 
 report = R('Tier Report', tables, banner="%s Tier Check" % TIER.name)
 report.send('html')

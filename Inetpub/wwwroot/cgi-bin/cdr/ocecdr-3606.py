@@ -44,7 +44,7 @@ def add_doc(sheet, doc, row_number):
 class TermName:
     def __init__(self, node, language):
         self.language = language
-        self.string = self.pronunciation = u""
+        self.string = self.pronunciation = ""
         self.exclude = node.get("AudioRecording") == "No"
         for child in node.findall('TermNameString'):
             self.string = child.text

@@ -449,9 +449,9 @@ class Summary:
                     self.sections.append(current_section)
                 current_section.comments.append(comment)
 
-    def __cmp__(self, other):
+    def __lt__(self, other):
         "Make the Summary list sortable"
-        return cmp(self.title, other.title)
+        return self.title < other.title
 
     def make_table(self):
         """
@@ -558,7 +558,7 @@ class Summary:
                 label += self.duration[0].upper()
             if self.source:
                 label += self.source[0].upper()
-            text = u"[%s] %s" % (label, self.text)
+            text = "[%s] %s" % (label, self.text)
             cells = [Cell(text, self.control.widths[1], color)]
             if Control.USER_AND_DATE in self.control.extra:
                 value = ""

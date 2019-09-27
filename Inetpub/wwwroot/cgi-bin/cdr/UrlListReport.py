@@ -39,7 +39,7 @@ class Control(cdrcgi.Control):
         rows = query.execute(self.cursor).fetchall()
         self.usedDoctypes = [docType for docType, count in rows
                                      if docType != 'Filter']
-        
+
 
     def populate_form(self, form):
         """
@@ -57,8 +57,8 @@ class Control(cdrcgi.Control):
            Show the report's only table
 
            We're using separate SQL queries depending on the doc-type.
-           This used to be a single query connected using a UNION 
-           statement but CIAT decided they only need the report by 
+           This used to be a single query connected using a UNION
+           statement but CIAT decided they only need the report by
            individual doc-type, so I'm splitting it but keeping the
            same columns for all three types.
         """
@@ -84,7 +84,7 @@ class Control(cdrcgi.Control):
                        "d.node_loc = i.node_loc")
             query.where("i.path like '%/ExternalRef/@cdr:xref'")
 
-        # DIS query    
+        # DIS query
         # ---------
         elif self.doctype == 'DrugInformationSummary':
             query = cdrdb.Query("query_term a", # "'DrugInformationSummary'",
@@ -101,7 +101,7 @@ class Control(cdrcgi.Control):
         # Everything else query
         # ---------------------
         else:
-            query = cdrdb.Query("query_term i", 
+            query = cdrdb.Query("query_term i",
                                                 "i.doc_id AS 'CDR-ID'",
                                                 "t.title AS value1",
                                                 "i.value AS value2",
@@ -110,7 +110,7 @@ class Control(cdrcgi.Control):
             query.join("document t", "i.doc_id = t.id")
             query.join("doc_type dt", "dt.id = t.doc_type",
                        "dt.name NOT IN ('Summary')")
-            query.outer("query_term s", 
+            query.outer("query_term s",
                         "s.doc_id = i.doc_id",
                         "s.path like '%/ExternalRef/@SourceTitle'",
                         "s.node_loc = i.node_loc")
@@ -129,7 +129,7 @@ class Control(cdrcgi.Control):
         # Run query and get data
         # ----------------------
         rows = query.execute(self.cursor).fetchall()
-            
+
         # Setting up report columns
         # -------------------------
         columns = (
@@ -139,7 +139,7 @@ class Control(cdrcgi.Control):
             cdrcgi.Report.Column("Display Text"),
             cdrcgi.Report.Column("Source Title")
         )
-        
+
         # Set table caption and print report
         # ----------------------------------
         caption = "Document Type: {}".format(self.doctype)

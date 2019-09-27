@@ -251,7 +251,7 @@ if request == "Get Audio" and ftpDone != 'Y':
         c.close()
         logger.info("Ftp download completed!")
     except Exception as info:
-        cdrcgi.bail(u"FTP Error: {}".format(info))
+        cdrcgi.bail("FTP Error: {}".format(info))
 
 
 #----------------------------------------------------------------------
@@ -259,66 +259,66 @@ if request == "Get Audio" and ftpDone != 'Y':
 #----------------------------------------------------------------------
 if ftpDone == 'Y':
    header  = cdrcgi.header(title, title, section, script, stdButtons)
-   form = u"""\
+   form = """\
 <input type='hidden' name='{}' value='{}' >
 """.format(cdrcgi.SESSION, session)
-   form += u"""\
+   form += """\
 <table style="margin-bottom: 10pt;">
  <tr>
   <th style="font-size: 14pt;">Files Retrieved:</th>
  </tr>
 """
    for newFile in newFiles:
-       form += u"""
+       form += """
  <tr>
   <td>{}</td>
  </tr>
 """.format(newFile)
 
    if testMode:
-       testString = u'Test '
+       testString = 'Test '
    else:
-       testString = u''
+       testString = ''
 
-   form += u"""
+   form += """
 </table>"""
 
    # Display files with bad file name format if those exist
    # ------------------------------------------------------
    if badFiles:
-       form += u"""\
+       form += """\
 <table>
  <tr>
   <th style="font-size: 14pt;">Files NOT Retrieved:</th>
  </tr>
 """
        for badFile in badFiles:
-           form += u"""
+           form += """
  <tr>
   <td>{}</td>
  </tr>
 """.format(badFile)
 
    if testMode:
-       testString = u'Test '
+       testString = 'Test '
    else:
-       testString = u''
+       testString = ''
 
-   form += u"""
+   form += """
 </table>"""
 
-   form += u"""
+   form += """
 <H4>Download {}Completed</H4>
 """.format(testString)
 
-   cdrcgi.sendPage(header + form + u"</body></html>")
+   cdrcgi.sendPage(header + form + "</body></html>")
 
 
 #----------------------------------------------------------------------
 # Display the form for downloading audio files
 #----------------------------------------------------------------------
 header = cdrcgi.header(title, title, section, script, getButtons)
-form = u"""\
+form = """\
 <fieldset>
  <legend>Download Term Audio Files from FTP server</legend>
    <b>Directory on FTP Server: </b> {}
@@ -335,4 +335,4 @@ form = u"""\
 </fieldset>
 """.format(NIX_DIR, WIN_DIR, cdrcgi.SESSION, session)
 
-cdrcgi.sendPage(header + form + u"</form></body></html>")
+cdrcgi.sendPage(header + form + "</form></body></html>")

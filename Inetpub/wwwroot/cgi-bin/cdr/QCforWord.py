@@ -77,7 +77,7 @@ if qcParms == 'yes':
     myParm = getParms(int(qcParmId))
     doc = cdr.filterDoc(session, cdr.FILTERS[docType], docId = docId,
                     docVer = version or None, parm = myParm)
-    sendPage(doc[0].decode("utf-8"))
+    sendPage(doc[0])
 else:
     cdrcgi.bail('No parameters found for qcParmId=%s' % qcParmId)
 

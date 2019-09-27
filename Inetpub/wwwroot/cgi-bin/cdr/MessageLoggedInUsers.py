@@ -111,15 +111,11 @@ if not recipients:
 # body += "\n\nRecipients: " + str(recipients)
 # recipients = cdr.getEmailList("Developers Notification")
 try:
-    error = cdr.sendMail(fromAddr, recipients, subject, body)
-except:
-    cdrcgi.bail("""Exception encountered in cdr.sendMail call
-   sender=%s
-   recipients=%s
-   subject=%s
-   body=%s""" % (sender, str(recipients), subject, body))
-if error:
-    cdrcgi.bail(error)
+    opts = dict(subject=subject, body=body)
+    message = cdr.EmailMessage(fromAddr, recipients, **opts)
+    message.send()
+except Exception as e:
+    cdrcgi.bail(f"Exception encountered sending message: {e}")
 toList = ''
 for recip in recipients:
     toList += """\

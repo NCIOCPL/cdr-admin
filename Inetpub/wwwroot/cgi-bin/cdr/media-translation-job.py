@@ -44,8 +44,6 @@ class Control(cdrcgi.Control):
         self.state_id = self.get_id("state", self.states.map)
         self.assigned_to = self.get_id("assigned_to", self.users)
         self.comments = self.fields.getvalue("comments") or None
-        if self.comments is not None:
-            self.comments = self.comments.decode("utf-8")
         self.job = Job(self) if self.english_id else None
 
     def run(self):
@@ -359,7 +357,7 @@ class Job:
             self.spanish_id = row.id
             self.spanish_title = row.title.split(";")[0]
             args = self.spanish_id, self.spanish_title
-            self.subtitle = u"Spanish Media doc: CDR{:d} ({})".format(*args)
+            self.subtitle = "Spanish Media doc: CDR{:d} ({})".format(*args)
 
     def changed(self):
         """

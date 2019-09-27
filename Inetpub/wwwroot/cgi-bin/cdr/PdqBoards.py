@@ -37,7 +37,7 @@ class Control(cdrcgi.Control):
 
     def populate_form(self, form):
         "Override the base class method to get our own fields on the form."
-        boards = [(v, k) for k, v in self.boards.iteritems()]
+        boards = [(v, k) for k, v in self.boards.items()]
         boards = [(doc_id, name) for name, doc_id in sorted(boards)]
         form.add("<fieldset>")
         form.add(form.B.LEGEND("Board and Audience"))
@@ -75,7 +75,7 @@ class Control(cdrcgi.Control):
         grouping = { "topic": "Topic", "member": "Board Member" }[self.grouping]
         opts = {
             "banner": self.title,
-            "subtitle": u"Board Report by %s \u2014 %s" % (grouping, today),
+            "subtitle": "Board Report by %s \u2014 %s" % (grouping, today),
             "buttons": (self.SUBMENU, self.ADMINMENU, self.LOG_OUT),
             "action": self.script,
             "body_classes": "report"
@@ -245,9 +245,9 @@ class Summary:
                 page.add(page.B.LI(member.name))
             page.add("</ul>")
 
-    def __cmp__(self, other):
+    def __lt__(self, other):
         "Support sorting."
-        return cmp(self.title, other.title)
+        return self.title < other.title
 
     class Person:
         "One of these for every reviewer on the report."
@@ -279,9 +279,9 @@ class Summary:
                     page.add(page.B.LI(summary.get_display_title()))
                 page.add("</ul>")
 
-        def __cmp__(self, other):
+        def __lt__(self, other):
             "Support sorting."
-            return cmp(self.name, other.name)
+            return self.name < other.name
 
 #----------------------------------------------------------------------
 # Let this be loaded without doing anything to support (e.g.) lint.

@@ -1,7 +1,7 @@
 #----------------------------------------------------------------------
 # Prototype for editing CDR query term definitions.
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, string, urllib
+import cgi, cdr, cdrcgi, re, string
 from html import escape as html_escape
 
 #----------------------------------------------------------------------
@@ -19,7 +19,7 @@ newPath = fields.getvalue('add')
 delete  = fields.getvalue('delete')
 script  = "EditQueryTermDefs.py"
 header  = cdrcgi.header(title, title, section, script, buttons,
-                        stylesheet = u"""\
+                        stylesheet = """\
 <style type='text/css'>
    .fb { width: 150px; }
    .path { color: green; font-weight: bold; font-family: "Courier New" }
@@ -68,14 +68,14 @@ if request == 'Compare' and server1 and server2:
         defs1 = cdr.listQueryTermDefs('guest', tier=server1)
     except:
         cdrcgi.bail("Unable to retrieve definitions from {!r}".format(server1))
-    if type(defs1) in (type(''), type(u'')):
+    if isinstance(defs1, (str, bytes)):
         cdrcgi.bail(defs1)
     defs1 = [d[0] for d in defs1]
     try:
         defs2 = cdr.listQueryTermDefs('guest', tier=server2)
     except:
         cdrcgi.bail("Unable to retrieve definitions from {!r}".format(server2))
-    if type(defs2) in (type(''), type(u'')):
+    if isinstance(defs2, (str, bytes)):
         cdrcgi.bail(defs2)
     defs2 = [d[0] for d in defs2]
     defs1.sort()
@@ -96,19 +96,19 @@ if request == 'Compare' and server1 and server2:
  <body>
 """ % (server1, server2)
     if not extra1 and not extra2:
-        cdrcgi.sendPage(html + u"""\
+        cdrcgi.sendPage(html + """\
   <h2>Query Term Definitions on %s and %s</h2>
   <p>Definitions match</p>
  </body>
 </html>
 """ % (server1, server2))
     if extra1:
-        html += u"""\
+        html += """\
   <h2>On %s</h2>
   <ul>
 """ % server1
         for extra in extra1:
-            html += u"""\
+            html += """\
    <li>%s</li>
 """ % html_escape(extra)
         html += """\
@@ -116,18 +116,18 @@ if request == 'Compare' and server1 and server2:
   <br>
 """
     if extra2:
-        html += u"""\
+        html += """\
   <h2>On %s</h2>
   <ul>
 """ % server2
         for extra in extra2:
-            html += u"""\
+            html += """\
    <li>%s</li>
 """ % html_escape(extra)
-        html += u"""\
+        html += """\
   </ul>
 """
-    cdrcgi.sendPage(html + u"""\
+    cdrcgi.sendPage(html + """\
  </body>
 </html>
 """)
@@ -136,7 +136,7 @@ if request == 'Compare' and server1 and server2:
 # Retrieve the lists of rules and query term definitions from the server.
 #----------------------------------------------------------------------
 defs = cdr.listQueryTermDefs(session)
-if type(defs) in (unicode, str): cdrcgi.bail(defs)
+if isinstance(defs, (str, bytes)): cdrcgi.bail(defs)
 defs.sort()
 
 #----------------------------------------------------------------------
@@ -151,7 +151,7 @@ def makeDeleteButton(path):
 #----------------------------------------------------------------------
 # Display the existing definitions.
 #----------------------------------------------------------------------
-form = [u"""\
+form = ["""\
   <script type='text/javascript' language='JavaScript'>
    function addPath() {
        var form = document.forms[0];
@@ -189,16 +189,16 @@ form = [u"""\
     </tr>
 """ % (cdrcgi.SESSION, session)]
 for path, rule in defs:
-    form.append(u"""\
+    form.append("""\
     <tr>
      <td>%s</td>
      <td class='path' nowrap='nowrap'>%s</td>
     </tr>
 """ % (makeDeleteButton(path), html_escape(path)))
-form.append(u"""\
+form.append("""\
    </table>
   </form>
  </body>
 <html>
 """)
-cdrcgi.sendPage(header + u"".join(form))
+cdrcgi.sendPage(header + "".join(form))

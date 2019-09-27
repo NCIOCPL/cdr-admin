@@ -91,7 +91,7 @@ def addMediaRow(data, label):
         <Root xmlns:cdr="cips.nci.nih.gov/cdr">
         %s
         </Root>''' % row
-        dom = xml.dom.minidom.parseString(mediaString.encode('utf-8'))
+        dom = xml.dom.minidom.parseString(mediaString)
         docElem = dom.documentElement
 
         for node in docElem.childNodes:
@@ -130,7 +130,7 @@ def addVideoRow(data, label):
         <Root xmlns:cdr="cips.nci.nih.gov/cdr">
         %s
         </Root>''' % row
-        dom = xml.dom.minidom.parseString(videoString.encode('utf-8'))
+        dom = xml.dom.minidom.parseString(videoString)
         docElem = dom.documentElement
 
         for node in docElem.childNodes:
@@ -147,14 +147,13 @@ def addVideoRow(data, label):
                     if child.nodeName == 'SpecificMediaTitle':
                         #specificTitle = str(cdr.getTextContent(child).strip())
                         specificTitle = cdr.getTextContent(child).strip()
-                        specificTitleBytes = specificTitle.encode('utf-8')
         dom.unlink()
 
         # Retrieve the hosting ID for YouTube from the Media document
         # -----------------------------------------------------------
         cursor.execute("SELECT xml FROM document WHERE id = ?", docId)
         row = cursor.fetchone()
-        dom = xml.dom.minidom.parseString(row[0].encode('utf-8'))
+        dom = xml.dom.minidom.parseString(row[0])
         docElem = dom.documentElement
 
         hostingElem = docElem.getElementsByTagName("HostingID")[0]
@@ -208,7 +207,7 @@ def addMultipleRow(data, label):
 #----------------------------------------------------------------------
 def addAttributeRow(data, label, indent = False):
     # Adding row for Date Last Reviewed
-    if data.has_key(label):
+    if label in data:
         iRow = -1
         htmlRows = ""
         for value, attribute in data[label]:
@@ -264,41 +263,33 @@ def addAttributeRow(data, label, indent = False):
 #  </GlossaryTermDef>
 #-----------------------------------------------------------------------
 def resolvePlaceHolder(language, termData, definitionText):
-     # Create the Glossary Definition
-     tmpdoc  = u"\n<GlossaryTermDef xmlns:cdr = 'cips.nci.nih.gov/cdr'>\n"
-     tmpdoc += termData.get(language, u"@S@%s (en ingl\xe9s)@E@" % termData['en'])\
-                  + u"\n"
-     tmpdoc += u" %s\n" % definitionText['DefinitionText']
+    # Create the Glossary Definition
+    default = f"@S@{termData['en']} (en ingl\xe9s)@E@"
+    tmpdoc  = '\n<GlossaryTermDef xmlns:cdr="cips.nci.nih.gov/cdr">\n'
+    tmpdoc += termData.get(language, default) + "\n"
+    tmpdoc += " %s\n" % definitionText['DefinitionText']
 
-     # Add the ReplacementText from the GlossaryTermName documents
-     if 'ReplacementText' in termData:
-         tmpdoc += u" <GlossaryTermPlaceHolder>\n"
-         for gtText in termData['ReplacementText']:
-             tmpdoc += u"  %s\n" % gtText
-         tmpdoc += u" </GlossaryTermPlaceHolder>\n"
+    # Add the ReplacementText from the GlossaryTermName documents
+    if 'ReplacementText' in termData:
+        tmpdoc += " <GlossaryTermPlaceHolder>\n"
+        for gtText in termData['ReplacementText']:
+            tmpdoc += "  %s\n" % gtText
+        tmpdoc += " </GlossaryTermPlaceHolder>\n"
 
-     # Add the ReplacementText from the GlossaryTermConcept document
-     if 'ReplacementText' in definitionText:
-         tmpdoc += u" <GlossaryConceptPlaceHolder>\n"
-         for gcText in definitionText['ReplacementText']:
-             tmpdoc += u"  %s\n" % gcText
-         tmpdoc += u" </GlossaryConceptPlaceHolder>\n"
+    # Add the ReplacementText from the GlossaryTermConcept document
+    if 'ReplacementText' in definitionText:
+        tmpdoc += " <GlossaryConceptPlaceHolder>\n"
+        for gcText in definitionText['ReplacementText']:
+            tmpdoc += "  %s\n" % gcText
+        tmpdoc += " </GlossaryConceptPlaceHolder>\n"
 
-     tmpdoc += u"</GlossaryTermDef>\n"
+    tmpdoc += "</GlossaryTermDef>\n"
 
-     # Need to encode the unicode string to UTF-8 since that's what the
-     # filter module expects.  Decoding it back to unicode once the
-     # filtered document comes back.
-     # --------------------------------------------------------------------
-     doc = cdr.filterDoc('guest', ['name:Glossary Term Definition Update'],
-                         doc = tmpdoc.encode('utf-8'))
-
-     if type(doc) in (type(""), type(u"")):
-         cdrcgi.bail(doc)
-     if type(doc) == type(()):
-         doc = doc[0].decode('utf-8')
-
-     return doc
+    filters = ['name:Glossary Term Definition Update']
+    doc = cdr.filterDoc('guest', filters, doc=tmpdoc)
+    if isinstance(doc, (str, bytes)):
+        cdrcgi.bail(doc)
+    return doc[0]
 
 
 #-----------------------------------------------------------------------
@@ -309,30 +300,22 @@ def resolvePlaceHolder(language, termData, definitionText):
 def displayMarkup(xmlString, element):
      # Create XML document to be filtered
      if element == 'TermName':
-         tmpdoc  = u"\n<TermNameDef xmlns:cdr = 'cips.nci.nih.gov/cdr'>\n"
-         tmpdoc += u"  %s\n" % xmlString
-         tmpdoc += u"</TermNameDef>\n"
+         tmpdoc  = "\n<TermNameDef xmlns:cdr = 'cips.nci.nih.gov/cdr'>\n"
+         tmpdoc += "  %s\n" % xmlString
+         tmpdoc += "</TermNameDef>\n"
      elif element == 'Comment':
-         tmpdoc  = u"\n<GlossaryTermDef xmlns:cdr = 'cips.nci.nih.gov/cdr'>\n"
+         tmpdoc  = "\n<GlossaryTermDef xmlns:cdr = 'cips.nci.nih.gov/cdr'>\n"
          # Add the CommentText and attributes
          for comment in xmlString:
-             tmpdoc += u"  %s\n" % comment
-         tmpdoc += u"</GlossaryTermDef>\n"
+             tmpdoc += "  %s\n" % comment
+         tmpdoc += "</GlossaryTermDef>\n"
 
 
-     # Need to encode the unicode string to UTF-8 since that's what the
-     # filter module expects.  Decoding it back to unicode once the
-     # filtered document comes back.
-     # --------------------------------------------------------------------
-     doc = cdr.filterDoc('guest', ['name:Glossary Term Definition Update'],
-                         doc = tmpdoc.encode('utf-8'))
-
-     if type(doc) in (type(""), type(u"")):
+     filters = ['name:Glossary Term Definition Update']
+     doc = cdr.filterDoc('guest', filters, doc=tmpdoc)
+     if isinstance(doc, (str, bytes)):
          cdrcgi.bail(doc)
-     if type(doc) == type(()):
-         doc = doc[0].decode('utf-8')
-
-     return doc
+     return doc[0]
 
 
 #----------------------------------------------------------------------
@@ -448,7 +431,7 @@ def getSharedInfo(docId):
     try:
         cursor.execute("SELECT xml FROM document WHERE id = ?", docId)
         row = cursor.fetchone()
-        dom = xml.dom.minidom.parseString(row[0].encode('utf-8'))
+        dom = xml.dom.minidom.parseString(row[0])
         docElem = dom.documentElement
 
         sharedElements = ['MediaLink', 'EmbeddedVideo', 'TermType',
@@ -521,7 +504,7 @@ def getConcept(docId):
     try:
         cursor.execute("SELECT xml FROM document WHERE id = ?", docId)
         row = cursor.fetchone()
-        dom = xml.dom.minidom.parseString(row[0].encode('utf-8'))
+        dom = xml.dom.minidom.parseString(row[0])
         docElem = dom.documentElement
 
         concept = {}
@@ -536,6 +519,7 @@ def getConcept(docId):
                 for child in node.childNodes:
                     if child.nodeName == 'Audience':
                         audience = str(cdr.getTextContent(child).strip())
+                lang_audience = f"{language}-{audience}"
 
                 # Prepare the dictionary that we add the data to
                 # The format of the dictionary will be
@@ -543,7 +527,7 @@ def getConcept(docId):
                 #                          element2:[value1, value2],}
                 #            'en-HP'     :{element1:value,
                 #                          element2:[value1, value2], ...}}
-                concept.update({'%s-%s' % (language, audience):{}})
+                concept.update({lang_audience:{}})
 
                 eNum += 1
                 sNum += 1
@@ -556,7 +540,7 @@ def getConcept(docId):
                                     'DateLastModified', 'TranslatedStatus',
                                     'TranslatedStatusDate']:
                         if child.nodeName == element:
-                            concept['%s-%s' % (language, audience)].update(
+                            concept[lang_audience].update(
                               {element:str(cdr.getTextContent(child).strip())})
 
                     # We need to preserve the inline markup of the
@@ -564,7 +548,7 @@ def getConcept(docId):
                     # -----------------------------------------------------
                     if (child.nodeName == 'DefinitionText'):
                         definition = child
-                        concept['%s-%s' % (language, audience)].update(
+                        concept[lang_audience].update(
                           {child.nodeName:definition.toxml()})
 
                     # Same as above but the MediaLink element is multiply
@@ -573,11 +557,11 @@ def getConcept(docId):
                     if (child.nodeName == 'MediaLink'):
                         if child.previousSibling.nodeName != 'MediaLink':
                             definition = child
-                            concept['%s-%s' % (language, audience)].update(
+                            concept[lang_audience].update(
                               {child.nodeName:[definition.toxml()]})
                         else:
                             definition = child
-                            concept['%s-%s' % (language, audience)][
+                            concept[lang_audience][
                                'MediaLink'].append(definition.toxml())
 
                     # Same as above for EmbeddedVideo.
@@ -585,11 +569,11 @@ def getConcept(docId):
                     if (child.nodeName == 'EmbeddedVideo'):
                         if child.previousSibling.nodeName != 'EmbeddedVideo':
                             definition = child
-                            concept['%s-%s' % (language, audience)].update(
+                            concept[lang_audience].update(
                               {child.nodeName:[definition.toxml()]})
                         else:
                             definition = child
-                            concept['%s-%s' % (language, audience)][
+                            concept[lang_audience][
                                'EmbeddedVideo'].append(definition.toxml())
 
                     # Adding all values that are multiply occuring
@@ -599,28 +583,25 @@ def getConcept(docId):
                                    'ReplacementText', 'Comment',
                                    'TranslationResource']:
                         if child.nodeName == gcList:
-                            if concept['%s-%s' % (language, audience)].has_key(
-                                                                       gcList):
+                            if gcList in concept[lang_audience]:
                                 # Comments and ReplacementText contain
                                 # attributes that need to be preserved.
                                 # -------------------------------------
                                 if gcList in ['ReplacementText', 'Comment']:
                                     rText = child
-                                    concept['%s-%s' % (language, audience)][
+                                    concept[lang_audience][
                                           gcList].append(rText.toxml())
-                                    #if sNum == 2: cdrcgi.bail(concept)
                                 else:
-                                    concept['%s-%s' % (language, audience)][
+                                    concept[lang_audience][
                                           gcList].append(
                                           cdr.getTextContent(child).strip())
                             else:
                                 if gcList in ['ReplacementText', 'Comment']:
                                     rText = child
-                                    concept['%s-%s' % (language, audience)
+                                    concept[lang_audience
                                               ].update({gcList:[rText.toxml()]})
-                                    #if eNum == 2: cdrcgi.bail(concept)
                                 else:
-                                    concept['%s-%s' % (language, audience)
+                                    concept[lang_audience
                                               ].update({gcList:[
                                           cdr.getTextContent(child).strip()]})
 
@@ -644,7 +625,7 @@ def getNameDefinition(docId):
     try:
         cursor.execute("SELECT xml FROM document WHERE id = ?", docId)
         row = cursor.fetchone()
-        dom = xml.dom.minidom.parseString(row[0].encode('utf-8'))
+        dom = xml.dom.minidom.parseString(row[0])
         docElem = dom.documentElement
         termName = {}
         termName[docId] = {}
@@ -654,6 +635,7 @@ def getNameDefinition(docId):
                 i += 1
                 language  = node.getAttribute('language') or 'en'
                 alternate = node.getAttribute('NameType') or None
+                lang_x = f"{language}x"
 
                 # We need to find the primary translation string
                 # and also store additional alternate strings to
@@ -675,18 +657,14 @@ def getNameDefinition(docId):
                 else:
                     for child in node.childNodes:
                         if child.nodeName == 'TermNameString':
-                            if termName[docId].has_key(language + 'x'):
-                                termName[docId][language + 'x'].append(
-                                             child.toxml())
-                            #                cdr.getTextContent(child).strip())
+                            if lang_x in termName[docId]:
+                                termName[docId][lang_x].append(child.toxml())
                             else:
-                                termName[docId].update(
-                                          {language + 'x':
-                                          [child.toxml()]})
-                            #             [cdr.getTextContent(child).strip()]})
+                                new_dict = {lang_x:[child.toxml()]}
+                                termName[docId].update(new_dict)
 
             if node.nodeName == 'ReplacementText':
-                if termName[docId].has_key('ReplacementText'):
+                if 'ReplacementText' in termName[docId]:
                     rText = node
                     termName[docId]['ReplacementText'].append(
                                                    rText.toxml())
@@ -856,10 +834,9 @@ audiences = ['Patient', 'Health professional']
 # definition exists.
 # Creating the languages/audiences list from the conceptInfo keys
 # ---------------------------------------------------------------
-lang_aud  = conceptInfo.keys()
 languages = []
 audiences = []
-for la in lang_aud:
+for la in conceptInfo:
     if la.split('-')[0] not in set(languages):
         languages.append(la.split('-')[0])
     if la.split('-')[1] not in set(audiences):
@@ -869,8 +846,11 @@ sections  = {'en':'English', 'es':'Spanish'}
 
 # cdrcgi.bail(allTermsInfo)
 for lang in languages:
+    lang_x = f"{lang}x"
     for aud in audiences:
-        if '%s-%s' % (lang, aud) not in lang_aud: continue
+        lang_aud = f"{lang}-{aud}"
+        if lang_aud not in conceptInfo:
+            continue
         html += """
   <br>
   <br>
@@ -881,12 +861,12 @@ for lang in languages:
 
         # Adding Term Name and Term Definition for language/audience
         # ----------------------------------------------------------
-        for id, termData in allTermsInfo.iteritems():
+        for id, termData in allTermsInfo.items():
             # Only if there doesn't exists a translation for an English
             # term would the Spanish term be missing.  In this case
             # (the 'else' block) we'll display the English term instead
             # ---------------------------------------------------------
-            if termData.has_key(lang):
+            if lang in termData:
                 html += """\
    <tr class="name">
     <td width="30%%">Name</td>"""
@@ -899,9 +879,9 @@ for lang in languages:
     <td width="70%%">%s (CDR%s)""" % (displayMarkup(termData[lang], 'TermName'),
                                                                           id)
 
-                    if termData.has_key(lang + 'x'):
+                    if lang_x in termData:
                         html += " &nbsp;[alternate: %s]" % (
-                                ', '.join([x for x in termData[lang + 'x']]))
+                                ', '.join([x for x in termData[lang_x]]))
 
                     html += """</td>
    </tr>"""
@@ -926,12 +906,12 @@ for lang in languages:
                 # and suppress display of the definition, if it is.
                 # --------------------------------------------------
                 if termNameStatus[id] == 'A':
-                    html += u"""\
+                    html += """\
     <td width="70%%">
      <span class='special'>%s (en ingl\xe9s)</span> (CDR%s)""" % (
                                                         termData['en'], id)
                 else:
-                    html += u"""\
+                    html += """\
     <td class="blocked" width="70%%">BLOCKED -
      <span class='special'>%s (en ingl\xe9s)</span> (CDR%s)""" % (
                                                         termData['en'], id)
@@ -941,42 +921,41 @@ for lang in languages:
             # table row from the resulting data
             # (The HTML output is created in the filter)
             # ----------------------------------------------------
-            if conceptInfo.has_key('%s-%s' % (lang, aud)):
-                definitionRow = resolvePlaceHolder(lang, termData,
-                                            conceptInfo['%s-%s' % (lang, aud)])
-                ### There may be a better way to do this substitution???
-                ### ####################################################
-                # If we have a CAPPEDTERMNAME PlaceHolder the filter has
-                # enclosed the term with @@...@@ characters.  However, the
-                # term name could be marked up with insertion/deletion
-                # markup.  We need to find the first character within this
-                # string that needs to be capitalized.
-                # If the first character is a '<' this indicates the
-                # beginning of the <span> element for markup. The first
-                # character after the </span> should then be capitalized.
-                # --------------------------------------------------------
-                replaceList = re.findall('@@.*?@@', definitionRow)
+            definitionRow = resolvePlaceHolder(lang, termData,
+                                               conceptInfo[lang_aud])
+            ### There may be a better way to do this substitution???
+            ### ####################################################
+            # If we have a CAPPEDTERMNAME PlaceHolder the filter has
+            # enclosed the term with @@...@@ characters.  However, the
+            # term name could be marked up with insertion/deletion
+            # markup.  We need to find the first character within this
+            # string that needs to be capitalized.
+            # If the first character is a '<' this indicates the
+            # beginning of the <span> element for markup. The first
+            # character after the </span> should then be capitalized.
+            # --------------------------------------------------------
+            replaceList = re.findall('@@.*?@@', definitionRow)
 
-                if replaceList:
-                    for text in replaceList:
-                        m1 = re.sub('@@', '', text)
-                        m2 = re.sub('@@', '', m1)
-                        if m2[0] == '<':
-                            m3 = re.search('<.*?>.', m2)
-                            rtext = m3.group(0)[:-1] + \
-                                    m3.group(0)[-1].upper() + \
-                                    re.sub(m3.group(0), '', m2)
-                        else:
-                            rtext = m2[0].upper() + m2[1:]
-                        definitionRow = definitionRow.replace(text, rtext)
+            if replaceList:
+                for text in replaceList:
+                    m1 = re.sub('@@', '', text)
+                    m2 = re.sub('@@', '', m1)
+                    if m2[0] == '<':
+                        m3 = re.search('<.*?>.', m2)
+                        rtext = m3.group(0)[:-1] + \
+                                m3.group(0)[-1].upper() + \
+                                re.sub(m3.group(0), '', m2)
+                    else:
+                        rtext = m2[0].upper() + m2[1:]
+                    definitionRow = definitionRow.replace(text, rtext)
 
-                # If there was a term without Spanish name display it
-                # in red to stand out.
-                # ----------------------------------------------------
-                definitionRow = definitionRow.replace('@S@',
-                                             '<span class="special">', 1)
-                definitionRow = definitionRow.replace('@E@', '</span>')
-                html += definitionRow
+            # If there was a term without Spanish name display it
+            # in red to stand out.
+            # ----------------------------------------------------
+            definitionRow = definitionRow.replace('@S@',
+                                                  '<span class="special">', 1)
+            definitionRow = definitionRow.replace('@E@', '</span>')
+            html += definitionRow
 
         html += """
   </table>
@@ -986,62 +965,52 @@ for lang in languages:
         # Adding the Term Concept information at the end of each
         # language/audience section
         # -----------------------------------------------------------
-        if conceptInfo.has_key('%s-%s' % (lang, aud)):
-            # Adding row for Definition Resource
-            if conceptInfo['%s-%s' % (lang, aud)].has_key(
-                                                      'DefinitionResource'):
-                html += addMultipleRow(conceptInfo['%s-%s' % (lang, aud)],
-                                    'DefinitionResource')
+        # Adding row for Definition Resource
+        if "DefinitionResource" in conceptInfo[lang_aud]:
+            html += addMultipleRow(conceptInfo[lang_aud], "DefinitionResource")
 
-            # Adding row for Translation Resource
-            if conceptInfo['%s-%s' % (lang, aud)].has_key(
-                                                      'TranslationResource'):
-                html += addMultipleRow(conceptInfo['%s-%s' % (lang, aud)],
-                                    'TranslationResource')
+        # Adding row for Translation Resource
+        if "TranslationResource" in conceptInfo[lang_aud]:
+            html += addMultipleRow(conceptInfo[lang_aud], "TranslationResource")
 
-            # Adding row for MediaLink
-            if conceptInfo['%s-%s' % (lang, aud)].has_key('MediaLink'):
-                #cdrcgi.bail(conceptInfo['%s-%s' % (lang, aud)]['MediaLink'])
-                html += addMediaRow(conceptInfo['%s-%s' % (lang, aud)],
-                                    'MediaLink')
-            # Adding row for EmbeddedVideo
-            if conceptInfo['%s-%s' % (lang, aud)].has_key('EmbeddedVideo'):
-                html += addVideoRow(conceptInfo['%s-%s' % (lang, aud)],
-                                    'EmbeddedVideo')
-            # Adding row for Dictionary
-            if conceptInfo['%s-%s' % (lang, aud)].has_key('Dictionary'):
-                html += addMultipleRow(conceptInfo['%s-%s' % (lang, aud)],
-                                    'Dictionary')
+        # Adding row for MediaLink
+        if "MediaLink" in conceptInfo[lang_aud]:
+            html += addMediaRow(conceptInfo[lang_aud], "MediaLink")
 
-            # Adding row for Definition Status
-            if conceptInfo['%s-%s' % (lang, aud)].has_key('DefinitionStatus'):
-                html += addSingleRow(conceptInfo['%s-%s' % (lang, aud)],
-                                    'DefinitionStatus')
-            # Adding row for Definition Status
-            if conceptInfo['%s-%s' % (lang, aud)].has_key('TranslatedStatus'):
-                html += addSingleRow(conceptInfo['%s-%s' % (lang, aud)],
-                                    'TranslatedStatus')
-            # Adding row for Status Date
-            if conceptInfo['%s-%s' % (lang, aud)].has_key('StatusDate'):
-                html += addSingleRow(conceptInfo['%s-%s' % (lang, aud)],
-                                    'StatusDate')
+        # Adding row for EmbeddedVideo
+        if "EmbeddedVideo" in conceptInfo[lang_aud]:
+            html += addVideoRow(conceptInfo[lang_aud], "EmbeddedVideo")
 
-            # Adding Comment rows
-            # We need to process the attributes, too, so we're sending
-            # the Comment node through a filter
-            if conceptInfo['%s-%s' % (lang, aud)].has_key('Comment'):
-                commentRow = displayMarkup(
-                            conceptInfo['%s-%s' % (lang, aud)]['Comment'],
-                                                               'Comment')
-                html += commentRow
-            # Adding row for Date Last Modified
-            if conceptInfo['%s-%s' % (lang, aud)].has_key('DateLastModified'):
-                html += addSingleRow(conceptInfo['%s-%s' % (lang, aud)],
-                                    'DateLastModified')
-            # Adding row for Date Last Reviewed
-            if conceptInfo['%s-%s' % (lang, aud)].has_key('DateLastReviewed'):
-                html += addSingleRow(conceptInfo['%s-%s' % (lang, aud)],
-                                    'DateLastReviewed')
+        # Adding row for Dictionary
+        if "Dictionary" in conceptInfo[lang_aud]:
+            html += addMultipleRow(conceptInfo[lang_aud], "Dictionary")
+
+        # Adding row for Definition Status
+        if "DefinitionStatus" in conceptInfo[lang_aud]:
+            html += addSingleRow(conceptInfo[lang_aud], "DefinitionStatus")
+
+        # Adding row for Definition Status
+        if "TranslatedStatus" in conceptInfo[lang_aud]:
+            html += addSingleRow(conceptInfo[lang_aud], "TranslatedStatus")
+
+        # Adding row for Status Date
+        if "StatusDate" in conceptInfo[lang_aud]:
+            html += addSingleRow(conceptInfo[lang_aud], "StatusDate")
+
+        # Adding Comment rows
+        # We need to process the attributes, too, so we're sending
+        # the Comment node through a filter
+        if "Comment" in conceptInfo[lang_aud]:
+            args = conceptInfo[lang_aud]["Comment"], "Comment"
+            html += displayMarkup(*args)
+
+        # Adding row for Date Last Modified
+        if "DateLastModified" in conceptInfo[lang_aud]:
+            html += addSingleRow(conceptInfo[lang_aud], "DateLastModified")
+
+        # Adding row for Date Last Reviewed
+        if "DateLastReviewed" in conceptInfo[lang_aud]:
+            html += addSingleRow(conceptInfo[lang_aud], "DateLastReviewed")
 
         html += """
   </table>
@@ -1112,7 +1081,7 @@ html += """
 #----------------------------------------------------------------------
 # Create the HTML footer
 html += """
- </BODY>
-</HTML>"""
+ </body>
+</html>"""
 
 cdrcgi.sendPage(html)

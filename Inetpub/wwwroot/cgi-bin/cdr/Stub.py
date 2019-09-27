@@ -31,7 +31,7 @@ if action == "Log Out":
 #----------------------------------------------------------------------
 page = cdrcgi.Page(title, subtitle=section, action="Reports.py",
                    buttons=buttons, session=session)
-instructions = u"""\
+instructions = """\
 This report has not yet been implemented, either because
 we don't yet have the specs, or because it's behind higher-priority
 tasks in the development task queue."""

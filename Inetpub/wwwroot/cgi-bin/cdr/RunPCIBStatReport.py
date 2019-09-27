@@ -1,7 +1,7 @@
 #----------------------------------------------------------------------
 #
-# Report listing the PCIB Statistics of updated/added documents for 
-# the specified time frame.  
+# Report listing the PCIB Statistics of updated/added documents for
+# the specified time frame.
 # This report runs on a monthly schedule but can also be submitted from
 # the CDR Admin reports menu.
 #
@@ -16,6 +16,7 @@ import cdr_stats
 
 class Control(cdrcgi.Control):
 
+    LOGNAME = "PCIBStatReport"
     LEGEND = "Run PCIB Statistics Report for a specific time frame"
     SECTION_LABELS = {
         "summary": "Summaries",
@@ -62,12 +63,12 @@ class Control(cdrcgi.Control):
         "Fill in the fields for requesting the report."
         form.add("<fieldset>")
         form.add(form.B.LEGEND(self.LEGEND))
-        instructions = (u"This Report runs on every 1\u02E2\u1d57 of the "
-                        u"month for the previous month. "
-                        u"Specify the start date and end date to run the "
-                        u"report for a different time frame.",
-                        u"Click the submit button only once!  The report "
-                        u"will take a few seconds to complete.")
+        instructions = ("This Report runs on every 1\u02E2\u1d57 of the "
+                        "month for the previous month. "
+                        "Specify the start date and end date to run the "
+                        "report for a different time frame.",
+                        "Click the submit button only once!  The report "
+                        "will take a few seconds to complete.")
         for para in instructions:
             form.add(form.B.P(para))
         form.add_date_field("start", "Start Date", value=self.start)
@@ -112,6 +113,7 @@ class Control(cdrcgi.Control):
         try:
             cdr_stats.Control(opts).run()
         except Exception as e:
+            self.logger.exception("Report failure")
             cdrcgi.bail("failure: %s" % e)
         page = cdrcgi.Page("CDR Administration",
                            subtitle="PCIB Statistics Report submitted",

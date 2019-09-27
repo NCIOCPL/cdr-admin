@@ -65,46 +65,6 @@ class Term:
             self.concept_code,
             self.available and "Yes" or "No",
             self.last_mod,
-            u"; ".join(self.types)
+            "; ".join(self.types)
         )
 Control().run()
-exit(0)
-cursor = db.connect(user="CdrGuest").cursor()
-title = "NCI Thesaurus Links Not Marked Public"
-style = """
-th, td { background-color: #ecf1ef; margin: 3px; padding: 3px; }
-th { background-color: maroon; color: white; }
-tr.odd td { background-color: #eff7f2; }
-* { font-family: Arial, sans-serif; font-size: 11pt; }
-h1 { color: maroon; font-size: 12pt; }
-.flag { text-align: center; }
-.frag-id { text-align: right; }
-"""
-html = H.Element("html")
-html.append(
-    B.HEAD(
-        B.TITLE(title),
-        B.STYLE(style)
-    )
-)
-body = H.Element("body")
-body.append(B.H1(title))
-table = H.Element("table")
-table.append(B.TR(B.TH("CDR ID"), B.TH("Concept ID"), B.TH("Available?"),
-                  B.TH("Date Last Modified"), B.TH("Semantic Types")))
-count = 1
-for docId, conceptId in cursor.fetchall():
-    rowClass = count % 2 == 1 and "odd" or "even"
-    count += 1
-    row = H.Element("tr", B.CLASS(rowClass))
-    row.append(B.TD(u"CDR%d" % docId))
-    row.append(B.TD(conceptId))
-    row.append(B.TD(checkConcept(conceptId) and "Yes" or "No"))
-    row.append(B.TD(getDateLastModified(cursor, docId)))
-    row.append(B.TD(getSemanticTypes(cursor, docId)))
-    table.append(row)
-body.append(B.DIV(table))
-html.append(body)
-print("Content-type: text/html\n")
-print("<!DOCTYPE html>")
-print(H.tostring(html, pretty_print=True))

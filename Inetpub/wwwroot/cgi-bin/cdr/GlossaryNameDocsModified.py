@@ -106,7 +106,7 @@ class GlossaryTermName:
         row = query.execute(control.cursor).fetchone()
         self.title, doc_xml, publishable, self.first_pub = row
         self.publishable = publishable == "Y"
-        root = etree.XML(doc_xml.encode("utf-8"))
+        root = etree.XML(doc_xml)
         names = { "en": "TermName", "es": "TranslatedName" }
         for node in root.findall(names.get(control.language)):
             if self.want_node(node):
@@ -125,12 +125,12 @@ class GlossaryTermName:
         "Create a row for each of the term's names"
         return [name.row() for name in self.names]
 
-    def __cmp__(self, other):
+    def __lt__(self, other):
         """
         Make the documents sortable, even though the order won't mean
         much to the user, since the title isn't shown.
         """
-        return cmp(self.title, other.title)
+        return self.title < other.title
 
     class Name:
         "A Glossary term can have multiple names."
@@ -153,8 +153,9 @@ class GlossaryTermName:
             name = self.value is not None and self.value or ""
             last_mod = self.last_mod and self.last_mod[:10] or ""
             publishable = self.term.publishable and "Y" or "N"
-            first_pub = self.term.first_pub and self.term.first_pub[:10] or ""
-            last_pub = self.term.last_pub and self.term.last_pub[:10] or ""
+            first_pub = self.term.first_pub
+            first_pub = first_pub and str(first_pub)[:10] or ""
+            last_pub = self.term.last_pub and str(self.term.last_pub)[:10] or ""
             comment = self.comment is not None and self.comment.tostring() or ""
             return (
                 cdrcgi.Report.Cell(self.term.doc_id, center=True),
@@ -174,10 +175,10 @@ class GlossaryTermName:
                 self.audience = node.get("audience", None)
                 self.user = node.get("user", None)
             def tostring(self):
-                return (u"[date: %s; user: %s; audience: %s] %s" %
+                return ("[date: %s; user: %s; audience: %s] %s" %
                         (self.date, self.user, self.audience, self.text))
-            def __cmp__(self, other):
-                return cmp(self.date, other.date)
+            def __lt__(self, other):
+                return self.date < other.date
 
 if __name__ == "__main__":
     "Allow documentation and code check tools to import us without side effects"

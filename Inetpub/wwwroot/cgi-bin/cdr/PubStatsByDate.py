@@ -520,8 +520,8 @@ if vol:
     <td align="center">%s</td>
     <td align="center">%s</td>
    </tr>
-""" % (id, id, title, first and first[:10] or "",
-       verDt and verDt[:16] or "", publishable,
+""" % (id, id, title, first and str(first)[:10] or "",
+       verDt and str(verDt)[:16] or "", publishable,
        volFlag and volFlag[:1] or "")
 
 
@@ -580,7 +580,7 @@ for doc_type in doc_types:
 
     # Display second column (documents added again after being deleted)
     # -----------------------------------------------------------------
-    if countRenew.has_key(doc_type):
+    if doc_type in countRenew:
         total += countRenew[doc_type]
         report += """
      <td align="right">
@@ -592,7 +592,7 @@ for doc_type in doc_types:
 
     # Display third column (documents being added for the first time)
     # ---------------------------------------------------------------
-    if countBrandnew.has_key(doc_type):
+    if doc_type in countBrandnew:
         total += countBrandnew[doc_type]
         report += """
      <td align="right">
@@ -604,7 +604,7 @@ for doc_type in doc_types:
 
     # Display fourth column (updated documents - unique count)
     # --------------------------------------------------------
-    if countUpdate.has_key(doc_type):
+    if doc_type in countUpdate:
         total += countUpdate[doc_type]
         report += """
      <td align="right">
@@ -617,7 +617,7 @@ for doc_type in doc_types:
     # Display fifth column (updated documents - not unique count)
     # We are not counting these to the total
     # -----------------------------------------------------------
-    if countUpdate.has_key(doc_type):
+    if doc_type in countUpdate:
         # total += countUpdate2[doc_type]
         report += """
      <td class="star" align="right">
@@ -629,7 +629,7 @@ for doc_type in doc_types:
 
     # Display sixth column (documents being deleted)
     # ----------------------------------------------
-    if countRemove.has_key(doc_type):
+    if doc_type in countRemove:
         total += countRemove[doc_type]
         report += """
      <td align="right">

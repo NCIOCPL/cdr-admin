@@ -10,7 +10,6 @@ import urllib.parse
 import re
 import sys
 import datetime
-import time
 
 # TODO: Get Acquia to fix their broken certificates.
 from urllib3.exceptions import InsecureRequestWarning
@@ -24,9 +23,8 @@ CHUNK = 32000
 def log(url, problem):
     try:
         now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        fp = open("%s/proxy.log" % cdr.DEFAULT_LOGDIR, "a")
-        fp.write("%s %s: %s\n" % (now, repr(url), problem))
-        fp.close()
+        with open(f"{cdr.DEFAULT_LOGDIR}/proxy.log", "a") as fp:
+            fp.write(f"{now} {url!r}: {problem}\n")
     except:
         pass
 
@@ -49,10 +47,10 @@ def src_replacer(match):
         return match.group(0)
     if not src.startswith("http"):
         if src.startswith("/"):
-            src = "%s/%s" % (absolute_base, src)
+            src = f"{absolute_base}/{src}"
         else:
-            src = "%s/%s" % (relative_base, src)
-    return "url(\"%s?url=%s\")" % (proxy, src)
+            src = f"{relative_base}/{src}"
+    return f'url("{proxy}?url={src}")'
 
 
 #----------------------------------------------------------------------
@@ -86,14 +84,14 @@ def send(what, content_type=None):
         written += CHUNK
     sys.exit(0)
 
-start = time.time()
+start = datetime.datetime.now()
 fields = cgi.FieldStorage()
 url = fields.getvalue("url")
 try:
     response = requests.get(url, verify=False)
     code = response.status_code
     if code != 200:
-        log(url, "code: %s" % repr(code))
+        log(url, f"code: {code!r}")
         send("")
     payload = response.content
     content_type = None
@@ -108,11 +106,11 @@ try:
         netloc = parsed_url.netloc
         path = parsed_url.path
         path, resource = os.path.split(path)
-        absolute_base = "%s://%s" % (scheme, netloc)
+        absolute_base = f"{scheme}://{netloc}"
         relative_base = absolute_base + path
         payload = fix_css(payload, url)
-    elapsed = time.time() - start
-    log(url, "elapsed: %s" % elapsed)
+    elapsed = datetime.datetime.now() - start
+    log(url, f"elapsed: {elapsed}")
 except Exception as e:
     log(url, e)
     send("")

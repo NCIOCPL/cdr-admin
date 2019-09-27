@@ -64,7 +64,7 @@ class Control:
                 columns.append(cdrcgi.Report.Column("", width="50px"))
                 extra -= 1
         sets = self.sets
-        doc_ids = (not sets or "all" in sets) and self.boards.keys() or sets
+        doc_ids = (not sets or "all" in sets) and list(self.boards) or sets
         title = "PDQ %s %s Summaries" % (self.language, self.audience)
         if self.show_all == "Y":
             title = title + " (all)"
@@ -227,7 +227,7 @@ class Board:
         else:
             docs = self.summaries
             what = (len(docs) == 1) and "summary" or "summaries"
-        opts = { "caption": u"%s (%d %s)" % (self.name, len(docs), what) }
+        opts = { "caption": "%s (%d %s)" % (self.name, len(docs), what) }
         rows = []
         for doc in sorted(docs):
             row = []
@@ -235,10 +235,10 @@ class Board:
                 row.append(cdrcgi.Report.Cell(doc.doc_id, classes="center"))
             title = [doc.title]
             if doc.original_title:
-                title.append(u"(%s)" % doc.original_title)
+                title.append("(%s)" % doc.original_title)
             row.append(title)
             while len(row) < len(columns):
-                row.append(u"")
+                row.append("")
             rows.append(row)
         return cdrcgi.Report.Table(columns, rows, **opts)
     def __lt__(self, other):

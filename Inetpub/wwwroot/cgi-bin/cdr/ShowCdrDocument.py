@@ -177,7 +177,7 @@ class Control(cdrcgi.Control):
         If no documents match, display an error message.
         """
 
-        fragment = unicode(self.fragment.strip(), "utf-8")
+        fragment = self.fragment.strip()
         if not fragment:
             cdrcgi.bail("Missing title")
         query = db.Query("document d", "d.id", "d.title", "t.name")
@@ -209,7 +209,7 @@ class Control(cdrcgi.Control):
         form.add(form.B.LEGEND("Choose Document"))
         for doc_id, title, doctype in rows:
             tooltip = None
-            display = u"CDR%d [%s] %s" % (doc_id, doctype, title)
+            display = "CDR%d [%s] %s" % (doc_id, doctype, title)
             if len(display) > 125:
                 display, tooltip = display[:125] + "...", display
             form.add_radio("doc-id", display, doc_id, tooltip=tooltip)

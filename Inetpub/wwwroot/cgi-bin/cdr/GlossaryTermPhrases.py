@@ -116,7 +116,7 @@ def putUpSelection(rows):
     page.add(page.B.LEGEND("Select Term For Report"))
     for doc_id, name in rows:
         id_string = cdr.normalize(doc_id)
-        label = u"%s: %s" % (id_string, name)
+        label = "%s: %s" % (id_string, name)
         page.add_radio("Id", label, id_string)
     page.add("</fieldset>")
     page.add_hidden_field("Email", email or "")

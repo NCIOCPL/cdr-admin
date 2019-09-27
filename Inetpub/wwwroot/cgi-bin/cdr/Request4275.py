@@ -102,15 +102,15 @@ class Mailer:
     all_changes = 0
     recipients = {}
     documents  = {}
-    urlBase    = (u"https://%s%s/QcReport.py?Session=guest&DocId=%%d" %
+    urlBase    = ("https://%s%s/QcReport.py?Session=guest&DocId=%%d" %
                   (cdrcgi.WEBSERVER, cdrcgi.BASE))
     def __init__(self, mailerId, cursor):
         self.docId = mailerId
-        self.mailerType = u""
-        self.address = u""
+        self.mailerType = ""
+        self.address = ""
         self.recipient = None
         self.document = None
-        self.response = u""
+        self.response = ""
         self.changes = []
         cursor.execute("SELECT xml FROM document WHERE id = ?", mailerId)
         docXml = cursor.fetchall()[0][0]
@@ -145,7 +145,7 @@ class Mailer:
               FROM document
              WHERE id = ?""", docId)
         rows = cursor.fetchall()
-        title = rows and rows[0][0] or u""
+        title = rows and rows[0][0] or ""
         cls.documents[docId] = Mailer.Doc(docId, title)
         return cls.documents[docId]
     @classmethod
@@ -162,11 +162,11 @@ class Mailer:
               FROM document
              WHERE id = ?""", docId)
         rows = cursor.fetchall()
-        title = rows and rows[0][0] or u""
+        title = rows and rows[0][0] or ""
         if title:
             title = title.split(";")
             if len(title) > 1 and title[0].lower() == 'inactive':
-                title = u"%s (Inactive)" % title[1]
+                title = "%s (Inactive)" % title[1]
             else:
                 title = title[0]
         cls.recipients[docId] = Mailer.Doc(docId, title)
@@ -205,18 +205,18 @@ def makeChangeCategoryPicklist(cursor):
      AND value IS NOT NULL
      AND value <> ''
 ORDER BY value""")
-    html = [u"""\
+    html = ["""\
 <select name='category'>
  <option value=''>All</option>
 """]
     for row in cursor.fetchall():
-        html.append(u"""\
+        html.append("""\
  <option>%s</option>
 """ % (html_escape(row[0])))
-    html.append(u"""\
+    html.append("""\
 </select>
 """)
-    return u"".join(html)
+    return "".join(html)
 
 #----------------------------------------------------------------------
 # Build a CGI form picklist for the mailer types.
@@ -229,18 +229,18 @@ def makeMailerTypePicklist(cursor):
      AND value IS NOT NULL
      AND value <> ''
 ORDER BY value""")
-    html = [u"""\
+    html = ["""\
 <select name='mailerType'>
  <option value=''>All</option>
 """]
     for row in cursor.fetchall():
-        html.append(u"""\
+        html.append("""\
 <option>%s</option>
 """ % (html_escape(row[0])))
-    html.append(u"""\
+    html.append("""\
 </select>
 """)
-    return u"".join(html)
+    return "".join(html)
 
 #----------------------------------------------------------------------
 # Display the form for the report's parameters.
@@ -250,7 +250,7 @@ def createForm(cursor):
     categories  = makeChangeCategoryPicklist(cursor)
     now = time.strftime("%Y-%m-%d")
     then = str(cdr.calculateDateByOffset(-30))[:10]
-    form = u"""\
+    form = """\
    <input type='hidden' name='%s' value='%s' />
    <table border='0'>
     <tr>
@@ -314,7 +314,7 @@ def createReport(cursor, mailerType, changeCategory, startDate, endDate):
                   "AND c.path = '/Mailer/Response/ChangesCategory'")
         join += " JOIN query_term c ON c.doc_id = r.doc_id"
         parms.append(changeCategory)
-    sql = u"""\
+    sql = """\
         SELECT DISTINCT r.doc_id
           FROM query_term r
           %s

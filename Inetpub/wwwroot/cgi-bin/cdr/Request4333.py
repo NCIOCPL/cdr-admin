@@ -66,7 +66,7 @@ class TermName:
     def addToSheet(self, sheet, styles, row):
         sheet.write(row, 0, self.docId, styles.left)
         sheet.write(row, 1, self.enName, styles.left)
-        sheet.write(row, 2, u"; ".join(self.spNames), styles.left)
+        sheet.write(row, 2, "; ".join(self.spNames), styles.left)
         sheet.write(row, 3, str(self.firstPub)[:10], styles.left)
         return row + 1
 
@@ -120,7 +120,7 @@ def createReport(cursor, startDate, endDate):
     row = 1
     for name in names:
         row = name.addToSheet(sheet, styles, row)
-    sheet.write(row, 0, u"Total: %d" % len(names), styles.bold)
+    sheet.write(row, 0, "Total: %d" % len(names), styles.bold)
     now = datetime.datetime.now()
     stamp = now.strftime("%Y%m%d%H%M%S")
     sys.stdout.buffer.write(f"""\

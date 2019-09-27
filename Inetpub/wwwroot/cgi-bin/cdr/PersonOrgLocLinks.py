@@ -62,7 +62,7 @@ for row in rows:
     title = row[1]
     shortTitle = title[:100]
     if len(title) > 100: shortTitle += " ..."
-    html += u"""\
+    html += """\
 <TR>
   <TD BGCOLOR='white' VALIGN='top' WIDTH='15%%' ALIGN='center'>
    <A HREF='%s?DocId=%s&Filter=%s'>

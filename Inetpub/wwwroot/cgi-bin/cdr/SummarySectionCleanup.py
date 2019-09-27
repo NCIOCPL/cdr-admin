@@ -216,7 +216,7 @@ class Summary:
                 if title is None or not title.strip():
                     title = "EMPTY TITLE"
                 if prev_section_empty:
-                    self.changes.append(u"*** %s" % title)
+                    self.changes.append("*** %s" % title)
                 if not (set(tags) & Summary.NORMAL_CONTENT):
                     ancestors = [a.tag for a in section.iterancestors()]
                     if "Insertion" not in ancestors:
@@ -227,9 +227,9 @@ class Summary:
         if prev_section_empty:
             self.changes.append("*** Last Section")
 
-    def __cmp__(self, other):
+    def __lt__(self, other):
         "Support sorting the summaries by title."
-        return cmp((self.title, self.id), (other.title, other.id))
+        return (self.title, self.id) < (other.title, other.id)
 
     def get_row(self):
         "Assemble the row for the report table."
@@ -238,7 +238,7 @@ class Summary:
     @staticmethod
     def is_element(node):
         "We need to skip over processing instructions and comments."
-        return isinstance(node.tag, basestring)
+        return isinstance(node.tag, str)
 
 if __name__ == "__main__":
     "Protect this from being executed when loaded by lint-like tools."

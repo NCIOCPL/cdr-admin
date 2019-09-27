@@ -1,144 +1,145 @@
-#----------------------------------------------------------------------
-# Compare filters between the current tier and the production tier.
-#----------------------------------------------------------------------
-import cdr, cgi, cdrcgi, os, tempfile, re, shutil, glob
+#!/usr/bin/env python
+
+"""Compare filters between the current tier and the production tier.
+"""
+
+from sys import stdout
+from difflib import unified_diff
+import cgi
+from lxml import etree
+import json
+import requests
+import cdr
+import cdrcgi
 from cdrapi import db
 from cdrapi.settings import Tier
-from html import escape as html_escape
 
-#----------------------------------------------------------------------
-# Make sure we're not on the production server.
-#----------------------------------------------------------------------
-if cdr.isProdHost():
-    cdrcgi.bail("Can't compare the production server to itself")
-tier_name = Tier().name
+class Control:
+    """Wrap the processing in a single namespace."""
 
-#----------------------------------------------------------------------
-# Create a temporary working area.
-#----------------------------------------------------------------------
-def makeTempDir():
-    tempfile.tempdir = "d:\\tmp"
-    where = tempfile.mktemp("diff")
-    abspath = os.path.abspath(where)
-    print(abspath)
-    try: os.mkdir(abspath)
-    except: cdrcgi.bail("Cannot create directory %s" % abspath)
-    try: os.chdir(abspath)
-    except:
-        cleanup(abspath)
-        cdrcgi.bail("Cannot cd to %s" % abspath)
-    return abspath
+    URL = "https://cdr.cancer.gov/cgi-bin/cdr/ShowDocXml.py?DocId={}"
+    CACHED_PROD_FILTERS = f"{cdr.BASEDIR}/Filters/prod-filters.json"
 
-#----------------------------------------------------------------------
-# Get the filters from the local tier.
-#----------------------------------------------------------------------
-def getLocalFilters(tmpDir):
-    try: os.mkdir(tier_name)
-    except:
-        cleanup(tmpDir)
-        cdrcgi.bail("Cannot create directory %s" % tier_name)
-    try:
-        conn = db.connect(user='CdrGuest')
-        curs = conn.cursor()
-        curs.execute("""\
-            SELECT d.title, d.xml
-              FROM document d
-              JOIN doc_type t
-                ON t.id = d.doc_type
-             WHERE t.name = 'Filter'""")
-        rows = curs.fetchall()
-    except Exception as e:
-        cleanup(tmpDir)
-        cdrcgi.bail('Database failure: %s' % e)
-    for row in rows:
-        try:
-            title = row[0].strip()
-            title = title.replace(" ", "@@SPACE@@") \
-                         .replace(":", "@@COLON@@") \
-                         .replace("/", "@@SLASH@@") \
-                         .replace("*", "@@STAR@@")
-            xml = row[1].replace("\r", "")
-            filename = "%s/@@MARK@@%s@@MARK@@" % (tier_name, title)
-            open(filename, "w").write(xml.encode('utf-8'))
-        except:
-            cleanup(tmpDir)
-            cdrcgi.bail("Failure writing %s" % filename);
+    def run(self):
+        """Run the report (top-level entry point)."""
 
-#----------------------------------------------------------------------
-# Make a copy of the filters on the production server.
-#----------------------------------------------------------------------
-def getProdFilters(tmpDir):
-    try:
-        os.mkdir("PROD")
-    except:
-        cleanup(tmpDir)
-        cdrcgi.bail("Cannot create directory PROD")
-    for oldpath in glob.glob("d:/cdr/prod-filters/*"):
-        try:
-            newpath = "PROD/%s" % os.path.basename(oldpath)
-            shutil.copy(oldpath, newpath)
-        except:
-            cleanup(tmpDir)
-            cdrcgi.bail("Failure writing %s" % newpath)
+        if cdr.isProdHost():
+            cdrcgi.bail("Can't compare the production server to itself")
+        lines = []
+        for name in sorted(self.filter_names, key=str.lower):
+            #print(f"checking {name}")
+            if name not in self.local_filters:
+                lines += self.only_on(name, "PROD")
+            elif name not in self.prod_filters:
+                lines += self.only_on(name, self.tier.name)
+            else:
+                lines += self.compare(name)
+        if not lines:
+            lines = [f"Filters on {self.tier.name} and PROD are identical"]
+        lines = "\n".join(lines) + "\n"
+        stdout.buffer.write(b"Content-type: text/plain; charset=utf-8\n\n")
+        stdout.buffer.write(lines.encode("utf-8"))
 
-#----------------------------------------------------------------------
-# Don't leave dross around if we can help it.
-#----------------------------------------------------------------------
-def cleanup(abspath):
-    try:
-        os.chdir("..")
-        cdr.runCommand("rm -rf %s" % abspath)
-    except:
-        pass
+    def compare(self, name):
+        """Run a diff between the local and production copies of a filter."""
 
-#----------------------------------------------------------------------
-# Undo our homemade encoding.
-#----------------------------------------------------------------------
-def unEncode(str):
-    return str.replace("@@SPACE@@", " ") \
-              .replace("@@COLON@@", ":") \
-              .replace("@@SLASH@@", "/") \
-              .replace("@@STAR@@", "*")  \
-              .replace("@@MARK@@", "")
+        prod = self.normalize(self.prod_filters[name])
+        local = self.normalize(self.local_filters[name])
+        opts = dict(lineterm="")
+        lines = list(unified_diff(prod, local, "PROD", self.tier.name, **opts))
+        if lines:
+            return self.filter_banner(name) + lines
+        return []
 
-#----------------------------------------------------------------------
-# Create a banner for the report on a single filter.
-#----------------------------------------------------------------------
-def makeBanner(name):
-    line = "*" * 79 + "\n"
-    name = (" %s " % name).center(79, "*")
-    return "\n\n%s%s\n%s\n" % (line * 2, name, line * 2)
+    def filter_banner(self, filter_name):
+        """Put the filter name at the top of a message or diff report"""
+        return ["=" * len(filter_name), filter_name, "=" * len(filter_name)]
 
-#----------------------------------------------------------------------
-# Get the filters.
-#----------------------------------------------------------------------
-workDir = makeTempDir()
-getLocalFilters(workDir)
-getProdFilters(workDir)
+    def only_on(self, filter_name, tier_name):
+        """Create a message to show a filter missing from one or the other."""
+        return self.filter_banner(filter_name) + [f"Only on {tier_name}", ""]
 
-#----------------------------------------------------------------------
-# Compare the filters.
-#----------------------------------------------------------------------
-result  = cdr.runCommand("diff -aur PROD %s" % tier_name)
-lines   = result.output.splitlines()
-pattern = re.compile("diff -aur PROD/@@MARK@@(.*?)@@MARK@@")
-for i in range(len(lines)):
-    match = pattern.match(lines[i])
-    if match:
-        lines[i] = makeBanner(unEncode(match.group(1)))
-report = html_escape(unEncode("\n".join(lines)))
-cleanup(workDir)
+    @property
+    def filter_names(self):
+        """Names of all filters, including those on one tier only."""
 
-print("""\
-Content-type: text/html; charset: utf-8
+        if not hasattr(self, "_filter_names"):
+            names =  set(self.local_filters) | set(self.prod_filters)
+            self._filter_names = names
+        return self._filter_names
 
-<!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
-<html>
- <head>
-  <title>Filter Comparison Results</title>
- </head>
- <body>
-  <h3>The following filters differ between PROD and %s</h3>
-  <pre>%s</pre>
- </body>
-</html>""" % (tier_name, report))
+    @property
+    def tier(self):
+        """Name of the local tier."""
+
+        if not hasattr(self, "_tier"):
+            self._tier = Tier()
+        return self._tier
+
+    @property
+    def fields(self):
+        """CGI parameters."""
+
+        if not hasattr(self, "_fields"):
+            self._fields = cgi.FieldStorage()
+        return self._fields
+
+    @property
+    def local_filters(self):
+        """Dictionary of local filters, indexed by title."""
+
+        if not hasattr(self, "_local_filters"):
+            self._local_filters = {}
+            query = db.Query("document d", "d.title", "d.xml")
+            query.join("doc_type t", "t.id = d.doc_type")
+            query.where("t.name = 'Filter'")
+            for title, xml in query.execute().fetchall():
+                self._local_filters[title] = xml
+        return self._local_filters
+
+    @property
+    def prod_filters(self):
+        """Dictionary of PROD filters, indexed by title."""
+
+        if not hasattr(self, "_prod_filters"):
+            if not self.refresh_cache:
+                try:
+                    with open(self.CACHED_PROD_FILTERS) as fp:
+                        self._prod_filters = json.load(fp)
+                    return self._prod_filters
+                except:
+                    pass
+            self._prod_filters = {}
+            for filt in cdr.getFilters("guest", tier="PROD"):
+                url = self.URL.format(filt.id)
+                response = requests.get(url)
+                if response.status_code != requests.codes.ok:
+                    msg = f"{url}: {response.status_code} ({response.reason})"
+                    cdrcgi.bail(msg)
+                self._prod_filters[filt.name] = response.text
+            try:
+                with open(self.CACHED_PROD_FILTERS, "w") as fp:
+                    json.dump(self._prod_filters, fp)
+            except:
+                pass
+        return self._prod_filters
+
+    @property
+    def refresh_cache(self):
+        """Flag indicating whether we need to get fresh filters from PROD."""
+
+        if not hasattr(self, "_refresh_cache"):
+            self._refresh_cache = False
+            if self.fields.getvalue("refresh-cache"):
+                self._refresh_cache = True
+        return self._refresh_cache
+
+    @staticmethod
+    def normalize(xml):
+        """Eliminate irrelevant differeneces."""
+        node = etree.fromstring(xml.encode("utf-8"))
+        xml = etree.tostring(node, encoding="utf-8").decode("utf-8")
+        return (xml.strip().replace("\r", "") + "\n").splitlines()
+
+
+Control().run()

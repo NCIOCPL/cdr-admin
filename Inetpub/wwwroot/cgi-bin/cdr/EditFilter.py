@@ -82,7 +82,7 @@ class Control(cdrcgi.Control):
         if not self.other_tier:
             cdrcgi.bail()
         try:
-            f1 = self.fix(self.filter.xml.encode("utf-8"))
+            f1 = self.fix(self.filter.xml)
             f2 = self.fix(self.get_filter())
             if self.other_tier_lower():
                 filters = (f1, f2)
@@ -92,7 +92,7 @@ class Control(cdrcgi.Control):
                 tiers = (self.other_tier, self.TIER)
             differ = difflib.Differ()
             #changes = False
-            pattern = (u'<span class="%%s">%%s %s on CDR %%s server</span>\n' %
+            pattern = ('<span class="%%s">%%s %s on CDR %%s server</span>\n' %
                        html_escape(self.filter.title))
             lines = [
                 pattern % ("deleted", "-", tiers[0]),
@@ -132,7 +132,7 @@ body     { background-color: #fafafa; }
             "session": self.session,
             "action": self.script,
             "banner": banner,
-            "subtitle": u"%s (%s)" % (self.filter.title, self.filter.cdr_id)
+            "subtitle": "%s (%s)" % (self.filter.title, self.filter.cdr_id)
         }
         page = cdrcgi.Page(self.PAGE_TITLE, **opts)
         page.add_hidden_field(cdrcgi.DOCID, str(self.filter.doc_id))
@@ -178,7 +178,7 @@ pre {
             data = { "title": self.filter.title }
             response = requests.post(url, data=data, timeout=5)
             if response.ok:
-                return response.content
+                return response.text
         except:
             pass
         filters = self.get_filters()
@@ -188,7 +188,7 @@ pre {
         url = "%s/ShowDocXml.py?DocId=%d" % (self.base, doc_id)
         response = requests.get(url, timeout=15)
         if response.ok:
-            return response.content
+            return response.text
         raise Exception(response.reason)
 
     def get_filters(self):
@@ -228,7 +228,8 @@ pre {
     def fix(self, me):
         "Prepare the XML for a filter document for comparison"
         if self.normalize:
-            xml = etree.tostring(etree.XML(me), pretty_print=True)
+            opts = dict(pretty_print=True, encoding="unicode")
+            xml = etree.tostring(etree.fromstring(me), **opts)
         else:
             xml = me
         return xml.replace("\r", "").strip().splitlines(1)

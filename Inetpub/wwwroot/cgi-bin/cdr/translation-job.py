@@ -55,8 +55,6 @@ class Control(cdrcgi.Control):
         self.change_type = self.get_id("change_type", self.change_types.map)
         self.state_date = self.fields.getvalue("state_date")
         self.comments = self.fields.getvalue("comments") or None
-        if self.comments is not None:
-            self.comments = self.comments.decode("utf-8")
         self.job = self.english_id and Job(self) or None
         cdrcgi.valParmDate(self.state_date, empty_ok=True, msg=cdrcgi.TAMPERING)
 
@@ -385,38 +383,38 @@ jQuery("input[value='%s']").click(function(e) {
 
         recip = self.UserInfo(self, job.assigned_to)
         if not recip.email:
-            error = u"no email address found for user %s" % recip.name
+            error = "no email address found for user %s" % recip.name
             self.logger.error(error)
             cdrcgi.bail(error)
         recips = [recip.email]
         sender = "cdr@cancer.gov"
         body = []
-        subject = u"[CDR-%s] Translation Queue Notification" % self.tier.name
+        subject = "[CDR-%s] Translation Queue Notification" % self.tier.name
         log_message = "mailed translation job state alert to %s" % recip
         if not cdr.isProdHost():
             recips = cdr.getEmailList("Test Translation Queue Recips")
-            body.append(u"[*** THIS IS A TEST MESSAGE ON THE %s TIER. "
-                        u"ON PRODUCTION IT WOULD HAVE GONE TO %s. ***]\n" %
+            body.append("[*** THIS IS A TEST MESSAGE ON THE %s TIER. "
+                        "ON PRODUCTION IT WOULD HAVE GONE TO %s. ***]\n" %
                         (self.tier.name, recip))
             log_message = "test alert for %s sent to %s" % (recip, recips)
         if self.job.new:
-            body.append(u"A new translation job has been assigned to you.")
+            body.append("A new translation job has been assigned to you.")
         else:
-            body.append(u"A translation job assigned to you has a new status.")
-        body.append(u"Assigned by: %s" % self.user)
-        body.append(u"English summary document ID: CDR%d" % job.english_id)
-        body.append(u"English summary title: %s" % job.english_title)
+            body.append("A translation job assigned to you has a new status.")
+        body.append("Assigned by: %s" % self.user)
+        body.append("English summary document ID: CDR%d" % job.english_id)
+        body.append("English summary title: %s" % job.english_title)
         if job.spanish_title:
-            body.append(u"Spanish summary document ID: CDR%d" % job.spanish_id)
-            body.append(u"Spanish summary title: %s" % job.spanish_title)
-        body.append(u"Summary audience: %s" % job.english_audience)
-        body.append(u"Job status: %s" % self.states.map.get(job.state_id))
-        body.append(u"Date of status transition: %s" % job.state_date)
-        body.append(u"Comments: %s" % job.comments)
+            body.append("Spanish summary document ID: CDR%d" % job.spanish_id)
+            body.append("Spanish summary title: %s" % job.spanish_title)
+        body.append("Summary audience: %s" % job.english_audience)
+        body.append("Job status: %s" % self.states.map.get(job.state_id))
+        body.append("Date of status transition: %s" % job.state_date)
+        body.append("Comments: %s" % job.comments)
         attachment = self.fetch_file()
         attachments = attachment and [attachment] or None
         try:
-            cdr.sendMailMime(sender, recips, subject, u"\n".join(body),
+            cdr.sendMailMime(sender, recips, subject, "\n".join(body),
                              attachments=attachments)
         except Exception as e:
             self.logger.error("sending mail: %s", e)
@@ -553,8 +551,8 @@ class Job:
                         child = node.find("Date")
                         if child is not None and child.text is not None:
                             self.date = child.text
-                    def __cmp__(self, other):
-                        return cmp(self.date, other.date)
+                    def __lt__(self, other):
+                        return self.date < other.date
                 name = "TypeOfSummaryChange"
                 change_types = [Change(node) for node in root.findall(name)]
                 if change_types:
@@ -577,7 +575,7 @@ class Job:
             title_parts = title.split(";")
             self.spanish_title = title = title_parts[0]
             self.spanish_audience = title_parts[-1]
-            self.subtitle = u"Spanish summary: CDR%d (%s)" % (row[0], title)
+            self.subtitle = "Spanish summary: CDR%d (%s)" % (row[0], title)
         title_parts = control.english_summaries[self.english_id].split(";")
         self.english_title = title_parts[0]
         self.english_audience = title_parts[-1]

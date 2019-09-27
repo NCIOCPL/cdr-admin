@@ -1,7 +1,8 @@
 #----------------------------------------------------------------------
 # Reports on newly created documents and their statuses.
 #----------------------------------------------------------------------
-import cdr, cdrcgi, cgi, time
+import cdr, cdrcgi, cgi
+import datetime
 from cdrapi import db
 from html import escape as html_escape
 
@@ -20,7 +21,7 @@ script  = "NewDocReport.py"
 title   = "CDR Administration"
 section = "New Documents Report"
 header  = cdrcgi.header(title, title, section, script, buttons)
-now     = time.localtime(time.time())
+today   = datetime.date.today()
 
 #----------------------------------------------------------------------
 # Make sure we're logged in.
@@ -45,16 +46,12 @@ if request == "Log Out":
 # If we don't have a request, put up the request form.
 #----------------------------------------------------------------------
 if not fromDate or not toDate:
-    toDate   = time.strftime("%Y-%m-%d", now)
-    then     = list(now)
-    then[1] -= 1
-    then[2] += 1
-    then     = time.localtime(time.mktime(then))
-    fromDate = time.strftime("%Y-%m-%d", then)
+    toDate   = str(today)
+    fromDate = str(today - datetime.timedelta(7))
     docTypes = cdr.getDoctypes(session)
-    if type(docTypes) in [type(""), type(u"")]:
+    if isinstance(docTypes, (str, bytes)):
         cdrcgi.bail(docTypes)
-    form = u"""\
+    form = """\
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
    <TABLE BORDER='0'>
     <TR>
@@ -64,10 +61,10 @@ if not fromDate or not toDate:
       <OPTION VALUE='' SELECTED>All Types</OPTION>
 """ % (cdrcgi.SESSION, session)
     for docType in docTypes:
-        form += u"""\
+        form += """\
       <OPTION VALUE='%s'>%s &nbsp;</OPTION>
 """ % (docType, docType)
-    form += u"""\
+    form += """\
     </TR>
     <TR>
      <TD><B>Start Date:&nbsp;</B></TD>
@@ -112,7 +109,7 @@ statuses      = ["Published",
 #----------------------------------------------------------------------
 # Start the page.
 #----------------------------------------------------------------------
-html = u"""\
+html = """\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>
  <head>
@@ -149,7 +146,7 @@ html = u"""\
      </b>
     </td>
    </tr>
-""" % (headerDocType, time.strftime("%m/%d/%Y", now), fromDate, toDate)
+""" % (headerDocType, today, fromDate, toDate)
 
 #----------------------------------------------------------------------
 # Extract the information from the database.
@@ -158,9 +155,11 @@ docCounts = {}
 try:
     conn   = db.connect()
     cursor = conn.cursor()
+    cursor.execute("CREATE TABLE #doc_statuses (name VARCHAR(32), dstat INT)")
     # Security note: docType already checked for whitelist, data i safe
     dtQual = docType and ("AND t.name = '%s'" % docType) or ""
     cursor.execute("""\
+    INSERT INTO #doc_statuses (name, dstat)
     SELECT t.name,
            dstat = CASE
                         WHEN EXISTS (SELECT *
@@ -191,17 +190,14 @@ try:
                                   ELSE          4
                              END
                     END
-      INTO #doc_statuses
       FROM document d
       JOIN doc_type t
         ON t.id = d.doc_type
      WHERE (SELECT MIN(a.dt)
               FROM audit_trail a
-             WHERE a.document = d.id) BETWEEN '%s'
-                                          AND DATEADD(s, -1,
-                                                      DATEADD(d, 1, '%s'))
+             WHERE a.document = d.id) BETWEEN ? AND ?
       %s
-""" % (fromDate, toDate, dtQual))
+""" % dtQual, (fromDate, toDate + " 23:59:59"))
     cursor.execute("""\
     SELECT name, dstat, COUNT(*)
       FROM #doc_statuses
@@ -212,20 +208,19 @@ except Exception as e:
     cdrcgi.bail('Database connection failure: %s' % e)
 
 for row in rows:
-    if not docCounts.has_key(row[0]):
+    if row[0] not in docCounts:
         docCounts[row[0]] = [0, 0, 0, 0, 0, 0, 0]
-    if row[1] not in range(len(statuses)):
+    if row[1] not in list(range(len(statuses))):
         cdrcgi.bail('Invalid status for %s documents' % row[0])
     docCounts[row[0]][row[1]] = row[2]
 
-keys = docCounts.keys()
-keys.sort()
+keys = sorted(docCounts)
 for key in keys:
     col1   = key
     total  = 0
     counts = docCounts[key]
     if key != keys[0]:
-        html += u"""\
+        html += """\
    <tr>
     <td>&nbsp;</td>
     <td>&nbsp;</td>
@@ -233,7 +228,7 @@ for key in keys:
    </tr>
 """
     for i in range(len(statuses)):
-        html += u"""\
+        html += """\
    <tr>
     <td nowrap='1'>
      <b>
@@ -251,7 +246,7 @@ for key in keys:
         col1 = "&nbsp;"
         total += counts[i]
 
-    html += u"""\
+    html += """\
    <tr>
     <td nowrap='1'>
      <b>
@@ -268,7 +263,7 @@ for key in keys:
     </td>
    </tr>
 """ % total
-cdrcgi.sendPage(html + u"""\
+cdrcgi.sendPage(html + """\
   </table>
  </body>
 </html>

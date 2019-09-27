@@ -33,7 +33,7 @@ class DocInfo:
             else:
                 raise Exception("Cannot find CDR%s" % docId)
         try:
-            tree = etree.XML(rows[0][0].encode('utf-8'))
+            tree = etree.XML(rows[0][0])
         except Exception as e:
             raise Exception("parsing CDR%s: %s" % (docId, e))
         if tree.tag == 'Media':
@@ -109,7 +109,7 @@ docVer = fields.getvalue('ver') or ''
 try:
     info = DocInfo(cursor, docId, docVer)
 except Exception as e:
-    cdrcgi.bail(u"%s" % e)
+    cdrcgi.bail("%s" % e)
 if info.docVer:
     cursor.execute("""\
             SELECT b.data

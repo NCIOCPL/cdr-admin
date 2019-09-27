@@ -7,13 +7,15 @@ import cdr
 import cdrcgi
 from cdrapi import db
 
-LOGFILE = cdr.DEFAULT_LOGDIR + "/check-auth.log"
+LOGNAME = "check-auth"
+LOGFILE = f"{cdr.DEFAULT_LOGDIR}/{LOGNAME}.log"
+LOGGER = cdr.Logging.get_logger(LOGNAME)
 
 def answer(yn):
-    print("""\
+    print(f"""\
 Content-type: text/plain
 
-%s""" % yn)
+{yn}""")
 
 fields = cgi.FieldStorage()
 try:
@@ -28,6 +30,6 @@ try:
         answer("N")
 except Exception as e:
     try:
-        cdr.logwrite("failure: %s" % e, LOGFILE, True, True)
-    except:
+        LOGGER.exception("check-auth failure")
+    finally:
         answer("N")

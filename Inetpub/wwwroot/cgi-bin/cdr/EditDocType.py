@@ -69,7 +69,7 @@ class Control(cdrcgi.Control):
         doctype = command(self.session, doctype)
         if doctype.error:
             errors = doctype.error
-            if isinstance(errors, basestring):
+            if isinstance(errors, (str, bytes)):
                 errors = [errors]
             cdrcgi.bail(errors[0], extra=errors[1:])
         self.doctype = self.get_doctype(doctype.type)
@@ -91,7 +91,7 @@ class Control(cdrcgi.Control):
         filters = self.filters.values
         title_filter = ""
         if self.doctype:
-            legend = u"Edit %s Document Type" % self.doctype.type
+            legend = "Edit %s Document Type" % self.doctype.type
             created = str(self.doctype.created)[:10]
             modified = str(self.doctype.schema_mod)[:10]
             fmt = self.formats.lookup(self.doctype.format)
@@ -306,7 +306,7 @@ class Control(cdrcgi.Control):
         value = self.fields.getvalue(name)
         if value:
             try:
-                unicode(value, "ascii")
+                value.encode("ascii")
             except:
                 cdrcgi.bail("%s must contain only ASCII" % repr(name))
             if len(value) > max_len:

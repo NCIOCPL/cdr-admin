@@ -48,8 +48,7 @@ class Control(cdrcgi.Control):
         query.join("query_term m", "m.int_val = t.doc_id")
         query.where("t.path = '/Term/PreferredName'")
         query.where("m.path = '%s'" % diagnosis_path)
-        return query.execute(self.cursor).fetchall()
-        return [["any", "Any Diagnosis"]] + query.execute(cursor).fetchall()
+        return [tuple(row) for row in query.execute(self.cursor).fetchall()]
     def get_statuses(self):
         dt = cdr.getDoctype(self.session, "Media")
         statuses = dict(dt.vvLists).get("ProcessingStatusValue")
@@ -162,10 +161,10 @@ class Doc:
         values = (self.HOST, self.BASE, self.control.session, self.doc_id)
         url = "https://%s%s/QcReport.py?Session=%s&DocId=%d" % values
         return [cdrcgi.Report.Cell(self.doc_id, href=url, target="_blank"),
-                self.title, u"; ".join(diagnoses),
+                self.title, "; ".join(diagnoses),
                 self.status.value, self.make_date_cell(self.status.date),
-                u"; ".join(summaries), u"; ".join(glossary_terms),
-                u"; ".join(self.status.comments),
+                "; ".join(summaries), "; ".join(glossary_terms),
+                "; ".join(self.status.comments),
                 cdrcgi.Report.Cell(publishable, center=True),
                 self.make_date_cell(self.last_publishable_date)]
     def make_date_cell(self, date):
@@ -202,8 +201,8 @@ class Doc:
             if not self.status.date or self.status.date > self.control.end:
                 return False
         return True
-    def __cmp__(self, other):
-        return cmp((self.title or "").lower(), (other.title or "").lower())
+    def __lt__(self, other):
+        return (self.title or "").lower() < (other.title or "").lower()
     class Status:
         def __init__(self, node):
             self.value = self.date = None

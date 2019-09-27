@@ -182,7 +182,7 @@ class Control(cdrcgi.Control):
         # There are no requirements for this report to include totals (yet)
         if False and self.type == "current":
             ncols = len(columns)
-            rows.append([unichr(160)] * ncols)
+            rows.append([chr(160)] * ncols)
             padding = [""] * (ncols - 2)
             rows.append(["", cdrcgi.Report.Cell("TOTALS", bold=True)] + padding)
             for state in sorted(Job.COUNTS):
@@ -319,10 +319,10 @@ class Job:
                 row = query.execute(self.control.cursor).fetchone()
                 if row:
                     title = row.title.split(";")[0]
-                    pattern = u"GTC for {}"
+                    pattern = "GTC for {}"
                     self._title = pattern.format(title)
                 else:
-                    pattern = u"GTC CDR{:d}"
+                    pattern = "GTC CDR{:d}"
                     self._title = pattern.format(self.doc_id)
         return self._title
 
@@ -361,11 +361,11 @@ class Job:
         else:
             return self.title.lower()
 
-    def __cmp__(self, other):
+    def __lt__(self, other):
         #key1 = self.key
         #key2 = other.key
         #self.control.logger.info("comparing %r against %r", key1, key2)
-        return cmp(self.key, other.key)
+        return self.key < other.key
 
 if __name__ == "__main__":
     """

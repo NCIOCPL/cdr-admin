@@ -54,9 +54,9 @@ if not fromDate or not toDate:
     toDate = datetime.date.today()
     fromDate = toDate - datetime.timedelta(7)
     docTypes = cdr.getDoctypes(session)
-    if type(docTypes) in [type(""), type(u"")]:
+    if type(docTypes) in [type(""), type("")]:
         cdrcgi.bail(docTypes)
-    form = u"""\
+    form = """\
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
    <STYLE>
     .fixed-width { width: 200px; }
@@ -69,10 +69,10 @@ if not fromDate or not toDate:
       <OPTION VALUE='' SELECTED>All Types</OPTION>
 """ % (cdrcgi.SESSION, session)
     for docType in docTypes:
-        form += u"""\
+        form += """\
       <OPTION VALUE='%s'>%s &nbsp;</OPTION>
 """ % (docType, docType)
-    form += u"""\
+    form += """\
     </TR>
     <TR>
      <TD><B>Start Date:&nbsp;</B></TD>
@@ -112,7 +112,7 @@ if docType and docType not in cdr.getDoctypes(session):
 #----------------------------------------------------------------------
 headerDocType = docType and ("%s Documents" % docType) or "All Document Types"
 if format_ == "html":
-    html = u"""\
+    html = """\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>
  <head>
@@ -162,7 +162,7 @@ try:
     row = cursor.fetchone()
     if not row:
         if format_ == "html":
-            cdrcgi.sendPage(html + u"""\
+            cdrcgi.sendPage(html + """\
   <b>
    <font size='3'>No documents found.</font>
   </b>
@@ -177,11 +177,11 @@ try:
         if docType != lastDocType:
             if format_ == "html":
                 if lastDocType:
-                    html += u"""\
+                    html += """\
   </table>
   <br />
 """
-                html += u"""\
+                html += """\
   <b>
    <font size='3'>Document Type:&nbsp;&nbsp;&nbsp;&nbsp;%s</font>
   </b>
@@ -219,7 +219,7 @@ try:
                 rowNumber = 3
             lastDocType = docType
         if format_ == "html":
-            html += u"""\
+            html += """\
    <tr>
     <td valign='top'>%s</td>
     <td valign='top'>CDR%010d</td>
@@ -233,7 +233,7 @@ try:
             rowNumber += 1
         row = cursor.fetchone()
     if format_ == "html" and lastDocType:
-        html += u"""\
+        html += """\
   </table>
 """
 
@@ -241,14 +241,16 @@ except Exception as e:
     cdrcgi.bail('Database failure: %s' % e)
 
 if format_ == "html":
-    cdrcgi.sendPage(html + u"""\
+    cdrcgi.sendPage(html + """\
  </body>
 </html>
 """)
 else:
     now = datetime.datetime.now()
     name = "DateLastModified-%s.xls" % now.strftime("%Y%m%d%H%M%S")
-    print("Content-type: application/vnd.ms-excel")
-    print("Content-disposition: attachment; filename=%s" % name)
-    print()
+    sys.stdout.buffer.write(f"""\
+Content-type: application/vnd.ms-excel
+Content-disposition: attachment; filename={name}
+
+""".encode("utf-8"))
     styles.book.save(sys.stdout.buffer)

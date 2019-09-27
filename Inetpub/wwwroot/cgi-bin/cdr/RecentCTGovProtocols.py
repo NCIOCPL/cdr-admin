@@ -65,13 +65,13 @@ rows = []
 for nct_id, received, title, phase in results:
     query = db.Query("ctgov_trial_other_id", "other_id").order("position")
     query.where(query.Condition("nct_id", nct_id))
-    ids = u"; ".join([row[0] for row in query.execute(cursor).fetchall()])
+    ids = "; ".join([row[0] for row in query.execute(cursor).fetchall()])
     query = db.Query("ctgov_trial_sponsor", "sponsor").order("position")
     query.where(query.Condition("nct_id", nct_id))
-    sponsors = u"; ".join([row[0] for row in query.execute(cursor).fetchall()])
+    sponsors = "; ".join([row[0] for row in query.execute(cursor).fetchall()])
     href = "https://clinicaltrials.gov/ct2/show/%s" % nct_id
     row = (cdrcgi.Report.Cell(nct_id, href=href, target="_blank"),
-           str(received)[:10], title, phase or u"", ids, sponsors)
+           str(received)[:10], title, phase or "", ids, sponsors)
     rows.append(row)
 caption = "CT.gov Protocols Received between %s and %s" % (start_date, end_date)
 table = cdrcgi.Report.Table(columns, rows, caption=caption)

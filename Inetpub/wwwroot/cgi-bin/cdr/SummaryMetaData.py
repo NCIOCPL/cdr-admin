@@ -125,7 +125,7 @@ jQuery(function() {
         if not summaries:
             cdrcgi.bail("No summaries found for report.")
         if len(summaries) == 1:
-            subtitle = u"%s (CDR%d)" % (summaries[0].title, summaries[0].doc_id)
+            subtitle = "%s (CDR%d)" % (summaries[0].title, summaries[0].doc_id)
         else:
             subtitle = "%s Language %s Summaries for the %s" % (self.language,
                                                                 self.audience,
@@ -183,7 +183,7 @@ table.summary th { width: 150px; text-align: right; padding-right: 10px; }""")
         """
         if not self.doc_title:
             cdrcgi.bail("No title specified")
-        pattern = "%" + unicode(self.doc_title, "utf-8") + "%"
+        pattern = f"%{self.doc_title}%"
         query = db.Query("active_doc d", "d.id", "d.title")
         query.join("doc_type t", "t.id = d.doc_type")
         query.where(query.Condition("t.name", "Summary"))
@@ -309,8 +309,8 @@ class Summary:
             cdrcgi.bail("CDR%d malformed" % self.doc_id)
         if root.tag != "Summary":
             cdrcgi.bail("CDR%d is not a summary" % self.doc_id)
-        self.title = self.language = self.audience = self.description = u""
-        self.purpose = self.advisory_board = self.editorial_board = u""
+        self.title = self.language = self.audience = self.description = ""
+        self.purpose = self.advisory_board = self.editorial_board = ""
         self.topics = []
         self.abstract = []
         self.keywords = []
@@ -359,7 +359,7 @@ class Summary:
         """
         Get all the text content for an element, stripping internal markup.
         """
-        return u"".join([t for t in node.itertext()]).strip()
+        return "".join([t for t in node.itertext()]).strip()
 
     def get_topic(self, node):
         """
@@ -368,7 +368,7 @@ class Summary:
         """
         for child in node.findall("Term"):
             suffix = node.tag == "MainTopics" and "M" or "S"
-            return u"%s (%s)" % (child.text, suffix)
+            return "%s (%s)" % (child.text, suffix)
 
     def report(self, page):
         """
@@ -390,7 +390,7 @@ class Summary:
             self.B.TR(
                 self.B.TH("Section Title"),
                 self.B.TH("Diagnoses"),
-                self.B.TH(u"SS\u00a0No"),
+                self.B.TH("SS\u00a0No"),
                 self.B.TH("Section Type")
             )
         )
@@ -442,10 +442,10 @@ class Summary:
                 while lines:
                     line = lines.pop(0)
                     br = self.B.BR()
-                    br.tail = line
+                    br.tail = str(line)
                     td.append(br)
-            elif isinstance(value, basestring) or type(value) is int:
-                td = self.B.TD(unicode(value))
+            elif isinstance(value, (str, int, float)):
+                td = self.B.TD(str(value))
             else:
                 cdrcgi.bail("type of value is %s" % type(value))
         else:
@@ -464,7 +464,7 @@ class Summary:
             query.where(query.Condition("path", Control.N_PATH))
             query.where(query.Condition("doc_id", doc_id))
             rows = query.execute(self.control.cursor).fetchall()
-            name = rows and rows[0][0] or (u"no name for %s" % repr(cdr_ref))
+            name = rows and rows[0][0] or ("no name for %s" % repr(cdr_ref))
             self.board_cache[cdr_ref] = name
         return self.board_cache[cdr_ref]
 
@@ -483,7 +483,7 @@ class Summary:
             """
             self.depth = len(node.getroottree().getpath(node).split("/"))
             self.cursor = cursor
-            self.title = u""
+            self.title = ""
             self.diagnoses = []
             self.types = []
             self.search_attr = node.get("TrialSearchString")
@@ -509,7 +509,7 @@ class Summary:
                 query.where(query.Condition("path", "/Term/PreferredName"))
                 query.where(query.Condition("doc_id", doc_id))
                 rows = query.execute(self.cursor).fetchall()
-                name = rows and rows[0][0] or (u"no name for %s" %
+                name = rows and rows[0][0] or ("no name for %s" %
                                                repr(cdr_ref))
                 self.diagnosis_cache[cdr_ref] = name
             return self.diagnosis_cache[cdr_ref]
@@ -527,14 +527,14 @@ class Summary:
             Add the table row for this summary section's information.
             """
             B = cdrcgi.Page.B
-            check_mark = self.search_attr == "No" and u"\u2714" or u""
+            check_mark = self.search_attr == "No" and "\u2714" or ""
             level = { 3: "top", 4: "mid" }.get(self.depth, "low")
             table.append(
                 B.TR(
                     B.TD(self.title, B.CLASS("%s-section" % level)),
-                    B.TD(u"; ".join(self.diagnoses)),
+                    B.TD("; ".join(self.diagnoses)),
                     B.TD(check_mark, B.CLASS("center")),
-                    B.TD(u"; ".join(self.types))
+                    B.TD("; ".join(self.types))
                 )
             )
 

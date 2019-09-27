@@ -82,14 +82,14 @@ class Control(cdrcgi.Control):
         self.buttons = self.get_buttons()
     def get_actions(self):
         actions = cdr.getActions(self.session)
-        if isinstance(actions, basestring):
+        if isinstance(actions, (str, bytes)):
             cdrcgi.bail(actions)
         return sorted(actions)
     def get_action(self):
         if not self.action_name:
             return cdr.Action("", "N")
         action = cdr.getAction(self.session, self.action_name)
-        if isinstance(action, basestring):
+        if isinstance(action, (str, bytes)):
             cdrcgi.bail(action)
         return action
 Control().run()

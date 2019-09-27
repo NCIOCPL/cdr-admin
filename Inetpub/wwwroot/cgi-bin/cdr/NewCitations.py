@@ -89,7 +89,7 @@ class Control(cdrcgi.Control):
                 doc_id,
                 title,
                 user,
-                date[:10],
+                str(date)[:10],
                 cdrcgi.Report.Cell(publishable or "N/A", classes="center"),
                 pmid
             ])

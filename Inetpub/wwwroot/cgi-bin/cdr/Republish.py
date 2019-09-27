@@ -20,8 +20,8 @@ newDocs = fields.getvalue('NewDocs')    and True or False
 gkHost  = fields.getvalue('GKHost')     or ''
 gkPubTarget= fields.getvalue('GKTarget')   or ''
 if not gkPubTarget.lower() in ('', 'gatekeeper', 'preview', 'live'):
-    cdrcgi.bail(u'Invalid value for GKTarget: %s. Allowed values are:'
-                u'GateKeeper, Preview, Live' % gkPubTarget)
+    cdrcgi.bail('Invalid value for GKTarget: %s. Allowed values are:'
+                'GateKeeper, Preview, Live' % gkPubTarget)
 email   = fields.getvalue('Email')      or ''
 failed  = fields.getvalue('FailedOnly') and True or False
 SUBMENU = "Developer Menu"
@@ -35,14 +35,16 @@ header  = cdrcgi.header(title, title, section, script, buttons, stylesheet =
   <style type='text/css'>
    body    { font-size: 10pt; font-family: Arial; }
    body    { background: #fdfdfd; }
-   h1      { font-size: 14pt; color: maroon; text-align: center; }
+   h1      { font-size: 14pt; color: maroon; } /*text-align: center; }*/
+   #title  { text-align: center; }
    .field  { width: 500px; }
    .extra  { color: green; font-size: 11pt; }
    .error  { color: red; font-size: 12pt; }
    th, td  { font-size: 10pt; }
    p       { border: 1px solid blue; padding: 5px; font-size: 10pt; }
    b, th   { color: green }
-   h1, p   { width: 650px }
+   /*h1, p   { width: 650px }*/
+   #instructions, table { width: 650px; margin: 10px auto; }
    p.error { border: 1px solid red; }
   </style>
 """, numBreaks = 1)
@@ -99,9 +101,9 @@ def makeDoctypePicklist():
 #----------------------------------------------------------------------
 def showForm(extra):
     form = """\
-   <h1>Re-publish CDR Documents to Cancer.gov</h1>
+   <h1 id="title">Re-publish CDR Documents to Cancer.gov</h1>
    <br>
-   <p>
+   <p id="instructions">
     This page can be used to request re-publishing of CDR documents
     which have already been sent to Cancer.gov, in a way which
     bypasses the optimization which normally prevents sending of

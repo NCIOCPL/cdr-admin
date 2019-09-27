@@ -49,7 +49,7 @@ query = db.Query("doc_type", "id", "name")
 query.where("active = 'Y'")
 query.where("xml_schema IS NOT NULL")
 query.where("name NOT IN ('Filter', 'xxtest', 'schema')")
-docTypes = query.order("name").execute(cursor).fetchall()
+docTypes = [tuple(r) for r in query.order("name").execute(cursor).fetchall()]
 
 #----------------------------------------------------------------------
 # Show the form if we don't have a document type selected.

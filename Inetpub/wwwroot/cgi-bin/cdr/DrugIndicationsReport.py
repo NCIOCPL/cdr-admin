@@ -33,7 +33,7 @@ buttons   = (SUBMENU, cdrcgi.MAINMENU)
 # -----------------------------------------------------------------
 def getBrandNames():
     brandNames = {}
-    brandNameQuery = u"""
+    brandNameQuery = """
         SELECT t.doc_id as "TermId", t.value as "Term", b.value AS "BrandName"
           FROM query_term_pub t
           JOIN query_term_pub d
@@ -63,7 +63,7 @@ def getBrandNames():
 
     for row in rows:
         brands = []
-        if row[0] in brandNames.keys():
+        if row[0] in brandNames:
             brandNames[row[0]][1].append(row[2])
         else:
             brandNames[row[0]] = [row[1], [row[2]]]
@@ -75,7 +75,7 @@ def getBrandNames():
 # Functions to select the indication for a single Drug
 # -----------------------------------------------------------------
 def getIndications(drugID):
-    indicationQuery = u"""
+    indicationQuery = """
     SELECT q.value, t.value
           FROM query_term_pub q
           JOIN query_term_pub i
@@ -111,7 +111,7 @@ def getIndications(drugID):
 # ---------------------------------------------------
 def createByIndication2(rows, type, names):
     """Return the HTML code to display the Summary Board Header with ID"""
-    html = u"""
+    html = """
     <table>
      <col class="col3">
      <col class="col3">
@@ -127,7 +127,7 @@ def createByIndication2(rows, type, names):
     i = 0
     for row in rows:
         i += 1
-        html += u"""
+        html += """
      <tr class='%s'>
       <td valign="top" class="indrow">""" % (i % 2 == 0 and 'even' or 'odd')
         if last == row[1]:
@@ -156,17 +156,17 @@ DocId=CDR%d&DocVersion=-1">CDR%d</a>)</span><br>
         cursor.execute(query, (row[0],))
         row = cursor.fetchone()
 
-        html += u"""
+        html += """
       <td>"""
 
-        if row[0] in names.keys():
+        if row[0] in names:
             for brand in names[row[0]][1]:
                 html += """
        <span class='indrow'>%s</span><br>""" % brand
         else:
             html += "&nbsp;"
 
-        html += u"""
+        html += """
       </td>
      </tr>"""
 
@@ -186,7 +186,7 @@ def createByIndication3(rows, type, names):
     allIndications = {}
     last = 'x'
     i = 0
-    html = u""
+    html = ""
 
     # We need to sort the display by indication and also the drug
     # names for each indication.
@@ -197,15 +197,15 @@ def createByIndication3(rows, type, names):
         allIndications.setdefault(row[1], []).append([row[0], row[2]])
         i += 1
 
-    html += u"<p><b>Indication : Drug</b></p>"
+    html += "<p><b>Indication : Drug</b></p>"
 
     for indication in sorted(allIndications.keys()):
-        html += u"""\n<span class='indlabel'>%s</span><br>""" % indication
+        html += """\n<span class='indlabel'>%s</span><br>""" % indication
 
         drugs = sorted(allIndications[indication], key=lambda i: i[1])
 
         for drug in drugs:
-            html += u"""
+            html += """
        <div class="drug">%s (<a href="/cgi-bin/cdr/QcReport.py?Session=guest&\
 DocType=DrugInformationSummary&\
 DocId=CDR%d&DocVersion=-1">CDR%d</a>)</div>
@@ -224,14 +224,14 @@ DocId=CDR%d&DocVersion=-1">CDR%d</a>)</div>
                 cursor.execute(query, (drug[0],))
                 row = cursor.fetchone()
 
-                if row[0] in names.keys():
+                if row[0] in names:
                     for brand in names[row[0]][1]:
                         html += """
            <div class="brand"><span class='indrow'>%s</span><br></div>""" % brand
                 else:
                     html += "&nbsp;"
 
-        html += u"\n<br>"
+        html += "\n<br>"
     return html
 
 
@@ -259,19 +259,19 @@ def createByIndication1(rows, type, names):
 
     last = 'x'
     i = 0
-    html = u""
+    html = ""
     sortrows = sorted(rows, key=lambda i: i[2])
 
     for row in rows:
         i += 1
         if last == row[1]:
-            html += u""
+            html += ""
         else:
-            html += u"""
+            html += """
     <br><b>Indication: </b>%s<br>""" % row[1]
         last = row[1]
 
-        html += u"""
+        html += """
        <div class="drug">%s (<a href="/cgi-bin/cdr/QcReport.py?Session=guest&\
 DocType=DrugInformationSummary&\
 DocId=CDR%d&DocVersion=-1">CDR%d</a>)</div>
@@ -290,7 +290,7 @@ DocId=CDR%d&DocVersion=-1">CDR%d</a>)</div>
             cursor.execute(query, (row[0],))
             row = cursor.fetchone()
 
-            if row[0] in names.keys():
+            if row[0] in names:
                 for brand in names[row[0]][1]:
                     html += """
        <div class="brand"><span class='indrow'>%s</span><br></div>""" % brand
@@ -305,7 +305,7 @@ DocId=CDR%d&DocVersion=-1">CDR%d</a>)</div>
 # ---------------------------------------------------
 def createByDrug(rows, type, names):
     """Return the HTML code to display the Summary Board Header with ID"""
-    html = u"""
+    html = """
     <table>
      <col class="cdrid">
      <col class="col1">
@@ -314,13 +314,13 @@ def createByDrug(rows, type, names):
       <th>CDR ID</th>"""
 
     if type == 'brand':
-        html += u"""
+        html += """
       <th>Drug Name (Brand name)</th>"""
     else:
-        html += u"""
+        html += """
       <th>Drug Name</th>"""
 
-    html += u"""
+    html += """
       <th>Approved Indication</th>
      </tr>
 """
@@ -342,7 +342,7 @@ def createByDrug(rows, type, names):
     # -----------------------------------
     for drug in sorted(allDrugs.keys()):
         i += 1
-        html += u"""
+        html += """
      <tr class='%s'>
       <td valign="top" class="indrow"><a href="/cgi-bin/cdr/QcReport.py?Session=guest&\
 DocType=DrugInformationSummary&\
@@ -373,18 +373,18 @@ DocId=CDR%d&DocVersion=-1">CDR%d</a></td>
         #cdrcgi.bail(bRows)
 
         if type == 'brand':
-            if bRows[0][0] in names.keys():
+            if bRows[0][0] in names:
                 html += " <span class='brand'>(%s)</span>" %\
                             ', '.join(x for x in names[bRows[0][0]][1])
 
-        html += u"""
+        html += """
       </td>
       <td>"""
         for ind in bRows:
-            html += u"""
+            html += """
         <span class='indrow'>%s<br></span>""" % ind[1]
 
-        html += u"""
+        html += """
       </td>"""
 
         html += """
@@ -426,7 +426,7 @@ instr = instr % dateString
 # Select all indications for the plain report and the select
 # text box.
 # -------------------------------------------------------------
-iQuery = u"""\
+iQuery = """\
          SELECT DISTINCT value
            FROM query_term_pub
           WHERE path = '/DrugInformationSummary' +
@@ -440,7 +440,7 @@ if not iQuery:
 ### # -------------------------------------------------------------
 ### # Create a drop-down list for Drug Names
 ### # -------------------------------------------------------------
-### dQuery = u"""\
+### dQuery = """\
 ###          SELECT distinct q.doc_id, q.value
 ###            FROM query_term q
 ###            JOIN active_doc d
@@ -460,20 +460,12 @@ if not iQuery:
 # Submit the queriew to the database.
 #----------------------------------------------------------------------
 try:
-    cursor = conn.cursor()
-    cursor.execute(iQuery)
-    iRows = cursor.fetchall()
-    cursor.close()
+    ind_cursor = conn.cursor()
+    ind_cursor.execute(iQuery)
+    iRows = ind_cursor.fetchall()
+    ind_cursor.close()
 except Exception as e:
     cdrcgi.bail('Failure retrieving initial indications: %s' % e)
-
-### try:
-###     cursor = conn.cursor()
-###     cursor.execute(dQuery)
-###     dRows = cursor.fetchall()
-###     cursor.close()
-### except Exception as e:
-###     cdrcgi.bail('Failure retrieving initial drugs: %s' % e)
 
 #----------------------------------------------------------------------
 # If we don't have a request, put up the form.
@@ -492,7 +484,7 @@ if not displayType:
     DL      { margin-left: 0; padding-left: 0 }
    </STYLE>
 """)
-    form   = u"""\
+    form   = """\
    <input type='hidden' name='%s' value='%s'>
 
    <!-- fieldset>
@@ -502,10 +494,10 @@ if not displayType:
 """ % (cdrcgi.SESSION, session)
 
 ###     for row in dRows:
-###         form += u"""<option value='%s'>%s</option>
+###         form += """<option value='%s'>%s</option>
 ### """ % (row[0], row[1])
 
-    form  += u"""\
+    form  += """\
     </select>
    </fieldset -->
 
@@ -545,10 +537,10 @@ if not displayType:
 """
 
     for row in iRows:
-        form += u"""<option value="%s">%s</option>
+        form += """<option value="%s">%s</option>
 """ % (html_escape(row[0], True), row[0])
 
-    form += u"""\
+    form += """\
     </select>
    </fieldset>
 
@@ -623,7 +615,7 @@ header    = cdrcgi.rptHeader(title, stylesheet = """\
    </STYLE>
 """)
 
-footer = u"""\
+footer = """\
  </BODY>
 </HTML>
 """
@@ -631,7 +623,7 @@ footer = u"""\
 # -------------------------
 # Display the Report Title
 # -------------------------
-report    = u"""\
+report    = """\
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
   <H3>Approved Indications for Drug Information Summaries<br>
   <span class="date">(%s)</span>
@@ -647,14 +639,14 @@ report    = u"""\
 # In the simple case we only want a list of the indications
 # ---------------------------------------------------------
 if displayType == 'plain':
-    report += u"""
+    report += """
     <span class="header">Full List of Drug Indications</span>
 
     <table class="full">
 """
 
     for row in iRows:
-        report += u"""\
+        report += """\
      <tr class="full">
       <td class="full">
        <li class='indrow'>%s</li>
@@ -662,7 +654,7 @@ if displayType == 'plain':
      </tr>
 """ % row[0]
 
-    report += u"""
+    report += """
     </table>
 """
     # Send the page back to the browser.
@@ -675,7 +667,7 @@ elif displayType == 'single':
 
     drugName, drugIndications = getIndications(singleDrug)
 
-    report += u"""
+    report += """
     <span class="header">Drug Name: %s (<a href="/cgi-bin/cdr/QcReport.py?\
 Session=guest&\
 DocType=DrugInformationSummary&\
@@ -685,10 +677,10 @@ DocId=CDR%s&DocVersion=-1">CDR%s</a>)
 """ % (drugName, singleDrug, singleDrug)
 
     for indication in drugIndications:
-        report += u"""<tr><td><li class='indrow'>%s</li></td></tr>
+        report += """<tr><td><li class='indrow'>%s</li></td></tr>
 """ % indication
 
-    report += u"""
+    report += """
     </table>
 """
     # Send the page back to the browser.

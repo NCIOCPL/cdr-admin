@@ -1,7 +1,8 @@
 #----------------------------------------------------------------------
 # Prototype for editing CDR groups.
 #----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, string, sys, urllib
+import cgi, cdr, cdrcgi, re, string, sys
+import urllib.parse
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -29,7 +30,8 @@ if action == cdrcgi.MAINMENU:
 # Retrieve the list of groups from the server.
 #----------------------------------------------------------------------
 groups = cdr.getGroups(session)
-if type(groups) == type("") or type(groups) == type(u""): cdrcgi.bail(groups)
+if isinstance(groups, (str, bytes)):
+    cdrcgi.bail(groups)
 
 #----------------------------------------------------------------------
 # Put up the main menu.
@@ -40,7 +42,8 @@ menu = "<OL>\n"
 for group in groups:
     menu += """\
   <LI><A HREF="%s/EditGroup.py?%s=%s&grp=%s">%s</A></LI>
-""" % (cdrcgi.BASE, cdrcgi.SESSION, session, urllib.quote_plus(group), group)
+""" % (cdrcgi.BASE, cdrcgi.SESSION, session, urllib.parse.quote_plus(group),
+       group)
 menu += """\
   <LI><A HREF="%s/EditGroup.py?%s=%s">%s</A></LI>
   <LI><A HREF="%s/Logout.py?%s=%s">%s</A></LI>
@@ -49,5 +52,5 @@ menu += """\
        cdrcgi.BASE, cdrcgi.SESSION, session, "LOG OUT")
 menu += "</OL>"
 menu += "<INPUT TYPE='hidden' NAME='%s' VALUE='%s'>" % (cdrcgi.SESSION,
-                                                       session)
+                                                        session)
 cdrcgi.sendPage(header + menu + "</FORM></BODY></HTML>")

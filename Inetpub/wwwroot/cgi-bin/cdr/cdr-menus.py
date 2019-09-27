@@ -3,12 +3,12 @@
 #----------------------------------------------------------------------
 import cdr
 import re
-import urllib
 import requests
-import urlparse
+import urllib.parse
 import lxml.etree as etree
 import lxml.html as html
 import lxml.html.builder as B
+import sys
 import time
 from cdrapi.settings import Tier
 
@@ -179,11 +179,11 @@ class Item:
     def __init__(self, label, url):
         self.label = label
         self.url = url
-        self.parsed = urlparse.urlparse(url)
+        self.parsed = urllib.parse.urlparse(url)
         self.script = self.parsed.path.split("/")[-1] or self.parsed.path
         if self.script.endswith("/scheduler/"):
             self.script = "../scheduler"
-        self.parms = urlparse.parse_qs(self.parsed.query)
+        self.parms = urllib.parse.parse_qs(self.parsed.query)
         Item.total += 1
         Item.unique.add(url.lower())
     def is_leaf(self):
@@ -199,7 +199,7 @@ class Item:
         parms = []
         for name in query:
             value = query[name]
-            if not isinstance(value, basestring):
+            if not isinstance(value, str):
                 value = value[0]
             parms.append("%s=%s" % (name, value))
         return "&".join(parms)
@@ -232,7 +232,7 @@ class Item:
         for k in self.parms:
             val = self.parms[k]
             if val:
-                if not isinstance(val, basestring):
+                if not isinstance(val, str):
                     val = val[0]
                 if val:
                     query[k] = val
@@ -284,6 +284,11 @@ page = B.HTML(
         etree.Comment("\n".join(list(Item.childless)))
     )
 )
-print("Content-type: text/html\n")
-print(etree.tostring(page, method="html", doctype="<!DOCTYPE html>",
-                     pretty_print=True, encoding="utf-8"))
+opts = dict(
+    method="html",
+    doctype="<!DOCTYPE html>",
+    pretty_print=True,
+    encoding="utf-8",
+)
+sys.stdout.buffer.write(b"Content-type: text/html\n\n")
+sys.stdout.buffer.write(etree.tostring(page, **opts))

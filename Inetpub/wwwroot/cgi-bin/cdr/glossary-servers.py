@@ -82,13 +82,13 @@ class Control(cdrcgi.Control):
             alias = self.get_unicode_parameter("alias-{:d}".format(i))
             if url and alias:
                 if alias in new:
-                    cdrcgi.bail(u"Duplicate alias {!r}".format(alias))
+                    cdrcgi.bail("Duplicate alias {!r}".format(alias))
                 if not url.startswith("http"):
-                    cdrcgi.bail(u"{!r} is not an HTTP URL".format(url))
+                    cdrcgi.bail("{!r} is not an HTTP URL".format(url))
                 url = url.strip("/")
                 key = url.lower()
                 if key in urls:
-                    cdrcgi.bail(u"{!r} appears more than once".format(key))
+                    cdrcgi.bail("{!r} appears more than once".format(key))
                 urls.add(key)
                 new[alias] = url
             i += 1

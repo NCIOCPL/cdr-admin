@@ -65,15 +65,15 @@ class PubmedArticle:
 
 def displayErrors(errors):
     if not errors:
-        return u""
-    html = [u'<p class="errors">']
-    sep = u""
+        return ""
+    html = ['<p class="errors">']
+    sep = ""
     for error in errors:
         html.append(html_escape(error))
         html.append(sep)
-        sep = u"<br />"
-    html.append(u"</p>")
-    return u"".join(html)
+        sep = "<br />"
+    html.append("</p>")
+    return "".join(html)
 
 errors = []
 url = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi"
@@ -134,7 +134,7 @@ for node in doc.findall("PubmedArticle"):
         citations[pmId].pubmedArticle = article
     else:
         errors.append("unexpected article with PMID %s" % pmid)
-html = [u"""\
+html = ["""\
 <html>
  <head>
   <title>Citation Status Changes</title>
@@ -168,7 +168,7 @@ for pmid in citations:
             updated += 1
         except Exception as e:
             notes = '<span class="errors">%s</span>' % html_escape(str(e))
-        html.append(u"""\
+        html.append("""\
    <tr>
     <td>%s</td>
     <td>%s</td>
@@ -179,10 +179,10 @@ for pmid in citations:
 """ % (citation.pmId, citation.cdrId, citation.status,
        pubmedStatus or "<span class='errors'>Missing</span>",
        notes))
-html.append(u"""\
+html.append("""\
   </table>
  </body>
  <p style='color: green'
  >%d pre-medline citations examined; %d statuses changed</p>
  </html>""" % (len(citations), changed))
-cdrcgi.sendPage(u"".join(html))
+cdrcgi.sendPage("".join(html))

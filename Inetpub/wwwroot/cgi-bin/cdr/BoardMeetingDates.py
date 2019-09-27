@@ -216,16 +216,14 @@ LEFT OUTER JOIN query_term c
             boards[cdrId] = board
         board.meetings.append(Meeting(meetingDate, meetingTime, board,
                                                    webEx, canceled))
-    boards = boards.values()
-    boards.sort()
-    return boards
+    return sorted(boards.values())
 
 #----------------------------------------------------------------------
 # Generate fields for selecting which boards should be included in the
 # report.
 #----------------------------------------------------------------------
 def makeBoardSelectionFields(boards):
-    html = [u"""\
+    html = ["""\
     <fieldset>
      <legend> Select Board Names </legend>
      &nbsp;
@@ -236,16 +234,16 @@ def makeBoardSelectionFields(boards):
 """ % len(boards)]
     i = 1
     for board in boards:
-        html.append(u"""\
+        html.append("""\
      &nbsp;
      <input name='boardpick' type='checkbox' value='%d' class='choice'
             onclick='javascript:someBoards()' id='E%d'> %s <br>
 """ % (board.cdrId, i, html_escape(board.name)))
         i += 1
-    html.append(u"""\
+    html.append("""\
     </fieldset>
 """)
-    return u"".join(html)
+    return "".join(html)
 
 #----------------------------------------------------------------------
 # Normalize a year, month, day tuple into a standard date-time value.
@@ -436,7 +434,7 @@ else:
     html.append("""
   </table>
 """)
-    html = u"".join(html)
+    html = "".join(html)
 
 # We have everything we need.  Show it to the user
 # ------------------------------------------------

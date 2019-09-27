@@ -54,7 +54,7 @@ class Control(cdrcgi.Control):
             return "Created %s." % doc_id
         raise Exception(cdr.checkErr(warnings) or "Unexpected error")
     def read_file(self, name):
-        if name not in self.fields.keys():
+        if name not in list(self.fields.keys()):
             return None
         f = self.fields[name]
         if f.file:

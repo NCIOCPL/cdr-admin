@@ -1,7 +1,7 @@
 #----------------------------------------------------------------------
 # Reports on the history of mailers for a particular document.
 #----------------------------------------------------------------------
-import cdrcgi, cgi, re, string
+import cdrcgi, cgi, re
 from cdrapi import db
 
 #----------------------------------------------------------------------
@@ -56,7 +56,7 @@ if not docId:
 # Connect to the database.
 #----------------------------------------------------------------------
 try:
-    conn   = db.connect()
+    conn   = db.connect(timeout=300)
     cursor = conn.cursor()
 except Exception as e:
     cdrcgi.bail('Database connection failure: %s' % e)
@@ -66,7 +66,7 @@ except Exception as e:
 #----------------------------------------------------------------------
 try:
     digits = re.sub(r'[^\d]', '', docId)
-    id     = string.atoi(digits)
+    id     = int(digits)
 except:
     cdrcgi.bail("Invalid document ID: %s, %s" % (docId, digits))
 
@@ -134,7 +134,7 @@ try:
                AND sent.path = '/Mailer/Sent'
                AND doc.path = '/Mailer/Document/@cdr:ref'
                AND doc.int_val = ?
-          ORDER BY sent.value""", id, 300)
+          ORDER BY sent.value""", id)
     row = cursor.fetchone()
     if not row:
         cdrcgi.sendPage(html + """\

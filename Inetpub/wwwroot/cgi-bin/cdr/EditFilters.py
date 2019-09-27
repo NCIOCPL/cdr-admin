@@ -5,7 +5,7 @@
 import cdr
 import cdrcgi
 import cgi
-import urllib
+import urllib.request, urllib.parse, urllib.error
 from cdrapi import db
 
 class Control(cdrcgi.Control):
@@ -69,7 +69,7 @@ function toggle(show, hide) {
         }
         for doc_id, title in docs:
             parms[cdrcgi.DOCID] = cdr_id = cdr.normalize(doc_id)
-            url = "EditFilter.py?%s" % urllib.urlencode(parms)
+            url = "EditFilter.py?%s" % urllib.parse.urlencode(parms)
             form.add("<tr>")
             form.add(form.B.TD(form.B.A(cdr_id, href=url)))
             form.add(form.B.TD(title))

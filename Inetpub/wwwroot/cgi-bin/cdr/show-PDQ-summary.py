@@ -32,14 +32,17 @@ import cgi
 import cdrcgi
 from sys import stdout
 from cdrapi import db
+from cdrapi.settings import Tier
 from io import BytesIO
 
 fields = cgi.FieldStorage()
 doc_id = fields.getvalue("doc-id") or 62843 #62779
 section = fields.getvalue("section") or "*"
 
-XSL = "d:/Inetpub/wwwroot/cgi-bin/cdr/PDQ-summary.xsl"
-XML = "d:/Inetpub/wwwroot/cgi-bin/cdr/PDQ-summary.xml"
+TIER = Tier()
+PDQDOCS = f"{TIER.basedir}/pdqdocs"
+XSL = f"{PDQDOCS}/PDQ-summary.xsl"
+XML = f"{PDQDOCS}/PDQ-summary.xml"
 
 # -------------------------------------------------------------
 # Retrieve a CDR document from the database
@@ -55,14 +58,12 @@ def get_doc(cursor, doc_id):
 # -------------------------------------------------------------
 def filter_doc(doc_xml, section):
     try:
-        f = open(XSL, 'r')
-        myXslt = f.read()
-        f.close()
+        with open(XSL, "rb") as fp:
+            xslt = fp.read()
     except:
         cdrcgi.bail('Unable to open XSL file %s' % XSL)
 
-    xslt_root = etree.XML("%s" % myXslt)
-
+    xslt_root = etree.XML(xslt)
     transform = etree.XSLT(xslt_root)
     fp = BytesIO(doc_xml.encode("utf-8"))
     doc = etree.parse(fp)
@@ -77,12 +78,11 @@ def main():
     # --------------------------------------------------------------
     # <read-section Start>
     try:
-        p = open(XML, 'r')
-        doc_xml = p.read()
-        p.close()
+        with open(XML, encoding="utf-8") as fp:
+            doc_xml = fp.read()
     except:
         cdrcgi.bail('Unable to open XML file %s' % XML)
-    filtered_doc = filter_doc(unicode(doc_xml, 'utf-8'), section)
+    filtered_doc = filter_doc(doc_xml, section)
     # <read-section End>
 
     # Use the following section to select CDR documents from the DB
@@ -93,6 +93,7 @@ def main():
     #filtered_doc = filter_doc(doc_xml, section)
     # <DB-section End>
     opts = dict(pretty_print=True, encoding="unicode")
+    #cdrcgi.bail("a")
     xml = lxml.html.tostring(filtered_doc, **opts)
     stdout.buffer.write(f"""\
 Content-type: text/html; charset=utf-8

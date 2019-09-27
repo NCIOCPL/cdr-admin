@@ -192,7 +192,7 @@ class Control:
             cols.append(cdrcgi.Report.Column("Definition Resource",
                                              **resource))
         if self.notes:
-            padding = u"\xa0" * 10
+            padding = "\xa0" * 10
             padding = ""
             heading = "QC %sNotes%s" % (padding, padding)
             cols.append(cdrcgi.Report.Column(heading, id="notes",
@@ -269,7 +269,7 @@ class Cell(cdrcgi.Report.Cell):
             if child.tag == "PlaceHolder":
                 name = child.get("name")
                 if not name:
-                    raise Exception(u"CDR%d: PlaceHolder without name" %
+                    raise Exception("CDR%d: PlaceHolder without name" %
                                     self.concept.doc_id)
                 if name in ("TERMNAME", "CAPPEDTERMNAME"):
                     replacement = None
@@ -288,7 +288,7 @@ class Cell(cdrcgi.Report.Cell):
                     span.tail = child.tail
                 else:
                     span = self.B.SPAN(style="font-weight: bold")
-                    if isinstance(replacement, basestring):
+                    if isinstance(replacement, str):
                         if name == "CAPPEDTERMNAME":
                             replacement = replacement.capitalize()
                         span.text = replacement
@@ -364,23 +364,23 @@ class NameString(Cell):
     def __init__(self, name, node, english=False):
         Cell.__init__(self, node.find("TermNameString"),
                       classes=name.blocked and "blocked" or "")
-        self.sort_key = u"".join(node.itertext()).lower()
+        self.sort_key = "".join(node.itertext()).lower()
         self.concept = name.concept
         if english and name.control.report == Control.ENGLISH:
             pron = node.find("TermPronunciation")
             if pron is not None and pron.text is not None:
                 pron_text = pron.text.strip()
                 if pron_text:
-                    self.extra = self.B.SPAN(u" (%s)" % pron_text)
+                    self.extra = self.B.SPAN(" (%s)" % pron_text)
         tag = "PronunciationResource"
         self.resources = [child.text for child in node.findall(tag)]
 
-    def __cmp__(self, other):
+    def __lt__(self, other):
         """
         Name strings are sortable on the text content with markup
         stripped.
         """
-        return cmp(self.sort_key, other.sort_key)
+        return self.sort_key < other.sort_key
 
 class Name:
     """
@@ -448,26 +448,27 @@ class Name:
                     return Definition(self.concept, node)
         return None
 
-    def __cmp__(self, other):
+    def __lt__(self, other):
         """
         Support sorting of the names of a glossary concept,
         based on the English name string or the "first" Spanish
         name string, depending on which report we're creating.
         """
         if self.control.report == Control.ENGLISH:
-            diff = cmp(self.english, other.english)
+            if self.english == other.english:
+                return self.docId < other.docId
+            return self.english < other.english
         else:
             if not self.spanish:
                 if not other.spanish:
-                    return cmp(self.docId, other.docId)
-                return 1
+                    return self.docId < other.docId
+                return True
             elif not other.spanish:
-                return -1
+                return False
             else:
-                diff = cmp(self.spanish[0], other.spanish[0])
-        if diff:
-            return diff
-        return cmp(self.docId, other.docId)
+                if self.spanish[0] == other.spanish[0]:
+                    return self.docId < other.docId
+                return self.spanish[0] < other.spanish[0]
 
 class Concept:
     """
@@ -637,7 +638,7 @@ class Concept:
         if self.sp_def.comments:
             last_comment = self.sp_def.comments[0]
         else:
-            last_comment = u""
+            last_comment = ""
         row.append(cdrcgi.Report.Cell(last_comment, rowspan=rowspan))
         if self.control.show_resources:
             def_resources = self.sp_def.resources

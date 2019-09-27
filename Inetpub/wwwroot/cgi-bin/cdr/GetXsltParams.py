@@ -59,7 +59,8 @@ def main():
         filters.append(Filter(doc_id, doc_title, doc_xml))
     tbody = builder.TBODY()
     caption = builder.CAPTION(TITLE)
-    for parm in sorted(Parameter.parameters.values()):
+    for name in sorted(Parameter.parameters, key=str.lower):
+        parm = Parameter.parameters[name]
         parm.add_rows(tbody)
     page = builder.HTML(
         builder.HEAD(
@@ -70,7 +71,7 @@ def main():
         builder.BODY(builder.TABLE(caption, tbody), builder.CLASS("report"))
     )
     print("Content-type: text/html\n")
-    print(etree.tostring(page, pretty_print=True))
+    print(etree.tostring(page, pretty_print=True).decode("ascii"))
 
 if __name__ == "__main__":
     main()

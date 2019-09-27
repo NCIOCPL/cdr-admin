@@ -126,7 +126,7 @@ def getLockedDoc(docId):
     docObj = cdr.getDoc(session, docId, checkout='Y', getObject=True)
 
     # Bail out if error
-    if type(docObj) in (type(""), type(u"")):
+    if isinstance(docObj, (str, byptes)):
         errList = ["Unable to lock document %s" % docId] + \
                   cdr.getErrors(docObj, errorsExpected=True, asSequence=True)
         fatal(errList)
@@ -207,7 +207,7 @@ SELECT DISTINCT t.name, d.id, d.title, n.source_elem, n.target_frag
     if len(rows) == 0:
         return None
 
-    html = u"""
+    html = """
 <table border='1'>
  <tr>
   <th>Doctype</th>
@@ -218,7 +218,7 @@ SELECT DISTINCT t.name, d.id, d.title, n.source_elem, n.target_frag
  </tr>
 """
     for row in rows:
-        html += u"""
+        html += """
  <tr>
   <td>%s</td>
   <td>%s</td>
@@ -409,9 +409,9 @@ if request == "Log Out":
 # Anything we send concludes with the session value and page termination tags
 endPage = """
  <input type='hidden' name='%s' value='%s' />
- </FORM>
- </BODY>
-</HTML>
+ </form>
+ </body>
+</html>
 """ % (cdrcgi.SESSION, session)
 
 LOGGER.info("Before check, request=%s", request)
@@ -520,7 +520,7 @@ if request != CONFIRM_SUBMIT:
                 refCount += 1
 
     # Tell user what will be done
-    html += u"""
+    html += """
 <style type='text/css'>
  td {
   font: 14pt 'Arial'; color: Blue; font-weight: bold; background transparent;
@@ -536,18 +536,18 @@ if request != CONFIRM_SUBMIT:
 </table>
 """ % (oldDocIdStr, oldDocTitle, newDocIdStr, newDocTitle)
 
-    html += u"""
+    html += """
 <hr />
 <h3>Validation Report:</h3>
 """
     if errList:
-        html += u"""
+        html += """
 <p>These errors occurred when validating the new document:</p>
 <ul>
 """
         for err in errList:
-            html += u" <li>%s</li>\n" % err
-        html += u"""
+            html += " <li>%s</li>\n" % err
+        html += """
 </ul>
 <p>Replacing an existing document with a new one that is invalid is
 allowed, but please consider whether you really want to do that.</p>
@@ -556,18 +556,18 @@ allowed, but please consider whether you really want to do that.</p>
 version.</p>
 """
     else:
-        html += u"""
+        html += """
 <p>There were no validation errors in the new document.</p>
 """
 
     # Check links to fragments in the old document
-    html += u"""
+    html += """
 <hr />
 <h3>Linked Fragments Report:</h3>
 """
     linkHtml = getFragmentLinks(oldDocId)
     if linkHtml:
-        html += u"""
+        html += """
 <p>There are links from other documents to specific fragments in the
 old document.  These are listed below.</p>
 
@@ -587,7 +587,7 @@ publishing job.</p>
 """ + linkHtml
 
     else:
-        html += u"""
+        html += """
 <p>There were no external documents with links to specific fragments that
 must be resolved.  The new document can replace the old one without
 breaking any links.</p>
@@ -598,14 +598,14 @@ version.</p>
 
     # Report how many internal references will be patched
     if refCount:
-        html += u"""
+        html += """
 <p>The new document contains %d internal references (e.g.,
 cdr:href="%s#_123") in which the new CDR ID will be replaced by the
 CDR ID of the old document (e.g., %s#_123).</p>""" % (refCount,
 newDocIdStr, oldDocIdStr)
 
     else:
-        html += u"""
+        html += """
 <p>There were no internal references (e.g., cdr:href="%s#_123") in which the
 new CDR ID would need to be replaced by the old one.
 """ % newDocIdStr
@@ -613,7 +613,7 @@ new CDR ID would need to be replaced by the old one.
     # Request confirmation
     LOGGER.info("Requesting confirmation, replace %s with %s",
                 oldDocIdStr, newDocIdStr)
-    html += u"""
+    html += """
 <center>
 <table border='0' cellpadding='10'>
  <tr>

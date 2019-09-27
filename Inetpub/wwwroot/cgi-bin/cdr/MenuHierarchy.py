@@ -182,7 +182,7 @@ if menuType not in menuTypes:
     cdrcgi.bail("INTERNAL ERROR: No terms for menu type '%s' found" % menuType)
 topItems = menuTypes[menuType].topTerms
 topItems.sort(key=lambda a: menuItems[a].name)
-html = u"""\
+html = """\
 <!DOCTYPE html>
 <html>
  <head>
@@ -201,7 +201,7 @@ html = u"""\
 
 for key in topItems:
     html += displayMenuItem(menuItems[key])
-cdrcgi.sendPage(html + u"""\
+cdrcgi.sendPage(html + """\
   </pre>
  </body>
 </html>

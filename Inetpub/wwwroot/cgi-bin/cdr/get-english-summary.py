@@ -6,12 +6,15 @@
 
 import cgi
 import re
+import sys
 from lxml import etree
 from cdrapi.docs import Doc
 from cdrapi.users import Session
 from cdr import Logging
 from cdrcgi import bail
 from html import escape as html_escape
+
+CTS = "SummarySection[SectMetaData/SectionType='Changes to summary']"
 
 def show_form():
     """
@@ -84,24 +87,24 @@ def markup_tag(match):
     """
 
     s = match.group(1)
-    if s.startswith(u"/"):
-        return u"</@@TAG-START@@{}@@END-SPAN@@>".format(s[1:])
-    trailingSlash = u""
-    if s.endswith(u"/"):
+    if s.startswith("/"):
+        return "</@@TAG-START@@{}@@END-SPAN@@>".format(s[1:])
+    trailingSlash = ""
+    if s.endswith("/"):
         s = s[:-1]
-        trailingSlash = u"/"
-    pieces = re.split(u"\\s", s, 1)
+        trailingSlash = "/"
+    pieces = re.split("\\s", s, 1)
     if len(pieces) == 1:
-        return u"<@@TAG-START@@{}@@END-SPAN@@{}>".format(s, trailingSlash)
+        return "<@@TAG-START@@{}@@END-SPAN@@{}>".format(s, trailingSlash)
     tag, attrs = pieces
-    pieces = [u"<@@TAG-START@@{}@@END-SPAN@@".format(tag)]
-    for attr, delim in re.findall(u"(\\S+=(['\"]).*?\\2)", attrs):
-        name, value = attr.split(u"=", 1)
-        pieces.append(u" @@NAME-START@@{}=@@END-SPAN@@"
-                      u"@@VALUE-START@@{}@@END-SPAN@@".format(name, value))
+    pieces = ["<@@TAG-START@@{}@@END-SPAN@@".format(tag)]
+    for attr, delim in re.findall("(\\S+=(['\"]).*?\\2)", attrs):
+        name, value = attr.split("=", 1)
+        pieces.append(" @@NAME-START@@{}=@@END-SPAN@@"
+                      "@@VALUE-START@@{}@@END-SPAN@@".format(name, value))
     pieces.append(trailingSlash)
-    pieces.append(u">")
-    return u"".join(pieces)
+    pieces.append(">")
+    return "".join(pieces)
 
 def markup(doc):
     """
@@ -111,12 +114,12 @@ def markup(doc):
       doc - Unicode string for serialized document XML
     """
 
-    doc = re.sub(u"<([^>]+)>", markup_tag, doc)
+    doc = re.sub("<([^>]+)>", markup_tag, doc)
     doc = html_escape(doc)
-    doc = doc.replace(u"@@TAG-START@@", u'<span class="tag">')
-    doc = doc.replace(u"@@NAME-START@@", u'<span class="name">')
-    doc = doc.replace(u"@@VALUE-START@@", u'<span class="value">')
-    doc = doc.replace(u"@@END-SPAN@@", u"</span>")
+    doc = doc.replace("@@TAG-START@@", '<span class="tag">')
+    doc = doc.replace("@@NAME-START@@", '<span class="name">')
+    doc = doc.replace("@@VALUE-START@@", '<span class="value">')
+    doc = doc.replace("@@END-SPAN@@", "</span>")
     return doc
 
 def strip(xml):
@@ -124,10 +127,10 @@ def strip(xml):
     Get rid of parts of the document the users don't want to translate
 
     Pass:
-      xml - UTF-8 bytes for the document's XML
+      xml - serialized document string
 
     Return:
-      XML for stripped document, UTF-8 encoding
+      XML for stripped document
     """
 
     doomed = ("Comment", "MediaLink", "SectMetaData", "ReplacementFor",
@@ -135,7 +138,7 @@ def strip(xml):
               "BoardMember", "RelatedDocuments", "TypeOfSummaryChange")
     try:
         parser = etree.XMLParser(remove_blank_text=True)
-        root = etree.fromstring(xml, parser).getroottree()
+        root = etree.fromstring(xml, parser)
         first = True
         for node in root.findall("SummaryMetaData/MainTopics"):
             if first:
@@ -143,16 +146,13 @@ def strip(xml):
             else:
                 parent = node.getparent()
                 parent.remove(node)
-        for node in root.xpath("SummarySection["
-                               "SectMetaData/SectionType="
-                               "'Changes to summary']"):
+        for node in root.xpath(CTS):
             parent = node.getparent()
             parent.remove(node)
 
         etree.strip_elements(root, with_tail=False, *doomed)
         etree.strip_attributes(root, "PdqKey")
-        return etree.tostring(root, pretty_print=True, encoding="utf-8",
-                              xml_declaration=True)
+        return etree.tostring(root, pretty_print=True, encoding="unicode")
     except Exception as e:
         bail("processing XML document: {}".format(e))
 
@@ -208,6 +208,7 @@ def fetch_doc(doc_id, version, logger):
     version = get_version(session, doc_id, version)
     try:
         doc = Doc(session, id=doc_id, version=version)
+        doc.normalize()
         assert doc.xml
         return doc
     except:
@@ -236,10 +237,10 @@ def filter_doc(doc, logger):
         parms = dict(useLevel="2")
         result = doc.filter("name:Revision Markup Filter", parms=parms)
         if isinstance(result.result_tree, etree._Element):
-            xml = strip(etree.tostring(result.result_tree, encoding="utf-8"))
+            xml = strip(etree.tostring(result.result_tree, encoding="unicode"))
         else:
-            xml = strip(unicode(result.result_tree).encode("utf-8"))
-        return xml.decode("utf-8")
+            xml = strip(str(result.result_tree))
+        return xml
     except:
         logger.exception("failure filtering document")
         bail("failure filtering document")
@@ -257,11 +258,11 @@ def send_raw(doc, xml):
     if doc.version:
         name += "V{:d}".format(doc.version)
     name += ".xml"
-    print((u"""\
+    sys.stdout.buffer.write(f"""\
 ContentType: text/xml;charset=utf-8
-Content-disposition: attachment; filename={}
+Content-disposition: attachment; filename={name}
 
-{}""".format(name, xml).encode("utf-8")))
+{xml}""".encode("utf-8"))
 
 def send_formatted(doc, xml, logger):
     """
@@ -277,12 +278,12 @@ def send_formatted(doc, xml, logger):
         title = "CDR Document {}".format(doc.cdr_id)
         if doc.version:
             title += " (version {:d})".format(doc.version)
-        print((u"""\
+        sys.stdout.buffer.write(f"""\
 Content-type: text/html;charset=utf-8
 
 <html>
  <head>
-  <title>{}</title>
+  <title>{title}</title>
   <style type="text/css">
 .tag {{ color: blue; font-weight: bold }}
 .name {{ color: brown }}
@@ -291,10 +292,10 @@ h1 {{ color: maroon; font-size: 14pt; font-family: Verdana, Arial; }}
   </style>
  </head>
  <body>
-  <h1>{}</h1>
-  <pre>{}</pre>
+  <h1>{title}</h1>
+  <pre>{markup(xml)}</pre>
  </body>
-</html>""".format(title, title, markup(xml)).encode("utf-8")))
+</html>""".encode("utf-8"))
     except Exception as e:
         logger.exception("rendering formatted xml")
         bail(e)

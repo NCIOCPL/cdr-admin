@@ -74,9 +74,9 @@ class Control(cdrcgi.Controller):
         """Use the Windows find command to search for a pattern in the file."""
         sys.stdout.buffer.write(self.HEADERS)
         try:
-            cmd = "find %s %s" % (self.pattern, self.path)
-            result = cdr.runCommand(cmd)
-            sys.stdout.buffer.write(result.output)
+            cmd = f"find {self.pattern} {self.path}"
+            process = cdr.run_command(cmd, merge_output=True, binary=True)
+            sys.stdout.buffer.write(process.stdout)
         except Exception as e:
             sys.stdout.buffer.write(f"{cmd}\n{e}\n".encode("utf-8"))
 
@@ -84,8 +84,9 @@ class Control(cdrcgi.Controller):
         """Display the output of the Windows dir command."""
         sys.stdout.buffer.write(self.HEADERS)
         try:
-            result = cdr.runCommand("dir %s" % self.path)
-            sys.stdout.buffer.write(result.output)
+            cmd = f"dir {self.path}"
+            process = cdr.run_command(cmd, merge_output=True, binary=True)
+            sys.stdout.buffer.write(process.stdout)
         except Exception as e:
             sys.stdout.buffer.write(str(e).encode("utf-8"))
 

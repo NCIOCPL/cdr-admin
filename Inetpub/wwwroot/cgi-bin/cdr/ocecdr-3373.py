@@ -24,12 +24,14 @@ import ModifyDocs
 import lxml.etree as etree
 import mutagen
 import zipfile
-import cStringIO
+from io import BytesIO
 from cdrapi import db
+from cdrapi.docs import Doc
+from cdrapi.users import Session
 
 CDRNS = "cips.nci.nih.gov/cdr"
 NSMAP = { "cdr" : CDRNS }
-AUDIO = cdr.BASEDIR + "/Audio_from_CIPSFTP"
+AUDIO = f"{cdr.BASEDIR}/Audio_from_CIPSFTP"
 BANNER = "CDR Administration"
 SUBTITLE = "Load Glossary Audio Files"
 logger = cdr.Logging.get_logger("audio-import")
@@ -59,7 +61,7 @@ def get_latest_batch():
     properly) and the original name (with possibly mixed case).
     """
     sets = {}
-    for path in glob.glob("%s/Week_*.zip" % AUDIO):
+    for path in glob.glob(f"{AUDIO}/Week_*.zip"):
         match = re.search(r"((Week_\d+).*.zip)", path, re.I)
         if match:
             name = match.group(1)
@@ -71,7 +73,7 @@ def get_latest_batch():
             sets[week].append((name.upper(), name))
     if not sets:
         return None
-    keys = sorted(sets.keys())
+    keys = sorted(sets)
     return sorted(sets[keys[-1]])
 
 def show_form():
@@ -117,11 +119,11 @@ def getCreationDate(path, zipFile):
     info = zipFile.getinfo(path)
     return "%04d-%02d-%02d" % info.date_time[:3]
 
-def getRuntime(bytes):
+def getRuntime(mp3_bytes):
     """
     Determine the duration of an audio clip.
     """
-    fp = cStringIO.StringIO(bytes)
+    fp = BytesIO(mp3_bytes)
     mp3 = mutagen.File(fp)
     logger.info("runtime is %s", mp3.info.length)
     return int(round(mp3.info.length))
@@ -181,7 +183,7 @@ class AudioFile:
             self.created = getCreationDate(self.filename, zipFile)
             self.title = self.nameTitle.split(';')[0]
             if self.language == 'Spanish':
-                self.title += u"-Spanish"
+                self.title += "-Spanish"
             if self.language not in ('English', 'Spanish'):
                 raise Exception("unexpected language value '%s'" %
                                 self.language)
@@ -198,7 +200,7 @@ class AudioFile:
         """
         element = etree.Element('MediaLink')
         child = etree.Element('MediaID')
-        child.text = u"%s; pronunciation; mp3" % self.title
+        child.text = "%s; pronunciation; mp3" % self.title
         child.set("{cips.nci.nih.gov/cdr}ref", "CDR%010d" % self.mediaId)
         element.append(child)
         return element
@@ -223,7 +225,7 @@ class AudioFile:
         representing this audio file.
         """
         language = self.language == 'Spanish' and 'es' or 'en'
-        creator = self.creator or u'Vanessa Richardson, VR Voice'
+        creator = self.creator or 'Vanessa Richardson, VR Voice'
         root = etree.Element("Media", nsmap=NSMAP)
         root.set("Usage", "External")
         etree.SubElement(root, "MediaTitle").text = self.title
@@ -249,29 +251,26 @@ class AudioFile:
         glossary = etree.SubElement(proposedUse, "Glossary")
         glossary.set("{%s}ref" % CDRNS, "CDR%010d" % self.nameId)
         glossary.text = self.nameTitle
-        return etree.tostring(root, pretty_print=True)
+        return etree.tostring(root, pretty_print=True, encoding="unicode")
 
     def save(self, session):
         """
         Create the new Media document in the CDR for this audio file.
         """
+
+        opts = dict(xml=self.toXml(), blob=self.bytes, doctype="Media")
+        doc = Doc(Session(session), **opts)
         comment = "document created for CDR request OCECDR=3373"
-        docTitle = u"%s; pronunciation; mp3" % self.title
-        ctrl = dict(DocType="Media", DocTitle=docTitle.encode("utf-8"))
-        doc = cdr.Doc(self.toXml(), doctype="Media", ctrl=ctrl)
         opts = dict(
-            doc=str(doc),
+            version=True,
+            publishable=True,
             comment=comment,
             reason=comment,
-            val="Y",
-            ver="Y",
-            publishable="Y",
-            blob=self.bytes
+            val_types=("schema", "links"),
+            unlock=True,
         )
-        result = cdr.addDoc(session, **opts)
-        self.mediaId = cdr.exNormalize(result)[1]
-        cdr.unlock(session, self.mediaId)
-        return self.mediaId
+        doc.save(**opts)
+        return doc.id
 
 #----------------------------------------------------------------------
 # Object representing the element in a GlossaryTermName document to

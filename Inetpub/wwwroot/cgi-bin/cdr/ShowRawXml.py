@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------
-# Show unformatted XML; mostly useful for filters.
+# Show unformatted XML.
 #----------------------------------------------------------------------
 import cgi, cdrcgi
 from cdrapi import db

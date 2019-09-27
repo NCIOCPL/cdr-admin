@@ -19,39 +19,37 @@ def reportDuplicate(name, docIds, language, dictionary):
     server = socket.gethostname().split('.')[0].upper()
     sender = "CDR@%s.NCI.NIH.GOV" % server
     subject = "DUPLICATE GLOSSARY TERM NAME MAPPINGS ON %s" % server
-    body = [u"The string '%s' " % name.upper(),
-            u"is mapped on %s to the following CDR GlossaryTermName" % server,
-            u"documents for language '%s' " % language,
-            u"and dictionary '%s'; " % dictionary,
-            u"mappings for any phrase+language+dictionary ",
-            u"combination (ignoring case) must be unique.  Please correct ",
-            u"the data so that this requirement is met.  You may need to ",
-            u"look at the External Map Table for Glossary Terms to find ",
-            u"some of the mappings.\n\n"]
+    body = ["The string '%s' " % name.upper(),
+            "is mapped on %s to the following CDR GlossaryTermName" % server,
+            "documents for language '%s' " % language,
+            "and dictionary '%s'; " % dictionary,
+            "mappings for any phrase+language+dictionary ",
+            "combination (ignoring case) must be unique.  Please correct ",
+            "the data so that this requirement is met.  You may need to ",
+            "look at the External Map Table for Glossary Terms to find ",
+            "some of the mappings.\n\n"]
     for docId in docIds:
-        body.append(u"CDR%010d\n" % docId)
-    cdr.sendMail(sender, recips, subject, u"".join(body), False, True)
+        body.append("CDR%010d\n" % docId)
+    cdr.sendMail(sender, recips, subject, "".join(body), False, True)
 
 def reportDuplicates(allDups):
     recips = cdr.getEmailList('GlossaryDupGroup') or DEV_EMAILS
     server = socket.gethostname().split('.')[0]
     sender = "cdr@%s.nci.nih.gov" % server.lower()
     subject = "DUPLICATE GLOSSARY TERM NAME MAPPINGS ON %s" % server.upper()
-    body = [u"The following %d sets of duplicate glossary " % len(allDups),
-            u"mappings were found in the CDR on %s.  " % server.upper(),
-            u"Mappings for any phrase + language + dictionary must be ",
-            u"unique.  Please correct the data so that this requirements is ",
-            u"met.  You may need to look at the External Map Table for ",
-            u"Glossary Terms to find some of the mappings.\n"]
-    keys = allDups.keys()
-    keys.sort()
-    for key in keys:
+    body = ["The following %d sets of duplicate glossary " % len(allDups),
+            "mappings were found in the CDR on %s.  " % server.upper(),
+            "Mappings for any phrase + language + dictionary must be ",
+            "unique.  Please correct the data so that this requirements is ",
+            "met.  You may need to look at the External Map Table for ",
+            "Glossary Terms to find some of the mappings.\n"]
+    for key in sorted(allDups):
         name, language, dictionary = key
-        body.append(u"\n%s (language='%s' dictionary='%s')\n" %
+        body.append("\n%s (language='%s' dictionary='%s')\n" %
                     (name.upper(), language, dictionary))
         for docId in allDups[key]:
-            body.append(u"\tCDR%010d\n" % docId)
-    cdr.sendMail(sender, recips, subject, u"".join(body), False, True)
+            body.append("\tCDR%010d\n" % docId)
+    cdr.sendMail(sender, recips, subject, "".join(body), False, True)
 
 #----------------------------------------------------------------------
 # See if we've already seen this name+language+dictionary combo.
@@ -122,11 +120,11 @@ def checkForDuplicates(name, names, allDups):
 #----------------------------------------------------------------------
 def normalize(me):
     if not me:
-        return u""
-    return re.sub(u"\\s+", " ", me
-                  .replace('\u2019', u"'")
-                  #.replace('\u201C', u'"')
-                  #.replace('\u201D', u'"')
+        return ""
+    return re.sub("\\s+", " ", me
+                  .replace('\u2019', "'")
+                  #.replace('\u201C', '"')
+                  #.replace('\u201D', '"')
                   .lower().strip())
 
 #----------------------------------------------------------------------
@@ -315,9 +313,8 @@ for language in terms:
                 names[name][docId][language] = set()
             if term.dictionaries:
                 names[name][docId][language].update(term.dictionaries)
-keys = names.keys()
 allDups = {}
-for key in keys:
+for key in names:
     checkForDuplicates(key, names, allDups)
 if allDups:
     reportDuplicates(allDups)

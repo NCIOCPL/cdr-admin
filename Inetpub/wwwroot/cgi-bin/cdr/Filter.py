@@ -21,7 +21,7 @@ import cdrcgi
 import cdrpub
 import os
 import pickle
-import urllib
+import urllib.request, urllib.parse, urllib.error
 from cdrapi.settings import Tier
 
 class Control(cdrcgi.Control):
@@ -185,11 +185,11 @@ class Control(cdrcgi.Control):
             filter_set = filter_sets[set_name]
             if self.set_wanted(filter_set, id_set):
                 opts["filter"] = [m.id for m in filter_set.members]
-                args = urllib.urlencode(opts, True)
+                args = urllib.parse.urlencode(opts, True)
                 rows.append((
                     set_name,
                     ActionCell(self.script, args),
-                    [u"%s:%s" % (m.id, m.name) for m in filter_set.members]
+                    ["%s:%s" % (m.id, m.name) for m in filter_set.members]
                 ))
         opts = {
             "html_callback_pre": self.show_cache_warning,
@@ -207,8 +207,7 @@ class Control(cdrcgi.Control):
 
     def show_filtered_doc(self):
         "Filter the document and display the results."
-        doc = self.filter_doc()
-        doc = str(self.filter_doc(), "utf-8").replace("@@DOCID@@", self.cdr_id)
+        doc = self.filter_doc().replace("@@DOCID@@", self.cdr_id)
         text_type = "<?xml" in doc and "xml" or "html"
         cdrcgi.sendPage(doc, text_type)
 

@@ -11,17 +11,17 @@ from html import escape as html_escape
 #----------------------------------------------------------------------
 # Constant values we look for in the MenuType element.
 #----------------------------------------------------------------------
-GP_GS = u"Genetics Professionals--GeneticSyndrome"
-GP_CT = u"Genetics Professionals--CancerType"
-GP_CS = u"Genetics Professionals--CancerSite"
+GP_GS = "Genetics Professionals--GeneticSyndrome"
+GP_CT = "Genetics Professionals--CancerType"
+GP_CS = "Genetics Professionals--CancerSite"
 
 #----------------------------------------------------------------------
 # Base class for the two term types; understands sorting order.
 #----------------------------------------------------------------------
 class Term:
     def __cmp__(self, other):
-        me = self.preferredName and self.preferredName.upper() or u""
-        him = other.preferredName and other.preferredName.upper() or u""
+        me = self.preferredName and self.preferredName.upper() or ""
+        him = other.preferredName and other.preferredName.upper() or ""
         diff = cmp(me, him)
         if diff:
             return diff
@@ -44,7 +44,7 @@ class RelatedTerm(Term):
         self.syndromes = set()
         cursor.execute("SELECT xml FROM document WHERE id = ?", cdrId)
         docXml = cursor.fetchall()[0][0]
-        tree = etree.XML(docXml.encode('utf-8'))
+        tree = etree.XML(docXml)
         for node in tree.findall('PreferredName'):
             self.preferredName = node.text
         for node in tree.findall('TermRelationship/RelatedTerm'):
@@ -72,10 +72,10 @@ class RelatedTerm(Term):
             elif displayName is not None and menuType == GP_CS:
                 self.cancerSite = displayName
     def toHtml(self):
-        pn = self.preferredName and html_escape(self.preferredName) or u"&nbsp;"
-        cs = self.cancerSite and html_escape(self.cancerSite) or u"&nbsp;"
-        ct = self.cancerType and html_escape(self.cancerType) or u"&nbsp;"
-        return u"""\
+        pn = self.preferredName and html_escape(self.preferredName) or "&nbsp;"
+        cs = self.cancerSite and html_escape(self.cancerSite) or "&nbsp;"
+        ct = self.cancerType and html_escape(self.cancerType) or "&nbsp;"
+        return """\
     <td>%s</td>
     <td>CDR%d</td>
     <td>%s</td>
@@ -93,7 +93,7 @@ class GeneticCondition(Term):
         self.relatedTerms = []
         cursor.execute("SELECT xml FROM document WHERE id = ?", cdrId)
         docXml = cursor.fetchall()[0][0]
-        tree = etree.XML(docXml.encode('utf-8'))
+        tree = etree.XML(docXml)
         for node in tree.findall('PreferredName'):
             self.preferredName = node.text
         for node in tree.findall('MenuInformation/MenuItem'):
@@ -118,41 +118,41 @@ class GeneticCondition(Term):
                 self.relatedTerms.append(relatedTerm)
         self.relatedTerms.sort()
     def toHtml(self):
-        rowspan = u""
+        rowspan = ""
         if len(self.relatedTerms) > 1:
-            rowspan = u" rowspan='%d'" % len(self.relatedTerms)
-        html = [u"""\
+            rowspan = " rowspan='%d'" % len(self.relatedTerms)
+        html = ["""\
    <tr>
     <td%s>%s (CDR%d)</td>
     <td%s>%s</td>
 """ % (rowspan,
-       self.preferredName and html_escape(self.preferredName) or u"&nbsp;",
+       self.preferredName and html_escape(self.preferredName) or "&nbsp;",
        self.cdrId, rowspan,
-       self.displayName and html_escape(self.displayName) or u"&nbsp;")]
+       self.displayName and html_escape(self.displayName) or "&nbsp;")]
         if self.relatedTerms:
             html.append(self.relatedTerms[0].toHtml())
         else:
-            html.append(u"""\
+            html.append("""\
     <td>&nbsp;</td>
     <td>&nbsp;</td>
     <td>&nbsp;</td>
     <td>&nbsp;</td>
 """)
-        html.append(u"""
+        html.append("""
    </tr>
 """)
         for rt in self.relatedTerms[1:]:
-            html.append(u"""\
+            html.append("""\
     <tr>
 %s
     </tr>
 """ % rt.toHtml())
-        return u"".join(html)
+        return "".join(html)
 
 #----------------------------------------------------------------------
 # Construct the head of the report.
 #----------------------------------------------------------------------
-html = [u"""\
+html = ["""\
 <html>
  <head>
   <title>Genetic Condition Menu Mapping Report</title>
@@ -198,9 +198,9 @@ conditions.sort()
 #----------------------------------------------------------------------
 for gc in conditions:
     html.append(gc.toHtml())
-html.append(u"""\
+html.append("""\
   </table>
  </body>
 </html>
 """)
-cdrcgi.sendPage(u"".join(html))
+cdrcgi.sendPage("".join(html))

@@ -23,7 +23,7 @@ title   = "CDR Administration"
 section = "Global Change Menu"
 buttons = []
 html    = cdrcgi.header(title, title, section, "", buttons) + """\
-   <ol>
+  <ol>
 """
 items   = (
            ('ShowGlobalChangeTestResults.py','Global Change Test Results'),
@@ -31,12 +31,11 @@ items   = (
            )
 for item in items:
     html += """\
-    <li><a href='%s/%s%s'>%s</a></li>
+   <li><a href='%s/%s%s'>%s</a></li>
 """ % (cdrcgi.BASE, item[0], session, item[1])
 
 cdrcgi.sendPage(html + """\
-   </ol>
-  </form>
+  </ol>
  </body>
 </html>
 """)

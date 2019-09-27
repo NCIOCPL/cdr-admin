@@ -126,7 +126,7 @@ keys = sorted(setDict)
 
 # Creating the HTML output page
 # -----------------------------
-report = u"""\
+report = """\
 <html>
  <head>
   <title>CDR Filter Sets</title>
@@ -160,7 +160,7 @@ for key in keys:
 
 # Adding the HTML footer to the output
 # ------------------------------------
-report += u"""\
+report += """\
   </ul>
  </body>
 </html>"""

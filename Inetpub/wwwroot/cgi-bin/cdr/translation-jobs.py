@@ -15,10 +15,10 @@ class Control(cdrcgi.Control):
     the complete processing course.
     """
 
-    ADD = "Add" # Job"
-    PURGE = "Purge" # Completed Jobs"
-    GLOSSARY = "Glossary" # Queue"
-    MEDIA = "Media" # Queue"
+    ADD = "Add"
+    PURGE = "Purge"
+    GLOSSARY = "Glossary"
+    MEDIA = "Media"
     REPORTS_MENU = SUBMENU = "Reports"
     ADMINMENU = "Admin"
 

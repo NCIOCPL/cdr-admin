@@ -2,7 +2,8 @@
 # Generates report of counts of mailers of each type, generated during
 # a specified date range.
 #----------------------------------------------------------------------
-import cdr, cdrcgi, cgi, time
+import cdr, cdrcgi, cgi
+import datetime
 from cdrapi import db
 
 #----------------------------------------------------------------------
@@ -19,7 +20,7 @@ script    = "MailerActivityStatistics.py"
 title     = "CDR Administration"
 section   = "Mailer Activity Statistics"
 header    = cdrcgi.header(title, title, section, script, buttons)
-now       = time.localtime(time.time())
+today     = datetime.date.today()
 
 #----------------------------------------------------------------------
 # Make sure we're logged in.
@@ -44,12 +45,8 @@ if request == "Log Out":
 # If we don't have a request, put up the request form.
 #----------------------------------------------------------------------
 if not fromDate or not toDate:
-    toDate      = time.strftime("%Y-%m-%d", now)
-    then        = list(now)
-    then[1]    -= 1
-    then[2]    += 1
-    then        = time.localtime(time.mktime(then))
-    fromDate    = time.strftime("%Y-%m-%d", then)
+    toDate      = str(today)
+    fromDate    = str(today - datetime.timedelta(7))
     form = """\
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
    <TABLE BORDER='0'>
@@ -72,12 +69,10 @@ if not fromDate or not toDate:
 #----------------------------------------------------------------------
 # Validate input dates
 #----------------------------------------------------------------------
-if fromDate:
-    if not cdr.strptime(fromDate, '%Y-%m-%d'):
-        cdrcgi.bail('Start Date must be valid date in YYYY-MM-DD format')
-if toDate:
-    if not cdr.strptime(toDate, '%Y-%m-%d'):
-        cdrcgi.bail('End Date must be valid date in YYYY-MM-DD format')
+if not cdr.strptime(fromDate, '%Y-%m-%d'):
+    cdrcgi.bail('Start Date must be valid date in YYYY-MM-DD format')
+if not cdr.strptime(toDate, '%Y-%m-%d'):
+    cdrcgi.bail('End Date must be valid date in YYYY-MM-DD format')
 if fromDate > toDate:
     cdrcgi.bail('Start Date is greater than End Date')
 
@@ -112,7 +107,7 @@ html = """\
   </center>
   <br />
   <br />
-""" % (time.strftime("%m/%d/%Y", now), fromDate, toDate)
+""" % (today, fromDate, toDate)
 
 #----------------------------------------------------------------------
 # Extract the information from the database.
@@ -127,7 +122,7 @@ try:
              WHERE s.value BETWEEN ? AND ?
                AND t.path = '/Mailer/Type'
                AND s.path = '/Mailer/Sent'
-          GROUP BY t.value""", (fromDate, toDate))
+          GROUP BY t.value""", (fromDate, toDate + " 23:59:59"))
     lastGroup  = None
     groupTotal = 0
     grandTotal = 0

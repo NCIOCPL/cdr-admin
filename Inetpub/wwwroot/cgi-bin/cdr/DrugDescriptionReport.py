@@ -12,6 +12,7 @@ import cgi
 import datetime
 import json
 import lxml.etree as etree
+import re
 
 class Control(cdrcgi.Control):
     """
@@ -327,18 +328,19 @@ class DrugInfoSummary:
         except Exception as e:
             raise Exception("Database failure fetching CDR%d version %d: %s" %
                             (doc_id, doc_version, e))
+        xml = re.sub(r"<\?xml[^?]*\?>\s*", "", xml)
         try:
-            root = etree.XML(xml.encode("utf-8"))
+            root = etree.fromstring(xml)
         except Exception as e:
             raise Exception("Failure parsing CDR%d version %d: %s" %
                             (doc_id, doc_version, e))
         self.name = title.split(";")[0].strip()
         for node in root.iter("Description"):
-            self.description = u"".join(self.fetch_text(node))
+            self.description = "".join(self.fetch_text(node))
         filters = ["name:Format DIS SummarySection"]
         parm = [("suppress-nbsp", "true")]
         response = cdr.filterDoc("guest", filters, doc_id, parm=parm)
-        if isinstance(response, basestring):
+        if isinstance(response, str):
             cdrcgi.bail(response)
             self.summary = '<span class="error">UNAVAILABLE</span>'
         else:
@@ -348,7 +350,7 @@ class DrugInfoSummary:
         """
         Add a table for this summary and a horizontal ruler to the report page.
         """
-        parser = cdrcgi.lxml.html.HTMLParser(encoding="utf-8")
+        parser = cdrcgi.lxml.html.HTMLParser() #encoding="utf-8")
         url = "QcReport.py?Session=guest&DocId=%d" % self.doc_id
         doc_id = page.B.TD(page.B.A(str(self.doc_id), href=url))
         summary = cdrcgi.lxml.html.fromstring("<td>%s</td>" % self.summary,
@@ -367,8 +369,8 @@ class DrugInfoSummary:
         page.add("</table>")
         page.add(page.B.HR())
 
-    def __cmp__(self, other):
-        return cmp(self.name.lower(), other.name.lower())
+    def __lt__(self, other):
+        return self.name.lower() < other.name.lower()
 
     @staticmethod
     def fetch_text(node):

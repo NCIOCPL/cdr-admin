@@ -24,7 +24,7 @@ def addRow(summary):
    <li class='summary'>%s (%s)
     <ul>
 """ % (summary.title, summary.id)
-    for element in summary.elemInfo.keys():
+    for element in summary.elemInfo:
         if (element == 'SummaryModuleLink' and
             len(summary.elements[element]) > 0):
             for module in summary.elements[element]:
@@ -113,7 +113,7 @@ while row:
 
 # Creating the HTML output page
 # -----------------------------
-report = u"""\
+report = """\
 <html>
  <head>
   <title>Summaries including Modules, MiscDocs</title>
@@ -159,7 +159,7 @@ for summary in sumIncludes:
 
 # Adding the HTML footer to the output
 # ------------------------------------
-report += u"""\
+report += """\
   </ul>
  </body>
 </html>"""

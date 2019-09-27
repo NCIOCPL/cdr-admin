@@ -135,18 +135,18 @@ SELECT DISTINCT value
         for row in cursor.fetchall():
             value = row[0].strip()
             if value:
-                html.append(u"""\
+                html.append("""\
     &nbsp;
     <input name='Audience' type='radio' value='%s' class='choice'/> %s <br />
 """ % (value, value))
     except Exception as e:
         cdrcgi.bail("Failure retrieving audience choices: %s" % e)
-    html.append(u"""\
+    html.append("""\
     &nbsp;
     <input name='Audience' type='radio' checked='1' value='all'
            class='choice' /> All <br />
 """)
-    return u"".join(html)
+    return "".join(html)
 
 #----------------------------------------------------------------------
 # Generate picklist for Summary type.
@@ -196,7 +196,7 @@ def getSummaryTypeOptions(cursor):
                    JOIN #english e
                      ON e.board = b.doc_id""")
     rows = cursor.fetchall()
-    html = [u"""\
+    html = ["""\
     <fieldset>
      <legend>English</legend>
      &nbsp;
@@ -212,7 +212,7 @@ def getSummaryTypeOptions(cursor):
         edBoard = docTitle.find(' Editorial Board;')
         if edBoard != -1:
             docTitle = docTitle[:edBoard]
-        html.append(u"""\
+        html.append("""\
      &nbsp;
      <input name='est' type='checkbox' value='%d' class='choice'
             onclick='javascript:someEnglish()' id='E%d' /> %s <br />
@@ -226,7 +226,7 @@ def getSummaryTypeOptions(cursor):
                    JOIN #board b
                      ON e.board = b.doc_id""")
     rows = cursor.fetchall()
-    html.append(u"""\
+    html.append("""\
     </fieldset>
     <fieldset>
      <legend>Spanish</legend>
@@ -242,16 +242,16 @@ def getSummaryTypeOptions(cursor):
         edBoard = docTitle.find(' Editorial Board;')
         if edBoard != -1:
             docTitle = docTitle[:edBoard]
-        html.append(u"""\
+        html.append("""\
      &nbsp;
      <input name='sst' type='checkbox' value='%d' class='choice'
             onclick='javascript:someSpanish()' id='S%d' /> %s <br />
 """ % (docId, i, html_escape(docTitle)))
         i += 1
-    html.append(u"""\
+    html.append("""\
     </fieldset>
 """)
-    return u"".join(html)
+    return "".join(html)
 
 #----------------------------------------------------------------------
 # Put up the menu if we don't have selection criteria yet.
@@ -335,7 +335,7 @@ class Summary:
         if reportType == 'S':
             self.comment = Summary.__getComment(self.docId, cursor)
         lastVersions = cdr.lastVersions('guest', "CDR%010d" % self.docId)
-        if type(lastVersions) in (type(""), type(u"")):
+        if isinstance(lastVersions, (str, bytes)):
             self.lastVFlag = lastVersions
         else:
             lastAny, lastPub, isChanged = lastVersions
@@ -463,7 +463,7 @@ if "modules" not in also:
 #----------------------------------------------------------------------
 if uStartDate and uEndDate:
     bodyTitle  = "Summary Date Last Modified (User) Report"
-    subtitle   = u"%s - %s" % (uStartDate, uEndDate)
+    subtitle   = "%s - %s" % (uStartDate, uEndDate)
     reportType = 'U'
     dateFilter = """\
                 AND lm.value BETWEEN '%s'
@@ -473,7 +473,7 @@ if uStartDate and uEndDate:
 """ % (uStartDate, uEndDate)
 else:
     bodyTitle  = "Summary Last Modified Date (System) Report"
-    subtitle   = u"%s - %s" % (sStartDate, sEndDate)
+    subtitle   = "%s - %s" % (sStartDate, sEndDate)
     reportType = 'S'
     dateFilter = """\
                 AND ls.last_save_date BETWEEN '%s' AND

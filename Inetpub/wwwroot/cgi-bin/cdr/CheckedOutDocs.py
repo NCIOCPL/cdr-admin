@@ -56,7 +56,7 @@ ORDER BY u.fullname""")
         page = cdrcgi.HTMLPage(TITLE, **pageopts)
         fieldset = page.fieldset("Select User")
         page.form.append(fieldset)
-        values = [(r[1], u"%s (%d locks)" % (r[2], r[0])) for r in rows]
+        values = [(r[1], "%s (%d locks)" % (r[2], r[0])) for r in rows]
         fieldset.append(page.select("User", options=values))
         page.add_output_options("html")
     else:

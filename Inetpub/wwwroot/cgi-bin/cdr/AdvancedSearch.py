@@ -1,9 +1,7 @@
 #----------------------------------------------------------------------
 # Main menu for advanced search forms.
 #----------------------------------------------------------------------
-import cgi
 import cdrcgi
-import urllib
 
 class Control(cdrcgi.Control):
     def __init__(self):

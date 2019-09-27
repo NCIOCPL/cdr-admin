@@ -58,19 +58,19 @@ class Control(cdrcgi.Control):
             return self.message(e, "red")
     def check_dtds(self):
         cmd = r"python d:\cdr\build\CheckDtds.py"
-        result = cdr.runCommand(cmd)
-        if result.code:
-            raise Exception("DTD check failure: %s" % result.output)
+        result = cdr.run_command(cmd, merge_output=True)
+        if result.returncode:
+            raise Exception("DTD check failure: %s" % result.stdout)
         self.logger.info("DTDs updated")
-        return "Running CheckDtds.py ...\n" + str(result.output, "utf-8")
+        return "Running CheckDtds.py ...\n" + result.stdout
     def refresh_manifest(self):
         cmd = r"python d:\cdr\build\RefreshManifest.py"
-        result = cdr.runCommand(cmd)
-        if result.code:
-            output = str(result.output, "utf-8")
+        result = cdr.run_command(cmd, merge_output=True)
+        if result.returncode:
+            output = result.stdout
             raise Exception(f"Manifest refresh failure: {output}")
         self.logger.info("Manifest updated")
-        return "Running RefreshManifest.py ...\n" + str(result.output, "utf-8")
+        return "Running RefreshManifest.py ...\n" + result.stdout
     def add_doc(self, schema):
         ctrl = dict(DocTitle=self.filename)
         doc = cdr.Doc(schema, doctype="schema", ctrl=ctrl)
@@ -95,7 +95,7 @@ class Control(cdrcgi.Control):
         self.logger.info("Replaced %r", doc_id)
         return "Updated schema %s (%r)." % (doc_id, self.filename)
     def read_file(self, name):
-        if name not in self.fields.keys():
+        if name not in list(self.fields.keys()):
             return None
         f = self.fields[name]
         self.filename = os.path.basename(f.filename)

@@ -403,17 +403,17 @@ class Summary:
         if not change_type:
             rows[0].append(changes[0].type)
         if self.control.comments:
-            rows[0].append(u" / ".join(changes[0].comments))
+            rows[0].append(" / ".join(changes[0].comments))
         for change in changes[1:]:
             row = [change.date]
             if not change_type:
                 row.append(change.type)
             if self.control.comments:
-                row.append(u" / ".join(change.comments))
+                row.append(" / ".join(change.comments))
             rows.append(row)
         return rows
     def format_title(self):
-        return u"%s (%d)" % (self.title, self.doc_id)
+        return "%s (%d)" % (self.title, self.doc_id)
     def get_single_row(self):
         change_types = dict([(ct, None) for ct in self.control.change_types])
         for change in self.changes:
@@ -434,7 +434,7 @@ class Summary:
                 nchanges += 1
             row.append(change and change.date or "")
             if self.control.comments:
-                row.append(change and u" / ".join(change.comments) or "")
+                row.append(change and " / ".join(change.comments) or "")
         if nchanges > 0:
             return [row]
         return []
@@ -502,23 +502,20 @@ class Summary:
 
             return "[%s %s]" % (self.type, self.date)
 
-        def __cmp__(self, other):
+        def __lt__(self, other):
             """
             Support sorting of the change events.
 
             Change request 2017-01-27 to reverse the date sort.
             """
 
-            diff = cmp(other.date, self.date)
-            if diff:
-                return diff
-            return cmp(self.type, other.type)
+            return (other.date, self.type) < (self.date, other.type)
 
-    def __cmp__(self, other):
+    def __lt__(self, other):
         """
         Support sorting the summaries by title.
         """
 
-        return cmp(self.key, other.key)
+        return self.key < other.key
 
 Control().run()

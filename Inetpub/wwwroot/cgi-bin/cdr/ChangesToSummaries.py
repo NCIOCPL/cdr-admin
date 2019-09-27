@@ -9,6 +9,8 @@ import cgi
 import cdrcgi
 import re
 import lxml.etree as etree
+import lxml.html
+from sys import stdout
 
 class Control(cdrcgi.Control):
     AUDIENCES = ("Health Professionals", "Patients")
@@ -80,9 +82,10 @@ class Control(cdrcgi.Control):
         for board in boards:
             board.show(body)
         page = B.HTML(head, body)
-        print("Content-type: text/html\n")
-        print(etree.tostring(page, method="html", pretty_print=True,
-                             doctype=self.DOCTYPE, encoding="utf-8"))
+        stdout.buffer.write(b"Content-type: text/html; charset=utf-8\n\n")
+        html = lxml.html.tostring(page, pretty_print=True, encoding="unicode")
+        stdout.buffer.write(html.encode("utf-8"))
+
     def get_boards(self):
         "Fetch IDs and names of the PDQ editorial boards (for piclist)"
         n_path = "/Organization/OrganizationNameInformation/OfficialName/Name"
@@ -93,7 +96,7 @@ class Control(cdrcgi.Control):
         query.where(query.Condition("t.path", t_path))
         query.where(query.Condition("t.value", "PDQ Editorial Board"))
         query.order("n.value")
-        return query.execute(self.cursor).fetchall()
+        return [tuple(row) for row in query.execute(self.cursor).fetchall()]
 
     @staticmethod
     def get_common_css():
@@ -130,7 +133,7 @@ class Control(cdrcgi.Control):
 </xsl:transform>
 """
         response = cdr.filterDoc('guest', script, doc="<dummy/>", inline=True)
-        if isinstance(response, basestring):
+        if isinstance(response, (str, bytes)):
             cdrcgi.bail("Failure loading common CSS style information: %s" %
                         response)
         return response[0]
@@ -179,7 +182,7 @@ class Summary:
         self.changes = None
         query = db.Query("document", "title")
         query.where(query.Condition("id", doc_id))
-        rows = query.execute(control.cursor).fetchall()
+        rows = [tuple(row) for row in query.execute(control.cursor).fetchall()]
         self.title = rows[0][0].split(";")[0]
         query = db.Query("publishable_version", "num").order("num DESC")
         query.where(query.Condition("id", doc_id))
@@ -205,7 +208,7 @@ class Summary:
                     date = "%s/%s/%s" % (date[5:7], date[8:10], date[:4])
                     filt = ["name:Summary Changes Report"]
                     resp = cdr.filterDoc(control.session, filt, doc=xml)
-                    if isinstance(resp, basestring):
+                    if isinstance(resp, (str, bytes)):
                         error = "Failure parsing CDR%d V%d" % (doc_id, version)
                         raise Exception(error)
                     html = resp[0].replace("@@PubVerDate@@", date).strip()
@@ -222,9 +225,9 @@ class Summary:
         page.append(B.H2(self.title, doc_id, B.CLASS("summary")))
         page.append(self.changes)
 
-    def __cmp__(self, other):
+    def __lt__(self, other):
         "Support intelligent sorting of the summaries"
-        return cmp(self.title, other.title)
+        return self.title < other.title
 
 if __name__ == "__main__":
     "Allow documentation and lint tools to import without side effects"

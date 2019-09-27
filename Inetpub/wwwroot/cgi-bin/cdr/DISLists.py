@@ -34,7 +34,7 @@ def summaryTableRow(id, summary, addCdrID='Y', addBlank='N'):
     # Start the table row
     # -------------------
     html = """\
-   <TR>"""
+   <tr>"""
 
     # Setting the class and column headers for table display
     # ------------------------------------------------------
@@ -48,28 +48,28 @@ def summaryTableRow(id, summary, addCdrID='Y', addBlank='N'):
     # --------------------------------
     if addCdrID == 'Y':
         html += """
-    <TD class="report cdrid %s" width="8%%">%s</TD>""" % (showGrid, id)
+    <td class="report cdrid %s" width="8%%">%s</td>""" % (showGrid, id)
 
     # Display the Summary title
     # -------------------------
     html += """
-    <TD class="report %s">%s""" % (showGrid, summary)
+    <td class="report %s">%s""" % (showGrid, summary)
 
     # End the summaries cell
     # ----------------------
     html += """
-    </TD>"""
+    </td>"""
 
     # Add and extra blank column
     # --------------------------
     if addBlank == 'Y':
         html += """
-    <TD class="report %s" width="50%%">&nbsp;</TD>""" % showGrid
+    <td class="report %s" width="50%%">&nbsp;</td>""" % showGrid
 
     # End the table row
     # -----------------
     html += """
-   </TR>
+   </tr>
 """
     return html
 
@@ -80,48 +80,12 @@ def summaryTableRow(id, summary, addCdrID='Y', addBlank='N'):
 # ---------------------------------------------------
 def disHeader(listHeader, disCount):
     """Return the HTML code to display the Summary Board Header"""
-    html = u"""\
-  <SPAN class="sectionHdr">%s (%d)</SPAN>
-  <TABLE width = "100%%">
+    html = """\
+  <span class="sectionHdr">%s (%d)</span>
+  <table width = "100%%">
 """ % (listHeader, disCount)
     return html
 
-
-## ---------------------------------------------------
-##
-## ---------------------------------------------------
-#def drugHeaderWithID(listHeader, type):
-#    """Return the HTML code to display the Summary Board Header with ID"""
-#    html = u"""\
-#  <SPAN class="sectionHdr">%s (%d)</SPAN>
-#""" % (listHeader, combiCount[type])
-#    return html
-#
-#
-## ------------------------------------------------
-## Create the table row for the English list output
-## ------------------------------------------------
-#def summaryRow(summary):
-#    """Return the HTML code to display a Summary row"""
-#    html = u"""\
-#   <LI class="report">%s</LI>
-#""" % (row[1])
-#    return html
-#
-##
-## -------------------------------------------------
-## Create the table row for the English table output
-## -------------------------------------------------
-#def summaryRowWithID(id, summary):
-#    """Return the HTML code to display a Summary row with ID"""
-#    html = u"""\
-#   <TR>
-#    <TD class="report cdrid" width = "8%%">%s</TD>
-#    <TD class="report">%s</TD>
-#   </TR>
-#""" % (id, summary)
-#    return html
-#
 
 # =====================================================================
 # Main starts here
@@ -162,13 +126,13 @@ if not drugType:
                             cdrcgi.MAINMENU),
                            numBreaks = 1,
                            stylesheet = """
-   <STYLE type="text/css">
-    TD      { font-size:  12pt; }
-    LI.none { list-style-type: none }
-    DL      { margin-left: 0; padding-left: 0 }
-   </STYLE>
+   <style type="text/css">
+    td      { font-size:  12pt; }
+    li.none { list-style-type: none }
+    dl      { margin-left: 0; padding-left: 0 }
+   </style>
 """)
-    form   = u"""\
+    form   = """\
    <input type='hidden' name='%s' value='%s'>
 
    <fieldset>
@@ -263,12 +227,12 @@ for row in rows:
 # Create the results page.
 #----------------------------------------------------------------------
 header    = cdrcgi.rptHeader(title, stylesheet = """\
-   <STYLE type="text/css">
-    UL             { margin-left:    0;
+   <style type="text/css">
+    ul             { margin-left:    0;
                      padding-left:   0;
                      margin-top:    10px;
                      margin-bottom: 30px; }
-    TABLE          { border-collapse:collapse;
+    table          { border-collapse:collapse;
                      margin-top:    10px;
                      margin-bottom: 30px; }
 
@@ -282,21 +246,21 @@ header    = cdrcgi.rptHeader(title, stylesheet = """\
     *.blankCol     { empty-cells: show;
                      border: 1px solid black; }
     *.cdrid        { text-align: right }
-    LI             { list-style-type: none }
+    li             { list-style-type: none }
     li.report      { font-size: 11pt;
                      font-weight: normal; }
     div.es          { height: 10px; }
-   </STYLE>
+   </style>
 """)
 
 # -------------------------
 # Display the Report Title
 # -------------------------
-report    = u"""\
-   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-  <H3>Drug Information Summaries<br>
+report    = """\
+   <input type='hidden' name='%s' value='%s'>
+  <h3>Drug Information Summaries<br>
   <span class="date">(%s)</span>
-  </H3>
+  </h3>
 """ % (cdrcgi.SESSION, session, dateString)
 
 # -------------------------------------------------------------------
@@ -314,18 +278,18 @@ reportD = disHeader('Combination Drug', combiCount['Combi'])
 if showTable == 'Y':
     if showId == 'Y':
         showHeader = """\
-   <TR>
-    <TH class="report blankCol">CDR-ID</TH>
-    <TH class="report blankCol">Title</TH>
-    <TH class="report blankCol"> </TH>
-   </TR>
+   <tr>
+    <th class="report blankCol">CDR-ID</th>
+    <th class="report blankCol">Title</th>
+    <th class="report blankCol"> </th>
+   </tr>
 """
     else:
         showHeader = """\
-   <TR>
-    <TH class="report blankCol">Title</TH>
-    <TH class="report blankCol"> </TH>
-   </TR>
+   <tr>
+    <th class="report blankCol">Title</th>
+    <th class="report blankCol"> </th>
+   </tr>
 """
     reportS += showHeader
     reportD += showHeader
@@ -345,10 +309,10 @@ for row in rows:
         reportD += summaryTableRow(row[0], row[1], addCdrID=showId,
                                   addBlank=showTable)
 reportS += """
-  </TABLE>
+  </table>
 """
 reportD += """
-  </TABLE>
+  </table>
 """
 
 # Decide which of the two individual reports should be printed
@@ -358,9 +322,9 @@ if drugType == 'All' or drugType == 'Single':
 if drugType == 'All' or drugType == 'Combi':
     report += reportD
 
-footer = u"""\
- </BODY>
-</HTML>
+footer = """\
+ </body>
+</html>
 """
 
 # Send the page back to the browser.

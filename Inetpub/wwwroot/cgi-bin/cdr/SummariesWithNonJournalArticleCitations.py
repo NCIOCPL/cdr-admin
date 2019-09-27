@@ -2,6 +2,7 @@
 # Report on summaries with citations to publications other than journal
 # articles.
 #----------------------------------------------------------------------
+from operator import itemgetter
 import cdr
 import cdrcgi
 import cgi
@@ -64,7 +65,7 @@ def get_citation_types(cursor):
     query.where(C("value", "Proceeding%", "NOT LIKE"))
     query.where(C("value", "Journal%", "NOT LIKE"))
     query.order("value")
-    return [row[0] for row in query.execute(cursor).fetchall()]
+    return [row[0] for row in query.execute(cursor).fetchall() if row[0]]
 
 #----------------------------------------------------------------------
 # Get the list of editorial boards for one of the languages.  Called
@@ -251,7 +252,7 @@ class Citation:
                 for node in tree.iter("ExternalRef"):
                     self.web_site = node.get("{cips.nci.nih.gov/cdr}xref")
             response = cdr.filterDoc(session, Citation.filters, docId=doc_id)
-            if isinstance(response, basestring):
+            if isinstance(response, (str, bytes)):
                 debug_log("failure filtering citation %s: %s" %
                           (doc_id, repr(response)))
                 cdrcgi.bail("failure filtering citation CDR%s: %s" %
@@ -354,9 +355,11 @@ rows = []
 for summary in summaries:
     for citation in summary.citations:
         pub_info = cdrcgi.Report.Cell(citation, callback=pub_info_cell)
-        row = (summary.doc_id, summary.title, citation.section_title,
-               citation.info.type, citation.doc_id, citation.info.title,
-               pub_info)
+        row = (summary.doc_id, summary.title or "",
+               citation.section_title or "",
+               citation.info.type or "", citation.doc_id,
+               citation.info.title or "",
+               pub_info or "")
         rows.append(row)
 debug_log("%d rows" % len(rows))
 table = cdrcgi.Report.Table(cols, sorted(rows))

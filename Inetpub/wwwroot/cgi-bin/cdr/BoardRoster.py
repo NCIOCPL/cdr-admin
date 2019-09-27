@@ -690,8 +690,8 @@ for boardMember in boardMembers:
                                      ['subgroup',  subgroup],
                                      ['eic',
                                       boardMember.isEic and 'Yes' or 'No']])
-    if isinstance(response, basestring):
-        cdrcgi.bail("%s: %s" % (boardMember.id, repr(response)))
+    if isinstance(response, (str, bytes)):
+        cdrcgi.bail("%s: %r" % (boardMember.id, response))
 
     # If we run the full report we just attach the resulting HTML
     # snippets to the previous output.
@@ -703,12 +703,13 @@ for boardMember in boardMembers:
     # MS-Word.
     # -----------------------------------------------------------
     if flavor == 'full':
-        html += u"""
+        cell_value = response[0]
+        html += """
         <table width='100%%'>
          <tr>
           <td>%s<td>
          </tr>
-        </table>""" % unicode(response[0], 'utf-8')
+        </table>""" % cell_value
     else:
         boardMember.parse(response[0])
 
@@ -733,7 +734,7 @@ if flavor == 'summary':
 if flavor == 'full':
     boardManagerInfo = getBoardManagerInfo(boardId)
 
-    html += u"""
+    html += """
       <br>
       <table width='100%%'>
        <tr>

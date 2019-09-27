@@ -2,7 +2,8 @@
 # Generates report on mailers for which reponses have been recorded
 # during a specified date range.
 #----------------------------------------------------------------------
-import cdrcgi, cgi, time
+import cdrcgi, cgi
+import datetime
 from cdrapi import db
 
 #----------------------------------------------------------------------
@@ -20,7 +21,7 @@ script     = "MailerCheckinReport.py"
 title      = "CDR Administration"
 section    = "Mailer Checkin"
 header     = cdrcgi.header(title, title, section, script, buttons)
-now        = time.localtime(time.time())
+today      = datetime.date.today()
 
 #----------------------------------------------------------------------
 # Make sure we're logged in.
@@ -79,14 +80,10 @@ if mailerType: cdrcgi.valParmVal(mailerType, valList=getMailerTypes())
 # If we don't have a request, put up the request form.
 #----------------------------------------------------------------------
 if not fromDate or not toDate:
-    toDate      = time.strftime("%Y-%m-%d", now)
-    then        = list(now)
-    then[1]    -= 1
-    then[2]    += 1
-    then        = time.localtime(time.mktime(then))
-    fromDate    = time.strftime("%Y-%m-%d", then)
+    toDate      = str(today)
+    fromDate    = str(today - datetime.timedelta(7))
     mailerTypes = getMailerTypes()
-    form = u"""\
+    form = """\
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
    <TABLE BORDER='0'>
     <TR>
@@ -96,10 +93,10 @@ if not fromDate or not toDate:
       <OPTION VALUE='' SELECTED>All Types</OPTION>
 """ % (cdrcgi.SESSION, session)
     for mailerType in mailerTypes:
-        form += u"""\
+        form += """\
       <OPTION VALUE='%s'>%s &nbsp;</OPTION>
 """ % (mailerType, mailerType)
-    form += u"""\
+    form += """\
     </TR>
     <TR>
      <TD><B>Start Date:&nbsp;</B></TD>
@@ -122,7 +119,7 @@ if not fromDate or not toDate:
 #----------------------------------------------------------------------
 headerMailerType = mailerType and ("%s Mailers" % mailerType) or \
                                    "All Mailer Types"
-html = u"""\
+html = """\
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>
  <head>
@@ -140,12 +137,13 @@ html = u"""\
  <body>
   <h2>Mailer Responses Checked In<br>From %s to %s</h2>
   <br />
-""" % (headerMailerType, time.strftime("%m/%d/%Y", now), fromDate, toDate)
+""" % (headerMailerType, today, fromDate, toDate)
 
 #----------------------------------------------------------------------
 # Extract the information from the database.
 #----------------------------------------------------------------------
 try:
+    toDate += " 23:59:59"
     typeQual = mailerType and ("AND t.value = '%s'" % mailerType) or ""
     cursor.execute("""\
             SELECT t.value,
@@ -180,14 +178,14 @@ try:
     lastMailerType = None
     row            = cursor.fetchone()
     if not row:
-        cdrcgi.sendPage(html + u"""\
+        cdrcgi.sendPage(html + """\
   <b>
    <font size='3'>No matching checkins found.</font>
   </b>
  </body>
 </html>
 """)
-    html += u"""\
+    html += """\
   <table border='1' cellspacing='0' cellpadding='2' width='100%%'>
    <tr>
     <th nowrap='1'>Mailer Type</th>
@@ -202,7 +200,7 @@ try:
             mailerTypeLabel = mailerType
             if lastMailerType:
                 total = totals.get(lastMailerType, 0)
-                html += u"""\
+                html += """\
    <tr>
     <th class='r'>Total</td>
     <td>&nbsp;</td>
@@ -213,7 +211,7 @@ try:
    </tr>
 """ % total
             lastMailerType = mailerType
-        html += u"""\
+        html += """\
    <tr>
     <th>%s</td>
     <td>%s</td>
@@ -227,7 +225,7 @@ except Exception as e:
 
 if lastMailerType:
     total = totals.get(lastMailerType, 0)
-    html += u"""\
+    html += """\
    <tr>
     <th class='r'>Total</td>
     <td>&nbsp;</td>
@@ -235,7 +233,7 @@ if lastMailerType:
    </tr>
 """ % total
 
-cdrcgi.sendPage(html + u"""\
+cdrcgi.sendPage(html + """\
   </table>
  </body>
 </html>

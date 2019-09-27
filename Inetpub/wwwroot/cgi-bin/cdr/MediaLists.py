@@ -49,12 +49,12 @@ query = db.Query("query_term t", "t.doc_id", "t.value").order(2).unique()
 query.join("query_term m", "m.int_val = t.doc_id")
 query.where("t.path = '/Term/PreferredName'")
 query.where("m.path = '/Media/MediaContent/Diagnoses/Diagnosis/@cdr:ref'")
-results = query.execute(cursor).fetchall()
+results = [tuple(row) for row in query.execute(cursor).fetchall()]
 diagnoses = [("any", "Any Diagnosis")] + results
 query = db.Query("query_term", "value", "value").order(1).unique()
 query.where("path = '/Media/MediaContent/Categories/Category'")
 query.where("value <> ''")
-results = query.execute(cursor).fetchall()
+results = [tuple(row) for row in query.execute(cursor).fetchall()]
 categories = [("any", "Any Category")] + results
 
 #----------------------------------------------------------------------
@@ -109,7 +109,7 @@ if diagnosis and "any" not in diagnosis:
     diag_query.where("path = '/Term/PreferredName'")
     diag_query.where(query.Condition("doc_id", diagnosis, "IN"))
     diagnosis_names = [row[0] for row in diag_query.execute().fetchall()]
-    diagnosis_names = u", ".join(diagnosis_names)
+    diagnosis_names = ", ".join(diagnosis_names)
 else:
     diagnosis_names = "Any Diagnosis"
 
@@ -117,7 +117,7 @@ else:
 # Submit the query to the database.
 #----------------------------------------------------------------------
 try:
-    rows = query.execute(cursor).fetchall()
+    rows = [tuple(row) for row in query.execute(cursor).fetchall()]
 except Exception as e:
     cdrcgi.bail('Failure retrieving Media documents: %s' % e)
 if not rows:

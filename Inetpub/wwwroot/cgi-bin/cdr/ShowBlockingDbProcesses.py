@@ -46,7 +46,7 @@ class Process:
     # Convert the object to a human-readable string representation.
     #------------------------------------------------------------------
     def toHtml(self):
-        return u"""\
+        return """\
    <tr>
     <td>%s</td>
     <td>%s</td>
@@ -72,6 +72,7 @@ class Process:
     <td>%s</td>
     <td>%s</td>
     <td>%s</td>
+   </tr>
 """ % (fix(self.spid), fix(self.blockedBy),
        fix(self.waitTime), fix(self.lastWaitType),
        fix(self.waitResource), fix(self.cpu), fix(self.physicalIO),
@@ -83,10 +84,12 @@ class Process:
        fix(self.ecid), fix(self.openTrans), fix(self.status))
 
 def fix(me):
-    if type(me) in (unicode, str):
+    if isinstance(me, bytes):
+        me = str(me, "utf-8")
+    if isinstance(me, str):
         me = me.strip().replace('\0', '')
         if not me:
-            return u"&nbsp;"
+            return "&nbsp;"
     return me
 
 #----------------------------------------------------------------------
@@ -108,7 +111,7 @@ def report(conn, cursor):
           WHERE blocked <> 0
              OR spid IN (SELECT blocked FROM master..sysprocesses)""")
     rows = cursor.fetchall()
-    html = [u"""\
+    html = ["""\
 <html>
  <head>
   <title>SQL Server Process Blocks (%s)</title>
@@ -122,11 +125,11 @@ def report(conn, cursor):
   <h1>SQL Server Process Blocks (%s)</h1>
 """ % (now, now)]
     if False and not rows:
-        html.append(u"""\
+        html.append("""\
   <h2>No blocks to report</h2>
 """)
     else:
-        html.append(u"""\
+        html.append("""\
   <table border='1' cellpadding='2' cellspacing='0'>
    <tr>
     <th>SPID</th>
@@ -158,14 +161,14 @@ def report(conn, cursor):
         for row in rows:
             process = Process(row)
             html.append(process.toHtml())
-        html.append(u"""\
+        html.append("""\
   </table>
 """)
-    html.append(u"""\
+    html.append("""\
  </body>
 </html>
 """)
-    html = u"".join(html)
+    html = "".join(html)
     cdrcgi.sendPage(html)
 if __name__ == "__main__":
     report(conn, cursor)

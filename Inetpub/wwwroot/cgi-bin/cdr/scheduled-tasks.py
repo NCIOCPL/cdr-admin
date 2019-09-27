@@ -10,9 +10,10 @@ import time
 from html import escape as html_escape
 
 REPORT = "d:/cdr/Reports/schtasks.xml"
+ORDINAL = lambda n: "%d%s" % (n,"tsnrhtdd"[(n/10%10!=1)*(n%10<4)*n%10::4])
 
 def serialize(node):
-    string = etree.tostring(node)
+    string = etree.tostring(node, encoding="unicode")
     return string.replace("\r", "").replace("\n\n", "\n")
 
 def local(node):
@@ -79,7 +80,7 @@ class ScheduleByWeek:
             if len(self.days) == 7:
                 return "every day"
             return "every %s" % days
-        return "every %s %s" (ordinal(self.interval), days)
+        return "every %s %s" (ORDINAL(self.interval), days)
 
 class ScheduleByMonth:
     path = "%s/%s" % (TAG.DaysOfMonth, TAG.Day)
@@ -88,7 +89,7 @@ class ScheduleByMonth:
         self.days = [int(d.text) for d in node.findall(self.path)]
         self.months = [local(c) for c in node.findall(TAG.Months + "/*")]
     def __str__(self):
-        days = ",".join([ordinal(d) for d in self.days])
+        days = ",".join([ORDINAL(d) for d in self.days])
         months = ",".join(self.months)
         if len(self.months) == 12 or not self.months:
             months = "every month"
@@ -106,7 +107,7 @@ class ScheduleByDay:
             return "every day"
         if self.interval == 2:
             return "every other day"
-        return "every %s day" % ordinal(self.interval)
+        return "every %s day" % ORDINAL(self.interval)
 
 class Email:
     def __init__(self, node):
@@ -224,25 +225,21 @@ Runs %s
 """ % (self.name, self.enabled() and "enabled" or "disabled",
        description, triggers, "".join(actions), line)
 
-ordinal = lambda n: "%d%s" % (n,"tsnrhtdd"[(n/10%10!=1)*(n%10<4)*n%10::4])
-
 tags = set()
 limits = set()
 stat = os.stat(REPORT)
 when = time.asctime(time.localtime(stat.st_mtime))
 doc = open(REPORT).read()
-#doc = open("schtasks.xml").read()
-#doc = re.search("<Tasks>.*</Tasks>", msg, re.DOTALL).group(0)
 tree = etree.XML(doc) #re.sub("<\\?xml[^>]*>\\s*", "", doc))
 name = None
 tasks = []
 for node in tree:
-    if isinstance(node.tag, basestring):
+    if isinstance(node.tag, str):
         tasks.append(Task(node, name))
     else:
         name = node.text.strip()[1:]
 if Task.HTML:
-    print("""\
+    print(f"""\
 Content-type: text/html
 
 <!DOCTYPE html>
@@ -250,15 +247,15 @@ Content-type: text/html
  <head>
   <title>CDR Scheduled Tasks</title>
   <style>
-h1 { color: maroon; font-size: 14pt; }
-div { border: solid 1px black; color: green; margin: 10px; padding: 5px;
-padding-top: 15px; }
-.disabled { color: red; }
-* { font-family: Arial, sans-serif; }
+h1 {{ color: maroon; font-size: 14pt; }}
+div {{ border: solid 1px black; color: green; margin: 10px; padding: 5px;
+padding-top: 15px; }}
+.disabled {{ color: red; }}
+* {{ font-family: Arial, sans-serif; }}
   </style>
  </head>
  <body>
-  <h1>CDR Scheduled Tasks as of %s</h1>""" % when)
+  <h1>CDR Scheduled Tasks as of {when}</h1>""")
 else:
     print("Content-type: text/plain\n")
 for task in tasks:

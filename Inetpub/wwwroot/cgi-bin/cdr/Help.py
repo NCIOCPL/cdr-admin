@@ -52,5 +52,4 @@ except Exception as e:
 #----------------------------------------------------------------------
 # Send the page back to the browser after converting to Unicode.
 #----------------------------------------------------------------------
-page = response[0].decode('utf-8')
-cdrcgi.sendPage(page)
+cdrcgi.sendPage(response[0])

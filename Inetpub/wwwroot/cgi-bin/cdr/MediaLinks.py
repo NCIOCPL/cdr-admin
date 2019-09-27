@@ -15,7 +15,7 @@ from html import escape as html_escape
 fields   = cgi.FieldStorage()
 session  = cdrcgi.getSession(fields)
 request  = cdrcgi.getRequest(fields)
-docTypes = fields and fields.getvalue('DocType')  or None
+docTypes = fields and fields.getlist('DocType')  or None
 SUBMENU  = "Report Menu"
 buttons  = ["Submit Request", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 script   = "MediaLinks.py"
@@ -120,13 +120,6 @@ html = ["""\
   <br>
   <table>
 """ % now]
-
-# ---------------------------------------------------------------------
-# If the user picked only one summary, put it into a list to we
-# can deal with the same object.
-# ---------------------------------------------------------------------
-if isinstance(docTypes, basestring):
-    docTypes = [docTypes]
 
 # Run the database query individually for each document type
 # ----------------------------------------------------------

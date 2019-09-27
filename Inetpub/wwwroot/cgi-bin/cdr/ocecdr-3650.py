@@ -51,7 +51,7 @@ except Exception as e:
 if not docId:
     header = cdrcgi.header(title, title, instr, script,
                            ("Submit", SUBMENU, cdrcgi.MAINMENU))
-    form = u"""\
+    form = """\
    <style>* { font-family: Arial; }</style>
    <input type='hidden' name='%s' value='%s'>
    <fieldset>
@@ -100,7 +100,7 @@ class SummarySection:
         self.title = self.parent = None
         for child in node:
             if child.tag == "Title":
-                self.title = u"".join([t for t in child.itertext()])
+                self.title = "".join([t for t in child.itertext()])
                 break
         return
         parent = node.getparent()
@@ -118,7 +118,7 @@ class Target:
         self.elem = top.xpath("//*[@cdr:id='%s']" % fragId,
                               namespaces={"cdr": "cips.nci.nih.gov/cdr"})[0]
         self.section = None
-        #self.text = u"".join([t for t in self.elem.itertext()])[:200]
+        #self.text = "".join([t for t in self.elem.itertext()])[:200]
         e = self.elem
         while e is not None:
             if e.tag == "SummarySection":

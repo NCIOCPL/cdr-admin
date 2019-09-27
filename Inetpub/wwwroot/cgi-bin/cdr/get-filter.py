@@ -7,6 +7,7 @@ Used for comparing filters across tiers
 """
 
 import cgi
+from sys import stdout
 import cdr
 from cdrapi import db
 
@@ -26,7 +27,7 @@ except:
     print("Status: 500 CDR database unavailable\n")
     exit(0)
 if not len(rows):
-    print("Status: 400 filter not found\n")
+    print("Status: 404 filter not found\n")
 elif len(rows) > 1:
     print("Status: 400 ambiguous title\n")
 else:
@@ -34,4 +35,4 @@ else:
     if doctype.lower() != "filter":
         print("Status: 400 not a filter document\n")
     else:
-        print(("Content-type: text/xml\n\n" + xml.encode("utf-8")))
+        stdout.buffer.write(f"Content-type: text/xml\n\n{xml}".encode("utf-8"))

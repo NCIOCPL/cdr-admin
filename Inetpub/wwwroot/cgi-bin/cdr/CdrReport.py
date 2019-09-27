@@ -40,7 +40,7 @@ class Control(cdrcgi.Control):
         report = etree.tostring(report, encoding="utf-8")
         filters = ['name:Inactivity Report Filter']
         html = cdr.filterDoc(self.session, filters, doc=report)[0]
-        html = html.replace("@@DAYS@@", str(self.days)).decode("utf-8")
+        html = html.replace("@@DAYS@@", str(self.days))
         cdrcgi.sendPage(html)
 
 if __name__ == "__main__":

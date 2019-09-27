@@ -70,7 +70,7 @@ if newName:
     if len(newName) > 80:
         cdrcgi.bail("Set name cannot exceed 80 characters")
     try:
-        newName.decode("ascii")
+        newName.encode("ascii")
     except:
         cdrcgi.bail("Set name must contain ASCII characters only")
 if setName and setName not in set([s.name for s in filterSets]):
@@ -101,50 +101,50 @@ elif request == SUBMENU:
 # Get the CDR filters and wrap them in <option> elements.
 #----------------------------------------------------------------------
 def getFilters():
-    html = u""
+    html = ""
     filters = cdr.getFilters('guest')
     for filter in filters:
         if len(filter.name) and filter.name[0] != '[':
             id   = int(re.sub(r'[^\d]', '', filter.id))
             name = html_escape(filter.name[:60])
-            html += u"<option value='%d'>%s</option>\n" % (id, name)
+            html += "<option value='%d'>%s</option>\n" % (id, name)
     for filter in filters:
         if len(filter.name) and filter.name[0] == '[':
             id   = int(re.sub(r'[^\d]', '', filter.id))
             name = html_escape(filter.name[:60])
-            html += u"<option value='%d'>%s</option>\n" % (id, name)
+            html += "<option value='%d'>%s</option>\n" % (id, name)
     return html
 
 #----------------------------------------------------------------------
 # Get the CDR filter sets and wrap them in <option> elements.
 #----------------------------------------------------------------------
 def getFilterSets():
-    html = u""
+    html = ""
     for filterSet in filterSets:
         id   = filterSet.id
         name = html_escape(filterSet.name[:60])
-        html += u"<option value='%d'>%s</option>\n" % (id, name)
+        html += "<option value='%d'>%s</option>\n" % (id, name)
     return html
 
 #----------------------------------------------------------------------
 # Create the initial <option/> elements for the set's members.
 #----------------------------------------------------------------------
 def getSetMemberHtml(members = None):
-    html = u""
+    html = ""
     if not members:
-        html = u"<option value='0'>%s</option>" % html_escape(noMembers, 1)
+        html = "<option value='0'>%s</option>" % html_escape(noMembers, 1)
     else:
         for member in members:
             id = member.id
             name = html_escape(member.name)
             if type(id) == type(9):
-                name = u"[S]%s" % name
-                value = u"S%d" % id
+                name = "[S]%s" % name
+                value = "S%d" % id
             else:
-                name = u"[F]%s" % name
+                name = "[F]%s" % name
                 id = int(re.sub(r'[^\d]', '', id))
-                value = u"F%d" % id
-            html += u'<option value="%s">%s</option>\n' % (value, name)
+                value = "F%d" % id
+            html += '<option value="%s">%s</option>\n' % (value, name)
     return html
 
 #----------------------------------------------------------------------
@@ -170,14 +170,14 @@ def makeDelFunction():
     except Exception as e:
         cdrcgi.bail("Database failure finding nested memberships: %s" % e)
     if rows:
-        body = u"""\
+        body = """\
         alert("Filter set cannot be deleted; it is used as a member of:"""
         for row in rows:
             body += '\\n"\n            + "%s' % row[0]
         return body + '");\n';
     else:
         # Strip quote marks from around setName.
-        return u"""\
+        return """\
         response = confirm("Are you sure you want to delete %s?");
         if (response) {
             var frm = document.forms[0];
@@ -190,12 +190,12 @@ def makeDelFunction():
 # Display the CDR document form.
 #----------------------------------------------------------------------
 def showForm(isNew, members = None):
-    html = u"""\
-<!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
+    html = """\
+<!DOCTYPE html>
 <html>
  <head>
   <title>Edit CDR Filter Set</title>
-  <meta http-equiv="Content-type" content="text/html;charset=utf-8" />
+  <meta html;charset=utf-8" />
   <basefont face='Arial, Helvetica, sans-serif'>
   <link rel='stylesheet' href='/stylesheets/dataform.css'>
   <script language='JavaScript'>
@@ -445,10 +445,10 @@ if doWhat == 'Delete':
         cdrcgi.bail("Action not permitted for this account.")
     try:
         cdr.delFilterSet(session, cdr.toUnicode(setName))
-    except StandardError as args:
+    except Exception as args:
         cdrcgi.bail("Failure deleting filter set")
     except UnicodeDecodeError as args:
-        cdrcgi.bail(u"Unicode decode error deleting filter set")
+        cdrcgi.bail("Unicode decode error deleting filter set")
     except:
         cdrcgi.bail("Unknown failure deleting filter set")
     cdrcgi.navigateTo("EditFilterSets.py", session)
@@ -471,10 +471,10 @@ if doWhat == 'Save':
         newSet = cdr.FilterSet(newName, setDesc, setNotes, setMemberList)
         try:
             cdr.addFilterSet(session, newSet)
-        except StandardError as args:
+        except Exception as args:
             cdrcgi.bail("Failure adding new filter set")
         except UnicodeDecodeError as args:
-            cdrcgi.bail(u"Unicode decode error saving new filter set")
+            cdrcgi.bail("Unicode decode error saving new filter set")
         except:
             cdrcgi.bail("Unknown failure adding new filter set")
         setName = newName
@@ -484,10 +484,10 @@ if doWhat == 'Save':
         oldSet = cdr.FilterSet(setName, setDesc, setNotes, setMemberList)
         try:
             cdr.repFilterSet(session, oldSet)
-        except StandardError as args:
-            cdrcgi.bail(u"Failure storing changes to filter set")
+        except Exception as args:
+            cdrcgi.bail("Failure storing changes to filter set")
         except UnicodeDecodeError as args:
-            cdrcgi.bail(u"Unicode decode error updating filter set")
+            cdrcgi.bail("Unicode decode error updating filter set")
         except:
             cdrcgi.bail("Unknown failure storing changes to filter set")
 

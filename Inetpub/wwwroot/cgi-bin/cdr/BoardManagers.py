@@ -24,7 +24,7 @@
 import cdr
 import cdrcgi
 import cgi
-from cdrapi import Session
+from cdrapi.users import Session
 
 class Control:
     TITLE = "CDR Administration"
@@ -109,7 +109,7 @@ class Control:
         page.add(page.B.H3("Mailers"))
         page.add("<ol>")
         page.add_menu_link("BoardMemberMailerReqForm.py",
-                           u"PDQ\xAE Board Member Correspondence Mailers",
+                           "PDQ\xAE Board Member Correspondence Mailers",
                            self.session)
         page.add_menu_link("SummaryMailerReport.py",
                            "Summary Mailer History Report", self.session,

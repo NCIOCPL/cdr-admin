@@ -76,10 +76,10 @@ try:
         terms[id] = Term(name,id,top)
         if parent:
             terms[id].parents[parent] = 1
-    for key in terms.keys():
+    for key in terms:
         term = terms[key]
         if term.parents:
-            for parentKey in term.parents.keys():
+            for parentKey in term.parents:
                 terms[parentKey].children[key] = 1
 
     # Get all the terms including the top level terms off the root.
@@ -105,7 +105,7 @@ try:
     #indexTerms = {}
     for row in cursor.fetchall():
         typeId, termId, name = row
-        if not terms.has_key(termId):
+        if termId not in terms:
             terms[termId] = Term(name,termId, 0)
 
     # Get all the parent/child relationships
@@ -122,7 +122,7 @@ try:
                     AND d.active_status = 'A'""")
     for row in cursor.fetchall():
         termId, parentId = row
-        if terms.has_key(parentId):
+        if parentId in terms:
             terms[parentId].children[termId] = 1
             terms[termId].parents[parentId] = 1
 
@@ -141,9 +141,6 @@ except:
     raise
     cdrcgi.bail("Database failure reading terminology information")
 
-def sorter(a, b):
-    return cmp(terms[a].uname, terms[b].uname)
-
 def addTerm(t):
     classname = 't'
     if t.top:
@@ -155,14 +152,10 @@ def addTerm(t):
     if t.children or (t.aliases and IncludeAlternateNames == "True"):
         html += "<ul>\n"
         if t.aliases and IncludeAlternateNames == "True":
-            keys = t.aliases.keys()
-            keys.sort()
-            for key in keys:
+            for key in sorted(t.aliases):
                 html += "<li class = 'a'>x %s</li>\n" % html_escape(key)
         if t.children:
-            keys = t.children.keys()
-            keys.sort(sorter)
-            for key in keys:
+            for key in sorted(t.children, key=lambda k: terms[k].uname):
                 html += addTerm(terms[key])
         html += "</ul>\n"
 

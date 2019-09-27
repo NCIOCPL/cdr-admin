@@ -79,7 +79,7 @@ class Control(cdrcgi.Control):
 
         # Collect all the multiply-occurring blocks' field values
         value_sets = {}
-        for key in self.fields.keys():
+        for key in self.fields:
             if "-" in key:
                 name, number = key.split("-", 1)
                 if number.isdigit():
@@ -271,13 +271,14 @@ fieldset.errors li { color: red; font-weight: bold; }
         wrapper = form.B.DIV(id="target-block")
         doctypes = list(self.doctypes)
         for t in self.SKIP:
-            doctypes.remove(t)
+            if t in doctypes:
+                doctypes.remove(t)
         for t in self.linktype.linkTargets:
             if t not in doctypes:
                 doctypes.append(t)
         doctypes = sorted(doctypes)
         ndoctypes = len(doctypes)
-        rows = ndoctypes / 2
+        rows = ndoctypes // 2
         if ndoctypes % 2:
             rows += 1
         j = rows
@@ -290,7 +291,7 @@ fieldset.errors li { color: red; font-weight: bold; }
             form.B.LEGEND("Allowed Link Targets"),
             wrapper
         )
-        return lxml.html.tostring(fieldset)
+        return lxml.html.tostring(fieldset, encoding="unicode")
 
     def add_target(self, form, wrapper, doctype):
         """
@@ -337,7 +338,7 @@ fieldset.errors li { color: red; font-weight: bold; }
             form.B.CLASS("r-block"),
             id="block-{}".format(counter)
         )
-        return lxml.html.tostring(fieldset)
+        return lxml.html.tostring(fieldset, encoding="unicode")
 
     def make_linking_element(self, form, counter, doctype="", element=""):
         """
@@ -361,7 +362,7 @@ fieldset.errors li { color: red; font-weight: bold; }
             form.B.CLASS("e-block"),
             id="block-{}".format(counter)
         )
-        return lxml.html.tostring(fieldset)
+        return lxml.html.tostring(fieldset, encoding="unicode")
 
     def make_doctype_field(self, form, counter, doctype=""):
         """

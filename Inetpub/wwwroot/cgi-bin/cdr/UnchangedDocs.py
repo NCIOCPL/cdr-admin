@@ -77,8 +77,8 @@ if request:
     for doc_id, doc_title, last_change in docs:
         short_title = doc_title[:100]
         if len(doc_title) > 100:
-            short_title += u" ..."
-        row = ("CDR%010d" % doc_id, short_title, last_change[:10])
+            short_title += " ..."
+        row = ("CDR%010d" % doc_id, short_title, str(last_change)[:10])
         rows.append(row)
     table = cdrcgi.Report.Table(columns, rows)
     report = cdrcgi.Report(title, table, banner=title, subtitle=instr)

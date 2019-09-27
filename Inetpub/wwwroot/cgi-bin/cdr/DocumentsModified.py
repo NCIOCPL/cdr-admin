@@ -61,7 +61,7 @@ def get_doctypes():
    WHERE xml_schema IS NOT NULL
      AND active = 'Y'
 ORDER BY name""")
-        return [[0, "All Types"]] + cursor.fetchall()
+        return [[0, "All Types"]] + [tuple(row) for row in cursor.fetchall()]
     except:
         cdrcgi.bail("Failure building document type picklist")
 

@@ -77,7 +77,7 @@ class TermMp3:
         self.review_date   = row[11]
 
     def __str__(self):
-        mp3Str = u"id=%s   zipfile_id=%s   review_status=%s   cdr_id=%s  \n" \
+        mp3Str = "id=%s   zipfile_id=%s   review_status=%s   cdr_id=%s  \n" \
                  "term_name=%s   language=%s  pronunciation=%s  \n" \
                  "mp3_name=%s   reader_note=%s   reviewer_note=%s  \n" \
                  "reviewer_id=%s   review_date=%s\n" % \
@@ -439,7 +439,7 @@ def installZipFile(zipName):
 
     # Wrap everything in a transaction
     try:
-        conn.setAutoCommit(False)
+        conn.autocommit = False
     except Exception as e:
         bail("Unable to create transaction for zipfile installation", e)
 
@@ -640,7 +640,7 @@ def listZipFiles(session):
                          script=SCRIPT, buttons=BUTTONS)
 
     # Instructions and output table column headers
-    html += u"""
+    html += """
 <p>Click a link to a zip file to review from the table below.  Only those files
 that have not yet been completely reviewed are hyperlinked.</p>
 
@@ -666,18 +666,18 @@ that have not yet been completely reviewed are hyperlinked.</p>
 
     # Started files
     for tzf in nameList:
-        if zipNameIndex.has_key(tzf.fname):
+        if tzf.fname in zipNameIndex:
             if zipNameIndex[tzf.fname].complete == 'N':
                 sortedList.append(tzf)
 
     # Unreviewed files
     for tzf in nameList:
-        if not zipNameIndex.has_key(tzf.fname):
+        if tzf.fname not in zipNameIndex:
             sortedList.append(tzf)
 
     # Completed files - all the rest
     for tzf in nameList:
-        if zipNameIndex.has_key(tzf.fname):
+        if tzf.fname in zipNameIndex:
             if zipNameIndex[tzf.fname].complete == 'Y':
                 sortedList.append(tzf)
 
@@ -687,7 +687,7 @@ that have not yet been completely reviewed are hyperlinked.</p>
         refName = tzf.fname
 
         # Has this file been reviewed at all?
-        if zipNameIndex.has_key(tzf.fname):
+        if tzf.fname in zipNameIndex:
 
             # We've seen this file before, get all info about it
             tzf = zipNameIndex[tzf.fname]
@@ -760,7 +760,7 @@ def makeOneMp3FormRow(mp3obj, zipFilename):
     if mp3obj.review_status == 'R': rcheck = " checked='1'"
     if mp3obj.review_status == 'U': ucheck = " checked='1'"
 
-    html = u"""
+    html = """
  <tr><td>
   <input type='radio' name='appr%d' value='A'%s />
   <input type='radio' name='appr%d' value='R'%s />
@@ -769,28 +769,28 @@ def makeOneMp3FormRow(mp3obj, zipFilename):
 """ % (mId, acheck, mId, rcheck, mId, ucheck)
 
     # CDR ID
-    html += u"  <td>%d</td>\n" % mp3obj.cdr_id
+    html += "  <td>%d</td>\n" % mp3obj.cdr_id
 
     # Term name
-    html += u" <td>%s</td>\n" % mp3obj.term_name
+    html += " <td>%s</td>\n" % mp3obj.term_name
 
     # Language
-    html += u"  <td>%s</td>\n" % mp3obj.language
+    html += "  <td>%s</td>\n" % mp3obj.language
 
     # Pronunciation
-    html += u"  <td>%s</td>\n" % (escape(mp3obj.pronunciation) or "&nbsp;")
+    html += "  <td>%s</td>\n" % (escape(mp3obj.pronunciation) or "&nbsp;")
 
     # mp3 filename, hyprlinked to allow user to hear it
     val = escape(mp3obj.mp3_name)
-    html += u"  <td><a href='%s?mp3=%d&zName=%s'>%s</a></td>\n" % \
+    html += "  <td><a href='%s?mp3=%d&zName=%s'>%s</a></td>\n" % \
                (SCRIPT, mp3obj.id, zipFilename, val)
 
     # Note from the reader (currently Vanessa)
-    html += u"  <td>%s</td>\n" % (escape(mp3obj.reader_note) or "&nbsp;")
+    html += "  <td>%s</td>\n" % (escape(mp3obj.reader_note) or "&nbsp;")
 
     # Place to add or update reviewer's note, and row close
     html += \
-u"""  <td><textarea name="revNote%d" rows="1" cols="40">%s</textarea>
+"""  <td><textarea name="revNote%d" rows="1" cols="40">%s</textarea>
   </td>
  </tr>
 """ % (mId, escape(mp3obj.reviewer_note))
@@ -858,10 +858,13 @@ def sendMp3(mp3Id):
         bail("Failed to read mp3 file named '%s'" % mp3Name, e)
 
     # Write binary mp3 audio data back to the browser
-    sys.stdout.write("Content-Type: audio/mpeg\r\n")
-    sys.stdout.write("Content-disposition: inline; filename=%s\n\n" % mp3Name)
-    sys.stdout.write("Content-Length: %d\r\n" % len(mp3Buf))
-    sys.stdout.write(mp3Buf)
+    sys.stdout.buffer.write(f"""\
+Content-Type: audio/mpeg
+Content-disposition: inline; filename={mp3Name}
+Content-Length: {len(mp3Buf):d}
+
+""".encode("utf-8"))
+    sys.stdout.buffer.write(mp3Buf)
     sys.exit()
 
 
@@ -890,7 +893,7 @@ def showZipfile(zipId, session):
                               "Review and approve or reject mp3 files",
                               script=SCRIPT, buttons=buttons))
 
-    html.append(u"""
+    html.append("""
 <p>Click a hyperlinked mp3 filename to play the sound in your browser
 configured mp3 player (already reviewed files are at the bottom of the list
 of files.)</p>
@@ -942,7 +945,7 @@ your workstation.  Please save it for future use.
 </html>
 """ % (zipId, cdrcgi.SESSION, session))
 
-    finalHtml = u"".join(html)
+    finalHtml = "".join(html)
 
     cdrcgi.sendPage(finalHtml)
 
@@ -1003,10 +1006,9 @@ def saveChanges(fields, session):
         revStatus = fields.getvalue("appr%d" % mId)
         revNote   = fields.getvalue("revNote%d" % mId, None)
 
-        # User may have input utf-8 Spanish chars in reviewer note
         if revNote:
-            # Fix character set and remove leading/trailing whitespace
-            revNote = revNote.decode('utf-8', 'replace').strip()
+            # Remove leading/trailing whitespace
+            revNote = revNote.strip()
 
             # Fix whitespace and newline translation problems
             # DEBUG cdr.logwrite('revNote="%s"' % revNote)
@@ -1130,7 +1132,7 @@ def doneZipfileReview(session, oldZipName, mp3List):
         html = cdrcgi.header(HEADER + " - Processing complete", HEADER,
                          "Proccessing of this file is complete",
                          script=SCRIPT, buttons=["Continue",]) + \
-u"""
+"""
 <p>All %d mp3 files in the zip file named "%s" have been reviewed and
 approved.</p>
 

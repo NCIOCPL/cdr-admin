@@ -194,7 +194,7 @@ class Control(cdrcgi.Control):
         )
         if self.type == "current":
             ncols = len(columns)
-            rows.append([unichr(160)] * ncols)
+            rows.append([chr(160)] * ncols)
             padding = [""] * (ncols - 2)
             rows.append(["", cdrcgi.Report.Cell("TOTALS", bold=True)] + padding)
             for state in sorted(Job.COUNTS):

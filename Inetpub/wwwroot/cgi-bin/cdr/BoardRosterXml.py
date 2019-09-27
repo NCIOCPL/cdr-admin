@@ -18,7 +18,7 @@ try:
     conn = db.connect(user="CdrGuest")
     cursor = conn.cursor()
 except Exception as e:
-    cdrcgi.sendPage(u'<Failure>%s</Failure>' % e, 'xml')
+    cdrcgi.sendPage('<Failure>%s</Failure>' % e, 'xml')
 
 #----------------------------------------------------------------------
 # Look up title of a board, given its ID.
@@ -31,7 +31,7 @@ def getBoardName(id):
             cdrcgi.bail('Failure looking up title for CDR%s' % id)
         return cleanTitle(rows[0][0])
     except Exception as e:
-        cdrcgi.sendPage(u'<Failure>%s</Failure' % e, 'xml')
+        cdrcgi.sendPage('<Failure>%s</Failure' % e, 'xml')
 
 #----------------------------------------------------------------------
 # Remove cruft from a document title.
@@ -65,7 +65,7 @@ def addSpecificContactInfo(boardIds, boardInfo):
     newBoardInfo = []
     try:
         cursor.execute("""\
-    SELECT g.doc_id, g.value AS GE, h.value, q.value as SpPhone, 
+    SELECT g.doc_id, g.value AS GE, h.value, q.value as SpPhone,
            f.value as SpFax, e.value as SpEmail
       FROM query_term g
 LEFT OUTER JOIN query_term h
@@ -98,7 +98,7 @@ LEFT OUTER JOIN query_term q
         memCount = len(member)
         for cdrId, ge, honor, phone, fax, email in rows:
             if member[4] == cdrId:
-                member = member + [ge, honor or None, phone or None, 
+                member = member + [ge, honor or None, phone or None,
                                    fax or None, email or None]
         if memCount == len(member):
             member = member + [None, None, None, None, None]
@@ -107,19 +107,19 @@ LEFT OUTER JOIN query_term q
 
 
 # ---------------------------------------------------------------------
-# A non-government employee may decline to receive a honorarium.  
+# A non-government employee may decline to receive a honorarium.
 # Returning the appropriate value for the person.
 # ---------------------------------------------------------------------
-def checkHonoraria(govEmployee, declined = u''):
+def checkHonoraria(govEmployee, declined = ''):
     if govEmployee == 'Yes':
-        return u''
-    elif govEmployee == u'Unknown':
-        return u''
+        return ''
+    elif govEmployee == 'Unknown':
+        return ''
     elif govEmployee == 'No':
         if declined == 'Yes':
-            return u'*'
+            return '*'
         else:
-            return u''
+            return ''
 
 #----------------------------------------------------------------------
 # Object for one PDQ board member.
@@ -147,17 +147,17 @@ class BoardMember:
         return 1
     def toNode(self):
         node = etree.Element('BoardMember')
-        etree.SubElement(node, 'DocId').text = unicode(self.id)
+        etree.SubElement(node, 'DocId').text = str(self.id)
         etree.SubElement(node, 'Name').text = self.name
         etree.SubElement(node, 'IsEic').text = self.isEic and 'Yes' or 'No'
-        etree.SubElement(node, 'TermStart').text = unicode(self.termStart)
+        etree.SubElement(node, 'TermStart').text = str(self.termStart)
         etree.SubElement(node, 'BoardName').text = self.boardName
-        etree.SubElement(node, 'BoardId').text = unicode(self.boardId)
+        etree.SubElement(node, 'BoardId').text = str(self.boardId)
         return node
 
 def getDocTree(cdrId):
     cursor.execute("SELECT xml FROM document WHERE id = ?", cdrId)
-    return etree.XML(cursor.fetchall()[0][0].encode('utf-8'))
+    return etree.fromstring(cursor.fetchall()[0][0])
 
 def addChild(node, name, value):
     if value:
@@ -185,8 +185,8 @@ class MemberDetails:
         self.person = self.Person(personTree)
     def toNode(self):
         node = etree.Element('BoardMember')
-        etree.SubElement(node, 'DocId').text = unicode(self.docId)
-        etree.SubElement(node, 'PersonId').text = unicode(self.personId)
+        etree.SubElement(node, 'DocId').text = str(self.docId)
+        etree.SubElement(node, 'PersonId').text = str(self.personId)
         if self.person and self.person.name:
             node.append(self.person.name.toNode())
         if self.contact:
@@ -348,7 +348,7 @@ class MemberDetails:
 def allBoardMembers():
     try:
         cursor.execute("""\
- SELECT DISTINCT member.doc_id, eic_start.value, eic_finish.value, 
+ SELECT DISTINCT member.doc_id, eic_start.value, eic_finish.value,
                  term_start.value, person_doc.title, member.int_val
             FROM query_term member
             JOIN query_term curmemb
@@ -364,7 +364,7 @@ def allBoardMembers():
              AND eic_start.path   = '/PDQBoardMemberInfo/BoardMembershipDetails'
                               + '/EditorInChief/TermStartDate'
  LEFT OUTER JOIN query_term eic_finish
-              ON eic_finish.doc_id = member.doc_id  
+              ON eic_finish.doc_id = member.doc_id
              AND LEFT(eic_finish.node_loc, 4) = LEFT(member.node_loc, 4)
              AND eic_finish.path  = '/PDQBoardMemberInfo/BoardMembershipDetails'
                               + '/EditorInChief/TermEndDate'
@@ -383,20 +383,20 @@ def allBoardMembers():
         rows = cursor.fetchall()
         root = etree.Element('BoardMembers')
         for docId, eic_start, eic_finish, term_start, name, boardId in rows:
-            boardMember = BoardMember(docId, eic_start, eic_finish, 
+            boardMember = BoardMember(docId, eic_start, eic_finish,
                                       term_start, name, boardId)
             root.append(boardMember.toNode())
-        return etree.tostring(root, pretty_print=True)
+        return etree.tostring(root, pretty_print=True, encoding="unicode")
     except Exception as e:
         raise
-        cdrcgi.sendPage(u'<Failure>%s</Failure>' % e, 'xml')
+        cdrcgi.sendPage('<Failure>%s</Failure>' % e, 'xml')
 
 def getBoardMember(cdrId):
     filters = ['set:Denormalization PDQBoardMemberInfo Set']
     # filters.append('name:Copy XML for Person 2')
     response = cdr.filterDoc('guest', filters, cdrId)
-    if type(response) in (str, unicode):
-        cdrcgi.sendPage(u"<Failure>%s</Failure>" % response, 'xml')
+    if isinstance(response, (str, bytes)):
+        cdrcgi.sendPage("<Failure>%s</Failure>" % response, 'xml')
     return response[0]
 
 def collectMembersForBoard(boardId):
@@ -417,17 +417,18 @@ def collectMembersForBoard(boardId):
              AND b.int_val = ?""", boardId)
         docIds = [row[0] for row in cursor.fetchall()]
         root = etree.Element('Board')
-        etree.SubElement(root, 'BoardId').text = unicode(boardId)
+        etree.SubElement(root, 'BoardId').text = str(boardId)
         etree.SubElement(root, 'BoardName').text = getBoardName(boardId)
         for docId in docIds:
             root.append(MemberDetails(docId).toNode())
-        return etree.tostring(root, pretty_print=True)
+        return etree.tostring(root, pretty_print=True, encoding="unicode")
     except Exception as e:
-        cdrcgi.sendPage(u"<Failure>%s</Failure>" % e, 'xml')
+        cdrcgi.sendPage("<Failure>%s</Failure>" % e, 'xml')
 
 if memberId:
     details = MemberDetails(int(memberId))
-    docXml = etree.tostring(details.toNode(), pretty_print=True)
+    opts = dict(pretty_print=True, encoding="unicode")
+    docXml = etree.tostring(details.toNode(), **opts)
     cdrcgi.sendPage(docXml, 'xml')
     #cdrcgi.sendPage(getBoardMember(int(memberId)), 'xml')
 elif boardId:

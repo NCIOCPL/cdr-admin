@@ -9,14 +9,15 @@
 #
 #----------------------------------------------------------------------
 import datetime
-import suds.client
+from zeep import Client
 import cdrcgi
 from cdrapi.settings import Tier
 
 class Control(cdrcgi.Control):
     TIER = Tier()
-    URL = "http://%s/cgi-bin/glossify" % TIER.hosts["GLOSSIFIERC"]
-    FRAGMENT = u"<p>Gerota\u2019s capsule breast cancer and mama</p>"
+    HOST = TIER.hosts["GLOSSIFIERC"]
+    URL = f"http://{HOST}/cgi-bin/glossify"
+    FRAGMENT = "<p>Gerota\u2019s capsule breast cancer and mama</p>"
     DEBUG_LEVEL = "X_DEBUG_LEVEL"
     PAGE_TITLE = "PDQ Glossifier Test"
 
@@ -26,18 +27,23 @@ class Control(cdrcgi.Control):
         self.frag = self.fields.getvalue("frag") or self.FRAGMENT
         self.lang = self.fields.getvalue("lang")
         self.standalone = self.fields.getvalue("standalone") and True or False
-        if not isinstance(self.frag, unicode):
-            self.frag = unicode(self.frag, "utf-8")
     def glossify(self):
+        client = Client(self.URL)
+        factory = client.type_factory('ns0')
+        dictionaries = factory.ArrayOfString(["Cancer.gov"])
+        languages = factory.ArrayOfString([self.lang] if self.lang else [])
         headers = self.level and { self.DEBUG_LEVEL: self.level } or {}
-        client = suds.client.Client(self.URL, headers=headers)
-        dictionaries = client.factory.create("ArrayOfString")
-        dictionaries.string.append(u"Cancer.gov")
-        languages = client.factory.create("ArrayOfString")
-        languages.string = self.lang and [self.lang] or []
-        return client.service.glossify(self.frag, dictionaries, languages)
+        with client.settings(extra_http_headers=headers):
+            return client.service.glossify(self.frag, dictionaries, languages)
     def populate_form(self, form):
-        result = self.glossify()
+        try:
+            result = self.glossify()
+        except Exception as e:
+            self.logger.exception("aargh!")
+            print(dir(e))
+            print(e.detail)
+            print(e)
+            exit(0)
         elapsed = (datetime.datetime.now() - self.started).total_seconds()
         if self.standalone:
             print(result)

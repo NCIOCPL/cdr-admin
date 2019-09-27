@@ -45,7 +45,7 @@ class Control(cdrcgi.Control):
         rows = [drug.values for drug in self.drugs]
         pattern = "Drug Information Summary Date Last Modified ({}) Report"
         title = pattern.format(self.report_type.capitalize())
-        subtitle = u"{} \u2014 {}".format(self.start, self.end)
+        subtitle = "{} \u2014 {}".format(self.start, self.end)
         report_date = "Report Date: {}".format(datetime.date.today())
         top_lines = title, subtitle
         tab = "DLM Report"

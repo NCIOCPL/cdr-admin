@@ -12,39 +12,35 @@ import lxml.etree as etree
 import requests
 import cdr
 import cdrcgi
-import cdrutil
 from cdrapi import db
 from cdrapi.settings import Tier
 
 class Settings:
-    HOSTNAMES = Tier().hosts
+    TIER = Tier()
+    HOSTNAMES = TIER.hosts
     LOGFILE = f"{cdr.DEFAULT_LOGDIR}/fetch-tier-settings.log"
     WD = cdr.WORK_DRIVE
-    WEBCONFIG_ROOT = "%s:/Inetpub/wwwroot/web.config" % WD
-    WEBCONFIG_SECURE = "%s:/Inetpub/wwwroot/cgi-bin/secure/web.config" % WD
+    WEBCONFIG_ROOT = f"{WD}:/Inetpub/wwwroot/web.config"
+    WEBCONFIG_SECURE = f"{WD}:/Inetpub/wwwroot/cgi-bin/secure/web.config"
+    WEBCONFIG_GLOSSIFIER = f"{WD}:/cdr/Glossifier/cgi-bin/web.config"
+
     def __init__(self, session):
         self.session = session
-        self.org = cdrutil.getEnvironment()
-        self.tier = cdrutil.getTier()
-        self.glossifier = self.get_linux_settings("GLOSSIFIERC")
-        self.emailers = self.get_linux_settings("EMAILERSC")
-        self.windows = self.get_windows_settings()
-    def get_linux_settings(self, key):
-        args = self.HOSTNAMES[key], self.session
-        url = "http://%s/cgi-bin/fetch-tier-settings.py?Session=%s" % args
         try:
-            return json.loads(requests.get(url).text)
-        except Exception as e:
-            print(url, e)
-            cdr.logwrite("%s: %s" % (url, e), self.LOGFILE)
-            return {}
+            with open(f"self.TIER.etc/cdrenv.rc") as fp:
+                self.org = fp.read().strip()
+        except:
+            self.org = "CBIIT"
+        self.tier = self.TIER.name
+        self.windows = self.get_windows_settings()
     def get_iis_settings(self):
         return {
-            "account": cdr.runCommand("whoami").output.strip(),
+            "account": cdr.run_command("whoami").stdout.strip(),
             "version": os.environ.get("SERVER_SOFTWARE"),
             "web.config": {
                 "root": self.xmltojson(self.WEBCONFIG_ROOT),
-                "secure": self.xmltojson(self.WEBCONFIG_SECURE)
+                "secure": self.xmltojson(self.WEBCONFIG_SECURE),
+                "glossifier": self.xmltojson(self.WEBCONFIG_GLOSSIFIER),
             }
         }
     def xmltojson(self, path):
@@ -79,7 +75,8 @@ class Settings:
 
     def get_doctypes(self):
         doctypes = {}
-        root = etree.parse("d:/cdr/ClientFiles/CdrDocTypes.xml").getroot()
+        path = f"{self.WD}:/cdr/ClientFiles/CdrDocTypes.xml"
+        root = etree.parse(path).getroot()
         for node in root.findall("CdrGetDocTypeResp"):
             key = node.get("Type")
             doctypes[key] = {}
@@ -94,19 +91,16 @@ class Settings:
 
     def get_files(self):
         files = {}
-        self.walk(files, "d:/cdr/lib")
-        self.walk(files, "d:/cdr/Bin")
-        self.walk(files, "d:/cdr/Build")
-        self.walk(files, "d:/cdr/ClientFiles")
-        self.walk(files, "d:/cdr/Licensee")
-        self.walk(files, "d:/cdr/Mailers")
-        self.walk(files, "d:/cdr/Publishing")
-        self.walk(files, "d:/cdr/Licensee")
-        self.walk(files, "d:/cdr/Licensee")
-        self.walk(files, "d:/Inetpub/wwwroot")
-        self.walk(files, "d:/usr/expat/Bin")
-        self.walk(files, "d:/usr/Sablot/bin")
-        self.walk(files, "d:/usr/xerces/bin")
+        self.walk(files, f"{self.WD}:/cdr/lib")
+        self.walk(files, f"{self.WD}:/cdr/Bin")
+        self.walk(files, f"{self.WD}:/cdr/Build")
+        self.walk(files, f"{self.WD}:/cdr/ClientFiles")
+        self.walk(files, f"{self.WD}:/cdr/Glossifier")
+        self.walk(files, f"{self.WD}:/cdr/Licensee")
+        self.walk(files, f"{self.WD}:/cdr/Mailers")
+        self.walk(files, f"{self.WD}:/cdr/Publishing")
+        self.walk(files, f"{self.WD}:/cdr/Licensee")
+        self.walk(files, f"{self.WD}:/Inetpub/wwwroot")
         return files
     def walk(self, files, path):
         for path, dirs, filenames in os.walk(path):
@@ -133,7 +127,7 @@ class Settings:
 
     def get_python_settings(self):
         env = pkg_resources.Environment()
-        settings = { "python": sys.version }
+        settings = dict(python=sys.version)
         for name in env:
             for package in env[name]:
                 settings[package.project_name] = package.version
@@ -148,11 +142,9 @@ class Settings:
     def serialize(self):
         return json.dumps({
             "windows": self.windows,
-            "glossifier": self.glossifier,
-            "emailers": self.emailers
         }, indent=2)
     def run(self):
-        print("Content-type: application/json\n\n%s" % self.serialize())
+        print(f"Content-type: application/json\n\n{self.serialize()}")
 if __name__ == "__main__":
     fields = cgi.FieldStorage()
     session = cdrcgi.getSession(fields)

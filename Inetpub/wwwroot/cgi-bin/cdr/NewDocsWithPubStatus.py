@@ -2,7 +2,8 @@
 # Reports on newly created documents and their publication statuses.
 # BZIssue::754 - changes requested by Margaret
 #----------------------------------------------------------------------
-import cdr, cdrcgi, cgi, time
+import cdr, cdrcgi, cgi
+import datetime
 from cdrapi import db
 from html import escape as html_escape
 
@@ -21,7 +22,7 @@ script  = "NewDocsWithPubStatus.py"
 title   = "CDR Administration"
 section = "New Documents With Publication Status"
 header  = cdrcgi.header(title, title, section, script, buttons)
-now     = time.localtime(time.time())
+today   = datetime.date.today()
 
 #----------------------------------------------------------------------
 # Make sure we're logged in.
@@ -54,14 +55,10 @@ if fromDate: cdrcgi.valParmDate(fromDate)
 # If we don't have a request, put up the request form.
 #----------------------------------------------------------------------
 if not fromDate or not toDate:
-    toDate   = time.strftime("%Y-%m-%d", now)
-    then     = list(now)
-    then[1] -= 1
-    then[2] += 1
-    then     = time.localtime(time.mktime(then))
-    fromDate = time.strftime("%Y-%m-%d", then)
+    toDate   = str(today)
+    fromDate = str(today - datetime.timedelta(7))
     docTypes = cdr.getDoctypes(session)
-    if type(docTypes) in [type(""), type(u"")]:
+    if isinstance(docTypes, (str, bytes)):
         cdrcgi.bail(docTypes)
     if fromDate < cdrcgi.DAY_ONE: fromDate = cdrcgi.DAY_ONE
     form = """\
@@ -99,7 +96,7 @@ if not fromDate or not toDate:
 # Start the page.
 #----------------------------------------------------------------------
 html = """\
-<!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
+<!DOCTYPE html>
 <html>
  <head>
   <title>List of New Documents with Publication Status - %s</title>
@@ -118,10 +115,8 @@ html = """\
   <font size = '4'>Documents Created Between:&nbsp;%s and %s</font>
   <br />
   <br />
-""" % (time.strftime("%m/%d/%Y", now),
-       time.strftime("%B %d, %Y", now),
-       fromDate,
-       toDate)
+""" % (today.strftime("%m/%d/%Y"), today.strftime("%B %d, %Y"),
+       fromDate, toDate)
 
 #----------------------------------------------------------------------
 # Extract the information from the database.
@@ -142,12 +137,12 @@ try:
                 epv,
                 doc_title
            FROM docs_with_pub_status
-          WHERE cre_date BETWEEN '%s' AND DATEADD(s, -1, DATEADD(d, 1, '%s'))
+          WHERE cre_date BETWEEN ? AND ?
             %s
        ORDER BY doc_type,
                 pv,
                 cre_date,
-                ver_date""" % (fromDate, toDate, dtQual))
+                ver_date""" % dtQual, (fromDate, toDate + " 23:59:59"))
     rows = cursor.fetchall()
 except Exception as e:
     cdrcgi.bail('Database connection failure: %s' % e)
@@ -242,8 +237,8 @@ for row in rows:
 """ % (docId,
        html_escape(docTitle),
        creUser.upper(),
-       creDate[:10],
-       verDate and verDate[:10] or "None",
+       str(creDate)[:10],
+       verDate and str(verDate)[:10] or "None",
        verUser and verUser.upper() or "None",
        pvFlag,
        epvCount and "Y" or "N")

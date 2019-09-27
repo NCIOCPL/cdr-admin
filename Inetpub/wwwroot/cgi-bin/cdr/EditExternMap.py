@@ -11,12 +11,14 @@ from html import escape as html_escape
 #----------------------------------------------------------------------
 # Extract integer from string; uses all decimal digits.
 #----------------------------------------------------------------------
-def extractInt(str):
-    if type(str) == type(9):
-        return str
-    if not str or type(str) not in (type(""), type(u"")):
+def extractInt(val):
+    if isinstance(val, int):
+        return val
+    if isinstance(val, bytes):
+        val = str(val, "utf-8")
+    if not val or not isinstance(val, str):
         return None
-    digits = re.sub(r"[^\d]", "", str)
+    digits = re.sub(r"[^\d]", "", val)
     if not digits:
         return None
     return int(digits)
@@ -194,7 +196,7 @@ def typeOk(mapId, docId):
         errors.append("CDR%s: %s documents not allowed for %s" %
                       (docId, typeNames[typeId], usageNames[usageId]))
         return False
-    if typeId not in usageTypes[usageId].keys():
+    if typeId not in usageTypes[usageId]:
         errors.append("CDR%s: %s documents not allowed for %s" %
                       (docId, typeNames[typeId], usageNames[usageId]))
         return False
@@ -231,14 +233,14 @@ if request == "Save Changes":
     oldMable = {}  # Value Y=Mappable box was initially checked, Y/N
     newMable = {}  # Value Y=Mappable box is now checked, Y/N
 
-    for field in fields.keys():
+    for field in fields:
         # In parsing the input, the digits in "id-...", "old-id-..." etc.
         #  are an external_map table id, i.e., key to above dictionaries.
         if field.startswith("id-"):
             # key=map table id, val=cdrid of doc mapped to after user input
             key = extractInt(field)
             val = extractInt(fields[field].value)
-            if not pairs.has_key(key):
+            if key not in pairs:
                 pairs[key] = [None, val]
             elif pairs[key] != "DELETE":
                 pairs[key][1] = val
@@ -246,7 +248,7 @@ if request == "Save Changes":
             # key=map table id, val=cdrid of doc mapped to before user input
             key = extractInt(field)
             val = extractInt(fields[field].value)
-            if not pairs.has_key(key):
+            if key not in pairs:
                 pairs[key] = [val, None]
             elif pairs[key] != "DELETE":
                 pairs[key][0] = val
@@ -279,14 +281,14 @@ if request == "Save Changes":
     # Update changes in bogus values
     for rowId, oldValue in oldBogus.items():
         # Don't fool with it if user has also deleted the whole mapping
-        if pairs.has_key(rowId) and pairs[rowId] == "DELETE":
+        if pairs.get(rowId) == "DELETE":
             continue
         newValue = None
         if oldValue == 'Y' and rowId not in newBogus:
             newValue = 'N'
         elif oldValue == 'N' and rowId in newBogus:
             # Make sure that bogus'd value is not mapped
-            if pairs.has_key(rowId):
+            if rowId in pairs:
                 mapToId = pairs[rowId][1]
                 if mapToId:
                     errors.append(
@@ -311,7 +313,7 @@ if request == "Save Changes":
     # Update changes in mappability of a value
     for rowId, oldValue in oldMable.items():
         # Don't fool with it if user has also deleted the whole mapping
-        if pairs.has_key(rowId) and pairs[rowId] == "DELETE":
+        if pairs.get(rowId) == "DELETE":
             continue
         newValue = None
         if oldValue == 'Y' and rowId not in newMable:
@@ -320,7 +322,7 @@ if request == "Save Changes":
             newValue = 'Y'
         if newValue:
             # Don't allow value to become unmappable if it's already mapped
-            if newValue == 'N' and pairs.has_key(rowId) and pairs[rowId][1]:
+            if newValue == 'N' and rowId in pairs and pairs[rowId][1]:
                 errors.append("Can't make \"%s\" non-mappable if it's "
                               "already mapped.  Must also erase CDRID." \
                               % lookupValueByMapId(rowId))
@@ -386,7 +388,7 @@ if request == "Save Changes":
         elif (pair != "DELETE" and pair[0] != pair[1] and allowed(key) and
               typeOk(key, pair[1])):
             # Can't map non-mappable values
-            if pair[1] and not newMable.has_key(key):
+            if pair[1] and key not in newMable:
                 errors.append(\
                     "Can't map value to %d and have field non-mappable" % \
                     pair[1])
@@ -476,18 +478,11 @@ for row in rows:
 """ % (row[0], selected, html_escape(row[1]))
 
 
-# Encoding for non-English patterns
-if type(form) is not unicode:
-    form = unicode(form)
-
-# Use this one if the page received input in utf-8
-pattern = unicode(pattern, 'utf-8')
-
 # Use this one if the page received input in Latin-1
 # Bob's latest cdrcgi.header() function is now using utf-8 encoding
 # pattern = unicode(pattern, 'latin-1')
 
-form += u"""\
+form += """\
       </select>
      </td>
      <td>Select the kind of mapping to show, or select all kinds.</td>
@@ -679,7 +674,7 @@ if request in ("Save Changes", "Get Values"):
        mapId, row[4], mapId, row[5]))
             row = cursor.fetchone()
         # Put form together
-        form = form + u"".join(formPieces) + """\
+        form = form + "".join(formPieces) + """\
   </table>
   </form>
  </body>

@@ -118,7 +118,7 @@ class GlossaryTermConcept:
         query.where(query.Condition("v.id", doc_id))
         query.where(query.Condition("v.num", doc_version))
         self.title, xml, publishable = query.execute(control.cursor).fetchone()
-        root = etree.XML(xml.encode("utf-8"))
+        root = etree.XML(xml)
         self.publishable = publishable == "Y"
         self.comment = self.last_mod = None
         names = { "en": "TermDefinition", "es": "TranslatedTermDefinition" }
@@ -174,10 +174,10 @@ class GlossaryTermConcept:
         def __cmp__(self, other):
             return cmp(self.date, other.date)
         def tostring(self):
-            return u"[date: %s; user: %s; audience: %s] %s" % (self.date,
-                                                               self.user,
-                                                               self.audience,
-                                                               self.text)
+            return "[date: %s; user: %s; audience: %s] %s" % (self.date,
+                                                              self.user,
+                                                              self.audience,
+                                                              self.text)
 if __name__ == "__main__":
     "Allow documentation and code check tools to import us without side effects"
     Control().run()

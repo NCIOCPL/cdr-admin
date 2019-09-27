@@ -2,7 +2,7 @@
 # Web interface for managing control tables for valid values.
 # OCECDR-4193
 #----------------------------------------------------------------------
-import urllib
+import urllib.parse
 import cdr
 import cdrcgi
 from cdrapi import db
@@ -88,7 +88,7 @@ class Control(cdrcgi.Control):
         Save a new or modified row in the selected valid values table.
         """
 
-        value = unicode(self.fields.getvalue("value", "").strip(), "utf-8")
+        value = self.fields.getvalue("value", "").strip()
         position = self.fields.getvalue("position")
         record = self.Value(self.value_id, value, position)
         error = record.validate(self)
@@ -122,7 +122,9 @@ class Control(cdrcgi.Control):
             self.cursor.execute(query)
             self.conn.commit()
             cdrcgi.navigateTo(self.script, self.session, table=table)
-        except:
+        except Exception:
+            args = id, table
+            self.logger.exception("failure dropping row %s from %s", *args)
             self.warning = "Value '%s' is in use" % self.map[id].value
             self.show_form()
 
@@ -207,8 +209,8 @@ jQuery("input[name='value']").attr("maxlength", %d);""" % self.MAX_VALUE_LEN)
         parms = { "Session": self.session, "table": self.table }
         for key, value, position in self.rows:
             parms["value_id"] = str(key)
-            url = "%s?%s" % (self.script, urllib.urlencode(parms))
-            display = u"%s (position %d)" % (value, position)
+            url = "%s?%s" % (self.script, urllib.parse.urlencode(parms))
+            display = "%s (position %d)" % (value, position)
             form.add(form.B.LI(form.B.A(display, href=url)))
         form.add("</ul>")
         form.add("</fieldset>")
@@ -220,7 +222,7 @@ jQuery("input[name='value']").attr("maxlength", %d);""" % self.MAX_VALUE_LEN)
         parms = { "Session": self.session, "table": self.table }
         for key, value, position in self.rows:
             parms["value_id"] = str(key)
-            url = "%s?%s" % (self.script, urllib.urlencode(parms))
+            url = "%s?%s" % (self.script, urllib.parse.urlencode(parms))
             col1 = form.B.TD(form.B.A(value, href=url))
             col2 = form.B.TD(str(position))
             tbody.append(form.B.TR(col1, col2))

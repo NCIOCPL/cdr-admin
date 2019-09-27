@@ -1,7 +1,8 @@
 #----------------------------------------------------------------------
 # Report of history of changes to a single summary.
 #----------------------------------------------------------------------
-import cdr, time, cgi, cdrcgi, re
+import datetime
+import cdr, cgi, cdrcgi, re
 from cdrapi import db
 from html import escape as html_escape
 
@@ -28,8 +29,6 @@ try:
     numYears = dateRange and int(dateRange) or 2
 except:
     cdrcgi.bail("Invalid date range: %s" % dateRange)
-if docTitle:
-    docTitle = unicode(docTitle, "utf-8")
 
 #----------------------------------------------------------------------
 # Load common style information from repository.
@@ -60,7 +59,7 @@ def getCommonCssStyle():
 </xsl:transform>
 """
     response = cdr.filterDoc('guest', xslScript, doc = "<dummy/>", inline = 1)
-    if type(response) in (type(""), type(u"")):
+    if isinstance(response, (str, bytes)):
         cdrcgi.bail("Failure loading common CSS style information: %s" %
                     response)
     return response[0]
@@ -138,7 +137,7 @@ except Exception as info:
 # If we have a title, use it to get a document ID.
 #----------------------------------------------------------------------
 if docTitle:
-    param = u"%s%%" % docTitle
+    param = "%s%%" % docTitle
     try:
         cursor.execute("""\
             SELECT d.id, d.title
@@ -151,7 +150,7 @@ if docTitle:
     except Exception as info:
         cdrcgi.bail("Failure looking up document title: %s" % str(info))
     if not rows:
-        cdrcgi.bail(u"No summary documents match %s" % docTitle)
+        cdrcgi.bail("No summary documents match %s" % docTitle)
     if len(rows) > 1:
         showTitleChoices(rows)
 
@@ -161,9 +160,8 @@ if docTitle:
 #numYears = 2
 #docId = 62978 #62906 #62978
 commonStyle = getCommonCssStyle()
-startDate = list(time.localtime())
-startDate[0] -= numYears
-startDate = time.strftime("%Y-%m-%d", time.localtime(time.mktime(startDate)))
+today = datetime.date.today()
+startDate = str(today - datetime.timedelta(365*numYears))
 conn = db.connect(user='CdrGuest')
 cursor = conn.cursor()
 cursor.execute("SELECT title FROM document WHERE id = ?", docId)
@@ -181,20 +179,20 @@ cursor.execute("""\
 sections = []
 lastSection = None
 for row in cursor.fetchall():
-    verDate = "%s/%s/%s" % (row[1][5:7], row[1][8:10], row[1][:4])
+    verDate = row[1].strftime("%m/%d/%Y")
     resp = cdr.filterDoc('guest', [#'set:Denormalization Summary Set',
                                    'name:Summary Changes Report'], docId,
                          docVer = "%d" % row[0])
-    if type(resp) in (str, unicode):
+    if isinstance(resp, (str, bytes)):
         cdrcgi.bail(resp)
     if resp[0].strip():
         if not lastSection or resp[0] != lastSection:
             lastSection = resp[0]
             section = resp[0].replace("@@PubVerDate@@", verDate)
-            sections.append(unicode(section, "utf-8"))
+            sections.append(section)
 sections.reverse()
-html = u"""\
-<!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
+html = """\
+<!DOCTYPE html>
 <html>
  <head>
   <title>Summary Changes Report for CDR%010d - %s</title>
@@ -210,18 +208,17 @@ html = u"""\
    </tr>
   </table>
 """ % (docId,
-       time.strftime("%B %d, %Y"),
+       today.strftime("%B %d, %Y"),
        commonStyle,
        numYears,
        numYears and "s" or "",
        docTitle,
        docId)
 for section in sections:
-    html += section + u"<br><hr><br>\n"
-html += u"""
+    html += section + "<br><hr><br>\n"
+html += """
  </body>
 </html>
 """
 
-#print html
 cdrcgi.sendPage(html)

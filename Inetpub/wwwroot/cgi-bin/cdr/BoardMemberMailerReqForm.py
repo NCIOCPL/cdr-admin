@@ -6,7 +6,7 @@
 # JIRA::OCECDR-3679 - workaround for IE Javascript bug
 # JIRA::OCECDR-3736 - added Editorial Board Reformatted Summary Review mailer
 #----------------------------------------------------------------------
-import cgi, cdr, cdrpub, cdrcgi, re, string, cdrmailcommon, sys
+import cgi, cdr, cdrpub, cdrcgi, re, string, sys
 from cdrapi import db
 
 #----------------------------------------------------------------------
@@ -281,9 +281,8 @@ for memberId, boardId, docTitle in rows:
 # Generate a picklist for the PDQ Editorial Boards.
 #----------------------------------------------------------------------
 def makeBoardList(boards):
-    keys = boards.keys()
-    keys.sort(lambda a,b: cmp(boards[a].name, boards[b].name))
-    html = u"""\
+    keys = sorted(boards, key=lambda k:boards[k].name)
+    html = """\
       <select id='board' name='board' style='width:500px'
               onchange='boardChange();'>
        <option value='' selected='1'>Choose One</option>

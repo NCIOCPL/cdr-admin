@@ -7,6 +7,7 @@ Used by the scheduled job to notify partners of new PDQ data availability.
 """
 
 import re
+import sys
 from lxml import etree
 from cdr import get_text
 from cdrapi import db
@@ -52,8 +53,8 @@ class Partner:
             if contact.type in ("I", "P", "S") and contact.email:
                 self.contacts.append(contact)
 
-    def __cmp__(self, other):
-        return cmp(self.key, other.key)
+    def __lt__(self, other):
+        return self.key < other.key
 
     @staticmethod
     def normalize(me):
@@ -110,7 +111,8 @@ for partner in sorted(partners):
         etree.SubElement(wrapper, "renewal_date").text = partner.renewed
         etree.SubElement(wrapper, "notified_date").text = notified
         etree.SubElement(wrapper, "org_id").text = str(partner.doc_id)
-print("""\
+xml = etree.tostring(root, pretty_print=True, encoding="unicode")
+sys.stderr.buffer.write(f"""\
 Content-type: text/xml
 
-%s""" % etree.tostring(root, pretty_print=True))
+{xml}""".encode("utf-8"))

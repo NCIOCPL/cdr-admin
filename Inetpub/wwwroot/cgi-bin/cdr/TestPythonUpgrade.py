@@ -9,7 +9,7 @@ Content-type: text/html
 {what}""".encode("utf-8"))
 
 def show(component, version):
-    html.append(u"""\
+    html.append("""\
    <tr>
     <td>%s</td>
     <td>%s</td>

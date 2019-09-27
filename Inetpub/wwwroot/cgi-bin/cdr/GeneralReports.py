@@ -16,7 +16,6 @@ class Control(cdrcgi.Control):
         ("ActiveLogins.py", "Current Sessions"),
         ("db-tables.py", "Database Tables/Columns"),
         ("DateLastModified.py", "Date Last Modified"),
-        ("DatedActions.py", "Dated Actions"),
         ("ActivityReport.py", "Document Activity Report"),
         ("DocVersionHistory.py", "Document Version History"),
         ("DocumentsModified.py", "Documents Modified"),

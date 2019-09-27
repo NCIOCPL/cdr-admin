@@ -10,6 +10,11 @@ import cgi
 import cdrcgi
 import datetime
 import zipfile
+import time
+import os
+
+FIX_PERMISSIONS = os.path.join(cdr.BASEDIR, "Bin", "fix-permissions.cmd")
+FIX_PERMISSIONS = FIX_PERMISSIONS.replace("/", os.path.sep)
 
 fields = cgi.FieldStorage()
 session = cdrcgi.getSession(fields)
@@ -22,7 +27,7 @@ request = fields.getvalue("Request")
 if "codes" in fields.keys():
     codes = fields["codes"]
 else:
-    cdrcgi.sendPage(u"""\
+    cdrcgi.sendPage("""\
 <!DOCTYPE html>
 <html>
   <head>
@@ -73,11 +78,10 @@ if not filebytes:
 # Save a copy of the uploaded files in the uploads directory
 # ----------------------------------------------------------
 now  = datetime.datetime.now()
-name = now.strftime(cdr.BASEDIR + "/uploads/zipcodes-%Y%m%d%H%M%S.zip")
-ziptxt  = now.strftime('/tmp/zip-%Y%m%d%H%M%S.txt')
-# ziptxt  = now.strftime('/tmp/zip.txt')
-zipload = '%s/utilities/bin/LoadZipCodes.py' % cdr.BASEDIR
-cmd = '%s %s %s' % (cdr.PYTHON, zipload, ziptxt)
+name = now.strftime(f"{cdr.BASEDIR}/uploads/zipcodes-%Y%m%d%H%M%S.zip")
+ziptxt  = now.strftime("/tmp/zip-%Y%m%d%H%M%S.txt")
+zipload = f"{cdr.BASEDIR}/utilities/bin/LoadZipCodes.py"
+cmd = f"{cdr.PYTHON} {zipload} {ziptxt}"
 
 # Saving the ZIP file to disk
 # ---------------------------
@@ -86,47 +90,70 @@ try:
         for segment in filebytes:
             fp.write(segment)
 except Exception as e:
-    cdrcgi.bail("failure storing %s: %s" % (name, e))
+    cdrcgi.bail(f"failure storing {name}: {e}")
 
 # Access the saved ZIP file and read the ZIP Code archive
 # -------------------------------------------------------
+time.sleep(2)
+native_name = name.replace("/", os.path.sep)
+command = f"{FIX_PERMISSIONS} {native_name}"
+process = cdr.run_command(command, merge_output=True)
+if process.returncode:
+    print(f"""\
+Content-type: text/plain
+
+Unable to set permissions on {name}.
+Command: {command}
+Output: {process.stdout}""")
+    sys.exit(0)
+
 try:
     zf = zipfile.ZipFile(name)
     names = zf.namelist()
-    if "z5max.txt" in names:
-        payload = zf.read("z5max.txt")
-        with open("%s" % ziptxt, "w") as fzip:
-            fzip.write(payload)
-
-        # Now that we have the data file on the server we're ready
-        # to run the load script
-        # --------------------------------------------------------
-        try:
-            result = cdr.runCommand(cmd)
-            # print "Content-type: text/plain\n\n%s" % result.output
-        except Exception as e:
-            print("Content-type: text/plain\n\n%s\n%s" % (cmd, repr(e)))
-        # sys.exit(0)
-
-    else:
-        payload = u"\n".join(names)
 except Exception as e:
-    cdrcgi.bail("failure opening %s: %s" % (name, e))
+    cdrcgi.bail(f"failure loading {name}: {e}")
+if "z5max.txt" not in names:
+    names = "\n".join(names)
+    print(f"""\
+Content-type: text/plain
+
+The file z5max.txt is not contained in the zipfile.
+Archive contents:
+{names}
+""")
+    sys.exit(0)
+
+try:
+    payload = zf.read("z5max.txt")
+    with open(ziptxt, "wb") as fzip:
+        fzip.write(payload)
+except Exception as e:
+    cdrcgi.bail(f"unable to write csv file: {e}")
+
+# Now that we have the data file on the server we're ready
+# to run the load script
+# --------------------------------------------------------
+try:
+    process = cdr.run_command(cmd, merge_output=True)
+except Exception as e:
+    print(f"Content-type: text/plain\n\n{cmd}\n{e!r}")
+    sys.exit(0)
+
 
 #-----------------------------------------------
 # Final report listing the number of rows loaded
 #-----------------------------------------------
-cdrcgi.sendPage(u"""\
+cdrcgi.sendPage(f"""\
 <!DOCTYPE html>
 <html>
   <head>
    <title>Update zipcode DB table</title>
   </head>
   <body>
-    <h3>Success:  zipcode table updated!</h3>
+    <h3>Success: zipcode table updated!</h3>
     <p>
     Log messages below:
     </p>
-    <pre>%s</pre>
+    <pre>{process.stdout}</pre>
   </body>
-</html>""" % result.output)
+</html>""")

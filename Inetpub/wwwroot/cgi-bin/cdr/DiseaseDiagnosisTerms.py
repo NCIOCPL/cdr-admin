@@ -63,7 +63,7 @@ try:
          WHERE n.path = '/Term/PreferredName'""")
     terms = {}
     for id, name, parent in cursor.fetchall():
-        if terms.has_key(id):
+        if id in terms:
             term = terms[id]
         else:
             term = terms[id] = Term(name)
@@ -120,15 +120,15 @@ html = f"""\
  <head>
   <title>CDR Cancer Diagnosis Hierarchy Report</title>
   <style type = 'text/css'>
-   h1 { color: navy; font-size: 14: font-weight: bold;
-        font-family: Arial, Helvetica, sans-serif; }
-   li.st { color: green; font-size: 14; font-weight: bold; list-style: none;
-          font-family: serif; font-variant: small-caps; }
-   li.t { color: blue; font-size: 14; list-style: none; font-weight: normal;
-          font-family: Arial, Helvetica, sans-serif; font-variant: normal }
-   li.a { color: #FF2222; font-size: 12;  list-style: none;
+   h1 {{ color: navy; font-size: 14: font-weight: bold;
+        font-family: Arial, Helvetica, sans-serif; }}
+   li.st {{ color: green; font-size: 14; font-weight: bold; list-style: none;
+          font-family: serif; font-variant: small-caps; }}
+   li.t {{ color: blue; font-size: 14; list-style: none; font-weight: normal;
+          font-family: Arial, Helvetica, sans-serif; font-variant: normal }}
+   li.a {{ color: #FF2222; font-size: 12;  list-style: none;
           font-variant: normal;
-          font-family: Arial, Helvetica, sans-serif; font-style: italic }
+          font-family: Arial, Helvetica, sans-serif; font-style: italic }}
   </style>
  </head>
  <body>

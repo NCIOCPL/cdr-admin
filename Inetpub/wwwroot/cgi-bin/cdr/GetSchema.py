@@ -40,7 +40,7 @@ cursor.execute("""\
         ON t.id = d.doc_type
      WHERE t.name = 'Schema'
   ORDER BY d.title""")
-html = [u"""\
+html = ["""\
 <html>
  <head>
   <title>CDR Schemas</title>
@@ -51,11 +51,11 @@ html = [u"""\
  <body>
   <h1>CDR Schemas</h1>"""]
 for row in cursor.fetchall():
-    line = (u"  <a href='GetSchema.py?id=%d'>%s</a><br />" %
+    line = ("  <a href='GetSchema.py?id=%d'>%s</a><br />" %
             (row[0], html_escape(row[1])))
     html.append(line)
-html.append(u"""\
+html.append("""\
  </body>
 </html>
 """)
-cdrcgi.sendPage(u"\n".join(html))
+cdrcgi.sendPage("\n".join(html))

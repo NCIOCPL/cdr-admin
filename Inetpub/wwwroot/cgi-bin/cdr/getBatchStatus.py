@@ -38,7 +38,7 @@ class Control:
         self.id = fields.getvalue("jobId")
         self.name = fields.getvalue("jobName")
         self.age = fields.getvalue("jobAge")
-        self.status = fields.getvalue("status")
+        self.status = fields.getvalue("jobStatus")
         self.sanitize()
         if self.request == "Cancel":
             cdrcgi.navigateTo("Admin.py", self.session)

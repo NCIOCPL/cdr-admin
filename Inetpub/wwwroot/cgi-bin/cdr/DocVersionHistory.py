@@ -77,7 +77,7 @@ class Control(cdrcgi.Control):
         page.add(page.B.LEGEND(legend))
         checked=True
         for doc_id, doc_title, doc_type in rows:
-            tooltip = u"CDR%d (%s) %s" % (doc_id, doc_type, doc_title)
+            tooltip = "CDR%d (%s) %s" % (doc_id, doc_type, doc_title)
             if len(doc_title) > 90:
                 doc_title = doc_title[:90] + " ..."
             page.add_radio(cdrcgi.DOCID, doc_title, str(doc_id),
@@ -218,7 +218,7 @@ class Document:
         cdr_id = cdr.normalize(self.doc_id)
         default = cdr.URDATE
         created = str(self.created_date)[:10] if self.created_date else default
-        created_by = self.created_by or u"[Conversion]"
+        created_by = self.created_by or "[Conversion]"
         modified = str(self.mod_date)[:10] if self.mod_date else None
         modified_by = self.modified_by or "N/A"
         removal = self.get_removal_info()

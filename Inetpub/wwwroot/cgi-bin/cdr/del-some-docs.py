@@ -10,7 +10,9 @@ import cdr, cgi, cdrcgi, re
 from cdrapi import db
 from html import escape as html_escape
 
-LOGFILE = "%s/del-some-docs.log" % cdr.DEFAULT_LOGDIR
+LOGNAME = "del-some-docs"
+LOGFILE = f"{cdr.DEFAULT_LOGDIR}/{LOGNAME}.log"
+LOGGER = cdr.Logging.get_logger(LOGNAME)
 
 def getUserName(session):
     cursor = db.connect(user="CdrGuest").cursor()
@@ -31,7 +33,7 @@ ids = fields.getvalue("ids")
 reason = fields.getvalue("reason")
 validate = fields.getvalue("validate")
 if not session: cdrcgi.bail("Unknown or expired CDR session.")
-html = [u"""\
+html = ["""\
 <!DOCTYPE html>
 <html>
  <head>
@@ -61,43 +63,41 @@ if ids:
     reason = reason or None
     validate = validate and "Y" or "N"
     userName = getUserName(session)
-    cdr.logwrite("del-some-docs.py: session %s" % repr(session), LOGFILE)
-    cdr.logwrite("del-some-docs.py: user name: %s" % repr(userName), LOGFILE)
-    cdr.logwrite("del-some-docs.py: validate: %s" % validate, LOGFILE)
-    cdr.logwrite("del-some-docs.py: reason: %s" % repr(reason), LOGFILE)
-    html.append(u"<p>Deletions:<ul>")
-    #html.append(u"<p>reason: %s; validate: %s</p><ul>" % (reason, validate))
-    ids = re.split(u"\\s+", ids.strip())
+    LOGGER.info("del-some-docs.py: session %r", session)
+    LOGGER.info("del-some-docs.py: user name: %r" % userName)
+    LOGGER.info("del-some-docs.py: validate: %s" % validate)
+    LOGGER.info("del-some-docs.py: reason: %r" % reason)
+    html.append("<p>Deletions:<ul>")
+    #html.append("<p>reason: %s; validate: %s</p><ul>" % (reason, validate))
+    ids = re.split("\\s+", ids.strip())
     for i in ids:
         try:
             docId = cdr.normalize(i)
         except Exception as e:
-            html.append(u"<li>%s: %s</li>" % (html_escape(i), repr(e)))
-            cdr.logwrite("%s: %s" % (repr(i), repr(e)), LOGFILE)
+            html.append("<li>%s: %r</li>" % (html_escape(i), e))
+            LOGGER.exception("Bad ID: %r", i)
             continue
         try:
             opts = dict(validate=validate, reason=reason)
             result = cdr.delDoc(session, docId, **opts)
         except Exception as e:
-            html.append(u"<li>%s: %s</li>" % (docId, repr(e)))
-            html.append(u"<li>e.message: %s</li>" % repr(e.message))
-            html.append(u"<li>e.args: %s</li>" % repr(e.args))
-            cdr.logwrite("%s: %s" % (docId, repr(e)), LOGFILE)
+            html.append("<li>%s: %s</li>" % (docId, e))
+            LOGGER.exception("Failure deleting %r", docId)
             continue
         if result == docId:
-            html.append(u"<li>%s: OK</li>" % docId)
-            cdr.logwrite("%s: deleted" % docId, LOGFILE)
+            html.append("<li>%s: OK</li>" % docId)
+            LOGGER.info("%s: deleted", docId)
         elif type(result) is list:
-            html.append(u"<li>%s:<ul>" % docId)
+            html.append("<li>%s:<ul>" % docId)
             for error in result:
-                html.append(u"<li>%s</li>" % html_escape(error))
-                cdr.logwrite("%s: %s" % (docId, error), LOGFILE)
-            html.append(u"</ul></li>")
+                html.append("<li>%s</li>" % html_escape(error))
+                LOGGER.error("%s: %s", docId, error)
+            html.append("</ul></li>")
         else:
-            html.append(u"<li>%s: %s</li>" % (docId, repr(result)))
-            cdr.logwrite("%s: %s" % (docId, repr(result)), LOGFILE)
+            html.append("<li>%s: %r</li>" % (docId, result))
+            LOGGER.info("%s: %r", docId, result)
     html.append("</ul>")
-html.append(u"""\
+html.append("""\
 <form method="POST" action="del-some-docs.py" accept-charset="utf-8">
 <input type="hidden" name="Session" value="%s" />
 <label for="ids">Document IDs</label>
@@ -112,5 +112,5 @@ html.append(u"""\
 <input id="submit" type="Submit" value="Delete Documents" />
 </form>
 """ % session)
-html.append(u"</body></html>")
-cdrcgi.sendPage(u"\n".join(html))
+html.append("</body></html>")
+cdrcgi.sendPage("\n".join(html))

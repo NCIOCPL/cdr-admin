@@ -19,7 +19,7 @@ class Disk:
         path = "%s:\\" % drive
         _, total, free = (ctypes.c_ulonglong(), ctypes.c_ulonglong(),
                           ctypes.c_ulonglong())
-        f = ctypes.windll.kernel32.GetDiskFreeSpaceExA
+        f = ctypes.windll.kernel32.GetDiskFreeSpaceExW
         ret = f(path, ctypes.byref(_), ctypes.byref(total), ctypes.byref(free))
         if ret == 0:
             raise ctypes.WinError()
@@ -28,20 +28,24 @@ class Disk:
         self.used = self.total - self.free
 
     def show(self):
-        print("%s DRIVE" % self.drive)
-        print("  TOTAL: %13s (%s)" % (self.total, human(self.total)))
-        print("   USED: %13s (%s)" % (self.used, human(self.used)))
-        print("   FREE: %13s (%s)" % (self.free, human(self.free)))
-        print("")
+        print(f"""\
+{self.drive} DRIVE
+  TOTAL: {self.total:>13} ({human(self.total)})
+   USED: {self.used:>13} ({human(self.used)})
+   FREE: {self.free:>13} ({human(self.free)})
+""")
 
 print("Content-type: text/plain")
 print("")
 
 try:
     import ctypes
+    import cdr
     Disk("C").show()
     Disk("D").show()
 except Exception as e:
+    cdr.LOGGER.exception("disk free failure")
     print(e)
 except:
+    cdr.LOGGER.exception("disk free unexpected error")
     print("Unexpected error")

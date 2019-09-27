@@ -69,9 +69,9 @@ class Control(cdrcgi.Control):
                 fp.write(self.content)
             self.extra = "Saved new values for {}".format(self.filepath)
             cmd = r"{} {}".format(self.FIX_PERMISSIONS, self.filepath)
-            result = cdr.runCommand(cmd)
-            if result.code:
-                self.extra = result.output or "Failure fixing permissions"
+            result = cdr.run_command(cmd, merge_output=True)
+            if result.returncode:
+                self.extra = result.stdout or "Failure fixing permissions"
         else:
             self.extra = "File {} unchanged".format(self.filepath)
         self.show_form()

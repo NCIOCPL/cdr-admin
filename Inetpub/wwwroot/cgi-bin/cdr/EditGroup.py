@@ -81,10 +81,10 @@ else:           group = cdr.getGroup(session, grpName)
 actions  = cdr.getActions(session)
 users    = cdr.getUsers(session)
 doctypes = cdr.getDoctypes(session)
-if isinstance(group,    basestring): cdrcgi.bail(group)
-if isinstance(actions,  basestring): cdrcgi.bail(actions)
-if isinstance(users,    basestring): cdrcgi.bail(users)
-if isinstance(doctypes, basestring): cdrcgi.bail(doctypes)
+if isinstance(group,    (str, bytes)): cdrcgi.bail(group)
+if isinstance(actions,  (str, bytes)): cdrcgi.bail(actions)
+if isinstance(users,    (str, bytes)): cdrcgi.bail(users)
+if isinstance(doctypes, (str, bytes)): cdrcgi.bail(doctypes)
 
 #----------------------------------------------------------------------
 # Display the information for the group.

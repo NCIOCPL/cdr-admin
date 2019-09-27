@@ -297,7 +297,7 @@ SELECT z.id, m.term_name, m.review_date, u.fullname
   <td>%s</td>
   <td>%s</td>
   <td>%s</td>
- </tr>""" % (row[1], row[2][:10], row[3]))
+ </tr>""" % (row[1], str(row[2])[:10], row[3]))
         else:
             break
 
@@ -320,5 +320,5 @@ SELECT z.id, m.term_name, m.review_date, u.fullname
 </html>
 """ % (cdrcgi.SESSION, session))
 
-    html = u"".join(html)
+    html = "".join(html)
     cdrcgi.sendPage(html)

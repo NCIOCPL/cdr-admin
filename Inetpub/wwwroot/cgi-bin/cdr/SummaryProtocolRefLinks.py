@@ -12,9 +12,7 @@ import cdr
 import cdrcgi
 import cgi
 import requests
-#import sys
 import datetime
-#import time
 
 from cdrapi.settings import Tier
 TIER = Tier()
@@ -46,7 +44,11 @@ class SummaryDoc:
         protocols within summaries.
     """
 
+    cursor = cdrdb.connect().cursor()
+    logger = cdr.Logging.get_logger("SummaryProtocolRefLinks")
+
     def __init__(self, docId):
+        self.logger.info("Parsing CDR%d", docId)
         self.docId = docId
         # Rows to be displayed on the report
         self.rows = []
@@ -58,23 +60,19 @@ class SummaryDoc:
         qry = "SELECT xml FROM document WHERE id = %d" % docId
         query = cdrdb.Query("document", "xml")
         query.where("id = {}".format(docId))
-        cursor = query.execute()
-        row = cursor.fetchall()
-        cursor.close()
-
-        docXml = row[0][0]
-        tree = etree.XML(docXml.encode('utf-8'))
+        docXml = query.execute(SummaryDoc.cursor).fetchone().xml
+        root = etree.XML(docXml.encode('utf-8'))
 
         # Finding the summary title
         # --------------------------
-        for titleNode in tree.findall('.//SummaryTitle'):
-            title = "CDR%d - %s" % (docId, titleNode.text)
-            sumRow = (self.docId, titleNode.text)
+        titleNode = root.find('SummaryTitle')
+        title = "CDR%d - %s" % (docId, titleNode.text)
+        sumRow = (self.docId, titleNode.text)
 
         # Finding the summary URL (currently not used)
         # --------------------------------------------
-        for urlNode in tree.findall('.//SummaryURL'):
-            summaryUrl = urlNode.attrib['{cips.nci.nih.gov/cdr}xref']
+        for urlNode in root.findall('SummaryMetaData/SummaryURL'):
+            summaryUrl = urlNode.get('{cips.nci.nih.gov/cdr}xref')
 
         # Searching for all ProtocolRef elements within the document
         # and testing the URL final location
@@ -83,11 +81,9 @@ class SummaryDoc:
         # We're creating the rows with the original URL first and
         # are replacing the final URL after the "requests" call.
         # ----------------------------------------------------------
-        for node in tree.findall('.//ProtocolRef'):
-            attribs = node.attrib
-            if 'nct_id' in attribs:
-                nctId = attribs['nct_id']
-
+        for node in root.iter('ProtocolRef'):
+            nct_id = node.get("nct_id")
+            if nct_id:
                 url = 'https://www.cancer.gov/clinicaltrials/%s' % nctId
                 row = [self.docId, titleNode.text, node.text, url]
             else:
@@ -178,6 +174,7 @@ if __name__ == "__main__":
     # Connecting to DB and selecting all published summaries
     # with ProtocolRefs
     # --------------------------------------------------------
+    start = datetime.datetime.now()
     qry = """
         SELECT DISTINCT p.doc_id
           FROM query_term_pub p
@@ -186,15 +183,14 @@ if __name__ == "__main__":
          WHERE path like '/Summary/%ProtocolRef%'
          ORDER BY p.doc_id
     """
-    query = cdrdb.Query("query_term_pub p",
-                        "DISTINCT p.doc_id").order("p.doc_id")
+    query = cdrdb.Query("query_term_pub p", "p.doc_id").unique().order(1)
     query.join("pub_proc_cg c", "c.id = p.doc_id")
-    query.where("path like '/Summary/%ProtocolRef%'")
-    cursor = query.execute()
-    rows = cursor.fetchall()
-    cursor.close()
+    query.where("path LIKE '/Summary/%ProtocolRef%'")
+    rows = query.execute().fetchall()
+    SummaryDoc.logger.info("Found %d summaries with ProtocolRef links",
+                           len(rows))
 
-    docIds = [row[0] for row in rows]
+    docIds = [row.doc_id for row in rows]
     rows = []
 
     #start_time = time.time()
@@ -204,7 +200,10 @@ if __name__ == "__main__":
             doc = SummaryDoc(docId)
             rows.extend(doc.rows)
         except Exception as e:
+            SummaryDoc.logger.exception("Failure parsing SummaryDoc")
             cdrcgi.bail("CDR%d: %s" % (docId, e))
-
+    elapsed = datetime.datetime.now() - start
+    SummaryDoc.logger.info("Finished parsing summaries")
+    SummaryDoc.logger.info("Elapsed: %s", elapsed)
     #print("--- {} seconds ---".format(time.time() - start_time))
     show_report(rows)

@@ -60,9 +60,9 @@ if not cdrcgi.is_date(fromDate) or not cdrcgi.is_date(toDate):
 
 class Status:
     def __init__(self, node):
-        self.value = u''
-        self.date = u''
-        self.comment = u''
+        self.value = ''
+        self.date = ''
+        self.comment = ''
         for child in node:
             if child.tag == "ProcessingStatusValue":
                 self.value = child.text
@@ -124,7 +124,7 @@ class MediaDoc:
         sheet.write(row, 0, self.docId, styles.center)
         sheet.write(row, 1, self.title, styles.left)
         sheet.write(row, 2, self.encoding, styles.left)
-        sheet.write(row, 3, self.dateCreated or u'', styles.center)
+        sheet.write(row, 3, self.dateCreated or '', styles.center)
         sheet.write(row, 4, self.flag, styles.center)
         sheet.write(row, 5, self.dateVersioned, styles.center)
         sheet.write(row, 6, self.comment, styles.left)

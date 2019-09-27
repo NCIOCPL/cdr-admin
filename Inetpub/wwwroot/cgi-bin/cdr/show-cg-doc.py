@@ -10,11 +10,11 @@ cursor   = db.connect(user='CdrGuest').cursor()
 titles   = ""
 
 def bail(message):
-    print("""\
+    print(f"""\
 Content-type: text/html
 
-<p style='font-weight: bold; font-size: 12pt; color: red'>%s</p>
-""" % repr(message))
+<p style='font-weight: bold; font-size: 12pt; color: red'>{message!r}</p>
+""")
     sys.exit(0)
 
 def makeDoctypeList():

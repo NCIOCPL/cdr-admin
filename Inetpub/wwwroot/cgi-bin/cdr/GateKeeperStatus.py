@@ -51,9 +51,9 @@ def fix(me, nbsp_for_empty_values=False):
 # ----------------------------------------------------------------------
 # Display the input form
 # ----------------------------------------------------------------------
-def showForm(extra = u""):
-    title = u"GateKeeper Status Request Form"
-    html = u"""\
+def showForm(extra = ""):
+    title = "GateKeeper Status Request Form"
+    html = """\
 <html>
  <head>
   <title>%s</title>
@@ -165,7 +165,7 @@ def addRow(cursor, cdrFlag):
         cdrRecord = cdrFlag and "Error" or "Removed"
     else:
         cdrRecord = cdrFlag and "OK" or "Error"
-    return (u"""\
+    return ("""\
    <tr>
     <td>%s</td>
     <td>%s</td>
@@ -189,10 +189,10 @@ def addRow(cursor, cdrFlag):
 # -----------------------------------------------------------------
 def makeError(error, exception):
     if logging:
-        return (u"<span style='color: red; font-weight: bold'>%s: %s</span>"
+        return ("<span style='color: red; font-weight: bold'>%s: %s</span>"
                 % (fix(error), fix(exception)))
     else:
-        return (u"<span style='color: red; font-weight: bold'>%s</span>" %
+        return ("<span style='color: red; font-weight: bold'>%s</span>" %
                 fix(error))
 
 
@@ -202,11 +202,11 @@ if jobId:
     try:
         response = cdr2gk.requestStatus('Summary', jobId, host=host)
     except Exception as e:
-        showForm(makeError(u"Job %s not found" % jobId, e))
+        showForm(makeError("Job %s not found" % jobId, e))
 
     details = response.details
 
-    html = [u"""\
+    html = ["""\
 <html>
  <head>
   <title>Summary Report for Job %s</title>
@@ -295,13 +295,13 @@ if jobId:
                 pDoc += 1
                 html.append(addRow(cursor, isRecorded))
 
-    html.append(u"""\
+    html.append("""\
   </table>
   <p>%d Records checked, %d Records not in pub_proc_cg</p>
  </body>
 </html>
 """ % (iDoc, pDoc))
-    cdrcgi.sendPage(u"".join(html))
+    cdrcgi.sendPage("".join(html))
 
 # Process the case when *all* documents are being checked or a single
 # CDR-ID has been passed.
@@ -314,18 +314,18 @@ if action:
             response = cdr2gk.requestStatus('SingleDocument', cdrId, host=host)
         except Exception as e:
             showForm(makeError("Report for CDR%s not found" % cdrId, e))
-        title = u"Location Status for Document CDR%s" % cdrId
+        title = "Location Status for Document CDR%s" % cdrId
     else:
         try:
             response = cdr2gk.requestStatus('DocumentLocation', host=host)
         except Exception as e:
             showForm(makeError("Unable to generate report on all documents",
                                e))
-        title = u"Location Status for All Documents"
+        title = "Location Status for All Documents"
 
     details = response.details
     docs = details and details.docs or []
-    print(u"""\
+    print("""\
 Content-type: text/html
 
 <html>
@@ -376,7 +376,7 @@ Content-type: text/html
         if cdrId or not isRecorded:
             if not isRecorded:
                 pDoc += 1
-            print(u"""\
+            print("""\
    <tr>
     <td>%s</td>
     <td>%s</td>
@@ -395,7 +395,7 @@ Content-type: text/html
                fix(doc.liveDateTime),
                isRecorded and 'OK' or 'Error'))
 
-    print(u"""\
+    print("""\
   </table>
   <p>%d Records checked, %d Records not in pub_proc_cg</p>
  </body>

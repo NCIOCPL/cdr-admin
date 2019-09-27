@@ -41,7 +41,7 @@ if request == "Log Out":
 #----------------------------------------------------------------------
 if not email:
     form = """\
-   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
+   <input type='hidden' name='%s' value='%s'>
 
    <fieldset>
    <p>
@@ -55,14 +55,14 @@ if not email:
     <br>
     <b>Email address(es):&nbsp;&nbsp;&nbsp;</b>
     <br>
-    <INPUT Name='email' Size='70' value='%s'>
+    <input name='email' size='70' value='%s'>
 
 """ % (cdrcgi.SESSION, session, cdr.getEmail(session))
 
     cdrcgi.sendPage(header + form + """\
    </fieldset>
- </BODY>
-</HTML>
+ </body>
+</html>
 """)
 
 #----------------------------------------------------------------------

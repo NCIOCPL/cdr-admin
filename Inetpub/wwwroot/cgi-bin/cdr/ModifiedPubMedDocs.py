@@ -7,7 +7,7 @@
 import cgi
 import cdrcgi
 from cdrapi import db
-import urllib
+import urllib.parse
 
 #----------------------------------------------------------------------
 # Named constants.
@@ -42,8 +42,8 @@ rows = query.execute().fetchall()
 #----------------------------------------------------------------------
 # Assemble the report.
 #----------------------------------------------------------------------
-title   = u"CDR Administration"
-instr   = u"Modified PubMed Documents"
+title   = "CDR Administration"
+instr   = "Modified PubMed Documents"
 buttons = (SUBMENU, cdrcgi.MAINMENU)
 caption = "Modified Documents (%d)" % len(rows)
 columns = (
@@ -58,7 +58,7 @@ parms = {
 for doc_id, doc_title in rows:
     doc_id_string = "CDR%010d" % doc_id
     parms["DocId"] = doc_id_string
-    url = "Filter.py?" + urllib.urlencode(parms)
+    url = "Filter.py?" + urllib.parse.urlencode(parms)
     short_title = doc_title[:100]
     if len(doc_title) > 100:
         short_title += " ..."

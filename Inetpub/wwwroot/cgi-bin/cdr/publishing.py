@@ -16,7 +16,7 @@ import cgi
 import lxml.etree as etree
 import os
 import re
-import urllib
+import urllib.parse
 from cdrapi import db
 from cdrapi.settings import Tier
 
@@ -124,7 +124,7 @@ class Control:
         Get a CGI value by name and make sure it hasn't been tampered with.
         Invoked by collect_user_choices().
         """
-        value = self.fields.getvalue(name) or u""
+        value = self.fields.getvalue(name) or ""
         if not value:
             return value
         info = self.system.param_info.get(name)
@@ -171,7 +171,7 @@ class Control:
         for system in self.systems:
             label = "%s [Version %d]" % (system.name, system.system_version)
             args["system"] = system.system_id
-            url = "%s?%s" % (self.script, urllib.urlencode(args))
+            url = "%s?%s" % (self.script, urllib.parse.urlencode(args))
             link = page.B.A(label, href=url)
             br = page.B.BR()
             br.tail = system.description
@@ -200,7 +200,7 @@ class Control:
             if subset.name == "Republish-Export":
                 continue
             args["subset"] = subset.name
-            url = "%s?%s" % (self.script, urllib.urlencode(args))
+            url = "%s?%s" % (self.script, urllib.parse.urlencode(args))
             link = page.B.A(subset.name, href=url)
             description = subset.description.replace("\n", cdrcgi.NEWLINE)
             description = page.B.PRE(description, description_class)

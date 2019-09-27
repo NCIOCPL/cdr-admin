@@ -28,6 +28,7 @@ class Control:
     """
 
     TIER = Tier()
+    PP = "PublishPreview.py"
     URL = "http://ncigovcdode36.prod.acquia-sites.com"
     URL = "https://{}".format(TIER.hosts["DRUPAL"])
     CIS = {
@@ -93,23 +94,18 @@ a:hover { color: maroon; }
         summary.send()
 
     def add_link(self, page, doc_id, title):
-        url = "pp.py?id={:d}".format(doc_id)
+        url = f"{self.PP}?DocId={doc_id:d}"
         opts = dict(href=url, target="_blank")
         a = html.builder.A(title, **opts)
         page.add(a)
         page.add(html.builder.BR())
 
     def pick(self):
-        opts = dict(
-            subtitle="Prototype for Drupal CMS",
-            #buttons=["Submit"],
-            #action="pp.py"
-        )
-        page = Page("Publish Preview", **opts)
+        page = Page("Publish Preview", subtitle="Prototype for Drupal CMS")
         page.add("<fieldset>")
         page.add(html.builder.LEGEND("Drugs"))
         for title in sorted(self.DIS):
-            self.add_link(page, self.DIS[title], title + u" Drug Summary")
+            self.add_link(page, self.DIS[title], title + " Drug Summary")
         page.add("</fieldset>")
         for summary_type in sorted(self.CIS):
             topics = self.CIS[summary_type]
@@ -124,7 +120,6 @@ a:hover { color: maroon; }
                             args = audience, topic, language
                             title = "{} {} Summary ({})".format(*args)
                             self.add_link(page, doc_id, title)
-                            #page.add_radio("id", title, doc_id)
                         language = "Spanish"
                     audience = "Patient"
             page.add("</fieldset>")
@@ -137,6 +132,7 @@ class Summary:
     Base class for PDQ summary documents (cancer and drug information)
     """
 
+    PP = Control.PP
     PROXY = "/cgi-bin/cdr/proxy.py"
     TIER_SUFFIXES = dict(DEV="-blue-dev", PROD="")
     IMAGE_PATH = "/images/cdr/live"
@@ -200,19 +196,19 @@ class Summary:
     def postprocess(self, page):
         for script in page.iter("script"):
             if script.text is None:
-                script.text = u" "
+                script.text = " "
             url = script.get("src")
-            if url is not None and not url.startswith(u"https:"):
-                if not url.startswith(u"http"):
-                    url = u"{}{}".format(self.url, url)
-                src = u"{}?url={}".format(self.PROXY, url)
-                script.set(u"src", src)
+            if url is not None and not url.startswith("https:"):
+                if not url.startswith("http"):
+                    url = "{}{}".format(self.url, url)
+                src = "{}?url={}".format(self.PROXY, url)
+                script.set("src", src)
         for link in page.findall("head/link"):
             url = link.get("href")
             if url is not None and not url.startswith("https://"):
-                if not url.startswith(u"http"):
-                    url = u"{}{}".format(self.url, url)
-                href = u"{}?url={}".format(self.PROXY, url)
+                if not url.startswith("http"):
+                    url = "{}{}".format(self.url, url)
+                href = "{}?url={}".format(self.PROXY, url)
                 link.set("href", href)
         replacement = "https://{}{}".format(self.image_host, self.IMAGE_PATH)
         for img in page.iter("img"):
@@ -244,14 +240,14 @@ class Summary:
                                 fixed = "#" + frag
                                 link_type = "SummaryFragRef-internal+uri"
                             else:
-                                fixed = "pp.py?id={:d}#{}".format(doc_id, frag)
+                                fixed = f"{self.PP}?DocId={doc_id:d}#{frag}"
                                 link_type = "SummaryFragRef-external"
                         else:
-                            fixed = "pp.py?id={:d}".format(doc_id)
+                            fixed = f"{self.PP}?DocId={doc_id:d}"
                             link_type = "SummaryRef-external"
                     else:
-                        fixed = "{}{}".format(self.url, href)
-                        # fixed = u"{}?url={}".format(self.PROXY, fixed)
+                        fixed = f"{self.url}{href}"
+                        # fixed = f"{self.PROXY}?url={fixed}"
                         link_type = "Cancer.gov-link"
                 else:
                     link_type = "Dead-link"

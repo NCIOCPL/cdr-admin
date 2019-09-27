@@ -5,6 +5,7 @@
 # BZIssue::5002 - Setting up MAHLER
 #
 #----------------------------------------------------------------------
+import cgi
 import cdrcgi
 from cdrapi import db
 
@@ -71,8 +72,8 @@ class Catalog:
     def __init__(self, cursor):
         self.databases = {}
         cursor.execute("""\
-    SELECT name 
-      FROM master..sysdatabases 
+    SELECT name
+      FROM master..sysdatabases
      ORDER BY name""")
         for row in cursor.fetchall():
             try:
@@ -84,11 +85,9 @@ class Catalog:
 def showTables(tables, label, html):
     if tables:
         html.append("<span class='heading'>%s</span>\n" % label)
-        tableNames = tables.keys()
-        tableNames.sort(lambda a,b: cmp(a.upper(), b.upper()))
-        for tableName in tableNames:
-            table = tables[tableName]
-            html.append("  <span class='tabname'>%s</span>" % tableName)
+        for name in sorted(tables, key=str.upper):
+            table = tables[name]
+            html.append(f"  <span class='tabname'>{name}</span>")
             for col in table.cols:
                 cls = col.pkPos and 'pk' or 'col'
                 nul = col.nullable[0] == 'Y' and "NULL" or "NOT NULL"
@@ -98,11 +97,12 @@ def showTables(tables, label, html):
         html.append("")
 
 if __name__ == '__main__':
+    fields  = cgi.FieldStorage()
+    all_dbs = True if fields.getvalue("all-dbs") else False
     conn    = db.connect(user='CdrGuest')
     cursor  = conn.cursor()
     catalog = Catalog(cursor)
-    dbNames = catalog.databases.keys()
-    html    = [u"""\
+    html    = ["""\
 <html>
  <head>
   <title>DB Catalog</title>
@@ -118,13 +118,22 @@ if __name__ == '__main__':
   <h1>DB Catalog</h1>
   <pre>
 """]
+    for name in sorted(catalog.databases):
+        if all_dbs or name.startswith("cdr"):
+            html.append(f"<span class='dbname'>{name} DATABASE</span>\n")
+            database = catalog.databases[name]
+            if database.tables:
+                showTables(database.tables, "TABLES", html)
+            if database.views:
+                showTables(database.views, "VIEWS", html)
+    '''
     html.append("<span class='dbname'>cdr DATABASE</span>\n")
     database = catalog.databases['cdr']
     showTables(database.tables, "TABLES", html)
     showTables(database.views, "VIEWS", html)
-
-html.append(u"""\
+    '''
+html.append("""\
   </pre>
  </body>
 </html>""")
-cdrcgi.sendPage(u"\n".join(html))
+cdrcgi.sendPage("\n".join(html))

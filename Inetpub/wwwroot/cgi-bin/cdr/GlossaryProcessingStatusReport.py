@@ -74,25 +74,25 @@ def getText(e, pieces = None):
     if e.tail is not None:
         pieces.append(e.tail)
     if top:
-        return u"".join(pieces)
+        return "".join(pieces)
 
 #----------------------------------------------------------------------
 # For Spanish names we need to know whether they're alternate names.
 #----------------------------------------------------------------------
 class SpanishName:
     def __init__(self, node):
-        self.string = u""
+        self.string = ""
         self.alternate = node.get('NameType') == 'alternate'
         for s in node.findall('TermNameString'):
             self.string = getText(s)
-    def __unicode__(self):
+    def __str__(self):
         # Can't call html_escape() if string = None
         if self.string:
             name = html_escape(self.string)
         else:
-            name = u""
+            name = ""
         if self.alternate:
-            return u"<span class='alt'>%s</span>" % name
+            return "<span class='alt'>%s</span>" % name
         return name
 
 #----------------------------------------------------------------------
@@ -101,14 +101,14 @@ class SpanishName:
 class Name:
     def __init__(self, docId, cursor, conceptId = None):
         self.docId = docId
-        self.string = u"[NO NAME]"
+        self.string = "[NO NAME]"
         self.spanish = []
-        self.status = u""
-        self.comment = u""
+        self.status = ""
+        self.comment = ""
         self.conceptId = conceptId
         cursor.execute("SELECT xml FROM document WHERE id = ?", docId)
         docXml = cursor.fetchall()[0][0]
-        tree = etree.XML(docXml.encode('utf-8'))
+        tree = etree.XML(docXml.encode("utf-8"))
         for n in tree.findall('TermName'):
             for s in n.findall('TermNameString'):
                 self.string = getText(s)
@@ -135,11 +135,11 @@ class Name:
          WHERE path = '/GlossaryTermName/GlossaryTermConcept/@cdr:ref'
            AND doc_id = ?""", docId)
             rows = cursor.fetchall()
-            self.conceptId = rows and rows[0][0] or u""
-    def __unicode__(self):
+            self.conceptId = rows and rows[0][0] or ""
+    def __str__(self):
         if 'spanish' not in status.lower():
-            return u"%s (CDR%d)" % (html_escape(self.string), self.docId)
-        return u"%s (CDR%d)" % (u"; ".join([u"%s" % n for n in self.spanish]),
+            return "%s (CDR%d)" % (html_escape(self.string), self.docId)
+        return "%s (CDR%d)" % ("; ".join(["%s" % n for n in self.spanish]),
                                 self.docId)
 
 #----------------------------------------------------------------------
@@ -147,16 +147,16 @@ class Name:
 #----------------------------------------------------------------------
 class Concept:
     def __init__(self, docId, cursor = None):
-        self.docId = cursor and docId or u''
-        self.status = u""
+        self.docId = cursor and docId or ''
+        self.status = ""
         self.names = {}
-        self.comment = u""
+        self.comment = ""
         if self.docId:
             cursor.execute("SELECT xml FROM document WHERE id = ?", docId)
             row = cursor.fetchone()
             if not row:
                 return
-            tree = etree.XML(row[0].encode('utf-8'))
+            tree = etree.XML(row[0].encode("utf-8"))
             eName = 'TermDefinition'
             if language != 'en':
                 eName = 'TranslatedTermDefinition'
@@ -182,14 +182,14 @@ class Concept:
 class Comment:
     def __init__(self, node):
         self.text = getText(node)
-        self.audience = node.get('audience') or u''
-        self.date = node.get('date') or u''
-        self.user = node.get('user') or u''
-    def __unicode__(self):
+        self.audience = node.get('audience') or ''
+        self.date = node.get('date') or ''
+        self.user = node.get('user') or ''
+    def __str__(self):
         text = self.text
         if not text:
-            text = u"[NO TEXT ENTERED FOR COMMENT]"
-        return u"[audience=%s; date=%s; user=%s] %s" % (self.audience,
+            text = "[NO TEXT ENTERED FOR COMMENT]"
+        return "[audience=%s; date=%s; user=%s] %s" % (self.audience,
                                                         self.date,
                                                         html_escape(self.user),
                                                         html_escape(text))
@@ -274,7 +274,7 @@ cursor.execute("""\
 for row in cursor.fetchall():
     docId = row[0]
     name = Name(docId, cursor)
-    if name.status == status:
+    if name.status == status and name.conceptId:
         concept = concepts.get(name.conceptId)
         if concept is None:
             concept = Concept(name.conceptId, show_all and cursor or None)
@@ -302,7 +302,7 @@ if show_all:
 #----------------------------------------------------------------------
 # Assemble the report.
 #----------------------------------------------------------------------
-html = [u"""\
+html = ["""\
 <!DOCTYPE html>
 <html>
  <head>
@@ -336,23 +336,20 @@ html = [u"""\
     <th>Last Comment</th>
    </tr>
 """ % (title, title)]
-conceptIds = concepts.keys()
-conceptIds.sort()
-for conceptId in conceptIds:
+for conceptId in sorted(concepts):
     concept = concepts[conceptId]
-    nameIds = concept.names.keys()
+    nameIds = sorted(concept.names)
     rowspan = len(nameIds) or 1
-    gtcId = gtcStatus = gtcComment = gtn = gtnStatus = gtnComment = u""
+    gtcId = gtcStatus = gtcComment = gtn = gtnStatus = gtnComment = ""
     if show_all or concept.status == status:
         gtcId = concept.docId
-        gtcStatus = concept.status or u""
-        gtcComment = concept.comment or u""
-    nameIds.sort()
+        gtcStatus = concept.status or ""
+        gtcComment = concept.comment or ""
     if nameIds:
         gtn = concept.names[nameIds[0]]
         gtnStatus = gtn.status
         gtnComment = gtn.comment
-    html.append(u"""\
+    html.append("""\
    <tr>
     <td valign='top' rowspan='%d'>%s</td>
     <td valign='top' rowspan='%d'>%s</td>
@@ -365,15 +362,15 @@ for conceptId in conceptIds:
        gtn, gtnStatus, gtnComment))
     for nameId in nameIds[1:]:
         name = concept.names[nameId]
-        html.append(u"""\
+        html.append("""\
    <tr>
     <td valign='top'>%s</td>
     <td valign='top'>%s</td>
     <td valign='top'>%s</td>
    </tr>
 """ % (name, name.status, name.comment))
-html.append(u"""\
+html.append("""\
   </table>
  </body>
 </html>""")
-cdrcgi.sendPage(u"".join(html))
+cdrcgi.sendPage("".join(html))

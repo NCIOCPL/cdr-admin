@@ -219,9 +219,9 @@ class Board:
                     if node.get("Source") == "advisory-board":
                         self.counts.advisory += 1
 
-        def __cmp__(self, other):
+        def __lt__(self, other):
             "Support sorting the board's summaries by title."
-            return cmp((self.title, self.id), (other.title, other.id))
+            return (self.title, self.id) < (other.title, other.id)
 
         def get_summary_title(self, doc_id):
             "Pull the summary's title from the query_term table."

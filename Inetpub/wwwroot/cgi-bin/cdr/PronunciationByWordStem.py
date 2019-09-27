@@ -8,6 +8,7 @@
 import cgi, cdr, cdrcgi, string, time, xml.dom.minidom, xml.sax.saxutils
 from cdrapi import db
 from html import escape as html_escape
+from operator import attrgetter
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -63,7 +64,7 @@ if not (name and name.strip()) and not (pron and pron.strip()):
 #----------------------------------------------------------------------
 def fix(me):
     if not me:
-        return u"&nbsp;"
+        return "&nbsp;"
     return me # xml.sax.saxutils.escape(me)
 
 #----------------------------------------------------------------------
@@ -71,8 +72,8 @@ def fix(me):
 #----------------------------------------------------------------------
 def fixList(defs):
     if not defs:
-        return u"&nbsp;"
-    return fix(u"; ".join(defs))
+        return "&nbsp;"
+    return fix("; ".join(defs))
 
 #----------------------------------------------------------------------
 # Extract the complete content of an element, tags and all.
@@ -86,24 +87,24 @@ def getNodeContent(node, pieces = None):
                 pieces.append(xml.sax.saxutils.escape(child.nodeValue))
         elif child.nodeType == child.ELEMENT_NODE:
             if child.nodeName == 'Insertion':
-                pieces.append(u"<span style='color: red'>")
+                pieces.append("<span style='color: red'>")
                 getNodeContent(child, pieces)
-                pieces.append(u"</span>")
+                pieces.append("</span>")
             elif child.nodeName == 'Deletion':
-                pieces.append(u"<span style='text-decoration: line-through'>")
+                pieces.append("<span style='text-decoration: line-through'>")
                 getNodeContent(child, pieces)
-                pieces.append(u"</span>")
+                pieces.append("</span>")
             elif child.nodeName == 'Strong':
-                pieces.append(u"<b>")
+                pieces.append("<b>")
                 getNodeContent(child, pieces)
-                pieces.append(u"</b>")
+                pieces.append("</b>")
             elif child.nodeName in ('Emphasis', 'ScientificName'):
-                pieces.append(u"<i>")
+                pieces.append("<i>")
                 getNodeContent(child, pieces)
-                pieces.append(u"</i>")
+                pieces.append("</i>")
             else:
                 getNodeContent(child, pieces)
-    return u"".join(pieces)
+    return "".join(pieces)
 
 class Comment:
     def __init__(self, node):
@@ -136,12 +137,12 @@ class GlossaryTerm:
 #----------------------------------------------------------------------
 conn = db.connect(user='CdrGuest')
 cursor = conn.cursor()
-nameVal = name and name.strip() or u""
-pronVal = pron and pron.strip() or u""
-if nameVal and u'%' not in nameVal: nameVal = u"%%%s%%" % nameVal
-if pronVal and u'%' not in pronVal: pronVal = u"%%%s%%" % pronVal
+nameVal = name and name.strip() or ""
+pronVal = pron and pron.strip() or ""
+if nameVal and '%' not in nameVal: nameVal = "%%%s%%" % nameVal
+if pronVal and '%' not in pronVal: pronVal = "%%%s%%" % pronVal
 if nameVal and pronVal:
-    stems = (u"Name Stem: %s<br />Pronunciation Stem: %s" %
+    stems = ("Name Stem: %s<br />Pronunciation Stem: %s" %
              (html_escape(name), html_escape(pron)))
     cursor.execute("""\
 SELECT DISTINCT doc_id
@@ -153,7 +154,7 @@ SELECT DISTINCT doc_id
 else:
     val   = nameVal or pronVal
     elem  = nameVal and 'NameString' or 'Pronunciation'
-    stems = u"%s Stem: %s" % (elem,
+    stems = "%s Stem: %s" % (elem,
                               nameVal and html_escape(name) or html_escape(pron))
     cursor.execute("""\
 SELECT DISTINCT doc_id
@@ -166,10 +167,9 @@ for row in rows:
     doc = cdr.getDoc('guest', row[0], getObject = True)
     dom = xml.dom.minidom.parseString(doc.xml)
     terms.append(GlossaryTerm(row[0], dom.documentElement))
-terms.sort(lambda a,b: cmp(a.name, b.name))
 
-html = [u"""\
-<!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
+html = ["""\
+<!DOCTYPE html>
 <html>
  <head>
   <title>Pronunciation by Term Stem Report</title>
@@ -201,16 +201,16 @@ html = [u"""\
     <th>Comments</th>
    </tr>
 """ % stems]
-for term in terms:
-    comment = u"&nbsp;"
+for term in sorted(terms, key=attrgetter("name")):
+    comment = "&nbsp;"
     if term.comment:
-        user = date = u""
+        user = date = ""
         if term.comment.user:
-            user = u"[user=%s] " % term.comment.user
+            user = "[user=%s] " % term.comment.user
         if term.comment.date:
-            date = u"[date=%s] " % term.comment.date
+            date = "[date=%s] " % term.comment.date
         comment = user + date + fix(term.comment.text)
-    html.append(u"""\
+    html.append("""\
    <tr>
     <td>%d</td>
     <td>%s</td>
@@ -223,9 +223,9 @@ for term in terms:
        fix(term.pronunciation),
        fixList(term.pronunciationResources),
        comment))
-html.append(u"""\
+html.append("""\
   </table>
  </body>
 </html>
 """)
-cdrcgi.sendPage(u"".join(html))
+cdrcgi.sendPage("".join(html))

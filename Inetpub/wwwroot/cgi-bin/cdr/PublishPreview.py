@@ -480,6 +480,8 @@ if not cachedHtml:
         showProgress("Submitting request to Cancer.gov...")
         resp = cdr2gk.pubPreview(doc, flavor, host=cgHost)
         cgHtml = resp.xmlResult
+        if isinstance(cgHtml, bytes):
+            cgHtml = str(cgHtml, "utf-8")
         showProgress("Response received from Cancer.gov...")
     except Exception as e:
         #cdrcgi.bail('Error in PubPreview:' + str(e))
@@ -647,7 +649,7 @@ if convert:
                     #showProgress(newLink)
             # Resetting the glossary links so we don't follow
             # a dead end.
-            else:
+            elif link and "=" in link:
                 #x.set('onclick', 'return false')
                 ppLink  = '/cgi-bin/cdr/PublishPreview.py?Session=guest'
                 ppLink += '&DocId=%s' % link.split('=')[1]
@@ -714,7 +716,7 @@ else:
 # -----------------------------------------------------------------
 html = lxml.html.tostring(myHtml.getroottree(),
                           include_meta_content_type = True,
-                          encoding = 'utf-8',
+                          encoding = 'unicode',
                           method = 'xml')
 
 #----------------------------------------------------------------------
@@ -748,4 +750,4 @@ if dbgLog:
     with open(f"{cdr.TMP}/pp-%s.html" % docId, "wb") as fp:
         fp.write(html)
 
-cdrcgi.sendPage("%s" % html.decode('utf-8'))
+cdrcgi.sendPage(html)

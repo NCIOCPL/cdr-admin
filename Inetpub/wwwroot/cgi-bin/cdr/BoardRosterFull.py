@@ -70,10 +70,10 @@ columns = [('Board Name',boardInfo),
 rptType    = fields and fields.getvalue("rpttype") or 'html'
 session    = cdrcgi.getSession(fields)
 request    = cdrcgi.getRequest(fields)
-title      = u"PDQ Board Roster Report"
-instr      = u"Report on PDQ Board Roster"
-script     = u"BoardRosterFull.py"
-SUBMENU    = u"Report Menu"
+title      = "PDQ Board Roster Report"
+instr      = "Report on PDQ Board Roster"
+script     = "BoardRosterFull.py"
+SUBMENU    = "Report Menu"
 buttons    = ("Submit", SUBMENU, cdrcgi.MAINMENU)
 header     = cdrcgi.header(title, title, instr, script, buttons,
                            method = 'GET',
@@ -127,7 +127,7 @@ header     = cdrcgi.header(title, title, instr, script, buttons,
     </style>
 """)
 
-dateString = time.strftime(u"%B %d, %Y")
+dateString = time.strftime("%B %d, %Y")
 
 filterType= {'summary':'name:PDQBoardMember Roster Summary',
              'excel'  :'name:PDQBoardMember Roster Excel',
@@ -234,24 +234,24 @@ def addTableRow(person, columns):
         elif colHeader == 'Blank':
             tableRows[colHeader] = ''
 
-    htmlRow = u"""\
+    htmlRow = """\
        <tr>
         <td>%s</td>""" % person.boardMemberName
 
     for colHeader, colDisplay in columns:
         if colDisplay == 'Yes' and colHeader == 'Email':
-            htmlRow += u"""
+            htmlRow += """
         <td class="email">
          <a href="mailto:%s">%s</a>
         </td>""" % (tableRows[colHeader], tableRows[colHeader])
         elif colDisplay == 'Yes' and colHeader == 'Blank':
-            htmlRow += u"""
+            htmlRow += """
         <td class="blank">&nbsp;</td>"""
         elif colDisplay == 'Yes':
-            htmlRow += u"""
+            htmlRow += """
         <td>%s</td>""" % tableRows[colHeader]
 
-    htmlRow += u"""
+    htmlRow += """
        </tr>"""
     return htmlRow
 
@@ -260,27 +260,27 @@ def addTableRow(person, columns):
 # If we don't have a request, put up the form.
 #----------------------------------------------------------------------
 if not boardType:
-    form   = u"""\
-      <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-      <TABLE border='0'>
-       <TR>
-        <TD ALIGN='right'><B>PDQ Boards included:&nbsp;</B></TD>
-        <TD>
-        <SELECT NAME='board'>
-        <OPTION SELECTED value='Editorial'>PDQ Editorial Boards</OPTION>
-        <OPTION value='Advisory'>PDQ Editorial Advisory Boards</OPTION>
-        </SELECT>
-        </TD>
-       </TR>
-       <TR>
-        <TD ALIGN='right'><B>Sort report by:&nbsp;</B></TD>
-        <TD>
-        <SELECT NAME='sort'>
-        <OPTION SELECTED value='Member'>Member Name</OPTION>
-        <OPTION value='Board'>Member Name (group by Board)</OPTION>
-        </SELECT>
-        </TD>
-       </TR>
+    form   = """\
+      <input type='hidden' name='%s' value='%s'>
+      <table border='0'>
+       <tr>
+        <td align='right'><b>PDQ Boards included:&nbsp;</b></td>
+        <td>
+         <select name='board'>
+          <option selected value='Editorial'>PDQ Editorial Boards</option>
+          <option value='Advisory'>PDQ Editorial Advisory Boards</option>
+         </select>
+        </td>
+       </tr>
+       <tr>
+        <td align='right'><b>Sort report by:&nbsp;</b></td>
+        <td>
+          <select name='sort'>
+           <option selected value='Member'>Member Name</option>
+           <option value='Board'>Member Name (group by Board)</option>
+          </select>
+         </td>
+        </tr>
 
    <tr>
     <td colspan="2">
@@ -291,7 +291,7 @@ if not boardType:
     <td> </td>
     <td class="grey">
      <div style="height: 10px"> </div>
-     <input TYPE='checkbox' NAME='sheet' id='summary'
+     <input type='checkbox' name='sheet' id='summary'
             onclick='javascript:doSummarySheet("summary")'>
       <label for="summary" class="select">
        <strong>Create Summary Sheet</strong>
@@ -299,76 +299,75 @@ if not boardType:
      <table>
       <tr>
        <th><span style="margin-left: 20px"> </span></th>
-       <th class="label2">Include Columns</th>
-      <tr>
-       <td><span style="margin-left: 20px"> </span></td>
-       <td class="select">
-        <input type='checkbox' name='binfo'
-               onclick='javascript:doSummarySheet()' id='E1' CHECKED>
-        <label for="E1">Board Name</label>
-       </td>
-      </tr>
-      <tr>
-       <td><span style="margin-left: 20px"> </span></td>
-       <td class="select">
-        <input type='checkbox' name='pinfo'
-               onclick='javascript:doSummarySheet()' id='E2'>
-        <label for="E2">Phone</label>
-       </td>
-      </tr>
-      <tr>
-       <td> </td>
-       <td class="select">
-        <input type='checkbox' name='finfo'
-               onclick='javascript:doSummarySheet()' id='E3'>
-        <label for="E3">Fax</label>
-       </td>
-      </tr>
-      <tr>
-       <td> </td>
-       <td class="select">
-        <input type='checkbox' name='einfo'
-               onclick='javascript:doSummarySheet()' id='E4'>
-        <label for="E4">Email</label>
-       </td>
-      </tr>
-      <tr>
-       <td> </td>
-       <td class="select">
-        <input type='checkbox' name='cinfo'
-               onclick='javascript:doSummarySheet()' id='E5'>
-        <label for="E5">CDR-ID</label>
-       </td>
-      </tr>
-      <tr>
-       <td> </td>
-       <td class="select">
-        <input type='checkbox' name='dinfo'
-               onclick='javascript:doSummarySheet()' id='E6'>
-        <label for="E6">Start Date</label>
-       </td>
-      </tr>
-      <tr>
-       <td> </td>
-       <td class="select">
-        <input type='checkbox' name='govemp'
-               onclick='javascript:doSummarySheet()' id='E7'>
-        <label for="E7">Government Employee</label>
-       </td>
-      </tr>
-      <tr>
-       <td> </td>
-       <td class="select">
-        <input type='checkbox' name='blank'
-               onclick='javascript:doSummarySheet()' id='E8'>
-        <label for="E8">Blank Column</label>
-       </td>
-      </tr>
-
-       </TABLE>
-      </FORM>
-     </BODY>
-    </HTML>
+        <th class="label2">Include Columns</th>
+        <tr>
+          <td><span style="margin-left: 20px"> </span></td>
+          <td class="select">
+            <input type='checkbox' name='binfo'
+                   onclick='javascript:doSummarySheet()' id='E1' CHECKED>
+            <label for="E1">Board Name</label>
+          </td>
+        </tr>
+        <tr>
+          <td><span style="margin-left: 20px"> </span></td>
+          <td class="select">
+            <input type='checkbox' name='pinfo'
+                   onclick='javascript:doSummarySheet()' id='E2'>
+            <label for="E2">Phone</label>
+          </td>
+        </tr>
+        <tr>
+          <td> </td>
+          <td class="select">
+            <input type='checkbox' name='finfo'
+                   onclick='javascript:doSummarySheet()' id='E3'>
+            <label for="E3">Fax</label>
+          </td>
+        </tr>
+        <tr>
+          <td> </td>
+          <td class="select">
+            <input type='checkbox' name='einfo'
+                   onclick='javascript:doSummarySheet()' id='E4'>
+            <label for="E4">Email</label>
+          </td>
+        </tr>
+        <tr>
+          <td> </td>
+          <td class="select">
+            <input type='checkbox' name='cinfo'
+                   onclick='javascript:doSummarySheet()' id='E5'>
+            <label for="E5">CDR-ID</label>
+          </td>
+        </tr>
+        <tr>
+          <td> </td>
+          <td class="select">
+            <input type='checkbox' name='dinfo'
+                   onclick='javascript:doSummarySheet()' id='E6'>
+            <label for="E6">Start Date</label>
+          </td>
+        </tr>
+        <tr>
+          <td> </td>
+          <td class="select">
+            <input type='checkbox' name='govemp'
+                   onclick='javascript:doSummarySheet()' id='E7'>
+            <label for="E7">Government Employee</label>
+          </td>
+        </tr>
+        <tr>
+          <td> </td>
+          <td class="select">
+            <input type='checkbox' name='blank'
+                   onclick='javascript:doSummarySheet()' id='E8'>
+            <label for="E8">Blank Column</label>
+          </td>
+        </tr>
+      </table>
+    </form>
+  </body>
+</html>
 """ % (cdrcgi.SESSION, session)
     cdrcgi.sendPage(header + form)
 
@@ -376,7 +375,7 @@ if not boardType:
 # Get the board's name from its ID.
 #----------------------------------------------------------------------
 allBoards = getBoardPicklist(boardType)
-boardIds  = allBoards.keys()
+boardIds  = list(allBoards)
 
 #----------------------------------------------------------------------
 # Main SELECT query
@@ -410,9 +409,8 @@ try:
              AND person_doc.active_status = 'A'
              AND member.int_val in (%s)
            ORDER BY member.int_val""" %
-                      ", ".join(["%s" % x for x in boardIds]))
+                      ", ".join([str(x) for x in boardIds]))
     rows = cursor.fetchall()
-    cursor.close()
     boardMembers = []
 
     for docId, boardId, term_start, name, ge in rows:
@@ -438,23 +436,22 @@ if rptType == 'html':
     # ---------------------------------------------------------------
     # Create the HTML Output Page
     # ---------------------------------------------------------------
-    html = u"""\
-    <!DOCTYPE HTML PUBLIC '-//W3C//DTD HTML 4.01 Transitional//EN'
-                          'http://www.w3.org/TR/html4/loose.dtd'>
-    <HTML>
-     <HEAD>
-      <TITLE>PDQ Board Member Roster Report - %s</title>
-      <META http-equiv='Content-Type' content='text/html; charset=UTF-8'>
-      <STYLE type='text/css'>
-       H1       { font-family: Arial, sans-serif;
+    html = """\
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>PDQ Board Member Roster Report - %s</title>
+    <meta http-equiv='Content-Type' content='text/html; charset=UTF-8'>
+    <style type='text/css'>
+       h1       { font-family: Arial, sans-serif;
                   font-size: 16pt;
                   text-align: center;
                   font-weight: bold; }
-       H2       { font-family: Arial, sans-serif;
+       h2       { font-family: Arial, sans-serif;
                   font-size: 14pt;
                   text-align: center;
                   font-weight: bold; }
-       P        { font-family: Arial, sans-serif;
+       p        { font-family: Arial, sans-serif;
                   font-size: 12pt; }
        #summary td, #summary th
                 { border: 1px solid black; }
@@ -470,9 +467,9 @@ if rptType == 'html':
        /* template for Persons.  The italic display used for the QC   */
        /* report does therefore need to be suppressed here.           */
        /* ----------------------------------------------------------- */
-       I        { font-family: Arial, sans-serif; font-size: 12pt;
+       i        { font-family: Arial, sans-serif; font-size: 12pt;
                   font-style: normal; }
-       SPAN.SectionRef { text-decoration: underline; font-weight: bold; }
+       span.SectionRef { text-decoration: underline; font-weight: bold; }
 
        .theader { background-color: #CFCFCF; }
        .name    { font-weight: bold;
@@ -485,25 +482,26 @@ if rptType == 'html':
                   font-weight: bold; }
        #main    { font-family: Arial, Helvetica, sans-serif;
                   font-size: 12pt; }
-      </STYLE>
-     </HEAD>
-     <BODY id="main">
-       <H1>All %s Boards<br>
+    </style>
+  </head>
+  <body id="main">
+    <h1>All %s Boards<br>
     """ % (boardType, boardType)
 
     # Adjusting the report title depending on the input values
     # --------------------------------------------------------
     if sortType == 'Member':
-        html += u"""
-       <span style="font-size: 12pt">by Member</span><br>
-    """
+        html += """\
+      <span style="font-size: 12pt">by Member</span><br>
+"""
     else:
-        html += u"""
-       <span style="font-size: 12pt">by Board and Member</span><br>
-    """
-    html += u"""
-       <span style="font-size: 12pt">%s</span></H1>
-    """ % (dateString)
+        html += """\
+      <span style="font-size: 12pt">by Board and Member</span><br>
+"""
+    html += """\
+      <span style="font-size: 12pt">%s</span>
+    </h1>
+""" % (dateString)
 
     boardTitle = None
     lastBoardTitle = None
@@ -512,19 +510,21 @@ if rptType == 'html':
     # We always print at least the board member name as a column
     # -----------------------------------------------------------
     if flavor == 'summary':
-        html += u"""
-      <table id="summary" cellspacing="0" cellpadding="5">
-       <tr class="theader">
-        <th class="thcell">Name</th>"""
+        html += """\
+    <table id="summary" cellspacing="0" cellpadding="5">
+      <tr class="theader">
+        <th class="thcell">Name</th>
+"""
 
         # Add column headings
         # -------------------
         for colHeader, colDisplay in columns:
             if colDisplay == 'Yes':
-                html += u"""
-        <th class="thcell">%s</th>""" % colHeader
-        html += """
-       </tr>
+                html += """\
+        <th class="thcell">%s</th>
+""" % colHeader
+        html += """\
+      </tr>
 """
 
     # Loop through the list of sorted members to get the address info
@@ -538,7 +538,7 @@ if rptType == 'html':
                                   boardMember[0],
                                   parm = [['otherInfo', otherInfo],
                                           ['assistant', assistant]])
-        if type(response) in (str, unicode):
+        if type(response) in (str, bytes):
             cdrcgi.bail("%s: %s" % (boardMember[0], response))
 
         # For the report we're just attaching the resulting HTML
@@ -548,34 +548,35 @@ if rptType == 'html':
         # page breaks within address blocks after the convertion to
         # MS-Word.
         # -----------------------------------------------------------
+        filtered_member_info = response[0]
         if flavor == 'full':
             # If we're grouping by board we need to display the board name
             # as a title.
             # ------------------------------------------------------------
             if not sortType == 'Member' and not lastBoardTitle == boardTitle:
-                html += u"""
-            <br>
-            <span class="bheader">%s</span>
-            <br>
-            """ % (boardTitle)
+                html += """\
+    <br>
+    <span class="bheader">%s</span>
+    <br>
+""" % (boardTitle)
 
             # If we're not grouping by board we need to print the board for
             # each board member
             # -------------------------------------------------------------
             if sortType == 'Member':
-                html += u"""
-                <table width='100%%'>
-                 <tr>
-                  <td>%s<span style="font-style: italic">%s</span><br><br><td>
-                 </tr>
-                </table>""" % (unicode(response[0], 'utf-8'), boardMember[2])
+                html += """\
+    <table width='100%%'>
+      <tr>
+        <td>%s<span style="font-style: italic">%s</span><br><br><td>
+      </tr>
+    </table>
+""" % (filtered_member_info, boardMember[2])
             else:
-                html += u"""
-                <table width='100%%'>
-                 <tr>
-                  <td>%s<br><td>
-                 </tr>
-                </table>""" % (unicode(response[0], 'utf-8'))
+                html += """\
+    <table width='100%%'>
+      <tr><td>%s<br><td></tr>
+    </table>
+""" % filtered_member_info
             lastBoardTitle = boardTitle
 
         # Creating the Summary sheet output
@@ -587,38 +588,34 @@ if rptType == 'html':
             # as an individuel row in the table
             # ------------------------------------------------------------
             if not sortType == 'Member' and not lastBoardTitle == boardTitle:
-                html += u"""
-            <tr>
-             <td class="theader" colspan="%d">
-              <b>%s</b>
-             </td>
-            </tr>
-            """ % (countCols(columns) + 1, boardTitle)
+                html += """\
+      <tr><td class="theader" colspan="%d"><b>%s</b></td></tr>
+""" % (countCols(columns) + 1, boardTitle)
             #if sortType == 'Member':
-            html += u"""%s
-            """ % (addTableRow(memberInfo, columns))
-            #else:
-            #    html += u"""%s
-            #""" % (addTableRow(memberInfo, columns))
+            html += """\
+%s
+""" % (addTableRow(memberInfo, columns))
 
             lastBoardTitle = boardTitle
 
     # Need to end the table wrapper for the summary sheet
     # ------------------------------------------------------
     if not flavor == 'full':
-        html += u"""      </table>"""
+        html += """\
+    </table>
+"""
 
-    html += u"""
-      <br>
-     </BODY>
-    </HTML>
-    """
+    html += """
+    <br>
+  </body>
+</html>
+"""
 
     # The users don't want to display the country if it's the US.
     # Since the address is build by a common address module we're
     # better off removing it in the final HTML output
     # ------------------------------------------------------------
-    cdrcgi.sendPage(html.replace(u'U.S.A.<br>', u''))
+    cdrcgi.sendPage(html.replace('U.S.A.<br>', ''))
 
 else:
     cdrcgi.bail("Sorry, don't know report type: %s" % rptType)

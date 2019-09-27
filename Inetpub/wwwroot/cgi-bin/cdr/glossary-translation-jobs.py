@@ -20,9 +20,9 @@ class Control(cdrcgi.Control):
 
     ADD = "Add Job"
     ASSIGN = "Assign"
-    PURGE = "Purge" # Completed Jobs"
-    SUMMARY = "Summary" # Queue"
-    MEDIA = "Media" # Queue"
+    PURGE = "Purge"
+    SUMMARY = "Summary"
+    MEDIA = "Media"
     REPORTS_MENU = SUBMENU = "Reports"
     ADMINMENU = "Admin"
 
@@ -234,11 +234,11 @@ class Job:
                 if True or rows:
                     titles = [row.title.split(";")[0] for row in rows]
                     #title = row.title.split(";")[0]
-                    pattern = u"GTC for {}"
+                    pattern = "GTC for {}"
                     #self._title = pattern.format(title)
-                    self._title = pattern.format(u"; ".join(titles))
+                    self._title = pattern.format("; ".join(titles))
                 else:
-                    pattern = u"GTC CDR{:d}"
+                    pattern = "GTC CDR{:d}"
                     self._title = pattern.format(self.doc_id)
         return self._title
 
