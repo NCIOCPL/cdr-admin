@@ -411,11 +411,13 @@ jQuery("input[value='%s']").click(function(e) {
         body.append("Job status: %s" % self.states.map.get(job.state_id))
         body.append("Date of status transition: %s" % job.state_date)
         body.append("Comments: %s" % job.comments)
+        opts = dict(subject=subject, body="\n".join(body))
         attachment = self.fetch_file()
-        attachments = attachment and [attachment] or None
+        if attachment:
+            opts["attachments"] = [attachment]
         try:
-            cdr.sendMailMime(sender, recips, subject, "\n".join(body),
-                             attachments=attachments)
+            message = cdr.EmailMessage(sender, recips, **opts)
+            message.send()
         except Exception as e:
             self.logger.error("sending mail: %s", e)
             cdrcgi.bail("sending mail: %s" % e)

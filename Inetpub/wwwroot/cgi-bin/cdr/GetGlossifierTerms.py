@@ -30,7 +30,9 @@ def reportDuplicate(name, docIds, language, dictionary):
             "some of the mappings.\n\n"]
     for docId in docIds:
         body.append("CDR%010d\n" % docId)
-    cdr.sendMail(sender, recips, subject, "".join(body), False, True)
+    opts = dict(subject=subject, body="".join(body))
+    message = cdr.EmailMessage(sender, recips, **opts)
+    message.send()
 
 def reportDuplicates(allDups):
     recips = cdr.getEmailList('GlossaryDupGroup') or DEV_EMAILS
@@ -49,7 +51,9 @@ def reportDuplicates(allDups):
                     (name.upper(), language, dictionary))
         for docId in allDups[key]:
             body.append("\tCDR%010d\n" % docId)
-    cdr.sendMail(sender, recips, subject, "".join(body), False, True)
+    opts = dict(subject=subject, body="".join(body))
+    message = cdr.EmailMessage(sender, recips, **opts)
+    message.send()
 
 #----------------------------------------------------------------------
 # See if we've already seen this name+language+dictionary combo.
