@@ -155,7 +155,7 @@ def build_zip_file(file_names):
     Control.logger.debug("Creating %s", zip_name)
     command = f"d:\\bin\\zip -@ {zip_name} < {list_name}"
     process = cdr.run_command(command, merge_output=True)
-    if process.resultcode:
+    if process.returncode:
         msg = f"zip failure code {process.resultcode} ({result.stdout})"
         Control.logger.debug(msg)
         raise msg
