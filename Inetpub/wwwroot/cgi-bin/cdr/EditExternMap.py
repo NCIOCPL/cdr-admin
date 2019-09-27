@@ -8,6 +8,10 @@ import cdrcgi, cgi, re, cdr
 from cdrapi import db
 from html import escape as html_escape
 
+LOGGER = cdr.Logging.get_logger("EditExternMap")
+DELETE_MESSAGE = "row %d (usage=%s; value=%s; CdrDocId=%s) deleted by %s"
+UPDATE_MESSAGE = "row %d changed from %s to %s by %s"
+
 #----------------------------------------------------------------------
 # Extract integer from string; uses all decimal digits.
 #----------------------------------------------------------------------
@@ -358,7 +362,7 @@ if request == "Save Changes":
                 pass
             if not row:
                 error = "failure looking up values for row %d" % key
-                cdr.logwrite(error, logFile)
+                LOGGER.warning(error)
                 errors.append(error)
                 continue
             usageName, mapValue, docId = row
@@ -376,14 +380,13 @@ if request == "Save Changes":
                     cursor.execute("DELETE FROM external_map WHERE id = %d" \
                                    % key)
                     conn.commit()
-                    cdr.logwrite("row %d (usage=%s; value=%s; CdrDocId=%s) "
-                                 "deleted by %s" % (key, usageName, mapValue,
-                                                    docId, uName), logFile)
+                    args = key, usageName, mapValue, docId, uName
+                    LOGGER.info(DELETE_MESSAGE, *args)
                     numDeletions += 1
                 except Exception as info:
                     error = "Failure deleting row %d = %s<br>%s" % \
                              (key, mapValue, str(info))
-                    cdr.logwrite(error, logFile)
+                    LOGGER.warning(error)
                     errors.append(error)
         elif (pair != "DELETE" and pair[0] != pair[1] and allowed(key) and
               typeOk(key, pair[1])):
@@ -404,8 +407,8 @@ if request == "Save Changes":
                     numChanges += 1
                     fromVal = pair[0] or "NULL"
                     toVal   = pair[1] or "NULL"
-                    cdr.logwrite("row %d changed from %s to %s by %s" % \
-                                 (key, fromVal, toVal, uName), logFile)
+                    args = key, fromVal, toVal, uName
+                    LOGGER.info(UPDATE_MESSAGE, *args)
                 except:
                     try:
                         cursor.execute("""\

@@ -1615,7 +1615,7 @@ if version == "-1": version = None
 if docType not in filters:
     user_name = Session(session).user_name
     message = "QcReport - Filter for document type '%s' does not exist (%s)."
-    cdr.logwrite(message % (docType, user_name))
+    cdr.LOGGER.info(message, docType, user_name)
     doc = cdr.getDoc(session, docId, version = version or "Current",
                      getObject = 1)
     if isinstance(doc, (str, bytes)):

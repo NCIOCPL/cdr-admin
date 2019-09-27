@@ -463,10 +463,10 @@ def installZipFile(zipName):
             # Load values from the sheet
             try:
                 cdrId = int(sheet.cell(rowx, 0).value)
-                # cdr.logwrite('got rowx=%d, cdrId=%d' % (rowx, cdrId))
+                cdr.LOGGER.debug("got rowx=%d, cdrId=%d", rowx, cdrId)
             except IndexError:
                 # Past the end of the rows
-                # cdr.logwrite('broke on rowx=%d, cdrId=%d' % (rowx, cdrId))
+                cdr.LOGGER.debug("broke on rowx=%d, cdrId=%d", rowx, cdrId)
                 done = True
                 break
             except (ValueError, TypeError) as e:
@@ -475,9 +475,9 @@ def installZipFile(zipName):
                 #  middle, a blank row at the end, or a corrupt spreadsheet
                 # The one case I've seen is blank row at the end.  I'll
                 #  therefore treat it as benign but log it.
-                cdr.logwrite('%s: ' % SCRIPT +
-                             'Expecting CDR ID integer on row=%d, got "%s"' %
-                              (rowx + 1, sheet.cell(rowx, 0).value))
+                msg = f"{SCRIPT}: Expecting CDR ID integer on row=%d, got %r"
+                args = rowx + 1, sheet.cell(rowx, 0).value
+                cdr.LOGGER.exception(msg, *args)
                 rowx += 1
                 continue
 
@@ -569,7 +569,7 @@ def updateMp3Row(cursor, mp3obj):
         TermMp3 object with the latest values
     """
     # DEBUG
-    # cdr.logwrite("Updating: %s" % mp3obj)
+    cdr.LOGGER.debug("Updating: %s", mp3obj)
     mp3Sql = """
       UPDATE term_audio_mp3
          SET review_status = ?,
@@ -1011,7 +1011,7 @@ def saveChanges(fields, session):
             revNote = revNote.strip()
 
             # Fix whitespace and newline translation problems
-            # DEBUG cdr.logwrite('revNote="%s"' % revNote)
+            cdr.LOGGER.debug("revNote=%r", revNote)
             revNote = re.sub(r"[\r\n]+", "\n", revNote).strip()
 
             # Limit the length for database input
@@ -1127,7 +1127,7 @@ def doneZipfileReview(session, oldZipName, mp3List):
             haveRejects = True
 
     # If there were no rejects, we're done
-    # cdr.logwrite("doneZipfileReview found no rejects")
+    cdr.LOGGER.debug("doneZipfileReview found no rejects")
     if not haveRejects:
         html = cdrcgi.header(HEADER + " - Processing complete", HEADER,
                          "Proccessing of this file is complete",
@@ -1214,8 +1214,8 @@ if __name__ == "__main__":
             zipId = int(zipIdStr)
 
     # XXX DEBUG
-    # cdr.logwrite("request=%s zipName=%s zipIdStr=%s" %
-    #              (request, zipName, zipIdStr))
+    args = request, zipName, zipIdStr
+    cdr.LOGGER.debug("request=%s zipName=%s zipIdStr=%s", *args)
 
     # If here for the first time (no fields), show available files
     if not fields:

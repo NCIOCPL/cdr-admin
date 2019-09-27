@@ -9,6 +9,8 @@
 import cgi, cdr, cdrpub, cdrcgi, re, string, sys
 from cdrapi import db
 
+LOGGER = cdr.Logging.get_logger("mailer")
+
 #----------------------------------------------------------------------
 # Set the form variables.
 #----------------------------------------------------------------------
@@ -195,7 +197,8 @@ if request == "Submit":
         if docCount > 1:
             msgs.append("                            Second doc = %s" %
                         docs[1])
-        cdr.logwrite (msgs, cdr.MAILER_LOGFILE)
+        for message in msgs:
+            LOGGER.info(message)
 
         # Tell user how to get status
         header = cdrcgi.header(title, title, section, None, [])

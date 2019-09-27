@@ -18,7 +18,7 @@ cdr.LOGGER.debug("cdrping called")
 try:
     response = cdr.getDoctypes('guest')
     if isinstance(response, (str, bytes)):
-        cdr.logwrite("cdrping getDoctypes error: %s" % response)
+        cdr.LOGGER.warning("cdrping getDoctypes error: %s", response)
         report("CORRUPT")
     else:
         report("OK")

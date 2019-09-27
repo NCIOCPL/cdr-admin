@@ -50,7 +50,7 @@ now       = dt.now().strftime("%Y-%m-%d_%H:%M:%S")
 ftpDone   = ''
 
 # ---------------------------------------------------------------------
-# Instantiate the Log class
+# Instantiate the Logging class
 # ---------------------------------------------------------------------
 logger = cdr.Logging.get_logger("FtpAudio")
 logger.info("FtpAudio - Started")
