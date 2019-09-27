@@ -11,6 +11,7 @@
 # *********************************************************************
 import cgi, cdr, cdrcgi, os, paramiko
 import glob
+import re
 from datetime import datetime as dt
 from cdrapi.settings import Tier
 
@@ -109,67 +110,64 @@ if request == "Get Audio" and ftpDone != 'Y':
        os.mkdir(os.path.join('d:\\cdr', WIN_DIR))
 
     try:
-        logger.info(AUDIOPATH)
-        logger.info(WIN_DIR)
-        logger.info(NIX_DIR)
-        logger.info(CIAT_DIR)
+        logger.info('Directory locations')
+        logger.info('   {}'.format(AUDIOPATH))
+        logger.info('   {}'.format(WIN_DIR))
+        logger.info('   {}'.format(NIX_DIR))
+        logger.info('   {}'.format(CIAT_DIR))
 
-        # Checking if any zip files are available to be downloaded
-        # but only include files following the naming convention
+        # Listing all available files in the directory
+        # --------------------------------------------
+        cmd = "ls {}/*".format(IN_DIR)
+        logger.info("Checking for files in FTP-dir:")
+        logger.info("{}".format(IN_DIR))
+        stdin, stdout, stderr = c.exec_command(cmd)
+        files = stdout.readlines()
+
+        zipFiles = []
+        badNames = []
+
+        # We need to follow a specific naming convention with the
+        # file names.  If the file name doesn't follow the file
+        # name format we're capturing the name in the badNames list.
+        # File names with the following format are getting copied:
         #  - Week_NNN.zip or
         #  - Week_NNN_RevN.zip
+        # File names include the full path and need to be stripped.
         # --------------------------------------------------------
-        cmd = "ls {}/Week_[0-9][0-9][0-9]{{_Rev[0-9],}}.zip | xargs -n 1 basename".format(IN_DIR)
-        logger.info("Checking for files in FTP-dir:")
-        logger.info(IN_DIR)
-        stdin, stdout, stderr = c.exec_command(cmd)
-
-        # Read the files and clean up file names
-        errors = stderr.readlines()
-        if not errors:
-            zipFiles = stdout.readlines()
-            zipFiles = [str(x.strip()) for x in zipFiles]
-        else:
-            if not stdout.readlines():
-                cdrcgi.bail("No files available for download!")
+        for audioFile in files:
+            zipFile = audioFile.replace('{}/'.format(IN_DIR), '')
+            # l.write(zipFile)
+            if re.match('Week_\d\d\d(_Rev\d)?.zip', zipFile):
+                zipFiles.append(zipFile.strip())
             else:
-                cdrcgi.bail("Error: {}".format(repr(errors)))
+                badNames.append(zipFile.strip())
 
+        # Exit if no file is available for download
+        # -----------------------------------------
+        if not zipFiles:
+            cdrcgi.bail("No files available for download!")
 
-        # Read all files. We need this to be able and display the
-        # files with incorrect file names
-        # -------------------------------------------------------
-        allFiles = "ls {}/* | sed 's/.*Term_Audio\///'".format(IN_DIR)
-        stdin, stdout, stderr = c.exec_command(allFiles)
+        logger.info('')
+        logger.info('Zip file(s) found:')
+        for zipFile in zipFiles:
+            logger.info(zipFile)
 
-        errors = stderr.readlines()
-        if not errors:
-            allFiles = stdout.readlines()
-            allFiles = [str(x.strip()) for x in allFiles]
-
-            badFiles = []
-            logger.info("Files found...")
-            for name in allFiles:
-                logger.info(name)
-                if name not in zipFiles:
-                    badFiles.append(name)
-            logger.info("Bad files found...")
-            logger.info(repr(badFiles))
-        else:
-            cdrcgi.bail("Error checking file names: {}".format(repr(errors)))
+        logger.info('')
+        logger.info('Bad file names(s) found:')
+        logger.info(repr(badNames))
 
         # Count the number of ZIP files found
         # -----------------------------------
-        nZipFiles = 0
-        for zipFile in zipFiles:
-            if zipFile.endswith('.zip'): nZipFiles += 1
-        if not nZipFiles:
+        if not zipFiles:
             logger.info("No zip files found.")
             logger.info("Ftp done!")
             cdrcgi.bail('No Audio zip file(s) to download')
 
-        logger.info("Found %d zip files:", nZipFiles)
-        logger.info("%s", zipFiles)
+        logger.info('')
+        logger.info("Found %d zip files:" % len(zipFiles))
+        logger.info("{}".format(zipFiles))
+        logger.info('')
 
         # Checking which zip files have already been downloaded earlier
         # -------------------------------------------------------------
@@ -229,7 +227,7 @@ if request == "Get Audio" and ftpDone != 'Y':
                 # In test mode move the copied files or a 'live' run will fail
                 # ------------------------------------------------------------
                 newName = "{}.{}".format(name, now)
-                cmd = "mv {}/{} {}/{}".format(MV_DIR, name, MV_DIR, newName) 
+                cmd = "mv {}/{} {}/{}".format(MV_DIR, name, MV_DIR, newName)
                 stdin, stdout, stderr = c.exec_command(cmd)
                 errors = stderr.readlines()
                 if errors:
@@ -285,19 +283,19 @@ if ftpDone == 'Y':
 
    # Display files with bad file name format if those exist
    # ------------------------------------------------------
-   if badFiles:
+   if badNames:
        form += """\
 <table>
  <tr>
   <th style="font-size: 14pt;">Files NOT Retrieved:</th>
  </tr>
 """
-       for badFile in badFiles:
+       for badName in badNames:
            form += """
  <tr>
   <td>{}</td>
  </tr>
-""".format(badFile)
+""".format(badName)
 
    if testMode:
        testString = 'Test '
