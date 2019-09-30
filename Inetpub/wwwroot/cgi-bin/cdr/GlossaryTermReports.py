@@ -1,161 +1,144 @@
-#----------------------------------------------------------------------
-# Submenu for glossary term reports.
-#
-# BZIssue::1447 - rearrange menu for Margaret
-# BZIssue::1531 - add menu option for publish preview reports
-# BZIssue::3948 - add new menu item for glossary term full report
-# BZIssue::4467 - implement new menu structure requested by William
-# BZIssue::4478 - add glossary term name with concept QC report
-#----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, string
+#!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields  = cgi.FieldStorage()
-session = cdrcgi.getSession(fields)
-action  = cdrcgi.getRequest(fields)
-nyi     = fields.getvalue('nyi')
-title   = "CDR Administration"
-section = "Glossary Term Reports"
-SUBMENU = "Reports Menu"
-buttons = [SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-header  = cdrcgi.header(title, title, section, "Reports.py", buttons,
-                        stylesheet = """\
-  <style type='text/css'>
-   ul > li { list-style-type: none }
-   h4 { font-style: italic; }
-   ol { margin-bottom: 1.25em; } /* workaround for IE bug */
-  </style>
-""")
+"""Glossary Term Reports.
+"""
 
-#----------------------------------------------------------------------
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if action == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif action == SUBMENU:
-    cdrcgi.navigateTo("Reports.py", session)
+from cdrcgi import Controller
 
-#----------------------------------------------------------------------
-# Handle request to log out.
-#----------------------------------------------------------------------
-if action == "Log Out":
-    cdrcgi.logout(session)
+class Control(Controller):
+    """Provide extra nesting for this, the most complex of the CDR menus."""
 
-#----------------------------------------------------------------------
-# If the command behind the menu item hasn't been implemented yet, say so.
-#----------------------------------------------------------------------
-if nyi:
-    cdrcgi.bail("This menu command has not yet been implemented")
+    SUBTITLE = "Glossary Term Reports"
+    SUBMIT = None
+    STATUS_REPORT = "Glossary Term Concept by {} Definition Status Report"
+    MENU = (
+        (
+            "QC Reports", (
+                (
+                    "Glossary Term Name", (
+                        (
+                            "Glossary Term Name QC Report",
+                            "QcReport.py",
+                            dict(DocType="GlossaryTermName"),
+                        ),
+                    ),
+                ),
+                (
+                    "Glossary Term Concept", (
+                        (
+                            "Glossary Term Concept QC Report",
+                            "QcReport.py",
+                            dict(DocType="GlossaryTermConcept"),
+                        ),
+                    ),
+                ),
+                (
+                    "Combined QC Reports", (
+                        (
+                            "Glossary Term Name With Concept QC Report",
+                            "QcReport.py",
+                            dict(
+                                DocType="GlossaryTermName",
+                                ReportType="gtnwc",
+                            ),
+                        ),
+                        (
+                            "Glossary Term Concept - Full QC Report",
+                            "GlossaryConceptFull.py",
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        (
+            "Management Reports", (
+                (
+                    "Linked or Related Document Reports", (
+                        (
+                            "Documents Linked to Glossary Term Name Report",
+                            "GlossaryTermLinks.py",
+                        ),
+                        (
+                            "Pronunciation by Glossary Term Stem Report",
+                            "PronunciationByWordStem.py",
+                        ),
+                        (
+                            "Glossary Term Concept By Type Report",
+                            "Request4486.py",
+                        ),
+                        (
+                            "Glossary Term and Variant Search Report",
+                            "GlossaryTermPhrases.py",
+                        ),
+                    ),
+                ),
+                (
+                    "Processing Reports", (
+                        (
+                            "Processing Status Report",
+                            "GlossaryProcessingStatusReport.py",
+                        ),
+                        (
+                            STATUS_REPORT.format("English"),
+                            "Request4344.py",
+                            dict(report="4342"),
+                        ),
+                        (
+                            STATUS_REPORT.format("Spanish"),
+                            "Request4344.py",
+                            dict(report="4344"),
+                        ),
+                        (
+                            "Glossary Term Concept Documents Modified Report",
+                            "GlossaryConceptDocsModified.py",
+                        ),
+                        (
+                            "Glossary Term Name Documents Modified Report",
+                            "GlossaryNameDocsModified.py",
+                        ),
+                        (
+                            "Glossary Translation Job Workflow Report",
+                            "glossary-translation-job-report.py",
+                        ),
+                    ),
+                ),
+                (
+                    "Publication Reports", (
+                        (
+                            "Publish Preview",
+                            "QcReport.py",
+                            dict(DocType="GlossaryTermName", ReportType="pp"),
+                        ),
+                        (
+                            "New Published Glossary Terms",
+                            "Request4333.py",
+                        ),
+                    ),
+                ),
+            ),
+        ),
+    )
 
-#----------------------------------------------------------------------
-# Display available report choices.
-#----------------------------------------------------------------------
-form = ["""\
-   <input type='hidden' name='%s' value='%s' />
-   <h3>QC Reports</h3>
-   <ul>
-    <li><h4>Glossary Term Name</h4>
-     <ol>
-""" % (cdrcgi.SESSION, session)]
-for r in ( # was using GlossaryTermSearch.py
-    ('QcReport.py?DocType=GlossaryTermName&', 'Glossary Term Name QC Report'),
-):
-    form.append("""\
-    <li><a href='%s/%s%s=%s'>%s</a></li>
-""" % (cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1]))
-form.append("""\
-     </ol>
-    </li>
-    <li><h4>Glossary Term Concept</h4>
-     <ol>
-""")
-for r in (
-    ('QcReport.py?DocType=GlossaryTermConcept&',
-     'Glossary Term Concept QC Report'),
-):
-    form.append("""\
-    <li><a href='%s/%s%s=%s'>%s</a></li>
-""" % (cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1]))
-form.append("""\
-     </ol>
-    </li>
-    <li><h4>Combined QC Reports</h4>
-     <ol>
-""")
-for r in (
-    # replace GlossaryTermSearch.py with simpler version
-    ('QcReport.py?DocType=GlossaryTermName&ReportType=gtnwc&',
-     'Glossary Term Name with Concept QC Report'),
-    ('GlossaryConceptFull.py?', 'Glossary Term Concept - Full QC Report')
-):
-    form.append("""\
-      <li><a href='%s/%s%s=%s'>%s</a></li>
-""" % (cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1]))
-form.append("""\
-     </ol>
-    </li>
-   </ul>
-   <h3>Management Reports</h3>
-   <ul>
-    <li><h4>Linked or Related Document Reports</h4>
-     <ol>
-""")
-for r in (
-    (#'GlossaryTermReports.py?nyi=1&', # needs rewrite of GlossaryTermLinks.py
-    'GlossaryTermLinks.py?',
-     'Documents Linked to Glossary Term Name Report'),
-    ('PronunciationByWordStem.py?',
-     'Pronunciation by Glossary Term Stem Report'),
-    ('Request4486.py?', 'Glossary Term Concept By Type Report'),
-    ('GlossaryTermPhrases.py?', 'Glossary Term and Variant Search Report')
-):
-    form.append("""\
-      <li><a href='%s/%s%s=%s'>%s</a></li>
-""" % (cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1]))
-form.append("""\
-     </ol>
-    </li>
-    <li><h4>Processing Reports</h4>
-     <ol>
-""")
-for r in (
-    ('GlossaryProcessingStatusReport.py?', "Processing Status Report"),
-    ('Request4344.py?report=4342&',
-     'Glossary Term Concept by English Definition Status Report'),
-    ('Request4344.py?report=4344&',
-     'Glossary Term Concept by Spanish Definition Status Report'),
-    ('GlossaryConceptDocsModified.py?',
-     'Glossary Term Concept Documents Modified Report'),
-    ('GlossaryNameDocsModified.py?',
-     'Glossary Term Name Documents Modified Report'),
-    ('glossary-translation-job-report.py?',
-     'Glossary Translation Job Workflow Report',)
-):
-    form.append("""\
-      <li><a href='%s/%s%s=%s'>%s</a></li>
-""" % (cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1]))
-form.append("""\
-     </ol>
-    </li>
-    <li><h4>Publication Reports</h4>
-     <ol>
-""")
-for r in (
-    ('QcReport.py?DocType=GlossaryTermName&ReportType=pp&', 'Publish Preview'),
-    ('Request4333.py?', "New Published Glossary Terms")
-):
-    form.append("""\
-      <li><a href='%s/%s%s=%s'>%s</a></li>
-""" % (cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1]))
-form.append("""\
-     </ol>
-    </li>
-   </ul>
-  </form>
- </body>
-</html>
-""")
-form = "".join(form)
-cdrcgi.sendPage(header + form)
+    def populate_form(self, page):
+        page.body.set("class", "admin-menu")
+        for top_section, submenus in self.MENU:
+            page.form.append(page.B.H3(top_section))
+            ul = page.B.UL()
+            page.form.append(ul)
+            for submenu_name, items in submenus:
+                submenu = page.B.LI()
+                submenu.append(page.B.H4(submenu_name))
+                ol = page.B.OL()
+                submenu.append(ol)
+                for item in items:
+                    if len(item) == 3:
+                        label, script, parms = item
+                    else:
+                        label, script = item
+                        parms = dict()
+                    link = page.menu_link(script, label, **parms)
+                    ol.append(page.B.LI(link))
+                ul.append(submenu)
+
+
+Control().run()

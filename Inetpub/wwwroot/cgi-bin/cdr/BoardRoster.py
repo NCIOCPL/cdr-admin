@@ -555,15 +555,13 @@ class BoardMember:
                     if child.tag == "BoardContactPhone":
                         self.specificPhone = child.text
         self.finished = True
-    def __cmp__(self, other):
+    def __lt__(self, other):
         """
         Sort editors-in-chief before others, subgroup by name
         """
-        if self.isEic == other.isEic:
-            return cmp(self.name.upper(), other.name.upper())
-        elif self.isEic:
-            return -1
-        return 1
+        a = True if self.isEic else False, self.name.upper()
+        b = True if other.isEic else False, other.name.upper()
+        return a < b
 
 #----------------------------------------------------------------------
 # Select the list of board members associated to a board (passed in

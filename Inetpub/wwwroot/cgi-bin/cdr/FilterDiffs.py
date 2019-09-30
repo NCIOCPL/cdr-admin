@@ -27,7 +27,6 @@ class Control:
             cdrcgi.bail("Can't compare the production server to itself")
         lines = []
         for name in sorted(self.filter_names, key=str.lower):
-            #print(f"checking {name}")
             if name not in self.local_filters:
                 lines += self.only_on(name, "PROD")
             elif name not in self.prod_filters:

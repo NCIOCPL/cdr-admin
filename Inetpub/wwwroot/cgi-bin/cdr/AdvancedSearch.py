@@ -1,34 +1,33 @@
-#----------------------------------------------------------------------
-# Main menu for advanced search forms.
-#----------------------------------------------------------------------
-import cdrcgi
+#!/usr/bin/env python
 
-class Control(cdrcgi.Control):
-    def __init__(self):
-        cdrcgi.Control.__init__(self, "Advanced Search")
-        self.buttons = (self.REPORTS_MENU, self.ADMINMENU, self.LOG_OUT)
-    def set_form_options(self, opts):
-        opts["body_classes"] = "admin-menu"
-        return opts
-    def populate_form(self, form):
-        form.add(form.B.H3("Document Type"))
-        form.add("<ol>")
-        for script, display in (
-            ("CiteSearch.py", "Citation"),
-            ("CountrySearch.py", "Country"),
-            ("DISSearch.py", "Drug Information Summary"),
-            ("HelpSearch.py", "Documentation"),
-            ("GlossaryTermConceptSearch.py", "Glossary Term Concept"),
-            ("GlossaryTermNameSearch.py", "Glossary Term Name"),
-            ("MiscSearch.py", "Miscellaneous"),
-            ("MediaSearch.py", "Media"),
-            ("OrgSearch2.py", "Organization"),
-            ("PersonSearch.py", "Person"),
-            ("PersonLocSearch.py", "Person (Locations in Result Display)"),
-            ("PoliticalSubUnitSearch.py", "Political SubUnit"),
-            ("SummarySearch.py", "Summary"),
-            ("TermSearch.py", "Term")
+"""Main menu for advanced search forms.
+"""
+
+from cdrcgi import Controller
+
+class Control(Controller):
+    SUBTITLE = "Advanced Search"
+    SUBMIT = None
+    def populate_form(self, page):
+        page.body.set("class", "admin-menu")
+        page.form.append(page.B.H3("Document Type"))
+        ol = page.B.OL()
+        for display, script in (
+            ("Citation", "CiteSearch.py"),
+            ("Country", "CountrySearch.py"),
+            ("Documentation", "HelpSearch.py"),
+            ("Drug Information Summary", "DISSearch.py"),
+            ("Glossary Term Concept", "GlossaryTermConceptSearch.py"),
+            ("Glossary Term Name", "GlossaryTermNameSearch.py"),
+            ("Media", "MediaSearch.py"),
+            ("Miscellaneous", "MiscSearch.py"),
+            ("Organization", "OrgSearch2.py"),
+            ("Person", "PersonSearch.py"),
+            ("Person (Locations in Result Display)", "PersonLocSearch.py"),
+            ("Political SubUnit", "PoliticalSubUnitSearch.py"),
+            ("Summary", "SummarySearch.py"),
+            ("Term", "TermSearch.py"),
         ):
-            form.add_menu_link(script, display, self.session)
-        form.add("</ol>")
+            ol.append(page.B.LI(page.menu_link(script, display)))
+        page.form.append(ol)
 Control().run()

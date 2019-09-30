@@ -1,57 +1,52 @@
-#----------------------------------------------------------------------
-# Submenu for terminology reports.
-#
-# BZIssue::4653 CTRO Access to CDR Admin Interface
-# BZIssue::4698 Genetics Directory Menu Information
-# JIRA::OCECDR-3987
-#----------------------------------------------------------------------
-import cdr
-import cdrcgi
-from cdrapi.users import Session
+#!/usr/bin/env python
 
-class Control(cdrcgi.Control):
-    def __init__(self):
-        cdrcgi.Control.__init__(self, "Terminology Reports")
-        self.buttons = (self.REPORTS_MENU, self.ADMINMENU, self.LOG_OUT)
-    def set_form_options(self, opts):
-        opts["body_classes"] = "admin-menu"
-        return opts
-    def populate_form(self, form):
-        form.add(form.B.H3("QC Reports"))
-        form.add("<ol>")
-        for script, display in (
-            ("TermUsage.py", "Term Usage"),
-            ("TermSearch.py", "Terminology QC Report")
+"""Terminology report menu.
+"""
+
+from cdrcgi import Controller
+
+class Control(Controller):
+
+    SUBTITLE = "Terminology Reports"
+    SUBMIT = None
+
+    def populate_form(self, page):
+        page.body.set("class", "admin-menu")
+        page.form.append(page.B.H3("QC Reports"))
+        ol = page.B.OL()
+        page.form.append(ol)
+        for display, script in (
+            ("Term Usage", "TermUsage.py"),
+            ("Terminology QC Report", "TermSearch.py"),
         ):
-            form.add_menu_link(script, display, self.session)
-        form.add("</ol>")
-        form.add(form.B.H3("Other Reports"))
-        form.add("<ol>")
-        for script, display, args in (
-            ("DiseaseDiagnosisTerms.py", "Cancer Diagnosis Hierarchy", {}),
-            ("DiseaseDiagnosisTerms.py",
-             "Cancer Diagnosis Hierarchy (Without Alternate Names)",
-             { "flavor": "short" }),
-            ("RecentCTGovProtocols.py",
-             "Clinical Trials Drug Analysis Report", {}),
-            ("DrugAgentReport.py", "Drug/Agent Report", {}),
-            ("DrugReviewReport.py", "Drug Review Report", {}),
-            ("GeneticConditionMenuMappingReport.py",
-             "Genetics Directory Menu Report", {}),
-            ("InterventionAndProcedureTerms.py",
-             "Intervention or Procedure Terms",
-             { "IncludeAlternateNames": "True" }),
-            ("InterventionAndProcedureTerms.py",
-             "Intervention or Procedure Terms (without Alternate Names)",
-             { "IncludeAlternateNames": "False" }),
-            ("MenuHierarchy.py", "Menu Hierarchy Report", {}),
-            ("TermHierarchyTree.py", "Term Hierarchy Tree", {}),
-            ("ocecdr-3588.py", "Thesaurus Concepts Not Marked Public", {}),
+            ol.append(page.B.LI(page.menu_link(script, display)))
+        page.form.append(page.B.H3("Other Reports"))
+        ol = page.B.OL()
+        page.form.append(ol)
+        for item in (
+            ("Cancer Diagnosis Hierarchy", "DiseaseDiagnosisTerms.py"),
+            ("Cancer Diagnosis Hierarchy (Without Alternate Names)",
+             "DiseaseDiagnosisTerms.py", dict(flavor="short")),
+            ("Clinical Trials Drug Analysis Report", "RecentCTGovProtocols.py"),
+            ("Drug/Agent Report", "DrugAgentReport.py"),
+            ("Drug Review Report", "DrugReviewReport.py"),
+            ("Genetics Directory Menu Report",
+             "GeneticConditionMenuMappingReport.py"),
+            ("Intervention or Procedure Terms",
+             "InterventionAndProcedureTerms.py",
+             dict(IncludeAlternateNames="True")),
+            ("Intervention or Procedure Terms (without Alternate Names)",
+             "InterventionAndProcedureTerms.py",
+             dict(IncludeAlternateNames="False")),
+            ("Menu Hierarchy Report", "MenuHierarchy.py"),
+            ("Term Hierarchy Tree", "TermHierarchyTree.py"),
+            ("Thesaurus Concepts Not Marked Public", "ocecdr-3588.py"),
         ):
-            form.add_menu_link(script, display, self.session, **args)
-        form.add("</ol>")
-    def guest_user(self):
-        name = Session(self.session).user_name
-        user = cdr.getUser(self.session, name)
-        return 'GUEST' in user.groups and len(user.groups) < 2
+            if len(item) == 3:
+                display, script, parms = item
+            else:
+                display, script = item
+                parms = dict()
+            ol.append(page.B.LI(page.menu_link(script, display, **parms)))
+
 Control().run()

@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 #----------------------------------------------------------------------
 # Show disk size/usage on CDR Windows Server
 # See http://code.activestate.com/recipes/577972-disk-usage/

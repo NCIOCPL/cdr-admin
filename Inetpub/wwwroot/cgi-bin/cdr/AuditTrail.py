@@ -1,114 +1,88 @@
 #!/usr/bin/python
-#----------------------------------------------------------------------
-# Audit Trail report (new report requested by Lakshmi).
-#----------------------------------------------------------------------
 
-import sys, cgi, time, cdrcgi, re
-from cdrapi import db as cdrdb
-from html import escape as html_escape
+"""Audit Trail report requested by Lakshmi.
+"""
 
-fields = cgi.FieldStorage()
-docId  = fields.getvalue("id") or ""
-nRows  = fields.getvalue("rows") or "150"
-if not docId:
-    cdrcgi.bail("Missing required id parameter")
-try:
-    digits = re.sub(r"[^\d]", "", docId)
-    id = int(digits)
-except:
-    cdrcgi.bail("Invalid id value: %s" % docId)
-try:
-    conn = cdrdb.connect(user='CdrGuest')
-except:
-    cdrcgi.bail("Unable to connect to CDR database")
-cursor = conn.cursor()
-try:
-    cursor.execute("""\
-      SELECT title
-        FROM document
-       WHERE id = ?""", (id,))
-    row = cursor.fetchone()
-    if not row:
-        cdrcgi.bail("Can't find document %d" % id)
-    title = html_escape(row[0])
-except:
-    cdrcgi.bail("Database failure retrieving title for document %d" % id)
-try:
-    cursor.execute("""\
-        CREATE TABLE #audit
-                 (dt DATETIME,
-                 usr VARCHAR(80),
-              action VARCHAR(255))""")
-    cursor.execute("""\
-        INSERT INTO #audit
-             SELECT audit_trail.dt, usr.fullname, action.name
-               FROM audit_trail
-               JOIN usr
-                 ON usr.id = audit_trail.usr
-               JOIN action
-                 ON action.id = audit_trail.action
-              WHERE audit_trail.document = ?""", (id,))
-    cursor.execute("""\
-        INSERT INTO #audit
-             SELECT c.dt_out, u.fullname, 'LOCK'
-               FROM checkout c
-               JOIN usr u
-                 ON u.id = c.usr
-              WHERE c.id = ?""", (id,) )
-    cursor.execute("""\
-    SELECT TOP %s CONVERT(VARCHAR(23), dt, 121), usr, action
-             FROM #audit
-         ORDER BY dt DESC""" % nRows)
-    rows = cursor.fetchall()
-except:
-    #raise
-    cdrcgi.bail("Failure retrieving rows for Audit Trail")
-html = """\
-<!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
-<html>
- <head>
-  <title>Audit Trail for %d</title>
-  <basefont face='Arial, Helvetica, sans-serif'>
- </head>
- <body>
-  <b>
-   <font size='4'>Audit Trail for %d</font>
-  </b>
-  <p>%s</p>
-  <table border='1' width='100%%' cellspacing='0' cellpadding='2'>
-   <tr>
-    <td align='center'>
-     <font size='3'>
-      <b>DATE TIME</b>
-     </font>
-    </td>
-    <td align='center'>
-     <font size='3'>
-      <b>USER NAME</b>
-     </font>
-    </td>
-    <td align='center'>
-     <font size='3'>
-      <b>ACTION</b>
-     </font>
-    </td>
-   </tr>
-""" % (id, id, title)
-for when, who, what in rows:
-    html += """\
-   <tr>
-    <td>
-     <font size='3'>%s</font>
-    </td>
-    <td>
-     <font size='3'>%s</font>
-    </td>
-    <td>
-     <font size='3'>%s</font>
-    </td>
-   </tr>
-""" % (when, who, html_escape(what))
-cdrcgi.sendPage(html +  """\
-  </table>
- </body>
-</html>""")
+from cdrapi import db
+from cdrapi.docs import Doc
+from cdrapi.users import Session
+from cdrcgi import Controller, Reporter
+
+class Control(Controller):
+
+    SUBTITLE = "Audit Trail"
+
+    def run(self):
+        """Bypass the wait for the Submit button if doc id is present."""
+        if self.doc:
+            self.show_report()
+        Controller.run(self)
+
+    @property
+    def doc(self):
+        """The subject of the report."""
+        if not hasattr(self, "_doc"):
+            doc_id = self.fields.getvalue("id")
+            if doc_id:
+                self._doc = Doc(Session("guest"), id=doc_id)
+            else:
+                self._doc = None
+        return self._doc
+
+    @property
+    def limit(self):
+        """How many rows should be included in the report."""
+        if not hasattr(self, "_limit"):
+            self._limit = int(self.fields.getvalue("rows", "150"))
+        return self._limit
+
+    def build_tables(self):
+        """Get the most recent activity for this document."""
+
+        # Create a temporary working table.
+        self.cursor.execute("""\
+            CREATE TABLE #audit
+                     (dt DATETIME,
+                     usr VARCHAR(80),
+                  action VARCHAR(255))""")
+
+        # Populate it with rows from the audit_trail table.
+        self.cursor.execute("""\
+            INSERT INTO #audit
+                 SELECT audit_trail.dt, usr.fullname, action.name
+                   FROM audit_trail
+                   JOIN usr
+                     ON usr.id = audit_trail.usr
+                   JOIN action
+                     ON action.id = audit_trail.action
+                  WHERE audit_trail.document = ?""", self.doc.id)
+
+        # Add rows for locking the document.
+        self.cursor.execute("""\
+            INSERT INTO #audit
+                 SELECT c.dt_out, u.fullname, 'LOCK'
+                   FROM checkout c
+                   JOIN usr u
+                     ON u.id = c.usr
+                  WHERE c.id = ?""", self.doc.id)
+
+        # Pull the rows we need for the report.
+        query = db.Query("#audit", "dt", "usr", "action").order("dt DESC")
+        query.limit(self.limit)
+        rows = []
+        for row in query.execute(self.cursor).fetchall():
+            rows.append([str(row.dt)[:19], row.usr, row.action])
+        caption = self.doc.cdr_id, self.doc.title
+        columns = "DATE TIME", "USER NAME", "ACTION"
+        return Reporter.Table(rows, columns=columns, caption=caption)
+
+    def populate_form(self, page):
+        """Ask for a document ID if we didn't get one already."""
+
+        fieldset = page.fieldset("Report Options")
+        fieldset.append(page.text_field("id"))
+        fieldset.append(page.text_field("rows", value=150))
+        page.form.append(fieldset)
+
+if __name__ == "__main__":
+    Control().run()

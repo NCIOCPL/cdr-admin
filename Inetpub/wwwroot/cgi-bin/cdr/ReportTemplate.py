@@ -8,12 +8,11 @@ import cdrcgi
 from cdrapi import db
 
 class Control(cdrcgi.Controller):
+
+    SUBTITLE = "Simple report on Publishing Jobs"
+
     """Report-specific behavior implemented in this derived class.
     """
-
-    def __init__(self):
-        """Let the base class get things started."""
-        cdrcgi.Controller.__init__(self, "Simple Report on Publishing Jobs")
 
     @property
     def end(self):
@@ -55,14 +54,8 @@ class Control(cdrcgi.Controller):
             query.where(query.Condition("started", end, "<="))
         query.order("1 DESC")
         rows = query.execute().fetchall()
-        columns = (
-            cdrcgi.Reporter.Column("Job ID"),
-            cdrcgi.Reporter.Column("Job Type"),
-            cdrcgi.Reporter.Column("Started"),
-            cdrcgi.Reporter.Column("Completed"),
-            cdrcgi.Reporter.Column("Status")
-        )
-        return cdrcgi.Reporter.Table(columns, rows)
+        columns = "Job ID", "Job Type", "Started", "Completed", "Status"
+        return cdrcgi.Reporter.Table(rows, columns=columns)
 
 
 #----------------------------------------------------------------------

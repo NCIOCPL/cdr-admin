@@ -1,41 +1,20 @@
-#----------------------------------------------------------------------
-# Menu for Global changes.
-# BZIssue::5239 (JIRA::OCECDR-3543)
-#----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, string
+#!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields  = cgi.FieldStorage()
-session = cdrcgi.getSession(fields)
-
-#----------------------------------------------------------------------
-# Make sure the login was successful.
-#----------------------------------------------------------------------
-if not session: cdrcgi.bail('Unknown user id or password.')
-
-#----------------------------------------------------------------------
-# Put up the menu.
-#----------------------------------------------------------------------
-session = "?%s=%s" % (cdrcgi.SESSION, session)
-title   = "CDR Administration"
-section = "Global Change Menu"
-buttons = []
-html    = cdrcgi.header(title, title, section, "", buttons) + """\
-  <ol>
+"""Global change reports menu.
 """
-items   = (
-           ('ShowGlobalChangeTestResults.py','Global Change Test Results'),
-           ('Logout.py',               'Log Out'                       )
-           )
-for item in items:
-    html += """\
-   <li><a href='%s/%s%s'>%s</a></li>
-""" % (cdrcgi.BASE, item[0], session, item[1])
 
-cdrcgi.sendPage(html + """\
-  </ol>
- </body>
-</html>
-""")
+from cdrcgi import Controller
+
+class Control(Controller):
+    SUBTITLE = "Global Change Menu"
+    SUBMIT = None
+    def populate_form(self, page):
+        page.body.set("class", "admin-menu")
+        ol = page.B.OL()
+        for display, script in (
+            ("Global Change Test Results", "ShowGlobalChangeTestResults.py"),
+            ("Log Out", "Logout.py"),
+        ):
+            ol.append(page.B.LI(page.menu_link(script, display)))
+        page.form.append(ol)
+Control().run()

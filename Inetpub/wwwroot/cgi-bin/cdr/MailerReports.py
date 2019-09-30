@@ -1,31 +1,26 @@
-#----------------------------------------------------------------------
-# Submenu for mailer reports.
-#
-# BZIssue::4630
-# BZIssue::1572
-# BZIssue::5239 (JIRA::OCECDR-3543) - menu cleanup
-# JIRA::OCECDR-3734
-# JIRA::OCECDR-4092 - fix bug in link to GP Emailers List; use Control class
-#----------------------------------------------------------------------
+#!/usr/bin/env python
 
-import cdrcgi
+"""Mailer report menu.
+"""
 
-class Control(cdrcgi.Control):
-    SUBMIT = "" # suppress this button
-    def __init__(self):
-        cdrcgi.Control.__init__(self, "Mailer Reports")
-    def set_form_options(self, opts):
-        opts["body_classes"] = "admin-menu"
-        return opts
-    def populate_form(self, form):
-        form.add("<ol>")
-        for script, display in (
-            ("ocecdr-3734.py", "Bounced GP Emailers"),
-            ("MailerActivityStatistics.py", "Mailer Activity Counts"),
-            ("MailerCheckinReport.py", "Mailer Check-In Count"),
-            ("MailerHistory.py", "Mailer History"),
-            ("Request4275.py", "Mailers Received - Detailed")
+from cdrcgi import Controller
+
+class Control(Controller):
+
+    SUBTITLE = "Mailer Reports"
+    SUBMIT = None
+
+    def populate_form(self, page):
+        page.body.set("class", "admin-menu")
+        ol = page.B.OL()
+        page.form.append(ol)
+        for display, script in (
+            ("Mailer Activity Counts", "MailerActivityStatistics.py"),
+            ("Mailer Check-In Count", "MailerCheckinReport.py"),
+            ("Mailer History", "MailerHistory.py"),
+            ("Mailers Received - Detailed", "Request4275.py"),
         ):
-            form.add_menu_link(script, display, self.session)
-        form.add("</ol>")
+            ol.append(page.B.LI(page.menu_link(script, display)))
+
+
 Control().run()

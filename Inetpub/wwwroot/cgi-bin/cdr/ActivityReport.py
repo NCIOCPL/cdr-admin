@@ -13,7 +13,7 @@ from cdrapi import db
 class ActivityReport(cdrcgi.Controller):
 
     SUBTITLE = "Document Activity Report"
-    COLS = "Who", "when", "Action", "DocType", "DocID", "DocTitle", "Comment"
+    COLS = "Who", "When", "Action", "DocType", "DocID", "DocTitle", "Comment"
     TODAY = datetime.date.today()
 
     def populate_form(self, page):
@@ -37,6 +37,7 @@ class ActivityReport(cdrcgi.Controller):
         # Build the report's query.
         query = db.Query("audit_trail a", "u.name", "u.fullname", "v.name",
                          "a.dt", "t.name", "d.id", "d.title", "a.comment")
+        query.order("a.dt DESC")
         query.join("usr u", "u.id = a.usr")
         query.join("all_docs d", "d.id = a.document")
         query.join("doc_type t", "t.id = d.doc_type")
@@ -59,14 +60,13 @@ class ActivityReport(cdrcgi.Controller):
             who = f"{name} ({user})"
             when = str(when)[:19]
             cdrid = f"{id:010d}"
-            url = f"QcReport.py?docId={cdrid}&Session={self.session}"
+            url = f"QcReport.py?DocId={cdrid}&Session={self.session}"
             link = cdrcgi.Reporter.Cell(cdrid, href=url)
             title = f"{title[:20]} ..."
             row = who, when, action, dt, link, title, cmt
             rows.append(row)
-            cols = [cdrcgi.Reporter.Column(col) for col in self.COLS]
         caption = [caption, date_range]
-        return cdrcgi.Reporter.Table(cols, rows, caption=caption)
+        return cdrcgi.Reporter.Table(rows, caption=caption, columns=self.COLS)
 
     def set_report_options(self, opts):
         """Provide a hook for some custom style rules."""

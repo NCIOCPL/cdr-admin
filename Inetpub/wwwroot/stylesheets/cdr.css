@@ -55,6 +55,8 @@ body.admin-menu { background-color: #dfdfdf; }
     font-weight: bold;
 }
 .admin-menu li a:hover { background: #ffc; }
+.admin-menu ul > li { list-style-type: none; }
+.admin-menu h4 { font-style: italic; }
 table { background-color: white; margin: 5px auto; border-collapse:collapse; }
 table caption {
     /* background-color: #936; */
@@ -138,3 +140,5 @@ form header h1 span input { margin-right: 5px; }
 #ncit-changes { margin-top: 10px; }
 #activity-report td, #activity-report th { white-space: nowrap; }
 #activity-report td:last-child { white-space: normal; }
+.success { color: green; }
+.failure { color: red; }

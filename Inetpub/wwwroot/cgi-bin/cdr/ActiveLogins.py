@@ -30,7 +30,7 @@ class Control(Controller):
         query.where("s.ended IS NULL")
         rows = query.execute(self.cursor).fetchall()
         desc = self.cursor.description
-        cols = [Reporter.Column(d[0].replace("_", " ").title()) for d in desc]
-        return Reporter.Table(cols, rows)
+        cols = [d[0].replace("_", " ").title() for d in desc]
+        return Reporter.Table(rows, columns=cols)
 
 Control().run()

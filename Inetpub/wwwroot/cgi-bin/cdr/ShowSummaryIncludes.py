@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """
    Report to display all summaries including a list of special elements.
    The elements currently included are:
