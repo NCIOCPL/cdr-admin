@@ -55,7 +55,7 @@ body.admin-menu { background-color: #dfdfdf; }
     font-weight: bold;
 }
 .admin-menu li a:hover { background: #ffc; }
-.admin-menu ul > li { list-style-type: none; }
+.admin-menu ul > li, .lnone { list-style-type: none; }
 .admin-menu h4 { font-style: italic; }
 table { background-color: white; margin: 5px auto; border-collapse:collapse; }
 table caption {
@@ -73,6 +73,7 @@ th, td {
     background-color: white; color: black;
     font-size: 11pt; padding: 2px; border: 1px solid black;
 }
+table.no-gridlines td, table.no-gridlines th { border: none; }
 td.middle { vertical-align: middle; }
 .center { text-align: center; }
 .right { text-align: right; }
@@ -142,3 +143,8 @@ form header h1 span input { margin-right: 5px; }
 #activity-report td:last-child { white-space: normal; }
 .success { color: green; }
 .failure { color: red; }
+dl { padding-left: 5px; }
+dt { margin-top: 15px; font-weight: bold; }
+#summaries-toc-report h5 { font-size: 1em; margin-bottom: 0; margin-top: 10px }
+#summaries-toc-report h4 { text-decoration: underline; }
+#summaries-toc-report > ul { margin: 0 2px; }

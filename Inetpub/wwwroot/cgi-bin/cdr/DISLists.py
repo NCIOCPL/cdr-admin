@@ -1,332 +1,159 @@
-#----------------------------------------------------------------------
-# Report on lists of drug information summaries.
-#
-# BZIssue::4250 - initial revision
-# BZIssue::5198 - Adding a Table Option to Drug Summaries Lists Report
-#----------------------------------------------------------------------
-import cdr, cgi, cdrcgi, time
+#!/usr/bin/env python
+
+"""Report on lists of drug information summaries.
+"""
+
+import datetime
+from cdrcgi import Controller, Reporter
 from cdrapi import db
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields    = cgi.FieldStorage()
-session   = cdrcgi.getSession(fields)
-# audience  = fields and fields.getvalue("audience")         or "Patient"
-drugType  = fields and fields.getvalue("type")             or None
-showId    = fields and fields.getvalue("showId")           or "N"
-showTable = fields and fields.getvalue("showTable")        or "N"
-submit    = fields and fields.getvalue("SubmitButton")     or None
-request   = cdrcgi.getRequest(fields)
-title     = "CDR Administration"
-instr     = 'Drug Info Summaries List -- %s.'
-script    = "DISLists.py"
-SUBMENU   = "Report Menu"
-buttons   = (SUBMENU, cdrcgi.MAINMENU)
+class Control(Controller):
+    """Top-level logic for the report."""
 
+    SUBTITLE = f"Drug Info Summaries List -- {datetime.date.today()}"
+    SINGLE_AGENT = "single_agent"
+    COMBINATION = "combination"
+    TYPES = {
+        SINGLE_AGENT: "Single Drug Agent",
+        COMBINATION: "Combination Drug",
+    }
+    OPTIONS = (
+        ("include_id", "Include CDR ID", True),
+        ("headers", "Include Column Headers", True),
+        ("gridlines", "Show Grid Lines", True),
+        ("extra", "Include Extra Column", False),
+    )
+    META_DATA = "/DrugInformationSummary/DrugInfoMetaData"
+    COMBO_PATH = f"{META_DATA}/DrugInfoType/@Combination"
 
-# -------------------------------------------------
-# Create the table row for the English table output
-# -------------------------------------------------
-def summaryTableRow(id, summary, addCdrID='Y', addBlank='N'):
-    """Return the HTML code to display a Summary row with ID"""
+    def build_tables(self):
+        """Create the report tables the user requested.
 
-    # Start the table row
-    # -------------------
-    html = """\
-   <tr>"""
+        If none were requested, fall back to the form.
+        """
 
-    # Setting the class and column headers for table display
-    # ------------------------------------------------------
-    if addBlank == 'Y':
-        showGrid = 'blankCol'
-    else:
-        showGrid = ''
+        tables = []
+        for agent_type in self.agent_types:
+            query = self.create_query(agent_type)
+            rows = []
+            for doc_id, title in query.execute(self.cursor).fetchall():
+                row = []
+                if self.include_id:
+                    row = [Reporter.Cell(doc_id, center=True)]
+                row.append(title)
+                if self.include_blank_column:
+                    row.append("")
+                rows.append(row)
+            caption = self.TYPES[agent_type]
+            table = Reporter.Table(rows, columns=self.cols, caption=caption)
+            if not self.show_gridlines:
+                table.node.set("class", "no-gridlines")
+            tables.append(table)
+        if tables:
+            return tables
+        else:
+            self.show_form()
 
+    def create_query(self, agent_type):
+        """Create a customized database query depending on the agent type.
 
-    # Add an extra cell for the CDR-ID
-    # --------------------------------
-    if addCdrID == 'Y':
-        html += """
-    <td class="report cdrid %s" width="8%%">%s</td>""" % (showGrid, id)
+        Pass:
+            agent_type: one of `SINGLE_AGENT` or `COMBINATION`
 
-    # Display the Summary title
-    # -------------------------
-    html += """
-    <td class="report %s">%s""" % (showGrid, summary)
+        Return:
+            `cdrapi.db.Query` object
+        """
 
-    # End the summaries cell
-    # ----------------------
-    html += """
-    </td>"""
+        fields = "d.id", "t.value"
+        query = db.Query("active_doc d", "d.id", "t.value").unique().order(2)
+        query.join("query_term_pub t", "t.doc_id = d.id")
+        query.where("t.path = '/DrugInformationSummary/Title'")
+        query.outer("query_term_pub c", "c.doc_id = d.id",
+                    f"c.path = '{self.COMBO_PATH}'")
+        if agent_type == self.SINGLE_AGENT:
+            query.where("c.value IS NULL")
+        else:
+            query.where("c.value = 'Yes'")
+        return query
 
-    # Add and extra blank column
-    # --------------------------
-    if addBlank == 'Y':
-        html += """
-    <td class="report %s" width="50%%">&nbsp;</td>""" % showGrid
+    def populate_form(self, page):
+        """Add the fields for the report.
 
-    # End the table row
-    # -----------------
-    html += """
-   </tr>
-"""
-    return html
+        Add client-side script to turn off the extra column flag
+        if grid lines are suppressed.
 
+        Pass:
+            `HTMLPage` object to which the fields are added.
+        """
 
+        fieldset = page.fieldset("Select Agent Type(s)")
+        for agent_type, display in reversed(sorted(self.TYPES.items())):
+            opts = dict(value=agent_type, label=display, checked=True)
+            fieldset.append(page.checkbox("type", **opts))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Options")
+        for value, label, checked in self.OPTIONS:
+            opts = dict(value=value, label=label, checked=checked)
+            fieldset.append(page.checkbox("options", **opts))
+        page.form.append(fieldset)
+        page.add_script("""\
+function check_options(value) {
+    if (!jQuery("#options-gridlines").prop("checked"))
+        jQuery("#options-extra").prop("checked", false);
+}""")
 
-# ---------------------------------------------------
-# Functions to replace sevaral repeated HTML snippets
-# ---------------------------------------------------
-def disHeader(listHeader, disCount):
-    """Return the HTML code to display the Summary Board Header"""
-    html = """\
-  <span class="sectionHdr">%s (%d)</span>
-  <table width = "100%%">
-""" % (listHeader, disCount)
-    return html
+    @property
+    def cols(self):
+        """Column headers selected to match the report options."""
 
+        if not hasattr(self, "_cols"):
+            if self.include_headers:
+                self._cols = []
+                if self.include_id:
+                    self._cols = ["CDR ID"]
+                self._cols.append("Title")
+                if self.include_blank_column:
+                    self._cols.append(Reporter.Column("", width="300px"))
+            else:
+                self._cols = None
+        return self._cols
 
-# =====================================================================
-# Main starts here
-# =====================================================================
-# Handle navigation requests.
-#----------------------------
-if request == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif request == SUBMENU:
-    cdrcgi.navigateTo("reports.py", session)
+    @property
+    def include_headers(self):
+        """Boolean indicating whether to show table column headers."""
+        return True if "headers" in self.options else False
 
-#----------------------------------------------------------------------
-# Set up a database connection and cursor.
-#----------------------------------------------------------------------
-try:
-    conn = db.connect(user="CdrGuest")
-    cursor = conn.cursor()
-except Exception as e:
-    cdrcgi.bail('Database connection failure: %s' % e)
+    @property
+    def include_blank_column(self):
+        """Boolean indicating whether to tack on a blank column."""
+        return True if "extra" in self.options else False
 
-#----------------------------------------------------------------------
-# Build date string for header.
-#----------------------------------------------------------------------
-dateString = time.strftime("%B %d, %Y")
-instr = instr % dateString
+    @property
+    def include_id(self):
+        """Boolean indicating whether we should include a column for the ID."""
+        return True if "include_id" in self.options else False
 
-### Testing
-#drugType = 'All'
-### Testing
-#----------------------------------------------------------------------
-# If we don't have a request, put up the form.
-#----------------------------------------------------------------------
-if not drugType:
-    header = cdrcgi.header(title, title, instr,
-                           script,
-                           ("Submit",
-                            SUBMENU,
-                            cdrcgi.MAINMENU),
-                           numBreaks = 1,
-                           stylesheet = """
-   <style type="text/css">
-    td      { font-size:  12pt; }
-    li.none { list-style-type: none }
-    dl      { margin-left: 0; padding-left: 0 }
-   </style>
-""")
-    form   = """\
-   <input type='hidden' name='%s' value='%s'>
+    @property
+    def options(self):
+        """Settings of the option checkboxes."""
+        return self.fields.getlist("options")
 
-   <fieldset>
-    <legend>&nbsp;Display CDR-ID?&nbsp;</legend>
-    <input name='showId' type='radio' id="idNo"
-           value='N'>
-    <label for="idNo">Without CDR-ID</label>
-    <br>
-    <input name='showId' type='radio' id="idYes"
-           value='Y' CHECKED>
-    <label for="idYes">With CDR-ID</label>
-   </fieldset>
+    @property
+    def show_gridlines(self):
+        """Boolean indicating whether we should have visible cell borders."""
+        return True if "gridlines" in self.options else False
 
-   <fieldset>
-    <legend>&nbsp;Select Agent Type&nbsp;</legend>
-    <input name='type' type='radio' id="single" value='Single'>
-    <label for="single">Single Agent</label>
-    <br>
-    <input name='type' type='radio' id="combi" value='Combi'>
-    <label for="combi">Combination</label>
-    <br>
-    <input name='type' type='radio' id="both" value='All' CHECKED>
-    <label for="both">Both</label>
-   </fieldset>
+    @property
+    def agent_types(self):
+        """Sequence of drug agent types to be included in the report.
 
-   <fieldset>
-    <legend>&nbsp;Display in Table Format?&nbsp;</legend>
-    <input name='showTable' type='radio' id="tableNo"
-           value='N' CHECKED>
-    <label for="tableNo">Standard</label>
-    <br>
-    <input name='showTable' type='radio' id="tableYes"
-           value='Y'>
-    <label for="tableYes">Table format with blank column</label>
-   </fieldset>
+        Reverse the order so that single drug agents come first.
+        """
 
-  </form>
- </body>
-</html>
-""" % (cdrcgi.SESSION, session)
-    cdrcgi.sendPage(header + form)
+        if not hasattr(self, "_agent_types"):
+            self._agent_types = reversed(sorted(self.fields.getlist("type")))
+        return self._agent_types
 
-# Put all the pieces together for the SELECT statement
-# -------------------------------------------------------------
-query = """\
-         SELECT d.id, q.value, active_status, val_status, s.value
-           FROM query_term_pub q
-           JOIN document d
-             ON d.id = q.doc_id
-           JOIN doc_type dt
-             ON d.doc_type = dt.id
-LEFT OUTER JOIN query_term s
-             ON s.doc_id = q.doc_id
-            AND s.path  = '/DrugInformationSummary/DrugInfoMetaData' +
-                          '/DrugInfoType/@Combination'
-          WHERE dt.name = 'DrugInformationSummary'
-            AND q.path  = '/DrugInformationSummary/Title'
-            AND d.active_status = 'A'
-          ORDER BY s.value, q.value
-"""
-
-if not query:
-    cdrcgi.bail('No query criteria specified')
-
-#----------------------------------------------------------------------
-# Submit the query to the database.
-#----------------------------------------------------------------------
-try:
-    cursor = conn.cursor()
-    cursor.execute(query)
-    rows = cursor.fetchall()
-    cursor.close()
-    cursor = None
-except Exception as e:
-    cdrcgi.bail('Failure retrieving DIS documents: %s' % e)
-
-if not rows:
-    cdrcgi.bail('No Records Found for Selection: %s ' % drugType   + "; ")
-
-# Counting the number of summaries per board
-# ------------------------------------------
-combiCount = {'All'   :len(rows),
-              'Combi' :0,
-              'Single':0}
-for row in rows:
-    if row[4] == 'Yes':
-        combiCount['Combi']  += 1
-    else:
-        combiCount['Single'] += 1
-
-#----------------------------------------------------------------------
-# Create the results page.
-#----------------------------------------------------------------------
-header    = cdrcgi.rptHeader(title, stylesheet = """\
-   <style type="text/css">
-    ul             { margin-left:    0;
-                     padding-left:   0;
-                     margin-top:    10px;
-                     margin-bottom: 30px; }
-    table          { border-collapse:collapse;
-                     margin-top:    10px;
-                     margin-bottom: 30px; }
-
-    *.date         { font-size: 12pt; }
-    *.sectionHdr   { font-size: 12pt;
-                     font-weight: bold;
-                     text-decoration: underline; }
-    *.report       { font-size: 11pt;
-                     padding-right: 15px;
-                     vertical-align: top; }
-    *.blankCol     { empty-cells: show;
-                     border: 1px solid black; }
-    *.cdrid        { text-align: right }
-    li             { list-style-type: none }
-    li.report      { font-size: 11pt;
-                     font-weight: normal; }
-    div.es          { height: 10px; }
-   </style>
-""")
-
-# -------------------------
-# Display the Report Title
-# -------------------------
-report    = """\
-   <input type='hidden' name='%s' value='%s'>
-  <h3>Drug Information Summaries<br>
-  <span class="date">(%s)</span>
-  </h3>
-""" % (cdrcgi.SESSION, session, dateString)
-
-# -------------------------------------------------------------------
-# Decision if the CDR IDs are displayed along with the summary titles
-# - The report without CDR ID is displayed as a none-bulleted list.
-# - The report with    CDR ID is displayed in a table format.
-# -------------------------------------------------------------------
-
-# ------------------------------------------------------------------------
-# Display the data
-# ------------------------------------------------------------------------
-reportS = disHeader('Single Agent Drug', combiCount['Single'])
-reportD = disHeader('Combination Drug', combiCount['Combi'])
-
-if showTable == 'Y':
-    if showId == 'Y':
-        showHeader = """\
-   <tr>
-    <th class="report blankCol">CDR-ID</th>
-    <th class="report blankCol">Title</th>
-    <th class="report blankCol"> </th>
-   </tr>
-"""
-    else:
-        showHeader = """\
-   <tr>
-    <th class="report blankCol">Title</th>
-    <th class="report blankCol"> </th>
-   </tr>
-"""
-    reportS += showHeader
-    reportD += showHeader
-
-# Creating the individual rows
-# ----------------------------------------
-for row in rows:
-    # The rows list all Drug Summary records sorted by DIS/Combo.
-    # If only one type needs to be printed then skip the other
-    # otherwise we'll need to print a second heading for the second
-    # type.
-    # ----------------------------------------------------------
-    if row[4] != 'Yes':
-        reportS += summaryTableRow(row[0], row[1], addCdrID=showId,
-                                   addBlank=showTable)
-    if row[4] == 'Yes':
-        reportD += summaryTableRow(row[0], row[1], addCdrID=showId,
-                                  addBlank=showTable)
-reportS += """
-  </table>
-"""
-reportD += """
-  </table>
-"""
-
-# Decide which of the two individual reports should be printed
-# ------------------------------------------------------------
-if drugType == 'All' or drugType == 'Single':
-    report += reportS
-if drugType == 'All' or drugType == 'Combi':
-    report += reportD
-
-footer = """\
- </body>
-</html>
-"""
-
-# Send the page back to the browser.
-#----------------------------------------------------------------------
-cdrcgi.sendPage(header + report + footer)
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+    Control().run()

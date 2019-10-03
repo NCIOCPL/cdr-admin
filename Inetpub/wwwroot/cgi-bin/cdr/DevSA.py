@@ -13,7 +13,6 @@ class Control(Controller):
     ON_PROD = isProdHost()
     def populate_form(self, page):
         page.body.set("class", "admin-menu")
-        page.form.append(page.B.H3("Document Type"))
         ol = page.B.OL()
         for display, script in (
             ("Batch Job Status", "getBatchStatus.py"),

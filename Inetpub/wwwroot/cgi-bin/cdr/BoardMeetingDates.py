@@ -1,441 +1,284 @@
-#----------------------------------------------------------------------
-# Report listing the Board meetings by date or board.
-#
-# BZIssue::4205 - initial report
-# BZIssue::4792 - add Meeting Canceled attribute to report
-#----------------------------------------------------------------------
-import cdrcgi, cgi, time
+#!/usr/bin/env python
+
+"""List PDQ editorial board meetings by date or board.
+"""
+
+import datetime
+from cdrcgi import Controller, Reporter, bail
+from cdr import Board
 from cdrapi import db
-from html import escape as html_escape
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields     = cgi.FieldStorage()
-session    = cdrcgi.getSession(fields)
-request    = cdrcgi.getRequest(fields)
-boardPick  = fields.getlist ('boardpick') or []
-flavor     = fields.getvalue('Report')    or 'ByBoard'
-startDate  = fields.getvalue('StartDate') or None
-endDate    = fields.getvalue('EndDate')   or None
-SUBMENU    = "Report Menu"
-buttons    = ["Submit", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-script     = "BoardMeetingDates.py"
-title      = "CDR Administration"
-section    = "PDQ Editorial Board Meetings"
-header     = cdrcgi.header(title, title, section, script, buttons,
-                            method = 'GET',
-                            stylesheet = """\
-   <link type='text/css' rel='stylesheet' href='/stylesheets/CdrCalendar.css'>
-   <script type='text/javascript' language='JavaScript'
-           src='/js/CdrCalendar.js'></script>
-   <style type='text/css'>
-    body          { background-color: #DFDFDF;
-                    font-family: sans-serif;
-                    font-size: 12pt; }
-    legend        { font-weight: bold;
-                    color: teal;
-                    font-family: sans-serif; }
-    fieldset      { width: 500px;
-                    margin-left: auto;
-                    margin-right: auto;
-                    display: block; }
-    .CdrDateField { width: 100px; }
-   </style>
-   <script type='text/javascript' language='JavaScript'>
-    function someBoards() {
-        document.getElementById('AllBoards').checked = false;
+class Control(Controller):
+    """Top-level processing logic."""
+
+    SUBTITLE = "PDQ Editorial Board Meetings"
+    BY_BOARD = "display_by_board"
+    BY_DATE = "display_by_date"
+    REPORT_TYPES = BY_BOARD, BY_DATE
+
+    def build_tables(self):
+        """Assemble the correct report, based on the user's choice."""
+        if self.report_type == self.BY_BOARD:
+            return self.table_by_board
+        return self.table_by_date
+
+    def populate_form(self, page):
+        """Add the field sets to the form page.
+
+        Add client-side scripting to make the board picklist behave
+        correctly.
+
+        Pass
+            page - HTMLPage object on which the form is built
+        """
+        fieldset = page.fieldset("Select Report Type")
+        for report_type in self.REPORT_TYPES:
+            opts = dict(value=report_type)
+            if report_type == self.BY_BOARD:
+                opts["checked"] = True
+            fieldset.append(page.radio_button("report_type", **opts))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Select Boards")
+        fieldset.append(page.checkbox("board", value="all", checked=True))
+        for board in sorted(self.boards.values()):
+            opts = dict(value=board.id, label=str(board))
+            fieldset.append(page.checkbox("board", **opts))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Date Range for Report")
+        today = datetime.date.today()
+        start = datetime.date(today.year, 1, 1)
+        end = datetime.date(today.year, 12, 31)
+        fieldset.append(page.date_field("start", value=str(start)))
+        fieldset.append(page.date_field("end", value=str(end)))
+        page.form.append(fieldset)
+        page.form.set("method", "get")
+        page.add_script("""\
+function check_board(val) {
+    if (val == "all") {
+        jQuery("input[name='board']").prop("checked", false);
+        jQuery("#board-all").prop("checked", true);
     }
-    function allBoards(widget, n) {
-        for (var i = 1; i <= n; ++i)
-            document.getElementById('E' + i).checked = false;
-    }
-   </script>
-""")
-rptStyle = """\
-  <style type='text/css'>
-   *.board       { font-weight: bold;
-                   text-decoration: underline;
-                   font-size: 12pt; }
-   .dates        { font-size: 11pt; }
-   .title        { font-size: 16pt;
-                   font-weight: bold;
-                   text-align: center; }
-   .subtitle     { font-size: 12pt; }
-   .blank        { background-color: #FFFFFF; }
-   .strikethrough { text-decoration: line-through; }
-  </style>"""
-rptHeader  = cdrcgi.rptHeader(title, bkgd = 'FFFFFF', stylesheet = rptStyle)
-footer     = """\
- </body>
-</html>"""
+    else if (jQuery("input[name='board']:checked").length > 0)
+        jQuery("#board-all").prop("checked", false);
+    else
+        jQuery("#board-all").prop("checked", true);
+}""")
 
-#----------------------------------------------------------------------
-# Make sure we're logged in.
-#----------------------------------------------------------------------
-if not session: cdrcgi.bail('Unknown or expired CDR session.')
+    @property
+    def caption(self):
+        """Display string for the top of the table."""
 
-#----------------------------------------------------------------------
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if request == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif request == SUBMENU:
-    cdrcgi.navigateTo("Reports.py", session)
+        if not hasattr(self, "_caption"):
+            caption = [self.SUBTITLE]
+            if self.start:
+                if self.end:
+                    caption.append(f"(between {self.start} and {self.end})")
+                else:
+                    caption.append(f"(on or after {self.start})")
+            elif self.end:
+                caption.append(f"(up through {self.end})")
+            self._caption = caption
+        return self._caption
 
-#----------------------------------------------------------------------
-# Handle request to log out.
-#----------------------------------------------------------------------
-if request == "Log Out":
-    cdrcgi.logout(session)
+    @property
+    def board(self):
+        """Sequence of IDs for the boards to be included."""
+        if not hasattr(self, "_board"):
+            self._board = self.fields.getlist("board")
+            for board in self._board:
+                if board != "all" and int(board) not in self.boards:
+                    bail()
+        return self._board
 
-#----------------------------------------------------------------------
-# Connect to the CDR database.
-#----------------------------------------------------------------------
-try:
-    conn   = db.connect(user='CdrGuest', timeout=600)
-    cursor = conn.cursor()
-except Exception as e:
-    cdrcgi.bail('Database connection failure: %s' % e)
+    @property
+    def boards(self):
+        """PDQ boards for the form's picklist."""
+        if not hasattr(self, "_boards"):
+            self._boards = Board.get_boards(cursor=self.cursor)
+        return self._boards
 
-#----------------------------------------------------------------------
-# Custom validation function for board pick
-#----------------------------------------------------------------------
-def valBoardPick(cursor, boardPicks):
-    """
-    Tests that a CDR ID representing a Board organization document is
-    really for a board and not something else.  Makes the script safe
-    against XSS attacks on the boardPick variable.
+    @property
+    def end(self):
+        """End of the date range for the report."""
+        if not hasattr(self, "_end"):
+            self._end = self.fields.getvalue("end")
+        return self._end
 
-    Pass:
-        cursor     - Active database cursor.
-        boardPicks - Array of CDR IDs to validate for board doc.
-    Return:
-        True if okay, else invokes cdrcgi.bail().
-    """
-    # This is okay
-    if boardPicks[0] == 'all':
-        return True
+    @property
+    def meetings(self):
+        """Find the meetings which are in-scope for this report."""
+        if not hasattr(self, "_meetings"):
+            self._meetings = Meeting.get_meetings(self)
+        return self._meetings
 
-    # Find the doc IDs for organization docs
-    cursor.execute("""
-        SELECT DISTINCT doc_id
-          FROM query_term
-         WHERE value = 'PDQ Editorial Board'
-           AND path = '/Organization/OrganizationType'
-    """)
-    # Get the editorial board IDs
-    # Note this simple query also gets the PDQ Spanish Editorial Board
-    #  but I don't think we need to exclude it for this purpose.
-    rows = cursor.fetchall()
-    docIds = [row[0] for row in rows]
+    @property
+    def report_type(self):
+        """User's decision as to whether to report by board or by date."""
+        if not hasattr(self, "_report_type"):
+            self._report_type = self.fields.getvalue("report_type")
+            if not self._report_type:
+                self._report_type = self.BY_BOARD
+            elif self._report_type not in self.REPORT_TYPES:
+                bail()
+        return self._report_type
 
-    # Test it, bail if not in the set
-    for board in boardPicks:
-        try:
-            bdNum = int(board)
-        except ValueError:
-            # Force an invalid value
-            bdNum = -1
-        cdrcgi.valParmVal(bdNum, valList=docIds)
+    @property
+    def start(self):
+        """Beginning of the date range for the report."""
+        if not hasattr(self, "_start"):
+            self._start = self.fields.getvalue("start")
+        return self._start
 
-#----------------------------------------------------------------------
-# Build a sequence of Board objects, which holds all the information
-# needed for the two reports.  Sequence is sorted by board name.
-#----------------------------------------------------------------------
-class Board:
-    def __init__(self, cdrId, name):
-        self.cdrId = cdrId
-        self.name = name.replace(' Editorial Board', '')
-        self.meetings = []
-        if self.name.startswith('PDQ '):
-            self.name = self.name[4:]
-    def __cmp__(self, other):
-        diff = cmp(self.name, other.name)
-        if diff:
-            return diff
-        return cmp(self.cdrId, other.cdrId)
+    @property
+    def table_by_board(self):
+        """Create the 'by board' flavor of the report."""
+
+        boards = {}
+        for meeting in self.meetings:
+            if meeting.board.name not in boards:
+                boards[meeting.board.name] = [meeting]
+            else:
+                boards[meeting.board.name].append(meeting)
+        rows = []
+        for board in sorted(boards):
+            if rows:
+                rows.append(["\xA0"])
+            rows.append([Reporter.Cell(board, bold=True)])
+            for meeting in boards[board]:
+                rows.append([meeting])
+        return Reporter.Table(rows, caption=self.caption)
+
+    @property
+    def table_by_date(self):
+        """Create the 'by date' flavor of the report."""
+
+        cols = "Date", "Day", "Time", "WebEx", "Board"
+        rows = []
+        prev = None
+        for meeting in sorted(self.meetings):
+            if prev and prev < (meeting.date.year, meeting.date.month):
+                rows.append([Reporter.Cell("\xA0", colspan=len(cols))])
+            prev = meeting.date.year, meeting.date.month
+            classes = ["strikethrough"] if meeting.canceled else []
+            center = classes + ["center"]
+            row = (
+                Reporter.Cell(meeting.date, classes=center),
+                Reporter.Cell(meeting.day, classes=center),
+                Reporter.Cell(meeting.time, classes=center),
+                Reporter.Cell("Yes" if meeting.webex else "", classes=center),
+                Reporter.Cell(meeting.board.name, classes=classes),
+            )
+            rows.append(row)
+        return Reporter.Table(rows, columns=cols, caption=self.caption)
+
+
 class Meeting:
-    def __init__(self, meetingDate, meetingTime, board, webEx = False,
-                                                        canceled = ''):
-        self.date = meetingDate
-        self.time = meetingTime
-        self.board = board
-        self.webEx = webEx
-        self.canceled = canceled
-        try:
-            y, m, d = [int(piece) for piece in meetingDate.split('-')]
-            normalizedDate = normalizeDate(y, m, d)
-            self.englishDate = time.strftime("%B %d, %Y", normalizedDate)
-            self.dayOfWeek = time.strftime("%A", normalizedDate)
-        except Exception as e:
-            # cdrcgi.bail("%s: %s" % (date, e))
-            self.prettyDate = self.dayOfWeek = "???"
-    def __cmp__(self, other):
-        diff = cmp(self.date, other.date)
-        if diff:
-            return diff
-        return cmp(self.board.name, other.board.name)
-def collectBoardMeetingInfo(cursor):
-    cursor.execute("""\
-SELECT DISTINCT a.id, n.value, d.value, t.value, w.value, c.value
-           FROM active_doc a
-           JOIN query_term n
-             ON n.doc_id = a.id
-           JOIN query_term o
-             ON o.doc_id = a.id
-           JOIN query_term d
-             ON d.doc_id = a.id
-           JOIN query_term t
-             ON t.doc_id = d.doc_id
-            AND LEFT(t.node_loc, 12) = LEFT(d.node_loc, 12)
-LEFT OUTER JOIN query_term w
-             ON w.doc_id = d.doc_id
-            AND LEFT(w.node_loc, 12) = LEFT(d.node_loc, 12)
-            AND w.path = '/Organization/PDQBoardInformation/BoardMeetings' +
-                         '/BoardMeeting/MeetingDate/@WebEx'
-LEFT OUTER JOIN query_term c
-             ON c.doc_id = d.doc_id
-            AND LEFT(c.node_loc, 12) = LEFT(d.node_loc, 12)
-            AND c.path = '/Organization/PDQBoardInformation/BoardMeetings' +
-                         '/BoardMeeting/@ReasonCanceled'
-          WHERE o.value IN ('PDQ Advisory Board', 'PDQ Editorial Board')
-            AND o.path = '/Organization/OrganizationType'
-            AND n.path = '/Organization/OrganizationNameInformation' +
-                         '/OfficialName/Name'
-            AND d.path = '/Organization/PDQBoardInformation/BoardMeetings' +
-                         '/BoardMeeting/MeetingDate'
-            AND t.path = '/Organization/PDQBoardInformation/BoardMeetings' +
-                         '/BoardMeeting/MeetingTime'""")
-    boards = {}
-    for cdrId, boardName, meetingDate, meetingTime, webEx, \
-                                          canceled in cursor.fetchall():
-        board = boards.get(cdrId)
-        if not board:
-            board = Board(cdrId, boardName)
-            boards[cdrId] = board
-        board.meetings.append(Meeting(meetingDate, meetingTime, board,
-                                                   webEx, canceled))
-    return sorted(boards.values())
+    """PDQ Board meeting information."""
 
-#----------------------------------------------------------------------
-# Generate fields for selecting which boards should be included in the
-# report.
-#----------------------------------------------------------------------
-def makeBoardSelectionFields(boards):
-    html = ["""\
-    <fieldset>
-     <legend> Select Board Names </legend>
-     &nbsp;
-     <input name='boardpick' type='checkbox' CHECKED id='AllBoards'
-            class='choice'
-            onclick='javascript:allBoards(this, %d)'
-            value='all'> All <br>
-""" % len(boards)]
-    i = 1
-    for board in boards:
-        html.append("""\
-     &nbsp;
-     <input name='boardpick' type='checkbox' value='%d' class='choice'
-            onclick='javascript:someBoards()' id='E%d'> %s <br>
-""" % (board.cdrId, i, html_escape(board.name)))
-        i += 1
-    html.append("""\
-    </fieldset>
-""")
-    return "".join(html)
+    FIELDS = (
+        "d.doc_id AS board_id",
+        "d.value AS meeting_date",
+        "t.value AS meeting_time",
+        "w.value AS webex",
+        "c.value AS cancellation_reason",
+    )
+    MEETINGS = "/Organization/PDQBoardInformation/BoardMeetings"
+    MEETING = f"{MEETINGS}/BoardMeeting"
+    DATE = f"{MEETING}/MeetingDate"
+    TIME = f"{MEETING}/MeetingTime"
+    CANCELED = f"{MEETING}/@ReasonCanceled"
+    WEBEX = f"{DATE}/@WebEx"
 
-#----------------------------------------------------------------------
-# Normalize a year, month, day tuple into a standard date-time value.
-#----------------------------------------------------------------------
-def normalizeDate(y, m, d):
-    return time.localtime(time.mktime((y, m, d, 0, 0, 0, 0, 0, -1)))
+    def __init__(self, control, row):
+        """Capture the caller's information.
 
-#----------------------------------------------------------------------
-# Generate a pair of dates suitable for seeding the user date fields.
-#----------------------------------------------------------------------
-def getDefaultDates():
-    import time
-    yr, mo, da, ho, mi, se, wd, yd, ds = time.localtime()
-    startYear = normalizeDate(yr, 1, 1)
-    endYear   = normalizeDate(yr, 12, 31)
-    return (time.strftime("%Y-%m-%d", startYear),
-            time.strftime("%Y-%m-%d", endYear))
+        Properties do the heavy lifting.
+        """
 
-# ---------------------------------------------------------------------
-# *** Main starts here ***
-# ---------------------------------------------------------------------
+        self.__control = control
+        self.__row = row
 
-#----------------------------------------------------------------------
-# Validate parameters
-# Some of this is not strictly necessary but will quiet AppScan warnings
-#----------------------------------------------------------------------
-if request:   cdrcgi.valParmVal(request, valList=buttons)
-if flavor:    cdrcgi.valParmVal(flavor, valList=('ByDate', 'ByBoard'))
-if startDate: cdrcgi.valParmDate(startDate)
-if endDate:   cdrcgi.valParmDate(endDate)
-if boardPick: valBoardPick(cursor, boardPick)
+    @property
+    def board(self):
+        """Board holding the meeting (`cdr.Board` object)."""
+        return self.__control.boards.get(self.__row.board_id)
+
+    @property
+    def canceled(self):
+        """Boolean indicating whether the meeting has been canceled."""
+        return self.__row.cancellation_reason is not None
+
+    @property
+    def date(self):
+        """Date of the meeting (a `datetime.date` object)."""
+        if not hasattr(self, "_date"):
+            y, m, d = self.__row.meeting_date.split("-")
+            self._date = datetime.date(int(y), int(m), int(d))
+        return self._date
+
+    @property
+    def day(self):
+        """String for the meeting's day of the week."""
+        return self.date.strftime("%A")
+
+    @property
+    def english_date(self):
+        """Localized form of the date (no longer used)."""
+        return self.date.strftime("%B %d, &Y")
+
+    @property
+    def time(self):
+        """String for the meeting's time block."""
+        return self.__row.meeting_time
+
+    @property
+    def webex(self):
+        """Boolean indicating whether this is a remote meeting."""
+        return self.__row.webex is not None
+
+    def __lt__(self, other):
+        """Support sorting the meetings by date, then by board."""
+        return (self.date, self.board.name) < (other.date, other.board.name)
+
+    def __str__(self):
+        """Prepare the display version of the meeting for the report."""
+        if self.webex:
+            return f"{self.date} {self.time} (WebEx)"
+        return f"{self.date} {self.time}"
+
+    @classmethod
+    def get_meetings(cls, control):
+        """Find the meetings which are in-scope for the report's parameters.
+        """
+
+        query = db.Query("query_term d", *cls.FIELDS).unique()
+        query.join("query_term t", *cls.meeting_join("t", "d"))
+        query.outer("query_term w", *cls.meeting_join("w", "d", cls.WEBEX))
+        query.outer("query_term c", *cls.meeting_join("c", "d", cls.CANCELED))
+        query.where(query.Condition("d.path", cls.DATE))
+        query.where(query.Condition("t.path", cls.TIME))
+        if control.board and "all" not in control.board:
+            query.where(query.Condition("d.doc_id", list(control.board), "IN"))
+        if control.start:
+            query.where(query.Condition("d.value", control.start, ">="))
+        if control.end:
+            query.where(query.Condition("d.value", control.end, "<="))
+        query.log()
+        rows = query.execute(control.cursor).fetchall()
+        return [cls(control, row) for row in query.execute(control.cursor)]
+
+    @staticmethod
+    def meeting_join(a, b, path=""):
+        """Conditions for a join clause in the query to find meetings."""
+        conditions = [
+            f"{a}.doc_id = {b}.doc_id",
+            f"LEFT({a}.node_loc, 12) = LEFT({b}.node_loc, 12)",
+        ]
+        if path:
+            conditions.append(f"{a}.path = '{path}'")
+        return conditions
 
 
-boards = collectBoardMeetingInfo(cursor)
-
-#----------------------------------------------------------------------
-# Put up the menu if we don't have selection criteria yet.
-#----------------------------------------------------------------------
-if not (boardPick and startDate and endDate):
-    startDate, endDate = getDefaultDates()
-    form = """\
-   <input type='hidden' name='%s' value='%s'>
-   <fieldset class='rtype'>
-    <legend>&nbsp;Select Report Type&nbsp;</legend>
-    <input type='radio' name='Report' value='ByBoard' id='byboard' CHECKED>
-    <label for='byboard'>Display by Board</label>
-    <br>
-    <input type='radio' name='Report' value='ByDate' id='bydate'>
-    <label for='bydate'>Display by Date</label>
-   </fieldset>
-   <p></p>
-%s
-   <p></p>
-   <fieldset class='dates'>
-    <legend>&nbsp;Report for this time frame&nbsp;</legend>
-    <label for='ustart'>Start Date:</label>
-    <input name='StartDate' value='%s' class='CdrDateField'
-           id='ustart'> &nbsp;
-    <label for='uend'>End Date:</label>
-    <input name='EndDate' value='%s' class='CdrDateField'
-           id='uend'>
-   </fieldset>
-  </form>
-""" % (cdrcgi.SESSION, session,
-       makeBoardSelectionFields(boards), startDate, endDate)
-    cdrcgi.sendPage(header + form + """\
- </body>
-</html>
-""")
-
-
-# Create the report and display dates by Board
-# --------------------------------------------
-if flavor == 'ByBoard':
-    html = ["""\
- <table>
-  <tr>
-   <td class="title">
-    PDQ Editorial Board Meetings<br>
-    <span class="subtitle">(between %s and %s)</span>
-   </td>
-  </tr>
- </table>
- <p></p>
-""" % (startDate, endDate)]
-
-    # Display data by board
-    # ---------------------
-    for board in boards:
-         if str(board.cdrId) in boardPick or boardPick[0] == 'all':
-             html.append("""
- <table>
-  <tr>
-   <td class="board">%s</td>
-  </tr>
-""" % html_escape(board.name))
-             board.meetings.sort()
-             for meeting in board.meetings:
-                 if meeting.date >= startDate and meeting.date <= endDate:
-                     html.append("""\
-  <tr>
-   <td class="dates%s">%s %s %s</td>
-  </tr>
-""" % (meeting.canceled and " strikethrough" or "",
-       meeting.date, meeting.time or "", meeting.webEx and ' (WebEx)' or ''))
-
-             html.append("""\
- </table>
- <p></p>
-""")
-    html = "".join(html)
-
-# Show the meeting information arranged by meeting dates.
-# -------------------------------------------------------
-else:
-    # First we're displaying the title and create the table layout
-    # ------------------------------------------------------------
-    html = ["""\
- <body>
-  <table width="850px">
-   <tr>
-    <td class="title">
-     PDQ Editorial Board Meetings<br>
-     <span class="subtitle">(between %s and %s)</span>
-    </td>
-   </tr>
-  </table>
-  <p></p>
-  <table>
-   <tr>
-    <th>Date</th>
-    <th>Day</th>
-    <th>Time</th>
-    <th>WebEx</th>
-    <th>Board</th>
-   </tr>""" % (startDate, endDate)]
-
-    # Reshuffle the boardInfo list so we can sort by date accross
-    # all boards
-    # -----------------------------------------------------------
-    meetings = []
-    for board in boards:
-        meetings += board.meetings
-    meetings.sort()
-    # mtgsByDate = getMeetingsByDate(boardInfo)
-    # cdrcgi.bail(mtgsByDate)
-    lastDate = startDate # prettyDate(startDate)[1][:3]
-    monthBlocks = 0
-
-    # Display Data by Date
-    # --------------------
-    #for date, boardName, boardId, mtgTime, isWebEx in mtgsByDate:
-    for meeting in meetings:
-        if meeting.date >= startDate and meeting.date <= endDate:
-            if str(meeting.board.cdrId) in boardPick or boardPick[0] == 'all':
-                # We want to add a space between each month
-                # Checking if we're still in the same month as the last row
-                # ---------------------------------------------------------
-                if lastDate[:7] != meeting.date[:7]:
-                    # cdrcgi.bail("%s vs. %s" % (lastDate, meeting.date))
-                    monthBlocks += 1
-                    html.append("""
-   <tr class="blank">
-    <td>&nbsp;</td>
-    <td>&nbsp;</td>
-    <td>&nbsp;</td>
-    <td>&nbsp;</td>
-    <td>&nbsp;</td>
-   </tr>""")
-                # Display the records in a table row format
-                # -----------------------------------------
-                bg = monthBlocks % 2 == 0 and 'even' or 'odd'
-                cls = "dates strikethrough" if meeting.canceled else "dates"
-                html.append("""
-   <tr class="%s">
-    <td width="150px" class="%s" align='center'>%s</td>
-    <td width="70px" class="%s" align='center'>%s</td>
-    <td width="200px" class="%s" align='center'>%s</td>
-    <td width="60px" class="%s" align='center'>%s</td>
-    <td width="330px" class="%s">%s</td>
-   </tr>""" % (bg, cls, meeting.date,
-               cls, meeting.dayOfWeek, cls, meeting.time,
-               cls, meeting.webEx and 'Yes' or '',
-               cls, html_escape(meeting.board.name)))
-
-                lastDate = meeting.date
-
-    html.append("""
-  </table>
-""")
-    html = "".join(html)
-
-# We have everything we need.  Show it to the user
-# ------------------------------------------------
-cdrcgi.sendPage(rptHeader + html + footer)
+if __name__ == "__main__":
+    """Let the script be loaded without executing (e.g., for linting)."""
+    Control().run()

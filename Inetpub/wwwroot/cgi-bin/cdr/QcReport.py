@@ -102,7 +102,8 @@ fields   = cgi.FieldStorage() or cdrcgi.bail("No Request Found", repTitle)
 debug    = fields.getvalue("debug") and True or False
 if debug:
     os.environ["CDR_LOGGING_LEVEL"] = "DEBUG"
-# DEBUG
+    cdr.LOGGER.setLevel("DEBUG")
+cdr.LOGGER.debug("QcReport.py called with %s", dict(fields))
 # cdrcgi.log_fields(fields, program='QcReport.py')
 docId    = fields.getvalue(cdrcgi.DOCID) or None
 session  = cdrcgi.getSession(fields) or cdrcgi.bail("Not logged in")

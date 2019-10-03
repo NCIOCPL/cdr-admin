@@ -68,9 +68,10 @@ class ActivityReport(cdrcgi.Controller):
         caption = [caption, date_range]
         return cdrcgi.Reporter.Table(rows, caption=caption, columns=self.COLS)
 
-    def set_report_options(self, opts):
-        """Provide a hook for some custom style rules."""
-        opts["page_opts"]["body_id"] = "activity-report"
+    def show_report(self):
+        """Override to provide a hook for some custom style rules."""
+        self.report.page.body.set("id", "activity-report")
+        self.report.send(self.format)
 
     @property
     def start_date(self):

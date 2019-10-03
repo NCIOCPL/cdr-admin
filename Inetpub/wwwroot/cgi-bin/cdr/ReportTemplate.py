@@ -67,17 +67,13 @@ class Control(cdrcgi.Controller):
 # the reports menu, or the top-level administrative menu page).
 # If the clicked button is the "Submit" button, the show_report()
 # method is invoked. The show_report() method in turn invokes the
-# build_tables() method, which we have overridden above. It also
-# invokes set_report_options() which we could override if we wanted
-# to modify how the report's page is displayed (for example, to
-# change which buttons are displayed); we're not overriding that
-# method in this simple example. Finally show_report() invokes
-# report.send() to display the report.
+# build_tables() method, which we have overridden above. Finally,
+# show_report() invokes this.report.send() to display the report.
 #
 # If no button is clicked, the run() method invokes the show_form()
-# method, which in turn calls the set_form_options() method (which
-# we're not overriding here) as well as the populate_form() method
-# (see above) before calling form.send() to display the form.
+# method, which in turn calls the populate_form() method so we can
+# add the fields we need for this report (as well as make any other
+# tweaks to the form's page) before displaying the form.
 #----------------------------------------------------------------------
 if __name__ == "__main__":
     Control().run()
