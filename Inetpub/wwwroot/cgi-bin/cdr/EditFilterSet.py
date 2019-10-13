@@ -1,502 +1,288 @@
-#----------------------------------------------------------------------
-# Form for editing named CDR filter sets.
-#
-# BZIssue::3716 - Unicode encoding cleanup
-# Rewritten August 2015 as part of security sweep.
-#----------------------------------------------------------------------
+#!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# Import required modules.
-#----------------------------------------------------------------------
-import cdr
-import cdrcgi
-import cgi
-import json
-import re
-from cdrapi import db
-from html import escape as html_escape
+"""Form for editing named CDR filter sets.
+"""
 
-#----------------------------------------------------------------------
-# Set some initial values.
-#----------------------------------------------------------------------
-banner   = "CDR Filter Set Editing"
-title    = "Edit CDR Filter Set"
-SUBMENU  = "Filter Sets"
-REQUESTS = ("Log Out", cdrcgi.MAINMENU, SUBMENU, "Edit", "New")
+from json import loads
+from cdrcgi import Controller, bail, navigateTo
+from cdrapi.docs import Doc, FilterSet
 
-#----------------------------------------------------------------------
-# Load the fields from the form.
-#----------------------------------------------------------------------
-fields     = cgi.FieldStorage()
-if not fields: cdrcgi.bail("Unable to read form fields", banner)
-session    = cdrcgi.getSession(fields)
-request    = cdrcgi.getRequest(fields)
-setName    = fields.getvalue('setName') or ''
-newName    = fields.getvalue('newName') or ''
-setDesc    = fields.getvalue('setDesc') or ''
-setNotes   = fields.getvalue('setNotes') or ''
-setMembers = fields.getvalue('setMembers') or ''
-isNew      = fields.getvalue('isNew') or 'N'
-doWhat     = fields.getvalue('doWhat') or ''
-noMembers  = "<< No members currently assigned to the set >>"
-filterSets = cdr.getFilterSets('guest')
+class Control(Controller):
+    """Processing control logic for managing filter sets."""
 
-#----------------------------------------------------------------------
-# Make sure we're allowed.
-#----------------------------------------------------------------------
-def allowed(session):
-    for action in ("ADD FILTER SET", "MODIFY FILTER SET", "DELETE FILTER SET"):
-        if cdr.canDo(session, action):
-            return True
-    return False
-if not allowed(session):
-    cdrcgi.bail("Account not permitted to use this page", banner)
+    SUBTITLE = "Edit Filter Set"
+    LOGNAME = "EditFilterSet"
+    SAVE = "Save Set"
+    SETS = "Manage Filter Sets"
+    EDIT_SETS = "EditFilterSets.py"
+    DELETE = "Delete Set"
+    JS = "/js/EditFilterSet.js"
+    CSS = "/stylesheets/EditFilterSet.css"
+    from lxml.html import builder as B
+    INSTRUCTIONS = (
+        "Drag filters or sets into the Members box to add them to the set.",
+        "Drag members within the box to re-order them.",
+        "Drag members out of the box to remove them from the set.",
+        "Double-click filters or sets to append them to the set.",
+        "Double-click members to remove them from the set.",
+        "If you change the name, adjust the sets which include this one!",
+    )
 
-#----------------------------------------------------------------------
-# Do some sanitizing of the parameters. The setDesc, setNotes, and
-# newName strings are escaped when inserted into HTML or CDR commmand
-# XML strings, and SQL placeholders are used in all of the database
-# queries which use the values.
-#----------------------------------------------------------------------
-if doWhat and doWhat not in ("Save", "Delete", "?"):
-    cdrcgi.bail()
-if isNew not in ("Y", "N"):
-    cdrcgi.bail()
-if request and request not in REQUESTS:
-    cdrcgi.bail()
-if setDesc and len(setDesc) > 256:
-    cdrcgi.bail("Set description cannot exceed 256 characters")
-if newName:
-    if len(newName) > 80:
-        cdrcgi.bail("Set name cannot exceed 80 characters")
-    try:
-        newName.encode("ascii")
-    except:
-        cdrcgi.bail("Set name must contain ASCII characters only")
-if setName and setName not in set([s.name for s in filterSets]):
-    cdrcgi.bail()
-if setMembers:
-    for m in setMembers.split("|"):
-        if not m or m[0] not in ("S", "F"):
-            cdrcgi.bail()
-        memberId = m[1:]
-        if not memberId or not memberId.isdigit():
-            cdrcgi.bail()
+    def run(self):
+        """Handle our custom actions."""
 
-#----------------------------------------------------------------------
-# Handle request to log out.
-#----------------------------------------------------------------------
-if request == "Log Out":
-    cdrcgi.logout(session)
-
-#----------------------------------------------------------------------
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if request == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif request == SUBMENU:
-    cdrcgi.navigateTo("EditFilterSets.py", session)
-
-#----------------------------------------------------------------------
-# Get the CDR filters and wrap them in <option> elements.
-#----------------------------------------------------------------------
-def getFilters():
-    html = ""
-    filters = cdr.getFilters('guest')
-    for filter in filters:
-        if len(filter.name) and filter.name[0] != '[':
-            id   = int(re.sub(r'[^\d]', '', filter.id))
-            name = html_escape(filter.name[:60])
-            html += "<option value='%d'>%s</option>\n" % (id, name)
-    for filter in filters:
-        if len(filter.name) and filter.name[0] == '[':
-            id   = int(re.sub(r'[^\d]', '', filter.id))
-            name = html_escape(filter.name[:60])
-            html += "<option value='%d'>%s</option>\n" % (id, name)
-    return html
-
-#----------------------------------------------------------------------
-# Get the CDR filter sets and wrap them in <option> elements.
-#----------------------------------------------------------------------
-def getFilterSets():
-    html = ""
-    for filterSet in filterSets:
-        id   = filterSet.id
-        name = html_escape(filterSet.name[:60])
-        html += "<option value='%d'>%s</option>\n" % (id, name)
-    return html
-
-#----------------------------------------------------------------------
-# Create the initial <option/> elements for the set's members.
-#----------------------------------------------------------------------
-def getSetMemberHtml(members = None):
-    html = ""
-    if not members:
-        html = "<option value='0'>%s</option>" % html_escape(noMembers, 1)
-    else:
-        for member in members:
-            id = member.id
-            name = html_escape(member.name)
-            if type(id) == type(9):
-                name = "[S]%s" % name
-                value = "S%d" % id
-            else:
-                name = "[F]%s" % name
-                id = int(re.sub(r'[^\d]', '', id))
-                value = "F%d" % id
-            html += '<option value="%s">%s</option>\n' % (value, name)
-    return html
-
-#----------------------------------------------------------------------
-# Create the JavaScript function for deleting the set.  The behavior
-# of the function depends on whether the set can be deleted (it can't
-# if it's being used as a nested member of other sets).
-#----------------------------------------------------------------------
-def makeDelFunction():
-    if not setName: return "return;\n"
-    try:
-        conn = db.connect(user='CdrGuest')
-        cursor = conn.cursor()
-        cursor.execute("""\
-              SELECT ps.name
-                FROM filter_set ms
-                JOIN filter_set_member m
-                  ON m.subset = ms.id
-                JOIN filter_set ps
-                  ON m.filter_set = ps.id
-               WHERE ms.name = ?
-            ORDER BY ps.name""", setName)
-        rows = cursor.fetchall()
-    except Exception as e:
-        cdrcgi.bail("Database failure finding nested memberships: %s" % e)
-    if rows:
-        body = """\
-        alert("Filter set cannot be deleted; it is used as a member of:"""
-        for row in rows:
-            body += '\\n"\n            + "%s' % row[0]
-        return body + '");\n';
-    else:
-        # Strip quote marks from around setName.
-        return """\
-        response = confirm("Are you sure you want to delete %s?");
-        if (response) {
-            var frm = document.forms[0];
-            frm.doWhat.value = 'Delete';
-            frm.submit();
-        }
-""" % json.dumps(setName)[1:-1]
-
-#----------------------------------------------------------------------
-# Display the CDR document form.
-#----------------------------------------------------------------------
-def showForm(isNew, members = None):
-    html = """\
-<!DOCTYPE html>
-<html>
- <head>
-  <title>Edit CDR Filter Set</title>
-  <meta html;charset=utf-8" />
-  <basefont face='Arial, Helvetica, sans-serif'>
-  <link rel='stylesheet' href='/stylesheets/dataform.css'>
-  <script language='JavaScript'>
-    function doSave() {
-        var frm = document.forms[0];
-        var setDesc = frm.setDesc.value;
-        if (!setDesc) {
-            alert('Set Description is required.');
-            return;
-        }
-        var numOpts = frm.members.options.length;
-        var sep = '';
-        var sm = frm.setMembers;
-        sm.value = '';
-        for (var i = 0; i < numOpts; ++i) {
-            if (frm.members.options[i].value != '0') {
-                sm.value += sep + frm.members.options[i].value;
-                sep = '|';
-            }
-        }
-        frm.doWhat.value = 'Save';
-        frm.submit();
-    }
-    function doDelete() {
-        %s
-    }
-    function blockChange() {
-        %s
-        var frm = document.forms[0];
-        frm.elements.newName.value = "%s";
-    }
-    function addFilter() {
-        var frm    = document.forms[0];
-        var i      = frm.filters.selectedIndex;
-        if (i < 0) return;
-        var filter = frm.filters[i];
-        var opt    = new Option('[F]' + filter.text, 'F' + filter.value);
-        var n      = frm.members.options.length;
-        opt.selected = true;
-        frm.members.options[n] = opt;
-        if (frm.members.options[0].value == 0) {
-            frm.members.options[0] = null;
-        }
-    }
-    function addFilterSet() {
-        var frm      = document.forms[0];
-        var i        = frm.filterSets.selectedIndex;
-        if (i < 0) return;
-        var set      = frm.filterSets[i];
-        var opt      = new Option('[S]' + set.text, 'S' + set.value);
-        var n        = frm.members.options.length;
-        opt.selected = true;
-        frm.members.options[n] = opt;
-        if (frm.members.options[0].value == 0) {
-            frm.members.options[0] = null;
-        }
-    }
-    function moveUp() {
-        var frm     = document.forms[0];
-        var members = frm.members;
-        var options = members.options;
-        var i       = members.selectedIndex;
-        if (i > 0) {
-            var o1 = options[i - 1];
-            var o2 = options[i];
-            var opt1 = new Option(o1.text, o1.value);
-            var opt2 = new Option(o2.text, o2.value);
-            options[i - 1] = opt2;
-            options[i] = opt1;
-            options[i - 1].selected = true;
-        }
-    }
-    function moveDown() {
-        var members = document.forms[0].members;
-        var opts    = members.options;
-        var i       = members.selectedIndex
-        if (i >= 0 && i < opts.length - 1) {
-            var o1 = opts[i + 1];
-            var o2 = opts[i];
-            var opt1 = new Option(o1.text, o1.value);
-            var opt2 = new Option(o2.text, o2.value);
-            opts[i + 1] = opt2;
-            opts[i] = opt1;
-            opts[i + 1].selected = true;
-        }
-    }
-    function deleteMember() {
-        var frm = document.forms[0];
-        var i   = frm.members.selectedIndex;
-        if (i >= 0) {
-            frm.members.options[i] = null;
-            if (frm.members.options.length == 0) {
-                var opt = new Option("%s", 0);
-                frm.members.options[0] = opt;
-            }
-            else {
-                if (i == frm.members.options.length)
-                    --i;
-                frm.members.options[i].selected = true;
-            }
-        }
-    }
-  </script>
- </head>
- <body bgcolor='EEEEEE'>
-  <form action='/cgi-bin/cdr/EditFilterSet.py' method='POST'>
-   <table width='100%%' cellspacing='0' cellpadding='0' border='0'>
-    <tr>
-     <th nowrap bgcolor='silver' align='left' background='/images/nav1.jpg'>
-      <font size='6' color='white'>&nbsp;CDR Filter Set Editing</FONT>
-     </th>
-     <td bgcolor='silver'
-         valign='middle'
-         align='right'
-         width='100%%'
-         background='/images/nav1.jpg'>
-      <input type='button' name='SaveSet' value='Save Set' onClick='doSave();'>
-       &nbsp;
-       %s
-      <input type='submit' name='Request' value="%s">&nbsp;
-      <input type='submit' name='Request' value="%s">&nbsp;
-      <input type='submit' name='Request' value='Log Out'>&nbsp;
-     </td>
-    </tr>
-    <tr>
-     <td bgcolor='#FFFFCC' colspan='3'>
-      <font size='-1' color='navy'>&nbsp;Edit CDR Filter Set<br></font>
-     </td>
-    </tr>
-   </table>
-   <br>
-   <table border='0'>
-    <tr>
-     <td align='right' nowrap=1><b>Set Name:</b>&nbsp;</td>
-     <td>
-      <input name='newName' size='80' value="%s" onChange='blockChange()'>
-     </td>
-    </tr>
-    <tr>
-     <td align='right' nowrap=1><b>Set Description:</b>&nbsp;</td>
-     <td><input name='setDesc' value="%s" size='80'></td>
-    </tr>
-    <tr>
-     <td align=right nowrap=1><b>Set Notes:</b>&nbsp;</td>
-     <td><textarea name='setNotes' rows='5' cols='60'>%s</textarea></td>
-    </tr>
-   </table>
-   <table border='0'>
-    <tr>
-     <td align='center'>
-      <b>Set Membership</b>
-     </td>
-     <td align='center'>
-      <b>Filters</b>
-     </td>
-     <td align='center'>
-      <b>Filter Sets</b>
-     </td>
-    </tr>
-    <tr>
-     <td>
-      <select name='members' size='20'>
-       %s
-      </select>
-     </td>
-     <td>
-      <select name='filters' size='20' onDblClick='addFilter()'>
-       %s
-      </select>
-     </td>
-     <td colspan='2' align='center'>
-      <select name='filterSets' size='20' onDblClick='addFilterSet()'>
-       %s
-      </select>
-     </td>
-    </tr>
-    <tr>
-     <td align='center'>
-      <input type='button' onClick='moveUp()' value = 'Move Up'/>
-      <input type='button' onClick='moveDown()' value = 'Move Down'/>
-      <input type='button' onClick='deleteMember()' value = 'Delete'/>
-     </td>
-     <td>&nbsp;</td>
-     <td>&nbsp;</td>
-    </tr>
-    <!--
-    <tr>
-     <td colspan='2' align='center'>
-      <b>Filter Sets</b>
-     </td>
-    </tr>
-    <tr>
-    </tr>
-    -->
-   </table>
-   <input type='hidden' name='setMembers' value=''>
-   <input type='hidden' name="%s" value="%s">
-   <input type='hidden' name='isNew' value="%s">
-   <input type='hidden' name='doWhat' value="?">
-   <input type='hidden' name='setName' value="%s">
-  </form>
- </body>
-</html>
-""" % (makeDelFunction(),
-       isNew == 'Y' and "return;" or "",
-       setName and html_escape(cdr.toUnicode(setName), 1) or '',
-       noMembers,
-       isNew != 'Y' and """\
-      <input type='button' name='DelSet' value='Delete Set'
-             onClick='doDelete();'>
-       &nbsp;
-""" or "",
-       SUBMENU,
-       cdrcgi.MAINMENU,
-       setName and html_escape(cdr.toUnicode(setName), 1) or '',
-       setDesc and html_escape(setDesc, 1) or '',
-       setNotes and html_escape(setNotes, 1) or '',
-       getSetMemberHtml(members),
-       getFilters(),
-       getFilterSets(),
-       cdrcgi.SESSION,
-       session,
-       isNew,
-       setName and html_escape(cdr.toUnicode(setName), 1) or '')
-    cdrcgi.sendPage(html)
-
-#----------------------------------------------------------------------
-# Edit an existing filter set.
-#----------------------------------------------------------------------
-if request == 'Edit':
-    filterSet = cdr.getFilterSet('guest', cdr.toUnicode(setName))
-    setDesc = filterSet.desc
-    setNotes = filterSet.notes
-    showForm('N', filterSet.members)
-
-#----------------------------------------------------------------------
-# Create a new filter set.
-#----------------------------------------------------------------------
-if request == 'New':
-    showForm('Y')
-
-#----------------------------------------------------------------------
-# Delete the filter set.
-#----------------------------------------------------------------------
-if doWhat == 'Delete':
-    if not cdr.canDo(session, "DELETE FILTER SET"):
-        cdrcgi.bail("Action not permitted for this account.")
-    try:
-        cdr.delFilterSet(session, cdr.toUnicode(setName))
-    except Exception as args:
-        cdrcgi.bail("Failure deleting filter set")
-    except UnicodeDecodeError as args:
-        cdrcgi.bail("Unicode decode error deleting filter set")
-    except:
-        cdrcgi.bail("Unknown failure deleting filter set")
-    cdrcgi.navigateTo("EditFilterSets.py", session)
-
-#----------------------------------------------------------------------
-# Save the filter set.
-#----------------------------------------------------------------------
-if doWhat == 'Save':
-    setMemberList = []
-    if setMembers:
-        for member in setMembers.split('|'):
-            idInt = int(member[1:])
-            if member[0] == 'F':
-                setMemberList.append(cdr.IdAndName("CDR%010d" % idInt, ""))
-            else:
-                setMemberList.append(cdr.IdAndName(idInt, ""))
-    if isNew == 'Y':
-        if not cdr.canDo(session, "ADD FILTER SET"):
-            cdrcgi.bail("Action not permitted for this account.")
-        newSet = cdr.FilterSet(newName, setDesc, setNotes, setMemberList)
+        if not self.session.can_do("MODIFY FILTER SET"):
+            bail("You are not authorized to use this page")
         try:
-            cdr.addFilterSet(session, newSet)
-        except Exception as args:
-            cdrcgi.bail("Failure adding new filter set")
-        except UnicodeDecodeError as args:
-            cdrcgi.bail("Unicode decode error saving new filter set")
-        except:
-            cdrcgi.bail("Unknown failure adding new filter set")
-        setName = newName
-    else:
-        if not cdr.canDo(session, "MODIFY FILTER SET"):
-            cdrcgi.bail("Action not permitted for this account.")
-        oldSet = cdr.FilterSet(setName, setDesc, setNotes, setMemberList)
+            if self.request == self.SAVE:
+                return self.save()
+            elif self.request == self.DELETE:
+                return self.delete()
+            elif self.request == self.SETS:
+                navigateTo(self.EDIT_SETS, self.session.name)
+        except Exception as e:
+            self.logger.exception("Failure")
+            bail(str(e))
+        Controller.run(self)
+
+    def populate_form(self, page):
+        """Add the fields to the form.
+
+        Pass:
+            page - HTMLPage object to be modified
+        """
+
+        # Capture information in fields behind the scenes.
+        page.form.append(page.hidden_field("members", ""))
+        page.form.append(page.hidden_field("id", self.set.id))
+
+        # Explain how to use the tool.
+        fieldset = page.fieldset("Instructions")
+        br = None
+        lines = []
+        for line in self.INSTRUCTIONS:
+            if br is not None:
+                lines.append(br)
+            br = page.B.BR()
+            lines.append(f"\u261e {line}")
+        fieldset.append(page.B.P(*lines, page.B.CLASS("info")))
+        page.form.append(fieldset)
+
+        # Add the regular text-based fields.
+        fieldset = page.fieldset("Properties")
+        fieldset.append(page.text_field("name", value=self.set.name))
+        opts = dict(value=self.set.description)
+        fieldset.append(page.text_field("description", **opts))
+        fieldset.append(page.textarea("notes", value=self.set.notes))
+
+        # Add the draggable widgets for set membership management.
+        # These are not fields, but are tracked by client-side scripting
+        # to populate the hidden 'members' field at save time.
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Put Your Set Members Here")
+        fieldset.append(self.member_list)
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Filters You Can Drag To Your Filter Set")
+        fieldset.append(self.filter_list)
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Filter Sets You Can Drag To Your Set")
+        fieldset.append(self.set_list)
+        page.form.append(fieldset)
+
+        # Add the magic.
+        page.head.append(page.B.SCRIPT(src=self.JS))
+        page.head.append(page.B.LINK(href=self.CSS, rel="stylesheet"))
+
+    def save(self):
+        """Save the new or modified filter set."""
+
+        original_name = self.set.name
+        opts = dict(
+            name=self.name,
+            description=self.description,
+            notes=self.notes,
+            members=self.members,
+        )
+        if self.set.id:
+            opts["id"] = self.set.id
+        filter_set = FilterSet(self.session, **opts)
         try:
-            cdr.repFilterSet(session, oldSet)
-        except Exception as args:
-            cdrcgi.bail("Failure storing changes to filter set")
-        except UnicodeDecodeError as args:
-            cdrcgi.bail("Unicode decode error updating filter set")
-        except:
-            cdrcgi.bail("Unknown failure storing changes to filter set")
+            filter_set.save()
+            args = filter_set.id, filter_set.name, len(filter_set.members)
+            self.subtitle = "Saved set {} ({}) with {} members".format(*args)
+            if self.set.id and self.set.name != filter_set.name:
+                self.subtitle += f" (name changed from {self.set.name})"
+        except Exception as e:
+            self.logger.exception("failure saving %s", self.name)
+            bail(str(e))
+        self._set = filter_set
+        self.show_form()
 
-    filterSet = cdr.getFilterSet('guest', cdr.toUnicode(setName))
-    setDesc = filterSet.desc
-    setNotes = filterSet.notes
-    showForm('N', filterSet.members)
+    def delete(self):
+        """Delete the current filter set and navigate back to the sets."""
 
-#----------------------------------------------------------------------
-# Tell the user we don't know how to do what he asked.
-#----------------------------------------------------------------------
-else: cdrcgi.bail("Request not yet implemented: " + request, banner)
+        filter_set = FilterSet(self.session, id=self.set.id)
+        name = filter_set.name
+        try:
+            filter_set.delete()
+        except Exception as e:
+            self.logger.exception("failure deleting %s", self.set.name)
+            bail(str(e))
+        navigateTo(self.EDIT_SETS, self.session.name, deleted=name)
+
+    @property
+    def buttons(self):
+        """Create custom action list (this isn't a report)."""
+
+        buttons = [
+            self.SAVE,
+            self.SETS,
+            self.DEVMENU,
+            self.ADMINMENU,
+            self.LOG_OUT,
+        ]
+        if self.set.id:
+            buttons.insert(1, self.DELETE)
+        return buttons
+
+    @property
+    def description(self):
+        """Short description string (from the editing form)."""
+
+        if not hasattr(self, "_description"):
+            self._description = self.fields.getvalue("description")
+        return self._description
+
+    @property
+    def filter_list(self):
+        """HTML ul object for the filter docs which can be made members."""
+
+        if not hasattr(self, "_filter_list"):
+            items = []
+            for doc in sorted(self.filters.values()):
+                items.append(self.B.LI(doc.title, self.B.CLASS("filter")))
+            self._filter_list = self.B.UL(*items)
+            self._filter_list.set("id", "filters")
+        return self._filter_list
+
+    @property
+    def filters(self):
+        """Dictionary of `Doc` objects, indexed by normalized titles."""
+
+        if not hasattr(self, "_filters"):
+            docs = FilterSet.get_filters(self.session)
+            self._filters = {}
+            for doc in docs:
+                key = doc.title.lower().strip()
+                self._filters[key] = doc
+        return self._filters
+
+    @property
+    def member_list(self):
+        """HTML ul element for the filter set's members."""
+
+        if not hasattr(self, "_member_list"):
+            items = []
+            for member in self.set.members:
+                if isinstance(member, FilterSet):
+                    member_class = "set"
+                    label = member.name
+                else:
+                    member_class = "filter"
+                    label = member.title
+                li = self.B.LI(label, self.B.CLASS(member_class))
+                items.append(li)
+            self._member_list = self.B.UL(*items)
+            self._member_list.set("id", "members")
+        return self._member_list
+
+    @property
+    def members(self):
+        """Ordered sequence of selected FilterSet and/or Doc objects."""
+
+        if not hasattr(self, "_members"):
+            self._members = []
+            members = self.fields.getvalue("members")
+            self.logger.info("members are %s", members)
+            for member in loads(members):
+                types = member["type"].split()
+                name = member["name"]
+                key = name.lower().strip()
+                if "filter" in types:
+                    self._members.append(self.filters[key])
+                elif "set" in types:
+                    self._members.append(self.sets[key])
+                else:
+                    message = "unrecognized type for member: %s"
+                    self.logger.warning(message, member)
+        return self._members
+
+    @property
+    def notes(self):
+        """Extended information about the set (from the form)."""
+        return self.fields.getvalue("notes")
+
+    @property
+    def name(self):
+        """Editable set name value from the form."""
+
+        if not hasattr(self, "_name"):
+            self._name = self.fields.getvalue("name")
+        return self._name
+
+    @property
+    def set(self):
+        """Instantiate an object for the set we are editing."""
+
+        if not hasattr(self, "_set"):
+            id = self.fields.getvalue("id")
+            if id:
+                self._set = FilterSet(self.session, id=id)
+            else:
+                self._set = FilterSet(self.session)
+        return self._set
+
+    @set.setter
+    def set(self, value):
+        """Allow save() to refresh the set object."""
+        self._set = value
+
+    @property
+    def set_list(self):
+        """HTML ul object for the filter sets which can be made members."""
+
+        if not hasattr(self, "_set_list"):
+            items = []
+            for filter_set in sorted(self.sets.values()):
+                items.append(self.B.LI(filter_set.name, self.B.CLASS("set")))
+            self._set_list = self.B.UL(*items)
+            self._set_list.set("id", "sets")
+        return self._set_list
+
+    @property
+    def sets(self):
+        """Dictionary of `FilterSet` objects, indexed by normalized names."""
+        if not hasattr(self, "_sets"):
+            self._sets = {}
+            for id, name in FilterSet.get_filter_sets(self.session):
+                key = name.lower().strip()
+                self._sets[key] = FilterSet(self.session, id=id, name=name)
+        return self._sets
+
+    @property
+    def subtitle(self):
+        """String to be displayed under the main banner."""
+
+        if hasattr(self, "_subtitle"):
+            return self._subtitle
+        return self.SUBTITLE
+
+    @subtitle.setter
+    def subtitle(self, value):
+        """Make this value modifiable on the fly."""
+        self._subtitle = value
+
+
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+    Control().run()

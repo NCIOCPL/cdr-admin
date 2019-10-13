@@ -98,6 +98,7 @@ class Control(cdrcgi.Control):
             if url != old.get(alias):
                 opts["name"] = alias
                 opts["value"] = url
+                opts["comment"] = "Stored by the glossary servers script."
                 cdr.updateCtl(self.session, "Create", **opts)
         for alias in old:
             if alias not in new:

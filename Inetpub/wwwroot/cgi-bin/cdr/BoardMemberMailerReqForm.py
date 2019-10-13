@@ -1,497 +1,386 @@
-#----------------------------------------------------------------------
-# Request form for generating RTF letters to board members.
-#
-# BZIssue::1664
-# BZIssue::4939
-# JIRA::OCECDR-3679 - workaround for IE Javascript bug
-# JIRA::OCECDR-3736 - added Editorial Board Reformatted Summary Review mailer
-#----------------------------------------------------------------------
-import cgi, cdr, cdrpub, cdrcgi, re, string, sys
-from cdrapi import db
+#!/usr/bin/env python
 
-LOGGER = cdr.Logging.get_logger("mailer")
+"""Request form for generating RTF letters to board members.
+"""
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields    = cgi.FieldStorage()
-session   = cdrcgi.getSession(fields)
-request   = cdrcgi.getRequest(fields)
-board     = fields.getvalue("board") or None
-letter    = fields.getvalue("letter") or None
-email     = fields.getvalue("email") or None
-members   = fields.getlist("member") or []
-title     = "CDR Administration"
-section   = "PDQ Board Member Correspondence Mailers"
-SUBMENU   = "Mailer Menu"
-buttons   = ["Submit", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-script    = 'BoardMemberMailerReqForm.py'
-header    = cdrcgi.header(title, title, section, script, buttons)
+from json import dumps
+from cdr import getControlValue
+from cdrcgi import Controller, navigateTo
+from cdrapi.docs import Doc
+from cdrapi.publishing import Job
 
-#----------------------------------------------------------------------
-# Make sure we're logged in.
-#----------------------------------------------------------------------
-if not session: cdrcgi.bail('Unknown or expired CDR session.')
+class Control(Controller):
+    """Logic for generating board member mailer letters."""
 
-#----------------------------------------------------------------------
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if request == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif request == SUBMENU:
-    cdrcgi.navigateTo("Mailers.py", session)
+    LOGNAME = "mailer"
+    SUBTITLE = "PDQ Board Member Correspondence Mailers"
+    SYSTEM = "Mailers"
+    SUBMENU = "Mailers"
+    SUBSYSTEM = "PDQ Board Member Correspondence Mailer"
+    LETTERS = "board-member-letters"
 
-#----------------------------------------------------------------------
-# Handle request to log out.
-#----------------------------------------------------------------------
-if request == "Log Out":
-    cdrcgi.logout(session)
+    def build_tables(self):
+        """Create the publishing job and list the mailer recipients."""
 
-#----------------------------------------------------------------------
-# Connect to the CDR database.
-#----------------------------------------------------------------------
-try:
-    conn = db.connect(user='CdrPublishing')
-except Exception as e:
-    cdrcgi.bail('Database connection failure: %s' % e)
 
-#----------------------------------------------------------------------
-# Just for testing.
-#----------------------------------------------------------------------
-def showDocsAndRun(rows):
-    if not rows:
-        rows = []
-    html = """\
-<!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
-<html>
- <head>
-  <title>Protocol S&amp;P Doc List</title>
-  <style type='text/css'>
-   th,h2    { font-family: Arial, sans-serif; font-size: 11pt;
-              text-align: center; font-weight: bold; }
-   h1       { font-family: Arial, sans-serif; font-size: 12pt;
-              text-align: center; font-weight: bold; }
-   td       { font-family: Arial, sans-serif; font-size: 10pt; }
-  </style>
- </head>
- <body>
-  <h1>Protocol S&amp;P Doc List</h1>
-  <h2>%d docs selected</h2>
-  <br><br>
-  <table border='1' cellspacing='0' cellpadding='1'>
-   <tr>
-    <th>Document</th>
-    <th>Version</th>
-   </tr>
-""" % len(rows)
-    for row in rows:
-        html += """\
-   <tr>
-    <td align='center'>CDR%010d</td>
-    <td align='center'>%d</td>
-   </tr>
-""" % (row[0], row[1])
-    cdrcgi.sendPage(html + """\
-  </table>
- </body>
-</html>""")
+    def populate_form(self, page):
+        """Add the parameters for mailer generation.
 
-#----------------------------------------------------------------------
-# Submit request if we have one.
-#----------------------------------------------------------------------
-boardError = "&nbsp;"
-letterError = "&nbsp;"
-if request == "Submit":
+        Pass:
+            page - HTMLPage object to which we add the form fields.
+        """
 
-    # Reality check.
-    if not board:
-        boardError = "<span class='error'>Board selection is required</span>"
-    if not letter:
-        letterError = "<span class='error'>Letter selection is required</span>"
+        fieldset = page.fieldset("Board")
+        fieldset.set("id", "boards")
+        checked = True
+        for board in self.boards:
+            opts = dict(value=board.id, label=board.name, checked=checked)
+            fieldset.append(page.radio_button("board", **opts))
+            checked = False
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Letter")
+        fieldset.set("id", "letters")
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Board Members")
+        fieldset.set("id", "members")
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Notification")
+        opts = dict(value=self.user.email)
+        fieldset.append(page.text_field("email", **opts))
+        page.form.append(fieldset)
+        page.add_script(f"var boards = {self.boards.json};")
+        page.add_script(f"var letters = {self.letters_json};")
+        page.head.append(page.B.SCRIPT(src="/js/BoardMemberMailerReqForm.js"))
 
-    if board and letter:
-        board = int(board)
+    def run(self):
+        """Override to handle routing to Mailers menu."""
 
-        # Find the publishing system control document.
-        try:
-            cursor = conn.cursor()
-            cursor.execute("""\
-            SELECT d.id
-              FROM document d
-              JOIN doc_type t
-                ON t.id    = d.doc_type
-             WHERE t.name  = 'PublishingSystem'
-               AND d.title = 'Mailers'""")
-            rows = cursor.fetchall()
-        except Exception as e:
-            cdrcgi.bail('Database failure looking up control document: %s' % e)
-        if len(rows) < 1:
-            cdrcgi.bail('Unable to find control document for Mailers')
-        if len(rows) > 1:
-            cdrcgi.bail('Multiple Mailer control documents found')
-        ctrlDocId = rows[0][0]
-
-        # Find the documents to be published.
-        try:
-            if not members or 'all' in members:
-                cursor.execute("""\
-    SELECT DISTINCT v.id, MAX(v.num)
-               FROM doc_version v
-               JOIN query_term q
-                 ON q.doc_id = v.id
-               JOIN document d
-                 ON d.id = v.id
-              WHERE q.path = '/PDQBoardMemberInfo/BoardMembershipDetails'
-                           + '/BoardName/@cdr:ref'
-                AND v.val_status = 'V'
-                AND q.int_val = ?
-                AND d.active_status = 'A'
-           GROUP BY v.id""", board)
-                docList = cursor.fetchall()
-            else:
-                docList = []
-                for member in members:
-                    member = int(member)
-                    cursor.execute("""\
-            SELECT MAX(num)
-              FROM doc_version
-             WHERE id = ?
-               AND val_status = 'V'""", member)
-                    docList.append((member, cursor.fetchall()[0][0]))
-        except Exception as e:
-            cdrcgi.bail("Failure retrieving document IDs: %s" % e)
-        #showDocsAndRun(docList)
-
-        # Check to make sure we have at least one mailer to send out.
-        docCount = len(docList)
-        if docCount == 0:
-            cdrcgi.bail ("No documents found")
-
-        # Compose the docList results into a format that cdr.publish() wants
-        #   e.g., id=25, version=3, then form: "CDR0000000025/3"
-        docs = []
-        for doc in docList:
-            docs.append("CDR%010d/%d" % (doc[0], doc[1]))
-
-        # Drop the job into the queue.
-        subset = 'PDQ Board Member Correspondence Mailer'
-        parms = (('Board', board),('Letter', letter))
-        result = cdr.publish(credentials = session, pubSystem = 'Mailers',
-                             pubSubset = subset, docList = docs,
-                             allowNonPub = 'Y', email = email, parms = parms)
-
-        # cdr.publish returns a tuple of job id + messages
-        # If serious error, job id = None
-        if not result[0] or int(result[0]) < 0:
-            cdrcgi.bail("Unable to initiate publishing job:<br>%s" % result[1])
-
-        jobId = int(result[0])
-
-        # Log what happened
-        msgs = ["Started correspondence mailer job - id = %d" % jobId,
-                "                           Mailer type = %s" % subset,
-                "               Number of docs selected = %d" % docCount]
-        if docCount > 0:
-            msgs.append("                             First doc = %s" %
-                        docs[0])
-        if docCount > 1:
-            msgs.append("                            Second doc = %s" %
-                        docs[1])
-        for message in msgs:
-            LOGGER.info(message)
-
-        # Tell user how to get status
-        header = cdrcgi.header(title, title, section, None, [])
-        cdrcgi.sendPage(header + """\
-    <H3>Job Number %d Submitted</H3>
-    <B>
-     <FONT COLOR='black'>Use
-      <A HREF='%s/PubStatus.py?id=%d'>this link</A> to view job status.
-     </FONT>
-    </B>
-   </FORM>
-  </BODY>
- </HTML>
-""" % (jobId, cdrcgi.BASE, jobId))
-
-class Board:
-    def __init__(self, id):
-        self.id = id
-        self.members = []
-        cursor.execute("""\
-    SELECT value
-      FROM query_term
-     WHERE path = '/Organization/OrganizationNameInformation'
-                + '/OfficialName/Name'
-       AND doc_id = ?""", id)
-        rows = cursor.fetchall()
-        if not rows:
-            cdrcgi.bail("No name found for board %d" % id)
-        self.name = rows[0][0]
-        cursor.execute("""\
-    SELECT value
-      FROM query_term
-     WHERE doc_id = ?
-       AND path = '/Organization/OrganizationType'
-       AND value IN ('PDQ Editorial Board', 'PDQ Advisory Board')""", id)
-        rows = cursor.fetchall()
-        if not rows:
-            cdrcgi.bail("Can't find board type for '%s'" % self.name)
-        if len(rows) > 1:
-            cdrcgi.bail("Multiple board types found for '%s'" % self.name)
-        if rows[0][0].upper() == 'PDQ EDITORIAL BOARD':
-            self.boardType = 'editorial'
+        if self.request == self.SUBMENU:
+            navigateTo("Mailers.py", self.session.name)
         else:
-            self.boardType = 'advisory'
+            Controller.run(self)
 
-class BoardMember:
-    def __init__(self, id, docTitle):
-        self.id = id
-        self.name = docTitle
-        delim = docTitle.find(';')
-        if delim != -1:
-            self.name = docTitle[:delim]
-        delim = self.name.find('(')
-        if delim != -1:
-            self.name = self.name[:delim]
-        self.name = self.name.strip()
+    def show_report(self):
+        """Overridden so we can create the mailers."""
 
-boards = {}
-members = {}
-cursor = conn.cursor()
-cursor.execute("""\
-    SELECT DISTINCT q.doc_id, q.int_val, d.title
-               FROM query_term q
-               JOIN document d
-                 ON q.doc_id = d.id
-               JOIN doc_version v
-                 ON v.id = d.id
-              WHERE path = '/PDQBoardMemberInfo/BoardMembershipDetails'
-                         + '/BoardName/@cdr:ref'
-                AND v.val_status = 'V'
-                AND d.active_status = 'A'""")
-rows = cursor.fetchall()
-for memberId, boardId, docTitle in rows:
-    if boardId not in boards:
-        boards[boardId] = Board(boardId)
-    if memberId not in members:
-        members[memberId] = BoardMember(memberId, docTitle)
-    board = boards[boardId]
-    member = members[memberId]
-    board.members.append(member)
+        opts = dict(
+            system=self.SYSTEM,
+            subsystem=self.SUBSYSTEM,
+            parms=self.parms,
+            docs=self.docs,
+            email=self.email,
+            permissive=True,
+        )
+        try:
+            job = Job(self.session, **opts)
+            job.create()
+        except Exception as e:
+            self.logger.exception("Mailer creation failed")
+            self.bail(str(e))
+        buttons = (
+            self.HTMLPage.button("Status Page", onclick="show_status()"),
+            self.HTMLPage.button(self.SUBMENU),
+            self.HTMLPage.button(self.ADMINMENU),
+            self.HTMLPage.button(self.LOG_OUT),
+        )
+        opts = dict(
+            action=self.script,
+            buttons=buttons,
+            subtitle=self.subtitle,
+            session=self.session,
+        )
+        page = self.HTMLPage(self.title, **opts)
+        legend = f"Queued {len(self.recipients)} Mailer(s)"
+        fieldset = page.fieldset(legend)
+        ul = page.B.UL()
+        for recipient in self.recipients:
+            ul.append(page.B.LI(recipient))
+        fieldset.append(ul)
+        page.form.append(fieldset)
+        page.add_script(f"""\
+function show_status() {{
+    window.open("PubStatus.py?id={job.id}", "status-{job.id}");
+}}""")
+        page.send()
 
-#----------------------------------------------------------------------
-# Generate a picklist for the PDQ Editorial Boards.
-#----------------------------------------------------------------------
-def makeBoardList(boards):
-    keys = sorted(boards, key=lambda k:boards[k].name)
-    html = """\
-      <select id='board' name='board' style='width:500px'
-              onchange='boardChange();'>
-       <option value='' selected='1'>Choose One</option>
-"""
-    for key in keys:
-        board = boards[key]
-        html += """\
-       <option value='%d'>%s &nbsp;</option>
-""" % (board.id, board.name)
-    return html + """\
-      </select>
-"""
+    @property
+    def board(self):
+        """Which board was selected?"""
+        return self.fields.getvalue("board")
 
-#----------------------------------------------------------------------
-# Create JavaScript for a list of Board objects.
-#----------------------------------------------------------------------
-def makeBoardObjects():
-    objects = """\
-   var boards = {"""
-    outerComma = ''
-    for key in boards:
-        board = boards[key]
-        board.members.sort(lambda a,b: cmp(a.name, b.name))
-        objects += """%s
-       '%s': new Board('%s', '%s', [""" % (outerComma, board.id,
-                                           board.id, board.boardType)
-        innerComma = ''
-        for member in board.members:
-            objects += """%s
-           new Option('%s', '%s')""" % (innerComma,
-                                        member.name.replace("'", "\\'"),
-                                        member.id)
-            innerComma = ','
-        objects += """
-       ])"""
-        outerComma = ','
-    return objects + """
-   };"""
+    @property
+    def boards(self):
+        """All active boards in the CDR, as id/title tuples."""
 
-#----------------------------------------------------------------------
-# Put up the form if we don't have a request yet.
-#----------------------------------------------------------------------
-header = cdrcgi.header(title, title, section, script, buttons,
-                       stylesheet = """\
- <style type='text/css'>
-   ul { margin-left: 20pt }
-   h2 { font-size: 14pt; font-family:Arial; color:Navy }
-   h3 { font-size: 13pt; font-family:Arial; color:black; font-weight:bold }
-   li, span.r {
-        font-size: 11pt; font-family:'Arial'; color:black;
-        margin-bottom: 10pt; font-weight:normal
-   }
-   b, th {  font-size: 11pt; font-family:'Arial'; color:black;
-        margin-bottom: 10pt; font-weight:bold
-   }
-   .error { color: red; }
-  </style>
-  <script language='JavaScript'>
-   function submitRequest() {
-       if (!document.forms[0].board.value) {
-           alert('You must select a board!');
-           if (document.forms[0].board.focus)
-               document.forms[0].board.focus();
-           return;
-       }
-       if (!document.forms[0].letter.value) {
-           alert('OK, which letter should we send out?');
-           if (document.forms[0].letter.focus)
-               document.forms[0].letter.focus();
-           return;
-       }
-       document.forms[0].action = 'DumpParams.py';
-       document.forms[0].Request.value = 'Submit';
-       document.forms[0].method = 'POST';
-       document.forms[0].submit();
-   }
-   function Board(id, boardType, members) {
-       this.id        = id;
-       this.boardType = boardType;
-       this.members   = members;
-   }
-%s
-   var letters = {
-       'advisory': [
-           new Option('Advisory Board Invitation Letter', 'adv-invitation'),
-           new Option('Advisory Board Review Letter for Email',
-                      'adv-summ-email'),
-           new Option('Advisory Board Review Letter for FedEx',
-                      'adv-summ-fedex'),
-           new Option('Advisory Board Still Interested Letter',
-                      'adv-interested'),
-           new Option('Advisory Board Thank You Letter',  'adv-thankyou'),
-           new Option('Advisory Board Big Thank You Letter',
-                      'adv-big-thankyou')
-       ],
-       'editorial': [
-           new Option('Editorial Board Invitation Letter', 'ed-invitation'),
-           new Option('Editorial Board Welcome Letter',    'ed-welcome'),
-           new Option('Editorial Board Renewal Letter',    'ed-renewal'),
-           new Option('Editorial Board Editor-in-Chief Renewal Letter',
-                      'ed-ec-renewal'),
-           new Option('Editorial Board Goodbye Letter',    'ed-goodbye'),
-           new Option('Editorial Board Goodbye For Good Letter',
-                      'ed-goodbye-forever'),
-           new Option('Editorial Board Reformatted Summary Review',
-                      'ed-ref-summ-rev'),
-           new Option('Editorial Board Thank You Letter',  'ed-thankyou'),
-           new Option('Editorial Board Comprehensive Review Letter',
-                      'ed-comp-review')
-      ]
-   };
+        if not hasattr(self, "_boards"):
+            self._boards = Boards(self)
+        return self._boards
 
-   function boardChange() {
-       var boardElem        = document.forms[0].board;
-       var letterElem       = document.forms[0].letter;
-       var memberElem       = document.forms[0].member;
-       var boardOptions     = boardElem.options;
-       var letterOptions    = letterElem.options;
-       var memberOptions    = memberElem.options;
-       letterOptions.length = memberOptions.length = 0;
-       letterOptions[0]     = new Option('Choose One', '', true, true);
-       memberOptions[0]     = new Option('All Members of Board', 'all',
-                                         true, true);
-       var boardIndex       = boardElem.selectedIndex;
-       if (boardIndex == -1)
-           return;
-       var boardId          = boardOptions[boardIndex].value;
-       if (!boardId)
-           return;
-       var board            = boards[boardId];
-       var lettersForBoard  = letters[board.boardType];
-       for (var i = 0; i < lettersForBoard.length; ++i) {
-           var letter       = lettersForBoard[i];
-           letter.selected  = false;
-           letterOptions[letterOptions.length] = letter;
-       }
-       var membersForBoard  = board.members;
-       for (var i = 0; i < membersForBoard.length; ++i) {
-           var member       = membersForBoard[i];
-           member.selected  = false;
-           memberOptions[memberOptions.length] = member;
-       }
-   }
-  </script>
- """ % makeBoardObjects())
-form = """\
-   <h2>PDQ Board Member Correspondence Mailers</h2>
-   <ul>
-    <li>
-     Select a PDQ Board from the first picklist below.  Then select
-     which letter should be sent and one or more individuals from the
-     list of board members (or prospective board members).
-     It may take a minute to select documents to be included in the mailing.
-     Please be patient.
-    </li>
-    <li>
-     To receive email notification when the job is completed, enter your
-     email address.
-    </li>
-    <li>
-     Click Submit to start the mailer job.
-    </li>
-   </ul>
-   <table border='0' cellpadding='1' cellspacing='0'>
-    <tr>
-     <th align='right'>Select Board:&nbsp;</th>
-     <td>
-%s
-     </td>
-     <td>%s</td>
-    </tr>
-    <tr>
-     <th align='right'>Select Letter:&nbsp;</th>
-     <td>
-      <select id='letter' name='letter' style='width:500px'>
-       <option value='' selected>Choose One</option>
-      </select>
-     </td>
-     <td>%s</td>
-    </tr>
-    <tr>
-     <th align='right'>Select Board Member(s):&nbsp;<br></th>
-     <td>
-      <select id='member' name='member' style='width:500px' multiple size=10>
-       <option value='all' selected>All Members of Board</option>
-      </select>
-     </td>
-     <td>&nbsp;</td>
-    </tr>
-    <tr>
-     <th align='right'>Email Address:&nbsp;</th>
-     <td><input name='email' style='width: 500px' value='%s'></td>
-     <td>&nbsp;</td>
-    </tr>
-    <tr>
-     <td align='center' colspan='2'>
-      <br><br>
-      <input type='submit' name='Request' value='Submit'>
-     </td>
-     <td>&nbsp;</td>
-    </tr>
-   </table>
-   <input type='hidden' name='%s' value='%s'>
-  </form>
- </body>
-</html>
-""" % (makeBoardList(boards), boardError, letterError, cdr.getEmail(session),
-       cdrcgi.SESSION, session)
-cdrcgi.sendPage(header + form)
+
+    @property
+    def board_members(self):
+        """Dictionary of all active PDQ board members in the CDR."""
+        if not hasattr(self, "_board_members"):
+            path = "/PDQBoardMemberInfo/BoardMemberName/@cdr:ref"
+            query = self.Query("active_doc d", "p.doc_id", "d.title")
+            query.join("query_term p", "p.int_val = d.id")
+            query.where(f"p.path = '{path}'")
+            self._board_members = {}
+            for id, title in query.execute(self.cursor):
+                title = title.split(";")[0].strip()
+                if title.lower() != "inactive":
+                    self._board_members[id] = title
+        return self._board_members
+
+    @property
+    def docs(self):
+        """Sequence of `Doc` objects for the selected board members."""
+
+        if not hasattr(self, "_docs"):
+            self._docs = []
+            for member_id in self.selected_members:
+                doc = Doc(self.session, id=member_id, version="lastv")
+                self._docs.append(doc)
+        return self._docs
+
+    @property
+    def email(self):
+        """Where should we send the notification?"""
+        return self.fields.getvalue("email")
+
+    @property
+    def letter(self):
+        """Machine name for the type of letter to be sent."""
+        return self.fields.getvalue("letter")
+
+    @property
+    def letters(self):
+        """Display names for letter types indexed by machine names."""
+
+        if not hasattr(self, "_letters"):
+            self._letters = {}
+            for letter_type in ("advisory", "editorial"):
+                for name, key in loads(self.letters_json)[letter_type]:
+                    self._letters[key] = name
+        return self._letters
+
+    @property
+    def letters_json(self):
+        """Letter type information usable by client-side scripting."""
+
+        if not hasattr(self, "_letters_json"):
+            self._letters_json = getControlValue("Mailers", self.LETTERS)
+        return self._letters_json
+
+    @property
+    def parms(self):
+        """Parameters to be fed to the publishing job."""
+        return dict(Board=self.board, Letter=self.letter)
+
+    @property
+    def recipients(self):
+        """Sorted sequence of selected board member names."""
+
+        if not hasattr(self, "_recipients"):
+            recipients = []
+            for member_id in self.selected_members:
+                recipients.append(self.board_members[member_id])
+            self._recipients = sorted(recipients, key=str.lower)
+        return self._recipients
+
+    @property
+    def selected_members(self):
+        """Document IDs for the board members which have been chosen."""
+
+        if not hasattr(self, "_selected_members"):
+            self._selected_members = []
+            for id in self.fields.getlist("member"):
+                if id.isdigit():
+                    self._selected_members.append(int(id))
+        return self._selected_members
+
+    @property
+    def user(self):
+        """Object for the currently logged-on CDR user."""
+
+        if not hasattr(self, "_user"):
+            opts = dict(id=self.session.user_id)
+            self._user = self.session.User(self.session, **opts)
+        return self._user
+
+
+class Boards:
+    """Collection of all of the active PDQ boards."""
+
+    IACT = "Integrative, Alternative, and Complementary Therapies"
+    BOARD_TYPES = "PDQ Editorial Board", "PDQ Advisory Board"
+
+    @property
+    def json(self):
+        """Information about the board in a form client-side scripting uses."""
+
+        if not hasattr(self, "_json"):
+            boards = {}
+            for board in self.boards:
+                members = [(m.id, m.name) for m in board.members]
+                values = dict(
+                    id=board.id,
+                    type=board.type,
+                    members=members
+                )
+                boards[board.id] = values
+            self._json = dumps(boards, indent=2)
+        return self._json
+
+    def __init__(self, control):
+        """Save the control object, and let properties do the heavy lifting."""
+        self.__control = control
+
+    def __len__(self):
+        """Support Boolean testing."""
+        return len(self.boards)
+
+    def __iter__(self):
+        """Allow this object to be used like an iterable sequence."""
+
+        class Iter:
+            def __init__(self, boards):
+                self.__index = 0
+                self.__boards = boards
+            def __next__(self):
+                if self.__index >= len(self.__boards):
+                    raise StopIteration
+                board = self.__boards[self.__index]
+                self.__index += 1
+                return board
+        return Iter(self.boards)
+
+    @property
+    def control(self):
+        """Access to the database cursor."""
+        return self.__control
+
+    @property
+    def cursor(self):
+        """Access to the database."""
+        return self.control.cursor
+
+    @property
+    def boards(self):
+        """Assemble the sequence of `Board` objects."""
+
+        if not hasattr(self, "_boards"):
+            fields = "d.id", "d.title"
+            query = self.control.Query("active_doc d", *fields)
+            query.order("d.title")
+            query.join("query_term t", "t.doc_id = d.id")
+            query.where("t.path = '/Organization/OrganizationType'")
+            query.where(query.Condition("t.value", self.BOARD_TYPES, "IN"))
+            self._boards = []
+            for id, title in query.execute(self.cursor).fetchall():
+                title = title.split(";")[0].strip()
+                title = title.replace(self.IACT, "IACT")
+                self._boards.append(self.Board(self.control, id, title))
+        return self._boards
+
+    class Board:
+        """Information about a PDQ board and its members."""
+
+        BOARD = "/PDQBoardMemberInfo/BoardMembershipDetails/BoardName/@cdr:ref"
+
+        def __init__(self, control, id, name):
+            """Remember the caller's values, let the properties do the work.
+
+            Pass:
+                control - access to the database
+                id - primary key for the board's Organization CDR document
+                name - string for the name of the board
+            """
+
+            self.__control = control
+            self.__id = id
+            self.__name = name
+
+        @property
+        def control(self):
+            """Access to the database cursor."""
+            return self.__control
+
+        @property
+        def cursor(self):
+            """Access to the database."""
+            return self.control.cursor
+
+        @property
+        def id(self):
+            """Primary key for the board's Organization CDR document."""
+            return self.__id
+
+        @property
+        def name(self):
+            """String for the name of the board."""
+            return self.__name
+
+        @property
+        def members(self):
+            """Sorted sequence of the board's members."""
+
+            if not hasattr(self, "_members"):
+                query = self.control.Query("active_doc d", "d.id").unique()
+                query.join("query_term m", "m.doc_id = d.id")
+                query.where(query.Condition("m.path", self.BOARD))
+                query.where(query.Condition("m.int_val", self.id))
+                members = []
+                for row in query.execute(self.cursor).fetchall():
+                    member = self.Member(self, row.id)
+                    if member.name:
+                        members.append(member)
+                self._members = sorted(members)
+            return self._members
+
+        @property
+        def type(self):
+            """String for the board's type ("advisory" or "editorial")."""
+
+            if not hasattr(self, "_type"):
+                if "advisory" in self.name.lower():
+                    self._type = "advisory"
+                else:
+                    self._type = "editorial"
+            return self._type
+
+
+        class Member:
+            """One of the members of a PDQ board."""
+
+            def __init__(self, board, id):
+                """Save the caller's values."""
+                self.__board = board
+                self.__id = id
+
+            def __lt__(self, other):
+                """Make the board member objects sortable by member name."""
+                return self.name.lower() < other.name.lower()
+
+            @property
+            def id(self):
+                """Primary key for the member's PDQBoardMemberInfo doc."""
+                return self.__id
+
+            @property
+            def board(self):
+                """Access to the `Control` object."""
+                return self.__board
+
+            @property
+            def name(self):
+                """Board member's name in Surname, Given Name format."""
+
+                if not hasattr(self, "_name"):
+                    self._name = self.board.control.board_members.get(self.id)
+                return self._name
+
+
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+    Control().run()

@@ -54,7 +54,8 @@ body.admin-menu { background-color: #dfdfdf; }
     font: 12pt "Arial";
     font-weight: bold;
 }
-.admin-menu li a:hover { background: #ffc; }
+/*.admin-menu li a:hover { background: #ffc; }*/
+.admin-menu li a:hover { text-decoration: underline; }
 .admin-menu ul > li, .lnone { list-style-type: none; }
 .admin-menu h4 { font-style: italic; }
 table { background-color: white; margin: 5px auto; border-collapse:collapse; }
@@ -141,10 +142,23 @@ form header h1 span input { margin-right: 5px; }
 #ncit-changes { margin-top: 10px; }
 #activity-report td, #activity-report th { white-space: nowrap; }
 #activity-report td:last-child { white-space: normal; }
-.success { color: green; }
+.success, .info { color: green; }
 .failure { color: red; }
+.news { font-weight: bold; border: 3px solid green; padding: 5px; }
+.news.failure { border: 3px solid red; }
 dl { padding-left: 5px; }
 dt { margin-top: 15px; font-weight: bold; }
 #summaries-toc-report h5 { font-size: 1em; margin-bottom: 0; margin-top: 10px }
 #summaries-toc-report h4 { text-decoration: underline; }
 #summaries-toc-report > ul { margin: 0 2px; }
+.flexlinks { width: 1200px; }
+.flexlinks ul {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: wrap;
+  height: 500px;
+  margin: 10px 0 0;
+}
+.admin-menu .flexlinks li a { color: #00E; font-weight: normal; }
+.flexlinks li { padding-bottom: 6px; }
+th.clickable { cursor: pointer; }

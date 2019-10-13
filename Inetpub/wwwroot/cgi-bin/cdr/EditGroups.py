@@ -1,56 +1,55 @@
-#----------------------------------------------------------------------
-# Prototype for editing CDR groups.
-#----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, string, sys
-import urllib.parse
+#!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields  = cgi.FieldStorage()
-session = cdrcgi.getSession(fields)
-action  = cdrcgi.getRequest(fields)
-title   = "CDR Administration"
-section = "Manage Groups"
-buttons = [cdrcgi.MAINMENU]
-header  = cdrcgi.header(title, title, section, "EditGroups.py", buttons)
+"""Menu for editing CDR groups.
+"""
 
-#----------------------------------------------------------------------
-# Make sure the login was successful.
-#----------------------------------------------------------------------
-if not session: cdrcgi.bail('Unknown or expired CDR session.')
+from cdrcgi import Controller, navigateTo
 
-#----------------------------------------------------------------------
-# Return to the main menu if requested.
-#----------------------------------------------------------------------
-if action == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
+class Control(Controller):
+    """Encapsulates processing logic for building the menu page."""
 
-#----------------------------------------------------------------------
-# Retrieve the list of groups from the server.
-#----------------------------------------------------------------------
-groups = cdr.getGroups(session)
-if isinstance(groups, (str, bytes)):
-    cdrcgi.bail(groups)
+    ADD_NEW_GROUP = "Add New Group"
+    EDIT_GROUP = "EditGroup.py"
 
-#----------------------------------------------------------------------
-# Put up the main menu.
-#----------------------------------------------------------------------
-SESSION = "?%s=%s" % (cdrcgi.SESSION, session)
+    def run(self):
+        """Override base class to add action for new button."""
+        if self.request == self.ADD_NEW_GROUP:
+            navigateTo(self.EDIT_GROUP, self.session.name)
+        else:
+            Controller.run(self)
 
-menu = "<OL>\n"
-for group in groups:
-    menu += """\
-  <LI><A HREF="%s/EditGroup.py?%s=%s&grp=%s">%s</A></LI>
-""" % (cdrcgi.BASE, cdrcgi.SESSION, session, urllib.parse.quote_plus(group),
-       group)
-menu += """\
-  <LI><A HREF="%s/EditGroup.py?%s=%s">%s</A></LI>
-  <LI><A HREF="%s/Logout.py?%s=%s">%s</A></LI>
- </OL>
-""" % (cdrcgi.BASE, cdrcgi.SESSION, session, "ADD NEW GROUP",
-       cdrcgi.BASE, cdrcgi.SESSION, session, "LOG OUT")
-menu += "</OL>"
-menu += "<INPUT TYPE='hidden' NAME='%s' VALUE='%s'>" % (cdrcgi.SESSION,
-                                                        session)
-cdrcgi.sendPage(header + menu + "</FORM></BODY></HTML>")
+    def populate_form(self, page):
+        """Add group editing links to the page."""
+        page.body.set("class", "admin-menu")
+        fieldset = page.fieldset("Existing Groups (click to edit)")
+        fieldset.set("class", "flexlinks")
+        script = self.EDIT_GROUP
+        ul = page.B.UL()
+        for group in self.session.list_groups():
+            link = page.menu_link(script, group, grp=group)
+            ul.append(page.B.LI(link))
+        fieldset.append(ul)
+        page.form.append(fieldset)
+        page.add_css(".flexlinks ul { height: 650px }")
+
+    @property
+    def subtitle(self):
+        """Dynamically determine what to display under the main banner."""
+
+        if not hasattr(self, "_subtitle"):
+            group = self.fields.getvalue("deleted")
+            if group:
+                self._subtitle = f"Successfully deleted group {group!r}"
+            else:
+                self._subtitle = "Manage Groups"
+        return self._subtitle
+
+    @property
+    def buttons(self):
+        """Override to specify custom buttons for this page."""
+        return self.ADD_NEW_GROUP, self.DEVMENU, self.ADMINMENU, self.LOG_OUT
+
+
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+    Control().run()

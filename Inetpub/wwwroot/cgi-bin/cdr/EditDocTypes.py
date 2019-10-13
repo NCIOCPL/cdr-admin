@@ -1,61 +1,58 @@
-#----------------------------------------------------------------------
-# Interface for editing CDR document types.
-# JIRA::OCECDR-4091
-#----------------------------------------------------------------------
-import urllib.request, urllib.parse, urllib.error
-import cdr
-import cdrcgi
+#!/usr/bin/env python
 
-class Control(cdrcgi.Control):
+"""Menu for editing CDR document types.
+"""
+
+from cdrcgi import Controller, navigateTo
+from cdrapi.docs import Doctype
+
+class Control(Controller):
+    """Encapsulates processing logic for building the menu page."""
+
     ADD_NEW_DOCTYPE = "Add New Document Type"
-    EDIT_DOCTYPE = "EditDoctype.py"
-    B = cdrcgi.Page.B
-    NCOLS = 4
-    def __init__(self):
-        cdrcgi.Control.__init__(self, "Manage Document Types")
-        self.buttons = (self.ADD_NEW_DOCTYPE, self.ADMINMENU, self.LOG_OUT)
-        self.parms = { cdrcgi.SESSION: self.session }
-    def populate_form(self, form):
-        form.add("<fieldset>")
-        form.add(self.B.LEGEND("Existing Document Types (click to edit)"))
-        form.add(self.make_table())
-        form.add("</fieldset>")
-        form.add_css("""\
-fieldset { width: 750px; }
-table { background: transparent; }
-th, td { background: transparent; padding: 3px; border: none; width: 25%; }
-a { text-decoration: none; color: #00E; }
-a:hover { text-decoration: underline; }
-.warning { font-weight: bold; text-align: center; }""")
-    def run(self):
-        if self.request == self.ADD_NEW_DOCTYPE:
-            cdrcgi.navigateTo(self.EDIT_DOCTYPE, self.session)
-        else:
-            cdrcgi.Control.run(self)
-    def make_table(self):
-        doctypes = self.get_doctypes()
-        nrows = len(doctypes) // self.NCOLS
-        if len(doctypes) % self.NCOLS:
-            nrows += 1
-        rows = []
-        while len(rows) < nrows:
-            rows.append(self.make_row(doctypes, nrows, len(rows)))
-        return self.B.TABLE(*rows)
-    def make_row(self, doctypes, nrows, row_number):
-        cells = []
-        for col in range(self.NCOLS):
-            index = nrows * col + row_number
-            if index < len(doctypes):
-                cells.append(self.make_cell(doctypes[index]))
-        return self.B.TR(*cells)
-    def make_cell(self, doctype):
-        self.parms["doctype"] = doctype
-        url = "%s?%s" % (self.EDIT_DOCTYPE, urllib.parse.urlencode(self.parms))
-        return self.B.TD(self.B.A(doctype, href=url))
-    def get_doctypes(self):
-        doctypes = cdr.getDoctypes(self.session)
-        if isinstance(doctypes, (str, bytes)):
-            cdrcgi.bail(doctypes)
-        return sorted(doctypes)
+    EDIT_DOCTYPE = "EditDocType.py"
+    SUBTITLE = "Manage Document Types"
 
-Control().run()
+    def run(self):
+        """Override base class to add action for new button."""
+        if self.request == self.ADD_NEW_DOCTYPE:
+            navigateTo(self.EDIT_DOCTYPE, self.session.name)
+        else:
+            Controller.run(self)
+
+    def populate_form(self, page):
+        """Add doctype editing links and some custom styling to the page."""
+
+        page.body.set("class", "admin-menu")
+        fieldset = page.fieldset("Existing Document Types (click to edit)")
+        fieldset.set("class", "flexlinks")
+        ul = page.B.UL()
+        script = self.EDIT_DOCTYPE
+        for doctype in Doctype.list_doc_types(self.session):
+            link = page.menu_link(script, doctype, doctype=doctype)
+            ul.append(page.B.LI(link))
+        fieldset.append(ul)
+        page.form.append(fieldset)
+        page.add_css(".flexlinks ul { height: 125px }")
+
+    @property
+    def subtitle(self):
+        """Dynamically determine what to display under the main banner."""
+
+        if not hasattr(self, "_subtitle"):
+            action = self.fields.getvalue("deleted")
+            if action:
+                self._subtitle = f"Successfully deleted type {action!r}"
+            else:
+                self._subtitle = "Manage Document Types"
+        return self._subtitle
+
+    @property
+    def buttons(self):
+        """Override to specify custom buttons for this page."""
+        return self.ADD_NEW_DOCTYPE, self.DEVMENU, self.ADMINMENU, self.LOG_OUT
+
+
+if __name__ == "__main__":
+    """Don't execute the script if we're loaded as a module."""
+    Control().run()

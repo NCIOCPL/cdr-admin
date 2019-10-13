@@ -1,179 +1,241 @@
-#----------------------------------------------------------------------
-# Interface for editing a CDR group.
-#----------------------------------------------------------------------
-import cgi, cdr, cdrcgi
+#!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields  = cgi.FieldStorage()
-session = cdrcgi.getSession(fields)
-request = cdrcgi.getRequest(fields)
-grpName = fields.getvalue("grp") or None
-SUBMENU = "Group Menu"
+"""Interface for editing a CDR group.
+"""
 
-#----------------------------------------------------------------------
-# Make sure we have an active session.
-#----------------------------------------------------------------------
-if not session: cdrcgi.bail("Unknown or expired CDR session.")
+from cdrcgi import Controller, navigateTo, bail
+from cdrapi.docs import Doctype
 
-#----------------------------------------------------------------------
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if request == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif request == SUBMENU:
-    cdrcgi.navigateTo("EditGroups.py", session)
+class Control(Controller):
+    """Top-level logic for editing interface."""
 
-#----------------------------------------------------------------------
-# Handle request to log out.
-#----------------------------------------------------------------------
-if request == "Log Out":
-    cdrcgi.logout(session)
+    EDIT_GROUPS = "EditGroups.py"
+    SUBMENU = "Group Menu"
+    SAVE = "Save Changes"
+    DELETE = "Delete Group"
 
-#----------------------------------------------------------------------
-# Handle request to delete the group.
-#----------------------------------------------------------------------
-if request == "Delete Group":
-    error = cdr.delGroup(session, grpName)
-    if error: cdrcgi.bail(error)
-    cdrcgi.mainMenu(session, "Group %s Deleted Successfully" % grpName)
+    def delete(self):
+        """Delete the current group and return to the Groups menu."""
+        self.group.delete(self.session)
+        self.return_to_groups_menu(self.group.name)
 
-#----------------------------------------------------------------------
-# Handle request to store changes to the group.
-#----------------------------------------------------------------------
-if request == "Save Changes":
-    name = fields.getvalue("name") or cdrcgi.bail("missing group name")
-    group = cdr.Group(name=name)
-    group.users = fields.getlist("users")
-    comment = fields.getvalue("comment")
-    if comment != "None": group.comment = comment
-    for action in fields.getlist("actions"):
-        if "::" in action:
-            action, doctype = action.split("::")
+    def populate_form(self, page):
+        """Add the field sets and custom style rules to the page.
+
+        Pass:
+            page - HTMLPage object to be filled out
+        """
+
+        page.form.append(page.hidden_field("grp", self.group.name or ""))
+        fieldset = page.fieldset("Group Identification")
+        fieldset.append(page.text_field("name", value=self.group.name))
+        opts = dict(value=self.group.comment, rows=5)
+        fieldset.append(page.textarea("description", **opts))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Group Members")
+        fieldset.set("id", "users-fieldset")
+        fieldset.set("class", "checkboxes")
+        for name in sorted(self.users, key=str.lower):
+            user = self.users[name]
+            opts = dict(value=user.name, label=user.name)
+            if user.fullname:
+                opts["tooltip"] = user.fullname
+            if self.group.users and name in self.group.users:
+                opts["checked"] = True
+            fieldset.append(page.checkbox("user", **opts))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Actions Independent Of Document Types")
+        fieldset.set("class", "checkboxes")
+        fieldset.set("id", "independent-actions")
+        for action in self.actions:
+            if action.doctype_specific == "N":
+                opts = dict(value=action.name, label=action.name)
+                if self.group.actions and action.name in self.group.actions:
+                    opts["checked"] = True
+                fieldset.append(page.checkbox("action", **opts))
+        page.form.append(fieldset)
+        for action in self.actions:
+            if action.doctype_specific == "Y":
+                group = self.action_group_name(action)
+                fieldset = page.fieldset(action.name)
+                fieldset.set("class", "checkboxes")
+                if self.group.actions:
+                    doctypes = self.group.actions.get(action.name) or []
+                else:
+                    doctypes = []
+                for doctype in self.doctypes:
+                    opts = dict(value=doctype, label=doctype)
+                    if doctype in doctypes:
+                        opts["checked"] = True
+                    fieldset.append(page.checkbox(group, **opts))
+                page.form.append(fieldset)
+        page.add_css("""\
+fieldset {width: 1200px; }
+fieldset.checkboxes div { float: left; width: 240px; }
+fieldset#users-fieldset div { width: 200px;}
+fieldset#independent-actions div { width: 300px; }
+.labeled-field textarea, .labeled-field #name { width: 1050px; }
+""")
+
+    def return_to_groups_menu(self, deleted=None):
+        """Go back to the menu listing all the CDR groups."""
+
+        opts = dict(deleted=deleted) if deleted else {}
+        navigateTo(self.EDIT_GROUPS, self.session.name, **opts)
+
+    def run(self):
+        """Override base class so we can handle the extra buttons."""
+
+        try:
+            if self.request == self.DELETE:
+                return self.delete()
+            elif self.request == self.SAVE:
+                return self.save()
+            elif self.request == self.SUBMENU:
+                return self.return_to_groups_menu()
+        except Exception as e:
+            bail(f"Failure: {e}")
+        Controller.run(self)
+
+    def save(self):
+        """Save the new or modified group object."""
+
+        opts = dict(
+            id=self.group.id,
+            name=self.name,
+            comment=self.comment,
+            users=self.members,
+            actions=self.allowed_actions,
+        )
+        self.group = self.session.Group(**opts)
+        if self.group.id:
+            self.group.modify(self.session)
+            self.subtitle = f"Group {self.name!r} successfully updated"
         else:
-            doctype = None
-        if action not in group.actions: group.actions[action] = []
-        group.actions[action].append(doctype)
-    error = cdr.putGroup(session, grpName, group)
-    if error: cdrcgi.bail(error)
-    grpName = name
+            self.group.add(self.session)
+            self.subtitle = f"Group {self.name!r} successfully added"
+        self.show_form()
 
-#----------------------------------------------------------------------
-# Retrieve and display the group information.
-#----------------------------------------------------------------------
-title   = "CDR Administration"
-section = "Edit Group Information"
-buttons = ["Save Changes", "Delete Group", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-script  = "EditGroup.py"
-page    = cdrcgi.Page(title, subtitle=section, action=script, buttons=buttons,
-        session=session, body_classes="checkbox-form")
+    @property
+    def actions(self):
+        """Sequence of `Action` objects for all the actions in the system."""
 
-#----------------------------------------------------------------------
-# Populate the group object.
-#----------------------------------------------------------------------
-if not grpName: group = cdr.Group()
-else:           group = cdr.getGroup(session, grpName)
+        if not hasattr(self, "_actions"):
+            self._actions = self.session.list_actions()
+        return self._actions
 
-#----------------------------------------------------------------------
-# Retrieve the related information we need from the server.
-#----------------------------------------------------------------------
-actions  = cdr.getActions(session)
-users    = cdr.getUsers(session)
-doctypes = cdr.getDoctypes(session)
-if isinstance(group,    (str, bytes)): cdrcgi.bail(group)
-if isinstance(actions,  (str, bytes)): cdrcgi.bail(actions)
-if isinstance(users,    (str, bytes)): cdrcgi.bail(users)
-if isinstance(doctypes, (str, bytes)): cdrcgi.bail(doctypes)
+    @property
+    def allowed_actions(self):
+        """Checkboxes checked for the "action" groups."""
 
-#----------------------------------------------------------------------
-# Display the information for the group.
-#----------------------------------------------------------------------
-B = page.B
-name = group.name or ""
-page.add(B.INPUT(type="hidden", name="grp", value=name))
-page.add(B.H2(name, style="font: 20pt Arial bold;"))
-if request == "Save Changes":
-    page.add(B.H4("(Successfully Updated)"))
-page.add(B.H3("Group Name"))
-page.add(B.INPUT(name="name", value=name, style="width: 200px;"))
-page.add(B.H3("Description"))
-page.add(B.TEXTAREA(group.comment or "", name="comment", rows="4", cols="80"))
+        if not hasattr(self, "_allowed_actions"):
+            actions = {}
+            independent_actions = self.fields.getlist("action")
+            for action in self.actions:
+                if action.doctype_specific == "N":
+                    if action.name in independent_actions:
+                        actions[action.name] = [""]
+                else:
+                    action_group_name = self.action_group_name(action)
+                    doctypes = self.fields.getlist(action_group_name)
+                    if doctypes:
+                        actions[action.name] = doctypes
+            self._allowed_actions = actions
+        return self._allowed_actions
 
-#----------------------------------------------------------------------
-# List the users which can be assigned to the group.
-#----------------------------------------------------------------------
-session = "%s=%s" % (cdrcgi.SESSION, session)
-page.add(B.H3("Users"))
-page.add("<table class='checkboxes'>")
-nUsers = 0
-USERS_PER_ROW = 6
-for user in users:
-    if nUsers % USERS_PER_ROW == 0: page.add("<tr>")
-    field = B.INPUT(type="checkbox", value=user, name="users")
-    if user in group.users:
-        field.set("checked", "checked")
-    url = "%s/EditUser.py?usr=%s&%s" % (cdrcgi.BASE, user, session)
-    page.add(B.TD(field, B.A(user, href=url)))
-    nUsers += 1
-    if nUsers % USERS_PER_ROW == 0: page.add("</tr>")
-if nUsers and nUsers % USERS_PER_ROW != 0: page.add("</tr>")
-page.add("</table>")
+    @property
+    def buttons(self):
+        """Add our custom navigation buttons."""
 
-#----------------------------------------------------------------------
-# Add the actions for which the group can be authorized.
-#----------------------------------------------------------------------
-page.add(B.H3("Actions"))
+        if not hasattr(self, "_buttons"):
+            buttons = [self.SAVE, self.SUBMENU, self.ADMINMENU, self.LOG_OUT]
+            if self.group.id:
+                buttons.insert(1, self.DELETE)
+            self._buttons = buttons
+        return self._buttons
 
-#----------------------------------------------------------------------
-# Add the actions independent of specific document types.
-#----------------------------------------------------------------------
-page.add(B.H4("Not Specific To Any Document Type"))
-page.add("<table class='checkboxes'>")
-nActions = 0
-ACTIONS_PER_ROW = 5
-for name in sorted(actions.keys()):
-    if actions[name] != 'Y':
-        if nActions % ACTIONS_PER_ROW == 0: page.add("<tr>")
-        field_id = "action-%s" % name.replace(" ", "_")
-        field = B.INPUT(type="checkbox", value=name, name="actions",
-                        id=field_id)
-        if name in group.actions:
-            field.set("checked", "checked")
-        label = B.LABEL(name, B.FOR(field_id))
-        page.add(B.TD(field, label))
-        nActions += 1
-        if nActions % ACTIONS_PER_ROW == 0: page.add("</tr>")
-if nActions and nActions % ACTIONS_PER_ROW != 0: page.add("</tr>")
-page.add("</table>")
+    @property
+    def comment(self):
+        """Current value of the form's description field."""
+        return self.fields.getvalue("description")
 
-#----------------------------------------------------------------------
-# Add the actions specific to individual document types.
-#----------------------------------------------------------------------
-DOCTYPES_PER_ROW = 7
-for name in sorted(actions.keys()):
-    if actions[name] == 'Y':
-        grpAction = group.actions.get(name)
-        page.add(B.H4(name))
-        page.add("<table class='checkboxes'>")
-        nDoctypes = 0
-        for doctype in doctypes:
-            if doctype == "ProtocolSourceDoc": continue
-            if nDoctypes % DOCTYPES_PER_ROW == 0: page.add("<tr>")
-            field_id = ("action-%s-%s" % (name, doctype)).replace(" ", "_")
-            value = "%s::%s" % (name, doctype)
-            field = B.INPUT(type="checkbox", value=value, name="actions",
-                            id=field_id)
-            if grpAction and doctype in grpAction:
-                field.set("checked", "checked")
-            label = B.LABEL(doctype, B.FOR(field_id))
-            page.add(B.TD(field, label))
-            nDoctypes += 1
-            if nDoctypes % DOCTYPES_PER_ROW == 0: page.add("</tr>")
-        if nDoctypes and nDoctypes % DOCTYPES_PER_ROW != 0: page.add("</tr>")
-        page.add("</table>")
+    @property
+    def doctypes(self):
+        """Sorted names of all the active document types."""
 
-#----------------------------------------------------------------------
-# Show the form.
-#----------------------------------------------------------------------
-page.send()
+        if not hasattr(self, "_doctypes"):
+            self._doctypes = Doctype.list_doc_types(self.session)
+        return self._doctypes
+
+    @property
+    def group(self):
+        """Object for the CDR group being edited/created."""
+
+        if not hasattr(self, "_group"):
+            name = self.fields.getvalue("grp")
+            if name:
+                self._group = self.session.get_group(name)
+            else:
+               opts = dict(
+                   name=self.name,
+                   comment=self.comment,
+                   session=self.session
+               )
+               self._group = self.session.Group(**opts)
+        return self._group
+
+    @group.setter
+    def group(self, value):
+        """Allow replacement after a save."""
+        self._group = value
+
+    @property
+    def members(self):
+        """Checkboxes checked from the "user" group."""
+
+        if not hasattr(self, "_members"):
+            self._members = self.fields.getlist("user")
+        return self._members
+
+    @property
+    def name(self):
+        """Current value of the form's name field."""
+        return self.fields.getvalue("name")
+
+    @property
+    def subtitle(self):
+        """Dynamic string for display under the main banner."""
+
+        if not hasattr(self, "_subtitle"):
+            if self.name:
+                self._subtitle = f"Editing {self.name!r} group"
+            else:
+                self._subtitle = "Adding New Group"
+            self._subtitle = self.name or "Add New Group"
+        return self._subtitle
+
+    @subtitle.setter
+    def subtitle(self, value):
+        """Provide status information after a save."""
+        self._subtitle = value
+
+    @property
+    def users(self):
+        if not hasattr(self, "_users"):
+            self._users = {}
+            for name in self.session.list_users():
+                self._users[name] = self.session.User(self.session, name=name)
+        return self._users
+
+    @staticmethod
+    def action_group_name(action):
+        """Name the doctype buttons for a specific action.
+
+        Pass:
+            action - `Action` object
+        """
+
+        return action.name.lower().replace(" ", "_") + "-doctype"
+
+
+Control().run()

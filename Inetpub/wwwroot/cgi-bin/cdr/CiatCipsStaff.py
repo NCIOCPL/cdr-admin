@@ -31,7 +31,7 @@ class Control(Controller):
             ("Replace Doc with New Doc", "ReplaceDocWithNewDoc.py"),
             ("Reports", "Reports.py"),
             ("Summary Translation Job Queue", "translation-jobs.py"),
-            ("Update Mapping Table", "EditExternMap.py"),
+            ("Update Mapping Table", "EditExternalMap.py"),
             ("Update Pre-Medline Citations", "UpdatePreMedlineCitations.py"),
         ):
             ol.append(page.B.LI(page.menu_link(script, display)))

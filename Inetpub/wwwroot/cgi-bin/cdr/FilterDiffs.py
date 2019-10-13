@@ -106,8 +106,8 @@ class Control:
                     with open(self.CACHED_PROD_FILTERS) as fp:
                         self._prod_filters = json.load(fp)
                     return self._prod_filters
-                except:
-                    pass
+                except Exception as e:
+                    self.logger.warning("Failure loading from cache: %s", e)
             self._prod_filters = {}
             for filt in cdr.getFilters("guest", tier="PROD"):
                 url = self.URL.format(filt.id)

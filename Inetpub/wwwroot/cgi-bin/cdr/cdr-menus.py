@@ -57,7 +57,7 @@ class Item:
         "drugreviewreport.py",
         "editactions.py",
         "editdoctypes.py",
-        "editexternmap.py",
+        "editexternalmap.py",
         "editfilters.py",
         "editfiltersets.py",
         "editgroups.py",

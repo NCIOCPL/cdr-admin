@@ -13,7 +13,7 @@ class Control(Controller):
     SUBTITLE = "Drug Indications"
     TYPES = (
         ("drug", "Indications and Drug Names Only"),
-        ("brand", "Indications and Drug Names (With Brand Name(s)"),
+        ("brand", "Indications and Drug Names (With Brand Name(s))"),
         ("plain", "Indications Only"),
     )
     GROUPINGS = (
@@ -321,7 +321,7 @@ class Drug:
         """Address for this drug's CDR QC report."""
         if not hasattr(self, "_url"):
             parms = self.PARMS.format(self.control.session, self.cdr_id)
-            self._url = f"QcReport?{parms}"
+            self._url = f"QcReport.py?{parms}"
         return self._url
 
     @classmethod

@@ -1,16 +1,170 @@
-#----------------------------------------------------------------------
-# Report to display the Board Roster with or without assistant
-# information.
-#
-# BZIssue::4673 - Changes to PDQ Board Roster report.
-# BZIssue::5060 - [Summaries] Changes to Combined Board Roster Report
-#                 Adding summary sheet options to the program
-#----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, time, operator
-import sys
-import lxml.html
-from cdrapi import db
+#!/usr/bin/env python
 
+"""Display the Board Roster with or without assistant information.
+"""
+
+from cdrcgi import Controller
+from cdrapi.docs import Doc
+
+class Control(Controller):
+
+    SUBTITLE = "PDQ Board Roster"
+    BOARD_TYPES = (
+        ("editorial", "PDQ Editorial Boards", True),
+        ("advisory", "PDQ Editorial Advisory Boards", False),
+    )
+    GROUPINGS = (
+        ("by_member", "Group by board member", True),
+        ("by_board", "Group by PDQ board", False),
+    )
+    FORMATS = (
+        ("qc", "QC report format", True),
+        ("table", "Tabular report format", False),
+    )
+    OPTIONAL_COLUMNS = (
+        ("board_name", "Board Name", True),
+        ("phone", "Phone", False),
+        ("fax", "Fax", False),
+        ("email", "Email", False),
+        ("cdrid", "CDR ID", False),
+        ("start_date", "Start Date", False),
+        ("govt_employee", "Government Employee", False),
+        ("blank", "Blank Column", False),
+    )
+
+    @property
+    def boards(self):
+        if not hasattr(self, "_boards"):
+            self._boards = {}
+            board_type = f"PDQ {self.board_type.title()} Board"
+            query = self.Query("active_doc b", "b.id", "b.title")
+            query.join("query_term t", "t.doc_id = b.id")
+            query.where("t.path = '/Organization/OrganizationType'")
+            query.where(query.Condidition("t.value", board_type))
+            for row in query.execute(self.cursor).fetchall():
+                self._boards[row.id] = Board(self, row)
+
+    @property
+    def board_type(self):
+        return self.fields.getvalue("board_type")
+    @property
+    def grouping(self):
+        return self.fields.getvalue("grouping")
+    @property
+    def report_format(self):
+        return self.fields.getvalue("format")
+    @property
+    def extra_columns(self):
+        return self.fields.getlist("column")
+
+    def build_tables(self):
+        if self.report_format == "qc":
+            return self.qc_report()
+        rows = []
+    def populate_form(self, page):
+        """
+        Add the fields to the form page.
+
+        Pass:
+            page - HTMLPage object to be populated
+        """
+
+        fieldset = page.fieldset("Select Boards")
+        for value, label, checked in self.BOARD_TYPES:
+            opts = dict(value=value, label=label, checked=checked)
+            fieldset.append(page.radio_button("board_type", **opts))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Report Grouping")
+        for value, label, checked in self.GROUPINGS:
+            opts = dict(value=value, label=label, checked=checked)
+            fieldset.append(page.radio_button("grouping", **opts))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Report Format")
+        fieldset.set("id", "report-formats")
+        for value, label, checked in self.FORMATS:
+            opts = dict(value=value, label=label, checked=checked)
+            fieldset.append(page.radio_button("format", **opts))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Optional Table Columns")
+        fieldset.set("id", "columns")
+        for value, label, checked in self.OPTIONAL_COLUMNS:
+            opts = dict(value=value, label=label, checked=checked)
+            fieldset.append(page.checkbox("column", **opts))
+        page.form.append(fieldset)
+        page.add_script("""\
+function check_format(which) {
+    let format = jQuery("#report-formats input:checked").val();
+    console.log("format is now " + format);
+    if (format == "qc")
+        jQuery("#columns").hide();
+    else
+        jQuery("#columns").show();
+}
+jQuery(function() {
+    //jQuery("#report-formats input").click(check_format);
+    check_format();
+});""")
+
+class Board:
+
+    DETAILS = "/PDQBoardMemberInfo/BoardMembershipDetails"
+    BOARD_PATH = f"{DETAILS}/BoardName/@cdr:ref"
+    CURRENT_PATH = f"{DETAILS}/CurrentMember"
+    PERSON_PATH = f"/PDQBoardMemberInfo/BoardMemberName/@cdr:ref"
+    IACT = "Integrative, Alternative, and Complementary Therapies"
+
+    def __init__(self, control, row):
+        self.__control = control
+        self.__row = row
+    @property
+    def control(self):
+        return self.__control
+    @property
+    def id(self):
+        return self.__row.id
+    @property
+    def title(self):
+        if not hasattr(self, "_title"):
+            self._title = self.__row.title.replace(self.IACT, "IACT")
+    @property
+    def members(self):
+        if not hasattr(self, "_members"):
+            fields = "p.doc_id AS member_id", "p.int_val AS person_id"
+            query = self.control.Query("query_term p", *self.FIELDS).unique()
+            query.join("active_doc a", "a.id = p.int_val")
+            query.join("query_term b", "b.doc_id = p.doc_id")
+            query.join("query_term c", "c.doc_id = p.doc_id")
+            query.where(query.Condition("p.path", self.PERSON_PATH))
+            query.where(query.Condition("b.path", self.BOARD_PATH))
+            query.where(query.Condition("c.path", self.CURRENT_PATH))
+            query.where(query.Condition("b.int_val", self.id))
+            query.where("c.value = 'Yes'")
+            self._members = []
+            for row in query.execute(self.control.cursor).fetchall():
+                self._members.append(self.Member(self, row))
+    class Member:
+        def __init__(self, board, row):
+            self.__board = board
+            self.__row = row
+        @property
+        def board(self):
+            return self.__board
+        @property
+        def member_id(self):
+            return self.__row.member_id
+        @property
+        def person_id(self):
+            return self.__row.person_id
+        response = cdr.filterDoc('guest',
+                                 ['set:Denormalization PDQBoardMemberInfo Set',
+                                  'name:Copy XML for Person 2',
+                                  filterType[flavor]],
+                                  boardMember[0],
+                                  parm = [['otherInfo', otherInfo],
+                                          ['assistant', assistant]])
+
+Control().run()
+'''
 # ---------------------------------------------------------------------
 # Class to collect all of the information for a single board member
 # ---------------------------------------------------------------------
@@ -40,128 +194,12 @@ class BoardMemberInfo:
             pass
 
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields     = cgi.FieldStorage()
-boardType  = fields and fields.getvalue("board")  or None
-sortType   = fields and fields.getvalue("sort")  or None
-otherInfo  = fields and fields.getvalue("oinfo") or 'Yes'
-assistant  = fields and fields.getvalue("ainfo") or 'Yes'
-flavor     = fields and fields.getvalue("sheet") and 'summary' or 'full'
-#if flavor == 'on':  flavor == 'summary'
-boardInfo  = fields and fields.getvalue("binfo") and 'Yes' or 'No'
-phoneInfo  = fields and fields.getvalue("pinfo") and 'Yes' or 'No'
-faxInfo    = fields and fields.getvalue("finfo") and 'Yes' or 'No'
-emailInfo  = fields and fields.getvalue("einfo") and 'Yes' or 'No'
-cdrIDInfo  = fields and fields.getvalue("cinfo") and 'Yes' or 'No'
-dateInfo   = fields and fields.getvalue("dinfo") and 'Yes' or 'No'
-geInfo     = fields and fields.getvalue("govemp") and 'Yes' or 'No'
-blank      = fields and fields.getvalue("blank") and 'Yes' or 'No'
-
-# List to define the column headings and identify which columns to be
-# displayed
-# -------------------------------------------------------------------
-columns = [('Board Name',boardInfo),
-           ('Phone', phoneInfo), ('Fax', faxInfo),
-           ('Email', emailInfo), ('CDR-ID', cdrIDInfo),
-           ('Start Date', dateInfo), ('Gov. Empl', geInfo), ('Blank', blank)]
-
-rptType    = fields and fields.getvalue("rpttype") or 'html'
-session    = cdrcgi.getSession(fields)
-request    = cdrcgi.getRequest(fields)
-title      = "PDQ Board Roster Report"
-instr      = "Report on PDQ Board Roster"
-script     = "BoardRosterFull.py"
-SUBMENU    = "Report Menu"
-buttons    = ("Submit", SUBMENU, cdrcgi.MAINMENU)
-header     = cdrcgi.header(title, title, instr, script, buttons,
-                           method = 'GET',
-                           stylesheet = """
-    <script type='text/javascript'>
-     function doSummarySheet(box) {
-         if (box == 'summary')
-             {
-             if (document.getElementById('summary').checked == true)
-                 {
-                 document.getElementById('summary').checked = true;
-                 }
-             else
-                 {
-                 document.getElementById('summary').checked = false;
-                 }
-             }
-         else
-             {
-             document.getElementById('summary').checked = true;
-             }
-
-         /*
-         document.getElementById('contact').checked   = false;
-         document.getElementById('assistant').checked = false;
-         document.getElementById('subgroup').checked  = false;
-         */
-         var form = document.forms[0];
-         {
-             form.sheet.value = form.sheet.checked ? 'summary' : 'full';
-             form.binfo.value = form.binfo.checked ? 'Yes' : 'No';
-             form.pinfo.value = form.pinfo.checked ? 'Yes' : 'No';
-             form.finfo.value = form.finfo.checked ? 'Yes' : 'No';
-             form.einfo.value = form.einfo.checked ? 'Yes' : 'No';
-             form.cinfo.value = form.cinfo.checked ? 'Yes' : 'No';
-             form.dinfo.value = form.dinfo.checked ? 'Yes' : 'No';
-             form.blank.value = form.blank.checked ? 'Yes' : 'No';
-             form.govemp.value = form.govemp.checked ? 'Yes' : 'No';
-         }
-     }
-    </script>
-    <style type="text/css">
-     td       { font-size: 12pt; }
-     .label   { font-weight: bold; }
-     .label2  { font-size: 11pt;
-                font-weight: bold; }
-     .select:hover { background-color: #FFFFCC; }
-     .grey    {background-color: #BEBEBE; }
-     .topspace { margin-top: 24px; }
-
-    </style>
-""")
 
 dateString = time.strftime("%B %d, %Y")
 
 filterType= {'summary':'name:PDQBoardMember Roster Summary',
              'excel'  :'name:PDQBoardMember Roster Excel',
              'full'   :'name:PDQBoardMember Roster'}
-#allRows   = []
-
-#----------------------------------------------------------------------
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if request == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif request == SUBMENU:
-    cdrcgi.navigateTo("reports.py", session)
-
-#----------------------------------------------------------------------
-# Set up a database connection and cursor.
-#----------------------------------------------------------------------
-try:
-    conn = db.connect(user="CdrGuest")
-    cursor = conn.cursor()
-except Exception as e:
-    cdrcgi.bail('Database connection failure: %s' % e)
-
-# ---------------------------------------------------------------------
-# Counting how many columns are to be printed. We need to know this
-# value for the colspan attribute of the table to be created.
-# ---------------------------------------------------------------------
-def countCols(cols):
-    k = 0
-    for header, display in cols:
-        if display == 'Yes': k += 1
-    return k
-
-
 #----------------------------------------------------------------------
 # Look up title of a board, given its ID.
 #----------------------------------------------------------------------
@@ -254,122 +292,6 @@ def addTableRow(person, columns):
     htmlRow += """
        </tr>"""
     return htmlRow
-
-
-#----------------------------------------------------------------------
-# If we don't have a request, put up the form.
-#----------------------------------------------------------------------
-if not boardType:
-    form   = """\
-      <input type='hidden' name='%s' value='%s'>
-      <table border='0'>
-       <tr>
-        <td align='right'><b>PDQ Boards included:&nbsp;</b></td>
-        <td>
-         <select name='board'>
-          <option selected value='Editorial'>PDQ Editorial Boards</option>
-          <option value='Advisory'>PDQ Editorial Advisory Boards</option>
-         </select>
-        </td>
-       </tr>
-       <tr>
-        <td align='right'><b>Sort report by:&nbsp;</b></td>
-        <td>
-          <select name='sort'>
-           <option selected value='Member'>Member Name</option>
-           <option value='Board'>Member Name (group by Board)</option>
-          </select>
-         </td>
-        </tr>
-
-   <tr>
-    <td colspan="2">
-     <div style="height: 10px"> </div>
-    </td>
-   </tr>
-   <tr>
-    <td> </td>
-    <td class="grey">
-     <div style="height: 10px"> </div>
-     <input type='checkbox' name='sheet' id='summary'
-            onclick='javascript:doSummarySheet("summary")'>
-      <label for="summary" class="select">
-       <strong>Create Summary Sheet</strong>
-      </label>
-     <table>
-      <tr>
-       <th><span style="margin-left: 20px"> </span></th>
-        <th class="label2">Include Columns</th>
-        <tr>
-          <td><span style="margin-left: 20px"> </span></td>
-          <td class="select">
-            <input type='checkbox' name='binfo'
-                   onclick='javascript:doSummarySheet()' id='E1' CHECKED>
-            <label for="E1">Board Name</label>
-          </td>
-        </tr>
-        <tr>
-          <td><span style="margin-left: 20px"> </span></td>
-          <td class="select">
-            <input type='checkbox' name='pinfo'
-                   onclick='javascript:doSummarySheet()' id='E2'>
-            <label for="E2">Phone</label>
-          </td>
-        </tr>
-        <tr>
-          <td> </td>
-          <td class="select">
-            <input type='checkbox' name='finfo'
-                   onclick='javascript:doSummarySheet()' id='E3'>
-            <label for="E3">Fax</label>
-          </td>
-        </tr>
-        <tr>
-          <td> </td>
-          <td class="select">
-            <input type='checkbox' name='einfo'
-                   onclick='javascript:doSummarySheet()' id='E4'>
-            <label for="E4">Email</label>
-          </td>
-        </tr>
-        <tr>
-          <td> </td>
-          <td class="select">
-            <input type='checkbox' name='cinfo'
-                   onclick='javascript:doSummarySheet()' id='E5'>
-            <label for="E5">CDR-ID</label>
-          </td>
-        </tr>
-        <tr>
-          <td> </td>
-          <td class="select">
-            <input type='checkbox' name='dinfo'
-                   onclick='javascript:doSummarySheet()' id='E6'>
-            <label for="E6">Start Date</label>
-          </td>
-        </tr>
-        <tr>
-          <td> </td>
-          <td class="select">
-            <input type='checkbox' name='govemp'
-                   onclick='javascript:doSummarySheet()' id='E7'>
-            <label for="E7">Government Employee</label>
-          </td>
-        </tr>
-        <tr>
-          <td> </td>
-          <td class="select">
-            <input type='checkbox' name='blank'
-                   onclick='javascript:doSummarySheet()' id='E8'>
-            <label for="E8">Blank Column</label>
-          </td>
-        </tr>
-      </table>
-    </form>
-  </body>
-</html>
-""" % (cdrcgi.SESSION, session)
-    cdrcgi.sendPage(header + form)
 
 #----------------------------------------------------------------------
 # Get the board's name from its ID.
@@ -619,3 +541,4 @@ if rptType == 'html':
 
 else:
     cdrcgi.bail("Sorry, don't know report type: %s" % rptType)
+'''

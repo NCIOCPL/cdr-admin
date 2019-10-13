@@ -10,7 +10,7 @@ import cdrlite
 import datetime
 
 fields = cgi.FieldStorage()
-target = fields.getvalue("target") or "cgi-bin/cdr/admin.py"
+target = fields.getvalue("target") or "cgi-bin/cdr/Admin.py"
 session = None
 auth_user = os.environ.get("AUTH_USER")
 webserver = os.environ.get("SERVER_NAME")
