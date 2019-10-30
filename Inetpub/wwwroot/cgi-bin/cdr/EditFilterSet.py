@@ -151,7 +151,7 @@ class Control(Controller):
 
         if not hasattr(self, "_description"):
             self._description = self.fields.getvalue("description")
-        return self._description
+        return self._description or None
 
     @property
     def filter_list(self):
@@ -220,7 +220,7 @@ class Control(Controller):
     @property
     def notes(self):
         """Extended information about the set (from the form)."""
-        return self.fields.getvalue("notes")
+        return self.fields.getvalue("notes") or None
 
     @property
     def name(self):

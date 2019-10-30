@@ -1,139 +1,157 @@
-#----------------------------------------------------------------------
-# "We need a New Published Glossary Terms Report which will serve as a
-# QC report to verify which new Glossary Term Name documents have been
-# published within the given time frame.  We would like a new Mailer
-# report so we can track responses easier."
-#
-# JIRA::OCECDR-3800 - Address security vulnerabilities
-#----------------------------------------------------------------------
-import cgi
-import cdr
-from cdrapi import db
-import cdrcgi
+#!/usr/bin/env python
+
+"""Show published Glossary Term Name documents.
+
+"We need a New Published Glossary Terms Report which will serve as a
+QC report to verify which new Glossary Term Name documents have been
+published within the given time frame.  We would like a new Mailer
+report so we can track responses easier."
+"""
+
 import datetime
-import sys
-import lxml.etree as etree
+from cdrcgi import Controller
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-cursor    = db.connect(user="CdrGuest").cursor()
-fields    = cgi.FieldStorage()
-session   = cdrcgi.getSession(fields)
-request   = cdrcgi.getRequest(fields)
-begin     = fields.getvalue("begin")
-end       = fields.getvalue("end")
-title     = "CDR Administration"
-section   = "New Published Glossary Terms"
-SUBMENU   = "Report Menu"
-buttons   = ["Submit", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-script    = 'Request4333.py'
 
-#----------------------------------------------------------------------
-# Make sure we're logged in.
-#----------------------------------------------------------------------
-if not session: cdrcgi.bail('Unknown or expired CDR session.')
+class Control(Controller):
+    """Access to the database and report-building facilities."""
 
-#----------------------------------------------------------------------
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if request == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif request == SUBMENU:
-    cdrcgi.navigateTo("Reports.py", session)
-if request == "Log Out":
-    cdrcgi.logout(session)
+    SUBTITLE = "New Published Glossary Terms"
+    COLUMNS = (
+        ("CDR ID", "75px"),
+        ("Term Name (English)", "300px"),
+        ("Term Name (Spanish)", "300px"),
+        ("Date First Published", "100px"),
+    )
 
-#----------------------------------------------------------------------
-# Object in which we collect what we need for the mailers.
-#----------------------------------------------------------------------
+    def build_tables(self):
+        """Assemble and return the report's table."""
+
+        opts = dict(caption=self.caption, columns=self.columns)
+        return self.Reporter.Table(self.rows, **opts)
+
+    def populate_form(self, page):
+        """Ask the user for the report parameters.
+
+        Pass:
+            page - HTMLPage object on which to place the form fields
+        """
+
+        end = datetime.date.today()
+        start = end - datetime.timedelta(7)
+        fieldset = page.fieldset("Report Parameters")
+        opts = dict(label="Start Date", value=start)
+        fieldset.append(page.date_field("start", **opts))
+        opts = dict(label="End Date", value=end)
+        fieldset.append(page.date_field("end", **opts))
+        page.form.append(fieldset)
+
+    @property
+    def caption(self):
+        """What we display at the top of the report's table."""
+        return f"{len(self.rows)} Newly Published Glossary Term Documents"
+
+    @property
+    def columns(self):
+        """Column headers displayed at the top of the report table."""
+
+        cols = []
+        for label, width in self.COLUMNS:
+            cols.append(self.Reporter.Column(label, width=width))
+        return cols
+
+    @property
+    def end(self):
+        return self.fields.getvalue("end")
+
+    @property
+    def format(self):
+        """Override the default report format so we get an Excel workbook."""
+        return "excel"
+
+    @property
+    def rows(self):
+        """Values for the report table."""
+
+        if not hasattr(self, "_rows"):
+            self._rows = [term.row for term in self.terms]
+        return self._rows
+
+    @property
+    def start(self):
+        return self.fields.getvalue("start")
+
+    @property
+    def terms(self):
+        """Values for the report table."""
+
+        query = self.Query("document d", "d.id", "d.first_pub").order("d.id")
+        query.join("doc_type t", "t.id = d.doc_type")
+        query.where("t.name = 'GlossaryTermName'")
+        query.where("d.first_pub IS NOT NULL")
+        query.where("d.active_status = 'A'")
+        if self.start:
+            query.where(query.Condition("d.first_pub", self.start, ">="))
+        if self.end:
+            end = f"{self.end} 23:59:59"
+            query.where(query.Condition("d.first_pub", end, "<="))
+        rows = query.execute(self.cursor).fetchall()
+        return [TermName(self, row) for row in rows]
+
+
 class TermName:
-    def __init__(self, docId, firstPub, cursor):
-        self.docId = docId
-        self.firstPub = firstPub
-        cursor.execute("""\
-            SELECT value
-              FROM query_term
-             WHERE path = '/GlossaryTermName/TermName/TermNameString'
-               AND doc_id = ?""", docId)
-        self.enName = cursor.fetchall()[0][0]
-        cursor.execute("""\
-            SELECT value
-              FROM query_term
-             WHERE path = '/GlossaryTermName/TranslatedName/TermNameString'
-               AND doc_id = ?""", docId)
-        self.spNames = [row[0] for row in cursor.fetchall()]
-    def addToSheet(self, sheet, styles, row):
-        sheet.write(row, 0, self.docId, styles.left)
-        sheet.write(row, 1, self.enName, styles.left)
-        sheet.write(row, 2, "; ".join(self.spNames), styles.left)
-        sheet.write(row, 3, str(self.firstPub)[:10], styles.left)
-        return row + 1
+    """GlossaryTermName document published in the report's date range."""
 
-#----------------------------------------------------------------------
-# Display the form for the report's parameters.
-#----------------------------------------------------------------------
-def createForm():
-    now = datetime.date.today()
-    then = now - datetime.timedelta(7)
-    page = cdrcgi.Page(title, subtitle=section, action=script,
-                       buttons=buttons, session=session)
-    page.add("<fieldset>")
-    page.add(page.B.LEGEND("Enter Report Parameters"))
-    page.add_date_field("begin", "Start Date", value=then)
-    page.add_date_field("end", "End Date", value=now)
-    page.add("</fieldset>")
-    page.send()
+    def __init__(self, control, row):
+        """Remember the caller's values.
 
-#----------------------------------------------------------------------
-# Add the title row and the column headers.
-#----------------------------------------------------------------------
-def addColumnHeaders(styles, sheet):
-    widths = (13, 55, 55, 23)
-    labels = ("CDR ID", "Term Name (English)", "Term Name (Spanish)",
-              "Date First Published")
-    assert(len(widths) == len(labels))
-    for col, width in enumerate(widths):
-        sheet.col(col).width = styles.chars_to_width(width)
-    for col, label in enumerate(labels):
-        sheet.write(0, col, label, styles.header)
+        Pass:
+            control - access to the database and report-generation tools
+            row - resultset row from the database query
+        """
 
-#----------------------------------------------------------------------
-# Generate the Mailer Tracking Report. We have already scrubbed date
-# parameters, so they're safe.
-#----------------------------------------------------------------------
-def createReport(cursor, startDate, endDate):
-    query = db.Query("document d", "d.id", "d.first_pub").order(1)
-    query.join("doc_type t", "t.id = d.doc_type")
-    query.where("t.name = 'GlossaryTermName'")
-    query.where("d.first_pub >= '%s'" % startDate)
-    query.where("d.first_pub <= '%s 23:59:59'" % endDate)
-    query.where("d.active_status = 'A'")
-    rows = query.execute(cursor, 300).fetchall()
-    names = []
-    for docId, firstPub in rows:
-        names.append(TermName(docId, firstPub, cursor))
-    styles = cdrcgi.ExcelStyles()
-    styles.set_color(styles.header, "blue")
-    sheet = styles.add_sheet("Term Names")
-    addColumnHeaders(styles, sheet)
-    row = 1
-    for name in names:
-        row = name.addToSheet(sheet, styles, row)
-    sheet.write(row, 0, "Total: %d" % len(names), styles.bold)
-    now = datetime.datetime.now()
-    stamp = now.strftime("%Y%m%d%H%M%S")
-    sys.stdout.buffer.write(f"""\
-Content-type: application/vnd.ms-excel
-Content-Disposition: attachment; filename=TermNames-{stamp}.xls
+        self.__control = control
+        self.__row = row
 
-""".encode("utf-8"))
-    styles.book.save(sys.stdout.buffer)
+    @property
+    def english_name(self):
+        """The primary English name for the glossary term."""
 
-#----------------------------------------------------------------------
-# Create the report or as for the report parameters.
-#----------------------------------------------------------------------
-if cdrcgi.is_date(begin) and cdrcgi.is_date(end):
-    createReport(cursor, begin, end)
-else:
-    createForm()
+        query = self.__control.Query("query_term", "value")
+        query.where("path = '/GlossaryTermName/TermName/TermNameString'")
+        query.where(query.Condition("doc_id", self.id))
+        return query.execute(self.__control.cursor).fetchall()[0].value
+
+    @property
+    def first_pub(self):
+        """Date the document was first published."""
+        return str(self.__row.first_pub)[:10]
+
+    @property
+    def id(self):
+        """Primary key from the all_docs table for the document."""
+        return self.__row.id
+
+    @property
+    def row(self):
+        """Values for the report's table."""
+        return (
+            self.__control.Reporter.Cell(self.id, center=True),
+            self.english_name,
+            self.spanish_names,
+            self.__control.Reporter.Cell(self.first_pub, center=True),
+        )
+
+    @property
+    def spanish_names(self):
+        """Concatenated list of all the Spanish names for this term."""
+
+        query = self.__control.Query("query_term", "value")
+        query.where("path = '/GlossaryTermName/TranslatedName/TermNameString'")
+        query.where(query.Condition("doc_id", self.id))
+        rows = query.execute(self.__control.cursor).fetchall()
+        return "; ".join([row.value for row in rows])
+
+
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+    Control().run()

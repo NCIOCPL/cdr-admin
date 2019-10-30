@@ -1,126 +1,142 @@
-#----------------------------------------------------------------------
-# Report on values found in external systems (such as ClinicalTrials.gov)
-# which have not yet been mapped to CDR documents.
-#
-# BZIssue::1339
-# JIRA::OCECDR-3800
-#----------------------------------------------------------------------
-import cdrcgi
-import cgi
+#!/usr/bin/env python
+
+"""Report on unmapped values in the external mapping table.
+"""
+
+from cdrcgi import Controller
 import datetime
-from cdrapi import db
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields   = cgi.FieldStorage()
-session  = cdrcgi.getSession(fields)
-request  = cdrcgi.getRequest(fields)
-usages   = fields.getlist('usage')
-age      = fields.getvalue('age')
-mappable = fields.getvalue('mappable') == "yes"
-SUBMENU  = "Report Menu"
-buttons  = ["Submit Request", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-script   = "ExternMapFailures.py"
-title    = "CDR Administration"
-section  = "External Map Failures Report"
 
-#----------------------------------------------------------------------
-# Make sure we're logged in.
-#----------------------------------------------------------------------
-if not session: cdrcgi.bail('Unknown or expired CDR session.')
+class Control(Controller):
+    """Access to the database and report generation tools."""
 
-#----------------------------------------------------------------------
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if request == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif request == SUBMENU:
-    cdrcgi.navigateTo("Reports.py", session)
+    SUBTITLE = "External Map Failures Report"
+    NON_MAPPABLE = "non-mappable"
+    OPTION = NON_MAPPABLE, "Include non-mappable values"
 
-#----------------------------------------------------------------------
-# Handle request to log out.
-#----------------------------------------------------------------------
-if request == "Log Out":
-    cdrcgi.logout(session)
+    def populate_form(self, page):
+        """Put the fields on the form.
 
-#----------------------------------------------------------------------
-# Establish a database connection.
-#----------------------------------------------------------------------
-conn = db.connect(user="CdrGuest")
-cursor = conn.cursor()
+        Pass:
+            page - HTMLPage object on which to place the fields
+        """
 
-#----------------------------------------------------------------------
-# Make sure the usage values haven't been tampered with by a hacker.
-#----------------------------------------------------------------------
-cursor.execute("SELECT name FROM external_map_usage ORDER BY name")
-usage_values = [row[0] for row in cursor.fetchall()]
-for usage in usages:
-    if usage not in usage_values:
-        cdrcgi.bail("Invalid usage value")
+        fieldset = page.fieldset("Select at Least One Usage")
+        for usage in self.usages:
+            opts = dict(value=usage, label=usage)
+            fieldset.append(page.checkbox("usage", **opts))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Age (in days)")
+        fieldset.append(page.text_field("age", value=30))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Options")
+        value, label = self.OPTION
+        fieldset.append(page.checkbox("options", value=value, label=label))
+        page.form.append(fieldset)
 
-#----------------------------------------------------------------------
-# If we don't have a request, put up the request form.
-#----------------------------------------------------------------------
-if not usages:
-    page = cdrcgi.Page(title, subtitle=section, action=script,
-                       buttons=buttons, session=session)
-    page.add("<fieldset>")
-    page.add(page.B.LEGEND("Report Parameters"))
-    page.add_select("usage", "Usage(s)", usage_values, multiple=True)
-    page.add_text_field("age", "Age (days)", value="30")
-    page.add("</fieldset>")
-    page.add("<fieldset>")
-    page.add(page.B.LEGEND("Options"))
-    page.add_radio("mappable", "Include only mappable values", "yes",
-                   checked=True)
-    page.add_radio("mappable", "Also include non-mappable values", "no")
-    page.add("</fieldset>")
-    page.send()
+    def build_tables(self):
+        """Assemble the report's tables."""
 
-#----------------------------------------------------------------------
-# Translate the age parameter into a date in the past.
-#----------------------------------------------------------------------
-try:
-    start_date = datetime.date.today() - datetime.timedelta(int(age))
-except:
-    start_date = datetime.date.today() - datetime.timedelta(1000)
+        if not self.usage:
+            self.show_form()
+        tables = []
+        for name in self.usage:
+            table = Usage(self, name).table
+            if table is not None:
+                tables.append(table)
+        return tables
 
-#----------------------------------------------------------------------
-# Construct a report table for one of the selected usage values.
-#----------------------------------------------------------------------
-def make_table(usage):
-    query = """\
-  SELECT m.value, CONVERT(CHAR(10), m.last_mod, 102)
-    FROM external_map m
-    JOIN external_map_usage u
-      ON u.id = m.usage
-   WHERE doc_id IS NULL
-     AND u.name = ?
-     AND m.last_mod >= ?
-"""
-    if mappable:
-        query += """\
-     AND m.mappable <> 'N'
-"""
-    query += """\
-ORDER BY 2 DESC, 1"""
-    cursor.execute(query, (usage, start_date))
-    rows = cursor.fetchall()
-    if not rows:
-        col = cdrcgi.Report.Column("No recent unmapped values found.",
-                                   width="905px")
-        return cdrcgi.Report.Table((col,), [], caption=usage)
-    columns = (
-        cdrcgi.Report.Column("Value", width="800px"),
-        cdrcgi.Report.Column("Recorded", width="100px"),
-    )
-    return cdrcgi.Report.Table(columns, rows, caption=usage)
+    @property
+    def options(self):
+        """Report options."""
+        return self.fields.getlist("options")
 
-#----------------------------------------------------------------------
-# Assemble and deliver the report.
-#----------------------------------------------------------------------
-today = datetime.date.today().strftime("%B %d, %Y")
-tables = [make_table(usage) for usage in usages]
-report = cdrcgi.Report(section, tables, banner=section, subtitle=today)
-report.send()
+    @property
+    def start(self):
+        """Start date for the report based on the age value from the form."""
+
+        if not hasattr(self, "_start"):
+            age = self.fields.getvalue("age")
+            if not age:
+                self._start = None
+            else:
+                try:
+                    days = int(age)
+                except:
+                    self.bail("Age must be an integer")
+                today = datetime.date.today()
+                self._start = today - datetime.timedelta(days)
+        return self._start
+
+    @property
+    def usage(self):
+        """Mapping type(s) selected by the user from the form."""
+        return self.fields.getlist("usage")
+
+    @property
+    def usages(self):
+        """Valid usage values for the form's picklist."""
+
+        query = self.Query("external_map_usage", "name").order("name")
+        return [row.name for row in query.execute(self.cursor).fetchall()]
+
+
+class Usage:
+    """Mappings for a specific mapping usage."""
+
+    FIELDS = "m.value", "m.last_mod"
+
+    def __init__(self, control, name):
+        """Remember the caller's values.
+
+        Pass:
+            control - access to the database and report generation facilities
+            name - string describing the mapping usage
+        """
+
+        self.__control = control
+        self.__name = name
+
+    @property
+    def columns(self):
+        """Column headers for the report table."""
+        return (
+            self.__control.Reporter.Column("Value", width="800px"),
+            self.__control.Reporter.Column("Recorded", width="100px"),
+        )
+
+    @property
+    def rows(self):
+        """Values for the report table."""
+
+        if not hasattr(self, "_rows"):
+            query = self.__control.Query("external_map m", *self.FIELDS)
+            query.order("m.last_mod DESC", "m.value")
+            query.join("external_map_usage u", "u.id = m.usage")
+            query.where("m.doc_id IS NULL")
+            query.where(query.Condition("u.name", self.__name))
+            if self.start:
+                query.where(query.Condition("m.last_mod", self.start, ">="))
+            if Control.NON_MAPPABLE not in self.__control.options:
+                query.where("m.mappable <> 'N'")
+            self._rows = query.execute(self.__control.cursor).fetchall()
+        return self._rows
+
+    @property
+    def start(self):
+        """Start date for the report based on the age value from the form."""
+        return self.__control.start
+
+    @property
+    def table(self):
+        """Report table for this mapping type."""
+
+        if not self.rows:
+            return None
+        opts = dict(columns=self.columns, caption=self.__name)
+        return self.__control.Reporter.Table(self.rows, **opts)
+
+
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+    Control().run()

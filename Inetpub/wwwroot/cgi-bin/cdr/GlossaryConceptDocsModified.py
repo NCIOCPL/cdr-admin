@@ -157,12 +157,12 @@ class GlossaryTermConcept:
             self.comment and self.comment.tostring() or ""
         )
 
-    def __cmp__(self, other):
+    def __lt__(self, other):
         """
         Make the documents sortable, even though the order won't mean
         much to the user, since the title isn't shown.
         """
-        return cmp(self.title, other.title)
+        return self.title < other.title
 
     class Comment:
         "Subclass holding text and metadata for a definition comment"
@@ -171,8 +171,8 @@ class GlossaryTermConcept:
             self.date = node.get("date", None)
             self.audience = node.get("audience", None)
             self.user = node.get("user", None)
-        def __cmp__(self, other):
-            return cmp(self.date, other.date)
+        def __lt__(self, other):
+            return self.date < other.date
         def tostring(self):
             return "[date: %s; user: %s; audience: %s] %s" % (self.date,
                                                               self.user,

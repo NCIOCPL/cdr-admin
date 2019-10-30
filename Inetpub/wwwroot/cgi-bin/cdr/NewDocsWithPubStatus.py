@@ -1,255 +1,211 @@
-#----------------------------------------------------------------------
-# Reports on newly created documents and their publication statuses.
-# BZIssue::754 - changes requested by Margaret
-#----------------------------------------------------------------------
-import cdr, cdrcgi, cgi
+#!/usr/bin/env python
+
+"""Report on newly created documents and their publication statuses.
+"""
+
 import datetime
-from cdrapi import db
-from html import escape as html_escape
+from cdrcgi import Controller, Reporter
+import cdrapi.docs
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields   = cgi.FieldStorage()
-session  = cdrcgi.getSession(fields)
-request  = cdrcgi.getRequest(fields)
-fromDate = fields and fields.getvalue('FromDate') or None
-toDate   = fields and fields.getvalue('ToDate')   or None
-docType  = fields and fields.getvalue('DocType')  or None
-SUBMENU = "Report Menu"
-buttons = ["Submit Request", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-script  = "NewDocsWithPubStatus.py"
-title   = "CDR Administration"
-section = "New Documents With Publication Status"
-header  = cdrcgi.header(title, title, section, script, buttons)
-today   = datetime.date.today()
 
-#----------------------------------------------------------------------
-# Make sure we're logged in.
-#----------------------------------------------------------------------
-if not session: cdrcgi.bail('Unknown or expired CDR session.')
+class Control(Controller):
+    """Report logic."""
 
-#----------------------------------------------------------------------
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if request == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif request == SUBMENU:
-    cdrcgi.navigateTo("Reports.py", session)
+    SUBTITLE = "New Documents With Publication Status"
 
-#----------------------------------------------------------------------
-# Handle request to log out.
-#----------------------------------------------------------------------
-if request == "Log Out":
-    cdrcgi.logout(session)
+    def populate_form(self, page):
+        """Add the fields to the form.
 
-#----------------------------------------------------------------------
-# Validate input
-#----------------------------------------------------------------------
-if request:  cdrcgi.valParmVal(request, valList=buttons)
-if docType:  cdrcgi.valParmVal(docType, valList=cdr.getDoctypes(session))
-if toDate:   cdrcgi.valParmDate(toDate)
-if fromDate: cdrcgi.valParmDate(fromDate)
+        Pass:
+            page - HTMLPage to which we add the fields
+        """
 
-#----------------------------------------------------------------------
-# If we don't have a request, put up the request form.
-#----------------------------------------------------------------------
-if not fromDate or not toDate:
-    toDate   = str(today)
-    fromDate = str(today - datetime.timedelta(7))
-    docTypes = cdr.getDoctypes(session)
-    if isinstance(docTypes, (str, bytes)):
-        cdrcgi.bail(docTypes)
-    if fromDate < cdrcgi.DAY_ONE: fromDate = cdrcgi.DAY_ONE
-    form = """\
-   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-   <TABLE BORDER='0'>
-    <TR>
-     <TD><B>Document Type:&nbsp;</B></TD>
-     <TD>
-      <SELECT NAME='DocType'>
-      <OPTION VALUE='' SELECTED>All Types</OPTION>
-""" % (cdrcgi.SESSION, session)
-    for docType in docTypes:
-        form += """\
-      <OPTION VALUE='%s'>%s &nbsp;</OPTION>
-""" % (docType, docType)
-    form += """\
-    </TR>
-    <TR>
-     <TD><B>Start Date:&nbsp;</B></TD>
-     <TD><INPUT NAME='FromDate' VALUE='%s'>&nbsp;
-         (use format YYYY-MM-DD for dates, e.g. %s)</TD>
-    </TR>
-    <TR>
-     <TD><B>End Date:&nbsp;</B></TD>
-     <TD><INPUT NAME='ToDate' VALUE='%s'>&nbsp;</TD>
-    </TR>
-   </TABLE>
-  </FORM>
- </BODY>
-</HTML>
-""" % (fromDate, cdrcgi.DAY_ONE, toDate)
-    cdrcgi.sendPage(header + form)
+        fieldset = page.fieldset("Select Document Type")
+        fieldset.append(page.radio_button("type", value="any", checked=True))
+        for name in self.typenames:
+            fieldset.append(page.radio_button("type", value=name, label=name))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Date Range")
+        end = datetime.date.today()
+        start = end - datetime.timedelta(7)
+        fieldset.append(page.date_field("start", value=start))
+        fieldset.append(page.date_field("end", value=end))
+        page.form.append(fieldset)
 
-#----------------------------------------------------------------------
-# Start the page.
-#----------------------------------------------------------------------
-html = """\
-<!DOCTYPE html>
-<html>
- <head>
-  <title>List of New Documents with Publication Status - %s</title>
- </head>
- <basefont face='Arial, Helvetica, sans-serif'>
- <body>
-  <center>
-   <b>
-    <font size='4'>List of New Documents with Publication Status</font>
-   </b>
-   <br />
-   <font size='4'>%s</font>
-  </center>
-  <br />
-  <br />
-  <font size = '4'>Documents Created Between:&nbsp;%s and %s</font>
-  <br />
-  <br />
-""" % (today.strftime("%m/%d/%Y"), today.strftime("%B %d, %Y"),
-       fromDate, toDate)
+    def build_tables(self):
+        """Create a table for each selected document type."""
+        return [doctype.table for doctype in self.doctypes]
 
-#----------------------------------------------------------------------
-# Extract the information from the database.
-#----------------------------------------------------------------------
-if fromDate < cdrcgi.DAY_ONE: fromDate = cdrcgi.DAY_ONE
-try:
-    conn   = db.connect()
-    cursor = conn.cursor()
-    dtQual = docType and ("AND doc_type = '%s'" % docType) or ""
-    cursor.execute("""\
-         SELECT doc_id,
-                cre_user,
-                cre_date,
-                ver_date,
-                ver_user,
-                doc_type,
-                pv,
-                epv,
-                doc_title
-           FROM docs_with_pub_status
-          WHERE cre_date BETWEEN ? AND ?
-            %s
-       ORDER BY doc_type,
-                pv,
-                cre_date,
-                ver_date""" % dtQual, (fromDate, toDate + " 23:59:59"))
-    rows = cursor.fetchall()
-except Exception as e:
-    cdrcgi.bail('Database connection failure: %s' % e)
+    @property
+    def doctypes(self):
+        """Sorted sequence of `DoctypeCounts` objects with report counts."""
 
-curDocType = None
-for row in rows:
-    (docId, creUser, creDate, verDate, verUser, docType, pvFlag,
-     epvCount, docTitle) = row
-    if curDocType != docType:
-        if curDocType:
-            html += """\
-  </table>
-  <br />
-  <br />
-"""
-        curDocType = docType
-        html += """\
-  <b>
-   <font size='3'>Document Type: &nbsp;%s</font>
-  </b>
-  <table border='1' cellspacing='0' cellpadding='2' width='100%%'>
-   <tr>
-    <td valign='top'>
-     <b>
-      <font size='3'>CDR ID</font>
-     </b>
-    </td>
-    <td valign='top'>
-     <b>
-      <font size='3'>DocTitle</font>
-     </b>
-    </td>
-    <td valign='top'>
-     <b>
-      <font size='3'>Created By</font>
-     </b>
-    </td>
-    <td valign='top'>
-     <b>
-      <font size='3'>Creation Date</font>
-     </b>
-    </td>
-    <td valign='top'>
-     <b>
-      <font size='3'>Latest Version Date</font>
-     </b>
-    </td>
-    <td valign='top'>
-     <b>
-      <font size='3'>Latest Version By</font>
-     </b>
-    </td>
-    <td valign='top'>
-     <b>
-      <font size='3'>Pub?</font>
-     </b>
-    </td>
-    <td valign='top'>
-     <b>
-      <font size='3'>Earlier PubVer?</font>
-     </b>
-    </td>
-   </tr>
-""" % docType
-    html += """\
-   <tr>
-    <td align='center'>
-     <font size='3'>%d</font>
-    </td>
-    <td>
-     <font size='3'>%s</font>
-    </td>
-    <td>
-     <font size='3'>%s</font>
-    </td>
-    <td>
-     <font size='3'>%s</font>
-    </td>
-    <td>
-     <font size='3'>%s</font>
-    </td>
-    <td>
-     <font size='3'>%s</font>
-    </td>
-    <td align='center'>
-     <font size='3'>%s</font>
-    </td>
-    <td align='center'>
-     <font size='3'>%s</font>
-    </td>
-   </tr>
-""" % (docId,
-       html_escape(docTitle),
-       creUser.upper(),
-       str(creDate)[:10],
-       verDate and str(verDate)[:10] or "None",
-       verUser and verUser.upper() or "None",
-       pvFlag,
-       epvCount and "Y" or "N")
-if curDocType:
-    html += """\
-  </table>
-"""
-cdrcgi.sendPage(html + """\
- <br />
- <br />
- %s
- </body>
-</html>
-""" % cdrcgi.getFullUserName(session, conn))
+        if not hasattr(self, "_doctypes"):
+            names = self.typenames if self.type == "any" else [self.type]
+            self._doctypes = []
+            for name in names:
+                doctype = Doctype(self, name)
+                if doctype.table:
+                    self._doctypes.append(doctype)
+        return self._doctypes
+
+    @property
+    def end(self):
+        """String for the end of the report's date range (optional)."""
+        return self.fields.getvalue("end")
+
+    @property
+    def start(self):
+        """String for the start of the report's date range (optional)."""
+        return self.fields.getvalue("start")
+
+    @property
+    def subtitle(self):
+        """Customize the string below the main banner."""
+
+        if not hasattr(self, "_subtitle"):
+            if self.request == "Submit":
+                if self.type == "any":
+                    self._subtitle = "New Documents"
+                else:
+                    self._subtitle = f"New {self.type} Documents"
+                start, end = self.start, self.end
+                if start:
+                    if end:
+                        self._subtitle += f" Created Between {start} and {end}"
+                    else:
+                        self._subtitle += f" Created Since {start}"
+                elif self.end:
+                    self._subtitle += f" Created Through {end}"
+            else:
+                self._subtitle = self.SUBTITLE
+        return self._subtitle
+
+    @property
+    def type(self):
+        """Selected document type for the report (or "any")."""
+        return self.fields.getvalue("type")
+
+    @property
+    def typenames(self):
+        """Document type names for the form's picklist."""
+
+        if not hasattr(self, "_typenames"):
+            self._typenames = []
+            for name in cdrapi.docs.Doctype.list_doc_types(self.session):
+                if name:
+                    self._typenames.append(name)
+        return self._typenames
+
+
+class Doctype:
+    """Collection of newly published documents of a specific type."""
+
+    COLUMNS = (
+        Reporter.Column("CDR ID", width="80px"),
+        Reporter.Column("Document Title", width="500px"),
+        Reporter.Column("Created By", width="150px"),
+        Reporter.Column("Creation Date", width="150px"),
+        Reporter.Column("Latest Version Date", width="150px"),
+        Reporter.Column("Latest Version By", width="150px"),
+        Reporter.Column("Pub?", width="50px"),
+        Reporter.Column("Earlier Pub Ver?", width="50px"),
+    )
+
+    def __init__(self, control, name):
+        """Capture the caller's values.
+
+        Pass:
+            control - access to the database
+            name - string for this document type's name
+        """
+
+        self.__control = control
+        self.__name = name
+
+    @property
+    def control(self):
+        """Access to the database."""
+        return self.__control
+
+    @property
+    def docs(self):
+        """New documents of this type."""
+
+        if not hasattr(self, "_docs"):
+            query = self.control.Query("docs_with_pub_status", "*")
+            query.order("pv", "cre_date", "ver_date")
+            query.where(query.Condition("doc_type", self.name))
+            start, end = self.control.start, self.control.end
+            if start:
+                query.where(query.Condition("cre_date", start, ">="))
+            if end:
+                end = f"{end} 23:59:59"
+                query.where(query.Condition("cre_date", end, "<="))
+            rows = query.execute(self.control.cursor).fetchall()
+            self._docs = [Doc(self.control, row) for row in rows]
+        return self._docs
+
+    @property
+    def name(self):
+        """String for this document type's name."""
+        return self.__name
+
+    @property
+    def table(self):
+        """Table of new documents (or None if there aren't any)."""
+
+        if not hasattr(self, "_table"):
+            self._table = None
+            if self.docs:
+                opts = dict(caption=self.name, columns=self.COLUMNS)
+                rows = [doc.row for doc in self.docs]
+                self._table = Reporter.Table(rows, **opts)
+        return self._table
+
+
+class Doc:
+    """Publication and version information about a newly created CDR doc."""
+
+    def __init__(self, control, row):
+        """Save the caller's values.
+
+        Pass:
+            control - access to the database
+            row - row from the `docs_with_pub_status` view
+        """
+
+        self.__control = control
+        self.__row = row
+
+    def __getattr__(self, name):
+        """Pull most properties from the database row."""
+        return getattr(self.__row, name)
+
+    @property
+    def control(self):
+        """Access to the database."""
+        return self.__control
+
+    @property
+    def row(self):
+        """Table row for the report."""
+
+        if not hasattr(self, "_row"):
+            ver_date = str(self.ver_date)[:10] if self.ver_date else ""
+            self._row = (
+                Reporter.Cell(self.doc_id, center=True),
+                self.doc_title,
+                Reporter.Cell(self.cre_user, center=True),
+                Reporter.Cell(str(self.cre_date)[:10], center=True),
+                Reporter.Cell(ver_date, center=True),
+                Reporter.Cell(self.ver_user, center=True),
+                Reporter.Cell(self.pv, center=True),
+                Reporter.Cell("Y" if self.epv else "N", center=True),
+            )
+        return self._row
+
+
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+    Control().run()

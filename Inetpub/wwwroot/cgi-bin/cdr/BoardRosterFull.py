@@ -3,23 +3,27 @@
 """Display the Board Roster with or without assistant information.
 """
 
+from lxml import html
 from cdrcgi import Controller
 from cdrapi.docs import Doc
 
 class Control(Controller):
+    """Logic for creating the report."""
 
     SUBTITLE = "PDQ Board Roster"
+    LOGNAME = "BoardRoster"
+    METHOD = "get"
     BOARD_TYPES = (
         ("editorial", "PDQ Editorial Boards", True),
         ("advisory", "PDQ Editorial Advisory Boards", False),
     )
     GROUPINGS = (
-        ("by_member", "Group by board member", True),
+        ("by_member", "Single sequence of all board members", True),
         ("by_board", "Group by PDQ board", False),
     )
     FORMATS = (
-        ("qc", "QC report format", True),
-        ("table", "Tabular report format", False),
+        ("full", "Full report", True),
+        ("summary", "Summary report", False),
     )
     OPTIONAL_COLUMNS = (
         ("board_name", "Board Name", True),
@@ -31,36 +35,69 @@ class Control(Controller):
         ("govt_employee", "Government Employee", False),
         ("blank", "Blank Column", False),
     )
-
-    @property
-    def boards(self):
-        if not hasattr(self, "_boards"):
-            self._boards = {}
-            board_type = f"PDQ {self.board_type.title()} Board"
-            query = self.Query("active_doc b", "b.id", "b.title")
-            query.join("query_term t", "t.doc_id = b.id")
-            query.where("t.path = '/Organization/OrganizationType'")
-            query.where(query.Condidition("t.value", board_type))
-            for row in query.execute(self.cursor).fetchall():
-                self._boards[row.id] = Board(self, row)
-
-    @property
-    def board_type(self):
-        return self.fields.getvalue("board_type")
-    @property
-    def grouping(self):
-        return self.fields.getvalue("grouping")
-    @property
-    def report_format(self):
-        return self.fields.getvalue("format")
-    @property
-    def extra_columns(self):
-        return self.fields.getlist("column")
+    WIDTHS = dict(
+        phone="100px;",
+        fax="100px;",
+        start_date="75px;",
+        blank="100px;",
+    )
+    COLUMN_OVERRIDES = dict(
+        govt_employee="Gov. Empl",
+        blank="Blank",
+    )
 
     def build_tables(self):
-        if self.report_format == "qc":
-            return self.qc_report()
-        rows = []
+        """Create table(s) for the "summary" version of the report."""
+
+        if self.report_format == "full":
+            self.show_full_report()
+        else:
+            opts = dict(columns=self.headers)
+            if self.grouping == "by_member":
+                rows = []
+                for member in self.members:
+                    rows.append(member.row)
+                #self.bail(f"{len(rows)} rows")
+                opts["caption"] = self.caption
+                return self.Reporter.Table(rows, **opts)
+            tables = []
+            for board in self.boards:
+                rows = []
+                for member in board.members:
+                    rows.append(member.row)
+                opts["caption"] = f"{board.name} Roster"
+                tables.append(self.Reporter.Table(rows, **opts))
+            return tables
+
+    def show_full_report(self):
+        """Show the QC-format version of the report."""
+
+        buttons = self.SUBMENU, self.ADMINMENU, self.LOG_OUT
+        opts = {
+            "action": self.script,
+            "buttons": [self.HTMLPage.button(b) for b in buttons],
+            "subtitle": self.subtitle,
+            "session": self.session
+        }
+        page = self.HTMLPage(self.title, **opts)
+        page.body.set("class", "report")
+        page.add_css("""\
+h3 { color: black; }
+th, td { border: none; font-size: 12pt; padding: 0; }
+i { font-style: normal; }
+p { margin: 0 0 35px 0; font-style: italic; }""")
+
+        if self.grouping == "by_member":
+            for member in self.members:
+                page.form.append(member.html)
+                page.form.append(page.B.P(member.board.name))
+        else:
+            for board in self.boards:
+                page.form.append(page.B.H3(board.name))
+                for member in board.members:
+                    page.form.append(member.html)
+        page.send()
+
     def populate_form(self, page):
         """
         Add the fields to the form page.
@@ -95,7 +132,7 @@ class Control(Controller):
 function check_format(which) {
     let format = jQuery("#report-formats input:checked").val();
     console.log("format is now " + format);
-    if (format == "qc")
+    if (format == "full")
         jQuery("#columns").hide();
     else
         jQuery("#columns").show();
@@ -105,440 +142,333 @@ jQuery(function() {
     check_format();
 });""")
 
+    @property
+    def boards(self):
+        """All active PDQ boards of the selected type."""
+
+        if not hasattr(self, "_boards"):
+            boards = []
+            board_type = f"PDQ {self.board_type.title()} Board"
+            query = self.Query("active_doc b", "b.id", "b.title")
+            query.join("query_term t", "t.doc_id = b.id")
+            query.where("t.path = '/Organization/OrganizationType'")
+            query.where(query.Condition("t.value", board_type))
+            for row in query.execute(self.cursor).fetchall():
+                boards.append(Board(self, row))
+            self._boards = sorted(boards)
+        return self._boards
+
+    @property
+    def board_type(self):
+        """Board type (advisory or editorial) selected for the report."""
+        return self.fields.getvalue("board_type")
+
+    @property
+    def caption(self):
+        """Default caption for the tabular report."""
+        return f"PDQ {self.board_type.title()} Board Member Roster"
+
+    @property
+    def columns(self):
+        """Optional columns which have been selected for the tabular report."""
+        return self.fields.getlist("column")
+
+    @property
+    def grouping(self):
+        """Grouping ("by_member" or "by_board") chosen for the report."""
+        return self.fields.getvalue("grouping")
+
+    @property
+    def headers(self):
+        """Column headers for the tabular ("summary") report."""
+
+        if not hasattr(self, "_headers"):
+            self._headers = ["Board Member"]
+            for name, display, default in self.OPTIONAL_COLUMNS:
+                if name in self.columns:
+                    header = self.COLUMN_OVERRIDES.get(name, display)
+                    width = self.WIDTHS.get(name)
+                    if width is not None:
+                        header = self.Reporter.Column(header, width=width)
+                    self._headers.append(header)
+        return self._headers
+
+    @property
+    def members(self):
+        """All active members of board of the selected type."""
+
+        if not hasattr(self, "_members"):
+            members = []
+            for board in self.boards:
+                members += board.members
+            self._members = sorted(members)
+        return self._members
+
+    @property
+    def report_format(self):
+        """Selected flavor of the report ("full" or "summary")."""
+        return self.fields.getvalue("format")
+
+
 class Board:
+    """One advisory or editorial PDQ board."""
 
     DETAILS = "/PDQBoardMemberInfo/BoardMembershipDetails"
     BOARD_PATH = f"{DETAILS}/BoardName/@cdr:ref"
     CURRENT_PATH = f"{DETAILS}/CurrentMember"
+    TERM_START_PATH = f"{DETAILS}/TermStartDate"
+    GOVT_EMPLOYEE_PATH = "/PDQBoardMemberInfo/GovernmentEmployee"
     PERSON_PATH = f"/PDQBoardMemberInfo/BoardMemberName/@cdr:ref"
     IACT = "Integrative, Alternative, and Complementary Therapies"
+    FULL_FIELDS = (
+        "m.doc_id AS member_id",
+        "d.title AS person_name",
+    )
+    SUMMARY_FIELDS = FULL_FIELDS + (
+        "g.value AS govt_employee",
+        "t.value AS term_start",
+    )
+    FIELDS = dict(full=FULL_FIELDS, summary=SUMMARY_FIELDS)
 
     def __init__(self, control, row):
+        """Capture the information provided by the caller."""
+
         self.__control = control
         self.__row = row
+
+    def __lt__(self, other):
+        """Make the `Board` objects sortable by name, case-insensitive."""
+        return self.name.lower() < other.name.lower()
+
     @property
     def control(self):
+        """Access to the database and the runtime report parameters."""
         return self.__control
+
+    @property
+    def fields(self):
+        """Values which need to be fetched from the database for this board."""
+        return self.FIELDS[self.control.report_format]
+
     @property
     def id(self):
+        """CDR document ID for the board's Organization document."""
         return self.__row.id
+
     @property
-    def title(self):
+    def name(self):
+        """Board name, tailored for display in the report."""
+
         if not hasattr(self, "_title"):
-            self._title = self.__row.title.replace(self.IACT, "IACT")
+            title = self.__row.title.replace(self.IACT, "IACT")
+            self._title = title.split(";")[0].strip()
+        return self._title
+
     @property
     def members(self):
+        """Sorted sequence of `Member` objects for this PDQ board."""
+
         if not hasattr(self, "_members"):
-            fields = "p.doc_id AS member_id", "p.int_val AS person_id"
-            query = self.control.Query("query_term p", *self.FIELDS).unique()
-            query.join("active_doc a", "a.id = p.int_val")
-            query.join("query_term b", "b.doc_id = p.doc_id")
-            query.join("query_term c", "c.doc_id = p.doc_id")
-            query.where(query.Condition("p.path", self.PERSON_PATH))
-            query.where(query.Condition("b.path", self.BOARD_PATH))
+            query = self.control.Query("query_term m", *self.fields).unique()
+            query.where(query.Condition("m.path", self.BOARD_PATH))
+            query.where(query.Condition("m.int_val", self.id))
+            query.join("query_term c", "c.doc_id = m.doc_id")
             query.where(query.Condition("c.path", self.CURRENT_PATH))
-            query.where(query.Condition("b.int_val", self.id))
             query.where("c.value = 'Yes'")
-            self._members = []
+            query.join("query_term p", "p.doc_id = m.doc_id")
+            query.where(query.Condition("p.path", self.PERSON_PATH))
+            query.join("active_doc d", "d.id = p.int_val")
+            if self.control.report_format == "summary":
+                query.join("query_term g", "g.doc_id = m.doc_id")
+                query.where(query.Condition("g.path", self.GOVT_EMPLOYEE_PATH))
+                query.outer("query_term t", "t.doc_id = m.doc_id",
+                            "LEFT(t.node_loc, 4) = LEFT(m.node_loc, 4)",
+                            f"t.path = '{self.TERM_START_PATH}'")
+            members = []
             for row in query.execute(self.control.cursor).fetchall():
-                self._members.append(self.Member(self, row))
+                members.append(self.Member(self, row))
+            self._members = sorted(members)
+        return self._members
+
+
     class Member:
+        """Member of a PDQ board."""
+
+        PREP_FILTERS = (
+            "set:Denormalization PDQBoardMemberInfo Set",
+            "name:Copy XML for Person 2",
+        )
+        FINISHING_FILTERS = dict(
+            summary="PDQBoardMember Roster Summary",
+            full="PDQBoardMember Roster",
+        )
+        PARAMS = dict(
+            otherInfo="Yes",
+            assistant="Yes",
+        )
+
         def __init__(self, board, row):
+            """Capture the caller's information."""
+
             self.__board = board
             self.__row = row
+
+        def __lt__(self, other):
+            """Make members sortable by name."""
+            return self.key < other.key
+
         @property
         def board(self):
+            """PDQ board of which this individual is an active member."""
             return self.__board
+
         @property
-        def member_id(self):
+        def board_name(self):
+            """Name of the member's board, streamlined for the report."""
+            return self.board.name.replace("PDQ ", "")
+
+        @property
+        def cdrid(self):
+            """CDR ID for the membership document."""
+            return self.id
+
+        @property
+        def control(self):
+            """Access to the runtime parameters chose for the report."""
+            return self.board.control
+
+        @property
+        def doc(self):
+            """The `Doc` object for the PDQBoardMemberInfo document."""
+
+            if not hasattr(self, "_doc"):
+                self._doc = Doc(self.session, id=self.id)
+            return self._doc
+
+        @property
+        def email(self):
+            """Email address for the board member."""
+
+            if not hasattr(self, "_email"):
+                self._email = None
+                for node in self.table.iter("email"):
+                    self._email = node.text
+                    break
+            return self._email
+
+        @property
+        def fax(self):
+            """Fax number for the board member."""
+
+            if not hasattr(self, "_fax"):
+                self._fax = None
+                for node in self.table.iter("fax"):
+                    self._fax = node.text
+                    break
+            return self._fax
+
+        @property
+        def filters(self):
+            """Filters used for assembling the member's report information."""
+
+            if not hasattr(self, "_filters"):
+                self._filters = list(self.PREP_FILTERS)
+                self._filters.append(self.finishing_filter)
+            return self._filters
+
+        @property
+        def finishing_filter(self):
+            """The final filter used on the member for this report."""
+
+            if not hasattr(self, "_finishing_filter"):
+                name = self.FINISHING_FILTERS[self.control.report_format]
+                self._finishing_filter = f"name:{name}"
+            return self._finishing_filter
+
+        @property
+        def govt_employee(self):
+            """String indicating whether the member is a government employee.
+            """
+
+            return self.__row.govt_employee
+
+        @property
+        def html(self):
+            """Filtered member document."""
+
+            if not hasattr(self, "_html"):
+                result = self.doc.filter(*self.filters, parms=self.PARAMS)
+                tree = result.result_tree
+                self._html = html.fromstring(str(tree))
+                for node in self._html:
+                    if node.tag == "br" and node.tail == "U.S.A.":
+                        self._html.remove(node)
+            return self._html
+
+        @property
+        def id(self):
+            """CDR ID for the membership document."""
             return self.__row.member_id
+
         @property
-        def person_id(self):
-            return self.__row.person_id
-        response = cdr.filterDoc('guest',
-                                 ['set:Denormalization PDQBoardMemberInfo Set',
-                                  'name:Copy XML for Person 2',
-                                  filterType[flavor]],
-                                  boardMember[0],
-                                  parm = [['otherInfo', otherInfo],
-                                          ['assistant', assistant]])
+        def key(self):
+            """Normalized name for sorting."""
 
-Control().run()
-'''
-# ---------------------------------------------------------------------
-# Class to collect all of the information for a single board member
-# ---------------------------------------------------------------------
-class BoardMemberInfo:
-    def __init__(self, person, html):
-        self.boardMemberID  = person[0]
-        self.boardID   = person[1]
-        self.boardName = person[2]
-        self.startDate = person[3]
-        self.govEmpl   = person[5]
-        self.phone     = ''
-        self.fax       = ''
-        self.email     = ''
+            if not hasattr(self, "_key"):
+                self._key = self.__row.person_name.lower()
+            return self._key
 
-        myHtml = lxml.html.fromstring(html)
-        self.boardMemberName = myHtml.find('b').text
-        table = myHtml.find('table')
-        try:
-            for element in table.iter():
-                if element.tag == 'phone':
-                    self.phone = element.text
-                elif element.tag == 'fax':
-                    self.fax   = element.text
-                elif element.tag == 'email':
-                    self.email = element.text
-        except:
-            pass
+        @property
+        def name(self):
+            """Board member name (used for the 'summary' report."""
 
+            if not hasattr(self, "_name"):
+                b = self.html.find("b")
+                self._name = b.text if b is not None else None
+            return self._name
 
+        @property
+        def phone(self):
+            """Phone number for the board member."""
 
-dateString = time.strftime("%B %d, %Y")
+            if not hasattr(self, "_phone"):
+                self._phone = None
+                for node in self.table.iter("phone"):
+                    self._phone = node.text
+                    break
+            return self._phone
 
-filterType= {'summary':'name:PDQBoardMember Roster Summary',
-             'excel'  :'name:PDQBoardMember Roster Excel',
-             'full'   :'name:PDQBoardMember Roster'}
-#----------------------------------------------------------------------
-# Look up title of a board, given its ID.
-#----------------------------------------------------------------------
-def getBoardName(id):
-    try:
-        cursor.execute("SELECT title FROM document WHERE id = ?", id)
-        rows = cursor.fetchall()
-        if not rows:
-            cdrcgi.bail('Failure looking up title for CDR%s' % id)
-        return cleanTitle(rows[0][0])
-    except Exception as e:
-        cdrcgi.bail('Looking up board title: %s' % str(e))
+        @property
+        def row(self):
+            """Values for the tabular ("summary") version of the report."""
 
-#----------------------------------------------------------------------
-# Remove cruft from a document title.
-#----------------------------------------------------------------------
-def cleanTitle(title):
-    semicolon = title.find(';')
-    if semicolon != -1:
-        title = title[:semicolon]
-    return title.strip()
+            if not hasattr(self, "_row"):
+                self._row = [self.name]
+                for column in self.control.columns:
+                    self.control.logger.debug("column %s", column)
+                    value = "" if column == "blank" else getattr(self, column)
+                    self._row.append(value)
+            return self._row
 
-#----------------------------------------------------------------------
-# Build a picklist for PDQ Boards.
-# This function serves two purposes:
-# a)  create the picklist for the selection of the board
-# b)  create a dictionary in subsequent calls to select the board
-#     ID based on the board selected in the first call.
-#----------------------------------------------------------------------
-def getBoardPicklist(boardType):
-    try:
-        cursor.execute("""\
-SELECT DISTINCT board.id, board.title
-           FROM document board
-           JOIN query_term org_type
-             ON org_type.doc_id = board.id
-          WHERE org_type.path = '/Organization/OrganizationType'
-            AND org_type.value IN ('PDQ %s Board')
-       ORDER BY board.title""" % boardType)
-        rows = cursor.fetchall()
-        allBoards = {}
-        for id, title in rows:
-            if id != 256088:
-                allBoards[id] = cleanTitle(title)
-    except Exception as e:
-        cdrcgi.bail('Database query failure: %s' % e)
-    return allBoards
+        @property
+        def session(self):
+            """Used for creating the `Doc` object for the board member."""
+            return self.board.control.session
+
+        @property
+        def start_date(self):
+            """When the board member's term began."""
+            return self.__row.term_start
+
+        @property
+        def table(self):
+            """Node from which email, fax, and phone values are retrieved."""
+
+            if not hasattr(self, "_table"):
+                self._table = self.html.find("table")
+            return self._table
 
 
-# -------------------------------------------------
-# Create the table row for a specific person
-# -------------------------------------------------
-def addTableRow(person, columns):
-    tableRows = {}
-    for colHeader, colDisplay in columns:
-        if colHeader == 'Board Name':
-            tableRows[colHeader] = person.boardName
-        elif colHeader == 'Phone':
-            tableRows[colHeader] = person.phone
-        elif colHeader == 'Fax':
-            tableRows[colHeader] = person.fax
-        elif colHeader == 'Email':
-            tableRows[colHeader] = person.email
-        elif colHeader == 'CDR-ID':
-            tableRows[colHeader] = person.boardMemberID
-        elif colHeader == 'Start Date':
-            tableRows[colHeader] = person.startDate
-        elif colHeader == 'Gov. Empl':
-            tableRows[colHeader] = person.govEmpl
-        elif colHeader == 'Blank':
-            tableRows[colHeader] = ''
-
-    htmlRow = """\
-       <tr>
-        <td>%s</td>""" % person.boardMemberName
-
-    for colHeader, colDisplay in columns:
-        if colDisplay == 'Yes' and colHeader == 'Email':
-            htmlRow += """
-        <td class="email">
-         <a href="mailto:%s">%s</a>
-        </td>""" % (tableRows[colHeader], tableRows[colHeader])
-        elif colDisplay == 'Yes' and colHeader == 'Blank':
-            htmlRow += """
-        <td class="blank">&nbsp;</td>"""
-        elif colDisplay == 'Yes':
-            htmlRow += """
-        <td>%s</td>""" % tableRows[colHeader]
-
-    htmlRow += """
-       </tr>"""
-    return htmlRow
-
-#----------------------------------------------------------------------
-# Get the board's name from its ID.
-#----------------------------------------------------------------------
-allBoards = getBoardPicklist(boardType)
-boardIds  = list(allBoards)
-
-#----------------------------------------------------------------------
-# Main SELECT query
-#----------------------------------------------------------------------
-try:
-    cursor.execute("""\
- SELECT DISTINCT member.doc_id, member.int_val,
-                 term_start.value, person_doc.title, ge.value
-            FROM query_term member
-            JOIN query_term curmemb
-              ON curmemb.doc_id = member.doc_id
-             AND LEFT(curmemb.node_loc, 4) = LEFT(member.node_loc, 4)
-            JOIN query_term person
-              ON person.doc_id = member.doc_id
-            JOIN document person_doc
-              ON person_doc.id = person.doc_id
-            JOIN query_term ge
-              ON ge.doc_id = person_doc.id
-             AND ge.path = '/PDQBoardMemberInfo/GovernmentEmployee'
- LEFT OUTER JOIN query_term term_start
-              ON term_start.doc_id = member.doc_id
-             AND LEFT(term_start.node_loc, 4) = LEFT(member.node_loc, 4)
-             AND term_start.path = '/PDQBoardMemberInfo/BoardMembershipDetails'
-                              + '/TermStartDate'
-           WHERE member.path  = '/PDQBoardMemberInfo/BoardMembershipDetails'
-                              + '/BoardName/@cdr:ref'
-             AND curmemb.path = '/PDQBoardMemberInfo/BoardMembershipDetails'
-                              + '/CurrentMember'
-             AND person.path  = '/PDQBoardMemberInfo/BoardMemberName/@cdr:ref'
-             AND curmemb.value = 'Yes'
-             AND person_doc.active_status = 'A'
-             AND member.int_val in (%s)
-           ORDER BY member.int_val""" %
-                      ", ".join([str(x) for x in boardIds]))
-    rows = cursor.fetchall()
-    boardMembers = []
-
-    for docId, boardId, term_start, name, ge in rows:
-        boardName = getBoardName(boardId)
-        boardMembers.append([docId, boardId, boardName, term_start, name, ge])
-
-except Exception as e:
-    cdrcgi.bail('Database query failure: %s' % e)
-
-# Sorting the list alphabetically by board member
-# or by board member grouped by board name
-# -----------------------------------------------
-if sortType == 'Member':
-    getcount = operator.itemgetter(4)
-    sortedMembers = sorted(boardMembers, key=getcount)
-else:
-    sortedMembers = sorted(boardMembers, key=operator.itemgetter(2, 4))
-
-# We're creating two flavors of the report here: excel and html
-# (but users decided later not to use the Excel report anymore)
-# -------------------------------------------------------------
-if rptType == 'html':
-    # ---------------------------------------------------------------
-    # Create the HTML Output Page
-    # ---------------------------------------------------------------
-    html = """\
-<!DOCTYPE html>
-<html>
-  <head>
-    <title>PDQ Board Member Roster Report - %s</title>
-    <meta http-equiv='Content-Type' content='text/html; charset=UTF-8'>
-    <style type='text/css'>
-       h1       { font-family: Arial, sans-serif;
-                  font-size: 16pt;
-                  text-align: center;
-                  font-weight: bold; }
-       h2       { font-family: Arial, sans-serif;
-                  font-size: 14pt;
-                  text-align: center;
-                  font-weight: bold; }
-       p        { font-family: Arial, sans-serif;
-                  font-size: 12pt; }
-       #summary td, #summary th
-                { border: 1px solid black; }
-       #hdg     { font-family: Arial, sans-serif;
-                  font-size: 16pt;
-                  font-weight: bold;
-                  text-align: center;
-                  padding-bottom: 20px;
-                  border: 0px; }
-       #summary { border: 0px; }
-
-       /* The Board Member Roster information is created via a global */
-       /* template for Persons.  The italic display used for the QC   */
-       /* report does therefore need to be suppressed here.           */
-       /* ----------------------------------------------------------- */
-       i        { font-family: Arial, sans-serif; font-size: 12pt;
-                  font-style: normal; }
-       span.SectionRef { text-decoration: underline; font-weight: bold; }
-
-       .theader { background-color: #CFCFCF; }
-       .name    { font-weight: bold;
-                  vertical-align: top; }
-       .phone, .email, .fax, .cdrid
-                { vertical-align: top; }
-       .blank   { width: 100px; }
-       .bheader { font-family: Arial, sans-serif;
-                  font-size: 14pt;
-                  font-weight: bold; }
-       #main    { font-family: Arial, Helvetica, sans-serif;
-                  font-size: 12pt; }
-    </style>
-  </head>
-  <body id="main">
-    <h1>All %s Boards<br>
-    """ % (boardType, boardType)
-
-    # Adjusting the report title depending on the input values
-    # --------------------------------------------------------
-    if sortType == 'Member':
-        html += """\
-      <span style="font-size: 12pt">by Member</span><br>
-"""
-    else:
-        html += """\
-      <span style="font-size: 12pt">by Board and Member</span><br>
-"""
-    html += """\
-      <span style="font-size: 12pt">%s</span>
-    </h1>
-""" % (dateString)
-
-    boardTitle = None
-    lastBoardTitle = None
-
-    # Need to create the table wrapper for the summary sheet
-    # We always print at least the board member name as a column
-    # -----------------------------------------------------------
-    if flavor == 'summary':
-        html += """\
-    <table id="summary" cellspacing="0" cellpadding="5">
-      <tr class="theader">
-        <th class="thcell">Name</th>
-"""
-
-        # Add column headings
-        # -------------------
-        for colHeader, colDisplay in columns:
-            if colDisplay == 'Yes':
-                html += """\
-        <th class="thcell">%s</th>
-""" % colHeader
-        html += """\
-      </tr>
-"""
-
-    # Loop through the list of sorted members to get the address info
-    # ---------------------------------------------------------------
-    for boardMember in sortedMembers:
-        boardTitle = boardMember[2]
-        response = cdr.filterDoc('guest',
-                                 ['set:Denormalization PDQBoardMemberInfo Set',
-                                  'name:Copy XML for Person 2',
-                                  filterType[flavor]],
-                                  boardMember[0],
-                                  parm = [['otherInfo', otherInfo],
-                                          ['assistant', assistant]])
-        if type(response) in (str, bytes):
-            cdrcgi.bail("%s: %s" % (boardMember[0], response))
-
-        # For the report we're just attaching the resulting HTML
-        # snippets to the previous output.
-        #
-        # We need to wrap each person in a table in order to prevent
-        # page breaks within address blocks after the convertion to
-        # MS-Word.
-        # -----------------------------------------------------------
-        filtered_member_info = response[0]
-        if flavor == 'full':
-            # If we're grouping by board we need to display the board name
-            # as a title.
-            # ------------------------------------------------------------
-            if not sortType == 'Member' and not lastBoardTitle == boardTitle:
-                html += """\
-    <br>
-    <span class="bheader">%s</span>
-    <br>
-""" % (boardTitle)
-
-            # If we're not grouping by board we need to print the board for
-            # each board member
-            # -------------------------------------------------------------
-            if sortType == 'Member':
-                html += """\
-    <table width='100%%'>
-      <tr>
-        <td>%s<span style="font-style: italic">%s</span><br><br><td>
-      </tr>
-    </table>
-""" % (filtered_member_info, boardMember[2])
-            else:
-                html += """\
-    <table width='100%%'>
-      <tr><td>%s<br><td></tr>
-    </table>
-""" % filtered_member_info
-            lastBoardTitle = boardTitle
-
-        # Creating the Summary sheet output
-        # ---------------------------------
-        else:
-            memberInfo = BoardMemberInfo(boardMember, response[0])
-
-            # If we're grouping by board we need to display the board name
-            # as an individuel row in the table
-            # ------------------------------------------------------------
-            if not sortType == 'Member' and not lastBoardTitle == boardTitle:
-                html += """\
-      <tr><td class="theader" colspan="%d"><b>%s</b></td></tr>
-""" % (countCols(columns) + 1, boardTitle)
-            #if sortType == 'Member':
-            html += """\
-%s
-""" % (addTableRow(memberInfo, columns))
-
-            lastBoardTitle = boardTitle
-
-    # Need to end the table wrapper for the summary sheet
-    # ------------------------------------------------------
-    if not flavor == 'full':
-        html += """\
-    </table>
-"""
-
-    html += """
-    <br>
-  </body>
-</html>
-"""
-
-    # The users don't want to display the country if it's the US.
-    # Since the address is build by a common address module we're
-    # better off removing it in the final HTML output
-    # ------------------------------------------------------------
-    cdrcgi.sendPage(html.replace('U.S.A.<br>', ''))
-
-else:
-    cdrcgi.bail("Sorry, don't know report type: %s" % rptType)
-'''
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+    Control().run()

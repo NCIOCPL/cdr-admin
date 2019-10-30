@@ -13,7 +13,7 @@ class Control(Controller):
         ol = page.B.OL()
         for display, script in (
             ("Checked Out Documents", "CheckedOutDocs.py"),
-            ("Checked Out Documents With No Activity", "CdrReport.py"),
+            ("Checked Out Documents With No Activity", "InactivityReport.py"),
             ("Current Sessions", "ActiveLogins.py"),
             ("Database Tables/Columns", "db-tables.py"),
             ("Date Last Modified", "DateLastModified.py"),

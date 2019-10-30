@@ -1,231 +1,256 @@
-#----------------------------------------------------------------------
-# "The Glossary Terms by Status Report will list terms and their
-# pronunciations by the user requesting a specific word stem from
-# the Glossary Term name or Term Pronunciation." (request 2643)
-#
-# BZIssue::2643
-#----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, string, time, xml.dom.minidom, xml.sax.saxutils
-from cdrapi import db
-from html import escape as html_escape
-from operator import attrgetter
+#!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields   = cgi.FieldStorage()
-name     = fields and fields.getvalue("name") or None
-pron     = fields and fields.getvalue("pron") or None
-session  = cdrcgi.getSession(fields)
-request  = cdrcgi.getRequest(fields)
-title    = "CDR Administration"
-instr    = "Pronunciation by Term Stem Report"
-buttons  = ["Submit Request", "Report Menu", cdrcgi.MAINMENU, "Log Out"]
-script   = "PronunciationByWordStem.py"
-header   = cdrcgi.header(title, title, instr, script, buttons)
+"""Show glossary term matching a name or pronunciation stem.
 
-#----------------------------------------------------------------------
-# Handle requests.
-#----------------------------------------------------------------------
-if request == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif request == "Report Menu":
-    cdrcgi.navigateTo("Reports.py", session)
-elif request == "Log Out":
-    cdrcgi.logout(session)
+"The Glossary Terms by Status Report will list terms and their
+pronunciations by the user requesting a specific word stem from
+the Glossary Term name or Term Pronunciation." (request 2643)
+"""
 
-#----------------------------------------------------------------------
-# As the user for the report parameters.
-#----------------------------------------------------------------------
-if not (name and name.strip()) and not (pron and pron.strip()):
-    form = """\
-   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-   <TABLE BORDER='0'>
-    <TR>
-     <TD align='right'><B>Stem of a Glossary Term Name:&nbsp;</B></TD>
-     <TD><INPUT NAME='name' />
-    </TR>
-    <TR>
-     <TD COLSPAN='2' ALIGN='CENTER'><b>Or</b></TD>
-    </TR>
-    <TR>
-     <TD align='right'><B>Stem of a Term Pronunciation:&nbsp;</B></TD>
-     <TD><INPUT NAME='pron' />
-    </TR>
-   </TABLE>
-  </FORM>
- </BODY>
-</HTML>
-""" % (cdrcgi.SESSION, session)
-    cdrcgi.sendPage(header + form)
+from cdrcgi import Controller
+from cdrapi.docs import Doc
 
-#----------------------------------------------------------------------
-# Escape markup special characters.
-#----------------------------------------------------------------------
-def fix(me):
-    if not me:
-        return "&nbsp;"
-    return me # xml.sax.saxutils.escape(me)
 
-#----------------------------------------------------------------------
-# Prepare definitions for display.
-#----------------------------------------------------------------------
-def fixList(defs):
-    if not defs:
-        return "&nbsp;"
-    return fix("; ".join(defs))
+class Control(Controller):
+    """Report logic."""
 
-#----------------------------------------------------------------------
-# Extract the complete content of an element, tags and all.
-#----------------------------------------------------------------------
-def getNodeContent(node, pieces = None):
-    if pieces is None:
-        pieces = []
-    for child in node.childNodes:
-        if child.nodeType in (child.TEXT_NODE, child.CDATA_SECTION_NODE):
-            if child.nodeValue:
-                pieces.append(xml.sax.saxutils.escape(child.nodeValue))
-        elif child.nodeType == child.ELEMENT_NODE:
-            if child.nodeName == 'Insertion':
-                pieces.append("<span style='color: red'>")
-                getNodeContent(child, pieces)
-                pieces.append("</span>")
-            elif child.nodeName == 'Deletion':
-                pieces.append("<span style='text-decoration: line-through'>")
-                getNodeContent(child, pieces)
-                pieces.append("</span>")
-            elif child.nodeName == 'Strong':
-                pieces.append("<b>")
-                getNodeContent(child, pieces)
-                pieces.append("</b>")
-            elif child.nodeName in ('Emphasis', 'ScientificName'):
-                pieces.append("<i>")
-                getNodeContent(child, pieces)
-                pieces.append("</i>")
-            else:
-                getNodeContent(child, pieces)
-    return "".join(pieces)
+    SUBTITLE = "Pronunciation by Term Stem Report"
+    NAME_PATH = "/GlossaryTermName/TermName/TermNameString"
+    PRON_PATH = "/GlossaryTermName/TermName/TermPronunciation"
 
-class Comment:
-    def __init__(self, node):
-        self.text = getNodeContent(node)
-        self.user = node.getAttribute('user')
-        self.date = node.getAttribute('date')
+    def populate_form(self, page):
+        """Give the user two ways to identify glossary terms.
 
-class GlossaryTerm:
-    def __init__(self, id, node):
-        self.id = id
-        self.name = None
-        self.pronunciation = None
-        self.pronunciationResources = []
-        self.comment = None
-        for child in node.childNodes:
-            if child.nodeName == "TermName":
-                for grandchild in child.childNodes:
-                    if grandchild.nodeName == 'TermNameString':
-                        self.name = getNodeContent(grandchild)
-                    elif grandchild.nodeName == "TermPronunciation":
-                        self.pronunciation = getNodeContent(grandchild)
-                    elif grandchild.nodeName == "PronunciationResource":
-                        resource = getNodeContent(grandchild)
-                        self.pronunciationResources.append(resource)
-                    elif grandchild.nodeName == "Comment" and not self.comment:
-                        self.comment = Comment(grandchild)
+        Pass:
+            page - HTMLPage object on which to place the fields
+        """
 
-#----------------------------------------------------------------------
-# Create/display the report.
-#----------------------------------------------------------------------
-conn = db.connect(user='CdrGuest')
-cursor = conn.cursor()
-nameVal = name and name.strip() or ""
-pronVal = pron and pron.strip() or ""
-if nameVal and '%' not in nameVal: nameVal = "%%%s%%" % nameVal
-if pronVal and '%' not in pronVal: pronVal = "%%%s%%" % pronVal
-if nameVal and pronVal:
-    stems = ("Name Stem: %s<br />Pronunciation Stem: %s" %
-             (html_escape(name), html_escape(pron)))
-    cursor.execute("""\
-SELECT DISTINCT doc_id
-           FROM query_term
-          WHERE path = '/GlossaryTermName/TermName/TermNameString'
-            AND value LIKE ?
-             OR path = '/GlossaryTermName/TermName/TermPronunciation'
-            AND value LIKE ?""", (nameVal, pronVal))
-else:
-    val   = nameVal or pronVal
-    elem  = nameVal and 'NameString' or 'Pronunciation'
-    stems = "%s Stem: %s" % (elem,
-                              nameVal and html_escape(name) or html_escape(pron))
-    cursor.execute("""\
-SELECT DISTINCT doc_id
-           FROM query_term
-          WHERE path = '/GlossaryTermName/TermName/Term%s'
-            AND value LIKE ?""" % elem, val)
-rows = cursor.fetchall()
-terms = []
-for row in rows:
-    doc = cdr.getDoc('guest', row[0], getObject = True)
-    dom = xml.dom.minidom.parseString(doc.xml)
-    terms.append(GlossaryTerm(row[0], dom.documentElement))
+        fieldset = page.fieldset("Enter a term or pronunciation word stem")
+        fieldset.append(page.text_field("term_stem"))
+        fieldset.append(page.text_field("pron_stem"))
+        page.form.append(fieldset)
 
-html = ["""\
-<!DOCTYPE html>
-<html>
- <head>
-  <title>Pronunciation by Term Stem Report</title>
-  <style type 'text/css'>
-   body    { font-family: Arial, Helvetica, sans-serif }
-   span.t1 { font-size: 14pt; font-weight: bold }
-   span.t2 { font-size: 12pt; font-weight: bold }
-   th      { font-size: 10pt; font-weight: bold }
-   td      { font-size: 10pt; font-weight: normal }
-   @page   { margin-left: 0cm; margin-right: 0cm; }
-   body, table   { margin-left: 0cm; margin-right: 0cm; }
-  </style>
- </head>
- <body>
-  <center>
-   <span class='t1'>Pronunciation by Term Stem Report</span>
-   <br />
-   <br />
-   <span class='t2'>%s</span>
-   <br />
-   <br />
-  </center>
-  <table border='1' cellspacing='0' cellpadding='2' width='100%%'>
-   <tr>
-    <th>Doc ID</th>
-    <th>Term Name</th>
-    <th>Pronunciation</th>
-    <th>Pronunciation Resource</th>
-    <th>Comments</th>
-   </tr>
-""" % stems]
-for term in sorted(terms, key=attrgetter("name")):
-    comment = "&nbsp;"
-    if term.comment:
-        user = date = ""
-        if term.comment.user:
-            user = "[user=%s] " % term.comment.user
-        if term.comment.date:
-            date = "[date=%s] " % term.comment.date
-        comment = user + date + fix(term.comment.text)
-    html.append("""\
-   <tr>
-    <td>%d</td>
-    <td>%s</td>
-    <td>%s</td>
-    <td>%s</td>
-    <td>%s</td>
-   </tr>
-""" % (term.id,
-       fix(term.name),
-       fix(term.pronunciation),
-       fixList(term.pronunciationResources),
-       comment))
-html.append("""\
-  </table>
- </body>
-</html>
-""")
-cdrcgi.sendPage("".join(html))
+    def build_tables(self):
+        """Return the single row for this report."""
+        return self.table
+
+    @property
+    def caption(self):
+        """Caption string(s) for the report's table."""
+
+        if not hasattr(self, "_caption"):
+            name = self.fields.getvalue("term_stem")
+            pron = self.fields.getvalue("pron_stem")
+            self._caption = []
+            if name:
+                self._caption.append(f"Name Stem: {name}")
+            if pron:
+                self._caption.append(f"Pronunciation Stem: {pron}")
+        return self._caption
+
+    @property
+    def columns(self):
+        """Column header definitions for the report."""
+
+        return (
+            self.Reporter.Column("Doc ID", width="75px"),
+            self.Reporter.Column("Term Name", width="300px"),
+            self.Reporter.Column("Pronunciation", width="350px"),
+            self.Reporter.Column("Pronunciation Resource", width="200px"),
+            self.Reporter.Column("Comments", width="500px"),
+        )
+
+    @property
+    def pron_stem(self):
+        """Substring for matching glossary term pronunciations."""
+
+        if not hasattr(self, "_pron_stem"):
+            self._pron_stem = self.fields.getvalue("pron_stem", "").strip()
+            if self._pron_stem and "%" not in self._pron_stem:
+                self._pron_stem = f"%{self._pron_stem}%"
+        return self._pron_stem
+
+    @property
+    def term_stem(self):
+        """Substring for matching glossary term names."""
+
+        if not hasattr(self, "_term_stem"):
+            self._term_stem = self.fields.getvalue("term_stem", "").strip()
+            if self._term_stem and "%" not in self._term_stem:
+                self._term_stem = f"%{self._term_stem}%"
+        return self._term_stem
+
+    @property
+    def rows(self):
+        """Table rows for the report."""
+
+        if not hasattr(self, "_rows"):
+            self._rows = [term.row for term in self.terms]
+        return self._rows
+
+    @property
+    def table(self):
+        """This report has a single table."""
+
+        if not hasattr(self, "_table"):
+            opts = dict(caption=self.caption, columns=self.columns)
+            self._table = self.Reporter.Table(self.rows, **opts)
+        return self._table
+
+    @property
+    def terms(self):
+        """Terms matching the word stem."""
+
+        if not hasattr(self, "_terms"):
+            query = self.Query("query_term", "doc_id")
+            if self.term_stem:
+                query.where(f"path = '{self.NAME_PATH}'")
+                query.where(query.Condition("value", self.term_stem, "LIKE"))
+            if self.pron_stem:
+                query.where(f"path = '{self.PRON_PATH}'")
+                query.where(query.Condition("value", self.pron_stem, "LIKE"))
+            self._terms = []
+            for row in query.execute(self.cursor).fetchall():
+                self._terms.append(Term(self, row.doc_id))
+        return self._terms
+
+
+class Term:
+    """Glossary term information for the report."""
+
+    CLASSES = dict(
+        Insertion="insertion",
+        Deletion="deletion",
+        Strong="strong",
+        Emphasis="emphasis",
+        ScientificName="emphasis",
+    )
+
+    def __init__(self, control, id):
+        """Capture the caller's values.
+
+        Pass:
+            control - access to the database and reporting
+        """
+
+        self.__control = control
+        self.__id = id
+
+    def make_span(self, node):
+        """Create a wrapper for the contents of a report table cell.
+
+        Works through the node's tree recursively, setting classes
+        to control display effects.
+
+        Pass:
+            node - parsed XML document node to be rolled into a wrapper
+
+        Return:
+            HTML span element object (or None if no content)
+        """
+
+        if node is None:
+            return None
+        segments = []
+        text = []
+
+        # Special handling for comments, to get their user and date info.
+        if node.tag == "Comment":
+            user = node.get("user")
+            date = node.get("date")
+            if user:
+                text.append(f"[user={user}]")
+            if date:
+                text.append(f"[date={date}]")
+        if node.text is not None and node.text:
+            text.append(node.text)
+        if text:
+            segments.append(" ".join(text))
+
+        # Recurse through all the child nodes.
+        for child in node.findall("*"):
+            span = self.make_span(child)
+            if span is not None:
+                segments.append(span)
+            if child.tail is not None and child.tail:
+                segments.append(child.tail)
+        if not segments:
+            return None
+
+        # Roll the segments into a single span element and set styling.
+        span = self.control.HTMLPage.B.SPAN(*segments)
+        span_class = self.CLASSES.get(node.tag)
+        if span_class:
+            span.set("class", span_class)
+        return span
+
+    @property
+    def comment(self):
+        """Node for the first comment found for the English term name."""
+
+        if not hasattr(self, "_comment"):
+            self._comment = self.doc.root.find("TermName/Comment")
+        return self._comment
+
+    @property
+    def control(self):
+        """Access to the database and reporting."""
+        return self.__control
+
+    @property
+    def doc(self):
+        """The `Doc` object for this glossary term name."""
+
+        if not hasattr(self, "_doc"):
+            self._doc = Doc(self.control.session, id=self.id)
+        return self._doc
+
+    @property
+    def id(self):
+        """Document ID for the glossary term name document."""
+        return self.__id
+
+    @property
+    def name(self):
+        """Node for the document's English name."""
+
+        if not hasattr(self, "_name"):
+            self._name = self.doc.root.find("TermName/TermNameString")
+        return self._name
+
+    @property
+    def pronunciation(self):
+        """Node for the document's English pronunciation."""
+
+        if not hasattr(self, "_pron"):
+            self._pron = self.doc.root.find("TermName/TermPronunciation")
+        return self._pron
+
+    @property
+    def resource(self):
+        """Node for the document's English pronunciation."""
+
+        if not hasattr(self, "_resource"):
+            path = "TermName/PronunciationResource"
+            self._resource = self.doc.root.find(path)
+        return self._resource
+
+    @property
+    def row(self):
+        """Row for the report table."""
+
+        if not hasattr(self, "_row"):
+            Cell = self.control.Reporter.Cell
+            self._row = (
+                Cell(self.id, center=True),
+                Cell(self.make_span(self.name)),
+                Cell(self.make_span(self.pronunciation)),
+                Cell(self.make_span(self.resource)),
+                Cell(self.make_span(self.comment)),
+            )
+        return self._row
+
+
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+    Control().run()

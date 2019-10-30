@@ -74,6 +74,8 @@ class DocInfo:
                     'application/pdf': 'pdf',
                     'application/msword': 'doc',
                     'application/vnd.ms-excel': 'xls',
+                    "application/vnd.openxlmformats-officedocument."
+                    "spreadsheetml.sheet": "xlsx",
                     'application/vnd.wordperfect': 'wpd',
                     'application/vnd.ms-powerpoint': 'ppt',
                     'application/zip': 'zip',

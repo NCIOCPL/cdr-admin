@@ -1,257 +1,217 @@
-#----------------------------------------------------------------------
-# Report of documents linking to a specified glossary term.
-#----------------------------------------------------------------------
-import cdr, cdrcgi, cgi, re, time
-from cdrapi import db
+#!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields  = cgi.FieldStorage()
-session = cdrcgi.getSession(fields)
-request = cdrcgi.getRequest(fields)
-name    = fields and fields.getvalue('Name') or None
-id      = fields and fields.getvalue('Id')   or None
-SUBMENU = "Report Menu"
-buttons = ["Submit Request", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-script  = "GlossaryTermLinks.py"
-title   = "CDR Administration"
-section = "Glossary Term Links QC Report"
-header  = cdrcgi.header(title, title, section, script, buttons)
-now     = time.localtime(time.time())
-
-#----------------------------------------------------------------------
-# Make sure we're logged in.
-#----------------------------------------------------------------------
-if not session: cdrcgi.bail('Unknown or expired CDR session.')
-
-#----------------------------------------------------------------------
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if request == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif request == SUBMENU:
-    cdrcgi.navigateTo("Reports.py", session)
-
-#----------------------------------------------------------------------
-# Handle request to log out.
-#----------------------------------------------------------------------
-if request == "Log Out":
-    cdrcgi.logout(session)
-
-#----------------------------------------------------------------------
-# If we don't have a request, put up the request form.
-#----------------------------------------------------------------------
-if not name and not id:
-    form = """\
-   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-   <TABLE BORDER='0'>
-    <TR>
-     <TD ALIGN='right'><B>Document ID:&nbsp;</B></TD>
-     <TD><INPUT NAME='Id'></TD>
-    </TR>
-    <TR>
-     <TD ALIGN='right'><B>Glossary Term Name:&nbsp;</B></TD>
-     <TD><INPUT NAME='Name'></TD>
-    </TR>
-   </TABLE>
-  </FORM>
- </BODY>
-</HTML>
-""" % (cdrcgi.SESSION, session)
-    cdrcgi.sendPage(header + form)
-
-#----------------------------------------------------------------------
-# Connect to the CDR database.
-#----------------------------------------------------------------------
-try:
-    conn   = db.connect()
-    cursor = conn.cursor()
-except Exception as e:
-    cdrcgi.bail('Database connection failure: %s' % e)
-
-#----------------------------------------------------------------------
-# Get the document ID.
-#----------------------------------------------------------------------
-if id:
-    digits = re.sub('[^\d]', '', id)
-    id     = int(digits)
-else:
-    try:
-        cursor.execute("""\
-                SELECT DISTINCT doc_id
-                           FROM query_term
-                          WHERE path  = '/GlossaryTermName/TermName'
-                                      + '/TermNameString'
-                            AND value = ?""", name)
-        rows = cursor.fetchall()
-    except Exception as e:
-        cdrcgi.bail("Failure looking up glossary term '%s': %s" % (name, e))
-    if len(rows) > 1: cdrcgi.bail("Ambiguous term name: '%s'" % name)
-    if len(rows) < 1: cdrcgi.bail("Unknown term '%s'" % name)
-    id = rows[0][0]
-
-#----------------------------------------------------------------------
-# Get the name and source for the term.  Even if we got the name from
-# the user, we are certain this way that the capitalization is correct.
-#----------------------------------------------------------------------
-try:
-    cursor.execute("""\
-            SELECT DISTINCT name.value,
-                            source.value
-                       FROM query_term name
-            LEFT OUTER JOIN query_term source
-                         ON source.doc_id = name.doc_id
-                        AND source.path = '/GlossaryTermName/TermName'
-                                        + '/TermNameSource'
-                      WHERE name.doc_id = ?
-                        AND name.path   = '/GlossaryTermName/TermName'
-                                        + '/TermNameString'""", id)
-    rows = cursor.fetchall()
-    if not rows:
-        cdrcgi.bail("Can't find GlossaryTermName document for CDR%s" % id)
-    (name, source) = rows[0]
-except Exception as e:
-    cdrcgi.bail(f'Failure fetching term name and source for CDR{id}: {e}')
-
-#----------------------------------------------------------------------
-# Get the list of documents which link to this glossary term.
-#----------------------------------------------------------------------
-try:
-    cursor.execute("""\
-            SELECT DISTINCT query_term.doc_id,
-                            document.title,
-                            doc_type.name
-                       FROM query_term
-                       JOIN document
-                         ON document.id = query_term.doc_id
-                       JOIN doc_type
-                         ON doc_type.id = document.doc_type
-                      WHERE query_term.value = 'CDR%010d'
-                   ORDER BY doc_type.name,
-                            query_term.doc_id""" % id)
-except Exception as e:
-    cdrcgi.bail('Failure fetching list of linking documents: %s' % e)
-
-#----------------------------------------------------------------------
-# Start the page.
-#----------------------------------------------------------------------
-ellipsis = '.' * 70
-html = """\
-<!DOCTYPE html>
-<html>
- <head>
-  <title>%s - %s - CDR%010d</title>
- </head>
- <basefont face='Arial, Helvetica, sans-serif'>
- <body>
-  <center>
-   <b>
-    <font size='4'>Documents Linked to Glossary Term Names Report</font>
-   </b>
-   <br />
-   <br />
-  </center>
-  <table border='0'>
-   <tr>
-    <td align='top'>
-     <b>
-      <font size='3'>Name</font>
-     </b>
-    </td>
-    <td align='top' nowrap='1'>
-     <font size='3'>%s</font>
-    </td>
-    <td>
-     <font size='3'>%s</font>
-    </td>
-   </tr>
-   <tr>
-    <td align='top'>
-     <b>
-      <font size='3'>Source</font>
-     </b>
-    </td>
-    <td align='top' nowrap='1'>
-     <font size='3'>%s</font>
-    </td>
-    <td>
-     <font size='3'>%s</font>
-    </td>
-   </tr>
-  </table>
-  <br />
-  <br />
-  <b>
-   <i>
-    <font size='3'>Documents Linked to Term Name</font>
-   </i>
-  </b>
-""" % (name, time.strftime("%B %d, %Y", now), id, ellipsis, name, ellipsis,
-       source)
-
-#----------------------------------------------------------------------
-# Display the report rows.
-#----------------------------------------------------------------------
-filterParms = [['linkTarget', 'CDR%010d' % id]]
-try:
-    row = cursor.fetchone()
-    currentDoctype = None
-    while row:
-        (docId, docTitle, docType) = row
-        if docType != currentDoctype:
-            if currentDoctype:
-                html += """\
-  </table>
+"""Report of documents linking to a specified glossary term.
 """
-            currentDoctype = docType
-            html += """\
-  <br />
-  <br />
-  <b>
-   <font size='3'>%s</font>
-  </b>
-  <br />
-  <table border='1' cellspacing='0' cellpadding='1' width='100%%'>
-   <tr>
-    <td>
-     <b>
-      <font size='3'>DocID</font>
-     </b>
-    </td>
-    <td>
-     <b>
-      <font size='3'>DocTitle</font>
-     </b>
-    </td>
-    <td>
-     <b>
-      <font size='3'>ElementName</font>
-     </b>
-    </td>
-    <td>
-     <b>
-      <font size='3'>FragmentID</font>
-     </b>
-    </td>
-   </tr>
-""" % currentDoctype
 
-        resp = cdr.filterDoc(session, ['name:Glossary Link Report Filter'],
-                             docId, parm = filterParms)
-        if isinstance(resp, (str, bytes)):
-            cdrcgi.bail(resp)
-        html += resp[0]
-        row = cursor.fetchone()
+from cdrcgi import Controller, Reporter
+from cdrapi.docs import Doc
 
-except Exception as e:
-    cdrcgi.bail('Failure fetching linking document: %s' % e)
+class Control(Controller):
+    """Report logic."""
 
-if currentDoctype:
-    html += """\
-  </table>
-"""
-cdrcgi.sendPage(html + """\
- </body>
-</html>
-""")
+    SUBTITLE = "Glossary Term Links QC Report"
+    NAME_PATH = "/GlossaryTermName/TermName/TermNameString"
+    SOURCE_PATH = "/GlossaryTermName/TermName/TermNameSource"
+    COLUMNS = (
+        Reporter.Column("Doc ID", classes="doc-id"),
+        Reporter.Column("Doc Title", classes="doc-title"),
+        Reporter.Column("Element Name", classes="element-name"),
+        Reporter.Column("Fragment ID", classes="frag-id"),
+    )
+
+    def populate_form(self, page):
+        """Add the two fields to the form for selecting a term name."""
+
+        fieldset = page.fieldset("Select a Glossary Term by Name or ID")
+        fieldset.append(page.text_field("id", label="CDR ID"))
+        fieldset.append(page.text_field("name", label="Term Name"))
+        page.form.append(fieldset)
+
+    def build_tables(self):
+        """Assemble the report tables, one for each linking document type."""
+
+        tables = []
+        for doctype in sorted(self.types):
+            rows = []
+            for linker in self.types[doctype]:
+                rows += linker.rows
+            opts = dict(cols=self.COLUMNS, caption=doctype, classes="linkers")
+            tables.append(self.Reporter.Table(rows, **opts))
+        return tables
+
+    def show_report(self):
+        """Override the base class version to add a top table and css."""
+
+        css = (
+            "#name-and-source tr * { padding: 2px 5px; }",
+            "#name-and-source { width: auto; }",
+            "#name-and-source th { text-align: right; }",
+            ".doc-id { width: 125px; }",
+            ".doc-title { width: auto; }",
+            ".element-name {width: 150px; }",
+            ".frag-id { width: 100px; }",
+            "table { width: auto; margin-top: 50px; }",
+            "table.linkers { width: 90%; }",
+        )
+        page = self.report.page
+        table = page.B.TABLE(
+            page.B.CAPTION("Glossary Term"),
+            page.B.TR(page.B.TH("Name"), page.B.TD(self.name)),
+            page.B.TR(page.B.TH("Source"), page.B.TD(self.source))
+        )
+        table.set("id", "name-and-source")
+        page.body.insert(1, table)
+        self.report.page.add_css("\n".join(css))
+        self.report.send()
+
+    @property
+    def types(self):
+        """Dictionary of linking document lists, indexed by document type."""
+
+        if not hasattr(self, "_types"):
+            fields = "d.id", "t.name"
+            query = self.Query("document d", *fields).unique().order("d.id")
+            query.join("doc_type t", "t.id = d.doc_type")
+            query.join("query_term l", "l.doc_id = d.id")
+            query.where(query.Condition("l.int_val", self.id))
+            self._types = {}
+            for row in query.execute(self.cursor).fetchall():
+                doc = LinkingDoc(self, row.id)
+                if row.name not in self._types:
+                    self._types[row.name] = [doc]
+                else:
+                    self._types[row.name].append(doc)
+        return self._types
+
+    @property
+    def cdr_id(self):
+        """String version if the glossary term's CDR ID."""
+
+        if not hasattr(self, "_cdr_id"):
+            self._cdr_id = f"CDR{self.id:010d}"
+        return self._cdr_id
+
+    @property
+    def id(self):
+        """Integer for the glossary term name document ID."""
+
+        if not hasattr(self, "_id"):
+            id = self.fields.getvalue("id")
+            if id:
+                try:
+                    self._id = Doc.extract_id(id)
+                except:
+                    self.bail(f"Invalid id: {id!r}")
+            else:
+                name = self.fields.getvalue("name")
+                if not name:
+                    self.show_form()
+                query = self.Query("query_term", "doc_id").unique()
+                query.where(f"path = '{self.NAME_PATH}'")
+                query.where(query.Condition("value", name))
+                rows = query.execute(self.cursor).fetchall()
+                if len(rows) > 1:
+                    self.bail(f"Ambiguous term name: {name!r}")
+                elif not rows:
+                    self.bail(f"Unknown term {name!r}")
+                self._id = rows[0].doc_id
+        return self._id
+
+    @property
+    def name(self):
+        """String for the glossary term name."""
+
+        if not hasattr(self, "_name"):
+            query = self.Query("query_term", "value")
+            query.where(f"path = '{self.NAME_PATH}'")
+            query.where(query.Condition("doc_id", self.id))
+            rows = query.execute(self.cursor).fetchall()
+            self._name = rows[0].value
+        return self._name
+
+    @property
+    def source(self):
+        """Source for the term name, if any."""
+
+        if not hasattr(self, "_source"):
+            query = self.Query("query_term", "value")
+            query.where(f"path = '{self.SOURCE_PATH}'")
+            query.where(query.Condition("doc_id", self.id))
+            rows = query.execute(self.cursor).fetchall()
+            self._source = rows[0].value if rows else None
+        return self._source
+
+    @property
+    def cdr_id(self):
+        """Display version of the term name document ID."""
+
+        if not hasattr(self, "_cdr_id"):
+            self._cdr_id = f"CDR{self.id:010d}"
+        return self._cdr_id
+
+    @property
+    def xpath(self):
+        """Search path for finding links to this document."""
+
+        if not hasattr(self, "_xpath"):
+            tests = (
+                f"@cdr:ref='{self.cdr_id}'",
+                f"@cdr:href='{self.cdr_id}'",
+            )
+            self._xpath = f"//*[{' or '.join(tests)}]"
+        return self._xpath
+
+
+class LinkingDoc:
+    """Document linking to our glossary term name."""
+
+    XPATH_OPTS = dict(namespaces=Doc.NSMAP)
+    CDR_ID = f"{{{Doc.NS}}}id"
+
+    def __init__(self, control, id):
+        """Capture the caller's values."""
+
+        self.__control = control
+        self.__id = id
+
+    @property
+    def id(self):
+        """CDR ID for the linking document."""
+        return self.__id
+
+    @property
+    def control(self):
+        """Access to information about the linked glossary term name."""
+        return self.__control
+
+    @property
+    def doc(self):
+        if not hasattr(self, "_doc"):
+            self._doc = Doc(self.control.session, id=self.id)
+        return self._doc
+
+    @property
+    def rows(self):
+        """Table rows for the report."""
+
+        if not hasattr(self, "_rows"):
+            rows = []
+            root = self.doc.root
+            for node in root.xpath(self.control.xpath, **self.XPATH_OPTS):
+                parent = node.getparent()
+                tag = parent.tag
+                node_id = str(parent.get(self.CDR_ID))
+                row = (
+                    Reporter.Cell(self.doc.cdr_id, center=True),
+                    self.doc.title,
+                    tag,
+                    Reporter.Cell(node_id, center=True),
+                )
+                rows.append(row)
+            self._rows = rows
+        return self._rows
+
+
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+    Control().run()

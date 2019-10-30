@@ -30,7 +30,7 @@ class Control(Controller):
 
     def run(self):
         """Bypass the Submit button if we already have a user."""
-        if self.user:
+        if not self.request and self.user:
             self.show_report()
         else:
             Controller.run(self)
@@ -70,7 +70,7 @@ class Control(Controller):
                 else:
                     opts = dict(name=value)
                 self._user = self.session.User(self.session, **opts)
-        return self._user
+        return self._userb
 
     def build_tables(self):
         """Show the documents the user has locked."""

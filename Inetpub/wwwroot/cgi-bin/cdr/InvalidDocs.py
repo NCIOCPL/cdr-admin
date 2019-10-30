@@ -1,96 +1,83 @@
-#----------------------------------------------------------------------
-# Reports on invalid or blocked CDR documents.
-#
-# BZIssue::3533
-# JIRA::OCECDR-3800
-#----------------------------------------------------------------------
-import cdrcgi
-import cgi
-from cdrapi import db
+#!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields  = cgi.FieldStorage()
-session = cdrcgi.getSession(fields)
-request = cdrcgi.getRequest(fields)
-docType = fields.getvalue('docType')
-docType = docType and int(docType) or None
-cursor  = db.connect(user='CdrGuest').cursor()
-SUBMENU = "Report Menu"
-buttons = ["Submit Request", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-script  = "InvalidDocs.py"
-title   = "CDR Administration"
-section = "Invalid Documents"
+"""Report on invalid or blocked CDR documents.
+"""
 
-#----------------------------------------------------------------------
-# Make sure we're logged in.
-#----------------------------------------------------------------------
-if not session: cdrcgi.bail('Unknown or expired CDR session.')
+from cdrcgi import Controller
 
-#----------------------------------------------------------------------
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if request == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif request == SUBMENU:
-    cdrcgi.navigateTo("Reports.py", session)
 
-#----------------------------------------------------------------------
-# Handle request to log out.
-#----------------------------------------------------------------------
-if request == "Log Out":
-    cdrcgi.logout(session)
+class Control(Controller):
 
-#----------------------------------------------------------------------
-# Get the list of active document types.
-#----------------------------------------------------------------------
-query = db.Query("doc_type", "id", "name")
-query.where("active = 'Y'")
-query.where("xml_schema IS NOT NULL")
-query.where("name NOT IN ('Filter', 'xxtest', 'schema')")
-docTypes = [tuple(r) for r in query.order("name").execute(cursor).fetchall()]
+    SUBTITLE = "Invalid Documents"
 
-#----------------------------------------------------------------------
-# Show the form if we don't have a document type selected.
-#----------------------------------------------------------------------
-if not docType:
-    page = cdrcgi.Page(title, subtitle=section, action=script,
-                       session=session, buttons=buttons)
-    page.add("<fieldset>")
-    page.add(page.B.LEGEND("Select Document Type"))
-    page.add_select("docType", "Type", docTypes)
-    page.send()
+    def build_tables(self):
+        """Assemble the two tables used for this report."""
 
-#----------------------------------------------------------------------
-# If a report has been requested, show it.
-#----------------------------------------------------------------------
-docTypeName = dict(docTypes).get(docType)
-invalidCaption = "Invalid %s Documents" % docTypeName
-blockedCaption = "Blocked %s Documents" % docTypeName
-subquery = db.Query("doc_version", "MAX(num)").where("id = v.id")
-query = db.Query("doc_version v", "v.id", "v.title", "d.active_status")
-query.join("document d", "d.id = v.id")
-query.join("doc_type t", "t.id = d.doc_type")
-query.where(query.Condition("t.id", docType))
-query.where(query.Condition("v.num", subquery))
-query.where("v.val_status = 'I'")
-rows = query.order("v.id").execute(cursor).fetchall()
-invalid = []
-blocked = []
-for doc_id, doc_title, active_status in rows:
-    doc = (cdrcgi.Report.Cell(doc_id, classes="right"), doc_title)
-    if active_status == "I":
-        blocked.append(doc)
-    else:
-        invalid.append(doc)
-columns = (
-    cdrcgi.Report.Column("ID", width="50px"),
-    cdrcgi.Report.Column("Title", width="950px"),
-)
-tables = (
-    cdrcgi.Report.Table(columns, invalid, caption=invalidCaption),
-    cdrcgi.Report.Table(columns, blocked, caption=blockedCaption),
-)
-report = cdrcgi.Report(title, tables, banner=title, subtitle=section)
-report.send()
+        subquery = self.Query("doc_version", "MAX(num)").where("id = v.id")
+        fields = "v.id", "v.title", "d.active_status"
+        query = self.Query("doc_version v", *fields).order("v.id")
+        query.join("document d", "d.id = v.id")
+        query.join("doc_type t", "t.id = d.doc_type")
+        query.where(query.Condition("t.id", self.doctype))
+        query.where(query.Condition("v.num", subquery))
+        query.where("v.val_status = 'I'")
+        invalid = []
+        blocked = []
+        for doc in query.execute(self.cursor).fetchall():
+            row = (self.Reporter.Cell(doc.id, classes="right"), doc.title)
+            if doc.active_status == "I":
+                blocked.append(row)
+            else:
+                invalid.append(row)
+        doctype = dict(self.doctypes)[int(self.doctype)]
+        caption = f"Invalid {doctype} Documents"
+        opts = dict(columns=self.columns, caption=caption)
+        invalid = self.Reporter.Table(invalid, **opts)
+        opts["caption"] = f"Blocked {doctype} Documents"
+        blocked = self.Reporter.Table(blocked, **opts)
+        return invalid, blocked
+
+    def populate_form(self, page):
+        """Let the user pick a document type.
+
+        Pass:
+            page - HTMLPage document on which to drop the fields
+        """
+
+        fieldset = page.fieldset("Select Document Type")
+        for id, name in self.doctypes:
+            opts = dict(value=id, label=name)
+            fieldset.append(page.radio_button("doctype", **opts))
+        page.form.append(fieldset)
+
+    @property
+    def columns(self):
+        """Column headers for the report."""
+
+        return (
+            self.Reporter.Column("ID", width="50px"),
+            self.Reporter.Column("Title", width="950px"),
+        )
+
+    @property
+    def doctype(self):
+        """CDR document type selected for the report."""
+        return self.fields.getvalue("doctype")
+
+    @property
+    def doctypes(self):
+        """Active document types for the form's picklist."""
+
+        if not hasattr(self, "_doctypes"):
+            query = self.Query("doc_type", "id", "name").order("name")
+            query.where("active = 'Y'")
+            query.where("xml_schema IS NOT NULL")
+            query.where("name NOT IN ('Filter', 'xxtest', 'schema')")
+            rows = query.execute(self.cursor).fetchall()
+            self._doctypes = [tuple(row) for row in rows]
+        return self._doctypes
+
+
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+    Control().run()

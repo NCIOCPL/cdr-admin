@@ -1,209 +1,97 @@
-#----------------------------------------------------------------------
-# Reports on the history of mailers for a particular document.
-#----------------------------------------------------------------------
-import cdrcgi, cgi, re
-from cdrapi import db
+#!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields     = cgi.FieldStorage()
-session    = cdrcgi.getSession(fields)
-request    = cdrcgi.getRequest(fields)
-docId      = fields and fields.getvalue('DocId')   or None
-SUBMENU   = "Report Menu"
-buttons   = ["Submit Request", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-script    = "MailerHistory.py"
-title     = "CDR Administration"
-section   = "Mailer History"
-header    = cdrcgi.header(title, title, section, script, buttons)
-
-#----------------------------------------------------------------------
-# Make sure we're logged in.
-#----------------------------------------------------------------------
-if not session: cdrcgi.bail('Unknown or expired CDR session.')
-
-#----------------------------------------------------------------------
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if request == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif request == SUBMENU:
-    cdrcgi.navigateTo("Reports.py", session)
-
-#----------------------------------------------------------------------
-# Handle request to log out.
-#----------------------------------------------------------------------
-if request == "Log Out":
-    cdrcgi.logout(session)
-
-#----------------------------------------------------------------------
-# If we don't have a request, put up the request form.
-#----------------------------------------------------------------------
-if not docId:
-    form = """\
-   <INPUT TYPE='hidden' NAME='%s' VALUE='%s' />
-   <BR />
-   <B>Document ID:&nbsp;&nbsp;</B>
-   <INPUT NAME='DocId' />
-  </FORM>
- </BODY>
-</HTML>
-""" % (cdrcgi.SESSION, session)
-    cdrcgi.sendPage(header + form)
-
-#----------------------------------------------------------------------
-# Connect to the database.
-#----------------------------------------------------------------------
-try:
-    conn   = db.connect(timeout=300)
-    cursor = conn.cursor()
-except Exception as e:
-    cdrcgi.bail('Database connection failure: %s' % e)
-
-#----------------------------------------------------------------------
-# Extract the document ID as an integer.
-#----------------------------------------------------------------------
-try:
-    digits = re.sub(r'[^\d]', '', docId)
-    id     = int(digits)
-except:
-    cdrcgi.bail("Invalid document ID: %s, %s" % (docId, digits))
-
-#----------------------------------------------------------------------
-# Get the document's title.
-#----------------------------------------------------------------------
-try:
-    cursor.execute("""\
-            SELECT title
-              FROM document
-             WHERE id = ?""", id)
-    row = cursor.fetchone()
-    if not row:
-        cdrcgi.bail("No such document CDR%010d" % id)
-    title = row[0]
-except Exception as e:
-    cdrcgi.bail('Failure retrieving document title: %s' % e)
-
-#----------------------------------------------------------------------
-# Build the report.
-#----------------------------------------------------------------------
-html = """\
-<!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
-<html>
- <head>
-  <title>Mailer History Report - CDR%010d</title>
-  <basefont face='Arial, Helvetica, sans-serif'>
- </head>
- <body>
-  <center>
-   <b>
-    <font size='4'>Mailer History for CDR%010d</font>
-   </b>
-   <br />
-   <b>
-    <font size='4'>%s</font>
-   </b>
-  </center>
-  <br />
-  <br />
-""" % (id, id, title)
-
-#----------------------------------------------------------------------
-# Extract the information from the database.
-#----------------------------------------------------------------------
-try:
-    cursor.execute("""\
-            SELECT type.value,
-                   sent.value,
-                   checkin.value,
-                   change.value,
-                   sent.doc_id
-              FROM query_term doc
-              JOIN query_term type
-                ON type.doc_id = doc.doc_id
-              JOIN query_term sent
-                ON sent.doc_id = doc.doc_id
-   LEFT OUTER JOIN query_term checkin
-                ON checkin.doc_id = doc.doc_id
-               AND checkin.path = '/Mailer/Response/Received'
-   LEFT OUTER JOIN query_term change
-                ON change.doc_id = doc.doc_id
-               AND change.path = '/Mailer/Response/ChangesCategory'
-             WHERE type.path = '/Mailer/Type'
-               AND sent.path = '/Mailer/Sent'
-               AND doc.path = '/Mailer/Document/@cdr:ref'
-               AND doc.int_val = ?
-          ORDER BY sent.value""", id)
-    row = cursor.fetchone()
-    if not row:
-        cdrcgi.sendPage(html + """\
-  <b>
-   <font size='3'>No mailers have been sent for CDR%010d.</font>
-  </b>
- </body>
-</html>
-""" % id)
-    html += """\
-  <table border='1' cellspacing='0' cellpadding='2' width='100%%'>
-   <tr>
-    <td nowrap='1'>
-     <b>
-      <font size='3'>Doc ID</font>
-     </b>
-    </td>
-    <td nowrap='1'>
-     <b>
-      <font size='3'>Mailer Type</font>
-     </b>
-    </td>
-    <td nowrap='1'>
-     <b>
-      <font size='3'>Date Generated</font>
-     </b>
-    </td>
-    <td nowrap='1'>
-     <b>
-      <font size='3'>Check-In Date</font>
-     </b>
-    </td>
-    <td nowrap='1'>
-     <b>
-      <font size='3'>Change Category</font>
-     </b>
-    </td>
-   </tr>
+"""Report on the history of mailers for a particular document.
 """
-    while row:
-        html += """\
-   <tr>
-    <td align='top'>
-     <font size='3'>CDR%d</font>
-    </td>
-    <td align='top'>
-     <font size='3'>%s</font>
-    </td>
-    <td align='top'>
-     <font size='3'>%s</font>
-    </td>
-    <td align='top'>
-     <font size='3'>%s</font>
-    </td>
-    <td align='top'>
-     <font size='3'>%s</font>
-    </td>
-   </tr>
-""" % (row[4],
-       row[0],
-       row[1],
-       row[2] or "&nbsp;",
-       row[3] or "&nbsp;")
-        row = cursor.fetchone()
-except Exception as e:
-    cdrcgi.bail('Failure executing query: %s' % e)
 
-cdrcgi.sendPage(html + """\
-  </table>
- </body>
-</html>
-""")
+from cdrcgi import Controller
+from cdrapi.docs import Doc
+
+
+class Control(Controller):
+    """Report logic."""
+
+    SUBTITLE = "Mailer History"
+    FIELDS = (
+        "t.value AS type",
+        "s.value AS sent",
+        "r.value AS received",
+        "c.value AS change",
+        "d.doc_id AS mailer_id"
+    )
+
+    def populate_form(self, page):
+        """Add a field for the document ID.
+
+        Pass:
+            page - HTMLPage object on which to place the field
+        """
+
+        fieldset = page.fieldset("Select CDR Document for Report")
+        fieldset.append(page.text_field("id", label="Document ID"))
+        page.form.append(fieldset)
+
+    def build_tables(self):
+        """Show the mailer history for the selected document."""
+        if not self.id:
+            self.show_form()
+        query = self.Query("query_term d", *self.FIELDS).order("s.value")
+        query.where("d.path = '/Mailer/Document/@cdr:ref'")
+        query.where(query.Condition("d.int_val", self.doc.id))
+        query.join("query_term t", "t.doc_id = d.doc_id")
+        query.where("t.path = '/Mailer/Type'")
+        query.join("query_term s", "s.doc_id = d.doc_id")
+        query.where("s.path = '/Mailer/Sent'")
+        query.outer("query_term r", "r.doc_id = d.doc_id",
+                    "r.path = '/Mailer/Response/Received'")
+        query.outer("query_term c", "c.doc_id = r.doc_id",
+                    "c.path = '/Mailer/Response/ChangesCategory'",
+                    "LEFT(c.node_loc, 4) = LEFT(r.node_loc, 4)")
+        rows = []
+        for row in query.execute(self.cursor).fetchall():
+            rows.append([
+                self.Reporter.Cell(f"CDR{row.mailer_id:010d}", center=True),
+                row.type,
+                self.Reporter.Cell(row.sent.split("T")[0], center=True),
+                self.Reporter.Cell(row.received, center=True),
+                row.change,
+            ])
+        if not rows:
+            return []
+        cols = (
+            self.Reporter.Column("Mailer ID", width="125px"),
+            self.Reporter.Column("Mailer Type", width="300px"),
+            self.Reporter.Column("Sent", width="85px"),
+            self.Reporter.Column("Checked In", width="75px"),
+            self.Reporter.Column("Change Category", width="200px"),
+        )
+        try:
+            caption = self.doc.title
+        except:
+            self.bail("Invalid document ID {self.id!r}")
+        return self.Reporter.Table(rows, cols=cols, caption=caption)
+
+    @property
+    def id(self):
+        """Document ID pulled from the form field."""
+        return self.fields.getvalue("id")
+
+    @property
+    def doc(self):
+        """Document on which to report."""
+
+        if not hasattr(self, "_doc"):
+            self._doc = Doc(self.session, id=self.id)
+        return self._doc
+
+    @property
+    def subtitle(self):
+        """Customize the string displayed under the main banner."""
+
+        if self.request == "Submit":
+            return f"Mailer History for {self.doc.cdr_id}"
+        return self.SUBTITLE
+
+
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+    Control().run()

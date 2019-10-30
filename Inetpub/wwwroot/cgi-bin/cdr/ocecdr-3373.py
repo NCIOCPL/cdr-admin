@@ -350,7 +350,9 @@ def collectInfo(zipNames):
         fileNames = set()
         termNames = set()
         for name in zipFile.namelist():
-            if "MACOSX" not in name and name.endswith(".xls"):
+            if "MACOSX" not in name:
+                continue
+            if name.endswith(".xls") or name.endswith(".xlsx"):
                 xlBytes = zipFile.read(name)
                 book = xlrd.open_workbook(file_contents=xlBytes)
                 sheet = book.sheet_by_index(0)

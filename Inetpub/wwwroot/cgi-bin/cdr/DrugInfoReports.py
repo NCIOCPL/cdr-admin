@@ -27,11 +27,11 @@ class Control(Controller):
         ol = page.B.OL()
         page.form.append(ol)
         for display, script in (
-            ("Drug Date Last Modified", "DrugDateLastModified.py?"),
-            ("Drug Description Report", "DrugDescriptionReport.py?"),
-            ("Drug Indications Report", "DrugIndicationsReport.py?"),
-            ("Drug Information Summaries Lists", "DISLists.py?"),
-            ("Drug Summaries with Markup Report", "DISWithMarkup.py?"),
+            ("Drug Date Last Modified", "DrugDateLastModified.py"),
+            ("Drug Description Report", "DrugDescriptionReport.py"),
+            ("Drug Indications Report", "DrugIndicationsReport.py"),
+            ("Drug Information Summaries Lists", "DISLists.py"),
+            ("Drug Summaries with Markup Report", "DISWithMarkup.py"),
         ):
             ol.append(page.B.LI(page.menu_link(script, display)))
 

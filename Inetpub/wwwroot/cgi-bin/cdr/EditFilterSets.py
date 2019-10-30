@@ -32,7 +32,6 @@ class Control(Controller):
             ul.append(page.B.LI(page.menu_link(script, name, id=id)))
         fieldset.append(ul)
         page.form.append(fieldset)
-        page.add_css(".flexlinks ul { height: 500px; }")
 
     def run(self):
         """Override base class to add action for new button."""

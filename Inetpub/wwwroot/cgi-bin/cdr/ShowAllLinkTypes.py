@@ -1,103 +1,82 @@
-#----------------------------------------------------------------------
-# Displays a table containing information about all link types.
-#----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, string
-from cdrapi import db
+#!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields  = cgi.FieldStorage()
-session = cdrcgi.getSession(fields)
-request = cdrcgi.getRequest(fields)
-SUBMENU = "Link Menu"
-
-#----------------------------------------------------------------------
-# Make sure we're logged in.
-#----------------------------------------------------------------------
-if not session: cdrcgi.bail('Unknown or expired CDR session.')
-
-#----------------------------------------------------------------------
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if request == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif request == SUBMENU:
-    cdrcgi.navigateTo("EditLinkControl.py", session)
-
-#----------------------------------------------------------------------
-# Handle request to log out.
-#----------------------------------------------------------------------
-if request == "Log Out":
-    cdrcgi.logout(session)
-
-#----------------------------------------------------------------------
-# Retrieve and display the user information.
-#----------------------------------------------------------------------
-title   = "CDR Administration"
-section = "Show All Link Types"
-buttons = [SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-#script  = "DumpParams.pl"
-script  = "ShowAllLinkTypes.py"
-header  = cdrcgi.header(title, title, section, script, buttons)
-
-#----------------------------------------------------------------------
-# Retrieve the information directly from the database.
-#----------------------------------------------------------------------
-try:
-    conn = db.connect(user='CdrGuest')
-except Exception as e:
-    cdrcgi.bail('Database failure: %s' % e)
-cursor = conn.cursor()
-query  = """\
-SELECT DISTINCT link_type.name,
-                source.name,
-                link_xml.element,
-                target.name,
-                link_type.chk_type
-           FROM link_xml,
-                link_type,
-                link_target,
-                doc_type source,
-                doc_type target
-          WHERE link_xml.link_id = link_type.id
-            AND link_target.source_link_type = link_type.id
-            AND link_xml.doc_type = source.id
-            AND link_target.target_doc_type = target.id
+"""Display a table containing information about all link types.
 """
-try:
-    cursor.execute(query)
-except Exception as e:
-    cdrcgi.bail('Database query failure: %s' % e)
 
-#----------------------------------------------------------------------
-# Display the information in a table.
-#----------------------------------------------------------------------
-form = """\
-<H2>All Available Linking Element Combinations</H2>
-<TABLE BORDER='2'>
- <TR>
-  <TD><B>Link Type</TD>
-  <TD><B>Source Doctype</TD>
-  <TD><B>Linking Element</TD>
-  <TD><B>Target Doctype</TD>
-  <TD><B>Pub/Ver/Cwd</TD>
- </TR>
-"""
-try:
-    for rec in cursor.fetchall():
-        form += " <TR>\n"
-        for col in rec:
-            form += "  <TD>%s</TD>\n" % col
-except Exception as e:
-    cdrcgi.bail('Failure fetching query results: %s' % e)
+from cdrcgi import Controller, navigateTo
 
-form += "</TABLE>\n"
 
-#----------------------------------------------------------------------
-# Add the session key and send back the form.
-#----------------------------------------------------------------------
-form += """\
-<INPUT TYPE='hidden' NAME='%s' VALUE='%s' >
-""" % (cdrcgi.SESSION, session)
-cdrcgi.sendPage(header + form + "</FORM></BODY></HTML>")
+class Control(Controller):
+
+    SUBTITLE = "Show All Link Types"
+    SUBMIT = None
+    SUBMENU = "Link Menu"
+    LINK_URL = "EditLinkControl.py"
+    CAPTION = "All Available Linking Element Combinations"
+    COLUMNS = (
+        "Link Type",
+	"Source Doctype",
+	"Linking Element",
+	"Target Doctype",
+	"Pub/Ver/Cwd",
+    )
+    FIELDS = (
+        "ltp.name AS link_type",
+        "sdt.name AS source_doc_type",
+        "xml.element AS linking_element",
+        "tdt.name AS target_doc_type",
+        "ltp.chk_type AS version_selector",
+    )
+
+    def run(self):
+        """Override to provide custom routing, bypassing forms."""
+
+        if self.request == self.SUBMENU:
+            navigateTo(self.LINK_URL, self.session.name)
+        elif not self.request:
+            try:
+                self.show_report()
+            except Exception as e:
+                self.logger.exception("Report failure")
+                self.bail(e)
+        else:
+            Controller.run(self)
+
+    def build_tables(self):
+        """This report has only a single table."""
+        return self.table
+
+    @property
+    def table(self):
+        if not hasattr(self, "_table"):
+            opts = dict(caption=self.CAPTION, columns=self.COLUMNS)
+            self._table = self.Reporter.Table(self.rows, **opts)
+            self._table.node.set("style", "width: 80%;")
+        return self._table
+
+    @property
+    def rows(self):
+        """Table rows for the report."""
+
+        if not hasattr(self, "_rows"):
+            query = self.Query("link_xml xml", *self.FIELDS).unique()
+            query.join("link_type ltp", "ltp.id = xml.link_id")
+            query.join("link_target ltg", "ltg.source_link_type = ltp.id")
+            query.join("doc_type sdt", "sdt.id = xml.doc_type")
+            query.join("doc_type tdt", "tdt.id = ltg.target_doc_type")
+            rows = query.execute(self.cursor).fetchall()
+            self._rows = []
+            for row in rows:
+                self._rows.append([
+                    row.link_type,
+                    row.source_doc_type,
+                    row.linking_element,
+                    row.target_doc_type,
+                    self.Reporter.Cell(row.version_selector, center=True),
+                ])
+        return self._rows
+
+
+if __name__ == "__main__":
+    "Don't execute the script if loaded as a module."""
+    Control().run()

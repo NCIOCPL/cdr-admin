@@ -1,55 +1,77 @@
-#----------------------------------------------------------------------
-# Display the table of contents for the CDR help system.
-# JIRA::OCECDR-3800
-#----------------------------------------------------------------------
-import cdr
-import cgi
-import cdrcgi
-from cdrapi import db
+#!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# Fallback when id parameter is not supplied.
-#----------------------------------------------------------------------
-def default_help():
-    try:
-        cursor = db.connect(user='CdrGuest').cursor()
-        cursor.execute("""\
-SELECT doc_id
-  FROM query_term
- WHERE path = '/DocumentationToC/ToCTitle'
-   AND value = 'CDR Help'""")
-        rows = cursor.fetchall()
-        if rows:
-            return rows[0][0]
-        cursor.execute("""\
-SELECT MIN(doc_id)
-  FROM query_term
- WHERE path = '/DocumentationToC/ToCTitle'""")
-        rows = cursor.fetchall()
-        if rows:
-            return rows[0][0]
-    except:
-        cdrcgi.bail("Unable to connect to the CDR database")
-    cdrcgi.bail("Help system cannot be found")
+from cdrcgi import Controller
+from cdrapi.docs import Doc
 
-#----------------------------------------------------------------------
-# Get the parameters from the request.
-#----------------------------------------------------------------------
-fields = cgi.FieldStorage()
-doc_id = fields.getvalue("id") or default_help()
 
-#----------------------------------------------------------------------
-# Filter the document to create the HTML page.
-#----------------------------------------------------------------------
-try:
-    response = cdr.filterDoc('guest', ['name:Help Table of Contents'], doc_id)
-    error = cdr.checkErr(response)
-    if error:
-        cdrcgi.bail(error)
-except Exception as e:
-    cdrcgi.bail(str(e))
+class Control(Controller):
+    """Access to the database and HTML page creation."""
 
-#----------------------------------------------------------------------
-# Send the page back to the browser after converting to Unicode.
-#----------------------------------------------------------------------
-cdrcgi.sendPage(response[0])
+    FILTER = "name:Help Table of Contents"
+    HELP = "CDR Help"
+
+    def show_form(self):
+        """Bypass the form."""
+        self.show_report()
+
+    def show_report(self):
+        """Override to bypass the form/table module."""
+
+        buttons = (
+            self.HTMLPage.button(self.SUBMENU),
+            self.HTMLPage.button(self.ADMINMENU),
+            self.HTMLPage.button(self.LOG_OUT),
+        )
+        opts = dict(
+            buttons=buttons,
+            session=self.session,
+            action=self.script,
+            banner=self.title,
+            footer=None,
+            subtitle=self.doc.title.split(";")[0],
+        )
+        page = self.HTMLPage(self.title, **opts)
+        for menu_list in self.lists:
+            page.body.append(menu_list)
+        page.body.set("class", "admin-menu")
+        page.send()
+
+    @property
+    def lists(self):
+        """Nested lists of menu links."""
+
+        if not hasattr(self, "_lists"):
+            root = self.doc.filter(self.FILTER).result_tree.getroot()
+            self._lists = root.findall("body/ul")
+        return self._lists
+
+    @property
+    def doc(self):
+        """The documentation table of contents document to display."""
+        return Doc(self.session, id=self.id)
+
+    @property
+    def id(self):
+        """ID of the table of contents document to render."""
+        return self.fields.getvalue("id", self.default)
+
+    @property
+    def default(self):
+        """Fallback if an "id" paramater is not present."""
+
+        query = self.Query("query_term", "doc_id")
+        query.where("path = '/DocumentationToC/ToCTitle'")
+        query.where(f"path = '{self.HELP}'")
+        rows = query.execute(self.cursor).fetchall()
+        if not rows:
+            query = self.Query("query_term", "MIN(doc_id) AS doc_id")
+            query.where("path = '/DocumentationToC/ToCTitle'")
+            rows = query.execute(self.cursor).fetchall()
+            if not rows:
+                self.bail("Help system missing")
+        return rows[0].doc_id
+
+
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+    Control().run()

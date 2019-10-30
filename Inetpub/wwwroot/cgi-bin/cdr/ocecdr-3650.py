@@ -1,198 +1,278 @@
-#----------------------------------------------------------------------
-# Reports on internal links within a summary to support keeping standard
-# treatment options in sync during the HP reformat process.  Implemented
-# in a more general way in order to support other uses.
-#
-# JIRA::OCECDR-3650
-#----------------------------------------------------------------------
-import cgi
-import datetime
+#!/usr/bin/env python
+
+"""Reports on internal links within a summary.
+
+The report is used to support keeping standard treatment options in
+sync during the HP reformat process.
+"""
+
 import re
-import sys
-import lxml.etree as etree
-import cdrcgi
-from cdrapi import db
+from sys import maxsize
+from cdrcgi import Controller, Reporter
+from cdrapi.docs import Doc
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields    = cgi.FieldStorage()
-docId     = fields.getvalue(cdrcgi.DOCID)
-session   = cdrcgi.getSession(fields)
-request   = cdrcgi.getRequest(fields)
-title     = "Internal Summary Links"
-instr     = "Report on Links From One Section of a Summary to Another Section"
-script    = "ocecdr-3650.py"
-SUBMENU   = "Report Menu"
-buttons   = (SUBMENU, cdrcgi.MAINMENU)
-linkPattern = re.compile("CDR(\\d+)(?:#(.+))?")
-fragNumPattern = re.compile("_(\\d+)")
 
-#----------------------------------------------------------------------
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if request == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif request == SUBMENU:
-    cdrcgi.navigateTo("reports.py", session)
+class Control(Controller):
+    "Report logic."""
 
-#----------------------------------------------------------------------
-# Set up a database connection and cursor.
-#----------------------------------------------------------------------
-try:
-    conn = db.connect(user="CdrGuest")
-    cursor = conn.cursor()
-except Exception as e:
-    cdrcgi.bail('Database connection failure: %s' % e)
+    SUBTITLE = ("Report on Links From One Section of a Summary "
+                "to Another Section")
+    COLUMNS = (
+        Reporter.Column("FragID", width="75px"),
+        Reporter.Column("Target Section/Subsection", width="500px"),
+        Reporter.Column("Linking Section/Subsection", width="500px"),
+        Reporter.Column("Text in Linking Node", width="500px"),
+        Reporter.Column("In Table?", width="75px"),
+        Reporter.Column("In List?", width="75px"),
+    )
 
-#----------------------------------------------------------------------
-# Put up the form if we don't have a document ID.
-#----------------------------------------------------------------------
-if not docId:
-    header = cdrcgi.header(title, title, instr, script,
-                           ("Submit", SUBMENU, cdrcgi.MAINMENU))
-    form = """\
-   <style>* { font-family: Arial; }</style>
-   <input type='hidden' name='%s' value='%s'>
-   <fieldset>
-    <legend>&nbsp;Pick A Document&nbsp;</legend>
-    <b>CDR Doc ID:&nbsp;</b>
-    <input name="%s">
-   </fieldset>
-  </form>
- </body>
-</html>
-""" % (cdrcgi.SESSION, session, cdrcgi.DOCID)
-    cdrcgi.sendPage(header + form)
+    def populate_form(self, page):
+        """Ask the user for a document ID.
+
+        Pass:
+            page - HTMLPage object to which the ID field is attached
+        """
+
+        fieldset = page.fieldset("Specify a Summary Document")
+        fieldset.append(page.text_field("id", label="Summary ID"))
+        page.form.append(fieldset)
+
+    def build_tables(self):
+        """Return the single table for this report."""
+        return self.table
+
+    @property
+    def doc(self):
+        """The `Doc` object for the report's Summary document."""
+
+        if not hasattr(self, "_doc"):
+            self._doc = Doc(self.session, id=self.id)
+        return self._doc
+
+    @property
+    def format(self):
+        """Generate this report as an Excel workbook."""
+        return "excel"
+
+    @property
+    def id(self):
+        """CDR ID of the summary for this report."""
+        return self.fields.getvalue("id")
+
+    @property
+    def rows(self):
+        """Rows for the report table."""
+
+        if not hasattr(self, "_rows"):
+            self._rows = []
+            for target in sorted(self.targets.values()):
+                args = target.id, len(target.links)
+                self.logger.debug("target %s has %d links", *args)
+                opts = {}
+                rowspan = len(target.links)
+                if rowspan > 1:
+                    opts = dict(rowspan=rowspan)
+                link = target.links[0]
+                row = [
+                    self.Reporter.Cell(target.id, right=True, **opts),
+                    self.Reporter.Cell(target.section, **opts),
+                    link.section,
+                    link.text,
+                    self.Reporter.Cell(link.in_table, center=True),
+                    self.Reporter.Cell(link.in_list, center=True),
+                ]
+                self._rows.append(row)
+                for link in target.links[1:]:
+                    row = [
+                        link.section,
+                        link.text,
+                        self.Reporter.Cell(link.in_table, center=True),
+                        self.Reporter.Cell(link.in_list, center=True),
+                    ]
+                    self._rows.append(row)
+            args = len(self._rows), self.doc.cdr_id
+            self.logger.info("%d internal links found in %s", *args)
+        return self._rows
+
+    @property
+    def table(self):
+        """Create the table for the document's internal links."""
+
+        if not hasattr(self, "_table"):
+            self._table = None
+            if self.rows:
+                caption = f"Links for CDR{self.doc.id} ({self.doc.title})"
+                opts = dict(columns=self.COLUMNS, caption=caption)
+                self._table = Reporter.Table(self.rows, **opts)
+        return self._table
+
+    @property
+    def targets(self):
+        """Collect the targets by following the links."""
+
+        if not hasattr(self, "_targets"):
+            self._targets = {}
+            dead_links = set()
+            root = self.doc.root
+            opts = dict(namespaces=Doc.NSMAP)
+            linking_nodes = root.xpath(self.xpath, **opts)
+            for linking_node in linking_nodes:
+                link = Link(linking_node)
+                if link.id and link.id not in dead_links:
+                    if link.id not in self._targets:
+                        xpath = f"//*[@cdr:id = '{link.id}']"
+                        nodes = root.xpath(xpath, **opts)
+                        if len(nodes) > 1:
+                            args = len(nodes), self.id
+                            self.logger.warning("%d nodes have id %s", *args)
+                        if nodes:
+                            args = link.id, nodes[0]
+                            self._targets[link.id] = Target(*args)
+                        else:
+                            self.logger.warning("cdr:id %s not found", link.id)
+                            dead.add(link.id)
+                    if link.id in self._targets:
+                        self._targets[link.id].add(link)
+        return self._targets
+
+    @property
+    def xpath(self):
+        """String for finding the linking nodes."""
+        return f"//*[starts-with(@cdr:href, '{self.doc.cdr_id}#')]"
+
 
 class Link:
-    def __init__(self, node, elements):
-        self.text = self.path = self.element = self.docId = self.fragId = None
-        self.fragNum = self.section = None
-        self.href = node.get("{cips.nci.nih.gov/cdr}href")
-        if self.href:
-            match = linkPattern.match(self.href.strip())
-            if match:
-                self.docId = int(match.group(1))
-                self.fragId = match.group(2)
-                self.element = elements[-1]
-                self.path = "/" + "/".join(elements)
-                self.text = node.text
-                if self.fragId:
-                    match = fragNumPattern.match(self.fragId)
-                    if match:
-                        self.fragNum = int(match.group(1))
-                p = node.getparent()
-                while p is not None:
-                    if p.tag == "SummarySection":
-                        self.section = SummarySection(p)
-                        break
-                    p = p.getparent()
-    def __cmp__(self, other):
-        if self.fragNum is not None:
-            if other.fragNum is not None:
-                return cmp(self.fragNum, other.fragNum)
-            return -1
-        return cmp(self.fragId, other.fragId)
+    """A link from one node in the report's document to another."""
 
-class SummarySection:
+    CDR_HREF = f"{{{Doc.NS}}}href"
+
     def __init__(self, node):
-        self.title = self.parent = None
-        for child in node:
-            if child.tag == "Title":
-                self.title = "".join([t for t in child.itertext()])
-                break
-        return
-        parent = node.getparent()
-        while parent is not None:
-            if parent.tag == "SummarySection":
-                self.parent = SummarySection(parent)
-                break
-            parent = parent.getparent()
+        """Remember the caller's node and start with false flags.
+
+        Pass:
+            node - the element containing an internal link
+        """
+
+        self.__node = node
+        self.__in_table = False
+        self.__in_list = False
+
+    @property
+    def id(self):
+        """The fragment ID for the linking attribute."""
+
+        if not hasattr(self, "_id"):
+            self._id = self.node.get(self.CDR_HREF, "#").split("#")[1]
+        return self._id
+
+    @property
+    def in_list(self):
+        """'X' if the link is inside a list, otherwise an empty string."""
+        return "X" if self.__in_list else ""
+
+    @property
+    def in_table(self):
+        """'X' if the link is inside a table, otherwise an empty string."""
+        return "X" if self.__in_table else ""
+
+    @property
+    def node(self):
+        """Node containing the cdr:href internal link."""
+        return self.__node
+
+    @property
+    def section(self):
+        """The string for the title of the immediately enclosing section.
+
+        As a side effect, we detect whether we are in a list or a table.
+        """
+
+        if not hasattr(self, "_section"):
+            node = self.node
+            self._section = None
+            while node is not None:
+                if node.tag == "SummarySection":
+                    self._section = Doc.get_text(node.find("Title"))
+                    break
+                if node.tag == "Table":
+                    self.__in_table = True
+                elif node.tag == "ListItem":
+                    self.__in_list = True
+                node = node.getparent()
+        return self._section
+
+    @property
+    def text(self):
+        """The text content of the linking element."""
+
+        if not hasattr(self, "_text"):
+            self._text = Doc.get_text(self.node)
+        return self._text
+
 
 class Target:
-    def __init__(self, top, fragId, fragNum):
-        self.fragId = fragId
-        self.fragNum = fragNum
-        self.links = []
-        self.elem = top.xpath("//*[@cdr:id='%s']" % fragId,
-                              namespaces={"cdr": "cips.nci.nih.gov/cdr"})[0]
-        self.section = None
-        #self.text = "".join([t for t in self.elem.itertext()])[:200]
-        e = self.elem
-        while e is not None:
-            if e.tag == "SummarySection":
-                self.section = SummarySection(e)
-                break
-            e = e.getparent()
+    """The target node of one of more internal links."""
+
+    def __init__(self, id, node):
+        """Save the caller's values and add tracking for linkers.
+
+        Pass:
+            id - cdr:id attribute value for this node
+            node - element to which one or more internal links exit.
+        """
+
+        self.__id = id
+        self.__node = node
+        self.__links = []
+
     def __lt__(self, other):
-        if self.fragNum is not None:
-            if other.fragNum is not None:
-                return self.fragNum < other.fragNum
-            return -1
-        return self.fragId < other.fragId
+        """Sort numerically, with a fallback for human-created IDs."""
+        return self.sortkey < other.sortkey
 
-def findLinks(docId, node, links, elements):
-    elements.append(node.tag)
-    link = Link(node, elements)
-    if link.docId == docId:
-        links.append(link)
-    for child in node:
-        findLinks(docId, child, links, list(elements))
+    def add(self, link):
+        """Remember another linker to this target node."""
+        self.__links.append(link)
 
-intId = int(re.sub("[^0-9]*", "", docId))
-cursor.execute("SELECT title, xml FROM document WHERE id = ?", intId)
-rows = cursor.fetchall()
-if not rows:
-    cdrcgi.bail("can't find document %s" % docId)
-tree = etree.XML(rows[0][1].encode("utf-8"))
-title = rows[0][0]
-links = []
-elements = []
-findLinks(intId, tree, links, elements)
-styles = cdrcgi.ExcelStyles()
-styles.set_color(styles.header, "blue")
-styles.frag = styles.style("align: horz right, vert center, wrap true")
-styles.source = styles.style("align: horz left, vert center, wrap true")
-sheet = styles.add_sheet("Links")
-banner = "Links for CDR%s (%s)" % (intId, title)
-sheet.write_merge(0, 0, 0, 5, banner, styles.header)
-labels = ("FragID", "Source Section/Subsection",
-          "Section/Subsection Containing Fragment Ref",
-          "Text in Fragment Ref", "In Table?", "In List?")
-widths = (10, 60, 60, 60, 10, 10)
-assert(len(labels) == len(widths))
-for i, chars in enumerate(widths):
-    sheet.col(i).width = styles.chars_to_width(chars)
-for i, label in enumerate(labels):
-    sheet.write(1, i, label, styles.header)
-targets = {}
-for link in links:
-    target = targets.get(link.fragId)
-    if not target:
-        targets[link.fragId] = target = Target(tree, link.fragId, link.fragNum)
-    target.links.append(link)
-row = 2
-for target in sorted(targets.values()):
-    targetSectionTitle = target.section and target.section.title or "None"
-    first = row
-    last = row + len(target.links) - 1
-    sheet.write_merge(first, last, 0, 0, target.fragId, styles.frag)
-    sheet.write_merge(first, last, 1, 1, targetSectionTitle, styles.source)
-    for link in target.links:
-        sourceSectionTitle = link.section and link.section.title or "None"
-        sheet.write(row, 2, sourceSectionTitle, styles.left)
-        sheet.write(row, 3, str(link.text), styles.left)
-        if "/Table/" in link.path:
-            sheet.write(row, 4, "X", styles.center)
-        if "/ListItem/" in link.path:
-            sheet.write(row, 5, "X", styles.center)
-        row += 1
-stamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
-name = "SummaryInternalLinks-CDR%s-%s.xls" % (intId, stamp)
-sys.stdout.buffer.write(f"""\
-Content-type: application/vnd.ms-excel
-Content-Disposition: attachment; filename={name}
+    @property
+    def id(self):
+        """ID of the target node."""
+        return self.__id
 
-""".encode("utf-8"))
-styles.book.save(sys.stdout.buffer)
+    @property
+    def links(self):
+        """The nodes which link to this one."""
+        return self.__links
+
+    @property
+    def node(self):
+        """Node to which one or more internal links exist."""
+        return self.__node
+
+    @property
+    def section(self):
+        """Title of the nnermost enclosing section for the link target."""
+
+        if not hasattr(self, "_section"):
+            self._section = None
+            node = self.node
+            while node is not None:
+                if node.tag == "SummarySection":
+                    self._section = Doc.get_text(node.find("Title"))
+                    break
+                node = node.getparent()
+        return self._section
+
+    @property
+    def sortkey(self):
+        """Sort the targets numerically, if possible, with a fallback."""
+
+        if not hasattr(self, "_sortkey"):
+            digits = re.sub("[^0-9]+", "", self.id)
+            number = int(digits) if digits else maxsize
+            self._sortkey = (number, self.id)
+        return self._sortkey
+
+
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+    Control().run()

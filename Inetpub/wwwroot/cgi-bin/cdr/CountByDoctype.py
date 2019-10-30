@@ -1,103 +1,68 @@
-#----------------------------------------------------------------------
-# Running the Publishing Documents Report Count as a batch job
-#
-# BZIssue::5237 - Report for publication document counts fails on
-#                 non-production server
-#----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, cdrbatch
+#!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields  = cgi.FieldStorage()
-session = cdrcgi.getSession(fields)
-request = cdrcgi.getRequest(fields)
-title   = "CDR Administration"
-section = "Published Documents Count"
-SUBMENU = 'Report Menu'
-buttons = ["Submit", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-header  = cdrcgi.header(title, title, section, "CountByDoctype.py", buttons,
-                        method = 'GET')
-email   = fields and fields.getvalue('email') or None
-command = 'lib/Python/CdrLongReports.py'
-docTypes = cdr.getDoctypes(session)
+"""Generate report of statistics on the most recent weekly export job.
+"""
 
-#----------------------------------------------------------------------
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if request == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif request == SUBMENU:
-    cdrcgi.navigateTo("reports.py", session)
+from cdrcgi import Controller
 
-#----------------------------------------------------------------------
-# Handle request to log out.
-#----------------------------------------------------------------------
-if request == "Log Out":
-    cdrcgi.logout(session)
 
-#----------------------------------------------------------------------
-# Put up the request interface if appropriate.
-#----------------------------------------------------------------------
-if not email:
-    form = """\
-   <input type='hidden' name='%s' value='%s'>
+class Control(Controller):
+    """Report logic."""
 
-   <fieldset>
-   <p>
-    This report requires a while to complete.
-    When the report processing has completed, email notification
-    will be sent to the addresses specified below.  At least
-    one email address must be provided.  If more than one
-    address is specified, separate the addresses with a blank.
-   </p>
+    def populate_form(self, page):
+        """Skip the form, which isn't needed for this report."""
+        self.show_report()
 
-    <br>
-    <b>Email address(es):&nbsp;&nbsp;&nbsp;</b>
-    <br>
-    <input name='email' size='70' value='%s'>
+    def build_tables(self):
+        """Create the only table needed for the report."""
 
-""" % (cdrcgi.SESSION, session, cdr.getEmail(session))
+        rows = []
+        total = 0
+        for doc_type in self.counts:
+            count = self.counts[doc_type]
+            total += count
+            row = (
+                doc_type,
+                self.Reporter.Cell(count, right=True),
+            )
+            rows.append(row)
+        row = (
+            self.Reporter.Cell("TOTAL", bold=True),
+            self.Reporter.Cell(total, bold=True, right=True)
+        )
+        rows.append(row)
+        columns = "Document Type", "Count"
+        caption = f"Documents Exported By Job {self.job}"
+        table = self.Reporter.Table(rows, columns=columns, caption=caption)
+        return table
 
-    cdrcgi.sendPage(header + form + """\
-   </fieldset>
- </body>
-</html>
-""")
+    @property
+    def counts(self):
+        """Find the number of documents publishing for each document type."""
 
-#----------------------------------------------------------------------
-# If we get here, we're ready to queue up a request for the report.
-#----------------------------------------------------------------------
-batch = cdrbatch.CdrBatch(jobName = "Published Documents Count",
-                          command = command, email = email)
-try:
-    batch.queue()
-except Exception as e:
-    cdrcgi.bail("Could not start job: " + str(e))
-jobId       = batch.getJobId()
-buttons     = [SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-script      = 'CountByDoctype.py'
-header      = cdrcgi.header(title, title, section, script, buttons,
-                            stylesheet = """\
-  <style type='text/css'>
-   body { font-family: Arial }
-  </style>
- """)
-base = "http://%s%s" % (cdrcgi.WEBSERVER, cdrcgi.BASE)
+        if not hasattr(self, "_counts"):
+            query = self.Query("doc_type t", "t.name", "COUNT(*) AS n")
+            query.join("document d", "d.doc_type = t.id")
+            query.join("pub_proc_doc p", "p.doc_id = d.id")
+            query.where(query.Condition("pub_proc", self.job))
+            query.where("p.failure IS NULL")
+            query.group("t.name")
+            rows = query.execute(self.cursor).fetchall()
+            self._counts = dict([tuple(row) for row in rows])
+        return self._counts
 
-cdrcgi.sendPage(header + """\
-   <fieldset>
-   <h4>Report has been queued for background processing</h4>
-   <p>
-    To monitor the status of the job, click this
-    <a href='%s/getBatchStatus.py?%s=%s&jobId=%s'>
-     <span style="text-decoration:underline;color:blue;">link</span>
-    </a>
-    or use the CDR Administration menu option
-    <span style="font-style:italic;">View Batch Job Status</span>.
-   </p>
-   </fieldset>
-  </form>
- </body>
-</html>
-""" % (base, cdrcgi.SESSION, session, jobId))
+    @property
+    def job(self):
+        """Last successful full export publishing job."""
+
+        if not hasattr(self, "_job"):
+            query = self.Query("pub_proc", "MAX(id) AS id")
+            query.where("pub_subset = 'Export'")
+            query.where("status = 'Success'")
+            self._job = query.execute(self.cursor).fetchall()[0].id
+        return self._job
+
+
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+    Control().run()

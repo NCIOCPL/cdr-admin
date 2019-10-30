@@ -139,12 +139,14 @@ class BoardMember:
         self.boardName = BoardMember.boards.get(boardId)
         if not self.boardName:
             self.boardName = BoardMember.boards[boardId] = getBoardName(boardId)
-    def __cmp__(self, other):
-        if self.isEic == other.isEic:
-            return cmp(self.name.upper(), other.name.upper())
-        elif self.isEic:
-            return -1
-        return 1
+    def __lt__(self, other):
+        return self.sortkey < other.sortkey
+    @property
+    def sortkey(self):
+        if not hasattr(self, "_sortkey"):
+            isEic = 1 if self.isEic else 0
+            self._sortkey = isEic, self.name.upper()
+        return self._sortkey
     def toNode(self):
         node = etree.Element('BoardMember')
         etree.SubElement(node, 'DocId').text = str(self.id)

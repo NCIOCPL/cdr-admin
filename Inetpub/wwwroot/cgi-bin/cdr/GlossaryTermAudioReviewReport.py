@@ -1,324 +1,284 @@
-#----------------------------------------------------------------------
-# Report information from the term_audio... database tables that
-# track the review of Term audio files.
-#
-# BZIssue::5128
-# JIRA::OCECDR-3800 - eliminated security vulnerabilities
-#----------------------------------------------------------------------
+#!/usr/bin/env python
 
-import cgi
-import cdrcgi
-from cdrapi import db
-
-# Constants
-SCRIPT  = "GlossaryTermAudioReviewReport.py"
-HEADER  = "Glossary Term Audio Review Statistical Report"
-BUTTONS = (cdrcgi.MAINMENU, "Logout")
-
-def bail(ctxtMsg, e=None):
-    """
-    Bail out, producing a debugging message.
-    May or may not include an Exception object.
-
-    Pass:
-        ctxtMsg - Error context message.
-        e       - Exception object of any type.
-    """
-    msg = "%s:<br />\n" % ctxtMsg
-    if e is not None:
-        msg += "Exception Type: %s</br />\n" % type(e)
-        msg += "Exception msg: %s" % str(e)
-    cdrcgi.bail(msg)
-
-def createZipDict(cursor, language):
-    """
-    Create a dictionary of:
-        zipfile_id => [filename, complete(Y/N), numApproved,
-                       numRejected, numUnreviewed]
-
-    Includes all zipfiles, we'll see which ones we need later.
-
-    Pass:
-        Database cursor.
-
-    Return:
-        Reference to dictionary.
-    """
-    # Dictionary to return
-    zipData = {}
-
-    sql = """
-SELECT z.filename, z.id, complete, m.review_status, count(*) as count
-  FROM term_audio_mp3 m
-  JOIN term_audio_zipfile z
-    ON m.zipfile_id = z.id
- WHERE m.language = ?
- GROUP BY z.filename, z.id, complete, m.review_status
- ORDER BY z.filename
+"""Report on audio files with a specified review disposition.
 """
-    try:
-        cursor.execute(sql, language)
-        rows = cursor.fetchall()
-    except Exception as e:
-            bail("Unable to select zipfile data", e)
 
-    # No zipId yet
-    zipId = -1
+from cdrcgi import Controller, Reporter
 
-    for row in rows:
-        # Parse row
-        fname, zId, complete, revStat, revCount = row
 
-        # Expecting 3 rows for 3 counters / zipfile
-        if zId != zipId:
-            # Load the dictionary
-            zipRow = [fname, complete, 0, 0, 0]
-            zipData[zId] = zipRow
-            zipId = zId
+class Control(Controller):
+    """Script logic."""
 
-        # Update counts by review status:
-        if revStat == 'A':  zipRow[2] = revCount
-        if revStat == 'R':  zipRow[3] = revCount
-        if revStat == 'U':  zipRow[4] = revCount
+    SUBTITLE = "Glossary Term Audio Review Statistical Report"
+    INSTRUCTIONS = (
+        "Select a language and approval status for the term names "
+        "to include in the report.  Optionally add start and/or "
+        "end dates for the term reviews to limit the size of the output."
+    )
+    LANGUAGES = "English", "Spanish"
+    STATUSES = "Approved", "Rejected", "Unreviewed"
+    REPORT_TYPES = (
+        "Full report showing terms",
+        "Summary report with status totals only",
+    )
 
-    return zipData
+    def build_tables(self):
+        """Create the full or summary report, as requested by the user."""
 
-# Main
-if __name__ == "__main__":
+        self.subtitle = f"{self.status} {self.language} Audio Pronuciations"
+        tables = [self.summary_table]
+        if self.type == "full":
+            tables += [audio_set.table for audio_set in self.sets]
+        return tables
 
-    language  = None
-    revStatus = None
-    errors    = []
+    def populate_form(self, page):
+        """Add the fields to the form.
 
-    # Find any posted parameters
-    fields    = cgi.FieldStorage()
-    session   = cdrcgi.getSession(fields)
-    request   = cdrcgi.getRequest(fields)
-    language  = fields.getvalue("language")
-    revStatus = fields.getvalue("revStatus")
-    startDate = fields.getvalue("startDate", "2010-01-01")
-    endDate   = fields.getvalue("endDate", "2999-01-01")
-    reportType= fields.getvalue("reportType", "full")
-    beenHere  = fields.getvalue("beenHere")
+        Pass:
+            page - HTMLPage object to which we add the fields
+        """
 
-    # Canceled?
-    if request == "Admin Menu":
-        cdrcgi.navigateTo("Admin.py", session)
+        fieldset = page.fieldset("Instructions")
+        fieldset.append(page.B.P(self.INSTRUCTIONS))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Select Language")
+        checked = True
+        for language in self.LANGUAGES:
+            opts = dict(value=language, checked=checked)
+            fieldset.append(page.radio_button("language", **opts))
+            checked = False
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Select Status")
+        checked = True
+        for status in self.STATUSES:
+            opts = dict(value=status, checked=checked)
+            fieldset.append(page.radio_button("status", **opts))
+            checked = False
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Select Full or Summary Report")
+        checked = True
+        for display in self.REPORT_TYPES:
+            value = display.split()[0].lower()
+            opts = dict(value=value, label=display, checked=checked)
+            fieldset.append(page.radio_button("type", **opts))
+            checked = False
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Optional Start and End Dates")
+        fieldset.append(page.date_field("start_date"))
+        fieldset.append(page.date_field("end_date"))
+        page.form.append(fieldset)
 
-    # Validate inputs
-    if language and language not in ("English", "Spanish"):
-        language = None
-    if revStatus and revStatus not in ("A", "R", "U"):
-        revStatus = None
-    if not cdrcgi.is_date(startDate):
-        startDate = "2010-01-01"
-    if not cdrcgi.is_date(endDate):
-        endDate = "2999-01-01"
-    if reportType != "summary":
-        reportType = "full"
-    if beenHere:
-        # Must specify langage and review status, dates can be defaulted
-        if not language:
-            errors.append("Language is required")
-        if not revStatus:
-            errors.append("Approval status is required")
+    def show_report(self):
+        """Override the base class version in order to add style rules."""
 
-        # Dates have to make sense
-        if endDate < startDate:
-            errors.append("End date cannot be before start date")
-
-    # Extend end date to cover all of the time that day, not just 0:0:0
-    endDate += " 23:59:59"
-
-    #######################################################
-    # Prompt for inputs if we don't have what we need
-    #######################################################
-    if not language or not revStatus or errors:
-        buttons = ('Submit', 'Admin Menu')
-        page = cdrcgi.Page(HEADER, subtitle="Enter report parameters",
-                           action=SCRIPT, buttons=buttons, session=session)
-        instructions = (
-            "Select a language and approval status for the term names "
-            "to include in the report.  Optionally add start and/or "
-            "end dates for the term reviews to limit the size of the output."
+        css = (
+            "table { width: 500px; margin-top: 50px; }",
+            "table.set { width: 75%; }",
+            ".center {width: 150px; }",
+            ".set td:last-child { width: 200px; }",
         )
-        page.add(page.B.FIELDSET(page.B.P(instructions)))
-        if errors:
-            page.add("<fieldset>")
-            page.add(page.B.LEGEND("Validation Errors", page.B.CLASS("error")))
-            page.add("<ul class='error'>")
-            for error in errors:
-                page.add(page.B.LI(error))
-            page.add("</ul>")
-            page.add("</fieldset>")
-        page.add("<fieldset>")
-        page.add(page.B.LEGEND("Select Language"))
-        page.add_radio("language", "English", "English")
-        page.add_radio("language", "Spanish", "Spanish")
-        page.add("</fieldset>")
-        page.add("<fieldset>")
-        page.add(page.B.LEGEND("Select Approval Status"))
-        page.add_radio("revStatus", "Approved", "A")
-        page.add_radio("revStatus", "Rejected", "R")
-        page.add_radio("revStatus", "Unreviewed", "U")
-        page.add("</fieldset>")
-        page.add("<fieldset>")
-        page.add(page.B.LEGEND("Select Full or Summary Report"))
-        page.add_radio("reportType", "Full report showing terms", "full",
-                       checked=True)
-        page.add_radio("reportType", "Summary report with grand totals only",
-                       "summary")
-        page.add("</fieldset>")
-        page.add("<fieldset>")
-        page.add(page.B.LEGEND("Optional Start and End Dates"))
-        page.add_date_field("startDate", "Start date")
-        page.add_date_field("endDate", "End date")
-        page.add("</fieldset>")
-        page.add(page.B.INPUT(name="beenHere", value="beenHere",
-                              type="hidden"))
-        page.send()
+        self.report.page.add_css("\n".join(css))
+        self.report.send()
 
-    #######################################################
-    # We have input parameters.  Create the report.
-    #######################################################
+    @property
+    def end(self):
+        """Optional end to report's date range."""
+        return self.fields.getvalue("end_date")
 
-    # Connect to the database
-    try:
-        conn = db.connect()
-        cursor = conn.cursor()
-    except Exception as e:
-        bail("Unable to access database", e)
+    @property
+    def language(self):
+        """Language value selected from the form by the user."""
+        return self.fields.getvalue("language")
 
-    # Get information about all of the zipfiles
-    zipData = createZipDict(cursor, language)
+    @property
+    def sets(self):
+        """Audio pronunciation sets in scope for this report."""
 
-    # Get all of the term by term review info
-    qry = """
-SELECT z.id, m.term_name, m.review_date, u.fullname
-  FROM term_audio_mp3 m
-  JOIN usr u
-    ON m.reviewer_id = u.id
-  JOIN term_audio_zipfile z
-    ON m.zipfile_id = z.id
- WHERE m.language = ?
-   AND m.review_status = ?
-   AND m.review_date >= ?
-   AND m.review_date <= ?
- ORDER BY z.filename, m.term_name
-"""
+        if not hasattr(self, "_sets"):
+            fields = "z.id", "z.filename"
+            query = self.Query("term_audio_zipfile z", *fields).unique()
+            query.join("term_audio_mp3 m", "m.zipfile_id = z.id")
+            query.where(query.Condition("m.language", self.language))
+            query.where(query.Condition("m.review_status", self.status[0]))
+            if self.start:
+                query.where(query.Condition("m.review_date", self.start, ">="))
+            if self.end:
+                end = f"{self.end[:10]} 23:59:59"
+                query.where(query.Condition("m.review_date", end, "<="))
+            rows = query.order("z.id").execute(self.cursor).fetchall()
+            self._sets = [AudioSet(self, row) for row in rows]
+        return self._sets
 
-    try:
-        cursor.execute(qry, (language, revStatus, startDate, endDate))
-    except Exception as e:
-        bail("Error fetching term status", e)
+    @property
+    def start(self):
+        """Optional start to report's date range."""
+        return self.fields.getvalue("start_date")
 
-    # Formatting for report
-    stylesheet = """\
-    <link type='text/css' rel='stylesheet'
-          href='/stylesheets/CdrCalendar.css'>
-    <script type='text/javascript' language='JavaScript'
-             src='/js/CdrCalendar.js'></script>
-    <style type='text/css'>
-      h1         {font: 16pt 'Times New Roman'; font-weight: bold;
-                  text-align: center;}
-      .errmsg    {font: 11pt 'Times New Roman'; color: red; font-weight: bold;}
-      th         {font: 12pt 'Times New Roman'; font-weight: bold;
-                  background-color: blue; color: white; text-align: left;}
-      td         {font: 11pt 'Times New Roman';}
-      /* tr:nth-child(odd) {background-color: #ffe; } */
-      td.summary {font: 10pt 'Times New Roman'; font-weight: bold;}
-      p          {font: 14pt 'Times New Roman';}
-      p.totals   {text-align: center; font-weight: bold;}
-      table.data {margin-left: auto; margin-right: auto;
-                  margin-bottom: 2em; width: 75%;}
-     </style>"""
+    @property
+    def status(self):
+        """Status value selected from the form by the user."""
+        return self.fields.getvalue("status")
 
-    html = []
-    buttons = ("Another report", cdrcgi.MAINMENU)
-    html.append(cdrcgi.header(HEADER, HEADER,
-                              "Pronunciation report",
-                              script=SCRIPT, buttons=buttons,
-                              stylesheet=stylesheet))
+    @property
+    def subtitle(self):
+        """String displayed immediately under the page's main banner."""
 
-    # Description of the report
-    if revStatus == 'A': statusName = "Approved"
-    if revStatus == 'R': statusName = "Rejected"
-    if revStatus == 'U': statusName = "Unreviewed"
+        if not hasattr(self, "_subtitle"):
+            self._subtitle = self.SUBTITLE
+        return self._subtitle
 
-    # Accumulators for counts of each status
-    countApproved   = 0
-    countRejected   = 0
-    countUnreviewed = 0
+    @subtitle.setter
+    def subtitle(self, value):
+        """Make this modifiable on the fly."""
+        self._subtitle = value
 
-    html.append("<h1>%s %s Audio Pronunciations</h1>\n" %
-                (statusName, language))
+    @property
+    def summary_table(self):
+        """Table showing the totals for each status."""
 
-    # Initialize zipId to no legal value
-    zipId = -1
+        if not hasattr(self, "_summary_table"):
+            approved = rejected = unreviewed = 0
+            for audio_set in self.sets:
+                approved += audio_set.approved
+                rejected += audio_set.rejected
+                unreviewed += audio_set.unreviewed
+            row = [
+                Reporter.Cell(approved, center=True),
+                Reporter.Cell(rejected, center=True),
+                Reporter.Cell(unreviewed, center=True),
+            ]
+            opts = dict(columns=self.STATUSES, caption="Status Totals")
+            self._summary_table =  Reporter.Table([row], **opts)
+        return self._summary_table
 
-    while True:
-        row = cursor.fetchone()
-        if not row or row[0] != zipId:
-            # Terminate old zipfile if we have one
-            if zipId >=0:
-                if reportType == "full":
-                    html.append("""\
- <tr>
-  <td class='summary' colspan='3'>Subtotal - %s only: &nbsp;
-  Approved=%d &nbsp; Rejected=%d &nbsp; Unreviewed=%d</td>
- </tr>
-</table>
-""" % (language, zipData[zipId][2], zipData[zipId][3], zipData[zipId][4]))
+    @property
+    def type(self):
+        """Report type selected by the user (full or summary)."""
+        return self.fields.getvalue("type")
 
-                # Add subtotals to totals
-                countApproved   += zipData[zipId][2]
-                countRejected   += zipData[zipId][3]
-                countUnreviewed += zipData[zipId][4]
 
-        if row:
-            if row[0] != zipId:
-                zipId = row[0]
-                if reportType == "full":
-                    # Start a new zipfile output
-                    html.append("""\
-<table class='data' border="1">
- <tr>
-  <th colspan='3'>%s</th>
- </tr>
- <tr>
-  <th width='50%%'>Term</th>
-  <th width='20%%'>Review Date</th>
-  <th width='30%%'>User</th>
- </tr>
-""" % zipData[zipId][0])
-            if reportType == "full":
-                html.append("""\
- <tr>
-  <td>%s</td>
-  <td>%s</td>
-  <td>%s</td>
- </tr>""" % (row[1], str(row[2])[:10], row[3]))
-        else:
-            break
+class AudioSet:
+    """Zip file containing glossary term audio pronunciation recordings."""
 
-    # Final totals
-    if countApproved + countRejected + countUnreviewed == 0:
-        html += """
-<p>No terms were found for the language and date range of the report.<p>
-"""
-    else:
-        html += """
-<p class='totals'>Total - %s only for these zipfiles: &nbsp;
-  Approved=%d &nbsp; Rejected=%d &nbsp; Unreviewed=%d</td></p>
-""" % (language, countApproved, countRejected, countUnreviewed)
+    FIELDS = "m.term_name", "m.review_date", "u.fullname"
+    COLUMNS = "Term", "Review Date", "User"
 
-    html.append("""\
-<input type="hidden" name="%s" value="%s" />
-</table>
-</form>
-</body>
-</html>
-""" % (cdrcgi.SESSION, session))
+    def __init__(self, control, row):
+        """Capture the caller's values.
 
-    html = "".join(html)
-    cdrcgi.sendPage(html)
+        Pass:
+            control - access to the database and the runtime report parameters
+            row - id and name for this set
+        """
+
+        self.__control = control
+        self.__row = row
+
+    @property
+    def audio_files(self):
+        """Audio recordings in this set which are in scope for the report."""
+
+        if not hasattr(self, "_audio_files"):
+            class MP3:
+                def __init__(self, row):
+                    self.name = row.term_name
+                    self.user = row.fullname
+                    self.date = row.review_date
+                @property
+                def row(self):
+                    return (
+                        self.name,
+                        Reporter.Cell(str(self.date)[:19], center=True),
+                        self.user
+                    )
+            status = self.control.status[0]
+            query = self.control.Query("term_audio_mp3 m", *self.FIELDS)
+            query.join("usr u", "u.id = m.reviewer_id")
+            query.where(query.Condition("m.zipfile_id", self.id))
+            query.where(query.Condition("m.language", self.control.language))
+            query.where(query.Condition("m.review_status", status))
+            if self.control.start:
+                start = self.control.start
+                query.where(query.Condition("m.review_date", start, ">="))
+            if self.control.end:
+                end = f"{self.control.end[:10]} 23:59:59"
+                query.where(query.Condition("m.review_date", end, "<="))
+            query.order("m.term_name")
+            rows = query.execute(self.control.cursor).fetchall()
+            self._audio_files = [MP3(row) for row in rows]
+        return self._audio_files
+
+    @property
+    def control(self):
+        """Access to the database and the options selected by the user."""
+        return self.__control
+
+    @property
+    def counts(self):
+        """Totals for each status in this set."""
+
+        if not hasattr(self, "_counts"):
+            fields = "review_status", "COUNT(*)"
+            query = self.control.Query("term_audio_mp3", *fields)
+            query.where(query.Condition("zipfile_id", self.id))
+            query.where(query.Condition("language", self.control.language))
+            query.group("review_status")
+            rows = query.execute(self.control.cursor).fetchall()
+            self._counts = dict([tuple(row) for row in rows])
+        return self._counts
+
+    @property
+    def id(self):
+        """Primary key for this set in its database row."""
+        return self.__row.id
+
+    @property
+    def name(self):
+        """File name for this set."""
+        return self.__row.filename
+
+    @property
+    def subtotals(self):
+        """Row in the report table for this set's subtotals."""
+
+        if not hasattr(self, "_subtotals"):
+            subtotals = []
+            for status in Control.STATUSES:
+                subtotals.append(f"{status}={self.counts.get(status[0], 0)}")
+            subtotals = "\xa0 ".join(subtotals)
+            language = self.control.language
+            subtotals = f"{language} names in this set:\xa0 {subtotals}"
+            cell = Reporter.Cell(subtotals, center=True, colspan=3)
+            self._subtotals = [cell]
+        return self._subtotals
+
+    @property
+    def table(self):
+        """Report table for this set."""
+
+        if not hasattr(self, "_table"):
+            rows = [mp3.row for mp3 in self.audio_files]
+            rows.append(self.subtotals)
+            opts = dict(cols=self.COLUMNS, caption=self.name, classes="set")
+            self._table = Reporter.Table(rows, **opts)
+        return self._table
+
+    @property
+    def approved(self):
+        """Number of approved recordings for the selected language."""
+        return self.counts.get("A", 0)
+
+    @property
+    def rejected(self):
+        """Number of rejected recordings for the selected language."""
+        return self.counts.get("R", 0)
+
+    @property
+    def unreviewed(self):
+        """Number of unreviewed recordings for the selected language."""
+        return self.counts.get("U", 0)
+
+
+if __name__ == "__main__":
+    """Don't run the script if loaded as a module."""
+    Control().run()

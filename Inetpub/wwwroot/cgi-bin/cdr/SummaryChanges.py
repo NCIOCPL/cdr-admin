@@ -1,37 +1,176 @@
-#----------------------------------------------------------------------
-# Report of history of changes to a single summary.
-#----------------------------------------------------------------------
-import datetime
-import cdr, cgi, cdrcgi, re
-from cdrapi import db
-from html import escape as html_escape
+#!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# Get the parameters from the request.
-#----------------------------------------------------------------------
-repTitle  = "History of Changes to Summary"
-fields    = cgi.FieldStorage() or cdrcgi.bail("No Request Found", repTitle)
-session   = cdrcgi.getSession(fields) or cdrcgi.bail("Not logged in")
-action    = cdrcgi.getRequest(fields)
-title     = "CDR Administration"
-section   = "History of Changes to Summary"
-SUBMENU   = "Reports Menu"
-buttons   = ["Submit", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-header    = cdrcgi.header(title, title, section, "SummaryChanges.py",
-                          buttons, method = 'GET')
-docId     = fields.getvalue(cdrcgi.DOCID) or None
-docTitle  = fields.getvalue("DocTitle")   or None
-dateRange = fields.getvalue("DateRange")  or None
-if docId:
-    digits = re.sub('[^\d]+', '', docId)
-    docId  = int(digits)
-try:
-    numYears = dateRange and int(dateRange) or 2
-except:
-    cdrcgi.bail("Invalid date range: %s" % dateRange)
+"""Report history of changes to a single summary.
+"""
 
+from cdrcgi import Controller
+from cdrapi.docs import Doc
+from datetime import timedelta
+import lxml.html
+
+
+class Control(Controller):
+    """Access to the database, logging, form building, etc."""
+
+    SUBTITLE = "History of Changes to Summary"
+    METHOD = "get"
+    FILTER = "name:Summary Changes Report"
+    CSS = (
+        "#summary-title, #wrapper h2 { text-align: center; }",
+        "#summary-title span { font-size: .85em; }",
+        "#wrapper h2 { font-size: 14pt; }",
+    )
+
+    def populate_form(self, page):
+        """Ask for the information we need for the report.
+
+        Pass:
+            page - HTMLPage object
+        """
+
+        if self.summaries:
+            fieldset = page.fieldset("Select Summary")
+            checked = True
+            for id, title in self.summaries:
+                label = f"[CDR{id:010d}] title"
+                opts = dict(label=title, value=id, checked=checked)
+                fieldset.append(page.radio_button("DocId", **opts))
+                checked = False
+            page.add_css("fieldset { width: 1024px; }")
+        else:
+            if self.fragment:
+                fieldset = page.fieldset("Error")
+                message = page.B.P(f"No matches for {self.fragment!r}")
+                message.set("class", "error")
+                fieldset.append(message)
+                page.form.append(fieldset)
+            fieldset = page.fieldset("Term ID or Title for Summary")
+            fieldset.append(page.text_field("DocId", label="CDR ID"))
+            fieldset.append(page.text_field("title", label="Doc Title"))
+            page.form.append(fieldset)
+            fieldset = page.fieldset("Date Range of Report")
+            fieldset.append(page.text_field("years", value=2))
+        page.form.append(fieldset)
+
+    def show_report(self):
+        """Override, because this is not a tabular report."""
+
+        B = lxml.html.builder
+        if not self.id:
+            self.show_form()
+        title = self.doc.title.split(";")[0]
+        span = B.SPAN(f"Changes made in the Last {self.years} Year(s)")
+        title = B.H2(title, B.BR(), span, id="summary-title")
+        self.report.page.form.append(title)
+        wrapper = B.DIV(id="wrapper")
+        for section in self.sections:
+            wrapper.append(B.BR())
+            for fragment in section:
+                wrapper.append(fragment)
+            wrapper.append(B.HR())
+            wrapper.append(B.BR())
+        self.report.page.form.append(wrapper)
+        self.report.page.add_css("\n".join(self.CSS))
+        self.report.send()
+
+    @property
+    def doc(self):
+        """The summary document for the report."""
+
+        if not hasattr(self, "_doc"):
+            self._doc = Doc(self.session, id=self.id)
+        return self._doc
+
+    @property
+    def fragment(self):
+        """Title fragment for the summary."""
+        return self.fields.getvalue("title")
+
+    @property
+    def id(self):
+        """Document ID for the report."""
+
+        if not hasattr(self, "_id"):
+            self._id = self.fields.getvalue("DocId")
+            if self._id:
+                try:
+                    self._id = Doc.extract_id(self._id)
+                except:
+                    self.bail("Invalid ID")
+            elif self.summaries and len(self.summaries) == 1:
+                self._id = self.summaries[0][0]
+        return self._id
+
+    @property
+    def no_results(self):
+        """Suppress the message we'd get with no tables."""
+        return None
+
+    @property
+    def sections(self):
+        """Sequence of sections of the report, one for each change."""
+
+        if not hasattr(self, "_sections"):
+            last_section = None
+            sections = []
+            for version, date in self.versions:
+                display_date = date.strftime("%m/%d/%Y")
+                doc = Doc(self.session, id=self.id, version=version)
+                response = doc.filter(self.FILTER)
+                html = str(response.result_tree).strip()
+                if html != last_section:
+                    last_section = html
+                    html = html.replace("@@PubVerDate@@", display_date)
+                    sections.append(lxml.html.fragments_fromstring(html))
+            self._sections = reversed(sections)
+        return self._sections
+
+    @property
+    def summaries(self):
+        """Sequence of ID/title tuples for the summary picklist."""
+
+        if not hasattr(self, "_summaries"):
+            self._summaries = None
+            if self.fragment:
+                fragment = f"{self.fragment}%"
+                query = self.Query("document d", "d.id", "d.title").order(2)
+                query.join("doc_type t", "t.id = d.doc_type")
+                query.where("t.name = 'Summary'")
+                query.where(query.Condition("d.title", fragment, "LIKE"))
+                rows = query.execute(self.cursor).fetchall()
+                self._summaries = [tuple(row) for row in rows]
+        return self._summaries
+
+    @property
+    def versions(self):
+        """Sequence of num/date for versions to be included in the report."""
+
+        if not hasattr(self, "_versions"):
+            days = int(365.25 * self.years)
+            start = self.started - timedelta(days)
+            query = self.Query("doc_version", "num", "dt").order("num")
+            query.where(query.Condition("id", self.id))
+            query.where(query.Condition("dt", start, ">="))
+            query.where("publishable = 'Y'")
+            rows = query.execute(self.cursor).fetchall()
+            self._versions = [tuple(row) for row in rows]
+        return self._versions
+
+    @property
+    def years(self):
+        """Date range for the report."""
+        try:
+            return int(self.field.getvalue("years"))
+        except:
+            return 2
+
+
+if __name__ == "__main__":
+    "Let the script be loaded as a module."
+    Control().run()
+'''
 #----------------------------------------------------------------------
-# Load common style information from repository.
+
 #----------------------------------------------------------------------
 def getCommonCssStyle():
     xslScript = """\
@@ -64,133 +203,10 @@ def getCommonCssStyle():
                     response)
     return response[0]
 
-#----------------------------------------------------------------------
-# More than one matching title; let the user choose one.
-#----------------------------------------------------------------------
-def showTitleChoices(choices):
-    form = """\
-   <H3>More than one matching document found; please choose one.</H3>
-"""
-    for choice in choices:
-        form += """\
-   <INPUT TYPE='radio' NAME='DocId' VALUE='CDR%010d'>[CDR%010d] %s<BR>
-""" % (choice[0], choice[0], html_escape(choice[1]))
-    cdrcgi.sendPage(header + form + """\
-   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-   <INPUT TYPE='hidden' NAME='DateRange' VALUE='%d'>
-  </FORM>
- </BODY>
-</HTML>
-""" % (cdrcgi.SESSION, session, numYears))
-
-#----------------------------------------------------------------------
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if action == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif action == SUBMENU:
-    cdrcgi.navigateTo("Reports.py", session)
-
-#----------------------------------------------------------------------
-# Handle request to log out.
-#----------------------------------------------------------------------
-if action == "Log Out":
-    cdrcgi.logout(session)
-
-#----------------------------------------------------------------------
-# If we don't have any information yet, put up the basic form.
-#----------------------------------------------------------------------
-if not docId and not docTitle:
-    form = """\
-  <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-
-  <TABLE>
-   <TR>
-    <TD ALIGN='right'>Document Title:&nbsp;</TD>
-    <TD><INPUT SIZE='60' NAME='DocTitle'></TD>
-   </TR>
-   <TR>
-    <TD ALIGN='right'>Doc ID:&nbsp;</TD>
-    <TD><INPUT SIZE='60' NAME='DocId'></TD>
-   </TR>
-   <TR>
-    <TD ALIGN='right'>Date Range:&nbsp;</TD>
-    <TD><INPUT NAME='DateRange' VALUE='2' SIZE='2'></TD>
-   </TR>
-  </TABLE>
-""" % (cdrcgi.SESSION, session)
-    cdrcgi.sendPage(header + form + """\
- </BODY>
-</HTML>
-""")
-
-#----------------------------------------------------------------------
-# Connect to the database.
-#----------------------------------------------------------------------
-try:
-    conn = db.connect(user='CdrGuest')
-    cursor = conn.cursor()
-except Exception as info:
-    cdrcgi.bail("Exception connecting to database: %s" % str(info))
-
-#----------------------------------------------------------------------
-# If we have a title, use it to get a document ID.
-#----------------------------------------------------------------------
-if docTitle:
-    param = "%s%%" % docTitle
-    try:
-        cursor.execute("""\
-            SELECT d.id, d.title
-              FROM document d
-              JOIN doc_type t
-                ON t.id = d.doc_type
-             WHERE d.title LIKE ?
-               AND t.name = 'Summary'""", param)
-        rows = cursor.fetchall()
-    except Exception as info:
-        cdrcgi.bail("Failure looking up document title: %s" % str(info))
-    if not rows:
-        cdrcgi.bail("No summary documents match %s" % docTitle)
-    if len(rows) > 1:
-        showTitleChoices(rows)
-
-#----------------------------------------------------------------------
-# From this point on we have what we need for the report.
-#----------------------------------------------------------------------
-#numYears = 2
-#docId = 62978 #62906 #62978
 commonStyle = getCommonCssStyle()
-today = datetime.date.today()
-startDate = str(today - datetime.timedelta(365*numYears))
-conn = db.connect(user='CdrGuest')
-cursor = conn.cursor()
-cursor.execute("SELECT title FROM document WHERE id = ?", docId)
-docTitle = cursor.fetchall()[0][0]
 semicolon = docTitle.find(";")
 if semicolon != -1:
     docTitle = docTitle[:semicolon]
-cursor.execute("""\
-    SELECT num, dt
-      FROM doc_version
-     WHERE id = ?
-       AND dt >= ?
-       AND publishable = 'Y'
-  ORDER BY num""", (docId, startDate))
-sections = []
-lastSection = None
-for row in cursor.fetchall():
-    verDate = row[1].strftime("%m/%d/%Y")
-    resp = cdr.filterDoc('guest', [#'set:Denormalization Summary Set',
-                                   'name:Summary Changes Report'], docId,
-                         docVer = "%d" % row[0])
-    if isinstance(resp, (str, bytes)):
-        cdrcgi.bail(resp)
-    if resp[0].strip():
-        if not lastSection or resp[0] != lastSection:
-            lastSection = resp[0]
-            section = resp[0].replace("@@PubVerDate@@", verDate)
-            sections.append(section)
-sections.reverse()
 html = """\
 <!DOCTYPE html>
 <html>
@@ -216,9 +232,4 @@ html = """\
        docId)
 for section in sections:
     html += section + "<br><hr><br>\n"
-html += """
- </body>
-</html>
-"""
-
-cdrcgi.sendPage(html)
+'''

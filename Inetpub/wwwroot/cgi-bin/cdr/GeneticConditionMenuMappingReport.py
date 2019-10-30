@@ -19,13 +19,14 @@ GP_CS = "Genetics Professionals--CancerSite"
 # Base class for the two term types; understands sorting order.
 #----------------------------------------------------------------------
 class Term:
-    def __cmp__(self, other):
-        me = self.preferredName and self.preferredName.upper() or ""
-        him = other.preferredName and other.preferredName.upper() or ""
-        diff = cmp(me, him)
-        if diff:
-            return diff
-        return cmp(self.cdrId, other.cdrId)
+    def __lt__(self, other):
+        return self.sortkey < other.sortkey
+    @property
+    def sortkey(self):
+        if not hasattr(self, "_sortkey"):
+            name = self.preferredName.upper() if self.preferredName else ""
+            self._sortkey = name, self.cdrId
+        return self._sortkey
 
 #----------------------------------------------------------------------
 # Term document representing what the genprof DB calls a "cancer site."

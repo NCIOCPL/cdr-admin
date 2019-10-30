@@ -79,6 +79,7 @@ td.middle { vertical-align: middle; }
 .center { text-align: center; }
 .right { text-align: right; }
 .nowrap { white-space: nowrap; }
+.report table { margin-top: 35px; }
 table.report { margin-bottom: 20px; }
 fieldset { border: 2px solid #936; width: 500px; margin: 10px auto; }
 fieldset fieldset, div fieldset { width: auto; border: 1px solid black; }
@@ -98,6 +99,9 @@ label.clickable:hover { color: white; background-color: #936; }
 .strikethrough { text-decoration: line-through; }
 .warning { color: green; }
 .hidden { display: none; }
+.no-results {
+    text-align: center; font-weight: bold; color: #936; margin-top: 25px;
+}
 .labeled-field input, .labeled-field select, .labeled-field textarea {
     width: 300px; padding-left: 2px; padding-right: 2px;
 }
@@ -162,3 +166,9 @@ dt { margin-top: 15px; font-weight: bold; }
 .admin-menu .flexlinks li a { color: #00E; font-weight: normal; }
 .flexlinks li { padding-bottom: 6px; }
 th.clickable { cursor: pointer; }
+footer p {
+    font-style: italic; font-size: .8em; margin-top: 25px; text-align: center;
+}
+footer p span { font-size: .8em; color: green; }
+.insertion { color: red; }
+.deletion { text-decoration: line-through; }

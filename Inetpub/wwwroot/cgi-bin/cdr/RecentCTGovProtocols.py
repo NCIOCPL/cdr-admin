@@ -1,79 +1,176 @@
-#----------------------------------------------------------------------
-# Report on recently imported CT.gov protocols.
-# JIRA::OCECDR-3877
-#----------------------------------------------------------------------
-import cdrcgi
-import cgi
+#!/usr/bin/env python
+
+"""Report on recently imported CT.gov protocols.
+"""
+
 import datetime
-from cdrapi import db
+from cdrcgi import Controller
 
-#----------------------------------------------------------------------
-# Collect the request's parameters.
-#----------------------------------------------------------------------
-fields = cgi.FieldStorage()
-start_date = fields.getvalue("startdate")
-end_date = fields.getvalue("enddate")
-fmt = fields.getvalue("format")
-title = "Recent CT.gov Protocols"
-script = "RecentCTGovProtocols.py"
-SUBMENU = "Report Menu"
-buttons = ("Submit Request", SUBMENU, cdrcgi.MAINMENU, "Log Out")
-session = cdrcgi.getSession(fields)
-request = cdrcgi.getRequest(fields)
 
-#----------------------------------------------------------------------
-# If we don't have the required parameters, ask for them.
-#----------------------------------------------------------------------
-if not cdrcgi.is_date(start_date) or not cdrcgi.is_date(end_date):
-    end_date = datetime.date.today()
-    start_date = end_date - datetime.timedelta(30)
-    subtitle = "Clinical Trial Documents at NLM"
-    page = cdrcgi.Page(title, subtitle=subtitle, action=script, buttons=buttons,
-                       session=session)
-    page.add("<fieldset>")
-    page.add(page.B.LEGEND("Report Parameters"))
-    page.add_date_field("startdate", "Start Date", value=start_date)
-    page.add_date_field("enddate", "End Date", value=end_date)
-    page.add("</fieldset>")
-    page.add_output_options("excel")
-    page.send()
+class Control(Controller):
 
-#----------------------------------------------------------------------
-# Create the report.
-#----------------------------------------------------------------------
-cursor = db.connect(user="CdrGuest").cursor()
-query = db.Query("ctgov_trial", "nct_id", "first_received", "trial_title",
-                 "trial_phase")
-query.where(query.Condition("first_received", start_date, ">="))
-query.where(query.Condition("first_received", "%s 23:59:59" % end_date, "<="))
-query.order(1)
-fp = open("d:/tmp/rcp.sql", "w")
-fp.write("%s\n" % query)
-fp.write("%s\n" % start_date)
-fp.write("%s\n" % end_date)
-fp.close()
-results = query.execute(cursor).fetchall()
-columns = (
-    cdrcgi.Report.Column("NCT ID", width="100px"),
-    cdrcgi.Report.Column("Received", width="100px"),
-    cdrcgi.Report.Column("Trial Title", width="500px"),
-    cdrcgi.Report.Column("Phase", width="100px"),
-    cdrcgi.Report.Column("Other IDs", width="200px"),
-    cdrcgi.Report.Column("Sponsors", width="1000px")
-)
-rows = []
-for nct_id, received, title, phase in results:
-    query = db.Query("ctgov_trial_other_id", "other_id").order("position")
-    query.where(query.Condition("nct_id", nct_id))
-    ids = "; ".join([row[0] for row in query.execute(cursor).fetchall()])
-    query = db.Query("ctgov_trial_sponsor", "sponsor").order("position")
-    query.where(query.Condition("nct_id", nct_id))
-    sponsors = "; ".join([row[0] for row in query.execute(cursor).fetchall()])
-    href = "https://clinicaltrials.gov/ct2/show/%s" % nct_id
-    row = (cdrcgi.Report.Cell(nct_id, href=href, target="_blank"),
-           str(received)[:10], title, phase or "", ids, sponsors)
-    rows.append(row)
-caption = "CT.gov Protocols Received between %s and %s" % (start_date, end_date)
-table = cdrcgi.Report.Table(columns, rows, caption=caption)
-report = cdrcgi.Report("Recent CT.gov Protocols", [table])
-report.send(fmt)
+    SUBTITLE = "Recent CT.gov Protocols"
+
+    def build_tables(self):
+        """Assemble the table for the report."""
+
+        opts = dict(columns=self.columns, caption=self.caption)
+        return self.Reporter.Table(self.rows, **opts)
+
+    def populate_form(self, page):
+        """If we don't have the required parameters, ask for them.
+
+        Pass:
+            page - HTMLPage on which to place the form fields.
+        """
+
+        fieldset = page.fieldset("Date Range for Report")
+        end = datetime.date.today()
+        start = end - datetime.timedelta(30)
+        fieldset.append(page.date_field("start", value=start))
+        fieldset.append(page.date_field("end", value=end))
+        page.form.append(fieldset)
+        page.add_output_options(default="excel")
+
+    @property
+    def caption(self):
+        """String displayed at the top of the table."""
+
+        if not hasattr(self, "_caption"):
+            suffix = ""
+            if self.start:
+                if self.end:
+                    suffix = f" Received Between {self.start} and {self.end}"
+                else:
+                    suffix = f" Received Since {self.start}"
+            elif self.end:
+                suffix = f" Received Through {self.end}"
+            self._caption = f"CT.gov Protocols{suffix}"
+        return self._caption
+
+    @property
+    def columns(self):
+        """Column headers for the report."""
+
+        return (
+            self.Reporter.Column("NCT ID", width="100px"),
+            self.Reporter.Column("Received", width="100px"),
+            self.Reporter.Column("Trial Title", width="500px"),
+            self.Reporter.Column("Phase", width="100px"),
+            self.Reporter.Column("Other IDs", width="200px"),
+            self.Reporter.Column("Sponsors", width="1000px"),
+        )
+
+    @property
+    def end(self):
+        """End of the report's date range."""
+        return self.fields.getvalue("end")
+
+    @property
+    def rows(self):
+        """Table rows for the report."""
+
+        if not hasattr(self, "_rows"):
+            self._rows = [trial.row for trial in self.trials]
+        return self._rows
+
+    @property
+    def start(self):
+        """Beginning of the report's date range."""
+        return self.fields.getvalue("start")
+
+    @property
+    def trials(self):
+        """Clinical trials to be included in the report."""
+
+        fields = "nct_id", "first_received", "trial_title", "trial_phase"
+        query = self.Query("ctgov_trial", *fields).order("nct_id")
+        if self.start:
+            query.where(query.Condition("first_received", self.start, ">="))
+        if self.end:
+            end = f"{self.end} 23:59:59"
+            query.where(query.Condition("first_received", end, "<="))
+        rows = query.execute(self.cursor).fetchall()
+        return [self.Trial(self, row) for row in rows]
+
+
+    class Trial:
+        """Recent clinical trial to be included in the report."""
+
+        def __init__(self, control, row):
+            """Capture the caller's values.
+
+            Pass:
+                control - access to the database and HTML page building
+                row - column values from the ctgov_trial table
+            """
+
+            self.__control = control
+            self.__row = row
+
+        @property
+        def ids(self):
+            """Alternate IDs for the trial."""
+
+            query = self.__control.Query("ctgov_trial_other_id", "other_id")
+            query.order("position")
+            query.where(query.Condition("nct_id", self.nctid))
+            rows = query.execute(self.__control.cursor).fetchall()
+            return "; ".join([row.other_id for row in rows])
+
+        @property
+        def nctid(self):
+            """NLM's ID for the trial."""
+            return self.__row.nct_id
+
+        @property
+        def phase(self):
+            """The phase of the trial (e.g., "Phase 3")."""
+            return self.__row.trial_phase
+
+        @property
+        def received(self):
+            """The date the trial was first received."""
+            return str(self.__row.first_received)[:10]
+
+        @property
+        def row(self):
+            """Table row for the report."""
+
+            opts = dict(href=self.url, target="_blank", center=True)
+            return (
+                self.__control.Reporter.Cell(self.nctid, **opts),
+                self.__control.Reporter.Cell(self.received, center=True),
+                self.title,
+                self.phase,
+                self.ids,
+                self.sponsors,
+            )
+
+        @property
+        def sponsors(self):
+            """Sponsors for the trial.
+
+            Hard to pin down the definition of 'sponsor' in this context.
+            """
+
+            query = self.__control.Query("ctgov_trial_sponsor", "sponsor")
+            query.order("position")
+            query.where(query.Condition("nct_id", self.nctid))
+            rows = query.execute(self.__control.cursor).fetchall()
+            return "; ".join([row.sponsor for row in rows])
+
+        @property
+        def title(self):
+            """The title of the clinical trial."""
+            return self.__row.trial_title
+
+        @property
+        def url(self):
+            """Address of the web page for the trial at NLM."""
+            return f"https://clinicaltrials.gov/ct2/show/{self.nctid}"
+
+
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+    Control().run()

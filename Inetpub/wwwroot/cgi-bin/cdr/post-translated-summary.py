@@ -1,74 +1,111 @@
-#----------------------------------------------------------------------
-# Create new summary document for translated version (CGI interface).
-# OCECDR-4004
-#----------------------------------------------------------------------
-import cdr
-import cdrcgi
+#!/usr/bin/env python
 
-class Control(cdrcgi.Control):
-    SUBMENU = None
-    def __init__(self):
-        cdrcgi.Control.__init__(self, "Create World Server Translated Summary")
-        if not self.session:
-            cdrcgi.bail("Invalid or missing session.")
-        if not cdr.canDo(self.session, "CREATE WS SUMMARIES"):
-            cdrcgi.bail("Account not authorized for adding WS summaries.")
-    def set_form_options(self, opts):
-        opts["enctype"] = "multipart/form-data"
-        return opts
-    def populate_form(self, form):
-        self.B = form.B
-        message = self.load_file("file")
-        if message is not None:
-            form.add(message)
-        form.add("<fieldset>")
-        form.add(self.B.LEGEND("Translated Summary"))
-        form.add_text_field("file", "Summary File", upload=True)
-        form.add_text_field("comment", "Comment")
-        form.add("</fieldset>")
+"""Create new summary document for translated version (CGI interface).
+"""
+
+from cdrcgi import Controller
+from cdrapi.docs import Doc
+
+
+class Control(Controller):
+
+    SUBTITLE = "Create World Server Translated Summary"
+    LOGNAME = "PostTranslatedSummary"
+    COMMENT = "Creating document translated in Trados"
+
+    def populate_form(self, page):
+        """Prompt for the file and an optional comment.
+
+        Pass:
+            page - HTMLPage on which we place the fields
+        """
+
+        fieldset = page.fieldset("Translated Summary")
+        if self.message is not None:
+            page.form.append(self.message)
+        fieldset.append(page.file_field("file", label="Summary File"))
+        fieldset.append(page.text_field("comment"))
+        page.form.append(fieldset)
+        page.form.set("enctype", "multipart/form-data")
+
     def show_report(self):
+        """Cycle back to the form."""
         self.show_form()
-    def load_file(self, name):
-        try:
-            xml = self.read_file(name)
-            if xml is None:
-                return None
-            doc_id = self.add_doc(xml)
-            return self.message(doc_id, "green")
-        except Exception as e:
-            return self.message(e, "red")
-    def add_doc(self, xml):
-        doc = cdr.Doc(xml, doctype="Summary")
-        reason = "Creating document translated in Trados"
-        reason = self.fields.getvalue("comment", reason)
-        opts = dict(
-            doc=str(doc),
-            ver="Y",
-            comment=reason,
-            reason=reason,
-            check_in="Y",
-            show_warnings=True
-        )
-        doc_id, warnings = cdr.addDoc(self.session, **opts)
-        if doc_id:
-            return "Created %s." % doc_id
-        raise Exception(cdr.checkErr(warnings) or "Unexpected error")
-    def read_file(self, name):
-        if name not in list(self.fields.keys()):
-            return None
-        f = self.fields[name]
-        if f.file:
-            file_bytes = []
-            while True:
-                more_bytes = f.file.read()
-                if not more_bytes:
-                    break
-                file_bytes.append(more_bytes)
-        else:
-            file_bytes = [f.value]
-        return b"".join(file_bytes)
-    def message(self, what, color):
-        style = "text-align: center; font-weight: bold; color: %s;" % color
-        return self.B.P(str(what), style=style)
 
-Control().run()
+    @property
+    def comment(self):
+        """Override the default comment as appropriate."""
+
+        if not hasattr(self, "_comment"):
+            self._comment = self.fields.getvalue("comment", self.COMMENT)
+        return self._comment
+
+    @property
+    def document(self):
+        """Uploaded summary document to be posted."""
+
+        if not hasattr(self, "_document"):
+            self._document = None
+            if self.file_bytes:
+                opts = dict(doctype="Summary", xml=self.file_bytes)
+                self._document = Doc(self.session, **opts)
+        return self._document
+
+    @property
+    def file_bytes(self):
+        """UTF-8 serialization of the document to be posted."""
+
+        if not hasattr(self, "_file_bytes"):
+            self._file_bytes = None
+            if "file" in list(self.fields.keys()):
+                field = self.fields["file"]
+                if field.file:
+                    segments = []
+                    while True:
+                        more_bytes = field.file.read()
+                        if not more_bytes:
+                            break
+                        segments.append(more_bytes)
+                else:
+                    segments = [field.value]
+                self._file_bytes = b"".join(segments)
+        return self._file_bytes
+
+    @property
+    def message(self):
+        """Paragraph element describing the outcome of a post action."""
+
+        if not hasattr(self, "_message"):
+            self._message = None
+            if self.document:
+                if not self.session.can_do("CREATE WS SUMMARIES"):
+                    error = "Account not authorized for adding WS summaries."
+                    self.bail(error)
+                try:
+                    self.document.save(**self.opts)
+                    message = f"Saved {self.document.cdr_id}."
+                    message_class = self.HTMLPage.B.CLASS("info center")
+                except Exception as e:
+                    self.logger.exception("Save failure")
+                    message = f"Failure: {e}"
+                    message_class = self.HTMLPage.B.CLASS("error center")
+                self._message = self.HTMLPage.B.P(message, message_class)
+        return self._message
+
+    @property
+    def opts(self):
+        """Options passed the the `Doc.save()` method."""
+
+        if not hasattr(self, "_opts"):
+            self._opts = dict(
+                version=True,
+                unlock=True,
+                comment=self.comment,
+                reason=self.comment,
+            )
+        return self._opts
+
+
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+    Control().run()

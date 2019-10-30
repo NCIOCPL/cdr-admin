@@ -1,87 +1,100 @@
-#----------------------------------------------------------------------
-# Reports on documents which link to specified terms.
-# JIRA::OCECDR-3800 - Address security vulnerabilities
-#----------------------------------------------------------------------
-import cgi
-import cdr
-import cdrcgi
-from cdrapi import db
+#!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields  = cgi.FieldStorage()
-doc_ids = fields.getvalue("doc_ids") or ""
-session = cdrcgi.getSession(fields)
-request = cdrcgi.getRequest(fields)
-SUBMENU = "Report Menu"
+"""Reports on documents which link to specified terms.
+"""
 
-#----------------------------------------------------------------------
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if request == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif request == SUBMENU:
-    cdrcgi.navigateTo("reports.py", session)
+from cdrcgi import Controller
+from cdrapi.docs import Doc
 
-#----------------------------------------------------------------------
-# Normalize the field values.
-#----------------------------------------------------------------------
-try:
-    term_ids = [cdr.exNormalize(i)[1] for i in doc_ids.strip().split()]
-except:
-    cdrcgi.bail("Invalid document ID format in %s" % repr(doc_ids))
 
-#----------------------------------------------------------------------
-# Put out the form if we don't have a request.
-#----------------------------------------------------------------------
-if not term_ids:
-    title    = "Term Usage"
-    subtitle = "Report on documents indexed by specified terms"
-    script   = "TermUsage.py"
-    buttons  = ("Submit Request", SUBMENU, cdrcgi.MAINMENU)
-    page     = cdrcgi.Page(title, subtitle=subtitle, buttons=buttons,
-                           action=script, session=session)
-    page.add("<fieldset>")
-    page.add(page.B.LEGEND("Enter Term IDs Separated By Spaces"))
-    page.add_textarea_field("doc_ids", "Term IDs")
-    page.add("</fieldset>")
-    page.send()
+class Control(Controller):
 
-#----------------------------------------------------------------------
-# Find the documents using the specified terms.
-#----------------------------------------------------------------------
-columns = ("doc_type.name", "doc.id", "doc.title", "term.id", "term.title")
-query = db.Query("doc_type", *columns).unique()
-query.join("document doc", "doc_type.id = doc.doc_type")
-query.join("query_term cdr_ref", "doc.id = cdr_ref.doc_id")
-query.join("document term", "term.id = cdr_ref.int_val")
-query.where("cdr_ref.path LIKE '%/@cdr:ref'")
-query.where("doc_type.name <> 'Term'")
-query.where(query.Condition("term.id", term_ids, "IN"))
-query.order("doc_type.name", "doc.title", "term.id")
-rows = query.execute().fetchall()
+    SUBTITLE = "Report on documents indexed by specified terms"
+    CAPTION = "Term Usage"
+    COLUMNS = "Doc Type", "Doc ID", "Doc Title", "Term ID", "Term Title"
 
-#----------------------------------------------------------------------
-# Assemble the report.
-#----------------------------------------------------------------------
-count   = len(set([row[1] for row in rows]))
-title   = "CDR Term Usage Report"
-caption = "Number of documents using specified terms: %d" % count
-columns = (
-    cdrcgi.Report.Column("Doc Type"),
-    cdrcgi.Report.Column("Doc ID"),
-    cdrcgi.Report.Column("Doc Title"),
-    cdrcgi.Report.Column("Term ID"),
-    cdrcgi.Report.Column("Term Title"),
-)
-rows = [(
-    row[0],
-    cdr.normalize(row[1]),
-    row[2],
-    cdr.normalize(row[3]),
-    row[4],
-) for row in rows]
-table = cdrcgi.Report.Table(columns, rows)
-report = cdrcgi.Report(title, table, banner=title, subtitle=caption)
-report.send()
+    def build_tables(self):
+        """Assemble the table for the report."""
+
+        if not self.terms:
+            self.show_form()
+        opts = dict(caption=self.caption, columns=self.COLUMNS)
+        return self.Reporter.Table(self.rows, **opts)
+
+    def populate_form(self, page):
+        """Put up a request for document IDs.
+
+        Pass:
+            page - HTMLPage on which to plant the field
+        """
+
+        fieldset = page.fieldset("Enter Term IDs Separated by Space")
+        fieldset.append(page.textarea("ids", label="Term IDs", rows = 5))
+        page.form.append(fieldset)
+
+    @property
+    def caption(self):
+        """String to display above the report table."""
+
+        count = len(set([link.id for link in self.links]))
+        return f"Number of documents using specified terms: {count}"
+
+    @property
+    def ids(self):
+        """Term IDs selected for the report."""
+
+        if not hasattr(self, "_ids"):
+            ids = self.fields.getvalue("ids") or ""
+            try:
+                self._ids = [Doc.extract_id(id) for id in ids.split()]
+            except:
+                self.bail(f"Invalid document ID format in {ids}")
+        return self._ids
+
+    @property
+    def links(self):
+        """Unique combinations of linkers and link targets."""
+
+        if not hasattr(self, "_links"):
+            fields = "t.name AS dtype", "d.title", "q.int_val AS term", "d.id"
+            query = self.Query("document d", *fields).unique()
+            query.order("t.name", "d.title", "q.int_val")
+            query.join("doc_type t", "t.id = d.doc_type")
+            query.join("query_term q", "q.doc_id = d.id")
+            query.where("q.path LIKE '%/@cdr:ref'")
+            query.where("t.name <> 'Term'")
+            query.where(query.Condition("q.int_val", list(self.terms), "IN"))
+            self._links = query.execute(self.cursor).fetchall()
+        return self._links
+
+    @property
+    def rows(self):
+        """Table rows for the report."""
+
+        if not hasattr(self, "_rows"):
+            self._rows = []
+            for link in self._links:
+                self._rows.append([
+                    link.dtype,
+                    f"CDR{link.id:010d}",
+                    link.title,
+                    f"CDR{link.term:010d}",
+                    self.terms[link.term],
+                ])
+        return self._rows
+
+    @property
+    def terms(self):
+        """Dictionary of term document titles indexed by CDR ID integers."""
+
+        if not hasattr(self, "_terms"):
+            query = self.Query("document", "id", "title")
+            query.where(query.Condition("id", self.ids, "IN"))
+            rows = query.execute(self.cursor).fetchall()
+            self._terms = dict([tuple(row) for row in rows])
+        return self._terms
+
+
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+    Control().run()

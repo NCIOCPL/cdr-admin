@@ -65,19 +65,18 @@ class MenuItem:
         self.sortString   = sortString
         self.parents      = []
         self.children     = []
-    def __cmp__(self, other):
-        x = cmp(self.id, other.id)
-        if x: return x
-        x = cmp(self.menuTypeName, other.menuTypeName)
-        if x: return x
-        return cmp(self.name, other.name)
+    def __lt__(self, other):
+        return self.key < other.key
+    @property
+    def key(self):
+        return self.id, self.menuTypeName, self.name
 
 class MenuType:
     def __init__(self, name):
         self.name     = name
         self.topTerms = []
-    def __cmp__(self, other):
-        return cmp(self.name, other.name)
+    def __lt__(self, other):
+        return self.name < other.name
 
 def loadMenuItems(menuType):
     global menuItems

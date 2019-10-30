@@ -1,224 +1,240 @@
-#----------------------------------------------------------------------
-# Change the status of a batch or publishing job to a failed state.
-#----------------------------------------------------------------------
-import cgi, cdr, cdrcgi
-from cdrapi import db
+#!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields  = cgi.FieldStorage()
-session = cdrcgi.getSession(fields)
-request = cdrcgi.getRequest(fields)
-title   = "CDR Administration"
-section = "Change Job Status"
-buttons = ['Submit', 'Cancel', cdrcgi.MAINMENU]
-header  = cdrcgi.header(title, title, section, "FailBatchJob.py", buttons)
+"""Change the status of a batch or publishing job to a failed state.
+"""
 
-#----------------------------------------------------------------------
-# Make sure the login was successful.
-#----------------------------------------------------------------------
-if not session: cdrcgi.bail('Unknown or expired CDR session.')
+from cdrcgi import Controller
 
-if not cdr.canDo(session, "SET_SYS_VALUE"):
-    cdrcgi.bail(
-        "Sorry, you are not authorized to fail a publishing or batch job")
 
-#----------------------------------------------------------------------
-# Return to the main menu if requested.
-#----------------------------------------------------------------------
-if request == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
+class Control(Controller):
+    "Logic for the script."
 
-#----------------------------------------------------------------------
-# Form parameters already entered by user
-#----------------------------------------------------------------------
-jobType = fields and fields.getvalue('JobType') or None
-jobId   = fields and fields.getvalue('JobId') or None
-failJob = fields and fields.getvalue('FailJob') or None
+    LOGNAME = "FailBatchJob"
+    SUBTITLE = "Mark Stuck Publishing or Batch Job as Failed"
+    INSTRUCTIONS = (
+        "This tool marks stalled publishing and batch jobs (usually "
+        "caused by a server crash) as failed so that attempt to create "
+        "new jobs are not blocked. Check the job(s) which need to "
+        "be resolved and press the Submit button."
+    )
 
-if jobId:
-    jobId = int(jobId)
-    if jobId < 1:
-        cdrcgi.bail("Job ID must be a positive integer");
+    def populate_form(self, page):
+        """Provide instructions and form fields.
 
-# Connect to database
-conn = db.connect()
-cursor = conn.cursor()
+        Pass:
+            page - HTMLPage object to be populated
+        """
 
-# Build form body here
-html = ''
-
-# Has he already done everything and we've checked it?
-if request == 'Submit' and failJob == 'Yes':
-    if jobId:
-        if jobType == 'pubJob':
-            updateQry = "UPDATE pub_proc SET status='Failure' WHERE id=?"
-        elif jobType == 'batchJob':
-            updateQry = "UPDATE batch_Job SET status='Aborted' WHERE id=?"
+        fieldset = page.fieldset("Instructions")
+        fieldset.append(page.B.P(self.INSTRUCTIONS))
+        page.form.append(fieldset)
+        if self.jobs:
+            legend = f"{len(self.sorted_jobs)} Stalled and Active Jobs"
+            fieldset = page.fieldset(legend)
+            rows = [job.row for job in self.sorted_jobs]
+            fieldset.append(page.B.TABLE(self.headers, *rows))
         else:
-            cdrcgi.bail("Internal error, unknown jobType");
+            fieldset = page.fieldset("Stalled Jobs")
+            para = page.B.P("There are currently no stalled jobs.")
+            para.set("class", "center info")
+            fieldset.append(para)
+        page.form.append(fieldset)
+        page.add_css("""\
+fieldset { width: 1000px; }
+table * { background: #e8e8e8; }
+td, th { border-color: #ccc; }
+table { width: 95%; }""")
 
-        cursor.execute(updateQry, jobId)
-        conn.commit()
+    def build_tables(self):
+        """Resolve jobs as requested and re-display form."""
 
-    else:
-        cdrcgi.bail("Internal error, no jobId");
-
-    # Tell user and clear variables for another run if desired
-    html = "<p>Status for job %d has been changed.</p>" % jobId
-    jobType = jobId = failJob = None
-
-elif request == 'Cancel':
-    # Clear all variables, that will put us back to the first screen
-    jobType = jobId = failJob = None
-
-elif request == 'cdrcgi.MAINMENU':
-    # Back to main menu
-    cdrcgi.navigateTo('Admin.py', session)
-
-#----------------------------------------------------------------------
-# Find out job type and ID
-#----------------------------------------------------------------------
-if (not jobType or not jobId):
-
-    html += """
-<style type='text/css'>
-fieldset {
-  margin: auto;
-}
-.error {
-  font-size: 2em;
-  font-color: red;
-  padding: 60px;
-}
-</style>
-
-
-<fieldset>
-<h3>Select a job type and job ID to set status to failed state</h3>
-<b>Note</b>: This program cannot be used to change a successful job to
-a failed state.  Doing so could cause inconsistency in the database.
-Its proper use is only to cleanup after a crash that left a publishing
-or batch job in some initial or in-process state that is must be cleared
-in order to unblock further jobs.
-
-</fieldset>
-<fieldset>
-  <div style="float:left; margin-right:280px;">
-  <label for='theId'>Job ID</label>
-  <input type='text' name='JobId' size='10' id='theId' />
-  </div>
-
-  <div style="float:right; width:300px;">
-  <input type='radio' name='JobType' value='pubJob' id='typePub' 
-         checked='checked'/>
-  <label for='typePub'> Publishing Job</label>
-  <br/>
-  <input type='radio' name='JobType' value='batchJob' id='typeBatch' />
-  <label for='typeBatch'>Batch Job</label>
-  </div>
-</fieldset>
-"""
-
-else:
-    # Had jobId and type already, keep them for next round
-    html += """
-<input type='hidden' name='JobType' value='%s' />
-<input type='hidden' name='JobId' value='%s' />
-""" % (jobType, jobId)
-
-    newStatus = fields and fields.getvalue('NewStatus') or None
-    if not newStatus:
-        # Get the existing values for the job
-        if jobType == 'pubJob':
-            cursor.execute("""
-SELECT status, pub_subset, started, completed, output_dir, messages
-  FROM pub_proc
- WHERE id = ?""", jobId)
-
-            row = cursor.fetchone()
-            if not row:
-                cdrcgi.bail("Publishing job %d not found" % jobId)
-
-            html += """
-<h2>Data for publishing job %d</h2>
-<table border='1'>
- <tr>
-  <th>status</th><th>pub_subset</th><th>started</th><th>completed</th>
-  <th>output_dir</th><th>messages</th>
- </tr>
- <tr>
-  <td>%s</td>
-  <td>%s</td>
-  <td>%s</td>
-  <td>%s</td>
-  <td>%s</td>
-  <td>%s</td>
- </tr>
-</table>
-""" % (jobId,row[0],row[1],row[2],row[3],row[4],row[5])
-
-            # Validate that change to failure is okay
-            if row[0] == 'Success':
-                html += """
-<p class='error'>Successful jobs may not be changed to status = "Failure"</p>
-"""
-            elif row[0] == 'Failure':
-                html += """
-<p class='error'>Job status already = "Failure"</p>
-"""
+        subtitle = ""
+        if not self.session.can_do("SET_SYS_VALUE"):
+            self.bail("Operation not authorized")
+        if self.publishing_jobs:
+            placeholders = ",".join(["?"] * len(self.publishing_jobs))
+            where = f"WHERE id IN ({placeholders})"
+            update = f"UPDATE pub_proc SET status = 'Failure' {where}"
+            self.cursor.execute(update, tuple(self.publishing_jobs))
+            subtitle = f"Resolved {len(self.publishing_jobs)} publishing jobs"
+            message = "%s marked publishing job %s as 'Failure'"
+            for job_id in sorted(self.publishing_jobs):
+                args = self.session.user_name, job_id
+                self.logger.info(message, *args)
+        if self.batch_jobs:
+            placeholders = ",".join(["?"] * len(self.batch_jobs))
+            where = f"WHERE id IN ({placeholders})"
+            update = f"UPDATE batch_job SET status = 'Aborted' {where}"
+            self.cursor.execute(update, tuple(self.batch_jobs))
+            if subtitle:
+                subtitle += f" and {len(self.batch_jobs)} batch jobs"
             else:
-                html += """
-<input type='hidden' name='FailJob' value='Yes'>
-<p>Click Submit to change the status of this job to "Failure".</p>
-"""
-
+                subtitle = f"Resolved {len(self.batch_jobs)} batch jobs"
+            for job_id in sorted(self.batch_jobs):
+                args = self.session.user_name, job_id
+                self.logger.info("%s marked batch job %s as 'Aborted'", *args)
+        if subtitle:
+            self.conn.commit()
         else:
-            # Job type is a batch job
-            cursor.execute("""
-SELECT status, name, started, status_dt, progress
-  FROM batch_job
- WHERE id = ?""", jobId)
+            subtitle = "No jobs were selected for resolution"
+            self.logger.warning("Request submitted with no jobs")
+        self.subtitle = subtitle
+        self.show_form()
 
-            row = cursor.fetchone()
-            if not row:
-                cdrcgi.bail("Batch job %d not found" % jobId)
+    @property
+    def buttons(self):
+        """Decide which buttons to display."""
 
-            html += """
-<h2>Data for batch job %d</h2>
-<table border='1'>
- <tr>
-  <th>id</th><th>status</th><th>name</th>
-  <th>started</th><th>status_dt</th><th>progress</th>
- </tr>
- <tr>
-  <td>%s</td>
-  <td>%s</td>
-  <td>%s</td>
-  <td>%s</td>
-  <td>%s</td>
- </tr>
-</table>
-""" % (jobId,row[0],row[1],row[2],row[3],row[4])
+        if self.jobs:
+            return self.SUBMIT, self.DEVMENU, self.ADMINMENU, self.LOG_OUT
+        return self.DEVMENU, self.ADMINMENU, self.LOG_OUT
 
-            # Validate that change is okay to fail
-            if row[0] == 'Completed':
-                html += """
-<p class='error'>Completed jobs may not be changed to status="Aborted"</p>
-"""
-            elif row[0] == 'Aborted':
-                html += """
-<p class='error'>Job status already = "Aborted"</p>
-"""
-            else:
-                html += """
-<input type='hidden' name='FailJob' value='Yes'
-<p>Click Submit to change the status of this job to "Aborted".</p>
-"""
+    @property
+    def headers(self):
+        """Column headers for the form."""
 
-html += """
-<input type='hidden' name='%s' value='%s' />
-""" % (cdrcgi.SESSION, session)
+        return self.HTMLPage.B.TR(
+            self.HTMLPage.B.TH("\u2713"),
+            self.HTMLPage.B.TH("Job", self.HTMLPage.B.STYLE("center")),
+            self.HTMLPage.B.TH("Type", self.HTMLPage.B.STYLE("center")),
+            self.HTMLPage.B.TH("Started", self.HTMLPage.B.STYLE("center")),
+            self.HTMLPage.B.TH("Status", self.HTMLPage.B.STYLE("center")),
+            self.HTMLPage.B.TH("Name", self.HTMLPage.B.STYLE("center"))
+        )
+    @property
+    def jobs(self):
+        """Dictionary of stalled jobs (both publihsing and batch)."""
 
-cdrcgi.sendPage(header + html + "</FORM></BODY></HTML>")
+        if not hasattr(self, "_jobs"):
+            self._jobs = {}
+            fields = "id", "name", "started", "status"
+            query = self.Query("batch_job", *fields)
+            query.where("status NOT IN ('Completed', 'Aborted')")
+            for row in query.execute(self.cursor).fetchall():
+                job = Job(self, "batch", row)
+                self._jobs[job.key] = job
+            fields = "id", "pub_subset AS name", "started", "status"
+            query = self.Query("pub_proc", *fields)
+            query.where("status NOT IN ('Success', 'Failure')")
+            for row in query.execute(self.cursor).fetchall():
+                job = Job(self, "publishing", row)
+                self._jobs[job.key] = job
+        return self._jobs
+
+    @property
+    def checked_jobs(self):
+        """Jobs marked for resolution by the user."""
+
+        if not hasattr(self, "_checked_jobs"):
+            self._checked_jobs = self.fields.getlist("job")
+        return self._checked_jobs
+
+    @property
+    def publishing_jobs(self):
+        """Publishing jobs marked for resolution by the user."""
+
+        if not hasattr(self, "_publishing_jobs"):
+            self._publishing_jobs = set()
+            for key in self.checked_jobs:
+                if key[0] == "P":
+                    self._publishing_jobs.add(int(key[1:]))
+        return self._publishing_jobs
+
+    @property
+    def batch_jobs(self):
+        """Batch jobs marked for resolution by the user."""
+
+        if not hasattr(self, "_batch_jobs"):
+            self._batch_jobs = set()
+            for key in self.checked_jobs:
+                if key[0] == "B":
+                    self._batch_jobs.add(int(key[1:]))
+        return self._batch_jobs
+
+    @property
+    def sorted_jobs(self):
+        """Sorted sequence of the `Job` object for display on the form."""
+
+        if not hasattr(self, "_sorted_jobs"):
+            self._sorted_jobs = list(reversed(sorted(self.jobs.values())))
+        return self._sorted_jobs
+
+    @property
+    def subtitle(self):
+        """String to be displayed under the primary banner."""
+
+        if not hasattr(self, "_subtitle"):
+            self._subtitle = self.SUBTITLE
+        return self._subtitle
+
+    @subtitle.setter
+    def subtitle(self, value):
+        """Override as necessary."""
+        self._subtitle = value
+
+
+class Job:
+    """Information about a stalled publishing or batch job."""
+
+    def __init__(self, control, job_type, row):
+        """Capture the caller's information."""
+
+        self.__control = control
+        self.__type = job_type
+        self.__row = row
+
+    def __lt__(self, other):
+        """Make the `Job` objects sortable by date."""
+        return self.started < other.started
+
+    @property
+    def id(self):
+        """Integer ID for the job."""
+        return self.__row.id
+
+    @property
+    def key(self):
+        """Combination of "P" or "B" and the job ID."""
+        return f"{self.type[0].upper()}{self.id}"
+
+    @property
+    def name(self):
+        """String for the particular type of job (e.g. 'Export')."""
+        return self.__row.name
+
+    @property
+    def row(self):
+        """HTML table row for display on the form."""
+
+        if not hasattr(self, "_row"):
+            B = self.__control.HTMLPage.B
+            opts = dict(name="job", value=f"{self.key}", type="checkbox")
+            self._row = B.TR(
+                B.TD(B.INPUT(**opts), B.CLASS("center")),
+                B.TD(str(self.id), B.CLASS("center")),
+                B.TD(self.type, B.CLASS("center")),
+                B.TD(str(self.started)[:10], B.CLASS("center")),
+                B.TD(self.status, B.CLASS("center")),
+                B.TD(self.name)
+            )
+        return self._row
+
+    @property
+    def started(self):
+        """Date and time when the job was created."""
+        return self.__row.started
+
+    @property
+    def status(self):
+        """Current status for the job."""
+        return self.__row.status
+
+    @property
+    def type(self):
+        """String for the job type ('batch' or 'publishing')."""
+        return self.__type
+
+
+if __name__ == "__main__":
+    """Don't execute script if loaded as module."""
+    Control().run()

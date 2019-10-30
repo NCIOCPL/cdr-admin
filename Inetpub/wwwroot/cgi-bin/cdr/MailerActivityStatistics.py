@@ -1,223 +1,81 @@
-#----------------------------------------------------------------------
-# Generates report of counts of mailers of each type, generated during
-# a specified date range.
-#----------------------------------------------------------------------
-import cdr, cdrcgi, cgi
-import datetime
-from cdrapi import db
+#!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields    = cgi.FieldStorage()
-session   = cdrcgi.getSession(fields)
-request   = cdrcgi.getRequest(fields)
-fromDate  = fields and fields.getvalue('FromDate') or None
-toDate    = fields and fields.getvalue('ToDate')   or None
-SUBMENU   = "Report Menu"
-buttons   = ["Submit Request", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-script    = "MailerActivityStatistics.py"
-title     = "CDR Administration"
-section   = "Mailer Activity Statistics"
-header    = cdrcgi.header(title, title, section, script, buttons)
-today     = datetime.date.today()
-
-#----------------------------------------------------------------------
-# Make sure we're logged in.
-#----------------------------------------------------------------------
-if not session: cdrcgi.bail('Unknown or expired CDR session.')
-
-#----------------------------------------------------------------------
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if request == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif request == SUBMENU:
-    cdrcgi.navigateTo("Reports.py", session)
-
-#----------------------------------------------------------------------
-# Handle request to log out.
-#----------------------------------------------------------------------
-if request == "Log Out":
-    cdrcgi.logout(session)
-
-#----------------------------------------------------------------------
-# If we don't have a request, put up the request form.
-#----------------------------------------------------------------------
-if not fromDate or not toDate:
-    toDate      = str(today)
-    fromDate    = str(today - datetime.timedelta(7))
-    form = """\
-   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-   <TABLE BORDER='0'>
-    <TR>
-     <TD><B>Start Date:&nbsp;</B></TD>
-     <TD><INPUT NAME='FromDate' VALUE='%s'>&nbsp;
-         (use format YYYY-MM-DD for dates, e.g. 2002-01-01)</TD>
-    </TR>
-    <TR>
-     <TD><B>End Date:&nbsp;</B></TD>
-     <TD><INPUT NAME='ToDate' VALUE='%s'>&nbsp;</TD>
-    </TR>
-   </TABLE>
-  </FORM>
- </BODY>
-</HTML>
-""" % (cdrcgi.SESSION, session, fromDate, toDate)
-    cdrcgi.sendPage(header + form)
-
-#----------------------------------------------------------------------
-# Validate input dates
-#----------------------------------------------------------------------
-if not cdr.strptime(fromDate, '%Y-%m-%d'):
-    cdrcgi.bail('Start Date must be valid date in YYYY-MM-DD format')
-if not cdr.strptime(toDate, '%Y-%m-%d'):
-    cdrcgi.bail('End Date must be valid date in YYYY-MM-DD format')
-if fromDate > toDate:
-    cdrcgi.bail('Start Date is greater than End Date')
-
-#----------------------------------------------------------------------
-# Connect to the database.
-#----------------------------------------------------------------------
-try:
-    conn   = db.connect()
-    cursor = conn.cursor()
-except Exception as e:
-    cdrcgi.bail('Database connection failure: %s' % e)
-
-#----------------------------------------------------------------------
-# We have a request; do it.
-#----------------------------------------------------------------------
-html = """\
-<!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
-<html>
- <head>
-  <title>Mailer Statistics Report %s</title>
-  <basefont face='Arial, Helvetica, sans-serif'>
- </head>
- <body>
-  <center>
-   <b>
-    <font size='4'>Mailer Statistics Report</font>
-   </b>
-   <br />
-   <b>
-    <font size='4'>From %s to %s</font>
-   </b>
-  </center>
-  <br />
-  <br />
-""" % (today, fromDate, toDate)
-
-#----------------------------------------------------------------------
-# Extract the information from the database.
-#----------------------------------------------------------------------
-try:
-    cursor.execute("""\
-            SELECT t.value,
-                   COUNT(*)
-              FROM query_term t
-              JOIN query_term s
-                ON s.doc_id = t.doc_id
-             WHERE s.value BETWEEN ? AND ?
-               AND t.path = '/Mailer/Type'
-               AND s.path = '/Mailer/Sent'
-          GROUP BY t.value""", (fromDate, toDate + " 23:59:59"))
-    lastGroup  = None
-    groupTotal = 0
-    grandTotal = 0
-    row        = cursor.fetchone()
-    if not row:
-        cdrcgi.sendPage(html + """\
-  <b>
-   <font size='3'>No mailers were sent during this period.</font>
-  </b>
- </body>
-</html>
-""")
-    while row:
-        mailerType, count = row
-        group = mailerType.split("-")[0]
-        if group != lastGroup:
-            if not groupTotal:
-                html += """\
-  <table border='1' cellspacing='0' cellpadding='2' width='100%%'>
-   <tr>
-    <td nowrap='1'>
-     <b>
-      <font size='3'>Type of Mailer</font>
-     </b>
-    </td>
-    <td nowrap='1'>
-     <b>
-      <font size='3'>Mailer Count</font>
-     </b>
-    </td>
-   </tr>
+"""Report on mailer counts for a specified date range.
 """
+
+from cdrcgi import Controller
+import datetime
+
+
+class Control(Controller):
+    """Report logic."""
+
+    SUBTITLE = "Mailer Activity Statistics"
+
+    def populate_form(self, page):
+        """Add date range fields to form.
+
+        Pass:
+            page - HTMLPage object on which to place the fields
+        """
+
+        fieldset = page.fieldset("Specify Date Range")
+        today = datetime.date.today()
+        last_week = today - datetime.timedelta(7)
+        fieldset.append(page.date_field("start", value=last_week))
+        fieldset.append(page.date_field("end", value=today))
+        page.form.append(fieldset)
+
+    def build_tables(self):
+        """Create the mailer counts table."""
+
+        query = self.Query("query_term t", "t.value", "COUNT(*) AS n")
+        query.join("query_term s", "s.doc_id = t.doc_id")
+        query.where("t.path = '/Mailer/Type'")
+        query.where("s.path = '/Mailer/Sent'")
+        query.group("t.value")
+        if self.start:
+            query.where(query.Condition("s.value", self.start, ">="))
+        if self.end:
+            end = f"{self.end} 23:59:59"
+            query.where(query.Condition("s.value", end, "<="))
+        rows = []
+        for mailer_type, count in query.execute(self.cursor).fetchall():
+            rows.append((mailer_type, self.Reporter.Cell(count, right=True)))
+        if not rows:
+            return []
+        columns = (
+            self.Reporter.Column("Type", width="300px"),
+            self.Reporter.Column("Count", width="75px"),
+        )
+        caption = "Mailers Sent"
+        if self.start:
+            if self.end:
+                caption += f" from {self.start} to {self.end}"
             else:
-                html += """\
-   <tr>
-    <td>
-     <b>
-      <font size='3'>%s Mailer Total</font>
-     </b>
-    </td>
-    <td align='right'>
-     <font size='3'>%d</font>
-    </td>
-   </tr>
-   <tr>
-    <td colspan='2'>&nbsp;</td>
-   </tr>
-""" % (lastGroup, groupTotal)
-            groupTotal = 0
-            lastGroup  = group
-        html += """\
-   <tr>
-    <td>
-     <font size='3'>%s</font>
-    </td>
-    <td align='right'>
-     <font size='3'>%d</font>
-    </td>
-   </tr>
-""" % (mailerType, count)
-        groupTotal += count
-        grandTotal += count
-        row = cursor.fetchone()
-except Exception as e:
-    cdrcgi.bail('Failure executing query: %s' % e)
+                caption += f" since {self.start}"
+        elif self.end:
+            caption += f" through {self.end}"
+        else:
+            caption = "Mailer Counts"
+        return self.Reporter.Table(rows, cols=columns, caption=caption)
 
-if groupTotal:
-    html += """\
-   <tr>
-    <td>
-     <b>
-      <font size='3'>%s Mailer Total</font>
-     </b>
-    </td>
-    <td align='right'>
-     <font size='3'>%d</font>
-    </td>
-   </tr>
-   <tr>
-    <td colspan='2'>&nbsp;</td>
-   </tr>
-""" % (lastGroup, groupTotal)
+    @property
+    def start(self):
+        """String from the form for the start of the date range."""
+        return self.fields.getvalue("start")
 
-cdrcgi.sendPage(html + """\
-   <tr>
-    <td nowrap='1'>
-     <b>
-      <font size='3'>TOTAL MAILERS</font>
-     </b>
-    </td>
-    <td align='right'>
-     <font size='3'>%d</font>
-    </td>
-   </tr>
-  </table>
- </body>
-</html>
-""" % grandTotal)
+    @property
+    def end(self):
+        """String from the form for the end of the date range."""
+        return self.fields.getvalue("end")
+
+    @property
+    def no_results(self):
+        """What to display if there are no mailers to report."""
+        return "No mailers were sent during this time period."
+
+
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+    Control().run()

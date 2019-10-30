@@ -1,159 +1,138 @@
-#----------------------------------------------------------------------
-# Script to copy the ZIP code zip-archive file to the CDR server and
-# load to the zip_code database table.
-# ---------------------------------------------------------------------
-# OCECDR-3848: Automate Quarterly ZIP Code Updates
-#----------------------------------------------------------------------
-import sys
-import cdr
-import cgi
-import cdrcgi
-import datetime
-import zipfile
-import time
-import os
+#!/usr/bin/env python
 
-FIX_PERMISSIONS = os.path.join(cdr.BASEDIR, "Bin", "fix-permissions.cmd")
-FIX_PERMISSIONS = FIX_PERMISSIONS.replace("/", os.path.sep)
+"""Automate Quarterly ZIP Code Updates
 
-fields = cgi.FieldStorage()
-session = cdrcgi.getSession(fields)
-if not session or not cdr.canDo(session, "UPLOAD ZIP CODES"):
-    cdrcgi.bail("You are not authorized to post ZIP code files")
-request = fields.getvalue("Request")
+Copy the ZIP code zip-archive file to the CDR server and load to the
+zip_code database table.
+"""
 
-# Display the upload page
-# -----------------------
-if "codes" in fields.keys():
-    codes = fields["codes"]
-else:
-    cdrcgi.sendPage("""\
-<!DOCTYPE html>
-<html>
-  <head>
-    <title>ZIP Codes</title>
-    <style>
-* { font-family: Arial, sans-serif; }
-fieldset { width: 350px; margin: 5px auto; }
-legend { color: green; }
-h1 { font-size: 20px; text-align: center; color: maroon; }
-input { display: block; }
-#submit { margin-top: 10px; }
-    </style>
-  </head>
-  <body>
-    <h1>Upload ZIP Codes</h1>
-    <form action="upload-zip-code-file.py" method="post"
-          enctype="multipart/form-data">
-      <input type="hidden" name="Session" value="%s">
-      <fieldset>
-        <legend>File Selection</legend>
-        <input type="file" name="codes">
-        <input type="submit" value="Submit" name="Request" id="submit">
-        <hr>
-        <p><strong>Note</strong>:<br>The load will take several minutes.
-           Don't press <em>Submit</em> twice.</p>
-      </fieldset>
-    </form>
-  </body>
-</html>""" % session)
+from os import path
+from time import sleep
+from zipfile import ZipFile
+from cdrcgi import Controller
+from cdr import BASEDIR, PYTHON, run_command
 
-# Read the zip file
-# -----------------
-if codes.file:
-    filebytes = []
-    while True:
-        more_bytes = codes.file.read()
-        if not more_bytes:
-            break
-        filebytes.append(more_bytes)
-else:
-    filebytes = [codes.value]
+class Control(Controller):
+    """Access to the database and form-building tools."""
 
-# We don't like empty files
-# -------------------------
-if not filebytes:
-    cdrcgi.bail("Empty file")
+    SUBTITLE = "Upload ZIP Codes"
+    LOGNAME = "UploadZIPCodes"
+    FIX_PERMISSIONS = path.join(BASEDIR, "Bin", "fix-permissions.cmd")
+    FIX_PERMISSIONS = FIX_PERMISSIONS.replace("/", path.sep)
 
-# Save a copy of the uploaded files in the uploads directory
-# ----------------------------------------------------------
-now  = datetime.datetime.now()
-name = now.strftime(f"{cdr.BASEDIR}/uploads/zipcodes-%Y%m%d%H%M%S.zip")
-ziptxt  = now.strftime("/tmp/zip-%Y%m%d%H%M%S.txt")
-zipload = f"{cdr.BASEDIR}/utilities/bin/LoadZipCodes.py"
-cmd = f"{cdr.PYTHON} {zipload} {ziptxt}"
+    def populate_form(self, page):
+        """Display instructions and prompt for the file.
 
-# Saving the ZIP file to disk
-# ---------------------------
-try:
-    with open(name, "wb") as fp:
-        for segment in filebytes:
-            fp.write(segment)
-except Exception as e:
-    cdrcgi.bail(f"failure storing {name}: {e}")
+        Pass:
+            page - HTMLPage on which we place the fields
+        """
 
-# Access the saved ZIP file and read the ZIP Code archive
-# -------------------------------------------------------
-time.sleep(2)
-native_name = name.replace("/", os.path.sep)
-command = f"{FIX_PERMISSIONS} {native_name}"
-process = cdr.run_command(command, merge_output=True)
-if process.returncode:
-    print(f"""\
-Content-type: text/plain
+        fieldset = page.fieldset("Instructions")
+        paragraph = page.B.P(
+            "The load will take several minutes. Don't press ",
+            page.B.EM("Submit"),
+            " twice."
+        )
+        fieldset.append(paragraph)
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Upload ZIP Files")
+        fieldset.append(page.file_field("file", label="Codes"))
+        page.form.append(fieldset)
+        if self.logs is not None:
+            fieldset = page.fieldset("Processing Output")
+            fieldset.append(self.logs)
+            page.form.append(fieldset)
+            page.add_css("pre { color: green }")
+        page.form.set("enctype", "multipart/form-data")
 
-Unable to set permissions on {name}.
-Command: {command}
-Output: {process.stdout}""")
-    sys.exit(0)
+    def show_report(self):
+        """Cycle back to the form."""
+        self.show_form()
 
-try:
-    zf = zipfile.ZipFile(name)
-    names = zf.namelist()
-except Exception as e:
-    cdrcgi.bail(f"failure loading {name}: {e}")
-if "z5max.txt" not in names:
-    names = "\n".join(names)
-    print(f"""\
-Content-type: text/plain
+    @property
+    def buttons(self):
+        """Customize the action buttons on the banner bar."""
+        return self.SUBMIT, self.DEVMENU, self.ADMINMENU, self.LOG_OUT
 
-The file z5max.txt is not contained in the zipfile.
-Archive contents:
-{names}
-""")
-    sys.exit(0)
+    @property
+    def file_bytes(self):
+        """UTF-8 serialization of the document to be posted."""
 
-try:
-    payload = zf.read("z5max.txt")
-    with open(ziptxt, "wb") as fzip:
-        fzip.write(payload)
-except Exception as e:
-    cdrcgi.bail(f"unable to write csv file: {e}")
+        if not hasattr(self, "_file_bytes"):
+            self._file_bytes = None
+            if "file" in list(self.fields.keys()):
+                field = self.fields["file"]
+                if field.file:
+                    segments = []
+                    while True:
+                        more_bytes = field.file.read()
+                        if not more_bytes:
+                            break
+                        segments.append(more_bytes)
+                else:
+                    segments = [field.value]
+                self._file_bytes = b"".join(segments)
+        return self._file_bytes
 
-# Now that we have the data file on the server we're ready
-# to run the load script
-# --------------------------------------------------------
-try:
-    process = cdr.run_command(cmd, merge_output=True)
-except Exception as e:
-    print(f"Content-type: text/plain\n\n{cmd}\n{e!r}")
-    sys.exit(0)
+    @property
+    def logs(self):
+        """Log output describing the outcome of an upload action."""
+
+        if not hasattr(self, "_logs"):
+            self._logs = None
+            if self.zipfile:
+                if not self.session.can_do("UPLOAD ZIP CODES"):
+                    error = "Account not authorized for uploading zip files."
+                    self.bail(error)
+                ziptxt = f"/tmp/zip-{self.timestamp}.txt"
+                try:
+                    with open(ziptxt, "wb") as fp:
+                        fp.write(self.zipfile.read("z5max.txt"))
+                except Exception as e:
+                    self.logger.exception("Failure creating %s", ziptxt)
+                    self.bail(f"Failure creating {ziptext}: {e}")
+                zipload = f"{BASEDIR}/utilities/bin/LoadZipCodes.py"
+                command = f"{PYTHON} {zipload} {ziptxt}"
+                process = run_command(command, merge_output=True)
+                if process.returncode:
+                    self.logger.error("%s: %s", zipload, process.stdout)
+                else:
+                    self.logger.info("ZIP codes loaded successfully")
+                self._logs = self.HTMLPage.B.PRE(process.stdout)
+        return self._logs
+
+    @property
+    def zipfile(self):
+        """Compressed archive from the ZIPList5 vendor."""
+
+        if not hasattr(self, "_zipfile"):
+            self._zipfile = None
+            if self.file_bytes:
+                name = f"zipcodes-{self.timestamp}.zip"
+                filepath = f"{BASEDIR}/uploads/{name}"
+                try:
+                    with open(filepath, "wb") as fp:
+                        fp.write(self.file_bytes)
+                except Exception as e:
+                    self.logger.exception("Failure storing %s", filepath)
+                    self.bail(f"failure storing {filepath}: {e}")
+                self.__fix_permissions(filepath)
+                self._zipfile = ZipFile(filepath)
+                self.logger.info("Stored %s", filepath)
+        return self._zipfile
+
+    def __fix_permissions(self, filepath):
+        """Clean up messiness in the file system on CBIIT Windows servers."""
+
+        sleep(2)
+        filepath = filepath.replace("/", path.sep)
+        command = f"{self.FIX_PERMISSIONS} {filepath}"
+        process = run_command(command, merge_output=True)
+        if process.returncode:
+            extra = command, process.stdout
+            self.bail("Failure fixing file permissions", extra=extra)
 
 
-#-----------------------------------------------
-# Final report listing the number of rows loaded
-#-----------------------------------------------
-cdrcgi.sendPage(f"""\
-<!DOCTYPE html>
-<html>
-  <head>
-   <title>Update zipcode DB table</title>
-  </head>
-  <body>
-    <h3>Success: zipcode table updated!</h3>
-    <p>
-    Log messages below:
-    </p>
-    <pre>{process.stdout}</pre>
-  </body>
-</html>""")
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+    Control().run()

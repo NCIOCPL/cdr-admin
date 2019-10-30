@@ -1799,5 +1799,7 @@ if isinstance(doc, bytes):
 #----------------------------------------------------------------------
 # Send it.
 #----------------------------------------------------------------------
+args = docId, version, docType, docParms
+cdr.LOGGER.info("QC for %s version %s type %s with parms %s", *args)
 cdrcgi.sendPage(doc, parms=docParms, docId=docId,
                      docType=docType, docVer=version)
