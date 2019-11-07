@@ -3,7 +3,7 @@
 """Prepare a document for comprehensive review.
 """
 
-from cdrcgi import Controller, DOCID, sendPage
+from cdrcgi import Controller, DOCID, sendPage, navigateTo
 from cdr import FILTERS
 from cdrapi.docs import Doc
 from lxml import html
@@ -61,7 +61,6 @@ class Control(Controller):
             page.form.append(page.hidden_field(DOCID, self.id))
             page.form.append(self.version_fieldset)
             self.__add_markup_options(page)
-            self.__add_audience_options(page)
             self.__add_comment_options(page)
             self.__add_section_options(page)
             self.__add_911_options(page)
@@ -84,17 +83,16 @@ class Control(Controller):
 
         # Put up the initial form asking for document identification.
         else:
+            label = "Title"
+            fragment = "Title Fragment"
             if self.doctype == "GlossaryTermConcept":
                 fragment = "Definition Fragment"
-            elif self.doctype:
-                fragment = "Title Fragment"
-            else:
-                fragment = "Fragment"
+                label = "Definition"
             fieldset = page.fieldset(f"Enter Document ID or {fragment}")
             if not self.doctype:
                 fieldset.append(page.select("DocType", options=self.doctypes))
             fieldset.append(page.text_field(DOCID, label="CDR ID"))
-            fieldset.append(page.text_field("fragment"))
+            fieldset.append(page.text_field("fragment", label=label))
             page.form.append(fieldset)
         page.head.append(page.B.SCRIPT(src="/js/QcReport.js"))
 
@@ -130,6 +128,8 @@ class Control(Controller):
 
         if not hasattr(self, "_doctype"):
             self._doctype = self.fields.getvalue("DocType")
+            if self._doctype and ":" in self._doctype:
+                self._doctype = self._doctype.split(":")[0]
             if not self._doctype and self.id:
                 doc = Doc(self.session, id=self.id)
                 self._doctype = doc.doctype.name
@@ -156,10 +156,11 @@ class Control(Controller):
                 self._filter_key += f":{self.report_type}"
             if "qd" in self.options:
                 self._filter_key += "qd"
-            if self.doctype == "Media":
-                self._filter_key += ":img"
-            if self.doctype == "MiscellaneousDocument":
-                self._filter_key += ":rs"
+            if ":" not in self._filter_key:
+                if self.doctype == "Media":
+                    self._filter_key += ":img"
+                if self.doctype == "MiscellaneousDocument":
+                    self._filter_key += ":rs"
         return self._filter_key
 
     @property
@@ -215,7 +216,7 @@ class Control(Controller):
         if not hasattr(self, "_matches"):
             self._matches = []
             if self.fragment:
-                query = self.Query("document d", "d.id", "d.title")
+                query = self.Query("document d", "d.id", "d.title").order(2)
                 if self.doctype == "GlossaryTermConcept":
                     fragment = f"%{self.fragment}%"
                     query.join("query_term c", "c.doc_id = d.id")
@@ -253,6 +254,10 @@ class Control(Controller):
 
         if not hasattr(self, "_report_type"):
             self._report_type = self.fields.getvalue("ReportType", "")
+            if not self._report_type:
+                doctype = self.fields.getvalue("DocType")
+                if doctype and ":" in doctype:
+                    self._report_type = doctype.split(":", 1)[1]
             if not self._report_type and self.doc is not None:
                 node = self.doc.root.find("SummaryMetaData/SummaryAudience")
                 if node is not None and node.text == "Patients":
@@ -279,7 +284,11 @@ class Control(Controller):
 
     @property
     def version(self):
-        """Version of the document to use for the report."""
+        """Version of the document to use for the report.
+
+        None means no version has been selected. An empty string
+        means the current working document has been chosen.
+        """
 
         version = self.fields.getvalue("DocVersion")
         if version in ("-1", self.CURRENT_WORKING_VERSION):
@@ -309,8 +318,8 @@ class Control(Controller):
 
         if self.doctype == "DrugInformationSummary":
             return True
-        if self.doctype in ("Summary", "GlossaryTermName"):
-            if self.report_type not in ("pp", "gtnwc"):
+        if self.doctype == "Summary":
+            if self.report_type and self.report_type not in ("pp", "gtnwc"):
                 return True
         return False
 
@@ -323,39 +332,28 @@ class Control(Controller):
             fieldset.append(page.checkbox("options", **opts))
             page.form.append(fieldset)
 
-    def __add_audience_options(self, page):
-        """Ask about glossary definition audience choices."""
-
-        if self.doctype != "GlossaryTermName":
-            return
-        fieldset = page.fieldset("Choose Definitions To Display By Audience")
-        opts = dict(value="hp", label="Health Professional", checked=True)
-        fieldset.append(page.checkbox("audience", **opts))
-        opts = dict(value="patient", label="Patient", checked=True)
-        fieldset.append(page.checkbox("audience", **opts))
-        page.form.append(fieldset)
-
     def __add_comment_options(self, page):
         """Determine which comments are to be displayed."""
 
-        fieldset = page.fieldset("Choose Comments To Be Displayed")
-        options = (
-            ("internal", "Internal", "P"),
-            ("external", "External", "H"),
-            ("advisory", "Advisory Board", "P"),
-            ("editorial", "Non-Advisory Board", "PH"),
-            ("permanent", "Permanent", "H"),
-            ("ephemeral", "Non-Permanent", "PH"),
-            ("external-permanent", "Permanent External", ""),
-            ("internal-advisory", "Internal Advisory", ""),
-        )
-        type_key = "P" if self.report_type.startswith("pat") else "H"
-        for value, label, types in options:
-            checked = type_key in types
-            label = f"Include {label} Comments"
-            opts = dict(value=value, label=label, checked=checked)
-            fieldset.append(page.checkbox("comment", **opts))
-        page.form.append(fieldset)
+        if self.doctype == "Summary":
+            fieldset = page.fieldset("Choose Comments To Be Displayed")
+            options = (
+                ("internal", "Internal", "P"),
+                ("external", "External", "H"),
+                ("advisory", "Advisory Board", "P"),
+                ("editorial", "Non-Advisory Board", "PH"),
+                ("permanent", "Permanent", "H"),
+                ("ephemeral", "Non-Permanent", "PH"),
+                ("external-permanent", "Permanent External", ""),
+                ("internal-advisory", "Internal Advisory", ""),
+            )
+            type_key = "P" if self.report_type.startswith("pat") else "H"
+            for value, label, types in options:
+                checked = type_key in types
+                label = f"Include {label} Comments"
+                opts = dict(value=value, label=label, checked=checked)
+                fieldset.append(page.checkbox("comment", **opts))
+            page.form.append(fieldset)
 
     def __add_markup_options(self, page):
         """Add checkboxes for how to display insertion/deletion markup."""
@@ -400,7 +398,7 @@ class Control(Controller):
             ("HP Reference Section", "CitationsHP"),
             ("Level of Evidence Terms", "LOEs"),
         )
-        defaults = {"CitationsHP", "CitationsPat", "KeyPoints", "LearnMore"}
+        defaults = {"CitationsHP", "CitationsPat", "Keypoints", "LearnMore"}
         if self.report_type.startswith("pat"):
             sections = common + patient
         else:
@@ -423,12 +421,18 @@ class Control(Controller):
         page.form.append(fieldset)
 
     def __reroute_summary(self):
-        """Make the summary usable by Microsoft Word."""
+        """Make the summary usable by Microsoft Word.
+
+        Note that the use of the name `docType` is bogus here, as we
+        are instead passing the value of the key into the dictionary
+        of filters.  This is regrettably caused by the need to preserve
+        the behavior of legacy code which depends on this ruse.
+        """
 
         opts = dict(
             parms=f"parmid={self.__save_parms()}",
             docId=self.doc.cdr_id,
-            docType=self.doc.doctype.name,
+            docType=self.filter_key,
             docVer=self.version or "",
         )
         return sendPage(None, **opts)
@@ -556,7 +560,7 @@ class FilterParameters:
 
     @property
     def learn_more(self):
-        """Whether to include key points."""
+        """Whether to include the 'Learn more about ...' section."""
         return "Y" if "LearnMore" in self.section_options else "N"
 
     @property
@@ -612,7 +616,7 @@ class FilterParameters:
 
     @property
     def standard_wording(self):
-        """Whether to include key points."""
+        """Whether to include the standard wording section."""
         return "Y" if "StandardWording" in self.section_options else "N"
 
     @property
