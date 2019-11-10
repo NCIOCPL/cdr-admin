@@ -16,6 +16,7 @@ import re
 import sys
 from cdrapi import db
 from html import escape as html_escape
+from operator import attrgetter
 
 fields  = cgi.FieldStorage()
 cdrId   = fields.getvalue('cdrId') # or '525153'
@@ -355,7 +356,7 @@ Content-type: text/html
     <th>Job ID</th>
     <th>Date/Time</th>
    </tr>""" % (title, title))
-    docs.sort(lambda a,b: cmp(a.cdrId, b.cdrId))
+    docs.sort(key=attrgetter("cdrId"))
 
     iDoc = pDoc = 0
 

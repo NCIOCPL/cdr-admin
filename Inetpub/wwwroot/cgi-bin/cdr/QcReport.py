@@ -460,11 +460,6 @@ class FilterParameters:
         self.__control = control
 
     @property
-    def audience(self):
-        """Which audience(s) to use for glossary term name reports."""
-        return "_".join(self.fields.getlist("audience"))
-
-    @property
     def citations(self):
         """Should the references be displayed?"""
         for value in ("CitationsHP", "CitationsPat"):
@@ -621,13 +616,23 @@ class FilterParameters:
 
     @property
     def values(self):
-        parms = {}
+        parms = dict(
+            isQC="Y",
+            DisplayCitations=self.citations,
+            DisplayGlossaryTermList=self.glossary,
+            DisplayImages=self.images,
+            DisplayLOETermList=self.loe,
+        )
         if self.markup_levels:
             parms["insRevLevels"] = self.markup_levels
-        if self.doctype in ("DrugInformationSummary", "Media"):
-            parms["isQC"] = "Y"
         if self.doctype == "DrugInformationSummary":
             parms["DisplayComments"] = "A"
+        if self.doctype == "GlossaryTermName":
+            parms["DisplayComments"] = self.comment_audience
+            parms["displayBoard"] = "editorial-board"
+        if self.doctype == "MiscellaneousDocument":
+            parms["insRevLevels"] = "approved"
+            parms["displayBoard"] = "editorial_board"
         if self.doctype == "Summary":
             parms["DisplayComments"] = self.comment_audience
             parms["DurationComments"] = self.comment_duration
@@ -636,25 +641,14 @@ class FilterParameters:
             parms["IncludeIntAdv"] = self.comment_internal_advisory
             parms["DisplayModuleMarkup"] = self.markup_module
             parms["displayBoard"] = self.markup_boards
-        if self.doctype == "GlossaryTermName":
-            parms["DisplayComments"] = self.comment_audience
-            parms["displayBoard"] = "editorial-board"
-            parms["displayAudience"] = self.audience
-        if self.doctype == "MiscellaneousDocument":
-            parms["insRevLevels"] = "approved"
-            parms["displayBoard"] = "editorial_board"
-        if self.report_type in ("bu", "but"):
-            parms["delRevLevels"] = "Y"
-        parms["DisplayGlossaryTermList"] = self.glossary
-        parms["DisplayImages"] = self.images
         if self.images == "Y":
             parms["DisplayPubImages"] = self.images_publishable
-        parms["DisplayCitations"] = self.citations
-        parms["DisplayLOETermList"] = self.loe
+        if self.report_type in ("bu", "but"):
+            parms["delRevLevels"] = "Y"
         if self.report_type.startswith("pat"):
-            parms["ShowStandardWording"] = self.standard_wording
             parms["ShowKPBox"] = self.key_points
             parms["ShowLearnMoreSection"] = self.learn_more
+            parms["ShowStandardWording"] = self.standard_wording
         return parms
 
 
@@ -756,8 +750,9 @@ class Substitutions:
                     query.outer("query_term c", "c.doc_id = s.doc_id")
                     query.where("s.path = '/Mailer/Sent'")
                     query.where(query.Condition("s.doc_id", mailer_id))
-                    row = query.execute(self.control.cursor).fetchall()
-                    if row:
+                    rows = query.execute(self.control.cursor).fetchall()
+                    if rows:
+                        row = rows[0]
                         info.sent = row.s
                         if row.r:
                             info.resp_received = row.r

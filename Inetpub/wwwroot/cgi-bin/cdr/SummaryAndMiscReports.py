@@ -13,20 +13,15 @@ class Control(Controller):
     def populate_form(self, page):
         page.body.set("class", "admin-menu")
 
-        # Part 1: Summary QC.
-        page.form.append(page.B.H3("Summary QC Reports"))
+        # Part 1: Board member information.
+        page.form.append(page.B.H3("Board Member Information Reports"))
         ol = page.B.OL()
         page.form.append(ol)
-        script = "QcReport.py"
-        parms = dict(DocType="Summary")
-        for display, report_type in (
-            ("HP Bold/Underline QC Report", "bu"),
-            ("HP Redline/Strikeout QC Report", "rs"),
-            ("PT Bold/Underline QC Report", "patbu"),
-            ("PT Redline/Strikeout QC Report", "pat"),
-            ("Publish Preview Report", "pp"),
+        for display, script, parms in (
+            ("Board Member Information QC Report", "QcReport.py",
+             dict(DocType="PDQBoardMemberInfo")),
+            ("Board Roster Reports", "BoardRoster.py", {}),
         ):
-            parms["ReportType"] = report_type
             ol.append(page.B.LI(page.menu_link(script, display, **parms)))
 
         # Part 2: Management QC.
@@ -53,18 +48,7 @@ class Control(Controller):
         ):
             ol.append(page.B.LI(page.menu_link(script, display)))
 
-        # Part 3: Board member information.
-        page.form.append(page.B.H3("Board Member Information Reports"))
-        ol = page.B.OL()
-        page.form.append(ol)
-        for display, script, parms in (
-            ("Board Member Information QC Report", "QcReport.py",
-             dict(DocType="PDQBoardMemberInfo")),
-            ("Board Roster Reports", "BoardRoster.py", {}),
-        ):
-            ol.append(page.B.LI(page.menu_link(script, display, **parms)))
-
-        # Part 4: Related QC.
+        # Part 3: Related QC.
         page.form.append(page.B.H3("Related QC Reports"))
         ol = page.B.OL()
         page.form.append(ol)
@@ -77,6 +61,22 @@ class Control(Controller):
         ):
             ol.append(page.B.LI(page.menu_link(script, display, **parms)))
 
+
+        # Part 4: Summary QC.
+        page.form.append(page.B.H3("Summary QC Reports"))
+        ol = page.B.OL()
+        page.form.append(ol)
+        script = "QcReport.py"
+        parms = dict(DocType="Summary")
+        for display, report_type in (
+            ("HP Bold/Underline QC Report", "bu"),
+            ("HP Redline/Strikeout QC Report", "rs"),
+            ("PT Bold/Underline QC Report", "patbu"),
+            ("PT Redline/Strikeout QC Report", "pat"),
+            ("Publish Preview Report", "pp"),
+        ):
+            parms["ReportType"] = report_type
+            ol.append(page.B.LI(page.menu_link(script, display, **parms)))
 
         # Part 5: Translation jobs.
         page.form.append(page.B.H3("Translation Job Reports"))

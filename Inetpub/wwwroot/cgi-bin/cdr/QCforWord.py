@@ -39,13 +39,27 @@ class Control(Controller):
         return self._doc
 
     @property
+    def filter_key(self):
+        """String used to select filters for the report.
+
+        Note that the parameter used to convey this value has a
+        completely misleading name.
+        """
+
+        if not hasattr(self, "_doctype"):
+            self._doctype = self.fields.getvalue("DocType")
+            if not self._doctype:
+                self._doctype = self.doc.doctype.name
+        return self._doctype
+
+    @property
     def filters(self):
         """XSL/T filters to be applied to the document."""
 
         if not hasattr(self, "_filters"):
-            self._filters = FILTERS.get(self.doc.doctype.name)
+            self._filters = FILTERS.get(self.filter_key)
             if not self._filters:
-                self.bail(f"Document type {self.doc.doctype} not supported")
+                self.bail(f"Filter for {self.filter_key} not supported")
         return self._filters
 
     @property

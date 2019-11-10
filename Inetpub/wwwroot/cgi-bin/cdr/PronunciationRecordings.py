@@ -45,8 +45,9 @@ class Control(Controller):
         except Exception as e:
             self.logger.exception("Failure queueing report")
             self.bail(f"Unable to start job: {e}")
-        self.job.show_status_page(self.session.name, self.title,
-                                  self.JOB_NAME, self.script, self.SUBMENU)
+        session = self.session.name
+        args = session, self.title, self.JOB_NAME, self.script, self.SUBMENU
+        self.job.show_status_page(*args)
 
     @property
     def args(self):

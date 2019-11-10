@@ -24,11 +24,14 @@ class Control(Controller):
                 opts = dict(label=name, value=concept_id)
                 fieldset.append(page.radio_button("id", **opts))
         else:
-            fieldset = page.fieldset("Enter Term Name Or Document ID")
-            opts = dict(tooltip="Use wildcards if appropriate")
-            fieldset.append(page.text_field("name", **opts))
+            fieldset = page.fieldset("Enter Document ID or Term Name")
+            opts = dict(
+                tooltip="Use wildcards if appropriate",
+                label="Term Name",
+            )
             fieldset.append(page.text_field("id", label="Concept ID"))
             fieldset.append(page.text_field("name_id", label="Name ID"))
+            fieldset.append(page.text_field("name", **opts))
         page.form.append(fieldset)
 
     def show_report(self):
@@ -55,12 +58,12 @@ class Control(Controller):
             self._id = self.fields.getvalue("id")
             if self._id is None:
                 if self.names and len(self.names) == 1:
-                    self._id = self.names[0].id
+                    self._id = self.names[0][0]
                 elif self.name_id:
                     query = self.Query("query_term", "int_val")
                     query.where(query.Condition("path", self.CONCEPT_PATH))
                     query.where(query.Condition("doc_id", self.name_id))
-                    rows = query.execute(self.cursor)
+                    rows = query.execute(self.cursor).fetchall()
                     if not rows:
                         self.bail("Not a GlossaryTermName document ID")
                     self._id = rows[0][0]
@@ -97,6 +100,7 @@ class Concept:
     """Subject of the report."""
 
     TITLE = "Glossary Term Concept"
+    SUBTITLE  = "Glossary Term Concept - Full"
     DEFINITION_ELEMENTS = "TermDefinition", "TranslatedTermDefinition"
     GUEST = Session("guest")
     LANGUAGES = dict(en="English", es="Spanish")
@@ -177,7 +181,7 @@ class Concept:
             icon = B.LINK(href="/favicon.ico", rel="icon")
             head = B.HEAD(meta, B.TITLE(self.TITLE), icon, link)
             time = B.SPAN(self.control.started.ctime())
-            args = self.TITLE, B.BR(), "Full QC Report", B.BR(), time
+            args = self.SUBTITLE, B.BR(), "QC Report", B.BR(), time
             concept_id = B.P(f"CDR{self.doc.id}", id="concept-id")
             body = B.BODY(B.E("header", B.H1(*args)), concept_id)
             self._report = B.HTML(head, body)
@@ -198,7 +202,7 @@ class Concept:
 
     @property
     def drug_links(self):
-        """Drug summery links for the concept."""
+        """Drug summary links for the concept."""
 
         if not hasattr(self, "_drug_links"):
             self._drug_links = self.Link.get_links(self, "drug")
@@ -241,6 +245,7 @@ class Concept:
         """Table at the bottom of the report to links to other information."""
 
         if not hasattr(self, "_related_info_table"):
+            self._related_info_table = None
             rows = [drug_link.row for drug_link in self.drug_links]
             rows += [summary_ref.row for summary_ref in self.summary_refs]
             rows += [external_ref.row for external_ref in self.external_refs]
@@ -264,7 +269,7 @@ class Concept:
         if not hasattr(self, "_thesaurus_ids"):
             self._thesaurus_ids = []
             for node in self.doc.root.findall("NCIThesaurusID"):
-                self._thesaurus_ids = Doc.get_text(node, "").strip()
+                self._thesaurus_ids.append(Doc.get_text(node, "").strip())
         return self._thesaurus_ids
 
     @property

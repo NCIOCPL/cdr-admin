@@ -43,7 +43,9 @@ class Control(Controller):
 .filter  { color: blue; }
 .include { color: green; }
 .error   { color: red; }
-.error { color: red; }""")
+.error { color: red; }
+li.filter a, li.include a { text-decoration: underline; }
+li.filter a:hover, li.include a:hover { cursor: pointer; }""")
 
     def show_deep_report(self, page):
         """Create the recursive version of the report.
@@ -240,7 +242,7 @@ class Filter:
     @property
     def node(self):
         if not hasattr(self, "_node"):
-            link = self.B.A(str(self.doc.id), href=f"show({self.doc.id})")
+            link = self.B.A(str(self.doc.id), onclick=f"show({self.doc.id})")
             self._node = self.B.LI(self.doc.title, " (", link, ")")
             self._node.set("class", "filter")
             if self.error:
@@ -286,7 +288,7 @@ class Filter:
                 filter_doc = Filter.TITLES.get(self.key)
                 if filter_doc:
                     doc_id = str(filter_doc.id)
-                    link = Filter.B.A(doc_id, href=f"show({doc_id})")
+                    link = Filter.B.A(doc_id, onclick=f"show({doc_id})")
                     self._node = Filter.B.LI(label, " (", link, ")")
                     self._node.set("class", "include")
                     if filter_doc.includes is not None:

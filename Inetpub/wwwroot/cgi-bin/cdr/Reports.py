@@ -26,7 +26,6 @@ class Control(Controller):
             ("General Reports", "GeneralReports.py"),
             ("Geographic", "GeographicReports.py"),
             ("Glossary Terms", "GlossaryTermReports.py"),
-            ("Mailers", "MailerReports.py"),
             ("Media", "MediaReports.py"),
             ("Persons and Organizations", "PersonAndOrgReports.py"),
             ("Publishing", "PublishReports.py"),

@@ -1,0 +1,127 @@
+body            { font-family: Arial, Helvetica, sans-serif;
+                  padding: 0;
+                }
+b.native        { color: #007000 }
+p.native        { color: #007000; margin-top: 0 }
+p               { font-size: 12pt; }
+dt              { font-size: 12pt; }
+dd              { font-size: 12pt; }
+
+ul.lnone        { list-style: none; }
+ul.disc         { list-style: disc; }
+ul.square       { list-style: square; }
+ol.little-alpha { list-style: lower-alpha; }
+ol.A            { list-style: upper-alpha; }
+ol.little-roman { list-style: lower-roman; }
+ol.I            { list-style: upper-roman; }
+ol.d            { list-style: decimal; }
+ol.none         { list-style: none; }  /* Default if no attribute specified */
+li.org          { vertical-align: top; }
+
+li              { margin-top: 0.5em;
+                  margin-bottom: 0.5em;
+                  margin-left: 0;
+                  padding-left: 0;
+                }
+span.video-title
+                { font-weight: bold; }
+div.video-caption
+                { font-style: italic;
+                  background-color: lightgray; }
+
+
+/* This style isn't properly handled when converting */
+/* to Word - the bullets are listed away from the    */
+/* list item.                                        */
+/* ul, ol          { margin-top: 0;         */
+/*                   margin-left:  1em;     */
+/*                   padding-left: 1em;     */
+/*                 }                        */
+
+ul, ol          { margin-top: 0;
+                }
+
+
+.qc_tbody      { border: none; }
+.qc_td         { border: none; }
+
+
+.tableBody     { border: solid black 1px;
+                 border-collapse: collapse;
+                 width: 100%; }
+.tableFooter1  { border: none;
+                 width: 100%; }
+
+.tableFooter2  { font-style: italic;        /* Text styles for footer */
+                 width: 100%; }
+
+.type4         { border: none; }            /* Gridlines for footer   */
+th, td         { border: solid black 1px;
+                 padding: 5px; }
+.ltext         { text-align: left; }
+.ctext         { text-align: center; }
+.rtext         { text-align: right; }
+
+p.listtitletop { font-style:       italic;  /* Display the first level  */
+                 font-weight:      bold;    /* list title               */
+                 margin-top:       0;
+                 margin-bottom:    0; }
+p.listtitle    { font-style:       italic;  /* Display para element     */
+                 font-weight:      bold;    /* as a list title          */
+                 margin-top:       0;
+                 margin-bottom:    0; }
+p.itemtitle    { font-weight:      bold;    /* Display para element     */
+                 margin-top:       0;       /* as a ListItemTitle       */
+                 margin-bottom:    0; }
+caption        { font-weight:      bold;    /* Display caption left     */
+                 text-align:       left; }  /* aligned and bold         */
+
+.error         { color: red; }
+.warning       { color: orange; }
+
+.attribute     { font-weight: normal;
+                 font-style: italic;
+                 background-color: #FFFFFF; }
+.big           { font-size: 14pt;
+                 font-weight: bold; }
+.bold          { font-size: 12pt;
+                 font-weight: bold; }
+.normal        { font-size: 12pt; }
+.ul            { font-size: 12pt;
+                 text-decoration: underline; }
+.bul           { font-size: 12pt;
+                 font-weight: bold;
+                 text-decoration: underline; }
+.media-caption:hover
+               { background-color: #CFCFCF; }
+.media-caption { font-style: italic; }   /* Adding font-style here even  */
+                                         /* though it's inherited from   */
+                                         /* caption-box but pasting into */
+                                         /* Word doesn't honor the       */
+                                         /* inherited style.             */
+.caption-box   { font-style: italic;
+                 text-align: center;
+                 margin: 0 5% 0 5%; }
+.is-module     { background-color: lightblue;
+                 border: 5px dashed black; }
+
+.place-holder-md { font-weight: bold; }  /* PlaceHolder display in       */
+                                         /* misc. documents.             */
+
+
+h1       { font-family: Arial, sans-serif; font-size: 16pt;
+           text-align: center; font-weight: bold; }
+h2       { font-family: Arial, sans-serif; font-size: 14pt;
+           text-align: center; font-weight: bold; }
+h1.left  { font-family: Arial, sans-serif; font-size: 16pt;
+           text-align: left; font-weight: bold; }
+h2.left  { font-family: Arial, sans-serif; font-size: 14pt;
+           text-align: left; font-weight: bold; }
+td.hdg   { font-family: Arial, sans-serif; font-size: 16pt;
+           font-weight: bold; }
+p        { font-family: Arial, sans-serif; font-size: 12pt; }
+body     { font-family: Arial; font-size: 12pt; }
+span.SectionRef { text-decoration: underline; font-weight: bold; }
+.summary { border: 2px solid black; text-align: left; }
+.board   { margin-top: 40px; }
+.changes { margin-bottom: 40px; }

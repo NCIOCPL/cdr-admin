@@ -13,44 +13,6 @@ class Control(Controller):
     STATUS_REPORT = "Glossary Term Concept by {} Definition Status Report"
     MENU = (
         (
-            "QC Reports", (
-                (
-                    "Glossary Term Name", (
-                        (
-                            "Glossary Term Name QC Report",
-                            "QcReport.py",
-                            dict(DocType="GlossaryTermName"),
-                        ),
-                    ),
-                ),
-                (
-                    "Glossary Term Concept", (
-                        (
-                            "Glossary Term Concept QC Report",
-                            "QcReport.py",
-                            dict(DocType="GlossaryTermConcept"),
-                        ),
-                    ),
-                ),
-                (
-                    "Combined QC Reports", (
-                        (
-                            "Glossary Term Name With Concept QC Report",
-                            "QcReport.py",
-                            dict(
-                                DocType="GlossaryTermName",
-                                ReportType="gtnwc",
-                            ),
-                        ),
-                        (
-                            "Glossary Term Concept - Full QC Report",
-                            "GlossaryConceptFull.py",
-                        ),
-                    ),
-                ),
-            ),
-        ),
-        (
             "Management Reports", (
                 (
                     "Linked or Related Document Reports", (
@@ -59,25 +21,21 @@ class Control(Controller):
                             "GlossaryTermLinks.py",
                         ),
                         (
-                            "Pronunciation by Glossary Term Stem Report",
-                            "PronunciationByWordStem.py",
+                            "Glossary Term and Variant Search Report",
+                            "GlossaryTermPhrases.py",
                         ),
                         (
                             "Glossary Term Concept By Type Report",
                             "Request4486.py",
                         ),
                         (
-                            "Glossary Term and Variant Search Report",
-                            "GlossaryTermPhrases.py",
+                            "Pronunciation by Glossary Term Stem Report",
+                            "PronunciationByWordStem.py",
                         ),
                     ),
                 ),
                 (
                     "Processing Reports", (
-                        (
-                            "Processing Status Report",
-                            "GlossaryProcessingStatusReport.py",
-                        ),
                         (
                             STATUS_REPORT.format("English"),
                             "Request4344.py",
@@ -100,18 +58,60 @@ class Control(Controller):
                             "Glossary Translation Job Workflow Report",
                             "glossary-translation-job-report.py",
                         ),
+                        (
+                            "Processing Status Report",
+                            "GlossaryProcessingStatusReport.py",
+                        ),
                     ),
                 ),
                 (
                     "Publication Reports", (
                         (
+                            "New Published Glossary Terms",
+                            "Request4333.py",
+                        ),
+                        (
                             "Publish Preview",
                             "QcReport.py",
                             dict(DocType="GlossaryTermName", ReportType="pp"),
                         ),
+                    ),
+                ),
+            ),
+        ),
+        (
+            "QC Reports", (
+                (
+                    "Combined QC Reports", (
                         (
-                            "New Published Glossary Terms",
-                            "Request4333.py",
+                            "Glossary Term Concept - Full QC Report",
+                            "GlossaryConceptFull.py",
+                        ),
+                        (
+                            "Glossary Term Name With Concept QC Report",
+                            "QcReport.py",
+                            dict(
+                                DocType="GlossaryTermName",
+                                ReportType="gtnwc",
+                            ),
+                        ),
+                    ),
+                ),
+                (
+                    "Glossary Term Concept", (
+                        (
+                            "Glossary Term Concept QC Report",
+                            "QcReport.py",
+                            dict(DocType="GlossaryTermConcept"),
+                        ),
+                    ),
+                ),
+                (
+                    "Glossary Term Name", (
+                        (
+                            "Glossary Term Name QC Report",
+                            "QcReport.py",
+                            dict(DocType="GlossaryTermName"),
                         ),
                     ),
                 ),

@@ -16,8 +16,7 @@ class Control(Controller):
         page.form.append(ol)
         for display, script in (
             ("Gatekeeper Status Request", "GatekeeperStatus.py"),
-            ("Published Document Count (Latest Export Job - runs >4 min)",
-             "CountByDoctype.py"),
+            ("Published Document Count", "CountByDoctype.py"),
             ("Publishing Job Activities", "PubStatus.py"),
             ("Publishing Job Statistics", "PubStatsByDate.py"),
         ):

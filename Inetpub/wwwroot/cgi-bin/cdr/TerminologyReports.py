@@ -30,8 +30,6 @@ class Control(Controller):
             ("Clinical Trials Drug Analysis Report", "RecentCTGovProtocols.py"),
             ("Drug/Agent Report", "DrugAgentReport.py"),
             ("Drug Review Report", "DrugReviewReport.py"),
-            ("Genetics Directory Menu Report",
-             "GeneticConditionMenuMappingReport.py"),
             ("Intervention or Procedure Terms",
              "InterventionAndProcedureTerms.py",
              dict(IncludeAlternateNames="True")),

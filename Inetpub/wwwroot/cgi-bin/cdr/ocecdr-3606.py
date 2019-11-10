@@ -145,7 +145,7 @@ class TermNameDoc:
         """Object with the parsed XML for the term name document."""
 
         if not hasattr(self, "_doc"):
-            self._doc = Doc(self.control.session, id=self.id)
+            self._doc = Doc(self.session, id=self.id)
         return self._doc
 
     @property

@@ -9,14 +9,14 @@ from cdrcgi import Controller
 class Control(Controller):
 
     SUBTITLE = "CDR Cancer Diagnosis Hierarchy Report"
-    LOGNAME = "DiseaseDiagnosisTerms"
+    LOGNAME = "TerminologyReports"
     CSS = (
         "ul.t { width: 600px; margin: 15px auto; }",
         "li { list-style: none; font-size: 14px; }",
         "li.u { color: green; font-weight: bold; font-family: serif; }",
         "li.i { font-variant: small-caps; }",
         "li.l { color: blue; font-variant: normal; }",
-        "li.a { color: #FF2222; font-size: 12px; font-style: italic; }",
+        "li.a { color: #ff2222; font-size: 12px; font-style: italic; }",
         "li.a { font-variant: normal; }",
     )
 
@@ -41,8 +41,7 @@ class Control(Controller):
             footer=self.footer,
             subtitle=self.subtitle,
         )
-        top = self.tree.top
-        top = self.tree.terms[top].node
+        top = self.tree.terms[self.tree.top].node
         report = self.HTMLPage(self.title, **opts)
         wrapper = report.B.UL(top, self.footer, report.B.CLASS("t"))
         report.body.append(wrapper)
@@ -52,7 +51,7 @@ class Control(Controller):
 
     @property
     def flavor(self):
-        """Boolean - if "short" don't collect or show aliases."""
+        """If "short" don't collect or show aliases."""
         return self.fields.getvalue("flavor")
 
     @property
@@ -225,11 +224,6 @@ class Tree:
                 self._level = "l"
                 if not self.parents or self.tree.top in self.parents:
                     self._level = "u"
-                #else:
-                #    for parent in self.parents:
-                #        if parent.name == Tree.TOP:
-                #            self._level = "u"
-                #            break
             return self._level
 
         @property

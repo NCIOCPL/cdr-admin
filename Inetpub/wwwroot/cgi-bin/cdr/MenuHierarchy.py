@@ -1,207 +1,235 @@
-#----------------------------------------------------------------------
-# Enables users to review the entire menu hierarchy for a given menu type.
-#
-# In order to sort the children of a term based on the SortOrder attribute
-# value the sortString was introduced.  The sortString is equal to the
-# TermName if the SortOrder attribute does not exist, otherwise it is the
-# SortOrder value itself.  Sort the children of a term by the sortString but
-# display the term name.
-#
-# JIRA::OCECDR-3800 - Address security vulnerabilities
-#----------------------------------------------------------------------
-from operator import attrgetter
-import cdr
-import cdrcgi
-import cgi
-import lxml.etree as etree
-import time
-from cdrapi import db
-from html import escape as html_escape
+#!/usr/bin/env
 
-#----------------------------------------------------------------------
-# Get the parameters from the request.
-#----------------------------------------------------------------------
-fields   = cgi.FieldStorage()
-session  = cdrcgi.getSession(fields) or cdrcgi.bail("Please log in")
-request  = cdrcgi.getRequest(fields)
-menuType = fields.getvalue("MenuType")
-script   = "MenuHierarchy.py"
-SUBMENU  = "Report Menu"
-buttons  = ["Submit Request", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-title    = "CDR Administration"
-section  = "Menu Hierarchy Report"
+"""Review the entire menu hierarchy for a given menu type.
 
-#----------------------------------------------------------------------
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if request == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif request == SUBMENU:
-    cdrcgi.navigateTo("Reports.py", session)
-if request == "Log Out":
-    cdrcgi.logout(session)
+In order to sort the children of a term based on the SortOrder attribute
+value the sortString was introduced.  The sortString is equal to the
+TermName if the SortOrder attribute does not exist, otherwise it is the
+SortOrder value itself.  Sort the children of a term by the sortString but
+display the term name.
+"""
 
-#----------------------------------------------------------------------
-# Collect the menu type names. Make sure any selected value is valid.
-# If not, we have a hacker, in which case we avoid showing any helpful
-# information.
-#----------------------------------------------------------------------
-query = db.Query("query_term", "value").unique().order(1)
-query.where("path = '/Term/MenuInformation/MenuItem/MenuType'")
-menuTypes = [row[0] for row in query.execute().fetchall()]
-if not menuTypes:
-    cdrcgi.bail("No menu types found in CDR terminology documents.")
-if len(menuTypes) == 1:
-    menuType = menuTypes[0]
-elif menuType and menuType not in menuTypes:
-    cdrcgi.bail("Corrupted form data")
+from cdrcgi import Controller
+from cdrapi.docs import Doc
+from cdrapi.reports import Report
 
-class MenuItem:
-    def __init__(self, id, sortString, menuTypeName, name, status):
-        self.id           = id
-        self.menuTypeName = menuTypeName
-        self.name         = name
-        self.status       = status
-        self.sortString   = sortString
-        self.parents      = []
-        self.children     = []
+
+class Control(Controller):
+    """Access to the database and report-building tools."""
+
+    SUBTITLE = "Menu Hierarchy Report"
+    RULES = (
+        "#menu-type { text-align: center; }",
+        "#wrapper { width: 700px; margin: 5px auto; }",
+        "ul { list-style: none; }",
+        "li li { font-weight: bold; }",
+        "li li li { font-weight: normal; }",
+        "li li li ul { display: none; }",
+    )
+
+    def populate_form(self, page):
+        """Ask the user to pick a menu type.
+
+        Pass:
+            page - HTMLPage object used to build the form
+        """
+
+        fieldset = page.fieldset("Select Menu Type For Report")
+        checked = True
+        for menu_type in self.menu_types:
+            opts = dict(value=menu_type, checked=checked)
+            fieldset.append(page.radio_button("type", **opts))
+            checked = False
+        page.form.append(fieldset)
+
+    def show_report(self):
+        """Override base class method, as this isn't a tabular report."""
+
+        h2 = self.HTMLPage.B.H2(self.menu_type)
+        h2.set("id", "menu-type")
+        self.report.page.form.append(h2)
+        ul = self.HTMLPage.B.UL()
+        ul.set("id", "wrapper")
+        for name in self.orphans:
+            ul.append(name.node)
+        self.report.page.form.append(ul)
+        self.report.page.add_css("\n".join(self.RULES))
+        self.report.send()
+
+    @property
+    def menu_type(self):
+        """Menu type selected from the form."""
+        return self.fields.getvalue("type")
+
+    @property
+    def menu_types(self):
+        """Options for the form's field."""
+
+        query = self.Query("query_term", "value").unique().order("value")
+        query.where("path = '/Term/MenuInformation/MenuItem/MenuType'")
+        return [row.value for row in query.execute(self.cursor).fetchall()]
+
+    @property
+    def names(self):
+        """Dictionary of unique ID/name/sortkey combinations."""
+
+        if not hasattr(self, "_names"):
+            self._names = {}
+            parms = dict(MenuType=self.menu_type)
+            root = Report(self.session, "Menu Term Tree", **parms).run()
+            for node in root.findall("MenuItem"):
+                name = Name(self, node)
+                parent = name.parent
+                if name.key in self._names:
+                    name = self._names[name.key]
+                else:
+                    self._names[name.key] = name
+                if parent:
+                    name.add_parent(parent)
+        return self._names
+
+    @property
+    def no_results(self):
+        """Suppress the message we'd normally get with no tables."""
+        return None
+
+    @property
+    def orphans(self):
+        """Ordered sequence of `Name` objects without parents."""
+
+        if not hasattr(self, "_orphans"):
+            orphans = [n for n in self.names.values() if not n.parents]
+            self._orphans = sorted(orphans)
+        return self._orphans
+
+    @property
+    def parents(self):
+        """Dictionary of children lists, indexed by parent Term ID."""
+
+        if not hasattr(self, "_parents"):
+            self._parents = {}
+            for name in self.names.values():
+                for id in name.parents:
+                    self._parents.setdefault(id, []).append(name)
+            for id, children in self._parents.items():
+                self._parents[id] = sorted(children)
+        return self._parents
+
+
+class Name:
+    """Unique ID/name/sortkey combination for the report's menu type."""
+
+    def __init__(self, control, node):
+        """Save the caller's value and create empty lists.
+
+        Pass:
+           control - access to report-building tools and the terms dictionary
+           node - parsed XML block with the values for this menu item
+        """
+
+        self.__control = control
+        self.__node = node
+        self.__parents = []
+
+    def add_parent(self, parent):
+        """Add to the private array of parents."""
+        self.__parents.append(parent)
+
     def __lt__(self, other):
-        return self.key < other.key
+        """Support sorting of the menu items."""
+        return self.sort_key < other.sort_key
+
+    @property
+    def children(self):
+        """Sequence of child menu items under this item."""
+
+        if not hasattr(self, "_children"):
+            self._children = self.__control.parents.get(self.id, [])
+        return self._children
+
+    @property
+    def display_name(self):
+        """String to override the name to be displayed in the menus."""
+
+        if not hasattr(self, "_display_name"):
+            self._display_name = Doc.get_text(self.__node.find("DisplayName"))
+        return self._display_name
+
+    @property
+    def id(self):
+        """CDR ID for the menu item's document."""
+
+        if not hasattr(self, "_id"):
+            self._id = int(self.__node.find("TermId").text)
+        return self._id
+
     @property
     def key(self):
-        return self.id, self.menuTypeName, self.name
+        """Index into the dictionary of menu items."""
 
-class MenuType:
-    def __init__(self, name):
-        self.name     = name
-        self.topTerms = []
-    def __lt__(self, other):
-        return self.name < other.name
+        if not hasattr(self, "_key"):
+            self._key = self.id, self.name.lower(), self.sort_key
+        return self._key
 
-def loadMenuItems(menuType):
-    global menuItems
-    global menuTypes
-    global findIndex
-    parms = dict(MenuType=menuType)
-    tempIndex = {}
-    name = "Menu Term Tree"
-    for node in cdr.report("guest", name, parms=parms).findall("*"):
-        if node.tag == "MenuItem":
-            termId       = None
-            termName     = None
-            menuTypeName = None
-            menuStatus   = None
-            displayName  = None
-            parentId     = None
-            sortString   = None
-            for child in node:
-                if child.tag == "TermId":
-                    termId = int(child.text)
-                elif child.tag == "TermName":
-                    termName = child.text
-                elif child.tag == "MenuType":
-                    menuTypeName = child.text
-                elif child.tag == "MenuStatus":
-                    menuStatus = child.text
-                elif child.tag == "DisplayName":
-                    displayName = child.text
-                elif child.tag == "ParentId":
-                    parentId = int(child.text)
-                elif child.tag == "SortString":
-                    sortString = child.text
+    @property
+    def name(self):
+        """Use the display name if we have one, else the term name."""
+        return self.display_name or self.term_name
 
-            if termId and termName and menuTypeName:
-                if menuTypeName not in menuTypes:
-                    menuTypes[menuTypeName] = MenuType(menuTypeName)
-                name = displayName or termName
-                key = (termId, sortString, name, menuTypeName)
-                if key in menuItems:
-                    menuItem = menuItems[key]
-                else:
-                    menuItem = MenuItem(termId, sortString, menuTypeName,
-                                        name, menuStatus)
-                    menuItems[key] = menuItem
-                if parentId:
-                    menuItem.parents.append(parentId)
-                tempIndex.setdefault((termId, menuTypeName), []).append(key)
-    for key in menuItems:
-        menuItem = menuItems[key]
-        if not menuItem.parents:
-            menuType = menuTypes[menuItem.menuTypeName]
-            if key not in menuType.topTerms:
-                menuType.topTerms.append(key)
-        for parentId in menuItem.parents:
-            key2 = (parentId, menuItem.menuTypeName)
-            if key2 not in tempIndex:
-                continue
-            for parentKey in tempIndex[key2]:
-                parent = menuItems[parentKey]
-                if key not in parent.children:
-                    parent.children.append(key)
+    @property
+    def node(self):
+        """HTML list item for the report (possibly with children)."""
 
-#----------------------------------------------------------------------
-# Put up a selection list from which the user can select a menu type.
-#----------------------------------------------------------------------
-def showMenuTypes(rows):
-    page = cdrcgi.Page(title, subtitle=section, action=script,
-                       buttons=buttons, session=session)
-    page.add("<fieldset>")
-    page.add(page.B.LEGEND("Select Menu Type For Report"))
-    page.add_select("MenuType", "Type", rows)
-    page.add("</fieldset>")
-    page.send()
+        B = self.__control.HTMLPage.B
+        node = B.LI(self.name)
+        if self.children:
+            node.append(B.UL(*[child.node for child in self.children]))
+        return node
 
-if not menuType:
-        showMenuTypes(menuTypes)
+    @property
+    def parent(self):
+        """ID from this node."""
 
-#----------------------------------------------------------------------
-# Display a term and its children.
-#----------------------------------------------------------------------
-def displayMenuItem(item, level=0):
-    b1 = level == 1 and "<b>" or ""
-    b2 = level == 1 and "</b>" or ""
-    html = " " * level * 5 + b1 + html_escape(item.name) + b2 + "\n"
+        if not hasattr(self, "_parent_id"):
+            self._parent = None
+            node = self.__node.find("ParentId")
+            if node is not None and node.text is not None:
+                self._parent = int(node.text)
+        return self._parent
 
-    # Sort the children of the terms by the sortString not the terms itself
-    # ---------------------------------------------------------------------
-    if level == 1:
-        item.children.sort(key=lambda a:menuItems[a].sortString)
-    else:
-        item.children.sort(key=lambda a:menuItems[a].name)
+    @property
+    def parents(self):
+        """Sequence of parents of this menu item."""
+        return self.__parents
 
-    if level < 2:
-        for child in item.children:
-            html += displayMenuItem(menuItems[child], level + 1)
-    return html
+    @property
+    def sort_key(self):
+        """Use custom sort string if provided, else display or term name."""
 
-menuItems = {}
-menuTypes = {}
-loadMenuItems(menuType)
-if menuType not in menuTypes:
-    cdrcgi.bail("INTERNAL ERROR: No terms for menu type '%s' found" % menuType)
-topItems = menuTypes[menuType].topTerms
-topItems.sort(key=lambda a: menuItems[a].name)
-html = """\
-<!DOCTYPE html>
-<html>
- <head>
-  <title>Menu Hierarchy Report -- %s</title>
-  <link rel="stylesheet" href="/stylesheets/dataform.css">
-  <style type='text/css'>
-   *, pre.sans-serif { font-family: Arial, Helvetica, sans-serif; }
-   h2 { text-align: center; font-size: 16pt; font-weight: bold; }
-   body { font-size: 12pt; }
-  </style>
- </head>
- <body>
-  <h2>Menu Hierarchy Report<br>%s<br>%s</h2>
-  <pre class="sans-serif">
-""" % (menuType, menuType, time.strftime("%B %d, %Y"))
+        if not hasattr(self, "_sort_key"):
+            if self.parents:
+                self._sort_key = (self.sort_string or self.name).lower()
+            else:
+                self._sort_key = self.name.lower()
+        return self._sort_key
 
-for key in topItems:
-    html += displayMenuItem(menuItems[key])
-cdrcgi.sendPage(html + """\
-  </pre>
- </body>
-</html>
-""")
+    @property
+    def sort_string(self):
+        """String used for sorting menus on the web site."""
+
+        if not hasattr(self, "_sort_string"):
+            self._sort_string = Doc.get_text(self.__node.find("SortString"))
+        return self._sort_string
+
+    @property
+    def term_name(self):
+        """Preferred name for the term."""
+
+        if not hasattr(self, "_term_name"):
+            self._term_name = Doc.get_text(self.__node.find("TermName"))
+        return self._term_name
+
+
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+    Control().run()

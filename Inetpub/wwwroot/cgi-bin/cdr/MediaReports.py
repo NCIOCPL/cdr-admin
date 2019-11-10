@@ -13,6 +13,22 @@ class Control(Controller):
 
     def populate_form(self, page):
         page.body.set("class", "admin-menu")
+        page.form.append(page.B.H3("Management Reports"))
+        ol = page.B.OL()
+        page.form.append(ol)
+        for display, script in (
+            ("Board Meeting Recording Tracking Report",
+             "RecordingTrackingReport.py"),
+            ("Linked Media Documents", "MediaLinks.py"),
+            ("Media Caption and Content Report", "MediaCaptionContent.py"),
+            ("Media Doc Publishing Report", "PublishedMediaDocuments.py"),
+            ("Media (Images) Processing Status Report", "ocecdr-4038.py"),
+            ("Media Lists", "MediaLists.py"),
+            ("Media Permissions Report", "ocecdr-3704.py"),
+            ("Media Translation Job Workflow Report",
+             "media-translation-job-report.py"),
+        ):
+            ol.append(page.B.LI(page.menu_link(script, display)))
         page.form.append(page.B.H3("QC Reports"))
         ol = page.B.OL()
         page.form.append(ol)
@@ -20,27 +36,6 @@ class Control(Controller):
             ("Advanced Search", "MediaSearch.py", dict()),
             ("Media Doc QC Report", "QcReport.py", self.QC_PARMS),
         ):
-            ol.append(page.B.LI(page.menu_link(script, display, **parms)))
-        page.form.append(page.B.H3("Management Reports"))
-        ol = page.B.OL()
-        page.form.append(ol)
-        for item in (
-            ("Board Meeting Recording Tracking Report",
-             "RecordingTrackingReport.py"),
-            ("Linked Media Documents", "MediaLinks.py"),
-            ("Media Caption and Content Report", "MediaCaptionContent.py"),
-            ("Media Doc Publishing Report", "PubStatsByDate.py", {"VOL":"Y"}),
-            ("Media (Images) Processing Status Report", "ocecdr-4038.py"),
-            ("Media Lists", "MediaLists.py"),
-            ("Media Permissions Report", "ocecdr-3704.py"),
-            ("Media Translation Job Workflow Report",
-             "media-translation-job-report.py"),
-        ):
-            if len(item) == 3:
-                display, script, parms = item
-            else:
-                display, script = item
-                parms = dict()
             ol.append(page.B.LI(page.menu_link(script, display, **parms)))
         page.form.append(page.B.H3("Other Reports"))
         ol = page.B.OL()

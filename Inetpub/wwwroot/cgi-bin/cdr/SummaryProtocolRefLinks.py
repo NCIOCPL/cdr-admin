@@ -1,209 +1,147 @@
-#----------------------------------------------------------------------
-# Finding ProtocolRef elements in Summary documents and testing its
-# final location (Cancer.gov or ClinicalTrials.gov) by following
-# redirects.  Some of the
-# links may have been removed by vendor filters if the linked document
-# has been blocked.  Those links will be listed as 'None'.
-#
-#----------------------------------------------------------------------
-from lxml import etree
-from cdrapi import db as cdrdb
-import cdr
-import cdrcgi
-import cgi
+#!/usr/bin/env
+
+"""Find ProtocolRef elements in Summary documents, showing the URLs.
+"""
+
+from cdrcgi import Controller
+from cdrapi.docs import Doc
 import requests
-import datetime
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
+requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
-from cdrapi.settings import Tier
-TIER = Tier()
+class Control(Controller):
+    """Access to the database and report-building utilities."""
 
-#----------------------------------------------------------------------
-# Get the parameters from the request.
-#----------------------------------------------------------------------
-fields  = cgi.FieldStorage() or None
+    SUBTITLE = "ProtocolRef Links in Summaries"
+    LOGNAME = "SummaryProtocolRefLinks"
 
-if not fields:
-    session    = 'guest'
-    tier = TIER
-else:
-    session    = cdrcgi.getSession(fields) or cdrcgi.bail("Not logged in")
-    tier       = fields.getvalue("Tier") or 'DEV'
+    def show_form(self):
+        """Bypass the form, which this report doesn't use."""
+        self.show_report()
 
+    def build_tables(self):
+        """Assemble the report's two tables."""
+        return self.summary_table, self.details_table
 
-#----------------------------------------------------------------------
-# Document class holding all CDR-IDs, and rows to display on report
-#----------------------------------------------------------------------
-class SummaryDoc:
-    """ Class to extract the ProtocolRef elements and URL for the link
-        It creates the list of rows for each ProtocolRef link found
+    @property
+    def details_table(self):
+        """Table with one row for each distinct protocol ref."""
 
-        This didn't have to be a class.  Should be rewritten.
+        cols = "CDR ID", "Summary Title", "Protocol ID", "Protocol Link"
+        caption = "Links to Clinical Trials"
+        return self.Reporter.Table(self.rows, columns=cols, caption=caption)
 
-        Using grequests didn't safe much time, so I'm reverting the
-        calls back to requests but I'm now removing duplicates
-        protocols within summaries.
-    """
+    @property
+    def docs(self):
+        """Sequence of Summary documents with ProtocolRef links."""
 
-    cursor = cdrdb.connect().cursor()
-    logger = cdr.Logging.get_logger("SummaryProtocolRefLinks")
+        query = self.Query("pub_proc_cg c", "c.id").unique().order("c.id")
+        query.join("query_term_pub p", "p.doc_id = c.id")
+        query.where("path LIKE '/Summary%ProtocolRef%'")
+        rows = query.execute(self.cursor).fetchall()
+        self.logger.info("Found %d docs with ProtocolRef links", len(rows))
+        return [Summary(self, row.id) for row in rows]
 
-    def __init__(self, docId):
-        self.logger.info("Parsing CDR%d", docId)
-        self.docId = docId
-        # Rows to be displayed on the report
-        self.rows = []
-        # Rows with original URLs
-        protRefRows = []
+    @property
+    def rows(self):
+        """Values for the details table."""
 
-        # Retrieve the XML of the summary
-        # ----------------------------------------------------
-        qry = "SELECT xml FROM document WHERE id = %d" % docId
-        query = cdrdb.Query("document", "xml")
-        query.where("id = {}".format(docId))
-        docXml = query.execute(SummaryDoc.cursor).fetchone().xml
-        root = etree.XML(docXml.encode('utf-8'))
+        if not hasattr(self, "_rows"):
+            self._rows = []
+            for doc in self.docs:
+                self._rows.extend(doc.rows)
+        return self._rows
 
-        # Finding the summary title
-        # --------------------------
-        titleNode = root.find('SummaryTitle')
-        title = "CDR%d - %s" % (docId, titleNode.text)
-        sumRow = (self.docId, titleNode.text)
+    @property
+    def summary_table(self):
+        """Table with counts for each url category."""
 
-        # Finding the summary URL (currently not used)
-        # --------------------------------------------
-        for urlNode in root.findall('SummaryMetaData/SummaryURL'):
-            summaryUrl = urlNode.get('{cips.nci.nih.gov/cdr}xref')
-
-        # Searching for all ProtocolRef elements within the document
-        # and testing the URL final location
-        # Cancer.gov will re-direct the link depending if the
-        # protocol is part of the CTRO or not.
-        # We're creating the rows with the original URL first and
-        # are replacing the final URL after the "requests" call.
-        # ----------------------------------------------------------
-        for node in root.iter('ProtocolRef'):
-            nct_id = node.get("nct_id")
-            if nct_id:
-                url = 'https://www.cancer.gov/clinicaltrials/%s' % nctId
-                row = [self.docId, titleNode.text, node.text, url]
+        ctgov = cgov = other = 0
+        for id, title, protocol, url in self.rows:
+            url = url.lower()
+            if "clinicaltrials.gov" in url:
+                ctgov += 1
+            elif "cancer.gov" in url:
+                cgov += 1
             else:
-                row = [self.docId, titleNode.text, node.text, 'None']
-
-            protRefRows.append(row)
-
-        # We have all ProtocolRef links for this summary.  Now we want
-        # to dedup those. No need to follow the same link multiple times
-        # --------------------------------------------------------------
-
-        # Build a set out of the list of lists (rows)
-        # -------------------------------------------
-        rowsTuple = [tuple(lst) for lst in protRefRows]
-        uniqueRows = set(rowsTuple)
-
-        # Convert back to a list so we can iterate over it and update
-        # the original URL with the redirected URL retrieved with
-        # the requests call
-        # --------------------------------------------------------------
-        uniqueLst = list(uniqueRows)
-
-        # Creating the rows to be displayed and updating the URL with the
-        # result from the requests call
-        # ---------------------------------------------------------------
-        self.rows = [list(row) for row in uniqueLst]
-        for row in self.rows:
-            try:
-                request = requests.head(row[3], allow_redirects=True)
-                row[3] = request.url
-            except:
-                if row[3] != 'None':
-                    row[3] += ' *** URL timed out'
+                other += 1
+        rows = (
+            ("clinicaltrials.gov", ctgov),
+            ("cancer.gov", cgov),
+            ("None", other),
+        )
+        caption = "Total Count by Link Type"
+        columns = "Protocol Links Including ...", "Count"
+        return self.Reporter.Table(rows, columns=columns, caption=caption)
 
 
-# -------------------------------------------------------------------
-# Display the report
-# -------------------------------------------------------------------
-def show_report(rows):
-    columns = (
-                cdrcgi.Report.Column("CDR ID"),
-                cdrcgi.Report.Column("Summary Title"),
-                cdrcgi.Report.Column("Protocol ID"),
-                cdrcgi.Report.Column("Protocol Link")
-              )
-    repTitle = "ProtocolRef links in Summaries"
-    now = datetime.date.today()
-    subtitle = "Report Date: {}".format(now)
+class Summary:
+    """CDR Summary document with protocol links."""
 
-    allLinks = { "CT": 0,
-                 "CG": 0,
-                 "None":0 }
+    def __init__(self, control, id):
+        """Save the caller's values.
 
-    # Counting the protocol links by "type" to create summary table
-    # -------------------------------------------------------------
-    for cdrId, title, protId, link in rows:
-        if link.find('clinicaltrials.gov') > -1:
-            allLinks['CT'] += 1
-        elif link.find('cancer.gov') > -1:
-            allLinks['CG'] += 1
-        else:
-            allLinks['None'] += 1
+        Pass:
+            control - access to the current session and report-building tools
+            id - integer for the CDR document ID
+        """
 
-    # Preparing the summary table
-    # ---------------------------
-    countCols = ( cdrcgi.Report.Column("Protocol Links including..."),
-                  cdrcgi.Report.Column("Count") )
-    countRows = ( ("clinicaltrials.gov", allLinks['CT']),
-                  ("www.cancer.gov", allLinks['CG']),
-                  ("None", allLinks['None']) )
-    countHeader = "Total Count by Link Type"
-    countTable = cdrcgi.Report.Table(countCols, countRows,
-                                     caption = countHeader)
+        self.__control = control
+        self.__id = id
 
-    # Preparing main protocol link table
-    # ----------------------------------
-    header = "Links to Clinical Trials"
-    table = cdrcgi.Report.Table(columns, rows, caption = header)
-    report = cdrcgi.Report(repTitle, [countTable, table], banner=repTitle,
-                           subtitle=subtitle)
-    report.send()
+    @property
+    def doc(self):
+        """`Doc` object for the summary."""
+
+        if not hasattr(self, "_doc"):
+            self._doc = Doc(self.__control.session, id=self.__id)
+            self.__control.logger.info("Processing %s", self._doc.cdr_id)
+        return self._doc
+
+    @property
+    def rows(self):
+        """Values for the report, one row for each link."""
+
+        if not hasattr(self, "_rows"):
+            nct_ids = set()
+            protocol_refs = set()
+            for node in self.doc.root.iter("ProtocolRef"):
+                protocol_id = Doc.get_text(node)
+                nct_id = node.get("nct_id", "").strip() or ""
+                if nct_id:
+                    nct_ids.add(nct_id)
+                protocol_refs.add((protocol_id, nct_id))
+            opts = dict(timeout=(5,5), verify=False, allow_redirects=True)
+            urls = {}
+            for nct_id in nct_ids:
+                url = f"https://www.cancer.gov/clinicaltrials/{nct_id}"
+                try:
+                    response = requests.head(url, allow_redirects=True)
+                    urls[nct_id] = response.url
+                    args = nct_id, response.url
+                    self.__control.logger.debug("%s -> %s", *args)
+                except:
+                    self.__control.logger.exception("Failure for %s", url)
+                    urls[nct_id] = "*** URL timed out"
+            self._rows = []
+            for protocol_id, nct_id in sorted(protocol_refs):
+                self._rows.append([
+                    self.doc.id,
+                    self.title,
+                    protocol_id,
+                    urls[nct_id] if nct_id else "None",
+                ])
+        return self._rows
+
+    @property
+    def title(self):
+        """String for the Summary document's title."""
+
+        if not hasattr(self, "_title"):
+            self._title = Doc.get_text(self.doc.root.find("SummaryTitle"))
+        return self._title
 
 
-# -------------------------------------------------------------------
-# Starting Main
-# -------------------------------------------------------------------
 if __name__ == "__main__":
-    # Connecting to DB and selecting all published summaries
-    # with ProtocolRefs
-    # --------------------------------------------------------
-    start = datetime.datetime.now()
-    qry = """
-        SELECT DISTINCT p.doc_id
-          FROM query_term_pub p
-          JOIN pub_proc_cg c
-            ON c.id = p.doc_id
-         WHERE path like '/Summary/%ProtocolRef%'
-         ORDER BY p.doc_id
-    """
-    query = cdrdb.Query("query_term_pub p", "p.doc_id").unique().order(1)
-    query.join("pub_proc_cg c", "c.id = p.doc_id")
-    query.where("path LIKE '/Summary/%ProtocolRef%'")
-    rows = query.execute().fetchall()
-    SummaryDoc.logger.info("Found %d summaries with ProtocolRef links",
-                           len(rows))
-
-    docIds = [row.doc_id for row in rows]
-    rows = []
-
-    #start_time = time.time()
-
-    for docId in docIds:
-        try:
-            doc = SummaryDoc(docId)
-            rows.extend(doc.rows)
-        except Exception as e:
-            SummaryDoc.logger.exception("Failure parsing SummaryDoc")
-            cdrcgi.bail("CDR%d: %s" % (docId, e))
-    elapsed = datetime.datetime.now() - start
-    SummaryDoc.logger.info("Finished parsing summaries")
-    SummaryDoc.logger.info("Elapsed: %s", elapsed)
-    #print("--- {} seconds ---".format(time.time() - start_time))
-    show_report(rows)
+    """Don't execute the script if loaded as a module."""
+    Control().run()

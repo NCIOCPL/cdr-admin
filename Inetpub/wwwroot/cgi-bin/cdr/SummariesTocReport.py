@@ -160,7 +160,7 @@ class Control(Controller):
         the user wants to zero in on a single summary.
         """
 
-        if self.method == "board" or self.version and self.id:
+        if self.selection_method == "board" or self.version and self.id:
             self.report_page.send()
         elif self.id:
             self.show_version_form()
@@ -356,7 +356,7 @@ jQuery(function() {
         return self.fields.getvalue("level") or self.DEFAULT_LEVEL
 
     @property
-    def method(self):
+    def selection_method(self):
         """One of board, id, or title."""
 
         return self.fields.getvalue("method")
@@ -376,7 +376,7 @@ jQuery(function() {
             board = None
             for summary in sorted(self.summaries):
                 self.logger.debug("processing %s", summary.title)
-                if self.method == "board" and summary.board != board:
+                if self.selection_method == "board" and summary.board != board:
                     page.body.append(page.B.H4(summary.board))
                     board = summary.board
                 for node in summary.nodes:
@@ -389,7 +389,7 @@ jQuery(function() {
         """Create the string identifying which report this is."""
 
         if not hasattr(self, "_report_title"):
-            if self.method == "id":
+            if self.selection_method == "id":
                 self._report_title = "Single Summary TOC Report"
             else:
                 audience = self.AUDIENCES.get(self.audience) or ""
@@ -563,7 +563,7 @@ class Summary:
     @property
     def version(self):
         """Which version of the document do we want to filter?"""
-        if self.control.method == "board":
+        if self.control.selection_method == "board":
             return None
         if not self.control.version or self.control.version < 1:
             return None

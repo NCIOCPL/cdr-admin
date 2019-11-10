@@ -56,6 +56,7 @@ jQuery(function() {
         connectToSortable: "#members",
         helper: "clone",
         revert: "invalid",
+        stop: function() { check_members(); }
     });
 
     // Let the user add a member by double-clicking it.

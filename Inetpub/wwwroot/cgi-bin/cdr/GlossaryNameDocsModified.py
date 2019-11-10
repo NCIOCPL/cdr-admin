@@ -1,185 +1,294 @@
-#----------------------------------------------------------------------
-# "The Glossary Term Concept - Documents Modified Report will serve as a
-# QC report to verify which documents were changed within a given time
-# frame. The report will be separated into English and Spanish.
-#
-# Rewritten as part of the 2015 security sweep.
-# JIRA::OCECDR-4184 - add new column for date last made publishable
-#----------------------------------------------------------------------
-import cgi
-import cdrcgi
-from cdrapi import db
+#!/usr/bin/env python
+#----------------------
+
+"""Show which glossary name documents have changed recently.
+"""
+
+from cdrcgi import Controller
+from cdrapi.docs import Doc
 import datetime
-import lxml.etree as etree
 
-class Control(cdrcgi.Control):
-    "Collect and verify the user options for the report."
 
-    TITLE = "Glossary Name Documents Modified Report"
+class Control(Controller):
+    """Access to database, session, and report/form building."""
+
+    SUBTITLE = "Glossary Term Name Documents Modified Report"
     NAME_LABELS = {"en": "Term Name", "es": "Translated Term Name" }
+    LANGUAGES = (("en", "English"), ("es", "Spanish"))
 
-    def __init__(self):
-        "Make sure the values make sense and haven't been hacked."
-        cdrcgi.Control.__init__(self)
-        now = datetime.date.today()
-        then = now - datetime.timedelta(7)
-        self.start = self.fields.getvalue("startdate", str(then))
-        self.end = self.fields.getvalue("enddate", str(now))
-        self.language = self.fields.getvalue("language", "en")
-        msg = cdrcgi.TAMPERING
-        cdrcgi.valParmDate(self.start, msg=msg)
-        cdrcgi.valParmDate(self.end, msg=msg)
-        cdrcgi.valParmVal(self.language, val_list=("en", "es"), msg=msg)
-        if self.end < self.start:
-            cdrcgi.bail("End date cannot precede start date.")
+    def build_tables(self):
+        """Assemble the table for the rpoert."""
 
-    def show_report(self):
-        "Create an Excel workbook with a single sheet."
-        table = self.build_table()
-        report = cdrcgi.Report("GlossaryNameDocumentsModified", [table])
-        report.send("excel")
+        opts = dict(columns=self.columns, sheet_name="GlossaryTerm")
+        return self.Reporter.Table(self.rows, **opts)
 
-    def build_table(self):
+    def populate_form(self, page):
+        """Request the information we need for this report.
+
+        Pass:
+            page - HTMLPage object with which the form is built
         """
-        Collect the glossary term name docs which match the user's
-        criteria and add a row to the report table for each one.
-        """
-        columns = (
-            cdrcgi.Report.Column("CDR ID", width="70px"),
-            cdrcgi.Report.Column(self.name_label(), width="350px"),
-            cdrcgi.Report.Column("Date Last Modified", width="100px"),
-            cdrcgi.Report.Column("Publishable?", width="100px"),
-            cdrcgi.Report.Column("Date First Published (*)", width="100px"),
-            cdrcgi.Report.Column("Last Comment", width="450px"),
-            cdrcgi.Report.Column("Date Last Publishable", width="100px")
+
+        end = datetime.date.today()
+        start = end - datetime.timedelta(7)
+        fieldset = page.fieldset("Date Range")
+        fieldset.append(page.date_field("start_date", value=start))
+        fieldset.append(page.date_field("end_date", value=end))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Language")
+        checked=True
+        for value, label in self.LANGUAGES:
+            opts = dict(value=value, label=label, checked=checked)
+            fieldset.append(page.radio_button("language", **opts))
+            checked = False
+        page.form.append(fieldset)
+
+    @property
+    def columns(self):
+        """Column headers for the report."""
+
+        return (
+            self.Reporter.Column("CDR ID", width="70px"),
+            self.Reporter.Column(self.name_label, width="350px"),
+            self.Reporter.Column("Date Last Modified", width="100px"),
+            self.Reporter.Column("Publishable?", width="100px"),
+            self.Reporter.Column("Date First Published", width="100px"),
+            self.Reporter.Column("Last Comment", width="450px"),
+            self.Reporter.Column("Date Last Publishable", width="100px")
         )
-        query = db.Query("doc_version v", "v.id", "MAX(v.num)")
+
+    @property
+    def docs(self):
+        """Term name documents selected for the report."""
+
+        query = self.Query("doc_version v", "v.id", "MAX(v.num) AS num")
         query.join("doc_type t", "t.id = v.doc_type")
         query.join("active_doc a", "a.id = v.id")
         query.where("t.name = 'GlossaryTermName'")
-        query.where(query.Condition("v.dt", self.start, ">="))
-        query.where(query.Condition("v.dt", "%s 23:59:59" % self.end, "<="))
+        if self.start:
+            query.where(query.Condition("v.dt", self.start, ">="))
+        if self.end:
+            query.where(query.Condition("v.dt", f"{self.end} 23:59:59", "<="))
         query.group("v.id")
-        docs = query.execute(self.cursor).fetchall()
-        rows = []
-        for term in sorted([GlossaryTermName(self, *d) for d in docs]):
-            rows += term.rows()
-        return cdrcgi.Report.Table(columns, rows, sheet_name="GlossaryTerm")
+        query.log()
+        rows = query.execute(self.cursor).fetchall()
+        docs = [GlossaryTermName(self, row) for row in rows]
+        return sorted(docs)
 
-    def populate_form(self, form):
-        "Put up the CGI form fields with defaults and instructions."
-        form.add("<fieldset>")
-        form.add(form.B.LEGEND("Date Range"))
-        form.add_date_field("startdate", "Start Date", value=self.start)
-        form.add_date_field("enddate", "End Date", value=self.end)
-        form.add("</fieldset>")
-        form.add("<fieldset>")
-        form.add(form.B.LEGEND("Language"))
-        form.add_radio("language", "English", "en", onclick=None, checked=True)
-        form.add_radio("language", "Spanish", "es", onclick=None)
-        form.add("</fieldset>")
+    @property
+    def end(self):
+        """End of the date range for the report."""
+        return self.fields.getvalue("end_date")
 
+    @property
+    def format(self):
+        """Override to get an Excel report."""
+        return "excel"
+
+    @property
+    def language(self):
+        """Language code selected for the report (en or es)."""
+        return self.fields.getvalue("language")
+
+    @property
     def name_label(self):
-        """
-        Show a different label for the name column's label, depending
-        on the language selected for the report.
-        """
+        """Custom column header, depending on the report's language."""
         return self.NAME_LABELS.get(self.language)
 
-class GlossaryTermName:
-    "Information needed for a glossary terms report rows"
-    def __init__(self, control, doc_id, doc_version):
-        self.control = control
-        self.doc_id = doc_id
-        self.doc_version = doc_version
-        self.names = []
-        query = db.Query("doc_version", "MAX(dt) AS last_pub")
-        query.where(query.Condition("id", doc_id))
-        query.where("publishable = 'Y'")
-        row = query.execute(control.cursor).fetchone()
-        self.last_pub = row and row[0] or None
-        fields = ("v.title", "v.xml", "v.publishable", "d.first_pub")
-        query = db.Query("doc_version v", *fields)
-        query.join("document d", "d.id = v.id")
-        query.where(query.Condition("v.id", doc_id))
-        query.where(query.Condition("v.num", doc_version))
-        row = query.execute(control.cursor).fetchone()
-        self.title, doc_xml, publishable, self.first_pub = row
-        self.publishable = publishable == "Y"
-        root = etree.XML(doc_xml)
-        names = { "en": "TermName", "es": "TranslatedName" }
-        for node in root.findall(names.get(control.language)):
-            if self.want_node(node):
-                self.names.append(self.Name(self, node))
-
-    def want_node(self, node):
-        """
-        See if the language matches for the name node. Ignore language for
-        the English report.
-        """
-        if self.control.language == "en":
-            return True
-        return self.control.language == node.get("language")
-
+    @property
     def rows(self):
-        "Create a row for each of the term's names"
-        return [name.row() for name in self.names]
+        """Values for the report table."""
+
+        rows = []
+        for doc in self.docs:
+            rows += doc.rows
+        return rows
+
+    @property
+    def start(self):
+        """Beginning of the date range for the report."""
+        return self.fields.getvalue("start_date")
+
+
+class GlossaryTermName:
+    """Information needed for a glossary term's report rows."""
+
+    def __init__(self, control, row):
+        """Save the caller's values.
+
+        Pass:
+            control - access to the session and report-building tools
+            row - values from the database query
+        """
+
+        self.__control = control
+        self.__row = row
 
     def __lt__(self, other):
-        """
-        Make the documents sortable, even though the order won't mean
-        much to the user, since the title isn't shown.
-        """
-        return self.title < other.title
+        """Make the documents sortable by document title."""
+        return self.doc.title < other.doc.title
+
+    @property
+    def control(self):
+        """Access to the login session and report-building tools."""
+        return self.__control
+
+    @property
+    def date_first_published(self):
+        """Date this document was first published."""
+
+        if not hasattr(self, "_date_first_published"):
+            self._date_first_published = ""
+            first_pub = self.doc.first_pub
+            if first_pub:
+                self._date_first_published = str(first_pub)[:10]
+        return self._date_first_published
+
+    @property
+    def date_last_publishable(self):
+        """Date of the most recent publishable version, if any."""
+
+        if not hasattr(self, "_date_last_publishable"):
+            self._date_last_publishable = ""
+            query = self.control.Query("doc_version", "MAX(dt) AS dt")
+            query.where("publishable = 'Y'")
+            query.where(query.Condition("id", self.doc.id))
+            row = query.execute(self.control.cursor).fetchone()
+            if row and row.dt:
+                self._date_last_publishable = str(row.dt)[:10]
+        return self._date_last_publishable
+
+    @property
+    def doc(self):
+        """`Doc` object for the glossary term name document."""
+
+        if not hasattr(self, "_doc"):
+            opts = dict(id=self.__row.id, version=self.__row.num)
+            self._doc = Doc(self.control.session, **opts)
+        return self._doc
+
+    @property
+    def names(self):
+        """Name strings (with comments) pulled from the document."""
+
+        tag = "TermName" if self.control.language == "en" else "TranslatedName"
+        names = []
+        for node in self.doc.root.findall(tag):
+            names.append(self.Name(self, node))
+        return names
+
+    @property
+    def publishable(self):
+        """String 'Y' or 'N' depending on whether the version is publshable."""
+
+        if not hasattr(self, "_publishable"):
+            self._publishable = "Y" if self.doc.publishable else "N"
+        return self._publishable
+
+    @property
+    def rows(self):
+        "Create a row for each of the term's name strings"
+        return [name.row for name in self.names]
+
 
     class Name:
-        "A Glossary term can have multiple names."
-        def __init__(self, term, node):
-            self.term = term
-            self.value = self.comment = self.last_mod = None
-            for child in node.findall("TermNameString"):
-                self.value = child.text
-            for child in node.findall("DateLastModified"):
-                self.last_mod = child.text
-            nodes = node.findall('Comment')
-            if nodes:
-                self.comment = self.Comment(nodes[0])
+        """A Glossary term can have multiple names, each with a comment."""
 
-        def row(self):
+        def __init__(self, term, node):
+            """Save the caller's values.
+
+            Pass:
+                term - object for the CDR document containing the name string
+                node - portion of the document for this name string
             """
+
+            self.__term = term
+            self.__node = node
+
+        @property
+        def comment(self):
+            """First comment in the block with this name string."""
+
+            if not hasattr(self, "_comment"):
+                self._comment = ""
+                node = self.__node.find("Comment")
+                if node is not None:
+                    self._comment = self.Comment(node)
+            return self._comment
+
+        @property
+        def date_last_modified(self):
+            """Date the name string for this report was last modified."""
+
+            if not hasattr(self, "_date_last_modified"):
+                self._date_last_modified = ""
+                node = self.__node.find("DateLastModified")
+                self._date_last_modified = Doc.get_text(node, "")[:10]
+            return self._date_last_modified
+
+        @property
+        def row(self):
+            """Values for this name string.
+
             Each name for a term gets its own row in the report, repeating
             the information common to the term in each row for the term.
             """
-            name = self.value is not None and self.value or ""
-            last_mod = self.last_mod and self.last_mod[:10] or ""
-            publishable = self.term.publishable and "Y" or "N"
-            first_pub = self.term.first_pub
-            first_pub = first_pub and str(first_pub)[:10] or ""
-            last_pub = self.term.last_pub and str(self.term.last_pub)[:10] or ""
-            comment = self.comment is not None and self.comment.tostring() or ""
+
+            Cell = self.__term.control.Reporter.Cell
             return (
-                cdrcgi.Report.Cell(self.term.doc_id, center=True),
-                name,
-                cdrcgi.Report.Cell(last_mod, center=True),
-                cdrcgi.Report.Cell(publishable, center=True),
-                cdrcgi.Report.Cell(first_pub, center=True),
-                comment,
-                cdrcgi.Report.Cell(last_pub, center=True)
+                Cell(self.__term.doc.id, center=True),
+                self.string,
+                Cell(self.date_last_modified, center=True),
+                Cell(self.__term.publishable, center=True),
+                Cell(self.__term.date_first_published, center=True),
+                str(self.comment),
+                Cell(self.__term.date_last_publishable, center=True)
             )
+
+        @property
+        def string(self):
+            """Term name string for this term."""
+            return Doc.get_text(self.__node.find("TermNameString"), "")
 
         class Comment:
             "Subclass holding text and metadata for a definition comment"
+
             def __init__(self, node):
-                self.text = node.text
-                self.date = node.get("date", None)
-                self.audience = node.get("audience", None)
-                self.user = node.get("user", None)
-            def tostring(self):
-                return ("[date: %s; user: %s; audience: %s] %s" %
-                        (self.date, self.user, self.audience, self.text))
-            def __lt__(self, other):
-                return self.date < other.date
+                """Remember the caller's value.
+
+                Pass:
+                    node - element containing the definition comment
+                """
+
+                self.__node = node
+
+            def __str__(self):
+                """Serialize the comment's values."""
+
+                args = self.date, self.user, self.audience, self.text
+                return "[date: {}; user; {}; audience: {}] {}".format(*args)
+
+            @property
+            def text(self):
+                """String for the comment text."""
+                return Doc.get_text(self.__node)
+
+            @property
+            def date(self):
+                """String for the date the comment was entered."""
+                return self.__node.get("date")
+
+            @property
+            def audience(self):
+                """Is the comment meant for internal or external viewers?"""
+                return self.__node.get("audience")
+
+            @property
+            def user(self):
+                """Account name of the user entering the comment."""
+                return self.__node.get("user")
+
 
 if __name__ == "__main__":
-    "Allow documentation and code check tools to import us without side effects"
+    """Don't execute the script if loaded as a module."""
     Control().run()

@@ -70,7 +70,7 @@ class Control(Controller):
                 else:
                     opts = dict(name=value)
                 self._user = self.session.User(self.session, **opts)
-        return self._userb
+        return self._user
 
     def build_tables(self):
         """Show the documents the user has locked."""

@@ -104,6 +104,8 @@ class Settings:
         return files
     def walk(self, files, path):
         for path, dirs, filenames in os.walk(path):
+            if "__pycache__" in path:
+                continue
             path = path.replace("\\", "/")
             directory = files
             for name in path.split("/")[1:]:

@@ -11,20 +11,19 @@ import re
 import cdr
 import cdrcgi
 
+
 class Control(cdrcgi.Controller):
     """Script master."""
 
+    SUBTITLE = "Log Viewer"
     DEFAULT_PATH = f"{cdr.DEFAULT_LOGDIR}/PubJob.log"
     HEADERS = "Content-type: text/plain; charset=utf-8\n\n".encode("utf-8")
 
-    def __init__(self):
-        """Let the @properties do most of the initialization."""
-        cdrcgi.Controller.__init__(self, "Log Viewer")
-        self.authenticate()
-        self.message = None
-
     def run(self):
         """Customize the request routing."""
+
+        self.authenticate()
+        self.message = None
         if self.request == self.SUBMIT:
             if not self.path:
                 self.show_form()
