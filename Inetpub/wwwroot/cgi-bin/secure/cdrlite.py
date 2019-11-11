@@ -42,7 +42,7 @@ class DatabaseWrapper:
     def conn(self):
         if not hasattr(self, "_conn"):
             parms = dict(
-                Driver="{ODBC Driver 13 for SQL Server}",
+                Driver="{ODBC Driver 17 for SQL Server}",
                 Server="{},{}".format(self.host, self.port),
                 Database=self.DB,
                 Uid=self.CDRSQLACCOUNT,
