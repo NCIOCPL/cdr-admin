@@ -153,8 +153,8 @@ class Job:
     def comments(self):
         """Possibly truncated comments for the last column in the row."""
 
-        comments = self.__row.comments[:40]
-        if len(self.__row.comments) > 40:
+        comments = (self.__row.comments or "")[:40]
+        if self.__row.comments and len(self.__row.comments) > 40:
             comments = f"{comments} ..."
         return comments
 
