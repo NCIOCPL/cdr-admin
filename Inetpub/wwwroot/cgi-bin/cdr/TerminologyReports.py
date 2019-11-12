@@ -28,7 +28,6 @@ class Control(Controller):
             ("Cancer Diagnosis Hierarchy (Without Alternate Names)",
              "DiseaseDiagnosisTerms.py", dict(flavor="short")),
             ("Clinical Trials Drug Analysis Report", "RecentCTGovProtocols.py"),
-            ("Drug/Agent Report", "DrugAgentReport.py"),
             ("Drug Review Report", "DrugReviewReport.py"),
             ("Intervention or Procedure Terms",
              "InterventionAndProcedureTerms.py",
