@@ -1,440 +1,622 @@
-#----------------------------------------------------------------------
-# Service to fetch board member information.
-#----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, time, lxml.etree as etree
-from cdrapi import db
+#!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields     = cgi.FieldStorage()
-boardId    = fields.getvalue("board")
-memberId   = fields.getvalue("member")
+"""Fetch board member information as a service.
+"""
 
-#----------------------------------------------------------------------
-# Set up a database connection and cursor.
-#----------------------------------------------------------------------
-try:
-    conn = db.connect(user="CdrGuest")
-    cursor = conn.cursor()
-except Exception as e:
-    cdrcgi.sendPage('<Failure>%s</Failure>' % e, 'xml')
-
-#----------------------------------------------------------------------
-# Look up title of a board, given its ID.
-#----------------------------------------------------------------------
-def getBoardName(id):
-    try:
-        cursor.execute("SELECT title FROM document WHERE id = ?", id)
-        rows = cursor.fetchall()
-        if not rows:
-            cdrcgi.bail('Failure looking up title for CDR%s' % id)
-        return cleanTitle(rows[0][0])
-    except Exception as e:
-        cdrcgi.sendPage('<Failure>%s</Failure' % e, 'xml')
-
-#----------------------------------------------------------------------
-# Remove cruft from a document title.
-#----------------------------------------------------------------------
-def cleanTitle(title):
-    semicolon = title.find(';')
-    if semicolon != -1:
-        title = title[:semicolon]
-    return title.strip()
-
-#----------------------------------------------------------------------
-# Get the information for the Board Manager
-#----------------------------------------------------------------------
-def getBoardManagerInfo(orgId):
-    try:
-        cursor.execute("""\
-SELECT path, value
- FROM query_term
- WHERE path like '/Organization/PDQBoardInformation/BoardManager%%'
- AND   doc_id = ?
- ORDER BY path""", orgId)
-
-    except Exception as e:
-        cdrcgi.bail('Database query failure for BoardManager: %s' % e)
-    return cursor.fetchall()
-
-#----------------------------------------------------------------------
-# Add the specific information to the boardInfo records
-#----------------------------------------------------------------------
-def addSpecificContactInfo(boardIds, boardInfo):
-    newBoardInfo = []
-    try:
-        cursor.execute("""\
-    SELECT g.doc_id, g.value AS GE, h.value, q.value as SpPhone,
-           f.value as SpFax, e.value as SpEmail
-      FROM query_term g
-LEFT OUTER JOIN query_term h
-        ON g.doc_id = h.doc_id
-       AND h.path = '/PDQBoardMemberInfo/GovernmentEmployee/@HonorariaDeclined'
-LEFT OUTER JOIN query_term f
-        ON g.doc_id = f.doc_id
-       AND f.path = '/PDQBoardMemberInfo/BoardMemberContact' +
-                    '/SpecificBoardMemberContact/BoardContactFax'
-LEFT OUTER JOIN query_term e
-        ON g.doc_id = e.doc_id
-       AND e.path = '/PDQBoardMemberInfo/BoardMemberContact/' +
-                    'SpecificBoardMemberContact/BoardContactEmail'
-LEFT OUTER JOIN query_term q
-        ON g.doc_id = q.doc_id
-       AND q.path = '/PDQBoardMemberInfo/BoardMemberContact' +
-                    '/SpecificBoardMemberContact/BoardContactPhone'
-     WHERE g.doc_id IN (%s)
-       AND g.path = '/PDQBoardMemberInfo/GovernmentEmployee'
-  ORDER BY q.path""" % ','.join(["'%d'" % id for id in boardIds]))
-    except Exception as e:
-        cdrcgi.bail('Database query failure for SpecificInfo: %s' % e +
-                    '<br>Board has No Board Members')
-
-    rows = cursor.fetchall()
-
-    # Add the specific info to the boardInfo records
-    # ----------------------------------------------
-    for member in boardInfo:
-        memCount = len(member)
-        for cdrId, ge, honor, phone, fax, email in rows:
-            if member[4] == cdrId:
-                member = member + [ge, honor or None, phone or None,
-                                   fax or None, email or None]
-        if memCount == len(member):
-            member = member + [None, None, None, None, None]
-        newBoardInfo.append(member)
-    return newBoardInfo
+from cdrapi.docs import Doc
+from cdrcgi import Controller, sendPage
+from lxml import etree
 
 
-# ---------------------------------------------------------------------
-# A non-government employee may decline to receive a honorarium.
-# Returning the appropriate value for the person.
-# ---------------------------------------------------------------------
-def checkHonoraria(govEmployee, declined = ''):
-    if govEmployee == 'Yes':
-        return ''
-    elif govEmployee == 'Unknown':
-        return ''
-    elif govEmployee == 'No':
-        if declined == 'Yes':
-            return '*'
+class Control(Controller):
+    """Access to the database and the current CDR logon session."""
+
+    CDR_REF = f"{{{Doc.NS}}}ref"
+    CDR_ID = f"{{{Doc.NS}}}id"
+    PERSON = "/PDQBoardMemberInfo/BoardMemberName/@cdr:ref"
+    MEMBERSHIP_DETAILS = "/PDQBoardMemberInfo/BoardMembershipDetails"
+    CURRENT = f"{MEMBERSHIP_DETAILS}/CurrentMember"
+    BOARD = f"{MEMBERSHIP_DETAILS}/BoardName/@cdr:ref"
+    BOARD_NAME = "/Organization/OrganizationNameInformation/OfficialName/Name"
+    TERM_START_DATE = f"{MEMBERSHIP_DETAILS}/TermStartDate"
+    EIC_START_DATE = f"{MEMBERSHIP_DETAILS}/EditorInChief/TermStartDate"
+    EIC_END_DATE = f"{MEMBERSHIP_DETAILS}/EditorInChief/TermEndDate"
+    FIELDS = (
+        "m.doc_id AS member_id",
+        "s.value AS eic_start",
+        "f.value AS eic_finish",
+        "t.value AS term_start",
+        "d.title AS person_name",
+        "m.int_val AS board_id",
+    )
+
+    def run(self):
+        """Override the base class version, as this isn't a tabular report."""
+
+        if self.member:
+            node = self.member.node
+        elif self.board:
+            node = self.board.node
         else:
-            return ''
+            node = self.node
+        opts = dict(encoding="unicode", pretty_print=True)
+        sendPage(etree.tostring(node, **opts), "xml")
 
-#----------------------------------------------------------------------
-# Object for one PDQ board member.
-#----------------------------------------------------------------------
-class BoardMember:
-    now = time.strftime("%Y-%m-%d")
-    boards = {}
-    def __init__(self, docId, eicStart, eicFinish, termStart, name, boardId):
-        self.id        = docId
-        self.name      = cleanTitle(name)
-        self.isEic     = (eicStart and eicStart <= BoardMember.now and
-                          (not eicFinish or eicFinish > BoardMember.now))
-        self.eicStart  = eicStart
-        self.eicFinish = eicFinish
-        self.termStart = termStart
-        self.boardId   = boardId
-        self.boardName = BoardMember.boards.get(boardId)
-        if not self.boardName:
-            self.boardName = BoardMember.boards[boardId] = getBoardName(boardId)
-    def __lt__(self, other):
-        return self.sortkey < other.sortkey
     @property
-    def sortkey(self):
-        if not hasattr(self, "_sortkey"):
-            isEic = 1 if self.isEic else 0
-            self._sortkey = isEic, self.name.upper()
-        return self._sortkey
-    def toNode(self):
-        node = etree.Element('BoardMember')
-        etree.SubElement(node, 'DocId').text = str(self.id)
-        etree.SubElement(node, 'Name').text = self.name
-        etree.SubElement(node, 'IsEic').text = self.isEic and 'Yes' or 'No'
-        etree.SubElement(node, 'TermStart').text = str(self.termStart)
-        etree.SubElement(node, 'BoardName').text = self.boardName
-        etree.SubElement(node, 'BoardId').text = str(self.boardId)
+    def board(self):
+        """Specific board for which information is requested."""
+
+        if not hasattr(self, "_board"):
+            self._board = None
+            id = self.fields.getvalue("board")
+            if id:
+                self._board = Board(self, id)
+        return self._board
+
+    @property
+    def boards(self):
+        """Board names indexed by Organization document ID."""
+
+        if not hasattr(self, "_boards"):
+            query = self.Query("query_term", "doc_id", "value")
+            query.where(f"path = '{self.BOARD_NAME}'")
+            query.where("value LIKE 'PDQ%Editorial%Board'")
+            rows = query.execute(self.cursor).fetchall()
+            self._boards = dict([tuple(row) for row in rows])
+        return self._boards
+
+    @property
+    def member(self):
+        """Specific member for which information is requested."""
+
+        if not hasattr(self, "_member"):
+            self._member = None
+            id = self.fields.getvalue("member")
+            if id:
+                self._member = MemberDetails(self, id)
+        return self._member
+
+    @property
+    def node(self):
+        """Information on all boards/members."""
+
+        if not hasattr(self, "_node"):
+            query = self.Query("query_term m", *self.FIELDS)
+            query.join("query_term c", "c.doc_id = m.doc_id",
+                       "LEFT(c.node_loc, 4) = LEFT(m.node_loc, 4)")
+            query.join("query_term p", "p.doc_id = m.doc_id")
+            query.join("active_doc d", "d.id = p.doc_id")
+            query.outer("query_term t", "t.doc_id = m.doc_id",
+                        "LEFT(t.node_loc, 4) = LEFT(m.node_loc, 4)",
+                        f"t.path = '{self.TERM_START_DATE}'")
+            query.outer("query_term s", "s.doc_id = m.doc_id",
+                        "LEFT(s.node_loc, 4) = LEFT(m.node_loc, 4)",
+                        f"s.path = '{self.EIC_START_DATE}'")
+            query.outer("query_term f", "f.doc_id = m.doc_id",
+                        "LEFT(f.node_loc, 4) = LEFT(m.node_loc, 4)",
+                        f"f.path = '{self.EIC_END_DATE}'")
+            query.where(f"m.path = '{self.BOARD}'")
+            query.where(f"c.path = '{self.CURRENT}'")
+            query.where(f"p.path = '{self.PERSON}'")
+            query.where("c.value = 'Yes'")
+            self._node = etree.Element("BoardMembers")
+            for row in query.execute(self.cursor).fetchall():
+                self._node.append(BoardMember(self, row).node)
+        return self._node
+
+
+class Board:
+    """PDQ Board, with information about its members."""
+
+    def __init__(self, control, id):
+        """Capture the caller's values.
+
+        Pass:
+            control - access to the database
+            id - CDR ID of the board's Organization document
+        """
+
+        self.__control = control
+        self.__id = id
+
+    @property
+    def id(self):
+        """Integer for the CDR ID of the board's Organization document."""
+        return Doc.extract_id(self.__id)
+
+    @property
+    def members(self):
+        """Ordered sequence of MemberDetails objects."""
+
+        if not hasattr(self, "_members"):
+            fields = "b.doc_id", "a.title"
+            query = self.__control.Query("query_term b", *fields).unique()
+            query.join("query_term c", "c.doc_id = b.doc_id",
+                       "LEFT(c.node_loc, 4) = LEFT(b.node_loc, 4)")
+            query.join("active_doc a", "a.id = c.doc_id")
+            query.where(f"b.path = '{Control.BOARD}'")
+            query.where(f"c.path = '{Control.CURRENT}'")
+            query.where("c.value = 'Yes'")
+            query.where(query.Condition("b.int_val", self.id))
+            query.order("a.title")
+            self._members = []
+            for row in query.execute(self.__control.cursor).fetchall():
+                self._members.append(MemberDetails(self.__control, row.doc_id))
+        return self._members
+
+    @property
+    def name(self):
+        """String for the board's name."""
+
+        if not hasattr(self, "_name"):
+            doc = Doc(self.__control.session, id=self.id)
+            self._name = doc.title.split(";")[0].strip()
+        return self._name
+
+    @property
+    def node(self):
+        """XML document to return with this board's detailed info."""
+
+        if not hasattr(self, "_node"):
+            self._node = etree.Element("Board")
+            etree.SubElement(self._node, "BoardId").text = str(self.id)
+            etree.SubElement(self._node, "BoardName").text = self.name
+            for member in self.members:
+                self._node.append(member.node)
+        return self._node
+
+
+class BoardMember:
+    """Summary information about a board member for the complete roster."""
+
+    def __init__(self, control, row):
+        """Remember the caller's values.
+
+        Pass:
+            control - access to the database
+            row - values from the database for this board member
+        """
+
+        self.__control = control
+        self.__row = row
+
+    @property
+    def board_name(self):
+        """String for the name of the board of which person is a member."""
+        return self.__control.boards[self.__row.board_id]
+
+    @property
+    def id(self):
+        """CDR ID for the PDQBoardMemberInfo document."""
+        return self.__row.member_id
+
+    @property
+    def is_eic(self):
+        """Boolean: is this member an editor-in-chief?"""
+
+        now = str(self.__control.started)[:10]
+        if not self.__row.eic_start or self.__row.eic_start > now:
+            return False
+        if self.__row.eic_finish and self.__row.eic_finish <= now:
+            return False
+        return True
+
+    @property
+    def name(self):
+        """Name string extracted from the Person's document title."""
+
+        if not hasattr(self, "_name"):
+            name = self.__row.person_name.split(";")[0].strip()
+            self._name = name.replace(" (board membership information)", "")
+        return self._name
+
+    @property
+    def node(self):
+        """Prepare the values for export through the service."""
+
+        node = etree.Element("BoardMember")
+        etree.SubElement(node, "DocId").text = str(self.id)
+        etree.SubElement(node, "Name").text = self.name
+        etree.SubElement(node, "IsEic").text = "Yes" if self.is_eic else "No"
+        etree.SubElement(node, "TermStart").text = self.__row.term_start
+        etree.SubElement(node, "BoardName").text = self.board_name
+        etree.SubElement(node, "BoardId").text = str(self.__row.board_id)
         return node
-
-def getDocTree(cdrId):
-    cursor.execute("SELECT xml FROM document WHERE id = ?", cdrId)
-    return etree.fromstring(cursor.fetchall()[0][0])
-
-def addChild(node, name, value):
-    if value:
-        etree.SubElement(node, name).text = value
 
 class MemberDetails:
-    #boards = {}
-    def __init__(self, docId):
-        self.docId = docId
-        self.person = self.contact = self.contactMode = self.govt = None
-        self.honorariaDeclined = contactId = personId = self.personId = None
-        tree = getDocTree(docId)
-        for node in tree.findall('BoardMemberName'):
-            personId = cdr.exNormalize(node.get("{cips.nci.nih.gov/cdr}ref"))
-            self.personId = personId[1]
-            personTree = getDocTree(self.personId)
-            for node in tree.findall('BoardMemberContact'):
-                self.contact = self.Contact(personTree, node)
-        for node in tree.findall('BoardMemberContactMode'):
-            self.contactMode = node.text
-        for node in tree.findall('GovernmentEmployee'):
-            self.govt = node.text == 'Yes'
-            if node.get('HonorariaDeclined') == 'Yes':
-                self.honorariaDeclined = True
-        self.person = self.Person(personTree)
-    def toNode(self):
-        node = etree.Element('BoardMember')
-        etree.SubElement(node, 'DocId').text = str(self.docId)
-        etree.SubElement(node, 'PersonId').text = str(self.personId)
-        if self.person and self.person.name:
-            node.append(self.person.name.toNode())
-        if self.contact:
-            node.append(self.contact.toNode())
-        if self.govt is not None:
-            value = self.govt and 'Yes' or 'No'
-            etree.SubElement(node, 'GovernmentEmployee').text = value
-        if self.honorariaDeclined:
-            etree.SubElement(node, 'HonorariaDeclined').text = 'Yes'
-        return node
-    class Person:
-        class Name:
-            def __init__(self, node):
-                self.first = self.mid = self.last = self.gen = self.fmt = None
-                self.suffixes = []
-                for child in node:
-                    if child.tag == 'GivenName':
-                        self.first = child.text
-                    elif child.tag == 'MiddleInitial':
-                        self.mid = child.text
-                    elif child.tag == 'SurName':
-                        self.last = child.text
-                    elif child.tag == 'GenerationSuffix':
-                        self.gen = child.text
-                    elif child.tag == 'NameFormat':
-                        self.fmt = child.text
-                    elif child.tag == 'ProfessionalSuffix':
-                        for grandchild in child:
-                            if grandchild.tag in ('StandardProfessionalSuffix',
-                                                  'CustomProfessionalSuffix'):
-                                self.suffixes.append(grandchild.text)
-            def toNode(self):
-                node = etree.Element('Name')
-                addChild(node, 'First', self.first)
-                addChild(node, 'Middle', self.mid)
-                addChild(node, 'Last', self.last)
-                addChild(node, 'Gen', self.gen)
-                addChild(node, 'Format', self.fmt)
-                for suffix in self.suffixes:
-                    addChild(node, 'Suffix', suffix)
-                return node
-        def __init__(self, tree):
-            self.name = None
-            for node in tree.findall('PersonNameInformation'):
-                self.name = MemberDetails.Person.Name(node)
+    """Detailed information about a single board member."""
+
+    def __init__(self, control, id):
+        """Save the caller's values.
+
+        Pass:
+            control - access to the database and the current CDR session
+            id - CDR ID of the PDQBoardMemberInfo document
+        """
+
+        self.__control = control
+        self.__id = id
+
+    @property
+    def contact(self):
+        """Contact information for the board member."""
+
+        if not hasattr(self, "_contact"):
+            self._contact = self.Contact(self)
+        return self._contact
+
+    @property
+    def control(self):
+        """Access to the database and the current CDR session."""
+        return self.__control
+
+    @property
+    def doc(self):
+        """`Doc` object for the PDQBoardMemberInfo document."""
+
+        if not hasattr(self, "_doc"):
+            self._doc = Doc(self.control.session, id=self.__id)
+        return self._doc
+
+    @property
+    def node(self):
+        """XML document to return with this board member's detailed info."""
+
+        if not hasattr(self, "_node"):
+            self._node = etree.Element("BoardMember")
+            etree.SubElement(self._node, "DocId").text = str(self.doc.id)
+            etree.SubElement(self._node, "PersonId").text = str(self.person.id)
+            self._node.append(self.person.node)
+            self._node.append(self.contact.node)
+            node = self.doc.root.find("GovernmentEmployee")
+            etree.SubElement(self._node, "GovernmentEmployee").text = node.text
+            if node.get("HonorariaDeclined"):
+                etree.SubElement(self._node, "HonorariaDeclined").text = "Yes"
+        return self._node
+
+    @property
+    def person(self):
+        """Personal information about the board member."""
+
+        if not hasattr(self, "_person"):
+            node = self.doc.root.find("BoardMemberName")
+            id = node.get(Control.CDR_REF)
+            self._person = self.Person(self.control, id)
+        return self._person
+
+
     class Contact:
-        def __init__(self, tree, contact):
-            self.phone = self.fax = self.email = location = contactId = None
-            for child in contact.findall('SpecificBoardMemberContact'):
-                for grandchild in child:
-                    if grandchild.tag == 'BoardContactPhone':
-                        self.phone = MemberDetails.Contact.Phone(grandchild)
-                    elif grandchild.tag == 'BoardContactEmail':
-                        self.email = MemberDetails.Contact.Email(grandchild)
-                    elif grandchild.tag == 'BoardContactFax':
-                        self.fax = grandchild.text
-            if self.phone and self.fax and self.email:
-                return
-            for child in contact.findall('PersonContactID'):
-                contactId = child.text
-            #print "contactId = %s" % contactId
-            if not contactId:
-                return
-            for child in tree.findall('PersonLocations/OtherPracticeLocation'):
-                locId = child.get("{cips.nci.nih.gov/cdr}id")
-                #print "location ID: %s" % locId
-                if locId == contactId:
-                    location = MemberDetails.Contact.Other(child)
-                    break
-            if not location:
-                path = 'PersonLocations/PrivatePractice/PrivatePracticeLocation'
-                for child in tree.findall(path):
-                    if child.get("{cips.nci.nih.gov/cdr}id") == contactId:
-                        location = MemberDetails.Contact.Detail(child)
+        """Contact information for the board member."""
+
+        PERSON_CONTACT_ID = "BoardMemberContact/PersonContactID"
+        SPECIFIC_CONTACT = "BoardMemberContact/SpecificBoardMemberContact"
+        SPECIFIC_EMAIL = f"{SPECIFIC_CONTACT}/BoardContactEmail"
+        SPECIFIC_FAX = f"{SPECIFIC_CONTACT}/BoardContactFax"
+        SPECIFIC_PHONE = f"{SPECIFIC_CONTACT}/BoardContactPhone"
+        LOCATION_TAGS = {
+            "Home",
+            "OtherPracticeLocation",
+            "PrivatePracticeLocation"
+        }
+
+        def __init__(self, member):
+            """Save the caller's information.
+
+            Pass:
+                node - portion of the Person document with the contact info
+            """
+
+            self.__member = member
+
+        @property
+        def email(self):
+            """Get the best email address we have."""
+
+            if not hasattr(self, "_email"):
+                self._email = None
+                node = self.__member.doc.root.find(self.SPECIFIC_EMAIL)
+                if node is not None:
+                    self._email = self.Email(node)
+                elif self.location:
+                    self._email = self.location.email
+            return self._email
+
+        @property
+        def fax(self):
+            """Get the best fax number we can find."""
+
+            if not hasattr(self, "_fax"):
+                self._fax = None
+                node = self.__member.doc.root.find(self.SPECIFIC_FAX)
+                if node is not None:
+                    self._fax = Doc.get_text(node, "").strip()
+                elif self.location:
+                    self._fax = self.location.fax
+            return self._fax
+
+        @property
+        def location(self):
+            """Location matching the value in the PersonContactID element."""
+
+            if not hasattr(self, "_location"):
+                self._location = None
+                node = self.__member.doc.root.find(self.PERSON_CONTACT_ID)
+                if node is None:
+                    return None
+                id = Doc.get_text(node, "").strip()
+                if not id:
+                    return None
+                query = f'//*[@cdr:id="{id}"]'
+                opts = dict(namespaces=Doc.NSMAP)
+                for node in self.__member.person.doc.root.xpath(query, **opts):
+                    if node.tag in self.LOCATION_TAGS:
+                        if node.tag == "OtherPracticeLocation":
+                            args = self.__member.control, node
+                            self._location = self.OtherPracticeLocation(*args)
+                        else:
+                            self._location = self.Detail(node)
                         break
-            if not location:
-                for child in tree.findall('PersonLocations/Home'):
-                    if child.get("{cips.nci.nih.gov/cdr}id") == contactId:
-                        location = MemberDetails.Contact.Detail(child)
-                        break
-            if location:
-                self.phone = self.phone or location.phone
-                self.fax = self.fax or location.fax
-                self.email = self.email or location.email
-        def toNode(self):
-            node = etree.Element('Contact')
-            if self.phone:
-                node.append(self.phone.toNode())
-            addChild(node, 'Fax', self.fax)
-            if self.email:
-                node.append(self.email.toNode())
-            return node
+            return self._location
+
+        @property
+        def node(self):
+            """Contact information packaged for return to the browser."""
+
+            if not hasattr(self, "_node"):
+                self._node = etree.Element("Contact")
+                if self.phone:
+                    self._node.append(self.phone.node)
+                if self.fax:
+                    etree.SubElement(self._node, "Fax").text = self.fax
+                if self.email:
+                    self._node.append(self.email.node)
+            return self._node
+
+        @property
+        def phone(self):
+            """Get the best phone number we can find."""
+
+            if not hasattr(self, "_phone"):
+                self._phone = None
+                node = self.__member.doc.root.find(self.SPECIFIC_PHONE)
+                if node is not None:
+                    self._phone = self.Phone(node)
+                elif self.location:
+                    self._phone = self.location.phone
+            return self._phone
+
         class Phone:
+            """Phone number and indication whether the number is public."""
+
             def __init__(self, node):
-                self.number = node.text
-                self.public = node.get('Public') != 'No'
-            def toNode(self):
-                node = etree.Element('Phone')
-                addChild(node, 'Number', self.number)
-                addChild(node, 'Public', self.public and 'Yes' or 'No')
+                """Save the caller's information.
+
+                Pass:
+                    node - XML document node with the phone information
+                """
+
+                self.__node = node
+
+            @property
+            def node(self):
+                """Phone information packaged for inclusion in the report."""
+
+                public = "No" if self.__node.get("Public") == "No" else "Yes"
+                node = etree.Element("Phone")
+                number = Doc.get_text(self.__node, "").strip()
+                etree.SubElement(node, "Number").text = number
+                etree.SubElement(node, "Public").text = public
                 return node
+
+
         class Email:
+            """Email address and indication whether the address is public."""
+
             def __init__(self, node):
-                self.address = node.text
-                self.public = node.get('Public') != 'No'
-            def toNode(self):
-                node = etree.Element('Email')
-                addChild(node, 'Address', self.address)
-                addChild(node, 'Public', self.public and 'Yes' or 'No')
+                """Save the caller's information.
+
+                Pass:
+                    node - XML document node with the email information
+                """
+
+                self.__node = node
+
+            @property
+            def node(self):
+                """Email information packaged for inclusion in the report."""
+
+                public = "No" if self.__node.get("Public") == "No" else "Yes"
+                node = etree.Element("Email")
+                address = Doc.get_text(self.__node, "").strip()
+                etree.SubElement(node, "Address").text = address
+                etree.SubElement(node, "Public").text = public
                 return node
+
         class Detail:
+            """Contact info for a location not associated with an org."""
+
             def __init__(self, node):
-                phone = tollFree = self.phone = self.fax = self.email = None
-                for child in node:
-                    if child.tag == 'Phone':
-                        phone = MemberDetails.Contact.Phone(child)
-                    elif child.tag == 'TollFreePhone':
-                        tollFree = MemberDetails.Contact.Phone(child)
-                    elif child.tag == 'Fax':
-                        self.fax = child.text
-                    elif child.tag == 'Email':
-                        self.email = MemberDetails.Contact.Email(child)
-                self.phone = tollFree or phone
-        class Other:
-            def __init__(self, node):
-                phone = tollFree = self.phone = self.fax = self.email = None
-                for child in node:
-                    if child.tag == 'SpecificPhone':
-                        phone = MemberDetails.Contact.Phone(child)
-                    elif child.tag == 'SpecificTollFreePhone':
-                        tollFree = MemberDetails.Contact.Phone(child)
-                    elif child.tag == 'SpecificFax':
-                        self.fax = child.text
-                    elif child.tag == 'SpecificEmail':
-                        self.email = MemberDetails.Contact.Email(child)
-                self.phone = tollFree or phone
-                if not (self.phone and self.fax and self.email):
-                    for child in node.findall('OrganizationLocation'):
-                        orgId = child.get("{cips.nci.nih.gov/cdr}ref")
-                        strId, intId, fragId = cdr.exNormalize(orgId)
-                        if fragId:
-                            orgTree = getDocTree(intId)
-                            path = 'OrganizationLocations/OrganizationLocation'
-                            for loc in orgTree.findall(path):
-                                locId = loc.get("{cips.nci.nih.gov/cdr}id")
-                                if locId == fragId:
-                                    for det in loc.findall('Location'):
-                                        cls = MemberDetails.Contact.Detail
-                                        detail = cls(det)
-                                        self.phone = self.phone or detail.phone
-                                        self.fax = self.fax or detail.fax
-                                        self.email = self.email or detail.email
-                                    break
+                """Save the caller's information.
 
-#----------------------------------------------------------------------
-# Select the list of board members associated to a board (passed in
-# by the selection of the user) along with start/end dates.
-#----------------------------------------------------------------------
-def allBoardMembers():
+                Pass:
+                    node - portion of XML document with contact information
+                """
+
+                self.__node = node
+
+            @property
+            def email(self):
+                """Email address for this location."""
+
+                if not hasattr(self, "_email"):
+                    self._email = None
+                    node = self.__node.find("Email")
+                    if node is not None:
+                        self._email = MemberDetails.Contact.Email(node)
+                return self._email
+
+            @property
+            def fax(self):
+                """Fax number for this location."""
+                return Doc.get_text(self.__node.find("Fax"), "").strip()
+
+            @property
+            def phone(self):
+                """Toll-free phone if present, otherwise regular phone."""
+
+                if not hasattr(self, "_phone"):
+                    self._phone = None
+                    node = self.__node.find("TollFreePhone")
+                    if node is None:
+                        node = self.__node.find("Phone")
+                    if node is not None:
+                        self._phone = MemberDetails.Contact.Phone(node)
+                return self._phone
+
+
+        class OtherPracticeLocation:
+            """Location associated with an organization."""
+
+            LOCATION_PATH = "OrganizationLocations/OrganizationLocation"
+
+            def __init__(self, session, node):
+                """Save the caller's values.
+
+                Pass:
+                    control - access to the current login session
+                    node - node from an XML document with contact information
+                """
+
+                self.__control = control
+                self.__node = node
+
+            @property
+            def email(self):
+                """Pick a email address preferring specific over org."""
+
+                if not hasattr(self, "_email"):
+                    self._email = None
+                    node = self.__node.find("SpecificEmail")
+                    if node is not None:
+                        self._email = MemberDetails.Contact.Email(node)
+                    elif self.organization:
+                        self._email = self.organization.email
+                return self._email
+
+            @property
+            def fax(self):
+                """Pick a fax number preferring specific over org."""
+
+                if not hasattr(self, "_fax"):
+                    self._fax = None
+                    node = self.__node.find("SpecificFax")
+                    if node is not None:
+                        self._fax = Doc.get_text(node, "").strip()
+                    elif self.organization:
+                        self._fax = self.organization.fax
+                return self._fax
+
+            @property
+            def organization(self):
+                """Contact information for the location's organization."""
+
+                if not hasattr(self, "_organization"):
+                    self._organization = None
+                    node = self.__node.find("OrganizationLocation")
+                    org = None
+                    if node is not None:
+                        id = node.get(Control.CDR_REF, "").strip()
+                        if "#" in id:
+                            doc_id, frag_id = id.split("#", 1)
+                            if frag_id:
+                                org = Doc(self.__control.session, id=id)
+                    if org is not None:
+                        for node in org.root.findall(self.LOCATION_PATH):
+                            if node.get(Control.CDR_ID) == frag_id:
+                                child = node.find("Location")
+                                if child is not None:
+                                    Detail = MemberDetails.Contact.Detail
+                                    self._organization = Detail(child)
+                                break
+                return self._organization
+
+            @property
+            def phone(self):
+                """Pick a phone number preferring specific and toll-free."""
+
+                if not hasattr(self, "_phone"):
+                    self._phone = None
+                    node = self.__node.find("SpecificTollFreePhone")
+                    if node is None:
+                        node = self.__node.find("SpecificPhone")
+                    if node is not None:
+                        self._phone = MemberDetails.Contact.Phone(node)
+                    elif self.organization:
+                        self._phone = self.organization.phone
+                return self._phone
+
+
+    class Person:
+        """Information from the board member's Person document."""
+
+        NAME_TAGS = (
+            ("GivenName", "First"),
+            ("MiddleInitial", "Middle"),
+            ("SurName", "Last"),
+            ("GenerationSuffix", "Gen"),
+            ("NameFormat", "Format"),
+        )
+        SUFFIX_TAGS = "StandardProfessionalSuffix", "CustomProfessionalSuffix"
+
+        def __init__(self, control, id):
+            """Save the caller's information.
+
+            Pass:
+                control - access to the database and the current CDR session
+                id - CDR ID of the PDQBoardMemberInfo document
+            """
+
+            self.__control = control
+            self.__id = id
+
+        @property
+        def doc(self):
+            """`Doc` object for the board member's Person document."""
+
+            if not hasattr(self, "_doc"):
+                self._doc = Doc(self.__control.session, id=self.__id)
+            return self._doc
+
+        @property
+        def id(self):
+            """CDR ID for the Person document."""
+            return self.doc.id
+
+        @property
+        def node(self):
+            """Personal name information block."""
+
+            if not hasattr(self, "_node"):
+                node = self.doc.root.find("PersonNameInformation")
+                self._node = etree.Element("Name")
+                for incoming, outgoing in self.NAME_TAGS:
+                    value = Doc.get_text(node.find(incoming))
+                    if value:
+                        etree.SubElement(self._node, outgoing).text = value
+                for child in node.findall("ProfessionalSuffix/*"):
+                    if child.tag in self.SUFFIX_TAGS:
+                        value = Doc.get_text(child)
+                        if value:
+                            etree.SubElement(self._node, "Suffix").text = value
+            return self._node
+
+
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+
+    control = Control()
     try:
-        cursor.execute("""\
- SELECT DISTINCT member.doc_id, eic_start.value, eic_finish.value,
-                 term_start.value, person_doc.title, member.int_val
-            FROM query_term member
-            JOIN query_term curmemb
-              ON curmemb.doc_id = member.doc_id
-             AND LEFT(curmemb.node_loc, 4) = LEFT(member.node_loc, 4)
-            JOIN query_term person
-              ON person.doc_id = member.doc_id
-            JOIN document person_doc
-              ON person_doc.id = person.doc_id
- LEFT OUTER JOIN query_term eic_start
-              ON eic_start.doc_id = member.doc_id
-             AND LEFT(eic_start.node_loc, 4) = LEFT(member.node_loc, 4)
-             AND eic_start.path   = '/PDQBoardMemberInfo/BoardMembershipDetails'
-                              + '/EditorInChief/TermStartDate'
- LEFT OUTER JOIN query_term eic_finish
-              ON eic_finish.doc_id = member.doc_id
-             AND LEFT(eic_finish.node_loc, 4) = LEFT(member.node_loc, 4)
-             AND eic_finish.path  = '/PDQBoardMemberInfo/BoardMembershipDetails'
-                              + '/EditorInChief/TermEndDate'
- LEFT OUTER JOIN query_term term_start
-              ON term_start.doc_id = member.doc_id
-             AND LEFT(term_start.node_loc, 4) = LEFT(member.node_loc, 4)
-             AND term_start.path = '/PDQBoardMemberInfo/BoardMembershipDetails'
-                              + '/TermStartDate'
-           WHERE member.path  = '/PDQBoardMemberInfo/BoardMembershipDetails'
-                              + '/BoardName/@cdr:ref'
-             AND curmemb.path = '/PDQBoardMemberInfo/BoardMembershipDetails'
-                              + '/CurrentMember'
-             AND person.path  = '/PDQBoardMemberInfo/BoardMemberName/@cdr:ref'
-             AND curmemb.value = 'Yes'
-             AND person_doc.active_status = 'A'""")
-        rows = cursor.fetchall()
-        root = etree.Element('BoardMembers')
-        for docId, eic_start, eic_finish, term_start, name, boardId in rows:
-            boardMember = BoardMember(docId, eic_start, eic_finish,
-                                      term_start, name, boardId)
-            root.append(boardMember.toNode())
-        return etree.tostring(root, pretty_print=True, encoding="unicode")
+        control.run()
     except Exception as e:
-        raise
-        cdrcgi.sendPage('<Failure>%s</Failure>' % e, 'xml')
-
-def getBoardMember(cdrId):
-    filters = ['set:Denormalization PDQBoardMemberInfo Set']
-    # filters.append('name:Copy XML for Person 2')
-    response = cdr.filterDoc('guest', filters, cdrId)
-    if isinstance(response, (str, bytes)):
-        cdrcgi.sendPage("<Failure>%s</Failure>" % response, 'xml')
-    return response[0]
-
-def collectMembersForBoard(boardId):
-    try:
-        cursor.execute("""\
- SELECT DISTINCT b.doc_id
-            FROM query_term b
-            JOIN query_term c
-              ON c.doc_id = b.doc_id
-             AND LEFT(c.node_loc, 4) = LEFT(b.node_loc, 4)
-            JOIN active_doc a
-              ON a.id = c.doc_id
-           WHERE b.path = '/PDQBoardMemberInfo/BoardMembershipDetails'
-                        + '/BoardName/@cdr:ref'
-             AND c.path = '/PDQBoardMemberInfo/BoardMembershipDetails'
-                        + '/CurrentMember'
-             AND c.value = 'Yes'
-             AND b.int_val = ?""", boardId)
-        docIds = [row[0] for row in cursor.fetchall()]
-        root = etree.Element('Board')
-        etree.SubElement(root, 'BoardId').text = str(boardId)
-        etree.SubElement(root, 'BoardName').text = getBoardName(boardId)
-        for docId in docIds:
-            root.append(MemberDetails(docId).toNode())
-        return etree.tostring(root, pretty_print=True, encoding="unicode")
-    except Exception as e:
-        cdrcgi.sendPage("<Failure>%s</Failure>" % e, 'xml')
-
-if memberId:
-    details = MemberDetails(int(memberId))
-    opts = dict(pretty_print=True, encoding="unicode")
-    docXml = etree.tostring(details.toNode(), **opts)
-    cdrcgi.sendPage(docXml, 'xml')
-    #cdrcgi.sendPage(getBoardMember(int(memberId)), 'xml')
-elif boardId:
-    doc = collectMembersForBoard(boardId)
-    cdrcgi.sendPage(doc, 'xml')
-else:
-    cdrcgi.sendPage(allBoardMembers(), 'xml')
+        control.logger.exception("Failure generating XML report")
+        control.bail(e)
