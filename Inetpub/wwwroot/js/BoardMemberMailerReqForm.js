@@ -6,7 +6,7 @@
 var current_board = 0;
 
 // When the board changes, re-populated the fields for members and letters.
-function check_board() {
+function check_board(whatever) {
 
     // Has the currently selected board changed?
     let board_id = jQuery("#boards input:checked").val();
@@ -17,9 +17,12 @@ function check_board() {
         jQuery("#letters div").remove();
         let board = boards[board_id];
         let type = board.type;
-        console.log("the type is " + type)
-        for (const letter of letters[type]) {
-            let [name, key] = letter;
+        console.log("the type is " + type);
+        for (var i = 0; i < letters[type].length; ++i) {
+            var letter = letters[type][i];
+            var name = letter[0];
+            var key = letter[1];
+            // let [name, key] = letter; poor IE can't cope
             let button = jQuery('<input type="radio", name="letter">');
             button.attr("value", key);
             button.attr("id", key);
@@ -36,8 +39,11 @@ function check_board() {
         jQuery("#members div").remove();
         let all_members = [["all", "All board members"]];
         let members = all_members.concat(boards[board_id].members);
-        for (const member of members) { //boards[board_id].members) {
-            let [id, name] = member;
+        for (var i = 0; i < members.length; ++i) {
+            var member = members[i];
+            let id = member[0];
+            let name = member[1];
+            // let [id, name] = member; aargh!
             let key = "member-" + id;
             let checkbox = jQuery('<input type="checkbox", name="member">');
             checkbox.attr("value", id);
