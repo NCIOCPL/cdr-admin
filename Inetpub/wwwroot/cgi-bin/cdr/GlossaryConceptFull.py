@@ -920,7 +920,7 @@ class Concept:
                 self._id = None
                 if node is not None:
                     try:
-                        Doc.extract_id(node.get(f"{{{Doc.NS}}}ref"))
+                        self._id = Doc.extract_id(node.get(f"{{{Doc.NS}}}ref"))
                     except:
                         pass
             return self._id
@@ -946,7 +946,7 @@ class Concept:
         @property
         def node(self):
             """Wrapper element for the video information."""
-            return self__node
+            return self.__node
 
         @property
         def row(self):
@@ -979,7 +979,7 @@ class Concept:
 
             if not hasattr(self, "_youtube_id"):
                 doc = Doc(self.SESSION, id=self.id)
-                node = doc.node.find("PhysicalMedia/VideoData/HostingID")
+                node = doc.root.find("PhysicalMedia/VideoData/HostingID")
                 self._youtube_id = Doc.get_text(node, "").strip() or None
             return self._youtube_id
 
