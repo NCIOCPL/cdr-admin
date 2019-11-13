@@ -54,13 +54,16 @@ class Control(Controller):
             "table.linkers { width: 90%; }",
         )
         page = self.report.page
+        h2 = page.B.H2("Documents Linked To Glossary Term Names")
+        h2.set("class", "center")
+        page.body.insert(1, h2)
         table = page.B.TABLE(
             page.B.CAPTION("Glossary Term"),
             page.B.TR(page.B.TH("Name"), page.B.TD(self.name)),
             page.B.TR(page.B.TH("Source"), page.B.TD(self.source))
         )
         table.set("id", "name-and-source")
-        page.body.insert(1, table)
+        page.body.insert(2, table)
         self.report.page.add_css("\n".join(css))
         self.report.send()
 
