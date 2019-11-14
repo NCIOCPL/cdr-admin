@@ -4,12 +4,13 @@
 """
 
 from copy import deepcopy
-from sys import stdout
 from cdrcgi import Controller
 from cdrapi.docs import Doc
 from cdrapi.users import Session
 from lxml import html, etree
 from lxml.html import builder
+import sys
+
 
 class Control(Controller):
     SUBTITLE = "Glossary QC Report - Full"
@@ -18,6 +19,11 @@ class Control(Controller):
     METHOD = "get"
 
     def populate_form(self, page):
+        """Ask for more information if we don't have everything we need."""
+
+        if self.concept:
+            self.show_report()
+            exit(0)
         if self.names:
             fieldset = page.fieldset("Select Glossary Concept Document")
             for concept_id, name in self.names:
@@ -57,6 +63,8 @@ class Control(Controller):
         if not hasattr(self, "_id"):
             self._id = self.fields.getvalue("id")
             if self._id is None:
+                self._id = self.fields.getvalue("DocId")
+            if self._id is None:
                 if self.names and len(self.names) == 1:
                     self._id = self.names[0][0]
                 elif self.name_id:
@@ -68,13 +76,18 @@ class Control(Controller):
                         self.bail("Not a GlossaryTermName document ID")
                     self._id = rows[0][0]
             else:
-                self._id = int(self._id)
+                self._id = Doc.extract_id(self._id)
         return self._id
 
     @property
     def name_id(self):
         """CDR ID for a GlossaryTermName document."""
-        return self.fields.getvalue("name_id")
+
+        if not hasattr(self, "_name_id"):
+            self._name_id = self.fields.getvalue("name_id")
+            if self._name_id:
+                self._name_id = Doc.extract_id(self._name_id)
+        return self._name_id
 
     @property
     def names(self):
@@ -126,8 +139,9 @@ class Concept:
             doctype="<!DOCTYPE html>",
             encoding="utf-8",
         )
-        stdout.buffer.write(b"Content-type: text/html;charset=utf-8\n\n")
-        stdout.buffer.write(html.tostring(self.report, **opts))
+        sys.stdout.buffer.write(b"Content-type: text/html;charset=utf-8\n\n")
+        sys.stdout.buffer.write(html.tostring(self.report, **opts))
+        sys.exit(0)
 
     @property
     def control(self):
