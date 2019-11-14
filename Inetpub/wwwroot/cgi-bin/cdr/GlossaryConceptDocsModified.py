@@ -196,7 +196,7 @@ class GlossaryTermConcept:
             self._date_last_modified = ""
             if self.definition is not None:
                 node = self.definition.find("DateLastModified")
-                self._date_last_modiied = Doc.get_text(node, "")[:10]
+                self._date_last_modified = Doc.get_text(node, "")[:10]
         return self._date_last_modified
 
     @property
