@@ -14,6 +14,7 @@ import cdr2gk
 import cdrpub
 from lxml import etree, html
 import requests
+from cdr import TMP
 
 # TODO: Get Acquia to fix their broken certificates.
 from urllib3.exceptions import InsecureRequestWarning
@@ -292,6 +293,10 @@ class Summary:
         """HTML page ready to be returned to the user."""
 
         if not hasattr(self, "_page"):
+            if self.__control.preserve_links:
+                self.__control.show_progress("preserving links...")
+                self._page = self.cms_doc
+                return self._page
             page = self.cms_doc
             self.__control.show_progress("fixing links...")
             for script in page.iter("script"):
