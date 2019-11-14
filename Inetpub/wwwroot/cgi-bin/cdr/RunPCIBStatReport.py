@@ -93,7 +93,7 @@ class Control(Controller):
             self.logger.exception("Report failure")
             cdrcgi.bail("failure: %s" % e)
         fieldset = self.HTMLPage.fieldset("Report Status")
-        para = self.HTMLPage.B.P("The report has been sent to you be email.")
+        para = self.HTMLPage.B.P("The report has been sent to you by email.")
         para.set("class", "center")
         fieldset.append(para)
         self.report.page.form.append(fieldset)
