@@ -35,7 +35,10 @@ class DocInfo:
         try:
             tree = etree.XML(rows[0][0])
         except Exception as e:
-            raise Exception("parsing CDR%s: %s" % (docId, e))
+            try:
+                tree = etree.XML(rows[0][0].encode("utf-8"))
+            except Exception as e:
+                raise Exception("parsing CDR%s: %s" % (docId, e))
         if tree.tag == 'Media':
             for medium in ('Image', 'Sound', 'Video'):
                 xpath = 'PhysicalMedia/%sData/%sEncoding' % (medium, medium)
