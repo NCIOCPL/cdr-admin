@@ -40,15 +40,6 @@ class Control(Controller):
         self.logger.info("Assembled %d bytes; elapsed: %s", *args)
         sendPage(page)
 
-    def send(self):
-        elapsed = (datetime.datetime.now() - self.start).total_seconds()
-        page = html.tostring(self.page)
-        args = len(page), elapsed
-        message = "Assembled %d bytes in %f seconds"
-        self.doc.session.logger.info(message, *args)
-        sys.stdout.buffer.write(b"Content-type: text/html; charset=utf-8\n\n")
-        sys.stdout.buffer.write(page)
-
     def show_progress(self, progress):
         """If enabled, write processing progress to the console."""
 
@@ -548,6 +539,7 @@ class GTN:
             if "CDR_audiofile" in classes:
                 id = Doc.extract_id(url.replace(".mp3", ""))
                 link.set("href", f"GetCdrBlob.py?id={id}")
+                link.set("type", "ExternalLink")
             elif url.startswith("http"):
                 link.set("type", "ExternalLink")
             elif "#cit" in url:
