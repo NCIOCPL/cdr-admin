@@ -383,14 +383,14 @@ jQuery("input[value='%s']").click(function(e) {
 
         recip = self.UserInfo(self, job.assigned_to)
         if not recip.email:
-            error = "no email address found for user %s" % recip.name
+            error = f"no email address found for user {recip.name}"
             self.logger.error(error)
             cdrcgi.bail(error)
         recips = [recip.email]
         sender = "cdr@cancer.gov"
         body = []
-        subject = "[CDR-%s] Translation Queue Notification" % self.tier.name
-        log_message = "mailed translation job state alert to %s" % recip
+        subject = f"[{self.tier.name}] Translation Queue Notification"
+        log_message = f"mailed translation job state alert to {recip}"
         if not cdr.isProdHost():
             recips = cdr.getEmailList("Test Translation Queue Recips")
             body.append("[*** THIS IS A TEST MESSAGE ON THE %s TIER. "
