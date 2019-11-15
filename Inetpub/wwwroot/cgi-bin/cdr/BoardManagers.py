@@ -19,8 +19,24 @@ class Control(Controller):
         if self.GROUP not in user.groups:
             bail("User not authorized for this menu")
 
-        # Section 1: general.
+        # Section 1: board members.
         page.body.set("class", "admin-menu")
+        page.form.append(page.B.H3("Board Member Information Reports"))
+        ol = page.B.OL()
+        page.form.append(ol)
+        opts = dict(DocType="PDQBoardMemberInfo")
+        display = "Board Member Information QC Report"
+        link = page.menu_link("QcReport.py", display, **opts)
+        ol.append(page.B.LI(link))
+        for display, script in (
+            ("Board Roster Reports", "BoardRoster.py"),
+            ("Board Roster Reports (Combined)", "BoardRosterFull.py"),
+            ("Invitation History Report", "BoardInvitationHistory.py"),
+            ("PDQ Board Members and Topics", "PdqBoards.py"),
+        ):
+            ol.append(page.B.LI(page.menu_link(script, display)))
+
+        # Section 2: general.
         page.form.append(page.B.H3("General Use Reports"))
         ol = page.B.OL()
         page.form.append(ol)
@@ -33,23 +49,29 @@ class Control(Controller):
         ):
             ol.append(page.B.LI(page.menu_link(script, display)))
 
-        # Section 2: QC.
-        page.form.append(page.B.H3("Summary QC Reports"))
-        ol = page.B.OL()
+        # Section 3: mailers.
+        page.form.append(page.B.H3("Mailers"))
+        links = (
+            page.menu_link(
+                "BoardMemberMailerReqForm.py",
+                "PDQ\xAE Board Member Correspondence Mailers"
+            ),
+            page.menu_link(
+                "SummaryMailerReport.py",
+                "Summary Mailer History Report",
+                flavor="4259"
+            ),
+            page.menu_link(
+                "SummaryMailerReport.py",
+                "Summary Mailer Report",
+                flavor="4258"
+            ),
+        )
+        items = [page.B.LI(link) for link in links]
+        ol = page.B.OL(*items)
         page.form.append(ol)
-        opts = dict(DocType="Summary")
-        for display, report_key in (
-            ("HP Bold/Underline QC Report", "bu"),
-            ("HP Redline/Strikeout QC Report", "rs"),
-            ("PT Bold/Underline QC Report", "patbu"),
-            ("PT Redline/Strikeout QC Report", "pat"),
-            ("Publish Preview Report", "pp")
-        ):
-            opts["ReportType"] = report_key
-            link = page.menu_link("QcReport.py", display, **opts)
-            ol.append(page.B.LI(link))
 
-        # Section 3: management.
+        # Section 4: management.
         page.form.append(page.B.H3("Management Reports"))
         ol = page.B.OL()
         page.form.append(ol)
@@ -72,22 +94,6 @@ class Control(Controller):
         ):
             ol.append(page.B.LI(page.menu_link(script, display)))
 
-        # Section 4: board members.
-        page.form.append(page.B.H3("Board Member Information Reports"))
-        ol = page.B.OL()
-        page.form.append(ol)
-        opts = dict(DocType="PDQBoardMemberInfo")
-        display = "Board Member Information QC Report"
-        link = page.menu_link("QcReport.py", display, **opts)
-        ol.append(page.B.LI(link))
-        for display, script in (
-            ("Board Roster Reports", "BoardRoster.py"),
-            ("Board Roster Reports (Combined)", "BoardRosterFull.py"),
-            ("Invitation History Report", "BoardInvitationHistory.py"),
-            ("PDQ Board Members and Topics", "PdqBoards.py"),
-        ):
-            ol.append(page.B.LI(page.menu_link(script, display)))
-
         # Section 5: miscellaneous docs.
         page.form.append(page.B.H3("Miscellaneous Document QC Report"))
         ol = page.B.OL()
@@ -95,27 +101,21 @@ class Control(Controller):
         link = page.menu_link("MiscSearch.py", "Miscellaneous Documents")
         ol.append(page.B.LI(link))
 
-        # Section 6: mailers.
-        page.form.append(page.B.H3("Mailers"))
-        links = (
-            page.menu_link(
-                "BoardMemberMailerReqForm.py",
-                "PDQ\xAE Board Member Correspondence Mailers"
-            ),
-            page.menu_link(
-                "SummaryMailerReport.py",
-                "Summary Mailer History Report",
-                flavor="4259"
-            ),
-            page.menu_link(
-                "SummaryMailerReport.py",
-                "Summary Mailer Report",
-                flavor="4258"
-            ),
-        )
-        items = [page.B.LI(link) for link in links]
-        ol = page.B.OL(*items)
+        # Section 6: QC.
+        page.form.append(page.B.H3("Summary QC Reports"))
+        ol = page.B.OL()
         page.form.append(ol)
+        opts = dict(DocType="Summary")
+        for display, report_key in (
+            ("HP Bold/Underline QC Report", "bu"),
+            ("HP Redline/Strikeout QC Report", "rs"),
+            ("PT Bold/Underline QC Report", "patbu"),
+            ("PT Redline/Strikeout QC Report", "pat"),
+            ("Publish Preview Report", "pp")
+        ):
+            opts["ReportType"] = report_key
+            link = page.menu_link("QcReport.py", display, **opts)
+            ol.append(page.B.LI(link))
 
 
 Control().run()
