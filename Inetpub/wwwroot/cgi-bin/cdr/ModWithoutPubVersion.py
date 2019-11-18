@@ -272,7 +272,7 @@ class Document:
     @property
     def user(self):
         """User who last saved the document."""
-        return self.__row.fullname or self.__row.name
+        return self.__row.fullname or self.__row.user_name
 
 
 if __name__ == "__main__":
