@@ -4,7 +4,6 @@
 """
 
 from cdrcgi import Controller, navigateTo
-from cdrapi.docs import LinkType
 
 class Control(Controller):
     """Encapsulates processing logic for building the menu page."""
@@ -23,10 +22,8 @@ class Control(Controller):
         fieldset.set("class", "flexlinks")
         ul = page.B.UL()
         script = self.EDIT_LINK_TYPE
-        parms = dict(linkact="modlink")
-        for link_type in self.link_types:
-            parms["name"] = link_type
-            ul.append(page.B.LI(page.menu_link(script, link_type, **parms)))
+        for id, name in self.link_types:
+            ul.append(page.B.LI(page.menu_link(script, name, id=id)))
         fieldset.append(ul)
         page.form.append(fieldset)
         page.add_css(".flexlinks ul { height: 400px; }")
@@ -57,7 +54,9 @@ class Control(Controller):
     @property
     def link_types(self):
         if not hasattr(self, "_link_types"):
-            self._link_types = LinkType.get_linktype_names(self.session)
+            query = self.Query("link_type", "id", "name").order("name")
+            rows = query.execute(self.cursor).fetchall()
+            self._link_types = [tuple(row) for row in rows]
         return self._link_types
 
 
