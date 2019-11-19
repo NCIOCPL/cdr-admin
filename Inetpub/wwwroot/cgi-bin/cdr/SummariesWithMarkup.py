@@ -267,6 +267,7 @@ class Board:
             parms = {
                 "DocId": "CDR%10d" % self.id,
                 "DocType": "Summary",
+                "DocVersion": "-1",
                 "ReportType": self.QC_REPORT_TYPES.get(control.audience[0]),
                 cdrcgi.SESSION: control.session
             }

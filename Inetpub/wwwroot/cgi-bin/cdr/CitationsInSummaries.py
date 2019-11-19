@@ -15,6 +15,7 @@ class Control(Controller):
     )
     HOST = Tier("PROD").hosts["APPC"]
     URL = f"https://{HOST}{BASE}/QcReport.py?Session=guest&DocId={{:d}}"
+    URL += "&DocVersion=-1"
     def run(self):
         self.show_report()
     def build_tables(self):

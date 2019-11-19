@@ -105,7 +105,7 @@ class Control(Controller):
         page.form.append(page.B.H3("Summary QC Reports"))
         ol = page.B.OL()
         page.form.append(ol)
-        opts = dict(DocType="Summary")
+        opts = dict(DocType="Summary", DocVersion="-1")
         for display, report_key in (
             ("HP Bold/Underline QC Report", "bu"),
             ("HP Redline/Strikeout QC Report", "rs"),

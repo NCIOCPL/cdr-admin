@@ -186,6 +186,7 @@ def show_report(doc_id, frag_id):
             last_doc_type = doc_type
         doc_id_string = "CDR%d" % doc_id
         params = { "DocId": doc_id_string, "Session": session or "guest" }
+        params["DocVersion"] = "-1"
         url = "QcReport.py?%s" % urllib.parse.urlencode(params)
         row = (
             cdrcgi.Report.Cell(doc_id_string, href=url),

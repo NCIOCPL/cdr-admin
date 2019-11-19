@@ -351,7 +351,7 @@ class DrugInfoSummary:
         Add a table for this summary and a horizontal ruler to the report page.
         """
         parser = cdrcgi.lxml.html.HTMLParser() #encoding="utf-8")
-        url = "QcReport.py?Session=guest&DocId=%d" % self.doc_id
+        url = f"QcReport.py?Session=guest&DocId={self.doc_id}&DocVersion=-1"
         doc_id = page.B.TD(page.B.A(str(self.doc_id), href=url))
         summary = cdrcgi.lxml.html.fromstring("<td>%s</td>" % self.summary,
                                               parser=parser)

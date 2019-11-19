@@ -93,6 +93,7 @@ class Control(Controller):
                             dict(
                                 DocType="GlossaryTermName",
                                 ReportType="gtnwc",
+                                DocVersion="-1",
                             ),
                         ),
                     ),
@@ -111,7 +112,7 @@ class Control(Controller):
                         (
                             "Glossary Term Name QC Report",
                             "QcReport.py",
-                            dict(DocType="GlossaryTermName"),
+                            dict(DocType="GlossaryTermName", DocVersion="-1"),
                         ),
                     ),
                 ),

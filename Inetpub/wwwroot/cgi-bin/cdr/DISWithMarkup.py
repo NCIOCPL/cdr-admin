@@ -66,7 +66,7 @@ class Summary:
     """Information about a PDQ Cancer Information Summary document."""
 
     TAGS = "Insertion", "Deletion"
-    URL = "QcReport.py?DocId=CDR{}&Session=guest"
+    URL = "QcReport.py?DocId=CDR{}&Session=guest&DocVersion=-1"
 
     def __init__(self, control, doc_id, title):
         """Assemble the counts needed for the report."""

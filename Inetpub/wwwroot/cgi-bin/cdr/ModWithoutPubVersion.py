@@ -244,7 +244,8 @@ class Document:
         """Link to the document (or just the id if no link can be made."""
 
         if self.doctype.lower() in self.QCTYPES:
-            url = self.__control.make_url("QcReport.py", DocId=self.id)
+            opts = dict(DocId=self.id, DocVersion=-1)
+            url = self.__control.make_url("QcReport.py", **opts)
             opts = dict(href=url, target="_blank")
             return self.__control.Reporter.Cell(self.cdr_id, **opts)
         return self.cdr_id

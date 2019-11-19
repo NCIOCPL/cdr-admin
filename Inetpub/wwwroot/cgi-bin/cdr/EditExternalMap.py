@@ -65,7 +65,8 @@ fieldset > ul { margin-top: 5px; }
 #change-report ul * { color: green; }""")
         page.add_script(f"""\
 function view_doc(id) {{
-    let url = "QcReport.py?DocId=" + id + "&Session={self.session.name}";
+    let url = "QcReport.py?DocId=" + id + "&Session={self.session.name}" +
+        "&DocVersion=-1";
     let name = window.open(url, "view-" + id);
 }}""")
         page.form.append(fieldset)

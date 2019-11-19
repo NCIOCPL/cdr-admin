@@ -103,7 +103,7 @@ class Control(cdrcgi.Control):
             url = "QcReport.py?DocId={:d}".format(tracker.reviewer.id)
             reviewer_link = cdrcgi.Report.Cell(title, href=url, **opts)
             title = tracker.summary.title
-            url = "QcReport.py?DocId={:d}".format(tracker.summary.id)
+            url = "QcReport.py?DocVersion=-1&DocId={tracker.summary.id:d}"
             summary_link = cdrcgi.Report.Cell(title, href=url, **opts)
             if self.method == "summary":
                 rows.append((tracker_link, summary_link, reviewer_link))

@@ -160,6 +160,7 @@ class Doc:
         publishable = self.last_version_publishable and "Yes" or "No"
         values = (self.HOST, self.BASE, self.control.session, self.doc_id)
         url = "https://%s%s/QcReport.py?Session=%s&DocId=%d" % values
+        url += "&DocVersion=-1"
         return [cdrcgi.Report.Cell(self.doc_id, href=url, target="_blank"),
                 self.title, "; ".join(diagnoses),
                 self.status.value, self.make_date_cell(self.status.date),
@@ -173,7 +174,6 @@ class Doc:
         return cdrcgi.Report.Cell(str(date)[:10], classes="nowrap center")
     def check_last_versions(self):
         versions = cdr.lastVersions(self.control.session, self.doc_id)
-        #cdrcgi.bail("versions: %s" % versions)
         if versions[1] > 0:
             self.last_version_publishable = versions[0] == versions[1]
             query = db.Query("doc_version", "dt")

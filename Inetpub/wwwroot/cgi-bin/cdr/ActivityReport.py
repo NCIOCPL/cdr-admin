@@ -61,6 +61,7 @@ class ActivityReport(cdrcgi.Controller):
             when = str(when)[:19]
             cdrid = f"{id:010d}"
             url = f"QcReport.py?DocId={cdrid}&Session={self.session}"
+            url += "&DocVersion=-1"
             link = cdrcgi.Reporter.Cell(cdrid, href=url)
             title = f"{title[:20]} ..."
             row = who, when, action, dt, link, title, cmt

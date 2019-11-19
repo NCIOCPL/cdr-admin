@@ -67,7 +67,7 @@ class Control(Controller):
         ol = page.B.OL()
         page.form.append(ol)
         script = "QcReport.py"
-        parms = dict(DocType="Summary")
+        parms = dict(DocType="Summary", DocVersion="-1")
         for display, report_type in (
             ("HP Bold/Underline QC Report", "bu"),
             ("HP Redline/Strikeout QC Report", "rs"),

@@ -9,7 +9,7 @@ class Control(Controller):
 
     SUBTITLE = "Media Reports"
     SUBMIT = None
-    QC_PARMS = dict(DocType="Media", ReportType="img")
+    QC_PARMS = dict(DocType="Media", ReportType="img", DocVersion="-1")
 
     def populate_form(self, page):
         page.body.set("class", "admin-menu")
