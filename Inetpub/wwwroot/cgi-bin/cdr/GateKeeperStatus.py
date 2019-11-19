@@ -1,406 +1,345 @@
-#----------------------------------------------------------------------
-# Web interface for requesting status from the Cancer.gov GateKeeper
-# and testing if our record in pub_proc_cg confirms that the documents
-# have been published.
-#
-# This program has been modified from the original GateKeeperStatus.py
-#
-# BZIssue::5015 - Documents on Cancer.gov not accounted for
-# Rewritten July 2015 as part of security sweep (lots of dead code dropped).
-#----------------------------------------------------------------------
-import cdr
+#!/usr/bin/env python
+
+"""Show the status of jobs/documents on GateKeeper.
+
+Web interface for requesting status from the Cancer.gov GateKeeper
+and testing if our record in pub_proc_cg confirms that the documents
+have been published.
+
+This program has been modified from the original GateKeeperStatus.py
+"""
+
+from cdrcgi import Controller
+from cdrapi.docs import Doc
 import cdr2gk
-import cdrcgi
-import cgi
 import re
-import sys
-from cdrapi import db
-from html import escape as html_escape
 from operator import attrgetter
 
-fields  = cgi.FieldStorage()
-cdrId   = fields.getvalue('cdrId') # or '525153'
-jobId   = fields.getvalue('jobId') # or '8437'
-host    = fields.getvalue('targetHost') or cdr2gk.HOST
-logging = fields.getvalue('debugLogging') and True or False
-action  = fields.getvalue('action') # or 'yes!'
-flavor  = fields.getvalue('flavor') # or 'full'
 
-if not re.match(r"^[a-zA-Z0-9._-]+$", host):
-    cdrcgi.bail("invalid host name")
+class Control(Controller):
 
-cdr2gk.DEBUGLEVEL = 2 if logging else 0
+    SUBTITLE = "GateKeeper Status"
+    INSTRUCTIONS = (
+        "This interface is provided for submitting status requests to "
+        "Cancer.gov's GateKeeper 2.0 and comparing them to what the "
+        "CDR has recorded in the table pub_proc_cg. "
+        "Currently the three types of status which can be requested are:",
+        (
+            (
+                "Summary",
+                "information about a specific push publishing job,",
+            ),
+            (
+                "Single Document",
+                "information about the location of an individual CDR "
+                "document in the Cancer.gov system, and",
+            ),
+            (
+                "All Documents",
+                "that information for every document in the Cancer.gov "
+                "system.",
+            ),
+        ),
+        "Enter a Job ID to request a Summary report for that job. "
+        "Enter a CDR ID to request a Single Document report for that "
+        "document. If both Job ID and CDR ID are omitted, you will "
+        "receive an All Documents report. If the 'Display all' option is "
+        "removed only the recorded problems are displayed. "
+        "Debug logging can be requested when needed for tracking down "
+        "failures and other unexpected behavior.",
+        "NOTE: The All Documents report is large; if you invoke it you "
+        "should be prepared to wait a while for it to complete; if you "
+        "invoke it with debug logging enabled, you will have a large "
+        "amount of data added to the debug log.",
+    )
+    DISPLAY_ALL = "Display all documents, not just those with errors"
+    STAGES = "gatekeeper", "preview", "live"
 
-# ----------------------------------------------------------------------
-# Set up a database connection and cursor.
-# ----------------------------------------------------------------------
-try:
-    conn = db.connect(user="CdrGuest")
-    cursor = conn.cursor()
-except Exception as e:
-    cdrcgi.bail('Database connection failure: %s' % e)
+    def build_tables(self):
+        """Assemble the table for the report."""
 
-#----------------------------------------------------------------------
-# Make a value safe for display on a web page.
-#----------------------------------------------------------------------
-def fix(me, nbsp_for_empty_values=False):
-    val = html_escape(str(me))
-    if not val and nbsp_for_empty_values:
-        return "&nbsp;"
-    return val
-
-# ----------------------------------------------------------------------
-# Display the input form
-# ----------------------------------------------------------------------
-def showForm(extra = ""):
-    title = "GateKeeper Status Request Form"
-    html = """\
-<html>
- <head>
-  <title>%s</title>
-  <style type='text/css'>
-   body   { font-family: Arial; font-size: 10pt }
-   h1     { font-size: 14pt; color: maroon; text-align: center; }
-   .fw    { width: 250px }
-   h1, p  { width: 650px }
-   div.help { width: 650px; border: 1px solid blue; padding: 5px }
-   b, th  { color: green }
-   a      { color: blue }
-   th, td { font-size: 10pt }
-   input.fw { padding-left: 4px; }
-  </style>
- </head>
- <body>
-  <br>
-  <h1>%s</h1>
-  <br>
-  <div class="help">
-  <p>
-   This interface is provided for submitting status requests to
-   Cancer.gov's GateKeeper 2.0 and comparing them to what the
-   CDR has recorded in the table pub_proc_cg.
-   Currently the three types of status which can be requested
-   are:
-   </p>
-    <il>
-     <li><b>Summary</b>, which provides information about a specific
-         push publishing job,</li>
-     <li><b>Single Document</b>, which provides
-         information about the location of an individual CDR document
-         in the Cancer.gov system, and</li>
-     <li><b>All Documents</b>, which
-         provides that information for every document in the Cancer.gov
-         system.</li>
-    </il>
-   <p>
-   Enter a <b>Job ID</b> to request a <b>Summary</b> report
-   for that job.
-   Enter a <b>CDR ID</b> to request a <b>Single Document</b>
-   report for that document.
-   If both <b>Job ID</b> and <b>CDR ID</b> are omitted, you
-   will receive an <b>All Documents</b> report.
-   If the <b>Display</b> option is removed only the recorded
-   problems are displayed.
-   Debug logging can be requested when needed for tracking down
-   failures and other unexpected behavior.<br /><br />
-   <b>NOTE</b>: The <b>All Documents</b> report is large; if you
-   invoke it you should be prepared to wait a while for it to
-   complete; if you invoke it with debug logging enabled, you
-   will have a <i>large</i> amount of data added to the debug log.
-  </p>
-  </div>
-  <br>
-  <form method='post' action='GatekeeperStatus.py'>
-   <table border='0' cellpadding='2' cellspacing='0'>
-    <tr>
-     <th align='right'>GateKeeper Host:&nbsp;</th>
-     <td><input class='fw' name='targetHost' value='%s'></td>
-    </tr>
-    <tr>
-     <th align='right'>Job ID:&nbsp;</th>
-     <td><input class='fw' name='jobId'></td>
-    </tr>
-    <tr>
-     <th align='right'>CDR ID:&nbsp;</th>
-     <td><input class='fw' name='cdrId'></td>
-    </tr>
-    <tr>
-     <th align='right'>Display:&nbsp;</th>
-     <td><input class='fw' name='flavor' value='all'></td>
-    </tr>
-    <tr>
-     <td align='center' colspan='2'><br>
-      <br />
-      <input type='checkbox' name='debugLogging'>
-      Enable Debug Logging &nbsp; &nbsp;&nbsp;&nbsp;
-      <input type='submit' name='action' value='Submit'></td>
-    </tr>
-   </table>
-  </form>
-%s </body>
-</html>
-""" % (title, title, host, extra)
-    cdrcgi.sendPage(html)
-
-
-# -----------------------------------------------------------------
-# Query to check if a given CDR-ID is recorded in pub_proc_cg.
-# Except for removed documents this should be true for all records.
-# -----------------------------------------------------------------
-def checkPubProcCg(cursor, cdrId):
-    cursor.execute("""\
-        SELECT id
-          FROM pub_proc_cg
-         WHERE id = ?""", cdrId)
-    rows = cursor.fetchall()
-
-    if not rows:
-        return False
-    return True
-
-# -----------------------------------------------------------------
-# Create the HTML format to add to the output table.
-# -----------------------------------------------------------------
-def addRow(cursor, cdrFlag):
-    if doc.pubType == "Remove":
-        cdrRecord = cdrFlag and "Error" or "Removed"
-    else:
-        cdrRecord = cdrFlag and "OK" or "Error"
-    return ("""\
-   <tr>
-    <td>%s</td>
-    <td>%s</td>
-    <td>%s</td>
-    <td>%s</td>
-    <td>%s</td>
-    <td>%s</td>
-    <td>%s</td>
-    <td>%s</td>
-    <td>%s</td>
-   </tr>
-""" % (fix(doc.packetNumber, True), fix(doc.group, True),
-       fix(doc.cdrId, True), fix(doc.pubType, True),
-       fix(doc.docType, True), fix(doc.status, True),
-       fix(doc.dependentStatus, True), fix(doc.location, True),
-       cdrRecord))
-
-
-# -----------------------------------------------------------------
-#
-# -----------------------------------------------------------------
-def makeError(error, exception):
-    if logging:
-        return ("<span style='color: red; font-weight: bold'>%s: %s</span>"
-                % (fix(error), fix(exception)))
-    else:
-        return ("<span style='color: red; font-weight: bold'>%s</span>" %
-                fix(error))
-
-
-if jobId:
-    if not jobId.isdigit():
-        cdrcgi.bail("Job ID must be an integer")
-    try:
-        response = cdr2gk.requestStatus('Summary', jobId, host=host)
-    except Exception as e:
-        showForm(makeError("Job %s not found" % jobId, e))
-
-    details = response.details
-
-    html = ["""\
-<html>
- <head>
-  <title>Summary Report for Job %s</title>
-  <style type='text/css'>
-   body { font-family: Arial }
-   h1   { font-size: 12pt; color: green }
-   th   { color: blue; }
-  </style>
- </head>
- <body>
-  <h1>Summary Report for Job %s</h1>
-  <table border='0'>
-   <tr>
-    <th align='right'>Job ID:&nbsp;</th>
-    <td>%s</td>
-   </tr>
-   <tr>
-    <th align='right'>Request Type:&nbsp;</th>
-    <td>%s</td>
-   </tr>
-   <tr>
-    <th align='right'>Description:&nbsp;</th>
-    <td>%s</td>
-   </tr>
-   <tr>
-    <th align='right'>Status:&nbsp;</th>
-    <td>%s</td>
-   </tr>
-   <tr>
-    <th align='right'>Source:&nbsp;</th>
-    <td>%s</td>
-   </tr>
-   <tr>
-    <th align='right'>Initiated:&nbsp;</th>
-    <td>%s</td>
-   </tr>
-   <tr>
-    <th align='right'>Completion:&nbsp;</th>
-    <td>%s</td>
-   </tr>
-   <tr>
-    <th align='right'>Target:&nbsp;</th>
-    <td>%s</td>
-   </tr>
-   <tr>
-    <th align='right'>Expected Count:&nbsp;</th>
-    <td>%s</td>
-   </tr>
-   <tr>
-    <th align='right'>Actual Count:&nbsp;</th>
-    <td>%s</td>
-   </tr>
-  </table>
-  <br />
-  <h1>Documents</h1>
-  <table border='1' cellpadding='2' cellspacing='0'>
-   <tr>
-    <th>Packet #</th>
-    <th>Group</th>
-    <th>CDR ID</th>
-    <th>Pub Type</th>
-    <th>Doc Type</th>
-    <th>Status</th>
-    <th>Dependent Status</th>
-    <th>Location</th>
-    <th>CDR Record</th>
-   </tr>
-""" % (fix(jobId), fix(jobId), fix(details.jobId), fix(details.requestType),
-       fix(details.description), fix(details.status), fix(details.source),
-       fix(details.initiated), fix(details.completion), fix(details.target),
-       fix(details.expectedCount), fix(details.actualCount))]
-
-    iDoc = pDoc = 0
-
-    for doc in details.docs:
-        iDoc += 1
-        isRecorded = checkPubProcCg(cursor, doc.cdrId)
-
-        if flavor == 'full' or flavor == 'all':
-
-            html.append(addRow(cursor, isRecorded))
-            if not isRecorded:
-                pDoc += 1
+        if self.job_detail_table:
+            return self.job_detail_table
+        if self.doc_id:
+            caption = f"Location Status for Document CDR{self.doc_id}"
+            args = "SingleDocument", self.doc_id
         else:
-            if not isRecorded:
-                pDoc += 1
-                html.append(addRow(cursor, isRecorded))
-
-    html.append("""\
-  </table>
-  <p>%d Records checked, %d Records not in pub_proc_cg</p>
- </body>
-</html>
-""" % (iDoc, pDoc))
-    cdrcgi.sendPage("".join(html))
-
-# Process the case when *all* documents are being checked or a single
-# CDR-ID has been passed.
-# -------------------------------------------------------------------
-if action:
-    if cdrId:
-        if not cdrId.isdigit():
-            cdrcgi.bail("CDR ID must be an integer")
+            caption = "Location Status for All Documents"
+            args = "DocumentLocation",
         try:
-            response = cdr2gk.requestStatus('SingleDocument', cdrId, host=host)
+            response = cdr2gk.requestStatus(*args, host=self.host)
         except Exception as e:
-            showForm(makeError("Report for CDR%s not found" % cdrId, e))
-        title = "Location Status for Document CDR%s" % cdrId
-    else:
-        try:
-            response = cdr2gk.requestStatus('DocumentLocation', host=host)
-        except Exception as e:
-            showForm(makeError("Unable to generate report on all documents",
-                               e))
-        title = "Location Status for All Documents"
+            self.logger.exception("Status failure")
+            self.bail(f"Status failure: {e}")
+        cols = "CDR ID", "GateKeeper", "Preview", "Live", "CDR Record"
+        rows = []
+        docs = response.details.docs if response.details else []
+        checked = missing = 0
+        for doc in sorted(docs, key=attrgetter("cdrId")):
+            if not self.should_skip(doc):
+                checked += 1
+                status = "OK" if int(doc.cdrId) in self.published else "Error"
+                if status == "Error":
+                    missing += 1
+                elif not self.full and not self.doc_id:
+                    continue
+                stages = {}
+                for stage in self.STAGES:
+                    job_id = getattr(doc, f"{stage}JobId")
+                    date_time = getattr(doc, f"{stage}DateTime")
+                    stages[stage] = f"Job {job_id} ({date_time})"
+                rows.append([
+                    doc.cdrId,
+                    stages["gatekeeper"],
+                    stages["preview"],
+                    stages["live"],
+                    status,
+                ])
+        caption = (
+            caption,
+            f"{checked} Records Checked, {missing} Not In pub_proc_cg",
+        )
+        return self.Reporter.Table(rows, cols=cols, caption=caption)
 
-    details = response.details
-    docs = details and details.docs or []
-    print("""\
-Content-type: text/html
+    def populate_form(self, page):
+        """Show the instructions and the form fields.
 
-<html>
- <head>
-  <title>%s</title>
-  <style type='text/css'>
-   body { font-family: Arial }
-   h1   { font-size: 12pt; color: green }
-   th   { color: blue }
-  </style>
- </head>
- <body>
-  <h1>%s</h1>
-  <table border='1' cellpadding='2' cellspacing='0'>
-   <tr>
-    <th rowspan='2'>CDR ID</th>
-    <th colspan='2'>GateKeeper</th>
-    <th colspan='2'>Preview</th>
-    <th colspan='2'>Live</th>
-    <th rowspan='2'>CDR Record</th>
-   </tr>
-   <tr>
-    <th>Job ID</th>
-    <th>Date/Time</th>
-    <th>Job ID</th>
-    <th>Date/Time</th>
-    <th>Job ID</th>
-    <th>Date/Time</th>
-   </tr>""" % (title, title))
-    docs.sort(key=attrgetter("cdrId"))
+        Pass:
+            page - HTMLPage object which displays the form
+        """
 
-    iDoc = pDoc = 0
+        if self.job:
+            self.show_report()
+        fieldset = page.fieldset("Instructions")
+        for instructions in self.INSTRUCTIONS:
+            if isinstance(instructions, str):
+                fieldset.append(page.B.P(instructions))
+            else:
+                ul = page.B.UL()
+                for report_type, provided in instructions:
+                    description = f", which provides {provided}"
+                    ul.append(page.B.LI(page.B.B(report_type), description))
+                fieldset.append(ul)
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Report Parameters")
+        opts = dict(value=self.host, label="Host")
+        fieldset.append(page.text_field("targetHost", **opts))
+        opts = dict(value=self.job_id, label="Job ID")
+        fieldset.append(page.text_field("jobId", **opts))
+        opts = dict(value=self.doc_id, label="CDR ID")
+        fieldset.append(page.text_field("cdrId", **opts))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Options")
+        opts = dict(label=self.DISPLAY_ALL, checked=self.full, value=1)
+        fieldset.append(page.checkbox("flavor", **opts))
+        opts = dict(label="Enable debug logging", checked=self.debug, value=1)
+        fieldset.append(page.checkbox("debugLogging", **opts))
+        page.form.append(fieldset)
 
-    for doc in docs:
-        iDoc += 1
+    def should_skip(self, doc):
+        """True if this document should not be included in the report.
 
-        # Documents that used to be on Gatekeeper but have since been
-        # removed are listed as 'Not Present' on all stages
-        # We can skip these.
-        # -----------------------------------------------------------
-        if doc.gatekeeperJobId == 'Not Present' and \
-           doc.previewJobId == 'Not Present' and \
-           doc.liveJobId == 'Not Present' and not cdrId:
-            continue
+        Pass:
+            doc - object returned by GateKeeper for a single CDR document
+        """
 
-        isRecorded = checkPubProcCg(cursor, doc.cdrId)
+        if self.doc_id:
+            return False
+        for stage in self.STAGES:
+            if getattr(doc, f"{stage}JobId") == "Not Present":
+                return True
+        return False
 
-        if cdrId or not isRecorded:
-            if not isRecorded:
-                pDoc += 1
-            print("""\
-   <tr>
-    <td>%s</td>
-    <td>%s</td>
-    <td>%s</td>
-    <td>%s</td>
-    <td>%s</td>
-    <td>%s</td>
-    <td>%s</td>
-    <td>%s</td>
-   </tr>""" % (fix(doc.cdrId),
-               fix(doc.gatekeeperJobId),
-               fix(doc.gatekeeperDateTime),
-               fix(doc.previewJobId),
-               fix(doc.previewDateTime),
-               fix(doc.liveJobId),
-               fix(doc.liveDateTime),
-               isRecorded and 'OK' or 'Error'))
+    def show_report(self):
+        """Override so we can inject a job summary table."""
 
-    print("""\
-  </table>
-  <p>%d Records checked, %d Records not in pub_proc_cg</p>
- </body>
-</html>""" % (iDoc, pDoc))
-    sys.exit(0)
+        cdr2gk.DEBUGLEVEL = 2 if self.debug else 0
+        if self.job_summary_table is not None:
+            self.report.page.form.insert(2, self.job_summary_table)
+        self.report.send()
 
-showForm()
+    @property
+    def debug(self):
+        """True if debug logging is requested."""
+        return True if self.fields.getvalue("debugLogging") else False
+
+    @property
+    def doc_id(self):
+        """CDR ID of the document selected for status reporting."""
+
+        if not hasattr(self, "_doc_id"):
+            self._doc_id = self.fields.getvalue("cdrId")
+            if self._doc_id:
+                try:
+                    self._doc_id = Doc.extract_id(self._doc_id)
+                except:
+                    self.logger.exception("Can't parse %s", self._doc_id)
+                    self.bail("Invalid CDR ID")
+        return self._doc_id
+
+    @property
+    def full(self):
+        """True if all document should be shown; otherwise only problems."""
+
+        if not hasattr(self, "_full"):
+            if not self.job_id and not self.doc_id and not self.request:
+                all = True
+            else:
+                all = True if self.fields.getvalue("flavor") else False
+            self._full = all
+        return self._full
+
+    @property
+    def host(self):
+        """GateKeeper host name."""
+
+        if not hasattr(self, "_host"):
+            self._host = self.fields.getvalue("targetHost")
+            if self._host:
+                if not re.match("^[a-zA-Z0-9._-]+$", self._host):
+                    self.bail("Invalid host name")
+            else:
+                self._host = cdr2gk.HOST
+        return self._host
+
+    @property
+    def job(self):
+        """Details about a specific job, if this is a job report."""
+
+        if not hasattr(self, "_job"):
+            self._job = None
+            if self.job_id:
+                try:
+                    args = "Summary", self.job_id
+                    self._job = cdr2gk.requestStatus(*args, host=self.host)
+                except Exception as e:
+                    self.logger.exception("Status failure")
+                    self.bail(f"Job {self.job_id} not found: {e}")
+        return self._job
+
+    @property
+    def job_detail_table(self):
+        """Table showing the status for documents in a job."""
+
+        if not self.job:
+            return None
+        if not hasattr(self, "_job_detail_table"):
+            columns = (
+                "Packet #",
+                "Group",
+                "CDR ID",
+                "Pub Type",
+                "Doc Type",
+                "Status",
+                "Dependent Status",
+                "Location",
+                "CDR Record",
+            )
+            rows = []
+            checked = errors = 0
+            for doc in self.job.details.docs:
+                published = int(doc.cdrId) in self.published
+                checked += 1
+                if doc.pubType == "Remove":
+                    status = "Error" if published else "Removed"
+                else:
+                    status = "OK" if published else "Error"
+                if self.full or status == "Error":
+                    if status == "Error":
+                        errors += 1
+                    rows.append([
+                        doc.packetNumber,
+                        doc.group,
+                        doc.cdrId,
+                        doc.pubType,
+                        doc.docType,
+                        doc.status,
+                        doc.dependentStatus,
+                        doc.location,
+                        status,
+                    ])
+            caption = f"{checked:d} Documents Checked, {errors:d} Errors"
+            opts = dict(caption=caption, columns=columns)
+            self._job_detail_table = self.Reporter.Table(rows, **opts)
+        return self._job_detail_table
+
+    @property
+    def job_id(self):
+        """ID of the job for which status reporting has been requested."""
+
+        if not hasattr(self, "_job_id"):
+            self._job_id = self.fields.getvalue("jobId")
+            if self._job_id:
+                try:
+                    self._job_id = int(self._job_id)
+                except:
+                    self.logger.exception("bad job id: %s", self._job_id)
+                    self.bail("Invalid job ID")
+        return self._job_id
+
+    @property
+    def job_summary_table(self):
+        """Extra table to show details about the report's job."""
+
+        if not self.job:
+            return None
+        return self.HTMLPage.B.TABLE(
+            self.HTMLPage.B.CAPTION(f"Summary Report for Job {self.job_id}"),
+            self.HTMLPage.B.TR(
+                self.HTMLPage.B.TH(f"Job ID"),
+                self.HTMLPage.B.TD(f"{self.job.details.jobId}")
+            ),
+            self.HTMLPage.B.TR(
+                self.HTMLPage.B.TH(f"Request Type"),
+                self.HTMLPage.B.TD(f"{self.job.details.requestType}")
+            ),
+            self.HTMLPage.B.TR(
+                self.HTMLPage.B.TH(f"Description"),
+                self.HTMLPage.B.TD(f"{self.job.details.description}")
+            ),
+            self.HTMLPage.B.TR(
+                self.HTMLPage.B.TH(f"Status"),
+                self.HTMLPage.B.TD(f"{self.job.details.status}")
+            ),
+            self.HTMLPage.B.TR(
+                self.HTMLPage.B.TH(f"Source"),
+                self.HTMLPage.B.TD(f"{self.job.details.source}")
+            ),
+            self.HTMLPage.B.TR(
+                self.HTMLPage.B.TH(f"Initiated"),
+                self.HTMLPage.B.TD(f"{self.job.details.initiated}")
+            ),
+            self.HTMLPage.B.TR(
+                self.HTMLPage.B.TH(f"Completion"),
+                self.HTMLPage.B.TD(f"{self.job.details.completion}")
+            ),
+            self.HTMLPage.B.TR(
+                self.HTMLPage.B.TH(f"Target"),
+                self.HTMLPage.B.TD(f"{self.job.details.target}")
+            ),
+            self.HTMLPage.B.TR(
+                self.HTMLPage.B.TH(f"Expected Count"),
+                self.HTMLPage.B.TD(f"{self.job.details.expectedCount}")
+            ),
+            self.HTMLPage.B.TR(
+                self.HTMLPage.B.TH(f"Actual Count"),
+                self.HTMLPage.B.TD(f"{self.job.details.actualCount}")
+            )
+        )
+
+    @property
+    def published(self):
+        """Dictionary of documents which are (or should be) on the web site."""
+
+        if not hasattr(self, "_published"):
+            query = self.Query("pub_proc_cg c", "c.id", "t.name")
+            query.join("all_docs d", "d.id = c.id")
+            query.join("doc_type t", "t.id = d.doc_type")
+            rows = query.execute(self.cursor).fetchall()
+            self._published = dict([tuple(row) for row in rows])
+        return self._published
+
+
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+    Control().run()
