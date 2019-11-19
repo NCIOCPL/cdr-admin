@@ -337,6 +337,10 @@ class Control(Controller):
 
         if self.doctype == "Summary":
             fieldset = page.fieldset("Choose Comments To Be Displayed")
+            fieldset.set("id", "comment-options-box")
+            if self.report_type in ("bu", "rs", "pat", "patbu"):
+                opts = dict(value="all", label="Include All Comments")
+                fieldset.append(page.checkbox("comment", **opts))
             options = (
                 ("internal", "Internal", "P"),
                 ("external", "External", "H"),

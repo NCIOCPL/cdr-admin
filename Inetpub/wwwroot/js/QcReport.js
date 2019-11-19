@@ -4,4 +4,14 @@ function check_section(option) {
     else
         jQuery("#image-versions-fieldset").hide();
 }
+function check_comment(option) {
+    if (option == "all") {
+        if (jQuery("#comment-all:checked").length > 0)
+            jQuery("#comment-options-box input").prop("checked", true);
+        else
+            jQuery("#comment-options-box input").prop("checked", false);
+    }
+    else
+        jQuery("#comment-all").prop("checked", false);
+}
 
