@@ -23,7 +23,7 @@ class Control(Controller):
 
         if self.concept:
             self.show_report()
-            exit(0)
+            sys.exit(0)
         if self.names:
             fieldset = page.fieldset("Select Glossary Concept Document")
             for concept_id, name in self.names:
@@ -913,7 +913,7 @@ class Concept:
     class Video:
         """Information about a YouTube video."""
 
-        IMAGE_URL = "https://img.youtube.com/vi/{}"
+        IMAGE_URL = "https://img.youtube.com/vi/{}/hqdefault.jpg"
         VIDEO_URL = "https://www.youtube.com/watch?v={}"
         SESSION = Session("guest")
 
