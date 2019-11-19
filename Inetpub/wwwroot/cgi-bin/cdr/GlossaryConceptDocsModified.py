@@ -11,6 +11,7 @@ New 'documents modified' reports for restructured glossary documents."
 from cdrcgi import Controller
 from cdrapi.docs import Doc
 import datetime
+from openpyxl.styles import Alignment
 
 
 class Control(Controller):
@@ -119,7 +120,8 @@ class Control(Controller):
             "(*) Date any GlossaryTermName document linked to the "
             "concept document was first published."
         )
-        note_cell = self.Reporter.Cell(note, colspan=len(self.columns))
+        styles = dict(alignment=Alignment(wrap_text=False))
+        note_cell = self.Reporter.Cell(note, sheet_styles=styles)
         return [doc.row for doc in self.docs] + [[note_cell]]
 
     @property
