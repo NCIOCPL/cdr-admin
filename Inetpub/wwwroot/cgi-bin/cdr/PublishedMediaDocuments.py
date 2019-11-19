@@ -110,7 +110,7 @@ class Control(Controller):
         query.where(query.Condition("d.id", subquery, "IN"))
         query.where(query.Condition("v.num", last_ver))
         if self.audience:
-            query.join("query_term_pub a", "a.doc_id = d.doc_id")
+            query.join("query_term_pub a", "a.doc_id = d.id")
             query.where(query.Condition("a.path", self.PATHS, "IN"))
             query.where(query.Condition("a.value", self.audience))
         rows = []
