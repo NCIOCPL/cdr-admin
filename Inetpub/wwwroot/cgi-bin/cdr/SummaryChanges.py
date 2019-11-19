@@ -160,7 +160,7 @@ class Control(Controller):
     def years(self):
         """Date range for the report."""
         try:
-            return int(self.field.getvalue("years"))
+            return int(self.fields.getvalue("years"))
         except:
             return 2
 
@@ -168,68 +168,3 @@ class Control(Controller):
 if __name__ == "__main__":
     "Let the script be loaded as a module."
     Control().run()
-'''
-#----------------------------------------------------------------------
-
-#----------------------------------------------------------------------
-def getCommonCssStyle():
-    xslScript = """\
-<?xml version="1.0"?>
-<xsl:transform           xmlns:xsl = "http://www.w3.org/1999/XSL/Transform"
-                           version = "1.0"
-                         xmlns:cdr = "cips.nci.nih.gov/cdr"
-           exclude-result-prefixes = "cdr">
- <xsl:output                method = "html"/>
- <xsl:include                 href = "cdr:name:Module:+STYLE+Default"/>
- <xsl:template               match = "/">
-  <style type='text/css'>
-   <xsl:call-template         name = "defaultStyle"/>
-   h1       { font-family: Arial, sans-serif; font-size: 16pt;
-              text-align: center; font-weight: bold; }
-   h2       { font-family: Arial, sans-serif; font-size: 14pt;
-              text-align: center; font-weight: bold; }
-   td.hdg   { font-family: Arial, sans-serif; font-size: 16pt;
-              font-weight: bold; }
-   p        { font-family: Arial, sans-serif; font-size: 12pt; }
-   body     { font-family: Arial; font-size: 12pt; }
-   span.SectionRef { text-decoration: underline; font-weight: bold; }
-  </style>
- </xsl:template>
-</xsl:transform>
-"""
-    response = cdr.filterDoc('guest', xslScript, doc = "<dummy/>", inline = 1)
-    if isinstance(response, (str, bytes)):
-        cdrcgi.bail("Failure loading common CSS style information: %s" %
-                    response)
-    return response[0]
-
-commonStyle = getCommonCssStyle()
-semicolon = docTitle.find(";")
-if semicolon != -1:
-    docTitle = docTitle[:semicolon]
-html = """\
-<!DOCTYPE html>
-<html>
- <head>
-  <title>Summary Changes Report for CDR%010d - %s</title>
-  %s
- </head>
- <body>
-  <h1>History of Changes to Summary Report<br>
-      Changes Made in the Last %d Year%s</h1>
-  <table border='0' width = '100%%'>
-   <tr>
-    <td class='hdg'>%s</td>
-    <td align='right' valign='top' class='hdg'>CDR%010d</td>
-   </tr>
-  </table>
-""" % (docId,
-       today.strftime("%B %d, %Y"),
-       commonStyle,
-       numYears,
-       numYears and "s" or "",
-       docTitle,
-       docId)
-for section in sections:
-    html += section + "<br><hr><br>\n"
-'''
