@@ -91,6 +91,9 @@ class Tree:
     @property
     def terms(self):
         """Dictionary of all the terms in the tree."""
+
+        if not hasattr(self, "_terms"):
+            self._terms = {}
         return self._terms
 
     @property
@@ -110,27 +113,26 @@ class Tree:
         """Walk through the rows in the new temporary table."""
 
         # Load the terms into the tree.
-        self._terms = {}
         for id, name, parent in self.control.cursor.fetchall():
-            term = self._terms.get(id)
+            term = self.terms.get(id)
             if not term:
-                term = self._terms[id] = self.Term(self, name)
+                term = self.terms[id] = self.Term(self, name)
             if not parent:
                 self._top = id
             elif parent not in term.parents:
                 term.parents.append(parent)
 
         # Gather in the children.
-        for term in self._terms.values():
+        for term in self.terms.values():
             for parent in term.parents:
                 try:
                     alreadyHaveIt = 0
-                    for child in self._terms[parent].children:
+                    for child in self.terms[parent].children:
                         if child.name == term.name:
                             alreadyHaveIt = 1
                             break
                     if not alreadyHaveIt:
-                        self._terms[parent].children.append(term)
+                        self.terms[parent].children.append(term)
                 except:
                     cdrcgi.bail("No object for parent %s" % str(parent))
 
@@ -143,8 +145,8 @@ class Tree:
                 "             ON t.id = q.doc_id"
                 "          WHERE q.path = '/Term/OtherName/OtherTermName'")
             for id, name in self.control.cursor.fetchall():
-                if name not in self._terms[id].aliases:
-                    self._terms[id].aliases.append(name)
+                if name not in self.terms[id].aliases:
+                    self.terms[id].aliases.append(name)
 
     def __create_table(self):
         """Create a temporary table for the tree."""
