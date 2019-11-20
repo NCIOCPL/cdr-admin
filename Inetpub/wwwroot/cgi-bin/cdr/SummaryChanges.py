@@ -29,6 +29,7 @@ class Control(Controller):
         """
 
         if self.summaries:
+            page.form.append(page.hidden_field("years", self.years))
             fieldset = page.fieldset("Select Summary")
             checked = True
             for id, title in self.summaries:
