@@ -32,8 +32,8 @@ class Control(Controller):
             fieldset = page.fieldset("Select Summary")
             checked = True
             for id, title in self.summaries:
-                label = f"[CDR{id:010d}] title"
-                opts = dict(label=title, value=id, checked=checked)
+                label = f"[CDR{id:010d}] {title}"
+                opts = dict(label=label, value=id, checked=checked)
                 fieldset.append(page.radio_button("DocId", **opts))
                 checked = False
             page.add_css("fieldset { width: 1024px; }")
