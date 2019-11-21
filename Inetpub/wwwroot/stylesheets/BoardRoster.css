@@ -1,0 +1,42 @@
+/**
+ * Custom markup for the full board roster report.
+ *
+ * This is to preserve the way it's been printed for the board members
+ * from Microsoft Word.
+ */
+h1       { font-family: Arial, sans-serif;
+           font-size: 16pt;
+           text-align: center;
+           font-weight: bold; }
+h2       { font-family: Arial, sans-serif;
+           font-size: 14pt;
+           text-align: center;
+           font-weight: bold; }
+p        { font-family: Arial, sans-serif;
+           font-size: 12pt; }
+#summary td, #summary th
+         { border: 1px solid black; }
+#hdg     { font-family: Arial, sans-serif;
+           font-size: 16pt;
+           font-weight: bold;
+           text-align: center;
+           padding-bottom: 20px;
+           border: 0px; }
+#summary { border: 0px; }
+
+/* The Board Member Roster information is created via a global */
+/* template for Persons.  The italic display used for the QC   */
+/* report does therefore need to be suppressed here.           */
+/* ----------------------------------------------------------- */
+I        { font-family: Arial, sans-serif; font-size: 12pt;
+           font-style: normal; }
+span.SectionRef { text-decoration: underline; font-weight: bold; }
+
+.theader { background-color: #CFCFCF; }
+.name    { font-weight: bold;
+           vertical-align: top; }
+.phone, .email, .fax, .cdrid
+         { vertical-align: top; }
+.blank   { width: 100px; }
+#main    { font-family: Arial, Helvetica, sans-serif;
+           font-size: 12pt; }
