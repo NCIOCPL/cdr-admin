@@ -5,6 +5,7 @@
 
 from cdrcgi import Controller
 from RepublishDocs import CdrRepublisher
+from cdrapi.docs import Doc
 
 
 class Control(Controller):
@@ -96,7 +97,8 @@ class Control(Controller):
             try:
                 docs = self.fields.getvalue("docs", "").split()
                 self._docs = [Doc.extract_id(doc) for doc in docs]
-            except:
+            except Exception:
+                self.logger.exception("failure parsing IDs")
                 self.bail("invalid document IDs")
         return self._docs
 
