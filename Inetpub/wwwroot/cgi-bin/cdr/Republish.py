@@ -119,7 +119,7 @@ class Control(Controller):
         """
 
         if not hasattr(self, "_doctypes"):
-            query = self.Query("doc_type t", "t.name", "d.doctype").unique()
+            query = self.Query("doc_type t", "t.name", "d.doc_type").unique()
             query.order("t.name")
             query.join("document d", "d.doc_type = t.id")
             query.join("pub_proc_cg c", "c.id = d.id")
