@@ -189,28 +189,32 @@ class Control(Controller):
     def subtitle(self):
         """String to be displayed under the main banner."""
 
-        if self.request != self.SUBMIT:
-            return self.SUBTITLE
-        if not (self.docs or self.jobs or self.doctype):
-            return self.SUBTITLE
-        try:
-            republisher = CdrRepublisher(self.session.name)
-            args = (
-                self.include_linked_documents,
-                self.docs,
-                self.jobs,
-                self.doctype,
-                self.include_all_documents_for_type,
-                self.include_only_failed_documents,
-                self.email,
-                self.gatekeeper_host,
-                self.gatekeeper_target,
-            )
-            job_id = republisher.republish(*args)
-            return f"Export job {job_id:d} created successfully"
-        except Exception as e:
-            self.logger.exception("Republish failure: %s", e)
-            return f"Republish request failed: {e}"
+        if not hasattr(self, "_subtitle"):
+            if self.request != self.SUBMIT:
+                self._subtitle = self.SUBTITLE
+            elif not (self.docs or self.jobs or self.doctype):
+                self._subtitle = self.SUBTITLE
+            else:
+                try:
+                    republisher = CdrRepublisher(self.session.name)
+                    args = (
+                        self.include_linked_documents,
+                        self.docs,
+                        self.jobs,
+                        self.doctype,
+                        self.include_all_documents_for_type,
+                        self.include_only_failed_documents,
+                        self.email,
+                        self.gatekeeper_host,
+                        self.gatekeeper_target,
+                    )
+                    job_id = republisher.republish(*args)
+                    subtitle = f"Export job {job_id:d} created successfully"
+                except Exception as e:
+                    self.logger.exception("Republish failure: %s", e)
+                    subtitle = f"Republish request failed: {e}"
+                self._subtitle = subtitle
+        return self._subtitle
 
 
 if __name__ == "__main__":
