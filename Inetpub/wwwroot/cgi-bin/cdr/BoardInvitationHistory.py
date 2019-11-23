@@ -241,14 +241,15 @@ class BoardMember:
             exclusions = self.control.exclusions
             if self._in_scope and exclusions:
                 for board in self.boards:
-                    if "advisory" in board.name.lower():
-                        if self.control.EXCLUDE_EDITORIAL in exclusions:
-                            self._in_scope = False
-                            break
-                    else:
-                        if self.control.EXCLUDE_ADVISORY in exclusions:
-                            self._in_scope = False
-                            break
+                    if board.current:
+                        if "advisory" in board.name.lower():
+                            if self.control.EXCLUDE_ADVISORY in exclusions:
+                                self._in_scope = False
+                                break
+                        else:
+                            if self.control.EXCLUDE_EDITORIAL in exclusions:
+                                self._in_scope = False
+                                break
         return self._in_scope
 
     @property
