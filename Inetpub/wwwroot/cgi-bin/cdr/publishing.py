@@ -56,7 +56,6 @@ class Control(Controller):
                     fieldset.append(page.select(p.name, **opts))
                 else:
                     opts["readonly"] = p.name in Control.READONLY_PARMS
-                    opts["disabled"] = p.name in Control.READONLY_PARMS
                     opts["value"] = p.default or ""
                     fieldset.append(page.text_field(p.name, **opts))
             user = self.session.User(self.session, id=self.session.user_id)
@@ -118,6 +117,7 @@ class Control(Controller):
                 fieldset.append(page.radio_button("system", **opts))
                 checked = False
             page.form.append(fieldset)
+        page.add_script("jQuery(document).tooltip({show:'fold'});")
 
     def publish(self):
         """Create the publishing job and link to its status."""
@@ -215,6 +215,11 @@ class Control(Controller):
     def force(self):
         """True if inclusion of documents marked Inactive is allowed."""
         return True if self.subset.name == "Hotfix-Remove" else False
+
+    @property
+    def method(self):
+        """Override for the form method."""
+        return "post" if self.subset else "get"
 
     @property
     def no_output(self):
