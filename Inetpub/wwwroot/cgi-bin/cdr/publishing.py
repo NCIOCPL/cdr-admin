@@ -1,531 +1,605 @@
-#----------------------------------------------------------------------
-#
-# Publishing CGI script.
-#
-# BZIssue::2533
-# BZIssue::4870
-# BZIssue::5051 - [Media] Modify Publishing Software to Process Audio Files
-# 2015-07-11 - Completely rewritten to address security vulnerabilities
-# OCECDR-4034: Prevent Modules from Being Published Automatically
-#
-#----------------------------------------------------------------------
-import cdr
-import cdr2gk
-import cdrcgi
-import cgi
-import lxml.etree as etree
-import os
+#!/usr/bin/env python
+
+"""Create publishing jobs.
+"""
+
+from cdrcgi import Controller, navigateTo
+from cdr import PDQDTDPATH, PUBTYPES
+from cdrapi.docs import Doc
+from cdrapi.publishing import Job
+from os import stat
 import re
-import urllib.parse
-from cdrapi import db
-from cdrapi.settings import Tier
 
-class Control:
-    """
-    Object used to determine how to respond to the client's request.
-    Collects parameters used to invoke the script and scrubs them.
-    """
 
-    readonly_parms = set(["PubType", "SubSetName", "GroupEmailAddrs"])
-    "Parameters that can't be overridden by the user."
+class Control(Controller):
+    """Access to the database, the current session, and form-building tools."""
 
-    def __init__(self):
-        """
-        Load the control information used to process the user's requests
-        and generate the next page. Make sure the user's account is
-        authorized to use the publishing system.
-        """
+    SUBTITLE = "Publishing"
+    LOGNAME = "publishing"
+    PUBLISH = "Publish"
+    MANAGE_STATUSES = "Manage Publishing Statuses"
+    READONLY_PARMS = {"PubType", "SubSetName", "GroupEmailAddrs"}
+    CSS = (
+        ".labeled-field label { width: 200px; }",
+        "fieldset { width: 575px; }",
+    )
 
-        self.cursor = db.connect(user="CdrPublishing").cursor()
-        self.title = "CDR Administration"
-        self.script = "publishing.py"
-        self.systems = []
-        self.system_names = {}
-        self.system_ids = {}
-        query = db.Query("active_doc d", "d.id", "d.title")
-        query.join("doc_type t", "t.id = d.doc_type")
-        query.where(query.Condition("t.name", "PublishingSystem"))
-        rows = query.order("d.title").execute(self.cursor).fetchall()
-        for doc_id, doc_title in rows:
-            title = doc_title.upper().strip()
-            if title == "MAILERS":
-                continue
-            if cdr.isProdHost() and title == "QCFILTERSETS":
-                continue
-            system = PublishingSystem(self.cursor, doc_id)
-            self.systems.append(system)
-            self.system_names[system.name] = system
-            self.system_ids[system.system_id] = system
-        self.load_parameters()
-        self.pageopts = {
-            "subtitle": "Publishing",
-            "action": self.script,
-            "buttons": (cdrcgi.MAINMENU, "Log Out"),
-            "session": self.session,
-            "body_classes": "admin-menu"
-        }
+    def populate_form(self, page):
+        """Show links or fields, depending on how far we've gotten.
 
-    def load_parameters(self):
-        """
-        Load the CGI parameters, including the session ID, the
-        publishing system and subset (if selected). Abort if the
-        user is not authorized to use this script. Invoked by the
-        object's constructor. Redirect elsewhere if so requested.
+        Pass:
+            page - HTMLPage object on which we place the links or fields
         """
 
-        self.fields = cgi.FieldStorage()
-        self.session = cdrcgi.getSession(self.fields)
-        self.request = cdrcgi.getRequest(self.fields)
-        if self.request == cdrcgi.MAINMENU:
-            cdrcgi.navigateTo("Admin.py", self.session)
-        elif self.request == "Log Out":
-            cdrcgi.logout(session)
-        if not cdr.canDo(self.session, "USE PUBLISHING SYSTEM"):
-            message = "You are not authorized to use the publishing system."
-            raise Exception(message)
-        self.system = self.subset = None
-        system_id = self.fields.getvalue("system")
-        if system_id:
-            try:
-                system_id = int(system_id)
-            except:
-                raise Exception("invalid publishing system ID")
-            self.system = self.system_ids.get(system_id)
-            if not self.system:
-                raise Exception("requested publishing system disappeared")
-            subset_name = self.fields.getvalue("subset")
-            if subset_name:
-                self.subset = self.system.subset_names.get(subset_name)
-                if not self.subset:
-                    raise Exception("requested publishing subset not found")
+        if self.subset:
 
-    def collect_user_choices(self):
-        """
-        Pack up the user choices (including an optional list of IDs for
-        documents to be published) so they can be passed along as the
-        parameters to the method for creating the publishing job. Make
-        sure the values haven't been tampered with. Reverse sort the
-        document ID list so newer documents get published first. Invoked
-        by load_parameters().
-        """
+            # Ask for the individual settings for this job.
+            page.form.append(page.hidden_field("system", self.system.id))
+            page.form.append(page.hidden_field("subset", self.subset.name))
+            if self.subset.user_can_select_docs:
+                fieldset = page.fieldset("Documents to Publish")
+                help = "Separate IDs with whitespace; 'CDR' prefix is optional"
+                opts = dict(label="Enter CDR IDs", tooltip=help, rows=3)
+                fieldset.append(page.textarea("docs", **opts))
+                page.form.append(fieldset)
+            fieldset = page.fieldset("Job Options")
+            yes_no = "Yes", "No"
+            for p in self.subset.parameters:
+                if p.name == "PubType":
+                    if p.default not in PUBTYPES:
+                        self.bail(f"Pub type {p.default!r} not supported")
+                help = p.info.help if p.info else ""
+                opts = dict(label=p.name, tooltip=help)
+                if p.default in yes_no:
+                    opts["options"] = yes_no
+                    opts["default"] = p.default
+                    fieldset.append(page.select(p.name, **opts))
+                else:
+                    opts["readonly"] = p.name in Control.READONLY_PARMS
+                    opts["disabled"] = p.name in Control.READONLY_PARMS
+                    opts["value"] = p.default or ""
+                    fieldset.append(page.text_field(p.name, **opts))
+            user = self.session.User(self.session, id=self.session.user_id)
+            email = user.email
+            if " " in email or "@" not in email:
+                email = ""
+            notify = email and "Yes" or "No"
+            help = self.system.param_info["notify"].help
+            opts = dict(options=yes_no, default=notify, tooltip=help)
+            fieldset.append(page.select("notify", **opts))
+            label = "Address(es)"
+            help = self.system.param_info["email"].help
+            opts = dict(tooltip=help, value=email, label="Address(es)")
+            fieldset.append(page.text_field("email", **opts))
+            label = "No Output"
+            help = self.system.param_info["no-output"].help
+            no = "No"
+            opts = dict(tooltip=help, label=label, options=yes_no, default=no)
+            fieldset.append(page.select("no-output", **opts))
+            page.form.append(fieldset)
+            page.add_css("\n".join(self.CSS))
 
-        choices = {}
-        doc_ids = re.findall(r"\d+", self.fields.getvalue("doc_ids", ""))
-        if doc_ids:
-            choices["doc_ids"] = sorted([int(d) for d in doc_ids], reverse=True)
-        for p in self.subset.parameters:
-            value = self.get_scrubbed_value(p.name)
-            if value:
-                choices[p.name] = value
-        return choices
+        elif self.system:
 
-    def get_scrubbed_value(self, name):
-        """
-        Get a CGI value by name and make sure it hasn't been tampered with.
-        Invoked by collect_user_choices().
-        """
-        value = self.fields.getvalue(name) or ""
-        if not value:
-            return value
-        info = self.system.param_info.get(name)
-        if not info:
-            raise Exception("Unsupported parameter %s" % repr(name))
-        info.scrub(value)
-        return value
+            # Ask the user to pick a specific job type.
+            page.form.append(page.hidden_field("system", self.system.id))
+            legend = f"Select {self.system.name} Publication System Subset"
+            fieldset = page.fieldset(legend)
+            checked=True
+            for subset in self.system.subsets:
+                if subset.name != "Republish-Export":
+                    description = subset.description.replace("\r", "")
+                    tooltip = re.sub(r"\n\n+", "@@NL@@", description)
+                    tooltip = re.sub(r"\s+", " ", tooltip)
+                    tooltip = tooltip.replace("@@NL@@", "\n\n")
+                    opts = dict(
+                        label=subset.name,
+                        tooltip=tooltip,
+                        value=subset.name,
+                        checked=checked,
+                    )
+                    fieldset.append(page.radio_button("subset", **opts))
+                    checked = False
+            page.form.append(fieldset)
+            page.add_css("fieldset { width: 600px; }")
+
+        else:
+
+            # Ask the user to pick a publishing system.
+            fieldset = page.fieldset("Select a Publishing System")
+            checked=True
+            for system in sorted(self.systems.values()):
+                opts = dict(
+                    label=f"{system.name} [Version {system.doc.version:d}]",
+                    tooltip=system.description,
+                    value=system.id,
+                    checked=checked,
+                )
+                fieldset.append(page.radio_button("system", **opts))
+                checked = False
+            page.form.append(fieldset)
+
+    def publish(self):
+        """Create the publishing job and link to its status."""
+
+        opts = dict(
+            system=self.system.name,
+            subsystem=self.subset.name,
+            parms=self.parameters,
+            docs=self.docs,
+            email=self.email,
+            no_output=self.no_output,
+            permissive=False,
+            force=self.force,
+        )
+        try:
+            job_id = Job(self.session, **opts).create()
+            self.logger.info("Job %d created", job_id)
+            legend = f"Job {job_id} started"
+            url = f"PubStatus.py?id={job_id}"
+            label = "Check the status of the publishing job."
+            details = self.HTMLPage.B.P(self.HTMLPage.B.A(label, href=url))
+        except Exception as e:
+            self.logger.exception("Job creation failure")
+            legend = "Publishing Request Failed"
+            details = self.HTMLPage.B.P(str(e), self.HTMLPage.B.CLASS("error"))
+        buttons = (
+            self.HTMLPage.button(self.DEVMENU),
+            self.HTMLPage.button(self.ADMINMENU),
+            self.HTMLPage.button(self.LOG_OUT),
+        )
+        opts = dict(
+            buttons=buttons,
+            subtitle=self.subset.name,
+        )
+        page = self.HTMLPage(self.TITLE, **opts)
+        fieldset = page.fieldset(legend)
+        fieldset.append(details)
+        page.body.append(fieldset)
+        page.send()
 
     def run(self):
-        """
-        Processing sequence (separate invocations for each step):
-          1. user selects one of the publishing systems
-          2. user selects a publishing subset from the selected system
-          3. user chooses settable options
-          4. publishing job is created status link is given to the user
-        """
+        """Overload to check permissions and to handle the publish command."""
 
-        if self.request == "Publish":
-            self.create_publishing_job()
-        elif self.subset:
-            self.offer_choices()
-        elif self.system:
-            self.show_subsets()
+        if not self.session.can_do("USE PUBLISHING SYSTEM"):
+            self.bail("You are not authorized to use the publishing system")
+        elif self.request == self.MANAGE_STATUSES:
+            params = dict(type="Manage", id=1)
+            navigateTo("PubStatus.py", self.session.name, **params)
+        elif self.request == self.PUBLISH:
+            self.publish()
+        elif self.request == self.SUBMIT:
+            self.show_form()
         else:
-            self.show_publishing_systems()
+            Controller.run(self)
 
-    def show_publishing_systems(self):
-        """
-        Put up the page from which the user will select one of the
-        publishing systems. We also include (at the top) a link to
-        the page for managing the status of an existing publishing
-        job (most frequently this is used to release the job to
-        push the results of an export job to Cancer.gov's GateKeeper).
-        The bogus parameter for a job ID on this link is needed
-        because of a bug in the PubStatus.py script. Invoked by
-        the run() method.
-        """
-        page = cdrcgi.Page(self.title, **self.pageopts)
-        page.add(page.B.H3("Publication Types"))
-        page.add("<ol>")
-        page.add_menu_link("PubStatus.py", "Manage Publishing Job Status",
-                           self.session, type="Manage", id=1)
-        args = { cdrcgi.SESSION: self.session }
-        for system in self.systems:
-            label = "%s [Version %d]" % (system.name, system.system_version)
-            args["system"] = system.system_id
-            url = "%s?%s" % (self.script, urllib.parse.urlencode(args))
-            link = page.B.A(label, href=url)
-            br = page.B.BR()
-            br.tail = system.description
-            link.append(br)
-            page.add(page.B.LI(link))
-        page.add("</ol>")
-        page.send()
+    @property
+    def buttons(self):
+        """Custom button list, as this isn't a standard report."""
 
-    def show_subsets(self):
-        """
-        Display the page from which the user will select one of the
-        publishing job sub-types for which to request a new job.
-        Suppress the Republish-Export sub type (invoked elsewhere?).
-        Invoked by the run() method.
-        """
-        page = cdrcgi.Page(self.title, **self.pageopts)
-        page.add_css(".description { font-size: 10pt; margin: 1em 0 0 -1em; }")
-        page.add(page.B.H3("%s Publication System Subsets" % self.system.name))
-        page.add("<ol>")
-        description_class = page.B.CLASS("description")
-        args = {
-            cdrcgi.SESSION: self.session,
-            "system": self.system.system_id
-        }
-        for subset in self.system.subsets:
-            if subset.name == "Republish-Export":
-                continue
-            args["subset"] = subset.name
-            url = "%s?%s" % (self.script, urllib.parse.urlencode(args))
-            link = page.B.A(subset.name, href=url)
-            description = subset.description.replace("\n", cdrcgi.NEWLINE)
-            description = page.B.PRE(description, description_class)
-            page.add(page.B.LI(link, description))
-        page.add("</ol>")
-        page.send()
-
-    def offer_choices(self):
-        """
-        Display the page on which the user will choose specific documents
-        to be published, or set options for the publishing job, or both.
-        The options (oddly called "SubsetParameters" in the control document)
-        are optional according to the schema, but in practice there has
-        never been a publishing sub type which didn't have some user-
-        settable options. Invoked by the run() method.
-        """
-
-        buttons = ("Publish",) + self.pageopts["buttons"]
-        subtitle = "Publishing Options For %s Job" % self.subset.name
-        self.pageopts["buttons"] = buttons
-        self.pageopts["subtitle"] = subtitle
-        page = cdrcgi.Page(self.title, **self.pageopts)
-        page.add_hidden_field("system", self.system.system_id)
-        page.add_hidden_field("subset", self.subset.name)
-        if self.subset.user_can_select_docs:
-            help = "Separate IDs with whitespace; 'CDR' prefix is optional"
-            selector = ".ids .labeled-field textarea"
-            page.add_css(" %s { height: 100px; width: 360px; }" % selector)
-            page.add_css(" .ids .labeled-field label { width: 115px; }")
-            page.add("<fieldset class='ids'>")
-            page.add(page.B.LEGEND("Documents to Publish"))
-            page.add_textarea_field("doc_ids", "Enter CDR IDs", tooltip=help)
-            page.add("</fieldset>")
-        page.add("<fieldset class='opts'>")
-        page.add(page.B.LEGEND("Job Options"))
-        page.add_css(".opts .labeled-field label { width: 180px; }")
-        yes_no = "Yes", "No"
-        for p in self.subset.parameters:
-            if p.name == "PubType":
-                if p.default not in cdr.PUBTYPES:
-                    raise Exception("PubType %r not supported" % p.default)
-            info = p.get_info()
-            help = info and info.get_help() or ""
-            if p.default in yes_no:
-                page.add_select(p.name, p.name, yes_no, p.default,
-                                tooltip=help)
+        if not hasattr(self, "_buttons"):
+            self._buttons = [self.DEVMENU, self.ADMINMENU, self.LOG_OUT]
+            if self.subset:
+                self._buttons.insert(0, self.PUBLISH)
             else:
-                readonly = p.name in Control.readonly_parms
-                page.add_text_field(p.name, p.name, value=p.default or "",
-                                    disabled=readonly, tooltip=help)
-        email = cdr.getEmail(self.session) or ""
-        if " " in email or "@" not in email:
-            email = ""
-        notify = email and "Yes" or "No"
-        help = self.system.param_info["notify"].get_help()
-        page.add_select("notify", "Notify", yes_no, notify, tooltip=help)
-        label = "Address(es)"
-        help = self.system.param_info["email"].get_help()
-        page.add_text_field("email", label, value=email, tooltip=help)
-        help = self.system.param_info["no-output"].get_help()
-        page.add_select("no-output", "No Output", yes_no, "No",
-                        tooltip=help)
-        page.add("</fieldset>")
-        page.send()
+                if not self.system:
+                    self._buttons.insert(0, self.MANAGE_STATUSES)
+                self._buttons.insert(0, self.SUBMIT)
+        return self._buttons
 
-    def create_publishing_job(self):
-        """
-        Invoke the cdr.publish command and tell the user if we succeeded.
-        If so, provide a link to the page showing the job's status.
-        Otherwise, explain what went wrong. Invoked by the run() method.
-        """
+    @property
+    def docs(self):
+        """Sorted sequence of documents if explicitly provided."""
 
-        user_opts = self.collect_user_choices()
-        parameters = self.collect_parameters(user_opts)
-        doc_ids = self.collect_doc_ids(user_opts.get("doc_ids", []))
-        inactive_ok = self.subset.name == "Hotfix-Remove" and "Y" or "N"
-        no_output = self.fields.getvalue("no-output") == "Yes" and "Y" or "N"
-        if self.fields.getvalue("notify") == "Yes":
-            email = self.fields.getvalue("email")
-        else:
-            email = "Do not notify"
-        args = self.session, self.system.name, self.subset.name
-        opts = dict(
-            parms=parameters,
-            docList=doc_ids,
-            email=email,
-            noOutput=no_output,
-            allowInActive=inactive_ok
-        )
-        response = cdr.publish(*args, **opts)
-        job_id, errors = response
-        self.pageopts["subtitle"] = self.subset.name
-        page = cdrcgi.Page(self.title, **self.pageopts)
-        if job_id:
-            page.add(page.B.H3("Job %s Started" % job_id))
-            label = "Check the status of the publishing job"
-            url = "PubStatus.py?id=%s" % job_id
-            page.add(page.B.A(label, href=url))
-        else:
-            page.add(page.B.H3("Publishing Request Failed"))
-            page.add(page.B.P(errors))
-        page.send()
+        if not hasattr(self, "_docs"):
+            self._docs = []
+            value = self.fields.getvalue("docs", "")
+            ids = re.findall(r"\d+", value)
+            for doc_id in sorted([int(id) for id in ids], reverse=True):
+                problem = None
+                if self.__is_meeting_recording(doc_id):
+                    problem = "meeting recording"
+                elif self.__is_module_only(doc_id):
+                    problem = "summary module"
+                if problem:
+                    self.bail(f"Attempt to publish {problem} CDR{doc_id}")
+                self._docs.append(Doc(self.session, id=doc_id))
+        return self._docs
 
-    def collect_parameters(self, user_opts):
-        """
-        Repackage the sequence of job settings to be passed to the
-        CdrPublish command. Check for invalid values (possibly caused
-        by malicious tampering). Invoked by create_publishing_job().
-        """
-        parameters = []
-        for name in user_opts:
-            if name != "doc_ids":
-                info = self.system.param_info.get(name)
-                if not info:
-                    raise Exception("Unexpected parameter %s" % repr(name))
-                value = user_opts[name]
-                info.scrub(value)
-                parameters.append((name, value))
-        return parameters
+    @property
+    def email(self):
+        """Address where notifications about the job should be sent."""
+        return self.fields.getvalue("email") or "Do not notify"
 
-    def collect_doc_ids(self, doc_ids):
-        """
-        Repackage the list of document IDs to be passed to the
-        CdrPublish command. Abort if we detect an attempt to
-        publish a meeting recording document or tampering with
-        the CGI parameter. Invoked by create_publishing_job().
-        """
+    @property
+    def force(self):
+        """True if inclusion of documents marked Inactive is allowed."""
+        return True if self.subset.name == "Hotfix-Remove" else False
 
-        id_list = []
-        for doc_id in doc_ids:
-            if not isinstance(doc_id, int):
-                raise Exception("Detected tampering with document ID list")
-            if self.is_meeting_recording(doc_id):
-                raise Exception("Attempt to publish meeting recording "
-                                "CDR%s" % doc_id)
-            if self.is_module_only(doc_id):
-                raise Exception("Attempt to publish a summary module "
-                                "CDR%s" % doc_id)
-            id_list.append("CDR%s" % doc_id)
-        return id_list
+    @property
+    def no_output(self):
+        """True: writing documents to the file system should be suppressed."""
+        return self.fields.getvalue("no-output") == "Yes"
 
-    def is_meeting_recording(self, doc_id):
-        """
+    @property
+    def parameters(self):
+        """Dictionary of options to be passed to the job creation request."""
+
+        if not hasattr(self, "_parameters"):
+            self._parameters = {}
+            for p in self.subset.parameters:
+                value = self.fields.getvalue(p.name)
+                if value:
+                    self.logger.debug("scrubbing %s value %s", p.name, value)
+                    info = self.system.param_info.get(p.name)
+                    if not info:
+                        self.bail(f"Unsupported parameter {p.name!r}")
+                    try:
+                        info.scrub(value)
+                    except Exception as e:
+                        self.bail(str(e))
+                    self._parameters[p.name] = value
+        return self._parameters
+
+    @property
+    def subset(self):
+        """Publishing subset selected by the user."""
+
+        if not hasattr(self, "_subset"):
+            self._subset = None
+            if self.system:
+                name = self.fields.getvalue("subset")
+                if name:
+                    for subset in self.system.subsets:
+                        if subset.name == name:
+                            self._subset = subset
+                            break
+                    if not self._subset:
+                        self.bail("subset missing")
+        return self._subset
+
+    @property
+    def subtitle(self):
+        """String displayed immediately under the main banner."""
+        return self.subset.name if self.subset else self.SUBTITLE
+
+    @property
+    def system(self):
+        """Publishing system selected by the user."""
+
+        if not hasattr(self, "_system"):
+            self._system = None
+            system_id = self.fields.getvalue("system")
+            if system_id:
+                try:
+                    self._system = self.systems[int(system_id)]
+                except Exception:
+                    self.logger.exception("Bad system ID")
+                    self.bail("Bad system ID")
+        return self._system
+
+    @property
+    def systems(self):
+        """Dictionary of objects for the known CDR (non-mailer) pub systems."""
+
+        if not hasattr(self, "_systems"):
+            self._systems = {}
+            query = self.Query("active_doc d", "d.id", "d.title")
+            query.join("doc_type t", "t.id = d.doc_type")
+            query.where("t.name = 'PublishingSystem'")
+            query.where("d.title <> 'Mailers'")
+            rows = query.execute(self.cursor).fetchall()
+            for row in rows:
+                if self.session.tier.name == "PROD":
+                    if row.title.lower() == "qcfiltersets":
+                        continue
+                system = PublishingSystem(self, row)
+                self._systems[system.id] = system
+        return self._systems
+
+    def __is_meeting_recording(self, doc_id):
+        """Is this a Media document for the recording of a board meeting?
+
         We don't allow publication of meeting recordings, which are
         for internal use only. The publishing queries in the control
         documents exclude those documents, but we have to make sure
         they aren't included in user-specified document lists.
-        Invoked by collect_doc_ids().
+
+        Pass:
+            doc_id - integer for the ID of a document to be published
+
+        Return:
+            True if this is an internal meeting recording, otherwise False
         """
 
-        query = db.Query("query_term_pub", "doc_id")
+        query = self.Query("query_term_pub", "doc_id")
         query.where(query.Condition("doc_id", doc_id))
-        query.where(query.Condition("value", "Internal"))
-        query.where(query.Condition("path", "/Media/@Usage"))
-        return query.execute(self.cursor).fetchall() and True or False
+        query.where("value = 'Internal'")
+        query.where("path = '/Media/@Usage'")
+        return True if query.execute(self.cursor).fetchall() else False
 
+    def __is_module_only(self, doc_id):
+        """Is this a summary which can only be used as a module?
 
-    def is_module_only(self, doc_id):
-        """
-        We don't allow summary modules, which are
+        We don't allow publication of summary modules, which are
         for internal use only. The publishing queries in the control
         documents exclude those documents, but we have to make sure
         they aren't included in user-specified document lists.
-        Invoked by collect_doc_ids().
+
+        Pass:
+            doc_id - integer for the ID of a document to be published
+
+        Return:
+            True if this is summary module, otherwise False
         """
 
-        query = db.Query("query_term_pub", "doc_id")
+        query = self.Query("query_term_pub", "doc_id")
         query.where(query.Condition("doc_id", doc_id))
-        query.where(query.Condition("value", "Yes"))
-        query.where(query.Condition("path", "/Summary/@ModuleOnly"))
-        return query.execute(self.cursor).fetchall() and True or False
+        query.where("value = 'Yes'")
+        query.where("path = '/Summary/@ModuleOnly'")
+        return True if query.execute(self.cursor).fetchall() else False
 
 
 class PublishingSystem:
-    """
-    Object containing instructions for each of the types of publishing
-    jobs available for a given publishing system.
-    """
+    """Settings for one of the major CDR publishing systems."""
 
-    def __init__(self, cursor, system_id, system_version=None):
-        """
-        Load the publishing control document for the specified
-        CDR document ID and extract the information about the
-        publishing system defined therein, including the system
-        name and description, as well as the publishing job
-        sub-types (commonly referred to as "subsets"). We also
-        load the information for validating and explaining each
-        of the choices (called "parameters" here) which the user
-        make for publishing jobs.
+    def __init__(self, control, row):
+        """Save the caller's values.
+
+        Pass:
+            control - access to the database and the current login session
+            row - values from the database query
         """
 
-        self.system_id = system_id
-        self.system_version = system_version
-        self.name = self.description = None
-        self.subsets = []
-        self.subset_names = {}
-        self.param_info = {}
-        if not self.system_version:
-            query = db.Query("doc_version", "MAX(num)")
-            query.where(query.Condition("id", self.system_id))
-            rows = query.execute(cursor).fetchall()
-            if not rows:
-                raise Exception("No publishable version of CDR%d found" %
-                                self.system_id)
-            self.system_version = rows[0][0]
-        query = db.Query("doc_version", "xml")
-        query.where(query.Condition("id", self.system_id))
-        query.where(query.Condition("num", self.system_version))
-        rows = query.execute(cursor).fetchall()
-        if not rows:
-            raise Exception("Version %s of document %s not found" %
-                            (repr(self.system_id), repr(self.system_version)))
-        root = etree.XML(rows[0][0].encode("utf-8"))
-        self.name = root.find("SystemName").text.strip()
-        for node in root.findall("SystemDescription"):
-            self.description = node.text.strip()
-        for node in root.findall("SystemSubset"):
-            subset = PublishingSystem.Subset(self, node)
-            self.subsets.append(subset)
-            self.subset_names[subset.name] = subset
-        for node in root.findall("ParmInfoSet/ParmInfo"):
-            info = PublishingSystem.ParamInfo(node)
-            self.param_info[info.name] = info
+        self.__control = control
+        self.__row = row
+
+    def __lt__(self, other):
+        """Support sorting by system name.
+
+        Pass:
+            other - reference to `PublishingSystem` we're comparing with
+        """
+
+        return self.name.lower() < other.name.lower()
+
+    @property
+    def id(self):
+        """CDR ID for the publishing system's control document."""
+        return self.__row.id
+
+    @property
+    def name(self):
+        """String for the publishing system's name."""
+        return self.__row.title
+
+    @property
+    def control(self):
+        """Access to the database and the current CDR login session."""
+        return self.__control
+
+    @property
+    def description(self):
+        """String containing the description of this system's usage."""
+
+        if not hasattr(self, "_description"):
+            node = self.doc.root.find("SystemDescription")
+            self._description = Doc.get_text(node, "").strip()
+        return self._description
+
+    @property
+    def doc(self):
+        """The control document for the publishing system."""
+
+        if not hasattr(self, "_doc"):
+            self._doc = Doc(self.control.session, id=self.id, version="lastp")
+        return self._doc
+
+    @property
+    def param_info(self):
+        """Dictionary of metadata about parameters, indexed by parm name."""
+
+        if not hasattr(self, "_param_info"):
+            self._param_info = {}
+            for node in self.doc.root.findall("ParmInfoSet/ParmInfo"):
+                info = self.ParamInfo(node)
+                self._param_info[info.name] = info
+        return self._param_info
+
+    @property
+    def subsets(self):
+        """Sequence of subtypes for this publishing system."""
+
+        if not hasattr(self, "_subsets"):
+            self._subsets = []
+            for node in self.doc.root.findall("SystemSubset"):
+                self._subsets.append(self.Subset(self, node))
+        return self._subsets
 
 
     class Subset:
-        """
-        A type of publishing job which can be created by the
-        publishing system represented by the control document
-        being parsed.
-        """
+        """Publishing job type available from this system."""
+
+        SPECIFICATION = "SubsetSpecifications/SubsetSpecification"
+        PARAMETER = "SubsetParameters/SubsetParameter"
 
         def __init__(self, system, node):
-            """
-            Extract the publishing job type's information from
-            the control document's SystemSubset block.
+            """Remember the caller's values.
+
+            Pass:
+                system - publishing system to which this subset belongs
+                node - parsed XML node with the subset's information
             """
 
-            self.system = system
-            self.name = self.description = None
-            self.user_can_select_docs = False
-            self.parameters = []
-            self.specifications = []
-            for child in node.findall("SubsetName"):
-                self.name = child.text
-            for child in node.findall("SubsetDescription"):
-                self.description = child.text
-            for child in node.findall("SubsetParameters/SubsetParameter"):
-                parameter = PublishingSystem.Subset.Parameter(self, child)
-                self.parameters.append(parameter)
-            path = "SubsetSpecifications/SubsetSpecification/SubsetSelection"
-            if node.findall("%s/UserSelect" % path):
-                self.user_can_select_docs = True
+            self.__system = system
+            self.__node = node
+
+        @property
+        def control(self):
+            """Access to the current CDR login session."""
+            return self.system.control
+
+        @property
+        def description(self):
+            """String explaining how this subset is to be used."""
+
+            if not hasattr(self, "_description"):
+                node = self.__node.find("SubsetDescription")
+                self._description = Doc.get_text(node, "")
+            return self._description
+
+        @property
+        def name(self):
+            """String for the name of the subset."""
+
+            if not hasattr(self, "_name"):
+                self._name = Doc.get_text(self.__node.find("SubsetName"))
+            return self._name
+
+        @property
+        def parameters(self):
+            """Sequence of `Parameter` objects."""
+
+            if not hasattr(self, "_parameters"):
+                self._parameters = []
+                for node in self.__node.findall(self.PARAMETER):
+                    self._parameters.append(self.Parameter(self, node))
+            return self._parameters
+
+        @property
+        def system(self):
+            """Publishing control system to which this subset belongs."""
+            return self.__system
+
+        @property
+        def user_can_select_docs(self):
+            """True if any specs allow the users to specify documents by id."""
+
+            if not hasattr(self, "_user_can_select_docs"):
+                self._user_can_select_docs = False
+                path = f"{self.SPECIFICATION}/SubsetSelection/UserSelect"
+                if self.__node.findall(path):
+                    self._user_can_select_docs = True
+            return self._user_can_select_docs
 
 
         class Parameter:
-            """
-            Holds the name and default value for an option
-            available for publishing jobs of this type.
-            """
-
-            TIER = Tier()
+            """Option which can be specified for jobs of this type."""
 
             def __init__(self, subset, node):
-                """
-                Extract the information for a job option which can
-                be used by this job type from the SubsetParameter
-                block.
+                """Save the caller's values.
+
+                Pass:
+                    subset - publishing type using this parameter value
+                    node - parsed XML node containing the parameter info
                 """
 
-                self.subset = subset
-                self.name = self.default = None
-                for child in node.findall("ParmName"):
-                    self.name = child.text
-                for child in node.findall("ParmValue"):
-                    self.default = child.text
-                if self.name == "GKServer" and not self.default:
-                    self.default = cdr2gk.HOST
-                if self.name == "DrupalServer" and not self.default:
-                    self.default = self.TIER.hosts.get("DRUPAL")
+                self.__subset = subset
+                self.__node = node
 
-            def get_info(self):
-                """
-                Find and return the help and validation information
-                for this parameter.
-                """
+            @property
+            def default(self):
+                """Default value for the parameter."""
 
-                return self.subset.system.param_info.get(self.name)
+                if not hasattr(self, "_default"):
+                    self._default = Doc.get_text(self.__node.find("ParmValue"))
+                    if not self._default:
+                        if self.name == "GKServer":
+                            self._default = self.hosts.get("GK")
+                        elif self.name == "DrupalServer":
+                            self._default = self.hosts.get("DRUPAL")
+                return self._default
+
+            @property
+            def hosts(self):
+                """Dictionary of host name defaults for this tier."""
+
+                if not hasattr(self, "_hosts"):
+                    self._hosts = self.__subset.control.session.tier.hosts
+                return self._hosts
+
+            @property
+            def info(self):
+                """Help and validation information for this parameter."""
+
+                return self.__subset.system.param_info.get(self.name)
+
+            @property
+            def name(self):
+                """String for the parameter value's name."""
+
+                if not hasattr(self, "_name"):
+                    self._name = Doc.get_text(self.__node.find("ParmName"))
+                return self._name
+
 
     class ParamInfo:
-        """
-        Metadata about publishing job parameters. Used for displaying help
-        and for scrubbing the data to prevent malicious tampering.
+        """Metadata about publishing job parameters.
+
+        Used for displaying help and for scrubbing the data to
+        prevent malicious tampering.
         """
 
         def __init__(self, node):
-            "Parse the name, help, and validation info from the DOM node."
-            self.name = self.help = self.pattern = self.method = None
-            self.values = None
-            for child in node:
-                if child.tag == "ParmInfoName":
-                    self.name = child.text.strip()
-                elif child.tag == "ParmInfoHelp":
-                    self.help = child.text.strip()
-                elif child.tag == "ParmInfoPattern":
-                    self.pattern = child.text
-                elif child.tag == "ParmInfoMethod":
-                    self.method = child.text
-                elif child.tag == "ParmInfoValidValues":
-                    self.values = [v.text for v in child]
+            """Save the caller's value.
 
-        def get_help(self):
-            """
-            Return a version of the help string that will survive
-            the indenting performed by the cdrcgi.Page object.
+            Pass:
+                node - parsed XML node with the parameter meta data
             """
 
-            if self.help:
-                help = self.help.replace("\r", "")
-                return help.replace("\n", cdrcgi.NEWLINE)
-            return ""
+            self.__node = node
+
+        @property
+        def help(self):
+            """String for the explanation of the parameter."""
+
+            if not hasattr(self, "_help"):
+                help = Doc.get_text(self.__node.find("ParmInfoHelp"))
+                self._help = help.replace("\r", "")
+            return self._help
+
+        @property
+        def method(self):
+            """Name of the method used to validate these values."""
+
+            if not hasattr(self, "_method"):
+                node = self.__node.find("ParmInfoMethod")
+                self._method = Doc.get_text(node)
+            return self._method
+
+        @property
+        def name(self):
+            """String for the parameter's name."""
+
+            if not hasattr(self, "_name"):
+                self._name = Doc.get_text(self.__node.find("ParmInfoName"))
+            return self._name
+
+        @property
+        def pattern(self):
+            """String for the regular expression used for validation."""
+
+            if not hasattr(self, "_pattern"):
+                node = self.__node.find("ParmInfoPattern")
+                self._pattern = Doc.get_text(node)
+            return self._pattern
+
+        @property
+        def values(self):
+            """Strings for the parameter's valid values."""
+
+            if not hasattr(self, "_values"):
+                self._values = []
+                path = "ParmInfoValidValues/ParmInfoValidValue"
+                for node in self.__node.findall(path):
+                    value = Doc.get_text(node, "").strip()
+                    if value:
+                        self._values.append(value)
+            return self._values
 
         def scrub(self, value):
-            """
-            Make sure the parameter's value hasn't been tampered with.
+            """Make sure the parameter's value hasn't been tampered with.
+
             Abort if it has.
             """
 
@@ -534,33 +608,31 @@ class PublishingSystem:
                 failed = True
             if self.values and value not in self.values:
                 failed = True
-            if self.method and not getattr(self, self.method)(value):
+            if self.method and not getattr(self, f"_{self.method}")(value):
                 failed = True
             if failed:
-                why = "invalid %s value %s" % (repr(self.name), repr(value))
-                raise Exception(why)
+                raise Exception(f"invalid {self.name!r} value {value!r}")
 
-        def yes_no_int(self, value):
-            "Make sure the value is 'Yes', 'No', or an integer."
-            if value in ("Yes", "No"):
-                return True
-            return value.isdigit()
-
-        def dtd(self, value):
+        def _dtd(self, value):
             """
             Verify that the file named can be found in the CDR
             Licensee directory in the file system.
             """
 
             try:
-                path = r"%s\%s" % (cdr.PDQDTDPATH, value)
-                return os.stat(path) and True or False
-            except Exception as e:
+                return True if stat(f"{PDQDTDPATH}/{value}") else False
+            except Exception:
                 return False
 
-        def job_date(self, value):
-            """
-            Ensure that the value contains one of the following:
+        def _integer(self, value):
+            """Verify that the value is an integer string."""
+
+            return value.isdigit()
+
+        def _job_date(self, value):
+            """Check the validity of a job date value.
+
+            Acceptable values will be one of the following:
               * the string 'JobStartDateTime'
               * an ISO date
               * an ISO date and time (with or without seconds)
@@ -571,31 +643,30 @@ class PublishingSystem:
             pattern = r"^\d{4}-\d{2}-\d{2}( \d{2}:\d{2}(:\d{2})?)?$"
             return re.match(pattern, value) and True or False
 
-        def integer(self, value):
-            "Verify that the value is an integer string"
-            return value.isdigit()
-
-        def pubtype(self, value):
-            "Make sure the value is one of the known publishing types"
+        def _pubtype(self, value):
+            """Make sure the value is one of the known publishing types."""
             return value in cdr.PUBTYPES
 
-        def server_name(self, value):
-            """
-            If the value is not empty, make sure it doesn't contain
-            any unexpected characters.
-            """
+        def _server_name(self, value):
+            """Ensure that the name contains only valid DNS characters."""
 
             if not value:
                 return True
-            return re.match(r"^[A-Za-z0-9._-]+$", value) and True or False
+            return True if re.match(r"^[A-Za-z0-9._-]+$", value) else False
 
-def main():
-    "Wrap up the top-level driver so we can use the classes separately."
-    try:
-        control = Control()
-        control.run()
-    except Exception as e:
-        cdrcgi.bail(str(e))
+        def _yes_no_int(self, value):
+            """Make sure the value is 'Yes', 'No', or an integer."""
+
+            if value in ("Yes", "No"):
+                return True
+            return value.isdigit()
+
 
 if __name__ == "__main__":
-    main()
+    "Don't execute the script if loaded as a module."""
+
+    control = Control()
+    try:
+        control.run()
+    except Exception as e:
+        control.bail(str(e))
