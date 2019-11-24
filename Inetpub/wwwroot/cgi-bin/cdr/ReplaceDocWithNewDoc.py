@@ -28,12 +28,23 @@ class Control(Controller):
     CONFIRM = "Confirm"
     CDR_REF = f"{{{Doc.NS}}}ref"
     PURPOSE = (
-        "This program replaces an existing document with a new one. "
-        "The new document will become the current working version of "
-        "the document identified by the old document ID.  It can be "
-        "used when a new version of a document has been prepared as a "
-        "completely separate document that will, when it is ready, "
-        "replace the original version.",
+        "This program replaces the XML of a CDR document with the XML "
+        "copied from another CDR document. This is typically done in "
+        "the case of a summary which is undergoing significant "
+        "modifications which takes require work over a long period of "
+        "time. "
+        "In order to be able to make minor corrections to the original "
+        "documentation during this period, the new version of the "
+        "summary is prepared as a separate, temporary document. "
+        "When the work on the new version is complete and has been "
+        "approved for replacement of the original summary, the XML "
+        "from the new temporary document is copied as a new unpublishable "
+        "version of the original summary, and the temporary document is "
+        "marked as blocked to prevent it from being inadvertently "
+        "published. In these instructions, the original document, whose "
+        "contents will be updated, is referred to as the 'old' document, "
+        "and the temporary document whose XML will be copied into the "
+        "permanent ('old') summary, is referred to as the 'new' document.",
     )
 
     CONDITIONS = (
