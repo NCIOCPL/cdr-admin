@@ -57,7 +57,7 @@ class Control(cdrcgi.Controller):
         path = self.path or self.DEFAULT_PATH
         upath = self.user_path
         fieldset = page.fieldset("Display Parameters")
-        opts = dict(label="Path", options=self.options, default=path)
+        opts = dict(label="File Name", options=self.options, default=path)
         fieldset.append(page.select("p", **opts))
         fieldset.append(page.text_field("u", label="Custom Path", value=upath))
         fieldset.append(page.text_field("s", label="Start", value=self.start))
