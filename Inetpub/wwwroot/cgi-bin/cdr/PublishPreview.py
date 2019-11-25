@@ -218,6 +218,7 @@ class Summary:
     SCRIPT = "PublishPreview.py"
     TIER_SUFFIXES = dict(DEV="-blue-dev", PROD="")
     IMAGE_PATH = "/images/cdr/live"
+    IMAGE_PATTERN = "images/cdr/live/(CDR[0-9-]+)\\.jpg"
     URL_PATHS = (
         "/Summary/SummaryMetaData/SummaryURL/@cdr:xref",
         "/DrugInformationSummary/DrugInfoMetaData/URL/@cdr:xref"
@@ -309,7 +310,11 @@ class Summary:
             replacement = f"https://{image_host}{self.IMAGE_PATH}"
             for img in page.iter("img"):
                 src = img.get("src", "")
-                if src.startswith(self.IMAGE_PATH):
+                img.set("osrc", src)
+                match = search(self.IMAGE_PATTERN, src)
+                if match:
+                    img.set("src", f"GetCdrImage.py?pp=Y&id={match.group(1)}")
+                elif src.startswith(self.IMAGE_PATH):
                     src = src.replace(self.IMAGE_PATH, replacement)
                     img.set("src", src)
                 elif not src.startswith("http"):
@@ -323,7 +328,11 @@ class Summary:
                 if "Common/PopUps" in href:
                     continue
                 self.__control.logger.debug("@href=%r", href)
-                if href.startswith("http"):
+                match = search(self.IMAGE_PATTERN, href)
+                if match:
+                    link_type = "ImageLink"
+                    fixed = f"GetCdrImage.py?pp=Y&id={match.group(1)}"
+                elif href.startswith("http"):
                     link_type = "ExternalLink"
                 elif href.startswith("#cit"):
                     link_type = "CitationLink"
