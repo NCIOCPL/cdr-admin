@@ -22,7 +22,7 @@ import re
 import xlrd
 import ModifyDocs
 import lxml.etree as etree
-import mutagen
+from mutagen.mp3 import MP3
 import zipfile
 from io import BytesIO
 from cdrapi import db
@@ -124,7 +124,7 @@ def getRuntime(mp3_bytes):
     Determine the duration of an audio clip.
     """
     fp = BytesIO(mp3_bytes)
-    mp3 = mutagen.File(fp)
+    mp3 = MP3(fp)
     logger.info("runtime is %s", mp3.info.length)
     return int(round(mp3.info.length))
 
@@ -350,7 +350,7 @@ def collectInfo(zipNames):
         fileNames = set()
         termNames = set()
         for name in zipFile.namelist():
-            if "MACOSX" not in name:
+            if "MACOSX" in name:
                 continue
             if name.endswith(".xls") or name.endswith(".xlsx"):
                 xlBytes = zipFile.read(name)
