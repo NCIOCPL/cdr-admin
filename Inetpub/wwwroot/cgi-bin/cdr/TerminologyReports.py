@@ -35,7 +35,6 @@ class Control(Controller):
             ("Intervention or Procedure Terms (without Alternate Names)",
              "InterventionAndProcedureTerms.py",
              dict(IncludeAlternateNames="False")),
-            ("Menu Hierarchy Report", "MenuHierarchy.py"),
             ("Term Hierarchy Tree", "TermHierarchyTree.py"),
             ("Thesaurus Concepts Not Marked Public", "ocecdr-3588.py"),
         ):

@@ -197,7 +197,6 @@ class Item:
         "medialists.py",
         "mediasearch.py",
         "mediatrackingreport.py",
-        "menuhierarchy.py",
         "messageloggedinusers.py",
         "miscsearch.py",
         "modifiedpubmeddocs.py",
