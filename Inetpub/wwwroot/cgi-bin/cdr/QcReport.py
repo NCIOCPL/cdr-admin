@@ -374,7 +374,8 @@ class Control(Controller):
                 page.form.append(fieldset)
         types = "Summary", "DrugInformationSummary", "GlossaryTermName"
         if self.doctype in types:
-            fieldset = self.HTMLPage.fieldset("Markup Filtering By Level")
+            legend = "Markup Filtering By Revision Level"
+            fieldset = self.HTMLPage.fieldset(legend)
             for level in ("publish", "approved", "proposed"):
                 checked = level == "approved"
                 label = f"{level.title()} Markup Level"
@@ -407,7 +408,7 @@ class Control(Controller):
             sections = common + patient
         else:
             sections = common + hp
-        fieldset = page.fieldset("Choose Sections To Include")
+        fieldset = page.fieldset("Choose Content To Be Displayed")
         for label, value in sorted(sections):
             checked = value in defaults
             opts = dict(value=value, label=label, checked=checked)
