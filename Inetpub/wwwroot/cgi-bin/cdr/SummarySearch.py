@@ -99,7 +99,10 @@ class SummarySearch(AdvancedSearch):
         query.join("query_term q", "q.int_val = d.id")
         query.where(query.Condition("q.path", path, "LIKE"))
         rows = query.execute(self.session.cursor).fetchall()
-        return [(f"CDR{row.id:010d}", row.title) for row in rows]
+        picklist = []
+        for row in rows:
+            picklist.append((f"CDR{row.id:010d}", row.title.split(";")[0]))
+        return picklist
 
 
 if __name__ == "__main__":
