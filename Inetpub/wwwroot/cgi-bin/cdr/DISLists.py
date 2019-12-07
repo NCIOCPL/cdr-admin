@@ -14,7 +14,7 @@ class Control(Controller):
     SINGLE_AGENT = "single_agent"
     COMBINATION = "combination"
     TYPES = {
-        SINGLE_AGENT: "Single Drug Agent",
+        SINGLE_AGENT: "Single Agent Drug",
         COMBINATION: "Combination Drug",
     }
     OPTIONS = (
@@ -33,8 +33,8 @@ class Control(Controller):
         """
 
         tables = []
-        for agent_type in self.agent_types:
-            query = self.create_query(agent_type)
+        for drug_type in self.drug_types:
+            query = self.create_query(drug_type)
             rows = []
             for doc_id, title in query.execute(self.cursor).fetchall():
                 row = []
@@ -44,7 +44,7 @@ class Control(Controller):
                 if self.include_blank_column:
                     row.append("")
                 rows.append(row)
-            caption = self.TYPES[agent_type]
+            caption = f"{self.TYPES[drug_type]} ({len(rows)})"
             table = Reporter.Table(rows, columns=self.cols, caption=caption)
             if not self.show_gridlines:
                 table.node.set("class", "no-gridlines")
@@ -54,11 +54,11 @@ class Control(Controller):
         else:
             self.show_form()
 
-    def create_query(self, agent_type):
+    def create_query(self, drug_type):
         """Create a customized database query depending on the agent type.
 
         Pass:
-            agent_type: one of `SINGLE_AGENT` or `COMBINATION`
+            drug_type: one of `SINGLE_AGENT` or `COMBINATION`
 
         Return:
             `cdrapi.db.Query` object
@@ -70,7 +70,7 @@ class Control(Controller):
         query.where("t.path = '/DrugInformationSummary/Title'")
         query.outer("query_term_pub c", "c.doc_id = d.id",
                     f"c.path = '{self.COMBO_PATH}'")
-        if agent_type == self.SINGLE_AGENT:
+        if drug_type == self.SINGLE_AGENT:
             query.where("c.value IS NULL")
         else:
             query.where("c.value = 'Yes'")
@@ -87,8 +87,8 @@ class Control(Controller):
         """
 
         fieldset = page.fieldset("Select Agent Type(s)")
-        for agent_type, display in reversed(sorted(self.TYPES.items())):
-            opts = dict(value=agent_type, label=display, checked=True)
+        for drug_type, display in reversed(sorted(self.TYPES.items())):
+            opts = dict(value=drug_type, label=display, checked=True)
             fieldset.append(page.checkbox("type", **opts))
         page.form.append(fieldset)
         fieldset = page.fieldset("Options")
@@ -144,15 +144,15 @@ function check_options(value) {
         return True if "gridlines" in self.options else False
 
     @property
-    def agent_types(self):
+    def drug_types(self):
         """Sequence of drug agent types to be included in the report.
 
-        Reverse the order so that single drug agents come first.
+        Reverse the order so that single agent drugs come first.
         """
 
-        if not hasattr(self, "_agent_types"):
-            self._agent_types = reversed(sorted(self.fields.getlist("type")))
-        return self._agent_types
+        if not hasattr(self, "_drug_types"):
+            self._drug_types = reversed(sorted(self.fields.getlist("type")))
+        return self._drug_types
 
 if __name__ == "__main__":
     """Don't execute the script if loaded as a module."""
