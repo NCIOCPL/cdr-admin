@@ -353,7 +353,7 @@ jQuery(function() {
     def level(self):
         """Integer indicating how deep the report should go."""
 
-        return self.fields.getvalue("level") or self.DEFAULT_LEVEL
+        return self.fields.getvalue("level") or "999"
 
     @property
     def selection_method(self):
@@ -551,7 +551,7 @@ class Summary:
     @property
     def parms(self):
         """Parameters for XSL/T filtering."""
-        level = str(self.control.level)
+        level = str(self.control.level) or "999"
         flag = "Y" if self.control.include_id else "N"
         return dict(showLevel=level, showId=flag)
 
