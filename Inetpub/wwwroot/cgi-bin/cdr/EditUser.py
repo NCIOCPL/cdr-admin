@@ -5,7 +5,6 @@
 
 from cdrcgi import Controller, navigateTo, bail
 from cdrapi import db
-from cdrapi.docs import Doc, Doctype
 
 
 class Control(Controller):
@@ -134,7 +133,7 @@ fieldset.text-fields-box textarea {
         if self.user.name:
             self.subtitle = f"Changes to {self.name} saved successfully"
         else:
-            self.subtitle = f"New doctype {self.name} saved successfully"
+            self.subtitle = f"New user {self.name} saved successfully"
         opts = dict(
             authmode=self.authmode,
             comment=self.comment,
