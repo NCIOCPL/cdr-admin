@@ -145,6 +145,8 @@ function check_board(val) {
                 rows.append(["\xA0"])
             rows.append([Reporter.Cell(board, bold=True)])
             for meeting in boards[board]:
+                if meeting.canceled:
+                    meeting = Reporter.Cell(meeting, classes="strikethrough")
                 rows.append([meeting])
         return Reporter.Table(rows, caption=self.caption)
 
