@@ -19,8 +19,8 @@ class Control(Controller):
     SUBTITLE = "PDQ Board Invitation History Report"
     METHOD = "get"
     IACT = "Integrative, Alternative, and Complementary Therapies"
-    EXCLUDE_EDITORIAL = "Exclude current editorial board members"
-    EXCLUDE_ADVISORY = "Exclude current advisory board members"
+    EXCLUDE_EDITORIAL = "Exclude current members of any editorial board"
+    EXCLUDE_ADVISORY = "Exclude current members of any advisory board"
     BOARD_TYPES = "PDQ Editorial Board", "PDQ Advisory Board"
     BLANK_COLUMN = "Blank Column"
     OPTIONAL_COLUMNS = (
@@ -53,13 +53,12 @@ class Control(Controller):
         # include one row per board member.
         rows = []
         for member in self.members:
-            row = row_start = [
-                self.Reporter.Cell(member.id, center=True),
-                self.Reporter.Cell(member.name)
-            ]
             if self.including_board_specific_columns:
                 for board in member.boards:
-                    row = list(row_start)
+                    row = [
+                        self.Reporter.Cell(member.id, center=True),
+                        self.Reporter.Cell(member.name),
+                    ]
                     for name in self.OPTIONAL_COLUMNS:
                         if name in self.optional_columns:
                             if name == self.BLANK_COLUMN:
@@ -68,7 +67,13 @@ class Control(Controller):
                                 key = name.replace(" ", "_").lower()
                                 value = getattr(board, key)
                             row.append(value)
-            rows.append(row)
+                    rows.append(row)
+            else:
+                row = [
+                    self.Reporter.Cell(member.id, center=True),
+                    self.Reporter.Cell(member.name),
+                ]
+                rows.append(row)
 
         # Assemble the table and return it.
         caption = self.board_names.get(self.board)
@@ -204,9 +209,10 @@ class BoardMember:
         if not hasattr(self, "_boards"):
             self._boards = []
             for node in self.doc.root.findall("BoardMembershipDetails"):
-                board = self.Board(self, node)
-                if board.id in self.__boards:
-                    self._boards.append(board)
+                #board = self.Board(self, node)
+                #if board.id in self.__boards:
+                #    self._boards.append(board)
+                self._boards.append(self.Board(self, node))
         return self._boards
 
     @property
@@ -239,8 +245,10 @@ class BoardMember:
         if not hasattr(self, "_in_scope"):
             self._in_scope = True if self.boards and self.name else False
             exclusions = self.control.exclusions
+            args = self.name, self.control.exclusions
             if self._in_scope and exclusions:
                 for board in self.boards:
+                    args = board.name, board.current
                     if board.current:
                         if "advisory" in board.name.lower():
                             if self.control.EXCLUDE_ADVISORY in exclusions:
