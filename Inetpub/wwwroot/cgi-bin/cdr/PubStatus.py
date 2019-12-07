@@ -1,1610 +1,775 @@
-#----------------------------------------------------------------------
-# Status of a publishing job.
-#
-# OCECDR-3695: PubStatus Report Drops Push Job
-# OCECDR-4545: Work around Microsoft ADO/DB bug
-#----------------------------------------------------------------------
-import cgi
-import re
+#!/usr/bin/env
+
+"""Show the status of a publishing job.
+"""
+
+from cdrcgi import Controller
+from cdrapi import db
+from cdrapi.docs import Doc, Doctype
 import datetime
-import cdr
-from cdrapi import db as cdrdb
-import cdrcgi
 
-# Logfile is same as that used in cdrpub.py
-LOG         = cdr.WORK_DRIVE + ":/cdr/log/publish.log"
-WAIT_STATUS = "Waiting user approval"
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields   = cgi.FieldStorage()
-logLevel = fields.getvalue("level") or "info"
-jobId    = fields and fields.getvalue("id") or None
-dispType = fields and fields.getvalue("type") or None
-session  = cdrcgi.getSession(fields)
-request  = cdrcgi.getRequest(fields)
-fromDate = fields and fields.getvalue('FromDate') or None
-toDate   = fields and fields.getvalue('ToDate') or None
-jobType  = fields and fields.getvalue('PubJobType') or None
-docType  = fields and fields.getvalue('docType') or None
-cgMode   = fields and fields.getvalue('cgMode') or None
-flavor   = fields and fields.getvalue('flavor') or 'full'
-docCount = fields and fields.getvalue('docCount') or '0'
-logger   = cdr.Logging.get_logger("PubStatus", level=logLevel)
+class Control(Controller):
 
-# Number of documents to be displayed on Pushing Information Report
-TOPDOCS  = 5000
+    SUBTITLE = "Publishing Status"
+    LOGNAME = "PubStatus"
+    DETAILS = "Details"
+    JOB_TYPES = (
+        "All",
+        "Export",
+        "Interim-Export",
+        "Hotfix-Export",
+        "Hotfix-Remove",
+        "Republish-Export",
+    )
 
-#----------------------------------------------------------------------
-# Validate parameters
-#----------------------------------------------------------------------
-if jobId:    cdrcgi.valParmVal(jobId, regex=cdrcgi.VP_UNSIGNED_INT)
-if fromDate: cdrcgi.valParmDate(fromDate)
-if toDate:   cdrcgi.valParmDate(toDate)
-if jobType:  cdrcgi.valParmVal(jobType, valList=('All', 'Export',
-                                'Interim-Export', 'Hotfix-Export',
-                                'Hotfix-Remove', 'Republish-Export'))
-if docType:  cdrcgi.valParmVal(docType, valList=cdr.getDoctypes(session))
-if cgMode:   cdrcgi.valParmVal(cgMode, valList=('Added', 'Updated', 'Removed'))
-if docCount: cdrcgi.valParmVal(docCount, regex=cdrcgi.VP_UNSIGNED_INT)
-docCount = int(docCount)
-# dispType tested later
-# flavor tested later
+    def run(self):
+        """Override the base class method to customize routing."""
 
-#----------------------------------------------------------------------
-# Display the publishing overall job status.
-#----------------------------------------------------------------------
-def dispJobStatus():
-
-    #----------------------------------------------------------------------
-    # Find some interesting information.
-    #----------------------------------------------------------------------
-    try:
-        conn = cdrdb.connect(user="CdrGuest")
-        cursor = conn.cursor()
-        cursor.execute("""\
-            SELECT d.title,
-                   p.pub_subset,
-                   u.name,
-                   p.output_dir,
-                   p.started,
-                   p.completed,
-                   p.status,
-                   p.messages,
-                   p.no_output
-              FROM document d
-              JOIN pub_proc p
-                ON p.pub_system = d.id
-              JOIN usr u
-                ON u.id = p.usr
-             WHERE p.id = ?
-    """, (jobId,))
-
-        # If we manually enter a JobID for that doesn't exist yet
-        # fetching the result will fail and create an error
-        # -------------------------------------------------------
         try:
-            (pubSystem, subset, name, dir, started, completed, status,
-             messages, no_output) = cursor.fetchone()
-        except:
-            cdrcgi.bail('Job%d does not exist!' % jobId)
+            if self.request == self.DETAILS:
+                self.show_report()
+            elif not self.request and (self.id or self.start and self.end):
+                self.show_report()
+            else:
+                Controller.run(self)
+        except Exception as e:
+            self.logger.exception("Status failure")
+            self.bail(e)
 
-    except Exception as e:
-        cdrcgi.bail("Failure retrieving job information: {}".format(e))
+    def populate_form(self, page):
+        """Ask the user for report parameters.
 
-    title   = "CDR Publishing Job Status"
-    instr   = "Job Number %d" % jobId
-    setting = """[<A style="text-decoration: underline;" href=
-                "pubstatus.py?id=%d&type=Setting">Job settings
-                 </A>]""" % jobId
-    buttons = []
-    header  = cdrcgi.header(title, title, instr, None, buttons)
-    html    = """\
-       <TABLE>
-        <TR>
-         <TD class="tlabel">Publishing System: &nbsp;</B></TD>
-         <TD class="ttext">%s</TD>
-        </TR>
-        <TR>
-         <TD class="tlabel">System Subset: &nbsp;</B></TD>
-         <TD class="ttext">%s %s</TD>
-        </TR>
-        <TR>
-         <TD class="tlabel">User Name: &nbsp;</B></TD>
-         <TD class="ttext">%s</TD>
-        </TR>
-        <TR>
-         <TD class="tlabel">Output Location: &nbsp;</B></TD>
-         <TD class="ttext">%s</TD>
-        </TR>
-        <TR>
-         <TD class="tlabel">Started: &nbsp;</B></TD>
-         <TD class="ttext">%s</TD>
-        </TR>
-        <TR>
-         <TD class="tlabel">Completed: &nbsp;</B></TD>
-         <TD class="ttext">%s</TD>
-        </TR>
-        <TR>
-         <TD class="tlabel">Status: &nbsp;</B></TD>
-         <TD class="ttext">%s</TD>
-        </TR>
-        <TR>
-         <TD class="tlabel">Messages: &nbsp;</B></TD>
-         <TD class="ttext">%s</TD>
-        </TR>
-       </TABLE>
-      </FORM>
-     </BODY>
-    </HTML>
-    """ % (pubSystem, subset, setting, name,
-           (no_output == 'Y' and "None") or dir or "None",
-           started, completed and completed or "No", status, messages)
-    cdrcgi.sendPage(header + html)
+        Pass:
+            page - HTMLPage object on which we build the form
+        """
 
-#----------------------------------------------------------------------
-# Add a table row for an published documents.
-#----------------------------------------------------------------------
-"""
-            SELECT ppd.doc_id, 0
-                   ppd.doc_version, 1
-                   t.name, 2
-                   d.title, 3
-                   ppd.messages, 4
-                   pp.pub_subset, 5
-                   u.name, 6
-                   ppd.failure 7
-"""
-def addRow(row):
-    # Replacing the ";" for the document title since this caused the
-    # table formatting to be off due to too many words that couldn't be
-    # wrapped within the given column width.
-    # --------------------------------------------------------------
-    messages = row[4]
-    failure = row[7] == "Y"
-    try:
-        messages = eval(messages)
-    except:
-        messages = [messages] if messages else ["No message"]
-    if failure:
-        messages = ["[ERROR] {}".format(message) for message in messages]
-    li = '<li style="font-size: 10pt; font-weight: normal">'
-    messages = ["{}{}".format(li, message) for message in messages]
-    style = "padding: 0px; margin: 0px; margin-left: 20px;"
-    open = '<ul style="{}">'.format(style)
-    close = "</ul>"
-    messages = "{}{}".format(open, "".join(messages), close)
-    return """\
-   <tr>
-    <td valign='top'>%d</td>
-    <td valign='top'>%d</td>
-    <td valign='top'>%s</td>
-    <td valign='top'>%s</td>
-    <td valign='top'>%s</td>
-   </tr>
-""" % (row[0], row[1], row[2], row[3].replace(";", "; "), messages)
+        fieldset = page.fieldset("Report Parameters")
+        end = datetime.date.today()
+        start = end - datetime.timedelta(7)
+        opts = dict(label="Start Date", value=start)
+        fieldset.append(page.date_field("start", **opts))
+        opts = dict(label="End Date", value=end)
+        fieldset.append(page.date_field("end", **opts))
+        opts = dict(label="Job Type", options=self.JOB_TYPES)
+        fieldset.append(page.select("type", **opts))
+        page.form.append(fieldset)
 
-#----------------------------------------------------------------------
-# Display the filter failures: docId, docVer, docType, docTitle, Message.
-#----------------------------------------------------------------------
-def dispFilterFailures(flavor = 'full'):
+    def build_tables(self):
+        """Assemble the tables appropriate for the parameters we are given."""
 
-    #----------------------------------------------------------------------
-    # Find some interesting information.
-    #----------------------------------------------------------------------
-    try:
-        conn = cdrdb.connect(user="CdrGuest")
-        cursor = conn.cursor()
-        cursor.execute("""\
-            SELECT ppd.doc_id,
-                   ppd.doc_version,
-                   t.name,
-                   d.title,
-                   ppd.messages,
-                   pp.pub_subset,
-                   u.name,
-                   ppd.failure
-              FROM pub_proc_doc ppd
-              JOIN document d
-                ON ppd.doc_id = d.id
-              JOIN pub_proc pp
-                ON ppd.pub_proc = pp.id
-              JOIN usr u
-                ON u.id = pp.usr
-              JOIN doc_type t
-                ON t.id = d.doc_type
-             WHERE ppd.pub_proc = ?
-               AND (ppd.failure = 'Y' OR ppd.messages IS NOT NULL)
-          ORDER BY t.name, d.title
-    """, (jobId,))
-        rows = cursor.fetchall()
-    except Exception as e:
-        cdrcgi.bail("Failure retrieving job information: {}".format(e))
-
-    title   = 'CDR Publishing Filter Failures'
-    instr   = 'Job Number %d' % jobId
-    buttons = []
-    header  = cdrcgi.header(title, title, instr, None, buttons)
-    if not rows:
-        cdrcgi.bail("Job%s finished without Failure" % jobId)
-    html    = """\
-       <TABLE>
-        <TR>
-         <TD ALIGN='right' NOWRAP><B>System Subset: &nbsp;</B></TD>
-         <TD>%s</TD>
-        </TR>
-        <TR>
-         <TD ALIGN='right' NOWRAP><B>User Name: &nbsp;</B></TD>
-         <TD>%s</TD>
-        </TR>
-       </TABLE>
-    """ % (rows[0][5], rows[0][6])
-
-    html   += "<BR><TABLE BORDER=1>"
-    html   += """\
-   <tr>
-    <td width='10%' valign='top'><B>Id</B></td>
-    <td width='5%'  valign='top'><B>Ver</B></td>
-    <td width='15%' valign='top'><B>Type</B></td>
-    <td width='40%' valign='top'><B>Title</B></td>
-    <td width='35%' valign='top'><B>Message(s)</B></td>
-    </tr>
-"""
-    # The warnings have been formatted with a "class=warning"
-    # attribute for the LI element.
-    # -------------------------------------------------------
-    #textPattern = re.compile('<LI class="(.*)</LI>')
-    textPattern2 = re.compile('<Messages><message>')
-    textPattern3 = re.compile('</message></Messages>')
-    ### errorPattern = re.compile('DTDerror')
-    #errorPattern = re.compile('error')
-
-    for row in rows:
-        failure = row[7] == "Y"
-        #text = textPattern.search(row[4])    # searching for warnings
-        #eText = errorPattern.search(row[4])  # searching for errors
-
-        if flavor == 'full':
-            html += addRow(row)
-        elif flavor == 'warning':
-            # Only print the row if the pattern was found
-            # -------------------------------------------
-            #if text and not eText:
-            if not failure:
-               html += addRow(row)
-        elif flavor == 'error':
-            # Print the row if the error pattern was found
-            # (it might also contain warnings)
-            # --------------------------------------------
-            #if eText:
-            if failure:
-               html += addRow(row)
+        if self.job_details:
+            return self.job_details.tables
         else:
-            cdrcgi.bail('Error: Valid values for flavor are: '
-                        '"full", "warning", "error"')
+            opts = dict(columns=self.columns, caption=self.caption)
+            return self.Reporter.Table(self.rows, **opts)
 
-    html  += '</TABLE></FORM></BODY></HTML>'
-    #html   = textPattern2.sub('<UL style="padding: 0px; margin: 0px; margin-left: 20px">',
-    #                                   html)
-    #html   = textPattern3.sub('</UL>', html)
+    def show_report(self):
+        """Override base class version to customize the form."""
 
-    cdrcgi.sendPage(header + html)
+        if self.request == self.SUBMIT and not (self.start and self.end):
+            self.show_form()
+        if self.job_details:
+            page = self.report.page
+            form = page.form
+            form.append(page.hidden_field("id", self.id))
+            if not self.job_details.show_details:
+                button = page.button(self.DETAILS)
+                buttons = form.find("header/h1/span")
+                buttons.insert(0, button)
+        self.report.send()
 
-#----------------------------------------------------------------------
-# Display the job parameters.
-#----------------------------------------------------------------------
-def dispJobSetting():
+    @property
+    def caption(self):
+        """Caption string displayed above list of jobs."""
 
-    #----------------------------------------------------------------------
-    # Find some interesting information.
-    #----------------------------------------------------------------------
-    try:
-        conn = cdrdb.connect(user="CdrGuest")
-        cursor = conn.cursor()
-        cursor.execute("""\
-            SELECT ppp.parm_name,
-                   ppp.parm_value,
-                   pp.pub_subset,
-                   u.name
-              FROM pub_proc_parm ppp
-              JOIN pub_proc pp
-                ON ppp.pub_proc = pp.id
-              JOIN usr u
-                ON u.id = pp.usr
-             WHERE ppp.pub_proc = ?
-          ORDER BY ppp.parm_name
-    """, (jobId,))
-        row = cursor.fetchone()
-    except Exception as e:
-        cdrcgi.bail("Failure retrieving job information: {}".format(e))
-
-    title   = "CDR Publishing Job Settings"
-    instr   = "Job Number %d" % jobId
-    buttons = []
-    header  = cdrcgi.header(title, title, instr, None, buttons)
-    html    = """\
-               <TABLE>
-                <TR>
-                 <TD class="tlabel">System Subset: &nbsp;</TD>
-                 <TD class="ttext">%s</TD>
-                </TR>
-                <TR>
-                 <TD class="tlabel">User Name: &nbsp;</TD>
-                 <TD class="ttext">%s</TD>
-                </TR>
-               </TABLE>
-              """ % (row[2], row[3])
-
-    html   += "<BR><TABLE BORDER=1>"
-    html   += """\
-               <tr>
-                <td valign='top'><B>ParamName</B></td>
-                <td valign='top'><B>ParamValue</B></td>
-                </tr>
-              """
-    ROW     = "<tr><td>%s</td><td>%s</td></tr>\n"
-
-    html   += ROW % (row[0], row[1])
-
-    row = cursor.fetchone()
-    while row:
-        html += ROW % (row[0], row[1])
-        row   = cursor.fetchone()
-
-    html  += "</TABLE></BODY></HTML>"
-
-    cdrcgi.sendPage(header + html)
-
-#----------------------------------------------------------------------
-# Display the job control page.
-#----------------------------------------------------------------------
-def dispJobControl():
-
-    # Need CdrPublishing to update pub_proc status.
-    conn = cdrdb.connect(user="CdrPublishing")
-    cursor = conn.cursor()
-
-    # Make any status change requested.
-    new_status = fields.getvalue("newstat")
-    if new_status in ("Failure", "In process") and jobId:
-        values = new_status, jobId
-        cursor.execute("""\
-            UPDATE pub_proc
-               SET status = ?
-             WHERE id = ?
-               AND status NOT IN ('Success', 'Failure')""", values)
-        conn.commit()
-        message = "Set job {:d} status to {}".format(jobId, new_status)
-    else:
-        message = "Jobs which have not completed"
-
-    # Get jobs which haven't hit the finish line.
-    query = cdrdb.Query("pub_proc", "id", "pub_subset", "started", "status")
-    query.where("status NOT IN ('Success', 'Failure', 'Verifying')")
-    query.order("started")
-    try:
-        rows = query.execute(cursor).fetchall()
-    except Exception as e:
-        cdrcgi.bail("Failure getting unfinished jobs: {}".format(e))
-
-    def callback(cell, format):
-        assert format == "html", "Not an Excel report"
-        B = cdrcgi.Page.B
-        job_id, status, session = list(cell.values())
-        base = "PubStatus.py?type=Manage&Session={}&id={}&newstat={}"
-        href = base.format(session, job_id, "Failure")
-        onclick = "location.href='{}'".format(href)
-        kill = B.BUTTON("Fail", onclick=onclick, type="button")
-        actions = [kill]
-        if status == WAIT_STATUS:
-            href = base.format(session, job_id, "In+process")
-            onclick = "location.href='{}'".format(href)
-            resume = B.BUTTON("Resume", onclick=onclick, type="button")
-            actions.append(resume)
-        td = B.TD(*actions)
-        return td
-
-    jobs = []
-    for job_id, pub_subset, started, status in rows:
-        job = (
-            cdrcgi.Report.Cell(str(job_id), center=True),
-            pub_subset,
-            str(started),
-            status,
-            cdrcgi.Report.Cell((job_id, status, session), callback=callback)
+        return (
+            f"{self.job_type} Publishing Jobs",
+            f"From {self.start} to {self.end}",
         )
-        jobs.append(job)
-    columns = "Job ID", "Job Type", "Job Started", "Job Status", "Actions"
-    columns = [cdrcgi.Report.Column(name) for name in columns]
-    caption = ""
-    if jobs:
-        caption = ("Note: If ALL documents need to be pushed"
-                   " you need to fail this job, manually submit a push-job"
-                   " and set the push-job parameter PushAllDocs=Yes.")
-    table = cdrcgi.Report.Table(columns, jobs, caption=caption)
-    title = "CDR Publishing Job Controller"
-    css = ("button { margin: 0 3px; } "
-           """table caption { font-weight: normal;
-                              text-align: left;
-                              margin-bottom: 10px;}""")
-    opts = dict(banner=title, subtitle=message, css=css)
-    page = cdrcgi.Report(title, [table], **opts)
-    page.send()
 
-#----------------------------------------------------------------------
-# Display the pub_proc_cg_work table info.
-#----------------------------------------------------------------------
-def dispCgWork():
+    @property
+    def columns(self):
+        """Columns for the list of jobs matching the user's criteria."""
 
-    title   = "CDR Document Pushing Information"
-    instr   = "Job Number %d" % jobId
-    buttons = []
-    header  = cdrcgi.header(title, title, instr, None, buttons)
+        return (
+            "Job ID",
+            "Job Type",
+            "Job Status",
+            "Job Start",
+            "Job Finish",
+            "Docs With Errors",
+            "Docs With Warnings",
+            "Total Docs",
+        )
 
-    conn = cdrdb.connect(user="CdrGuest")
-    cursor = conn.cursor()
+    @property
+    def conn(self):
+        """We need a connection with a longer timeout."""
 
-    ###
-    # The pub_proc_cg_work table only holds the data from the last
-    # push job.  If the user is trying to get the information from
-    # a previous push job display a notification that this is not
-    # the data he/she is looking for.
-    # -------------------------------------------------------------
-    try:
-        cursor.execute("""\
-             SELECT max(id)
-               FROM pub_proc
-              WHERE pub_system = 178
-                AND pub_subset like 'Push_Documents_to_Cancer.gov_%'
-                       """)
-        lastPushJob = cursor.fetchone()
-        if lastPushJob and lastPushJob[0] > jobId:
-            cdrcgi.bail("Sorry, but another push job (Job%s) already removed \
-                         the data you're looking for!" % lastPushJob[0])
-    except Exception as e:
-        cdrcgi.bail("Failure getting latest push job ID: {}".format(e))
+        if not hasattr(self, "_conn"):
+            self._conn = db.connect(timeout=900)
+        return self._conn
 
-    ###
+    @property
+    def cursor(self):
+        """Patient access to the database."""
 
-    # Is there any documents in PPCW?
-    try:
-        cursor.execute("""\
-            SELECT count(*)
-              FROM pub_proc_cg_work ppcw
-                       """)
-        numRows = cursor.fetchone()
-        if numRows and numRows[0] == 0:
-            cdrcgi.bail("No rows in pub_proc_cg_work. No docs to be pushed.")
-    except Exception as e:
-        cdrcgi.bail("Failure getting row count in PPCW: {}.".format(e))
+        if not hasattr(self, "_cursor"):
+            self._cursor = self.conn.cursor()
+        return self._cursor
 
-    #----------------------------------------------------------------------
-    # Find vendor and push jobs.
-    #----------------------------------------------------------------------
-    try:
-        cursor.execute("""\
-            SELECT ppv.pub_subset, ppp.pub_subset
-              FROM pub_proc_cg_work ppcw
-              JOIN pub_proc ppv
-                ON ppv.id = ppcw.vendor_job
-              JOIN pub_proc ppp
-                ON ppp.id = ppcw.cg_job
-                       """)
-        (vendor, push) = cursor.fetchone()
-    except Exception:
-        cdrcgi.bail("Failure getting vendor and push job info from PPCW.")
+    @property
+    def end(self):
+        """End of the reporting date range."""
 
-    #----------------------------------------------------------------------
-    # Find number of removed documents.
-    #----------------------------------------------------------------------
-    try:
-        cursor.execute("""\
-            SELECT count(ppcw.id)
-              FROM pub_proc_cg_work ppcw
-             WHERE ppcw.xml IS NULL
-                       """)
-        oneRow = cursor.fetchone()
-        nRemoved = 0
-        if oneRow and oneRow[0]:
-            nRemoved = oneRow[0]
-    except Exception:
-        cdrcgi.bail("Failure getting removed count from PPCW.")
+        if not hasattr(self, "_end"):
+            try:
+                self._end = self.parse_date(self.fields.getvalue("end"))
+            except Exception:
+                self.bail("Date must use ISO format (YYYY-MM-DD)")
+        return self._end
 
-    #----------------------------------------------------------------------
-    # Find removed document information.
-    #----------------------------------------------------------------------
-    try:
-        numDocs = (nRemoved > TOPDOCS) and TOPDOCS or nRemoved or 1
-        cursor.execute("""\
-            SELECT TOP %d ppcw.id, ppcw.doc_type, d.title
-              FROM pub_proc_cg_work ppcw
-              JOIN document d
-                ON d.id = ppcw.id
-             WHERE ppcw.xml IS NULL
-          ORDER BY ppcw.doc_type, d.title
-                       """ % numDocs)
-        rowsRemoved = cursor.fetchall()
-    except Exception:
-        cdrcgi.bail("Failure getting removed info from PPCW.")
+    @property
+    def id(self):
+        """Integer for the ID of the job to report on."""
 
-    #----------------------------------------------------------------------
-    # Find number of updated documents.
-    #----------------------------------------------------------------------
-    try:
-        cursor.execute("""\
-            SELECT count(*)
-              FROM pub_proc_cg_work ppcw
-              JOIN pub_proc_cg ppc
-                ON ppcw.id = ppc.id
-             WHERE NOT ppcw.xml IS NULL
-                       """)
-        oneRow = cursor.fetchone()
-        nUpdated = 0
-        if oneRow and oneRow[0]:
-            nUpdated = oneRow[0]
-    except Exception:
-        cdrcgi.bail("Failure getting updated count from PPCW.")
+        if not hasattr(self, "_id"):
+            self._id = self.fields.getvalue("id")
+            if self._id:
+                if not self._id.isdigit():
+                    self.bail("Job ID must be an integer")
+                self._id = int(self._id)
+        return self._id
 
-    #----------------------------------------------------------------------
-    # Find updated document information.
-    #----------------------------------------------------------------------
-    try:
-        numDocs = (nUpdated > TOPDOCS) and TOPDOCS or nUpdated or 1
-        cursor.execute("""\
-            SELECT TOP %d ppcw.id, ppcw.doc_type, d.title
-              FROM pub_proc_cg_work ppcw
-              JOIN document d
-                ON d.id = ppcw.id
-              JOIN pub_proc_cg ppc
-                ON ppcw.id = ppc.id
-             WHERE NOT ppcw.xml IS NULL
-          ORDER BY ppcw.doc_type, d.title
-                       """ % numDocs)
-        rowsUpdated = cursor.fetchall()
-    except Exception:
-        cdrcgi.bail("Failure getting updated info from PPCW.")
+    @property
+    def job_details(self):
+        """Information for a report on a specific publishing job."""
 
-    #----------------------------------------------------------------------
-    # Find number of added documents.
-    #----------------------------------------------------------------------
-    try:
-        cursor.execute("""\
-            SELECT count(*)
-              FROM pub_proc_cg_work ppcw
-              JOIN document d
-                ON d.id = ppcw.id
-             WHERE NOT ppcw.xml IS NULL
-               AND NOT EXISTS (
-                       SELECT *
-                         FROM pub_proc_cg ppc
-                        WHERE ppc.id = ppcw.id
-                              )
-                       """)
-        oneRow = cursor.fetchone()
-        nAdded = 0
-        if oneRow and oneRow[0]:
-            nAdded = oneRow[0]
-    except Exception:
-        cdrcgi.bail("Failure getting added count from PPCW.")
+        if not hasattr(self, "_job_details"):
+            self._job_details = JobDetails(self) if self.id else None
+        return self._job_details
 
-    #----------------------------------------------------------------------
-    # Find added document information.
-    #----------------------------------------------------------------------
-    try:
-        numDocs = (nAdded > TOPDOCS) and TOPDOCS or nAdded or 1
-        cursor.execute("""\
-            SELECT TOP %d ppcw.id, ppcw.doc_type, d.title
-              FROM pub_proc_cg_work ppcw
-              JOIN document d
-                ON d.id = ppcw.id
-             WHERE NOT ppcw.xml IS NULL
-               AND NOT EXISTS (
-                       SELECT *
-                         FROM pub_proc_cg ppc
-                        WHERE ppc.id = ppcw.id
-                              )
-          ORDER BY ppcw.doc_type, d.title
-                       """ % numDocs)
-        rowsAdded = cursor.fetchall()
-    except Exception:
-        cdrcgi.bail("Failure getting added info from PPCW.")
+    @property
+    def jobs(self):
+        """Jobs which match the user's criteria."""
 
-    # Create links when appropriate.
-    LINK     = "<A style='text-decoration: underline;' href='#%s'>%d</A>"
-    lRemoved = nRemoved and LINK % ('Removed', nRemoved) or '%d' % nRemoved
-    lUpdated = nUpdated and LINK % ('Updated', nUpdated) or '%d' % nUpdated
-    lAdded   = nAdded and LINK % ('Added', nAdded) or '%d' % nAdded
+        if not hasattr(self, "_jobs"):
+            end = f"{self.end} 23:59:59"
+            fields = "id", "pub_subset", "started", "completed", "status"
+            query = self.Query("pub_proc", *fields).order("id DESC")
+            query.where(query.Condition("pub_system", self.pub_system))
+            query.where(query.Condition("started", self.start, ">="))
+            query.where(query.Condition("started", end, "<="))
+            #query.where("status in ('Success', 'Verifying')")
+            if self.job_type and self.job_type != "All":
+                push_type = f"Push_Documents_To_Cancer.Gov_{self.job_type}"
+                types = self.job_type, push_type
+                query.where(query.Condition("pub_subset", types, "IN"))
+            rows = query.execute(self.cursor).fetchall()
+            self._jobs = [Job(self, row) for row in rows]
+        return self._jobs
 
-    html    = """\
-        <TABLE>
-           <TR>
-             <TD ALIGN='right' NOWRAP><B>Vendor Job Name: &nbsp;</B></TD>
-             <TD>%s</TD>
-            </TR>
-            <TR>
-             <TD ALIGN='right' NOWRAP><B>Pushing Job Name: &nbsp;</B></TD>
-             <TD>%s</TD>
-            </TR>
-            <TR>
-             <TD ALIGN='right' NOWRAP><B>Removed Documents: &nbsp;</B></TD>
-             <TD>%s</TD>
-            </TR>
-            <TR>
-             <TD ALIGN='right' NOWRAP><B>Updated Documents: &nbsp;</B></TD>
-             <TD>%s</TD>
-            </TR>
-            <TR>
-             <TD ALIGN='right' NOWRAP><B>Added Documents: &nbsp;</B></TD>
-             <TD>%s</TD>
-            </TR>
-           </TABLE>
-              """ % (vendor, push, lRemoved, lUpdated, lAdded)
+    @property
+    def job_type(self):
+        """String for type of job on which to report."""
 
-    HEADER  = """\
-               <BR>
-               <span style="color: red; font-weight: bold;">Documents
-                 %s %s</span>
-               <BR>
-               <a NAME='%s'></a>
-               %s
-               <TABLE BORDER=1>
-                <tr>
-                <th class="theader">DocId</th>
-                <th class="theader">DocType</th>
-                <th class="theader">DocTitle</th>
-                </tr>
-              """
-    ROW     = """<tr><td class="ttext">%s</td>
-                     <td class="ttext">%s</td>
-                     <td class="ttext">%s</td></tr>"""
+        if not hasattr(self, "_job_type"):
+            self._job_type = self.fields.getvalue("type")
+            if self._job_type and self._job_type not in self.JOB_TYPES:
+                self.bail("Invalid job type")
+        return self._job_type
 
-    # Only if the push job hasn't finished yet will we be able to
-    # display the newly added documents.  Once the job finished the
-    # comparison between pub_proc_cg and pub_proc_cg_work will give
-    # incorrect results and new documents will be listed as updated
-    # once.  We want to warn the user about this fact.
-    # -------------------------------------------------------------
-    try:
-        cursor.execute("""\
-             SELECT status
-               FROM pub_proc
-              WHERE pub_system = 178
-                AND pub_subset like 'Push_Documents_to_Cancer.gov_%'
-                AND id = ?
-                       """, jobId)
-        jobStatus = cursor.fetchone()[0]
-    except Exception as e:
-        cdrcgi.bail("Failure getting latest push job ID: {}".format(e))
+    @property
+    def loglevel(self):
+        """How much logging we should perform (default INFO)."""
+        return self.fields.getvalue("level") or "INFO"
 
-    # Inserting a space after ';' to allow line breaks between
-    # protocol numbers in HTML output.        VE, 2005-03-25
-    # --------------------------------------------------------
-    listCount = ""
-    DISCLAIMER = "<br>"
-    if nRemoved:
-        if nRemoved > TOPDOCS:
-            listCount = "(Top %s only)" % TOPDOCS
-        html   += HEADER % ('Removed', listCount, 'Removed', DISCLAIMER)
-        for row in rowsRemoved:
-            html += ROW % (row[0], row[1], row[2].replace(';', '; '))
-        html  += "</TABLE></BODY>"
+    @property
+    def method(self):
+        """Override base class to place the parameters in the URL."""
+        return "get"
 
-    if nAdded:
-        if nAdded > TOPDOCS:
-            listCount = "(Top %s only)" % TOPDOCS
-        html   += HEADER % ('Added', listCount, 'Added', DISCLAIMER)
-        for row in rowsAdded:
-            html += ROW % (row[0], row[1], row[2].replace(';', '; '))
-        html  += "</TABLE></BODY>"
+    @property
+    def pub_system(self):
+        """ID for the control document for the Primary publishing system."""
 
-    if nUpdated:
-        if jobStatus in ['Verifying', 'Success']:
-            DISCLAIMER = """\
-            <b>Note:</b> The push job already finished. Any newly
-            added documents are now displayed as updates.<br><br>"""
-        if nUpdated > TOPDOCS:
-            listCount = "(Top %s only)" % TOPDOCS
-        html   += HEADER % ('Updated', listCount, 'Updated', DISCLAIMER)
+        if not hasattr(self, "_pub_system"):
+            query = self.Query("active_doc d", "d.id")
+            query.join("doc_type t", "t.id = d.doc_type")
+            query.where("t.name = 'PublishingSystem'")
+            query.where("d.title = 'Primary'")
+            self._pub_system = query.execute(self.cursor).fetchall()[0].id
+        return self._pub_system
 
-        for row in rowsUpdated:
-            html += ROW % (row[0], row[1], row[2].replace(';', '; '))
-        html  += "</TABLE></BODY>"
+    @property
+    def rows(self):
+        """Values for the report table."""
+        return [job.row for job in self.jobs]
 
-    html  += "</HTML>"
+    @property
+    def start(self):
+        """Beginning of the reporting date range."""
 
-    cdrcgi.sendPage(header + html)
+        if not hasattr(self, "_start"):
+            try:
+                self._start = self.parse_date(self.fields.getvalue("start"))
+            except Exception:
+                self.bail("Date must use ISO format (YYYY-MM-DD)")
+        return self._start
 
-#----------------------------------------------------------------------
-# Show a period to pick publishing jobs.
-#----------------------------------------------------------------------
-def selectPubDates():
 
-    logger.debug("putting up form for selecting pub dates")
-    title   = "CDR Administration"
-    instr   = "Publishing Job Activities"
-    buttons = ["Submit Request", "Report Menu", cdrcgi.MAINMENU, "Log Out"]
-    script  = "PubStatus.py"
-    header  = cdrcgi.header(title, title, instr, script, buttons)
+class JobDetails:
+    """Information for a report on a single job."""
 
-    today       = datetime.date.today()
-    toDate      = str(today)
-    fromDate    = str(today - datetime.timedelta(7))
-    form = """\
-   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-   <TABLE BORDER='0'>
-    <TR>
-     <TD><B>Start Date:&nbsp;</B></TD>
-     <TD><INPUT NAME='FromDate' VALUE='%s'>&nbsp;
-         (use format YYYY-MM-DD for dates, e.g. 2002-01-01)</TD>
-    </TR>
-    <TR>
-     <TD><B>End Date:&nbsp;</B></TD>
-     <TD><INPUT NAME='ToDate' VALUE='%s'>&nbsp;</TD>
-    </TR>
-    <TR>
-     <TD><B>Publishing Job Type:&nbsp;</B></TD>
-     <TD><select name="PubJobType">
-          <option VALUE='All'>All</option>
-          <option VALUE='Export'>Export</option>
-          <option VALUE='Interim-Export'>Interim-Export</option>
-          <option VALUE='Hotfix-Export'>Hotfix-Export</option>
-          <option VALUE='Hotfix-Remove'>Hotfix-Remove</option>
-          <option VALUE='Republish-Export'>Republish-Export</option>
-     </TD>
-    </TR>
-   </TABLE>
-  </FORM>
- </BODY>
-</HTML>
-""" % (cdrcgi.SESSION, session, fromDate, toDate)
-    cdrcgi.sendPage(header + form)
+    THRESHOLD = 100
+    PUSH_PREFIX = "Push_Documents_To_Cancer.Gov_"
 
-#----------------------------------------------------------------------
-# Show all publishing jobs within the period.
-#----------------------------------------------------------------------
-def dispJobsByDates():
+    def __init__(self, control):
+        """Remember the caller's value.
 
-    title   = "CDR Administration"
-    instr   = "Publishing Job Summary"
-    buttons = ["Report Menu", cdrcgi.MAINMENU, "Log Out"]
-    script  = "PubStatus.py"
+        Pass:
+            control - access to the database and the report parameters
+        """
 
-    pubJobType = ""
-    if jobType and jobType != 'All':
-       pubJobType  = "AND pp.pub_subset in "
-       pubJobType += "('%s', 'Push_Documents_To_Cancer.Gov_%s')" % (jobType,
-                                                                    jobType)
-    else:
-        pubJobType = ""
+        self.__control = control
 
-    header  = cdrcgi.header(title, title, instr, script, buttons,
-                            stylesheet = """
-  <style type = 'text/css'>
-    th             { font: bold 16px arial;
-                     background-color:  #AFAFAF; }
-   .text           { font: bold 10pt arial;
-                     color: black; }
-   .link           { font: bold 10pt arial;
-                     color: black; }
-  </style>
-                            """)
+    @property
+    def control(self):
+        """Access to the database and the report parameters."""
+        return self.__control
 
-    conn   = cdrdb.connect(user="CdrGuest")
-    cursor = conn.cursor()
+    @property
+    def doc_titles(self):
+        """Dictionary of titles for docs in job (optimization)."""
 
-    form = """
-      <center style="font: bold 18px arial;">
-        <span>Publishing Job Report<br />From %s to %s</span>
-      </center>
-      <br />
-      <br />
-      <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-           """ % (fromDate, toDate, cdrcgi.SESSION, session)
+        if not hasattr(self, "_doc_titles"):
+            query = self.control.Query("document d", "d.id", "d.title")
+            query.join("pub_proc_doc p", "p.doc_id = d.id")
+            query.where(query.Condition("p.pub_proc", self.id))
+            rows = query.execute(self.control.cursor).fetchall()
+            self._doc_titles = dict([tuple(row) for row in rows])
+        return self._doc_titles
 
-    #----------------------------------------------------------------------
-    # Extract the job information from the database.
-    #----------------------------------------------------------------------
-    try:
-        cursor.execute("""\
-                SELECT pp.id, pp.pub_subset, pp.started,
-                       pp.completed, count(ppd.pub_proc) AS numDocs, pp.status
-                  FROM pub_proc pp
-       LEFT OUTER JOIN pub_proc_doc ppd
-                    ON pp.id = ppd.pub_proc
-                 WHERE pp.started >= ?
-                   AND pp.completed <= ?
-                   AND pp.status in ('Success','Verifying')
-                   AND ppd.failure IS NULL
-                   AND pp.pub_system IN (
-                           SELECT d.id
-                             FROM document d, doc_type t
-                            WHERE d.doc_type = t.id
-                              AND t.name = 'PublishingSystem'
-                              AND d.title = 'Primary'
-                       )
-              %s
-              GROUP BY pp.id, pp.pub_subset, pp.started, pp.completed,
-                       pp.status
-              ORDER BY pp.id DESC
-                       """ % pubJobType, (fromDate, toDate + " 23:59:59"))
+    @property
+    def doctypes(self):
+        """Dictionary of doctype strings for docs in job (optimization)."""
 
-        row        = cursor.fetchone()
-        if not row:
-            cdrcgi.sendPage(header + """
-              <span style="font: bold 18px arial;">
-               No publishing jobs during this period.
-              </span>
-             </body>
-            </html>
-                                   """)
+        if not hasattr(self, "_doctypes"):
+            query = self.control.Query("doc_type t", "d.id", "t.name")
+            query.join("document d", "d.doc_type = t.id")
+            query.join("pub_proc_doc p", "p.doc_id = d.id")
+            query.where(query.Condition("p.pub_proc", self.id))
+            rows = query.execute(self.control.cursor).fetchall()
+            self._doctypes = dict([tuple(row) for row in rows])
+        return self._doctypes
 
-        form += """
-            <span style="font: 15px arial">
-             <B>Note:</b> A
-              <span style="background-color: #FF7F50;">Colored row</span>
-                did not complete loading to the Cancer.gov live site</span>
-            <table border='1' cellspacing='0' cellpadding='2' width='100%%'>
-                <tr>
-                    <th nowrap='1'>Job ID</th>
-                    <th nowrap='1'>Job Name</th>
-                    <th nowrap='1'>Job Status Reports</th>
-                    <th nowrap='1'>Starting Time</th>
-                    <th nowrap='1'>Ending Time</th>
-                    <th nowrap='1'>NumDocs</th>
-                </tr>
-                """
-        while row:
-            id, name, started, completed, count, curStatus = row
+    @property
+    def docs(self):
+        """Documents in this job."""
 
-            # Indicate that a job is still being loaded on Cancer.gov
-            # by setting a different background color
-            if curStatus == 'Verifying':
-                form += '<tr style="background-color: #FF7F50;">'
+        if not hasattr(self, "_docs"):
+            query = self.control.Query("pub_proc_doc", "*")
+            query.where(query.Condition("pub_proc", self.id))
+            rows = query.execute(self.control.cursor).fetchall()
+            self._docs = [self.Doc(self, row) for row in rows]
+        return self._docs
+
+    @property
+    def document_table(self):
+        """Table listing or summarizing the documents for this job."""
+
+        if self.show_details:
+            rows = [doc.row for doc in self.docs]
+            columns = ["ID", "Version", "Type", "Title", "Failed", "Warnings"]
+            columns.append("Action" if self.is_push else "Removed")
+            opts = dict(caption="Documents", columns=columns)
+            return self.control.Reporter.Table(rows, **opts)
+        columns = ["Type", "Total"]
+        if self.is_push:
+            columns += ["Added", "Updated"]
+        columns += ["Removed", "Failures", "Warnings"]
+        opts = dict(caption="Documents", columns=columns)
+        return self.control.Reporter.Table(self.rows, **opts)
+
+    @property
+    def export_job_id(self):
+        """Find the job whose documents we are pushing."""
+
+        if not hasattr(self, "_export_job_id"):
+            subset = self.row.pub_subset.replace(self.PUSH_PREFIX, "")
+            query = self.control.Query("pub_proc", "MAX(id) AS id")
+            query.where(query.Condition("pub_subset", subset))
+            query.where(query.Condition("id", self.id, "<"))
+            query.where("status = 'Success'")
+            row = query.execute(self.control.cursor).fetchone()
+            self._export_job_id = row.id
+        return self._export_job_id
+
+    @property
+    def id(self):
+        """Integer for this job's ID."""
+        return self.control.id
+
+    @property
+    def failures(self):
+        """Table showing failed documents (if any)."""
+
+        if not hasattr(self, "_failures"):
+            self._failures = None
+            rows = []
+            for doc in self.docs:
+                if doc.failed:
+                    details = self.parse(doc.messages) or "[NO ERROR MESSAGE]"
+                    rows.append([
+                        self.control.Reporter.Cell(doc.id, right=True),
+                        doc.doctype,
+                        self.control.Reporter.Cell(details),
+                    ])
+            if rows:
+                columns = "ID", "Type", "Details"
+                opts = dict(columns=columns, caption="Failures")
+                self._failures = self.control.Reporter.Table(rows, **opts)
+        return self._failures
+
+    @property
+    def is_push(self):
+        """True if this job pushed documents to the CMS."""
+
+        if not hasattr(self, "_is_push"):
+            self._is_push = "Push" in self.row.pub_subset
+        return self._is_push
+
+    @property
+    def last_full_push_job(self):
+        """Job ID for the most recent full load push job."""
+
+        query = self.control.Query("pub_proc", "MAX(id) AS id")
+        query.where("pub_subset = 'Push_Documents_To_Cancer.Gov_Full-Load'")
+        query.where("status = 'Success'")
+        return query.execute(self.control.cursor).fetchone().id
+
+    @property
+    def next_successful_export_job(self):
+        """Integer for the ID of the next successful job of this type."""
+
+        if not hasattr(self, "_next_successful_export_job"):
+            query = self.control.Query("pub_proc", "MIN(id) AS id")
+            query.where(query.Condition("id", self.id, ">"))
+            query.where(query.Condition("pub_subset", self.row.pub_subset))
+            query.where("status = 'Success'")
+            query.log()
+            row = query.execute(self.control.cursor).fetchone()
+            self._next_successful_export_job = row.id if row else None
+        return self._next_successful_export_job
+
+    @property
+    def overview(self):
+        """Identification values for this job."""
+
+        row = self.row
+        values = [
+            row.title,
+            row.pub_subset,
+            row.name,
+            row.output_dir,
+            str(row.started)[:19],
+            str(row.completed)[:19] if row.completed else "[not recorded]",
+            row.status,
+            row.messages,
+            len(self.docs),
+        ]
+        labels = [
+            "Publishing System",
+            "System Subset",
+            "User Name",
+            "Output Location",
+            "Started",
+            "Completed",
+            "Status",
+            "Messages",
+            "Total Documents",
+        ]
+        Cell = self.control.Reporter.Cell
+        if self.is_push:
+            job_id = self.export_job_id
+            url = self.control.make_url(self.control.script, id=job_id)
+            values.append(Cell(job_id, href=url))
+            labels.append("Export Job")
+        elif self.row.status == "Success":
+            for job in self.push_jobs:
+                if job.status == "Success":
+                    labels.append("Push Job")
+                elif job.status == "Failure":
+                    labels.append("Failed Push Job")
+                else:
+                    labels.append(f"Push Job ({job.status})")
+                url = self.control.make_url(self.control.script, id=job.id)
+                values.append(Cell(job.id, href=url))
+        rows = []
+        for i, value in enumerate(values):
+            label = labels[i]
+            rows.append((Cell(label, bold=True, right=True), value))
+        flavor = "Push" if "Push" in self.row.pub_subset else "Publishing"
+        caption = f"{flavor} Job {self.id}"
+        return self.control.Reporter.Table(rows, caption=caption)
+
+    @property
+    def parameters(self):
+        """Settings chosen for this job."""
+
+        fields = "parm_name", "parm_value"
+        query = self.control.Query("pub_proc_parm", *fields).order(1)
+        query.where(query.Condition("pub_proc", self.id))
+        rows = query.execute(self.control.cursor).fetchall()
+        rows = [tuple(row) for row in rows]
+        columns = "Name", "Value"
+        opts = dict(columns=columns, caption="Parameters")
+        return self.control.Reporter.Table(rows, **opts)
+
+    @property
+    def previous_pushes(self):
+        """IDs for docs in this job whose last prev push was not a remove."""
+
+        if not hasattr(self, "_previous_pushes"):
+            fields = "d.doc_id", "MAX(p.id) AS id"
+            subquery = self.control.Query("pub_proc_doc d", *fields)
+            subquery.join("pub_proc p", "p.id = d.pub_proc")
+            subquery.join("pub_proc_doc j", "j.doc_id = d.doc_id")
+            subquery.where(f"j.pub_proc = {self.id}")
+            subquery.where(f"d.pub_proc < {self.id}")
+            subquery.where(f"d.pub_proc >= {self.last_full_push_job}")
+            subquery.where("d.failure IS NULL")
+            subquery.where("p.status = 'Success'")
+            subquery.where(f"p.pub_subset LIKE '{self.PUSH_PREFIX}%'")
+            subquery.group("d.doc_id")
+            subquery.alias("p")
+            fields = "d.doc_id", "d.removed"
+            query = self.control.Query("pub_proc_doc d", *fields)
+            query.join(subquery, "p.id = d.pub_proc", "p.doc_id = d.doc_id")
+            self._previous_pushes = set()
+            for row in query.execute(self.control.cursor).fetchall():
+                if row.removed != "Y":
+                    self._previous_pushes.add(row.doc_id)
+        return self._previous_pushes
+
+    @property
+    def push_jobs(self):
+        """ID/status pairs of job(s) pushing the docs from this export job."""
+
+        if not hasattr(self, "_push_job_id"):
+            subset = f"{self.PUSH_PREFIX}{self.row.pub_subset}"
+            query = self.control.Query("pub_proc", "id", "status").order("id")
+            query.where(f"pub_subset = '{subset}'")
+            query.where(query.Condition("id", self.id, ">"))
+            if self.next_successful_export_job:
+                args = "id", self.next_successful_export_job, "<"
+                query.where(query.Condition(*args))
+            query.log()
+            self._push_jobs = query.execute(self.control.cursor).fetchall()
+        return self._push_jobs
+
+    @property
+    def row(self):
+        """Basic values from the job's pub_proc table row."""
+
+        if not hasattr(self, "_row"):
+            fields = (
+                "d.title",
+                "p.pub_subset",
+                "u.name",
+                "p.output_dir",
+                "p.started",
+                "p.completed",
+                "p.status",
+                "p.messages",
+            )
+            query = self.control.Query("pub_proc p", *fields)
+            query.join("document d", "d.id = p.pub_system")
+            query.join("usr u", "u.id = p.usr")
+            query.where(query.Condition("p.id", self.id))
+            self._row = query.execute(self.control.cursor).fetchone()
+        return self._row
+
+    @property
+    def rows(self):
+        """Summary statistics by document type for jobs with lots of docs."""
+
+        doctypes = {}
+        for doc in self.docs:
+            stats = doctypes.get(doc.doctype)
+            if stats is None:
+                stats = doctypes[doc.doctype] = dict(
+                    total=0,
+                    failures=0,
+                    warnings=0,
+                    removed=0,
+                    added=0,
+                    updated=0,
+                )
+            stats["total"] += 1
+            if doc.failed:
+                stats["failures"] += 1
+            elif doc.messages:
+                stats["warnings"] += 1
+            if doc.removed:
+                stats["removed"] += 1
+            elif self.is_push:
+                if doc.action == "added":
+                    stats["added"] += 1
+                else:
+                    stats["updated"] += 1
+        rows = []
+        Cell = self.control.Reporter.Cell
+        for doctype in sorted(doctypes):
+            stats = doctypes[doctype]
+            row = [doctype, Cell(stats["total"], right=True)]
+            if self.is_push:
+                row.append(Cell(stats["added"], right=True))
+                row.append(Cell(stats["updated"], right=True))
+            row += [
+                Cell(stats["removed"], right=True),
+                Cell(stats["failures"], right=True),
+                Cell(stats["warnings"], right=True),
+            ]
+            rows.append(row)
+        return rows
+
+    @property
+    def show_details(self):
+        """Whether to show information about each document in the job."""
+
+        if not hasattr(self, "_show_details"):
+            self._show_details = False
+            if len(self.docs) < self.THRESHOLD:
+                self._show_details = True
+            elif self.control.request == Control.DETAILS:
+                self._show_details = True
+        return self._show_details
+
+    @property
+    def tables(self):
+        """Sequence of tables for the status report on this job."""
+
+        tables = [
+            self.overview,
+            self.parameters,
+        ]
+        if self.docs:
+            tables.append(self.document_table)
+        if self.failures:
+            tables.append(self.failures)
+        if self.warnings:
+            tables.append(self.warnings)
+        return tables
+
+    @property
+    def warnings(self):
+        """Table showing documents with non-fatal warnings (if any)."""
+
+        if not hasattr(self, "_warnings"):
+            self._warnings = None
+            rows = []
+            for doc in self.docs:
+                if doc.messages and not doc.failed:
+                    rows.append([
+                        self.control.Reporter.Cell(doc.id, right=True),
+                        doc.doctype,
+                        self.control.Reporter.Cell(self.parse(doc.messages)),
+                    ])
+            if rows:
+                columns = "ID", "Type", "Details"
+                opts = dict(columns=columns, caption="Warnings")
+                self._warnings = self.control.Reporter.Table(rows, **opts)
+        return self._warnings
+
+    @staticmethod
+    def parse(messages):
+        """Evaluate a string created with repr() returning a string list."""
+
+        if not messages:
+            return ""
+        try:
+            parsed = eval(messages)
+            if isinstance(parsed, (list, tuple)):
+                return parsed
+        except:
+            pass
+        return str(messages)
+
+
+    class Doc:
+        """Document from a publishing job."""
+
+        def __init__(self, job, row):
+            """Remember the caller's values.
+
+            Pass:
+                job - access to information about the job and the database
+                row - values from the database query
+            """
+
+            self.__job = job
+            self.__row = row
+
+        def __lt__(self, other):
+            """Support sorting by document ID."""
+            return self.id < other.id
+
+        @property
+        def action(self):
+            """One of added|updated|removed."""
+
+            if not hasattr(self, "_action"):
+                if self.removed:
+                    self._action = "removed"
+                elif self.id in self.__job.previous_pushes:
+                    self._action = "updated"
+                else:
+                    self._action = "added"
+            return self._action
+
+        @property
+        def doctype(self):
+            """String for the name of this document's type."""
+
+            if not hasattr(self, "_doctype"):
+                self._doctype = self.__job.doctypes[self.id]
+            return self._doctype
+
+        @property
+        def failed(self):
+            """True if publishing failed for this document."""
+            return True if self.__row.failure == "Y" else False
+
+        @property
+        def id(self):
+            """Integer for the CDR document ID."""
+            return self.__row.doc_id
+
+        @property
+        def messages(self):
+            """Warning or error messages for this document."""
+            return self.__row.messages
+
+        @property
+        def removed(self):
+            """True if the document was being removed by this job."""
+            return True if self.__row.removed == "Y" else False
+
+        @property
+        def row(self):
+            """Values for the document table."""
+
+            Cell = self.__job.control.Reporter.Cell
+            row = [
+                Cell(self.id, right=True),
+                Cell(self.version, right=True),
+                self.doctype,
+                self.title,
+                Cell("Yes" if self.failed else "No", center=True),
+                Cell("Yes" if not self.failed and self.messages else "No",
+                     center=True),
+            ]
+            if self.__job.is_push:
+                row.append(self.action)
             else:
-                form += '<tr>'
+                row.append(Cell("Yes" if self.removed else "No", center=True))
+            return row
 
-            form += """
-                    <td nowrap='1'>
-                     <a style="text-decoration: underline; color: black;"
-                        href="PubStatus.py?id=%d&type=Report&%s=%s">
-                      <span class="link">%d</span></a>
-                    </td>
-                    <td nowrap='1'>
-                     <a style="text-decoration: underline; color: black;"
-                        href="PubStatus.py?id=%d&type=Report&%s=%s">
-                      <span class="link">%s<span class="link"></a>
-                    </td>
-                    <td nowrap='1'>&nbsp;
-                     <a style="text-decoration: underline; color: black;"
-                        href="PubStatus.py?id=%d">
-                      <span class="link">status</span></a>
-                     <br />
-                     &nbsp;
-                     <a style="text-decoration: underline; color: black;"
-                        href="PubStatus.py?id=%d&type=FilterFailure&flavor=error"
-                        ><span class="link">errors</span></a>,
-                     &nbsp;
-                     <a style="text-decoration: underline; color: black;"
-                        href="PubStatus.py?id=%d&type=FilterFailure&flavor=warning"
-                        ><span class="link">warnings</span></a>,
-                     &nbsp;
-                     <a style="text-decoration: underline; color: black;"
-                        href="PubStatus.py?id=%d&type=FilterFailure&flavor=full"
-                        ><span class="link">both</span></a>
-                    </td>
-                    <td nowrap='1'>
-                     <span class="text">%s</span>
-                    </td>
-                    <td nowrap='1'>
-                     <span class="text">%s</span>
-                    </td>
-                    <td nowrap='1'>
-                     <span class="text">%d</span>
-                    </td>
-                </tr>
-                    """ % (id, cdrcgi.SESSION, session, id,
-                           id, cdrcgi.SESSION, session, name,
-                           id, id, id, id,
-                           started, completed, count)
+        @property
+        def version(self):
+            """Integer for the version of the document which was published."""
+            return self.__row.doc_version
 
-            row = cursor.fetchone()
+        @property
+        def title(self):
+            """Title for the document as of this version."""
 
-        form += "</table>"
-    except Exception as e:
-        cdrcgi.bail('Failure executing query: {}'.format(e))
-
-    cdrcgi.sendPage(header + form + "</BODY></HTML>")
-
-#------------------------------------------------------------------
-# Create some useful temporary tables holding information about
-# the current and previous publishing jobs.  These tables speed
-# things up, and also make the logic for what we're doing more
-# transparent.
-#------------------------------------------------------------------
-def createTemporaryPubInfoTables(cursor, conn, latestFullLoad, cgJob):
-
-    #------------------------------------------------------------------
-    # What was the last Cancer.gov push job for each document?
-    # This will be before the current job, but no earlier than
-    # the most recent full load of Cancer.gov.
-    #------------------------------------------------------------------
-    try:
-        cursor.execute("""\
-            CREATE TABLE #prev_job_for_doc
-                 (doc_id INTEGER,
-                  job_id INTEGER)""")
-        conn.commit()
-        cursor.execute("""\
-             INSERT INTO #prev_job_for_doc
-                  SELECT d.doc_id, MAX(p.id) job_id
-                    FROM pub_proc_doc d
-                    JOIN primary_pub_job p
-                      ON p.id = d.pub_proc
-                   WHERE p.id BETWEEN %d AND %d
-                     AND p.pub_subset LIKE 'Push_Documents_To_Cancer.Gov_%%'
-                     AND d.failure IS NULL
-                GROUP BY d.doc_id""" % (latestFullLoad, cgJob - 1))
-        conn.commit()
-    except Exception as e:
-        cdrcgi.bail("Failure getting previous push job ids: {}".format(e))
-
-    #------------------------------------------------------------------
-    # Now, for each of those documents, get the flag indicating
-    # whether we were sending the document to Cancer.gov or pulling it.
-    #------------------------------------------------------------------
-    try:
-        cursor.execute("""\
-            CREATE TABLE #removed_flag
-                 (doc_id INTEGER,
-                 removed CHAR)""")
-        conn.commit()
-        cursor.execute("""\
-             INSERT INTO #removed_flag
-                  SELECT d.doc_id, d.removed
-                    FROM pub_proc_doc d
-                    JOIN #prev_job_for_doc p
-                      ON p.job_id = d.pub_proc
-                     AND d.doc_id = p.doc_id""")
-        conn.commit()
-    except Exception as e:
-        msg = "Failure collecting removed flags for previous push jobs: {}"
-        cdrcgi.bail(msg.format(e))
-
-    #------------------------------------------------------------------
-    # Get the document IDs for the documents that were removed by
-    # the current job.
-    #------------------------------------------------------------------
-    try:
-        cursor.execute("CREATE TABLE #removed_docs (doc_id INTEGER)")
-        conn.commit()
-        cursor.execute("""\
-            INSERT INTO #removed_docs
-                 SELECT doc_id
-                   FROM pub_proc_doc
-                  WHERE pub_proc = ?
-                    AND removed = 'Y'
-                    AND failure IS NULL""", cgJob)
-        conn.commit()
-    except Exception as e:
-        cdrcgi.bail("Failure getting IDs for removed docs: {}".format(e))
-
-    #------------------------------------------------------------------
-    # Get the document IDs for the documents that were sent to
-    # Cancer.gov by the current job (that is, the ones that we
-    # didn't pick up by the previous query).
-    #------------------------------------------------------------------
-    try:
-        cursor.execute("CREATE TABLE #sent_docs (doc_id INTEGER)")
-        conn.commit()
-        cursor.execute("""\
-            INSERT INTO #sent_docs
-                 SELECT doc_id
-                   FROM pub_proc_doc
-                  WHERE pub_proc = ?
-                    AND removed = 'N'
-                    AND failure IS NULL""", cgJob)
-        conn.commit()
-    except Exception as e:
-        cdrcgi.bail("Failure getting IDs for docs sent to CG: {}".format(e))
-
-    #------------------------------------------------------------------
-    # Get the IDs for the documents that were changed.  These are the
-    # documents for which we have a previous job (#prev_job_for_doc)
-    # and for which the 'removed' flag is off.
-    #------------------------------------------------------------------
-    try:
-        cursor.execute("CREATE TABLE #changed_docs (doc_id INTEGER)")
-        conn.commit()
-        cursor.execute("""\
-            INSERT INTO #changed_docs
-                 SELECT d.doc_id
-                   FROM pub_proc_doc d
-                   JOIN #removed_flag f
-                     ON f.doc_id = d.doc_id
-                  WHERE d.pub_proc = ?
-                    AND d.failure IS NULL
-                    AND d.removed = 'N'
-                    AND f.removed = 'N'""", cgJob)
-        conn.commit()
-    except Exception as e:
-        cdrcgi.bail("Failure getting IDs for docs modified on CG: {}".format(e))
-
-    #------------------------------------------------------------------
-    # Now get the IDs for the documents which we sent to Cancer.gov
-    # that they didn't have already (because they hadn't ever had
-    # them or because the last transaction removed them).  In this
-    # context "ever" means from the last full load, which sort of
-    # starts history with a clean slate as far as their site goes.
-    # This is just the sent docs minus the changed docs.
-    #------------------------------------------------------------------
-    try:
-        cursor.execute("CREATE TABLE #new_docs (doc_id INTEGER)")
-        conn.commit()
-        cursor.execute("""\
-            INSERT INTO #new_docs
-                 SELECT doc_id
-                   FROM #sent_docs
-                  WHERE doc_id NOT IN (SELECT doc_id
-                                         FROM #changed_docs)""")
-        conn.commit()
-    except Exception as e:
-        msg = "Failure getting IDs for docs new to Cancer.gov: {}"
-        cdrcgi.bail(msg.format(e))
-
-#----------------------------------------------------------------------
-# Report what has been added, removed, and updated in this job.
-#----------------------------------------------------------------------
-def dispJobReport():
-
-    title   = "CDR Administration"
-    instr   = "Publishing Job Summary"
-    buttons = ["Report Menu", cdrcgi.MAINMENU, "Log Out"]
-    script  = "PubStatus.py"
-    header  = cdrcgi.header(title, title, instr, script, buttons)
-
-    conn = cdrdb.connect(user="CdrGuest")
-    cursor = conn.cursor()
+            if not hasattr(self, "_title"):
+                self._title = self.__job.doc_titles[self.id]
+            return self._title
 
 
-    #----------------------------------------------------------------------
-    # Get subset name.
-    #----------------------------------------------------------------------
-    subSet = ""
-    try:
-        cursor.execute("""\
-                SELECT pp.pub_subset
-                  FROM pub_proc pp
-                 WHERE id = %d
-                   AND pp.status in ('Success', 'Verifying')
-                   AND pp.pub_system IN (
-                           SELECT d.id
-                             FROM document d, doc_type t
-                            WHERE d.doc_type = t.id
-                              AND t.name = 'PublishingSystem'
-                              AND d.title = 'Primary'
-                                        )
-                       """ % jobId
-                      )
-        row = cursor.fetchone()
-        if row and row[0]:
-            subSet = row[0]
-        else:
-            cdrcgi.bail("Job%d is not a successful publishing job." % jobId)
+class Job:
+    """Publishing job information for list of jobs."""
 
-    except Exception as e:
-        cdrcgi.bail("Failure in query for Job{:d}: {}.".format(jobId, e))
+    def __init__(self, control, row):
+        """Remember the caller's values.
 
-    #----------------------------------------------------------------------
-    # If subSet is for a Vendor job, find the CG job.
-    # If subSet is for a CG job, find the vendor job.
-    #----------------------------------------------------------------------
-    pushJobName = "Push_Documents_To_Cancer.Gov_"
-    cg_job = subSet.find(pushJobName) != -1 and jobId or 0
-    vendor_job = cg_job == 0 and jobId or 0
-    cg_job_name = ""
-    vendor_job_name = ""
+        Pass:
+            control  access to the database and the report parameters
+            row - values from the database
+        """
 
-    if cg_job:
-        cg_job_name = subSet
-        vendor_job_name = subSet[len(pushJobName):]
-        try:
-            cursor.execute("""\
-                SELECT id
-                  FROM pub_proc
-                 WHERE status = 'Success'
-                   AND pub_subset = ?
-                   AND id < ?
-              ORDER BY id DESC
-                           """,
-                           (vendor_job_name, cg_job)
-                          )
-            row = cursor.fetchone()
-            if row and row[0]:
-                vendor_job = row[0]
-            else:
-                cdrcgi.bail("No Vendor job for CG Job%d." % jobId)
+        self.__control = control
+        self.__row = row
 
-        except Exception as e:
-            cdrcgi.bail("No Vendor job for CG Job{:d}: {}".format(jobId, e))
-    else:
-        cg_job_name = pushJobName + subSet
-        vendor_job_name = subSet
-        try:
-            cursor.execute("""\
-                SELECT id
-                  FROM pub_proc
-                 WHERE status = 'Success'
-                   AND pub_subset = ?
-                   AND id > ?
-              ORDER BY id
-                           """,
-                           (cg_job_name, vendor_job)
-                          )
-            row = cursor.fetchone()
-            if row and row[0]:
-                cg_job = row[0]
-            else:
-                cdrcgi.bail("No CG job for Vendor Job%d." % jobId)
+    @property
+    def docs(self):
+        """Sequence of information on documents in this publishing job."""
 
-        except Exception as e:
-            cdrcgi.bail("No CG job for Vendor Job{:d}: {}.".format(jobId, e))
+        if not hasattr(self, "_docs"):
+            fields = "failure", "messages"
+            query = self.__control.Query("pub_proc_doc", *fields)
+            query.where(query.Condition("pub_proc", self.__row.id))
+            self._docs = query.execute(self.__control.cursor).fetchall()
+        return self._docs
 
-    # Get the latest Full Load.
-    try:
-        cursor.execute("""\
-            SELECT MAX(id)
-              FROM pub_proc
-             WHERE status = 'Success'
-               AND pub_subset = ?
-               AND id <= ?
-                       """,
-                       (pushJobName + 'Full-Load', cg_job)
-                      )
-        row = cursor.fetchone()
-        if row and row[0]:
-            latestFullLoad = row[0]
-        else:
-            cdrcgi.bail("No latest full load for job %s." % cg_job)
-    except Exception as e:
-        msg = "Failure getting latest full load for job {}: {}."
-        cdrcgi.bail(msg.format(cg_job, e))
+    @property
+    def errors(self):
+        """Count of documents which failed for this job."""
 
-    # See comments for this function.
-    createTemporaryPubInfoTables(cursor, conn, latestFullLoad, cg_job)
+        if not hasattr(self, "_errors"):
+            self._errors = self._warnings = 0
+            for doc in self.docs:
+                if doc.failure == "Y":
+                    self._errors += 1
+                elif doc.messages is not None:
+                    self._warnings += 1
+        return self._errors
 
-    # How many documents are published in vendor job?
-    try:
-        cursor.execute("""\
-            SELECT t.name, count(t.name)
-              FROM pub_proc_doc ppd, document d, doc_type t
-             WHERE ppd.failure IS NULL
-               AND ppd.doc_id = d.id
-               AND d.doc_type = t.id
-               AND ppd.pub_proc = ?
-          GROUP BY t.name""", vendor_job)
-        rowsPublished = cursor.fetchall()
-        numPublished = 0
-        for row in rowsPublished:
-            numPublished += row[1]
+    @property
+    def id(self):
+        """Integer for the job's ID."""
 
-    except Exception as e:
-        msg = "Failure getting vendor_count for {:d}: {}."
-        cdrcgi.bail(msg.format(vendor_job, e))
+        return self.__row.id
 
-    #------------------------------------------------------------------
-    # Get the counts (by doc type) of documents removed from Cancer.gov.
-    #------------------------------------------------------------------
-    try:
-        cursor.execute("""
-            SELECT t.name, count(t.name)
-              FROM doc_type t
-              JOIN document d
-                ON d.doc_type = t.id
-              JOIN #removed_docs r
-                ON r.doc_id = d.id
-          GROUP BY t.name""")
-        rowsRemoved = cursor.fetchall()
-        numRemoved = 0
-        for row in rowsRemoved:
-            numRemoved += row[1]
+    @property
+    def row(self):
+        """Values for the table listing matching publishing jobs."""
 
-    except Exception as e:
-        msg = "Failure getting removed doc counts for job {:d}: {}."
-        cdrcgi.bail(msg.format(cg_job, e))
+        Cell = self.__control.Reporter.Cell
+        url = self.__control.make_url(self.__control.script, id=self.__row.id)
+        started = str(self.__row.started)[:19]
+        completed = str(self.__row.completed)[:19]
+        if completed == "None":
+            completed = "[not recorded]"
+        return (
+            Cell(self.__row.id, href=url, center=True),
+            Cell(self.__row.pub_subset),
+            Cell(self.__row.status),
+            Cell(started, center=True),
+            Cell(completed, center=True),
+            Cell(self.errors, right=True),
+            Cell(self.warnings, right=True),
+            Cell(len(self.docs), right=True),
+        )
 
-    #------------------------------------------------------------------
-    # Get the counts (by doc type) of documents updated on Cancer.gov.
-    #------------------------------------------------------------------
-    try:
-        cursor.execute("""\
-            SELECT t.name, count(t.name)
-              FROM doc_type t
-              JOIN document d
-                ON d.doc_type = t.id
-              JOIN #changed_docs c
-                ON c.doc_id = d.id
-          GROUP BY t.name""")
-        rowsUpdated = cursor.fetchall()
-        numUpdated = 0
-        for row in rowsUpdated:
-            numUpdated += row[1]
-    except Exception as e:
-        msg = "Failure getting updated doc counts for job {:d}: {}."
-        cdrcgi.bail(msg.format(cg_job, e))
+    @property
+    def warnings(self):
+        """Count of documents with non-fatal warnings for this job."""
 
-    #------------------------------------------------------------------
-    # Get the counts (by doc type) of all documents sent to Cancer.gov
-    # that they didn't already have.
-    #------------------------------------------------------------------
-    try:
-        cursor.execute("""\
-            SELECT t.name, count(t.name)
-              FROM doc_type t
-              JOIN document d
-                ON d.doc_type = t.id
-              JOIN #new_docs n
-                ON n.doc_id = d.id
-          GROUP BY t.name""")
-        rowsAdded = cursor.fetchall()
-        numAdded = 0
-        for row in rowsAdded:
-            numAdded += row[1]
-    except Exception as e:
-        cdrcgi.bail("Failure getting counts of new documents sent to CG "
-                    "by job {:d}: {}".format(cg_job, e))
-
-    #------------------------------------------------------------------
-    # Get the list of document types.
-    # We need this so that we are able to display doc types even if
-    # there is no entry/count in the document table. The output of this
-    # query serves as the row label for the statistics Report output.
-    # We do this by selecting all known doc types from the last Export
-    # job and combine the result with all new doc types from the
-    # current job (in case a new doc type gets introduces with a
-    # hotfix).
-    #------------------------------------------------------------------
-    try:
-        cursor.execute("""\
-            SELECT DISTINCT t.name
-              FROM doc_type t
-              JOIN document d
-                ON d.doc_type = t.id
-              JOIN pub_proc_doc ppd
-                ON ppd.doc_id = d.id
-              JOIN pub_proc p
-                ON p.id = ppd.pub_proc
-             WHERE p.id = (SELECT MAX(id)
-                             FROM pub_proc
-                            WHERE pub_subset IN ('Full-Load', 'Export')
-                          )
-            UNION
-            SELECT DISTINCT t.name
-              FROM doc_type t
-              JOIN document d
-                ON d.doc_type = t.id
-              JOIN #new_docs n
-                ON n.doc_id = d.id
-             ORDER BY 1
-""")
-
-        docTypes = []
-        for row in cursor.fetchall():
-            if row[0]:
-               docTypes.append(row[0])
-    except Exception:
-        cdrcgi.bail("Failure getting list of document types from pub_proc ")
-
-    #------------------------------------------------------------------
-    # Build the report HTML.
-    #------------------------------------------------------------------
-    form = """
-       <center>
-       <b>
-        <font size='4'>Publishing Job Pair Summary</font>
-       </b>
-           """
-    form += """
-        <BR><BR>
-        <TABLE ALIGN='center'>
-           <TR>
-             <TD ALIGN='right' NOWRAP><B>Vendor Job: &nbsp;</B></TD>
-             <TD>%s (Job%d)</TD>
-            </TR>
-            <TR>
-             <TD ALIGN='right' NOWRAP><B>Pushing Job: &nbsp;</B></TD>
-             <TD>%s (Job%d)</TD>
-            </TR>
-            <TR>
-             <TD ALIGN='right' NOWRAP><B>Published Documents: &nbsp;</B></TD>
-             <TD>%d</TD>
-            </TR>
-            <TR>
-             <TD ALIGN='right' NOWRAP><B>Added Documents: &nbsp;</B></TD>
-             <TD>%d</TD>
-            </TR>
-            <TR>
-             <TD ALIGN='right' NOWRAP><B>Updated Documents: &nbsp;</B></TD>
-             <TD>%d</TD>
-            </TR>
-            <TR>
-             <TD ALIGN='right' NOWRAP><B>Removed Documents: &nbsp;</B></TD>
-             <TD>%d</TD>
-            </TR>
-        </TABLE>
-              """ % (vendor_job_name, vendor_job, cg_job_name, cg_job,
-                     numPublished, numAdded, numUpdated, numRemoved)
-
-    form += """
-        <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-        <BR>
-        <TABLE WIDTH="50%%" ALIGN='center' BORDER='1'>
-           <TR>
-             <TD              ALIGN='center'><B>DocType</B></TD>
-             <TD WIDTH="18%%" ALIGN='center'><B>Published</B></TD>
-             <TD WIDTH="18%%" ALIGN='center'><B>Added</B></TD>
-             <TD WIDTH="18%%" ALIGN='center'><B>Updated</B></TD>
-             <TD WIDTH="18%%" ALIGN='center'><B>Removed</B></TD>
-           </TR>
-           """ % (cdrcgi.SESSION, session)
-    ROW = """<TR>
-             <TD ALIGN='left' NOWRAP>%s</TD>
-             <TD ALIGN='right' NOWRAP>%d</TD>
-             <TD ALIGN='right' NOWRAP>%s</TD>
-             <TD ALIGN='right' NOWRAP>%s</TD>
-             <TD ALIGN='right' NOWRAP>%s</TD>
-           </TR>
-          """
-    LINK = "<A STYLE='text-decoration: underline;' "
-    LINK += "HREF='PubStatus.py?id=%d&type=RepDetail&docType=%s"
-    LINK += "&docCount=%d&cgMode=%s&%s=%s'>%d</A>"
-
-    for type in docTypes:
-        nPublished = 0
-        nAdded = 0
-        nUpdated = 0
-        nRemoved = 0
-        for row in rowsPublished:
-            if row[0] == type:
-                nPublished = row[1]
-                break
-        for row in rowsAdded:
-            if row[0] == type:
-                nAdded = row[1]
-                break
-        for row in rowsUpdated:
-            if row[0] == type:
-                nUpdated = row[1]
-                break
-        for row in rowsRemoved:
-            if row[0] == type:
-                nRemoved = row[1]
-                break
-        form += ROW % (
-            type,
-            nPublished,
-            nAdded and LINK % (cg_job, type, nAdded, 'Added',
-                               cdrcgi.SESSION, session, nAdded) or "0",
-            nUpdated and LINK % (cg_job, type, nUpdated, 'Updated',
-                                 cdrcgi.SESSION, session, nUpdated) or "0",
-            nRemoved and LINK % (cg_job, type, nRemoved, 'Removed',
-                                 cdrcgi.SESSION, session, nRemoved) or "0"
-                      )
-
-    form += "</TABLE>"
-
-    cdrcgi.sendPage(header + form + "</BODY></HTML>")
+        if not hasattr(self, "_warnings"):
+            self._errors = self._warnings = 0
+            for doc in self.docs:
+                if doc.failure == "Y":
+                    self._errors += 1
+                elif doc.messages is not None:
+                    self._warnings += 1
+        return self._warnings
 
 
-#----------------------------------------------------------------------
-# Report what has been added, removed, or updated in each doc type.
-#----------------------------------------------------------------------
-def dispJobRepDetail():
-
-    title   = "CDR Administration"
-    instr   = "Publishing Job Detail"
-    buttons = ["Report Menu", cdrcgi.MAINMENU, "Log Out"]
-    script  = "PubStatus.py"
-    header  = cdrcgi.header(title, title, instr, script, buttons)
-
-    conn = cdrdb.connect(user="CdrGuest")
-    cursor = conn.cursor()
-    pushJobName = "Push_Documents_To_Cancer.Gov_"
-
-    # Get the latest Full Load.
-    try:
-        cursor.execute("""\
-            SELECT MAX(id)
-              FROM pub_proc
-             WHERE status = 'Success'
-               AND pub_subset = ?
-               AND id <= ?
-                       """,
-                       (pushJobName + 'Full-Load', jobId)
-                      )
-        row = cursor.fetchone()
-        if row and row[0]:
-            latestFullLoad = row[0]
-        else:
-            cdrcgi.bail("No latest full load for job %s." % jobId)
-    except Exception as e:
-        msg = "Failure getting latest full load for job {}: {}."
-        cdrcgi.bail(msg.format(jobId, e))
-
-    if cgMode in ('Updated', 'Added'):
-        createTemporaryPubInfoTables(cursor, conn, latestFullLoad, jobId)
-
-    # What documents are removed by cg job?
-    if cgMode == 'Removed':
-        try:
-            cursor.execute("""
-                SELECT TOP 500 ppd.doc_id, ppd.doc_version, d.title
-                  FROM pub_proc_doc ppd, document d, doc_type t
-                 WHERE ppd.failure IS NULL
-                   AND ppd.doc_id = d.id
-                   AND ppd.removed = 'Y'
-                   AND d.doc_type = t.id
-                   AND t.name = ?
-                   AND ppd.pub_proc = ?
-              ORDER BY d.title
-                           """, (docType, jobId)
-                          )
-            rows = cursor.fetchall()
-
-        except Exception as e:
-            msg = "Failure getting removed for {:d}: {}."
-            cdrcgi.bail(msg.format(jobId, e))
-
-    # What documents are updated by cg job?
-    elif cgMode == 'Updated':
-        try:
-            cursor.execute("""\
-                SELECT TOP 500 p.doc_id, p.doc_version, d.title
-                  FROM pub_proc_doc p
-                  JOIN #changed_docs c
-                    ON c.doc_id = p.doc_id
-                  JOIN document d
-                    ON d.id = p.doc_id
-                  JOIN doc_type t
-                    ON t.id = d.doc_type
-                 WHERE t.name = ?
-                   AND p.pub_proc = ?
-              ORDER BY d.title""", (docType, jobId))
-            rows = cursor.fetchall()
-
-        except Exception as e:
-            msg = "Failure getting updated for job {:d}: {}."
-            cdrcgi.bail(msg.format(jobId, e))
-
-    # What documents are newly added by cg job?
-    elif cgMode == 'Added':
-        try:
-            cursor.execute("""\
-                SELECT TOP 500 p.doc_id, p.doc_version, d.title
-                  FROM pub_proc_doc p
-                  JOIN #new_docs n
-                    ON n.doc_id = p.doc_id
-                  JOIN document d
-                    ON d.id = p.doc_id
-                  JOIN doc_type t
-                    ON t.id = d.doc_type
-                 WHERE t.name = ?
-                   AND p.pub_proc = ?
-              ORDER BY d.title""", (docType, jobId))
-            rows = cursor.fetchall()
-
-        except Exception as e:
-            msg = "Failure getting added for job {:d}: {}."
-            cdrcgi.bail(msg.format(jobId, e))
-
-    form = """
-       <center>
-       <b>
-        <font size='4'>Documents Pushed to Cancer.gov</font>
-        <br><br>
-        <font size='3'>Job ID: %d</font>
-        <br>
-        <font size='3'>%s</font>
-       </b>
-       </center>
-           """ % (jobId, docType)
-
-    form += """
-        <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-        <BR>
-        <TABLE ALIGN='center'><TR><TD>
-        <b><font size='3'>%s %d documents %s</font></b>
-        </TD></TR>
-        <TR><TD>
-        <TABLE ALIGN='center' BORDER='1'>
-           <TR>
-             <TD ALIGN='center' NOWRAP><B>DocId</B></TD>
-             <TD ALIGN='center' NOWRAP><B>DocVersion</B></TD>
-             <TD ALIGN='left' NOWRAP><B>DocTitle</B></TD>
-           </TR>
-           """ % (cdrcgi.SESSION, session, cgMode, docCount,
-                  (docCount > 500 ) and "(Top 500 listed only)" or "")
-    ROW = """<TR>
-             <TD ALIGN='right' NOWRAP>
-              %s%d%s</TD>
-             <TD ALIGN='right' NOWRAP>%d</TD>
-             <TD ALIGN='left'>%s</TD>
-           </TR>
-          """
-    URLS = "<a class='show-link' href='%s'>"
-
-    # Adding a link to the output for summaries
-    # Put this in a function if we end up adding links to other document
-    # types.  At the moment it's just requested for summaries.
-    # ------------------------------------------------------------------
-    for row in rows:
-        try:
-            cursor.execute("""\
-                SELECT value
-                  FROM query_term_pub
-                 WHERE doc_id = ?
-                   AND path = '/Summary/SummaryMetaData/SummaryURL/@cdr:xref'
-              """, (row[0]))
-            url = cursor.fetchone()
-        except Exception:
-            cdrcgi.bail("Failure getting summary URL for {:d}".format(row[0]))
-
-        #cdrcgi.bail(repr(url))
-        if url:
-            URL  = URLS % url[0]
-            form += ROW % (URL, row[0], "</a>", row[1], row[2])
-        else:
-            form += ROW % ("", row[0], "", row[1], row[2])
-
-    form += "</TABLE></TD></TR></TABLE>"
-
-    cdrcgi.sendPage(header + form + "</BODY></HTML>")
-
-#----------------------------------------------------------------------
-# Handle requests.
-#
-# High-level logic:
-#
-#   IF THE USER WANTS TO NAVIGATE AWAY FROM THE PAGE:
-#      DO IT
-#   OTHERWISE, IF WE DON'T HAVE A JOB ID:
-#      PUT UP A FORM FOR SELECTING A JOB
-#   OTHERWISE, IF THE USER WANT TO MANAGE A JOB BUT ISN'T ALLOWED TO:
-#      BAIL OUT WITH AN ERROR MESSAGE
-#   OTHERWISE:
-#      RUN THE REQUESTED REPORT
-#----------------------------------------------------------------------
-if request == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif request == "Report Menu":
-    cdrcgi.navigateTo("Reports.py", session)
-elif request == "Log Out":
-    cdrcgi.logout(session)
-
-if not jobId:
-    if fromDate and toDate:
-        dispJobsByDates()
-    else:
-        selectPubDates()
-
-jobId = int(jobId)
-logger.info("session %r running %r for job %d",
-             session, dispType or "JobStatus", jobId)
-if not dispType:
-    dispJobStatus()
-elif dispType == "FilterFailure":
-    dispFilterFailures(flavor)
-elif dispType == "Setting":
-    dispJobSetting()
-elif dispType == "CgWork":
-    dispCgWork()
-elif dispType == "Manage":
-    if not cdr.canDo(session, "USE PUBLISHING SYSTEM"):
-        cdrcgi.bail("Permission denied")
-    dispJobControl()
-elif dispType == "Report":
-    dispJobReport()
-elif dispType == "RepDetail":
-    dispJobRepDetail()
-else:
-    cdrcgi.bail("Display type: %s not supported." % dispType)
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+    Control().run()

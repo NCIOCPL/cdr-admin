@@ -22,7 +22,10 @@ class Control(Controller):
     CSS = (
         ".labeled-field label { width: 200px; }",
         "fieldset { width: 575px; }",
+        ".labeled-field img { margin-left: 5px; }",
+        ".labeled-field select { width: 308px; }",
     )
+    HELP = "/images/help.gif"
 
     def populate_form(self, page):
         """Show links or fields, depending on how far we've gotten.
@@ -39,8 +42,11 @@ class Control(Controller):
             if self.subset.user_can_select_docs:
                 fieldset = page.fieldset("Documents to Publish")
                 help = "Separate IDs with whitespace; 'CDR' prefix is optional"
-                opts = dict(label="Enter CDR IDs", tooltip=help, rows=3)
-                fieldset.append(page.textarea("docs", **opts))
+                img = page.B.IMG(src=self.HELP, title=help)
+                opts = dict(label="Enter CDR IDs", rows=3)
+                field = page.textarea("docs", **opts)
+                field.append(img)
+                fieldset.append(field)
                 page.form.append(fieldset)
             fieldset = page.fieldset("Job Options")
             yes_no = "Yes", "No"
@@ -49,32 +55,48 @@ class Control(Controller):
                     if p.default not in PUBTYPES:
                         self.bail(f"Pub type {p.default!r} not supported")
                 help = p.info.help if p.info else ""
-                opts = dict(label=p.name, tooltip=help)
+                opts = dict(label=p.name)
                 if p.default in yes_no:
                     opts["options"] = yes_no
                     opts["default"] = p.default
-                    fieldset.append(page.select(p.name, **opts))
+                    field = page.select(p.name, **opts)
                 else:
                     opts["readonly"] = p.name in Control.READONLY_PARMS
                     opts["value"] = p.default or ""
-                    fieldset.append(page.text_field(p.name, **opts))
+                    field = page.text_field(p.name, **opts)
+                if help:
+                    img = page.B.IMG(src=self.HELP, title=help)
+                    field.append(img)
+                fieldset.append(field)
             user = self.session.User(self.session, id=self.session.user_id)
             email = user.email
             if " " in email or "@" not in email:
                 email = ""
             notify = email and "Yes" or "No"
             help = self.system.param_info["notify"].help
-            opts = dict(options=yes_no, default=notify, tooltip=help)
-            fieldset.append(page.select("notify", **opts))
+            opts = dict(options=yes_no, default=notify)
+            field = page.select("notify", **opts)
+            if help:
+                img = page.B.IMG(src=self.HELP, title=help)
+                field.append(img)
+            fieldset.append(field)
             label = "Address(es)"
             help = self.system.param_info["email"].help
-            opts = dict(tooltip=help, value=email, label="Address(es)")
-            fieldset.append(page.text_field("email", **opts))
+            opts = dict(value=email, label="Address(es)")
+            field = page.text_field("email", **opts)
+            if help:
+                img = page.B.IMG(src=self.HELP, title=help)
+                field.append(img)
+            fieldset.append(field)
             label = "No Output"
             help = self.system.param_info["no-output"].help
             no = "No"
-            opts = dict(tooltip=help, label=label, options=yes_no, default=no)
-            fieldset.append(page.select("no-output", **opts))
+            opts = dict(label=label, options=yes_no, default=no)
+            field = page.select("no-output", **opts)
+            if help:
+                img = page.B.IMG(src=self.HELP, title=help)
+                field.append(img)
+            fieldset.append(field)
             page.form.append(fieldset)
             page.add_css("\n".join(self.CSS))
 
@@ -164,8 +186,7 @@ class Control(Controller):
         if not self.session.can_do("USE PUBLISHING SYSTEM"):
             self.bail("You are not authorized to use the publishing system")
         elif self.request == self.MANAGE_STATUSES:
-            params = dict(type="Manage", id=1)
-            navigateTo("PubStatus.py", self.session.name, **params)
+            navigateTo("ManagePubStatus.py", self.session.name)
         elif self.request == self.PUBLISH:
             self.publish()
         elif self.request == self.SUBMIT:
@@ -650,7 +671,7 @@ class PublishingSystem:
 
         def _pubtype(self, value):
             """Make sure the value is one of the known publishing types."""
-            return value in cdr.PUBTYPES
+            return value in PUBTYPES
 
         def _server_name(self, value):
             """Ensure that the name contains only valid DNS characters."""
