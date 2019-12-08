@@ -631,6 +631,7 @@ class AudioSet:
         """Update the database row save any rejects to a new workbook."""
 
         self.cursor.execute(self.UPDATE, self.id)
+        self.control.conn.commit()
         if self.rejects:
             self.new_workbook.save(Control.REVDIR)
             return self.new_name
