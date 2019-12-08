@@ -72,7 +72,7 @@ table caption p { font-weight: normal; font-size: 10pt; }
 td { vertical-align: top; }
 th, td {
     background-color: white; color: black;
-    font-size: 11pt; padding: 2px; border: 1px solid black;
+    font-size: 11pt; padding: 2px 4px; border: 1px solid black;
 }
 table.no-gridlines td, table.no-gridlines th { border: none; }
 td.middle { vertical-align: middle; }
