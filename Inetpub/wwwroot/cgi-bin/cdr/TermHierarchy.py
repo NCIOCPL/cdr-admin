@@ -23,6 +23,10 @@ class Control(Controller):
         "  margin: 25px auto; padding: 10px; font-size: .8em;",
         "}",
     )
+    NO_RELATIONSHIPS = (
+        "Term document does not specify any relationships to any other "
+        "documents."
+    )
 
     def populate_form(self, page):
         """If we don't have a term ID, get one.
@@ -120,6 +124,8 @@ class Control(Controller):
 
         if not hasattr(self, "_subtitle"):
             if self.id:
+                if self.id not in self.tree.terms:
+                    self.bail(self.NO_RELATIONSHIPS)
                 name = self.tree.terms[self.id].name.split(";")[0]
                 self._subtitle = f"Hierarchy display for {name}"
             else:
