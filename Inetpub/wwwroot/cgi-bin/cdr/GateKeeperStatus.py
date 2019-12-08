@@ -2,11 +2,9 @@
 
 """Show the status of jobs/documents on GateKeeper.
 
-Web interface for requesting status from the Cancer.gov GateKeeper
+Web interface for requesting status from the Cancer.gov GateKeeper.
 and testing if our record in pub_proc_cg confirms that the documents
 have been published.
-
-This program has been modified from the original GateKeeperStatus.py
 """
 
 from cdrcgi import Controller
@@ -179,7 +177,7 @@ class Control(Controller):
 
     @property
     def full(self):
-        """True if all document should be shown; otherwise only problems."""
+        """True if all documents should be shown; otherwise only problems."""
 
         if not hasattr(self, "_full"):
             if not self.job_id and not self.doc_id and not self.request:
@@ -233,19 +231,13 @@ class Control(Controller):
                 "Status",
                 "Dependent Status",
                 "Location",
-                "CDR Record",
             )
             rows = []
             checked = errors = 0
             for doc in self.job.details.docs:
-                published = int(doc.cdrId) in self.published
                 checked += 1
-                if doc.pubType == "Remove":
-                    status = "Error" if published else "Removed"
-                else:
-                    status = "OK" if published else "Error"
-                if self.full or status == "Error":
-                    if status == "Error":
+                if self.full or doc.status == "Error":
+                    if doc.status == "Error":
                         errors += 1
                     rows.append([
                         doc.packetNumber,
@@ -256,7 +248,6 @@ class Control(Controller):
                         doc.status,
                         doc.dependentStatus,
                         doc.location,
-                        status,
                     ])
             caption = f"{checked:d} Documents Checked, {errors:d} Errors"
             opts = dict(caption=caption, columns=columns)
