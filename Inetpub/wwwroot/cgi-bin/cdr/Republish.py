@@ -62,7 +62,7 @@ class Control(Controller):
         fieldset.append(page.text_field("docs", label="Doc IDs"))
         fieldset.append(page.text_field("jobs", label="Job IDs"))
         opts = dict(label="Doc Type", options=[""]+self.doctypes)
-        fieldset.append(page.text_field("doctype", **opts))
+        fieldset.append(page.select("doctype", **opts))
         opts = dict(label="Email", value=self.email)
         fieldset.append(page.text_field("email", **opts))
         fieldset.append(page.text_field("host", label="GK Host"))
