@@ -125,7 +125,7 @@ def getRuntime(mp3_bytes):
     """
     fp = BytesIO(mp3_bytes)
     mp3 = MP3(fp)
-    logger.info("runtime is %s", mp3.info.length)
+    logger.debug("runtime is %s", mp3.info.length)
     return int(round(mp3.info.length))
 
 def getDocTitle(docId):
@@ -157,11 +157,13 @@ class AudioFile:
         representing the contents of the zip file, and from the audio
         file itself.
         """
+        self.zipName = zipName
+        value = getCellValue(sheet, row, 0)
         try:
-            self.zipName = zipName
-            self.nameId = int(getCellValue(sheet, row, 0))
+            self.nameId = int(value)
         except Exception as e:
-            logger.exception("%s row %s", zipName, row)
+            if value != "CDR ID":
+                logger.exception("%s row %s", zipName, row)
             raise
         try:
             self.nameTitle = getDocTitle(self.nameId)
@@ -270,6 +272,7 @@ class AudioFile:
             unlock=True,
         )
         doc.save(**opts)
+        self.mediaId = doc.id
         return doc.id
 
 #----------------------------------------------------------------------
@@ -422,7 +425,9 @@ SELECT DISTINCT doc_id
 alreadyDone = set([row[0] for row in cursor.fetchall()])
 logger.info("%d documents already processed", len(alreadyDone))
 files = ["%s/%s" % (AUDIO, f.split("|")[1]) for f in files]
+logger.info("files=%s", files)
 info = collectInfo(files)
+logger.info("term ids: %s", sorted(info))
 mediaDocs = {}
 docs = {}
 report_rows = []
