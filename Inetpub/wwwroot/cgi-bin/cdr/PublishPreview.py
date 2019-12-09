@@ -152,6 +152,7 @@ class Control(Controller):
                 parser.add_argument("--preserve_links", action="store_true")
                 parser.add_argument("--debug", "-d", action="store_true")
                 parser.add_argument("--drupal_host")
+                parser.add_argument("--password", "-p")
                 parser.add_argument("--flavor", "-f", default="GlossaryTerm")
                 parser.add_argument("--gk_host", "-g")
                 parser.add_argument("--cached_html", "-c")
@@ -175,6 +176,17 @@ class Control(Controller):
             with open(f"{TMP}/pp-{self.id}.html", "wb") as fp:
                 fp.write(html.tostring(page, encoding="utf-8"))
         return page
+
+    @property
+    def password(self):
+        """Override for the password used by the PDQ Drupal account."""
+
+        if not hasattr(self, "_password"):
+            if self.opts is None:
+                self._password = self.fields.getvalue("Password")
+            else:
+                self._password = self.opts.password
+        return self._password
 
     @property
     def preserve_links(self):
@@ -238,7 +250,12 @@ class Summary:
         """Interface with the CMS server."""
 
         if not hasattr(self, "_client"):
-            self._client = DrupalClient(self.doc.session)
+            opts = {}
+            if self.__control.password:
+                opts["auth"] = "PDQ", self.__control.password
+            if self.__control.drupal_host:
+                opts["base"] = self.__control.drupal_host
+            self._client = DrupalClient(self.doc.session, **opts)
         return self._client
 
     @property
@@ -265,7 +282,7 @@ class Summary:
             self.__control.show_progress("received response from Drupal...")
             return etree.fromstring(response.content, parser=parser)
         except Exception as e:
-            cdrcgi.bail(f"Failure generating preview: {e}")
+            self.__control.bail(f"Failure generating preview: {e}")
         finally:
             if nid is not None:
                 self.client.remove(self.values["cdr_id"])
