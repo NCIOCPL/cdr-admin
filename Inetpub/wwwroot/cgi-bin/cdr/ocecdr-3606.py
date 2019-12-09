@@ -23,6 +23,7 @@ class Control(Controller):
         ("Filename", 30),
         ("Notes (Vanessa)", 20),
         ("Notes (NCI)", 30),
+        ("Reuse Media ID", 10),
     )
     NAME_PATH = "/GlossaryTermName/T%Name/TermNameString"
     MEDIA_PATH = "/GlossaryTermName/%/MediaLink/MediaID/@cdr:ref"
