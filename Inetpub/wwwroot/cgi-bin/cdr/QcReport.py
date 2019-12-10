@@ -1663,6 +1663,7 @@ if docType == 'DrugInformationSummary':
 # Supply the summary comments and board display parameters
 # --------------------------------------------------------
 if docType.startswith('Summary'):
+    filterParm.append(['isQC', 'Y'])
     filterParm.append(['DisplayComments', audienceComments ])
     filterParm.append(['DurationComments', durationComments ])
     filterParm.append(['SourceComments', sourceComments ])
@@ -1679,6 +1680,7 @@ if docType.startswith('Summary'):
 # Need to set the displayBoard parameter or all markup will be dropped
 # --------------------------------------------------------------------
 if docType.startswith('GlossaryTerm'):
+    filterParm.append(['isQC', 'Y'])
     filterParm.append(['DisplayComments', audienceComments ])
                        # audienceComments and 'Y' or 'N'])
     filterParm.append(['displayBoard', 'editorial-board_'])
@@ -1688,6 +1690,7 @@ if docType.startswith('GlossaryTerm'):
 # markup will be dropped
 # --------------------------------------------------------------------
 if docType.startswith('MiscellaneousDocument'):
+    filterParm.append(['isQC', 'Y'])
     filterParm.append(['insRevLevels', 'approved|'])
     filterParm.append(['displayBoard', 'editorial-board_'])
 
