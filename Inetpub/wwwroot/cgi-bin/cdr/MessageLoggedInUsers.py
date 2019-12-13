@@ -22,7 +22,7 @@ class Control(Controller):
 
         # Make sure this action is allowed for the current user.
         if not self.session.can_do("EMAIL USERS"):
-            bail("Current user not allowed to use this script")
+            self.bail("Current user not allowed to use this script")
 
         # Make sure we have everything we need for the message.
         if not self.message:
