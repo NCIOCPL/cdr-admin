@@ -32,6 +32,7 @@ class Control(Controller):
             ("Manage Groups", "EditGroups.py"),
             ("Manage Linking Tables", "EditLinkControl.py"),
             ("Manage Query Term Definitions", "EditQueryTermDefs.py"),
+            ("Manage Scheduled Jobs (New)", "Scheduler.py"),
             ("Manage Users", "EditUsers.py"),
             ("Manage Value Tables", "edit-value-table.py"),
             ("Publishing - Create Job", "Publishing.py"),
