@@ -1,0 +1,20 @@
+/**
+ * Style rules for editing CDR filter sets.
+ */
+
+fieldset { width: 600px }
+fieldset .labeled-field input,
+fieldset .labeled-field textarea {
+    width: 450px;
+}
+.info { padding-left: 50px; }
+fieldset li {
+    margin-left: -25px;
+    width: 550px;
+    color: green;
+}
+ul { margin: 5px auto 10px; }
+li { list-style-type: none; }
+fieldset li.filter { color: blue; }
+fieldset li.dummy { color: red; }
+#filters, #sets { height: 150px; overflow-y: scroll; }

@@ -1,3 +1,10 @@
+#!/usr/bin/env python
+
+"""Show the last times each data partner has logged in.
+
+Run occasionally for Margaret.
+"""
+
 sids = {}
 users = {}
 for line in open("d:/cdr/sftp_log/cumulative.log"):
@@ -15,4 +22,4 @@ for line in open("d:/cdr/sftp_log/cumulative.log"):
         sids[sid] = user
 print("Content-type: text/plain\n")
 for user in sorted(users):
-    print("{} {}".format(user, users[user]))
+    print(("{} {}".format(user, users[user])))

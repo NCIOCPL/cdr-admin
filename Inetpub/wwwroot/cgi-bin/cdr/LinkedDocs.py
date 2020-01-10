@@ -11,22 +11,22 @@
 #----------------------------------------------------------------------
 import cdr
 import cdrcgi
-import cdrdb
 import cgi
 import datetime
-import urllib
+import urllib.parse
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Set the form variables.
 #----------------------------------------------------------------------
-cursor       = cdrdb.connect("CdrGuest").cursor()
+cursor       = db.connect(user="CdrGuest").cursor()
 fields       = cgi.FieldStorage()
 doc_id       = fields.getvalue("doc_id") or fields.getvalue("DocId")
-frag_id      = fields.getvalue("frag_id") or fields.getvalue("FragId") or u""
-doc_title    = unicode(fields.getvalue("doc_title", ""), "utf-8")
+frag_id      = fields.getvalue("frag_id") or fields.getvalue("FragId") or ""
+doc_title    = fields.getvalue("doc_title", "")
 linked_type  = fields.getvalue("linked_type")
-linking_type = fields.getvalue("linking_type") or u""
-with_blocked = fields.getvalue("with_blocked") or u"N"
+linking_type = fields.getvalue("linking_type") or ""
+with_blocked = fields.getvalue("with_blocked") or "N"
 session      = cdrcgi.getSession(fields)
 request      = cdrcgi.getRequest(fields)
 title        = "Linked Documents Report"
@@ -54,7 +54,7 @@ def put_up_selection(rows):
     page.add(page.B.LEGEND("Select Linked Document For Report"))
     for doc_id, name in rows:
         id_string = cdr.normalize(doc_id)
-        label = u"%s: %s" % (id_string, name)
+        label = "%s: %s" % (id_string, name)
         page.add_radio("doc_id", label, id_string)
     page.add("</fieldset>")
     page.add(page.B.INPUT(name="frag_id", value=frag_id, type="hidden"))
@@ -68,7 +68,7 @@ def put_up_selection(rows):
 # Search for linked document by title, if so requested.
 #----------------------------------------------------------------------
 if doc_title and not doc_id:
-    query = cdrdb.Query("document d", "d.id", "d.title")
+    query = db.Query("document d", "d.id", "d.title")
     if linked_type:
         query.join("doc_type t", "t.id = d.doc_type")
         query.where(query.Condition("t.name", linked_type))
@@ -112,7 +112,7 @@ def show_target_info(table, page):
 #----------------------------------------------------------------------
 def show_footer(table, page):
     try:
-        query = cdrdb.Query("usr u", "u.fullname")
+        query = db.Query("usr u", "u.fullname")
         query.join("session s", "u.id = s.usr")
         query.where(query.Condition("s.name", session))
         user = query.execute().fetchall()[0][0]
@@ -132,7 +132,7 @@ def show_report(doc_id, frag_id):
         frag_id = id_pieces[2]
 
     # Get the target doc info.
-    query = cdrdb.Query("document d", "d.title", "t.name")
+    query = db.Query("document d", "d.title", "t.name")
     query.join("doc_type t", "t.id = d.doc_type")
     query.where(query.Condition("d.id", doc_id))
     rows = query.execute(cursor).fetchall()
@@ -144,7 +144,7 @@ def show_report(doc_id, frag_id):
 
     # Find the links.
     columns = ("d.id", "d.title", "t.name", "n.source_elem", "n.target_frag")
-    query = cdrdb.Query("document d", *columns)
+    query = db.Query("document d", *columns)
     query.join("doc_type t", "t.id = d.doc_type")
     query.join("link_net n", "d.id = n.source_doc")
     query.where(query.Condition("n.target_doc", doc_id))
@@ -179,14 +179,15 @@ def show_report(doc_id, frag_id):
     for doc_id, doc_title, doc_type, source_elem, target_frag in results:
         if doc_type != last_doc_type:
             if rows:
-                args["caption"] = u"Links From %s Documents" % last_doc_type
+                args["caption"] = "Links From %s Documents" % last_doc_type
                 tables.append(cdrcgi.Report.Table(columns, rows, **args))
                 rows = []
                 args = {}
             last_doc_type = doc_type
         doc_id_string = "CDR%d" % doc_id
         params = { "DocId": doc_id_string, "Session": session or "guest" }
-        url = "QcReport.py?%s" % urllib.urlencode(params)
+        params["DocVersion"] = "-1"
+        url = "QcReport.py?%s" % urllib.parse.urlencode(params)
         row = (
             cdrcgi.Report.Cell(doc_id_string, href=url),
             doc_title or "",
@@ -195,7 +196,7 @@ def show_report(doc_id, frag_id):
         )
         rows.append(row)
     if last_doc_type:
-        args["caption"] = u"Links From %s Documents" % last_doc_type
+        args["caption"] = "Links From %s Documents" % last_doc_type
         args["html_callback_post"] = show_footer
         tables.append(cdrcgi.Report.Table(columns, rows, **args))
     report = cdrcgi.Report(title, tables, banner=title, subtitle=instr)
@@ -207,7 +208,7 @@ def show_report(doc_id, frag_id):
 if doc_id:
     try:
         show_report(doc_id, frag_id)
-    except Exception, e:
+    except Exception as e:
         cdrcgi.bail("%s" % e)
 
 #----------------------------------------------------------------------
@@ -222,8 +223,8 @@ SELECT DISTINCT name
        ORDER BY name
 """)
         return cursor.fetchall()
-    except cdrdb.Error, info:
-        cdrcgi.bail('Database query failure: %s' % info[1][0])
+    except Exception as e:
+        cdrcgi.bail('Database query failure: %s' % e)
 
 #----------------------------------------------------------------------
 # Put up the main request form.

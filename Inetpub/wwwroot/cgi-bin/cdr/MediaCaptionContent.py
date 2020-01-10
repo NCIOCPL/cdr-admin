@@ -15,7 +15,6 @@
 
 import cdr
 import cdrcgi
-import cdrdb
 import cgi
 import copy
 import datetime
@@ -26,14 +25,12 @@ import xml.sax.handler
 
 from datetime import datetime as dt
 from io import BytesIO
-from os import O_BINARY
 from sys import stdout
-from msvcrt import setmode
 from xlsxwriter import Workbook
 from cdr import get_image
-#from cdrapi.db import Query
 from cdrapi.docs import Doc
 from cdrapi.users import Session
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # CGI form variables
@@ -61,12 +58,11 @@ end_date   = fields.getvalue("end_date")
 #addImage  = "Y"
 # ------------------------
 
-cdr.logwrite("*** MediaCaptionContent.py started")
+LOGGER = cdr.Logging.get_logger("MediaCaptionContent")
+LOGGER.info("*** started")
 URL = "{}/cgi-bin/cdr/GetCdrImage.py?id={}"
 FILENAME = "{}.xlsx".format(dt.now().strftime("%Y%m%d%H%M%S"))
-
-setmode(stdout.fileno(), O_BINARY)  # Needed on Windows machines
-output = BytesIO()                  # ^^^
+output = BytesIO()
 
 #----------------------------------------------------------------------
 # Form buttons
@@ -91,27 +87,27 @@ if action == BT_LOGOUT:
 # Connection to database
 #----------------------------------------------------------------------
 try:
-    conn = cdrdb.connect("CdrGuest")
+    conn = db.connect(user="CdrGuest")
     cursor = conn.cursor()
-except Exception, e:
+except Exception as e:
     cdrcgi.bail("Unable to connect to database", extra=[str(e)])
 
 #----------------------------------------------------------------------
 # Assemble the lists of valid values.
 #----------------------------------------------------------------------
-query = cdrdb.Query("query_term t", "t.doc_id", "t.value")
+query = db.Query("query_term t", "t.doc_id", "t.value")
 query.join("query_term m", "m.int_val = t.doc_id")
 query.where("t.path = '/Term/PreferredName'")
 query.where("m.path = '/Media/MediaContent/Diagnoses/Diagnosis/@cdr:ref'")
-results = query.unique().order(2).execute(cursor).fetchall()
-diagnoses = [("any", "Any Diagnosis")] + results
+rows = query.unique().order(2).execute(cursor).fetchall()
+diagnoses = [("any", "Any Diagnosis")] + [tuple(row) for row in rows]
 
-query = cdrdb.Query("query_term", "value", "value")
+query = db.Query("query_term", "value", "value")
 query.where("path = '/Media/MediaContent/Categories/Category'")
 query.where("value <> ''")
 results = query.unique().order(1).execute(cursor).fetchall()
 
-categories = [("any", "Any Category")] + results
+categories = [("any", "Any Category")] + [tuple(row) for row in results]
 languages = (("all", "All Languages"),
              ("en", "English"),
              ("es", "Spanish"))
@@ -129,7 +125,7 @@ images    = (("Y", "Yes"), ("N", "No"))
 for value, values in ((diagnosis, diagnoses), (audience, audiences),
                       (language, languages), (category, categories),
                       (addImage, images)):
-    if isinstance(value, basestring):
+    if isinstance(value, str):
         value = [value]
     values = [str(v[0]).lower() for v in values]
     for val in value:
@@ -269,7 +265,7 @@ language_path = caption_path + "/@language"
 audience_path = caption_path + "/@audience"
 
 # Create base query for the documents
-query = cdrdb.Query("document d", "d.id", "d.title").unique().order(2)
+query = db.Query("document d", "d.id", "d.title").unique().order(2)
 query.join("doc_type t", "t.id = d.doc_type")
 query.join("doc_version v", "d.id = v.id")
 query.where("t.name = 'Media'")
@@ -308,13 +304,10 @@ query.log(logfile=cdr.DEFAULT_LOGDIR + "/media.log")
 try:
     docIds = [row[0] for row in query.execute(cursor).fetchall()]
     #print("docs: {}".format(docIds))
-except cdrdb.Error, info:
+except Exception as e:
     msg = "Database error executing MediaCaptionContent.py query"
-    extra = (
-        "query = %s" % query,
-        "error = %s" % str(info),
-    )
-    cdr.logwrite(str(info))
+    extra = f"query = {query}", f"error = {e}"
+    LOGGER.exception("Report database query failure")
     cdrcgi.bail(msg, extra=extra)
 
 # If there was no data, we're done
@@ -449,9 +442,10 @@ Error: %s""" % (docId, result))
         if values and values[0] == 'JPEG':
             doc = Doc(session, id=docId)
             try:
-                image = get_image(doc.id, height=200, width=200, return_stream=True)
+                image = get_image(doc.id, height=200, width=200,
+                                  return_stream=True)
             except Exception as e:
-                cdr.logwrite("No blob found for CDR document {}".format(doc.id))
+                LOGGER.exception("Fetching blob for %s", doc.id)
 
                 #args = doc.cdr_id, doc.has_blob, e
                 #sys.stderr.write("{} ({}) failed: {}\n".format(*args))
@@ -467,15 +461,14 @@ Error: %s""" % (docId, result))
 
     row += 2
 
-cdr.logwrite("*** MediaCaptionContent.py finished")
-#sys.exit()
-# Output
+LOGGER.info("*** finished")
 book.close()
 output.seek(0)
 book_bytes = output.read()
-stdout.write("""\
+stdout.buffer.write(f"""\
 Content-type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
-Content-Disposition: attachment; filename={}
-Content-length: {:d}
+Content-Disposition: attachment; filename={FILENAME}
+Content-length: {len(book_bytes):d}
 
-{}""".format(FILENAME, len(book_bytes), book_bytes))
+""".encode("utf-8"))
+stdout.buffer.write(book_bytes)

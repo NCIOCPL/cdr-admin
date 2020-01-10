@@ -1,44 +1,65 @@
-#----------------------------------------------------------------------
-# Interface for editing CDR linking tables.
-#----------------------------------------------------------------------
+#!/usr/bin/env python
 
-import cgi, cdr, cdrcgi, re, string
+"""Menu for editing CDR linking tables.
+"""
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields  = cgi.FieldStorage()
-session = cdrcgi.getSession(fields)
-action  = cdrcgi.getRequest(fields)
-title   = "CDR Administration"
-section = "Manage Linking Tables"
-buttons = [cdrcgi.MAINMENU]
-header  = cdrcgi.header(title, title, section, "EditLinkControl.py", buttons)
+from cdrcgi import Controller, navigateTo
 
-#----------------------------------------------------------------------
-# Return to the main menu if requested.
-#----------------------------------------------------------------------
-if action == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
+class Control(Controller):
+    """Encapsulates processing logic for building the menu page."""
 
-#----------------------------------------------------------------------
-# Put up a stub page for now.
-#----------------------------------------------------------------------
-form = "<INPUT TYPE='hidden' NAME='%s' VALUE='%s'><OL>\n" % (cdrcgi.SESSION,
-                                                             session)
-types = cdr.getLinkTypes(session)
-if type(types) == type(""): cdrcgi.bail(types)
+    SUBTITLE = "Manage Link Types"
+    ADD_NEW_LINK_TYPE = "Add New Link Type"
+    EDIT_LINK_TYPE = "EditLinkType.py"
+    SHOW_ALL = "Show All Link Types"
+    SHOW_ALL_LINK_TYPES = "ShowAllLinkTypes.py"
 
-for t in types:
-    form += "<LI><A HREF='%s/EditLinkType.py?name=%s&linkact=modlink&%s=%s'>%s</LI>\n" % (
-            cdrcgi.BASE, t, cdrcgi.SESSION, session, t)
+    def populate_form(self, page):
+        """Add link type editing links and custom formatting to the page."""
 
-form += """\
-<LI><A HREF="%s/EditLinkType.py?linkact=addlink&%s=%s">%s</LI>
-<LI><A HREF="%s/ShowAllLinkTypes.py?%s=%s">%s</LI>
-<LI><A HREF="%s/Logout.py?%s=%s">%s</LI>
-</OL>
-""" % (cdrcgi.BASE, cdrcgi.SESSION, session, "Add New Link Type",
-       cdrcgi.BASE, cdrcgi.SESSION, session, "Show All Link Types",
-       cdrcgi.BASE, cdrcgi.SESSION, session, "Log Out")
-cdrcgi.sendPage(header + form + "</FORM></BODY></HTML>")
+        page.body.set("class", "admin-menu")
+        fieldset = page.fieldset("Existing Link Types (click to edit)")
+        fieldset.set("class", "flexlinks")
+        ul = page.B.UL()
+        script = self.EDIT_LINK_TYPE
+        for id, name in self.link_types:
+            ul.append(page.B.LI(page.menu_link(script, name, id=id)))
+        fieldset.append(ul)
+        page.form.append(fieldset)
+        page.add_css(".flexlinks ul { height: 400px; }")
+
+    def run(self):
+        """Override base class to add action for new button."""
+
+        if self.request == self.ADD_NEW_LINK_TYPE:
+            opts = dict(linkact="addlink")
+            navigateTo(self.EDIT_LINK_TYPE, self.session.name, **opts)
+        elif self.request == self.SHOW_ALL:
+            navigateTo(self.SHOW_ALL_LINK_TYPES, self.session.name)
+        else:
+            Controller.run(self)
+
+    @property
+    def buttons(self):
+        """Override to specify custom buttons for this page."""
+
+        return (
+            self.ADD_NEW_LINK_TYPE,
+            self.SHOW_ALL,
+            self.DEVMENU,
+            self.ADMINMENU,
+            self.LOG_OUT
+        )
+
+    @property
+    def link_types(self):
+        if not hasattr(self, "_link_types"):
+            query = self.Query("link_type", "id", "name").order("name")
+            rows = query.execute(self.cursor).fetchall()
+            self._link_types = [tuple(row) for row in rows]
+        return self._link_types
+
+
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+    Control().run()

@@ -1,95 +1,115 @@
-#----------------------------------------------------------------------
-# New report to track the processing of audio pronunciation media
-# documents.
-#
-# BZIssue::5123
-# JIRA::OCECDR-3800 - Address security vulnerabilities
-#----------------------------------------------------------------------
-import cdr
-import cdrbatch
-import cdrcgi
-import cgi
-import datetime
+#!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-today      = datetime.date.today()
-fields     = cgi.FieldStorage()
-request    = cdrcgi.getRequest(fields)
-session    = cdrcgi.getSession(fields) or cdrcgi.bail("Please log in")
-email      = cdr.getEmail(session) or cdrcgi.bail("No email for user")
-language   = fields.getvalue("language") or "all"
-start_date = fields.getvalue("start_date") or "2011-01-01"
-end_date   = fields.getvalue("end_date") or str(today)
-SUBMENU    = "Report Menu"
-buttons    = ["Submit", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-script     = "PronunciationRecordings.py"
-title      = "CDR Administration"
-section    = "Audio Pronunciation Recordings Tracking Report"
+"""Track the processing of audio pronunciation media documents.
+"""
 
-#----------------------------------------------------------------------
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if request == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif request == SUBMENU:
-    cdrcgi.navigateTo("Reports.py", session)
-if request == "Log Out":
-    cdrcgi.logout(session)
+from cdrcgi import Controller
+from cdrbatch import CdrBatch
 
-#----------------------------------------------------------------------
-# Validate the parameters.
-#----------------------------------------------------------------------
-cdrcgi.valParmDate(start_date, msg="invalid start date")
-cdrcgi.valParmDate(end_date, msg="invalid end date")
-if start_date > end_date:
-    cdrcgi.bail("end date cannot precede start date")
 
-#----------------------------------------------------------------------
-# Put up the menu if we don't have selection criteria yet.
-#----------------------------------------------------------------------
-if not request:
-    instructions = (
-        "All fields are required. "
-        "The end date cannot precede the start date."
-    )
-    page = cdrcgi.Page(title, subtitle=section, buttons=buttons,
-                       action=script, session=session)
-    page.add(page.B.FIELDSET(page.B.P(instructions)))
-    page.add("<fieldset>")
-    page.add(page.B.LEGEND("Date Range"))
-    page.add_date_field("start_date", "Start Date", value=start_date)
-    page.add_date_field("end_date", "End Date", value=end_date)
-    page.add("</fieldset>")
-    page.add("<fieldset>")
-    page.add(page.B.LEGEND("Language"))
-    page.add_radio("language", "All", "all", checked=True)
-    page.add_radio("language", "English", "en")
-    page.add_radio("language", "Spanish", "es")
-    page.add("</fieldset>")
-    page.send()
+class Control(Controller):
 
-#----------------------------------------------------------------------
-# Queue up a request for the report.
-#----------------------------------------------------------------------
-if language not in ("en", "es"):
-    language = "all"
-args = (
-    ("start", start_date),
-    ("end", end_date),
-    ("language", language),
-)
-if not email or "@" not in email:
-    cdrcgi.bail("No email address for logged-in user")
-try:
-    batch = cdrbatch.CdrBatch(jobName=section, email=email, args=args,
-                              command="lib/Python/CdrLongReports.py")
-except Exception, e:
-    cdrcgi.bail("Failure creating batch job: %s" % repr(e))
-try:
-    batch.queue()
-except Exception, e:
-    cdrcgi.bail("Unable to start job: %s" % repr(e))
-jobId = batch.getJobId()
-batch.show_status_page(session, title, section, script, SUBMENU)
+    JOB_NAME = SUBTITLE = "Audio Pronunciation Recordings Tracking Report"
+    LANGUAGES = dict(all="All", en="English", es="Spanish")
+    LONG_REPORTS = "lib/Python/CdrLongReports.py"
+    ARGS = "start", "end", "language"
+
+    def populate_form(self, page):
+        """Show the instructions and request the required values.
+
+        Pass:
+            page - HTMLPage where we drop the forms
+        """
+        fieldset = page.fieldset("Date Range")
+        fieldset.append(page.date_field("start_date", value=self.start))
+        fieldset.append(page.date_field("end_date", value=self.end))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Language")
+        for langcode in sorted(self.LANGUAGES):
+            opts = dict(value=langcode, label=self.LANGUAGES[langcode])
+            if langcode == "all":
+                opts["checked"] = True
+            fieldset.append(page.radio_button("language", **opts))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Email Address for Report Notification")
+        fieldset.append(page.text_field("email", value=self.email))
+        page.form.append(fieldset)
+
+    def show_report(self):
+        """Queue the report and display its status."""
+
+        if not self.email:
+            self.bail("Missing required email address")
+        try:
+            self.job.queue()
+        except Exception as e:
+            self.logger.exception("Failure queueing report")
+            self.bail(f"Unable to start job: {e}")
+        session = self.session.name
+        args = session, self.title, self.JOB_NAME, self.script, self.SUBMENU
+        self.job.show_status_page(*args)
+
+    @property
+    def args(self):
+        """Arguments for the batch job."""
+        return [(name, getattr(self, name)) for name in self.ARGS]
+
+    @property
+    def email(self):
+        """Email address to which we send the notification."""
+
+        if not hasattr(self, "_email"):
+            self._email = self.fields.getvalue("email")
+            if not self._email:
+                self._email = self.user.email
+        return self._email
+
+    @property
+    def user(self):
+        """The currently logged-in user."""
+
+        if not hasattr(self, "_user"):
+            opts = dict(id=self.session.user_id)
+            self._user = self.session.User(self.session, **opts)
+        return self._user
+
+    @property
+    def end(self):
+        """End of the date range for the report."""
+
+        default = self.started.strftime("%Y-%m-%d")
+        return self.fields.getvalue("end_date") or default
+
+    @property
+    def job(self):
+        """Batch job for the report."""
+
+        if not hasattr(self, "_job"):
+            self._job = CdrBatch(**self.opts)
+        return self._job
+
+    @property
+    def language(self):
+        """Language code selected for the report."""
+        return self.fields.getvalue("language")
+
+    @property
+    def opts(self):
+        """Options for the batch job constructor."""
+
+        return dict(
+            jobName=self.JOB_NAME,
+            email=self.email,
+            args=self.args,
+            command=self.LONG_REPORTS,
+        )
+
+    @property
+    def start(self):
+        """Beginning of the date range for the report."""
+        return self.fields.getvalue("start_date") or "2011-01-01"
+
+
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+    Control().run()

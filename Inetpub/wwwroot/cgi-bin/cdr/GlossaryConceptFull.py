@@ -1,1119 +1,1004 @@
-#----------------------------------------------------------------------
-# coding=latin-1
-#
-# Glossary Term Concept report
-# This report takes a concept and displays all of the Term Name
-# definitions that are linked to this concept document
-#
-# BZIssue::3948 - Element name changes
-# BZIssue::3948 - Modified display of blocked/missing term names
-# BZIssue::4375 - Added CSS for insertion/deletion markup
-# BZIssue::4425 - Don't display Spanish definitions for blocked docuents
-# BZIssue::4482 - Rewritten at user request
-# Modified July 2015 as part of security sweep
-#----------------------------------------------------------------------
-import cgi
-import cdr
-import cdrcgi
-import cdrdb
-import re
+#!/usr/bin/python
+
+"""Show complete information about a glossary concept and its names.
+"""
+
+from copy import deepcopy
+from cdrcgi import Controller
+from cdrapi.docs import Doc
+from cdrapi.users import Session
+from lxml import html, etree
+from lxml.html import builder
 import sys
-import time
-import xml.dom.minidom
 
-# Setting the labels used for each element displayed
-# --------------------------------------------------
-LABEL = { 'DateLastModified'      :'Date Last Modified',
-          'DateLastReviewed'      :'Date Last Reviewed',
-          'DefinitionResource'    :'Definition Resource',
-          'DefinitionStatus'      :'Definition Status',
-          'Dictionary'            :'Dictionary',
-          'MediaLink'             :'Media Link',
-          'NCIThesaurusID'        :'NCI Thesaurus ID',
-          'PDQTerm'               :'PDQ Term',
-          'RelatedExternalRef'    :'Rel External Ref',
-          'RelatedDrugSummaryLink':'Rel Drug Summary Link',
-          'RelatedSummaryRef'     :'Rel Summary Ref',
-          'RelatedGlossaryTermNameLink':'Rel Glossary Term',
-          'StatusDate'            :'Status Date',
-          'TermType'              :'Term Type',
-          'TranslatedStatus'      :'Translated Status',
-          'TranslationResource'   :'Translation Resource',
-          'EmbeddedVideo'         :'Video Link'}
 
-#----------------------------------------------------------------------
-# More than one matching term name; let the user choose one.
-#----------------------------------------------------------------------
-def showTermNameChoices(choices):
-    form = """\
-   <H3>More than one matching document found; please choose one.</H3>
-"""
-    for choice in choices:
-        form += """\
-   <INPUT TYPE='radio' NAME='DocId' VALUE='CDR%010d'>[CDR%d] %s<BR>
-""" % (choice[0], choice[0], cgi.escape(choice[1]))
-    cdrcgi.sendPage(header + form + """\
-   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-  </FORM>
- </BODY>
-</HTML>
-""" % (cdrcgi.SESSION, session))
-
-#----------------------------------------------------------------------
-# Create a single row to be displayed in an HTML table (two columns)
-#----------------------------------------------------------------------
-def addSingleRow(data, label):
-    # Adding row for Date Last Reviewed
-    if label in data:
-        htmlRow = """
-   <tr>
-    <td>
-     <b>%s</b>
-    </td>
-    <td>%s</td>
-   </tr>
-""" % (LABEL[label], data[label])
-
-    return htmlRow
-
-
-#----------------------------------------------------------------------
-# Create a single row for the Media link such that the media is being
-# displayed.
-# We're creating a small DOM that we can parse in order to extract the
-# CDR-ID of the media document.
-#----------------------------------------------------------------------
-def addMediaRow(data, label):
-    #cdrcgi.bail(data[label])
-    url = "https://cdr.cancer.gov/cgi-bin/cdr/GetCdrImage.py?id"
-    htmlRow = ''
-    for row in data['MediaLink']:
-        mediaString = '''
-        <Root xmlns:cdr="cips.nci.nih.gov/cdr">
-        %s
-        </Root>''' % row
-        dom = xml.dom.minidom.parseString(mediaString.encode('utf-8'))
-        docElem = dom.documentElement
-
-        for node in docElem.childNodes:
-            if node.nodeName == 'MediaLink':
-                for child in node.childNodes:
-                    if child.nodeName == 'MediaID':
-                        mediaValue = str(cdr.getTextContent(child).strip())
-                        mediaID = child.getAttribute('cdr:ref')
-        dom.unlink()
-        htmlRow += """
-   <tr>
-    <td width="30%%" valign="top">
-     <b>%s</b>
-    </td>
-    <td width="70%%">%s  <br>
-     <img src="%s=%s-300.jpg">
-    </td>
-   </tr>
-""" % (LABEL[label], mediaValue, url, mediaID)
-
-    return htmlRow
-
-#----------------------------------------------------------------------
-# Create a single row for the Video link such that an image is being
-# displayed and a link to YouTube to watch the video.
-# We're creating a small DOM that we can parse in order to extract the
-# CDR-ID of the video document.
-#----------------------------------------------------------------------
-def addVideoRow(data, label):
-    imgUrl = "https://img.youtube.com/vi"
-    url = "https://www.youtube.com/watch?v"
-    htmlRow = ''
-    for row in data['EmbeddedVideo']:
-        specificTitle = ''
-        videoString = '''
-        <Root xmlns:cdr="cips.nci.nih.gov/cdr">
-        %s
-        </Root>''' % row
-        dom = xml.dom.minidom.parseString(videoString.encode('utf-8'))
-        docElem = dom.documentElement
-
-        for node in docElem.childNodes:
-            if node.nodeName == 'EmbeddedVideo':
-                for child in node.childNodes:
-                    if child.nodeName == 'VideoID':
-                        videoValue = str(cdr.getTextContent(child).strip())
-                        videoID = child.getAttribute('cdr:ref')[3:]
-                        try:
-                           docId = int(videoID)
-                        except:
-                           cdrcgi.bail("Error converting videoID: " % videoID)
-
-                    if child.nodeName == 'SpecificMediaTitle':
-                        #specificTitle = str(cdr.getTextContent(child).strip())
-                        specificTitle = cdr.getTextContent(child).strip()
-                        specificTitleBytes = specificTitle.encode('utf-8')
-        dom.unlink()
-
-        # Retrieve the hosting ID for YouTube from the Media document
-        # -----------------------------------------------------------
-        cursor.execute("SELECT xml FROM document WHERE id = ?", docId)
-        row = cursor.fetchone()
-        dom = xml.dom.minidom.parseString(row[0].encode('utf-8'))
-        docElem = dom.documentElement
-
-        hostingElem = docElem.getElementsByTagName("HostingID")[0]    
-        youtubeID = cdr.getTextContent(hostingElem)
-
-        # Overwrite media title if specific title exists
-        if specificTitle: videoValue = specificTitle
-
-        htmlRow += """
-   <tr>
-    <td width="30%%" valign="top">
-     <b>%s</b>
-    </td>
-    <td width="70%%">%s  <br>
-     <img src="%s/%s/hqdefault.jpg"><br>
-     <a href="%s=%s">Watch video on YouTube</a>
-    </td>
-   </tr>
-""" % (LABEL[label], videoValue, imgUrl, youtubeID, url, youtubeID)
-
-    return htmlRow
-
-#----------------------------------------------------------------------
-# Same as addSingleRow() but the label is only displayed for the first
-# row.
-#----------------------------------------------------------------------
-def addMultipleRow(data, label):
-    # Adding row for Date Last Reviewed
-    if label in data:
-        iRow = -1
-        htmlRows = ""
-        for value in data[label]:
-            iRow += 1
-            if iRow == 0:
-                iLabel = LABEL[label]
-            else:
-                iLabel = ''
-            htmlRows += """
-   <tr>
-    <td width="30%%">
-     <b>%s</b>
-    </td>
-    <td width="70%%">%s</td>
-   </tr>""" % (iLabel, value)
-
-    return htmlRows
-
-
-#----------------------------------------------------------------------
-# Same as addMultipleRow() but we are also adding a single attribute
-#----------------------------------------------------------------------
-def addAttributeRow(data, label, indent = False):
-    # Adding row for Date Last Reviewed
-    if data.has_key(label):
-        iRow = -1
-        htmlRows = ""
-        for value, attribute in data[label]:
-            try:
-                attrValue = ('<a href="/cgi-bin/cdr/QcReport.py?' +
-                             'Session=guest&amp;DocId=%d">CDR%d</a>') % (
-                                              cdr.exNormalize(attribute)[1],
-                                              cdr.exNormalize(attribute)[1])
-            except:
-                attrValue = '<a href="%s">%s</a>' % (attribute, attribute)
-
-            iRow += 1
-            if iRow == 0:
-                iLabel = LABEL[label]
-            else:
-                iLabel = ''
-            if not indent:
-                htmlRows += """
-   <tr>
-    <td width="30%%">
-     <b>%s</b>
-    </td>
-    <td width="70%%">%s (%s)</td>
-   </tr>""" % (iLabel, value, attrValue)
-            else:
-                htmlRows += """
-   <tr>
-    <td width="3%%"> </td>
-    <td width="27%%">
-     <b>%s</b>
-    </td>
-    <td width="70%%">%s (%s)</td>
-   </tr>""" % (iLabel, value, attrValue)
-
-    return htmlRows
-
-
-#-----------------------------------------------------------------------
-# Module to create a small XML snippet that can be submitted to a filter
-# in order to substitute the PlaceHolder elements with the appropriate
-# text from the ReplacementText elements.
-#
-# The XML snippet has the following structure:
-# <GlossaryTermDef>
-#    <TermNameString/>
-#    <DefinitionText>
-#      <Insertion or Deletion> [optional]
-#      <PlaceHolder/>          [optional]
-#    </DefinitionText>
-#    <GlossaryTermPlaceHolder> [optional]
-#      <ReplacementText/>
-#    </GlossaryTermPlaceHolder>
-#  </GlossaryTermDef>
-#-----------------------------------------------------------------------
-def resolvePlaceHolder(language, termData, definitionText):
-     # Create the Glossary Definition
-     tmpdoc  = u"\n<GlossaryTermDef xmlns:cdr = 'cips.nci.nih.gov/cdr'>\n"
-     tmpdoc += termData.get(language, u"@S@%s (en inglés)@E@" % termData['en'])\
-                  + u"\n"
-     tmpdoc += u" %s\n" % definitionText['DefinitionText']
-
-     # Add the ReplacementText from the GlossaryTermName documents
-     if 'ReplacementText' in termData:
-         tmpdoc += u" <GlossaryTermPlaceHolder>\n"
-         for gtText in termData['ReplacementText']:
-             tmpdoc += u"  %s\n" % gtText
-         tmpdoc += u" </GlossaryTermPlaceHolder>\n"
-
-     # Add the ReplacementText from the GlossaryTermConcept document
-     if 'ReplacementText' in definitionText:
-         tmpdoc += u" <GlossaryConceptPlaceHolder>\n"
-         for gcText in definitionText['ReplacementText']:
-             tmpdoc += u"  %s\n" % gcText
-         tmpdoc += u" </GlossaryConceptPlaceHolder>\n"
-
-     tmpdoc += u"</GlossaryTermDef>\n"
-
-     # Need to encode the unicode string to UTF-8 since that's what the
-     # filter module expects.  Decoding it back to unicode once the
-     # filtered document comes back.
-     # --------------------------------------------------------------------
-     doc = cdr.filterDoc('guest', ['name:Glossary Term Definition Update'],
-                         doc = tmpdoc.encode('utf-8'))
-
-     if type(doc) in (type(""), type(u"")):
-         cdrcgi.bail(doc)
-     if type(doc) == type(()):
-         doc = doc[0].decode('utf-8')
-
-     return doc
-
-
-#-----------------------------------------------------------------------
-# Module to create a small XML snippet that can be submitted to a filter
-# in order to substitute the PlaceHolder elements with the appropriate
-# text from the ReplacementText elements.
-#-----------------------------------------------------------------------
-def displayMarkup(xmlString, element):
-     # Create XML document to be filtered
-     if element == 'TermName':
-         tmpdoc  = u"\n<TermNameDef xmlns:cdr = 'cips.nci.nih.gov/cdr'>\n"
-         tmpdoc += u"  %s\n" % xmlString
-         tmpdoc += u"</TermNameDef>\n"
-     elif element == 'Comment':
-         tmpdoc  = u"\n<GlossaryTermDef xmlns:cdr = 'cips.nci.nih.gov/cdr'>\n"
-         # Add the CommentText and attributes
-         for comment in xmlString:
-             tmpdoc += u"  %s\n" % comment
-         tmpdoc += u"</GlossaryTermDef>\n"
-
-
-     # Need to encode the unicode string to UTF-8 since that's what the
-     # filter module expects.  Decoding it back to unicode once the
-     # filtered document comes back.
-     # --------------------------------------------------------------------
-     doc = cdr.filterDoc('guest', ['name:Glossary Term Definition Update'],
-                         doc = tmpdoc.encode('utf-8'))
-
-     if type(doc) in (type(""), type(u"")):
-         cdrcgi.bail(doc)
-     if type(doc) == type(()):
-         doc = doc[0].decode('utf-8')
-
-     return doc
-
-
-#----------------------------------------------------------------------
-# Get the parameters from the request.
-#----------------------------------------------------------------------
-repTitle = "CDR QC Glossary Concept Report"
-fields   = cgi.FieldStorage()
-session  = cdrcgi.getSession(fields) or cdrcgi.bail("Not logged in")
-action   = cdrcgi.getRequest(fields)
-docId    = fields.getvalue("DocId")
-termName = fields.getvalue("TermName")
-title    = "CDR Administration"
-section  = "QC Report"
-SUBMENU  = "Reports Menu"
-buttons  = ["Submit", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-header   = cdrcgi.header(title, title, "Glossary QC Report - Full",
-                         "GlossaryConceptFull.py", buttons, method = 'GET')
-
-#----------------------------------------------------------------------
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if action == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif action == SUBMENU:
-    cdrcgi.navigateTo("Reports.py", session)
-
-#----------------------------------------------------------------------
-# Handle request to log out.
-#----------------------------------------------------------------------
-if action == "Log Out":
-    cdrcgi.logout(session)
-
-#----------------------------------------------------------------------
-# If we have no request yet, put up the form.
-#----------------------------------------------------------------------
-if not docId and not termName:
-    form = """\
-  <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-  <TABLE>
-   <TR>
-    <TD ALIGN='right'><B>Glossary Term Name:&nbsp;</B><BR />
-    (use %% as wildcard)</TD>
-    <TD><INPUT SIZE='60' NAME='TermName'></TD>
-   </TR>
-   <TR>
-    <TD> </TD>
-    <TD>... or ...</TD>
-   </TR>
-   <TR>
-    <TD ALIGN='right'>
-     <B>Glossary Term Name or Glossary Term Concept CDR ID:&nbsp;</B>
-    </TD>
-    <TD><INPUT SIZE='60' NAME='DocId'></TD>
-   </TR>
-  </TABLE>
-""" % (cdrcgi.SESSION, session)
-    cdrcgi.sendPage(header + form + """\
- </BODY>
-</HTML>
-""")
-
-#----------------------------------------------------------------------
-# Set up a database connection and cursor.
-#----------------------------------------------------------------------
-try:
-    conn = cdrdb.connect('CdrGuest')
-    cursor = conn.cursor()
-except cdrdb.Error, info:
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
-
-#----------------------------------------------------------------------
-# Passing a CDR-ID and the document type
-# Returning a list with a concept ID and all linking term names
-#----------------------------------------------------------------------
-def getAllTermNames(conceptId):
-    cursor.execute("""\
-        SELECT DISTINCT doc_id
-                   FROM query_term
-                  WHERE path = '/GlossaryTermName/GlossaryTermConcept/@cdr:ref'
-                    AND int_val = ?""", conceptId, timeout = 300)
-    return [row[0] for row in cursor.fetchall()]
-
-#----------------------------------------------------------------------
-# Getting the status of the GlossaryTermNames so that we can
-# identify blocked terms.
-#----------------------------------------------------------------------
-def getTermNameStatus(termList):
-    termNameIds = ','.join("%s" % id for id in termList)
-
-    try:
-        cursor.execute("""SELECT id, active_status
-                          FROM document
-                         WHERE id in (%s)""" % termNameIds)
-        rows = cursor.fetchall()
-
-    except cdrdb.Error, info:
-        cdrcgi.bail("Error selecting term name status: %s" % info[1][0])
-
-    statusList = {}
-    for id, status in rows:
-        statusList[id] = str(status)
-
-    return statusList
-
-
-#----------------------------------------------------------------------
-# Passing a CDR-ID
-# This function returns an HTML snippet in case a MediaLink element
-# or an EmbeddedVideo link exists that's being shared between English 
-# and Spanish definitions.
-#----------------------------------------------------------------------
-def getSharedInfo(docId):
-    try:
-        cursor.execute("SELECT xml FROM document WHERE id = ?", docId)
-        row = cursor.fetchone()
-        dom = xml.dom.minidom.parseString(row[0].encode('utf-8'))
-        docElem = dom.documentElement
-
-        sharedElements = ['MediaLink', 'EmbeddedVideo', 'TermType', 
-                          'PDQTerm', 'NCIThesaurusID', 
-                          'RelatedDrugSummaryLink',
-                          'RelatedExternalRef', 
-                          'RelatedSummaryRef',
-                          'RelatedGlossaryTermNameLink']
-        sharedContent = {}
-        for sharedElement in sharedElements:
-            sharedContent[sharedElement] = []
-
-        #cdrcgi.bail(docElem.childNodes[2].childNodes[1].toxml())
-        for node in docElem.childNodes:
-            if node.nodeName == 'MediaLink':
-                sharedContent['MediaLink'].append(node.toxml())
-            if node.nodeName == 'EmbeddedVideo':
-                sharedContent['EmbeddedVideo'].append(node.toxml())
-            if node.nodeName == 'TermType':
-                sharedContent['TermType'].append(
-                                       cdr.getTextContent(node).strip())
-
-            # For related information we add a list [value, attribute]
-            # for each entry resulting in
-            #   {'RelatedExternalRef:[[val1, attr1], [val2, attr2], ...], ...}
-            # ----------------------------------------------------------------
-            if node.nodeName == 'RelatedInformation':
-                for child in node.childNodes:
-                    if child.nodeName == 'RelatedDrugSummaryLink':
-                        sharedContent['RelatedDrugSummaryLink'].append(
-                                      [cdr.getTextContent(child).strip(),
-                                       child.getAttribute('cdr:ref').strip()])
-                    if child.nodeName == 'RelatedExternalRef':
-                        sharedContent['RelatedExternalRef'].append(
-                                      [cdr.getTextContent(child).strip(),
-                                       child.getAttribute('cdr:xref').strip()])
-                    if child.nodeName == 'RelatedSummaryRef':
-                        #cdrcgi.bail(child.getAttribute('cdr:href'))
-                        sharedContent['RelatedSummaryRef'].append(
-                                      [cdr.getTextContent(child).strip(),
-                                       child.getAttribute('cdr:href').strip()])
-                    if child.nodeName == 'RelatedGlossaryTermNameLink':
-                        #cdrcgi.bail(child.getAttribute('cdr:href'))
-                        sharedContent['RelatedGlossaryTermNameLink'].append(
-                                      [cdr.getTextContent(child).strip(),
-                                       child.getAttribute('cdr:ref').strip()])
-
-            if node.nodeName == 'PDQTerm':
-                sharedContent['PDQTerm'].append(
-                                      [cdr.getTextContent(node).strip(),
-                                       node.getAttribute('cdr:ref').strip()])
-            if node.nodeName == 'NCIThesaurusID':
-                sharedContent['NCIThesaurusID'].append(
-                                       cdr.getTextContent(node).strip())
-
-    except cdrdb.Error, info:
-        cdrcgi.bail("Error extracting shared Info: %s" % info[1][0])
-
-    #cdrcgi.bail(sharedContent)
-    return sharedContent
-
-#----------------------------------------------------------------------
-# We're selecting the information from the GTC document to be
-# combined with the information from the GTN document.
-# The data is stored in a dictionary.
-#----------------------------------------------------------------------
-def getConcept(docId):
-    debugCount = sNum = eNum = 0
-    debugList = []
-    try:
-        cursor.execute("SELECT xml FROM document WHERE id = ?", docId)
-        row = cursor.fetchone()
-        dom = xml.dom.minidom.parseString(row[0].encode('utf-8'))
-        docElem = dom.documentElement
-
-        concept = {}
-        for node in docElem.childNodes:
-            if node.nodeName == 'TermDefinition' or \
-               node.nodeName == 'TranslatedTermDefinition':
-                if node.nodeName == 'TermDefinition':
-                    language = 'en'
-                else:
-                    language = 'es'
-                # I need the audience value (as the dictionary index)
-                for child in node.childNodes:
-                    if child.nodeName == 'Audience':
-                        audience = str(cdr.getTextContent(child).strip())
-
-                # Prepare the dictionary that we add the data to
-                # The format of the dictionary will be
-                #    concept{'en-Patient':{element1:value,
-                #                          element2:[value1, value2],}
-                #            'en-HP'     :{element1:value,
-                #                          element2:[value1, value2], ...}}
-                concept.update({'%s-%s' % (language, audience):{}})
-
-                eNum += 1
-                sNum += 1
-                for child in node.childNodes:
-                    # Adding all values that are not multiply occuring
-                    # Creating entry 'key':value
-                    # -----------------------------------------------------
-                    for element in ['DefinitionStatus',
-                                    'StatusDate', 'DateLastReviewed',
-                                    'DateLastModified', 'TranslatedStatus',
-                                    'TranslatedStatusDate']:
-                        if child.nodeName == element:
-                            concept['%s-%s' % (language, audience)].update(
-                              {element:str(cdr.getTextContent(child).strip())})
-
-                    # We need to preserve the inline markup of the
-                    # definition text.
-                    # -----------------------------------------------------
-                    if (child.nodeName == 'DefinitionText'):
-                        definition = child
-                        concept['%s-%s' % (language, audience)].update(
-                          {child.nodeName:definition.toxml()})
-
-                    # Same as above but the MediaLink element is multiply
-                    # occurring.
-                    # -----------------------------------------------------
-                    if (child.nodeName == 'MediaLink'):
-                        if child.previousSibling.nodeName != 'MediaLink':
-                            definition = child
-                            concept['%s-%s' % (language, audience)].update(
-                              {child.nodeName:[definition.toxml()]})
-                        else:
-                            definition = child
-                            concept['%s-%s' % (language, audience)][
-                               'MediaLink'].append(definition.toxml())
-
-                    # Same as above for EmbeddedVideo.
-                    # -----------------------------------------------------
-                    if (child.nodeName == 'EmbeddedVideo'):
-                        if child.previousSibling.nodeName != 'EmbeddedVideo':
-                            definition = child
-                            concept['%s-%s' % (language, audience)].update(
-                              {child.nodeName:[definition.toxml()]})
-                        else:
-                            definition = child
-                            concept['%s-%s' % (language, audience)][
-                               'EmbeddedVideo'].append(definition.toxml())
-
-                    # Adding all values that are multiply occuring
-                    # Creating entry 'key':[listitem, listitem, ...]
-                    # ----------------------------------------------------
-                    for gcList in ['DefinitionResource', 'Dictionary',
-                                   'ReplacementText', 'Comment',
-                                   'TranslationResource']:
-                        if child.nodeName == gcList:
-                            if concept['%s-%s' % (language, audience)].has_key(
-                                                                       gcList):
-                                # Comments and ReplacementText contain
-                                # attributes that need to be preserved.
-                                # -------------------------------------
-                                if gcList in ['ReplacementText', 'Comment']:
-                                    rText = child
-                                    concept['%s-%s' % (language, audience)][
-                                          gcList].append(rText.toxml())
-                                    #if sNum == 2: cdrcgi.bail(concept)
-                                else:
-                                    concept['%s-%s' % (language, audience)][
-                                          gcList].append(
-                                          cdr.getTextContent(child).strip())
-                            else:
-                                if gcList in ['ReplacementText', 'Comment']:
-                                    rText = child
-                                    concept['%s-%s' % (language, audience)
-                                              ].update({gcList:[rText.toxml()]})
-                                    #if eNum == 2: cdrcgi.bail(concept)
-                                else:
-                                    concept['%s-%s' % (language, audience)
-                                              ].update({gcList:[
-                                          cdr.getTextContent(child).strip()]})
-
-        dom.unlink()
-
-    except cdrdb.Error, info:
-        cdrcgi.bail("Error extracting Concept: %s" % info[1][0])
-
-    return concept
-
-#----------------------------------------------------------------------
-# Select the information of the GTN document to be combined with the
-# information from the GTC document.  We need the term named and the
-# ReplacementText elements.
-#----------------------------------------------------------------------
-def getNameDefinition(docId):
-    """
-    We are returning a dictionary with the following information
-       {CDR-ID : [ {'en' : termName-en, 'es' : termName-es}] }
-    """
-    try:
-        cursor.execute("SELECT xml FROM document WHERE id = ?", docId)
-        row = cursor.fetchone()
-        dom = xml.dom.minidom.parseString(row[0].encode('utf-8'))
-        docElem = dom.documentElement
-        termName = {}
-        termName[docId] = {}
-        i = -1
-        for node in docElem.childNodes:
-            if node.nodeName in ('TermName', 'TranslatedName'):
-                i += 1
-                language  = node.getAttribute('language') or 'en'
-                alternate = node.getAttribute('NameType') or None
-
-                # We need to find the primary translation string
-                # and also store additional alternate strings to
-                # be displayed together.  These are stored as
-                # 'enx':[one, two], 'esx':[uno, duo], ...
-                # Note:  We need to escape possible '&' characters
-                #        in the TermNameString
-                # New requirement:
-                #        We need to preserve insertion/deletion
-                #        markup.
-                # ------------------------------------------------
-                if not alternate:
-                    for child in node.childNodes:
-                        if child.nodeName == 'TermNameString':
-                            termName[docId].update(
-                               {language:child.toxml()})
-                #              {language:cgi.escape(
-                #                        cdr.getTextContent(child).strip())})
-                else:
-                    for child in node.childNodes:
-                        if child.nodeName == 'TermNameString':
-                            if termName[docId].has_key(language + 'x'):
-                                termName[docId][language + 'x'].append(
-                                             child.toxml())
-                            #                cdr.getTextContent(child).strip())
-                            else:
-                                termName[docId].update(
-                                          {language + 'x':
-                                          [child.toxml()]})
-                            #             [cdr.getTextContent(child).strip()]})
-
-            if node.nodeName == 'ReplacementText':
-                if termName[docId].has_key('ReplacementText'):
-                    rText = node
-                    termName[docId]['ReplacementText'].append(
-                                                   rText.toxml())
-                else:
-                    rText = node
-                    termName[docId].update(
-                               {'ReplacementText':[rText.toxml()]})
-        dom.unlink()
-
-    except cdrdb.Error, info:
-        cdrcgi.bail("Error extracting Term Name: %s" % info[1][0])
-
-    return termName
-
-#----------------------------------------------------------------------
-# Document ID can be given for the concept or for one of its names.
-#----------------------------------------------------------------------
-if docId:
-    try:
-        intId = cdr.exNormalize(docId)[1]
-    except:
-        cdrcgi.bail("Malformed CDR ID")
-    cursor.execute("""\
-        SELECT t.name
-          FROM document d
-          JOIN doc_type t
-            ON t.id = d.doc_type
-         WHERE d.id = ?""", intId)
-    rows = cursor.fetchall()
-    if not rows:
-        cdrcgi.bail("Unable to find document '%s'" % docId)
-    docType = rows[0][0]
-    if docType == 'GlossaryTermConcept':
-        conceptId = intId
-    elif docType == 'GlossaryTermName':
-        cursor.execute("""\
-            SELECT int_val
-              FROM query_term
-             WHERE path = '/GlossaryTermName/GlossaryTermConcept/@cdr:ref'
-               AND doc_id = ?""", intId)
-        rows = cursor.fetchall()
-        if not rows:
-            cdrcgi.bail("GlossaryTermName document %s not associated with "
-                        "any GlossaryTermConcept document" % docId)
+class Control(Controller):
+    SUBTITLE = "Glossary QC Report - Full"
+    CONCEPT_PATH = "/GlossaryTermName/GlossaryTermConcept/@cdr:ref"
+    NAME_PATH = "/GlossaryTermName/TermName/TermNameString"
+    METHOD = "get"
+
+    def populate_form(self, page):
+        """Ask for more information if we don't have everything we need."""
+
+        if self.concept:
+            self.show_report()
+            sys.exit(0)
+        if self.names:
+            fieldset = page.fieldset("Select Glossary Concept Document")
+            for concept_id, name in self.names:
+                opts = dict(label=name, value=concept_id)
+                fieldset.append(page.radio_button("id", **opts))
         else:
-            conceptId = rows[0][0]
-    else:
-        cdrcgi.bail("%s is a %s document" % (docId, docType))
+            fieldset = page.fieldset("Enter Document ID or Term Name")
+            opts = dict(
+                tooltip="Use wildcards if appropriate",
+                label="Term Name",
+            )
+            fieldset.append(page.text_field("id", label="Concept ID"))
+            fieldset.append(page.text_field("name_id", label="Name ID"))
+            fieldset.append(page.text_field("name", **opts))
+        page.form.append(fieldset)
 
-#----------------------------------------------------------------------
-# If we have a term name but not a document ID, find the ID.
-#----------------------------------------------------------------------
-else:
-    if "<script" in termName.lower():
-        cdrcgi.bail()
-    try:
-        cursor.execute("""\
-        SELECT c.int_val, n.value
-          FROM query_term n
-          JOIN query_term c
-            ON c.doc_id = n.doc_id
-         WHERE n.path = '/GlossaryTermName/TermName/TermNameString'
-           AND c.path = '/GlossaryTermName/GlossaryTermConcept/@cdr:ref'
-           AND n.value LIKE ?""", termName)
-        rows = cursor.fetchall()
-    except Exception, e:
-        cdrcgi.bail("Database error looking up term name: %s" % e)
-    if not rows:
-        cdrcgi.bail("No term names match %s" % repr(termName))
-    if len(rows) > 1:
-        showTermNameChoices(rows)
-    conceptId = rows[0][0]
+    def show_report(self):
+        """Provide custom routing for the multiple forms."""
 
-#----------------------------------------------------------------------
-# At this point we have a glossary term concept ID.  Find all the names
-# for this concept.
-#----------------------------------------------------------------------
-termNameIds = getAllTermNames(conceptId)
+        if not self.concept:
+            self.show_form()
+        else:
+            self.concept.show_report()
 
-# -------------------------------------------------------------------
-# Create the HTML header, style sheet, etc.
-# -------------------------------------------------------------------
-htmlConcept = ""
-html = """\
-<HTML>
- <HEAD>
-  <META http-equiv="Content-Type" content="text/html; charset=UTF-8">
-  <TITLE>CDR%s: Glossary Term Concept - Full QC Report</TITLE>
-  <STYLE type="text/css">
-   body          { font-family: sans-serif; }
-   .big          { font-size: 14pt;
-                   font-weight: bold; }
-   .center       { text-align: center; }
-   .name         { color: blue;
-                   font-weight: bold;
-                   background-color: #EEEEEE; }
-   .term-normal  { background-color: yellow; }
-   .term-capped  { background-color: yellow; }
-   .term-name    { color: blue;
-                   font-weight: bold; }
-   .term-concept { color: green;
-                   font-weight: bold; }
-   .term-error   { color: red;
-                   font-weight: bold; }
-   .blocked, .special
-                 { color: red;
-                   font-weight: bold; }
-   .attribute    { font-weight: normal;
-                   font-style: italic;
-                   background-color: #FFFFFF; }
-   .insertapproved { color: red; }
-   .deleteapproved { text-decoration: line-through; }
-   img           { width: 300px; }
-  </STYLE>
- </HEAD>
- <BODY>
-  <div class="center">
-  <span class="big">
-   Glossary Term Concept - Full<br>
-   QC Report
-  </span>
-  <br>
-  <b>
-   %s
-  </b>
-  </div>
-""" % (conceptId, time.strftime(time.ctime()))
+    @property
+    def concept(self):
+        """Subject of the report."""
 
-# Display the CDR-ID
-# ------------------
-html += '  <span class="big">CDR%s</span>' % conceptId
+        if not hasattr(self, "_concept"):
+            self._concept = Concept(self) if self.id else None
+        return self._concept
 
-# Get the concept information to be displayed
-# -----------------------------------------------------------
-conceptInfo = getConcept(conceptId)
+    @property
+    def id(self):
+        """CDR GlossaryTermConcept document ID."""
 
-# We need to mark the term names that have been blocked.  For
-# this we need to go back to the database, which could have
-# been done more intelligently, but the request to display
-# blocked GTNs came after the program was nearly completed.
-# -----------------------------------------------------------
-termNameStatus = getTermNameStatus(termNameIds)
-# cdrcgi.bail(termNameStatus)
-
-# Get the term name (for spanish and english) for each of the
-# related GlossaryTermName document and create a dictionary
-# holding all of this information
-# -----------------------------------------------------------
-allTermsInfo = {}
-for termNameId in termNameIds:
-    termInfo = getNameDefinition(termNameId)
-    allTermsInfo.update(termInfo)
-
-#cdrcgi.bail(allTermsInfo)
-# -----------------------------------------------------------------
-# Display the GlossaryTermName Information
-# -----------------------------------------------------------------
-#pattern   = re.compile("@@(.)@@")
-
-# If all options should need to be printed on the QC report here
-# are the possible values
-# --------------------------------------------------------------
-languages = ['en', 'es']
-audiences = ['Patient', 'Health professional']
-
-# The users decided to only display those term blocks for which a
-# definition exists.
-# Creating the languages/audiences list from the conceptInfo keys
-# ---------------------------------------------------------------
-lang_aud  = conceptInfo.keys()
-languages = []
-audiences = []
-for la in lang_aud:
-    if la.split('-')[0] not in set(languages):
-        languages.append(la.split('-')[0])
-    if la.split('-')[1] not in set(audiences):
-        audiences.append(la.split('-')[1])
-
-sections  = {'en':'English', 'es':'Spanish'}
-
-# cdrcgi.bail(allTermsInfo)
-for lang in languages:
-    for aud in audiences:
-        if '%s-%s' % (lang, aud) not in lang_aud: continue
-        html += """
-  <br>
-  <br>
-  <br>
-  <span class="big">%s - %s</span>
-  <table border="1" width="100%%" cellspacing="0" cellpadding="0">
-""" % (sections[lang], aud)
-
-        # Adding Term Name and Term Definition for language/audience
-        # ----------------------------------------------------------
-        for id, termData in allTermsInfo.iteritems():
-            # Only if there doesn't exists a translation for an English
-            # term would the Spanish term be missing.  In this case
-            # (the 'else' block) we'll display the English term instead
-            # ---------------------------------------------------------
-            if termData.has_key(lang):
-                html += """\
-   <tr class="name">
-    <td width="30%%">Name</td>"""
-
-                # Display the term names and add any existing alternate
-                # term names that exist for the non-English language
-                # -----------------------------------------------------
-                if termNameStatus[id] == 'A':
-                    html += """\
-    <td width="70%%">%s (CDR%s)""" % (displayMarkup(termData[lang], 'TermName'),
-                                                                          id)
-
-                    if termData.has_key(lang + 'x'):
-                        html += " &nbsp;[alternate: %s]" % (
-                                ', '.join([x for x in termData[lang + 'x']]))
-
-                    html += """</td>
-   </tr>"""
-                # Display the blocked term names in red and don't
-                # bother displaying the term definition
-                # -----------------------------------------------
-                else:
-                    html += """\
-    <td class="blocked" width="70%%">BLOCKED - %s (CDR%s)</td>
-   </tr>""" % (termData[lang], id)
-                    continue
-
+        if not hasattr(self, "_id"):
+            self._id = self.fields.getvalue("id")
+            if self._id is None:
+                self._id = self.fields.getvalue("DocId")
+            if self._id is None:
+                if self.names and len(self.names) == 1:
+                    self._id = self.names[0][0]
+                elif self.name_id:
+                    query = self.Query("query_term", "int_val")
+                    query.where(query.Condition("path", self.CONCEPT_PATH))
+                    query.where(query.Condition("doc_id", self.name_id))
+                    rows = query.execute(self.cursor).fetchall()
+                    if not rows:
+                        self.bail("Not a GlossaryTermName document ID")
+                    self._id = rows[0][0]
             else:
-                html += """\
-   <tr><td>&nbsp;</td><td>&nbsp;</td></tr>
-   <tr class="name">
-    <td width="30%%">Name</td>"""
+                self._id = Doc.extract_id(self._id)
+        return self._id
 
-                # If there doesn't exist a Spanish name we'll still
-                # have to check if the document might be blocked
-                #   (termNameStatus[id] == 'I'
-                # and suppress display of the definition, if it is.
-                # --------------------------------------------------
-                if termNameStatus[id] == 'A':
-                    html += u"""\
-    <td width="70%%">
-     <span class='special'>%s (en inglés)</span> (CDR%s)""" % (
-                                                        termData['en'], id)
+    @property
+    def name_id(self):
+        """CDR ID for a GlossaryTermName document."""
+
+        if not hasattr(self, "_name_id"):
+            self._name_id = self.fields.getvalue("name_id")
+            if self._name_id:
+                self._name_id = Doc.extract_id(self._name_id)
+        return self._name_id
+
+    @property
+    def names(self):
+        """Concept-id/name-string tuples matching name fragment."""
+
+        if not hasattr(self, "_names"):
+            fragment = self.fields.getvalue("name")
+            if fragment:
+                fields = "c.int_val", "n.value"
+                query = self.Query("query_term n", *fields).order("n.value")
+                query.join("query_term c", "c.doc_id = n.doc_id")
+                query.where(query.Condition("n.path", self.NAME_PATH))
+                query.where(query.Condition("c.path", self.CONCEPT_PATH))
+                query.where(query.Condition("n.value", fragment, "LIKE"))
+                rows = query.execute(self.cursor).fetchall()
+                self._names = [tuple(row) for row in rows]
+            else:
+                self._names = []
+        return self._names
+
+
+class Concept:
+    """Subject of the report."""
+
+    TITLE = "Glossary Term Concept"
+    SUBTITLE  = "Glossary Term Concept - Full"
+    DEFINITION_ELEMENTS = "TermDefinition", "TranslatedTermDefinition"
+    GUEST = Session("guest")
+    LANGUAGES = dict(en="English", es="Spanish")
+    AUDIENCES = "Patient", "Health professional"
+    FILTER = "name:Glossary Term Definition Update"
+    EN_INGLES = " (en ingl\xe9s)"
+    CSS = "/stylesheets/GlossaryConceptFull.css"
+
+    def __init__(self, control):
+        """Save the control object, which has everything we need.
+
+        Pass:
+            control - access to the database and the report parameters
+        """
+
+        self.__control = control
+
+    def show_report(self):
+        """Send the report back to the browser."""
+
+        opts = dict(
+            pretty_print=True,
+            doctype="<!DOCTYPE html>",
+            encoding="utf-8",
+        )
+        sys.stdout.buffer.write(b"Content-type: text/html;charset=utf-8\n\n")
+        sys.stdout.buffer.write(html.tostring(self.report, **opts))
+        sys.exit(0)
+
+    @property
+    def control(self):
+        """Access to all the information we need for the report."""
+        return self.__control
+
+    @property
+    def definitions(self):
+        """`Definition` objects for the concept, indexed by langcode."""
+
+        if not hasattr(self, "_definitions"):
+            self._definitions = {}
+            for langcode in self.LANGUAGES:
+                self._definitions[langcode] = []
+            for name in self.DEFINITION_ELEMENTS:
+                for node in self.doc.root.findall(name):
+                    definition = self.Definition(self, node)
+                    self._definitions[definition.langcode].append(definition)
+        return self._definitions
+
+    @property
+    def doc(self):
+        """CDR `Doc` object for the GlossaryTermConcept document."""
+
+        if not hasattr(self, "_doc"):
+            self._doc = Doc(self.control.session, id=self.control.id)
+            if self._doc.doctype.name != "GlossaryTermConcept":
+                self.control.bail("Not a GlossaryTermConcept document")
+        return self._doc
+
+    @property
+    def names(self):
+        """Objects for the concept's GlossaryTermName documents."""
+
+        if not hasattr(self, "_names"):
+            query = self.control.Query("query_term", "doc_id")
+            query.where(query.Condition("path", self.control.CONCEPT_PATH))
+            query.where(query.Condition("int_val", self.doc.id))
+            rows = query.execute(self.control.cursor).fetchall()
+            self._names = [self.Name(self, row.doc_id) for row in rows]
+        return self._names
+
+    @property
+    def report(self):
+        """`HTMLPage` object for the report."""
+
+        if not hasattr(self, "_report"):
+            B = builder
+            meta = B.META(charset="utf-8")
+            link = B.LINK(href=self.CSS, rel="stylesheet")
+            icon = B.LINK(href="/favicon.ico", rel="icon")
+            head = B.HEAD(meta, B.TITLE(self.TITLE), icon, link)
+            time = B.SPAN(self.control.started.ctime())
+            args = self.SUBTITLE, B.BR(), "QC Report", B.BR(), time
+            concept_id = B.P(f"CDR{self.doc.id}", id="concept-id")
+            body = B.BODY(B.E("header", B.H1(*args)), concept_id)
+            self._report = B.HTML(head, body)
+            for langcode in sorted(self.definitions):
+                language = self.LANGUAGES[langcode]
+                for definition in self.definitions[langcode]:
+                    section = f"{language} - {definition.audience}"
+                    body.append(B.H2(section))
+                    body.append(definition.term_table)
+                    body.append(definition.info_table)
+                if langcode == "en" and self.media_table is not None:
+                    body.append(self.media_table)
+            body.append(self.term_type_table)
+            if self.related_info_table is not None:
+                body.append(B.H2("Related Information"))
+                body.append(self.related_info_table)
+        return self._report
+
+    @property
+    def drug_links(self):
+        """Drug summary links for the concept."""
+
+        if not hasattr(self, "_drug_links"):
+            self._drug_links = self.Link.get_links(self, "drug")
+        return self._drug_links
+
+    @property
+    def external_refs(self):
+        """Links from this concept to pages outside the CDR."""
+
+        if not hasattr(self, "_external_refs"):
+            self._external_refs = self.Link.get_links(self, "xref")
+        return self._external_refs
+
+    @property
+    def summary_refs(self):
+        """Links to Cancer Information Summary documents."""
+
+        if not hasattr(self, "_summary_refs"):
+            self._summary_refs = self.Link.get_links(self, "sref")
+        return self._summary_refs
+
+    @property
+    def name_links(self):
+        """Links to other glossary term names."""
+
+        if not hasattr(self, "_name_links"):
+            self._name_links = self.Link.get_links(self, "term")
+        return self._name_links
+
+    @property
+    def pdq_terms(self):
+        """Links to PDQ term documents."""
+
+        if not hasattr(self, "_pdq_terms"):
+            self._pdq_terms = self.Link.get_links(self, "pdqt")
+        return self._pdq_terms
+
+    @property
+    def related_info_table(self):
+        """Table at the bottom of the report to links to other information."""
+
+        if not hasattr(self, "_related_info_table"):
+            self._related_info_table = None
+            rows = [drug_link.row for drug_link in self.drug_links]
+            rows += [summary_ref.row for summary_ref in self.summary_refs]
+            rows += [external_ref.row for external_ref in self.external_refs]
+            rows += [name_link.row for name_link in self.name_links]
+            rows += [pdq_term.row for pdq_term in self.pdq_terms]
+            if self.thesaurus_ids:
+                label = "NCI Thesaurus ID"
+                args = [self.thesaurus_ids[0]]
+                for id in self.thesaurus_ids[1:]:
+                    args += [builder.BR(), id]
+                rows.append(builder.TR(builder.TD(label), builder.TD(*args)))
+            if rows:
+                self._related_info_table = builder.TABLE(*rows)
+                self._related_info_table.set("class", "related-info-table")
+        return self._related_info_table
+
+    @property
+    def thesaurus_ids(self):
+        """Links to concepts in the NCI thesaurus."""
+
+        if not hasattr(self, "_thesaurus_ids"):
+            self._thesaurus_ids = []
+            for node in self.doc.root.findall("NCIThesaurusID"):
+                self._thesaurus_ids.append(Doc.get_text(node, "").strip())
+        return self._thesaurus_ids
+
+    @property
+    def media_links(self):
+        """Links to images not associated with a specific definition."""
+
+        if not hasattr(self, "_media_links"):
+            nodes = self.doc.root.findall("MediaLink")
+            self._media_links = [self.MediaLink(node) for node in nodes]
+        return self._media_links
+
+    @property
+    def media_table(self):
+        """Table showing all the non-definition-specific images."""
+
+        if not hasattr(self, "_media_table"):
+            self._media_table = builder.TABLE()
+            for link in self.media_links:
+                self._media_table.append(link.row)
+        return self._media_table
+
+    @property
+    def term_type_table(self):
+        """Table showing all of the term type string for the concept."""
+
+        args = [self.term_types[0]]
+        for term_type in self.term_types[1:]:
+            args += [builder.BR(), term_type]
+        term_types = builder.TD(*args)
+        table = builder.TABLE(builder.TR(builder.TD("Term Type"), term_types))
+        table.set("class", "term-type-table")
+        return table
+
+    @property
+    def term_types(self):
+        """Sequence of term type strings for the concept, in document order."""
+
+        if not hasattr(self, "_term_types"):
+            self._term_types = []
+            for node in self.doc.root.findall("TermType"):
+                self._term_types.append(Doc.get_text(node, "").strip())
+        return self._term_types
+
+    @property
+    def videos(self):
+        """Embedded videos not associated with a specific definition.
+
+        Note that we're collecting these, but never displaying them.
+        That is surely a mistake.
+        """
+
+        if not hasattr(self, "_videos"):
+            nodes = self.doc.root.findall("EmbeddedVideo")
+            self._videos = [Concept.Video(node) for node in nodes]
+        return self._videos
+
+
+    class Definition:
+        """One concept definition for a specifc language/audience combo."""
+
+        ROWS = (
+            ("definitions", "Definition Resource"),
+            ("media_links", "Media Link"),
+        )
+        RESOURCES = dict(en="Definition Resource", es="Translation Resource")
+        STATUSES = dict(en="Definition Status", es="Translation Status")
+
+        def __init__(self, concept, node):
+            """Capture the caller's information.
+
+            Pass:
+                concept - `Concept` to which this definition belongs
+                node - wrapper element for this definition
+            """
+
+            self.__concept = concept
+            self.__node = node
+
+        @property
+        def audience(self):
+            """Audience for this definition."""
+
+            if not hasattr(self, "_audience"):
+                self._audience = Doc.get_text(self.node.find("Audience"))
+            return self._audience
+
+        @property
+        def comments(self):
+            """`Comment` objects belonging to the definition."""
+
+            if not hasattr(self, "_comments"):
+                self._comments = []
+                for node in self.node.findall("Comment"):
+                    self._comments.append(self.Comment(node))
+            return self._comments
+
+        @property
+        def concept(self):
+            """Access to the terms connected with the concept."""
+            return self.__concept
+
+        @property
+        def dictionaries(self):
+            """Dictionaries in which this definition should appear."""
+
+            if not hasattr(self, "_dictionaries"):
+                self._dictionaries = []
+                for node in self.node.findall("Dictionary"):
+                    self._dictionaries.append(Doc.get_text(node, "").strip())
+            return self._dictionaries
+
+        @property
+        def info_table(self):
+            """Table with meta information about this definition."""
+
+            table = builder.TABLE(builder.CLASS("definition-info"))
+            for row in self.rows:
+                table.append(row)
+            return table
+
+        @property
+        def langcode(self):
+            """Language code for this definition ("en" or "es")."""
+            return "en" if self.node.tag == "TermDefinition" else "es"
+
+        @property
+        def last_modified(self):
+            """Date the definition was last modified."""
+
+            if not hasattr(self, "_last_modified"):
+                self._last_modified = None
+                node = self.node.find("DateLastModified")
+                if node is not None:
+                    self._last_modified = Doc.get_text(node, "").strip()
+            return self._last_modified
+
+        @property
+        def last_reviewed(self):
+            """Date the definition was last reviewed."""
+
+            if not hasattr(self, "_last_reviewed"):
+                self._last_reviewed = None
+                node = self.node.find("DateLastReviewed")
+                if node is not None:
+                    self._last_reviewed = Doc.get_text(node, "").strip()
+            return self._last_reviewed
+
+        @property
+        def media_links(self):
+            """Links to images for the definition."""
+
+            if not hasattr(self, "_media_links"):
+                nodes = self.node.findall("MediaLink")
+                self._media_links = [Concept.MediaLink(node) for node in nodes]
+            return self._media_links
+
+        @property
+        def node(self):
+            """Parsed XML node for the definition."""
+            return self.__node
+
+        @property
+        def replacements(self):
+            """Replacement strings not specific to any term name."""
+
+            if not hasattr(self, "_replacements"):
+                self._replacements = {}
+                for node in self.node.findall("ReplacementText"):
+                    self._replacements[node.get("name")] = node
+            return self._replacements
+
+        @property
+        def resources(self):
+            """Resources used for this definition."""
+
+            if not hasattr(self, "_resources"):
+                self._resources = []
+                for tag in ("DefinitionResource", "TranslationResource"):
+                    for node in self.node.findall(tag):
+                        self._resources.append(Doc.get_text(node, "").strip())
+            return self._resources
+
+        @property
+        def rows(self):
+            """Table rows for this definition's meta data."""
+
+            if not hasattr(self, "_rows"):
+                rows = []
+                resources = self.RESOURCES[self.langcode]
+                self.__add_row(rows, "resources", resources)
+                for media_link in self.media_links:
+                    rows.append(media_link.row)
+                for video in self.videos:
+                    rows.append(video.row)
+                self.__add_row(rows, "dictionaries", "Dictionary")
+                self.__add_row(rows, "status", self.STATUSES[self.langcode])
+                self.__add_row(rows, "status_date", "Status Date")
+                for comment in self.comments:
+                    rows.append(comment.row)
+                self.__add_row(rows, "last_modified", "Date Last Modified")
+                self.__add_row(rows, "last_reviewed", "Date Last Reviewed")
+                self._rows = rows
+            return self._rows
+
+        @property
+        def status(self):
+            """String for the definition's status."""
+
+            if not hasattr(self, "_status"):
+                self._status = None
+                for tag in ("DefinitionStatus", "TranslatedStatus"):
+                    self._status = self.node.find(tag)
+                    if self._status is not None:
+                        self._status = Doc.get_text(self._status, "").strip()
+                        break
+            return self._status
+
+        @property
+        def status_date(self):
+            """Date of the definition's current status."""
+
+            if not hasattr(self, "_status_date"):
+                self._status_date = None
+                for tag in ("StatusDate", "TranslatedStatusDate"):
+                    node = self.node.find(tag)
+                    if node is not None:
+                        self._status_date = Doc.get_text(node, "").strip()
+                        break
+            return self._status_date
+
+        @property
+        def term_table(self):
+            """Table showing term names and customized definitions."""
+
+            B = builder
+            table = B.TABLE(B.CLASS("name-and-def"))
+            for name in self.concept.names:
+                if self.langcode == "en":
+                    langname = name.english_name
+                elif name.spanish_name is not None:
+                    langname = name.spanish_name
                 else:
-                    html += u"""\
-    <td class="blocked" width="70%%">BLOCKED -
-     <span class='special'>%s (en inglés)</span> (CDR%s)""" % (
-                                                        termData['en'], id)
-                    continue
+                    langname = name.english_name
+                markup = name.markup_for_name(langname)
+                if markup.tag == "p":
+                    markup.tag = "span"
+                alt_names = ""
+                if self.langcode == "es":
+                    if name.spanish_name is None:
+                        args = markup, " (en ingl\xe9s)", B.CLASS("special")
+                        markup = B.SPAN(*args)
+                    elif name.alternate_spanish_names:
+                        alt_names = name.alternate_spanish_names
+                        alt_names = ", ".join(alt_names)
+                        alt_names = f" \xa0[{alt_names}]"
+                args = [markup, f" (CDR{name.id})", alt_names]
+                if name.blocked:
+                    args = ["BLOCKED - "] + args + [B.CLASS("blocked")]
+                table.append(B.TR(B.TD("Name"), B.TD(*args), B.CLASS("name")))
+                if not name.blocked:
+                    table.append(name.resolve_placeholders(self))
+            return table
 
-            # Resolve the PlaceHolder elements and create an HTML
-            # table row from the resulting data
-            # (The HTML output is created in the filter)
-            # ----------------------------------------------------
-            if conceptInfo.has_key('%s-%s' % (lang, aud)):
-                definitionRow = resolvePlaceHolder(lang, termData,
-                                            conceptInfo['%s-%s' % (lang, aud)])
-                ### There may be a better way to do this substitution???
-                ### ####################################################
-                # If we have a CAPPEDTERMNAME PlaceHolder the filter has
-                # enclosed the term with @@...@@ characters.  However, the
-                # term name could be marked up with insertion/deletion
-                # markup.  We need to find the first character within this
-                # string that needs to be capitalized.
-                # If the first character is a '<' this indicates the
-                # beginning of the <span> element for markup. The first
-                # character after the </span> should then be capitalized.
-                # --------------------------------------------------------
-                replaceList = re.findall('@@.*?@@', definitionRow)
+        @property
+        def text(self):
+            """Definition text with placeholders to be resolved."""
 
-                if replaceList:
-                    for text in replaceList:
-                        m1 = re.sub('@@', '', text)
-                        m2 = re.sub('@@', '', m1)
-                        if m2[0] == '<':
-                            m3 = re.search('<.*?>.', m2)
-                            rtext = m3.group(0)[:-1] + \
-                                    m3.group(0)[-1].upper() + \
-                                    re.sub(m3.group(0), '', m2)
-                        else:
-                            rtext = m2[0].upper() + m2[1:]
-                        definitionRow = definitionRow.replace(text, rtext)
+            if not hasattr(self, "_text"):
+                self._text = self.node.find("DefinitionText")
+            return self._text
 
-                # If there was a term without Spanish name display it
-                # in red to stand out.
-                # ----------------------------------------------------
-                definitionRow = definitionRow.replace('@S@',
-                                             '<span class="special">', 1)
-                definitionRow = definitionRow.replace('@E@', '</span>')
-                html += definitionRow
+        @property
+        def videos(self):
+            """Sequence of embedded videos for this definition."""
 
-        html += """
-  </table>
-  <p/>
-  <table border="0" width="100%%" cellspacing="0" cellpadding="0">"""
+            if not hasattr(self, "_videos"):
+                nodes = self.node.findall("EmbeddedVideo")
+                self._videos = [Concept.Video(node) for node in nodes]
+            return self._videos
 
-        # Adding the Term Concept information at the end of each
-        # language/audience section
-        # -----------------------------------------------------------
-        if conceptInfo.has_key('%s-%s' % (lang, aud)):
-            # Adding row for Definition Resource
-            if conceptInfo['%s-%s' % (lang, aud)].has_key(
-                                                      'DefinitionResource'):
-                html += addMultipleRow(conceptInfo['%s-%s' % (lang, aud)],
-                                    'DefinitionResource')
+        def __add_row(self, rows, name, label):
+            """Helper method to create a row for the definition meta table."""
 
-            # Adding row for Translation Resource
-            if conceptInfo['%s-%s' % (lang, aud)].has_key(
-                                                      'TranslationResource'):
-                html += addMultipleRow(conceptInfo['%s-%s' % (lang, aud)],
-                                    'TranslationResource')
+            values = getattr(self, name)
+            if values:
+                label = builder.TD(label)
+                if not isinstance(values, list):
+                    values = [values]
+                args = [values[0]]
+                for value in values[1:]:
+                    args.append(builder.BR())
+                    args.append(value)
+                values = builder.TD(*args)
+                rows.append(builder.TR(label, values))
 
-            # Adding row for MediaLink
-            if conceptInfo['%s-%s' % (lang, aud)].has_key('MediaLink'):
-                #cdrcgi.bail(conceptInfo['%s-%s' % (lang, aud)]['MediaLink'])
-                html += addMediaRow(conceptInfo['%s-%s' % (lang, aud)],
-                                    'MediaLink')
-            # Adding row for EmbeddedVideo
-            if conceptInfo['%s-%s' % (lang, aud)].has_key('EmbeddedVideo'):
-                html += addVideoRow(conceptInfo['%s-%s' % (lang, aud)],
-                                    'EmbeddedVideo')
-            # Adding row for Dictionary
-            if conceptInfo['%s-%s' % (lang, aud)].has_key('Dictionary'):
-                html += addMultipleRow(conceptInfo['%s-%s' % (lang, aud)],
-                                    'Dictionary')
 
-            # Adding row for Definition Status
-            if conceptInfo['%s-%s' % (lang, aud)].has_key('DefinitionStatus'):
-                html += addSingleRow(conceptInfo['%s-%s' % (lang, aud)],
-                                    'DefinitionStatus')
-            # Adding row for Definition Status
-            if conceptInfo['%s-%s' % (lang, aud)].has_key('TranslatedStatus'):
-                html += addSingleRow(conceptInfo['%s-%s' % (lang, aud)],
-                                    'TranslatedStatus')
-            # Adding row for Status Date
-            if conceptInfo['%s-%s' % (lang, aud)].has_key('StatusDate'):
-                html += addSingleRow(conceptInfo['%s-%s' % (lang, aud)],
-                                    'StatusDate')
+        class Comment:
+            """Comment associated with the definition."""
 
-            # Adding Comment rows
-            # We need to process the attributes, too, so we're sending
-            # the Comment node through a filter
-            if conceptInfo['%s-%s' % (lang, aud)].has_key('Comment'):
-                commentRow = displayMarkup(
-                            conceptInfo['%s-%s' % (lang, aud)]['Comment'],
-                                                               'Comment')
-                html += commentRow
-            # Adding row for Date Last Modified
-            if conceptInfo['%s-%s' % (lang, aud)].has_key('DateLastModified'):
-                html += addSingleRow(conceptInfo['%s-%s' % (lang, aud)],
-                                    'DateLastModified')
-            # Adding row for Date Last Reviewed
-            if conceptInfo['%s-%s' % (lang, aud)].has_key('DateLastReviewed'):
-                html += addSingleRow(conceptInfo['%s-%s' % (lang, aud)],
-                                    'DateLastReviewed')
+            def __init__(self, node):
+                """Remember the node for this comment.
 
-        html += """
-  </table>
-"""
-    if lang == 'en':
-        sharedXml  = getSharedInfo(conceptId)
-        mediaHtml = addMediaRow(sharedXml, 'MediaLink')
+                Pass:
+                    node - parsed XML for the comment's element
+                """
 
-        html += """
-  <p />
-  <table border="0" width="100%%" cellspacing="0" cellpadding="0">
-  %s
-  </table>
-""" % mediaHtml
+                self.__node = node
 
-# Create the table rows for the elements that include an attribute
-# ----------------------------------------------------------------
-relDSRHtml   = addAttributeRow(sharedXml, 'RelatedDrugSummaryLink', 
-                                                                   indent=True)
-relSRHtml    = addAttributeRow(sharedXml, 'RelatedSummaryRef',     indent=True)
-relERHtml    = addAttributeRow(sharedXml, 'RelatedExternalRef',    indent=True)
-relGLHtml    = addAttributeRow(sharedXml, 'RelatedGlossaryTermNameLink', 
-                                                                   indent=True)
-pdqTermHtml  = addAttributeRow(sharedXml, 'PDQTerm')
+            @property
+            def row(self):
+                """HTML markup for this comment."""
 
-# Create the table rows for the elements without attribute
-# --------------------------------------------------------
-termTypeHtml = addMultipleRow(sharedXml, 'TermType')
-nciThesHtml  = addMultipleRow(sharedXml, 'NCIThesaurusID')
+                if not hasattr(self, "_row"):
+                    wrapper = etree.Element("GlossaryTermDef")
+                    wrapper.append(self.__node)
+                    doc = Doc(Concept.GUEST, xml=etree.tostring(wrapper))
+                    result = doc.filter(Concept.FILTER)
+                    self._row = html.fromstring(str(result.result_tree))
+                return self._row
 
-# Adding Term information to HTML document
-# ----------------------------------------
-html += """
-  <p />
-  <table border="0" width="100%%" cellspacing="0" cellpadding="0">
-  %s
-  </table>
-""" % (termTypeHtml)
 
-# Adding the related information to HTML document
-# -----------------------------------------------
-if relDSRHtml or relSRHtml or relERHtml or relGLHtml:
-    html += """
-  <table border="0" width="100%%" cellspacing="0" cellpadding="0">
-   <tr>
-    <td colspan="2">
-     <b>Related Information</b>
-    </td>
-   </tr>
-  %s
-  %s
-  %s
-  %s
-  </table>
-""" % (relDSRHtml, relSRHtml, relERHtml, relGLHtml)
+    class Link:
+        """Link to be displayed in the concept's table for related info."""
 
-# Adding PDQTerm and Thesaurus information to HTML document
-# ---------------------------------------------------------
-html += """
-  <table border="0" width="100%%" cellspacing="0" cellpadding="0">
-  %s
-  %s
-  </table>
-""" % (pdqTermHtml, nciThesHtml)
+        RELINFO = "RelatedInformation"
+        DRUG_SUMMARY_LINK = "RelatedInformation/RelatedDrugSummaryLink"
+        EXTERNAL_REF = "RelatedInformation/RelatedExternalRef"
+        SUMMARY_REF = "RelatedInformation/RelatedSummaryRef"
+        TERM_NAME_LINK = "RelatedInformation/RelatedGlossaryTermNameLink"
+        PDQ_TERM = "PDQTerm"
+        TYPES = dict(
+            drug=(DRUG_SUMMARY_LINK, "Rel Drug Summary Link", "ref", True),
+            xref=(EXTERNAL_REF, "Rel External Ref", "xref", True),
+            sref=(SUMMARY_REF, "Rel Summary Ref", "href", True),
+            term=(TERM_NAME_LINK, "Rel Glossary Term", "ref", True),
+            pdqt=(PDQ_TERM, "PDQ Term", "ref", False),
+        )
 
-#----------------------------------------------------------------------
-# Send it.
-#----------------------------------------------------------------------
-# Create the HTML footer
-html += """
- </BODY>
-</HTML>"""
+        def __init__(self, label, value, text, external, indent):
+            """Capture the caller's values.
 
-cdrcgi.sendPage(html)
+            Pass:
+                label - string for the left-side column
+                value - string extracted from the linking attribute
+                text - text displayed in the right-side column
+                external - True if this is a link outside the CDR
+                indent - whether the label should be offset from the left
+            """
+
+            self.__label = label
+            self.__value = value
+            self.__text = text
+            self.__external = external
+            self.__indent = indent
+
+        @property
+        def row(self):
+            """HTML markup for the link."""
+
+            if not hasattr(self, "_row"):
+                label = builder.TD(self.__label)
+                if self.__indent:
+                    label.set("class", "indent")
+                if self.__external:
+                    display = url = self.__value
+                else:
+                    doc_id = Doc.extract_id(self.__value)
+                    display = f"CDR{doc_id:d}"
+                    url = f"QcReport.py?Session=guest&DocId={doc_id:d}"
+                    url += "&DocVersion=-1"
+                link = builder.A(display, href=url)
+                args = f"{self.__text} (", link, ")"
+                self._row = builder.TR(label, builder.TD(*args))
+            return self._row
+
+        @classmethod
+        def get_links(cls, concept, key):
+            """Find all the links of a given type for the concept.
+
+            Pass:
+                concept - subject of the report
+                key - index into the values for this type of link
+            """
+
+            path, label, name, indent = cls.TYPES[key]
+            external = name == "xref"
+            name = f"{{{Doc.NS}}}{name}"
+            links = []
+            for node in concept.doc.root.findall(path):
+                text = Doc.get_text(node, "").strip()
+                value = node.get(name)
+                links.append(cls(label, value, text, external, indent))
+                label = ""
+            return links
+
+
+    class MediaLink:
+        """Link to an image used by the glossary term."""
+
+        CDR_REF = f"{{{Doc.NS}}}ref"
+        CGI = "https://cdr.cancer.gov/cgi-bin/cdr"
+        URL = f"{CGI}/GetCdrImage.py?id={{}}-300.jpg"
+
+        def __init__(self, node):
+            """Remember the XML node for this link.
+
+            Pass:
+                node - wrapper element for the image information
+            """
+
+            self.__node = node
+
+        @property
+        def id(self):
+            """CDR ID for the image document."""
+
+            if not hasattr(self, "_id"):
+                node = self.node.find("MediaID")
+                try:
+                    self._id = Doc.extract_id(node.get(f"{{{Doc.NS}}}ref"))
+                except:
+                    self._id = None
+                if not hasattr(self, "_text"):
+                    self._text = Doc.get_text(node, "").strip()
+            return self._id
+
+        @property
+        def node(self):
+            """Wrapper node for the media link."""
+            return self.__node
+
+        @property
+        def row(self):
+            """HTML markup for the the image's table row."""
+
+            if not hasattr(self, "_row"):
+                B = builder
+                img = B.IMG(src=self.URL.format(self.id))
+                args = self.text, B.BR(), img
+                self._row = B.TR(B.TD("Media Link"), B.TD(*args))
+            return self._row
+
+        @property
+        def text(self):
+            """Text to be displayed above the image."""
+
+            if not hasattr(self, "_text"):
+                node = self.node.find("MediaID")
+                self._text = Doc.get_text(node, "").strip()
+                if not hasattr(self, "_id"):
+                    try:
+                        self._id = Doc.extract_id(node.get(self.CDR_REF))
+                    except:
+                        self._id = None
+            return self._text
+
+
+    class Name:
+        """Information needed from a GlossaryTermName document."""
+
+        NAME_TAGS = "TermName", "TranslatedName"
+
+        def __init__(self, concept, id):
+            """Remember the caller's information.
+
+            Pass:
+                concept - `Concept` to which this name belongs
+                id - CDR ID for the GlossaryTermName document
+            """
+
+            self.__concept = concept
+            self.__id = id
+
+        def resolve_placeholders(self, definition):
+            """Assemble the definition using our name and replacements.
+
+            Pass:
+                definition - definition with placeholders to be resolved
+
+            Return:
+                marked-up definition row
+            """
+
+            if definition.langcode == "en":
+                name = deepcopy(self.english_name)
+            elif self.spanish_name is None:
+                name = deepcopy(self.english_name)
+                self.__append_en_ingles(name)
+            else:
+                name = deepcopy(self.spanish_name)
+            root = etree.Element("GlossaryTermDef")
+            root.append(name)
+            root.append(self.__make_capped_name(name))
+            root.append(deepcopy(definition.node.find("DefinitionText")))
+            if self.replacements:
+                node = etree.Element("GlossaryTermPlaceHolder")
+                for replacement in self.replacements.values():
+                    node.append(deepcopy(replacement))
+                root.append(node)
+            if definition.replacements:
+                node = etree.Element("GlossaryConceptPlaceHolder")
+                for replacement in definition.replacements.values():
+                    node.append(deepcopy(replacement))
+                root.append(node)
+            doc = Doc(Concept.GUEST, xml=etree.tostring(root))
+            result = doc.filter(Concept.FILTER)
+            return html.fromstring(str(result.result_tree))
+
+        @property
+        def alternate_spanish_names(self):
+            """Extra spanish names."""
+
+            if not hasattr(self, "_alternate_spanish_names"):
+                self._alternate_spanish_names = []
+                path = "TranslatedName/TermNameString"
+                for node in self.doc.root.findall(path):
+                    if node.get("NameType") == "alternate":
+                        self._alternate_spanish_names.append(node)
+                    elif not hasattr(self, "_spanish_name"):
+                        self._spanish_name = node
+            return self._alternate_spanish_names
+
+        @property
+        def blocked(self):
+            """True if the name document can't be published."""
+            self.doc.active_status != Doc.ACTIVE
+
+        @property
+        def doc(self):
+            """CDR `Doc` object for the GlossaryTermName document."""
+
+            if not hasattr(self, "_doc"):
+                self._doc = Doc(Concept.GUEST, id=self.id)
+            return self._doc
+
+        @property
+        def id(self):
+            """CDR ID for the GlossaryTermName document."""
+            return self.__id
+
+        @property
+        def english_name(self):
+            """English name for the glossary term."""
+
+            if not hasattr(self, "_english_name"):
+                node = self.doc.root.find("TermName/TermNameString")
+                self._english_name = node
+            return self._english_name
+
+        @property
+        def replacements(self):
+            """The name's replacement strings for definition placeholders."""
+
+            if not hasattr(self, "_replacements"):
+                self._replacements = {}
+                for node in self.doc.root.findall("ReplacementText"):
+                    self._replacements[node.get("name")] = node
+            return self._replacements
+
+        @property
+        def spanish_name(self):
+            """Primary (non-"alternate") Spanish name for the term."""
+
+            if not hasattr(self, "_spanish_name"):
+                self._spanish_name = None
+                alternates = []
+                path = "TranslatedName/TermNameString"
+                for node in self.doc.root.findall(path):
+                    if node.get("NameType") != "alternate":
+                        self._spanish_name = node
+                    else:
+                        alternates.append(node)
+                if not hasattr(self, "_alternate_spanish_names"):
+                    self._alternate_spanish_names = alternates
+            return self._spanish_name
+
+        @staticmethod
+        def markup_for_name(name):
+            """Highlight insertion/deletion markup for the term name.
+
+            Pass:
+                name - parsed XML node for the term name string
+            """
+
+            doc = Doc(Concept.GUEST, xml=etree.tostring(name))
+            result = doc.filter(Concept.FILTER)
+            return html.fromstring(str(result.result_tree))
+
+        @staticmethod
+        def __make_capped_name(node):
+            """Helper method for uppercasing the first character of a name.
+
+            Pass:
+                node - parsed XML node containing the term name
+            """
+
+            node = deepcopy(node)
+            node.tag = "CappedNameString"
+            for n in node.iter("*"):
+                if n.text is not None and n.text.strip():
+                    n.text = n.text[0].upper() + n.text[1:]
+                    break
+                elif n is not node and n.tail is not None and n.tail.strip():
+                    n.tail = n.tail[0].upper() + n.tail[1:]
+                    break
+            return node
+
+        @staticmethod
+        def __append_en_ingles(node):
+            """Helper method for marking this name as an English substitute.
+
+            Pass:
+                node - XML node to which the suffix is added
+            """
+
+            last_child = None
+            for child in node.findall("*"):
+                last_child = child
+            if last_child is not None:
+                if last_child.tail is not None:
+                    last_child.tail += Concept.EN_INGLES
+                else:
+                    last_child.tail = Concept.EN_INGLES
+            else:
+                node.text += Concept.EN_INGLES
+
+    class Video:
+        """Information about a YouTube video."""
+
+        IMAGE_URL = "https://img.youtube.com/vi/{}/hqdefault.jpg"
+        VIDEO_URL = "https://www.youtube.com/watch?v={}"
+        SESSION = Session("guest")
+
+        def __init__(self, node):
+            """Capture the caller's information.
+
+            Pass:
+                node - wrapper node for the video information
+            """
+
+            self.__node = node
+
+        @property
+        def id(self):
+            """CDR ID for the video's Media document."""
+
+            if not hasattr(self, "_id"):
+                node = self.node.find("VideoID")
+                self._id = None
+                if node is not None:
+                    try:
+                        self._id = Doc.extract_id(node.get(f"{{{Doc.NS}}}ref"))
+                    except:
+                        pass
+            return self._id
+
+        @property
+        def img(self):
+            """Still image displayed for the video."""
+
+            if not hasattr(self, "_img"):
+                url = self.IMAGE_URL.format(self.youtube_id)
+                self._img = builder.IMG(src=url)
+            return self._img
+
+        @property
+        def link(self):
+            """Link for playing the YouTube video."""
+
+            if not hasattr(self, "_link"):
+                url = self.VIDEO_URL.format(self.youtube_id)
+                self._link = builder.A("Watch video on YouTube", href=url)
+            return self._link
+
+        @property
+        def node(self):
+            """Wrapper element for the video information."""
+            return self.__node
+
+        @property
+        def row(self):
+            """HTML markup for displaying the video info and link."""
+
+            if not hasattr(self, "_row"):
+                B = builder
+                args = self.text, B.BR(), self.img, B.BR(), self.link
+                self._row = B.TR(B.TD("Video Link"), B.TD(*args))
+            return self._row
+
+        @property
+        def text(self):
+            """String describing the video, displayed at the top."""
+
+            if not hasattr(self, "_text"):
+                self._text = None
+                node = self.node.find("SpecificMediaTitle")
+                if node is not None:
+                    self._text = Doc.get_text(node, "").strip()
+                if not self._text:
+                    node = self.node.find("VideoID")
+                    if node is not None:
+                        self._text = Doc.get_text(node, "").strip()
+            return self._text
+
+        @property
+        def youtube_id(self):
+            """Token for the URL to play the video."""
+
+            if not hasattr(self, "_youtube_id"):
+                doc = Doc(self.SESSION, id=self.id)
+                node = doc.root.find("PhysicalMedia/VideoData/HostingID")
+                self._youtube_id = Doc.get_text(node, "").strip() or None
+            return self._youtube_id
+
+
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+    Control().run()

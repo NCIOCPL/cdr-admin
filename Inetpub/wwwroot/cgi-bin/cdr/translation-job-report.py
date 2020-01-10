@@ -5,7 +5,7 @@
 import datetime
 import operator
 import cdrcgi
-import cdrdb
+from cdrapi import db
 
 class Control(cdrcgi.Control):
     """
@@ -154,9 +154,9 @@ class Control(cdrcgi.Control):
         fields = ("d.id", "d.title", "s.value_name", "c.value_name",
                   "u.fullname", "j.state_date", "j.comments")
         if self.type == "current":
-            query = cdrdb.Query("summary_translation_job j", *fields)
+            query = db.Query("summary_translation_job j", *fields)
         else:
-            query = cdrdb.Query("summary_translation_job_history j", *fields)
+            query = db.Query("summary_translation_job_history j", *fields)
         query.join("usr u", "u.id = j.assigned_to")
         query.join("document d", "d.id = j.english_id")
         query.join("summary_translation_state s", "s.value_id = j.state_id")
@@ -194,7 +194,7 @@ class Control(cdrcgi.Control):
         )
         if self.type == "current":
             ncols = len(columns)
-            rows.append([unichr(160)] * ncols)
+            rows.append([chr(160)] * ncols)
             padding = [""] * (ncols - 2)
             rows.append(["", cdrcgi.Report.Cell("TOTALS", bold=True)] + padding)
             for state in sorted(Job.COUNTS):
@@ -212,7 +212,7 @@ class Control(cdrcgi.Control):
             dictionary of user names indexed by user ID
         """
 
-        query = cdrdb.Query("usr u", "u.id", "u.fullname")
+        query = db.Query("usr u", "u.id", "u.fullname")
         query.join("grp_usr gu", "gu.usr = u.id")
         query.join("grp g", "g.id = gu.grp")
         query.where("u.expired IS NULL")
@@ -230,7 +230,7 @@ class Control(cdrcgi.Control):
         Returns a populated Values object.
         """
 
-        query = cdrdb.Query(table_name, "value_id", "value_name")
+        query = db.Query(table_name, "value_id", "value_name")
         rows = query.order("value_pos").execute(self.cursor).fetchall()
         class Values:
             def __init__(self, rows):
@@ -299,7 +299,7 @@ class Job:
             self.comments = self.comments.split("\n")
         Job.COUNTS[state] = self.COUNTS.get(state, 0) + 1
         self.spanish_id = self.spanish_title = self.spanish_audience = None
-        query = cdrdb.Query("query_term q", "d.id", "d.title")
+        query = db.Query("query_term q", "d.id", "d.title")
         query.join("document d", "d.id = q.doc_id")
         query.where("path = '/Summary/TranslationOf/@cdr:ref'")
         query.where(query.Condition("int_val", doc_id))

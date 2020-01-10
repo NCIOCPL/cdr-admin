@@ -43,8 +43,6 @@ class Control(cdrcgi.Control):
         self.state_id = self.get_id("state", self.states.map)
         self.assigned_to = self.get_id("assigned_to", self.users)
         self.comments = self.fields.getvalue("comments") or None
-        if self.comments is not None:
-            self.comments = self.comments.decode("utf-8")
         self.job = Job(self) if self.doc_id else None
 
     @property
@@ -90,10 +88,10 @@ class Control(cdrcgi.Control):
                     row = query.execute(self.cursor).fetchone()
                     if row:
                         title = row.title.split(";")[0]
-                        pattern = u"Concept document for {}"
+                        pattern = "Concept document for {}"
                         self._doc_title = pattern.format(title)
                     else:
-                        pattern = u"Concept document CDR{:d}"
+                        pattern = "Concept document CDR{:d}"
                         self._doc_title = pattern.format(self.doc_id)
         return self._doc_title
 

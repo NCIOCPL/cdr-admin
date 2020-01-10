@@ -1,59 +1,76 @@
-#----------------------------------------------------------------------
-# Gets a schema document from the repository and returns it as a plain
-# text file.
-#----------------------------------------------------------------------
-import cgi, cdrdb, cdrcgi, sys
+#!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields  = cgi.FieldStorage()
-id      = fields and fields.getvalue("id")
+"""Show the raw XML for a CDR schema document.
+"""
 
-conn = cdrdb.connect('CdrGuest')
-cursor = conn.cursor()
+import sys
+from cdrcgi import Controller
+from cdrapi.docs import Doc
 
-if id:
-    cursor.execute("SELECT title, xml FROM document WHERE id = %s" % id)
-    rows = cursor.fetchall()
-    if not rows:
-        cdrcgi.bail("Can't retrieve XML for document %s" % id)
-    sys.stdout.write("""\
-Content-type: text/html; charset: utf-8
 
-<html>
- <body>
-  <h1>%s</h1>
-  <pre>%s</pre>
- </body>
-</html>
-""" % (rows[0][0],
-       cgi.escape(rows[0][1]).encode('utf-8')))
-    sys.exit(0)
+class Control(Controller):
+    """Script logic."""
 
-cursor.execute("""\
-    SELECT d.id, d.title
-      FROM document d
-      JOIN doc_type t
-        ON t.id = d.doc_type
-     WHERE t.name = 'Schema'
-  ORDER BY d.title""")
-html = [u"""\
-<html>
- <head>
-  <title>CDR Schemas</title>
-  <style type='text/css'>
-   body { font-family: Arial }
-  </style>
- </head>
- <body>
-  <h1>CDR Schemas</h1>"""]
-for row in cursor.fetchall():
-    line = (u"  <a href='GetSchema.py?id=%d'>%s</a><br />" %
-            (row[0], cgi.escape(row[1])))
-    html.append(line)
-html.append(u"""\
- </body>
-</html>
-""")
-cdrcgi.sendPage(u"\n".join(html))
+    SUBMIT = None
+
+    def run(self):
+        """Override router."""
+
+        if self.id:
+            sys.stdout.buffer.write(b"Content-type: text/plain;charset=utf-8")
+            sys.stdout.buffer.write(b"\n\n")
+            sys.stdout.buffer.write(self.doc.xml.encode("utf-8"))
+            sys.exit(0)
+        Controller.run(self)
+
+    def populate_form(self, page):
+        """If we don't have an ID, show the form as a menu.
+
+        Pass:
+            page - HTMLPage object to be populated
+        """
+
+        page.body.set("class", "admin-menu")
+        fieldset = page.fieldset("Schemas")
+        fieldset.set("class", "flexlinks")
+        ul = page.B.UL()
+        script = self.script
+        for schema in self.schemas:
+            link = page.menu_link(script, schema.name, id=schema.id)
+            ul.append(page.B.LI(link))
+        fieldset.append(ul)
+        page.form.append(fieldset)
+        page.add_css(".flexlinks ul { height: 400px; }")
+
+    @property
+    def doc(self):
+        """Document whose XML we will display."""
+
+        if not hasattr(self, "_doc"):
+            self._doc = Doc(self.session, id=self.id)
+        return self._doc
+
+    @property
+    def id(self):
+        """ID of schema document to be displayed."""
+        return self.fields.getvalue("id")
+
+    @property
+    def schemas(self):
+        """Sorted sequence of `Schema` objects for the menu."""
+
+        if not hasattr(self, "_schemas"):
+            query = self.Query("document d", "d.id", "d.title").order(2)
+            query.join("doc_type t", "t.id = d.doc_type")
+            query.where("t.name = 'Schema'")
+            class Schema:
+                def __init__(self, row):
+                    self.id = row.id
+                    self.name = row.title.replace(".xml", "")
+            self._schemas = [Schema(row) for row in query.execute(self.cursor)]
+        return self._schemas
+
+
+if __name__ == "__main__":
+    """Don't run the script if loaded as a module."""
+    Control().run()

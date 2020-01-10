@@ -22,14 +22,16 @@ import re
 import xlrd
 import ModifyDocs
 import lxml.etree as etree
-import mutagen
-import cdrdb
+from mutagen.mp3 import MP3
 import zipfile
-import cStringIO
+from io import BytesIO
+from cdrapi import db
+from cdrapi.docs import Doc
+from cdrapi.users import Session
 
 CDRNS = "cips.nci.nih.gov/cdr"
 NSMAP = { "cdr" : CDRNS }
-AUDIO = cdr.BASEDIR + "/Audio_from_CIPSFTP"
+AUDIO = f"{cdr.BASEDIR}/Audio_from_CIPSFTP"
 BANNER = "CDR Administration"
 SUBTITLE = "Load Glossary Audio Files"
 logger = cdr.Logging.get_logger("audio-import")
@@ -59,7 +61,7 @@ def get_latest_batch():
     properly) and the original name (with possibly mixed case).
     """
     sets = {}
-    for path in glob.glob("%s/Week_*.zip" % AUDIO):
+    for path in glob.glob(f"{AUDIO}/Week_*.zip"):
         match = re.search(r"((Week_\d+).*.zip)", path, re.I)
         if match:
             name = match.group(1)
@@ -71,7 +73,7 @@ def get_latest_batch():
             sets[week].append((name.upper(), name))
     if not sets:
         return None
-    keys = sorted(sets.keys())
+    keys = sorted(sets)
     return sorted(sets[keys[-1]])
 
 def show_form():
@@ -117,13 +119,13 @@ def getCreationDate(path, zipFile):
     info = zipFile.getinfo(path)
     return "%04d-%02d-%02d" % info.date_time[:3]
 
-def getRuntime(bytes):
+def getRuntime(mp3_bytes):
     """
     Determine the duration of an audio clip.
     """
-    fp = cStringIO.StringIO(bytes)
-    mp3 = mutagen.File(fp)
-    logger.info("runtime is %s", mp3.info.length)
+    fp = BytesIO(mp3_bytes)
+    mp3 = MP3(fp)
+    logger.debug("runtime is %s", mp3.info.length)
     return int(round(mp3.info.length))
 
 def getDocTitle(docId):
@@ -155,11 +157,13 @@ class AudioFile:
         representing the contents of the zip file, and from the audio
         file itself.
         """
+        self.zipName = zipName
+        value = getCellValue(sheet, row, 0)
         try:
-            self.zipName = zipName
-            self.nameId = int(getCellValue(sheet, row, 0))
-        except Exception, e:
-            logger.exception("%s row %s", zipName, row)
+            self.nameId = int(value)
+        except Exception as e:
+            if value != "CDR ID":
+                logger.exception("%s row %s", zipName, row)
             raise
         try:
             self.nameTitle = getDocTitle(self.nameId)
@@ -181,11 +185,11 @@ class AudioFile:
             self.created = getCreationDate(self.filename, zipFile)
             self.title = self.nameTitle.split(';')[0]
             if self.language == 'Spanish':
-                self.title += u"-Spanish"
+                self.title += "-Spanish"
             if self.language not in ('English', 'Spanish'):
                 raise Exception("unexpected language value '%s'" %
                                 self.language)
-        except Exception, e:
+        except Exception as e:
             logger.exception("CDR%d %r (%s) row %s in %s", self.nameId,
                              self.name, self.language, row, zipName)
             raise
@@ -198,7 +202,7 @@ class AudioFile:
         """
         element = etree.Element('MediaLink')
         child = etree.Element('MediaID')
-        child.text = u"%s; pronunciation; mp3" % self.title
+        child.text = "%s; pronunciation; mp3" % self.title
         child.set("{cips.nci.nih.gov/cdr}ref", "CDR%010d" % self.mediaId)
         element.append(child)
         return element
@@ -223,7 +227,7 @@ class AudioFile:
         representing this audio file.
         """
         language = self.language == 'Spanish' and 'es' or 'en'
-        creator = self.creator or u'Vanessa Richardson, VR Voice'
+        creator = self.creator or 'Vanessa Richardson, VR Voice'
         root = etree.Element("Media", nsmap=NSMAP)
         root.set("Usage", "External")
         etree.SubElement(root, "MediaTitle").text = self.title
@@ -249,29 +253,27 @@ class AudioFile:
         glossary = etree.SubElement(proposedUse, "Glossary")
         glossary.set("{%s}ref" % CDRNS, "CDR%010d" % self.nameId)
         glossary.text = self.nameTitle
-        return etree.tostring(root, pretty_print=True)
+        return etree.tostring(root, pretty_print=True, encoding="unicode")
 
     def save(self, session):
         """
         Create the new Media document in the CDR for this audio file.
         """
+
+        opts = dict(xml=self.toXml(), blob=self.bytes, doctype="Media")
+        doc = Doc(Session(session), **opts)
         comment = "document created for CDR request OCECDR=3373"
-        docTitle = u"%s; pronunciation; mp3" % self.title
-        ctrl = dict(DocType="Media", DocTitle=docTitle.encode("utf-8"))
-        doc = cdr.Doc(self.toXml(), doctype="Media", ctrl=ctrl)
         opts = dict(
-            doc=str(doc),
+            version=True,
+            publishable=True,
             comment=comment,
             reason=comment,
-            val="Y",
-            ver="Y",
-            publishable="Y",
-            blob=self.bytes
+            val_types=("schema", "links"),
+            unlock=True,
         )
-        result = cdr.addDoc(session, **opts)
-        self.mediaId = cdr.exNormalize(result)[1]
-        cdr.unlock(session, self.mediaId)
-        return self.mediaId
+        doc.save(**opts)
+        self.mediaId = doc.id
+        return doc.id
 
 #----------------------------------------------------------------------
 # Object representing the element in a GlossaryTermName document to
@@ -325,7 +327,7 @@ class Request4926(ModifyDocs.Job):
             return_value = etree.tostring(root)
             self.report_rows += report_rows
             return return_value
-        except Exception, e:
+        except Exception as e:
             logger.exception(string_id)
             self.report_rows.append([string_id, str(e)])
             return doc.xml
@@ -351,14 +353,16 @@ def collectInfo(zipNames):
         fileNames = set()
         termNames = set()
         for name in zipFile.namelist():
-            if "MACOSX" not in name and name.endswith(".xls"):
+            if "MACOSX" in name:
+                continue
+            if name.endswith(".xls") or name.endswith(".xlsx"):
                 xlBytes = zipFile.read(name)
                 book = xlrd.open_workbook(file_contents=xlBytes)
                 sheet = book.sheet_by_index(0)
                 for row in range(sheet.nrows):
                     try:
                         mp3 = AudioFile(zipName, zipFile, sheet, row)
-                    except Exception, e:
+                    except Exception as e:
                         continue
                     lowerName = mp3.filename.lower()
                     if lowerName in fileNames:
@@ -413,7 +417,7 @@ if request == cdrcgi.MAINMENU:
 #----------------------------------------------------------------------
 if request != "Submit" or not files:
     show_form()
-cursor = cdrdb.connect('CdrGuest').cursor()
+cursor = db.connect(user='CdrGuest').cursor()
 cursor.execute("""\
 SELECT DISTINCT doc_id
            FROM query_term
@@ -421,7 +425,9 @@ SELECT DISTINCT doc_id
 alreadyDone = set([row[0] for row in cursor.fetchall()])
 logger.info("%d documents already processed", len(alreadyDone))
 files = ["%s/%s" % (AUDIO, f.split("|")[1]) for f in files]
+logger.info("files=%s", files)
 info = collectInfo(files)
+logger.info("term ids: %s", sorted(info))
 mediaDocs = {}
 docs = {}
 report_rows = []

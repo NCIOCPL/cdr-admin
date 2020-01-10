@@ -12,8 +12,8 @@
 #----------------------------------------------------------------------
 import cdr
 import cdrcgi
-import cdrdb
-import lxml.etree as etree
+from cdrapi import db
+from lxml import etree
 
 class Control(cdrcgi.Control):
     """
@@ -125,7 +125,7 @@ jQuery(function() {
         if not summaries:
             cdrcgi.bail("No summaries found for report.")
         if len(summaries) == 1:
-            subtitle = u"%s (CDR%d)" % (summaries[0].title, summaries[0].doc_id)
+            subtitle = "%s (CDR%d)" % (summaries[0].title, summaries[0].doc_id)
         else:
             subtitle = "%s Language %s Summaries for the %s" % (self.language,
                                                                 self.audience,
@@ -183,8 +183,8 @@ table.summary th { width: 150px; text-align: right; padding-right: 10px; }""")
         """
         if not self.doc_title:
             cdrcgi.bail("No title specified")
-        pattern = "%" + unicode(self.doc_title, "utf-8") + "%"
-        query = cdrdb.Query("active_doc d", "d.id", "d.title")
+        pattern = f"%{self.doc_title}%"
+        query = db.Query("active_doc d", "d.id", "d.title")
         query.join("doc_type t", "t.id = d.doc_type")
         query.where(query.Condition("t.name", "Summary"))
         query.where(query.Condition("d.title", pattern, "LIKE"))
@@ -227,7 +227,7 @@ table.summary th { width: 150px; text-align: right; padding-right: 10px; }""")
         b_path = "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"
         l_path = "/Summary/SummaryMetaData/SummaryLanguage"
         t_path = "/Summary/TranslationOf/@cdr:ref"
-        query = cdrdb.Query("active_doc d", "d.id", "d.title").unique()
+        query = db.Query("active_doc d", "d.id", "d.title").unique()
         query.join("doc_version v", "v.id = d.id")
         query.join("query_term b", "b.doc_id = d.id")
         query.join("query_term a", "a.doc_id = d.id")
@@ -242,7 +242,7 @@ table.summary th { width: 150px; text-align: right; padding-right: 10px; }""")
         query.order("d.title")
         doc_ids = [row[0] for row in query.execute(self.cursor).fetchall()]
         if self.language != "English":
-            query = cdrdb.Query("document d", "d.id", "d.title").unique()
+            query = db.Query("document d", "d.id", "d.title").unique()
             query.join("query_term t", "t.doc_id = d.id")
             query.where(query.Condition("t.path", t_path))
             query.where(query.Condition("t.int_val", doc_ids, "IN"))
@@ -257,7 +257,7 @@ table.summary th { width: 150px; text-align: right; padding-right: 10px; }""")
         document. The caller will catch any exceptions raised (presumably
         because the document ID has been tampered with by a hacker).
         """
-        query = cdrdb.Query("query_term", "value")
+        query = db.Query("query_term", "value")
         query.where(query.Condition("path", self.N_PATH))
         query.where(query.Condition("doc_id", board_id))
         return query.execute(self.cursor).fetchone()[0]
@@ -266,7 +266,7 @@ table.summary th { width: 150px; text-align: right; padding-right: 10px; }""")
         """
         Fetch IDs and names of the PDQ editorial boards (for picklist).
         """
-        query = cdrdb.Query("query_term n", "n.doc_id", "n.value")
+        query = db.Query("query_term n", "n.doc_id", "n.value")
         query.join("query_term t", "t.doc_id = n.doc_id")
         query.join("active_doc a", "a.id = n.doc_id")
         query.where(query.Condition("n.path", self.N_PATH))
@@ -275,7 +275,7 @@ table.summary th { width: 150px; text-align: right; padding-right: 10px; }""")
         query.order("n.value")
         boards = []
         prefix, suffix = ("PDQ ", " Editorial Board")
-        for id, name in query.execute(self.cursor, timeout=300).fetchall():
+        for id, name in query.execute(self.cursor).fetchall():
             if name.startswith(prefix):
                 name = name[len(prefix):]
             if name.endswith(suffix):
@@ -298,7 +298,7 @@ class Summary:
         """
         self.control = control
         self.doc_id = int(doc_id)
-        query = cdrdb.Query("document", "xml")
+        query = db.Query("document", "xml")
         query.where(query.Condition("id", self.doc_id))
         rows = query.execute(control.cursor).fetchall()
         if not rows:
@@ -309,8 +309,8 @@ class Summary:
             cdrcgi.bail("CDR%d malformed" % self.doc_id)
         if root.tag != "Summary":
             cdrcgi.bail("CDR%d is not a summary" % self.doc_id)
-        self.title = self.language = self.audience = self.description = u""
-        self.purpose = self.advisory_board = self.editorial_board = u""
+        self.title = self.language = self.audience = self.description = ""
+        self.purpose = self.advisory_board = self.editorial_board = ""
         self.topics = []
         self.abstract = []
         self.keywords = []
@@ -337,7 +337,7 @@ class Summary:
                             self.advisory_board = name
                         else:
                             self.editorial_board = name
-                    except Exception, e:
+                    except Exception as e:
                         self.advisory_board = "oops! (%s)" % e
             elif node.tag in ("MainTopics", "SecondaryTopics"):
                 self.topics.append(self.get_topic(node))
@@ -359,7 +359,7 @@ class Summary:
         """
         Get all the text content for an element, stripping internal markup.
         """
-        return u"".join([t for t in node.itertext()]).strip()
+        return "".join([t for t in node.itertext()]).strip()
 
     def get_topic(self, node):
         """
@@ -368,7 +368,7 @@ class Summary:
         """
         for child in node.findall("Term"):
             suffix = node.tag == "MainTopics" and "M" or "S"
-            return u"%s (%s)" % (child.text, suffix)
+            return "%s (%s)" % (child.text, suffix)
 
     def report(self, page):
         """
@@ -390,7 +390,7 @@ class Summary:
             self.B.TR(
                 self.B.TH("Section Title"),
                 self.B.TH("Diagnoses"),
-                self.B.TH(u"SS\u00a0No"),
+                self.B.TH("SS\u00a0No"),
                 self.B.TH("Section Type")
             )
         )
@@ -442,10 +442,10 @@ class Summary:
                 while lines:
                     line = lines.pop(0)
                     br = self.B.BR()
-                    br.tail = line
+                    br.tail = str(line)
                     td.append(br)
-            elif isinstance(value, basestring) or type(value) is int:
-                td = self.B.TD(unicode(value))
+            elif isinstance(value, (str, int, float)):
+                td = self.B.TD(str(value))
             else:
                 cdrcgi.bail("type of value is %s" % type(value))
         else:
@@ -460,11 +460,11 @@ class Summary:
         cdr_ref = node.get("{%s}ref" % self.NS)
         if cdr_ref not in self.board_cache:
             doc_id = cdr.exNormalize(cdr_ref)[1]
-            query = cdrdb.Query("query_term", "value")
+            query = db.Query("query_term", "value")
             query.where(query.Condition("path", Control.N_PATH))
             query.where(query.Condition("doc_id", doc_id))
             rows = query.execute(self.control.cursor).fetchall()
-            name = rows and rows[0][0] or (u"no name for %s" % repr(cdr_ref))
+            name = rows and rows[0][0] or ("no name for %s" % repr(cdr_ref))
             self.board_cache[cdr_ref] = name
         return self.board_cache[cdr_ref]
 
@@ -483,7 +483,7 @@ class Summary:
             """
             self.depth = len(node.getroottree().getpath(node).split("/"))
             self.cursor = cursor
-            self.title = u""
+            self.title = ""
             self.diagnoses = []
             self.types = []
             self.search_attr = node.get("TrialSearchString")
@@ -492,7 +492,7 @@ class Summary:
             for child in node.findall("SectMetaData/Diagnosis"):
                 try:
                     self.diagnoses.append(self.get_diagnosis_name(child))
-                except Exception, e:
+                except Exception as e:
                     self.diagnoses.append("oops: %s" % e)
             for child in node.findall("SectMetaData/SectionType"):
                 self.types.append(child.text)
@@ -505,11 +505,11 @@ class Summary:
             cdr_ref = node.get("{%s}ref" % Summary.NS)
             if cdr_ref not in self.diagnosis_cache:
                 doc_id = cdr.exNormalize(cdr_ref)[1]
-                query = cdrdb.Query("query_term", "value")
+                query = db.Query("query_term", "value")
                 query.where(query.Condition("path", "/Term/PreferredName"))
                 query.where(query.Condition("doc_id", doc_id))
                 rows = query.execute(self.cursor).fetchall()
-                name = rows and rows[0][0] or (u"no name for %s" %
+                name = rows and rows[0][0] or ("no name for %s" %
                                                repr(cdr_ref))
                 self.diagnosis_cache[cdr_ref] = name
             return self.diagnosis_cache[cdr_ref]
@@ -527,14 +527,14 @@ class Summary:
             Add the table row for this summary section's information.
             """
             B = cdrcgi.Page.B
-            check_mark = self.search_attr == "No" and u"\u2714" or u""
+            check_mark = self.search_attr == "No" and "\u2714" or ""
             level = { 3: "top", 4: "mid" }.get(self.depth, "low")
             table.append(
                 B.TR(
                     B.TD(self.title, B.CLASS("%s-section" % level)),
-                    B.TD(u"; ".join(self.diagnoses)),
+                    B.TD("; ".join(self.diagnoses)),
                     B.TD(check_mark, B.CLASS("center")),
-                    B.TD(u"; ".join(self.types))
+                    B.TD("; ".join(self.types))
                 )
             )
 

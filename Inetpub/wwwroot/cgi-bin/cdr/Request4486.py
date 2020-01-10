@@ -7,15 +7,16 @@
 #----------------------------------------------------------------------
 import cgi
 import cdr
-import cdrdb
 import cdrcgi
 import datetime
 from lxml import etree
+from cdrapi import db
+from html import escape as html_escape
 
 #----------------------------------------------------------------------
 # Set the form variables.
 #----------------------------------------------------------------------
-cursor    = cdrdb.connect("CdrGuest").cursor()
+cursor    = db.connect(user="CdrGuest").cursor()
 fields    = cgi.FieldStorage()
 session   = cdrcgi.getSession(fields) or cdrcgi.bail("Please log in.")
 request   = cdrcgi.getRequest(fields)
@@ -51,8 +52,8 @@ def resolveRevisionMarkup(docId):
     parms = (('useLevel', '1'),)
     filt  = ['name:Revision Markup Filter']
     response = cdr.filterDoc('guest', filt, docId, parm = parms)
-    if type(response) in (str, unicode):
-        cdrcgi.bail(u"Unable to fetch CDR%d: %s" % (docId, response))
+    if isinstance(response, (str, bytes)):
+        cdrcgi.bail("Unable to fetch CDR%d: %s" % (docId, response))
     return response[0]
 
 #----------------------------------------------------------------------
@@ -82,29 +83,29 @@ class Name:
     def __init__(self, docId, spanish):
         Name.COUNT += 1
         self.docId         = docId
-        self.englishName   = u""
+        self.englishName   = ""
         self.replacements  = {}
         self.blocked       = False
-        self.pronunciation = u""
+        self.pronunciation = ""
         self.spanishNames  = []
 
         docXml = resolveRevisionMarkup(docId)
         root = etree.fromstring(docXml)
         for node in root.findall("TermName/TermNameString"):
-            self.englishName = cdr.get_text(node, u"")
+            self.englishName = cdr.get_text(node, "")
         if not spanish:
             for node in root.findall("TermName/TermPronunciation"):
-                self.pronunciation = cdr.get_text(node, u"")
+                self.pronunciation = cdr.get_text(node, "")
         for node in root.findall("ReplacementText"):
-            self.replacements[node.get("name")] = cdr.get_text(node, u"")
+            self.replacements[node.get("name")] = cdr.get_text(node, "")
         if spanish:
             for node in root.findall("TranslatedName/TermNameString"):
                 name = cdr.get_text(node)
                 if name:
                     self.spanishNames.append(name)
-        query = cdrdb.Query("document", "active_status")
+        query = db.Query("document", "active_status")
         query.where(query.Condition("id", docId))
-        if query.execute(cursor).fetchall()[0][0] == u"I":
+        if query.execute(cursor).fetchall()[0][0] == "I":
             self.blocked = True
 
 #----------------------------------------------------------------------
@@ -125,26 +126,26 @@ class Definition:
         for child in node.findall("DefinitionText"):
             self.text = breakDownDefinition(child)
         for child in node.findall("ReplacementText"):
-            self.replacements[child.get("name")] = cdr.get_text(child, u"")
+            self.replacements[child.get("name")] = cdr.get_text(child, "")
         for child in node.findall("Audience"):
-            self.audiences.add(cdr.get_text(child, u"").upper())
+            self.audiences.add(cdr.get_text(child, "").upper())
     def resolve(self, replacementsFromNameDoc, termName):
         reps = self.replacements.copy()
         reps.update(replacementsFromNameDoc)
         pieces = []
         for piece in self.text:
             if isinstance(piece, PlaceHolder):
-                default = u"[UNRESOLVED PLACEHOLDER %s]" % piece.name
+                default = "[UNRESOLVED PLACEHOLDER %s]" % piece.name
                 if piece.name == 'TERMNAME' and termName:
-                    rep = cgi.escape(termName)
+                    rep = html_escape(termName)
                 elif piece.name == 'CAPPEDTERMNAME' and termName:
-                    rep = cgi.escape(termName[0].upper() + termName[1:])
+                    rep = html_escape(termName[0].upper() + termName[1:])
                 else:
-                    rep = cgi.escape(reps.get(piece.name, default))
-                pieces.append(u"<span class='replacement'>%s</span>" % rep)
+                    rep = html_escape(reps.get(piece.name, default))
+                pieces.append("<span class='replacement'>%s</span>" % rep)
             else:
-                pieces.append(cgi.escape(piece))
-        return u"".join(pieces)
+                pieces.append(html_escape(piece))
+        return "".join(pieces)
 
 #----------------------------------------------------------------------
 # Object for a glossary term concept's information.
@@ -154,8 +155,8 @@ class Concept:
     def __init__(self, docId, cursor, audience, spanish):
         Concept.COUNT += 1
         self.docId = docId
-        self.htmlBlocked = u"<span class='error'>[Blocked]</span>"
-        query = cdrdb.Query("query_term", "doc_id").unique()
+        self.htmlBlocked = "<span class='error'>[Blocked]</span>"
+        query = db.Query("query_term", "doc_id").unique()
         query.where("path = '/GlossaryTermName/GlossaryTermConcept/@cdr:ref'")
         query.where(query.Condition("int_val", docId))
         rows = query.execute(cursor).fetchall()
@@ -190,14 +191,14 @@ class Concept:
             definitionRows = len(self.spanishDefinitions)
         if definitionRows > 1:
             rowspan += definitionRows - 1
-        html = [u"""\
+        html = ["""\
    <tr>
     <td rowspan='%d'>%d</td>
 """ % (rowspan, self.docId)]
         rowspan = termNameRows or 1
-        name = self.names and self.names[0].englishName or u""
+        name = self.names and self.names[0].englishName or ""
         reps = self.names and self.names[0].replacements or {}
-        enDef = u""
+        enDef = ""
         firstEnglishName = name
         if self.definitions:
             enDef = self.definitions[0].resolve(reps, firstEnglishName)
@@ -205,8 +206,8 @@ class Concept:
         # Processing the Terms if English and Spanish need to be displayed
         # ----------------------------------------------------------------
         if spanish:
-            spName = spDef = u""
-            termBlocked = u""
+            spName = spDef = ""
+            termBlocked = ""
             nameRowspan = 1
             if self.names and self.names[0].spanishNames:
                 spName = self.names[0].spanishNames[0]
@@ -222,59 +223,59 @@ class Concept:
             if self.names[0].blocked:
                 termBlocked = self.htmlBlocked
 
-            html.append(u"""\
+            html.append("""\
     <td rowspan='%d'>%s %s</td>
     <td>%s</td>
     <td rowspan='%d'>%s</td>
     <td rowspan='%d'>%s</td>
    </tr>
-""" % (nameRowspan, cgi.escape(name), termBlocked, cgi.escape(spName),
+""" % (nameRowspan, html_escape(name), termBlocked, html_escape(spName),
        rowspan, enDef, rowspan, spDef))
             if self.names:
                 for spName in self.names[0].spanishNames[1:]:
-                    html.append(u"""\
+                    html.append("""\
    <tr>
     <td>%s</td>
    </tr>
-""" % cgi.escape(spName))
+""" % html_escape(spName))
                 for name in self.names[1:]:
                     nameRowspan = len(name.spanishNames) or 1
-                    spName = name.spanishNames and name.spanishNames[0] or u""
+                    spName = name.spanishNames and name.spanishNames[0] or ""
                     if name.blocked:
                         termBlocked = self.htmlBlocked
 
-                    html.append(u"""\
+                    html.append("""\
    <tr>
     <td rowspan='%d'>%s %s</td>
     <td>%s</td>
    </tr>
-""" % (nameRowspan, cgi.escape(name.englishName), termBlocked,
-                                                  cgi.escape(spName)))
+""" % (nameRowspan, html_escape(name.englishName), termBlocked,
+                                                  html_escape(spName)))
                     for spName in name.spanishNames[1:]:
-                        html.append(u"""\
+                        html.append("""\
    <tr>
     <td>%s</td>
    </tr>
-""" % cgi.escape(spName))
+""" % html_escape(spName))
         # Processing the Terms if only English names are requested
         # --------------------------------------------------------
         else:
             # Processing the first name
             # -------------------------
-            termBlocked = u""
+            termBlocked = ""
             if self.names and self.names[0].pronunciation:
-                name += u" (%s)" % self.names[0].pronunciation
+                name += " (%s)" % self.names[0].pronunciation
 
                 # Need to indicate if a term has been blocked
                 # -------------------------------------------
                 if self.names[0].blocked:
                     termBlocked = self.htmlBlocked
 
-            html.append(u"""\
+            html.append("""\
     <td>%s %s</td>
     <td rowspan='%d'>%s</td>
    </tr>
-""" % (cgi.escape(name), termBlocked, rowspan, enDef))
+""" % (html_escape(name), termBlocked, rowspan, enDef))
 
             # Processing all other names (except the first)
             # ---------------------------------------------
@@ -284,39 +285,39 @@ class Concept:
                     enName += (" (%s)" % name.pronunciation)
                 if name.blocked:
                     termBlocked = self.htmlBlocked
-                html.append(u"""\
+                html.append("""\
    <tr>
     <td>%s %s</td>
    </tr>
-""" % (cgi.escape(enName), termBlocked))
+""" % (html_escape(enName), termBlocked))
 
         i = 1
         while i < definitionRows:
-            enDef = u""
+            enDef = ""
             if i < len(self.definitions):
                 enDef = self.definitions[i].resolve(reps, firstEnglishName)
-            html.append(u"""\
+            html.append("""\
    <tr>
     <td>%s</td>
 """ % enDef)
             if spanish:
-                spDef = u""
+                spDef = ""
                 if i < len(self.spanishDefinitions):
                     spName = firstSpanishName
                     spDef = self.spanishDefinitions[i].resolve(reps, spName)
-                html.append(u"""\
+                html.append("""\
     <td>%s</td>
 """ % spDef)
-            html.append(u"""\
+            html.append("""\
    </tr>
 """)
             i += 1
-        return u"".join(html)
+        return "".join(html)
 
 #----------------------------------------------------------------------
 # Create the valid values lists.
 #----------------------------------------------------------------------
-query = cdrdb.Query("query_term", "value").unique().order(1)
+query = db.Query("query_term", "value").unique().order(1)
 query.where("path = '/GlossaryTermConcept/TermType'")
 query.where("value <> 'Other'")
 term_types = [row[0] for row in query.execute(cursor).fetchall()]
@@ -342,7 +343,7 @@ def createForm():
     then = now - datetime.timedelta(7)
     page = cdrcgi.Page(title, subtitle=section, action=script,
                        buttons=buttons, session=session)
-    instructions = u"""\
+    instructions = """\
 You must specifiy either a term name start, or text from the definitions
 of the terms to be selected. All other selection criteria are required."""
     page.add(page.B.FIELDSET(page.B.P(instructions)))
@@ -366,7 +367,7 @@ of the terms to be selected. All other selection criteria are required."""
 # Generate the Mailer Tracking Report.
 #----------------------------------------------------------------------
 def createReport(cursor, conceptType, status, audience, name, text, spanish):
-    query = cdrdb.Query("query_term t", "t.doc_id").unique().order(1)
+    query = db.Query("query_term t", "t.doc_id").unique().order(1)
     query.join("query_term s", "s.doc_id = t.doc_id")
     query.join("query_term a", "a.doc_id = t.doc_id"
                " AND LEFT(a.node_loc, 4) = LEFT(s.node_loc, 4)")
@@ -395,7 +396,7 @@ def createReport(cursor, conceptType, status, audience, name, text, spanish):
     concepts = [Concept(cid, cursor, audience, spanish) for cid in conceptIds]
     logger.info("concept objects loaded with %d names", Name.COUNT)
     title = "%s - %s" % (section, language)
-    report = [u"""\
+    report = ["""\
 <!DOCTYPE html>
 <html>
  <head>
@@ -421,7 +422,7 @@ def createReport(cursor, conceptType, status, audience, name, text, spanish):
 """ % (title, title, conceptType,
        datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))]
     if spanish:
-        report.append(u"""\
+        report.append("""\
     <th>Term Names (English)</th>
     <th>Term Names (Spanish)</th>
     <th>Definition (English)</th>
@@ -429,12 +430,12 @@ def createReport(cursor, conceptType, status, audience, name, text, spanish):
    </tr>
 """)
     else:
-        report.append(u"""\
+        report.append("""\
     <th>Term Names (Pronunciations)</th>
     <th>Definition (English)</th>
    </tr>
 """)
-    report.append(u"""\
+    report.append("""\
    </tr>
 """)
     for concept in concepts:
@@ -442,13 +443,13 @@ def createReport(cursor, conceptType, status, audience, name, text, spanish):
     elapsed = datetime.datetime.now() - start
     args = len(conceptIds), elapsed.total_seconds()
     timer = "Processed {:d} concepts in {:f} seconds".format(*args)
-    report.append(u"""\
+    report.append("""\
   </table>
   <p class="timer">{}</p>
  </body>
 </html>
 """.format(timer))
-    cdrcgi.sendPage(u"".join(report))
+    cdrcgi.sendPage("".join(report))
 
 #----------------------------------------------------------------------
 # Create the report or as for the report parameters.

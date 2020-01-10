@@ -1,72 +1,71 @@
-#----------------------------------------------------------------------
-# Interface for managing CDR user accounts
-#----------------------------------------------------------------------
-import cgi
-import cdr
-import cdrdb
-import cdrcgi
+#!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields  = cgi.FieldStorage()
-session = cdrcgi.getSession(fields)
-action  = cdrcgi.getRequest(fields)
-title   = "CDR Administration"
-section = "Manage Users"
-buttons = [cdrcgi.MAINMENU]
-header  = cdrcgi.header(title, title, section, "EditUsers.py", buttons)
+"""Menu for editing CDR users.
+"""
 
-#----------------------------------------------------------------------
-# Make sure the login was successful.
-#----------------------------------------------------------------------
-if not session: cdrcgi.bail('Unknown or expired CDR session.')
+from cdrcgi import Controller, navigateTo
 
-#----------------------------------------------------------------------
-# Return to the main menu if requested.
-#----------------------------------------------------------------------
-if action == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
+class Control(Controller):
+    """Encapsulates processing logic for building the menu page."""
 
-#----------------------------------------------------------------------
-# Retrieve the list of users from the server.
-#----------------------------------------------------------------------
-query = cdrdb.Query("open_usr", "name", "fullname")
-query.where("expired IS NULL OR expired > GETDATE()")
-rows = query.order("name").execute().fetchall()
+    ADD_NEW_USER = "Add New User"
+    EDIT_USER = "EditUser.py"
 
-#----------------------------------------------------------------------
-# Put up the list of users.
-#----------------------------------------------------------------------
-nUsers = 0
-USERS_PER_ROW = 5
-menu = "<INPUT TYPE='hidden' NAME='%s' VALUE='%s'><TABLE>\n" % (cdrcgi.SESSION,
-                                                                session)
-padding = "<TD>&nbsp;&nbsp;</TD>"
+    def populate_form(self, page):
+        """Add user editing links and custom formatting to the page."""
 
-for user, fullname in rows:
-    if fullname == "Alan Meyer":
-        colors = "red", "green", "blue", "violet", "white", "yellow", "orange"
-        letters = ['<span style="color: {}">{}</span>'
-                   .format(colors[i % len(colors)], fullname[i])
-                   for i in range(len(fullname))]
-        fullname = "".join(letters)
-    if nUsers % USERS_PER_ROW == 0:
-        menu += "<TR>%s" % padding
-    menu += """\
-  <TD><A HREF="%s/EditUser.py?%s=%s&usr=%s"><B>%s</B></A><br>%s</TD>
-""" % (cdrcgi.BASE, cdrcgi.SESSION, session, cgi.escape(user, 1),
-       user, fullname)
-    nUsers += 1
-    if nUsers % USERS_PER_ROW == 0: menu += "</TR>\n"
-if nUsers % USERS_PER_ROW > 0: menu += "</TR>\n"
-menu += """\
-<TR><TD COLSPAN="3">&nbsp;</TD></TR>
-<TR>%s<TD COLSPAN='3'><A HREF="%s/EditUser.py?%s=%s"><B>%s</B></A> %s</TD></TR>
-<TR>%s<TD COLSPAN='3'><A HREF="%s/Logout.py?%s=%s"><B>%s</B></A></TD></TR>
-""" % (padding, cdrcgi.BASE, cdrcgi.SESSION, session, "ADD NEW USER",
-       "(Use same ID as NIH user ID)",
-       padding, cdrcgi.BASE, cdrcgi.SESSION, session, "LOG OUT")
-menu += "</TABLE>\n"
+        page.body.set("class", "admin-menu")
+        fieldset = page.fieldset("Existing Users (click to edit)")
+        fieldset.set("class", "flexlinks")
+        ul = page.B.UL()
+        script = self.EDIT_USER
+        for user in self.users:
+            display = user.fullname or user.name
+            link = page.menu_link(script, display, usr=user.name)
+            if user.fullname:
+                link.set("title", user.name)
+            ul.append(page.B.LI(link))
+        fieldset.append(ul)
+        page.form.append(fieldset)
 
-cdrcgi.sendPage(header + menu + "</FORM></BODY></HTML>")
+    def run(self):
+        """Override base class to add action for new button."""
+
+        if self.request == self.ADD_NEW_USER:
+            navigateTo(self.EDIT_USER, self.session.name)
+        else:
+            Controller.run(self)
+
+    @property
+    def buttons(self):
+        """Override to specify custom buttons for this page."""
+        return self.ADD_NEW_USER, self.DEVMENU, self.ADMINMENU, self.LOG_OUT
+
+    @property
+    def subtitle(self):
+        """Dynamically determine what to display under the main banner."""
+
+        if not hasattr(self, "_subtitle"):
+            user = self.fields.getvalue("deleted")
+            if user:
+                self._subtitle = f"Successfully retired account for {user!r}"
+            else:
+                self._subtitle = "Manage Users"
+        return self._subtitle
+
+    @property
+    def users(self):
+        """Users sorted by the best name we have."""
+
+        if not hasattr(self, "_users"):
+            users = []
+            for name in self.session.list_users():
+                users.append(self.session.User(self.session, name=name))
+            users = sorted(users, key=lambda u:(u.fullname or u.name).lower())
+            self._users = users
+        return self._users
+
+
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+    Control().run()

@@ -11,7 +11,7 @@ import datetime
 
 # Custom/application-specific modules
 import cdrcgi
-import cdrdb
+from cdrapi import db
 
 class Control(cdrcgi.Control):
     "Master processing object"
@@ -37,7 +37,7 @@ class Control(cdrcgi.Control):
 
     def populate_form(self, form):
         "Override the base class method to get our own fields on the form."
-        boards = [(v, k) for k, v in self.boards.iteritems()]
+        boards = [(v, k) for k, v in self.boards.items()]
         boards = [(doc_id, name) for name, doc_id in sorted(boards)]
         form.add("<fieldset>")
         form.add(form.B.LEGEND("Board and Audience"))
@@ -75,7 +75,7 @@ class Control(cdrcgi.Control):
         grouping = { "topic": "Topic", "member": "Board Member" }[self.grouping]
         opts = {
             "banner": self.title,
-            "subtitle": u"Board Report by %s \u2014 %s" % (grouping, today),
+            "subtitle": "Board Report by %s \u2014 %s" % (grouping, today),
             "buttons": (self.SUBMENU, self.ADMINMENU, self.LOG_OUT),
             "action": self.script,
             "body_classes": "report"
@@ -95,7 +95,7 @@ class Control(cdrcgi.Control):
         "Collect objects for all of the summaries connected to our board."
 
         qt = self.unpub and "query_term" or "query_term_pub"
-        query = cdrdb.Query("%s b" % qt, "b.doc_id", "m.value")
+        query = db.Query("%s b" % qt, "b.doc_id", "m.value")
         query.join("%s a" % qt, "a.doc_id = b.doc_id")
         if not self.unpub:
             query.join("active_doc d", "d.id = b.doc_id")
@@ -134,7 +134,7 @@ class Control(cdrcgi.Control):
         m_path = "/%s/BoardMemberName/@cdr:ref" % doctype
         b_path = "%s/BoardName/@cdr:ref" % details
         c_path = "%s/CurrentMember" % details
-        query = cdrdb.Query("query_term m", "m.int_val")
+        query = db.Query("query_term m", "m.int_val")
         query.join("query_term b", "b.doc_id = m.doc_id")
         query.join("query_term c",
                    " AND ".join(("c.doc_id = m.doc_id",
@@ -173,7 +173,7 @@ class Control(cdrcgi.Control):
     def get_boards(self):
         "Get a dictionary of the active boards (indexed by CDR document ID)."
 
-        query = cdrdb.Query("query_term n", "n.doc_id", "n.value")
+        query = db.Query("query_term n", "n.doc_id", "n.value")
         query.join("query_term t", "t.doc_id = n.doc_id")
         query.join("active_doc a", "a.id = n.doc_id")
         query.where("t.path = '/Organization/OrganizationType'")
@@ -202,12 +202,12 @@ class Summary:
         self.is_module = is_module
         self.control = control
         self.doc_id = doc_id
-        query = cdrdb.Query("query_term", "value")
+        query = db.Query("query_term", "value")
         query.where(query.Condition("doc_id", doc_id))
         query.where("path = '/Summary/SummaryTitle'")
         rows = query.execute(control.cursor).fetchall()
         self.title = rows and rows[0][0] or "NO TITLE FOUND"
-        query = cdrdb.Query("query_term m", "m.int_val")
+        query = db.Query("query_term m", "m.int_val")
         query.join("query_term b",
                    " AND ".join(("b.doc_id = m.doc_id",
                                  "LEFT(b.node_loc, 8) = LEFT(m.node_loc, 8)")))
@@ -245,9 +245,9 @@ class Summary:
                 page.add(page.B.LI(member.name))
             page.add("</ul>")
 
-    def __cmp__(self, other):
+    def __lt__(self, other):
         "Support sorting."
-        return cmp(self.title, other.title)
+        return self.title < other.title
 
     class Person:
         "One of these for every reviewer on the report."
@@ -263,7 +263,7 @@ class Summary:
             self.doc_id = person_id
             self.summaries = []
             self.name = "NO NAME FOUND"
-            query = cdrdb.Query("document", "title")
+            query = db.Query("document", "title")
             query.where(query.Condition("id", person_id))
             rows = query.execute(control.cursor).fetchall()
             if rows:
@@ -279,9 +279,9 @@ class Summary:
                     page.add(page.B.LI(summary.get_display_title()))
                 page.add("</ul>")
 
-        def __cmp__(self, other):
+        def __lt__(self, other):
             "Support sorting."
-            return cmp(self.name, other.name)
+            return self.name < other.name
 
 #----------------------------------------------------------------------
 # Let this be loaded without doing anything to support (e.g.) lint.

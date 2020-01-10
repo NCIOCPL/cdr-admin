@@ -147,20 +147,20 @@ def build_zip_file(file_names):
     base_name = tempfile.mktemp()
     zip_name  = base_name + ".zip"
     list_name = base_name + ".txt"
-    list_file = file(list_name, "w")
+    list_file = open(list_name, "w")
     for name in file_names:
         list_file.write("%s\n" % name)
     list_file.close()
     os.chdir(cdr.CLIENT_FILES_DIR)
-    result = cdr.runCommand("d:\\bin\\zip -@ %s < %s" % (zip_name, list_name))
     Control.logger.debug("Creating %s", zip_name)
-    if result.code:
-        msg = "zip failure code %d (%s)" % (result.code, result.output)
+    command = f"d:\\bin\\zip -@ {zip_name} < {list_name}"
+    process = cdr.run_command(command, merge_output=True)
+    if process.returncode:
+        msg = f"zip failure code {process.resultcode} ({result.stdout})"
         Control.logger.debug(msg)
         raise msg
-    zip_file = file(zip_name, "rb")
-    zip_bytes = zip_file.read()
-    zip_file.close()
+    with open(zip_name, "rb") as fp:
+        zip_bytes = fp.read()
     Control.logger.debug("saved zip file as %r", zip_name)
     if Control.logger.level != logging.DEBUG:
         os.unlink(list_name)
@@ -249,7 +249,7 @@ def main():
         else:
             error = "Don't understand %r" % request.type
             response = WebService.ErrorResponse(error, Control.logger)
-    except Exception, e:
+    except Exception as e:
         response = WebService.ErrorResponse(str(e), Control.logger)
     Control.logger.debug("Response:\n%s\n", response.body)
     if Control.STANDALONE:

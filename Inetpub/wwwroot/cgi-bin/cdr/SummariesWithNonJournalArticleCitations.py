@@ -2,12 +2,13 @@
 # Report on summaries with citations to publications other than journal
 # articles.
 #----------------------------------------------------------------------
+from operator import itemgetter
 import cdr
 import cdrcgi
-import cdrdb
 import cgi
 import lxml.etree as etree
 import time
+from cdrapi import db
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -58,13 +59,13 @@ def debug_log(what):
 # can select.  Avoid proceedings and journal publications.
 #----------------------------------------------------------------------
 def get_citation_types(cursor):
-    C = cdrdb.Query.Condition
-    query = cdrdb.Query("query_term", "value").unique()
+    C = db.Query.Condition
+    query = db.Query("query_term", "value").unique()
     query.where(C("path", "/Citation/PDQCitation/CitationType"))
     query.where(C("value", "Proceeding%", "NOT LIKE"))
     query.where(C("value", "Journal%", "NOT LIKE"))
     query.order("value")
-    return [row[0] for row in query.execute(cursor).fetchall()]
+    return [row[0] for row in query.execute(cursor).fetchall() if row[0]]
 
 #----------------------------------------------------------------------
 # Get the list of editorial boards for one of the languages.  Called
@@ -81,8 +82,8 @@ def get_boards(query, cursor):
 # Get the list of editorial boards linked to active English summaries.
 #----------------------------------------------------------------------
 def get_english_boards(cursor):
-    C = cdrdb.Query.Condition
-    query = cdrdb.Query("active_doc d", "d.id", "d.title").unique()
+    C = db.Query.Condition
+    query = db.Query("active_doc d", "d.id", "d.title").unique()
     query.join("query_term b", "b.int_val = d.id")
     query.join("query_term l", "b.doc_id = l.doc_id")
     query.where(C("b.path",
@@ -97,8 +98,8 @@ def get_english_boards(cursor):
 # have been translated into Spanish.
 #----------------------------------------------------------------------
 def get_spanish_boards(cursor):
-    C = cdrdb.Query.Condition
-    query = cdrdb.Query("active_doc d", "d.id", "d.title").unique()
+    C = db.Query.Condition
+    query = db.Query("active_doc d", "d.id", "d.title").unique()
     query.join("query_term b", "b.int_val = d.id")
     query.join("query_term t", "t.int_val = b.doc_id")
     query.where(C("b.path",
@@ -120,9 +121,9 @@ elif request == SUBMENU:
 # Connect to the database.
 #----------------------------------------------------------------------
 try:
-    conn = cdrdb.connect('CdrGuest')
+    conn = db.connect(user='CdrGuest')
     cursor = conn.cursor()
-except Exception, e:
+except Exception as e:
     cdrcgi.bail("Unable to connect to the CDR database: %s" % e)
 
 #----------------------------------------------------------------------
@@ -186,8 +187,8 @@ jQuery(function() {
 # requestor.
 #----------------------------------------------------------------------
 def getQuery():
-    C = cdrdb.Query.Condition
-    query = cdrdb.Query("query_term_pub s", "s.doc_id").unique()
+    C = db.Query.Condition
+    query = db.Query("query_term_pub s", "s.doc_id").unique()
     query.join("active_doc a", "a.id = s.doc_id")
     query.join("query_term c", "c.doc_id = s.int_val")
     query.where("s.path LIKE '/Summary%CitationLink/@cdr:ref'")
@@ -239,7 +240,7 @@ class Citation:
             self.doc_id = doc_id
             self.title = self.type = self.web_site = None
             self.pub_details = ""
-            query = cdrdb.Query("document", "xml")
+            query = db.Query("document", "xml")
             query.where(query.Condition("id", doc_id))
             doc = query.execute(cursor).fetchall()[0][0]
             tree = etree.XML(doc.encode("utf-8"))
@@ -251,7 +252,7 @@ class Citation:
                 for node in tree.iter("ExternalRef"):
                     self.web_site = node.get("{cips.nci.nih.gov/cdr}xref")
             response = cdr.filterDoc(session, Citation.filters, docId=doc_id)
-            if isinstance(response, basestring):
+            if isinstance(response, (str, bytes)):
                 debug_log("failure filtering citation %s: %s" %
                           (doc_id, repr(response)))
                 cdrcgi.bail("failure filtering citation CDR%s: %s" %
@@ -259,7 +260,7 @@ class Citation:
             xml = response[0]
             try:
                 tree = etree.XML(xml)
-            except Exception, e:
+            except Exception as e:
                 debug_log("failure parsing %s: %s" % (repr(xml), e))
                 cdrcgi.bail("failure parsing %s: %s" % (repr(xml), e))
             for node in tree.iter("FormattedReference"):
@@ -290,7 +291,7 @@ class Citation:
         Get a list of all citations whose types match those selected
         on the report request form.
         """
-        query = cdrdb.Query("query_term", "doc_id").unique()
+        query = db.Query("query_term", "doc_id").unique()
         query.where("path = '/Citation/PDQCitation/CitationType'")
         if not types or "all" in types:
             query.where("value NOT LIKE 'Journal%'")
@@ -311,7 +312,7 @@ class Summary:
         self.doc_id = doc_id
         self.title = None
         self.citations = []
-        query = cdrdb.Query("document", "xml")
+        query = db.Query("document", "xml")
         query.where(query.Condition("id", doc_id))
         doc_xml = query.execute(cursor).fetchall()[0][0]
         tree = etree.XML(doc_xml.encode("utf-8"))
@@ -337,7 +338,7 @@ class Summary:
 #----------------------------------------------------------------------
 query = getQuery()
 debug_log("got query")
-rows = query.execute(cursor, timeout=300).fetchall()
+rows = query.execute(cursor).fetchall()
 debug_log("query returned %d rows" % len(rows))
 summaries = [Summary(row[0]) for row in rows]
 debug_log("got %d summaries" % len(summaries))
@@ -354,9 +355,11 @@ rows = []
 for summary in summaries:
     for citation in summary.citations:
         pub_info = cdrcgi.Report.Cell(citation, callback=pub_info_cell)
-        row = (summary.doc_id, summary.title, citation.section_title,
-               citation.info.type, citation.doc_id, citation.info.title,
-               pub_info)
+        row = (summary.doc_id, summary.title or "",
+               citation.section_title or "",
+               citation.info.type or "", citation.doc_id,
+               citation.info.title or "",
+               pub_info or "")
         rows.append(row)
 debug_log("%d rows" % len(rows))
 table = cdrcgi.Report.Table(cols, sorted(rows))

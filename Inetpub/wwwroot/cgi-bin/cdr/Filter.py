@@ -21,7 +21,7 @@ import cdrcgi
 import cdrpub
 import os
 import pickle
-import urllib
+import urllib.request, urllib.parse, urllib.error
 from cdrapi.settings import Tier
 
 class Control(cdrcgi.Control):
@@ -39,6 +39,7 @@ class Control(cdrcgi.Control):
     CACHE = cdr.BASEDIR + "/reports/expanded-filter-sets"
     USE_CACHE = "use"
     REFRESH_CACHE = "refresh"
+    LOGNAME = "filter"
     TIER = Tier()
 
     def __init__(self):
@@ -171,7 +172,7 @@ class Control(cdrcgi.Control):
                 fp = open(self.CACHE, "w")
                 pickle.dump(filter_sets, fp)
                 fp.close()
-            except Exception, e:
+            except Exception as e:
                 cache_warning = "Failure refreshing filter set cache: %s" % e
         opts = {
             cdrcgi.DOCID: self.cdr_id,
@@ -184,11 +185,11 @@ class Control(cdrcgi.Control):
             filter_set = filter_sets[set_name]
             if self.set_wanted(filter_set, id_set):
                 opts["filter"] = [m.id for m in filter_set.members]
-                args = urllib.urlencode(opts, True)
+                args = urllib.parse.urlencode(opts, True)
                 rows.append((
                     set_name,
                     ActionCell(self.script, args),
-                    [u"%s:%s" % (m.id, m.name) for m in filter_set.members]
+                    ["%s:%s" % (m.id, m.name) for m in filter_set.members]
                 ))
         opts = {
             "html_callback_pre": self.show_cache_warning,
@@ -208,7 +209,7 @@ class Control(cdrcgi.Control):
         "Filter the document and display the results."
         doc = self.filter_doc().replace("@@DOCID@@", self.cdr_id)
         text_type = "<?xml" in doc and "xml" or "html"
-        cdrcgi.sendPage(unicode(doc, "utf-8"), text_type)
+        cdrcgi.sendPage(doc, text_type)
 
     def filter_and_validate(self):
         """
@@ -268,7 +269,7 @@ class Control(cdrcgi.Control):
             ("displayLOETermList",      self.loeref and "Y" or "N")]
         if self.vendor_or_qc:
             parms.append(("vendorOrQC", 'QC'))
-        cdr.logwrite(repr(parms))
+        self.logger.info("Filter.py(parms=%r)", parms)
         return parms
 
     def check_filter(self, spec):
@@ -297,7 +298,7 @@ class Control(cdrcgi.Control):
                 if cdr_id not in self.all_filter_ids:
                     cdrcgi.bail("%s is not a filter on the CDR %s server" %
                                 (cdr_id, self.TIER.name))
-            except Exception, e:
+            except Exception as e:
                 cdrcgi.bail("%s is not a well-formed CDR ID" % repr(spec))
 
     @staticmethod

@@ -1,170 +1,281 @@
-#----------------------------------------------------------------------
-# Reports on documents which have been changed since a previously
-# publishable version without a new publishable version have been
-# created.
-#
-# Rewritten summer 2015 as part of security sweep.
-#----------------------------------------------------------------------
-import cdr
-import cdrdb
-import cdrcgi
-import cgi
+#!/usr/bin/env python
+
+"""Report on unpublishable changes to documents.
+
+Reports on documents which have been changed since a previously
+publishable version without a new publishable version have been
+created.
+"""
+
+from cdrapi.docs import Doctype
+from cdrcgi import Controller
+from cdr import FILTERS
 import datetime
 
-class Control(cdrcgi.Control):
-    TITLE = "Documents Modified Since Last Publishable Version"
-    def __init__(self):
-        cdrcgi.Control.__init__(self, Control.TITLE)
-        self.mod_user = self.fields.getvalue("ModUser")
-        self.start = self.fields.getvalue("FromDate")
-        self.end = self.fields.getvalue("ToDate")
-        self.doc_type = self.fields.getvalue("DocType")
-        self.sanitize()
-    def populate_form(self, form):
+
+class Control(Controller):
+
+    SUBTITLE = "Documents Modified Since Last Publishable Version"
+    COLUMNS = (
+        "Doc ID",
+        "Latest Publishable Version Date",
+        "Modified By",
+        "Modified Date",
+        "Latest Non-publishable Version Date",
+    )
+
+    def populate_form(self, page):
+        """Add the fields to the form.
+
+        Pass:
+            page - HTMLPage object where the fields live
+        """
+
         end = datetime.date.today()
         start = end - datetime.timedelta(7)
-        doc_types = [("", "All Types")] + cdr.getDoctypes(self.session)
-        form.add("<fieldset>")
-        form.add(form.B.LEGEND("Report Options"))
-        form.add_text_field("ModUser", "User")
-        form.add_select("DocType", "Doc Type", doc_types)
-        form.add_date_field("FromDate", "Start Date", value=start)
-        form.add_date_field("EndDate", "To Date", value=end)
-        form.add("</fieldset>")
+        fieldset = page.fieldset("Report Options")
+        fieldset.append(page.select("user", options=["all"]+self.users))
+        fieldset.append(page.select("doctype", options=["all"]+self.doctypes))
+        fieldset.append(page.date_field("start", value=start))
+        fieldset.append(page.date_field("end", value=end))
+        page.form.append(fieldset)
 
     def build_tables(self):
-        "String interpolation is safe because of sanitize() below."
-        actions = ("ADD DOCUMENT", "MODIFY DOCUMENT")
-        actions = ", ".join(["'%s'" % action for action in actions])
+        """Assemble one table for each doctype with documents to show."""
+
+        fields = (
+            "m.id",
+            "m.doctype",
+            "u.name AS user_name",
+            "u.fullname",
+            "m.dt AS last_modification_date",
+            "p.dt AS last_publishable_version_date",
+            "n.dt AS last_unpublishable_version_date",
+        )
+        self.__make_last_mod_table()
+        self.__make_last_pub_table()
+        self.__make_last_unp_table()
+        query = self.Query(f"{self.last_mod} m", *fields)
+        query.order("m.doctype", "m.dt", "m.usr")
+        query.join("usr u", "u.name = m.usr")
+        query.join("#last_pub p", "p.id = m.id")
+        query.outer("#last_unp n", "n.id = m.id")
+        query.where("p.dt < m.dt")
+        doctype = None
         tables = []
-        subquery = cdrdb.Query("audit_trail a", "MAX(dt)")
-        subquery.join("action", "action.id = a.action")
-        subquery.where("a.document = d.id")
-        subquery.where("action.name IN (%s)" % actions)
-        query = cdrdb.Query("active_doc d", "t.name AS doc_type",
-                            "d.id AS doc_id", "u.fullname AS user_name",
-                            "a.dt AS mod_date").into("#last_mod")
-        query.join("doc_type t", "d.doc_type = t.id")
-        query.join("audit_trail a", "a.document = d.id")
-        query.join("open_usr u", "u.id = a.usr")
-        query.join("action", "action.id = a.action")
-        query.where("action.name IN (%s)" % actions)
-        query.where(query.Condition("a.dt", subquery))
+        rows = []
+        opts = dict(columns=self.COLUMNS)
+        for row in query.execute(self.cursor).fetchall():
+            doc = Document(self, row)
+            if doc.doctype != doctype:
+                if doctype and rows:
+                    opts["caption"] = doctype
+                    tables.append(self.Reporter.Table(rows, **opts))
+                doctype = doc.doctype
+                rows = []
+            rows.append(doc.row)
+        if doctype and rows:
+            opts["caption"] = doctype
+            tables.append(self.Reporter.Table(rows, **opts))
+        return tables
+
+    def __make_last_mod_table(self):
+        """Create a temp table for the doc to be included on the report."""
+
+        fields = "d.id", "a.dt", "t.name AS doctype", "u.name AS usr"
+        query = self.Query("all_docs d", *fields).into(self.last_mod)
+        query.join("doc_type t", "t.id = d.doc_type")
+        query.join("doc_last_save s", "s.doc_id = d.id")
+        query.join("audit_trail a", "a.document = d.id",
+                   "a.dt = s.last_save_date")
+        query.join("usr u", "u.id = a.usr")
+        if self.user:
+            query.where(query.Condition("u.name", self.user))
+        if self.doctype:
+            query.where(query.Condition("t.name", self.doctype))
         if self.start:
-            query.where("a.dt >= '%s'" % self.start)
+            query.where(query.Condition("s.last_save_date", self.start, ">="))
         if self.end:
-            query.where("a.dt <= '%s 23:59:59'" % self.end)
-        if self.mod_user:
-            query.where("u.name = '%s'" % self.mod_user.replace("'", "''"))
-        if self.doc_type:
-            query.where("t.name = '%s'" % self.doc_type)
+            end = f"{self.end} 23:59:59"
+            query.where(query.Condition("s.last_save_date", end, "<="))
         query.execute(self.cursor)
-        query = cdrdb.Query("doc_version v", "v.id AS doc_id",
-                            "MAX(v.updated_dt) AS pub_ver_date")
-        query.into("#last_publishable_version")
-        query.join("#last_mod m", "m.doc_id = v.id")
+        self.conn.commit()
+
+    def __make_last_pub_table(self):
+        """Create a temp table showing the last publishable versions."""
+
+        fields = "v.id", "MAX(v.dt) as dt"
+        query = self.Query("all_doc_versions v", *fields).into("#last_pub")
+        query.join(f"{self.last_mod} m", "m.id = v.id")
         query.where("v.publishable = 'Y'")
         query.group("v.id")
         query.execute(self.cursor)
-        query = cdrdb.Query("doc_version v", "v.id AS doc_id",
-                            "MAX(v.updated_dt) AS unpub_ver_date")
-        query.into("#last_unpublishable_version")
-        query.join("#last_mod m", "m.doc_id = v.id")
+        self.conn.commit()
+
+    def __make_last_unp_table(self):
+        """Create a temp table showing the last unpublishable versions."""
+
+        fields = "v.id", "MAX(v.dt) as dt"
+        query = self.Query("all_doc_versions v", *fields).into("#last_unp")
+        query.join(f"{self.last_mod} m", "m.id = v.id")
         query.where("v.publishable = 'N'")
         query.group("v.id")
         query.execute(self.cursor)
-        query = cdrdb.Query("#last_mod d", "d.doc_type", "d.doc_id",
-                            "p.pub_ver_date", "d.user_name", "d.mod_date",
-                            "u.unpub_ver_date")
-        query.join("#last_publishable_version p", "p.doc_id = d.doc_id")
-        query.outer("#last_unpublishable_version u", "u.doc_id = d.doc_id")
-        query.where("p.pub_ver_date < d.mod_date")
-        query.order("d.doc_type", "d.mod_date", "d.user_name")
-        rows = query.execute(self.cursor).fetchall()
-        current_doc_type = None
-        columns = (
-            cdrcgi.Report.Column("Doc ID"),
-            cdrcgi.Report.Column("Latest Publishable Version Date"),
-            cdrcgi.Report.Column("Modified By"),
-            cdrcgi.Report.Column("Modified Date"),
-            cdrcgi.Report.Column("Latest Non-publishable Version Date")
-        )
-        table_rows = []
-        for row in rows:
-            doc = Document(*row)
-            if doc.doc_type != current_doc_type:
-                if current_doc_type and table_rows:
-                    tables.append(cdrcgi.Report.Table(columns, table_rows,
-                                                      caption=current_doc_type))
-                current_doc_type = doc.doc_type
-                table_rows = []
-            table_rows.append(doc.report())
-        if current_doc_type and table_rows:
-            tables.append(cdrcgi.Report.Table(columns, table_rows,
-                                              caption=current_doc_type))
-        return tables
-    def set_report_options(self, opts):
-        if self.doc_type:
-            subtitle = "%s Documents" % self.doc_type
+        self.conn.commit()
+
+    @property
+    def doctype(self):
+        """Document type selected from the form for the report."""
+
+        if not hasattr(self, "_doctype"):
+            self._doctype = self.fields.getvalue("doctype")
+            if self._doctype == "all":
+                self._doctype = None
+        return self._doctype
+
+    @property
+    def doctypes(self):
+        return sorted(Doctype.list_doc_types(self.session))
+
+    @property
+    def end(self):
+        """End of report date range selected from the form."""
+        return self.fields.getvalue("end")
+
+    @property
+    def last_mod(self):
+        """Create unique temp table name to work around SQL Server bug.
+
+        Sometimes SQL Server can find its local temporary tables and
+        sometimes it can't. This is one of those cases where it can't.
+        So we create a global temporary table, and add a timestamp to
+        it to minimize the likelihood that two requests will step on
+        each other.
+        """
+
+        if not hasattr(self, "_last_mod"):
+            stamp = f"{self.started.second}_{self.started.microsecond}"
+            self._last_mod = f"##last_mod_{stamp}"
+            self.logger.info("using global temp table %s", self._last_mod)
+        return self._last_mod
+
+    @property
+    def start(self):
+        """Start of report date range selected from the form."""
+        return self.fields.getvalue("start")
+
+    @property
+    def subtitle(self):
+        """Customize the string displayed below the main banner."""
+
+        if self.request != self.SUBMIT:
+            return self.SUBTITLE
+
+        if self.doctype:
+            segments = [f"{self.doctype} Documents"]
         else:
-            subtitle = "Documents"
-        if self.mod_user or self.start or self.end:
-            subtitle += " Modified"
-        if self.mod_user:
-            subtitle += " By %s" % self.mod_user
+            segments = ["Documents"]
+        if self.user or self.start or self.end:
+            segments.append("Modified")
+        if self.user:
+            segments.append(f"By {self.user}")
         if self.start and self.end:
-            subtitle += " Between %s And %s" % (self.start, self.end)
+            segments.append(f"Between {self.start} And {self.end}")
         elif self.start:
-            subtitle += " On Or After %s" % self.start
+            segments.append(f" On Or After {self.start}")
         elif self.end:
-            subtitle += " On Or Before %s" % self.end
+            segments.append(f" On Or Before {self.end}")
+        subtitle = " ".join(segments)
         if subtitle == "Documents":
             subtitle = "All Documents"
-        opts["subtitle"] = subtitle
-        opts["page_opts"] = {}
-        return opts
-    def sanitize(self):
-        if not self.session:
-            cdrcgi.bail("Missing required session")
-        msg = cdrcgi.TAMPERING
-        cdrcgi.valParmVal(self.request, val_list=self.buttons, empty_ok=True,
-                          msg=msg)
-        cdrcgi.valParmDate(self.start, empty_ok=True, msg=msg)
-        cdrcgi.valParmDate(self.end, empty_ok=True, msg=msg)
-        if self.start and self.end and self.start > self.end:
-            cdrcgi.bail("Date range can't end before it starts")
-        if self.mod_user:
-            if self.mod_user.lower() not in self.get_names("open_usr"):
-                cdrcgi.bail("Unknown user")
-        if self.doc_type:
-            if self.doc_type.lower() not in self.get_names("doc_type"):
-                cdrcgi.bail()
-    def get_names(self, table):
-        query = cdrdb.Query(table, "name")
-        rows = query.execute(self.cursor).fetchall()
-        return set([row[0].lower() for row in rows])
+        return subtitle
+
+    @property
+    def user(self):
+        """User selected for the report."""
+
+        if not hasattr(self, "_user"):
+            self._user = self.fields.getvalue("user")
+            if self._user == "all":
+                self._user = None
+        return self._user
+
+    @property
+    def users(self):
+        """List of users (for the picklist)."""
+
+        query = self.Query("usr", "name").order("name")
+        return [row.name for row in query.execute(self.cursor)]
+
 
 class Document:
-    QCTYPES = set([name.lower().split(":")[0] for name in cdr.FILTERS])
-    def __init__(self, doc_type, doc_id, pub_date, mod_by, mod_date, np_date):
-        self.doc_type = doc_type
-        self.doc_id = doc_id
-        self.pub_date = pub_date
-        self.mod_by = mod_by
-        self.mod_date = mod_date
-        self.non_pub_ver_date = np_date
-    def report(self):
-        cdr_id = cdr.normalize(self.doc_id)
-        if self.doc_type.lower() in self.QCTYPES:
-            url = "QcReport.py?DocId={:d}".format(self.doc_id)
-            cdr_id = cdrcgi.Report.Cell(cdr_id, href=url, target="_blank")
-        return (
-            cdr_id,
-            self.pub_date,
-            self.mod_by,
-            self.mod_date,
-            self.non_pub_ver_date
-        )
+    """Modified document to appear on the report."""
+
+    QCTYPES = set([name.lower().split(":")[0] for name in FILTERS])
+
+    def __init__(self, control, row):
+        """Save the caller's values.
+
+        Pass:
+            control - access to the current session and to reporting tools
+            row - results from the database query
+        """
+
+        self.__control = control
+        self.__row = row
+
+    @property
+    def cdr_id(self):
+        """Canonical string format for the document ID."""
+        return f"CDR{self.id:010d}"
+
+    @property
+    def doctype(self):
+        """String for CDR type of the document."""
+        return self.__row.doctype
+
+    @property
+    def id(self):
+        """Integer for the document's unique ID."""
+        return self.__row.id
+
+    @property
+    def doc_id(self):
+        """Link to the document (or just the id if no link can be made."""
+
+        if self.doctype.lower() in self.QCTYPES:
+            opts = dict(DocId=self.id, DocVersion=-1)
+            url = self.__control.make_url("QcReport.py", **opts)
+            opts = dict(href=url, target="_blank")
+            return self.__control.Reporter.Cell(self.cdr_id, **opts)
+        return self.cdr_id
+
+    @property
+    def mod(self):
+        """Date/time the document was modified."""
+        return self.__row.last_modification_date
+
+    @property
+    def pub(self):
+        """Date of the last publishable version."""
+        return self.__row.last_publishable_version_date
+
+    @property
+    def row(self):
+        """Values for the report table."""
+        return self.doc_id, self.pub, self.user, self.mod, self.unpub
+
+    @property
+    def unpub(self):
+        """Date of the last unpublishable version."""
+        return self.__row.last_unpublishable_version_date
+
+    @property
+    def user(self):
+        """User who last saved the document."""
+        return self.__row.fullname or self.__row.user_name
+
 
 if __name__ == "__main__":
+    """Don't run the script if loaded as a module."""
     Control().run()

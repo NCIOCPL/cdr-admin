@@ -16,11 +16,10 @@
 # JIRA::OCECDR-4170 - complete rewrite
 #----------------------------------------------------------------------
 import datetime
-import os
 import sys
 import lxml.etree as etree
 import cdrcgi
-import cdrdb
+from cdrapi import db
 
 class Control(cdrcgi.Control):
     """
@@ -95,18 +94,17 @@ class Control(cdrcgi.Control):
         self.add_sheet(self.NCI_TITLE, self.nci_terms)
         self.add_sheet(self.CDR_TITLE, self.cdr_terms)
         self.add_sheet(self.RVW_TITLE, self.rvw_terms)
-        if sys.platform == "win32":
-            import msvcrt
-            msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
         stamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
         secs = (datetime.datetime.now() - self.begin).total_seconds()
         ndocs = self.ndocs
         name = "DrugReviewReport-%s-%d_docs-%s_secs.xls" % (stamp, ndocs, secs)
         if not self.test:
-            print "Content-type: application/vnd.ms-excel"
-            print "Content-Disposition: attachment; filename=%s" % name
-            print
-        self.styles.book.save(sys.stdout)
+            sys.stdout.buffer.write(f"""\
+Content-type: application/vnd.ms-excel
+Content-Disposition: attachment; filename={name}
+
+""".encode("utf-8"))
+        self.styles.book.save(sys.stdout.buffer)
 
     def collect_terms(self):
         """
@@ -122,10 +120,10 @@ class Control(cdrcgi.Control):
         self.nci_terms = []
         self.cdr_terms = []
         self.rvw_terms = []
-        subquery = cdrdb.Query("query_term", "doc_id")
+        subquery = db.Query("query_term", "doc_id")
         subquery.where("path = '/Term/PreferredName'")
         subquery.where("value = 'Drug/Agent'")
-        query = cdrdb.Query("query_term t", "t.doc_id").unique()
+        query = db.Query("query_term t", "t.doc_id").unique()
         query.where("t.path = '/Term/SemanticType/@cdr:ref'")
         query.where(query.Condition("t.int_val", subquery))
         if self.start or self.end:
@@ -216,10 +214,10 @@ class Drug:
         self.definitions = []
         self.comments = []
         self.status = None
-        query = cdrdb.Query("document", "xml")
+        query = db.Query("document", "xml")
         query.where(query.Condition("id", doc_id))
         xml = query.execute(control.cursor).fetchone()[0]
-        root = etree.fromstring(xml.encode("utf-8"))
+        root = etree.fromstring(xml)
         self.name = self.get_text(root.find("PreferredName"))
         self.last_mod = self.get_text(root.find("DateLastModified"))
         self.other_names = [self.OtherName(n) for n in root.findall("other")]
@@ -347,7 +345,7 @@ class Drug:
         for definition in definitions:
             if not first:
                 pieces.append("\n\n")
-            if isinstance(definition.with_comments, basestring):
+            if isinstance(definition.with_comments, str):
                 pieces.append(definition.with_comments)
             else:
                 pieces += definition.with_comments
@@ -420,8 +418,8 @@ class Drug:
         """
 
         if node is None:
-            return u""
-        return u"".join(node.itertext("*"))
+            return ""
+        return "".join(node.itertext("*"))
 
     class Definition:
         """
@@ -548,7 +546,7 @@ class Drug:
             """
 
             if self.audience == self.PUBLIC:
-                return (u"\n[%s]" % self.text, font)
+                return ("\n[%s]" % self.text, font)
             return None
 
 if __name__ == "__main__":

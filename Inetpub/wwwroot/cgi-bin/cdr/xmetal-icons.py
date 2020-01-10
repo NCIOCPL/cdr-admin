@@ -32,4 +32,5 @@ page = B.HTML(
     ),
     B.BODY(content)
 )
-print "Content-type: text/html\n\n" + etree.tostring(page, pretty_print=True)
+xml = etree.tostring(page, pretty_print=True, encoding="unicode")
+print(f"Content-type: text/html\n\n{xml}")

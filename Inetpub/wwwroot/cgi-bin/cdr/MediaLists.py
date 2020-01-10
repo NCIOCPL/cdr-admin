@@ -1,140 +1,169 @@
-#----------------------------------------------------------------------
-# Report to list Media documents, optionally filtered by
-# category and/or diagnosis.
-#
-# JIRA::OCECDR-3800 - Address security vulnerabilities
-#----------------------------------------------------------------------
-import cgi
-import cdrcgi
-import cdrdb
-import datetime
+#!/usr/bin/env /python
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields    = cgi.FieldStorage()
-session   = cdrcgi.getSession(fields)
-show_id   = fields.getvalue("show_id") == "Y"
-diagnosis = fields.getlist("diagnosis")
-category  = fields.getlist("category")
-request   = cdrcgi.getRequest(fields)
-title     = "CDR Media List"
-instr     = "Media Lists"
-script    = "MediaLists.py"
-SUBMENU   = "Report Menu"
-buttons   = ("Submit", SUBMENU, cdrcgi.MAINMENU)
+"""Show Media documents, optionally filtered by category and/or diagnosis.
+"""
 
-#----------------------------------------------------------------------
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if request == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif request == SUBMENU:
-    cdrcgi.navigateTo("reports.py", session)
+from cdrcgi import Controller
 
-#----------------------------------------------------------------------
-# Set up a database connection and cursor.
-#----------------------------------------------------------------------
-try:
-    conn = cdrdb.connect("CdrGuest")
-    cursor = conn.cursor()
-except cdrdb.Error, info:
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
 
-#----------------------------------------------------------------------
-# Assemble the lists of valid values.
-#----------------------------------------------------------------------
-query = cdrdb.Query("query_term t", "t.doc_id", "t.value").order(2).unique()
-query.join("query_term m", "m.int_val = t.doc_id")
-query.where("t.path = '/Term/PreferredName'")
-query.where("m.path = '/Media/MediaContent/Diagnoses/Diagnosis/@cdr:ref'")
-results = query.execute(cursor).fetchall()
-diagnoses = [("any", "Any Diagnosis")] + results
-query = cdrdb.Query("query_term", "value", "value").order(1).unique()
-query.where("path = '/Media/MediaContent/Categories/Category'")
-query.where("value <> ''")
-results = query.execute(cursor).fetchall()
-categories = [("any", "Any Category")] + results
+class Control(Controller):
+    """Access to the database and report-generation tools."""
 
-#----------------------------------------------------------------------
-# Validate the form values. The expectation is that any bogus values
-# will come from someone tampering with the form, so no need to provide
-# the hacker with any useful diagnostic information.
-#----------------------------------------------------------------------
-for value, values in ((diagnosis, diagnoses), (category, categories)):
-    values = [str(v[0]).lower() for v in values]
-    for val in value:
-        if val.lower() not in values:
-            cdrcgi.bail("Corrupted form value")
+    SUBTITLE = "Media Lists"
+    LOGNAME = "MediaLists"
+    DIAGNOSIS_PATH = "/Media/MediaContent/Diagnoses/Diagnosis/@cdr:ref"
+    CATEGORY_PATH = "/Media/MediaContent/Categories/Category"
 
-#----------------------------------------------------------------------
-# If we don't have a request, put up the form.
-#----------------------------------------------------------------------
-if not categories or not request:
-    page = cdrcgi.Page(title, subtitle=instr, action=script,
-                       buttons=buttons, session=session)
-    page.add("<fieldset>")
-    page.add(page.B.LEGEND("Report Filtering"))
-    page.add_select("diagnosis", "Diagnosis", diagnoses, "any", multiple=True)
-    page.add_select("category", "Category", categories, "any", multiple=True)
-    page.add("</fieldset>")
-    page.add("<fieldset>")
-    page.add(page.B.LEGEND("Display Options"))
-    page.add_radio("show_id", "Do not include CDR ID", "N", checked=True)
-    page.add_radio("show_id", "Include CDR ID", "Y")
-    page.add("</fieldset>")
-    page.send()
+    def build_tables(self):
+        """Assemble the report and return it."""
 
-#----------------------------------------------------------------------
-# Build the SQL query.
-#----------------------------------------------------------------------
-content_path = "/Media/MediaContent"
-diagnosis_path = content_path + "/Diagnoses/Diagnosis/@cdr:ref"
-category_path = content_path + "/Categories/Category"
-query = cdrdb.Query("query_term m", "m.doc_id", "m.value").unique().order(2)
-query.where("m.path = '/Media/MediaTitle'")
-if category and "any" not in category:
-    query.join("query_term c", "c.doc_id = m.doc_id")
-    query.where(query.Condition("c.path", category_path))
-    query.where(query.Condition("c.value", category, "IN"))
-    category_names = ", ".join(category)
-else:
-    category_names = "Any Category"
-if diagnosis and "any" not in diagnosis:
-    query.join("query_term d", "d.doc_id = m.doc_id")
-    query.where(query.Condition("d.path", diagnosis_path))
-    query.where(query.Condition("d.int_val", diagnosis, "IN"))
-    diag_query = cdrdb.Query("query_term", "value").order(1)
-    diag_query.where("path = '/Term/PreferredName'")
-    diag_query.where(query.Condition("doc_id", diagnosis, "IN"))
-    diagnosis_names = [row[0] for row in diag_query.execute().fetchall()]
-    diagnosis_names = u", ".join(diagnosis_names)
-else:
-    diagnosis_names = "Any Diagnosis"
+        opts = dict(caption=self.caption, columns=self.columns)
+        return self.Reporter.Table(self.rows, **opts)
 
-#----------------------------------------------------------------------
-# Submit the query to the database.
-#----------------------------------------------------------------------
-try:
-    rows = query.execute(cursor).fetchall()
-except cdrdb.Error, info:
-    cdrcgi.bail('Failure retrieving Media documents: %s' % info[1][0])
-if not rows:
-    criteria = "Diagnosis: %s; Condition: %s" % (diagnosis_names,
-                                                 category_names)
-    cdrcgi.bail("No Records Found for Criteria: %s" % criteria)
+    def populate_form(self, page):
+        """Ask the user for the report's parameters.
 
-#----------------------------------------------------------------------
-# Assemble and return the report.
-#----------------------------------------------------------------------
-id_column = cdrcgi.Report.Column("Doc ID", width="80px")
-title_column = cdrcgi.Report.Column("Doc Title", width="800px")
-columns = show_id and [id_column, title_column] or [title_column]
-if not show_id:
-    rows = [[row[1]] for row in rows]
-caption = ("Category: %s" % category_names, "Diagnosis: %s" % diagnosis_names)
-title = "PDQ Media Documents (%d)" % len(rows)
-subtitle = "Media List -- %s" % datetime.date.today().strftime("%B %d, %Y")
-table = cdrcgi.Report.Table(columns, rows, caption=caption)
-report = cdrcgi.Report(title, [table], banner=title, subtitle=subtitle)
-report.send()
+        Pass:
+            page - HTMLPage object on which the form is drawn
+        """
+
+        fieldset = page.fieldset("Report Filtering")
+        opts = dict(options=["all"]+self.diagnoses, multiple=True)
+        fieldset.append(page.select("diagnosis", **opts))
+        opts["options"] = ["all"] + self.categories
+        fieldset.append(page.select("category", **opts))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Options")
+        opts = dict(label="Include CDR ID", value="show_id")
+        fieldset.append(page.checkbox("options", **opts))
+        page.form.append(fieldset)
+
+    @property
+    def caption(self):
+        """Strings to be displayed immediately above the report table."""
+
+        return (
+            "Report Filtering",
+            f"Diagnosis: {self.diagnosis_names}",
+            f"Condition: {self.category_names}",
+        )
+
+    @property
+    def categories(self):
+        """ID/name tuples of the category terms for the form picklist."""
+
+        query = self.Query("query_term", "value").order("value").unique()
+        query.where("path = '/Media/MediaContent/Categories/Category'")
+        query.where("value <> ''")
+        return [row.value for row in query.execute(self.cursor).fetchall()]
+
+    @property
+    def category(self):
+        """Categories selected by the user for filtering the report."""
+
+        if not hasattr(self, "_category"):
+            self._category = self.fields.getlist("category")
+            if "all" in self._category:
+                self._category = []
+            self.logger.info("categories selected: %s", self._category)
+        return self._category
+
+    @property
+    def category_names(self):
+        """Display the category filtering selected for the report."""
+
+        if not self.category:
+            return "All Categories"
+        return ", ".join(sorted(self.category))
+
+    @property
+    def columns(self):
+        """Column header(s) for the report table (might be only one)."""
+
+        columns = []
+        if self.show_id:
+            columns = [self.Reporter.Column("Doc ID", width="80px")]
+        columns.append(self.Reporter.Column("Doc Title", width="800px"))
+        return columns
+
+    @property
+    def diagnoses(self):
+        """ID/name tuples of the diagnosis terms for the form picklist."""
+
+        query = self.Query("query_term t", "t.doc_id", "t.value").unique()
+        query.order("t.value")
+        query.join("query_term m", "m.int_val = t.doc_id")
+        query.where("t.path = '/Term/PreferredName'")
+        query.where(query.Condition("m.path", self.DIAGNOSIS_PATH))
+        return [tuple(row) for row in query.execute(self.cursor).fetchall()]
+
+    @property
+    def diagnosis(self):
+        """Diagnoses selected by the user for filtering the report."""
+
+        if not hasattr(self, "_diagnosis"):
+            self._diagnosis = []
+            diagnoses = self.fields.getlist("diagnosis")
+            if "all" not in diagnoses:
+                try:
+                    for diagnosis in diagnoses:
+                        self._diagnosis.append(int(diagnosis))
+                except:
+                    self.bail()
+            self.logger.info("diagnoses selected: %s", self._diagnosis)
+        return self._diagnosis
+
+    @property
+    def diagnosis_names(self):
+        """Display the diagnosis filtering selected for the report."""
+
+        if not self.diagnosis:
+            return "All Diagnoses"
+        names = []
+        diagnoses = dict(self.diagnoses)
+        try:
+            for id in self.diagnosis:
+                names.append(diagnoses[id])
+        except:
+            self.bail()
+        return ", ".join(sorted(names))
+
+    @property
+    def options(self):
+        """Miscellaneous options selected by the user."""
+
+        if not hasattr(self, "_options"):
+            self._options = self.fields.getlist("options")
+        return self._options
+
+    @property
+    def rows(self):
+        """Values for the report table."""
+
+        if not hasattr(self, "_rows"):
+            fields = ["m.doc_id", "m.value"] if self.show_id else ["m.value"]
+            query = self.Query("query_term m", *fields).unique()
+            query.order("m.value")
+            query.where("m.path = '/Media/MediaTitle'")
+            if self.category:
+                query.join("query_term c", "c.doc_id = m.doc_id")
+                query.where(query.Condition("c.path", self.CATEGORY_PATH))
+                query.where(query.Condition("c.value", self.category, "IN"))
+            if self.diagnosis:
+                query.join("query_term d", "d.doc_id = m.doc_id")
+                query.where(query.Condition("d.path", self.DIAGNOSIS_PATH))
+                query.where(query.Condition("d.int_val", self.diagnosis, "IN"))
+            rows = query.execute(self.cursor).fetchall()
+            self._rows = [tuple(row) for row in rows]
+            self.logger.info("%d rows found", len(self._rows))
+        return self._rows
+
+    @property
+    def show_id(self):
+        """True if we should include another column for the document IDs."""
+        return "show_id" in self.options
+
+
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+    Control().run()

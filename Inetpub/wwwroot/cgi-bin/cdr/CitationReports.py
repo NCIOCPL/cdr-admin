@@ -1,54 +1,35 @@
-#----------------------------------------------------------------------
-# Submenu for citation reports.
-# JIRA::OCECDR-3800
-#----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, string
+#!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields  = cgi.FieldStorage()
-session = cdrcgi.getSession(fields)
-action  = cdrcgi.getRequest(fields)
-title   = "CDR Administration"
-section = "Citation Reports"
-SUBMENU = "Reports Menu"
-buttons = [SUBMENU, cdrcgi.MAINMENU, "Log Out"]
+"""Submenu for citation reports.
+"""
 
-#----------------------------------------------------------------------
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if action == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif action == SUBMENU:
-    cdrcgi.navigateTo("Reports.py", session)
+from cdrcgi import Controller
 
-#----------------------------------------------------------------------
-# Handle request to log out.
-#----------------------------------------------------------------------
-if action == "Log Out":
-    cdrcgi.logout(session)
+class Control(Controller):
 
-#----------------------------------------------------------------------
-# Display available report choices.
-#----------------------------------------------------------------------
-page = cdrcgi.Page(title, subtitle=section, action="Reports.py",
-                   buttons=buttons, session=session, body_classes="admin-menu")
-page.add(page.B.H3("QC Reports"))
-page.add("<ol>")
-page.add_menu_link("CiteSearch.py", "Citation QC Report", session)
-page.add("</ol>")
-page.add(page.B.H3("Other Reports"))
-page.add("<ol>")
-page.add_menu_link("UnverifiedCitations.py", "Unverified Citations", session)
-page.add("</ol>")
-page.add(page.B.H3("Management Reports"))
-page.add("<ol>")
-for script, display in (
-    ('CitationsInSummaries.py',      'Citations Linked to Summaries'),
-    ('ModifiedPubMedDocs.py',        'Modified PubMed Documents'),
-    ('NewCitations.py',              'New Citations Report'),
-):
-    page.add_menu_link(script, display, session)
-page.add("</ol>")
-page.send()
+    SUBMIT = None
+    SUBTITLE = "Citation Reports"
+
+    def populate_form(self, page):
+        """Add the menu items for Citations."""
+        page.body.set("class", "admin-menu")
+        page.form.append(page.B.H3("QC Reports"))
+        link = page.menu_link("CiteSearch.py", "Citation QC Report")
+        ol = page.B.OL(page.B.LI(link))
+        page.form.append(ol)
+        page.form.append(page.B.H3("Other Reports"))
+        link = page.menu_link("UnverifiedCitations.py", "Unverified Citations")
+        ol = page.B.OL(page.B.LI(link))
+        page.form.append(ol)
+        page.form.append(page.B.H3("Management Reports"))
+        ol = page.B.OL()
+        page.form.append(ol)
+        for display, script in (
+            ("Citations Linked to Summaries", "CitationsInSummaries.py"),
+            ("Modified PubMed Documents", "ModifiedPubMedDocs.py"),
+            ("New Citations Report", "NewCitations.py"),
+        ):
+            ol.append(page.B.LI(page.menu_link(script, display)))
+
+
+Control().run()

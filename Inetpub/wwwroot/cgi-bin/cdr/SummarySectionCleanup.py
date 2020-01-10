@@ -5,7 +5,7 @@
 #----------------------------------------------------------------------
 import cdr
 import cdrcgi
-import cdrdb
+from cdrapi import db
 import datetime
 import lxml.etree as etree
 
@@ -106,7 +106,7 @@ class Control(cdrcgi.Control):
 
         b_path = "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"
         t_path = "/Summary/TranslationOf/@cdr:ref"
-        query = cdrdb.Query("active_doc d", "d.id")
+        query = db.Query("active_doc d", "d.id")
         query.join("query_term_pub a", "a.doc_id = d.id")
         query.where("a.path = '/Summary/SummaryMetaData/SummaryAudience'")
         query.where(query.Condition("a.value", self.audience + "s"))
@@ -195,7 +195,7 @@ class Summary:
         self.id = doc_id
         self.control = control
         self.changes = []
-        query = cdrdb.Query("document", "title", "xml")
+        query = db.Query("document", "title", "xml")
         query.where(query.Condition("id", doc_id))
         self.title, xml = query.execute(control.cursor).fetchone()
         root = etree.XML(xml.encode("utf-8"))
@@ -216,7 +216,7 @@ class Summary:
                 if title is None or not title.strip():
                     title = "EMPTY TITLE"
                 if prev_section_empty:
-                    self.changes.append(u"*** %s" % title)
+                    self.changes.append("*** %s" % title)
                 if not (set(tags) & Summary.NORMAL_CONTENT):
                     ancestors = [a.tag for a in section.iterancestors()]
                     if "Insertion" not in ancestors:
@@ -227,9 +227,9 @@ class Summary:
         if prev_section_empty:
             self.changes.append("*** Last Section")
 
-    def __cmp__(self, other):
+    def __lt__(self, other):
         "Support sorting the summaries by title."
-        return cmp((self.title, self.id), (other.title, other.id))
+        return (self.title, self.id) < (other.title, other.id)
 
     def get_row(self):
         "Assemble the row for the report table."
@@ -238,7 +238,7 @@ class Summary:
     @staticmethod
     def is_element(node):
         "We need to skip over processing instructions and comments."
-        return isinstance(node.tag, basestring)
+        return isinstance(node.tag, str)
 
 if __name__ == "__main__":
     "Protect this from being executed when loaded by lint-like tools."

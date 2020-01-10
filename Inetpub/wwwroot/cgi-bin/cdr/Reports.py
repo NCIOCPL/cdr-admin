@@ -1,33 +1,38 @@
-#----------------------------------------------------------------------
-# Reports submenu for CDR administrative system.
-#----------------------------------------------------------------------
-import cdrcgi
+#!/usr/bin/env python
 
-class Control(cdrcgi.Control):
-    def __init__(self):
-        cdrcgi.Control.__init__(self, "Reports")
-        self.buttons = (cdrcgi.DEVTOP, cdrcgi.MAINMENU, "Log Out")
-    def set_form_options(self, opts):
-        opts["body_classes"] = "admin-menu"
-        return opts
-    def populate_form(self, form):
-        form.add("<ol>")
-        for script, display in (
-            ("GeneralReports.py", "General Reports"),
-            ("CitationReports.py", "Citations"),
-            ("CdrDocumentation.py", "Documentation"),
-            ("DrugInfoReports.py", "Drug Information"),
-            ("GeographicReports.py", "Geographic"),
-            ("GlossaryTermReports.py", "Glossary Terms"),
-            ("MailerReports.py", "Mailers"),
-            ("MediaReports.py", "Media"),
-            ("PublishReports.py", "Publishing"),
-            ("PersonAndOrgReports.py", "Persons and Organizations"),
-            ("ProtocolReports.py", "Protocols"),
-            ("SummaryAndMiscReports.py",
-             "Summaries and Miscellaneous Documents"),
-            ("TerminologyReports.py",  "Terminology")
+"""Reports menu.
+"""
+
+from cdrcgi import Controller
+
+class Control(Controller):
+
+    SUBTITLE = "Reports"
+    SUBMIT = None
+
+    @property
+    def buttons(self):
+        """Override to omit the button for this page."""
+        return self.DEVMENU, self.ADMINMENU, self.LOG_OUT
+
+    def populate_form(self, page):
+        page.body.set("class", "admin-menu")
+        ol = page.B.OL()
+        page.form.append(ol)
+        for display, script in (
+            ("Citations", "CitationReports.py"),
+            ("Documentation", "CdrDocumentation.py"),
+            ("Drug Information", "DrugInfoReports.py"),
+            ("General Reports", "GeneralReports.py"),
+            ("Geographic", "GeographicReports.py"),
+            ("Glossary Terms", "GlossaryTermReports.py"),
+            ("Media", "MediaReports.py"),
+            ("Persons and Organizations", "PersonAndOrgReports.py"),
+            ("Publishing", "PublishReports.py"),
+            ("Summaries and Miscellaneous Documents",
+             "SummaryAndMiscReports.py"),
+            ("Terminology", "TerminologyReports.py"),
         ):
-            form.add_menu_link(script, display, self.session)
-        form.add("</ol>")
+            ol.append(page.B.LI(page.menu_link(script, display)))
+
 Control().run()

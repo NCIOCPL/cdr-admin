@@ -8,21 +8,20 @@
 import cdr
 
 def report(what):
-    print """\
+    print(f"""\
 Content-type: text/plain
 
-CDR %s""" % what
+CDR {what}""")
 
-# Uncomment if needed
-# cdr.logwrite("cdrping called")
+cdr.LOGGER.debug("cdrping called")
+
 try:
     response = cdr.getDoctypes('guest')
-    if type(response) in (str, unicode):
-        cdr.logwrite("cdrping getDoctypes error: %s" % response)
+    if isinstance(response, (str, bytes)):
+        cdr.LOGGER.warning("cdrping getDoctypes error: %s", response)
         report("CORRUPT")
     else:
         report("OK")
-except Exception, e:
-    cdr.logwrite("cdrping getDoctypes exception type=%s  value=%s" %
-                 (type(e), e))
+except Exception as e:
+    cdr.LOGGER.exception("CDR ping failure")
     report("UNAVAILABLE")

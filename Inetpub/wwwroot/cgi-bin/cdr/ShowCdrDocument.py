@@ -3,7 +3,7 @@
 #----------------------------------------------------------------------
 import cdr
 import cdrcgi
-import cdrdb
+from cdrapi import db
 
 class Control(cdrcgi.Control):
     """
@@ -53,17 +53,17 @@ class Control(cdrcgi.Control):
         except Exception:
             cdrcgi.bail("Invalid document ID")
         if self.vtype == "exported":
-            query = cdrdb.Query("pub_proc_cg", "xml")
+            query = db.Query("pub_proc_cg", "xml")
             what = "exported XML"
         else:
             version = self.get_version(doc_id)
             if version:
-                query = cdrdb.Query("doc_version", "xml")
+                query = db.Query("doc_version", "xml")
                 query.where(query.Condition("num", version))
                 what = "version %s" % version
             else:
                 what = "current working document"
-                query = cdrdb.Query("document", "xml")
+                query = db.Query("document", "xml")
         query.where(query.Condition("id", doc_id))
         rows = query.execute(self.cursor).fetchall()
         if not rows:
@@ -123,21 +123,21 @@ class Control(cdrcgi.Control):
         """
 
         if self.vtype == "cwd":
-            query = cdrdb.Query("document", "id")
+            query = db.Query("document", "id")
             query.where(query.Condition("id", doc_id))
             rows = query.execute(self.cursor).fetchall()
             if not rows:
                 cdrcgi.bail("CDR%d not found" % doc_id)
             return None
         if self.vtype == "latest":
-            query = cdrdb.Query("doc_version", "MAX(num)")
+            query = db.Query("doc_version", "MAX(num)")
             query.where(query.Condition("id", doc_id))
             rows = query.execute(self.cursor).fetchall()
             if not rows:
                 cdrcgi.bail("no versions found for CDR%d" % doc_id)
             return rows[0][0]
         if self.vtype == "lastpub":
-            query = cdrdb.Query("publishable_version", "MAX(num)")
+            query = db.Query("publishable_version", "MAX(num)")
             query.where(query.Condition("id", doc_id))
             rows = query.execute(self.cursor).fetchall()
             if not rows:
@@ -148,7 +148,7 @@ class Control(cdrcgi.Control):
             if not version.isdigit():
                 cdrcgi.bail("invalid version")
             back = int(version)
-            query = cdrdb.Query("doc_version", "num").limit(back)
+            query = db.Query("doc_version", "num").limit(back)
             query.where(query.Condition("id", doc_id))
             rows = query.order("num DESC").execute(self.cursor).fetchall()
             if not rows:
@@ -159,7 +159,7 @@ class Control(cdrcgi.Control):
             return rows[-1][0]
         if not self.version.isdigit():
             cdrcgi.bail("invalid version")
-        query = cdrdb.Query("doc_version", "num")
+        query = db.Query("doc_version", "num")
         query.where(query.Condition("id", doc_id))
         query.where(query.Condition("num", self.version))
         rows = query.execute(self.cursor).fetchall()
@@ -177,10 +177,10 @@ class Control(cdrcgi.Control):
         If no documents match, display an error message.
         """
 
-        fragment = unicode(self.fragment.strip(), "utf-8")
+        fragment = self.fragment.strip()
         if not fragment:
             cdrcgi.bail("Missing title")
-        query = cdrdb.Query("document d", "d.id", "d.title", "t.name")
+        query = db.Query("document d", "d.id", "d.title", "t.name")
         query.join("doc_type t", "t.id = d.doc_type")
         query.where(query.Condition("d.title", fragment, "LIKE"))
         if self.doctypes:
@@ -209,7 +209,7 @@ class Control(cdrcgi.Control):
         form.add(form.B.LEGEND("Choose Document"))
         for doc_id, title, doctype in rows:
             tooltip = None
-            display = u"CDR%d [%s] %s" % (doc_id, doctype, title)
+            display = "CDR%d [%s] %s" % (doc_id, doctype, title)
             if len(display) > 125:
                 display, tooltip = display[:125] + "...", display
             form.add_radio("doc-id", display, doc_id, tooltip=tooltip)
@@ -222,7 +222,7 @@ class Control(cdrcgi.Control):
         Get the names of the active document types for the form picklist.
         """
 
-        query = cdrdb.Query("doc_type", "name")
+        query = db.Query("doc_type", "name")
         query.where("active = 'Y'")
         query.where("xml_schema IS NOT NULL")
         rows = query.order("name").execute(self.cursor).fetchall()

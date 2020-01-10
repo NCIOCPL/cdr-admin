@@ -10,7 +10,7 @@ import operator
 import lxml.etree as etree
 import cdr
 import cdrcgi
-import cdrdb
+from cdrapi import db
 from cdrapi.settings import Tier
 
 class Control(cdrcgi.Control):
@@ -35,7 +35,6 @@ class Control(cdrcgi.Control):
         """
 
         self.tier = Tier()
-        self.set_binary_mode()
         cdrcgi.Control.__init__(self, "Translation Job")
         if not self.session:
             cdrcgi.bail("not authorized")
@@ -56,8 +55,6 @@ class Control(cdrcgi.Control):
         self.change_type = self.get_id("change_type", self.change_types.map)
         self.state_date = self.fields.getvalue("state_date")
         self.comments = self.fields.getvalue("comments") or None
-        if self.comments is not None:
-            self.comments = self.comments.decode("utf-8")
         self.job = self.english_id and Job(self) or None
         cdrcgi.valParmDate(self.state_date, empty_ok=True, msg=cdrcgi.TAMPERING)
 
@@ -85,7 +82,7 @@ class Control(cdrcgi.Control):
 
         if self.have_required_values():
             if self.job.changed():
-                conn = cdrdb.connect()
+                conn = db.connect()
                 cursor = conn.cursor()
                 params = [getattr(self, name) for name in Job.FIELDS]
                 params.append(getattr(self, Job.KEY))
@@ -105,7 +102,7 @@ class Control(cdrcgi.Control):
                 try:
                     cursor.execute(query, params)
                     conn.commit()
-                except Exception, e:
+                except Exception as e:
                     if "duplicate key" in str(e).lower():
                         self.logger.error("duplicate translation job ID")
                         cdrcgi.bail("attempt to create duplicate job")
@@ -206,7 +203,7 @@ jQuery("input[value='%s']").click(function(e) {
         """
 
         temp = self.sort_dict(self.english_summaries)
-        query = cdrdb.Query(Job.TABLE, Job.KEY)
+        query = db.Query(Job.TABLE, Job.KEY)
         rows = query.execute(self.cursor).fetchall()
         jobs = set([row[0] for row in rows])
         summaries = []
@@ -225,7 +222,7 @@ jQuery("input[value='%s']").click(function(e) {
         """
 
         query = "DELETE FROM %s WHERE english_id = ?" % Job.TABLE
-        conn = cdrdb.connect()
+        conn = db.connect()
         cursor = conn.cursor()
         cursor.execute(query, self.english_id)
         conn.commit()
@@ -242,7 +239,7 @@ jQuery("input[value='%s']").click(function(e) {
         Returns a populated Values object.
         """
 
-        query = cdrdb.Query(table_name, "value_id", "value_name")
+        query = db.Query(table_name, "value_id", "value_name")
         rows = query.order("value_pos").execute(self.cursor).fetchall()
         class Values:
             def __init__(self, rows):
@@ -296,7 +293,7 @@ jQuery("input[value='%s']").click(function(e) {
             indexed by the summary document IDs
         """
 
-        query = cdrdb.Query("active_doc d", "d.id", "d.title")
+        query = db.Query("active_doc d", "d.id", "d.title")
         query.join("query_term l", "l.doc_id = d.id")
         query.where("l.path = '/Summary/SummaryMetaData/SummaryLanguage'")
         query.where(query.Condition("l.value", language))
@@ -330,7 +327,7 @@ jQuery("input[value='%s']").click(function(e) {
         group.
         """
 
-        query = cdrdb.Query("usr", "id", "fullname")
+        query = db.Query("usr", "id", "fullname")
         query.where("fullname IS NOT NULL")
         rows = query.execute(self.cursor).fetchall()
         return dict([(row[0], row[1]) for row in rows])
@@ -346,7 +343,7 @@ jQuery("input[value='%s']").click(function(e) {
             dictionary of user names indexed by user ID
         """
 
-        query = cdrdb.Query("usr u", "u.id", "u.fullname")
+        query = db.Query("usr u", "u.id", "u.fullname")
         query.join("grp_usr gu", "gu.usr = u.id")
         query.join("grp g", "g.id = gu.grp")
         query.where("u.expired IS NULL")
@@ -386,40 +383,42 @@ jQuery("input[value='%s']").click(function(e) {
 
         recip = self.UserInfo(self, job.assigned_to)
         if not recip.email:
-            error = u"no email address found for user %s" % recip.name
+            error = f"no email address found for user {recip.name}"
             self.logger.error(error)
             cdrcgi.bail(error)
         recips = [recip.email]
         sender = "cdr@cancer.gov"
         body = []
-        subject = u"[CDR-%s] Translation Queue Notification" % self.tier.name
-        log_message = "mailed translation job state alert to %s" % recip
+        subject = f"[{self.tier.name}] Translation Queue Notification"
+        log_message = f"mailed translation job state alert to {recip}"
         if not cdr.isProdHost():
             recips = cdr.getEmailList("Test Translation Queue Recips")
-            body.append(u"[*** THIS IS A TEST MESSAGE ON THE %s TIER. "
-                        u"ON PRODUCTION IT WOULD HAVE GONE TO %s. ***]\n" %
+            body.append("[*** THIS IS A TEST MESSAGE ON THE %s TIER. "
+                        "ON PRODUCTION IT WOULD HAVE GONE TO %s. ***]\n" %
                         (self.tier.name, recip))
             log_message = "test alert for %s sent to %s" % (recip, recips)
         if self.job.new:
-            body.append(u"A new translation job has been assigned to you.")
+            body.append("A new translation job has been assigned to you.")
         else:
-            body.append(u"A translation job assigned to you has a new status.")
-        body.append(u"Assigned by: %s" % self.user)
-        body.append(u"English summary document ID: CDR%d" % job.english_id)
-        body.append(u"English summary title: %s" % job.english_title)
+            body.append("A translation job assigned to you has a new status.")
+        body.append("Assigned by: %s" % self.user)
+        body.append("English summary document ID: CDR%d" % job.english_id)
+        body.append("English summary title: %s" % job.english_title)
         if job.spanish_title:
-            body.append(u"Spanish summary document ID: CDR%d" % job.spanish_id)
-            body.append(u"Spanish summary title: %s" % job.spanish_title)
-        body.append(u"Summary audience: %s" % job.english_audience)
-        body.append(u"Job status: %s" % self.states.map.get(job.state_id))
-        body.append(u"Date of status transition: %s" % job.state_date)
-        body.append(u"Comments: %s" % job.comments)
+            body.append("Spanish summary document ID: CDR%d" % job.spanish_id)
+            body.append("Spanish summary title: %s" % job.spanish_title)
+        body.append("Summary audience: %s" % job.english_audience)
+        body.append("Job status: %s" % self.states.map.get(job.state_id))
+        body.append("Date of status transition: %s" % job.state_date)
+        body.append("Comments: %s" % job.comments)
+        opts = dict(subject=subject, body="\n".join(body))
         attachment = self.fetch_file()
-        attachments = attachment and [attachment] or None
+        if attachment:
+            opts["attachments"] = [attachment]
         try:
-            cdr.sendMailMime(sender, recips, subject, u"\n".join(body),
-                             attachments=attachments)
-        except Exception, e:
+            message = cdr.EmailMessage(sender, recips, **opts)
+            message.send()
+        except Exception as e:
             self.logger.error("sending mail: %s", e)
             cdrcgi.bail("sending mail: %s" % e)
         self.logger.info(log_message)
@@ -476,11 +475,11 @@ jQuery("input[value='%s']").click(function(e) {
             """
 
             if not user_id:
-                query = cdrdb.Query("session", "usr")
+                query = db.Query("session", "usr")
                 query.where(query.Condition("name", control.session))
                 user_id = query.execute(control.cursor).fetchone()[0]
             self.id = user_id
-            query = cdrdb.Query("open_usr", "email", "fullname")
+            query = db.Query("open_usr", "email", "fullname")
             query.where(query.Condition("id", user_id))
             self.email, self.name = query.execute(control.cursor).fetchone()
 
@@ -491,21 +490,6 @@ jQuery("input[value='%s']").click(function(e) {
 
             return "%s <%s>" % (self.name, self.email)
 
-    @staticmethod
-    def set_binary_mode():
-        """
-        Make sure the user's file isn't mangled if she posts one.
-        """
-
-        try:
-            import msvcrt
-            import os
-            msvcrt.setmode(0, os.O_BINARY) # stdin = 0
-            msvcrt.setmode(1, os.O_BINARY) # stdout = 1
-        except ImportError:
-            pass
-        except:
-            cdrcgi.bail("Internal error")
 
 class Job:
     """
@@ -542,7 +526,7 @@ class Job:
         self.subtitle = None
         for name in self.FIELDS:
             setattr(self, name, None)
-        query = cdrdb.Query(self.TABLE, *self.FIELDS)
+        query = db.Query(self.TABLE, *self.FIELDS)
         query.where(query.Condition(self.KEY, self.english_id))
         row = query.execute(control.cursor).fetchone()
         if row:
@@ -555,7 +539,7 @@ class Job:
             if self.state_date:
                 self.state_date = str(self.state_date)[:10]
         else:
-            query = cdrdb.Query("document", "xml")
+            query = db.Query("document", "xml")
             query.where(query.Condition("id", self.english_id))
             try:
                 xml = query.execute(control.cursor).fetchone()[0]
@@ -569,8 +553,8 @@ class Job:
                         child = node.find("Date")
                         if child is not None and child.text is not None:
                             self.date = child.text
-                    def __cmp__(self, other):
-                        return cmp(self.date, other.date)
+                    def __lt__(self, other):
+                        return self.date < other.date
                 name = "TypeOfSummaryChange"
                 change_types = [Change(node) for node in root.findall(name)]
                 if change_types:
@@ -581,7 +565,7 @@ class Job:
                             break
             except:
                 pass
-        query = cdrdb.Query("query_term", "doc_id")
+        query = db.Query("query_term", "doc_id")
         query.where("path = '/Summary/TranslationOf/@cdr:ref'")
         query.where(query.Condition("int_val", self.english_id))
         row = query.execute(control.cursor).fetchone()
@@ -593,7 +577,7 @@ class Job:
             title_parts = title.split(";")
             self.spanish_title = title = title_parts[0]
             self.spanish_audience = title_parts[-1]
-            self.subtitle = u"Spanish summary: CDR%d (%s)" % (row[0], title)
+            self.subtitle = "Spanish summary: CDR%d (%s)" % (row[0], title)
         title_parts = control.english_summaries[self.english_id].split(";")
         self.english_title = title_parts[0]
         self.english_audience = title_parts[-1]

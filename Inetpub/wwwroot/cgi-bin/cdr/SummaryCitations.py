@@ -15,7 +15,7 @@ import locale
 import lxml.etree as etree
 import cdr
 import cdrcgi
-import cdrdb
+from cdrapi import db
 
 class Control(cdrcgi.Control):
     """
@@ -83,7 +83,7 @@ class Control(cdrcgi.Control):
         Let the user select the document version for the report.
         """
 
-        query = cdrdb.Query("doc_version v", "v.num", "v.dt", "v.comment")
+        query = db.Query("doc_version v", "v.num", "v.dt", "v.comment")
         query.join("usr u", "u.id = v.usr")
         query.where(query.Condition("v.id", self.doc_id))
         rows = query.order("v.num DESC").execute(self.cursor).fetchall()
@@ -91,17 +91,17 @@ class Control(cdrcgi.Control):
             self.doc_version = -1
             self.show_report()
         else:
-            query = cdrdb.Query("document", "title")
+            query = db.Query("document", "title")
             query.where("id = %d" % self.doc_id)
             title = query.execute(self.cursor).fetchone()[0].split(";")[0]
             form.add_hidden_field("modules", self.modules and "1" or "")
             form.add_hidden_field("DocId", str(self.doc_id))
             form.add("<fieldset>")
-            form.add(form.B.LEGEND(u"Select version for %s" % title))
+            form.add(form.B.LEGEND("Select version for %s" % title))
             versions = [(-1, "Current Working Version")]
             for version, date, comment in rows:
                 comment = comment or "[No comment]"
-                label = u"[V%d %s] %s" % (version, str(date)[:10], comment)
+                label = "[V%d %s] %s" % (version, str(date)[:10], comment)
                 versions.append((version, label))
             form.add_select("DocVersion", "Version", versions, -1)
             form.add("</fieldset>")
@@ -125,7 +125,7 @@ class Control(cdrcgi.Control):
             form.add("<fieldset style='width: 1024px'>")
             form.add(form.B.LEGEND("Select Summary"))
             for doc in docs:
-                display = u"[CDR%010d] %s" % (doc.id, doc.title)
+                display = "[CDR%010d] %s" % (doc.id, doc.title)
                 form.add_radio("DocId", display, str(doc.id))
             form.add("</fieldset>")
 
@@ -139,7 +139,7 @@ class Control(cdrcgi.Control):
             self.show_form()
         self.parse_summary(self.doc_id, self.doc_version, self.modules)
         locale.setlocale(locale.LC_COLLATE, "")
-        citations = sorted(Citation.citations.itervalues())
+        citations = sorted(Citation.citations.values())
         page = cdrcgi.Page(self.title, banner=None)
         page.add(page.B.H1(self.summary_title))
         page.add(page.B.H2("References"))
@@ -166,7 +166,7 @@ class Control(cdrcgi.Control):
         filter_set = ['set:Denormalization Summary Set']
         response = cdr.filterDoc("guest", filter_set, doc_id,
                                  docVer=doc_version)
-        if isinstance(response, basestring):
+        if isinstance(response, (str, bytes)):
            cdrcgi.bail(response)
         try:
             root = etree.XML(response[0])
@@ -191,8 +191,8 @@ class Control(cdrcgi.Control):
         Find the summaries matching the user's title fragment.
         """
 
-        fragment = unicode(self.title_fragment, "utf-8") + "%"
-        query = cdrdb.Query("document d", "d.id", "d.title")
+        fragment = f"{self.title_fragment}%"
+        query = db.Query("document d", "d.id", "d.title")
         query.join("doc_type t", "t.id = d.doc_type")
         query.where("t.name = 'Summary'")
         query.where(query.Condition("d.title", fragment, "LIKE"))
@@ -244,7 +244,7 @@ class Citation:
         yet, add the citation to the dictionary of unique citations found.
         """
 
-        self.text = u"".join(node.itertext()).strip()
+        self.text = "".join(node.itertext()).strip()
         self.pmid = node.get("PMID")
         if self.text:
             if not self.text.endswith("."):
@@ -268,12 +268,12 @@ class Citation:
             return cdrcgi.Page.B.LI(self.text + " [", a)
         return cdrcgi.Page.B.LI(self.text)
 
-    def __cmp__(self, other):
+    def __lt__(self, other):
         """
         Use intelligent sorting for the citations, folding characters
         with different diacritics together.
         """
 
-        return locale.strcoll(self.text.lower(), other.text.lower())
+        return locale.strcoll(self.text.lower(), other.text.lower()) < 0
 
 Control().run()

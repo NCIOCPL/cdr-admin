@@ -31,9 +31,11 @@
 # Request form for generating RTF letters to board members."
 #
 #----------------------------------------------------------------------
+import sys
 import cgi, cdr, cdrcgi, time
 import lxml.etree as etree
 from cdrapi import db as cdrdb
+from html import escape as html_escape
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -104,7 +106,7 @@ if flavor not in ("4258", "4259"):
 #----------------------------------------------------------------------
 try:
     conn = cdrdb.connect(user='CdrGuest', timeout=300)
-except Exception, e:
+except Exception as e:
     cdrcgi.bail('Database connection failure: %s' % e)
 
 #----------------------------------------------------------------------
@@ -120,24 +122,24 @@ def makeBoardPicklist(cursor):
      AND b.path = '/Organization/OrganizationNameInformation'
                 + '/OfficialName/Name'
 ORDER BY b.value""")
-    html = [u"""\
+    html = ["""\
 <select name='board'>
 """]
     for docId, boardName in cursor.fetchall():
-        html.append(u"""\
+        html.append("""\
 <option value='%d'>%s</option>
-""" % (docId, cgi.escape(boardName)))
-    html.append(u"""\
+""" % (docId, html_escape(boardName)))
+    html.append("""\
 </select>
 """)
-    return u"".join(html)
+    return "".join(html)
 
 #----------------------------------------------------------------------
 # Add the title row and the column headers.
 #----------------------------------------------------------------------
 def addHeaderRows(sheet, styles, cursor, board, titleStart):
     boardName = getBoardName(cursor, board)
-    now       = time.strftime(u"%Y-%m-%d")
+    now       = time.strftime("%Y-%m-%d")
     title     = "%s - %s  %s" % (titleStart, boardName, now)
     widths = (10, 30, 60, 10, 10, 40, 50)
     headers = ("Mailer ID", "Board Member", "Summary", "Sent", "Response",
@@ -154,10 +156,10 @@ def addHeaderRows(sheet, styles, cursor, board, titleStart):
 def report4258(sheet, styles, cursor, board, selectBy):
     if selectBy == "lastMailer":
         dateField = "Sent"
-        title = u"Summary Mailer Report (Last)"
+        title = "Summary Mailer Report (Last)"
     else:
         dateField = "Response/Received"
-        title = u"Summary Mailer Report (Last Checked-In)"
+        title = "Summary Mailer Report (Last Checked-In)"
     addHeaderRows(sheet, styles, cursor, board, title)
     dateField = selectBy == "lastMailer" and "Sent" or "Response/Received"
     cursor.execute("""\
@@ -189,7 +191,7 @@ def report4259(sheet, styles, cursor, board, begin, end):
     if not begin or not end:
         cdrcgi.bail("Both date range parameters are required for this report.")
     end = cdr.calculateDateByOffset(1, end)
-    title = u"Summary Mailer History Report (%s - %s)" % (begin, end)
+    title = "Summary Mailer History Report (%s - %s)" % (begin, end)
     addHeaderRows(sheet, styles, cursor, board, title)
     cursor.execute("""\
         SELECT DISTINCT mailer.doc_id, sent.value, member.person_id
@@ -277,10 +279,10 @@ class Mailer:
     summaries = {}
     def __init__(self, mailerId, cursor):
         self.docId = mailerId
-        self.recipient = u""
-        self.summary = u""
-        self.sent = u""
-        self.response = u""
+        self.recipient = ""
+        self.summary = ""
+        self.sent = ""
+        self.response = ""
         self.changes = []
         self.comments = []
         cursor.execute("SELECT xml FROM document WHERE id = ?", mailerId)
@@ -294,7 +296,7 @@ class Mailer:
             self.sent = e.text[:10]
         for r in tree.findall('Response'):
             for e in r.findall('Received'):
-                self.response = e.text and e.text[:10] or u""
+                self.response = e.text and e.text[:10] or ""
             for e in r.findall('ChangesCategory'):
                 if e.text:
                     change = e.text.strip()
@@ -305,23 +307,21 @@ class Mailer:
                     comment = e.text.strip()
                     if comment:
                         self.comments.append(comment)
-    def __cmp__(self, other):
+    def __lt__(self, other):
         if Mailer.sortBy == "member":
-            diff = cmp(self.recipient, other.recipient)
-            if diff:
-                return diff
-            return cmp(self.summary, other.summary)
-        diff = cmp(self.summary, other.summary)
-        if diff:
-            return diff
-        return cmp(self.recipient, other.recipient)
+            a = self.recipient, self.summary
+            b = other.recipient, other.summary
+        else:
+            a = self.summary, self.recipient
+            b = other.summary, other.recipient
+        return a < b
     @classmethod
     def getSummary(cls, e, cursor):
         docId = e.get('{cips.nci.nih.gov/cdr}ref')
         try:
             docId = cdr.exNormalize(docId)[1]
         except:
-            return u""
+            return ""
         if docId in cls.summaries:
             return cls.summaries[docId]
         cursor.execute("""\
@@ -330,7 +330,7 @@ class Mailer:
              WHERE path = '/Summary/SummaryTitle'
                AND doc_id = ?""", docId)
         rows = cursor.fetchall()
-        title = rows and rows[0][0] or u""
+        title = rows and rows[0][0] or ""
         cls.summaries[docId] = title
         return title
     @classmethod
@@ -339,7 +339,7 @@ class Mailer:
         try:
             docId = cdr.exNormalize(docId)[1]
         except:
-            return u""
+            return ""
         if docId in cls.recipients:
             return cls.recipients[docId]
         cursor.execute("""\
@@ -347,8 +347,8 @@ class Mailer:
               FROM document
              WHERE id = ?""", docId)
         rows = cursor.fetchall()
-        title = rows and rows[0][0] or u""
-        cls.recipients[docId] = title.split(u";")[0]
+        title = rows and rows[0][0] or ""
+        cls.recipients[docId] = title.split(";")[0]
         return cls.recipients[docId]
     def addRow(self, sheet, styles, row):
         sheet.write(row, 0, self.docId, styles.center)
@@ -356,8 +356,8 @@ class Mailer:
         sheet.write(row, 2, self.summary, styles.left)
         sheet.write(row, 3, self.sent, styles.center)
         sheet.write(row, 4, self.response, styles.center)
-        sheet.write(row, 5, u"\n".join(self.changes), styles.left)
-        sheet.write(row, 6, u"\n".join(self.comments), styles.left)
+        sheet.write(row, 5, "\n".join(self.changes), styles.left)
+        sheet.write(row, 6, "\n".join(self.comments), styles.left)
         return row + 1
 
 #----------------------------------------------------------------------
@@ -376,12 +376,6 @@ def getBoardName(cursor, boardId):
 # Create the report if we have a request for one.
 #----------------------------------------------------------------------
 if board:
-
-    try:
-        import msvcrt, os, sys
-        msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
-    except:
-        pass
 
     cursor = conn.cursor()
     cursor.execute("CREATE TABLE #board_member (person_id INT, member_id INT)")
@@ -419,14 +413,16 @@ if board:
     else:
         report4259(sheet, styles, cursor, board, begin, end)
     stamp = time.strftime("%Y%m%d%H%M%S")
-    print "Content-type: application/vnd.ms-excel"
-    print "Content-Disposition: attachment; filename=SummMailRep-%s.xls" % stamp
-    print
-    styles.book.save(sys.stdout)
+    sys.stdout.buffer.write(f"""\
+Content-type: application/vnd.ms-excel
+Content-Disposition: attachment; filename=SummMailRep-{stamp}.xls
+
+""".encode("utf-8"))
+    styles.book.save(sys.stdout.buffer)
 
 else:
     boards = makeBoardPicklist(conn.cursor())
-    form = [u"""\
+    form = ["""\
    <input type='hidden' name='flavor' value='%s' />
    <input type='hidden' name='%s' value='%s' />
    <table border='0'>
@@ -436,7 +432,7 @@ else:
     </tr>
 """ % (flavor, cdrcgi.SESSION, session, boards)]
     if flavor == "4259":
-        form.append(u"""\
+        form.append("""\
     <tr>
      <th align='right'>Start: </th>
      <td><input class='CdrDateField' name='begin' id='begin' /></td>
@@ -446,7 +442,7 @@ else:
      <td><input class='CdrDateField' name='end' id='end' /></td>
     </tr>
 """)
-    form.append(u"""\
+    form.append("""\
     <tr>
      <th align='right'>Sort By: </th>
      <td>
@@ -458,7 +454,7 @@ else:
     </tr>
 """)
     if flavor == "4258":
-        form.append(u"""\
+        form.append("""\
     <tr>
      <th align='right'>Show: </th>
      <td>
@@ -469,11 +465,11 @@ else:
      </td>
     </tr>
 """)
-    form.append(u"""\
+    form.append("""\
    </table>
   </form>
  </body>
 </html>
 """)
 
-    cdrcgi.sendPage(header + u"".join(form))
+    cdrcgi.sendPage(header + "".join(form))

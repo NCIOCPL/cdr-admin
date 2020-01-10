@@ -1,54 +1,26 @@
-#----------------------------------------------------------------------
-# Submenu for publishing reports.
-# BZIssue::2111
-#----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, string
+#!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields  = cgi.FieldStorage()
-session = cdrcgi.getSession(fields)
-action  = cdrcgi.getRequest(fields)
-title   = "CDR Administration"
-section = "Publishing Reports"
-SUBMENU = "Reports Menu"
-buttons = [SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-header  = cdrcgi.header(title, title, section, "Reports.py", buttons)
+"""Publishing report menu.
+"""
 
-#----------------------------------------------------------------------
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if action == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif action == SUBMENU:
-    cdrcgi.navigateTo("Reports.py", session)
+from cdrcgi import Controller
 
-#----------------------------------------------------------------------
-# Handle request to log out.
-#----------------------------------------------------------------------
-if action == "Log Out": 
-    cdrcgi.logout(session)
+class Control(Controller):
 
-#----------------------------------------------------------------------
-# Display available report choices.
-#----------------------------------------------------------------------
-form = """\
-    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-    <OL>
-""" % (cdrcgi.SESSION, session)
-reports = [
-           ('GatekeeperStatus.py',
-            'Gatekeeper Status Request'),
-           ('PubStatus.py',
-            'Publishing Job Activities'),
-           ('PubStatsByDate.py',
-            'Publishing Job Statistics'),
-           ('CountByDoctype.py',
-            'Published Document Count (Latest Export Job - runs >4 min)')
-          ]
-for r in reports:
-    form += "<LI><A HREF='%s/%s?%s=%s'>%s</LI></A>\n" % (
-            cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
+    SUBTITLE = "Publishing Reports"
+    SUBMIT = None
 
-cdrcgi.sendPage(header + form + "</OL></FORM></BODY></HTML>")
+    def populate_form(self, page):
+        page.body.set("class", "admin-menu")
+        ol = page.B.OL()
+        page.form.append(ol)
+        for display, script in (
+            ("Gatekeeper Status Request", "GatekeeperStatus.py"),
+            ("Published Document Count (Latest Weekly Export Job)",
+             "CountByDoctype.py"),
+            ("Publishing Job Activities", "PubStatus.py"),
+            ("Publishing Job Statistics", "PubStatsByDate.py"),
+        ):
+            ol.append(page.B.LI(page.menu_link(script, display)))
+
+Control().run()

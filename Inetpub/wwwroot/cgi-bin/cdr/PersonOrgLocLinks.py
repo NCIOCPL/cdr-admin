@@ -1,78 +1,84 @@
-#----------------------------------------------------------------------
-# Reports on Person documents which link to Organization address
-# fragments.
-#----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, string, cdrdb
+#!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# Named constants.
-#----------------------------------------------------------------------
-SCRIPT  = '/cgi-bin/cdr/Filter.py'
+"""Report on Person docs linking to Organization address fragments.
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields   = cgi.FieldStorage()
-fragLink = fields and fields.getvalue("FragLink") or None
-
-#----------------------------------------------------------------------
-# Set up a database connection and cursor.
-#----------------------------------------------------------------------
-try:
-    conn = cdrdb.connect()
-    cursor = conn.cursor()
-except cdrdb.Error, info:
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
-
-#----------------------------------------------------------------------
-# Submit the query to the database.
-#----------------------------------------------------------------------
-query = """\
-SELECT DISTINCT document.id,
-                document.title
-           FROM document
-           JOIN query_term
-             ON query_term.doc_id = document.id
-          WHERE query_term.path   = '/Person/PersonLocations' +
-                                    '/OtherPracticeLocation' +
-                                    '/OrganizationLocation/@cdr:ref'
-            AND query_term.value  = ?
-       ORDER BY document.title
+Not on the admin menus (invoked from XMetaL).
 """
-try:
-    cursor.execute(query, fragLink)
-    rows = cursor.fetchall()
-except cdrdb.Error, info:
-    cdrcgi.bail('Database query failure: %s' % info[1][0])
 
-title   = "Person Documents Linking to Fragment %s" % fragLink
-instr   = "Number of linking documents: %d" % len(rows)
-buttons = ()
-header  = cdrcgi.header(title, title, instr, None, buttons)
-html    = """\
-<TABLE BORDER='0' WIDTH='100%' CELLSPACING='1' CELLPADDING='1'>
- <TR BGCOLOR='silver' VALIGN='top'>
-  <TD ALIGN='center' WIDTH='15%'><FONT SIZE='-1'><B>Doc ID</B></FONT></TD>
-  <TD ALIGN='center'><FONT SIZE='-1'><B>Title</B></FONT></TD>
- </TR>
-"""
-for row in rows:
-    docId = "CDR%010d" % row[0]
-    title = row[1]
-    shortTitle = title[:100]
-    if len(title) > 100: shortTitle += " ..."
-    html += u"""\
-<TR>
-  <TD BGCOLOR='white' VALIGN='top' WIDTH='15%%' ALIGN='center'>
-   <A HREF='%s?DocId=%s&Filter=%s'>
-    <FONT SIZE='-1'>%s</FONT>
-   </A>
-  </TD>
-  <TD BGCOLOR='white' ALIGN='left'><FONT SIZE='-1'>%s</FONT></TD>
- </TR>
-""" % (SCRIPT,
-       docId,
-       'CDR266296',
-       docId,
-       shortTitle)
-cdrcgi.sendPage(header + html + "</TABLE></BODY></HTML>")
+from cdrcgi import Controller
+from cdrapi.docs import Doc
+
+
+class Control(Controller):
+    """Report logic."""
+
+    SUBTITLE = "Person Document Linking to Organization Address Fragments"
+    LOCS = "/Person/PersonLocations"
+    PATH = f"{LOCS}/OtherPracticeLocation/OrganizationLocation/@cdr:ref"
+
+    def run(self):
+        """Override routing because there is no form for this report."""
+        self.show_report()
+
+    def build_tables(self):
+        """Return the single table for this report."""
+        return self.table
+
+    @property
+    def columns(self):
+        """Column header definitions for the report."""
+
+        return (
+            self.Reporter.Column("Doc ID", width="150px"),
+            self.Reporter.Column("Title", width="500px"),
+        )
+
+    @property
+    def docs(self):
+        """Person documents which link to this address fragment."""
+
+        if not hasattr(self, "_docs"):
+            query = self.Query("query_term", "doc_id")
+            query.where(f"path = '{self.PATH}'")
+            query.where(query.Condition("value", self.target))
+            self._docs = []
+            for row in query.execute(self.cursor).fetchall():
+                self._docs.append(Doc(self.session, id=row.doc_id))
+        return self._docs
+
+    @property
+    def rows(self):
+        """Table rows for the report."""
+
+        if not hasattr(self, "_rows"):
+            self._rows = []
+            for link in sorted(self.docs):
+                row = [
+                    self.Reporter.Cell(link.cdr_id, center=True),
+                    link.title,
+                ]
+                self._rows.append(row)
+            args = len(self.docs), self.target
+            self.logger.info("found %d rows linking to %s", *args)
+        return self._rows
+
+    @property
+    def table(self):
+        """This report has only one table."""
+
+        if not hasattr(self, "_table"):
+            args = len(self.rows), self.target
+            caption = "{:d} Person Documents Linking to {}".format(*args)
+            opts = dict(columns=self.columns, caption=caption)
+            self._table = self.Reporter.Table(self.rows, **opts)
+        return self._table
+
+    @property
+    def target(self):
+        """Address fragment link target string."""
+        return self.fields.getvalue("FragLink")
+
+
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+    Control().run()

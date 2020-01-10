@@ -5,12 +5,12 @@
 #----------------------------------------------------------------------
 import cdr
 import cdrcgi
-import cdrdb
 import cgi
 import datetime
 import lxml.html
 import lxml.html.builder
 import lxml.etree as etree
+from cdrapi import db
 
 def main():
     request = Request()
@@ -37,7 +37,7 @@ class Request:
         self.action = cdrcgi.getRequest(self.fields)
         self.session = cdrcgi.getSession(self.fields)
     def report(self):
-        self.cursor = cdrdb.connect("CdrGuest").cursor()
+        self.cursor = db.connect(user="CdrGuest").cursor()
         self.option1 = self.fields.getlist("option1")
         self.option2 = self.fields.getvalue("option2")
         self.format = self.fields.getvalue("format") or "excel"
@@ -61,7 +61,7 @@ class Request:
             "/Media/PermissionInformation/PermissionResponse",
             "/Media/PermissionInformation/SpanishTranslationPermissionResponse"
         )
-        query = cdrdb.Query("query_term", "doc_id").unique()
+        query = db.Query("query_term", "doc_id").unique()
         query.where(query.Condition("path", paths, "IN"))
         query.where(query.Condition("value", "Permission Denied"))
         query.execute(self.cursor)
@@ -88,7 +88,7 @@ class Request:
             if doc.spanish_response:
                 col4 += " (%s)" % doc.spanish_response
             rows.append((col1, col2, col3, col4, col5))
-        rows.sort(lambda a,b: cmp(a[0].lower(), b[0].lower()))
+        rows.sort(key=lambda row:row[0].lower())
         caption = "Media Permission Denials"
         opts = { "caption": caption, "sheet_name": "Denials" }
         table = Report.Table(columns, rows, **opts)
@@ -111,7 +111,7 @@ class Request:
         paths = []
         for language in self.option1:
             paths.append("/Media/PermissionInformation/%s" % tags[language])
-        query = cdrdb.Query("query_term", "doc_id").unique()
+        query = db.Query("query_term", "doc_id").unique()
         query.where(query.Condition("path", paths, "IN"))
         query.where(query.Condition("value", "Yes"))
         query.execute(self.cursor)
@@ -136,7 +136,7 @@ class Request:
             if doc.spanish_response:
                 col5 += " (%s)" % doc.spanish_response
             rows.append((col1, col2, col3, col4, col5, col6, col7))
-        rows.sort(lambda a,b: cmp(a[0].lower(), b[0].lower()))
+        rows.sort(key=lambda row:row[0].lower())
         langs = { "en": "English", "es": "Spanish" }
         langs = " and ".join([langs[key] for key in self.option1])
         caption = "%s Permission Requests" % langs
@@ -175,7 +175,7 @@ class Request:
             for approval in doc.approved:
                 col1 = "%s (CDR%d)" % (approval.title, approval.doc_id)
                 rows.append((col1, col2, col3, col4, col5, col6, col7))
-        rows.sort(lambda a,b: cmp(a[0].lower(), b[0].lower()))
+        rows.sort(key=lambda row:row[0].lower())
         opts = { "caption": results.caption, "sheet_name": "Permissions" }
         table = Report.Table(columns, rows, **opts)
         return Report(table)
@@ -192,7 +192,7 @@ class Request:
         l_path = "/Summary/SummaryMetaData/SummaryLanguage"
         b_path = "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"
         t_path = "/Summary/TranslationOf/@cdr:ref"
-        query = cdrdb.Query("query_term m", "m.doc_id").unique()
+        query = db.Query("query_term m", "m.doc_id").unique()
         query.where(query.Condition("m.path", m_path))
         query.join("query_term l", "l.doc_id = m.int_val")
         query.where(query.Condition("l.path", l_path))
@@ -227,7 +227,7 @@ class Request:
             "summary": "Summaries",
             "glossary": "Glossary Terms"
         }[doctype]
-        query = cdrdb.Query("query_term", "doc_id").unique()
+        query = db.Query("query_term", "doc_id").unique()
         pattern = "/Media/PermissionInformation/ApprovedUse/%s/@cdr:ref"
         doctypes = ("summary", "glossary")
         if doctype in doctypes:
@@ -247,15 +247,15 @@ class Request:
             cdrcgi.bail("Invalid document ID %s" % repr(docid))
         paths = ["/Media/PermissionInformation/ApprovedUse/Glossary/@cdr:ref",
                  "/Media/PermissionInformation/ApprovedUse/Summary/@cdr:ref"]
-        query = cdrdb.Query("query_term", "doc_id").unique()
+        query = db.Query("query_term", "doc_id").unique()
         query.where(query.Condition("path", paths, "IN"))
         query.where(query.Condition("int_val", doc_id))
         query.execute(self.cursor)
         return Results([row[0] for row in self.cursor.fetchall()],
                        "Media Approved For Use With CDR%s" % doc_id)
     def get_board_name(self, doc_id):
-        query = cdrdb.Query("document", "title")
-        query.where(cdrdb.Query.Condition("id", doc_id))
+        query = db.Query("document", "title")
+        query.where(db.Query.Condition("id", doc_id))
         return extract_board_name(query.execute(self.cursor).fetchall()[0][0])
     class DateRange:
         def __init__(self, start, end):
@@ -271,13 +271,13 @@ class Request:
 
 class Form(cdrcgi.Page):
     def __init__(self):
-        self.cursor = cdrdb.connect("CdrGuest").cursor()
+        self.cursor = db.connect(user="CdrGuest").cursor()
         self._fields = cgi.FieldStorage()
         self._session = self._fields.getvalue("Session")
         settings = {
             "subtitle": "Media Permissions Report",
             "action": "ocecdr-3704.py",
-            "buttons": (u"Submit", u"Report Menu", cdrcgi.MAINMENU),
+            "buttons": ("Submit", "Report Menu", cdrcgi.MAINMENU),
             "session": self._session
         }
         cdrcgi.Page.__init__(self, "CDR Administration", **settings)
@@ -385,11 +385,11 @@ function clear_option_2() {
         self.add(self.B.LEGEND("Select PDQ Summaries"))
         for language in ("English", "Spanish"):
             self.add_radio("summary", language, language, wrapper=None)
-        C = cdrdb.Query.Condition
+        C = db.Query.Condition
         self.add('<fieldset id="english_block" class="hidden">')
         self.add(self.B.LEGEND("English Summary Board(s)"))
         self.add_checkbox("english", "All English", "all")
-        query = cdrdb.Query("active_doc d", "d.id", "d.title").unique()
+        query = db.Query("active_doc d", "d.id", "d.title").unique()
         query.join("query_term b", "b.int_val = d.id")
         query.join("query_term l", "b.doc_id = l.doc_id")
         query.where(C("b.path",
@@ -407,7 +407,7 @@ function clear_option_2() {
         self.add('<fieldset id="spanish_block" class="hidden">')
         self.add(self.B.LEGEND("Spanish Summary Board(s)"))
         self.add_checkbox("spanish", "All Spanish", "all")
-        query = cdrdb.Query("active_doc d", "d.id", "d.title").unique()
+        query = db.Query("active_doc d", "d.id", "d.title").unique()
         query.join("query_term b", "b.int_val = d.id")
         query.join("query_term t", "t.int_val = b.doc_id")
         query.where(C("b.path",
@@ -469,7 +469,7 @@ class Table(Report.Table):
 
 class Media:
     def __init__(self, doc_id, cursor):
-        query = cdrdb.Query("document", "title", "xml")
+        query = db.Query("document", "title", "xml")
         query.where(query.Condition("id", doc_id))
         rows = query.execute(cursor).fetchall()
         if not rows:
@@ -518,7 +518,7 @@ class Media:
 
 class Approval:
     def __init__(self, doc_id, cursor):
-        query = cdrdb.Query("document", "title")
+        query = db.Query("document", "title")
         query.where(query.Condition("id", doc_id))
         self.doc_id = doc_id
         self.title = query.execute(cursor).fetchall()[0][0].split(";")[0]

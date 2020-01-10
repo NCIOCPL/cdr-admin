@@ -1,79 +1,60 @@
-#----------------------------------------------------------------------
-# Make a blocked document active.
-# Modified July 2015 as part of security sweep.
-#----------------------------------------------------------------------
-import cdr
-import cdrcgi
-import cgi
-import re
+#!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields   = cgi.FieldStorage()
-session  = cdrcgi.getSession(fields)
-request  = cdrcgi.getRequest(fields)
-doc_id   = fields.getvalue(cdrcgi.DOCID) or ""
-title    = "CDR Administration"
-section  = "Unblock CDR Document"
-buttons  = ["Unblock", cdrcgi.MAINMENU, "Log Out"]
-script   = "UnblockDoc.py"
-message  = error = None
+"""Make a blocked document active.
+"""
 
-#----------------------------------------------------------------------
-# Scrub the document ID.
-#----------------------------------------------------------------------
-matches = re.findall(r"\d+", doc_id)
-doc_id = matches and matches[0] or ""
+from cdrcgi import Controller
+from cdrapi.docs import Doc
 
-#----------------------------------------------------------------------
-# Make sure we're logged in.
-#----------------------------------------------------------------------
-if not session: cdrcgi.bail('Unknown or expired CDR session.')
 
-#----------------------------------------------------------------------
-# Handle request to log out.
-#----------------------------------------------------------------------
-if request == "Log Out":
-    cdrcgi.logout(session)
+class Control(Controller):
 
-#----------------------------------------------------------------------
-# Return to the main menu if requested.
-#----------------------------------------------------------------------
-if request == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
+    SUBTITLE = "Unblock CDR Document"
 
-#----------------------------------------------------------------------
-# Handle request to unblock the document.
-#----------------------------------------------------------------------
-if request == "Unblock":
-    if not doc_id:
-        error = "Missing required document ID."
-    else:
-        try:
-            oldStatus = cdr.getDocStatus('guest', doc_id)
-            if oldStatus == 'I':
+    def populate_form(self, page):
+        """Show the form and (if appropriate) processing results.
+
+        Pass:
+            page - HTMLPage where everything happens
+        """
+
+        # if we have a request, process it and display the outcome.
+        if self.doc:
+            if self.doc.active_status == Doc.BLOCKED:
                 try:
-                    cdr.unblockDoc(session, doc_id)
-                    message = "Successfully unblocked CDR%s" % doc_id
-                except Exception, e:
-                    error = e.message[0]
+                    self.doc.set_status(Doc.ACTIVE)
+                    message = f"Successfully unblocked {self.doc.cdr_id}"
+                    message = page.B.P(message, page.B.CLASS("info center"))
+                except Exception as e:
+                    message = page.B.P(str(e), page.B.CLASS("error center"))
             else:
-                error = "CDR%s was not blocked" % doc_id
-        except Exception, e:
-            error = e.message[0]
+                message = f"{self.doc.cdr_id} is not blocked"
+                message = page.B.P(message, page.B.CLASS("error center"))
+            fieldset = page.fieldset("Processing Results")
+            fieldset.append(message)
+            page.form.append(fieldset)
 
-#----------------------------------------------------------------------
-# Display the form for requesting that a document be unblocked.
-#----------------------------------------------------------------------
-page = cdrcgi.Page(title, subtitle=section, action=script, buttons=buttons,
-                   session=session)
-page.add("<fieldset>")
-page.add(page.B.LEGEND("Specify document to be unblocked"))
-if message:
-    page.add(page.B.P(message, page.B.CLASS("warning")))
-if error:
-    page.add(page.B.P(error, page.B.CLASS("error")))
-page.add_text_field(cdrcgi.DOCID, "Document ID")
-page.add("</fieldset>")
-page.send()
+        # In any case, put up the form requesting a document ID.
+        fieldset = page.fieldset("Document To Be Unblocked")
+        fieldset.append(page.text_field("id", label="Document ID"))
+        page.form.append(fieldset)
+
+    @property
+    def show_report(self):
+        """Circle back to the form."""
+        self.show_form()
+
+    @property
+    def doc(self):
+        """Document to be unblocked."""
+
+        if not hasattr(self, "_doc"):
+            self._doc = self.fields.getvalue("id")
+            if self._doc:
+                self._doc = Doc(self.session, id=self._doc)
+        return self._doc
+
+
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+    Control().run()

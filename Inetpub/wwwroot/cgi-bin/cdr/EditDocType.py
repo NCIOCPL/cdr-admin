@@ -1,320 +1,254 @@
-#----------------------------------------------------------------------
-# Interface for editing CDR document types.
-# OCECDR-4091 - support for modifying active flag
-#----------------------------------------------------------------------
-import lxml.etree as etree
-import cdr
-import cdrcgi
-import cdrdb
+#!/usr/bin/env python
 
-class Control(cdrcgi.Control):
-    """
-    Handles creating/editing CDR document types.
-    """
+"""Create a new CDR document type or modify an existing one.
+"""
 
+from cdrcgi import Controller, navigateTo, bail
+from cdrapi import db
+from cdrapi.docs import Doc, Doctype
+
+class Control(Controller):
+    """Top-level logic for editing interface."""
+
+    EDIT_DOCTYPES = "EditDocTypes.py"
     SUBMENU = "Document Type Menu"
-    CANCEL = SUBMENU
-    FLAGS = ("versioning", "active")
+    SAVE_CHANGES = "Save Changes"
+    SAVE_NEW = "Save New Document Type"
+    DELETE = "Delete Document Type"
+    ELEMENT = "{http://www.w3.org/2001/XMLSchema}element"
+    LOGNAME = "EditDocType"
 
-    def __init__(self):
-        """
-        Gather and validate the parameters for the request.
+    def delete(self):
+        """Delete the current document type and return to the parent menu."""
+        self.doctype.delete()
+        self.return_to_doctypes_menu(self.doctype.name)
+
+    def populate_form(self, page):
+        """Add the field sets and custom style rules to the page.
+
+        Pass:
+            page - HTMLPage object to be filled out
         """
 
-        cdrcgi.Control.__init__(self, "CDR Document Type Editor")
-        self.formats = self.load_formats()
-        self.schemas = self.load_schemas()
-        self.filters = self.load_filters()
-        self.doctype = self.get_doctype()
-        self.name = self.get_string("name", 32)
-        self.comment = self.get_string("comment", 255) or ""
-        self.format = self.get_int("format", self.formats.map)
-        self.schema = self.get_int("schema", self.schemas.map)
-        self.title_filter = self.get_int("filter", self.filters.map)
-        self.flags = self.get_list("flags", self.FLAGS)
-        self.message = None
+        # Add the text and picklist fields, disabling the date fields).
+        fieldset = page.fieldset("Document Type Settings")
+        if self.doctype.name:
+            opts = dict(value=self.doctype.name)
+            fieldset.append(page.hidden_field("doctype", **opts))
+            opts = dict(value=self.doctype.name, disabled=True, label="Name")
+            fieldset.append(page.text_field("name", **opts))
+            opts = dict(value=str(self.doctype.created)[:10], disabled=True)
+            fieldset.append(page.text_field("created", **opts))
+            opts["value"] = (str(self.doctype.schema_mod or ""))[:10]
+            fieldset.append(page.text_field("modified", **opts))
+        else:
+            fieldset.append(page.text_field("doctype", label="Name"))
+        opts = dict(options=self.formats, default=self.doctype.format)
+        fieldset.append(page.select("format", **opts))
+        opts = dict(options=self.schemas, default=self.doctype.schema)
+        fieldset.append(page.select("schema", **opts))
+        opts = dict(
+            options=self.title_filters,
+            default=self.doctype.title_filter,
+        )
+        fieldset.append(page.select("title_filter", **opts))
+        opts = dict(value=self.doctype.comment, rows=5)
+        fieldset.append(page.textarea("comment", **opts))
+        page.form.append(fieldset)
+
+        # Add a second field set for the checkbox options.
+        fieldset = page.fieldset("Options")
+        label = "Documents of this type can be versioned"
+        opts = dict(value="versioning", label=label)
+        if self.doctype.versioning == "Y":
+            opts["checked"] = True
+        fieldset.append(page.checkbox("options", **opts))
+        label = "Documents of this type can be versioned"
+        opts = dict(value="active", label="Document type is active")
+        if self.doctype.active == "Y":
+            opts["checked"] = True
+        fieldset.append(page.checkbox("options", **opts))
+        page.form.append(fieldset)
+
+        # The last "fieldset" is read-only information about valid values.
+        if self.doctype.name:
+            try:
+                if self.doctype.vv_lists:
+                    fieldset = page.fieldset("Valid Values")
+                    dl = page.B.DL()
+                    for name in sorted(self.doctype.vv_lists, key=str.lower):
+                        dl.append(page.B.DT(name))
+                        for value in self.doctype.vv_lists[name]:
+                            dl.append(page.B.DD(value))
+                    fieldset.append(dl)
+                    page.form.append(fieldset)
+            except:
+                self.logger.exception("Failure parsing vv lists")
+                fieldset = page.fieldset("Valid Values")
+                message = page.B.P("Valid value information is not parseable.")
+                message.set("class", "error")
+                fieldset.append(message)
+                page.form.append(fieldset)
+
+    def return_to_doctypes_menu(self, deleted=None):
+        """Go back to the menu listing all the CDR document types."""
+
+        opts = dict(deleted=deleted) if deleted else {}
+        navigateTo(self.EDIT_DOCTYPES, self.session.name, **opts)
 
     def run(self):
-        """
-        Override the base class method to support our extra button.
-        """
+        """Override base class so we can handle the extra buttons."""
 
-        if self.request == self.CANCEL:
-            cdrcgi.navigateTo("EditDocTypes.py", self.session)
-        cdrcgi.Control.run(self)
+        try:
+            if self.request == self.DELETE:
+                return self.delete()
+            elif self.request in (self.SAVE_CHANGES, self.SAVE_NEW):
+                return self.save()
+            elif self.request == self.SUBMENU:
+                return self.return_to_doctypes_menu()
+        except Exception as e:
+            bail(f"Failure: {e}")
+        Controller.run(self)
 
-    def show_report(self):
-        """
-        Override the base class method, because we're not really
-        showing a report, we're processing a form which stores
-        values in the database, and then re-displaying the form.
-        """
+    def save(self):
+        """Save the new or modified document type object."""
 
-        required = ["format"]
-        if not self.doctype:
-            required.append("name")
-        for name in required:
-            if not getattr(self, name):
-                cdrcgi.bail("document type must have a %s" % name)
-        doctype = self.doctype or cdr.dtinfo()
-        if not self.doctype:
-            doctype.type = self.name
-        doctype.format = self.formats.map[self.format]
-        doctype.schema = self.schemas.map.get(self.schema, "")
-        doctype.title_filter = self.filters.map.get(self.title_filter, "")
-        doctype.comment = self.comment
-        doctype.versioning = ("versioning" in self.flags) and "Y" or "N"
-        doctype.active = ("active" in self.flags) and "Y" or "N"
-        command = self.doctype and cdr.modDoctype or cdr.addDoctype
-        doctype = command(self.session, doctype)
-        if doctype.error:
-            errors = doctype.error
-            if isinstance(errors, basestring):
-                errors = [errors]
-            cdrcgi.bail(errors[0], extra=errors[1:])
-        self.doctype = self.get_doctype(doctype.type)
-        self.message = "Document type %s saved" % doctype.type
+        if not self.name:
+            bail("Required name is missing")
+        if self.doctype.name:
+            self.subtitle = f"Changes to {self.name} saved successfully"
+        else:
+            self.subtitle = f"New doctype {self.name} saved successfully"
+        opts = dict(
+            active=self.active,
+            comment=self.comment,
+            format=self.format,
+            name=self.name,
+            schema=self.schema,
+            title_filter=self.title_filter,
+            versioning=self.versioning,
+        )
+        self.doctype = Doctype(self.session, **opts)
+        self.doctype.save()
         self.show_form()
 
-    def populate_form(self, form):
-        """
-        Put up the editing form, followed by valid value lists for
-        the document type if we're not creating a new document type.
-        """
+    @property
+    def active(self):
+        """Boolean representing whether the doctype is active (Y or N)."""
+        if not hasattr(self, "_active"):
+            self._active = "N"
+            if "active" in self.fields.getlist("options"):
+                self._active = "Y"
+        return self._active
 
-        flags = list(self.FLAGS)
-        legend = "Create Document Type"
-        fmt = self.formats.lookup("xml")
-        schema = ""
-        schemas = self.schemas.values
-        comment = ""
-        filters = self.filters.values
-        title_filter = ""
-        if self.doctype:
-            legend = u"Edit %s Document Type" % self.doctype.type
-            created = str(self.doctype.created)[:10]
-            modified = str(self.doctype.schema_mod)[:10]
-            fmt = self.formats.lookup(self.doctype.format)
-            if self.doctype.schema:
-                schema = self.schemas.lookup(self.doctype.schema)
-            if self.doctype.title_filter:
-                title_filter = self.filters.lookup(self.doctype.title_filter)
-            comment = self.doctype.comment
-            for flag in self.FLAGS:
-                if getattr(self.doctype, flag) != "Y":
-                    flags.remove(flag)
-        form.add("<fieldset>")
-        form.add(form.B.LEGEND(legend))
-        if self.doctype:
-            form.add_text_field("created", "Created", value=created,
-                                disabled=True)
-            form.add_text_field("modified", "Modified", value=modified,
-                                disabled=True)
-            form.add_hidden_field("doctype", self.doctype.type)
-        else:
-            form.add_text_field("name", "Name")
-        form.add_select("format", "Format", self.formats.values, fmt)
-        form.add_select("schema", "Schema", schemas, schema)
-        form.add_select("filter", "Title Filter", filters, title_filter)
-        form.add_textarea_field("comment", "Comment", value=comment)
-        form.add("</fieldset>")
-        form.add("<fieldset>")
-        form.add(form.B.LEGEND("Document Type Flags"))
-        for flag in self.FLAGS:
-            label = flag.capitalize()
-            checked = flag in flags
-            form.add_checkbox("flags", label, flag, checked=checked)
-        form.add("</fieldset>")
-        if self.doctype and self.doctype.vvLists:
-            form.add("<fieldset>")
-            form.add(form.B.LEGEND("Valid Values"))
-            for vv in self.doctype.vvLists:
-                form.add("<dl>")
-                form.add(form.B.DT(form.B.B(vv[0])))
-                for value in vv[1]:
-                    form.add(form.B.DD(value))
-                form.add("</dl>")
-            form.add("</fieldset>")
+    @property
+    def doctype(self):
+        """Object for the CDR document type being edited/created."""
 
-    def set_form_options(self, opts):
-        """
-        Override the base class method so we can set our own buttons.
-        """
+        if not hasattr(self, "_doctype"):
+            self._doctype = Doctype(self.session, name=self.name)
+        return self._doctype
 
-        buttons = (self.SUBMIT, self.CANCEL, self.ADMINMENU, self.LOG_OUT)
-        opts["buttons"] = buttons
-        if self.message:
-            opts["subtitle"] = self.message
-        return opts
+    @doctype.setter
+    def doctype(self, value):
+        """Allow replacement after a save."""
+        self._doctype = value
 
-    def get_list(self, name, values):
-        """
-        Fetch a list of values for a given parameter name. Validate the list.
-        """
+    @property
+    def buttons(self):
+        """Add our custom navigation buttons."""
 
-        field_values = self.fields.getlist(name)
-        if set(field_values) - set(values):
-            cdrcgi.bail()
-        return field_values
+        if not hasattr(self, "_buttons"):
+            self._buttons = [self.SUBMENU, self.ADMINMENU, self.LOG_OUT]
+            if self.doctype.id:
+                self._buttons.insert(0, self.DELETE)
+                self._buttons.insert(0, self.SAVE_CHANGES)
+            else:
+                self._buttons.insert(0, self.SAVE_NEW)
+        return self._buttons
 
-    def get_doctype(self, name=None):
-        """
-        Load a cdr.dtinfo object if we have a document name.
-        """
+    @property
+    def comment(self):
+        """Get the comment value from the form field."""
+        return self.fields.getvalue("comment")
 
-        name = name or self.fields.getvalue("doctype")
-        if not name:
-            return None
-        doctype = cdr.getDoctype(self.session, name)
-        if not doctype.type:
-            cdrcgi.bail()
-            cdrcgi.bail("failure loading %s" % repr(name))
-            cdrcgi.bail(doctype.error[0], extra=doctype.error[1:])
-        else:
-            return doctype
+    @property
+    def format(self):
+        """Value from the form's format field."""
+        return self.fields.getvalue("format")
 
-    def load_formats(self):
-        """
-        Load the valid values for document type formats.
+    @property
+    def formats(self):
+        """CDR document formats (e.g., xml)."""
 
-        Consider eliminating this field, as we no longer really support
-        formats other than 'xml' in the CDR.
-        """
+        if not hasattr(self, "_formats"):
+            self._formats = Doctype.list_formats(self.session)
+        return self._formats
 
-        query = cdrdb.Query("format", "id", "name").order("name")
-        return self.load_values(query.execute(self.cursor).fetchall(), "xml")
+    @property
+    def name(self):
+        """Current value of the form's name field."""
+        return self.fields.getvalue("doctype")
 
-    def load_schemas(self):
-        """
-        Create a set of schema documents which can be used for controlling
-        validation of documents of a given type.
-        """
+    @property
+    def schema(self):
+        """Selected value from the schema picklist."""
+        return self.fields.getvalue("schema")
 
-        query = cdrdb.Query("document d", "d.id", "d.title")
-        query.join("doc_type t", "t.id = d.doc_type")
-        query.where("t.name = 'schema'")
-        rows = query.order("d.title").execute(self.cursor).fetchall()
-        rows = [(row[0], row[1]) for row in rows if self.top_schema(row[0])]
-        return self.load_values(rows)
+    @property
+    def schemas(self):
+        """Top-level CDR schemas."""
 
-    def load_filters(self):
-        """
-        Create a set of filter documents which can be used for extracting
-        the title of documents of a given type.
-        """
+        if not hasattr(self, "_schemas"):
+            query = db.Query("document d", "d.id").order("d.title")
+            query.join("doc_type t", "t.id = d.doc_type")
+            query.where("t.name = 'schema'")
+            self._schemas = []
+            for row in query.execute(self.cursor).fetchall():
+                doc = Doc(self.session, id=row.id)
+                if doc.root.find(self.ELEMENT) is not None:
+                    self._schemas.append(doc.title)
+        return self._schemas
 
-        query = cdrdb.Query("document d", "d.id", "d.title")
-        query.join("doc_type t", "t.id = d.doc_type")
-        query.where("t.name = 'Filter'")
-        rows = query.order("d.title").execute(self.cursor).fetchall()
-        rows = [tuple(row) for row in rows if row[1].startswith("DocTitle ")]
-        return self.load_values(rows)
+    @property
+    def subtitle(self):
+        """Dynamic string for display under the main banner."""
 
-    def top_schema(self, doc_id):
-        """
-        We need to weed out schema documents which do not have a top-level
-        'element' element, as those are not appropriate for controlling
-        validation for a document type (they are instead included in other
-        schema documents which are appropriate).
-        """
+        if not hasattr(self, "_subtitle"):
+            if self.doctype.name:
+                self._subtitle = f"Editing {self.doctype.name} Document Type"
+            else:
+                self._subtitle = "Adding New Document Type"
+        return self._subtitle
 
-        query = cdrdb.Query("document", "xml")
-        query.where(query.Condition("id", doc_id))
-        row = query.execute(self.cursor).fetchone()
-        if row and row[0]:
-            try:
-                root = etree.fromstring(row[0].encode("utf-8"))
-                if root.findall("{http://www.w3.org/2001/XMLSchema}element"):
-                    return True
-            except:
-                pass
-        return False
+    @subtitle.setter
+    def subtitle(self, value):
+        """Provide status information after a save."""
+        self._subtitle = value
 
-    def load_values(self, values, default=None):
-        """
-        Load an object representing valid values.
-        """
+    @property
+    def title_filter(self):
+        """Value from the title filter picklist."""
+        return self.fields.getvalue("title_filter")
 
-        class Values:
-            """
-            Set of valid values, each having a key and a display value
+    @property
+    def title_filters(self):
+        """Filters used to generate titles for documents of given types."""
 
-            Properties:
+        if not hasattr(self, "_title_filters"):
+            self._title_filters = Doctype.list_title_filters(self.session)
+        return self._title_filters
 
-                map - dictionary mapping integer key to display string
-                normalized - maps lowercase display string to integer key
-                values - ordered sequence of key, display tuples
-                default - optional key for default value
-            """
+    @property
+    def versioning(self):
+        """Boolean representing whether versioning is supported (Y or N)."""
+        if not hasattr(self, "_versioning"):
+            self._versioning = "N"
+            if "versioning" in self.fields.getlist("options"):
+                self._versioning = "Y"
+        return self._versioning
 
-            def __init__(self, values, default=None):
-                """
-                Create maps and ordered sequence of valid values.
 
-                Pass:
-                    values - sequence of ordered key, value tuples
-                             from a database query
-                    default - optional display string for the default value
-                """
-
-                self.map = {}
-                self.normalized = {}
-                self.values = []
-                self.default = None
-                for key, value in values:
-                    normalized = value.strip().lower()
-                    self.map[key] = value
-                    self.normalized[normalized] = key
-                    self.values.append((key, value))
-                    if default and default == normalized:
-                        self.default = key
-
-            def lookup(self, value):
-                """
-                Find the key for the value's display string.
-                It's a fatal error if the value is not found.
-                """
-
-                key = self.normalized.get(value.lower())
-                if not key:
-                    cdrcgi.bail()
-                    cdrcgi.bail("%s not found; map=%s" % (value, self.map))
-                return key
-
-        return Values(values, default)
-
-    def get_int(self, name, values):
-        """
-        Load and validate an integer (foreign key) parameter.
-        """
-
-        value = self.fields.getvalue(name)
-        if value:
-            try:
-                value = int(value)
-                if value not in values:
-                    raise Exception()
-            except:
-                cdrcgi.bail(cdrcgi.TAMPERING)
-        return value
-
-    def get_string(self, name, max_len):
-        """
-        Load and validate a string parameter.
-        """
-
-        value = self.fields.getvalue(name)
-        if value:
-            try:
-                unicode(value, "ascii")
-            except:
-                cdrcgi.bail("%s must contain only ASCII" % repr(name))
-            if len(value) > max_len:
-                cdrcgi.bail("%s has length limit of %d" % (repr(name), max_len))
-            if name == "name":
-                try:
-                    etree.Element(name)
-                except:
-                    cdrcgi.bail("%s is an invalid Element name" % repr(name))
-        return value
-Control().run()
+if __name__ == "__main__":
+    """Don't execute the script if we've been loaded as a module."""
+    Control().run()

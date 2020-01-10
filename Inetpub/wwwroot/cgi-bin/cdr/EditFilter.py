@@ -1,258 +1,204 @@
-#----------------------------------------------------------------------
-# Original interface for editing CDR filter documents.  Now used for
-# viewing and comparing filters only.
-#
-# BZIssue::2561
-# BZIssue::3716
-# Rewritten July 2015 as part of a security sweep.
-#----------------------------------------------------------------------
-import cdr
-import cdrcgi
-import cdrdb
-import cgi
-import difflib
-import requests
-import lxml.etree as etree
-from cdrapi.settings import Tier
+#!/usr/bin/env python
 
-class Control(cdrcgi.Control):
-    """
-    Logic for displaying a CDR filter document or comparing it
-    with the corresponding copy on another tier's CDR server.
-    """
+"""View filter code or compare with another tier.
+"""
+
+from cdrapi.docs import Doc
+from cdrcgi import Controller, navigateTo, DOCID
+from difflib import Differ
+from lxml import etree
+from requests import post
+
+
+class Control(Controller):
+    """Access to the database and form-building tools."""
 
     LOGNAME = "filters"
-    TIERS = ("PROD", "STAGE", "QA", "DEV")
-    TIER = Tier().name
+    TIERS = "PROD", "STAGE", "QA", "DEV"
     VIEW = "View"
     COMPARE = "Compare"
     FILTERS = "Filters"
-    REQUESTS = (VIEW, COMPARE, FILTERS, cdrcgi.Control.ADMINMENU,
-                cdrcgi.Control.LOG_OUT)
+    NORMALIZE_TOOLTIP = (
+        "Not usually recommended, unless the formatting",
+        "of one of the documents has been seriously mangled.",
+    )
+    CSS = (
+        "pre {"
+        "    border: solid #936 2px; font-size: 12px; padding: 12px; ",
+        "    width: 700px; margin: 25px auto; ",
+        "}",
+        "fieldset { width: 700px; }",
+        ".del { background-color: #fafad2; } /* light goldenrod yellow */",
+        ".add { background-color: #f0e68c; } /* khaki */",
+        ".pnt { background-color: #87cefa; } /* light sky blue */",
+        "@media print {",
+        "    h1, fieldset { display: none; }",
+        "    h2 { font-size: 2em; }",
+        "    pre { border: none; }",
+    )
+    CLASSES = {"-": "del", "+": "add", "?": "pnt"}
 
-    def __init__(self):
-        "Collect and validate the CGI parameters for this request."
-        cdrcgi.Control.__init__(self)
-        self.base = None
-        self.full = self.fields.getvalue("full") == "full"
-        self.normalize = self.fields.getvalue("normalize") == "normalize"
-        self.filter = Filter(self)
-        self.other_tier = self.fields.getvalue("tier")
-        if self.other_tier:
-            if self.other_tier not in self.TIERS:
-                cdrcgi.bail()
-            elif self.other_tier == self.TIER:
-                cdrcgi.bail()
-            host = "cdr"
-            if self.other_tier != "PROD":
-                host += "-%s" % self.other_tier.lower()
-            self.base = "https://%s.cancer.gov/cgi-bin/cdr" % host
-        if self.request not in self.REQUESTS:
-            cdrcgi.bail()
-        elif self.request == self.FILTERS:
-            cdrcgi.navigateTo("EditFilters.py", self.session)
+    def run(self):
+        """Override the base class version, as this isn't a standard report."""
 
-    def show_form(self):
-        """
-        We override the base class's version of this method so we
-        can fork for the version of the form which shows the document
-        and the one which compares it with a version on another tier's
-        server.
-        """
-        if self.request == self.COMPARE:
-            self.compare()
-        self.show()
-
-    def show(self):
-        "Show the XML for the filter on our own tier."
-        banner = "View CDR Filter"
-        page = self.create_page(banner, self.REQUESTS[1:])
-        pre = page.B.PRE(self.filter.xml.strip().replace("\n", cdrcgi.NEWLINE))
-        page.add(pre)
-        page.send()
-
-    def compare(self):
-        """
-        Show the differences between our version of the filter and
-        the copy on another tier's CDR server.
-        """
-        banner = "Compare Filter With Another Tier"
-        page = self.create_page(banner, self.REQUESTS)
-        if not self.other_tier:
-            cdrcgi.bail()
-        try:
-            f1 = self.fix(self.filter.xml.encode("utf-8"))
-            f2 = self.fix(self.get_filter())
-            if self.other_tier_lower():
-                filters = (f1, f2)
-                tiers = (self.TIER, self.other_tier)
-            else:
-                filters = (f2, f1)
-                tiers = (self.other_tier, self.TIER)
-            differ = difflib.Differ()
-            #changes = False
-            pattern = (u'<span class="%%s">%%s %s on CDR %%s server</span>\n' %
-                       cgi.escape(self.filter.title))
-            lines = [
-                pattern % ("deleted", "-", tiers[0]),
-                pattern % ("added", "+", tiers[1]),
-                "\n"
-            ]
-            for line in differ.compare(*filters):
-                line = cgi.escape(line)
-                if not line.startswith(" "):
-                    changes = True
-                if line.startswith("-"):
-                    lines.append(self.wrap_line(line, "deleted"))
-                elif line.startswith("+"):
-                    lines.append(self.wrap_line(line, "added"))
-                elif line.startswith("?"):
-                    lines.append(self.wrap_line(line, "pointer"))
-                elif self.full:
-                    lines.append(line)
-            lines = "".join(lines).replace("\n", cdrcgi.NEWLINE)
-            page.add("<pre>%s</pre>" % lines)
-        except:
-            self.logger.exception("filter comparison failure")
-            page.add('<p class="error">Filter &ldquo;%s&rdquo; '
-                     'not found on CDR %s server</p>' %
-                     (cgi.escape(self.filter.title), self.other_tier))
-        page.add_css("""\
-body     { background-color: #fafafa; }
-.deleted { background-color: #FAFAD2; } /* Light goldenrod yellow */
-.added   { background-color: #F0E68C; } /* Khaki */
-.pointer { background-color: #87CEFA; } /* Light sky blue */}""")
-        page.send()
-
-    def create_page(self, banner, buttons):
-        "Common logic to build the page for viewing and for comparing."
-        opts = {
-            "buttons": buttons,
-            "session": self.session,
-            "action": self.script,
-            "banner": banner,
-            "subtitle": u"%s (%s)" % (self.filter.title, self.filter.cdr_id)
-        }
-        page = cdrcgi.Page(self.PAGE_TITLE, **opts)
-        page.add_hidden_field(cdrcgi.DOCID, str(self.filter.doc_id))
-        page.add("<fieldset>")
-        page.add(page.B.LEGEND("Select Stage For Filter Comparison"))
-        default = self.other_tier or (cdr.isProdHost() and "DEV" or "PROD")
-        for tier in self.TIERS:
-            if tier != self.TIER:
-                checked = tier == default
-                page.add_radio("tier", tier, tier, checked=checked)
-        page.add("</fieldset>")
-        page.add("<fieldset>")
-        page.add(page.B.LEGEND("Comparison Options"))
-        page.add_checkbox("full", "Show all lines?", "full", checked=self.full,
-                          tooltip="Leave unchecked to see just the changes.")
-        page.add_checkbox("normalize", "Parse documents to normalize them?",
-                          "normalize", checked=self.normalize,
-                          tooltip="Not usually recommended, unless the "
-                          "formatting%sof one of the documents has been "
-                          "seriously mangled." % cdrcgi.NEWLINE)
-        page.add("</fieldset>")
-        page.add_css("""\
-pre {
-    border: solid grey 2px; font-size: 12px; padding: 5px; margin-top: 25px;
-}
-@media print {
-    h1, fieldset { display: none; }
-    h2 { font-size: 2em; }
-    pre { border: none; }
-}""")
-        return page
-
-    def get_filter(self):
-        """
-        Get the other tier's server to give us the XML for its version
-        of our filter. Fastest way is the get-filter.py script, but
-        we have a fallback on screen scraping some HTML to find out
-        which document ID belongs to our filter on that server if
-        the more efficient script isn't available.
-        """
-        try:
-            url = "%s/get-filter.py" % self.base
-            data = { "title": self.filter.title }
-            response = requests.post(url, data=data, timeout=5)
-            if response.ok:
-                return response.content
-        except:
-            pass
-        filters = self.get_filters()
-        doc_id = filters.get(self.filter.title.lower())
-        if not doc_id:
-            raise Exception("%r not found" % self.filter.title)
-        url = "%s/ShowDocXml.py?DocId=%d" % (self.base, doc_id)
-        response = requests.get(url, timeout=15)
-        if response.ok:
-            return response.content
-        raise Exception(response.reason)
-
-    def get_filters(self):
-        """
-        Get the other server to give us the list of all of its CDR
-        filters. We only need this if the server doesn't have the
-        get-filter.py script installed and working.
-        """
-        url = "%s/EditFilters.py?Session=guest" % self.base
-        response = requests.get(url, timeout=10)
-        root = cdrcgi.lxml.html.fromstring(response.content)
-        table = [t for t in root.iter("table")][1]
-        filters = {}
-        for node in table.findall("tr"):
-            cells = node.findall("td")
-            if len(cells) != 2:
-                continue
-            try:
-                cdr_id = "".join(cells[0].itertext()).strip()
-            except:
-                continue
-            title = cells[1].text
-            if cdr_id is not None and cdr_id.startswith("CDR"):
-                filter_id = cdr.exNormalize(cdr_id)[1]
-                filters[title.lower()] = filter_id
-        return filters
-
-    def other_tier_lower(self):
-        """
-        Find out if the tier with which our copy of the filter is being
-        compared is "lower" than ours, where "lower" means "further from
-        production." If it is we'll make our copy the "before" copy and
-        the other one the "after" version. Otherwise, we'll switch them.
-        """
-        return self.TIERS.index(self.other_tier) > self.TIERS.index(self.TIER)
-
-    def fix(self, me):
-        "Prepare the XML for a filter document for comparison"
-        if self.normalize:
-            xml = etree.tostring(etree.XML(me), pretty_print=True)
+        if not self.doc or self.request == self.FILTERS:
+            navigateTo("EditFilters.py", self.session.name)
+        elif not self.request or self.request in (self.VIEW, self.COMPARE):
+            self.show_form()
         else:
-            xml = me
-        return xml.replace("\r", "").strip().splitlines(1)
+            Controller.run(self)
 
-    @staticmethod
-    def wrap_line(line, line_class):
-        "Add coloring to diff lines so user can tell where they came from"
-        return '<span class="%s">%s</span>' % (line_class, line)
+    def populate_form(self, page):
+        """Show the form and the filter (possibly compared with another tier).
 
-class Filter:
-    "Collect document ID, title, and XML for the filter being viewed/compared"
-    def __init__(self, control):
-        try:
-            doc_ids = cdr.exNormalize(control.fields.getvalue(cdrcgi.DOCID))
-            self.cdr_id, self.doc_id, self.id_frag = doc_ids
-        except:
-            cdrcgi.bail()
-        query = cdrdb.Query("document d", "d.title", "d.xml")
-        query.join("doc_type t", "t.id = d.doc_type")
-        query.where("t.name = 'Filter'")
-        query.where(query.Condition("d.id", self.doc_id))
-        rows = query.execute(control.cursor).fetchall()
-        if not rows:
-            cdrcgi.bail()
-        self.title, self.xml = rows[0]
+        Pass:
+            page - HTMLPage object on which the form and filter are placed
+        """
+
+        page.form.append(page.hidden_field(DOCID, self.doc.id))
+        fieldset = page.fieldset("Select Stage For Filter Comparison")
+        for tier in self.TIERS:
+            if tier != self.session.tier.name:
+                checked = tier == self.default_tier
+                opts = dict(value=tier, label=tier, checked=checked)
+                fieldset.append(page.radio_button("tier", **opts))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Comparison Options")
+        opts = dict(label="Show all lines?", value="full", checked=self.full)
+        opts["tooltip"] = "Leave unchecked to see just the changes."
+        fieldset.append(page.checkbox("options", **opts))
+        label = "Parse documents to normalize them?"
+        opts = dict(label=label, value="normalize", checked=self.normalize)
+        opts["tooltip"] = "\n".join(self.NORMALIZE_TOOLTIP)
+        fieldset.append(page.checkbox("options", **opts))
+        page.form.append(fieldset)
+        if self.diff is not None:
+            page.form.append(self.diff)
+        else:
+            page.form.append(page.B.PRE(self.doc.xml.strip()))
+        page.add_css("\n".join(self.CSS))
+
+    @property
+    def buttons(self):
+        """Customize the command buttons."""
+
+        buttons = [
+            self.COMPARE,
+            self.FILTERS,
+            self.DEVMENU,
+            self.ADMINMENU,
+            self.LOG_OUT,
+        ]
+        if self.request and self.request != self.VIEW:
+            buttons.insert(0, self.VIEW)
+        return buttons
+
+    @property
+    def default_tier(self):
+        """Natural tier against which to compare our filter."""
+        return "DEV" if self.session.tier.name == "PROD" else "PROD"
+
+    @property
+    def diff(self):
+        """String for differences between two tiers, if requested."""
+
+        if self.request != self.COMPARE:
+            return None
+        if not hasattr(self, "_diff"):
+            host = "cdr.cancer.gov"
+            if self.tier != "PROD":
+                host = f"cdr-{self.tier.lower()}.cancer.gov"
+            url = f"https://{host}/cgi-bin/cdr/get-filter.py"
+            self.logger.info("url=%s", url)
+            parms = dict(title=self.doc.title)
+            response = post(url, data=parms, timeout=5)
+            if not response.ok:
+                self.bail(f"{self.doc.title} not found on {host}")
+            if self.normalize:
+                root = etree.fromstring(response.content)
+                other = etree.tostring(root, encoding="unicode")
+                mine = etree.tostring(self.doc.root, encoding="unicode")
+            else:
+                other = response.text
+                mine = self.doc.xml
+            filters = [other, mine]
+            tiers = [self.tier, self.session.tier.name]
+            if self.higher:
+                filters.reverse()
+                tiers.reverse()
+            for i in range(len(filters)):
+                filters[i] = filters[i].strip().replace("\r", "").splitlines()
+            differ = Differ()
+            B = self.HTMLPage.B
+            title = self.doc.title
+            pre = B.PRE(
+                B.SPAN(f"- {title} on {tiers[0]}\n", B.CLASS("del")),
+                B.SPAN(f"+ {title} on {tiers[1]}\n", B.CLASS("add")),
+                "\n"
+            )
+            self.logger.info("comparing %s with %s", *tiers)
+            for line in differ.compare(*filters):
+                cls = ""
+                if line[0] != "?":
+                    line += "\n"
+                if line[0] in self.CLASSES:
+                    pre.append(B.SPAN(line, B.CLASS(self.CLASSES[line[0]])))
+                elif self.full:
+                    pre.append(B.SPAN(line))
+            self._diff = pre
+        return self._diff
+
+    @property
+    def doc(self):
+        """`Doc` object for filter to display or compare."""
+
+        if not hasattr(self, "_doc"):
+            id = self.fields.getvalue(DOCID)
+            if not id:
+                self.bail()
+            self._doc = Doc(self.session, id=id)
+        return self._doc
+
+    @property
+    def full(self):
+        """True if we should show all the lines in the diff output."""
+        return True if "full" in self.options else False
+
+    @property
+    def higher(self):
+        """True if this tier is higher than the one we're comparing with."""
+
+        tier = self.session.tier.name
+        return self.TIERS.index(tier) < self.TIERS.index(self.tier)
+
+    @property
+    def method(self):
+        """Override HTTP method."""
+        return "get"
+
+    @property
+    def normalize(self):
+        """True if we should parse the documents before comparing them."""
+        return True if "normalize" in self.options else False
+
+    @property
+    def options(self):
+        """Comparison options for the diff report."""
+
+        if not hasattr(self, "_options"):
+            self._options = self.fields.getlist("options")
+        return self._options
+
+    @property
+    def subtitle(self):
+        """String to be displayed directly under the main banner."""
+        return f"{self.doc.title} ({self.doc.cdr_id})"
+
+    @property
+    def tier(self):
+        """Tier with which we compare the filter."""
+        return self.fields.getvalue("tier") or self.default_tier
+
 
 if __name__ == "__main__":
     "Allow documentation and lint to import this without side effects"

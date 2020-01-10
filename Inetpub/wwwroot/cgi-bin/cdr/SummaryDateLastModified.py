@@ -14,10 +14,11 @@
 #----------------------------------------------------------------------
 import cgi
 import cdr
-import cdrdb
 import cdrcgi
 import datetime
 import sys
+from cdrapi import db
+from html import escape as html_escape
 
 #----------------------------------------------------------------------
 # Set the form variables.
@@ -95,10 +96,10 @@ if request == "Log Out":
 # Connect to the CDR database.
 #----------------------------------------------------------------------
 try:
-    conn   = cdrdb.connect('CdrGuest')
+    conn   = db.connect(user='CdrGuest', timeout=600)
     cursor = conn.cursor()
-except cdrdb.Error, info:
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
+except Exception as e:
+    cdrcgi.bail('Database connection failure: %s' % e)
 
 #----------------------------------------------------------------------
 # Validate parameters
@@ -134,18 +135,18 @@ SELECT DISTINCT value
         for row in cursor.fetchall():
             value = row[0].strip()
             if value:
-                html.append(u"""\
+                html.append("""\
     &nbsp;
     <input name='Audience' type='radio' value='%s' class='choice'/> %s <br />
 """ % (value, value))
     except Exception as e:
         cdrcgi.bail("Failure retrieving audience choices: %s" % e)
-    html.append(u"""\
+    html.append("""\
     &nbsp;
     <input name='Audience' type='radio' checked='1' value='all'
            class='choice' /> All <br />
 """)
-    return u"".join(html)
+    return "".join(html)
 
 #----------------------------------------------------------------------
 # Generate picklist for Summary type.
@@ -163,7 +164,7 @@ def getSummaryTypeOptions(cursor):
                JOIN active_doc a
                  ON a.id = board.id
               WHERE org_type.path = '/Organization/OrganizationType'
-                AND org_type.value = 'PDQ Editorial Board'""", timeout = 600)
+                AND org_type.value = 'PDQ Editorial Board'""")
     cursor.execute("""\
         INSERT INTO #english
     SELECT DISTINCT s.doc_id AS summary, s.int_val as board
@@ -176,7 +177,7 @@ def getSummaryTypeOptions(cursor):
                            + '/Board/@cdr:ref'
                 AND l.path = '/Summary/SummaryMetaData'
                            + '/SummaryLanguage'
-                AND l.value = 'English'""", timeout = 600)
+                AND l.value = 'English'""")
     cursor.execute("""\
         INSERT INTO #spanish
     SELECT DISTINCT s.doc_id summary, s.int_val as english
@@ -188,14 +189,14 @@ def getSummaryTypeOptions(cursor):
               WHERE s.path = '/Summary/TranslationOf/@cdr:ref'
                 AND l.path = '/Summary/SummaryMetaData'
                            + '/SummaryLanguage'
-                AND l.value = 'Spanish'""", timeout = 600)
+                AND l.value = 'Spanish'""")
     cursor.execute("""\
         SELECT DISTINCT b.doc_id, b.title
                    FROM #board b
                    JOIN #english e
-                     ON e.board = b.doc_id""", timeout = 600)
+                     ON e.board = b.doc_id""")
     rows = cursor.fetchall()
-    html = [u"""\
+    html = ["""\
     <fieldset>
      <legend>English</legend>
      &nbsp;
@@ -211,11 +212,11 @@ def getSummaryTypeOptions(cursor):
         edBoard = docTitle.find(' Editorial Board;')
         if edBoard != -1:
             docTitle = docTitle[:edBoard]
-        html.append(u"""\
+        html.append("""\
      &nbsp;
      <input name='est' type='checkbox' value='%d' class='choice'
             onclick='javascript:someEnglish()' id='E%d' /> %s <br />
-""" % (docId, i, cgi.escape(docTitle)))
+""" % (docId, i, html_escape(docTitle)))
         i += 1
     cursor.execute("""\
         SELECT DISTINCT b.doc_id, b.title
@@ -223,9 +224,9 @@ def getSummaryTypeOptions(cursor):
                    JOIN #english e
                      ON s.english = e.summary
                    JOIN #board b
-                     ON e.board = b.doc_id""", timeout = 600)
+                     ON e.board = b.doc_id""")
     rows = cursor.fetchall()
-    html.append(u"""\
+    html.append("""\
     </fieldset>
     <fieldset>
      <legend>Spanish</legend>
@@ -241,16 +242,16 @@ def getSummaryTypeOptions(cursor):
         edBoard = docTitle.find(' Editorial Board;')
         if edBoard != -1:
             docTitle = docTitle[:edBoard]
-        html.append(u"""\
+        html.append("""\
      &nbsp;
      <input name='sst' type='checkbox' value='%d' class='choice'
             onclick='javascript:someSpanish()' id='S%d' /> %s <br />
-""" % (docId, i, cgi.escape(docTitle)))
+""" % (docId, i, html_escape(docTitle)))
         i += 1
-    html.append(u"""\
+    html.append("""\
     </fieldset>
 """)
-    return u"".join(html)
+    return "".join(html)
 
 #----------------------------------------------------------------------
 # Put up the menu if we don't have selection criteria yet.
@@ -334,7 +335,7 @@ class Summary:
         if reportType == 'S':
             self.comment = Summary.__getComment(self.docId, cursor)
         lastVersions = cdr.lastVersions('guest', "CDR%010d" % self.docId)
-        if type(lastVersions) in (type(""), type(u"")):
+        if isinstance(lastVersions, (str, bytes)):
             self.lastVFlag = lastVersions
         else:
             lastAny, lastPub, isChanged = lastVersions
@@ -344,11 +345,10 @@ class Summary:
                 self.lastVFlag = 'Y'
             else:
                 self.lastVFlag = 'N'
-    def __cmp__(self, other):
-        result = cmp(self.title, other.title)
-        if result:
-            return result
-        return cmp(self.docId, other.docId)
+
+    def __lt__(self, other):
+        return (self.title, self.docId) < (other.title, other.docId)
+
     @staticmethod
     def __getComment(docId, cursor):
         " Get the comment from the last version of the document."
@@ -463,7 +463,7 @@ if "modules" not in also:
 #----------------------------------------------------------------------
 if uStartDate and uEndDate:
     bodyTitle  = "Summary Date Last Modified (User) Report"
-    subtitle   = u"%s - %s" % (uStartDate, uEndDate)
+    subtitle   = "%s - %s" % (uStartDate, uEndDate)
     reportType = 'U'
     dateFilter = """\
                 AND lm.value BETWEEN '%s'
@@ -473,7 +473,7 @@ if uStartDate and uEndDate:
 """ % (uStartDate, uEndDate)
 else:
     bodyTitle  = "Summary Last Modified Date (System) Report"
-    subtitle   = u"%s - %s" % (sStartDate, sEndDate)
+    subtitle   = "%s - %s" % (sStartDate, sEndDate)
     reportType = 'S'
     dateFilter = """\
                 AND ls.last_save_date BETWEEN '%s' AND
@@ -526,13 +526,12 @@ def collectSummaries(sqlSelect, sqlFrom, sqlJoin, sqlWhere,
         try:
             sql = (sqlSelect + sqlFrom + boardJoin + sqlJoin + sqlWhere +
                    audienceFilter + boardFilter + langFilter + dateFilter)
-            cursor.execute(sql, timeout = 300)
+            cursor.execute(sql)
             rows = cursor.fetchall()
             for row in rows:
                 Summary(row, language, reportType, cursor)
-        except cdrdb.Error, info:
-            cdrcgi.bail('Failure retrieving report information: %s' %
-                        info[1][0])
+        except Exception as e:
+            cdrcgi.bail('Failure retrieving report information: %s' % e)
         return sql
 
 collectSummaries(sqlSelect, sqlFrom, sqlJoin, sqlWhere,
@@ -553,9 +552,6 @@ def getAudienceAbbreviation(audience):
 #----------------------------------------------------------------------
 # Create the workbook.
 #----------------------------------------------------------------------
-if sys.platform == "win32":
-    import os, msvcrt
-    msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
 styles = cdrcgi.ExcelStyles()
 styles.header = styles.style("align: wrap true, horz center; font: bold true")
 styles.url = styles.style(styles.HYPERLINK, styles.CENTER_TOP)
@@ -651,7 +647,9 @@ for boardName in sorted(Summary.summaries):
                                 audienceName, reportType, styles, rowNum)
 
 stamp = cdr.make_timestamp()
-print "Content-type: application/vnd.ms-excel"
-print "Content-Disposition: attachment; filename=sdlm-%s.xls" % stamp
-print
-styles.book.save(sys.stdout)
+sys.stdout.buffer.write(f"""\
+Content-type: application/vnd.ms-excel
+Content-Disposition: attachment; filename=sdlm-{stamp}.xls
+
+""".encode("utf-8"))
+styles.book.save(sys.stdout.buffer)

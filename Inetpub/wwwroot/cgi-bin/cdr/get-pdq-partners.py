@@ -7,6 +7,7 @@ Used by the report on SFTP retrieval activity for the PDQ data.
 """
 
 import re
+import sys
 from lxml import etree
 from cdr import get_text
 from cdrapi import db
@@ -40,8 +41,8 @@ class Partner:
         if self.username is not None:
             self.username = self.normalize(self.username)
         self.key = self.status, self.name.lower()
-    def __cmp__(self, other):
-        return cmp(self.key, other.key)
+    def __lt__(self, other):
+        return self.key < other.key
 
     @staticmethod
     def normalize(me):
@@ -73,7 +74,8 @@ for partner in sorted(partners):
     etree.SubElement(contact, "activated").text = partner.activated
     etree.SubElement(contact, "terminated").text = partner.deactivated
     etree.SubElement(contact, "ftp_userid").text = partner.username
-print """\
+xml = etree.tostring(root, pretty_print=True, encoding="unicode")
+sys.stdout.buffer.write(f"""\
 Content-type: text/xml
 
-%s""" % etree.tostring(root, pretty_print=True)
+{xml}""".encode("utf-8"))

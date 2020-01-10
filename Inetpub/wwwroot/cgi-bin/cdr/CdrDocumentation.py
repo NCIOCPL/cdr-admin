@@ -1,65 +1,23 @@
-#----------------------------------------------------------------------
-# Prototype for CDR reporting/formatting web wrapper.
-#
-# BZIssue::1338
-# JIRA::OCECDR-3800
-#----------------------------------------------------------------------
-import cgi
-import cdr
-import cdrcgi
-import cdrdb
+#!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# Get the form variables.
-#----------------------------------------------------------------------
-fields  = cgi.FieldStorage()
-session = cdrcgi.getSession(fields)
-request = cdrcgi.getRequest(fields)
-SUBMENU = "Report Menu"
+"""Main menu for advanced search forms.
+"""
 
-#----------------------------------------------------------------------
-# Make sure we're logged in.
-#----------------------------------------------------------------------
-if not session: cdrcgi.bail('Unknown or expired CDR session.')
+from cdrapi import db
+from cdrcgi import Controller
 
-#----------------------------------------------------------------------
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if request == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif request == SUBMENU:
-    cdrcgi.navigateTo("Reports.py", session)
+class Control(Controller):
+    SUBTITLE = "CDR Documentation"
+    SUBMIT = None
+    def populate_form(self, page):
+        page.body.set("class", "admin-menu")
+        page.form.append(page.B.H3("Documentation Categories"))
+        ol = page.B.OL()
+        page.form.append(ol)
+        query = db.Query("query_term", "doc_id", "value").order("value")
+        query.where("path = '/DocumentationToC/ToCTitle'")
+        for row in query.execute(self.cursor).fetchall():
+            link = page.menu_link("Help.py", row.value, id=row.doc_id)
+            ol.append(page.B.LI(link))
 
-#----------------------------------------------------------------------
-# Find the table-of-contents documents for the categories of help.
-#----------------------------------------------------------------------
-def get_help_sections():
-    try:
-        cursor = cdrdb.connect("CdrGuest").cursor()
-        cursor.execute("""\
-  SELECT doc_id, value
-    FROM query_term
-   WHERE path = '/DocumentationToC/ToCTitle'
-ORDER BY value""")
-        return cursor.fetchall()
-    except Exception, e:
-        cdrcgi.bail("Unable to connect to CDR database")
-
-#----------------------------------------------------------------------
-# Show the menu of documentation options.
-#----------------------------------------------------------------------
-title    = "CDR Administration"
-subtitle = "CDR Documentation"
-buttons  = (SUBMENU, cdrcgi.MAINMENU)
-script   = "CdrDocumentation.py"
-page = cdrcgi.Page(title, subtitle=subtitle, buttons=buttons, action=script,
-                   session=session, body_classes="admin-menu")
-page.add("<h3>CDR Documentation Categories</h3>")
-page.add("<ol>")
-for doc_id, title in get_help_sections():
-    url = "Help.py?id=%d" % doc_id
-    link = page.B.A(title, href=url)
-    list_item = page.B.LI(link)
-    page.add(list_item)
-page.add("</ol>")
-page.send()
+Control().run()

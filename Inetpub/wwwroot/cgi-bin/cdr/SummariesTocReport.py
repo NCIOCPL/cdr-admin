@@ -1,759 +1,582 @@
-#----------------------------------------------------------------------
-#
-# Report on lists of summaries.
-#
-# BZIssue::1231 - initial version; based on SummariesLists.py
-# BZIssue::3716 - unicode cleanup
-# BZIssue::4207 - board name modification; UI enhancements
-# BZIssue::5104 - [Summaries] Changes to Summaries TOC Lists report
-# JIRA::OCECDR-4078 - reduce indentation
-#
-#----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, cdrdb, time
+#!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields    = cgi.FieldStorage()
-session   = cdrcgi.getSession(fields)
-boolOp    = fields and fields.getvalue("Boolean")          or "AND"
-audience  = fields and fields.getvalue("audience")         or None
-lang      = fields and fields.getvalue("lang")             or None
-showId    = fields and fields.getvalue("showId")           or "N"
-tocLevel  = fields and fields.getvalue("tocLevel")         or "9"
-groups    = fields and fields.getvalue("grp")              or []
-byCdrid   = fields and fields.getvalue("byCdrid")          or None
-docVers   = fields and fields.getvalue("DocVersion")       or None
-byTitle   = fields and fields.getvalue("byTitle")          or None
-submit    = fields and fields.getvalue("SubmitButton")     or None
-docType   = "Summary"
-request   = cdrcgi.getRequest(fields)
-title     = "CDR Administration"
-instr     = "Summaries TOC Lists"
-script    = "SummariesTocReport.py"
-SUBMENU   = "Report Menu"
-buttons   = ("Submit", SUBMENU, cdrcgi.MAINMENU)
-header   = cdrcgi.header(title, title, "Summaries TOC Report",
-                         script, buttons, method = 'GET',
-                         stylesheet = """
-  <style type = 'text/css'>
-    body            { font: 12pt "Arial"; }
-    span.ip:hover     { background-color: #FFFFCC; }
-    fieldset        { margin-bottom: 10px; }
-    /* fieldset.docversion { width: 860px; */
-    fieldset.docversion
-                    { width: 75%;
-                      margin-left: auto;
-                      margin-right: auto;
-                      margin-bottom: 0;
-                      display: block; }
-    fieldset.wrapper{ width: 520px;
-                      margin-left: auto;
-                      margin-right: auto;
-                      display: block; }
-    *.gogreen       { width: 95%;
-                      border: 1px solid green;
-                      background: #99FF66; }
-    *.gg            { border: 1px solid green;
-                      background: #99FF66;
-                      color: #006600; }
-    *.comgroup      { background: #C9C9C9;
-                      margin-bottom: 8px; }
-  </style>
-""")
-
-# Testing
-#byCdrid = 62875
-#byTitle = 'Breast'
-
-if byTitle:
-    byTitle = unicode(byTitle, "utf-8")
-
-#----------------------------------------------------------------------
-# Some input validation
-#----------------------------------------------------------------------
-if showId not in ('Y', 'N'):
-    cdrcgi.bail("Invalid showId, internal error, please inform support staff")
-
-# Audience isn't using the exact canonical forms
-if audience and audience not in ('Health Professional', 'Patient'):
-    cdrcgi.bail("Invalid audience, internal error, please inform support staff")
-
-if lang and lang not in cdr.getSummaryLanguages():
-    cdrcgi.bail("Invalid language, internal error, please inform support staff")
-
-if tocLevel and not tocLevel.isdigit():
-    cdrcgi.bail("Expecting integer table of contents (TOC) level")
-
-# Expecting '-1' or a positive integer
-if docVers and not (docVers == '-1' or docVers.isdigit()):
-    cdrcgi.bail("Internal error, document version is not in the select list")
-
-# ----------------------------------------------------
-# Functions to replace sevaral repeated HTML snippets
-# ----------------------------------------------------
-def boardHeader(header):
-    """Return the HTML code to display the Summary Board Header"""
-    html = """\
-  <U><H4>%s</H4></U>
-""" % board_type
-    return html
-
-#----------------------------------------------------------------------
-# More than one matching title; let the user choose one.
-#----------------------------------------------------------------------
-def showTitleChoices(choices):
-    form = u"""\
-   <H3>More than one matching document found; please choose one.</H3>
-"""
-    i = 0
-    for choice in choices:
-        i += 1
-        form += u"""\
-   <span class="ip">
-    <INPUT TYPE='radio' NAME='byCdrid' VALUE='CDR%010d' id='byCdrid%d'>
-    <label for='byCdrid%d'>%s (CDR%06d)</label><br>
-   </span>
-""" % (choice[0], i, i, cgi.escape(choice[1]), choice[0])
-    cdrcgi.sendPage(header + form + u"""\
-   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-   <INPUT TYPE='hidden' NAME='DocType' VALUE='%s'>
-   <INPUT TYPE='hidden' NAME='ReportType' VALUE='%s'>
-   <INPUT TYPE='hidden' NAME='showId' VALUE='%s'>
-   <INPUT TYPE='hidden' NAME='tocLevel' VALUE='%s'>
-  </FORM>
- </BODY>
-</HTML>
-""" % (cdrcgi.SESSION, session, docType, 'TOC', showId, tocLevel))
-
-# ----------------------------------------------------
-#
-# ----------------------------------------------------
-def summaryRow(id, summary, toc, docVersion = None):
-    """Return the HTML code to display a Summary row"""
-    response = cdr.filterDoc('guest',
-                     ['name:Denormalization Filter: Summary Module',
-                      'name:Wrap nodes with Insertion or Deletion',
-                      'name:Clean up Insertion and Deletion',
-                      'name:Summaries TOC Report'],
-                     id, parm = filterParm, docVer = docVersion)
-    html = unicode(response[0], "utf-8")
-    html += u"""\
-"""
-    return html
-
-#----------------------------------------------------------------------
-# If the user only picked one summary group, put it into a list so we
-# can deal with the same data structure whether one or more were
-# selected.
-#----------------------------------------------------------------------
-if type(groups) in (type(""), type(u"")):
-    groups = [groups]
-
-#----------------------------------------------------------------------
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if request == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif request == SUBMENU:
-    cdrcgi.navigateTo("reports.py", session)
-
-#----------------------------------------------------------------------
-# Set up a database connection and cursor.
-#----------------------------------------------------------------------
-try:
-    conn = cdrdb.connect("CdrGuest")
-    cursor = conn.cursor()
-except cdrdb.Error, info:
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
-
-#----------------------------------------------------------------------
-# Build date string for header.
-#----------------------------------------------------------------------
-dateString = time.strftime("%B %d, %Y")
-
-#----------------------------------------------------------------------
-# If we don't have a request, put up the form.
-#----------------------------------------------------------------------
-if not lang and (not byCdrid and not byTitle):
-                           #("Submit",
-                           # SUBMENU,
-                           # cdrcgi.MAINMENU),
-    header = cdrcgi.header(title, title, instr + ' - ' + dateString,
-                           script, buttons,
-                           numBreaks = 1,
-                           stylesheet = """
-   <STYLE type="text/css">
-    TD      { font-size:  12pt; }
-    LI.none { list-style-type: none }
-    DL      { margin-left: 0; padding-left: 0 }
-    *.singletoc, *.multitoc, *.alltoc
-            { width: 50%;
-              font: 12pt "Arial";
-              border: 2px solid white;
-              margin-top: 20px;
-              margin-bottom: 20px;
-              margin-left: auto;
-              margin-right:auto;
-              padding: 5px;
-              background: #CCCCCC; }
-    *.alltoc
-            { background: #CCDDCC; }
-
-   </STYLE>
-   <script language='JavaScript'>
-    function someEnglish() {
-        document.getElementById('allEn').checked = false;
-    }
-    function someSpanish() {
-        document.getElementById('allEs').checked = false;
-    }
-    function allEnglish(widget, n) {
-        for (var i = 1; i <= n; ++i)
-            document.getElementById('E' + i).checked = false;
-    }
-    function allSpanish(widget, n) {
-        for (var i = 1; i <= n; ++i)
-            document.getElementById('S' + i).checked = false;
-    }
-   </script>
-
-"""                           )
-
-    form   = """\
-   <input type='hidden' name='%s' value='%s'>
-   <input type='hidden' name='singletoc' value='N'>
-
-   <div class='singletoc'>
-   <b>Single Summary</b>
-   <fieldset>
-    <legend>&nbsp;Document Title or CDR-ID&nbsp;</legend>
-    <label for="byCdrid">CDR-ID</label>
-    <input name='byCdrid' size='15' id="byCdrid">
-    <br>
-    <label for="byTitle">Title</label>
-    <input name='byTitle' size='40' id='byTitle'>
-   </fieldset>
-   </div>
-
-   <div class='alltoc'>
-   <b>Shared Options (Single Summary, All Summaries)</b>
-   <fieldset>
-    <legend>&nbsp;Display CDR-ID?&nbsp;</legend>
-    <input name='showId' type='radio' id="idNo"
-           value='N' CHECKED>
-    <label for="idNo">Without CDR-ID</label>
-    <br>
-    <input name='showId' type='radio' id="idYes"
-           value='Y'>
-    <label for="idYes">With CDR-ID</label>
-   </fieldset>
-
-   <fieldset>
-    <legend>&nbsp;TOC Levels?&nbsp;</legend>
-    <input name='tocLevel' type='text' size='1' value='3' CHECKED>
-    (QC Report uses "3" - leave blank to see all levels)
-   </fieldset>
-   </div>
-
-   <div class='multitoc'>
-   <b>All Summaries</b>
-   <fieldset>
-    <legend>&nbsp;Select Summary Audience&nbsp;</legend>
-    <input name='audience' type='radio' id="byHp"
-           value='Health Professional' CHECKED>
-    <label for="byHp">Health Professional</label>
-    <br>
-    <input name='audience' type='radio' id="byPat"
-           value='Patient'>
-    <label for="byPat">Patient</label>
-   </fieldset>
-
-   <fieldset>
-    <legend>&nbsp;Select Summary Language and Summary Type&nbsp;</legend>
-   <table border = '0'>
-    <tr>
-     <td width=100>
-      <input name='lang' type='radio' id="en" value='English' CHECKED>
-      <label for="en">English</label>
-     </td>
-     <td valign='top'>
-      Select PDQ Summaries: (one or more)
-     </td>
-    </tr>
-    <tr>
-     <td></td>
-     <td>
-      <input type='checkbox' name='grp' value='All English'
-             onclick="javascript:allEnglish(this, 6)" id="allEn" CHECKED>
-       <label id="allEn">All English</label><br>
-      <input type='checkbox' name='grp' value='Adult Treatment'
-             onclick="javascript:someEnglish()" id="E1">
-       <label id="E1">Adult Treatment</label><br>
-      <input type='checkbox' name='grp' value='Genetics'
-             onclick="javascript:someEnglish()" id="E2">
-       <label id="E2">Cancer Genetics</label><br>
-      <input type='checkbox' name='grp'
-             value='Integrative, Alternative, and Complementary Therapies'
-                    onclick="javascript:someEnglish()" id="E3">
-       <label id="E3">Integrative, Alternative, and Complementary Therapies</label><br>
-      <input type='checkbox' name='grp' value='Pediatric Treatment'
-             onclick="javascript:someEnglish()" id="E4">
-       <label id="E4">Pediatric Treatment</label><br>
-      <input type='checkbox' name='grp' value='Screening and Prevention'
-             onclick="javascript:someEnglish()" id="E5">
-       <label id="E5">Screening and Prevention</label><br>
-      <input type='checkbox' name='grp' value='Supportive Care'
-             onclick="javascript:someEnglish()" id="E6">
-       <label id="E6">Supportive and Palliative Care</label><br><br>
-     </td>
-    </tr>
-    <tr>
-     <td width=100>
-      <input name='lang' type='radio' id="es" value='Spanish'>
-      <label for="es">Spanish</label>
-     </td>
-     <td valign='top'>
-      Select PDQ Summaries: (one or more)
-     </td>
-    </tr>
-    <tr>
-     <td></td>
-     <td>
-      <input type='checkbox' name='grp' value='All Spanish'
-             onclick="javascript:allSpanish(this, 5)" id="allEs" CHECKED>
-         <label id="allEs">All Spanish</label><br>
-      <input type='checkbox' name='grp' value='Spanish Adult Treatment'
-             onclick="javascript:someSpanish()" id="S1">
-         <label id="S1">Adult Treatment</label><br>
-      <input type='checkbox' name='grp'
-           value='Spanish Integrative, Alternative, and Complementary Therapies'
-                    onclick="javascript:someSpanish()" id="S2">
-         <label id="S2">Integrative, Alternative, and Complementary Therapies</label><br>
-      <input type='checkbox' name='grp' value='Spanish Pediatric Treatment'
-             onclick="javascript:someSpanish()" id="S3" >
-         <label id="S3">Pediatric Treatment</label><br>
-      <input type='checkbox' name='grp' value='Spanish Screening and Prevention'
-             onclick="javascript:someSpanish()" id="S4">
-         <label id="S4">Screening and Prevention</label><br>
-      <input type='checkbox' name='grp' value='Spanish Supportive Care'
-             onclick="javascript:someSpanish()" id="S5" >
-         <label id="S5">Supportive and Palliative Care</label><br>
-     </td>
-    </tr>
-   </table>
-   </fieldset>
-   </div>
-
-  </form>
- </body>
-</html>
-""" % (cdrcgi.SESSION, session)
-    cdrcgi.sendPage(header + form)
-
-#----------------------------------------------------------------------
-# If we have a document title but not a document ID, find the ID.
-#----------------------------------------------------------------------
-#if not lang and not docId:
-if byTitle and byCdrid:
-    byTitle = None
-
-if byTitle:
-    lookingFor = 'title'
-    try:
-        cursor.execute("""\
-            SELECT d.id, d.title
-              FROM document d
-              JOIN doc_type dt
-                on dt.id = d.doc_type
-             WHERE title LIKE ?
-               AND dt.name = '%s'
-             ORDER BY d.title""" % docType, '%' + byTitle + '%')
-        rows = cursor.fetchall()
-        if not rows:
-            cdrcgi.bail(u"Unable to find document with %s '%s'" % (lookingFor,
-                                                                   byTitle))
-        if len(rows) > 1:
-            showTitleChoices(rows)
-        intId = rows[0][0]
-        docId = "CDR%010d" % intId
-    except cdrdb.Error, info:
-        cdrcgi.bail('Failure looking up document %s: %s' % (lookingFor,
-                                                            info[1][0]))
-
-#----------------------------------------------------------------------
-# Language variable has been selected
-# Building individual Queries
-# - English, HP, with CDR ID
-# - English, HP, without CDR ID
-# - English, Patient, with CDR ID ...
-#----------------------------------------------------------------------
-
-#----------------------------------------------------------------------
-# Create the selection criteria based on the groups picked by the user
-# But the decision will be based on the content of the board instead
-# of the SummaryType.
-# Based on the SummaryType selected on the form the boardPick list is
-# being created including the Editorial and Advisory board for each
-# type.  These board IDs can then be decoded into the proper
-# heading to be used for each selected summary type.
-# --------------------------------------------------------------------
-boardPick = ''
-for i in range(len(groups)):
-  # if i+1 == len(groups):
-  if groups[i] == 'Adult Treatment'            and lang == 'English':
-      boardPick += """'CDR0000028327', 'CDR0000035049', """
-  elif groups[i] == 'Spanish Adult Treatment'  and lang == 'Spanish':
-      boardPick += """'CDR0000028327', 'CDR0000035049', """
-  elif groups[i] == 'Integrative, Alternative, and Complementary Therapies' \
-                                               and lang == 'English':
-      boardPick += """'CDR0000256158', 'CDR0000423294', """
-  elif groups[i] == 'Spanish Integrative, Alternative, and Complementary Therapies' \
-                                               and lang == 'Spanish':
-      boardPick += """'CDR0000256158', 'CDR0000423294', """
-  elif groups[i] == 'Genetics':
-      boardPick += """'CDR0000032120', 'CDR0000257061', """
-  elif groups[i] == 'Screening and Prevention' and lang == 'English':
-      boardPick += """'CDR0000028536', 'CDR0000028537', """
-  elif groups[i] == 'Spanish Screening and Prevention' and lang == 'Spanish':
-      boardPick += """'CDR0000028536', 'CDR0000028537', """   ### XXX
-  elif groups[i] == 'Pediatric Treatment'      and lang == 'English':
-      boardPick += """'CDR0000028557', 'CDR0000028558', """
-  elif groups[i] == 'Spanish Pediatric Treatment' and lang == 'Spanish':
-      boardPick += """'CDR0000028557', 'CDR0000028558', """
-  elif groups[i] == 'Supportive Care'          and lang == 'English':
-      boardPick += """'CDR0000028579', 'CDR0000029837', """
-  elif groups[i] == 'Spanish Supportive Care'  and lang == 'Spanish':
-      boardPick += """'CDR0000028579', 'CDR0000029837', """
-  else:
-      boardPick += """'""" + groups[i] + """', """
-
-# --------------------------------------------------------------
-# Define the Headings under which the summaries should be listed
-# --------------------------------------------------------------
-q_case = """\
-       CASE WHEN board.value = 'CDR0000028327'  THEN 'Adult Treatment'
-            WHEN board.value = 'CDR0000035049'  THEN 'Adult Treatment'
-            WHEN board.value = 'CDR0000032120'  THEN 'Cancer Genetics'
-            WHEN board.value = 'CDR0000257061'  THEN 'Cancer Genetics'
-            WHEN board.value = 'CDR0000256158'  THEN 'Integrative, Alternative, and Complementary Therapies'
-            WHEN board.value = 'CDR0000423294'  THEN 'Integrative, Alternative, and Complementary Therapies'
-            WHEN board.value = 'CDR0000028557'  THEN 'Pediatric Treatment'
-            WHEN board.value = 'CDR0000028558'  THEN 'Pediatric Treatment'
-            WHEN board.value = 'CDR0000028536'  THEN 'Screening and Prevention'
-            WHEN board.value = 'CDR0000028537'  THEN 'Screening and Prevention'
-            WHEN board.value = 'CDR0000028579'  THEN 'Supportive and Palliative Care'
-            WHEN board.value = 'CDR0000029837'  THEN 'Supportive and Palliative Care'
-            ELSE board.value END
+"""Show the tables of contents for one or more Cancer Information Summaries.
 """
 
-# ------------------------------------------------------------------------
-# Create the selection criteria for the summary language (English/Spanish)
-# ------------------------------------------------------------------------
-q_lang = """\
-AND    lang.path = '/Summary/SummaryMetaData/SummaryLanguage'
-AND    lang.value = '%s'
-""" % lang
+from cdrcgi import Controller, Reporter, HTMLPage, bail
+from cdrapi import db
+from cdrapi.docs import Doc
+from cdr import Board
 
-# ---------------------------------------------------------------------
-# Define the selection criteria parts that are different for English or
-# Spanish documents:
-# q_fields:  Fields to be selected, i.e. the Spanish version needs to
-#            display the English translation
-# q_join:    The Spanish version has to evaluate the board and language
-#            elements differently
-# q_board:   Don't restrict on selected boards if All English/Spanish
-#            has been selected as well
-# --------------------------------------------------------------------
-if lang == 'English':
-    q_fields = """
-                'dummy1', 'dummy2', title.value EnglTitle,
-"""
-    q_join = """
-JOIN  query_term board
-ON    qt.doc_id = board.doc_id
-JOIN  query_term lang
-ON    qt.doc_id    = lang.doc_id
-"""
-    q_trans = ''
-    if groups.count('All English'):
-        q_board = ''
-    else:
-        q_board = """\
-AND    board.value in (%s)
-""" % boardPick[:-2]
-else:
-    q_fields = """
-                qt.value CDRID, qt.int_val ID, translation.value EnglTitle,
-"""
-    q_join = """
-JOIN  query_term board
-ON    qt.int_val = board.doc_id
-JOIN  query_term translation
-ON    qt.int_val = translation.doc_id
-JOIN  query_term lang
-ON    qt.doc_id    = lang.doc_id
-"""
-    q_trans = """
-AND   translation.path = '/Summary/SummaryTitle'
-AND   qt.path          = '/Summary/TranslationOf/@cdr:ref'
-"""
-    if groups.count('All Spanish'):
-        q_board = ''
-    else:
-        q_board = """\
-AND    board.value in (%s)
-""" % boardPick[:-2]
+class Control(Controller):
+    """Top-level logic for the report.
 
-# ---------------------------------------------------
-# Create selection criteria for HP or Patient version
-# ---------------------------------------------------
-if audience == 'Patient':
-    q_audience = """\
-AND audience.value = 'Patients'
-"""
-else:
-    q_audience = """\
-AND audience.value = 'Health professionals'
-"""
-
-# -------------------------------------------------------------
-# Put all the pieces together for the SELECT statement
-# -------------------------------------------------------------
-query = """\
-SELECT DISTINCT qt.doc_id, title.value DocTitle,
-%s
-%s
-FROM  query_term qt
-%s
-JOIN  query_term title
-ON    qt.doc_id    = title.doc_id
-JOIN  query_term audience
-ON    qt.doc_id    = audience.doc_id
-WHERE title.path   = '/Summary/SummaryTitle'
-%s
-AND   board.path   = '/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref'
-%s
-AND   audience.path = '/Summary/SummaryMetaData/SummaryAudience'
-%s
-%s
-AND EXISTS (SELECT 'x' FROM doc_version v
-            WHERE  v.id = qt.doc_id
-            AND    v.val_status = 'V'
-            AND    v.publishable = 'Y')
-AND qt.doc_id not in (select doc_id
-                       from doc_info
-                       where doc_status = 'I'
-                       and doc_type = 'Summary')
-ORDER BY 6, 2
-""" % (q_fields, q_case, q_join, q_trans, q_board, q_audience, q_lang)
-
-if not query:
-    cdrcgi.bail('No query criteria specified')
-
-#----------------------------------------------------------------------
-# If we are running the report for a single summary but we don't have
-# a version number yet, display the intermediary screen to select the
-# version.
-#----------------------------------------------------------------------
-vrows = []
-cursor = conn.cursor()
-letUserPickVersion = True
-if byCdrid:
-    byCdrid = cdr.exNormalize(byCdrid)[1]
-    if not docVers:
-        try:
-            cursor.execute("""\
-                SELECT num,
-                       comment,
-                       dt
-                  FROM doc_version
-                 WHERE id = ?
-              ORDER BY num DESC""", byCdrid)
-            vrows = cursor.fetchall()
-        except cdrdb.Error, info:
-            cdrcgi.bail('Failure retrieving document versions: %s' % info[1][0])
-        form = u"""\
-      <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-      <INPUT TYPE='hidden' NAME='DocType' VALUE='%s'>
-      <INPUT TYPE='hidden' NAME='byCdrid' VALUE='CDR%010d'>
-      <INPUT TYPE='hidden' NAME='showId' VALUE='%s'>
-      <INPUT TYPE='hidden' NAME='tocLevel' VALUE='%s'>
-    """ % (cdrcgi.SESSION, session, docType, byCdrid, showId, tocLevel)
-
-        form += u"""\
-      <fieldset class='docversion'>
-       <legend>&nbsp;Select document version&nbsp;</legend>
-      <div style="width: 100%; text-align: center;">
-      <div style="margin: 0 auto;">
-      <SELECT NAME='DocVersion'>
-       <OPTION VALUE='-1' SELECTED='1'>Current Working Version</OPTION>
+    There are basically two paths this report script can take. With the
+    first, the user selects one or more boards, a language, and an
+    audience, and we find all the publishable summaries which match.
+    On the other path, the user asks for a report on a single summary,
+    either by supplying the summary's document ID directly, or by
+    entering a title fragment which we use to present a list of
+    matching summaries from which the user selects one. On this
+    second path, the user also selects a version. When we're reporting
+    on the summaries selected by board, we use the current working
+    document.
     """
 
-        # Limit display of version comment to 120 chars (if exists)
-        # ---------------------------------------------------------
-        for row in vrows:
-            form += u"""\
-       <OPTION VALUE='%d'>[V%d %s] %s</OPTION>
-    """ % (row[0], row[0], row[2][:10],
-           not row[1] and "[No comment]" or row[1][:120])
-            selected = ""
-        form += u"</SELECT></div></div>"
-        form += u"""
-      </fieldset>
-    """
-        cdrcgi.sendPage(header + form)
+    SUBTITLE = "Summary TOC Lists"
+    LOGNAME = "summary_toc_lists"
+    METHODS = (
+        ("board", "By PDQ Board"),
+        ("id", "By CDR ID"),
+        ("title", "By Summary Title"),
+    )
+    AUDIENCES = dict(
+        health_professional="Health Professional",
+        patient="Patient",
+    )
+    LANGUAGES = "english", "spanish"
+    DEFAULT_LEVEL = 3
 
-    else:
-        if docVers == "-1": docVers = None
+    def add_audience_fieldset(self, page):
+        """Add the radio buttons for choosing the audience.
 
-    # We need the summary title to display on the report
-    # --------------------------------------------------
-    try:
-        query = """\
-    SELECT DISTINCT qt.doc_id, title.value DocTitle,
-                    'dummy1', 'dummy2', title.value EnglTitle, ' '
-      FROM query_term qt
-      JOIN query_term title
-        ON qt.doc_id = title.doc_id
-     WHERE title.path = '/Summary/SummaryTitle'
-       AND qt.doc_id = %s""" % byCdrid
+        Pass:
+            page - HTMLPage object to be filled with field sets.
+        """
 
-        cursor.execute(query)
-        rows = cursor.fetchall()
-        cursor.close()
-        cursor = None
-    except cdrdb.Error, info:
-        cdrcgi.bail('Failure retrieving single Summary document: %s' %
-                    info[1][0])
-else:
-    try:
-        cursor.execute(query)
-        rows = cursor.fetchall()
-        cursor.close()
-        cursor = None
-    except cdrdb.Error, info:
-        cdrcgi.bail('Failure retrieving Summary documents: %s' %
-                    info[1][0])
+        fieldset = page.fieldset("Audience")
+        fieldset.set("class", "board-fieldset")
+        checked = True
+        for audience in self.AUDIENCES:
+            opts = dict(value=audience, checked=checked)
+            fieldset.append(page.radio_button("audience", **opts))
+            checked = False
+        page.form.append(fieldset)
 
-if not rows and not vrows:
-    cdrcgi.bail('No Records Found for Selection: %s ' % lang+"; "+audience+"; "+groups[0] )
+    def add_board_fieldset(self, page):
+        """Add the checkboxes for selecting one or more PDQ boards.
 
-#cdrcgi.bail("Result: [%s]" % rows)
-#----------------------------------------------------------------------
-# Create the results page.
-#----------------------------------------------------------------------
-instr     = 'Section Titles for %s Summaries -- %s.' % (lang, dateString)
-header    = cdrcgi.rptHeader(title, instr,
-                          stylesheet = """\
-   <STYLE type="text/css">
-    UL             { margin: 0pt; margin-left: 25px; padding-left: 5px; }
-    LI             { font-style: normal;
-                     font-family: Arial;
-                     font-weight: normal;
-                     font-size: 12pt;
-                     list-style-type: none; }
-    H5             { font-weight: bold;
-                     font-family: Arial;
-                     font-size: 13pt;
-                     margin: 0pt; }
-    *.ehdr         { font-size: 18pt;
-                     font-weight: bold;
-                     text-align: center;
-                     width: 420px; }
-    *.shdr         { font-size: 18pt;
-                     font-weight: bold;
-                     text-align: center;
-                     width: 540px; }
-    *.hdrDate      { font-size: 12pt;
-                     font-weight: bold; }
-    *.Insertion    { color: red; }
-    *.Deletion     { color: red;
-                     text-decoration: line-through; }
-   </STYLE>
-""")
+        Pass:
+            page - HTMLPage object to be filled with field sets.
+        """
 
-# -------------------------
-# Display the Report Titles
-# -------------------------
-# Single Summary TOC Report
-if byCdrid:
-    report    = """\
-       <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-      </FORM>
-      <div class="ehdr">Single Summary TOC Report<br>
-      <span class="hdrDate">%s</span>
-      </div>
-    """ % (cdrcgi.SESSION, session, dateString)
-# Multi-Summary TOC Report
-else:
-    if lang == 'English':
-        report    = """\
-       <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-      </FORM>
-      <div class="ehdr">PDQ %s Summaries<br>
-      <span class="hdrDate">%s</span>
-      </div>
-    """ % (cdrcgi.SESSION, session, audience, dateString)
-    else:
-        report    = """\
-       <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-      </FORM>
-      <div class="shdr">PDQ %s %s Summaries<br>
-      <span class="hdrDate">%s</span>
-      </div>
-    """ % (cdrcgi.SESSION, session, lang, audience, dateString)
+        fieldset = page.fieldset("Board(s)")
+        fieldset.set("class", "board-fieldset")
+        opts = dict(value="all", label="All Boards", checked=True)
+        fieldset.append(page.checkbox("board", **opts))
+        for board in sorted(self.boards.values()):
+            opts = dict(value=board.id, label=str(board))
+            fieldset.append(page.checkbox("board", **opts))
+        page.form.append(fieldset)
 
-board_type = rows[0][5] or None
+    def add_cdrid_fieldset(self, page):
+        """Add the field for the summary document ID.
 
-# -------------------------------------------------------------------
-# Decision if the CDR IDs are displayed along with the summary titles
-# - The report without CDR ID is displayed as a bulleted list.
-# - The report with    CDR ID is displayed in a table format.
-# -------------------------------------------------------------------
-# ------------------------------------------------------------------------
-# Display Summary Title including CDR ID
-# ------------------------------------------------------------------------
-filterParm = []
-filterParm = [['showLevel', tocLevel], ['showId', showId ]]
-report += u"""\
-  <U><H4>%s</H4></U>
-""" % board_type
+        Pass:
+            page - HTMLPage object to be filled with field sets.
+        """
 
-for row in rows:
-    # If we encounter a new board_type we need to create a new
-    # heading
-    # ----------------------------------------------------------
-    if row[5] == board_type:
-       report += summaryRow(row[0], row[1], toc = tocLevel,
-                                               docVersion = docVers)
-       #if lang == 'English':
-       #   report += summaryRow(row[0], row[1], toc = tocLevel,
-       #                                        docVersion = docVers)
-       #else:
-       #   report += summaryRow(row[0], row[1], toc = tocLevel,
-       #                                        docVersion = docVers)
+        fieldset = page.fieldset("Summary Document ID")
+        fieldset.set("id", "cdrid-fieldset")
+        fieldset.append(page.text_field("id", label="CDR ID"))
+        page.form.append(fieldset)
 
-    # For the Treatment Summary Type we need to check if this is an
-    # adult or pediatric summary
-    # -------------------------------------------------------------
-    else:
-       board_type = row[5]
-       report += boardHeader(board_type)
-       report += summaryRow(row[0], row[1], toc = tocLevel,
-                                               docVersion = docVers)
-       #if lang == 'English':
-       #   report += summaryRow(row[0], row[1], toc = tocLevel,
-       #                                        docVersion = docVers)
-       #else:
-       #   report += summaryRow(row[0], row[1], toc = tocLevel,
-       #                                        docVersion = docVers)
-footer = u"""\
- </BODY>
-</HTML>
-"""
+    def add_language_fieldset(self, page):
+        """Add the radio buttons for choosing between English and Spanish.
 
-#----------------------------------------------------------------------
-# Send the page back to the browser.
-#----------------------------------------------------------------------
-cdrcgi.sendPage(header + report + footer)
+        Pass:
+            page - HTMLPage object to be filled with field sets.
+        """
+
+        fieldset = page.fieldset("Language")
+        fieldset.set("class", "board-fieldset")
+        checked = True
+        for language in self.LANGUAGES:
+            opts = dict(value=language, checked=checked)
+            fieldset.append(page.radio_button("language", **opts))
+            checked = False
+        page.form.append(fieldset)
+
+    def add_level_fieldset(self, page):
+        """Add a picklist for choosing how deep the report should go.
+
+        Pass:
+            page - HTMLPage object to be filled with field sets.
+        """
+
+        fieldset = page.fieldset("Table of Contents Depth")
+        options = [("", "All Levels")] + [str(n) for n in range(1, 10)]
+        tooltip = f"QC report uses level {self.DEFAULT_LEVEL:d}"
+        default = str(self.DEFAULT_LEVEL)
+        opts = dict(options=options, default=default, tooltip=tooltip)
+        fieldset.append(page.select("level", **opts))
+        page.form.append(fieldset)
+
+    def add_method_fieldset(self, page):
+        """Add the fields for choosing how summaries will be selected.
+
+        Pass:
+            page - HTMLPage object to be filled with field sets.
+        """
+
+        fieldset = page.fieldset("Selection Method")
+        checked = True
+        for value, display in self.METHODS:
+            opts = dict(value=value, label=display, checked=checked)
+            fieldset.append(page.radio_button("method", **opts))
+            checked = False
+        page.form.append(fieldset)
+
+    def add_options_fieldset(self, page):
+        """Add the checkbox for choosing whether to display Summary CDR IDs.
+
+        Pass:
+            page - HTMLPage object to be filled with field sets.
+        """
+
+        fieldset = page.fieldset("Options")
+        opts = dict(value="include_id", label="Include CDR ID", checked=True)
+        fieldset.append(page.checkbox("include_id", **opts))
+        page.form.append(fieldset)
+
+    def add_title_fieldset(self, page):
+        """Add the field for entering a summary title fragment.
+
+        Pass:
+            page - HTMLPage object to be filled with field sets.
+        """
+
+        fieldset = page.fieldset("Summary Title")
+        fieldset.set("id", "title-fieldset")
+        fieldset.append(page.text_field("title", label="Title"))
+        page.form.append(fieldset)
+
+    def build_tables(self):
+        """Show the report if we have all the information we need.
+
+        We might not, as there are at least two stages of cascading
+        forms (sometimes three) to get through before we get to the
+        point where we're ready to actually create the report when
+        the user wants to zero in on a single summary.
+        """
+
+        if self.selection_method == "board" or self.version and self.id:
+            self.report_page.send()
+        elif self.id:
+            self.show_version_form()
+        elif self.fragment:
+            self.show_title_form()
+        else:
+            self.show_form()
+
+    def populate_form(self, page):
+        """Assemble the main form for this report.
+
+        Broken into helper methods, since this is a complex form.
+        We add some client-side scripting to make the form easier
+        to use.
+
+        Pass:
+            page - HTMLPage object to be filled with field sets.
+        """
+
+        self.add_method_fieldset(page)
+        self.add_cdrid_fieldset(page)
+        self.add_title_fieldset(page)
+        self.add_board_fieldset(page)
+        self.add_audience_fieldset(page)
+        self.add_language_fieldset(page)
+        self.add_level_fieldset(page)
+        self.add_options_fieldset(page)
+        page.add_script("""\
+function check_method(value) {
+    if (value == "id") {
+        jQuery("fieldset.board-fieldset").hide();
+        jQuery("fieldset#title-fieldset").hide();
+        jQuery("fieldset#cdrid-fieldset").show();
+    }
+    else if (value == "title") {
+        jQuery("fieldset.board-fieldset").hide();
+        jQuery("fieldset#title-fieldset").show();
+        jQuery("fieldset#cdrid-fieldset").hide();
+    }
+    else {
+        jQuery("fieldset.board-fieldset").show();
+        jQuery("fieldset#title-fieldset").hide();
+        jQuery("fieldset#cdrid-fieldset").hide();
+    }
+}
+function check_board(val) {
+    if (val == "all") {
+        jQuery("input[name='board']").prop("checked", false);
+        jQuery("#board-all").prop("checked", true);
+    }
+    else if (jQuery("input[name='board']:checked").length > 0)
+        jQuery("#board-all").prop("checked", false);
+    else
+        jQuery("#board-all").prop("checked", true);
+}
+jQuery(function() {
+    var value = jQuery("input[name='method']:checked").val();
+    check_method(value);
+});""")
+
+    def show_title_form(self):
+        """Let the user pick a summary from those which match her fragment."""
+
+        if not self.fragment_matches:
+            bail("No summaries match that title fragment")
+        page = self.form_page
+        page.form.append(page.hidden_field("method", value="id"))
+        page.form.append(page.hidden_field("level", self.level))
+        if self.include_id:
+            page.form.append(page.hidden_field("include_id", "Y"))
+        fieldset = page.fieldset("Choose Summary")
+        fieldset.set("style", "width: 600px")
+        for summary in self.fragment_matches:
+            opts = dict(value=summary.id, label=summary.display)
+            if summary.tooltip:
+                opts["tooltip"] = summary.tooltip
+            fieldset.append(page.radio_button("id", **opts))
+        page.form.append(fieldset)
+        page.send()
+
+    def show_version_form(self):
+        """We have a summary id, let the user pick a version."""
+
+        page = self.form_page
+        page.form.append(page.hidden_field("method", value="id"))
+        page.form.append(page.hidden_field("id", value=self.id))
+        page.form.append(page.hidden_field("level", self.level))
+        if self.include_id:
+            page.form.append(page.hidden_field("include_id", "Y"))
+        fieldset = page.fieldset("Select Document Version")
+        fieldset.set("style", "width: 600px")
+        options = [(v.id, v.description) for v in self.versions]
+        default = -1
+        fieldset.append(page.select("version", options=options))
+        page.form.append(fieldset)
+        page.send()
+
+    @property
+    def audience(self):
+        """Either patient or health_professional."""
+
+        if not hasattr(self, "_audience"):
+            self._audience = self.fields.getvalue("audience")
+            if self._audience and self._audience not in self.AUDIENCES:
+                bail()
+        return self._audience
+
+    @property
+    def board(self):
+        """Board(s) which the user has selected.
+
+        Sequence of board IDs or ["all"] if the user wants all boards
+        included.
+        """
+
+        return self.fields.getlist("board")
+
+    @property
+    def boards(self):
+        """PDQ boards for the form's picklist."""
+
+        if not hasattr(self, "_boards"):
+            self._boards = Board.get_boards(cursor=self.cursor)
+        return self._boards
+
+    @property
+    def fragment(self):
+        """Title fragment used to find matching summaries."""
+
+        if not hasattr(self, "_fragment"):
+            self._title = (self.fields.getvalue("title") or "").strip()
+        return self._title
+
+    @property
+    def fragment_matches(self):
+        """Information about summaries which match the title fragment."""
+
+        if not hasattr(self, "_fragment_matches"):
+            if not self.fragment:
+                bail("No title fragment to match")
+            pattern = f"{self.fragment}%"
+            query = db.Query("document d", "d.id", "d.title").order(2, 1)
+            query.join("doc_type t", "t.id = d.doc_type")
+            query.where("t.name = 'Summary'")
+            query.where(query.Condition("d.title", pattern, "LIKE"))
+            self._fragment_matches = []
+            class Summary:
+                def __init__(self, doc_id, display, tooltip=None):
+                    self.id = doc_id
+                    self.display = display
+                    self.tooltip = tooltip
+            for doc_id, title in query.execute(self.cursor).fetchall():
+                if len(title) > 60:
+                    short_title = title[:57] + "..."
+                    summary = Summary(doc_id, short_title, title)
+                else:
+                    summary = Summary(doc_id, title)
+                self._fragment_matches.append(summary)
+        return self._fragment_matches
+
+    @property
+    def id(self):
+        """CDR document ID for the summary to be used for the report."""
+
+        if not hasattr(self, "_id"):
+            self._id = self.fields.getvalue("id")
+            if self._id:
+                self._id = int(self._id)
+            if self.fragment and len(self.fragment_matches) == 1:
+                self._id = self.fragment_matches[0].id
+        return self._id
+
+    @property
+    def include_id(self):
+        """Boolean indicating whether Summary CDR IDs should be displayed."""
+
+        return True if self.fields.getvalue("include_id") else False
+
+    @property
+    def language(self):
+        """Either english or spanish."""
+
+        if not hasattr(self, "_language"):
+            self._language = self.fields.getvalue("language")
+            if self._language and self._language not in self.LANGUAGES:
+                bail()
+        return self._language
+
+    @property
+    def level(self):
+        """Integer indicating how deep the report should go."""
+
+        return self.fields.getvalue("level") or "999"
+
+    @property
+    def selection_method(self):
+        """One of board, id, or title."""
+
+        return self.fields.getvalue("method")
+
+    @property
+    def report_page(self):
+        """Assemble the HTMLPage object for the report.
+
+        This is a non-tabular report, so we create the page ourselves,
+        instead of letting the base class take care of that for us.
+        """
+
+        if not hasattr(self, "_report_page"):
+            self.logger.info("processing %d summaries", len(self.summaries))
+            page = HTMLPage(self.title, subtitle=self.report_title)
+            page.body.set("id", "summaries-toc-report")
+            board = None
+            for summary in sorted(self.summaries):
+                self.logger.debug("processing %s", summary.title)
+                if self.selection_method == "board" and summary.board != board:
+                    page.body.append(page.B.H4(summary.board))
+                    board = summary.board
+                for node in summary.nodes:
+                    page.body.append(node)
+            self._report_page = page
+        return self._report_page
+
+    @property
+    def report_title(self):
+        """Create the string identifying which report this is."""
+
+        if not hasattr(self, "_report_title"):
+            if self.selection_method == "id":
+                self._report_title = "Single Summary TOC Report"
+            else:
+                audience = self.AUDIENCES.get(self.audience) or ""
+                language = self.language.title()
+                self._report_title = f"PDQ {language} {audience} Summaries"
+        return self._report_title
+
+    @property
+    def summaries(self):
+        """PDQ summaries (`Summary` objects) to be displayed on the report."""
+
+        if not hasattr(self, "_summaries"):
+            fields = "q.doc_id", "q.value AS title"
+            if self.id:
+                query = db.Query("query_term q", *fields).unique()
+                query.where(query.Condition("doc_id", self.id))
+            else:
+                audience = f"{self.AUDIENCES.get(self.audience)}s"
+                language = self.language.title()
+                b_path = "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"
+                t_path = "/Summary/TranslationOf/@cdr:ref"
+                a_path = "/Summary/SummaryMetaData/SummaryAudience"
+                l_path = "/Summary/SummaryMetaData/SummaryLanguage"
+                query = db.Query("query_term q", *fields).unique()
+                query.join("active_doc d", "d.id = q.doc_id")
+                query.join("doc_version v", "v.id = d.id")
+                query.where("v.publishable = 'Y'")
+                query.join("query_term a", "a.doc_id = d.id")
+                query.where(query.Condition("a.path", a_path))
+                query.where(query.Condition("a.value", audience))
+                query.join("query_term l", "l.doc_id = d.id")
+                query.where(query.Condition("l.path", l_path))
+                query.where(query.Condition("l.value", language))
+                if "all" not in self.board:
+                    if language == "English":
+                        query.join("query_term_pub b", "b.doc_id = d.id")
+                    else:
+                        query.join("query_term_pub t", "t.doc_id = d.id")
+                        query.where(query.Condition("t.path", t_path))
+                        query.join("query_term b", "b.doc_id = t.int_val")
+                    query.where(query.Condition("b.path", b_path))
+                    query.where(query.Condition("b.int_val", self.board, "IN"))
+            query.where("q.path = '/Summary/SummaryTitle'")
+            self.logger.debug("query=\n%s", query)
+            self.logger.debug("self.board = %s", self.board)
+            query.log()
+            rows = query.execute(self.cursor).fetchall()
+            self._summaries = [Summary(self, row) for row in rows]
+        return self._summaries
+
+    @property
+    def version(self):
+        """Integer for a specific version of the selected document.
+
+        Will be `None` if we don't yet have a version number.
+        """
+
+        if not hasattr(self, "_version"):
+            self._version = self.fields.getvalue("version")
+            if self._version:
+                self._version = int(self._version)
+            elif self.id and len(self.versions) == 1:
+                self._version = self.versions[0].number
+        return self._version
+    @property
+    def versions(self):
+        """Version numbers with descriptions for the picklist."""
+
+        if not hasattr(self, "_versions"):
+            class Version:
+                def __init__(self, number, description):
+                    self.id = number
+                    self.description = description
+            self._versions = [Version(-1, "Current Working Version")]
+            fields = "num", "comment", "dt"
+            query = db.Query("doc_version", *fields).order("num DESC")
+            query.where(query.Condition("id", self.id))
+            for row in query.execute(self.cursor).fetchall():
+                date = row.dt.strftime("%Y-%m-%d")
+                description = f"[V{row.num} {date}] {row.comment}"
+                self._versions.append(Version(row.num, description))
+        return self._versions
+
+
+class Summary:
+    """Table of content (and auxilliary) information for one PDQ summary."""
+
+    from lxml import html as H
+    FILTERS = (
+        "name:Denormalization Filter: Summary Module",
+        "name:Wrap nodes with Insertion or Deletion",
+        "name:Clean up Insertion and Deletion",
+        "name:Summaries TOC Report",
+    )
+
+    def __init__(self, control, row):
+        """Remember the caller's information. Let properties do the real work.
+        """
+
+        self.__control = control
+        self.__row = row
+
+    @property
+    def board(self):
+        """String for the summary's PDQ Editorial board.
+
+        A summary typically has multiple board links. Only one will
+        match the controller's list of editorial boards shown on the
+        picklist. For a Spanish summary, we have to find the English
+        summary of which it is a translation, as that is the document
+        which will have the link to the editorial board we need.
+        """
+
+        if not hasattr(self, "_board"):
+            self._board = "Board not found"
+            b_path = "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"
+            t_path = "/Summary/TranslationOf/@cdr:ref"
+            query = db.Query("query_term_pub b", "b.int_val").unique()
+            if self.control.language == "english":
+                query.where(query.Condition("b.path", b_path))
+                query.where(query.Condition("b.doc_id", self.id))
+            else:
+                query.join("query_term_pub t", "t.int_val = b.doc_id")
+                query.where(query.Condition("t.path", t_path))
+                query.where(query.Condition("t.doc_id", self.id))
+            for row in query.execute(self.control.cursor).fetchall():
+                board = self.control.boards.get(row.int_val)
+                if board:
+                    self._board = str(board)
+        return self._board
+
+    @property
+    def control(self):
+        """Access to report parameters and database connectivity."""
+        return self.__control
+
+    @property
+    def id(self):
+        """Unique CDR ID for the summary."""
+        return self.__row.doc_id
+
+    @property
+    def nodes(self):
+        """Sequence of HTML elements to be added to the report.
+
+        We use XSL/T filtering to generate the HTML fragments
+        for the report for this summary, which we then parse
+        so they can be added to the page object.
+        """
+
+        if not hasattr(self, "_nodes"):
+            opts = dict(id=self.id, version=self.version)
+            doc = Doc(self.control.session, **opts)
+            result = doc.filter(*self.FILTERS, parms=self.parms)
+            html = str(result.result_tree).strip()
+            self._nodes = self.H.fragments_fromstring(html)
+        return self._nodes
+
+    @property
+    def parms(self):
+        """Parameters for XSL/T filtering."""
+        level = str(self.control.level) or "999"
+        flag = "Y" if self.control.include_id else "N"
+        return dict(showLevel=level, showId=flag)
+
+    @property
+    def title(self):
+        """Title for the PDQ Summary document."""
+        return self.__row.title
+
+    @property
+    def version(self):
+        """Which version of the document do we want to filter?"""
+        if self.control.selection_method == "board":
+            return None
+        if not self.control.version or self.control.version < 1:
+            return None
+        return self.control.version
+
+    def __lt__(self, other):
+        """Support sorting a sequence of `Summary` objects."""
+
+        title = self.title.lower()
+        other_title = other.title.lower()
+        return (self.board, title) < (other.board, other_title)
+
+
+if __name__ == "__main__":
+    """Don't execute the script when loaded as a module."""
+    Control().run()

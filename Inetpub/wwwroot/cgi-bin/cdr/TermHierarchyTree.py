@@ -3,10 +3,14 @@
 #
 # BZIssue::3316
 # JIRA::OCECDR-3800 - Address security vulnerabilities
+#
+# As of 2019-09-20 the "Terms with No Parent Term and Not a Semantic
+# Type" version of this report has been retired.
 #----------------------------------------------------------------------
-import cdrcgi
-import cdrdb
 import cgi
+import cdrcgi
+from cdrapi import db
+from operator import attrgetter
 
 LOG_QUERIES = False
 
@@ -52,7 +56,7 @@ class Term:
         self.sign = "+"
         self.selectedTerm = "False"
 
-conn = cdrdb.connect('CdrGuest')
+conn = db.connect(user='CdrGuest')
 cursor = conn.cursor()
 
 def log_query(q, label):
@@ -70,19 +74,19 @@ boolSemanticType INTEGER)
     conn.commit()
 
     # Subqueries
-    obsolete = cdrdb.Query("query_term", "doc_id")
+    obsolete = db.Query("query_term", "doc_id")
     obsolete.where("path = '/Term/TermType/TermTypeName'")
     obsolete.where("value = 'Obsolete term'")
-    not_obsolete = cdrdb.Query.Condition("doc_id", obsolete, "NOT IN")
-    parents = cdrdb.Query("#terms", "id")
+    not_obsolete = db.Query.Condition("doc_id", obsolete, "NOT IN")
+    parents = db.Query("#terms", "id")
     parents.where("id = p.doc_id")
     parents.where("parent = p.int_val")
     not_already_inserted = "NOT EXISTS (%s)" % parents
-    semantic_types = cdrdb.Query("query_term", "doc_id")
+    semantic_types = db.Query("query_term", "doc_id")
     semantic_types.where("path = '/Term/TermType/TermTypeName'")
     semantic_types.where("value = 'Semantic type'")
     semantic_types.where(not_obsolete)
-    non_semantic_types = cdrdb.Query("query_term", "doc_id")
+    non_semantic_types = db.Query("query_term", "doc_id")
     non_semantic_types.where("path = '/Term/TermType/TermTypeName'")
     non_semantic_types.where("value <> 'Semantic type'")
     non_semantic_types.where(not_obsolete)
@@ -103,7 +107,7 @@ INSERT INTO #terms
      WHERE path = '/Term/TermType/TermTypeName'
        AND value = 'Obsolete term')
 """)'''
-    select = cdrdb.Query("query_term", "doc_id", "NULL", "1")
+    select = db.Query("query_term", "doc_id", "NULL", "1")
     select.where("path = '/Term/TermType/TermTypeName'")
     select.where("value = 'Semantic type'")
     select.where(not_obsolete)
@@ -123,7 +127,7 @@ INSERT INTO #terms
      WHERE path = '/Term/TermType/TermTypeName'
        AND value = 'Obsolete term')
 """)'''
-    select = cdrdb.Query("query_term", "doc_id", "NULL", "0")
+    select = db.Query("query_term", "doc_id", "NULL", "0")
     select.where("path = '/Term/TermType/TermTypeName'")
     select.where("value <> 'Semantic type'")
     select.where(not_obsolete)
@@ -163,7 +167,7 @@ INSERT INTO #terms
                                    WHERE path = '/Term/TermType/TermTypeName'
                                      AND value = 'Obsolete term'))
                                 """)'''
-        query = cdrdb.Query("query_term p", "p.doc_id", "p.int_val", "1")
+        query = db.Query("query_term p", "p.doc_id", "p.int_val", "1")
         query.join("#terms t", "t.id = p.int_val")
         query.where(is_parent)
         query.where(not_already_inserted)
@@ -202,7 +206,7 @@ INSERT INTO #terms
                                    WHERE path = '/Term/TermType/TermTypeName'
                                      AND value = 'Obsolete term'))
                                             """)'''
-        query = cdrdb.Query("query_term p", "p.doc_id", "p.int_val", "0")
+        query = db.Query("query_term p", "p.doc_id", "p.int_val", "0")
         query.join("#terms t", "t.id = p.int_val")
         query.where(is_parent)
         query.where(not_already_inserted)
@@ -242,11 +246,11 @@ INSERT INTO #terms
                                    WHERE path = '/Term/TermType/TermTypeName'
                                      AND value = 'Obsolete term'))
                                             """)'''
-        non_semantic_orphans = cdrdb.Query("#terms", "id")
+        non_semantic_orphans = db.Query("#terms", "id")
         non_semantic_orphans.where("parent IS NULL")
         non_semantic_orphans.where("boolSemanticType = 0")
-        non_orphans = cdrdb.Query("#terms", "id").where("parent IS NOT NULL")
-        query = cdrdb.Query("query_term p", "p.doc_id", "p.int_val", "0")
+        non_orphans = db.Query("#terms", "id").where("parent IS NOT NULL")
+        query = db.Query("query_term p", "p.doc_id", "p.int_val", "0")
         #query.where(is_parent)
         #query.where("p.path = '/Term/SemanticType/@cdr:ref'")
         query.where(not_already_inserted)
@@ -267,7 +271,7 @@ INSERT INTO #terms
          WHERE n.path = '/Term/PreferredName'
       ORDER BY d.parent desc""")'''
     columns = ("t.id", "n.value", "t.parent", "t.boolSemanticType")
-    query = cdrdb.Query("#terms t", *columns)
+    query = db.Query("#terms t", *columns)
     query.join("query_term n", "n.doc_id = t.id").order("t.parent DESC")
     query.where("n.path = '/Term/PreferredName'")
     log_query(query, "TERM HIERARCHY TREE QUERY")
@@ -278,7 +282,7 @@ INSERT INTO #terms
     #exit(0)
     terms = {}
     for id, name, parent, isSemantic in cursor.fetchall():
-        if terms.has_key(id):
+        if id in terms:
             term = terms[id]
         else:
             term = terms[id] = Term(name.rstrip(),id,isSemantic)
@@ -324,7 +328,7 @@ def expandUp(t):
 
 # add all terms that don't have parents
 def addTerms(terms,SemanticTerms):
-    html = [u""]
+    html = [""]
 
     # create a dummy parent node so we can sort the top node
     parentTerm = terms[-1] = Term("",-1,0)
@@ -345,12 +349,10 @@ def addTerms(terms,SemanticTerms):
                     if term.parents:
                         expandUp(term)
 
-    parentTerm.children.sort(lambda a,b: cmp(a.uname, b.uname))
-
-    for rootTerm in parentTerm.children:
+    for rootTerm in sorted(parentTerm.children, key=attrgetter("name")):
         html.append(addTerm(rootTerm,rootTerm))
 
-    html = u"".join(html)
+    html = "".join(html)
     return html
 
 def addLeafIDsToList(t,cdrids):
@@ -364,48 +366,47 @@ def addLeafIDsToList(t,cdrids):
 
 # add a term to the hierarchy list
 def addTerm(t,parent):
-    html = [u""]
-    cbText= [u""]
+    html = [""]
+    cbText= [""]
 
     if t.children:
         cdrids = {}
         addLeafIDsToList(t,cdrids)
-        cbText.append(u"%s:" % t.id)
-        cbText.append(u" ".join([`id` for id in cdrids]))
-        cbText = u"".join(cbText)
-        html.append(u"""\
+        cbText.append("%s:" % t.id)
+        cbText.append(" ".join([str(id) for id in cdrids]))
+        cbText = "".join(cbText)
+        html.append("""\
    <li id="%s" class="parent %s" onclick="clickOnName(event,this);"
    ><span onclick="clickOnSign(event, '%s')">%s</span>&nbsp;%s""" %
                     (t.id, t.showMode, t.id, t.sign, t.name))
         if len(cbText) > 0:
-            html.append(u"""\
+            html.append("""\
    <a style="font-size: 8pt; color: rgb(200, 100, 100)"
       onclick="Send2Clipboard('%s');" href='#'>&nbsp(copy)</a>""" % cbText)
-        html.append(u"<ul>")
+        html.append("<ul>")
 
-        t.children.sort(lambda a,b: cmp(a.uname, b.uname))
-        for child in t.children:
+        for child in sorted(t.children, key=attrgetter("name")):
             html.append(addTerm(child, t))
-        html.append(u"</ul></li>")
+        html.append("</ul></li>")
     else:
-        html.append(u" <li class='leaf'")
+        html.append(" <li class='leaf'")
         if t.selectedTerm == "True":
-            html.append(u" selected")
-        html.append(u">&nbsp;&nbsp;%s</li>" % t.name)
+            html.append(" selected")
+        html.append(">&nbsp;&nbsp;%s</li>" % t.name)
 
-    html = u"".join(html)
+    html = "".join(html)
     return html
 
 
 # generate HTML
 # XXX This is whacked! Charlie has two opening <html> tags. :-( FIX!
-html =[u"""\
+html =["""\
 <html>
 <input type='hidden' name='%s' value='%s'>
 <head>
 <title>%s</title>""" % (cdrcgi.SESSION, session, section)]
 
-html.append(u"""\
+html.append("""\
  <style type="text/css">
      ul.treeview li {
         font-family: courier,serif;
@@ -546,7 +547,7 @@ html.append(u"""\
  <body>
   <table><tr><td width="60%">""")
 
-html.append(u"""\
+html.append("""\
 <h1>%s</h1></td><td align="right">
   </td></tr></table>
   <ul class="treeview">
@@ -554,13 +555,13 @@ html.append(u"""\
 
 html.append(addTerms(terms,SemanticTerms))
 
-html.append(u"""\
+html.append("""\
 </ul>
 <p id ="CopiedCDRIDs" STYLE="font-size: 10pt; color: rgb(200, 100, 100); display: none;">Here are the copied CDRID's. Highlight the list and type Ctrl+C to copy to the clipboard:<br>
 <textarea WRAP=VIRTUAL id = "CopiedCDRIDsEditBox" name="CopiedCDRIDsEditBox" value="" wrap="virtual" STYLE="width: 80%; height:300px"></textarea>
 </p>
  </body>
 </html>""")
-html = u"".join(html)
+html = "".join(html)
 cdrcgi.sendPage(header + html)
 

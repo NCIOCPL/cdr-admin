@@ -1,63 +1,93 @@
-#----------------------------------------------------------------------
-# Tools used for tracking down what really happened when a user
-# reports anomalies in stored versions of CDR documents.
-#----------------------------------------------------------------------
-import cdrdb, cgi, cdr
+#!/usr/bin/env python
 
-fields = cgi.FieldStorage()
-start  = fields.getvalue('start') or str(cdr.calculateDateByOffset(-7))
-end    = fields.getvalue('end')   or str(cdr.calculateDateByOffset(0))
-user   = fields.getvalue('user')  or '%'
-cursor = cdrdb.connect('CdrGuest').cursor()
-sqlEnd = len(end) == 10 and ("%s 23:59:59" % end) or end
+"""Report on the logged events on the client.
 
-cursor.execute("""\
-    SELECT u.name, u.fullname, c.event_time, c.event_desc, s.id, s.name
-      FROM client_log c
-      JOIN session s
-        ON c.session = s.id
-      JOIN usr u
-        ON u.id = s.usr
-     WHERE c.event_time BETWEEN '%s' AND '%s'
-       AND u.name LIKE '%s'
-  ORDER BY c.event_id""" % (start, sqlEnd, user))
-html = [u"""\
-<html>
- <head>
-  <title>CDR Client Events</title>
-  <style>* { font-family: Arial, sans-serif }</style>
- </head>
- <body>
-  <h1>CDR Client Events %s &mdash; %s</h1>
-  <table border='1' cellpadding='2' cellspacing='0'>
-   <tr>
-    <th>User ID</th>
-    <th>User Name</th>
-    <th>Event Time</th>
-    <th>Event Description</th>
-    <th>Session ID</th>
-    <!--
-    <th>Session Name</th>
-    -->
-   </tr>
-""" % (start, end)]
-for uId, uName, eTime, eDesc, sId, sName in cursor.fetchall():
-    html.append(u"""\
-   <tr>
-    <td>%s</td>
-    <td>%s</td>
-    <td>%s</td>
-    <td>%s</td>
-    <td>%s</td>
-    <!-- <td>%s</td> -->
-   </tr>
-""" % (cgi.escape(uId), cgi.escape(uName), eTime, cgi.escape(eDesc), sId,
-       cgi.escape(sName)))
-html.append(u"""\
-  </table>
- </body>
-</html>""")
-html = u"".join(html)
-print "Content-type: text/html; charset=utf-8"
-print ""
-print html.encode('utf-8')
+Tools used for tracking down what really happened when a user
+reports anomalies in stored versions of CDR documents.
+"""
+
+import datetime
+from cdrcgi import Controller
+
+
+class Control(Controller):
+
+    SUBTITLE = "Client Events"
+    COLUMNS = (
+        "User ID",
+        "User Name",
+        "Event Time",
+        "Event Description",
+        "Session ID",
+        "Session Name",
+    )
+    FIELDS = (
+        "u.name",
+        "u.fullname",
+        "c.event_time",
+        "c.event_desc",
+        "s.id",
+        "s.name",
+    )
+    TODAY = datetime.date.today()
+
+    def populate_form(self, page):
+        """Bypass the from, which isn't used."""
+        self.show_report()
+
+    def build_tables(self):
+        """Create the only table this report uses."""
+
+        opts = dict(columns=self.COLUMNS, caption=self.caption)
+        return self.Reporter.Table(self.rows, **opts)
+
+    @property
+    def caption(self):
+        """The string describing the report's range."""
+        return f"{len(self.rows)} Events From {self.start} To {self.end}"
+
+    @property
+    def end(self):
+        """End of the report's date range."""
+
+        if not hasattr(self, "_end"):
+            self._end = self.fields.getvalue("end") or str(self.TODAY)
+        return self._end
+
+    @property
+    def rows(self):
+        """Table rows for the report."""
+
+        if not hasattr(self, "_rows"):
+            end = self.end
+            if len(end) == 10:
+                end = f"{end} 23:59:59"
+            user = self.user
+            query = self.Query("usr u", *self.FIELDS).order("c.event_id")
+            query.join("session s", "s.usr = u.id")
+            query.join("client_log c", "c.session = s.id")
+            query.where(query.Condition("c.event_time", self.start, ">="))
+            query.where(query.Condition("c.event_time", end, "<="))
+            if user:
+                query.where(query.Condition("u.name", user))
+            self._rows = [tuple(row) for row in query.execute(self.cursor)]
+        return self._rows
+
+    @property
+    def start(self):
+        """Start of the report's date range."""
+
+        if not hasattr(self, "_start"):
+            default = self.TODAY - datetime.timedelta(7)
+            self._start = self.fields.getvalue("start") or str(default)
+        return self._start
+
+    @property
+    def user(self):
+        """Optional user for the report."""
+        return self.fields.getvalue("user")
+
+
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+    Control().run()

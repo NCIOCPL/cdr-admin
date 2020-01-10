@@ -2,36 +2,48 @@
 # Web interface for showing changes which would be made by a
 # global change.
 #----------------------------------------------------------------------
-import cgi, glob, cdrcgi, os, xml.dom.minidom, cdr
+import cgi
+from glob import glob
+from html import escape as html_escape
+import os
+import re
+from lxml import etree
+import cdr
+import cdrcgi
+from cdrapi.docs import Doc
+from cdrapi.users import Session
 
-BASE      = 'd:/cdr/GlobalChange/'
+BASE      = f'{cdr.BASEDIR}/GlobalChange'
 script    = 'ShowGlobalChangeTestResults.py'
 fields    = cgi.FieldStorage()
-directory = fields and fields.getvalue("dir") or None
-file      = fields and fields.getvalue("file") or None
-sortBy    = fields and fields.getvalue("sortBy") or "byDiff"
-reSort    = fields and fields.getvalue("reSort") or None
-reSortDir = fields and fields.getvalue("reSortDir") or None
+directory = fields.getvalue("dir") or None
+filename  = fields.getvalue("file") or None
+sortBy    = fields.getvalue("sortBy") or "byDiff"
+reSort    = fields.getvalue("reSort") or None
+reSortDir = fields.getvalue("reSortDir") or None
 
 # If re-sort requested, set the directory to force re-sorting
 if reSort:
     directory = reSortDir
 
 # Format an xml file with nice indentation
-def prettyPrint(doc):
-    doc = xml.dom.minidom.parseString(doc).toprettyxml("  ")
-    if type(doc) == type(u""):
-        doc = doc.encode('utf-8')
-    return cdr.stripBlankLines(doc)
+def prettyPrint(xml):
+    xml = re.sub(r"<\?xml[^?]*\?>\s*", "", xml)
+    doc = Doc(Session("guest"), xml=xml)
+    doc.doctype = doc.root.tag
+    doc.normalize()
+    xml = etree.tostring(doc.root, pretty_print=True, encoding="unicode")
+    return cdr.stripBlankLines(xml)
 
 # If we got here by a hyperlink to a file from a page constructed
 #   by this program, display the file as prettyPrinted xml, or text.
-if file and directory:
-    f = open(BASE + directory + "/" + file)
-    doc = f.read()
-    if file.lower().endswith('.xml'):
+if filename and directory:
+    path = f"{BASE}/{directory}/{filename}"
+    with open(path, encoding="utf-8") as fp:
+        doc = fp.read()
+    if filename.lower().endswith('.xml'):
         doc = prettyPrint(doc)
-    cdrcgi.sendPage(u"""\
+    cdrcgi.sendPage("""\
 <html>
  <body>
   <pre>
@@ -39,7 +51,7 @@ if file and directory:
   </pre>
  </body>
 </html>
-""" % cgi.escape(unicode(doc, "utf-8")))
+""" % html_escape(doc))
 
 class DocFileInfo:
     """
@@ -57,7 +69,7 @@ class DocFileInfo:
         try:
             fullpath = "%s/%s" % (baseDir, filename)
             self.fsize = os.stat(fullpath).st_size
-        except Exception, info:
+        except Exception as info:
             # Won't always exist
             self.fname = None
 
@@ -140,17 +152,16 @@ def makeRow(docId, col2, verInfo):
 # If the user has picked a directory, take him to a display of
 #   all files in that directory
 if directory:
-    baseDir = BASE + directory
+    baseDir = f"{BASE}/{directory}"
     files = os.listdir(baseDir)
     docs = {}
-    for file in files:
-        if file.startswith('CDR0') and (file.endswith('xml') or
-                                        file.endswith('diff') or
-                                        file.endswith('NEW_ERRORS.txt')):
-            docId = file[:13]
-            if not docs.has_key(docId):
+    for filename in files:
+        if filename.startswith('CDR0') and (filename.endswith('xml') or
+                                        filename.endswith('diff') or
+                                        filename.endswith('NEW_ERRORS.txt')):
+            docId = filename[:13]
+            if docId not in docs:
                 doc = docs[docId] = Doc(baseDir, docId)
-    keys = docs.keys()
 
     # Check radio buttons
     chkSortDiff  = ''
@@ -164,27 +175,25 @@ if directory:
         # Index = docId -> docId -> Doc
         # Not needed, but simplifies the logic to have all indexes at the
         #   same level of indirection
-        for key in keys:
+        for key in docs:
             sortKeys[key] = key
         chkSortCdrId = " checked='1'"
     elif sortBy == "byDiff":
         # Index = Diff file size -> docId -> Doc
         # Using negative of size to get reverse sort order
-        for key in keys:
+        for key in docs:
             newKey = '%d.%s' % (maxsize - docs[key].diffSize, key)
             sortKeys[newKey] = key
         chkSortDiff = " checked='1'"
     elif sortBy == "byCwdSize":
         # Index = CWD file size -> docId -> Doc
-        for key in keys:
+        for key in docs:
             newKey = '%d.%s' % (maxsize - docs[key].cwdSize, key)
             sortKeys[newKey] = key
         chkSortSize = " checked='1'"
 
-    keys = sortKeys.keys()
-    keys.sort()
     rows = []
-    for key in keys:
+    for key in sorted(sortKeys):
         doc = docs[sortKeys[key]]
         docId = doc.docId
         if doc.cwd.diff.fname:
@@ -201,10 +210,10 @@ if directory:
     if directory:
         stamp = "Runtime: %s &nbsp; " % directory
     # Counts
-    docCount = len(keys)
+    docCount = len(sortKeys)
     verCount = len(rows)
 
-    cdrcgi.sendPage(u"""\
+    cdrcgi.sendPage("""\
 <html>
  <head>
   <title>Global Change Test Results</title>
@@ -236,16 +245,14 @@ if directory:
 """ % (directory, chkSortCdrId, chkSortDiff, chkSortSize,
        stamp, docCount, verCount, "".join(rows)))
 
-dirs =  glob.glob(BASE + '/20*')
-dirs.sort()
-dirs.reverse()
+dirs =  glob(f"{BASE}/20*")
 links = []
-for d in dirs:
+for d in reversed(sorted(dirs)):
     d2 = os.path.basename(d)
     d3 = d2[:10] + ' ' + d2[11:13] + ':' + d2[14:16] + ':' + d2[17:19]
     link = "<a href='%s?dir=%s'>%s</a><br />\n" % (script, d2, d3)
     links.append(link)
-cdrcgi.sendPage(u"""\
+cdrcgi.sendPage("""\
 <html>
  <head>
   <title>Global Change Test Results</title>

@@ -1,90 +1,51 @@
-#----------------------------------------------------------------------
-# Admin menu for reports on CDR Media documents.
-#
-# BZIssue::1653
-# BZIssue::2135
-# BZIssue::3226
-# BZIssue::3704
-#----------------------------------------------------------------------
-import cgi, cdrcgi
+#!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields  = cgi.FieldStorage()
-session = cdrcgi.getSession(fields)
-action  = cdrcgi.getRequest(fields)
-title   = "CDR Administration"
-section = "Media Reports"
-SUBMENU = "Reports Menu"
-buttons = [SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-page    = cdrcgi.Page(title, subtitle=section, action="Reports.py",
-                      buttons=buttons, session=session,
-                      body_classes="admin-menu")
+"""Media report menu.
+"""
 
-#----------------------------------------------------------------------
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if action == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif action == SUBMENU:
-    cdrcgi.navigateTo("Reports.py", session)
+from cdrcgi import Controller
 
-#----------------------------------------------------------------------
-# Handle request to log out.
-#----------------------------------------------------------------------
-if action == "Log Out":
-    cdrcgi.logout(session)
+class Control(Controller):
 
-#----------------------------------------------------------------------
-# QC reports.
-#----------------------------------------------------------------------
-session = "%s=%s" % (cdrcgi.SESSION, session)
-B = cdrcgi.Page.B
-page.add(B.H3("QC Reports"))
-page.add("<ol>")
-url = "MediaSearch.py?%s" % session
-page.add(B.LI(B.A("Advanced Search", href=url)))
-url = "%s/QcReport.py?DocType=Media&ReportType=img&%s" % (cdrcgi.BASE, session)
-page.add(B.LI(B.A("Media Doc QC Report", href=url)))
-page.add("</ol>")
+    SUBTITLE = "Media Reports"
+    SUBMIT = None
+    QC_PARMS = dict(DocType="Media", ReportType="img", DocVersion="-1")
 
-#----------------------------------------------------------------------
-# Management reports.
-#----------------------------------------------------------------------
-page.add(B.H3("Management Reports"))
-page.add("<ol>")
-for script, label in(
-    ("ocecdr-4038.py?", "Media (Images) Processing Status Report"),
-    ('RecordingTrackingReport.py?', 'Board Meeting Recording Tracking Report'),
-    ('MediaLists.py?',              'Media Lists'),
-    ('ocecdr-3704.py?',             'Media Permissions Report'),
-    ('MediaCaptionContent.py?',     'Media Caption and Content Report'),
-    ('PubStatsByDate.py?VOL=Y&',    'Media Doc Publishing Report'),
-    ('MediaLinks.py?',              'Linked Media Documents'),
-    ('media-translation-job-report.py?',
-     'Media Translation Job Workflow Report',)
-):
-    url = "%s/%s%s" % (cdrcgi.BASE, script, session)
-    page.add(B.LI(B.A(label, href=url)))
-page.add("</ol>")
+    def populate_form(self, page):
+        page.body.set("class", "admin-menu")
+        page.form.append(page.B.H3("Management Reports"))
+        ol = page.B.OL()
+        page.form.append(ol)
+        for display, script in (
+            ("Board Meeting Recording Tracking Report",
+             "RecordingTrackingReport.py"),
+            ("Linked Media Documents", "MediaLinks.py"),
+            ("Media Caption and Content Report", "MediaCaptionContent.py"),
+            ("Media Doc Publishing Report", "PublishedMediaDocuments.py"),
+            ("Media (Images) Processing Status Report", "ocecdr-4038.py"),
+            ("Media Lists", "MediaLists.py"),
+            ("Media Permissions Report", "ocecdr-3704.py"),
+            ("Media Translation Job Workflow Report",
+             "media-translation-job-report.py"),
+        ):
+            ol.append(page.B.LI(page.menu_link(script, display)))
+        page.form.append(page.B.H3("QC Reports"))
+        ol = page.B.OL()
+        page.form.append(ol)
+        for display, script, parms in (
+            ("Advanced Search", "MediaSearch.py", dict()),
+            ("Media Doc QC Report", "QcReport.py", self.QC_PARMS),
+        ):
+            ol.append(page.B.LI(page.menu_link(script, display, **parms)))
+        page.form.append(page.B.H3("Other Reports"))
+        ol = page.B.OL()
+        page.form.append(ol)
+        for display, script in (
+            ("Audio Pronunciation Recordings Tracking Report",
+             "PronunciationRecordings.py"),
+            ("Audio Pronunciation Review Statistics Report",
+             "GlossaryTermAudioReviewReport.py"),
+        ):
+            ol.append(page.B.LI(page.menu_link(script, display)))
 
-#----------------------------------------------------------------------
-# Other reports.
-#----------------------------------------------------------------------
-page.add(B.H3("Other Reports"))
-page.add("<ol>")
-for script, label in (
-    ('PronunciationRecordings.py?',
-     'Audio Pronunciation Recordings Tracking Report'),
-    ('GlossaryTermAudioReviewReport.py?',
-     'Audio Pronunciation Review Statistics Report'),
-):
-    url = "%s/%s%s" % (cdrcgi.BASE, script, session)
-    page.add(B.LI(B.A(label, href=url)))
-page.add("</ol>")
-
-#----------------------------------------------------------------------
-# Display the menu.
-#----------------------------------------------------------------------
-page.send()
+Control().run()

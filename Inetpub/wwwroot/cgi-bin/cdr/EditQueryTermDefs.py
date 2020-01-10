@@ -1,203 +1,195 @@
-#----------------------------------------------------------------------
-# Prototype for editing CDR query term definitions.
-#----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, string, urllib
+#!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields  = cgi.FieldStorage()
-session = cdrcgi.getSession(fields)
-request = fields.getvalue(cdrcgi.REQUEST)
-title   = "CDR Administration"
-section = "Manage Query Term Definitions"
-buttons = [cdrcgi.MAINMENU, "Log Out"]
-server1 = fields.getvalue('server1')
-server2 = fields.getvalue('server2')
-newPath = fields.getvalue('add')
-delete  = fields.getvalue('delete')
-script  = "EditQueryTermDefs.py"
-header  = cdrcgi.header(title, title, section, script, buttons,
-                        stylesheet = u"""\
-<style type='text/css'>
-   .fb { width: 150px; }
-   .path { color: green; font-weight: bold; font-family: "Courier New" }
-   .path { color: navy; font-size: 1.0em; }
-   .path { color: black; }
-</style>""")
-
-#----------------------------------------------------------------------
-# Make sure the login was successful.
-#----------------------------------------------------------------------
-if not session: cdrcgi.bail('Unknown or expired CDR session.')
-
-#----------------------------------------------------------------------
-# Return to the main menu if requested.
-#----------------------------------------------------------------------
-if request == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-
-#----------------------------------------------------------------------
-# Handle request to log out.
-#----------------------------------------------------------------------
-if request == "Log Out":
-    cdrcgi.logout(session)
-
-#----------------------------------------------------------------------
-# Process an action if the user requested one.
-#----------------------------------------------------------------------
-if delete:
-    try:
-        err = cdr.delQueryTermDef(session, delete, None)
-    except Exception as e:
-        cdrcgi.bail("Failure deleting {!r}: {}".format(delete, e))
-    if err: cdrcgi.bail(err)
-if newPath:
-    try:
-        err = cdr.addQueryTermDef(session, newPath, None)
-    except Exception as e:
-        cdrcgi.bail("Failure adding {!r}: {}".format(newPath, e))
-    if err: cdrcgi.bail(err)
-
-#----------------------------------------------------------------------
-# Compare the definitions with another server.
-#----------------------------------------------------------------------
-if request == 'Compare' and server1 and server2:
-    try:
-        defs1 = cdr.listQueryTermDefs('guest', tier=server1)
-    except:
-        cdrcgi.bail("Unable to retrieve definitions from {!r}".format(server1))
-    if type(defs1) in (type(''), type(u'')):
-        cdrcgi.bail(defs1)
-    defs1 = [d[0] for d in defs1]
-    try:
-        defs2 = cdr.listQueryTermDefs('guest', tier=server2)
-    except:
-        cdrcgi.bail("Unable to retrieve definitions from {!r}".format(server2))
-    if type(defs2) in (type(''), type(u'')):
-        cdrcgi.bail(defs2)
-    defs2 = [d[0] for d in defs2]
-    defs1.sort()
-    defs2.sort()
-    extra1 = []
-    extra2 = []
-    for qdef in defs1:
-        if qdef not in defs2:
-            extra1.append(qdef)
-    for qdef in defs2:
-        if qdef not in defs1:
-            extra2.append(qdef)
-    html = """\
-<html>
- <head>
-  <title>Query Term Definitions on %s and %s</title>
- </head>
- <body>
-""" % (server1, server2)
-    if not extra1 and not extra2:
-        cdrcgi.sendPage(html + u"""\
-  <h2>Query Term Definitions on %s and %s</h2>
-  <p>Definitions match</p>
- </body>
-</html>
-""" % (server1, server2))
-    if extra1:
-        html += u"""\
-  <h2>On %s</h2>
-  <ul>
-""" % server1
-        for extra in extra1:
-            html += u"""\
-   <li>%s</li>
-""" % cgi.escape(extra)
-        html += """\
-  </ul>
-  <br>
+"""Edit CDR query term definitions.
 """
-    if extra2:
-        html += u"""\
-  <h2>On %s</h2>
-  <ul>
-""" % server2
-        for extra in extra2:
-            html += u"""\
-   <li>%s</li>
-""" % cgi.escape(extra)
-        html += u"""\
-  </ul>
-"""
-    cdrcgi.sendPage(html + u"""\
- </body>
-</html>
-""")
 
-#----------------------------------------------------------------------
-# Retrieve the lists of rules and query term definitions from the server.
-#----------------------------------------------------------------------
-defs = cdr.listQueryTermDefs(session)
-if type(defs) in (unicode, str): cdrcgi.bail(defs)
-defs.sort()
+from cdrcgi import Controller
+from cdrapi.searches import QueryTermDef
+from cdrapi.users import Session
 
-#----------------------------------------------------------------------
-# Create a button for deleting a specific query term definition.
-#----------------------------------------------------------------------
-def makeDeleteButton(path):
-    onclick = 'javascript:delPath("%s");' % cgi.escape(path, True)
-    return ("<input class='fb' type='button' onclick='%s' "
-            "value='Delete Definition' />"
-            % onclick.replace("'", "&apos;"))
 
-#----------------------------------------------------------------------
-# Display the existing definitions.
-#----------------------------------------------------------------------
-form = [u"""\
-  <script type='text/javascript' language='JavaScript'>
-   function addPath() {
-       var form = document.forms[0];
-       var newPath = form.newPath.value;
-       if (!newPath) {
-           window.alert('No path given');
-           return;
-       }
-       form.add.value = newPath;
-       form.submit();
-   }
-   function delPath(p) {
-       if (!window.confirm("Delete query term definition for '" + p + "'?"))
-           return;
-       var form = document.forms[0];
-       form['delete'].value = p;
-       form.submit();
-   }
-  </script>
-  <form method='post' action='EditQueryTermDefs.py'>
-   <input type='hidden' name='%s' value='%s'>
-   <input type='hidden' name='add' value=''>
-   <input type='hidden' name='delete' value=''>
-   <input class='fb' type='submit' name='Request' value='Compare'>
-   <input name='server1' value='DEV' />
-   <b>with</b>
-   <input name='server2' value='PROD' />
-   <br /><br />
-   <table>
-    <tr>
-     <td><input class='fb'
-                type='button' onclick='javascript:addPath()'
-                value='Add New Definition' /></td>
-     <td><input name='newPath' size='80' value='' /></td>
-    </tr>
-""" % (cdrcgi.SESSION, session)]
-for path, rule in defs:
-    form.append(u"""\
-    <tr>
-     <td>%s</td>
-     <td class='path' nowrap='nowrap'>%s</td>
-    </tr>
-""" % (makeDeleteButton(path), cgi.escape(path)))
-form.append(u"""\
-   </table>
-  </form>
- </body>
-<html>
-""")
-cdrcgi.sendPage(header + u"".join(form))
+class Control(Controller):
+
+    SUBTITLE = "Manage Query Term Definitions"
+    TIERS = "PROD", "STAGE", "QA", "DEV"
+    COMPARE = "Compare"
+    ADD = "Add"
+    REMOVE = "Remove"
+    LOGNAME = "EditQueryTermDefs"
+    MANAGE = "Manage Definitions"
+
+    def run(self):
+        """Add some extra routing."""
+
+        try:
+            if self.request == self.COMPARE:
+                return self.compare()
+            elif self.request == self.ADD:
+                return self.add()
+            elif self.request == self.REMOVE:
+                return self.remove()
+        except Exception as e:
+            self.logger.exception("Failure of %s command", self.request)
+            self.bail(e)
+        Controller.run(self)
+
+    def populate_form(self, page):
+        """Add the fields to the form page.
+
+        Pass:
+            page - HTMLPage object to which we add fields
+        """
+
+        fieldset = page.fieldset("Choose Tiers and Click the 'Compare' Button")
+        opts = dict(options=self.TIERS, default=self.session.tier.name)
+        if self.session.tier.name == "PROD":
+            default = "DEV"
+        fieldset.append(page.select("lower", **opts))
+        opts["default"] = "PROD"
+        fieldset.append(page.select("upper", **opts))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Enter a New Path and Click 'Add'")
+        fieldset.set("id", "new-dev")
+        fieldset.append(page.text_field("new_path"))
+        page.form.append(fieldset)
+        legend = "Select Definitions to Delete and Click 'Remove'"
+        fieldset = page.fieldset(legend)
+        for definition in self.definitions:
+            opts = dict(value=definition.path, label=definition.path)
+            fieldset.append(page.checkbox("path", **opts))
+        page.form.append(fieldset)
+        page.add_css("""\
+fieldset { width: 1024px; }
+.labeled-field select, #new-dev input { width: 874px; }""")
+
+    def compare(self):
+        """Compare the definitions on two tiers."""
+
+        session = Session("guest", tier=self.lower)
+        lower = set([d.path for d in QueryTermDef.get_definitions(session)])
+        session = Session("guest", tier=self.upper)
+        upper = set([d.path for d in QueryTermDef.get_definitions(session)])
+        buttons = (
+            self.HTMLPage.button(self.MANAGE),
+            self.HTMLPage.button(self.DEVMENU),
+            self.HTMLPage.button(self.ADMINMENU),
+            self.HTMLPage.button(self.LOG_OUT),
+        )
+        opts = dict(
+            action=self.script,
+            buttons=buttons,
+            subtitle=self.subtitle,
+            session=self.session,
+            method=self.method,
+        )
+        page = self.HTMLPage(self.title, **opts)
+        diffs = False
+        only_lower = lower - upper
+        only_upper = upper - lower
+        if only_lower:
+            fieldset = page.fieldset(f"Only on {self.lower}")
+            ul = page.B.UL()
+            for path in sorted(only_lower, key=str.lower):
+                ul.append(page.B.LI(path))
+            fieldset.append(ul)
+            page.form.append(fieldset)
+        if only_upper:
+            fieldset = page.fieldset(f"Only on {self.upper}")
+            ul = page.B.UL()
+            for path in sorted(only_upper, key=str.upper):
+                ul.append(page.B.LI(path))
+            fieldset.append(ul)
+            page.form.append(fieldset)
+        if not only_lower and not only_upper:
+            p = page.B.P(f"{self.lower} and {self.upper} match.")
+            p.set("class", "news info center")
+            page.form.append(p)
+        page.send()
+
+    def add(self):
+        """Add a new definition and re-display the form."""
+
+        if not self.new_path:
+            self.bail("No path specified to be added")
+        QueryTermDef(self.session, self.new_path).add()
+        self.subtitle = "New query term definition successfully added"
+        self.show_form()
+
+    def remove(self):
+        """Delete the checked paths and re-display the form."""
+
+        if not self.deletions:
+            self.bail("No definitions marked for deletion")
+        for path in self.deletions:
+            QueryTermDef(self.session, path).delete()
+        count = len(self.deletions)
+        self.subtitle = f"Removed {count} definition(s) successfully"
+        self.show_form()
+
+    @property
+    def buttons(self):
+        """Customize form buttons."""
+
+        return (
+            self.COMPARE,
+            self.ADD,
+            self.REMOVE,
+            self.DEVMENU,
+            self.ADMINMENU,
+            self.LOG_OUT,
+        )
+
+    @property
+    def definitions(self):
+        """Sorted names of the existing query term definitions."""
+
+        if not hasattr(self, "_definitions"):
+            self._definitions = QueryTermDef.get_definitions(self.session)
+        return self._definitions
+
+    @property
+    def deletions(self):
+        """Paths marked for removal."""
+        return self.fields.getlist("path")
+
+    @property
+    def lower(self):
+        """Lower tier name for comparing definitions."""
+        return self.fields.getvalue("lower")
+
+    @property
+    def new_path(self):
+        """String for new query term definition to be added."""
+        return (self.fields.getvalue("new_path") or "").strip()
+
+    @property
+    def subtitle(self):
+        """String to be displayed under banner."""
+
+        if not hasattr(self, "_subtitle"):
+            self._subtitle = self.SUBTITLE
+        return self._subtitle
+
+    @subtitle.setter
+    def subtitle(self, value):
+        """Allow some actions to change this.
+
+        Pass:
+            value - replacement string for subtitle
+        """
+
+        self._subtitle = value
+
+    @property
+    def upper(self):
+        """Upper tier name for comparing definitions."""
+        if not hasattr(self, "_upper"):
+            self._upper = self.fields.getvalue("upper")
+            if self._upper == self.lower:
+                self.bail(f"Attempt to compare {self.lower} to itself")
+        return self._upper
+
+
+if __name__ == "__main__":
+    """Don't run the script if loaded as a module."""
+    Control().run()

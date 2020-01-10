@@ -1,18 +1,11 @@
-#----------------------------------------------------------------------
-# Web interface for managing control tables for valid values.
-# OCECDR-4193
-#----------------------------------------------------------------------
-import urllib
-import cdr
-import cdrcgi
-import cdrdb
+#!/usr/bin/env python
 
-class Control(cdrcgi.Control):
-    """
+"""Manage control tables for valid values.
+
     Manages three separate form pages:
      1. form for selecting a table
      2. form for selecting a value
-     3. form for adding/editing a value
+     3. form for adding/editing/dropping a value
 
     This class/script can be used to support any table of valid values
     comprised as having exactly these columns:
@@ -23,273 +16,237 @@ class Control(cdrcgi.Control):
 
     To add support for such a table, all that is needed is to add the
     name of the table to the Control.TABLES tuple immediately below.
-    """
+"""
 
-    TABLES = ("summary_translation_state", "summary_change_type")
-    FIELDS = ("value_id", "value_name", "value_pos")
+from cdrcgi import Controller, navigateTo
+
+
+class Control(Controller):
+    """Access to the database and form-building tools."""
+
+    SUBTITLE = "Edit Value Tables"
+    SUBTITLE = "EditValueTables"
+    TABLES = (
+        "glossary_translation_state",
+        "media_translation_state",
+        "summary_translation_state",
+        "summary_change_type"
+    )
+    FIELDS = "value_id", "value_name", "value_pos"
     ADD = "Add"
     DROP = "Drop"
     SAVE = "Save"
     CANCEL = "Cancel"
     MAX_VALUE_LEN = 128
 
-    def __init__(self):
-        """
-        Collect and validate request parameters. Create our own database
-        connection and cursor, capable of writing to the database.
-        """
-
-        cdrcgi.Control.__init__(self, "Edit Value Tables")
-        if not self.session:
-            cdrcgi.bail("not authorized")
-        if not cdr.canDo(self.session, "MANAGE DB TABLES"):
-            cdrcgi.bail("not authorized")
-        self.table = self.get_table()
-        self.value_id = self.get_value_id()
-        self.warning = self.message = None
-        self.conn = cdrdb.connect()
-        self.cursor = self.conn.cursor()
-
     def run(self):
-        """
-        Override base class method because we have multiple forms.
-        """
+        """Override base class method because we have multiple forms."""
 
-        if self.request == self.ADD:
+        if not self.session.can_do("MANAGE DB TABLES"):
+            self.bail("not authorized")
+        if self.request in (self.ADD, self.SUBMIT):
             self.show_form()
         elif self.request == self.DROP:
             self.drop()
         elif self.request == self.SAVE:
             self.save()
-        elif self.request == self.SUBMIT:
-            self.show_form()
         elif self.request == self.CANCEL:
-            cdrcgi.navigateTo(self.script, self.session, table=self.table)
+            navigateTo(self.script, self.session.name, table=self.table)
         else:
-            cdrcgi.Control.run(self)
+            Controller.run(self)
 
-    def set_form_options(self, opts):
-        """
-        Add buttons for extra forms/actions.
+    def populate_form(self, page):
+        """If we need more information, ask for it.
+
+        Pass:
+            page - HTMLPage object on which we draw the form fields
         """
 
-        if self.table:
-            if self.value_id or self.request == self.ADD:
-                opts["buttons"][0] = self.SAVE
-                opts["buttons"].insert(1, self.CANCEL)
-                if self.value_id:
-                    opts["buttons"].insert(2, self.DROP)
-            else:
-                opts["buttons"][0] = self.ADD
-        return opts
+        if not self.table:
+            fieldset = page.fieldset("Select Table")
+            for table in self.TABLES:
+                opts = dict(value=table, label=table)
+                fieldset.append(page.radio_button("table", **opts))
+        elif self.id or self.request == self.ADD:
+            page.form.append(page.hidden_field("table", self.table))
+            page.form.append(page.hidden_field("id", self.id))
+            value = position = ""
+            if self.id:
+                value = self.map[self.id].name
+                position = self.map[self.id].position
+            fieldset = page.fieldset("Unique Value Name and Position")
+            field = page.text_field("value", label="Value Name", value=value)
+            field.set("maxlength", str(self.MAX_VALUE_LEN))
+            fieldset.append(field)
+            opts = dict(value=position)
+            fieldset.append(page.text_field("position", **opts))
+        else:
+            page.form.append(page.hidden_field("table", self.table))
+            fieldset = page.fieldset("Values (click link to edit a values)")
+            ul = page.B.UL()
+            params = dict(table=self.table)
+            for value in sorted(self.map.values()):
+                display = f"{value.name} (position {value.position:d})"
+                params["id"] = str(value.id)
+                url = self.make_url(self.script, **params)
+                ul.append(page.B.LI(page.B.A(display, href=url)))
+            fieldset.append(ul)
+        page.form.append(fieldset)
 
     def save(self):
-        """
-        Save a new or modified row in the selected valid values table.
-        """
+        """Save a new or modified row in the selected valid values table."""
 
-        value = unicode(self.fields.getvalue("value", "").strip(), "utf-8")
-        position = self.fields.getvalue("position")
-        record = self.Value(self.value_id, value, position)
-        error = record.validate(self)
-        if error:
-            self.warning = error
-            self.show_form()
-        if not record.key:
+        if not self.id:
             cols = ", ".join(self.FIELDS[1:])
-            query = "INSERT INTO %s (%s) VALUES (?,?)" % (self.table, cols)
-            self.cursor.execute(query, (record.value, record.position))
+            args = self.value, self.position
+            query = f"INSERT INTO {self.table} ({cols}) VALUES (?,?)"
         else:
-            sets = ", ".join([("%s = ?" % col) for col in self.FIELDS[1:]])
-            query = "UPDATE %s SET %s WHERE value_id = ?" % (self.table, sets)
-            parms = (record.value, record.position, record.key)
-            self.cursor.execute(query, parms)
+            sets = ", ".join([f"{col} = ?" for col in self.FIELDS[1:]])
+            args = self.value, self.position, self.id
+            query = f"UPDATE {self.table} SET {sets} WHERE value_id = ?"
+        self.cursor.execute(query, args)
         self.conn.commit()
-        cdrcgi.navigateTo(self.script, self.session, table=self.table)
+        navigateTo(self.script, self.session.name, table=self.table)
 
     def drop(self):
-        """
-        Remove a from the table.
+        """Remove a value from the table.
 
-        Confirmation has already been provided via Javascript.
         Will fail with an error message displayed if the value
         is still in use.
         """
 
-        table, id = self.table, self.value_id
+        if not self.id:
+            self.bail()
+        query = f"DELETE FROM {self.table} WHERE value_id = ?"
         try:
-            query = "DELETE FROM %s WHERE value_id = %d" % (table, id)
-            self.cursor.execute(query)
+            self.cursor.execute(query, self.id)
             self.conn.commit()
-            cdrcgi.navigateTo(self.script, self.session, table=table)
-        except:
-            self.warning = "Value '%s' is in use" % self.map[id].value
-            self.show_form()
+            navigateTo(self.script, self.session, table=self.table)
+        except Exception as e:
+            args = self.id, self.table
+            self.logger.exception("failure dropping row %s from %s", *args)
+            self.bail(e)
 
-    def get_table(self):
-        """
-        Get and validate the 'table' parameter if present (and load its rows).
-        """
+    @property
+    def buttons(self):
+        """Customize the button list, depending on what's going on."""
 
-        table = self.fields.getvalue("table")
-        if table:
-            if table not in self.TABLES:
-                cdrcgi.bail()
-            query = cdrdb.Query(table, *self.FIELDS)
-            self.rows = query.order("value_pos").execute(self.cursor).fetchall()
-            self.map = {}
-            for row in self.rows:
-                self.map[row[0]] = self.Value(*row)
-        return table
+        buttons = [self.DEVMENU, self.ADMINMENU, self.LOG_OUT]
+        if self.table:
+            if self.id or self.request == self.ADD:
+                if self.id:
+                    return [self.SAVE, self.CANCEL, self.DROP] + buttons
+                return [self.SAVE, self.CANCEL] + buttons
+            return [self.ADD] + buttons
+        return [self.SUBMIT] + buttons
 
-    def get_value_id(self):
-        """
-        Get and validate the value's primary key if present.
-        """
+    @property
+    def id(self):
+        """Primary key for the current value."""
 
-        value_id = self.fields.getvalue("value_id")
-        if not value_id:
-            return None
-        try:
-            value_id = int(value_id)
-        except:
-            cdrcgi.bail()
-        if value_id not in [row[0] for row in self.rows]:
-            cdrcgi.bail
-        return value_id
+        if not hasattr(self, "_id"):
+            self._id = None
+            id = self.fields.getvalue("id", "").strip()
+            if id:
+                try:
+                    self._id = int(id)
+                except Exception:
+                    self.bail()
+            if self._id and self._id not in self.map:
+                self.bail()
+        return self._id
 
-    def populate_table_selection_form(self, form):
-        """
-        Show the form for selecting a database table.
-        """
+    @property
+    def map(self):
+        """Dictionary of `Value` objects, indexed by `value_id`."""
 
-        form.add("<fieldset>")
-        form.add(form.B.LEGEND("Select Table"))
-        for table in self.TABLES:
-            form.add_radio("table", table, table)
-        form.add("</fieldset>")
+        if not hasattr(self, "_map"):
+            self._map = {}
+            if self.table:
+                query = self.Query(self.table, *self.FIELDS)
+                for row in query.execute(self.cursor).fetchall():
+                    value = self.Value(row)
+                    self._map[value.id] = value
+        return self._map
 
-    def populate_value_editing_form(self, form):
-        """
-        Show the form for editing/adding a value record.
-        """
+    @property
+    def position(self):
+        """Indication of where this value should be display in picklists."""
 
-        if self.value_id:
-            form.add_script("""\
-jQuery("input[value='%s']").click(function(e) {
-    if (confirm("Are you sure?"))
-        return true;
-    e.preventDefault();
-});""" % self.DROP)
-        form.add_script("""\
-jQuery("input[name='value']").attr("maxlength", %d);""" % self.MAX_VALUE_LEN)
-        row = self.map.get(self.value_id)
-        action = row and "Edit" or "Add"
-        value = row and row.value or ""
-        position = row and row.position or ""
-        value_id = row and str(row.key) or ""
-        form.add("<fieldset>")
-        form.add_hidden_field("value_id", value_id)
-        form.add(form.B.LEGEND("%s Value" % action))
-        form.add_text_field("value", "Value", value=value)
-        form.add_text_field("position", "Position", value=position)
-        form.add("</fieldset>")
+        if not hasattr(self, "_position"):
+            self._position = None
+            string_value = self.fields.getvalue("position", "").strip()
+            if string_value:
+                try:
+                    self._position = int(string_value)
+                except:
+                    self.bail("position must be an integer")
+            if isinstance(self._position, int):
+                for value in self.map.values():
+                    if self._position == value.position:
+                        if self.id != value.id:
+                            self.bail("position must be unique")
+            elif self.request == self.SAVE:
+                self.bail("Position is required")
+        return self._position
 
+    @property
+    def table(self):
+        """Table selected by the user from the landing page form."""
 
-    def populate_value_selection_form(self, form):
-        """
-        Let the user select a table row to edit.
-        """
+        if not hasattr(self, "_table"):
+            self._table = self.fields.getvalue("table")
+            if self._table:
+                if self._table not in self.TABLES:
+                    self.bail()
+        return self._table
 
-        form.add("<fieldset>")
-        form.add(form.B.LEGEND("Values (click link to edit)"))
-        form.add("<ul>")
-        parms = { "Session": self.session, "table": self.table }
-        for key, value, position in self.rows:
-            parms["value_id"] = str(key)
-            url = "%s?%s" % (self.script, urllib.urlencode(parms))
-            display = u"%s (position %d)" % (value, position)
-            form.add(form.B.LI(form.B.A(display, href=url)))
-        form.add("</ul>")
-        form.add("</fieldset>")
-        return
-        style = "table, tr, td, th { background-color: transparent; }"
-        form.add_css(style)
-        thead = form.B.THEAD(form.B.TH("Value"), form.B.TH("Position"))
-        tbody = form.B.TBODY()
-        parms = { "Session": self.session, "table": self.table }
-        for key, value, position in self.rows:
-            parms["value_id"] = str(key)
-            url = "%s?%s" % (self.script, urllib.urlencode(parms))
-            col1 = form.B.TD(form.B.A(value, href=url))
-            col2 = form.B.TD(str(position))
-            tbody.append(form.B.TR(col1, col2))
-        form.add("<fieldset>")
-        form.add(form.B.LEGEND("Values (click link to edit)"))
-        form.add(form.B.TABLE(thead, tbody))
-        form.add("</fieldset>")
+    @property
+    def value(self):
+        """String for the `value_name` column."""
 
-    def populate_form(self, form):
-        """
-        Puts up one of the three forms identified in the class comment.
-        """
+        if not hasattr(self, "_value"):
+            self._value = self.fields.getvalue("value", "").strip()
+            if self._value:
+                name = self._value.lower()
+                for value in self.map.values():
+                    if name == value.name.lower() and self.id != value.id:
+                        self.bail("Value name must be unique")
+            elif self.request == self.SAVE:
+                self.bail("Value name is required")
+        return self._value
 
-        if self.warning:
-            form.add(form.B.P(self.warning, form.B.CLASS("error center")))
-        if not self.table:
-            self.populate_table_selection_form(form)
-        else:
-            form.add_hidden_field("table", self.table)
-            if self.value_id or self.request == self.ADD:
-                self.populate_value_editing_form(form)
-            else:
-                self.populate_value_selection_form(form)
     class Value:
-        """
-        Column values for a database table row.
+        """Column values for a database table row."""
 
-        Attributes:
-            key - primary key for the row in the table (None if new record)
-            value - display string for the record
-            position - controls order of values on forms
-        """
+        def __init__(self, row):
+            """Save the caller's value.
 
-        def __init__(self, key, value, position):
-            """
-            Collect the column values for the record.
+            Pass:
+                row - record from the query's results
             """
 
-            self.key = key
-            self.value = value
-            self.position = position
+            self.__row = row
 
-        def validate(self, control):
-            """
-            Verify that the record is suitable for saving.
+        def __lt__(self, other):
+            """Sort by position, not name."""
+            return self.position < other.position
 
-            Return:
-                error string on failure
-                otherwise None
-            """
+        @property
+        def id(self):
+            """Primary key for the value."""
+            return self.__row.value_id
 
-            if not self.value:
-                return "value is required"
-            elif not self.position:
-                return "position is required"
-            try:
-                self.position = int(self.position)
-            except:
-                return "position must be a unique integer value"
-            if len(self.value) > control.MAX_VALUE_LEN:
-                return "maximum value length is %d" % control.MAX_VALUE_LEN
-            lower = self.value.strip()
-            for k, v, p in control.rows:
-                if k != self.key:
-                    if lower == v.lower():
-                        return "value name must be unique"
-                    elif p == self.position:
-                        return "position must be unique"
-            return None
+        @property
+        def name(self):
+            """String for this valid value's name."""
+            return self.__row.value_name
+
+        @property
+        def position(self):
+            """Integer for where this value should appear in picklists."""
+            return self.__row.value_pos
+
 
 if __name__ == "__main__":
     "Let the script be loaded as a module."

@@ -1,11 +1,11 @@
-#----------------------------------------------------------------------
-# Prototype for CDR admin main menu.
-#----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, string
+#!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# Get the form variables and call the logout function.
-#----------------------------------------------------------------------
+"""Log the current user out of the CDR.
+"""
+
+import cgi
+import cdrcgi
+
 fields  = cgi.FieldStorage()
 session = cdrcgi.getSession(fields)
 cdrcgi.logout(session)

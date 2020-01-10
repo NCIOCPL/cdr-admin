@@ -7,10 +7,10 @@ import os
 import cdr
 import cdrcgi
 
-PATH = cdr.DEFAULT_LOGDIR + "/FileSweeper.lockfile"
+PATH = f"{cdr.DEFAULT_LOGDIR}/FileSweeper.lockfile"
 
 def report(what):
-    print "Content-type: text/plain\n\n%s" % what
+    print(f"Content-type: text/plain\n\n{what}")
 
 fields = cgi.FieldStorage()
 session = cdrcgi.getSession(fields)

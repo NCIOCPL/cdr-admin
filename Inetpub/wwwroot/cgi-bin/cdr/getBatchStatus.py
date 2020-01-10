@@ -1,169 +1,140 @@
-#----------------------------------------------------------------------
-# CGI program for displaying the status of batch jobs.
-#
-# Administrator may use this to see past or current batch job
-# status information.
-#
-# Program may be invoked with posted variables to display status
-# to a user.  If no variables are posted, the program displays
-# a form to get user parameters for the status request, then
-# processes them.
-#
-# May post:
-#   jobId     = ID of job in batch_jobs table.
-#   jobName   = Name of job.
-#   jobAge    = Number of days to look backwards for jobs.
-#   jobStatus = One of the status strings in cdrbatch.py.
-#
-# As with many other CDR CGI programs, the same program functions
-# both to display a form and to read its contents.
-#
-# Rewritten July 2015 to eliminate security vulnerabilities.
-#----------------------------------------------------------------------
-import cdrbatch
-import cdrcgi
-import cgi
+#!/usr/bin/env python
 
-class Control:
-    """
-    Collects information about the report request and generates the report.
-    """
-    statuses = [getattr(cdrbatch, n) for n in dir(cdrbatch)
-                if n.startswith("ST_")]
-    def __init__(self):
-        self.script = "getBatchStatus.py"
-        fields = cgi.FieldStorage()
-        self.session = cdrcgi.getSession(fields)
-        self.request = cdrcgi.getRequest(fields)
-        self.id = fields.getvalue("jobId")
-        self.name = fields.getvalue("jobName")
-        self.age = fields.getvalue("jobAge")
-        self.status = fields.getvalue("status")
-        self.sanitize()
-        if self.request == "Cancel":
-            cdrcgi.navigateTo("Admin.py", self.session)
+"""Display status of batch jobs.
 
-    def sanitize(self):
+Administrator may use this to see past or current batch job
+status information.
+
+Program may be invoked with posted variables to display status
+to a user.  If no variables are posted, the program displays
+a form to get user parameters for the status request, then
+processes them.
+
+May post:
+  jobId     = ID of job in batch_jobs table.
+  jobName   = Name of job.
+  jobAge    = Number of days to look backwards for jobs.
+  jobStatus = One of the status strings in cdrbatch.py.
+
+As with many other CDR CGI programs, the same program functions
+both to display a form and to read its contents.
+"""
+
+from cdrbatch import getJobStatus, STATUSES
+from cdrcgi import Controller, navigateTo
+from lxml import html
+
+
+class Control(Controller):
+    """Access to form/report generation tools."""
+
+    SUBTITLE = "Batch Job Status"
+    REFRESH = "Refresh"
+    BACK = "New Request"
+    COLS = "ID", "Job Name", "Started", "Status", "Last Info", "Last Message"
+
+    def populate_form(self, page):
+        """Draw the fields on the form.
+
+        Pass:
+            page - HTMLPage object where the fields go
         """
-        Make sure the parameters haven't been tampered with.
-        We don't need to worry about the job name parameter,
-        because we're escaping it when we fold it into our
-        form, and the cdrbatch module is doing the right thing
-        with SQL placeholders to guard against an injection
-        attach. That's a good thing, because it would be a
-        challenge to come up with a regular expression which
-        accepted all possible job names but rejected dangerous
-        strings. The cdrbatch module allows for partial matches
-        of the job name strings and wildcards; otherwise we
-        could have checked against all unique strings in the
-        database. Invoked by the Control constructor.
-        """
-        if not self.session:
-            raise Exception("Missing or expired session")
-        if self.id and not self.id.isdigit():
-            raise Exception("Job ID must be an integer")
-        if self.age and not self.age.isdigit():
-            raise Exception("Job age must be an integer")
-        if self.status and self.status not in Control.statuses:
-            raise Exception("Parameter tampering detected")
+
+        fieldset = page.fieldset("Report Options")
+        fieldset.append(page.text_field("jobId", label="Job ID"))
+        fieldset.append(page.text_field("jobName", label="Job Name"))
+        opts = dict(label="Job Age", tooltip="Number of days to look back")
+        fieldset.append(page.text_field("jobAge", **opts))
+        fieldset.append(page.select("jobStatus", options=[""]+STATUSES))
+        page.form.append(fieldset)
 
     def run(self):
-        """
-        Shows the request form or the report as appropriate.
-        """
-        if self.request == "New Request":
-            self.show_form()
-        if self.id or self.name or self.age or self.status:
-            self.show_report()
-        self.show_form()
+        """Add some custom routing."""
 
-    def show_form(self):
-        """
-        Displays the search form for the report request.
-        """
-        self.pageopts = {
-            "action": self.script,
-            "session": self.session,
-            "subtitle": "View batch jobs",
-            "buttons": ("Submit", "Cancel")
-        }
-        page = cdrcgi.Page("CDR Batch Job Status Request", **self.pageopts)
-        page.add("<fieldset>")
-        page.add(page.B.LEGEND("Enter Job ID or Other Options"))
-        page.add_text_field("jobId", "Job ID")
-        page.add_text_field("jobName", "Job Name")
-        page.add_text_field("jobAge", "Job Age",
-                            tooltip="Number of days to look back.")
-        page.add_select("jobStatus", "Job Status", [""] + Control.statuses)
-        page.add("</fieldset>")
-        page.send()
+        if not self.request:
+            if self.id or self.name or self.age or self.status:
+                self.request = self.SUBMIT
+        elif self.request == self.BACK:
+            return navigateTo(self.script, self.session.name)
+        elif self.request == self.REFRESH:
+            self.request = self.SUBMIT
+        Controller.run(self)
 
     def show_report(self):
+        """Override to add hidden fields and a couple of extra buttons."""
+
+        page = self.report.page
+        buttons = page.form.find("header/h1/span")
+        buttons.insert(0, page.button(self.BACK))
+        buttons.insert(0, page.button(self.REFRESH))
+        page.form.append(page.hidden_field("jobId", self.id))
+        page.form.append(page.hidden_field("jobName", self.name))
+        page.form.append(page.hidden_field("jobAge", self.age))
+        page.form.append(page.hidden_field("jobStatus", self.status))
+        self.report.send()
+
+    def build_tables(self):
+        """Assemble the report table."""
+
+        opts = dict(columns=self.COLS, caption="Batch Jobs")
+        return self.Reporter.Table(self.rows, **opts)
+
+    @property
+    def rows(self):
+        """Values for the report table.
+
+        The batch job software violates the principle of applying
+        markup to information as far downstream as possible. As a
+        result we have to jump through some hoops to extract what
+        we need for the Last Message column.
         """
-        Show the information about the requested jobs. Use a custom
-        Cell object (see below) for the last column.
-        """
-        columns = (
-            cdrcgi.Report.Column("ID", width="40px"),
-            cdrcgi.Report.Column("Job Name", width="200px"),
-            cdrcgi.Report.Column("Started", width="150px"),
-            cdrcgi.Report.Column("Status", width="100px"),
-            cdrcgi.Report.Column("Last Info", width="150px"),
-            cdrcgi.Report.Column("Last Message")#, width="300px")
-        )
-        jobs = cdrbatch.getJobStatus(self.id, self.name, self.age, self.status)
+
+        jobs = getJobStatus(self.id, self.name, self.age, self.status)
         rows = []
+        Cell = self.Reporter.Cell
+        B = self.HTMLPage.B
         for job in jobs:
             row = list(job)
-            row[0] = cdrcgi.Report.Cell(job[0], classes="center")
-            row[-1] = Cell(row[-1])
+            row[0] = Cell(row[0], classes="center")
+            if row[2]:
+                row[2] = Cell(str(row[2])[:19], classes="nowrap")
+            if row[4]:
+                row[4] = Cell(str(row[4])[:19], classes="nowrap")
+            if row[-1]:
+                try:
+                    node = html.fromstring(row[-1])
+                    if node.tag == "errors":
+                        errors = [child.text for child in node.findall("err")]
+                        errors = "; ".join(errors)
+                        row[-1] = Cell(errors, classes="error")
+                    else:
+                        row[-1] = Cell(node)
+                except:
+                    row[-1] = Cell(B.SPAN(*html.fragments_fromstring(row[-1])))
             rows.append(row)
-        caption = "Batch Jobs"
-        table = cdrcgi.Report.Table(columns, rows, caption=caption)
-        report = Report(self, table)
-        report.send()
+        return rows
 
-class Cell(cdrcgi.Report.Cell):
-    """
-    The batch job software violates the rule of applying display markup
-    to information as far downstream as possible. As a result we have to
-    override the Cell method which assembles the td element so we can
-    parse the markup in the database column.
-    """
-    def to_td(self):
-        markup = "<td>%s</td>" % (self._value or "").strip()
-        td = cdrcgi.lxml.html.fragment_fromstring(markup)
-        td.set("style", "xwidth: 300px; word-wrap: break-word;")
-        return td
+    @property
+    def age(self):
 
-class Report(cdrcgi.Report):
-    """
-    Overrides the default cdrcgi.Report class so we can display our
-    report inside a CGI form with buttons and hidden form fields.
-    """
-    def __init__(self, control, table):
-        cdrcgi.Report.__init__(self, "CDR Batch Job Status Review", [table])
-        self.control = control
-    def _create_html_page(self, **opts):
-        opts["session"] = self.control.session
-        opts["action"] = self.control.script
-        opts["buttons"] = ("Refresh", "New Request", "Cancel")
-        opts["subtitle"] = "Batch status search results"
-        opts["banner"] = self._title
-        page = cdrcgi.Page(self._title, **opts)
-        page.add_hidden_field("jobId", self.control.id or "")
-        page.add_hidden_field("jobName", self.control.name or "")
-        page.add_hidden_field("jobAge", self.control.age or "")
-        page.add_hidden_field("jobStatus", self.control.status or "")
-        page.add_css("table.report { width: 90%; table-layout: fixed; }")
-        page.add_css(".right padding-right: 4px;")
-        return page
+        """Number of days to look back."""
+        return self.fields.getvalue("jobAge")
 
-def main():
-    """
-    Protect the top-level code so we can be imported by autodoc
-    tools and code checkers.
-    """
-    Control().run()
+    @property
+    def id(self):
+        """Job ID on which to report."""
+        return self.fields.getvalue("jobId")
+
+    @property
+    def name(self):
+        """Name of job on which to report."""
+        return self.fields.getvalue("jobName")
+
+    @property
+    def status(self):
+        return self.fields.getvalue("jobStatus")
+
+
 if __name__ == "__main__":
-    main()
+    """Don't execute the script if loaded as a module."""
+    Control().run()

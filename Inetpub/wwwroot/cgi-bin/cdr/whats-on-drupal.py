@@ -1,72 +1,98 @@
 #!/usr/bin/env python
 
-"""
-Show which Summaries (DIS & CIS) are on the Drupal CMS
+"""Show which Summaries (DIS & CIS) are on the Drupal CMS
 """
 
+from cdrcgi import Controller
 from cdrapi.docs import Doc
 from cdrapi.publishing import DrupalClient
-from cdrapi.users import Session
-from cdrcgi import Control, Report
 
 
-class DrupalSummaries(Control):
+class Control(Controller):
 
-    TITLE = "PDQ Summaries on Drupal"
-
-    def __init__(self):
-        """
-        Collect report settings
-        """
-
-        Control.__init__(self, self.PAGE_TITLE, self.TITLE)
-        session = Session(self.session)
-        host = session.tier.hosts.get("DRUPAL")
-        self.host = self.fields.getvalue("host") or host
-        self.base = "https://{}".format(self.host)
-        self.client = DrupalClient(session, base=self.base)
-
-    def populate_form(self, form):
-        """
-        Let the user choose another Drupal server than the tier's default
-        """
-
-        form.add("<fieldset>")
-        form.add(form.B.LEGEND("Drupal Server"))
-        form.add_text_field("host", "Server", value=self.host)
-        form.add("</fieldset>")
-        form.add_output_options("html", None)
+    SUBTITLE = "PDQ Summaries on Drupal"
+    COLUMNS = "CDR ID", "Title", "Type", "Language"
 
     def build_tables(self):
-        """
-        Populate a table with the CMS summaries the Drupal server says it has
-        """
+        """Populate a table with the CMS summaries the Drupal server has."""
 
-        catalog = self.client.list()
-        headers = "CDR ID", "Title", "Type", "Language"
-        cols = [Report.Column(header) for header in headers]
-        rows = []
-        for summary in catalog:
-            summary_type = "DIS" if "drug" in summary.type else "CIS"
-            title = self.lookup_title(summary.cdr_id)
-            language = "English" if summary.langcode == "en" else "Spanish"
-            row = (
-                "CDR{:d}".format(summary.cdr_id),
-                title,
-                summary_type,
-                language,
-            )
-            rows.append(row)
-        table = Report.Table(cols, rows)
-        return [table]
+        rows = [doc.row for doc in self.docs]
+        return self.Reporter.Table(rows, columns=self.COLUMNS)
 
-    def lookup_title(self, cdr_id):
-        """
-        Get the display portion of the summary title
+    def populate_form(self, page):
+        """Let the user choose another Drupal server.
+
+        Pass:
+            page - HTMLPage object where the field goes.
         """
 
-        doc = Doc(self.client.session, id=cdr_id)
-        return doc.title.split(";")[0].strip()
+        fieldset = page.fieldset("Drupal Server")
+        opts = dict(label="Server", value=self.host)
+        fieldset.append(page.text_field("host", **opts))
+        page.form.append(fieldset)
+        page.add_output_options(default="html")
+
+    @property
+    def docs(self):
+        """PDQ Summary documents on the Drupal host."""
+
+        if not hasattr(self, "_docs"):
+            client = DrupalClient(self.session, base=f"https://{self.host}")
+            self._docs = [self.Summary(self, doc) for doc in client.list()]
+        return self._docs
+
+    @property
+    def host(self):
+        """Drupal host to query."""
+
+        if not hasattr(self, "_host"):
+            default = self.session.tier.hosts.get("DRUPAL")
+            self._host = self.fields.getvalue("host") or default
+        return self._host
 
 
-DrupalSummaries().run()
+    class Summary:
+        """PDQ summary document for the report."""
+
+        def __init__(self, control, doc):
+            """Remember the caller's values.
+
+            Pass:
+                control - access to the current session
+                doc - item from the Drupal catalog
+            """
+
+            self.__control = control
+            self.__doc = doc
+
+        @property
+        def row(self):
+            """Table row for the report."""
+            return self.id, self.title, self.type, self.language
+
+        @property
+        def id(self):
+            """CDR document ID for the summary."""
+            return f"CDR{self.__doc.cdr_id:d}"
+
+        @property
+        def title(self):
+            """Short title for the PDQ summary document."""
+
+            doc = Doc(self.__control.session, id=self.__doc.cdr_id)
+            return doc.title.split(";")[0].strip()
+
+        @property
+        def type(self):
+            """DIS or CIS (for Drug|Cancer Information Summary)."""
+            return "DIS" if "drug" in self.__doc.type else "CIS"
+
+        @property
+        def language(self):
+            """English or Spanish."""
+            return "English" if self.__doc.langcode == "en" else "Spanish"
+
+
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+    Control().run()

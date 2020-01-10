@@ -1,732 +1,418 @@
-#----------------------------------------------------------------------
-# Replace an existing version of a document with a completely new
-# document that was separately created and edited under its own
-# CDR document ID.
-#
-# This is primarily intended for use when a new Summary document has
-# been independently developed over a long period of time to replace
-# an existing Summary.
-#
-# Requirements and design are described in Bugzilla issue #3561.
-#
-# JIRA::OCECDR-4178 - adjust fragment links for table and figure numbers
-#----------------------------------------------------------------------
+#!/usr/bin/env python
 
-import datetime
-import lxml.etree as etree
-import cgi, cgitb, cdr, re, cdrcgi, cdrdb
-cgitb.enable()
+"""Replace one CDR document with the content of another one.
 
-# Prepare a log file for what we're about to do
-# Not using a banner since the program comes through here more than once
-G_log = cdr.Log("ReplaceDocWithNewDoc.log", banner=None)
+Replace an existing version of a document with a completely new
+document that was separately created and edited under its own
+CDR document ID.
 
-# Locations of attributes we must examine for possible modification
-class AttributePath:
-    NAMESPACES = { "cdr": "cips.nci.nih.gov/cdr" }
-    def __init__(self, element, local_name, prefix=None):
-        self.element = element
-        self.local_name = local_name
-        self.prefix = prefix
-    def get_canonical_name(self):
-        if self.prefix:
-            return "{%s}%s" % (self.NAMESPACES[self.prefix], self.local_name)
-        return self.local_name
-    def get_serialized_name(self):
-        if self.prefix:
-            return "%s:%s" % (self.prefix, self.local_name)
-        return self.local_name
-AttributePath.PATHS = (
-    AttributePath("*", "ref", "cdr"),
-    AttributePath("*", "href", "cdr"),
-    AttributePath("ReferencedTableNumber", "Target"),
-    AttributePath("ReferencedFigureNumber", "Target")
-)
+This is primarily intended for use when a new Summary document has
+been independently developed over a long period of time to replace
+an existing Summary.
 
-# These will contain the full documents, in cdr.getDoc CdrDoc format.
-# If they exist, the docs have been checked out and must be checked in
-#   before exiting
-oldDoc  = None
-newDoc  = None
+Requirements and design are described in Bugzilla issue #3561.
+"""
 
-session = None
+from cdrcgi import Controller
+from cdrapi.docs import Doc
+from lxml import etree
 
-def fatal(msgs):
-    """
-    Cleanup and display a fatal error to the user.
 
-    Pass:
-        msgs - Single message or sequence of messages.
+class Control(Controller):
+    """Access to the current CDR login session and form-building tools."""
 
-    Return:
-        Does not return.
-    """
-    # Cleanup locked documents
-    unlockDocs("Fatal error aborted ReplaceDocWithNewDoc")
+    SUBTITLE = "Replace Old Document With New One"
+    LOGNAME = "ReplaceDocWithNewDoc"
+    CSS = "/stylesheets/ReplaceDocWithNewDoc.css"
+    SUPPORTED_DOCTYPES = {"Summary"}
+    CONFIRM = "Confirm"
+    CDR_REF = f"{{{Doc.NS}}}ref"
+    PURPOSE = (
+        "This program replaces the XML of a CDR document with the XML "
+        "copied from another CDR document. This is typically done in "
+        "the case of a summary which is undergoing significant "
+        "modifications which requires work over a longer period of time. "
+        "In order to be able to make minor corrections to the original "
+        "documentation during this period, the new version of the "
+        "summary is prepared as a separate, temporary document. "
+        "When the work on the new version is complete and has been "
+        "approved for replacement of the original summary, the XML "
+        "from the new temporary document is copied as a new unpublishable "
+        "version of the original summary, and the temporary document is "
+        "marked as blocked to prevent it from being inadvertently "
+        "published. In these instructions, the original document, whose "
+        "contents will be updated, is referred to as the 'old' document, "
+        "and the temporary document whose XML will be copied into the "
+        "permanent ('old') summary, is referred to as the 'new' document.",
+    )
 
-    # Convert messages from string to sequence, if needed and prepend
-    #   fatal error string
-    msgList = ["Fatal error - aborting"]
-    if type(msgs) in (list, tuple):
-        msgList += msgs
-    else:
-        msgList.append(msgs)
+    CONDITIONS = (
+        "All of the following conditions must be met before replacment "
+        "will proceed:",
+        (
+            "The user must be authorized to perform this operation.",
+            "The old and new documents must both be Summaries.",
+            "The new replacement document must have a WillReplace "
+            "element with a cdr:ref attribute referencing the old document.",
+            "After receiving feedback, the user must confirm that the "
+            "replacement should proceed.",
+        ),
+    )
 
-    # Log what we're doing
-    log(msgList)
+    OPERATION = (
+        "A user first enters the CDR document ID for the old (replaced) "
+        "and new (replacement) documents in the form below and clicks the "
+        "Submit button. The program then checks to see if the first three "
+        "conditions above are met. If they are, the program will report "
+        "to the user:",
+        (
+            "The titles of the respective old and new documents.",
+            "The validation status of the new document.",
+            "A list of any documents that have links to specific "
+            "fragments in the old document.",
+        ),
+        "Any such links will need to be resolved after the new document "
+        "replaces the old.",
+        "The user must then confirm that this replacement should proceed.",
+        "If replacement is confirmed, the program will do the following:",
+        (
+            "Check out both documents.  If either document is locked by "
+            "someone else, the program will stop.",
+            "Version the current working document for the old document, "
+            "if it is different from the last saved version.",
+            "Remove the WillReplace element from the new document.",
+            "Save the current working document for the new document as a "
+            "non-publishable version under the old ID.",
+            "Mark the now unused ID of the new document as blocked. That "
+            "ID will no longer be used in the CDR.",
+        )
+    )
+    INSTRUCTIONS = "Purpose", "Conditions", "Operation"
+    NO_ERRORS = "There were no validation errors in the new document."
+    ERRORS = "These errors occurred when validating the new document:"
+    WARNING = (
+        "Replacing an existing document with a new one that is invalid is "
+        "allowed, but please consider whether you really want to do that. "
+        "The new document will be saved as a non-publishable version."
+    )
+    EXTERNAL_LINKS_FOUND = (
+        "There are links from other documents to specific fragments in the "
+        "old document.  These are listed below.",
+        "Fragment identifiers in the new replacement document are likely not "
+        "the same as they are in the old document. Therefore, when a "
+        "publishable version of the replaced document is created, a user "
+        "must individually fix these links to refer to valid fragment IDs "
+        "in the new replacement version, or the user must delete them. "
+        "Otherwise misdirected or broken links are likely to occur in the "
+        "published documents.",
+        "The new document will be saved as a non-publishable version. "
+        "Please coordinate the creation of a publishable version with "
+        "fixups of fragment links to the document, so that both the new "
+        "publishable version of this document and new publishable versions of "
+        "any documents that link to it can all be published in the same "
+        "publishing job.",
+    )
+    NO_EXTERNAL_LINKS_FOUND = (
+        "There were no external documents with links to specific fragments "
+        "that must be resolved. The new document can replace the old one "
+        "without breaking any links.",
+        "The new document will be saved as a non-publishable version.",
+    )
+    INTERNAL_LINKS_FOUND = (
+        "The new document contains {:d} internal references (e.g., "
+        'cdr:href="{}#_123") in which the new CDR ID will be replaced by the '
+        "CDR ID of the old document (e.g., {}#_123)."
+    )
+    NO_INTERNAL_LINKS_FOUND = (
+        'There were no internal references (e.g., cdr:href="{}#_123") '
+        "in which the new CDR ID would need to be replaced by the old one."
+    )
 
-    # Bail out
-    cdrcgi.bail(msgList[0], extra=msgList[1:])
+    def run(self):
+        """Override base class version as this is not a standard report."""
 
-def log(msgs):
-    """
-    Wrapper for Log.write()
+        if not (self.request and self.old and self.new):
+            self.show_form()
+        elif self.request == self.SUBMIT:
+            self.confirm()
+        elif self.request == self.CONFIRM:
+            self.replace()
+        else:
+            Controller.run(self)
 
-    Pass:
-        msgs - Single message string or sequence of message strings.
-    """
-    global G_log
+    def populate_form(self, page):
+        """Ask the user to identify the two documents and explain what we do.
 
-    G_log.write(msgs)
+        Pass:
+            page - HTMLPage object where the form is drawn
+        """
 
-def checkDoc(docId):
-    """
-    Check that a document exists and find its document type.
+        for name in self.INSTRUCTIONS:
+            fieldset = page.fieldset(name)
+            fieldset.set("class", "instructions")
+            for segment in getattr(self, name.upper()):
+                if isinstance(segment, str):
+                    fieldset.append(page.B.P(segment))
+                else:
+                    ul = page.B.UL()
+                    for item in segment:
+                        ul.append(page.B.LI(item))
+                    fieldset.append(ul)
+            page.form.append(fieldset)
+        fieldset = page.fieldset("Enter IDs for Old and New Documents")
+        fieldset.append(page.text_field("old", label="Old Document ID"))
+        fieldset.append(page.text_field("new", label="New Document ID"))
+        page.form.append(fieldset)
+        page.head.append(page.B.LINK(href=self.CSS, rel="stylesheet"))
 
-    Pass:
-        CDR doc ID.
+    def confirm(self):
+        """Show the user what will happen and request confirmation."""
 
-    Return:
-        Document type, or None if doc not found.
-    """
-    # Normalize doc ID to simple integer
-    docNum = cdr.exNormalize(docId)[1]
+        # Create a custom page.
+        buttons = (
+            self.HTMLPage.button(self.CONFIRM),
+            self.HTMLPage.button(self.ADMINMENU),
+            self.HTMLPage.button(self.LOG_OUT),
+        )
+        opts = dict(
+            buttons=buttons,
+            session=self.session,
+            action=self.script,
+            subtitle="Confirmation Required"
+        )
+        page = self.HTMLPage(self.TITLE, **opts)
+        page.form.append(page.hidden_field("old", self.old.id))
+        page.form.append(page.hidden_field("new", self.new.id))
 
+        # Explain what's about to happen (if the user approves).
+        old = f"{self.old.cdr_id} ({self.old.title})"
+        new = f"{self.new.cdr_id} ({self.new.title})"
+        fieldset = page.fieldset("Proposed Action")
+        fieldset.append(page.B.P(f"{old} will be replaced by {new}."))
+        page.form.append(fieldset)
+
+        # Show any validation errors found in the replacement document, if any.
+        fieldset = page.fieldset("Validation Report")
+        if self.validation_errors:
+            fieldset.append(page.B.P(self.ERRORS, page.B.CLASS("error")))
+            ul = page.B.UL(page.B.CLASS("error"))
+            for error in self.validation_errors:
+                ul.append(page.B.LI(error))
+            fieldset.append(ul)
+            fieldset.append(page.B.P(self.WARNING, page.B.CLASS("error")))
+        else:
+            fieldset.append(page.B.P(self.NO_ERRORS, page.B.CLASS("info")))
+        page.form.append(fieldset)
+
+        # Show any fragment links which might need to be taken care of.
+        fieldset = page.fieldset("Linked Fragment Report")
+        if self.external_links:
+            for paragraph in self.EXTERNAL_LINKS_FOUND:
+                fieldset.append(page.B.P(paragraph))
+            headers = page.B.TR()
+            for header in ("Type", "ID", "Title", "Element", "Fragment"):
+                headers.append(page.B.TH(header))
+            fieldset.append(page.B.TABLE(headers, *self.external_links))
+        else:
+            for paragraph in self.NO_EXTERNAL_LINKS_FOUND:
+                fieldset.append(page.B.P(paragraph))
+        if self.internal_links:
+            args = len(self.internal_links), self.new.cdr_id, self.old.cdr_id
+            fieldset.append(page.B.P(self.INTERNAL_LINKS_FOUND.format(*args)))
+        else:
+            paragraph = self.NO_INTERNAL_LINKS_FOUND.format(self.new.cdr_id)
+            fieldset.append(page.B.P(paragraph))
+        page.form.append(fieldset)
+        page.head.append(page.B.LINK(href=self.CSS, rel="stylesheet"))
+        page.send()
+
+    def replace(self):
+        """Save the old document with the new document's XML."""
+
+        # Check out both documents.
+        self.old.check_out()
+        self.new.check_out()
+
+        # Version the old document if there are unversioned changes.
+        if self.old.has_unversioned_changes:
+            comment = "Versioning last CWD of replaced document"
+            self.old.save(version=True, comment=comment)
+
+        # Add/adjust DateLastModified and drop WillReplace.
+        will_replace = self.new.root.find("WillReplace")
+        date_last_modified = self.new.root.find("DateLastModified")
+        if date_last_modified is None:
+            date_last_modified = etree.Element("DateLastModified")
+            will_replace.addnext(date_last_modified)
+        date_last_modified.text = self.started.strftime("%Y-%m-%d")
+        self.new.root.remove(will_replace)
+
+        # Adjust the internal links to point to the old document.
+        target = f"{self.new.cdr_id}#"
+        replacement = f"{self.old.cdr_id}#"
+        for node, name in self.internal_links:
+            value = node.get(name).replace(target, replacement)
+            node.set(name, value)
+
+        # Save the old document with XML from the replacement document.
+        self.old.xml = etree.tostring(self.new.root, encoding="unicode")
+        comment = "Replacing old version with content of replacement doc {}"
+        opts = dict(
+            version=True,
+            val_types=("schema", "links"),
+            comment=comment.format(self.new.cdr_id),
+            unlock=True
+        )
+        self.old.save(**opts)
+        args = self.old.cdr_id, self.new.cdr_id
+        self.logger.info("Saved %s with XML from %s", *args)
+
+        # Block the replacement document.
+        comment = "This document's data is now in {}. Use that one, not this."
+        comment = comment.format(self.old.cdr_id)
+        self.new.set_status(Doc.INACTIVE, comment=comment)
+        self.new.check_in(abandon=True)
+        self.logger.info("Blocked %s", self.new.cdr_id)
+
+        # Show the outcome.
+        buttons = (
+            self.HTMLPage.button(self.ADMINMENU),
+            self.HTMLPage.button(self.LOG_OUT),
+        )
+        opts = dict(
+            buttons=buttons,
+            session=self.session,
+            action=self.script,
+            subtitle="Replacement Successful"
+        )
+        page = self.HTMLPage(self.TITLE, **opts)
+        fieldset = page.fieldset("Result")
+        message = "XML from {} successfully saved as a new version of {}."
+        args = self.new.cdr_id, self.old.cdr_id
+        fieldset.append(page.B.P(message.format(*args)))
+        page.form.append(fieldset)
+        if self.old.errors:
+            fieldset = page.fieldset("Warnings")
+            ul = page.B.UL()
+            for error in self.old.errors:
+                ul.append(page.B.LI(str(error), page.B.CLASS("error")))
+            fieldset.append(ul)
+            page.form.append(fieldset)
+        page.head.append(page.B.LINK(href=self.CSS, rel="stylesheet"))
+        page.send()
+
+    @property
+    def external_links(self):
+        """Other documents linking to a portion of the old document."""
+
+        if not hasattr(self, "_external_links"):
+            fields = (
+                "t.name AS doctype",
+                "d.id",
+                "d.title",
+                "n.source_elem",
+                "n.target_frag",
+            )
+            query = self.Query("document d", *fields).unique()
+            query.join("doc_type t", "t.id = d.doc_type")
+            query.join("link_net n", "n.source_doc = d.id")
+            query.where("n.target_frag IS NOT NULL")
+            query.where(query.Condition("n.target_doc", self.old.id))
+            query.where("n.target_doc <> d.id")
+            query.order("t.name", "d.id", "n.source_elem", "n.target_frag")
+            self._external_links = []
+            B = self.HTMLPage.B
+            for row in query.execute(self.cursor).fetchall():
+                self._external_links.append(
+                    B.TR(
+                        B.TD(row.doctype),
+                        B.TD(str(row.id), B.CLASS("center")),
+                        B.TD(row.title),
+                        B.TD(row.source_elem),
+                        B.TD(row.target_frag, B.CLASS("center"))
+                    )
+                )
+        return self._external_links
+
+    @property
+    def internal_links(self):
+        """Internal links in the replacement document."""
+
+        if not hasattr(self, "_internal_links"):
+            self._internal_links = []
+            target = f"{self.new.cdr_id}#"
+            for local_name in ("ref", "href"):
+                name = f"{{{Doc.NS}}}{local_name}"
+                xpath = f"//*[starts-with(@cdr:{local_name}, '{target}')]"
+                for node in self.new.root.xpath(xpath, namespaces=Doc.NSMAP):
+                    self._internal_links.append((node, name))
+            for name in ("ReferencedTableNumber", "ReferencedFigureNumber"):
+                xpath = f"//{name}[starts-with(@Target, '{target}')]"
+                for node in self.new.root.xpath(xpath):
+                    self._internal_links.append((node, name))
+        return self._internal_links
+
+    @property
+    def new(self):
+        """Replacement document."""
+
+        if not hasattr(self, "_new"):
+            self._new = None
+            id = self.fields.getvalue("new", "").strip()
+            if id:
+                self._new = Doc(self.session, id=id)
+                doctype = self._new.doctype.name
+                if doctype not in self.SUPPORTED_DOCTYPES:
+                    self.bail(f"Document type {doctype} not supported")
+                if self.old:
+                    old_doctype = self.old.doctype.name
+                    if old_doctype != doctype:
+                        msg = f"New doc is a {doctype} not a {old_doctype}"
+                        self.bail(msg)
+                    will_replace = self._new.root.find("WillReplace")
+                    if will_replace is None:
+                        self.bail("WillReplace element not found")
+                    cdr_id = will_replace.get(self.CDR_REF)
+                    if cdr_id != self.old.cdr_id:
+                        self.bail(f"WillReplace points to {cdr_id}")
+        return self._new
+
+    @property
+    def old(self):
+        """Existing document whose contents will be replaced."""
+
+        if not hasattr(self, "_old"):
+            self._old = None
+            id = self.fields.getvalue("old", "").strip()
+            if id:
+                self._old = Doc(self.session, id=id)
+                if self._old.doctype.name not in self.SUPPORTED_DOCTYPES:
+                    self.bail(f"Doctype {self._old.doctype} not supported")
+        return self._old
+
+    @property
+    def validation_errors(self):
+        """Problems found in the replacement document."""
+
+        if not hasattr(self, "_validation_errors"):
+            self.new.validate(types=("schema", "links"))
+            self._validation_errors = [str(error) for error in self.new.errors]
+        return self._validation_errors
+
+
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+
+    control = Control()
     try:
-        conn   = cdrdb.connect()
-        cursor = conn.cursor()
-        cursor.execute("""
-SELECT t.name
-  FROM doc_type t
-  JOIN document d
-    ON d.doc_type = t.id
- WHERE d.id = ?""", docNum)
-        row = cursor.fetchone()
-    except Exception, info:
-        fatal("Error retrieving doctype for %s: %s" % (docId, str(info)))
-
-    if row:
-        return row[0]
-    return None
-
-def getLockedDoc(docId):
-    """
-    Retrieve the document, locked for update.
-
-    Pass:
-        docId - CDR ID of the document.
-
-    Return:
-        cdr.doc object for the document.
-
-    If errors, do not return.  Bail out with error message.
-    """
-    global session
-
-    docObj = cdr.getDoc(session, docId, checkout='Y', getObject=True)
-
-    # Bail out if error
-    if type(docObj) in (type(""), type(u"")):
-        errList = ["Unable to lock document %s" % docId] + \
-                  cdr.getErrors(docObj, errorsExpected=True, asSequence=True)
-        fatal(errList)
-
-    # Success
-    return docObj
-
-def unlockDocs(reason):
-    """
-    Unlock document that need unlocking.
-    Called before exit.
-
-    Pass:
-        Reason for unlock to log on server.
-
-    Return:
-        Error messages or empty string
-    """
-
-    # If there is no session, nothing was locked
-    errors = []
-    if session:
-        # Error could occur after locking one but not the other
-        # So check each individually
-        if oldDoc:
-            log("Unlocking old document: %s" % oldDocIdStr)
+        control.run()
+    except Exception as e:
+        control.logger.exception("Failure")
+        for which_doc in ("old", "new"):
             try:
-                cdr.unlock(session, oldDocIdStr, reason=reason)
-            except Exception as e:
-                errors.append(str(e))
-                log("Error unlocking old doc:\n%s" % e)
-        if newDoc:
-            log("Unlocking new document: %s" % newDocIdStr)
-            try:
-                cdr.unlock(session, newDocIdStr, reason=reason)
-            except Exception as e:
-                errors.append(str(e))
-                log("Error unlocking new doc:\n%s" % e)
-
-    return "; ".join(errors)
-
-
-def getFragmentLinks(targetDocId):
-    """
-    Search for any documents that link to fragments in the old document.
-    These must be resolved by the user sometime after the replacement.
-
-    Pass:
-        targetDocId - ID of the document to be replaced.
-
-    Return:
-        HTML table with the report.
-        None if there are no fragment links
-    """
-    try:
-        conn   = cdrdb.connect()
-        cursor = conn.cursor()
-        cursor.execute("""
-SELECT DISTINCT t.name, d.id, d.title, n.source_elem, n.target_frag
-           FROM document d
-           JOIN doc_type t
-             ON t.id = d.doc_type
-           JOIN link_net n
-             ON n.source_doc = d.id
-          WHERE n.target_doc = ?
-            AND n.target_frag is not null
-            AND d.id <> n.target_doc
-       ORDER BY t.name, d.id, n.source_elem, n.target_frag
-""", cdr.exNormalize(targetDocId)[1])
-    except Exception, info:
-        fatal("Error retrieving links to fragments in old doc: %s" % \
-                    info)
-
-    # Get them, there won't be more than a few, if any
-    rows = cursor.fetchall()
-
-    # If there aren't any, we're done
-    if len(rows) == 0:
-        return None
-
-    html = u"""
-<table border='1'>
- <tr>
-  <th>Doctype</th>
-  <th>Doc ID</th>
-  <th>Doc title</th>
-  <th>Element</th>
-  <th>Frag ID</th>
- </tr>
-"""
-    for row in rows:
-        html += u"""
- <tr>
-  <td>%s</td>
-  <td>%s</td>
-  <td>%s</td>
-  <td>%s</td>
-  <td>%s</td>
- </tr>
-""" % (row[0], row[1], row[2], row[3], row[4])
-
-    html += "</table>\n"
-
-    return html
-
-def versionDocIfNeeded(session, docId, doc):
-    """
-    If docId identifies a document for which the current working document
-    is different from the last version, version it.
-
-    Pass:
-        session - Credentials
-        docId   - ID of doc to process, CDR0000000000 format.
-        doc     - Full CWD of doc, in CdrDoc format from cdr.getDoc().
-    """
-    try:
-        # Is last version same as CWD?
-        isChanged = cdr.lastVersions(session, docId)[2]
-
-        if isChanged == 'Y':
-            log("Creating non-publishable version of doc %s" % docId)
-            reason='Versioning last CWD of replaced document'
-            resp = cdr.repDoc(session, doc=doc, checkIn='N', ver='Y',
-                       verPublishable='N', comment=reason)
-            errList = cdr.getErrors(resp, errorsExpected=False,
-                                    asSequence=True)
-            if errList:
-                raise Exception(errList)
-
-    except Exception, info:
-        fatal("Error versioning CWD of %s: %s" % (docId, str(info)))
-
-def prepare(xml):
-    """
-    Make the necessary adjustments to the new document.
-
-    These adjustments include:
-      1. Remove the WillReplace element from the document
-      2. Add or adjust the DateLastModified element
-      3. Adjust any internal fragment refs to point to the correct document
-
-    Pass:
-        xml = serialized replacement document
-
-    Return:
-        same document with required modifications
-    """
-
-    global oldDocIdStr
-    global newDocIdStr
-
-    root = etree.fromstring(xml)
-    dateLastModified = root.find("DateLastModified")
-    willReplace = root.find("WillReplace")
-    if willReplace is None:
-        fatal("missing WillReplace element")
-    if dateLastModified is None:
-        dateLastModified = etree.Element("DateLastModified")
-        willReplace.addnext(dateLastModified)
-    dateLastModified.text = str(datetime.date.today())
-    root.remove(willReplace)
-    target = "%s#" % newDocIdStr
-    replacement = "%s#" % oldDocIdStr
-    for attr_path in AttributePath.PATHS:
-        serialized_name = attr_path.get_serialized_name()
-        canonical_name = attr_path.get_canonical_name()
-        path = "//%s[@%s]" % (attr_path.element, serialized_name)
-        for node in root.xpath(path, namespaces=AttributePath.NAMESPACES):
-            value = node.get(canonical_name)
-            if value is not None and value.startswith(target):
-                value = value.replace(target, replacement)
-                node.set(canonical_name, value)
-    return etree.tostring(root)
-
-
-# Constants
-LF      = "ReplaceDocWithNewDoc.log"
-TITLE   = "Replace Old Document with New One"
-SCRIPT  = "ReplaceDocWithNewDoc.py"
-
-# Action button constants
-MENUBAR_BUTTONS = (cdrcgi.MAINMENU, "Log Out")
-START_SUBMIT    = "Submit"                          # Start screen submit
-START_CANCEL    = "Cancel"                          # Start screen cancel
-CONFIRM_SUBMIT  = "Proceed to Replace Document"     # Submission confirmed
-CONFIRM_CANCEL  = "Cancel Document Replacement"     # Submission cancelled
-
-# HTML containing a description of what will be done
-DESCRIPTIVE_HTML = """
-<h3>Purpose</h3>
-<p>This program replaces an existing document with a new one.  The new
-document will become the current working version of the document identified
-by the old document ID.  It can be used when a
-new version of a document has been prepared as a completely separate
-document that will, when it is ready, replace the original version.</p>
-
-<h3>Pre-conditions</h3>
-<p>All of the following conditions must be met before replacment will
-proceed:</p>
-<ol>
- <li>The user must be authorized to perform this operation.</li>
- <li>The old and new documents must both be Summaries.</li>
- <li>The new replacement document must have a WillReplace element with
-     a cdr:ref referencing the old document.</li>
- <li>After receiving feedback, the user must confirm that the replacement
-     should proceed.</li>
-</ol>
-
-<h3>Operation</h3>
-<p>A user first enters the CDR document ID for the old (replaced) and
-new (replacement) documents in the form below and clicks "Submit".
-The program then checks to see if the first three conditions above are met.
-If they are, the program will report to the user:</p>
-<ul>
- <li>The titles of the respective old and new documents.</li>
- <li>The validation status of the new document.</li>
- <li>A list of any documents that have links to specific fragments in the
-     old document.  Those links will need to be resolved after the new
-     document replaces the old.</li>
-</ul>
-
-<p>The user must then confirm that this replacement should proceed.</p>
-
-<p>If replacement is confirmed, the program will do the following:</p>
-<ol>
- <li>Check out both documents.  If either document is locked by someone
-     else, the program will stop.</li>
- <li>Version the current working document for the old document, if it is
-     different from the last saved version.</li>
- <li>Remove the WillReplace element from the new document.</li>
- <li>Save the current working document for the new document as a
-     non-publishable version under the old ID.</li>
- <li>Mark the now unused ID of the new document as blocked.  That ID will
-     no longer be used in the CDR.</li>
-</ol>
-"""
-DOCUMENT_ID_FORM = """
-<h3>Document Identifiers</h3>
- <table border='0'>
-  <tr>
-   <td align='right'><strong>Old CDR ID </strong></td>
-   <td><input type='text' size='12' name='oldDocId' /></td>
-   <td>(keep this ID but replace the doc with the new one)</td>
-  </tr><tr>
-   <td align='right'><strong>New CDR ID </strong></td>
-   <td><input type='text' size='12' name='newDocId' /></td>
-   <td>(keep this doc but store it with the old ID)</td>
-  </tr>
- </table>
- <p />
- <table border='0'>
-  <tr>
-   <td><input type='submit' name='%s' value='%s' /></td>
-   <td><input type='submit' name='%s' value='%s' /></td>
-  <tr>
- </table>
-""" % (cdrcgi.REQUEST, START_SUBMIT, cdrcgi.REQUEST, START_CANCEL)
-
-fields = cgi.FieldStorage()
-if not fields:
-    fatal("Unable to load form fields - should not happen!")
-
-# Collect form data
-session   = cdrcgi.getSession(fields)
-request   = cdrcgi.getRequest(fields)
-oldDocId  = fields.getvalue("oldDocId") or None
-newDocId  = fields.getvalue("newDocId") or None
-
-# Normalize doc IDs to standard CDR0000000000 format
-if oldDocId:
-    oldDocIdStr = cdr.exNormalize(oldDocId)[0]
-if newDocId:
-    newDocIdStr = cdr.exNormalize(newDocId)[0]
-
-# Navigation away from form?
-if request in (cdrcgi.MAINMENU, START_CANCEL):
-    cdrcgi.navigateTo("Admin.py", session)
-if request == "Log Out":
-    cdrcgi.logout(session)
-
-# Anything we send concludes with the session value and page termination tags
-endPage = """
- <input type='hidden' name='%s' value='%s' />
- </FORM>
- </BODY>
-</HTML>
-""" % (cdrcgi.SESSION, session)
-
-log("Before check, request=%s" % request)
-# If first time through, or if insufficient data, put up initial form
-if not oldDocId or not newDocId or request == CONFIRM_CANCEL:
-
-    # Send the initial explanation and input form
-    log("Putting up initial input form")
-    html = cdrcgi.header(TITLE, TITLE, 'Initial screen',
-                         script=SCRIPT, buttons=MENUBAR_BUTTONS) + \
-           DESCRIPTIVE_HTML + DOCUMENT_ID_FORM + endPage
-    cdrcgi.sendPage(html)
-
-####################################################################
-# Check that documents are okay for this action
-####################################################################
-oldDocType = checkDoc(oldDocId)
-newDocType = checkDoc(newDocId)
-
-# Both documents must exist and, for this version, must be Summaries
-allowedTypes = set(['Summary'])
-msgs = ""
-if not oldDocType:
-    msgs += "Old document %s not found in database<br>" % oldDocIdStr
-elif oldDocType not in allowedTypes:
-    msgs += "Old document %s is of wrong doctype=%s<br>" % (oldDocIdStr,
-                                                            oldDocType)
-if not newDocType:
-    msgs += "New document %s not found in database<br>" % newDocIdStr
-elif newDocType not in allowedTypes:
-    msgs += "New document %s is of wrong doctype=%s<br>" % (newDocIdStr,
-                                                            newDocType)
-
-# They must have the same doc type
-if not msgs and oldDocType != newDocType:
-    msgs += """
-Old document %s is of type %s, but new doc %s is of type %s<br>
-The two document types must be the same in order to replace one doc with the
-other.
-""" % (oldDocIdStr, oldDocType, newDocIdStr, newDocType)
-
-# Any errors?
-if msgs:
-    fatal(msgs)
-
-# The new document must have a WillReplace@cdr:ref referencing the old one
-try:
-    conn   = cdrdb.connect()
-    cursor = conn.cursor()
-    cursor.execute("""
-SELECT value
-  FROM query_term
- WHERE path = '/Summary/WillReplace/@cdr:ref'
-   AND doc_id = ?""", newDocId)
-    row = cursor.fetchone()
-except Exception, info:
-    fatal("Error retrieving WillReplace@cdr:ref for new doc=%s: %s" % \
-          (newDocIdStr, info))
-
-if not row:
-    fatal("WillReplace / @cdr:ref not found in new document")
-refDocId = row[0]
-if refDocId != cdr.exNormalize(oldDocIdStr)[0]:
-    fatal("WillReplace / @cdr:ref=%s does not match user entered old id=%s" \
-                % (refDocId, oldDocIdStr))
-
-####################################################################
-# Request user confirmation if needed
-####################################################################
-# If we've passed all validation, but user hasn't confirmed yet,
-#   give him what he needs to confirm
-if request != CONFIRM_SUBMIT:
-
-    # Prepare to send another screen
-    html = cdrcgi.header(TITLE, "Confirmation required", '', script=SCRIPT,
-           buttons=MENUBAR_BUTTONS) + "\n"
-
-    # Validate new doc
-    result  = cdr.valDoc(session, newDocType, docId=newDocId)
-    errList = cdr.getErrors(result, errorsExpected=False, asSequence=True)
-
-    # Get info for display
-    try:
-        conn   = cdrdb.connect()
-        cursor = conn.cursor()
-        cursor.execute("SELECT title FROM document WHERE id = %d" %
-                        cdr.exNormalize(oldDocId)[1])
-        oldDocTitle = cursor.fetchone()[0]
-        cursor.execute("SELECT title FROM document WHERE id = %d" %
-                        cdr.exNormalize(newDocId)[1])
-        newDocTitle = cursor.fetchone()[0]
-    except Exception, info:
-        fatal("Error retrieving titles for docs: %s" % info)
-
-    # Determine the number of internal references to replace
-    # Requires fetching the new doc without lock for count
-    newXml = cdr.getDoc(session, newDocId, checkout='N', getObject=True).xml
-    root = etree.fromstring(newXml)
-    refCount = 0
-    fragStart = "%s#" % newDocIdStr
-    for attr_path in AttributePath.PATHS:
-        serialized_name = attr_path.get_serialized_name()
-        path = "//%s/@%s" % (attr_path.element, serialized_name)
-        for value in root.xpath(path, namespaces=AttributePath.NAMESPACES):
-            if value is not None and value.startswith(fragStart):
-                refCount += 1
-
-    # Tell user what will be done
-    html += u"""
-<style type='text/css'>
- td {
-  font: 14pt 'Arial'; color: Blue; font-weight: bold; background transparent;
- }
-</style>
-<table class='P'>
- <tr>
-   <td align='right' class='P'>Replace: </td><td>%s</td><td>%s</td>
- </tr>
- <tr>
-   <td align='right'>With: </td><td>%s</td><td>%s</td>
- </tr>
-</table>
-""" % (oldDocIdStr, oldDocTitle, newDocIdStr, newDocTitle)
-
-    html += u"""
-<hr />
-<h3>Validation Report:</h3>
-"""
-    if errList:
-        html += u"""
-<p>These errors occurred when validating the new document:</p>
-<ul>
-"""
-        for err in errList:
-            html += u" <li>%s</li>\n" % err
-        html += u"""
-</ul>
-<p>Replacing an existing document with a new one that is invalid is
-allowed, but please consider whether you really want to do that.</p>
-
-<p>The new document will be saved as a <strong>non-publishable</strong>
-version.</p>
-"""
-    else:
-        html += u"""
-<p>There were no validation errors in the new document.</p>
-"""
-
-    # Check links to fragments in the old document
-    html += u"""
-<hr />
-<h3>Linked Fragments Report:</h3>
-"""
-    linkHtml = getFragmentLinks(oldDocId)
-    if linkHtml:
-        html += u"""
-<p>There are links from other documents to specific fragments in the
-old document.  These are listed below.</p>
-
-<p>Fragment identifiers in the new replacement document are likely not
-the same as they are in the old document.  Therefore, when a publishable
-version of the replaced document is created, a user must individually
-fix these links to refer to valid fragment IDs in the new replacement
-version, or the user must delete them.  Otherwise misdirected or broken
-links are likely to occur in the published documents.</p>
-
-<p>The new document will be saved as a <strong>non-publishable</strong>
-version.  Please coordinate the creation of a publishable version with
-fixups of fragment links to the document, so that both the new
-publishable version of this document and new publishable versions of
-any documents that link to it can all be published in the same
-publishing job.</p>
-""" + linkHtml
-
-    else:
-        html += u"""
-<p>There were no external documents with links to specific fragments that
-must be resolved.  The new document can replace the old one without
-breaking any links.</p>
-
-<p>The new document will be saved as a <strong>non-publishable</strong>
-version.</p>
-"""
-
-    # Report how many internal references will be patched
-    if refCount:
-        html += u"""
-<p>The new document contains %d internal references (e.g.,
-cdr:href="%s#_123") in which the new CDR ID will be replaced by the
-CDR ID of the old document (e.g., %s#_123).</p>""" % (refCount,
-newDocIdStr, oldDocIdStr)
-
-    else:
-        html += u"""
-<p>There were no internal references (e.g., cdr:href="%s#_123") in which the
-new CDR ID would need to be replaced by the old one.
-""" % newDocIdStr
-
-    # Request confirmation
-    log("Requesting confirmation, replace %s with %s" %
-        (oldDocIdStr, newDocIdStr))
-    html += u"""
-<center>
-<table border='0' cellpadding='10'>
- <tr>
-  <td><input type='submit' name='%s' value='%s' /></td>
-  <td><input type='submit' name='%s' value='%s' /></td>
- </tr>
-</table>
-<input type='hidden' name='newDocId' value='%s' />
-<input type='hidden' name='oldDocId' value='%s' />
-</center>
-""" % (cdrcgi.REQUEST, CONFIRM_SUBMIT, cdrcgi.REQUEST, CONFIRM_CANCEL,
-       newDocId, oldDocId)
-
-    html += endPage
-
-    cdrcgi.sendPage(html)
-
-####################################################################
-# Perform the replacement
-####################################################################
-
-# If we got this far, we have what we need, the pre-requisites are met,
-#   the user has confirmed that we should proceed
-
-# Check out old and new documents, bails out if fails
-oldDoc = getLockedDoc(oldDocIdStr)
-newDoc = getLockedDoc(newDocIdStr)
-
-# Save the current working version of the old doc, if needed
-versionDocIfNeeded(session, oldDocIdStr, str(oldDoc))
-
-# Make the necessary adjustments to the new document.
-xml = prepare(newDoc.xml)
-
-# Use the new XML to replace the text of the old document
-# We've still got all the CdrDocCtl fields from the new doc here
-oldDoc.xml = xml
-
-# Save the new doc under the old ID
-reason = "Replacing old version with content of replacement doc ID=%s" % \
-          newDocIdStr
-
-# Decision of users was to only make a non-publishable version
-log("Saving non-publishable version of new doc using old docId")
-resp = cdr.repDoc(session, doc=str(oldDoc), checkIn='N', ver='Y',
-                  verPublishable='N', comment=reason, showWarnings=True)
-
-# Expecting (docId, error string)
-# If no docId, there were errors
-# If no error string there weren't
-# If both, save was successful but there were warnings
-errors = []
-if resp[1]:
-    errors = cdr.getErrors(resp[1], errorsExpected=False, asSequence=True)
-if not resp[0]:
-    # Null docID means errors were fatal
-    msgs = ["Unable to save new document",]
-    msgs.append(errors)
-    fatal(msgs)
-
-# Document stored
-msgs = """
-<p>The new document was stored successfully as a new version of the old
-   document</p>
-"""
-# Else if messages occurred, they are warnings
-if errors:
-    msgs += """
-<p>However, some warnings were returned:</p>
-<ul>
-"""
-    for err in errors:
-        msgs += " <li>%s</li>\n" % err
-    msgs += "</ul\n"
-
-# Block the new document from being re-used by accident
-log("Blocking new docId: %s" % newDocIdStr)
-reason = "This doc replaced %s.  Use that doc now, not this one." % oldDocIdStr
-try:
-    cdr.setDocStatus(session, newDocIdStr, 'I', comment=reason)
-except cdr.Exception, info:
-    # Report error, but don't stop
-    log("Blocking raised exception: %s" % str(info))
-    msgs += "<p><strong>Warning: Failed to block new document:\n</strong></p>"
-    msgs += "<p>%s</p>\n" % str(info)
-
-errs = unlockDocs("Completed replacement of %s with %s" %
-                  (oldDocIdStr, newDocIdStr))
-if errs:
-    msgs += """
-<p><strong>Errors encountered unlocking documents:</strong><br />
-%s<br />
-Please check the status of the documents.</p>
-"""% str(errs)
-
-msgs += "<p>Processing is complete.</p>"
-
-log("Reporting final confirmation to user")
-html = cdrcgi.header(TITLE, "Processing complete", 'Final confirmation',
-                     script=SCRIPT, buttons=MENUBAR_BUTTONS)
-html += msgs
-html += endPage
-
-# That's all
-cdrcgi.sendPage(html)
+                doc = getattr(control, which_doc)
+                if doc and doc.lock:
+                    doc.check_in()
+            except:
+                control.logger.exception(f"Failure unlocking {which_doc} doc")
+        control.bail(e)

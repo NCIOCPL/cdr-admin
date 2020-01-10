@@ -5,7 +5,7 @@ import datetime
 import re
 import cdr
 import cdrcgi
-import cdrdb
+from cdrapi import db
 
 class Control(cdrcgi.Control):
     """
@@ -43,13 +43,12 @@ class Control(cdrcgi.Control):
         return diagnosis
     def get_diagnoses(self):
         diagnosis_path = "/Media/MediaContent/Diagnoses/Diagnosis/@cdr:ref"
-        query = cdrdb.Query("query_term t", "t.doc_id", "t.value")
+        query = db.Query("query_term t", "t.doc_id", "t.value")
         query.unique().order(2)
         query.join("query_term m", "m.int_val = t.doc_id")
         query.where("t.path = '/Term/PreferredName'")
         query.where("m.path = '%s'" % diagnosis_path)
-        return query.execute(self.cursor).fetchall()
-        return [["any", "Any Diagnosis"]] + query.execute(cursor).fetchall()
+        return [tuple(row) for row in query.execute(self.cursor).fetchall()]
     def get_statuses(self):
         dt = cdr.getDoctype(self.session, "Media")
         statuses = dict(dt.vvLists).get("ProcessingStatusValue")
@@ -86,7 +85,7 @@ class Control(cdrcgi.Control):
         """
         if not self.status:
             cdrcgi.bail("missing required status value")
-        query = cdrdb.Query("query_term i", "i.doc_id")
+        query = db.Query("query_term i", "i.doc_id")
         query.where("i.path = '/Media/PhysicalMedia/ImageData/ImageType'")
         if self.diagnosis:
             query.join("query_term d", "d.doc_id = i.doc_id")
@@ -133,7 +132,7 @@ class Doc:
         self.last_version_publishable = False
         try:
             self.root = self.control.get_parsed_doc_xml(doc_id)
-        except Exception, e:
+        except Exception as e:
             cdrcgi.bail(e)
         self.title = (self.root.find("MediaTitle").text or "").strip()
         self.status = None
@@ -161,11 +160,12 @@ class Doc:
         publishable = self.last_version_publishable and "Yes" or "No"
         values = (self.HOST, self.BASE, self.control.session, self.doc_id)
         url = "https://%s%s/QcReport.py?Session=%s&DocId=%d" % values
+        url += "&DocVersion=-1"
         return [cdrcgi.Report.Cell(self.doc_id, href=url, target="_blank"),
-                self.title, u"; ".join(diagnoses),
+                self.title, "; ".join(diagnoses),
                 self.status.value, self.make_date_cell(self.status.date),
-                u"; ".join(summaries), u"; ".join(glossary_terms),
-                u"; ".join(self.status.comments),
+                "; ".join(summaries), "; ".join(glossary_terms),
+                "; ".join(self.status.comments),
                 cdrcgi.Report.Cell(publishable, center=True),
                 self.make_date_cell(self.last_publishable_date)]
     def make_date_cell(self, date):
@@ -174,10 +174,9 @@ class Doc:
         return cdrcgi.Report.Cell(str(date)[:10], classes="nowrap center")
     def check_last_versions(self):
         versions = cdr.lastVersions(self.control.session, self.doc_id)
-        #cdrcgi.bail("versions: %s" % versions)
         if versions[1] > 0:
             self.last_version_publishable = versions[0] == versions[1]
-            query = cdrdb.Query("doc_version", "dt")
+            query = db.Query("doc_version", "dt")
             query.where(query.Condition("id", self.doc_id))
             query.where(query.Condition("num", versions[1]))
             row = query.execute(self.control.cursor).fetchone()
@@ -202,8 +201,8 @@ class Doc:
             if not self.status.date or self.status.date > self.control.end:
                 return False
         return True
-    def __cmp__(self, other):
-        return cmp((self.title or "").lower(), (other.title or "").lower())
+    def __lt__(self, other):
+        return (self.title or "").lower() < (other.title or "").lower()
     class Status:
         def __init__(self, node):
             self.value = self.date = None

@@ -1,69 +1,42 @@
-#----------------------------------------------------------------------
-# Report listing all citations linked by a summary document.
-# The output format is an Excel workbook.
-# BZIssue-2040
-#----------------------------------------------------------------------
-import sys
-import time
-import cdrcgi
-import cdrdb
+#!/usr/bin/env python
 
-ROW_HEIGHT = 40 # in point size
+""" Report all citations linked by a summary document.
+"""
 
-if sys.platform == "win32":
-    import os, msvcrt
-    msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
+from cdrcgi import Controller, Reporter, BASE
+from cdrapi import db
+from cdrapi.settings import Tier
 
-conn = cdrdb.connect("CdrGuest")
-cursor = conn.cursor()
+class Control(Controller):
+    TITLE = "Citations In Summaries"
+    COLS = (
+        Reporter.Column("CDR-ID", width="60px"),
+        Reporter.Column("Citation Title", width="1000px"),
+    )
+    HOST = Tier("PROD").hosts["APPC"]
+    URL = f"https://{HOST}{BASE}/QcReport.py?Session=guest&DocId={{:d}}"
+    URL += "&DocVersion=-1"
+    def run(self):
+        self.show_report()
+    def build_tables(self):
+        query = db.Query("active_doc d", "d.id", "d.title").order("d.id DESC")
+        query.join("query_term q", "q.int_val = d.id")
+        query.join("active_doc s", "s.id = q.doc_id")
+        query.where("q.path LIKE '/Summary/%CitationLink/@cdr:ref'")
+        rows = []
+        for doc_id, title in query.unique().execute():
+            url = self.URL.format(doc_id)
+            row = Reporter.Cell(doc_id, center=True, href=url), title.strip()
+            rows.append(row)
+        opts = dict(
+            columns=self.COLS,
+            caption=self.TITLE,
+            sheet_name=self.TITLE,
+        )
+        return Reporter.Table(rows, **opts)
 
-#----------------------------------------------------------------------
-# Identify the Citation documents for the report.
-#----------------------------------------------------------------------
-cursor.execute("""\
-SELECT distinct d.id CDRID, d.title
-  FROM query_term q
-  JOIN active_doc d
-    ON d.id = q.int_val
-  JOIN active_doc s
-    ON s.id = q.doc_id
- WHERE path like '/Summary/%CitationLink/@cdr:ref'
- ORDER BY d.id desc
-""", timeout = 300)
-rows = cursor.fetchall()
+    @property
+    def format(self):
+        return "excel"
 
-# Create the spreadsheet and define default style, etc.
-# -----------------------------------------------------
-styles = cdrcgi.ExcelStyles()
-sheet = styles.add_sheet("Citations in Summaries")
-
-# Set the colum widths
-# -------------------
-sheet.col(0).width = styles.chars_to_width(10)
-sheet.col(1).width = styles.chars_to_width(100)
-
-# Create the Header row
-# ---------------------
-styles.set_row_height(sheet.row(0), ROW_HEIGHT)
-sheet.write(0, 0, "CDR-ID", styles.header)
-sheet.write(0, 1, "Citation Title", styles.header)
-
-# Add the protocol data one record at a time beginning after
-# the header row. Link to the production server.
-# ----------------------------------------------------------
-row = 1
-base = "%s?Session=guest" % cdrdb.h.makeCdrCgiUrl("PROD", "QCReport.py")
-for doc_id, doc_title in rows:
-    styles.set_row_height(sheet.row(row), ROW_HEIGHT)
-    url = "%s&DocId=%d" % (base, doc_id)
-    link = styles.link(url, doc_id)
-    sheet.write(row, 0, link, styles.url)
-    sheet.write(row, 1, doc_title, styles.left)
-    row += 1
-
-name = "CitationsInSummaries-%s.xls" % time.strftime("%Y%m%d%H%M%S")
-print("Content-type: application/vnd.ms-excel")
-print("Content-Disposition: attachment; filename=%s" % name)
-print("")
-
-styles.book.save(sys.stdout)
+Control().run()

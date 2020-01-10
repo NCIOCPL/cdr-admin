@@ -1,35 +1,16 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
+"""Show menu for testing publish preview on representative PDQ summaries.
 """
-Menu for testing publish preview on representative PDQ summaries.
-"""
 
-# Standard library modules.
-import cgi
-import datetime
-
-# Third-party modules.
-import requests
-from lxml import etree, html
-
-# Custom modules.
-from cdrapi.db import Query
-from cdrapi.docs import Doc
-from cdrapi.users import Session
-from cdrapi.publishing import DrupalClient
-from cdrapi.settings import Tier
-from cdrcgi import Page, bail
-import cdrpub
+from cdrcgi import Controller
 
 
-class Control:
-    """
-    Processing control for new publish preview prototype
-    """
+class Control(Controller):
+    """Processing control for new publish preview prototype."""
 
-    TIER = Tier()
-    URL = "http://ncigovcdode36.prod.acquia-sites.com"
-    URL = "https://{}".format(TIER.hosts["DRUPAL"])
+    SUBTITLE = "Sample Summary Publish Preview Reports"
+    PP = "PublishPreview.py"
     CIS = {
         # Summary Type:
         "Adult Treatment": {
@@ -69,247 +50,44 @@ class Control:
         "BEP": 682526,
         "Blinatumomab": 767077,
     }
-    CSS = """\
-a { color: black; text-decoration: none; }
-a:hover { color: maroon; }
-"""
 
-    def __init__(self):
-        fields = cgi.FieldStorage()
-        self.id = fields.getvalue("id")
-        self.session = Session("guest")
-        self.debug_level = int(fields.getvalue("debug") or "0")
-        self.url = self.URL
+    def populate_form(self, page):
+        """Provide the links to the sample summary publish preview reports.
 
-    def run(self):
-        self.show() if self.id else self.pick()
+        Pass:
+            page - HTMLPage object where the links are put
+        """
 
-    def show(self):
-        doc = Doc(self.session, id=self.id)
-        if doc.doctype.name == "Summary":
-            summary = CIS(self, doc)
-        else:
-            summary = DIS(self, doc)
-        summary.send()
-
-    def add_link(self, page, doc_id, title):
-        url = "pp.py?id={:d}".format(doc_id)
-        opts = dict(href=url, target="_blank")
-        a = html.builder.A(title, **opts)
-        page.add(a)
-        page.add(html.builder.BR())
-
-    def pick(self):
-        opts = dict(
-            subtitle="Prototype for Drupal CMS",
-            #buttons=["Submit"],
-            #action="pp.py"
-        )
-        page = Page("Publish Preview", **opts)
-        page.add("<fieldset>")
-        page.add(html.builder.LEGEND("Drugs"))
+        fieldset = page.fieldset("Drugs")
+        ul = page.B.UL()
         for title in sorted(self.DIS):
-            self.add_link(page, self.DIS[title], title + u" Drug Summary")
-        page.add("</fieldset>")
+            url = self.make_url(self.PP, DocId=self.DIS[title])
+            opts = dict(href=url, target="_blank")
+            ul.append(page.B.LI(page.B.A(f"{title} Drug Summary", **opts)))
+        fieldset.append(ul)
+        page.form.append(fieldset)
         for summary_type in sorted(self.CIS):
             topics = self.CIS[summary_type]
-            page.add("<fieldset>")
-            page.add(html.builder.LEGEND(summary_type))
+            fieldset = page.fieldset(summary_type)
+            ul = page.B.UL()
             for topic in sorted(topics):
                 audience = "HP"
-                for pair in topics[topic]:
+                for doc_ids in topics[topic]:
                     language = "English"
-                    for doc_id in pair:
+                    for doc_id in doc_ids:
                         if doc_id is not None:
-                            args = audience, topic, language
-                            title = "{} {} Summary ({})".format(*args)
-                            self.add_link(page, doc_id, title)
-                            #page.add_radio("id", title, doc_id)
+                            title = f"{audience} {topic} Summary ({language})"
+                            url = self.make_url(self.PP, DocId=doc_id)
+                            opts = dict(href=url, target="_blank")
+                            ul.append(page.B.LI(page.B.A(title, **opts)))
                         language = "Spanish"
                     audience = "Patient"
-            page.add("</fieldset>")
-        page.add_css(self.CSS)
-        page.send()
+            fieldset.append(ul)
+            page.form.append(fieldset)
+        page.body.set("class", "admin-menu")
+        page.add_css(".admin-menu li { font-weight: normal }")
 
 
-class Summary:
-    """
-    Base class for PDQ summary documents (cancer and drug information)
-    """
-
-    PROXY = "/cgi-bin/cdr/proxy.py"
-    TIER_SUFFIXES = dict(DEV="-blue-dev", PROD="")
-    IMAGE_PATH = "/images/cdr/live"
-    URL_PATHS = (
-        "/Summary/SummaryMetaData/SummaryURL/@cdr:xref",
-        "/DrugInformationSummary/DrugInfoMetaData/URL/@cdr:xref"
-    )
-
-    def __init__(self, control, doc):
-        self.start = datetime.datetime.now()
-        self.control = control
-        self.url = control.url
-        self.doc = doc
-        if control.debug_level >= 2:
-            doc.session.logger.setLevel("DEBUG")
-        self.urls = self.load_urls()
-        self.client = DrupalClient(doc.session)
-        suffix = self.TIER_SUFFIXES.get(doc.session.tier.name, "-qa")
-        self.image_host = "www{}.cancer.gov".format(suffix)
-        url = "{}/user/login?_format=json".format(self.url)
-        name, password = self.client.auth
-        data = {"name": name, "pass": password}
-        response = requests.post(url, json=data)
-        self.cookies = response.cookies
-        opts = dict(parms=dict(DateFirstPub=""))
-        result = doc.filter(self.VENDOR_FILTERS, **opts)
-        root = result.result_tree
-        xsl = Doc.load_single_filter(doc.session, self.CMS_FILTER)
-        values = self.ASSEMBLE(doc.session, doc.id, xsl, root)
-        if control.debug_level >= 1:
-            doc.session.logger.setLevel("DEBUG")
-        self.page = self.generate_preview(values)
-
-    def generate_preview(self, values):
-        parser = etree.HTMLParser()
-        values["cdr_id"] = -values["cdr_id"]
-        nid = None
-        try:
-            espanol = ""
-            if values.get("language") == "es":
-                espanol = "/espanol"
-                #values["short_title"] = "Excelente!"
-                if False:
-                    values["language"] = "en"
-                    nid = self.client.push(values)
-                    values["nid"] = nid
-                    values["language"] = "es"
-            #values["title"] = "muy bien"
-            nid = self.client.push(values)
-            url = "{}{}/node/{}".format(self.url, espanol, nid)
-            response = requests.get(url, cookies=self.cookies)
-            page = etree.fromstring(response.content, parser=parser)
-            self.postprocess(page)
-            return page
-        except Exception as e:
-            bail("Failure generating preview: {}".format(e))
-        finally:
-            if nid is not None:
-                self.client.remove(values["cdr_id"])
-
-    def postprocess(self, page):
-        for script in page.iter("script"):
-            if script.text is None:
-                script.text = u" "
-            url = script.get("src")
-            if url is not None and not url.startswith(u"https:"):
-                if not url.startswith(u"http"):
-                    url = u"{}{}".format(self.url, url)
-                src = u"{}?url={}".format(self.PROXY, url)
-                script.set(u"src", src)
-        for link in page.findall("head/link"):
-            url = link.get("href")
-            if url is not None and not url.startswith("https://"):
-                if not url.startswith(u"http"):
-                    url = u"{}{}".format(self.url, url)
-                href = u"{}?url={}".format(self.PROXY, url)
-                link.set("href", href)
-        replacement = "https://{}{}".format(self.image_host, self.IMAGE_PATH)
-        for img in page.iter("img"):
-            src = img.get("src")
-            if src.startswith(self.IMAGE_PATH):
-                src = src.replace(self.IMAGE_PATH, replacement)
-                img.set("src", src)
-        for a in page.xpath("//a[@href]"):
-            if "nav-item-xxtitle" in (a.getparent().get("class") or ""):
-                continue
-            link_type = "unknown"
-            fixed = href = (a.get("href") or "").strip()
-            if "Common/PopUps" in href:
-                continue
-            self.doc.session.logger.debug("@href=%r", href)
-            if href.startswith("http"):
-                link_type = "ExternalLink"
-            elif href.startswith("#cit"):
-                link_type = "CitationLink"
-            else:
-                doc_id = self.extract_id_from_url(href)
-                if href.startswith("#"): # and doc_id == self.doc.id:
-                    link_type = "SummaryFragRef-internal-frag"
-                elif href.startswith("/"):
-                    if doc_id:
-                        if "#" in href:
-                            frag = href.split("#")[1]
-                            if doc_id == self.doc.id:
-                                fixed = "#" + frag
-                                link_type = "SummaryFragRef-internal+uri"
-                            else:
-                                fixed = "pp.py?id={:d}#{}".format(doc_id, frag)
-                                link_type = "SummaryFragRef-external"
-                        else:
-                            fixed = "pp.py?id={:d}".format(doc_id)
-                            link_type = "SummaryRef-external"
-                    else:
-                        fixed = "{}{}".format(self.url, href)
-                        # fixed = u"{}?url={}".format(self.PROXY, fixed)
-                        link_type = "Cancer.gov-link"
-                else:
-                    link_type = "Dead-link"
-                    self.doc.session.logger.info("glossary popup %r", href)
-                    # a.set("onclick", "return false")
-            a.set("href", fixed)
-            a.set("ohref", href)
-            a.set("type", link_type)
-
-    def load_urls(self):
-        urls = dict()
-        session = self.doc.session
-        for path in self.URL_PATHS:
-            query = Query("query_term q", "q.doc_id", "q.value")
-            query.join("active_doc a", "a.id = q.doc_id")
-            query.where(query.Condition("q.path", path))
-            for doc_id, url in query.execute(session.cursor).fetchall():
-                url = url.replace("https://www.cancer.gov", "")
-                url = url.replace("http://www.cancer.gov", "")
-                urls[url.lower().strip()] = doc_id
-        session.logger.info("loaded %d urls", len(urls))
-        return urls
-
-    def extract_id_from_url(self, url):
-        """
-        If the URL matches a PDQ summary return its CDR ID
-        """
-
-        self.doc.session.logger.debug("checking URL %r", url)
-        url = url.split("#")[0].rstrip("/").lower()
-        if url:
-            doc_id = self.urls.get(url)
-            if doc_id:
-                self.doc.session.logger.debug("found %d", doc_id)
-            return doc_id
-        return None
-
-    def send(self):
-        elapsed = (datetime.datetime.now() - self.start).total_seconds()
-        page = html.tostring(self.page)
-        args = len(page), elapsed
-        message = "Assembled %d bytes in %f seconds"
-        self.doc.session.logger.info(message, *args)
-        print("Content-type: text/html; charset=utf-8")
-        print("")
-        print(page)
-
-
-class CIS(Summary):
-    VENDOR_FILTERS = "set:Vendor Summary Set"
-    CMS_FILTER = "Cancer Information Summary for Drupal CMS"
-    ASSEMBLE = cdrpub.Control.assemble_values_for_cis
-
-
-class DIS(Summary):
-    VENDOR_FILTERS = "set:Vendor DrugInfoSummary Set"
-    CMS_FILTER = "Drug Information Summary for Drupal CMS"
-    ASSEMBLE = cdrpub.Control.assemble_values_for_dis
-
-
-Control().run()
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+    Control().run()

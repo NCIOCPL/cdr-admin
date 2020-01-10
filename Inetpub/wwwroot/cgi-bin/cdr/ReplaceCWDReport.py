@@ -1,138 +1,179 @@
-#--------------------------------------------------------------
-# Report information to a user about documents for which the CWD
-# was replaced with an earlier version.
-#
-# Filters and displays information from the CWDReplacements.log file
-# created by ReplaceCWDwithVersion.py
-#
-# JIRA::OCECDR-3800 - Address security vulnerabilities
-#--------------------------------------------------------------
-import cgi
-import cdr
-import cdrcgi
+#!/usr/bin/env python
 
-TITLE    = "Report CWD Replacements"
-SCRIPT   = "ReplaceCWDReport.py"
-SRC_FILE = "%s/%s" % (cdr.DEFAULT_LOGDIR, "CWDReplacements.log")
+"""Show documents for which the CWD was replaced by an earlier version.
+"""
 
-# Parse form variables
-fields = cgi.FieldStorage()
+from cdrcgi import Controller
 
-# Establish user session and authorization
-# No special authorization required, it's just a report
-session = cdrcgi.getSession(fields) or cdrcgi.bail("Please log in")
 
-# Load fields from form
-firstDate = fields.getvalue("firstDate")
-userId    = fields.getvalue("userId")
-docType   = fields.getvalue("docType")
-docId     = fields.getvalue("docId")
-action    = cdrcgi.getRequest(fields)
+class Control(Controller):
+    """Access to the database and report generation tools."""
 
-# Normalize case for later comparisons
-if userId:  userId  = userId.lower()
-if docType: docType = docType.lower()
+    SUBTITLE = "Report CWD Replacements"
+    SOURCE = "CWDReplacements.log"
+    COLUMNS = (
+        ("Date/time", "When did the replacement occur?"),
+        ("DocID", "CDR ID of the affected document"),
+        ("Doc type", "Document type for the affected document"),
+        ("User", "User ID of the user promoting the version"),
+        ("LV", "Version number of last version at time of promotion"),
+        ("PV",
+         "Version number of last publishable version at that time, -1 = None"),
+        ("Chg", "'Y' = CWD was different from last version, else 'N'"),
+        ("V#", "Version number promoted to become CWD"),
+        ("V", "Was new CWD also versioned? (Y/N)"),
+        ("P", "Was new CWD also versioned as publishable? (Y/N)"),
+        ("Comment", "System generated comment ':' user entered comment"),
+    )
+    INSTRUCTIONS = (
+        "Retrieve information on documents for which someone has replaced "
+        "the current working document (CWD) with an older version. "
+        "Fill in the form to select only those replacements meeting the "
+        "criteria given in the parameter values.  All parameters are "
+        "optional.  If all are blank, all replacements will be reported "
+        "for which we have logged information."
+    )
 
-# Navigate away?
-if action and action == "Admin Menu":
-    cdrcgi.navigateTo ("Admin.py", session)
+    def populate_form(self, page):
+        """Ask the user for the report parameters.
 
-# Has user seen the form yet?
-if fields.getvalue("formSeen") is None:
-    buttons = ('Submit', 'Admin Menu')
-    page = cdrcgi.Page("CDR Administration", subtitle=TITLE, action=SCRIPT,
-                       buttons=buttons, session=session)
-    instructions = """\
-Retrieve information on documents for which someone has replaced
-the current working document (CWD) with an older version.
-Fill in the form to select only those replacements meeting the criteria
-given in the parameter values.  All parameters are optional.  If all are
-blank, all replacements will be reported for which we have logged
-information."""
-    page.add(page.B.FIELDSET(page.B.P(instructions)))
-    page.add("<fieldset>")
-    page.add(page.B.LEGEND("Enter Report Parameters"))
-    page.add_date_field("firstDate", "Earliest Date")
-    page.add_text_field("userId", "User ID")
-    page.add_text_field("docType", "Doc Type")
-    page.add_text_field("docId", "CDR ID")
-    page.add("</fieldset>")
-    page.add(page.B.INPUT(type="hidden", name="formSeen", value="True"))
-    page.send()
+        Pass:
+            page - HTMLPage object where the fields go
+        """
 
-# If we got here, the user has already seen and submitted the form
-if firstDate and not cdrcgi.is_date(firstDate):
-    cdrcgi.bail("Invalid start date")
-if docId:
-    # Validate doc ID format
-    try:
-        result = cdr.exNormalize(docId.upper())
-    except cdr.Exception, info:
-        cdrcgi.bail('Doc ID "%s" is not a recognized CDR ID format' % docId)
-    else:
-        docId = str(result[1])
+        fieldset = page.fieldset("Instructions")
+        fieldset.append(page.B.P(self.INSTRUCTIONS))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Report Parameters")
+        fieldset.append(page.date_field("start", label="Earliest Date"))
+        fieldset.append(page.text_field("user", label="User ID"))
+        fieldset.append(page.text_field("doctype", label="Doc Type"))
+        fieldset.append(page.text_field("id", label="CDR ID"))
+        page.form.append(fieldset)
 
-# Construct page and report headers
-help = (
-    "When did the replacement occur?",
-    "CDR ID of the affected document",
-    "Document type for the affected document",
-    "User ID of the user promoting the version",
-    "Version number of last version at time of promotion",
-    "Version number of last publishable version at that time, -1 = None",
-    "'Y' = CWD was different from last version, else 'N'",
-    "Version number promoted to become CWD",
-    "Was new CWD also versioned? (Y/N)",
-    "Was new CWD also versioned as publishable? (Y/N)",
-    "System generated comment ':' user entered comment",
-)
-headings = ("Date/time", "DocID", "Doc type", "User", "LV", "PV", "Chg",
-            "V#", "V", "P", "Comment")
-columns = []
-for i, h in enumerate(headings):
-    columns.append(cdrcgi.Report.Column(h, title=help[i]))
+    def build_tables(self):
+        """Assemble the report table."""
 
-# Open the file
-try:
-    fp = open(SRC_FILE, "r")
-except IOError, info:
-    cdrcgi.bail("Unable to open log file: %s" % info)
+        opts = dict(columns=self.columns, caption=self.caption)
+        return self.Reporter.Table(self.rows, **opts)
 
-rows = []
-while True:
-    # Read each line
-    line = fp.readline()
-    if not line:
-        break
+    @property
+    def caption(self):
+        """String to be display directly above the report table."""
+        return f"Replaced Documents ({len(self.rows)})"
 
-    # Skip lines prior to our first date
-    if firstDate and line[0:10] < firstDate:
-        continue
+    @property
+    def columns(self):
+        """Column headers for the report."""
 
-    # Parse on tabs
-    data = line.split('\t')
+        columns = []
+        for label, tooltip in self.COLUMNS:
+            columns.append(self.Reporter.Column(label, tooltip=tooltip))
+        return columns
 
-    # This is a text file, it could get corrupted, ignore corrupt lines
-    if len(data) != 11:
-        continue
+    @property
+    def doctype(self):
+        """Optional document type for filtering the report."""
+        return self.fields.getvalue("doctype", "").lower()
 
-    # Filters
-    if docId and data[1] != docId:
-        continue
-    if docType and data[2].lower() != docType:
-        continue
-    if userId and data[3].lower() != userId:
-        continue
+    @property
+    def id(self):
+        """Optional document ID for filtering the report."""
+        return self.fields.getvalue("id", "").lower()
 
-    # Include the row if we got here.
-    row = []
-    for i, d in enumerate(data):
-        row.append(cdrcgi.Report.Cell(d.strip(), title=help[i]))
-    rows.append(row)
+    @property
+    def rows(self):
+        """Values for the report's table."""
 
-# Assemble and send the report.
-caption = "Replaced Documents (%d)" % len(rows)
-title = "CWD Replacement Report"
-table = cdrcgi.Report.Table(columns, rows, caption=caption)
-report = cdrcgi.Report(title, [table], banner=title)
-report.send()
+        if not hasattr(self, "_rows"):
+            self._rows = []
+            with open(f"{self.session.tier.basedir}/Log/{self.SOURCE}") as fp:
+                for line in fp:
+                    record = Record(self, line)
+                    if record.in_scope:
+                        self._rows.append(record.row)
+        return self._rows
+
+    @property
+    def start(self):
+        """Optional cutoff for the earliest replacements to include."""
+        return self.fields.getvalue("start")
+
+    @property
+    def user(self):
+        """Optional user for filtering the report."""
+        return self.fields.getvalue("user", "").lower()
+
+
+class Record:
+    """One row from the log file."""
+
+    TIPS = [column[1] for column in Control.COLUMNS]
+
+    def __init__(self, control, line):
+        """Save the caller's values.
+
+        Pass:
+            control - access to the report parameters
+            line - string for the line from the log file we're parsing
+        """
+
+        self.__control = control
+        self.__fields = line.strip().split("\t")
+
+    @property
+    def control(self):
+        """Access to the report settings."""
+        return self.__control
+
+    @property
+    def date(self):
+        """When the replacement occurred."""
+        return self.__fields[0]
+
+    @property
+    def id(self):
+        """CDR ID for the document."""
+        return self.__fields[1]
+
+    @property
+    def doctype(self):
+        """Normalized string for the document's type."""
+        return self.__fields[2].lower()
+
+    @property
+    def user(self):
+        """Normalized account name for the user."""
+        return self.__fields[3].lower()
+
+    @property
+    def in_scope(self):
+        """Boolean: should this record be included in the report?"""
+
+        if len(self.__fields) != len(self.TIPS):
+            return False
+        if self.control.start and self.date < self.control.start:
+            return False
+        if self.control.id and self.control.id != self.id:
+            return False
+        if self.control.doctype and self.control.doctype != self.doctype:
+            return False
+        if self.control.user and self.control.user != self.user:
+            return False
+        return True
+
+    @property
+    def row(self):
+        """Values for the report table."""
+
+        values = []
+        for i, field in enumerate(self.__fields):
+            opts = dict(tooltip=self.TIPS[i])
+            cell = self.__control.Reporter.Cell(field.strip(), **opts)
+            values.append(cell)
+        return values
+
+
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+    Control().run()

@@ -1,649 +1,452 @@
-#----------------------------------------------------------------------
-# Creatign a HTML report to help track who had been invited to the
-# Boards in the past, what their current (and past) membership statuses
-# are, and reasons why they left PDQ. This information will be helpful
-# in discussions about inviting new members.
-#                                           Volker Englisch, 2011-09-23
-#
-# BZIssue::5061 -Board Membership and Invitation History Report
-# OCECDR-3649: PDQ Board Invitation History Report - Problem with
-#              exclude current members options
-#----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, cdrdb, re, time
-import lxml.etree as etree
+#!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields     = cgi.FieldStorage()
-boardIds   = fields and fields.getvalue("board")    or None
-excludeCurrEd = fields and fields.getvalue("NoCurEd")  or False
-excludeCurrAd = fields and fields.getvalue("NoCurAd")  or False
-dispBoardName = fields and fields.getvalue("bname") or False
-dispAoE       = fields and fields.getvalue("aoe")      or False
-dispInvDate   = fields and fields.getvalue("idate")    or False
-dispResponse  = fields and fields.getvalue("response") or False
-dispCurMember = fields and fields.getvalue("member")   or False
-dispEndDate   = fields and fields.getvalue("end")      or False
-dispReason    = fields and fields.getvalue("reason")   or False
-blankCol      = fields and fields.getvalue("blank")    or False
-session    = cdrcgi.getSession(fields)
-request    = cdrcgi.getRequest(fields)
-title      = "PDQ Board Invitation History Report"
-instr      = "Report on Board Member History"
-script     = "BoardInvitationHistory.py"
-SUBMENU    = "Report Menu"
-buttons    = ("Submit", SUBMENU, cdrcgi.MAINMENU)
-header     = cdrcgi.header(title, title, instr, script, buttons,
-                           method = 'GET',
-                           stylesheet = """
-    <script type='text/javascript'>
-     function doFullReport() {
-         document.getElementById('summary').checked = false;
-         var form = document.forms[0];
-         {
-             form.noCurEd.value  = form.noCurEd.checked  ? 'Yes' : 'No';
-             form.ainfo.value  = form.ainfo.checked  ? 'Yes' : 'No';
-             form.sginfo.value = form.sginfo.checked ? 'Yes' : 'No';
-             form.sheet.value  = form.sheet.checked  ? 'summary' : 'full';
-         }
-     }
-    </script>
-    <style type="text/css">
-     td       { font-size: 12pt; }
-     .label   { font-weight: bold; }
-     .label2  { font-size: 11pt;
-                font-weight: bold; }
-     .select:hover { background-color: #FFFFCC; }
-     .grey    {background-color: #BEBEBE; }
-     .topspace { margin-top: 24px; }
-
-    </style>
-""")
-dateString = time.strftime("%B %d, %Y")
-
-filterType= {'summary':'name:PDQBoardMember Roster Summary',
-             'full'   :'name:PDQBoardMember Roster'}
-allRows   = []
-
-#----------------------------------------------------------------------
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if request == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif request == SUBMENU:
-    cdrcgi.navigateTo("reports.py", session)
-
-#----------------------------------------------------------------------
-# Set up a database connection and cursor.
-#----------------------------------------------------------------------
-try:
-    conn = cdrdb.connect("CdrGuest")
-    cursor = conn.cursor()
-except cdrdb.Error, info:
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
-
-#----------------------------------------------------------------------
-# Object for one PDQ board member.
-#----------------------------------------------------------------------
-class BoardMember:
-    def __init__(self, cursor, row):
-        self.bmId      = row[0]
-        self.persId    = row[1]
-        self.fname     = row[2]
-        self.lname     = row[3]
-        self.boardInfo = row[4]
-        ### self.boardId   = row[4]
-        ### self.boardname = row[5]
-        # self.current   = None
-        #self.invDate   = None
-        #self.aoe       = ''
-        #self.response  = None
-        #self.endDate   = None
-        #self.reason    = None
-
-        ### if self.boardname.find('Advisory'):
-        ###     self.currentAd = True
-        ###     self.currentEd = False
-        ### else:
-        ###     self.currentAd = False
-        ###     self.currentEd = True
-
-        cursor.execute("""SELECT xml
-                          FROM document
-                         WHERE id = ?""", self.bmId)
-        docXml = cursor.fetchall()[0][0]
-        tree = etree.XML(docXml.encode('utf-8'))
-
-        self.allBoardsInfo = {}
-        for boardId, boardName in self.boardInfo:
-            self.allBoardsInfo[boardId] = {'name':boardName}
-            for detailsNode in tree.findall('BoardMembershipDetails'):
-                if detailsNode.findall('BoardName')[0].text == boardName:
+"""Track past board member invitations.
 
 
-                    #self.current = detailsNode.findall('CurrentMember')[0].text
-                    self.allBoardsInfo[boardId]['current'] = detailsNode.findall('CurrentMember')[0].text
-                    #self.invDate   = detailsNode.findall('InvitationDate')[0].text
-                    self.allBoardsInfo[boardId]['invdate'] = detailsNode.findall('InvitationDate')[0].text
-                    #self.response  = detailsNode.findall('ResponseToInvitation')[0].text
-                    self.allBoardsInfo[boardId]['response'] = detailsNode.findall('ResponseToInvitation')[0].text
-                    if detailsNode.findall('AreaOfExpertise'):
-                        #self.aoe = ", ".join(["%s" % g.text for g in \
-                        #                 detailsNode.findall('AreaOfExpertise')])
-                        self.allBoardsInfo[boardId]['aoe'] = ", ".join(["%s" % g.text for g in \
-                                         detailsNode.findall('AreaOfExpertise')])
-                    if detailsNode.findall('TerminationDate'):
-                        #self.endDate   = detailsNode.findall('TerminationDate')[0].text
-                        self.allBoardsInfo[boardId]['termdate'] = detailsNode.findall('TerminationDate')[0].text
-                    if detailsNode.findall('TerminationReason'):
-                        #self.reason    = detailsNode.findall('TerminationReason')[0].text
-                        self.allBoardsInfo[boardId]['termreason'] = detailsNode.findall('TerminationReason')[0].text
-        #cdrcgi.bail(self.allBoardsInfo)
-
-
-#----------------------------------------------------------------------
-# Function to decide if a board member needs to get printed.
-# If there is no exclusion criteria specified the board memeber will
-# always get printed.  If there is a criteria 'A' specified, the
-# appropriate board (Advisory or Editorial) regardless of the type
-# (Genetics, Treatment, etc) will turn off printing if the board
-# member is currently active on that board.
-#----------------------------------------------------------------------
-def printRow(boardMember, includeIds, exclude):
-    printIt = True
-
-    # Print everything if no exclusion is specified
-    # ---------------------------------------------
-    if not exclude:
-        return printIt
-
-    # Find out if printing needs to be suppressed based on the
-    # exclusion criteria
-    # --------------------------------------------------------
-    # If both current ed board and adv board members need to
-    # be excluded check if this person is current for either
-    # one.
-    if 'Editorial Board' in exclude and \
-         'Editorial Advisory Board' in exclude:
-        for id in boardMember.allBoardsInfo.keys():
-            if 'current' in boardMember.allBoardsInfo[id]        and \
-               boardMember.allBoardsInfo[id]['current'] == 'Yes':
-               printIt = False
-    # If current ed board members need to be excluded check
-    # to ensure the board is not an adv board.
-    elif 'Editorial Board' in exclude:
-        for id in boardMember.allBoardsInfo.keys():
-            if 'current' in boardMember.allBoardsInfo[id]        and \
-               boardMember.allBoardsInfo[id]['current'] == 'Yes' and \
-               boardMember.allBoardsInfo[id]['name'].find('Advisory') == -1:
-               printIt = False
-    # If current adv board members need to be excluded check
-    # to ensure the board is not an ed board.
-    elif 'Editorial Advisory Board' in exclude:
-        for id in boardMember.allBoardsInfo.keys():
-            if 'current' in boardMember.allBoardsInfo[id]        and \
-               boardMember.allBoardsInfo[id]['current'] == 'Yes' and \
-               boardMember.allBoardsInfo[id]['name'].find('Advisory') > 0:
-               printIt = False
-
-    return printIt
-
-
-#----------------------------------------------------------------------
-# Look up title of a board, given its ID.
-#----------------------------------------------------------------------
-def getBoardName(id):
-    try:
-        cursor.execute("SELECT title FROM document WHERE id = ?", id)
-        rows = cursor.fetchall()
-        if not rows:
-            cdrcgi.bail('Failure looking up title for CDR%s' % id)
-        return cleanTitle(rows[0][0])
-    except Exception, e:
-        cdrcgi.bail('Looking up board title: %s' % str(e))
-
-#----------------------------------------------------------------------
-# Remove cruft from a document title.
-#----------------------------------------------------------------------
-def cleanTitle(title):
-    semicolon = title.find(';')
-    if semicolon != -1:
-        title = title[:semicolon]
-    return title.strip()
-
-#----------------------------------------------------------------------
-# Build a picklist for PDQ Boards and create an additional option for
-# all boards.
-# Returns the HTML snipped for a <SELECT/> element.
-#----------------------------------------------------------------------
-def getBoardPicklist():
-    allBoards = []
-    picklist = """
-     <SELECT NAME='board' size='6' MULTIPLE='MULTIPLE'>
+ "Creatign a HTML report to help track who had been invited to the
+  Boards in the past, what their current (and past) membership statuses
+  are, and reasons why they left PDQ. This information will be helpful
+  in discussions about inviting new members."
+                                           Volker Englisch, 2011-09-23
 """
-    options = ""
-    try:
-        cursor.execute("""\
-SELECT DISTINCT board.id, board.title
-           FROM document board
-           JOIN query_term org_type
-             ON org_type.doc_id = board.id
-          WHERE org_type.path = '/Organization/OrganizationType'
-            AND org_type.value IN ('PDQ Editorial Board',
-                                   'PDQ Advisory Board')
-       ORDER BY board.title""")
-        for id, title in cursor.fetchall():
-            allBoards.append(id)
-            title = cleanTitle(title)
-            options += "      <OPTION value='%d'>%s</OPTION>\n" % (id, title)
-    except cdrdb.Error, info:
-        cdrcgi.bail('Database query failure: %s' % info[1][0])
 
-    allIds = ",".join(["%s" % b for b in allBoards])
-    allOpt  = "     <OPTION value='%s' SELECTED='SELECTED'>" % allIds
-    allOpt += "All Boards</OPTION>\n"
+from cdrcgi import Controller
+from cdrapi.docs import Doc, Link
 
-    return picklist + allOpt + options + "     </SELECT>\n"
+class Control(Controller):
+    """Contains the top-level logic for this report."""
 
-#----------------------------------------------------------------------
-# Creating the table rows for the HTML output - one row for each member
-# and board.
-# This requires that the members are coming in sorted because all that
-# we do now is to filter the members we don't want to see and add
-# additional information for the person that we do want to see.
-# Return:  string containing <tr>... info </tr>
-#----------------------------------------------------------------------
-def makeRow(cursor, row, boardIds, dispColumn, excludeRow):
-    if not type(boardIds) == type([]):
-        boardIds = [boardIds]
-    member = BoardMember(cursor, row)
-    bmrow = u""
+    SUBTITLE = "PDQ Board Invitation History Report"
+    METHOD = "get"
+    IACT = "Integrative, Alternative, and Complementary Therapies"
+    EXCLUDE_EDITORIAL = "Exclude current members of any editorial board"
+    EXCLUDE_ADVISORY = "Exclude current members of any advisory board"
+    BOARD_TYPES = "PDQ Editorial Board", "PDQ Advisory Board"
+    BLANK_COLUMN = "Blank Column"
+    OPTIONAL_COLUMNS = (
+        "Board Name",
+        "Area of Expertise",
+        "Invitation Date",
+        "Response to Invitation",
+        "Current Member",
+        "Termination End Date",
+        "Termination Reason",
+        BLANK_COLUMN,
+    )
 
-    for boardId in member.allBoardsInfo.keys():
-        # Check if this row needs to be printed
-        if not printRow(member, boardIds, excludeRow):
-            return bmrow
-        ### for skip in excludeRow:
-        ###     #cdrcgi.bail("%s - %s" % (member.boardname, skip))
-        ###     if member.boardname.find(skip) > 0 and member.current == 'Yes':
-        ###         #cdrcgi.bail("%s (%s) : %s, %d" % (member.boardname, skip,
-        ###         #     excludeRow, member.boardname.find(skip)))
-        ###         return ""
+    def build_tables(self):
+        """Create the meat of the report."""
 
-        if str(boardId) in boardIds:
-            cssClass = u"%s" % boardId
+        # Add the column headers, based on which optional columns we want.
+        cols = ["ID", "Name"]
+        for name in self.OPTIONAL_COLUMNS:
+            if name in self.optional_columns:
+                if name == self.BLANK_COLUMN:
+                    cols.append(self.Reporter.Column("Blank", width="250px"))
+                elif "Date" in name:
+                    cols.append(self.Reporter.Column(name, width="75px"))
+                else:
+                    cols.append(name)
 
-            if 'current' in member.allBoardsInfo[boardId] and \
-                            member.allBoardsInfo[boardId]['current'] == 'Yes':
-                cssClass += u" current"
+        # Create one row for each member/board combination. If we have
+        # not been asked to display any board-specific columns, only
+        # include one row per board member.
+        rows = []
+        for member in self.members:
+            if self.including_board_specific_columns:
+                for board in member.boards:
+                    row = [
+                        self.Reporter.Cell(member.id, center=True),
+                        self.Reporter.Cell(member.name),
+                    ]
+                    for name in self.OPTIONAL_COLUMNS:
+                        if name in self.optional_columns:
+                            if name == self.BLANK_COLUMN:
+                                value = ""
+                            else:
+                                key = name.replace(" ", "_").lower()
+                                value = getattr(board, key)
+                            row.append(value)
+                    rows.append(row)
             else:
-                cssClass += u" notcurrent"
-            bmrow += """
-         <tr class="%s">
-          <td>%d</td>
-          <td>%s, %s</td>
-    """ % (cssClass, member.bmId, member.lname, member.fname)
+                row = [
+                    self.Reporter.Cell(member.id, center=True),
+                    self.Reporter.Cell(member.name),
+                ]
+                rows.append(row)
 
-            if 'BoardName' in dispColumn:
-                bmrow += """
-          <td>%s</td>
-    """ % (member.allBoardsInfo[boardId]['name'])
+        # Assemble the table and return it.
+        caption = self.board_names.get(self.board)
+        if not caption:
+            caption = "PDQ Board Invitation History for All Boards"
+        opts = dict(columns=cols, caption=caption)
+        return self.Reporter.Table(rows, **opts)
 
-            if 'AoE' in dispColumn:
-                bmrow += """
-          <td>%s</td>
-    """ % ('aoe' in member.allBoardsInfo[boardId] and
-                    member.allBoardsInfo[boardId]['aoe'] or "&nbsp;")
+    def populate_form(self, page):
+        """Add the report control options to the form.
 
-            if 'Invitation' in dispColumn:
-                bmrow += """
-          <td>%s</td>
-    """ % ('invdate' in member.allBoardsInfo[boardId] and
-                        member.allBoardsInfo[boardId]['invdate'] or "&nbsp;")
+        Pass:
+            page - HTMLPage object on which the fields are placed
+        """
 
-            if 'Response' in dispColumn:
-                bmrow += """
-          <td>%s</td>
-    """ % ('response' in member.allBoardsInfo[boardId] and
-                         member.allBoardsInfo[boardId]['response'])
+        fieldset = page.fieldset("Select Board")
+        boards = [("all", "All Boards")] + self.boards
+        checked = True
+        for id, name in boards:
+            opts = dict(value=id, label=name, checked=checked)
+            fieldset.append(page.radio_button("board", **opts))
+            checked = False
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Exclusions")
+        opts = dict(value=self.EXCLUDE_EDITORIAL, label=self.EXCLUDE_EDITORIAL)
+        fieldset.append(page.checkbox("exclusions", **opts))
+        opts = dict(value=self.EXCLUDE_ADVISORY, label=self.EXCLUDE_ADVISORY)
+        fieldset.append(page.checkbox("exclusions", **opts))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Optional Columns")
+        checked = True
+        for column in self.OPTIONAL_COLUMNS:
+            opts = dict(value=column, label=column, checked=checked)
+            fieldset.append(page.checkbox("optional", **opts))
+            checked = False
+        page.form.append(fieldset)
 
-            if 'Current' in dispColumn:
-                bmrow += """
-          <td>%s</td>
-    """ % ('current' in member.allBoardsInfo[boardId] and
-                        member.allBoardsInfo[boardId]['current'] or '&nbsp;')
+    @property
+    def board(self):
+        """ID of the board selected for the report (or None for all boards)."""
 
-            if 'EndDate' in dispColumn:
-                bmrow += """
-          <td>%s</td>
-    """ % ('termdate' in member.allBoardsInfo[boardId] and
-                         member.allBoardsInfo[boardId]['termdate'])
+        if not hasattr(self, "_board"):
+            board = self.fields.getvalue("board")
+            try:
+                self._board = int(board)
+            except:
+                self._board = None
+        return self._board
 
-            if 'Termination' in dispColumn:
-                bmrow += """
-          <td>%s</td>
-    """ % ('termreason' in member.allBoardsInfo[boardId] and
-                           member.allBoardsInfo[boardId]['termreason'])
+    @property
+    def board_names(self):
+        """Dictionary of board names indexed by organization ID."""
 
-            # If a blank column is printed
-            # ----------------------------
-            if 'BlankCol' in dispColumn:
-                bmrow += u"""
-             <td class="blank">&nbsp;</td>"""
+        if not hasattr(self, "_board_names"):
+            self._board_names = {}
+            for id, name in self.boards:
+                self._board_names[id] = name.replace("PDQ ", "")
+        return self._board_names
 
-            bmrow += """
-         </tr>
-    """
-    ###         return row
-    ###     else:
-    ###         return ""
-    #    if member.fname == 'Karen':
-    #        cdrcgi.bail(member.allBoardsInfo)
-    return bmrow
+    @property
+    def boards(self):
+        """All active boards in the CDR, as id/title tuples."""
+
+        if not hasattr(self, "_boards"):
+            fields = "d.id", "d.title"
+            query = self.Query("active_doc d", *fields).order("d.title")
+            query.join("query_term t", "t.doc_id = d.id")
+            query.where("t.path = '/Organization/OrganizationType'")
+            query.where(query.Condition("t.value", self.BOARD_TYPES, "IN"))
+            self._boards = []
+            for id, title in query.execute(self.cursor).fetchall():
+                title = title.split(";")[0].strip()
+                self._boards.append((id, title.replace(self.IACT, "IACT")))
+        return self._boards
+
+    @property
+    def exclusions(self):
+        """The types of board members to be excluded from the report."""
+        return self.fields.getlist("exclusions")
+
+    @property
+    def including_board_specific_columns(self):
+        """If False, we show only one row per board member."""
+
+        if not self.optional_columns:
+            return False
+        if self.optional_columns == [self.BLANK_COLUMN]:
+            return False
+        return True
+
+    @property
+    def members(self):
+        """Sequence of BoardMember objects in scope for the report."""
+
+        if not hasattr(self, "_members"):
+            self._members = BoardMember.get_members(self)
+        return self._members
+
+    @property
+    def optional_columns(self):
+        """Which optional columns has the user requested?"""
+        return self.fields.getlist("optional")
 
 
-#----------------------------------------------------------------------
-# If we don't have a request, put up the form.
-#----------------------------------------------------------------------
-if not boardIds:
-    form   = """\
-  <input TYPE='hidden' NAME='%s' VALUE='%s'>
+class BoardMember:
+    """Information about a PDQ board member and his/her board memberships."""
 
-  <table>
-   <tr>
-    <td class="label">PDQ Board:&nbsp;</TD>
-    <td>%s</td>
-   </tr>
-   <tr>
-    <td> </td>
-    <td class="select">
-     <input type='checkbox' name='NoCurEd' id='edboard'>
-     <label for="edboard">Exclude current Ed Board Members</label>
-    </td>
-   </tr>
-   <tr>
-    <td> </td>
-    <td class="select">
-     <input type='checkbox' name='NoCurAd' id='adboard'>
-     <label for="adboard">Exclude current Advisory Board Members</label>
-    </td>
-   </tr>
-   <tr>
-    <td colspan="2">
-     <div style="height: 10px"> </div>
-    </td>
-   </tr>
-   <tr>
-    <td> </td>
-    <td class="grey">
-     <div style="height: 10px"> </div>
-     <table>
-      <tr>
-       <td> </td>
-       <td>
-       <strong>Include Additional Columns</strong>
-       </td>
-      </tr>
-      <tr>
-       <td><span style="margin-left: 20px"> </span></td>
-       <td class="select">
-        <input type='checkbox' name='bname' id='E1' CHECKED>
-        <label for="E1">Board Name</label>
-       </td>
-      </tr>
-      <tr>
-       <td> </td>
-       <td class="select">
-        <input type='checkbox' name='aoe' id='E2'>
-        <label for="E2">Area of Expertise</label>
-       </td>
-      </tr>
-      <tr>
-       <td> </td>
-       <td class="select">
-        <input type='checkbox' name='idate' id='E3'>
-        <label for="E3">Invitation Date</label>
-       </td>
-      </tr>
-      <tr>
-       <td> </td>
-       <td class="select">
-        <input type='checkbox' name='response' id='E4'>
-        <label for="E4">Response to Invitation</label>
-       </td>
-      </tr>
-      <tr>
-       <td> </td>
-       <td class="select">
-        <input type='checkbox' name='member' id='E5'>
-        <label for="E5">Current Member</label>
-       </td>
-      </tr>
-      <tr>
-       <td> </td>
-       <td class="select">
-        <input type='checkbox' name='end' id='E7'>
-        <label for="E7">Termination End Date</label>
-       </td>
-      </tr>
-      <tr>
-       <td> </td>
-       <td class="select">
-        <input type='checkbox' name='reason' id='E8'>
-        <label for="E8">Termination Reason</label>
-       </td>
-      </tr>
-      <tr>
-       <td> </td>
-       <td class="select">
-        <input type='checkbox' name='blank' id='E6'>
-        <label for="E6">Blank Column</label>
-       </td>
-      </tr>
-     </table>
-    </td>
-   </tr>
-   </table>
-  </form>
- </body>
-</html>
-""" % (cdrcgi.SESSION, session, getBoardPicklist())
-    cdrcgi.sendPage(header + form)
+    BOARD = "/PDQBoardMemberInfo/BoardMembershipDetails/BoardName/@cdr:ref"
+    FIRST_NAME = "/Person/PersonNameInformation/GivenName"
+    LAST_NAME = "/Person/PersonNameInformation/SurName"
+    PERSON = "/PDQBoardMemberInfo/BoardMemberName/@cdr:ref"
 
-#----------------------------------------------------------------------
-# Get the board's name from its ID.  If multiple boards are selected
-# we're adjusting the report title
-# If 'All Boards' is selected all board IDs are concatenated into a
-# single string
-#----------------------------------------------------------------------
-# Selected single board or AllBoards entry
-if not type(boardIds) == type([]):
-    if boardIds.find(',') > 0:
-        reportTitle = 'PDQ Board Invitation History for All Boards'
-        boardIds = boardIds.split(',')  # convert to list
-    else:
-        boardId    = boardIds and int(boardIds) or None
-        reportTitle = getBoardName(boardId)
-# Selected multiple boards
-else:
-    reportTitle = "PDQ Board Invitation History"
+    def __init__(self, control, id, boards):
+        """Capture the caller's information; let properties do the real work.
 
-#----------------------------------------------------------------------
-# Select the list of board members (Lastname, Firstname) and their
-# board affiliation.
-#----------------------------------------------------------------------
-try:
-    cursor.execute("""\
-          SELECT q.doc_id, q.int_val AS PersonID, fn.value AS First,
-                 ln.value AS Last, b.int_val AS BoardID,
-                 o.value AS BoardName
-            FROM query_term q
-            JOIN query_term fn
-              ON q.int_val = fn.doc_id
-             AND fn.path   = '/Person/PersonNameInformation/GivenName'
-            JOIN query_term ln
-              ON q.int_val = ln.doc_id
-             AND ln.path   = '/Person/PersonNameInformation/SurName'
-            JOIN query_term b
-              ON q.doc_id  = b.doc_id
-             AND b.path    = '/PDQBoardMemberInfo/BoardMembershipDetails' +
-                             '/BoardName/@cdr:ref'
-            JOIN query_term o
-              ON b.int_val = o.doc_id
-             AND o.path    = '/Organization/OrganizationNameInformation'  +
-                             '/OfficialName/Name'
-           WHERE q.path    = '/PDQBoardMemberInfo/BoardMemberName/@cdr:ref'
- -- and q.doc_id in (639551, 404154) -- 410773, 404154, 369926, 369860)
-           ORDER BY ln.value, fn.value, o.value
-""", timeout = 300)
-    rows = cursor.fetchall()
+        Pass:
+            control - provides access to runtime options and the database
+            id - CDR ID for the PDQBoardMemberInfo document
+            boards - integers for the member's boards
+        """
+        self.__control = control
+        self.__id = id
+        self.__boards = boards
 
-    boardMembers = []
-    lastMemberId = 0
-    for row in rows:
-        if row[0] == lastMemberId:
-            boardMembers[len(boardMembers)-1][4].append([row[4], row[5]])
+    def __lt__(self, other):
+        """Make the board member objects sortable by member name."""
+        return self.name.lower() < other.name.lower()
+
+    @property
+    def boards(self):
+        """Board objects for PDQ board to which this member has belonged."""
+
+        if not hasattr(self, "_boards"):
+            self._boards = []
+            for node in self.doc.root.findall("BoardMembershipDetails"):
+                #board = self.Board(self, node)
+                #if board.id in self.__boards:
+                #    self._boards.append(board)
+                self._boards.append(self.Board(self, node))
+        return self._boards
+
+    @property
+    def control(self):
+        """Access to the database and the runtime options."""
+        return self.__control
+
+    @property
+    def cursor(self):
+        """Access to the database."""
+        return self.__control.cursor
+
+    @property
+    def doc(self):
+        """The PDQBoardMemberInfo document for this board member."""
+
+        if not hasattr(self, "_doc"):
+            self._doc = Doc(self.session, id=self.id)
+        return self._doc
+
+    @property
+    def id(self):
+        """CDR ID for this member's PDQBoardMemberInfo document."""
+        return self.__id
+
+    @property
+    def in_scope(self):
+        """Boolean indicating whether this board member should be included."""
+
+        if not hasattr(self, "_in_scope"):
+            self._in_scope = True if self.boards and self.name else False
+            exclusions = self.control.exclusions
+            args = self.name, self.control.exclusions
+            if self._in_scope and exclusions:
+                for board in self.boards:
+                    args = board.name, board.current
+                    if board.current:
+                        if "advisory" in board.name.lower():
+                            if self.control.EXCLUDE_ADVISORY in exclusions:
+                                self._in_scope = False
+                                break
+                        else:
+                            if self.control.EXCLUDE_EDITORIAL in exclusions:
+                                self._in_scope = False
+                                break
+        return self._in_scope
+
+    @property
+    def name(self):
+        """Board member's name in Surname, Given Name format."""
+
+        if not hasattr(self, "_name"):
+            query = self.control.Query("query_term g", "g.value", "s.value")
+            query.join("query_term s", "s.doc_id = g.doc_id")
+            query.join("query_term p", "p.int_val = g.doc_id")
+            query.where(query.Condition("p.path", self.PERSON))
+            query.where(query.Condition("g.path", self.FIRST_NAME))
+            query.where(query.Condition("s.path", self.LAST_NAME))
+            query.where(query.Condition("p.doc_id", self.id))
+            rows = query.execute(self.cursor).fetchall()
+            if not rows:
+                self._name = None
+            else:
+                self._name = f"{rows[0][1].strip()}, {rows[0][0].strip()}"
+        return self._name
+
+    @property
+    def session(self):
+        """Login session for the user running the report."""
+        return self.control.session
+
+    @classmethod
+    def get_members(cls, control):
+        """Get the board members in scope for this report.
+
+        Pass:
+            control - access to the database and the report parameters
+
+        Return:
+            sequence of `BoardMember` objects
+        """
+
+        query = control.Query("query_term", "doc_id", "int_val")
+        query.where(query.Condition("path", cls.BOARD))
+        if control.board is not None:
+            query.where(query.Condition("int_val", control.board))
         else:
-            boardMembers.append([row[0], row[1], row[2], row[3],
-                                                       [[row[4], row[5]]]])
-        lastMemberId = row[0]
+            boards = list(control.board_names)
+            query.where(query.Condition("int_val", boards, "IN"))
+        members = {}
+        for member_id, board_id in query.execute(control.cursor):
+            if member_id not in members:
+                members[member_id] = [board_id]
+            else:
+                members[member_id].append(board_id)
+        result = []
+        for item in members.items():
+            member = cls(control, *item)
+            if member.in_scope:
+                result.append(member)
+        return sorted(result)
 
-except cdrdb.Error, info:
-    cdrcgi.bail('Database query failure: %s' % info[1][0])
 
-# ---------------------------------------------------------------
-# Create the HTML Output Page
-# ---------------------------------------------------------------
-html = """\
-<!DOCTYPE HTML PUBLIC '-//W3C//DTD HTML 4.01 Transitional//EN'
-                      'http://www.w3.org/TR/html4/loose.dtd'>
-<html>
- <head>
-  <title>PDQ Board Member History Report</title>
-  <meta http-equiv='Content-Type' content='text/html; charset=UTF-8'>
-  <style type='text/css'>
-   h1       { font-family: Arial, sans-serif;
-              font-size: 16pt;
-              text-align: center;
-              font-weight: bold; }
-   h2       { font-family: Arial, sans-serif;
-              font-size: 14pt;
-              text-align: center;
-              font-weight: bold; }
-   p        { font-family: Arial, sans-serif;
-              font-size: 12pt; }
-   #summary td, #summary th
-            { border: 1px solid black; }
-   #hdg     { font-family: Arial, sans-serif;
-              font-size: 16pt;
-              font-weight: bold;
-              text-align: center;
-              padding-bottom: 20px;
-              border: 0px; }
-   #summary { border: 0px; }
+    class Board:
+        """Information about a board member's membership in a PDQ board."""
 
-   /* The Board Member Roster information is created via a global */
-   /* template for Persons.  The italic display used for the QC   */
-   /* report does therefore need to be suppressed here.           */
-   /* ----------------------------------------------------------- */
-   I        { font-family: Arial, sans-serif; font-size: 12pt;
-              font-style: normal; }
-   span.SectionRef { text-decoration: underline; font-weight: bold; }
+        NAME = "/Organization/OrganizationNameInformation/OfficialName/Name"
 
-   .theader { background-color: #CFCFCF; }
-   .name    { font-weight: bold;
-              vertical-align: top; }
-   .phone, .email, .fax, .cdrid
-            { vertical-align: top; }
-   .blank   { width: 100px; }
-   .notcurrent { background-color: None; }  /* #BEBEBE; } */
-   #main    { font-family: Arial, Helvetica, sans-serif;
-              font-size: 12pt; }
-  </style>
- </head>
- <body id="main">
-"""
+        def __init__(self, member, node):
+            """Remember the caller's information.
 
-###         html += u"""
-###         <table width='100%%'>
-###           <td>%s<td>
-###         </table>""" % unicode(response[0], 'utf-8')
+            Let @properties do the real work.
 
-# Identify which columns to print
-# -------------------------------
-columns = []
-exclude = []
-htmlCol = ''
-# What needs to be excluded?
-# --------------------------
-if excludeCurrEd:
-    exclude.append('Editorial Board')
-if excludeCurrAd:
-    exclude.append('Editorial Advisory Board')
+            Pass:
+                member - `BoardMember` object for this membership
+                node - portion of the PDQBoardMemberInfo document for this
+                       board membership
+            """
 
-# What needs to be displayed?
-# ---------------------------
-if dispBoardName:
-    columns.append('BoardName')
-    htmlCol += '    <th>Board Name</th>\n'
-if dispAoE:
-    columns.append('AoE')
-    htmlCol += '    <th>Area of Expertise</th>\n'
-if dispInvDate:
-    columns.append('Invitation')
-    htmlCol += '    <th>Invitation Date</th>\n'
-if dispResponse:
-    columns.append('Response')
-    htmlCol += '    <th>Response to Invitation</th>\n'
-if dispCurMember:
-    columns.append('Current')
-    htmlCol += '    <th>Current Member</th>\n'
-if dispEndDate:
-    columns.append('EndDate')
-    htmlCol += '    <th>Termination End Date</th>\n'
-if dispReason:
-    columns.append('Termination')
-    htmlCol += '    <th>Termination Reason</th>\n'
-if blankCol:
-    columns.append('BlankCol')
-    htmlCol += '    <th>Blank</th>\n'
+            self.__member = member
+            self.__node = node
 
-# Create the HTML table for the summary sheet
-# -------------------------------------------
-html += u"""\
-   <table id="summary" cellspacing="0" cellpadding="5">
-    <tr>
-     <td id="hdg" colspan="%d">%s<br>
-       <span style="font-size: 12pt">%s</span>
-     </td>
-    </tr>
-""" % (len(columns) + 2, reportTitle, dateString)
+        @property
+        def control(self):
+            """Access to the database, runtime parameters, logging, etc."""
+            return self.member.control
 
-html += u"""\
-    <tr>
-     <th>ID</th>
-     <th>Name</th>
-%s""" % htmlCol
+        @property
+        def cursor(self):
+            """Access to the database."""
+            return self.control.cursor
 
-html += u"""\
-    </tr>"""
+        @property
+        def member(self):
+            """Access to the `BoardMember` object."""
+            return self.__member
 
-for boardMember in boardMembers:
-    tableRow = makeRow(cursor, boardMember, boardIds, columns, exclude)
-    html += u"%s" % tableRow
+        @property
+        def node(self):
+            """Portion of the member info document for this membership."""
+            return self.__node
 
-# for bmId, personID, first, last, bordId, boardName in rows:
-#     boardMembers.append(BoardMember(docId, eic_start, eic_finish,
-#                                                term_start, name))
-html += u"""
-  </table>
- </body>
-</html>
-"""
+        @property
+        def id(self):
+            """CDR ID for the board's Organization document."""
 
-# The users don't want to display the country if it's the US.
-# Since the address is build by a common address module we're
-# better off removing it in the final HTML output
-# ------------------------------------------------------------
-cdrcgi.sendPage(html.replace('U.S.A.<br>', ''))
+            if not hasattr(self, "_id"):
+                value = self.node.find("BoardName").get(Link.CDR_REF)
+                self._id = Doc.extract_id(value)
+            return self._id
+
+        @property
+        def name(self):
+            """The string for this PDQ board's name."""
+
+            if not hasattr(self, "_name"):
+                self._name = self.control.board_names.get(self.id)
+            return self._name
+
+        @property
+        def board_name(self):
+            """Alias for name.
+
+            Needed for hooking into the automatic lookup for column values.
+            """
+
+            return self.name
+
+        @property
+        def area_of_expertise(self):
+            """Expertise applicable to membership on this board."""
+
+            if not hasattr(self, "_area_of_expertise"):
+                areas = []
+                for child in self.node.findall("AreaOfExpertise"):
+                    area = Doc.get_text(child, "").strip()
+                    if area:
+                        areas.append(area)
+                self._area_of_expertise = ", ".join(areas)
+            return self._area_of_expertise
+
+        @property
+        def current(self):
+            """Boolean indicating whether the membership is still active."""
+            return self.current_member == "Yes"
+
+        @property
+        def current_member(self):
+            """String value displayed in the Current Member column."""
+
+            if not hasattr(self, "_current_member"):
+                child = self.node.find("CurrentMember")
+                self._current_member = Doc.get_text(child, "Unknown")
+            return self._current_member
+
+        @property
+        def invitation_date(self):
+            """Date the member was invited to join the board, if known."""
+
+            if not hasattr(self, "_invitation_date"):
+                child = self.node.find("InvitationDate")
+                self._invitation_date = Doc.get_text(child, "Unknown")
+            return self._invitation_date
+
+        @property
+        def response_to_invitation(self):
+            """How the prospective board member replied to the invitation."""
+
+            if not hasattr(self, "_response_to_invitation"):
+                child = self.node.find("ResponseToInvitation")
+                self._response_to_invitation = Doc.get_text(child, "None")
+            return self._response_to_invitation
+
+        @property
+        def termination_end_date(self):
+            """When the member's participation ended, if applicable."""
+
+            if not hasattr(self, "_termination_date"):
+                child = self.node.find("TerminationDate")
+                default = "N/A" if self.current else "None"
+                self._termination_date = Doc.get_text(child, default)
+            return self._termination_date
+
+        @property
+        def termination_reason(self):
+            """Why the membership ended, if applicable."""
+
+            if not hasattr(self, "_termination_reason"):
+                child = self.node.find("TerminationReason")
+                default = "N/A" if self.current else "None"
+                self._termination_reason = Doc.get_text(child, default)
+            return self._termination_reason
+
+
+if __name__ == "__main__":
+    "Don't execute the script if loaded as a module."""
+    Control().run()

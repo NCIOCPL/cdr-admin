@@ -5,29 +5,31 @@
 import cgi
 import cdr
 import cdrcgi
-import cdrdb
+from cdrapi import db
 
-LOGFILE = cdr.DEFAULT_LOGDIR + "/check-auth.log"
+LOGNAME = "check-auth"
+LOGFILE = f"{cdr.DEFAULT_LOGDIR}/{LOGNAME}.log"
+LOGGER = cdr.Logging.get_logger(LOGNAME)
 
 def answer(yn):
-    print """\
+    print(f"""\
 Content-type: text/plain
 
-%s""" % yn
+{yn}""")
 
 fields = cgi.FieldStorage()
 try:
     session = fields.getvalue("Session")
     action = fields.getvalue("action")
     doctype = fields.getvalue("doctype", "")
-    query = cdrdb.Query("action", "name")
+    query = db.Query("action", "name")
     actions = set([row[0] for row in query.execute().fetchall()])
     if action in actions and cdr.canDo(session, action, doctype):
         answer("Y")
     else:
         answer("N")
-except Exception, e:
+except Exception as e:
     try:
-        cdr.logwrite("failure: %s" % e, LOGFILE, True, True)
-    except:
+        LOGGER.exception("check-auth failure")
+    finally:
         answer("N")

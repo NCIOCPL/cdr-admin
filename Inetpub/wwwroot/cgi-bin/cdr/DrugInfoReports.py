@@ -1,67 +1,40 @@
-#----------------------------------------------------------------------
-# Administrative menu for managing CDR DrugInformationSummary documents.
-#
-# BZIssue::4887 - New Drug Information Summary Report
-# BZIssue::4922 - Enhancements to the Summaries with Markup Report
-#----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, string
+#!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields  = cgi.FieldStorage()
-session = cdrcgi.getSession(fields)
-action  = cdrcgi.getRequest(fields)
-title   = "CDR Administration"
-section = "Drug Information Reports"
-SUBMENU = "Reports Menu"
-buttons = [SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-header  = cdrcgi.header(title, title, section, "Reports.py", buttons)
+"""Drug Information Summary report menu.
+"""
 
-#----------------------------------------------------------------------
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if action == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif action == SUBMENU:
-    cdrcgi.navigateTo("Reports.py", session)
+from cdrcgi import Controller
 
-#----------------------------------------------------------------------
-# Handle request to log out.
-#----------------------------------------------------------------------
-if action == "Log Out":
-    cdrcgi.logout(session)
+class Control(Controller):
 
-#----------------------------------------------------------------------
-# Display available menu choices.
-#----------------------------------------------------------------------
-form = """
-    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-    <H3>QC Reports</H3>
-    <OL>
-""" % (cdrcgi.SESSION, session)
-QCReports = (('DISSearch.py?type=advanced', 'Advanced Search'),
-             ('QcReport.py?DocType=DrugInformationSummary',
-              'Drug Information QC Report'),
-             ('QcReport.py?DocType=DrugInformationSummary&ReportType=pp&',
-              'Publish Preview'),
-)
+    SUBTITLE = "Drug Information Reports"
+    SUBMIT = None
+    QC_PARMS = dict(DocType="DrugInformationSummary", DocVersion="-1")
+    PP_PARMS = dict(DocType="DrugInformationSummary", ReportType="pp")
+    PP_PARMS["DocVersion"] = "-1"
 
-for r in QCReports:
-    form += "<LI><A HREF='%s/%s&%s=%s'>%s</LI></A>\n" % (
-            cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
+    def populate_form(self, page):
+        page.body.set("class", "admin-menu")
+        page.form.append(page.B.H3("QC Reports"))
+        ol = page.B.OL()
+        page.form.append(ol)
+        for display, script, parms in (
+            ("Advanced Search", "DISSearch.py?type=advanced", {}),
+            ("Drug Information QC Report", "QcReport.py", self.QC_PARMS),
+            ("Publish Preview", "QcReport.py", self.PP_PARMS),
+        ):
+            ol.append(page.B.LI(page.menu_link(script, display, **parms)))
+        page.form.append(page.B.H3("Other Reports"))
+        ol = page.B.OL()
+        page.form.append(ol)
+        for display, script in (
+            ("Drug Date Last Modified", "DrugDateLastModified.py"),
+            ("Drug Description Report", "DrugDescriptionReport.py"),
+            ("Drug Indications Report", "DrugIndicationsReport.py"),
+            ("Drug Information Summaries Lists", "DISLists.py"),
+            ("Drug Summaries with Markup Report", "DISWithMarkup.py"),
+        ):
+            ol.append(page.B.LI(page.menu_link(script, display)))
 
-form += """</OL><H3>Other Reports</H3><OL>"""
 
-OtherReports = [
-           ('DrugDateLastModified.py?', 'Drug Date Last Modified'),
-           ('DrugDescriptionReport.py?', 'Drug Description Report'),
-           ('DrugIndicationsReport.py?', 'Drug Indications Report'),
-           ('DISLists.py?',              'Drug Information Summaries Lists'),
-           ('DISWithMarkup.py?',         'Drug Summaries with Markup Report')]
-
-for r in OtherReports:
-    form += "<LI><A HREF='%s/%s&%s=%s'>%s</LI></A>\n" % (
-            cdrcgi.BASE, r[0], cdrcgi.SESSION, session, r[1])
-
-cdrcgi.sendPage(header + form + "</OL></FORM></BODY></HTML>")
+Control().run()

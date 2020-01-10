@@ -6,9 +6,10 @@
 # supplied for the command to be applicable to all filters named by
 # the command).
 #----------------------------------------------------------------------
-import cdrdb
-import lxml.etree as etree
-import lxml.html.builder as builder
+
+from lxml import etree
+from lxml.html import builder
+from cdrapi import db
 
 TITLE = "Global Filter Parameters"
 
@@ -49,8 +50,8 @@ class Parameter:
             tbody.append(builder.TR(*f.make_cells()))
 
 def main():
-    cursor = cdrdb.connect("CdrGuest").cursor()
-    query = cdrdb.Query("document d", "d.id", "d.title", "d.xml").order(2)
+    cursor = db.connect(user="CdrGuest").cursor()
+    query = db.Query("document d", "d.id", "d.title", "d.xml").order(2)
     query.join("doc_type t", "t.id = d.doc_type")
     query.where("t.name = 'Filter'")
     filters = []
@@ -58,7 +59,8 @@ def main():
         filters.append(Filter(doc_id, doc_title, doc_xml))
     tbody = builder.TBODY()
     caption = builder.CAPTION(TITLE)
-    for parm in sorted(Parameter.parameters.values()):
+    for name in sorted(Parameter.parameters, key=str.lower):
+        parm = Parameter.parameters[name]
         parm.add_rows(tbody)
     page = builder.HTML(
         builder.HEAD(
@@ -68,8 +70,8 @@ def main():
         ),
         builder.BODY(builder.TABLE(caption, tbody), builder.CLASS("report"))
     )
-    print "Content-type: text/html\n"
-    print etree.tostring(page, pretty_print=True)
+    print("Content-type: text/html\n")
+    print(etree.tostring(page, pretty_print=True).decode("ascii"))
 
 if __name__ == "__main__":
     main()

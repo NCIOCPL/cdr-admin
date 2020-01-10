@@ -1,292 +1,125 @@
-#----------------------------------------------------------------------
-# Report listing summaries containing specified markup.
-#
-# BZIssue::4671 - Summaries with Mark-up Report
-# BZIssue::4922 - Enhancements to the Summaries with Markup Report
-#----------------------------------------------------------------------
-import cdr, cgi, cdrcgi, time, cdrdb, xml.dom.minidom
+#!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields    = cgi.FieldStorage()
-session   = cdrcgi.getSession(fields)
-audience  = 'Patients'  # Leaving audience here for future use
-markUp    = fields and fields.getvalue("markUp")           or None
-submit    = fields and fields.getvalue("SubmitButton")     or None
-request   = cdrcgi.getRequest(fields)
-title     = "CDR Administration"
-instr     = "Drug Summaries with Markup"
-script    = "DISWithMarkup.py"
-SUBMENU   = "Report Menu"
-buttons   = (SUBMENU, cdrcgi.MAINMENU)
-
-if type(markUp) == type(""):
-    markUp = [markUp]
-
-# ---------------------------------------------------
-#
-# ---------------------------------------------------
-def reportHeader(disTitle = 'Drug Information Summary Markup'):
-    """Return the HTML code to display the Summary Board Header with ID"""
-    html = """\
-  </TABLE>
-
-  <span class="sectionHdr">%s</span>
-  <TABLE border="1" width = "90%%">
-   <tr>
-    <th>ID</th>
-    <th>Summary</th>
-    <th>Publish</th>
-    <th>Approved</th>
-    <th>Proposed</th>
-    <th>Rejected</th>
-   </tr>
-""" % (disTitle)
-    return html
-
-
-# -------------------------------------------------
-# Create the table row for the English table output
-# -------------------------------------------------
-def summaryRow(id, summary, markupCount, display):
-    """Return the HTML code to display a Summary row with ID"""
-
-    # The users only want to display those summaries that do have
-    # markup, so we need to suppress the once that don't by counting
-    # the number of markup elements.
-    # --------------------------------------------------------------
-    #cdrcgi.bail(display)
-    num = 0
-    for list in display:
-        num += markupCount[list]
-
-    if num == 0: return ""
-
-    # Create the table row display
-    # If a markup type hasn't been checked the table cell will be
-    # displayed with the class="nodisplay" style otherwise the
-    # count of the markup type is being displayed.
-    # ------------------------------------------------------
-    html = """\
-   <TR>
-    <TD class="report cdrid" width = "7%%">
-     <a href="/cgi-bin/cdr/QcReport.py?DocId=CDR%s&Session=guest">%s</a>
-    </TD>
-    <TD class="report">%s</TD>
-    <TD class="%s" width="7%%">%s</TD>
-    <TD class="%s" width="7%%">%s</TD>
-    <TD class="%s" width="7%%">%s</TD>
-    <TD class="%s" width="7%%">%s</TD>
-   </TR>
-""" % (id, id, summary,
-           'publish' in display and 'display' or 'nodisplay',
-           ('publish' not in display or markupCount['publish']  == 0)
-                           and '&nbsp;' or markupCount['publish'],
-           'approved' in display and 'display' or 'nodisplay',
-           ('approved' not in display or markupCount['approved'] == 0)
-                           and '&nbsp;' or markupCount['approved'],
-           'proposed' in display and 'display' or 'nodisplay',
-           ('proposed' not in display or markupCount['proposed'] == 0)
-                           and '&nbsp;' or markupCount['proposed'],
-           'rejected' in display and 'display' or 'nodisplay',
-           ('rejected' not in display or markupCount['rejected'] == 0)
-                           and '&nbsp;' or markupCount['rejected'])
-    return html
-
-
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if request == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif request == SUBMENU:
-    cdrcgi.navigateTo("reports.py", session)
-
-#----------------------------------------------------------------------
-# Set up a database connection and cursor.
-#----------------------------------------------------------------------
-try:
-    conn = cdrdb.connect("CdrGuest")
-    cursor = conn.cursor()
-except cdrdb.Error, info:
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
-
-#----------------------------------------------------------------------
-# Build date string for header.
-#----------------------------------------------------------------------
-dateString = time.strftime("%B %d, %Y")
-
-#----------------------------------------------------------------------
-# If we don't have a request, put up the form.
-#----------------------------------------------------------------------
-if not markUp:
-    header = cdrcgi.header(title, title, instr + ' - ' + dateString,
-                           script,
-                           ("Submit",
-                            SUBMENU,
-                            cdrcgi.MAINMENU),
-                           numBreaks = 1,
-                           stylesheet = """
-   <STYLE type="text/css">
-    TD      { font-size:  12pt; }
-    label   { font: 12pt "Arial"; }
-    LI.none { list-style-type: none }
-    DL      { margin-left: 0; padding-left: 0 }
-   </STYLE>
-""" )
-
-    form   = """\
-   <input type='hidden' name='%s' value='%s'>
-
-   <fieldset>
-    <legend>&nbsp;Type of mark-up to Include&nbsp;</legend>
-    <input name='markUp' type='checkbox' id="pub"
-           value='publish' CHECKED>
-    <label for="pub">Publish</label>
-    <br>
-    <input name='markUp' type='checkbox' id="app"
-           value='approved' CHECKED>
-    <label for="app">Approved</label>
-    <br>
-    <input name='markUp' type='checkbox' id="pro"
-           value='proposed' CHECKED>
-    <label for="pro">Proposed</label>
-    <br>
-    <input name='markUp' type='checkbox' id="rej"
-           value='rejected' CHECKED>
-    <label for="rej">Rejected</label>
-    <br>
-   </fieldset>
-
-  </form>
- </body>
-</html>
-""" % (cdrcgi.SESSION, session)
-    cdrcgi.sendPage(header + form)
-
-# Setup the SQL query to be submitted to select all DIS
-# -----------------------------------------------------
-query = """\
-        SELECT DISTINCT qt.doc_id, t.value DocTitle
-          FROM query_term qt
-          JOIN query_term t
-            ON qt.doc_id = t.doc_id
-          JOIN query_term a
-            ON qt.doc_id = a.doc_id
-         WHERE t.path  = '/DrugInformationSummary/Title'
-           AND a.path = '/DrugInformationSummary' +
-                        '/DrugInfoMetaData'       +
-                        '/Audience'
-           AND a.value = 'Patients'
-         ORDER BY t.value
+"""Report listing summaries containing specified markup.
 """
 
-if not query:
-    cdrcgi.bail('No query criteria specified')
+from datetime import date
+from cdrcgi import Controller, Reporter, bail
+from cdrapi import db
+from cdrapi.docs import Doc
 
-# Submit the query to the database.
-#----------------------------------
-try:
-    cursor = conn.cursor()
-    cursor.execute(query)
-    rows = cursor.fetchall()
-    cursor.close()
-    cursor = None
-except cdrdb.Error, info:
-    cdrcgi.bail('Failure retrieving Summary documents: %s' %
-                info[1][0])
+class Control(Controller):
+    """Top-level logic for the report."""
 
-if not rows:
-    cdrcgi.bail('No Records Found for Selection: %s ' % audience+"; ")
+    TYPES = "publish", "approved", "proposed", "rejected"
+    SUBTITLE = "Drug Summaries with Markup"
+    DOCTYPE = "DrugInformationSummary"
+    TODAY = date.today().strftime("%B %d, %Y")
 
-# Counting the number of drug info summaries
-# ------------------------------------------
-markupCount = {}
-for dis in rows:
-    doc = cdr.getDoc('guest', dis[0], getObject = 1)
+    def build_tables(self):
+        if not self.types:
+            self.show_form()
+        cols = ["ID", "Summary"]
+        for markup_type in self.TYPES:
+            if markup_type in self.types:
+                cols.append(markup_type.title())
+        query = db.Query("query_term t", "t.doc_id", "t.value").unique()
+        query.join("query_term a", "a.doc_id = t.doc_id")
+        query.where(f"t.path = '/{self.DOCTYPE}/Title'")
+        query.where(f"a.path = '/{self.DOCTYPE}/DrugInfoMetaData/Audience'")
+        query.where("a.value = 'Patients'")
+        rows = query.order("t.value").execute(self.cursor).fetchall()
+        summaries = [Summary(self, *row) for row in rows]
+        rows = [summary.row for summary in summaries if summary.in_scope]
+        return Reporter.Table(rows, columns=cols, caption=self.caption)
 
-    #if doc.xml.startswith("<Errors"):
-    #    continue
+    def populate_form(self, page):
+        """Add the fields to the form.
 
-    dom = xml.dom.minidom.parseString(doc.xml)
-    markupCount[dis[0]] = {'publish':0,
-                            'approved':0,
-                            'proposed':0,
-                            'rejected':0}
+        Pass:
+            page - HTMLPage object to which the fields are attached.
+        """
 
-    insertionElements = dom.getElementsByTagName('Insertion')
-    for obj in insertionElements:
-        markupCount[dis[0]][obj.getAttribute('RevisionLevel')] += 1
+        fieldset = page.fieldset("Type of mark-up to Include")
+        for value in self.TYPES:
+            fieldset.append(page.checkbox("type", value=value, checked=True))
+        page.form.append(fieldset)
 
-    deletionElements  = dom.getElementsByTagName('Deletion')
-    for obj in deletionElements:
-        markupCount[dis[0]][obj.getAttribute('RevisionLevel')] += 1
+    @property
+    def caption(self):
+        """Display string for the top of the report's table."""
+        return f"Count of Revision Level Markup - {date.today()}"
 
-#cdrcgi.bail(dis)
+    @property
+    def types(self):
+        "User-selected types, validated and sorted correctly."""
+        if not hasattr(self, "_types"):
+            types = self.fields.getlist("type")
+            for markup_type in types:
+                if markup_type not in self.TYPES:
+                    bail()
+            self._types = [t for t in self.TYPES if t in types]
+        return self._types
 
 
-# Create the results page.
-#----------------------------------------------------------------------
-instr     = 'Summaries List -- %s.' % (dateString)
-header    = cdrcgi.rptHeader(title, instr,
-                          stylesheet = """\
-   <STYLE type="text/css">
-    DL             { margin-left:    0;
-                     padding-left:   0;
-                     margin-top:    10px;
-                     margin-bottom: 30px; }
-    TABLE          { margin-top:    10px;
-                     margin-bottom: 30px; }
+class Summary:
+    """Information about a PDQ Cancer Information Summary document."""
 
-    .date          { font-size: 12pt; }
-    .sectionHdr    { font-size: 12pt;
-                     font-weight: bold;
-                     text-decoration: underline; }
-    td.report      { font-size: 11pt;
-                     padding-right: 15px;
-                     vertical-align: top; }
-    td.nodisplay   { background-color: grey; }
-    td.display     { background-color: white;
-                     font-weight: bold;
-                     text-align: center; }
-    .cdrid         { text-align: right;
-                     text-decoration: underline;
-                     text-color: blue; }
-    LI             { list-style-type: none; }
-    li.report      { font-size: 11pt;
-                     font-weight: normal; }
-    div.es         { height: 10px; }
-   </STYLE>
-""")
+    TAGS = "Insertion", "Deletion"
+    URL = "QcReport.py?DocId=CDR{}&Session=guest&DocVersion=-1"
 
-# -------------------------
-# Display the Report Title
-# -------------------------
-report    = """\
-   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-  </FORM>
-  <H3>PDQ Drug Information Summaries - %s<br>
-  <span class="date">(%s)</span>
-  </H3>
-""" % (cdrcgi.SESSION, session, audience, dateString)
+    def __init__(self, control, doc_id, title):
+        """Assemble the counts needed for the report."""
 
-dis_hdr = 'Count of Revision Level Markup'
-report += reportHeader(dis_hdr)
+        self.__control = control
+        self.__id = doc_id
+        self.__title = title
+        self.__counts = {}
+        for markup_type in control.TYPES:
+            self.__counts[markup_type] = 0
+        doc = Doc(control.session, id=doc_id)
+        for tag in self.TAGS:
+            for node in doc.root.iter(tag):
+                self.__counts[node.get("RevisionLevel")] += 1
 
-# Create the HTML snippet for each row
-# ------------------------------------
-for row in rows:
-    report += summaryRow(row[0], row[1], markupCount[row[0]], markUp)
+    @property
+    def id(self):
+        """Unique ID for the summary document."""
+        return self.__id
 
-report += """
-  </TABLE>
-"""
+    @property
+    def title(self):
+        """Summary document's title."""
+        return self.__title
 
-footer = """\
- </BODY>
-</HTML>
-"""
+    @property
+    def row(self):
+        """Assemble the report row for this summary."""
+        if not hasattr(self, "_row"):
+            self._row = [self.link, self.title]
+            for markup_type in self.__control.types:
+                count = self.__counts[markup_type]
+                if count:
+                    self._row.append(Reporter.Cell(count, center=True))
+                else:
+                    self._row.append("")
+        return self._row
 
-# Send the page back to the browser.
-#----------------------------------------------------------------------
-cdrcgi.sendPage(header + report + footer)
+    @property
+    def link(self):
+        """Cell containing a link to the QC report for this summary."""
+        url = self.URL.format(self.id)
+        return Reporter.Cell(self.id, href=url, center=True)
+
+    @property
+    def in_scope(self):
+        """Does this have any reportable markup?"""
+        for markup_type in self.__control.types:
+            if self.__counts[markup_type]:
+                return True
+        return False
+
+
+if __name__ == "__main__":
+    """Don't run if this script is loaded as a module."""
+    Control().run()

@@ -1,256 +1,109 @@
-#----------------------------------------------------------------------
-# Prototype for duplicate-checking interface for Summary documents.
-#----------------------------------------------------------------------
-import cgi, cdr, cdrcgi, re, cdrdb
+#!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# Get the form variables.
-#----------------------------------------------------------------------
-fields    = cgi.FieldStorage()
-session   = cdrcgi.getSession(fields)
-boolOp    = fields and fields.getvalue("Boolean")          or "AND"
-title     = fields and fields.getvalue("Title")            or None
-sectType  = fields and fields.getvalue("SectionType")      or None
-diagnosis = fields and fields.getvalue("Diagnosis")        or None
-audience  = fields and fields.getvalue("Audience")         or None
-topic     = fields and fields.getvalue("Topic")            or None
-status    = fields and fields.getvalue("Status")           or None
-submit    = fields and fields.getvalue("SubmitButton")     or None
-help      = fields and fields.getvalue("HelpButton")       or None
-
-if help: 
-    cdrcgi.bail("Sorry, help for this interface has not yet been developed.")
-
-#----------------------------------------------------------------------
-# Generate picklist for summary section type list.
-#----------------------------------------------------------------------
-def sectionTypeList(conn, fName):
-    try:
-        cursor = conn.cursor()
-        query  = """\
-SELECT DISTINCT value
-           FROM query_term
-          WHERE path LIKE '/Summary/SummarySection%SectMetaData/SectionType'
-       ORDER BY value
+"""Search for CDR Summary documents.
 """
-        cursor.execute(query, timeout=120)
-        rows = cursor.fetchall()
-        cursor.close()
-        cursor = None
-    except cdrdb.Error, info:
-        cdrcgi.bail('Failure retrieving summary section types from CDR: %s' 
-                % info[1][0])
-    html = """\
-      <SELECT NAME='%s'>
-       <OPTION VALUE='' SELECTED>&nbsp;</OPTION>
-""" % fName
-    for row in rows:
-        if row:
-            html += """\
-       <OPTION VALUE='%s'>%s &nbsp;</OPTION>
-""" % (row[0], row[0])
-    html += """\
-      </SELECT>
-"""
-    return html
-        
-#----------------------------------------------------------------------
-# Generate picklist for section diagnosis list.
-#----------------------------------------------------------------------
-def sectionDiagList(conn, fName):
-    try:
-        cursor = conn.cursor()
-        query  = """\
-   SELECT d.id, d.title
-     FROM document d
-    WHERE EXISTS (SELECT *
-                    FROM query_term q
-                   WHERE q.int_val = d.id
-                     AND q.path LIKE '/Summary/SummarySection/%' +
-                                     'SectMetaData/Diagnosis/@cdr:ref')
- ORDER BY d.title
-"""
-        cursor.execute(query)
-        rows = cursor.fetchall()
-        cursor.close()
-        cursor = None
-    except cdrdb.Error, info:
-        cdrcgi.bail('Failure retrieving diagnosis list from CDR: %s' 
-                    % info[1][0])
-    html = """\
-      <SELECT NAME='%s'>
-       <OPTION VALUE='' SELECTED>&nbsp;</OPTION>
-""" % fName
-    for row in rows:
-        semi = row[1].find(';')
-        if semi != -1:
-            diag = row[1][:semi]
-        else:
-            diag = row[1]
-        html += """\
-       <OPTION VALUE='CDR%010d'>%s &nbsp;</OPTION>
-""" % (row[0], diag)
-    html += """\
-      </SELECT>
-"""
-    return html
 
-#----------------------------------------------------------------------
-# Generate picklist for summary topic list.
-#----------------------------------------------------------------------
-def topicList(conn, fName):
-    try:
-        cursor = conn.cursor()
-        query  = """\
-   SELECT d.id, d.title
-     FROM document d
-    WHERE EXISTS (SELECT *
-                    FROM query_term q
-                   WHERE q.int_val = d.id
-                     AND q.path LIKE '/Summary/SummaryMetaData/%Topics' +
-                                     '/Term/@cdr:ref')
- ORDER BY d.title
-"""
-        cursor.execute(query)
-        rows = cursor.fetchall()
-        cursor.close()
-        cursor = None
-    except cdrdb.Error, info:
-        cdrcgi.bail('Failure retrieving diagnosis list from CDR: %s' 
-                % info[1][0])
-    html = """\
-      <SELECT NAME='%s'>
-       <OPTION VALUE='' SELECTED>&nbsp;</OPTION>
-""" % fName
-    for row in rows:
-        semi = row[1].find(';')
-        if semi != -1:
-            topic = row[1][:semi]
-        else:
-            topic = row[1]
-        html += """\
-       <OPTION VALUE='CDR%010d'>%s &nbsp;</OPTION>
-""" % (row[0], topic)
-    html += """\
-      </SELECT>
-"""
-    return html
+from cdrcgi import AdvancedSearch
 
-#----------------------------------------------------------------------
-# Generate picklist for summary audience list.
-#----------------------------------------------------------------------
-def audienceList(conn, fName):
-    try:
-        cursor = conn.cursor()
-        query  = """\
-SELECT DISTINCT value
-           FROM query_term
-          WHERE path = '/Summary/SummaryMetaData/SummaryAudience'
-       ORDER BY value
-"""
-        cursor.execute(query)
-        rows = cursor.fetchall()
-        cursor.close()
-        cursor = None
-    except cdrdb.Error, info:
-        cdrcgi.bail('Failure retrieving summary section types from CDR: %s' 
-                % info[1][0])
-    html = """\
-      <SELECT NAME='%s'>
-       <OPTION VALUE='' SELECTED>&nbsp;</OPTION>
-""" % fName
-    for row in rows:
-        if row:
-            html += """\
-       <OPTION VALUE='%s'>%s &nbsp;</OPTION>
-""" % (row[0], row[0])
-    html += """\
-      </SELECT>
-"""
-    return html
-        
-#----------------------------------------------------------------------
-# Connect to the CDR database.
-#----------------------------------------------------------------------
-try:
-    conn = cdrdb.connect('CdrGuest')
-except cdrdb.Error, info:
-    cdrcgi.bail('Failure connecting to CDR: %s' % info[1][0])
+class SummarySearch(AdvancedSearch):
+    """Customize search for this document type."""
 
-#----------------------------------------------------------------------
-# Display the search form.
-#----------------------------------------------------------------------
-if not submit:
-    fields = (('Title',                        'Title'),
-              ('Section Type',                 'SectionType', sectionTypeList),
-              ('Diagnosis',                    'Diagnosis', sectionDiagList),
-              ('Audience',                     'Audience', audienceList),
-              ('Topic',                        'Topic', topicList),
-              ('Publication Status',           'Status', 
-                                                cdrcgi.pubStatusList))
-    buttons = (('submit', 'SubmitButton', 'Search'),
-               ('submit', 'HelpButton',   'Help'),
-               ('reset',  'CancelButton', 'Clear'))
-    page = cdrcgi.startAdvancedSearchPage(session,
-                                          "Summary Search Form",
-                                          "SummarySearch.py",
-                                          fields,
-                                          buttons,
-                                          'Summary',
-                                          conn)
-    page += """\
-  </FORM>
- </BODY>
-</HTML>
-"""
-    cdrcgi.sendPage(page)
+    DOCTYPE = "Summary"
+    SUBTITLE = DOCTYPE
+    SUMMARY_SECTION = "/Summary/SummarySection"
+    SUMMARY_METADATA = "/Summary/SummaryMetaData"
+    PATHS = {
+        "title": ["/Summary/SummaryTitle"],
+        "section_type": [f"{SUMMARY_SECTION}/%SectMetaData/SectionType"],
+        "diagnosis": [f"{SUMMARY_SECTION}/%SectMetaData/Diagnosis/@cdr:ref"],
+        "audience": ["/Summary/SummaryMetaData/SummaryAudience"],
+        "topic": ["/Summary/SummaryMetaData/%Topics/Term/@cdr:ref"],
+        "status": "active_status",
+    }
 
-#----------------------------------------------------------------------
-# Define the search fields used for the query.
-#----------------------------------------------------------------------
-searchFields = (cdrcgi.SearchField(title,
-                            ("/Summary/SummaryTitle",)),
-                cdrcgi.SearchField(sectType,
-                            ("/Summary/SummarySection/%SectMetaData"
-                             "/SectionType",)),
-                cdrcgi.SearchField(diagnosis,
-                            ("/Summary/SummarySection/%SectMetaData"
-                             "/Diagnosis/@cdr:ref",)),
-                cdrcgi.SearchField(audience,
-                            ("/Summary/SummaryMetaData/SummaryAudience",)),
-                cdrcgi.SearchField(topic,
-                            ("/Summary/SummaryMetaData/%Topics"
-                             "/Term/@cdr:ref",)),
-                cdrcgi.SearchField(status, "active_status"))
+    def __init__(self):
+        AdvancedSearch.__init__(self)
+        for name in self.PATHS:
+            setattr(self, name, self.fields.getvalue(name))
+        if self.section_type and self.section_type not in self.section_types:
+            raise Exception("Tampering with form values")
+        if self.audience and self.audience not in self.audiences:
+            raise Exception("Tampering with form values")
+        if self.topic and self.topic not in [t[0] for t in self.topics]:
+            raise Exception("Tampering with form values")
+        if self.status and self.status not in [s[0] for s in self.statuses]:
+            raise Exception("Tampering with form values")
+        if self.diagnosis:
+            if self.diagnosis not in [d[0] for d in self.diagnoses]:
+                raise Exception("Tampering with form values")
+        types = [""] + self.section_types
+        self.search_fields = (
+            self.text_field("title"),
+            self.select("section_type", label="Sec Type", options=types),
+            self.select("diagnosis", options=[""]+self.diagnoses),
+            self.select("audience", options=[""]+self.audiences),
+            self.select("topic", options=[""]+self.topics),
+            self.select("status", options=[""]+self.statuses),
+        )
+        self.query_fields = []
+        for name, paths in self.PATHS.items():
+            field = self.QueryField(getattr(self, name), paths)
+            self.query_fields.append(field)
 
-#----------------------------------------------------------------------
-# Construct the query.
-#----------------------------------------------------------------------
-(query, strings) = cdrcgi.constructAdvancedSearchQuery(searchFields, boolOp, 
-                                                       "Summary")
-if not query:
-    cdrcgi.bail('No query criteria specified')
-#cdrcgi.bail("QUERY: [%s]" % query)
-#----------------------------------------------------------------------
-# Submit the query to the database.
-#----------------------------------------------------------------------
-try:
-    cursor = conn.cursor()
-    cursor.execute(query)
-    rows = cursor.fetchall()
-    cursor.close()
-    cursor = None
-except cdrdb.Error, info:
-    cdrcgi.bail('Failure retrieving Summary documents: %s' % 
-                info[1][0])
+    @property
+    def audiences(self):
+        """Valid values for the audience field"""
 
-#----------------------------------------------------------------------
-# Create the results page.
-#----------------------------------------------------------------------
-html = cdrcgi.advancedSearchResultsPage("Summary", rows, strings, None,
-                                        session)
+        query = self.DBQuery("query_term", "value").unique().order("value")
+        query.where(query.Condition("path", self.PATHS["audience"][0]))
+        query.where("value IS NOT NULL")
+        query.where("value <> ''")
+        rows = query.execute(self.session.cursor).fetchall()
+        return [row.value for row in rows]
 
-#----------------------------------------------------------------------
-# Send the page back to the browser.
-#----------------------------------------------------------------------
-cdrcgi.sendPage(html)
+    @property
+    def section_types(self):
+        """Valid summary section types."""
+
+        path = self.PATHS["section_type"][0]
+        query = self.DBQuery("query_term", "value").unique().order("value")
+        query.where(query.Condition("path", path, "LIKE"))
+        query.where("value IS NOT NULL")
+        query.where("value <> ''")
+        rows = query.execute(self.session.cursor).fetchall()
+        return [row.value for row in rows]
+
+    @property
+    def diagnoses(self):
+        """Picklist values for diagnosis field."""
+        return self.__linked_docs("diagnosis")
+
+    @property
+    def topics(self):
+        """Picklist values for topic field."""
+        return self.__linked_docs("topic")
+
+    def __linked_docs(self, field):
+        """Find documents linked for a field's path.
+
+        Pass:
+            field - field name, used as index into PATHS
+
+        Return:
+            list of (cdr-id, title) tuples for linked documents
+        """
+
+        cols = "d.id", "d.title"
+        path = self.PATHS[field][0]
+        query = self.DBQuery("document d", *cols).unique().order("d.title")
+        query.join("query_term q", "q.int_val = d.id")
+        query.where(query.Condition("q.path", path, "LIKE"))
+        rows = query.execute(self.session.cursor).fetchall()
+        picklist = []
+        for row in rows:
+            picklist.append((f"CDR{row.id:010d}", row.title.split(";")[0]))
+        return picklist
+
+
+if __name__ == "__main__":
+    SummarySearch().run()

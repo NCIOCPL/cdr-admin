@@ -27,6 +27,7 @@ header h1 span {
 header h1 span input {
     position: relative;
     bottom: 6px;
+    margin-left: 4px;
 }
 header h2 {
     background-color: #ffc;
@@ -53,7 +54,10 @@ body.admin-menu { background-color: #dfdfdf; }
     font: 12pt "Arial";
     font-weight: bold;
 }
-.admin-menu li a:hover { background: #ffc; }
+/*.admin-menu li a:hover { background: #ffc; }*/
+.admin-menu li a:hover { text-decoration: underline; }
+.admin-menu ul > li, .lnone { list-style-type: none; }
+.admin-menu h4 { font-style: italic; }
 table { background-color: white; margin: 5px auto; border-collapse:collapse; }
 table caption {
     /* background-color: #936; */
@@ -68,12 +72,14 @@ table caption p { font-weight: normal; font-size: 10pt; }
 td { vertical-align: top; }
 th, td {
     background-color: white; color: black;
-    font-size: 11pt; padding: 2px; border: 1px solid black;
+    font-size: 11pt; padding: 2px 4px; border: 1px solid black;
 }
+table.no-gridlines td, table.no-gridlines th { border: none; }
 td.middle { vertical-align: middle; }
 .center { text-align: center; }
 .right { text-align: right; }
 .nowrap { white-space: nowrap; }
+.report table { margin-top: 35px; }
 table.report { margin-bottom: 20px; }
 fieldset { border: 2px solid #936; width: 500px; margin: 10px auto; }
 fieldset fieldset, div fieldset { width: auto; border: 1px solid black; }
@@ -93,9 +99,13 @@ label.clickable:hover { color: white; background-color: #936; }
 .strikethrough { text-decoration: line-through; }
 .warning { color: green; }
 .hidden { display: none; }
+.no-results {
+    text-align: center; font-weight: bold; color: #936; margin-top: 25px;
+}
 .labeled-field input, .labeled-field select, .labeled-field textarea {
     width: 300px; padding-left: 2px; padding-right: 2px;
 }
+.labeled-field textarea { width: 303px; }
 .checkbox-form { background-color: #dfdfdf; color: navy; }
 .checkbox-form h3 { font: 16pt Arial bold; }
 .checkbox-form h4 { font: 14pt Arial bold; }
@@ -113,9 +123,52 @@ table.checkboxes td a {
     text-decoration: none;
     font: 10pt Arial;
 }
-.advanced-search .buttons { text-align: center; width: 100%; }
 .footnote { font-size: 9pt; font-style: italic; color: green; }
 .ui-datepicker { width: inherit; }
 .ui-datepicker * { font-size: 11pt; font-family: Arial, sans-serif; }
 .ui-datepicker-trigger { margin-left: 5px; }
 .ui-datepicker td, .ui-datepicker th { min-width: 23px; }
+
+form header h1 span input { margin-right: 5px; }
+.date-range.labeled-field input.CdrDateField { width: 100px; }
+.date-range span.date-range-sep { padding: 0 31px; }
+
+#advanced-search-results p {
+    border-bottom: 2px solid black;
+    font-size: 1.2em;
+    text-align: center;
+}
+#advanced-search-results table { width: 100%; }
+#advanced-search-results td { border: none; background: #e8e8e8; }
+#advanced-search-results .row-number { width: 50px; text-align: right; }
+#advanced-search-results .doc-link { width: 125px; }
+#pubmed-import-button, #term-import-button { text-align: center; }
+#ncit-changes { margin-top: 10px; }
+#activity-report td, #activity-report th { white-space: nowrap; }
+#activity-report td:last-child { white-space: normal; }
+.success, .info { color: green; }
+.failure { color: red; }
+.news { font-weight: bold; border: 3px solid green; padding: 5px; }
+.news.failure { border: 3px solid red; }
+dl { padding-left: 5px; }
+dt { margin-top: 15px; font-weight: bold; }
+#summaries-toc-report h5 { font-size: 1em; margin-bottom: 0; margin-top: 10px }
+#summaries-toc-report h4 { text-decoration: underline; }
+#summaries-toc-report > ul { margin: 0 2px; }
+.flexlinks { width: 1200px; }
+.flexlinks ul {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: wrap;
+  height: 500px;
+  margin: 10px 0 0;
+}
+.admin-menu .flexlinks li a { color: #00E; font-weight: normal; }
+.flexlinks li { padding-bottom: 6px; }
+th.clickable { cursor: pointer; }
+footer p {
+    font-style: italic; font-size: .8em; margin-top: 25px; text-align: center;
+}
+footer p span { font-size: .8em; color: green; }
+.insertion { color: red; }
+.deletion { text-decoration: line-through; }

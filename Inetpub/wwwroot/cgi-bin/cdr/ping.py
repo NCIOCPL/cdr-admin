@@ -1,4 +1,4 @@
-print """\
+print("""\
 Content-type: text/html
 
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
@@ -8,4 +8,4 @@ Content-type: text/html
  </head>
  <body>Python mapping is alive . . .</body>
 </html>
-"""
+""")

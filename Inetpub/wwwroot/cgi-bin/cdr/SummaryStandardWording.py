@@ -8,7 +8,6 @@ JIRA::OCECDR-4568
 
 import datetime
 from io import BytesIO
-from os import O_BINARY
 import re
 from sys import stdout
 from lxml import etree
@@ -164,8 +163,8 @@ jQuery(add_button());
         if not terms:
             cdrcgi.bail("No search terms specified")
         regex = self.build_regex(*terms)
-        terms = u"; ".join(sorted([term.lower() for term in terms]))
-        caption = "STANDARD WORDING REPORT", u"Search Terms: {}".format(terms)
+        terms = "; ".join(sorted([term.lower() for term in terms]))
+        caption = "STANDARD WORDING REPORT", "Search Terms: {}".format(terms)
 
         # If the user wants an Excel workbook, create it.
         if self.format == "excel":
@@ -200,7 +199,6 @@ jQuery(add_button());
           subtitle - expanded list of search terms
         """
 
-        setmode(stdout.fileno(), O_BINARY)
         stamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
         filename = "standard-wording-{}.xlsx".format(stamp)
         output = BytesIO()
@@ -226,16 +224,17 @@ jQuery(add_button());
             doc_id, title = summary.cdr_id, summary.title
             for match in summary.find_matches(regex):
                 row = match.excel_row(sheet, row, formats, doc_id, title)
-                doc_id = title = u""
+                doc_id = title = ""
         book.close()
         output.seek(0)
         book_bytes = output.read()
-        stdout.write("""\
+        stdout.buffer.write(f"""\
 Content-type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
-Content-Disposition: attachment; filename={}
-Content-length: {:d}
+Content-Disposition: attachment; filename={filename}
+Content-length: {len(book_bytes)}
 
-{}""".format(filename, len(book_bytes), book_bytes))
+""".encode("utf-8"))
+        stdout.buffer.write(book_bytes)
 
     def collect_terms(self):
         """
@@ -265,7 +264,7 @@ Content-length: {:d}
             if term and term.strip():
 
                 # See if the term matches a glossary term name document.
-                term = Summary.normalize(term.decode("utf-8")).strip()
+                term = Summary.normalize(term).strip()
                 query = db.Query("query_term", "doc_id")
                 query.where(query.Condition("path", path))
                 query.where(query.Condition("value", term))
@@ -437,8 +436,8 @@ Content-length: {:d}
 
         phrases = [Summary.normalize(phrase) for phrase in phrases]
         phrases = sorted(phrases, key=len, reverse=True)
-        phrases = u"|".join([cls.to_regex(phrase) for phrase in phrases])
-        expression = u"(?<!\\w)({})(?!\\w)".format(phrases)
+        phrases = "|".join([cls.to_regex(phrase) for phrase in phrases])
+        expression = "(?<!\\w)({})(?!\\w)".format(phrases)
         flags = re.UNICODE | re.IGNORECASE
         return re.compile(expression, flags)
 
@@ -474,7 +473,7 @@ Content-length: {:d}
             .replace("|",  r"\|")
             .replace("(",  r"\(")
             .replace(")",  r"\)")
-            .replace("'",  u"['\u2019]"))
+            .replace("'",  "['\u2019]"))
 
 
 class Summary:
@@ -487,7 +486,7 @@ class Summary:
       root - parsed document object, streamlined for the report
     """
 
-    WHITESPACE = re.compile(u"\\s+")
+    WHITESPACE = re.compile("\\s+")
     DROP = (
         "CitationLink",
         "Comment",
@@ -724,14 +723,14 @@ class Summary:
         def prefix(self):
             """Context string appearing before matched phrase"""
             if not hasattr(self, "_prefix"):
-                self._prefix = u"".join(self.__prefix)
+                self._prefix = "".join(self.__prefix)
             return self._prefix
 
         @property
         def suffix(self):
             """Context string appearing after matched phrase"""
             if not hasattr(self, "_suffix"):
-                self._suffix = u"".join(self.__suffix)
+                self._suffix = "".join(self.__suffix)
             return self._suffix
 
         @property

@@ -22,7 +22,7 @@ try:
 except:
     pass
 if session:
-    print "Content-type: text/plain\n"
-    print session
+    print("Content-type: text/plain\n")
+    print(session)
 else:
-    print "Status: 401 Unauthorized\n"
+    print("Status: 401 Unauthorized\n")

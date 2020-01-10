@@ -52,9 +52,11 @@
 import cgi
 import cdr
 import cdrcgi
-import cdrdb
 import os
 import re
+from cdrapi import db
+from cdrapi.users import Session
+from html import escape as html_escape
 
 #----------------------------------------------------------------------
 # Dynamically create the title of the menu section (request #809).
@@ -100,7 +102,8 @@ fields   = cgi.FieldStorage() or cdrcgi.bail("No Request Found", repTitle)
 debug    = fields.getvalue("debug") and True or False
 if debug:
     os.environ["CDR_LOGGING_LEVEL"] = "DEBUG"
-# DEBUG
+    cdr.LOGGER.setLevel("DEBUG")
+cdr.LOGGER.debug("QcReport.py called with %s", dict(fields))
 # cdrcgi.log_fields(fields, program='QcReport.py')
 docId    = fields.getvalue(cdrcgi.DOCID) or None
 session  = cdrcgi.getSession(fields) or cdrcgi.bail("Not logged in")
@@ -406,8 +409,6 @@ kpbox    = fields.getvalue("Keypoints")  or None
 learnmore= fields.getvalue("LearnMore")  or None
 modMarkup= fields.getvalue("ModuleMarkup")     or None
 
-if docTitle:
-    docTitle = unicode(docTitle, "utf-8")
 standardWording      = fields.getvalue("StandardWording") or None
 audInternComments    = fields.getvalue("AudInternalComments")  or None
 audExternComments    = fields.getvalue("AudExternalComments")  or None
@@ -541,7 +542,7 @@ if not docId and not docTitle and not glossaryDefinition:
     if repType:
         extra += "\n   "
         extra += "<INPUT TYPE='hidden' NAME='ReportType' VALUE='%s'>" % repType
-    form = u"""\
+    form = """\
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
    %s
    <TABLE>
@@ -559,7 +560,7 @@ if not docId and not docTitle and not glossaryDefinition:
     </TR>
    </TABLE>
 """ % (cdrcgi.SESSION, session, extra, label[0], fieldName, label[1])
-    cdrcgi.sendPage(header + form + u"""\
+    cdrcgi.sendPage(header + form + """\
   </FORM>
  </BODY>
 </HTML>
@@ -569,23 +570,23 @@ if not docId and not docTitle and not glossaryDefinition:
 # Set up a database connection and cursor.
 #----------------------------------------------------------------------
 try:
-    conn = cdrdb.connect('CdrGuest')
+    conn = db.connect(user='CdrGuest', timeout=300)
     cursor = conn.cursor()
-except cdrdb.Error, info:
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
+except Exception as e:
+    cdrcgi.bail(f"Database connection failure: {e}")
 
 #----------------------------------------------------------------------
 # More than one matching title; let the user choose one.
 #----------------------------------------------------------------------
 def showTitleChoices(choices):
-    form = u"""\
+    form = """\
    <H3>More than one matching document found; please choose one.</H3>
 """
     for choice in choices:
-        form += u"""\
+        form += """\
    <INPUT TYPE='radio' NAME='DocId' VALUE='CDR%010d'>[CDR%d] %s<BR>
-""" % (choice[0], choice[0], cgi.escape(choice[1]))
-    cdrcgi.sendPage(header + form + u"""\
+""" % (choice[0], choice[0], html_escape(choice[1]))
+    cdrcgi.sendPage(header + form + """\
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
    <INPUT TYPE='hidden' NAME='DocType' VALUE='%s'>
    <INPUT TYPE='hidden' NAME='ReportType' VALUE='%s'>
@@ -602,18 +603,18 @@ def addCheckbox(inputLabels, inputName, inputID='', checked=0):
     showImages = ''
 
     # Adding on-click trigger when 'Images' are selected so that the
-    # user can decide to include publishable versions of images or 
+    # user can decide to include publishable versions of images or
     # non-publishable versions.
     # ---------------------------------------------------------------
     if inputName == 'Images':
        showImages = 'onclick="selectImageVersion(\'displayImages\')"'
 
-    cbHtml = u"""\
+    cbHtml = """\
       <input name='%s' type='checkbox' id='%s' %s
              %s>&nbsp;
       <label for='%s'>%s</label>
       <br>
-""" % (inputName, inputID, showImages, isChecked, inputID, 
+""" % (inputName, inputID, showImages, isChecked, inputID,
        inputLabels[inputName])
     return cbHtml
 
@@ -626,7 +627,7 @@ def addCheckbox(inputLabels, inputName, inputID='', checked=0):
 def addImageRadioBtn(inputLabels, inputName, inputID=''):
     id1 = 'pubYes'
     id2 = 'pubNo'
-    cbHtml = u"""\
+    cbHtml = """\
       <div id="pub-image" class="radio-button" style="display:none;">
        <input type='radio' name='%s' id='%s'
               value="Y" checked>&nbsp;
@@ -637,7 +638,7 @@ def addImageRadioBtn(inputLabels, inputName, inputID=''):
        <label for='%s'>%s</label>
        <br>
       </div>
-""" % (inputName, id1, id1, inputLabels['PubImages'][id1], 
+""" % (inputName, id1, id1, inputLabels['PubImages'][id1],
        inputName, id2, id2, inputLabels['PubImages'][id2])
     return cbHtml
 
@@ -659,8 +660,7 @@ if not docId:
                                   '/DefinitionText',
                                   '/GlossaryTermConcept' +
                                   '/TranslatedTermDefinition/DefinitionText')
-                   AND q.value LIKE ?""", u"%" + glossaryDefinition + u"%",
-                           timeout = 300)
+                   AND q.value LIKE ?""", "%" + glossaryDefinition + "%")
         elif docType:
             cursor.execute("""\
                 SELECT document.id, document.title
@@ -677,21 +677,20 @@ if not docId:
                  WHERE title LIKE ?""", docTitle + '%')
         rows = cursor.fetchall()
         if not rows:
-            cdrcgi.bail(u"Unable to find document with %s %s" %
+            cdrcgi.bail("Unable to find document with %s %s" %
                         (lookingFor, repr(docTitle)))
         if len(rows) > 1:
             showTitleChoices(rows)
         intId = rows[0][0]
         docId = "CDR%010d" % intId
-    except cdrdb.Error, info:
-        cdrcgi.bail('Failure looking up document %s: %s' % (lookingFor,
-                                                            info[1][0]))
+    except Exception as e:
+        cdrcgi.bail(f"Failure looking up document {lookingFor}: {e}")
 
 #----------------------------------------------------------------------
 # We have a document ID.  Check added at William's request.
 #----------------------------------------------------------------------
 elif docType:
-    cursor.execute(u"""\
+    cursor.execute("""\
         SELECT t.name
           FROM doc_type t
           JOIN document d
@@ -724,9 +723,9 @@ if letUserPickVersion:
              WHERE id = ?
           ORDER BY num DESC""", intId)
         rows = cursor.fetchall()
-    except cdrdb.Error, info:
-        cdrcgi.bail('Failure retrieving document versions: %s' % info[1][0])
-    form = u"""\
+    except Exception as e:
+        cdrcgi.bail(f"Failure retrieving document versions: {e}")
+    form = """\
   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
   <INPUT TYPE='hidden' NAME='DocType' VALUE='%s'>
   <INPUT TYPE='hidden' NAME='DocId' VALUE='CDR%010d'>
@@ -737,11 +736,11 @@ if letUserPickVersion:
 
     # Include the ReportType so the "DocumentVersion" screen can differentiate
     # the specific report type to run.
-    form += u"""\
+    form += """\
   <INPUT TYPE='hidden' NAME='ReportType' VALUE='%s'>
 """ % (repType or "")
 
-    form += u"""\
+    form += """\
   <fieldset class='docversion'>
    <legend>&nbsp;Select document version&nbsp;</legend>
   <div style="width: 100%; text-align: center;">
@@ -753,13 +752,13 @@ if letUserPickVersion:
     # Limit display of version comment to 120 chars (if exists)
     # ---------------------------------------------------------
     for row in rows:
-        form += u"""\
+        form += """\
    <OPTION VALUE='%d'>[V%d %s] %s</OPTION>
-""" % (row[0], row[0], row[2][:10],
-       not row[1] and "[No comment]" or cgi.escape(row[1][:120]))
+""" % (row[0], row[0], str(row[2])[:10],
+       not row[1] and "[No comment]" or html_escape(row[1][:120]))
         selected = ""
-    form += u"</SELECT></div></div>"
-    form += u"""
+    form += "</SELECT></div></div>"
+    form += """
   </fieldset>
 """
     if docType in ("Summary", "DrugInformationSummary", "GlossaryTermName"):
@@ -774,7 +773,7 @@ if letUserPickVersion:
         # ----------------------------------------------------------------
         if docType == 'Summary':
             if repType not in ("pat", "patbu", "patrs"):
-                form += u"""\
+                form += """\
      <fieldset>
       <legend>&nbsp;Board Markup&nbsp;</legend>
       <input name='Editorial-board' type='checkbox' id='eBoard'
@@ -789,7 +788,7 @@ if letUserPickVersion:
         # XXX WHAT IS THIS <TD> TAG DOING???
         # -----------------------------------------------------
     ### <td valign="top">
-        form += u"""\
+        form += """\
      <fieldset>
       <legend>&nbsp;Revision-level Markup&nbsp;</legend>
       <input name='publish' type='checkbox' id='pup'>
@@ -808,7 +807,7 @@ if letUserPickVersion:
     # Display the check boxes for the HP or Patient version sections
     # --------------------------------------------------------------
     if docType == 'GlossaryTermName':
-        form += u"""\
+        form += """\
      <table>
       <tr>
        <td class="colheading">Display Audience Definition</td>
@@ -845,7 +844,7 @@ if letUserPickVersion:
                             'Display Module Markup'
                  }
 
-    radioBtnLabels = { 'PubImages':{'pubYes':'... use publishable version', 
+    radioBtnLabels = { 'PubImages':{'pubYes':'... use publishable version',
                                     'pubNo':'... use non-publishable version'}
                  }
 
@@ -853,7 +852,7 @@ if letUserPickVersion:
     # --------------------------------------------------------
     if docType == 'Summary':
         if repType == 'pat' or repType == 'patbu' or repType == 'patrs':
-            form += u"""\
+            form += """\
          <p>
          <fieldset>
           <legend>&nbsp;Misc Print Options&nbsp;</legend>
@@ -878,7 +877,7 @@ if letUserPickVersion:
 
         # End - Misc Print Options block
         # ------------------------------
-            form += u"""\
+            form += """\
              </fieldset>
         """
 
@@ -891,7 +890,7 @@ if letUserPickVersion:
     #                        X  O  X
     # -----------------------------------------------------------
     if docType == 'Summary':
-        form += u"""\
+        form += """\
      <p>
      <fieldset>
       <legend>&nbsp;Select Comment Types to be displayed&nbsp;</legend>
@@ -899,13 +898,13 @@ if letUserPickVersion:
       <input name='internal' type='checkbox' id='int'
 """
         if repType != 'pat' and repType != 'patbu' and repType != 'patrs':
-            form += u"""\
+            form += """\
 """
         else:
-            form += u"""\
+            form += """\
                    CHECKED="1"
 """
-        form += u"""\
+        form += """\
                    onclick='javascript:dispInternal()'>
       <label for='int'>Internal Comments (excluding permanent comments)</label>
       <br>
@@ -923,7 +922,7 @@ if letUserPickVersion:
         # -----------------------------------------------------------
         # XXX
         if repType != 'pat' and repType != 'patbu' and repType != 'patrs':
-            form += u"""\
+            form += """\
       <div class='comgroup'>
       <input name='external' type='checkbox' id='ext'
                    CHECKED="1"
@@ -936,7 +935,7 @@ if letUserPickVersion:
       </div>
 """
         else:
-            form += u"""\
+            form += """\
       <div class='comgroup'>
       <input name='external' type='checkbox' id='ext'
                    onclick='javascript:dispExternal()'>
@@ -949,7 +948,7 @@ if letUserPickVersion:
       </div>
 """
 
-        form += u"""\
+        form += """\
       <div class='comgroup'>
       <input name='all' type='checkbox' id='allcomment'
                    onclick='javascript:dispAll()'>
@@ -983,14 +982,14 @@ if letUserPickVersion:
 """
 
         if repType != 'pat' and repType != 'patbu' and repType != 'patrs':
-            form += u"""\
+            form += """\
 """
         else:
-            form += u"""\
+            form += """\
                CHECKED = "1"
 """
 
-        form += u"""\
+        form += """\
                ID      = "ai">&nbsp; Internal
        </td>
       </tr>
@@ -1001,14 +1000,14 @@ if letUserPickVersion:
 """
 
         if repType != 'pat' and repType != 'patbu' and repType != 'patrs':
-            form += u"""\
+            form += """\
                CHECKED = "1"
 """
         else:
-            form += u"""\
+            form += """\
 """
 
-        form += u"""\
+        form += """\
                ID      = "ae">&nbsp; External
        </td>
        </tr>
@@ -1034,14 +1033,14 @@ if letUserPickVersion:
 """
 
         if repType != 'pat' and repType != 'patbu' and repType != 'patrs':
-            form += u"""\
+            form += """\
 """
         else:
-            form += u"""\
+            form += """\
                CHECKED = "1"
 """
 
-        form += u"""\
+        form += """\
                ID      = "sa">&nbsp; Advisory
        </td>
        </tr>
@@ -1059,14 +1058,14 @@ if letUserPickVersion:
 """
 
         if repType != 'pat' and repType != 'patbu' and repType != 'patrs':
-            form += u"""\
+            form += """\
                CHECKED = "1"
 """
         else:
-            form += u"""\
+            form += """\
 """
 
-        form += u"""\
+        form += """\
                ID      = "dp">&nbsp; Permanent
        </td>
       </tr>
@@ -1089,7 +1088,7 @@ if letUserPickVersion:
     # --------------------------------------------------
     if docType == 'Summary':
         if repType != 'pat' and repType != 'patbu' and repType != 'patrs':
-            form += u"""\
+            form += """\
          <p>
          <fieldset>
           <legend>&nbsp;Misc Print Options&nbsp;</legend>
@@ -1110,14 +1109,14 @@ if letUserPickVersion:
 
         # End - Misc Print Options block
         # ------------------------------
-            form += u"""\
+            form += """\
              </fieldset>
         """
 
     # Display the Quick&Dirty option checkbox
     # ---------------------------------------
     if docType == 'Summary':
-        form += u"""\
+        form += """\
   <p>
      <fieldset>
       <legend>&nbsp;911 Options&nbsp;</legend>
@@ -1125,10 +1124,10 @@ if letUserPickVersion:
       <label for='dispQD'>Run Quick &amp; Dirty report</label>
       <br>
      </fieldset>"""
-#    form += u"""
+#    form += """
 #     </table>"""
 
-    cdrcgi.sendPage(header + form + u"""
+    cdrcgi.sendPage(header + form + """
  </BODY>
 </HTML>
 """)
@@ -1148,15 +1147,15 @@ if not docType:
         if not row:
             cdrcgi.bail("Unable to find document type for %s" % docId)
         docType = row[0]
-    except cdrdb.Error, info:
-            cdrcgi.bail('Unable to find document type for %s: %s' % (docId,
-                                                                 info[1][0]))
+    except Exception as e:
+            cdrcgi.bail(f"Unable to find document type for {docId}: {e}")
+
     #----------------------------------------------------------------------
     # Determine the report type if the document is a summary.
-    # The the resulting text output is given as a string similar to this:  
+    # The the resulting text output is given as a string similar to this:
     #      "Treatment Patients KeyPoint KeyPoint KeyPoint"
     # which will be used to set the propper report type for patient or HP
-    # 
+    #
     # In the past there used to be new (including KeyPoints) and old (not
     # including KeyPoints) summaries and the old versions had to use HP
     # QC report filters.
@@ -1175,7 +1174,7 @@ if not docType:
  </xsl:template>
 </xsl:transform>""", inline = 1, docId = docId, docVer = version or None)
 
-        if inspectSummary[0].find('Patients') > 0:  
+        if "Patients" in inspectSummary[0]:
             repType = 'pat'
 
 
@@ -1197,7 +1196,9 @@ def getDocsLinkingToPerson(docId):
                    ]
 
     try:
-        cursor.callproc('cdr_get_count_of_links_to_persons', docId)
+        #cursor.callproc('cdr_get_count_of_links_to_persons', docId)
+        parms = (docId,)
+        cursor.execute("{CALL cdr_get_count_of_links_to_persons (?)}", parms)
         for row in cursor.fetchall():
             if row[1] in statusValues[0]:        counts[0] += row[0]
             if row[1] in statusValues[1]:        counts[1] += row[0]
@@ -1215,8 +1216,8 @@ def getDocsLinkingToPerson(docId):
                AND path LIKE '/CTGovProtocol/%/@cdr:ref'""", docId)
         counts[4] = cursor.fetchall()[0][0]
 
-    except cdrdb.Error, info:
-        cdrcgi.bail('Failure retrieving link counts: %s' % info[1][0])
+    except Exception as e:
+        cdrcgi.bail(f"Failure retrieving link counts: {e}")
     return counts
 
 #----------------------------------------------------------------------
@@ -1261,9 +1262,9 @@ def fixMailerInfo(doc):
                         mailerTypeOfChange = "Unable to retrieve change type"
                 else:
                     mailerResponseReceived = "Response not yet received"
-    except cdrdb.Error, info:
-        cdrcgi.bail('Failure retrieving mailer info for %s: %s' % (docId,
-                                                                   info[1][0]))
+    except Exception as e:
+        cdrcgi.bail(f"Failure retrieving mailer info for {docId}: {e}")
+
     doc = re.sub("@@MAILER_DATE_SENT@@",         mailerDateSent,         doc)
     doc = re.sub("@@MAILER_RESPONSE_RECEIVED@@", mailerResponseReceived, doc)
     doc = re.sub("@@MAILER_TYPE_OF_CHANGE@@",    mailerTypeOfChange,     doc)
@@ -1352,9 +1353,8 @@ def fixOrgReport(doc):
            AND org.int_val = ?
            AND org.path like '%@cdr:ref'
          GROUP BY prot.value""", intId)
-    except cdrdb.Error, info:
-        cdrcgi.bail('Failure retrieving Protocol info for %s: %s' % (intId,
-                                                                   info[1][0]))
+    except Exception as e:
+        cdrcgi.bail(f"Failure retrieving Protocol info for {intId:d}: {e}")
 
     # -------------------------------------------------------
     # Assign protocol count to counts list items
@@ -1412,9 +1412,8 @@ SELECT int_val
  WHERE doc_id = ?
    AND path = '/PDQBoardMemberInfo/BoardMemberName/@cdr:ref'""", intId)
 
-    except cdrdb.Error, info:
-        cdrcgi.bail('Failure retrieving Person ID for %s: %s' % (intId,
-                                                                   info[1][0]))
+    except Exception as e:
+        cdrcgi.bail(f"Failure retrieving Person ID for {intId:d}: {e}")
 
     row = cursor.fetchone()
     if not row:
@@ -1450,9 +1449,8 @@ SELECT person.doc_id, summary.value, audience.value, max(ppd.pub_proc) as jobid
    AND pp.pub_subset = 'Summary-PDQ Editorial Board'
  GROUP BY summary.value, person.doc_id, audience.value""", personId)
 
-    except cdrdb.Error, info:
-        cdrcgi.bail('Failure retrieving Summary info for CDR%s: %s' % (intId,
-                                                                   info[1][0]))
+    except Exception as e:
+        cdrcgi.bail(f"Failure retrieving Summary info for CDR{intId:d}: {e}")
 
     # -------------------------------------------------------
     # Display the summaries reviewed by this person.
@@ -1519,10 +1517,10 @@ SELECT mailer.doc_id, mailer.int_val, summary.value, response.value,
  ORDER BY title.value""" % (batchId, summaryIds, personId)
 
     try:
-       cursor.execute(query)
-    except cdrdb.Error, info:
-       cdrcgi.bail('Failure retrieving Mailer info for batch ID %d: %s' % (batchId,
-                                                                   info[1][0]))
+        cursor.execute(query)
+    except Exception as e:
+        message = f"Failure retrieving Mailer info for batch ID {batchId}: {e}"
+        cdrcgi.bail(message)
 
     rows = cursor.fetchall()
 
@@ -1548,22 +1546,23 @@ SELECT mailer.doc_id, mailer.int_val, summary.value, response.value,
         %s
        </TD>
       </TR>
-""" % (cgi.escape(row[4]), row[3])
-    doc    = re.sub("@@SUMMARY_MAILER_SENT@@", html, doc)
+""" % (html_escape(row[4]), row[3])
+    doc = re.sub("@@SUMMARY_MAILER_SENT@@", html, doc)
 
     # -----------------------------------------------------------------
     # Database query to select the time of the mailers send
     # -----------------------------------------------------------------
     try:
-	query = """
+        query = """\
 SELECT completed
   FROM pub_proc
  WHERE id = %d""" % batchId
         cursor.execute(query)
 
-    except cdrdb.Error, info:
-        cdrcgi.bail('Failure retrieving Mailer Date for batch %d: %s' % (batchId,
-                                                                   info[1][0]))
+    except Exception as e:
+        message = f"Failure retrieving Mailer Date for batch {batchId:d}: {e}"
+        cdrcgi.bail(message)
+
     row = cursor.fetchone()
     # -----------------------------------------------------------------
     # Substitute @@...@@ strings for job ID and date send
@@ -1572,7 +1571,7 @@ SELECT completed
     # in this case.
     # -----------------------------------------------------------------
     if row:
-       dateSent = row[0][:10]
+       dateSent = str(row[0])[:10]
        html = "%s" % (dateSent)
        doc    = re.sub("@@SUMMARY_DATE_SENT@@", html, doc)
        html = "%s" % (batchId)
@@ -1614,15 +1613,15 @@ if version == "-1": version = None
 
 # Display error message if no filter exist for current docType
 # ------------------------------------------------------------
-if not filters.has_key(docType):
-    thisUser = cdr.idSessionUser('', session)
+if docType not in filters:
+    user_name = Session(session).user_name
     message = "QcReport - Filter for document type '%s' does not exist (%s)."
-    cdr.logwrite(message % (docType, thisUser[0]))
+    cdr.LOGGER.info(message, docType, user_name)
     doc = cdr.getDoc(session, docId, version = version or "Current",
                      getObject = 1)
-    if type(doc) in (type(""), type(u"")):
+    if isinstance(doc, (str, bytes)):
         cdrcgi.bail(doc)
-    html = u"""\
+    html = """\
 <html>
  <head>
   <title>%s</title>
@@ -1633,8 +1632,8 @@ if not filters.has_key(docType):
   <p>Document follows (view source to preview XML!):</p>
   <pre>%s</pre>
  </body>
-</html>""" % (cgi.escape(doc.ctrl['DocTitle'].decode("utf-8")), docType,
-              cgi.escape(doc.xml.decode('utf-8')))
+</html>""" % (html_escape(doc.ctrl['DocTitle'].decode("utf-8")), docType,
+              html_escape(doc.xml.decode('utf-8')))
     cdrcgi.sendPage(html)
 
 filterParm = []
@@ -1664,6 +1663,7 @@ if docType == 'DrugInformationSummary':
 # Supply the summary comments and board display parameters
 # --------------------------------------------------------
 if docType.startswith('Summary'):
+    filterParm.append(['isQC', 'Y'])
     filterParm.append(['DisplayComments', audienceComments ])
     filterParm.append(['DurationComments', durationComments ])
     filterParm.append(['SourceComments', sourceComments ])
@@ -1680,6 +1680,7 @@ if docType.startswith('Summary'):
 # Need to set the displayBoard parameter or all markup will be dropped
 # --------------------------------------------------------------------
 if docType.startswith('GlossaryTerm'):
+    filterParm.append(['isQC', 'Y'])
     filterParm.append(['DisplayComments', audienceComments ])
                        # audienceComments and 'Y' or 'N'])
     filterParm.append(['displayBoard', 'editorial-board_'])
@@ -1689,6 +1690,7 @@ if docType.startswith('GlossaryTerm'):
 # markup will be dropped
 # --------------------------------------------------------------------
 if docType.startswith('MiscellaneousDocument'):
+    filterParm.append(['isQC', 'Y'])
     filterParm.append(['insRevLevels', 'approved|'])
     filterParm.append(['displayBoard', 'editorial-board_'])
 
@@ -1729,8 +1731,8 @@ def saveParms(parms):
      SELECT max(id) from url_parm_set""")
         row = cursor.fetchone()
 
-    except cdrdb.Error, info:
-        cdrcgi.bail('Failure inserting parms: %s' % (info[1][0]))
+    except Exception as e:
+        cdrcgi.bail(f"Failure inserting parms: {e}")
 
     return row[0]
 
@@ -1750,11 +1752,14 @@ try:
 except Exception as e:
     cdrcgi.bail("filtering error: {}".format(e))
 
-#if (type(doc) in (type(""), type(u"")):
-#    cdrcgi.bail("OOPS! %s" % doc)
+if isinstance(doc, (str, bytes)):
+    cdrcgi.bail(doc)
+doc = doc[0]
+
 if docType == "CTGovProtocol":
-    if (type(doc) in (type(""), type(u"")) and
-        doc.find("undefined/lastp") != -1):
+    if isinstance(doc, bytes):
+        doc = str(doc, "utf-8")
+    if isinstance(doc, str) and "undefined/lastp" in doc:
         # cdrcgi.bail("CTGovProtocol QC Report cannot be run until "
         #             "PDQIndexing block has been completed")
         filterParm.append(['skipPdqIndexing', 'Y'])
@@ -1768,14 +1773,6 @@ if docType == "CTGovProtocol":
 """
     else:
         noPdqIndexing = ""
-if type(doc) in (type(""), type(u"")):
-    cdrcgi.bail(doc)
-if type(doc) == type(()):
-    doc = doc[0]
-
-# Replace all utf-8 unicode chars with &#x...; character entities
-# Allows our macro substitutions to work without ascii decode errs
-doc = cdrcgi.decode(doc)
 
 # Perform any required macro substitions
 doc = re.sub("@@DOCID@@", docId, doc)
@@ -1798,12 +1795,14 @@ elif docType == 'PDQBoardMemberInfo':
 # cdrcgi.bail("docType = %s" % docType)
 
 # If not already changed to unicode by a fix.. routine, change it
-if type(doc) != type(u""):
-    doc = unicode(doc, 'utf-8')
+if isinstance(doc, bytes):
+    doc = str(doc, 'utf-8')
 
 # cdrcgi.bail('%s - %s' % (docParms, type(docParms)))
 #----------------------------------------------------------------------
 # Send it.
 #----------------------------------------------------------------------
+args = docId, version, docType, docParms
+cdr.LOGGER.info("QC for %s version %s type %s with parms %s", *args)
 cdrcgi.sendPage(doc, parms=docParms, docId=docId,
                      docType=docType, docVer=version)

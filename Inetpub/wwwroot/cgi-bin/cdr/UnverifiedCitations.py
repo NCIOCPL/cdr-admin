@@ -1,121 +1,96 @@
-#----------------------------------------------------------------------
-# Reports on citations which have not been verified.
-#----------------------------------------------------------------------
-import cdr, cgi, cdrdb, cdrcgi, time, re
+#!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields  = cgi.FieldStorage()
-session = cdrcgi.getSession(fields)
+"""Report on citations which have not been verified.
+"""
 
-#----------------------------------------------------------------------
-# Connect to the database.
-#----------------------------------------------------------------------
-try:
-    conn = cdrdb.connect()
-    cursor = conn.cursor()
-except cdrdb.Error, info:
-    cdrcgi.bail('Database connection failure: %s' % info[1][0])
+from cdrcgi import Controller
+from cdrapi.docs import Doc
 
-#----------------------------------------------------------------------
-# Get some general values.
-#----------------------------------------------------------------------
-now = time.localtime(time.time())
-try:
-    cursor.execute("""\
-            SELECT fullname
-              FROM usr
-              JOIN session
-                ON session.usr = usr.id
-             WHERE session.name = ?""", session)
-    usr = cursor.fetchone()[0]
-except:
-    cdrcgi.bail("Unable to find current user name")
 
-#----------------------------------------------------------------------
-# Start the page.
-#----------------------------------------------------------------------
-html = """\
-<!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
-<html>
- <head>
-  <title>Unverified Citations Report %s %s</title>
- </head>
- <basefont face='Arial, Helvetica, sans-serif'>
- <body>
-  <center>
-   <b>
-    <font size='4'>Unverified Citations Report</font>
-   </b>
-   <br />
-   <br />
-   <font size='4'>%s</font>
-  </center>
-  <br />
-  <table border='1' cellspacing='0' cellpadding='2' width='100%%'>
-   <tr>
-    <td>
-     <font size='4'>DocID</font>
-    </td>
-    <td>
-     <font size='4'>Citation</font>
-    </td>
-    <td>
-     <font size='4'>Comment</font>
-    </td>
-   </tr>
-""" % (time.strftime("%m/%d/%Y", now), usr, time.strftime("%B %d, %Y", now))
-   
-#----------------------------------------------------------------------
-# Find out which citations are unverified.
-#----------------------------------------------------------------------
-try:
-    cursor.execute("""\
-            SELECT DISTINCT doc_id
-                       FROM query_term
-                      WHERE path = '/Citation/VerificationDetails/Verified'
-                        AND value = 'No'
-                   ORDER BY doc_id""")
-    rows = cursor.fetchall()
-except cdrdb.Error, info:
-    cdrcgi.bail('Failure selecting citation IDs: %s' % info[1][0])
+class Control(Controller):
+    """Access to the database for report generation."""
 
-#----------------------------------------------------------------------
-# Add one row to the table for each unverified citation.
-#----------------------------------------------------------------------
-textPattern    = re.compile("<FormattedReference>(.*)</FormattedReference>")
-commentPattern = re.compile("<Comment>(.*)</Comment>")
-for row in rows:
-    resp = cdr.filterDoc(session, ['set:Denormalization Citation Set',
-                                   'name:Copy XML for Citation QC Report'], 
-				   row[0])
-    text = textPattern.search(resp[0])
-    cmnt = commentPattern.search(resp[0])
-    text = text and text.group(1) or 'Unable to retrieve citation title'
-    cmnt = cmnt and cmnt.group(1) or '&nbsp;'
-    html += """\
-   <tr>
-    <td valign='top'>
-     <font size='3'>%d</font>
-    </td>
-    <td valign='top'>
-     <font size='3'>%s</font>
-    </td>
-    <td valign='top'>
-     <font size='3'>%s</font>
-    </td>
-   </tr>
-""" % (row[0], cdrcgi.decode(text), cdrcgi.decode(cmnt))
+    SUBTITLE = "Unverified Citations Report"
+    COLUMNS = "Doc ID", "Citation", "Comment"
 
-#----------------------------------------------------------------------
-# Display the report.
-#----------------------------------------------------------------------
-cdrcgi.sendPage(html + """\
-  </table>
-  <br />
-  <center>
-   <font size='3'>%s</font>
-  </center>
- </body>
-</html>""" % usr)
+    def show_form(self):
+        """Bypass the form; this report doesn't use one."""
+        self.show_report()
+
+    def build_tables(self):
+        """Build and show the table for the report."""
+
+        opts = dict(caption=self.caption, columns=self.COLUMNS)
+        return self.Reporter.Table(self.rows, **opts)
+
+    def show_report(self):
+        """Override to apply some custom styling."""
+
+        self.report.page.add_css("table { width: 95%; }")
+        self.report.send()
+
+    @property
+    def caption(self):
+        """String to display at the top of the report table."""
+        return f"{len(self.rows)} Unverified Citations"
+
+    @property
+    def citations(self):
+        """Unverified citations to be reflected in the report."""
+
+        query = self.Query("query_term", "doc_id").unique().order("doc_id")
+        query.where("path = '/Citation/VerificationDetails/Verified'")
+        query.where("value = 'No'")
+        rows = query.execute(self.cursor).fetchall()
+        return [Citation(Doc(self.session, id=row.doc_id)) for row in rows]
+
+    @property
+    def rows(self):
+        """Values for the report table."""
+
+        if not hasattr(self, "_rows"):
+            self._rows = [citation.row for citation in self.citations]
+        return self._rows
+
+
+class Citation:
+    """Unverified citation to be shown on the report."""
+
+    FILTERS = (
+        "set:Denormalization Citation Set",
+        "name:Copy XML for Citation QC Report",
+    )
+
+    def __init__(self, doc):
+        """Save a reference to the Citation document.
+
+        Pass:
+            doc - `Doc` object for this CDR Citation document
+        """
+
+        self.__doc = doc
+
+    @property
+    def row(self):
+        """Values to be displayed in the report for this citation doc."""
+        return self.__doc.id, self.citation, self.comment
+
+    @property
+    def citation(self):
+        """Formatted bibliographic citation."""
+        return Doc.get_text(self.root.find("FormattedReference"))
+
+    @property
+    def comment(self):
+        """Comment pulled from the filtered citation document."""
+        return Doc.get_text(self.root.find("Comment"))
+
+    @property
+    def root(self):
+        """Top node of the filtered citation document."""
+        return self.__doc.filter(*self.FILTERS).result_tree.getroot()
+
+
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+    Control().run()

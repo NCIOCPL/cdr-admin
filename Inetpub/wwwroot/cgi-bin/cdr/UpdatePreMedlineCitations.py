@@ -1,186 +1,305 @@
-#----------------------------------------------------------------------
-# Update premedline citations that have had their statuses changed
-# since they were last imported or updated.
-#
-# BZIssue::5150
-#----------------------------------------------------------------------
-import cdr, cdrdb, lxml.etree as etree, cgi, cdrcgi, copy
-import requests
+#!/usr/bin/env python
+
+"""Refresh citations from NLM.
+
+Update premedline citations that have had their statuses changed
+since they were last imported or updated.
+"""
+
+from copy import deepcopy
+from cdrcgi import Controller
+from cdrapi.docs import Doc
+from cdr import prepare_pubmed_article_for_import
+from lxml import etree
+from requests import post
+
+
+class Control(Controller):
+    """Access to the current login session and report-building tools."""
+
+    SUBTITLE = "Citation Status Changes"
+    LOGNAME = "UpdatePreMedlineCitations"
+    URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
+    COLUMNS = "PMID", "CDR ID", "Old Status", "New Status", "Notes"
+    PMID_PATH = "/Citation/PubmedArticle/MedlineCitation/PMID"
+    STATUS_PATH = "/Citation/PubmedArticle/MedlineCitation/@Status"
+    STATUSES = "In-Process", "Publisher", "In-data-review"
+    CAPTION = "{:d} Pre-Medline Citations Examined -- {:d} Statuses Changed"
+
+    def build_tables(self):
+        """Assemble the table showing what we did and return it."""
+
+        if not self.session.can_do("MODIFY DOCUMENT", "Citation"):
+            self.bail("You must be authorized to replace Citation documents "
+                      "to run this script.")
+        opts = dict(caption=self.caption, columns=self.COLUMNS)
+        return self.Reporter.Table(self.rows, **opts)
+
+    def show_form(self):
+        """Bypass the form, which isn't needed for this script."""
+        self.show_report()
+
+    def show_report(self):
+        """Override the base class version so we can show any errors."""
+
+        if self.citations and self.errors is not None:
+            self.report.page.form.append(self.errors)
+        self.report.page.add_css("table { width: 600px; }")
+        self.report.send(self.format)
+
+    @property
+    def caption(self):
+        """String to be displayed immediately above the table."""
+        return self.CAPTION.format(len(self.citations), len(self.rows))
+
+    @property
+    def citations(self):
+        """Dictionary (by PMID) of citations with non-terminal statuses."""
+
+        if not hasattr(self, "_citations"):
+            fields = "p.doc_id", "p.value AS pmid", "s.value AS status"
+            query = self.Query("query_term p", *fields)
+            query.join("query_term s", "s.doc_id = p.doc_id")
+            query.where(query.Condition("p.path", self.PMID_PATH))
+            query.where(query.Condition("s.path", self.STATUS_PATH))
+            query.where(query.Condition("s.value", self.STATUSES, "IN"))
+            self._citations = {}
+            self.__errors = []
+            dup_message = "Duplicate PMID {} (CDR{:d} and CDR{:d}"
+            for row in query.execute(self.cursor).fetchall():
+                pmid = row.pmid.strip().upper()
+                if pmid in self._citations:
+                    args = row.pmid, self._citations[pmid].id, row.doc_id
+                    self.__errors.append(dup_message.format(*args))
+                else:
+                    self._citations[pmid] = Citation(self, row)
+            self.__fetch(self._citations)
+        return self._citations
+
+    @property
+    def errors(self):
+        """Renderable version of any errors logged."""
+
+        if not hasattr(self, "_errors"):
+            self._errors = None
+            if self.__errors:
+                self._errors = self.HTMLPage.fieldset("Date Integrity Errors")
+                ul = self.HTMLPage.B.UL()
+                for error in self.__errors:
+                    li = self.HTMLPage.B.LI(error)
+                    li.set("class", "error")
+                    ul.append(li)
+                self._errors.append(ul)
+        return self._errors
+
+    @property
+    def rows(self):
+        """Table rows reporting citations whose statuses have changed."""
+
+        if not hasattr(self, "_rows"):
+            self._rows = []
+            error_opts = dict(classes="error")
+            for pmid in sorted(self.citations):
+                citation = self.citations[pmid]
+                row = [citation.pmid, citation.doc.id, citation.status]
+                changed = False
+                if citation.pubmed_article is not None:
+                    row.append(citation.pubmed_article.status)
+                    if citation.pubmed_article.status != citation.status:
+                        changed = True
+                        try:
+                            citation.update()
+                            row.append("updated")
+                        except Exception:
+                            args = pmid
+                            self.logger.exception("Failure updating %s", pmid)
+                            cell = self.Reporter.Cell("failed", **error_opts)
+                            row.append(cell)
+                else:
+                    changed = True
+                    cell = self.Reporter.Cell("missing", **error_opts)
+                    row  += [cell, ""]
+                if changed:
+                    self._rows.append(row)
+        return self._rows
+
+    def __fetch(self, citations):
+        """Get the latest for the citations from NLM.
+
+        Attach the PubMed articles to the Citation objects with which
+        they belong.
+
+        Pass:
+            citations - dictionary of citation docs with non-terminal statuses
+        """
+
+        data = dict(db="pubmed", id=",".join(list(citations)), retmode="xml")
+        xml = post(self.URL, data).content
+        for node in etree.fromstring(xml).findall("PubmedArticle"):
+            article = PubmedArticle(node)
+            if len(article.pmids) != 1:
+                self.__errors.append(f"PMIDs: {article.pmids}")
+                continue
+            if article.pmid in citations:
+                citations[article.pmid].pubmed_article = article
+            else:
+                error = f"Unexpected article with PMID {article.pmid}"
+                self.__errors.append(error)
+
 
 class Citation:
-    def __init__(self, pmId, cdrId, status):
-        self.pmId = pmId.strip()
-        self.cdrId = cdrId
-        self.status = status.strip()
-        self.pubmedArticle = None
-    def updateDoc(self):
-        if not self.pubmedArticle:
-            raise Exception("PubmedArticle %s dropped" % self.pmId)
-        node = copy.deepcopy(self.pubmedArticle.node)
-        node = cdr.prepare_pubmed_article_for_import(node)
-        try:
-            obj = cdr.getDoc(session, self.cdrId, 'Y', getObject=True)
-        except Exception as e:
-            raise Exception("getDoc(): %s" % e)
-        doc = etree.XML(obj.xml)
-        for child in doc.findall("PubmedArticle"):
-            doc.replace(child, node)
-            obj.xml = etree.tostring(doc, xml_declaration=True,
-                                     encoding="utf-8")
-            comment = "pre-medline citation updated (issue #5150)"
-            response = cdr.repDoc(session, doc=str(obj), val="Y", ver="Y",
-                                  checkIn="Y", showWarnings=True,
-                                  reason=comment, comment=comment,
-                                  publishable="Y")
-            if response[0]:
-                return "updated"
-            raise Exception("repDoc(): %s" % repr(response[1]))
-        raise Exception("PubmedArticle missing from CDR document")
+    """CDR Citation document."""
+
+    COMMENT = "pre-medline citation updated (issue #5150)"
+    VAL_TYPES = "schema", "links"
+    SAVE_OPTS = dict(
+        version=True,
+        publishable=True,
+        val_types=VAL_TYPES,
+        comment=COMMENT,
+        reason=COMMENT,
+        unlock=True,
+    )
+
+    def __init__(self, control, row):
+        """Save the caller's values.
+
+        Pass:
+            control - access to the current CDR login session
+            row - results set row from the database query
+        """
+
+        self.__control = control
+        self.__row = row
+
+    @property
+    def doc(self):
+        """`Doc` object for the CDR Citation document."""
+
+        if not hasattr(self, "_doc"):
+            self._doc = Doc(self.__control.session, id=self.__row.doc_id)
+        return self._doc
+
+    @property
+    def id(self):
+        """Unique ID for the CDR Citation document."""
+        return self.__row.doc_id
+
+    @property
+    def pmid(self):
+        """Normalized string for the PubMed ID."""
+
+        if not hasattr(self, "_pmid"):
+            self._pmid = self.__row.pmid.strip()
+        return self._pmid
+
+    @property
+    def pubmed_article(self):
+        """Fresh copy of the article from NLM."""
+
+        if hasattr(self, "_pubmed_article"):
+            return self._pubmed_article
+        return None
+
+    @pubmed_article.setter
+    def pubmed_article(self, value):
+        """This gets set later."""
+        self._pubmed_article = value
+
+    @property
+    def status(self):
+        """What the CDR thinks the status of this citation is."""
+        return self.__row.status
+
+    def update(self):
+        """Save a new version with updated information from NLM."""
+
+        node = self.pubmed_article.node
+        replacement = prepare_pubmed_article_for_import(node)
+        old_node = self.doc.root.find("PubmedArticle")
+        self.doc.root.replace(old_node, replacement)
+        self.doc.check_out(comment=self.COMMENT)
+        self.doc.save(**self.SAVE_OPTS)
+
 
 class PubmedArticle:
-    class PMID:
-        def __init__(self, node):
-            try:
-                self.version = int(node.get("Version"))
-            except:
-                self.version = 0
-            self.value = node.text.strip()
-        def __repr__(self):
-            return repr("PMID", self.version, self.value)
-        def __cmp__(self, other):
-            return cmp(self.version, other.version)
+    """Article information retrieved from NLM for one of our Citation docs."""
+
     def __init__(self, node):
-        self.node = node
-        self.pmIds = []
-        self.status = None
-        for child in node.findall("MedlineCitation"):
-            self.status = child.get("Status")
-            for grandchild in child.findall("PMID"):
-                self.pmIds.append(self.PMID(grandchild))
-        self.pmIds.sort()
-    def getLastId(self):
-        return self.pmIds and self.pmIds[-1].value or None
+        """Save a reference to the parsed XML node.
 
-def displayErrors(errors):
-    if not errors:
-        return u""
-    html = [u'<p class="errors">']
-    sep = u""
-    for error in errors:
-        html.append(cgi.escape(error))
-        html.append(sep)
-        sep = u"<br />"
-    html.append(u"</p>")
-    return u"".join(html)
+        Pass:
+            node - parsed PubmedArticle node
+        """
+        self.__node = node
 
-errors = []
-url = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi"
-url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
-fields = cgi.FieldStorage()
-session = cdrcgi.getSession(fields)
-if not cdr.canDo(session, "MODIFY DOCUMENT", "Citation"):
-    cdrcgi.bail("You must be authorized to replace Citation documents "
-                "to run this script.")
-cursor = cdrdb.connect('CdrGuest').cursor()
-query = """\
-SELECT DISTINCT s.doc_id, s.value, i.value
-           FROM query_term s
-           JOIN query_term i
-             ON i.doc_id = s.doc_id
-          WHERE s.path = '/Citation/PubmedArticle/MedlineCitation/@Status'
-            AND i.path = '/Citation/PubmedArticle/MedlineCitation/PMID'
-            AND s.value IN ('In-Process', 'Publisher', 'In-data-review')"""
-debugging_query = """\
-SELECT DISTINCT v.id, s.value + '-DEBUG', i.value
-  FROM doc_version v
-  JOIN query_term s
-    ON s.doc_id = v.id
-  JOIN query_term i
-    ON i.doc_id = s.doc_id
- WHERE s.path = '/Citation/PubmedArticle/MedlineCitation/@Status'
-   AND i.path = '/Citation/PubmedArticle/MedlineCitation/PMID'
-   AND v.comment = 'pre-medline citation updated (issue #5150)'
-   AND v.dt > '2019-08-01'"""
-cursor.execute(query)
-citations = {}
-pmIds = set()
-for cdrId, status, pmId in cursor.fetchall():
-    pmIds.add(pmId)
-    if pmId in citations:
-        errors.append("%s for CDR%d (%s) and CDR%d (%s)" %
-                      (pmId, cdrId, status,
-                       citations[pmId].cdrId, citations[pmId].status))
-    else:
-        citations[pmId] = Citation(pmId, cdrId, status)
-data = {
-    "db": "pubmed",
-    "id": ",".join(list(pmIds)),
-    "retmode": "xml"
-}
-docXml = requests.post(url, data).content
-## fp = open("nlm-reply.xml", "w")
-## fp.write(docXml)
-## fp.close()
-doc = etree.XML(docXml)
-for node in doc.findall("PubmedArticle"):
-    article = PubmedArticle(node)
-    if len(article.pmIds) != 1:
-        errors.append("PMIDs: " + repr(article.pmIds))
-        continue
-    pmId = article.getLastId()
-    if pmId in citations:
-        citations[pmId].pubmedArticle = article
-    else:
-        errors.append("unexpected article with PMID %s" % pmid)
-html = [u"""\
-<html>
- <head>
-  <title>Citation Status Changes</title>
-  <style type="text/css">
-   .errors { font-weight: bold; color: red }
-   h1 { color: maroon; font-size: 16pt }
-  </style>
- </head>
- <body>
-  <h1>Citation Status Changes</h1>
-  %s
-  <table border='1' cellpadding='2' cellspacing='0'>
-   <tr>
-    <th>PMID</th>
-    <th>CDR ID</th>
-    <th>Old Status</th>
-    <th>New Status</th>
-    <th>Notes</th>
-   </tr>
-""" % displayErrors(errors)]
-changed = updated = 0
-for pmid in citations:
-    citation = citations[pmid]
-    pubmedStatus = None
-    if citation.pubmedArticle:
-        pubmedStatus = citation.pubmedArticle.status
-    if citation.status != pubmedStatus:
-        changed += 1
-        try:
-            notes = citation.updateDoc()
-            updated += 1
-        except Exception, e:
-            notes = '<span class="errors">%s</span>' % cgi.escape(str(e))
-        html.append(u"""\
-   <tr>
-    <td>%s</td>
-    <td>%s</td>
-    <td>%s</td>
-    <td>%s</td>
-    <td>%s</td>
-   </tr>
-""" % (citation.pmId, citation.cdrId, citation.status,
-       pubmedStatus or "<span class='errors'>Missing</span>",
-       notes))
-html.append(u"""\
-  </table>
- </body>
- <p style='color: green'
- >%d pre-medline citations examined; %d statuses changed</p>
- </html>""" % (len(citations), changed))
-cdrcgi.sendPage(u"".join(html))
+    @property
+    def node(self):
+        """Give the caller a copy of the PubmedArticle node."""
+        return deepcopy(self.__node)
+
+    @property
+    def pmid(self):
+        """Pick the latest PubMed ID if there is more than one."""
+        return self.pmids and self.pmids[-1].value or None
+
+    @property
+    def pmids(self):
+        """Sequence of PubMed IDs found in the node."""
+
+        if not hasattr(self, "_pmids"):
+            pmids = []
+            for child in self.__node.findall("MedlineCitation/PMID"):
+                pmids.append(self.PMID(child))
+            self._pmids = sorted(pmids)
+        return self._pmids
+
+    @property
+    def status(self):
+        """Current status for the PubMed article."""
+
+        if not hasattr(self, "_status"):
+            self._status = None
+            node = self.__node.find("MedlineCitation")
+            if node is not None:
+                self._status = node.get("Status")
+        return self._status
+
+    class PMID:
+        """PubMed ID with version number (who knew they had more than one?)."""
+
+        def __init__(self, node):
+            """Save the node so we can get the ID and version."""
+            self.__node = node
+
+        @property
+        def version(self):
+            """Integer for the ID's version."""
+
+            if not hasattr(self, "_version"):
+                try:
+                    self._version = int(self._-node.get("Version"))
+                except:
+                    self._version = 0
+            return self._version
+
+        @property
+        def value(self):
+            """Normalized string for the PubMed ID."""
+
+            if not hasattr(self, "_value"):
+                self._value = self.__node.text.strip()
+            return self._value
+
+        def __repr__(self):
+            """String rendering of the PubMed ID for error reporting."""
+            return repr("PMID", self.version, self.value)
+
+        def __lt__(self, other):
+            """Suport sorting multiple PubMed IDs by version integer."""
+            return self.version < other.version
+
+
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+    Control().run()

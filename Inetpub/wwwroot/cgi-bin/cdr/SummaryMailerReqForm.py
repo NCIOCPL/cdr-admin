@@ -9,6 +9,7 @@
 #----------------------------------------------------------------------
 
 from datetime import datetime
+from json import dumps
 from operator import attrgetter
 from lxml import etree
 from cdr import canDo as can_do
@@ -16,7 +17,6 @@ from cdrapi import db
 from cdrapi.docs import Doc
 from cdrapi.users import Session
 import cdrcgi
-import cdrmailcommon
 
 class Control(cdrcgi.Control):
     """
@@ -43,7 +43,7 @@ class Control(cdrcgi.Control):
         self.pairs = self.fields.getlist("pairs")
         self.method = self.fields.getvalue("method") or "all"
         self.section = "PDQ Advisory Board Members Tracking Request Form"
-        self.cursor = db.connect(user="CdrGuest").cursor()
+        self.cursor = db.connect(user="CdrGuest", timeout=300).cursor()
         self.sanitize()
 
     def run(self):
@@ -76,7 +76,7 @@ class Control(cdrcgi.Control):
             attrs = "summary.title", "reviewer.title"
             labels = "Tracker", "Summary", "Reviewer"
         if self.method == "all":
-            for summary in self.board.summaries.values():
+            for summary in list(self.board.summaries.values()):
                 for recip_id in summary.get_checkbox_ids():
                     tracker = Tracker(session, summary.id, recip_id)
                     #print("{}-{}".format(summary.id, recip_id))
@@ -103,7 +103,7 @@ class Control(cdrcgi.Control):
             url = "QcReport.py?DocId={:d}".format(tracker.reviewer.id)
             reviewer_link = cdrcgi.Report.Cell(title, href=url, **opts)
             title = tracker.summary.title
-            url = "QcReport.py?DocId={:d}".format(tracker.summary.id)
+            url = "QcReport.py?DocVersion=-1&DocId={tracker.summary.id:d}"
             summary_link = cdrcgi.Report.Cell(title, href=url, **opts)
             if self.method == "summary":
                 rows.append((tracker_link, summary_link, reviewer_link))
@@ -375,7 +375,7 @@ jQuery(document).ready(function() { board_change(); });""")
         query.where(query.Condition("c.value", "Yes"))
         query.where("t.value = 'PDQ Advisory Board'")
         query.unique()
-        rows = query.execute(self.cursor, timeout=300).fetchall()
+        rows = query.execute(self.cursor).fetchall()
         for member_id, board_id, doc_title in rows:
             board = boards.get(board_id)
             if not board:
@@ -403,7 +403,7 @@ jQuery(document).ready(function() { board_change(); });""")
         query.where("a.path = '%s'" % a_path)
         query.where("a.value = 'Health professionals'")
         query.group("d.id", "d.title", "b.int_val")
-        rows = query.execute(self.cursor, timeout=300).fetchall()
+        rows = query.execute(self.cursor).fetchall()
         for doc_id, doc_version, board_id, doc_title in rows:
             board = boards.get(board_id)
             if not board:
@@ -469,7 +469,7 @@ class Board:
         query = db.Query("query_term", "value")
         query.where(query.Condition("path", path))
         query.where(query.Condition("doc_id", doc_id))
-        rows = query.execute(control.cursor, timeout=300).fetchall()
+        rows = query.execute(control.cursor).fetchall()
         if not rows:
             cdrcgi.bail("No name found for board document CDR%d" % doc_id)
         self.name = rows[0][0]
@@ -507,7 +507,7 @@ class Board:
             selected = self.control.summaries
             self.outer, self.inner = self.summaries, self.members
         if "all" in selected:
-            outer = self.outer.values()
+            outer = list(self.outer.values())
         else:
             outer = []
             for id in selected:
@@ -546,8 +546,8 @@ class Board:
         adjust the composition of the summary and board member picklists.
         """
         glue = ",\n        "
-        members = self.members.values()
-        summaries = self.summaries.values()
+        members = list(self.members.values())
+        summaries = list(self.summaries.values())
         if members:
             members = glue.join([m.to_script() for m in sorted(members)])
             members = "\n        %s" % members
@@ -559,9 +559,9 @@ class Board:
     ], [%s
     ])""" % (self.id, self.id, self.type, members, summaries)
 
-    def __cmp__(self, other):
+    def __lt__(self, other):
         "Support sorting the boards alphabetically by name."
-        return cmp(self.name, other.name)
+        return self.name < other.name
 
 class Choice:
     """
@@ -573,11 +573,10 @@ class Choice:
         self.board = board
         self.id = id
         self.name = doc_title.split(";")[0].strip()
-    def __cmp__(self, other):
-        return cmp(self.name, other.name)
+    def __lt__(self, other):
+        return self.name < other.name
     def to_script(self):
-        name = cdrcgi.unicodeToJavaScriptCompatible(self.name)
-        return "new Choice('%s', '%s')" % (name.replace("'", "\\'"), self.id)
+        return """new Choice({}, "{}")""".format(dumps(self.name), self.id)
     def get_checkbox_ids(self):
         cdrcgi.bail("Internal error: "
                     "get_checkbox_ids method must be overridden.")
@@ -644,7 +643,7 @@ class Tracker:
     NOW = datetime.now().isoformat().split(".")[0]
     TYPE = "Summary-PDQ Advisory Board"
     MODE = "Web-based"
-    OPTS = dict(encoding="utf-8", xml_declaration=True, pretty_print=True)
+    OPTS = dict(encoding="unicode", pretty_print=True)
 
     summaries = {}
     reviewers = {}
