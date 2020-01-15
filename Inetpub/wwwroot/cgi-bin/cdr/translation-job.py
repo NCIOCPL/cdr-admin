@@ -439,7 +439,7 @@ jQuery("input[value='%s']").click(function(e) {
                 if not more_bytes:
                     break
                 file_bytes.append(more_bytes)
-            file_bytes = "".join(file_bytes)
+            file_bytes = b"".join(file_bytes)
         else:
             file_bytes = f.value
         if not file_bytes:
