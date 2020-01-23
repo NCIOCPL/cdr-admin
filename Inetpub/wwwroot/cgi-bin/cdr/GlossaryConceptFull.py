@@ -617,7 +617,7 @@ class Concept:
         TYPES = dict(
             drug=(DRUG_SUMMARY_LINK, "Rel Drug Summary Link", "ref", True),
             xref=(EXTERNAL_REF, "Rel External Ref", "xref", True),
-            sref=(SUMMARY_REF, "Rel Summary Ref", "href", True),
+            sref=(SUMMARY_REF, "Rel Summary Ref", "ref", True),
             term=(TERM_NAME_LINK, "Rel Glossary Term", "ref", True),
             pdqt=(PDQ_TERM, "PDQ Term", "ref", False),
         )
