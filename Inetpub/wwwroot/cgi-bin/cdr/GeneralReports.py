@@ -29,7 +29,7 @@ class Control(Controller):
             ("List of New Documents with Publication Status",
              "NewDocsWithPubStatus.py"),
             ("New Document Count", "NewDocReport.py"),
-            ("Records Modified Since Last Publishable Version",
+            ("Documents Modified Since Last Publishable Version",
              "ModWithoutPubVersion.py"),
             ("Show CDR Document XML", "ShowCdrDocument.py"),
             ("Show Summary Elements", "ShowSummaryIncludes.py"),
