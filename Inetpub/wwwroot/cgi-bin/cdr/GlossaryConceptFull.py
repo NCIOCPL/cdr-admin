@@ -653,7 +653,6 @@ class Concept:
                     doc_id = Doc.extract_id(self.__value)
                     display = f"CDR{doc_id:d}"
                     url = f"QcReport.py?Session=guest&DocId={doc_id:d}"
-                    url += "&DocVersion=-1"
                 link = builder.A(display, href=url)
                 args = f"{self.__text} (", link, ")"
                 self._row = builder.TR(label, builder.TD(*args))
