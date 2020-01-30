@@ -272,7 +272,8 @@ class Board:
             query = self.control.Query("query_term m", *self.fields).unique()
             query.where(query.Condition("m.path", self.BOARD_PATH))
             query.where(query.Condition("m.int_val", self.id))
-            query.join("query_term c", "c.doc_id = m.doc_id")
+            query.join("query_term c", "c.doc_id = m.doc_id",
+                       "LEFT(c.node_loc, 4) = LEFT(m.node_loc, 4)")
             query.where(query.Condition("c.path", self.CURRENT_PATH))
             query.where("c.value = 'Yes'")
             query.join("query_term p", "p.doc_id = m.doc_id")
