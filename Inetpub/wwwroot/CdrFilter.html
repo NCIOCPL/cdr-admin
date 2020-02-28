@@ -36,8 +36,8 @@ function filter_doc(extra) {
                 + encodeURIComponent(doc);
         jQuery.each([
             "editorial", "advisory", "glosspatient", "glosshp", "publish",
-            /* "internal", "external", "ispp", "isqc", */
-            "approved", "proposed", "glossary", "stdword", "loeref"
+            /* "internal", "external", "ispp", */
+            "isqc", "approved", "proposed", "glossary", "stdword", "loeref"
         ], function(i, name) {
             if (jQuery("#" + name + ":checked").length)
                 url += "&" + name + "=true";
@@ -196,19 +196,19 @@ function filter_doc(extra) {
           <label for="loeref" class="clickable">LOE Refs</label>
         </div>
       </fieldset>
-<!--
       <fieldset>
         <legend>Report</legend>
+<!--
         <div>
           <input type="checkbox" name="ispp" value="true" id="ispp">
           <label for="ispp" class="clickable">Publish Preview</label>
         </div>
+-->
         <div>
-          <input type="checkbox" name="isqc" value="true" id="isqc">
+          <input type="checkbox" name="isqc" value="true" id="isqc" checked>
           <label for="isqc" class="clickable">QC Report</label>
         </div>
       </fieldset>
--->
       <fieldset>
         <legend>Filter Set Cache</legend>
         <div>
