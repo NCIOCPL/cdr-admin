@@ -450,7 +450,8 @@ if docType and re.search("\\W", docType):
     cdrcgi.bail("Invalid document type parameter")
 if repType and re.search("\\W", repType):
     cdrcgi.bail("Invalid report type parameter")
-if version and re.search("\\W", version) and int(version) != 0:
+# The version number -1 for the CWD is deprecated
+if version and re.search("\\W", version) and int(version) not in (-1, 0):
     cdrcgi.bail("Invalid document version parameter")
 
 # ---------------------------------------------------------------
@@ -705,6 +706,11 @@ elif docType:
 #----------------------------------------------------------------------
 # Let the user pick the version for most Summary or Glossary reports.
 # OCECDR-4190: let the user pick the version for drug information summaries.
+#
+# Note: The QC report "Glossary Term Name with Concept" called from
+#       within XMetaL is running Filter.py instead of QcReport.py!!!
+#       The CDR Admin interface is calling QcReport.py. This affects
+#       the reportType "GlossaryTermName:gtnwc"
 #----------------------------------------------------------------------
 letUserPickVersion = False
 if not version:
