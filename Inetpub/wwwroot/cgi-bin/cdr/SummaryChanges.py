@@ -60,7 +60,10 @@ class Control(Controller):
         if not self.id:
             self.show_form()
         title = self.doc.title.split(";")[0]
-        span = B.SPAN(f"Changes made in the Last {self.years} Year(s)")
+        if self.years is not None:
+            span = B.SPAN(f"Changes made in the Last {self.years} Year(s)")
+        else:
+            span = B.SPAN("Changes made over the life of the summary")
         title = B.H2(title, B.BR(), span, id="summary-title")
         self.report.page.form.append(title)
         wrapper = B.DIV(id="wrapper")
@@ -147,11 +150,12 @@ class Control(Controller):
         """Sequence of num/date for versions to be included in the report."""
 
         if not hasattr(self, "_versions"):
-            days = int(365.25 * self.years)
-            start = self.started - timedelta(days)
             query = self.Query("doc_version", "num", "dt").order("num")
             query.where(query.Condition("id", self.id))
-            query.where(query.Condition("dt", start, ">="))
+            if self.years is not None:
+                days = int(365.25 * self.years)
+                start = self.started - timedelta(days)
+                query.where(query.Condition("dt", start, ">="))
             query.where("publishable = 'Y'")
             rows = query.execute(self.cursor).fetchall()
             self._versions = [tuple(row) for row in rows]
@@ -160,10 +164,13 @@ class Control(Controller):
     @property
     def years(self):
         """Date range for the report."""
-        try:
-            return int(self.fields.getvalue("years"))
-        except:
-            return 2
+
+        if not hasattr(self, "_years"):
+            try:
+                self._years = int(self.fields.getvalue("years"))
+            except:
+                self._years = None
+        return self._years
 
 
 if __name__ == "__main__":
