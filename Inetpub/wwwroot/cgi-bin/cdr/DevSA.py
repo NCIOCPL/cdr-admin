@@ -45,6 +45,7 @@ class Control(Controller):
             ("Schema - Post", "post-schema.py"),
             ("Schema - Show", "GetSchema.py"),
             ("Unblock Documents", "UnblockDoc.py"),
+            ("Unlock Media", "UnlockMedia.py"),
             ("Update Mapping Table", "EditExternalMap.py"),
             ("Update ZIP Codes", "upload-zip-code-file.py"),
             ("View Logs", "log-tail.py"),
