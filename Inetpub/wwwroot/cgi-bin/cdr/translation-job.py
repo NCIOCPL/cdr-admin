@@ -156,7 +156,8 @@ jQuery("input[value='{self.SUBMIT}']").click(function(e) {{
         opts = dict(options=states, default=state_id)
         fieldset.append(page.select("status", **opts))
         fieldset.append(page.textarea("comments", value=comments))
-        fieldset.append(page.file_field("file", label="QC Report"))
+        opts = dict(label="QC Report(s)", multiple=True)
+        fieldset.append(page.file_field("file", **opts))
         page.form.append(page.hidden_field("english_id", self.english_id))
         page.form.append(fieldset)
 
@@ -265,6 +266,35 @@ jQuery("input[value='{self.SUBMIT}']").click(function(e) {{
         if not hasattr(self, "_english_summaries"):
             self._english_summaries = self.get_summaries("English")
         return self._english_summaries
+
+    @property
+    def files(self):
+        """Attachments to be appended to email notification."""
+
+        if not hasattr(self, "_files"):
+            self._files = []
+            if "file" in self.fields.keys():
+                files = self.fields["file"]
+                if not isinstance(files, list):
+                    files = [files]
+                for f in files:
+                    if f.file:
+                        file_bytes = []
+                        while True:
+                            more_bytes = f.file.read()
+                            if not more_bytes:
+                                break
+                            file_bytes.append(more_bytes)
+                        file_bytes = b"".join(file_bytes)
+                    else:
+                        file_bytes = f.value
+                    if file_bytes:
+                        self.logger.info("filename=%s", f.filename)
+                        attachment = EmailAttachment(file_bytes, f.filename)
+                        self._files.append(attachment)
+                    else:
+                        self.logger.warning("%s empty", f.filename)
+        return self._files
 
     @property
     def have_required_values(self):
@@ -529,9 +559,8 @@ jQuery("input[value='{self.SUBMIT}']").click(function(e) {{
         body.append(f"Date of status transition: {job.state_date}")
         body.append(f"Comments: {job.comments}")
         opts = dict(subject=subject, body="\n".join(body))
-        attachment = self.fetch_file()
-        if attachment:
-            opts["attachments"] = [attachment]
+        if self.files:
+            opts["attachments"] = self.files
         try:
             message = EmailMessage(sender, recips, **opts)
             message.send()
@@ -539,29 +568,6 @@ jQuery("input[value='{self.SUBMIT}']").click(function(e) {{
             self.logger.error("sending mail: %s", e)
             self.bail(f"sending mail: {e}")
         self.logger.info(log_message)
-
-    def fetch_file(self):
-        """
-        If the user has posted a file, wrap it in an `EmailAttachment`
-        object and return the object. Otherwise, return None
-        """
-
-        if "file" not in self.fields.keys():
-            return None
-        f = self.fields["file"]
-        if f.file:
-            file_bytes = []
-            while True:
-                more_bytes = f.file.read()
-                if not more_bytes:
-                    break
-                file_bytes.append(more_bytes)
-            file_bytes = b"".join(file_bytes)
-        else:
-            file_bytes = f.value
-        if not file_bytes:
-            return None
-        return EmailAttachment(file_bytes, f.filename)
 
     @staticmethod
     def sort_dict(d):
