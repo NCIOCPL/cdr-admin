@@ -64,7 +64,11 @@ class Control(Controller):
         fieldset.append(page.text_field("office", value=self.user.office))
         fieldset.append(page.text_field("email", value=self.user.email))
         fieldset.append(page.text_field("phone", value=self.user.phone))
-        fieldset.append(page.textarea("comment", value=self.user.comment))
+        wrapper = page.textarea("comment", value=self.user.comment)
+        textarea = wrapper.find("textarea")
+        textarea.set("maxlength", "255")
+        textarea.set("title", "Maximum number of comment characters is 255.")
+        fieldset.append(wrapper)
         page.form.append(fieldset)
 
         # Add the checkbox fields for the account's group memberships.
