@@ -46,6 +46,7 @@ class Control(Controller):
         ("ADD DOCUMENT", "Media"),
         ("MODIFY DOCUMENT", "Media"),
         ("MODIFY DOCUMENT", "GlossaryTermName"),
+        ("AUDIO IMPORT", None),
     )
 
     def build_tables(self):
