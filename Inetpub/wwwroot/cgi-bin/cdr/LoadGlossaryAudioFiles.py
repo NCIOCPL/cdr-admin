@@ -1,472 +1,616 @@
-#----------------------------------------------------------------------
-#
-# Add and link to glossary pronunciation Media documents.
-#
-# Invoked from the CDR Admin web menu.
-#
-# If for any reason this script will not process the correct set of
-# zip files (for example, because a file name did not match the
-# agreed pattern of "Week_NNN*.zip" or the file names for a batch
-# do not sort in the order the files should be processed), then it
-# will be necessary to have a developer load the batch from the
-# bastion host using DevTools/Utilities/Request4926.py.
-#
-# JIRA::OCECDR-3373
-#
-#----------------------------------------------------------------------
-import cdr
-import cdrcgi
-import cgi
-import glob
-import re
-import xlrd
-import ModifyDocs
-import lxml.etree as etree
-from mutagen.mp3 import MP3
-import zipfile
+"""Add and link to glossary pronunciation Media documents.
+
+Invoked from the CDR Admin web menu.
+
+If for any reason this script will not process the correct set of
+zip files (for example, because a file name did not match the
+agreed pattern of "Week_NNN*.zip" or the file names for a batch
+do not sort in the order the files should be processed), then it
+will be necessary to have a developer load the batch from the
+bastion host using DevTools/Utilities/Request4926.py.
+
+JIRA::OCECDR-3373
+"""
+
+from glob import glob
 from io import BytesIO
-from cdrapi import db
+from re import search, IGNORECASE
+from zipfile import ZipFile
+from lxml import etree
+from mutagen.mp3 import MP3
+from openpyxl import load_workbook
 from cdrapi.docs import Doc
-from cdrapi.users import Session
+from cdrcgi import Controller
+from ModifyDocs import Job
 
-CDRNS = "cips.nci.nih.gov/cdr"
-NSMAP = { "cdr" : CDRNS }
-AUDIO = f"{cdr.BASEDIR}/Audio_from_CIPSFTP"
-BANNER = "CDR Administration"
-SUBTITLE = "Load Glossary Audio Files"
-logger = cdr.Logging.get_logger("audio-import")
 
-def get_latest_batch():
-    """
-    Collect the list of zip files representing the most recent batch
-    of audio files to be loaded into the CDR. For some reason the users
-    assign names starting with "Week_..." for the zip files, even
-    though there appears to be no correspondence between week numbers
-    embedded in the file and directory names and week numbers in the
-    calendar. A better naming convention might have used "Batch..."
-    or something along those lines, but we're working with what we're
-    given. The behavior of the software relies on some assumptions.
+class Control(Controller):
+    """Top-level logic for the import job and its report."""
 
-      1. The zip file names have a 3-digit number following "Week_"
-      2. All files in a single batch have this "Week_NNN" prefix
-      3. The names, when sorted (without regard to case) are in
-         order, representing when the zip file was given to NCI
-      4. The users will pay attention to the list displayed, and
-         either confirm if the list represents the correct set of
-         files to be processed (in the correct order), or submit
-         a request for a developer to import the files manually.
+    SUBTITLE = "Load Glossary Audio Files"
+    LOGNAME = "LoadGlossaryAudioFiles"
+    AUDIO = "Audio_from_CIPSFTP"
+    SKIPPING = "skipping CDR%d: already done"
+    SKIPPED = "Skipped (already processed)"
+    INSTRUCTIONS = (
+        "Press the Submit button to create Media documents for the MP3 files "
+        "contained in the archive files listed below, and have those "
+        "documents linked from the corresponding GlossaryTermName documents. "
+        "Archives will be processed in the order in which they appear in this "
+        "list, with MP3 clips found in later archives overriding those found "
+        "in earlier archives. If this set is not the correct set of archives "
+        "to be processed, please contact a CDR developer to have the audio "
+        "files imported manually."
+    )
+    PERMISSIONS = (
+        ("ADD DOCUMENT", "Media"),
+        ("MODIFY DOCUMENT", "Media"),
+        ("MODIFY DOCUMENT", "GlossaryTermName"),
+    )
 
-    Returns a sorted list of tuples, each of which contains the
-    uppercase version of the zip file's name (to make sorting work
-    properly) and the original name (with possibly mixed case).
-    """
-    sets = {}
-    for path in glob.glob(f"{AUDIO}/Week_*.zip"):
-        match = re.search(r"((Week_\d+).*.zip)", path, re.I)
-        if match:
-            name = match.group(1)
-            week = match.group(2).upper()
-            if len(week) != 8:
-                continue
-            if week not in sets:
-                sets[week] = []
-            sets[week].append((name.upper(), name))
-    if not sets:
-        return None
-    keys = sorted(sets)
-    return sorted(sets[keys[-1]])
+    def build_tables(self):
+        """Assemble the table reporting the documents we created/updated."""
 
-def show_form():
-    """
-    Show the user the proposed list of zip files to be processed.
-    """
-    global buttons
+        Linker(self).run()
+        return self.Reporter.Table(self.rows, columns=self.columns)
 
-    files = get_latest_batch()
-    if not files:
-        cdrcgi.bail("no archives found")
-    form = cdrcgi.Page(BANNER, subtitle=SUBTITLE, session=session,
-                       buttons=buttons, action="ocecdr-3373.py")
-    ol = form.B.OL()
-    for name_upper, name in files:
-        value = "%s|%s" % (name_upper, name)
-        form.add(form.B.INPUT(name="zipfiles", value=value, type="hidden"))
-        ol.append(form.B.LI(name))
-    form.add("<fieldset>")
-    instructions = ("Press the Submit button to create Media documents "
-                    "for the MP3 files contained in the archive files "
-                    "listed below, and have those documents linked from "
-                    "the corresponding GlossaryTermName documents. "
-                    "Archives will be processed in the order "
-                    "in which they appear in this list, with MP3 clips "
-                    "found in later archives overriding those found in "
-                    "earlier archives. If this set is not the correct "
-                    "set of archives to be processed, please contact "
-                    "a CDR developer to have the audio files imported "
-                    "manually.")
-    form.add(form.B.P(instructions))
-    form.add("</fieldset>")
-    form.add("<fieldset>")
-    form.add(form.B.LEGEND("Compressed Archives containing Audio files"))
-    form.add(ol)
-    form.add("</fieldset>")
-    form.send()
+    def populate_form(self, page):
+        """Show the user the proposed list of zipfiles to be processed.
 
-def getCreationDate(path, zipFile):
-    """
-    Find out when the audio file was created.
-    """
-    info = zipFile.getinfo(path)
-    return "%04d-%02d-%02d" % info.date_time[:3]
+        Pass:
+            page - object on which we draw the information
+        """
 
-def getRuntime(mp3_bytes):
-    """
-    Determine the duration of an audio clip.
-    """
-    fp = BytesIO(mp3_bytes)
-    mp3 = MP3(fp)
-    logger.debug("runtime is %s", mp3.info.length)
-    return int(round(mp3.info.length))
+        fieldset = page.fieldset()
+        fieldset.append(page.B.P(self.INSTRUCTIONS))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Compressed Archives containing Audio files")
+        ordered_list = page.B.OL()
+        for zipfile in self.zipfiles:
+            ordered_list.append(page.B.LI(zipfile))
+        fieldset.append(ordered_list)
+        page.form.append(fieldset)
 
-def getDocTitle(docId):
-    """
-    Fetch the document title from a CDR document, identified by its CDR ID.
-    """
-    cursor.execute("SELECT title FROM document WHERE id = ?", docId)
-    return cursor.fetchall()[0][0]
+    @property
+    def columns(self):
+        """Column headers for the report."""
 
-def getCellValue(sheet, row, col):
-    """
-    Extract and return the value from a cell in a spreadsheet, or
-    None if the cell does not exist, or has no value.
-    """
-    try:
-        cell = sheet.cell(row, col)
-        return cell and cell.value or None
-    except:
-        return None
+        if not hasattr(self, "_columns"):
+            self._columns = (
+                self.Reporter.Column("CDR ID"),
+                self.Reporter.Column("Processing"),
+            )
+        return self._columns
 
-#----------------------------------------------------------------------
-# Object representing a single pronunciation audio file.
-#----------------------------------------------------------------------
+    @property
+    def directory(self):
+        """Where the ZIP files live."""
+        return f"{self.session.tier.basedir}/{self.AUDIO}"
+
+    @property
+    def done(self):
+        """CDR document IDs for terms which already have MediaLink elements."""
+
+        if not hasattr(self, "_done"):
+            path = "/GlossaryTermName/%/MediaLink/MediaID/@cdr:ref"
+            query = self.Query("query_term", "doc_id")
+            query.where(f"path LIKE '{path}'")
+            rows = query.execute(self.cursor).fetchall()
+            self._done = {row.doc_id for row in rows}
+            count = len(self._done)
+            self.logger.info("%d documents already processed", count)
+        return self._done
+
+    @property
+    def rows(self):
+        """Table rows reporting what we did for each document."""
+
+        if not hasattr(self, "_rows"):
+            self._rows = []
+        return self._rows
+
+    @property
+    def term_docs(self):
+        """Dictionary of term name docs for which we have new MP3 files."""
+
+        # Do all this work only once, caching the resulting dictionary.
+        if not hasattr(self, "_term_docs"):
+            self._term_docs = {}
+
+            # Don't log skipping the same term name document multiple times.
+            skipped = set()
+
+            for path in self.zipfiles:
+                zipfile = ZipFile(f"{self.directory}/{path}")
+
+                # Use these for logging multiple occurrences of values.
+                filenames = set()
+                termnames = set()
+
+                # Find the Excel workbook in the zipfile.
+                bookpath = None
+                for name in zipfile.namelist():
+                    if "MACOSX" not in name and name.endswith(".xlsx"):
+                        bookpath = name
+                if bookpath is None:
+                    self.bail(f"no workbook in {path}")
+                book = load_workbook(BytesIO(zipfile.read(bookpath)), True)
+                sheet = book.active
+                for row in sheet:
+
+                    # Skip over the column header row.
+                    if isinstance(self.get_cell_value(row, 0), (int, float)):
+                        mp3 = AudioFile(self, path, zipfile, row)
+
+                        # Log term name docs which already have media links.
+                        if mp3.term_id in self.done:
+                            if mp3.term_id not in skipped:
+                                self.logger.info(self.SKIPPING, mp3.term_id)
+                                row = f"CDR{mp3.term_id}", self.SKIPPED
+                                self.rows.append(row)
+                                skipped.add(mp3.term_id)
+                            continue
+
+                        # Check for unexpected multiple occurrences.
+                        key = mp3.filename.lower()
+                        if key in filenames:
+                            logger.warning("multiple %r in %s", key, path)
+                        filenames.add(key)
+                        key = (mp3.term_id, mp3.name, mp3.language)
+                        if key in termnames:
+                            logger.warning("multiple %r in %s", key, path)
+                        termnames.add(key)
+
+                        # Add the MP3 file to the term document object.
+                        doc = self._term_docs.get(mp3.term_id)
+                        if doc is None:
+                            doc = self._term_docs[mp3.term_id] = TermDoc()
+                        doc.add(mp3)
+
+            # Save the new or updated Media documents.
+            self.logger.info("term ids: %s", sorted(self._term_docs))
+            for id in self._term_docs:
+                for mp3 in self._term_docs[id].mp3s:
+                    mp3.save()
+
+        return self._term_docs
+
+    @property
+    def zipfiles(self):
+        """Most recent set of audio archive files.
+
+        Collect the list of zip files representing the most recent batch
+        of audio files to be loaded into the CDR. For some reason the users
+        assign names starting with "Week_..." for the zip files, even
+        though there appears to be no correspondence between week numbers
+        embedded in the file and directory names and week numbers in the
+        calendar. A better naming convention might have used "Batch..."
+        or something along those lines, but we're working with what we're
+        given. The behavior of the software relies on some assumptions.
+
+          1. The zip file names have a 3-digit number following "Week_"
+          2. All files in a single batch have this "Week_NNN" prefix
+          3. The names, when sorted (without regard to case) are in
+             order, representing when the zip file was given to NCI
+          4. The users will pay attention to the list displayed, and
+             either confirm if the list represents the correct set of
+             files to be processed (in the correct order), or submit
+             a request for a developer to import the files manually.
+
+        Constructs a possibly empty sequence of filenames, sorted without
+        regard to case differences.
+        """
+
+        # Don't waste the user's time unnecessarily.
+        for action, doctype in self.PERMISSIONS:
+            if not self.session.can_do(action, doctype):
+                self.bail("Unauthorized")
+
+        # Collect files for each week
+        if not hasattr(self, "_zipfiles"):
+            weeks = {}
+            for path in glob(f"{self.directory}/Week_*.zip"):
+                include = False
+                match = search(r"((Week_\d+).*.zip)", path, IGNORECASE)
+                if match:
+                    name = match.group(1)
+                    week = match.group(2).upper()
+                    if len(week) == len("WEEK_999"):
+                        if week not in weeks:
+                            weeks[week] = []
+                        weeks[week].append(name)
+                        include = True
+                if not include:
+                    self.logger.warning("skipping %r", path)
+            if not weeks:
+                self.bail("Nothing to be loaded")
+            week = sorted(weeks)[-1]
+            self._zipfiles = sorted(weeks[week], key=str.upper)
+            self.logger.info("zipfiles: %s", self._zipfiles)
+        return self._zipfiles
+
+    @staticmethod
+    def get_cell_value(row, col):
+        """Extract value from a cell in an Excel spreadsheet.
+
+        Pass:
+            row - indexable object for a row of cells in the worksheet
+            col - integer offset of the column's position in the row
+
+        Return:
+            value of the cell if it exists or None
+        """
+
+        try:
+            return row[col].value
+        except:
+            return None
+
+
 class AudioFile:
+    """Object representing a single pronunciation audio file."""
 
-    def __init__(self, zipName, zipFile, sheet, row):
-        """
-        Extract the information for the audio file from the spreadsheet
-        representing the contents of the zip file, and from the audio
-        file itself.
-        """
-        self.zipName = zipName
-        value = getCellValue(sheet, row, 0)
-        try:
-            self.nameId = int(value)
-        except Exception as e:
-            if value != "CDR ID":
-                logger.exception("%s row %s", zipName, row)
-            raise
-        try:
-            self.nameTitle = getDocTitle(self.nameId)
-        except Exception:
-            logger.error("CDR document %d not found", self.nameId)
-            raise
-        try:
-            self.name = getCellValue(sheet, row, 1)
-        except Exception:
-            logger.exception("CDR%d row %s in %s", self.nameId, row, zipName)
-            raise
-        try:
-            self.language = getCellValue(sheet, row, 2)
-            self.filename = getCellValue(sheet, row, 4)
-            self.creator = getCellValue(sheet, row, 5)
-            self.notes = getCellValue(sheet, row, 6)
-            self.bytes = zipFile.read(self.filename)
-            self.duration = getRuntime(self.bytes)
-            self.created = getCreationDate(self.filename, zipFile)
-            self.title = self.nameTitle.split(';')[0]
-            if self.language == 'Spanish':
-                self.title += "-Spanish"
-            if self.language not in ('English', 'Spanish'):
-                raise Exception("unexpected language value '%s'" %
-                                self.language)
-        except Exception as e:
-            logger.exception("CDR%d %r (%s) row %s in %s", self.nameId,
-                             self.name, self.language, row, zipName)
-            raise
+    CREATOR = "Vanessa Richardson, VR Voice"
+    COMMENT = f"Saved by {Control.SUBTITLE} script"
+    TERM_ID = 0
+    NAME = 1
+    LANGUAGE = 2
+    FILENAME = 4
+    MEDIA_ID = 7
+    CDR_REF = f"{{{Doc.NS}}}ref"
+    GLOSSARY_TERM_NAME_TAGS = dict(en="TermName", es="TranslatedName")
 
-    def makeElement(self):
-        """
-        Create an element representing a link to this audio file's Media
-        document, for insertion into the XML document for the linking
-        GlossaryTermName document.
-        """
-        element = etree.Element('MediaLink')
-        child = etree.Element('MediaID')
-        child.text = "%s; pronunciation; mp3" % self.title
-        child.set("{cips.nci.nih.gov/cdr}ref", "CDR%010d" % self.mediaId)
-        element.append(child)
-        return element
+    def __init__(self, control, path, zipfile, row):
+        """Remember initial values from caller.
 
-    def findNameNode(self, tree):
-        """
-        Find the node in a GlossaryTermName document where we will insert
-        the element linking to the new Media document.
-        """
-        targetNode = None
-        tag = self.language == 'English' and 'TermName' or 'TranslatedName'
-        for node in tree.findall(tag):
-            nameNode = NameNode(node)
-            if nameNode.name == self.name:
-                return nameNode
-        raise Exception("unable to find name node for %s in CDR%s" %
-                        (repr(self.name), self.nameId))
-
-    def toXml(self):
-        """
-        Create the serialized XML for a new CDR Media document
-        representing this audio file.
-        """
-        language = self.language == 'Spanish' and 'es' or 'en'
-        creator = self.creator or 'Vanessa Richardson, VR Voice'
-        root = etree.Element("Media", nsmap=NSMAP)
-        root.set("Usage", "External")
-        etree.SubElement(root, "MediaTitle").text = self.title
-        physicalMedia = etree.SubElement(root, "PhysicalMedia")
-        soundData = etree.SubElement(physicalMedia, "SoundData")
-        etree.SubElement(soundData, "SoundType").text = "Speech"
-        etree.SubElement(soundData, "SoundEncoding").text = "MP3"
-        etree.SubElement(soundData, "RunSeconds").text = str(self.duration)
-        mediaSource = etree.SubElement(root, "MediaSource")
-        originalSource = etree.SubElement(mediaSource, "OriginalSource")
-        etree.SubElement(originalSource, "Creator").text = creator
-        etree.SubElement(originalSource, "DateCreated").text = self.created
-        etree.SubElement(originalSource, "SourceFilename").text = self.filename
-        mediaContent = etree.SubElement(root, "MediaContent")
-        categories = etree.SubElement(mediaContent, "Categories")
-        etree.SubElement(categories, "Category").text = "pronunciation"
-        descs = etree.SubElement(mediaContent, "ContentDescriptions")
-        desc = etree.SubElement(descs, "ContentDescription")
-        desc.text = 'Pronunciation of dictionary term "%s"' % self.name
-        desc.set("audience", "Patients")
-        desc.set("language", language)
-        proposedUse = etree.SubElement(root, "ProposedUse")
-        glossary = etree.SubElement(proposedUse, "Glossary")
-        glossary.set("{%s}ref" % CDRNS, "CDR%010d" % self.nameId)
-        glossary.text = self.nameTitle
-        return etree.tostring(root, pretty_print=True, encoding="unicode")
-
-    def save(self, session):
-        """
-        Create the new Media document in the CDR for this audio file.
+        Pass:
+            control - access to logging and the database
+            path - location of the zipfile
+            zipfile - archive containing the audio files
+            row - cell values from a spreadsheet row
         """
 
-        opts = dict(xml=self.toXml(), blob=self.bytes, doctype="Media")
-        doc = Doc(Session(session), **opts)
-        comment = "document created for CDR request OCECDR=3373"
+        self.__control = control
+        self.__path = path
+        self.__zipfile = zipfile
+        self.__row = row
+
+    def save(self):
+        """Create or update the Media document for this audio file."""
+
+        if self.media_id:
+            doc = Doc(self.__control.session, id=self.media_id)
+            if doc.doctype.name != "Media":
+                raise Exception(f"CDR{self.media_id} is not a Media document")
+            doc.check_out(comment="re-using media document")
+            doc.blob = self.bytes
+        else:
+            opts = dict(xml=self.xml, blob=self.bytes, doctype="Media")
+            doc = Doc(self.__control.session, **opts)
         opts = dict(
             version=True,
             publishable=True,
-            comment=comment,
-            reason=comment,
+            comment=self.COMMENT,
+            reason=self.COMMENT,
             val_types=("schema", "links"),
             unlock=True,
         )
         doc.save(**opts)
-        self.mediaId = doc.id
-        return doc.id
+        self.media_id = doc.id
 
-#----------------------------------------------------------------------
-# Object representing the element in a GlossaryTermName document to
-# which a new child element will be inserted for the link to a new
-# CDR Media document.
-#----------------------------------------------------------------------
-class NameNode:
-    def __init__(self, node):
-        self.node = node
-        self.name = None
-        self.insertPosition = 0
-        for child in node:
-            if child.tag == 'TermNameString':
-                self.name = child.text
-                self.insertPosition += 1
-            elif child.tag in ('TranslationResource', 'MediaLink',
-                               'TermPronunciation', 'PronunciationResource'):
-                self.insertPosition += 1
+    @property
+    def bytes(self):
+        """Binary content of the audio file."""
 
-#----------------------------------------------------------------------
-# Job control object. Implements the interface used by the ModifyDocs
-# module, returning the list of IDs for the documents to be modified,
-# and performing the actual document modifications.
-#----------------------------------------------------------------------
-class Request4926(ModifyDocs.Job):
+        if not hasattr(self, "_bytes"):
+            self._bytes = self.__zipfile.read(self.filename)
+        return self._bytes
 
-    LOGNAME = "ocecdr-3373"
-    COMMENT = "OCECDR-3373"
+    @property
+    def created(self):
+        """Date string for when the audio file was created."""
+
+        if not hasattr(self, "_created"):
+            info = self.__zipfile.getinfo(self.filename)
+            self._created = "{:04d}-{:02d}-{:02d}".format(*info.date_time[:3])
+        return self._created
+
+    @property
+    def creator(self):
+        """String for the Creator element in the Media document."""
+
+        if not hasattr(self, "_creator"):
+            query = self.__control.Query("ctl", "val")
+            query.where("grp = 'media'")
+            query.where("name = 'audio-pronunciation-creator'")
+            query.where("inactivated IS NULL")
+            rows = query.execute(self.__control.cursor).fetchall()
+            if rows:
+                self._creator = rows[0].val
+            else:
+                self._creator = self.CREATOR
+        return self._creator
+
+    @property
+    def duration(self):
+        """Runtime length in seconds for the MP3 audio file."""
+
+        if not hasattr(self, "_duration"):
+            mp3 = MP3(BytesIO(self.bytes))
+            self._duration = int(round(mp3.info.length))
+            self.__control.logger.debug("runtime is %s", self._duration)
+        return self._duration
+
+    @property
+    def filename(self):
+        """Where to find the MP3 bytes in the zipfile."""
+
+        if not hasattr(self, "_filename"):
+            self._filename = self.__cell(self.FILENAME)
+        return self._filename
+
+    @property
+    def language(self):
+        """English or Spanish."""
+
+        if not hasattr(self, "_language"):
+            self._language = self.__cell(self.LANGUAGE)
+            if self._language not in ("English", "Spanish"):
+                raise Exception(f"Unexpected language {self._language!r}")
+        return self._language
+
+    @property
+    def langcode(self):
+        """ISO code for language (en or es)."""
+
+        if not hasattr(self, "_langcode"):
+            self._langcode = "en" if self.language == "English" else "es"
+        return self._langcode
+
+    @property
+    def link_node(self):
+        """MediaLink element to this audio file's CDR document.
+
+        Create an element representing a link to this audio file's Media
+        document, for insertion into the XML document for the linking
+        GlossaryTermName document. Don't cache this, as we need a separate
+        instance for each link.
+        """
+
+        element = etree.Element("MediaLink")
+        child = etree.SubElement(element, "MediaID")
+        child.text = f"{self.title}; pronunciation; mp3"
+        child.set(self.CDR_REF, f"CDR{self.media_id:010d}")
+        return element
+
+    @property
+    def media_id(self):
+        """CDR document ID for this pronunciation file."""
+
+        if not hasattr(self, "_media_id"):
+            self._media_id = self.__cell(self.MEDIA_ID)
+            if self._media_id:
+                self._media_id = int(self._media_id)
+        return self._media_id
+
+    @media_id.setter
+    def media_id(self, value):
+        """Set this when the document is created.
+
+        Pass:
+            value - integer for the newly created Media document
+        """
+
+        self._media_id = value
+
+    @property
+    def name(self):
+        """String for the glossary term name being pronounced."""
+
+        if not hasattr(self, "_name"):
+            self._name = self.__cell(self.NAME)
+        return self._name
+
+    @property
+    def name_title(self):
+        """Full CDR document title for the GlossaryTermName document."""
+
+        if not hasattr(self, "_name_title"):
+            query = self.__control.Query("document", "title")
+            query.where(query.Condition("id", self.term_id))
+            row = query.execute(self.__control.cursor).fetchone()
+            if not row:
+                raise Exception(f"Term name CDR{self.term_id} not found")
+            self._name_title = row.title
+        return self._name_title
+
+    @property
+    def term_id(self):
+        """CDR ID for the pronunciation's GlossaryTermName document."""
+
+        if not hasattr(self, "_term_id"):
+            self._term_id = int(self.__cell(self.TERM_ID))
+        return self._term_id
+
+    @property
+    def title(self):
+        """String used for the MediaTitle and MediaLink elements."""
+
+        if not hasattr(self, "_title"):
+            self._title = self.name_title.split(";")[0]
+            if self.language == "Spanish":
+                self._title += "-Spanish"
+        return self._title
+
+    @property
+    def xml(self):
+        """Serialized XML for a new CDR Media document for this audio file."""
+
+        root = etree.Element("Media", nsmap=Doc.NSMAP)
+        root.set("Usage", "External")
+        etree.SubElement(root, "MediaTitle").text = self.title
+        physical_media = etree.SubElement(root, "PhysicalMedia")
+        sound_data = etree.SubElement(physical_media, "SoundData")
+        etree.SubElement(sound_data, "SoundType").text = "Speech"
+        etree.SubElement(sound_data, "SoundEncoding").text = "MP3"
+        etree.SubElement(sound_data, "RunSeconds").text = str(self.duration)
+        media_source = etree.SubElement(root, "MediaSource")
+        original_source = etree.SubElement(media_source, "OriginalSource")
+        etree.SubElement(original_source, "Creator").text = self.creator
+        etree.SubElement(original_source, "DateCreated").text = self.created
+        source_filename = etree.SubElement(original_source, "SourceFilename")
+        source_filename.text = self.filename
+        media_content = etree.SubElement(root, "MediaContent")
+        categories = etree.SubElement(media_content, "Categories")
+        etree.SubElement(categories, "Category").text = "pronunciation"
+        descs = etree.SubElement(media_content, "ContentDescriptions")
+        desc = etree.SubElement(descs, "ContentDescription")
+        desc.text = f'Pronunciation of dictionary term "{self.name}"'
+        desc.set("audience", "Patients")
+        desc.set("language", self.langcode)
+        proposed_use = etree.SubElement(root, "ProposedUse")
+        glossary = etree.SubElement(proposed_use, "Glossary")
+        glossary.set(self.CDR_REF, f"CDR{self.term_id:010d}")
+        glossary.text = self.name_title
+        return etree.tostring(root, pretty_print=True, encoding="unicode")
+
+    def __cell(self, col):
+        """Convenience method for fetching values from the spreadsheet row."""
+        return Control.get_cell_value(self.__row, col)
+
+    def find_link_home(self, root):
+        """Find the node to which the link to this Media doc is appended.
+
+        Pass:
+            root - top-level object for parsed GlossaryTermName document
+
+        Return:
+            `LinkHome` object
+        """
+
+        for node in root.findall(self.GLOSSARY_TERM_NAME_TAGS[self.langcode]):
+            link_home = self.LinkHome(node)
+            if link_home.name == self.name:
+                return link_home
+        error = f"unable to find home for {self.name!r} in CDR{self.term_id}"
+        raise Exception(error)
+
+
+    class LinkHome:
+        """Where we put the link to this Media document."""
+
+        BEFORE = (
+            "TranslationResource",
+            "MediaLink",
+            "TermPronunciation",
+            "PronunciationResource",
+            "TermNameString",
+        )
+
+        def __init__(self, node):
+            """Get the name and position for this node."""
+            self.node = node
+            self.name = None
+            self.position = 0
+            for child in node:
+                if child.tag in self.BEFORE:
+                    self.position += 1
+                if child.tag == 'TermNameString':
+                    self.name = child.text
+
+
+class TermDoc:
+    """GlossaryTermName document and its `AudioFile` objects."""
+
+    def add(self, mp3):
+        """Insert the `AudioFile` object into our nested `names` dictionary.
+
+        Pass:
+            mp3 - `AudioFile` object created for this glossary term name
+        """
+        if mp3.name not in self.names:
+            self.names[mp3.name] = dict(English=[], Spanish=[])
+        self.names[mp3.name][mp3.language].append(mp3)
+
+    @property
+    def mp3s(self):
+        """Sequence of audio files to be saved and linked."""
+
+        if not hasattr(self, "_mp3s"):
+            self._mp3s = []
+            for name in self.names:
+                for language in self.names[name]:
+                    if self.names[name][language]:
+                        self._mp3s.append(self.names[name][language][-1])
+        return self._mp3s
+
+    @property
+    def names(self):
+        """Nested dictionary of `AudioFile` objects.
+
+        The top-level index is by name, under which are nested dictionaries
+        indexed by language. Populated by calls to the `add()` method.
+        """
+
+        if not hasattr(self, "_names"):
+            self._names = {}
+        return self._names
+
+
+class Linker(Job):
+    """Job for adding MediaLink elements to GlossaryTermName docs.
+
+    Implements the interface used by the ModifyDocs module, returning
+    the list of IDs for the documents to be modified, and performing
+    the actual document modifications.
+    """
+
+    LOGNAME = "LoadGlossaryAudioFiles"
+    COMMENT = "Adding links from glossary term name docs to media docs"
     MESSAGE = "Added link from this document to Media document CDR{:d}"
 
-    def __init__(self, mp3s, report_rows, **opts):
-        ModifyDocs.Job.__init__(self, **opts)
-        self.mp3s = mp3s
-        self.report_rows = report_rows
+    def __init__(self, control):
+        """Capture the caller's value and initialize the base class.
+
+        Pass:
+            control - access to the rows for the report (to which we
+                      contribute), and the term names and their audio files
+        """
+
+        self.__control = control
+        opts = dict(session=control.session, mode="live", console=False)
+        Job.__init__(self, **opts)
 
     def select(self):
-        return sorted(self.mp3s)
+        """Provide the sorted GlossaryTermName document IDs."""
+        return sorted(self.__control.term_docs)
 
     def transform(self, doc):
-        int_id = cdr.exNormalize(doc.id)[1]
-        string_id = "CDR{:d}".format(int_id)
+        """Add `MediaLink` elements to the GlossaryTermName document.
+
+        Pass:
+            doc - `cdr.Doc` object
+
+        Return:
+            Possibly transformed XML
+        """
+
+        int_id = Doc.extract_id(doc.id)
+        cdr_id = f"CDR{int_id:d}"
         try:
             root = etree.fromstring(doc.xml)
-            mp3s = self.mp3s[int_id]
-            report_rows = []
-            for mp3 in mp3s:
-                node = mp3.findNameNode(root)
-                node.node.insert(node.insertPosition, mp3.makeElement())
-                message = self.MESSAGE.format(mp3.mediaId)
-                report_rows.append([string_id, message])
-            return_value = etree.tostring(root)
-            self.report_rows += report_rows
-            return return_value
+            for mp3 in self.__control.term_docs[int_id].mp3s:
+                home = mp3.find_link_home(root)
+                home.node.insert(home.position, mp3.link_node)
+                row = cdr_id, self.MESSAGE.format(mp3.media_id)
+                self.__control.rows.append(row)
+            return etree.tostring(root)
         except Exception as e:
-            logger.exception(string_id)
-            self.report_rows.append([string_id, str(e)])
+            self.logger.exception(cdr_id)
+            self.__control.rows.append([cdr_id, str(e)])
             return doc.xml
 
-def collectInfo(zipNames):
-    """
-    Create a nested dictionary for all of the sound files found in all
-    of the zipfiles identified on the command line.  The top level of
-    the dictionary is indexed by the CDR ID for the GlossaryTermName
-    document with which the sound file belongs.  Within a given
-    GlossaryTermName document is a nested dictionary indexed by the
-    term name string.  Because Spanish and English often spell the
-    term name the same way, each entry in this dictionary is in turn
-    another dictionary indexed by the name of the language.  Each entry
-    in these dictionaries at the lowest level is a sequence of MP3 objects.
-    Since the zipfiles are named on the command line in ascending order
-    of precedence, the last MP3 object in a given sequence supercedes
-    the earlier objects in that sequence.
-    """
-    nameDocs = {}
-    for zipName in zipNames:
-        zipFile = zipfile.ZipFile(zipName)
-        fileNames = set()
-        termNames = set()
-        for name in zipFile.namelist():
-            if "MACOSX" in name:
-                continue
-            if name.endswith(".xls") or name.endswith(".xlsx"):
-                xlBytes = zipFile.read(name)
-                book = xlrd.open_workbook(file_contents=xlBytes)
-                sheet = book.sheet_by_index(0)
-                for row in range(sheet.nrows):
-                    try:
-                        mp3 = AudioFile(zipName, zipFile, sheet, row)
-                    except Exception as e:
-                        continue
-                    lowerName = mp3.filename.lower()
-                    if lowerName in fileNames:
-                        logger.error("multiple %r in %s", lowerName, zipName)
-                    else:
-                        fileNames.add(lowerName)
-                    key = (mp3.nameId, mp3.name, mp3.language)
-                    if key in termNames:
-                        logger.error("multiple %r in %s", key, zipName)
-                    else:
-                        termNames.add(key)
-                    nameDoc = nameDocs.get(mp3.nameId)
-                    if nameDoc is None:
-                        nameDoc = nameDocs[mp3.nameId] = {}
-                    termName = nameDoc.get(mp3.name)
-                    if termName is None:
-                        termName = nameDoc[mp3.name] = {}
-                    mp3sForThisLanguage = termName.get(mp3.language)
-                    if mp3sForThisLanguage is None:
-                        mp3sForThisLanguage = termName[mp3.language] = []
-                    mp3sForThisLanguage.append(mp3)
-                break
-    return nameDocs
 
-#----------------------------------------------------------------------
-# Collect the request's parameters.
-#----------------------------------------------------------------------
-fields = cgi.FieldStorage()
-session = cdrcgi.getSession(fields)
-request = cdrcgi.getRequest(fields)
-files = fields.getlist("zipfiles")
-
-# Validate them
-buttons = ('Submit', cdrcgi.MAINMENU)
-if request: cdrcgi.valParmVal(request, valList=buttons)
-if files:   cdrcgi.valParmVal(files, regex='Week_\d{3}.*\.zip', icase=True)
-
-#----------------------------------------------------------------------
-# Make sure the user is authorized to run this script.
-#----------------------------------------------------------------------
-if not cdr.canDo(session, "ADD DOCUMENT", "Media"):
-    cdrcgi.bail("Sorry, you aren't authorized to create new Media documents")
-if not cdr.canDo(session, "MODIFY DOCUMENT", "GlossaryTermName"):
-    cdrcgi.bail("Sorry, you aren't authorized to modify GlossaryTermName docs")
-
-# Navigate away from script?
-if request == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-
-#----------------------------------------------------------------------
-# If we don't have a request yet, show the page asking for confirmation.
-#----------------------------------------------------------------------
-if request != "Submit" or not files:
-    show_form()
-cursor = db.connect(user='CdrGuest').cursor()
-cursor.execute("""\
-SELECT DISTINCT doc_id
-           FROM query_term
-          WHERE path LIKE '/GlossaryTermName/%/MediaLink/MediaID/@cdr:ref'""")
-alreadyDone = set([row[0] for row in cursor.fetchall()])
-logger.info("%d documents already processed", len(alreadyDone))
-files = ["%s/%s" % (AUDIO, f.split("|")[1]) for f in files]
-logger.info("files=%s", files)
-info = collectInfo(files)
-logger.info("term ids: %s", sorted(info))
-mediaDocs = {}
-docs = {}
-report_rows = []
-for nameId in info:
-    if nameId in alreadyDone:
-        logger.info("skipping CDR%d: already done", nameId)
-        report_rows.append(["CDR%d" % nameId, "Skipped (already processed)"])
-        continue
-    mp3sForNameDoc = []
-    termNames = info[nameId]
-    for termName in termNames:
-        languages = termNames[termName]
-        for language in languages:
-            mp3s = languages[language]
-            lang = language == 'Spanish' and 'es' or 'en'
-            key = (nameId, termName, lang)
-            mp3 = mp3s[-1]
-            mp3sForNameDoc.append(mp3)
-            mediaId = mediaDocs.get(key)
-            if mediaId:
-                message = "%s already saved as CDR%d" % (repr(key), mediaId)
-                logger.info(message)
-                report_rows.append(["", message])
-                mp3.mediaId = mediaId
-            else:
-                mediaId = mp3.save(session)
-                mediaDocs[key] = mediaId
-                logger.info("saved %s from %s as CDR%d", key, mp3.zipName,
-                            mediaId)
-                message = "Media doc created for %s from %s" % (repr(key),
-                                                                mp3.zipName)
-                report_rows.append(["CDR%d" % mediaId, message])
-    if mp3sForNameDoc:
-        docs[nameId] = mp3sForNameDoc
-opts = dict(session=session, mode="live", console=False)
-job = Request4926(docs, report_rows, **opts)
-job.run()
-columns = (cdrcgi.Report.Column("CDR ID"), cdrcgi.Report.Column("Processing"))
-table = cdrcgi.Report.Table(columns, job.report_rows)
-opts = dict(banner=BANNER, subtitle=SUBTITLE)
-report = cdrcgi.Report("Pronunciation Media Document Imports", [table], **opts)
-report.send()
+if __name__ == "__main__":
+    """Only execute if loaded as a script."""
+    Control().run()
