@@ -259,6 +259,7 @@ class AudioFile:
     MEDIA_ID = 7
     CDR_REF = f"{{{Doc.NS}}}ref"
     GLOSSARY_TERM_NAME_TAGS = dict(en="TermName", es="TranslatedName")
+    MESSAGE = "{} Media doc for CDR{:d} ({!r} [{}]) from {}"
 
     def __init__(self, control, path, zipfile, row):
         """Remember initial values from caller.
@@ -284,9 +285,11 @@ class AudioFile:
                 raise Exception(f"CDR{self.media_id} is not a Media document")
             doc.check_out(comment="re-using media document")
             doc.blob = self.bytes
+            action = "updated"
         else:
             opts = dict(xml=self.xml, blob=self.bytes, doctype="Media")
             doc = Doc(self.__control.session, **opts)
+            action = "created"
         opts = dict(
             version=True,
             publishable=True,
@@ -296,6 +299,10 @@ class AudioFile:
             unlock=True,
         )
         doc.save(**opts)
+        args = action, self.term_id, self.name, self.langcode, self.__path
+        message = self.MESSAGE.format(*args)
+        self.__control.rows.append((f"CDR{doc.id}", message))
+        self.__control.logger.info("%s as CDR%d", message, doc.id)
         self.media_id = doc.id
 
     @property
@@ -369,7 +376,7 @@ class AudioFile:
 
     @property
     def link_node(self):
-        """MediaLink element to this audio file's CDR document.
+        """MediaLink element linking to this audio file's CDR document.
 
         Create an element representing a link to this audio file's Media
         document, for insertion into the XML document for the linking
@@ -449,17 +456,23 @@ class AudioFile:
         root = etree.Element("Media", nsmap=Doc.NSMAP)
         root.set("Usage", "External")
         etree.SubElement(root, "MediaTitle").text = self.title
+
+        # Add the physical characteristics of the media file.
         physical_media = etree.SubElement(root, "PhysicalMedia")
         sound_data = etree.SubElement(physical_media, "SoundData")
         etree.SubElement(sound_data, "SoundType").text = "Speech"
         etree.SubElement(sound_data, "SoundEncoding").text = "MP3"
         etree.SubElement(sound_data, "RunSeconds").text = str(self.duration)
+
+        # Add the source information.
         media_source = etree.SubElement(root, "MediaSource")
         original_source = etree.SubElement(media_source, "OriginalSource")
         etree.SubElement(original_source, "Creator").text = self.creator
         etree.SubElement(original_source, "DateCreated").text = self.created
         source_filename = etree.SubElement(original_source, "SourceFilename")
         source_filename.text = self.filename
+
+        # Add the elements describing the media's content.
         media_content = etree.SubElement(root, "MediaContent")
         categories = etree.SubElement(media_content, "Categories")
         etree.SubElement(categories, "Category").text = "pronunciation"
@@ -468,6 +481,8 @@ class AudioFile:
         desc.text = f'Pronunciation of dictionary term "{self.name}"'
         desc.set("audience", "Patients")
         desc.set("language", self.langcode)
+
+        # Identify what the media file will be used for.
         proposed_use = etree.SubElement(root, "ProposedUse")
         glossary = etree.SubElement(proposed_use, "Glossary")
         glossary.set(self.CDR_REF, f"CDR{self.term_id:010d}")
@@ -602,8 +617,9 @@ class Linker(Job):
             for mp3 in self.__control.term_docs[int_id].mp3s:
                 home = mp3.find_link_home(root)
                 home.node.insert(home.position, mp3.link_node)
-                row = cdr_id, self.MESSAGE.format(mp3.media_id)
-                self.__control.rows.append(row)
+                message = self.MESSAGE.format(mp3.media_id)
+                self.__control.rows.append((cdr_id, message))
+                self.logger.info(message.replace("this document", cdr_id))
             return etree.tostring(root)
         except Exception as e:
             self.logger.exception(cdr_id)
