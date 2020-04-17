@@ -38,6 +38,7 @@ class Control(Controller):
         ("Contact Mode", "Contact Mode"),
         ("Assistant Name", "Assist Name"),
         ("Assistant E-mail", "Assist Email"),
+        ("Response Dates", "Resp. Dates"),
     )
     DEFAULTS = "Phone", "E-mail"
     JS = (
@@ -641,6 +642,18 @@ class BoardMember:
         return phones
 
     @property
+    def response_dates(self):
+        """Response dates added by OCECDR-4693."""
+
+        if not hasattr(self, "_response_dates"):
+            self._response_dates = []
+            path = "BoardMembershipDetails/ResponseDate"
+            for node in self.doc.root.findall(path):
+                response_date = Doc.get_text(node, "").strip()
+                if response_date:
+                    self._response_dates.append(response_date)
+        return self._response_dates
+    @property
     def row(self):
         """Values for the summary report's table."""
 
@@ -676,6 +689,8 @@ class BoardMember:
                 row.append(Cell(self.assistant_email, href=url))
             else:
                 row.append("")
+        if "Response Dates" in self.__control.columns:
+            row.append(self.response_dates)
         for col in range(len(self.__control.extra_columns)):
             row.append("")
         return row
