@@ -404,39 +404,6 @@ Content-length: {len(book_bytes)}
         return self._summaries
 
     @property
-    def summary_titles(self):
-        """Find the summaries that match the user's title fragment.
-
-        Note that the user is responsible for adding any non-trailing
-        SQL wildcards to the fragment string. If the title is longer
-        than 60 characters, truncate with an ellipsis, but add a
-        tooltip showing the whole title. We create a local class for
-        the resulting list.
-        """
-
-        class SummaryTitle:
-            def __init__(self, doc_id, display, tooltip=None):
-                self.id = doc_id
-                self.display = display
-                self.tooltip = tooltip
-
-        query = db.Query("active_doc d", "d.id", "d.title")
-        query.join("doc_type t", "t.id = d.doc_type")
-        query.where("t.name = 'Summary'")
-        query.where(query.Condition("d.title", self.fragment + "%", "LIKE"))
-        query.order("d.title")
-        rows = query.execute(self.cursor).fetchall()
-        summaries = []
-        for doc_id, title in rows:
-            if len(title) > 60:
-                short_title = title[:57] + "..."
-                summary = SummaryTitle(doc_id, short_title, title)
-            else:
-                summary = SummaryTitle(doc_id, title)
-            summaries.append(summary)
-        return summaries
-
-    @property
     def tables(self):
         """List with a single table for the HTML report."""
 
