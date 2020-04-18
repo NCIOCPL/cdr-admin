@@ -5,7 +5,7 @@
 
 from cdrcgi import Controller
 from cdrapi.docs import Doc
-from datetime import timedelta
+from datetime import date, timedelta
 import lxml.html
 
 
@@ -14,11 +14,20 @@ class Control(Controller):
 
     SUBTITLE = "History of Changes to Summary"
     METHOD = "get"
+    SCOPES = "all", "range"
     FILTER = "name:Summary Changes Report"
     CSS = (
         "#summary-title, #wrapper h2 { text-align: center; }",
         "#summary-title span { font-size: .85em; }",
         "#wrapper h2 { font-size: 14pt; }",
+    )
+    SCRIPT = (
+        "function check_scope(scope) {",
+        "  if (scope == 'all')",
+        "    jQuery('#date-range').hide();",
+        "  else",
+        "    jQuery('#date-range').show();",
+        "}",
     )
 
     def populate_form(self, page):
@@ -29,7 +38,9 @@ class Control(Controller):
         """
 
         if self.summaries:
-            page.form.append(page.hidden_field("years", self.years))
+            page.form.append(page.hidden_field("start", self.start))
+            page.form.append(page.hidden_field("end", self.end))
+            page.form.append(page.hidden_field("scope", self.scope))
             fieldset = page.fieldset("Select Summary")
             checked = True
             for id, title in self.summaries:
@@ -49,8 +60,24 @@ class Control(Controller):
             fieldset.append(page.text_field("DocId", label="CDR ID"))
             fieldset.append(page.text_field("title", label="Doc Title"))
             page.form.append(fieldset)
-            fieldset = page.fieldset("Date Range of Report")
-            fieldset.append(page.text_field("years", value=2))
+            fieldset = page.fieldset("Report Options")
+            opts = dict(value="range", label="Date Range", checked=True)
+            fieldset.append(page.radio_button("scope", **opts))
+            opts = dict(value="all", label="Complete History")
+            fieldset.append(page.radio_button("scope", **opts))
+            page.form.append(fieldset)
+            end = date.today()
+            year = end.year - 2
+            day = end.day
+            if day == 29 and end.month == 2:
+                day = 28
+            start = date(year, end.month, day)
+            fieldset = page.fieldset("Date Range Of Report")
+            fieldset.set("id", "date-range")
+            fieldset.append(page.date_field("start", value=start))
+            fieldset.append(page.date_field("end", value=end))
+            page.form.append(fieldset)
+            page.add_script("\n".join(self.SCRIPT))
         page.form.append(fieldset)
 
     def show_report(self):
@@ -60,10 +87,18 @@ class Control(Controller):
         if not self.id:
             self.show_form()
         title = self.doc.title.split(";")[0]
-        if self.years is not None:
-            span = B.SPAN(f"Changes made in the Last {self.years} Year(s)")
+        if self.all:
+            description = "Changes made over the life of the summary"
+        elif self.start:
+            if self.end:
+                description = f"Changes made {self.start} through {self.end}"
+            else:
+                description = f"Changes made since {self.start}"
+        elif self.end:
+            description = f"Changes made through {self.end}"
         else:
-            span = B.SPAN("Changes made over the life of the summary")
+            description = "Changes made over the life of the summary"
+        span = B.SPAN(description)
         title = B.H2(title, B.BR(), span, id="summary-title")
         self.report.page.form.append(title)
         wrapper = B.DIV(id="wrapper")
@@ -78,12 +113,25 @@ class Control(Controller):
         self.report.send()
 
     @property
+    def all(self):
+        """True if we should report on all changes."""
+        return self.scope == "all"
+
+    @property
     def doc(self):
         """The summary document for the report."""
 
         if not hasattr(self, "_doc"):
             self._doc = Doc(self.session, id=self.id)
         return self._doc
+
+    @property
+    def end(self):
+        """End of date range for the report."""
+
+        if not hasattr(self, "_end"):
+            self._end = self.parse_date(self.fields.getvalue("end"))
+        return self._end
 
     @property
     def fragment(self):
@@ -111,6 +159,16 @@ class Control(Controller):
         return None
 
     @property
+    def scope(self):
+        """How is the user deciding which versions to report on?"""
+
+        if not hasattr(self, "_scope"):
+            self._scope = self.fields.getvalue("scope")
+            if self._scope not in self.SCOPES:
+                self.bail()
+        return self._scope
+
+    @property
     def sections(self):
         """Sequence of sections of the report, one for each change."""
 
@@ -128,6 +186,14 @@ class Control(Controller):
                     sections.append(lxml.html.fragments_fromstring(html))
             self._sections = reversed(sections)
         return self._sections
+
+    @property
+    def start(self):
+        """Beginning of date range for the report."""
+
+        if not hasattr(self, "_start"):
+            self._start = self.parse_date(self.fields.getvalue("start"))
+        return self._start
 
     @property
     def summaries(self):
@@ -152,25 +218,16 @@ class Control(Controller):
         if not hasattr(self, "_versions"):
             query = self.Query("doc_version", "num", "dt").order("num")
             query.where(query.Condition("id", self.id))
-            if self.years is not None:
-                days = int(365.25 * self.years)
-                start = self.started - timedelta(days)
-                query.where(query.Condition("dt", start, ">="))
+            if not self.all:
+                if self.start:
+                    query.where(query.Condition("dt", self.start, ">="))
+                if self.end:
+                    end = f"{self.end} 23:59:59"
+                    query.where(query.Condition("dt", end, "<="))
             query.where("publishable = 'Y'")
             rows = query.execute(self.cursor).fetchall()
             self._versions = [tuple(row) for row in rows]
         return self._versions
-
-    @property
-    def years(self):
-        """Date range for the report."""
-
-        if not hasattr(self, "_years"):
-            try:
-                self._years = int(self.fields.getvalue("years"))
-            except:
-                self._years = None
-        return self._years
 
 
 if __name__ == "__main__":
