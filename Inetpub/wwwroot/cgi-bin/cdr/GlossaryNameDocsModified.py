@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-#----------------------
 
 """Show which glossary name documents have changed recently.
 """
@@ -15,6 +14,15 @@ class Control(Controller):
     SUBTITLE = "Glossary Term Name Documents Modified Report"
     NAME_LABELS = {"en": "Term Name", "es": "Translated Term Name" }
     LANGUAGES = (("en", "English"), ("es", "Spanish"))
+    STATUS_PATHS = dict(
+        en="/GlossaryTermName/TermNameStatus",
+        es="/GlossaryTermName/TranslatedName/TranslatedNameStatus",
+    )
+    AUDIENCE_PATHS = dict(
+        en="/GlossaryTermConcept/TermDefinition/Audience",
+        es="/GlossaryTermConcept/TranslatedTermDefinition/Audience",
+    )
+    CONCEPT_PATH = "/GlossaryTermName/GlossaryTermConcept/@cdr:ref"
 
     def build_tables(self):
         """Assemble the table for the rpoert."""
@@ -42,6 +50,26 @@ class Control(Controller):
             fieldset.append(page.radio_button("language", **opts))
             checked = False
         page.form.append(fieldset)
+        fieldset = page.fieldset("Audience")
+        for value in self.AUDIENCES:
+            opts = dict(value=value, checked=True)
+            fieldset.append(page.checkbox("audience", **opts))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Term Status(es)")
+        for value in self.statuses:
+            fieldset.append(page.checkbox("status", value=value, checked=True))
+        page.form.append(fieldset)
+
+    @property
+    def audience(self):
+        """Audience(s) selected for the report."""
+
+        if not hasattr(self, "_audience"):
+            self._audience = self.fields.getlist("audience")
+            for audience in self._audience:
+                if audience not in self.AUDIENCES:
+                    self.bail()
+        return self._audience
 
     @property
     def columns(self):
@@ -63,12 +91,24 @@ class Control(Controller):
 
         query = self.Query("doc_version v", "v.id", "MAX(v.num) AS num")
         query.join("doc_type t", "t.id = v.doc_type")
-        query.join("active_doc a", "a.id = v.id")
+        query.join("active_doc d", "d.id = v.id")
         query.where("t.name = 'GlossaryTermName'")
         if self.start:
             query.where(query.Condition("v.dt", self.start, ">="))
         if self.end:
             query.where(query.Condition("v.dt", f"{self.end} 23:59:59", "<="))
+        if self.audience:
+            query.join("query_term c", "c.doc_id = d.id")
+            query.where(f"c.path = '{self.CONCEPT_PATH}'")
+            query.join("query_term a", "a.doc_id = c.int_val")
+            query.where(f"a.path = '{self.AUDIENCE_PATHS[self.language]}'")
+            query.where(query.Condition("a.value", self.audience, "IN"))
+            query.unique()
+        if self.status:
+            query.join("query_term s", "s.doc_id = d.id")
+            query.where(f"s.path = '{self.STATUS_PATHS[self.language]}'")
+            query.where(query.Condition("s.value", self.status, "IN"))
+            query.unique()
         query.group("v.id")
         query.log()
         rows = query.execute(self.cursor).fetchall()
@@ -88,7 +128,12 @@ class Control(Controller):
     @property
     def language(self):
         """Language code selected for the report (en or es)."""
-        return self.fields.getvalue("language")
+
+        if not hasattr(self, "_language"):
+            self._language = self.fields.getvalue("language")
+            if self._language not in {"en", "es"}:
+                self.bail
+        return self._language
 
     @property
     def name_label(self):
@@ -109,6 +154,34 @@ class Control(Controller):
         """Beginning of the date range for the report."""
         return self.fields.getvalue("start_date")
 
+    @property
+    def status(self):
+        """Term status(es) selected by the user for the report."""
+
+        if not hasattr(self, "_status"):
+            self._status = []
+            for status in self.fields.getlist("status"):
+                if status not in self.statuses:
+                    self.bail()
+                self._status.append(status)
+        return self._status
+
+    @property
+    def statuses(self):
+        """Valid values for term name status checkboxes."""
+
+        if not hasattr(self, "_statuses"):
+            paths = tuple(self.STATUS_PATHS.values())
+            query = self.Query("query_term", "value").unique()
+            query.where(query.Condition("path", paths, "IN"))
+            rows = query.execute(self.cursor).fetchall()
+            statuses = []
+            for row in rows:
+                status = (row.value or "").strip()
+                if status:
+                    statuses.append(status)
+            self._statuses = sorted(statuses)
+        return self._statuses
 
 class GlossaryTermName:
     """Information needed for a glossary term's report rows."""
