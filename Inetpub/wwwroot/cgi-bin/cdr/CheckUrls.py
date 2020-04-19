@@ -147,7 +147,7 @@ class Control(Controller):
             jobName=self.report_type,
             command=self.LONG_REPORTS,
             args=self.args,
-            email=self.email,
+            email=" ".join(self.email),
         )
         job = CdrBatch(**opts)
         if self.quick:

@@ -46,9 +46,9 @@ function check_doctype(doctype) {
         jQuery("#board-set").hide();
 }
 
-function check_opts(setting) {
+function check_opt(setting) {
     if (setting == "quick") {
-        if (jQuery("#opts-quick").prop("checked")) {
+        if (jQuery("#opt-quick").prop("checked")) {
             jQuery("#throttle-block").show();
             jQuery("#email-block").hide();
         }
@@ -72,6 +72,6 @@ function check_report_type(type) {
 
 jQuery(function() {
     check_method(jQuery("input[name='method']:checked").val());
-    check_opts("quick");
+    check_opt("quick");
     check_report_type(jQuery("input[name='report-type']:checked").val());
 });
