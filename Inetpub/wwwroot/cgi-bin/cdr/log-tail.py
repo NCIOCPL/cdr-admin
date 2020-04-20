@@ -18,12 +18,14 @@ class Control(cdrcgi.Controller):
     SUBTITLE = "Log Viewer"
     DEFAULT_PATH = f"{cdr.DEFAULT_LOGDIR}/PubJob.log"
     HEADERS = "Content-type: text/plain; charset=utf-8\n\n".encode("utf-8")
+    ENCODINGS = "utf-8", "latin-1"
 
     def run(self):
         """Customize the request routing."""
 
         self.authenticate()
         self.message = None
+        self.encoding = self.fields.getvalue("encoding")
         if self.request == self.SUBMIT:
             if not self.path:
                 self.show_form()
@@ -121,7 +123,7 @@ Content-type: text/plain; charset=utf-8
 {border}
 
 """
-            with open(self.path, encoding="utf-8") as fp:
+            with open(self.path, encoding=self.encoding) as fp:
                 sys.stdout.buffer.write(prologue.encode("utf-8"))
                 fp.seek(self.offsets[self.slice.start])
                 done = 0
@@ -180,27 +182,36 @@ Content-type: text/plain; charset=utf-8
     @property
     def offsets(self):
         """Sequence of starting positions for each line in the file."""
-        if not hasattr(self, "_offsets"):
-            try:
-                with open(self.path, encoding="utf-8") as fp:
-                    offset = 0
-                    while True:
-                        try:
+
+        exceptions = []
+        while not hasattr(self, "_offsets"):
+            encodings = [self.encoding] if self.encoding else self.ENCODINGS
+            for encoding in encodings:
+                try:
+                    with open(self.path, encoding=encoding) as fp:
+                        offset = 0
+                        while True:
+                            try:
+                                line = fp.readline()
+                                break
+                            except UnicodeDecodeError:
+                                offset += 1
+                                if offset > 3:
+                                    self._offsets = None
+                                    return None
+                            fp.seek(offset)
+                        offsets = []
+                        while line:
+                            offsets.append(offset)
+                            offset = fp.tell()
                             line = fp.readline()
-                            break
-                        except UnicodeDecodeError:
-                            offset += 1
-                            if offset > 3:
-                                self._offsets = None
-                                return None
-                        fp.seek(offset)
-                    self._offsets = []
-                    while line:
-                        self._offsets.append(offset)
-                        offset = fp.tell()
-                        line = fp.readline()
-            except Exception as e:
-                cdrcgi.bail(f"{self.path}: {e}")
+                    self._offsets = offsets
+                    if not self.encoding:
+                        self.encoding = encoding
+                except Exception as e:
+                    exceptions.append(f"encoding {encoding!r}: {e}")
+        if not hasattr(self, "_offsets"):
+            cdrcgi.bail(f"{self.path}: {exceptions}")
         return self._offsets
 
     @property
