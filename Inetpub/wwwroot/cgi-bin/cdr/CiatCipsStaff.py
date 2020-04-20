@@ -19,7 +19,7 @@ class Control(Controller):
             ("Advanced Search", "AdvancedSearch.py"),
             ("Audio Download", "FtpAudio.py"),
             ("Audio Import", "LoadGlossaryAudioFiles.py"),
-            ("Audio Request Spreadsheet", "ocecdr-3606.py"),
+            ("Audio Request Spreadsheet", "AudioRequestSpreadsheet.py"),
             ("Audio Review Glossary Term", "GlossaryTermAudioReview.py"),
             ("Batch Job Status", "getBatchStatus.py"),
             ("Create World Server Translated Summary",
