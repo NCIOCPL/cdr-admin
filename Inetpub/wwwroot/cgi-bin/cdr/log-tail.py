@@ -148,7 +148,7 @@ Content-type: text/plain; charset=utf-8
     def count(self):
         """Total number of lines to display."""
         if not hasattr(self, "_count"):
-            self._count = self.fields.getvalue("s", "")
+            self._count = self.fields.getvalue("c", "")
         return self._count
 
     @property
