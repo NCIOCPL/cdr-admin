@@ -1,655 +1,686 @@
-#----------------------------------------------------------------------
-# Report listing specified set of Cancer Information Summaries, the date
-# they were last modified as entered by a user, and the date the last
-# Modify action was taken.
-#
-# BZIssue::913 - user-requested changes
-# BZIssue::1698 - add new columns and switch to Excel report
-# BZIssue::3635 - extensive rewrite
-# BZIssue::3716 - unicode encoding cleanup
-# BZIssue::4209 - add date to report
-# BZIssue::4214 - use the document's own DateLastModified value
-# BZIssue::4924 - modify Summary Date Last Modified Report
-# JIRA::OCECDR-4285 - add filtering by summary document state
-#----------------------------------------------------------------------
-import cgi
-import cdr
-import cdrcgi
-import datetime
-import sys
-from cdrapi import db
-from html import escape as html_escape
+"""Report on the most recent changes made to PDQ summary documents.
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields      = cgi.FieldStorage()
-session     = cdrcgi.getSession(fields)
-request     = cdrcgi.getRequest(fields)
-also        = fields.getlist ('also')          or []
-est         = fields.getlist ('est')           or []
-sst         = fields.getlist ('sst')           or []
-audience    = fields.getvalue('Audience')      or None
-uStartDate  = fields.getvalue('UserStartDate') or None
-uEndDate    = fields.getvalue('UserEndDate')   or None
-sStartDate  = fields.getvalue('SysStartDate')  or None
-sEndDate    = fields.getvalue('SysEndDate')    or None
-SUBMENU     = "Report Menu"
-buttons     = ["Submit", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-script      = "SummaryDateLastModified.py"
-title       = "CDR Administration"
-section     = "Summary Date Last Modified"
-today       = str(datetime.date.today())
-header      = cdrcgi.header(title, title, section, script, buttons,
-                            stylesheet = """\
-   <link type='text/css' rel='stylesheet' href='/stylesheets/CdrCalendar.css'>
-   <script language='JavaScript' src='/js/CdrCalendar.js'></script>
-   <style type='text/css'>
-    .CdrDateField { width: 100px; }
-   </style>
-   <script language='JavaScript'>
-    function clearSysDates() {
-        document.getElementById('sstart').value = '';
-        document.getElementById('send').value = '';
-    }
-    function clearUserDates() {
-        document.getElementById('ustart').value = '';
-        document.getElementById('uend').value = '';
-    }
-    function someEnglish() {
-        document.getElementById('AllEnglish').checked = false;
-    }
-    function someSpanish() {
-        document.getElementById('AllSpanish').checked = false;
-    }
-    function allEnglish(widget, n) {
-        for (var i = 1; i <= n; ++i)
-            document.getElementById('E' + i).checked = false;
-    }
-    function allSpanish(widget, n) {
-        for (var i = 1; i <= n; ++i)
-            document.getElementById('S' + i).checked = false;
-    }
-   </script>
-""")
+The users have insisted that we keep all the tables for the report
+on a single worksheet, so we can't use the standard report harness
+to generate the Excel file.
+"""
 
-#----------------------------------------------------------------------
-# Make sure we're logged in.
-#----------------------------------------------------------------------
-if not session: cdrcgi.bail('Unknown or expired CDR session.')
+from datetime import date, timedelta
+from openpyxl.styles import Alignment, Font
+from cdrapi.docs import Doc
+from cdrcgi import Controller, Excel
 
-#----------------------------------------------------------------------
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if request == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif request == SUBMENU:
-    cdrcgi.navigateTo("Reports.py", session)
 
-#----------------------------------------------------------------------
-# Handle request to log out.
-#----------------------------------------------------------------------
-if request == "Log Out":
-    cdrcgi.logout(session)
+class Control(Controller):
 
-#----------------------------------------------------------------------
-# Connect to the CDR database.
-#----------------------------------------------------------------------
-try:
-    conn   = db.connect(user='CdrGuest', timeout=600)
-    cursor = conn.cursor()
-except Exception as e:
-    cdrcgi.bail('Database connection failure: %s' % e)
+    SUBTITLE = "Summary Date Last Modified"
+    LOGNAME = "SummaryDateLastModified"
+    INCLUDE_ANY_AUDIENCE_CHECKBOX = True
+    OPTS = (
+        ("modules", "Modules"),
+        ("blocked", "Blocked Documents"),
+        ("unpub", "Other Unpublished Documents"),
+    )
+    SCRIPT = "../../js/SummaryDateLastModified.js"
+    USER_REPORT = "user"
+    SYSTEM_REPORT = "system"
 
-#----------------------------------------------------------------------
-# Validate parameters
-#----------------------------------------------------------------------
-if request:    cdrcgi.valParmVal(request, valList=buttons)
-if est:
-    if est != ['all']:
-               cdrcgi.valParmVal(est, regex=r'^\d+$')
-if sst:
-    if sst != ['all']:
-               cdrcgi.valParmVal(sst, regex=r'^\d+$')
-if uStartDate: cdrcgi.valParmDate(uStartDate)
-if uEndDate:   cdrcgi.valParmDate(uEndDate)
-if sStartDate: cdrcgi.valParmDate(sStartDate)
-if sEndDate:   cdrcgi.valParmDate(sEndDate)
-if audience:
-    if audience != 'all':
-        # Note: I'm using the cdr. version here, not refactoring the code
-        #       that generated audiences in this script
-        cdrcgi.valParmVal(audience, valList=cdr.getSummaryAudiences())
+    def populate_form(self, page):
+        """Add the field sets to the form page.
 
-#----------------------------------------------------------------------
-# Build a picklist for Summary Audience.
-#----------------------------------------------------------------------
-def getAudienceChoices(cursor):
-    html = []
-    try:
-        cursor.execute("""\
-SELECT DISTINCT value
-           FROM query_term
-          WHERE path = '/Summary/SummaryMetaData/SummaryAudience'
-       ORDER BY value""")
-        for row in cursor.fetchall():
-            value = row[0].strip()
-            if value:
-                html.append("""\
-    &nbsp;
-    <input name='Audience' type='radio' value='%s' class='choice'/> %s <br />
-""" % (value, value))
-    except Exception as e:
-        cdrcgi.bail("Failure retrieving audience choices: %s" % e)
-    html.append("""\
-    &nbsp;
-    <input name='Audience' type='radio' checked='1' value='all'
-           class='choice' /> All <br />
-""")
-    return "".join(html)
+        Pass:
+            page - object where we store the fields
+        """
 
-#----------------------------------------------------------------------
-# Generate picklist for Summary type.
-#----------------------------------------------------------------------
-def getSummaryTypeOptions(cursor):
-    cursor.execute("CREATE TABLE #board (doc_id INTEGER, title NVARCHAR(512))")
-    cursor.execute("CREATE TABLE #english (summary INTEGER, board INTEGER)")
-    cursor.execute("CREATE TABLE #spanish (summary INTEGER, english INTEGER)")
-    cursor.execute("""\
-        INSERT INTO #board
-    SELECT DISTINCT board.id, board.title
-               FROM document board
-               JOIN query_term org_type
-                 ON org_type.doc_id = board.id
-               JOIN active_doc a
-                 ON a.id = board.id
-              WHERE org_type.path = '/Organization/OrganizationType'
-                AND org_type.value = 'PDQ Editorial Board'""")
-    cursor.execute("""\
-        INSERT INTO #english
-    SELECT DISTINCT s.doc_id AS summary, s.int_val as board
-               FROM query_term s
-               JOIN query_term l
-                 ON l.doc_id = s.doc_id
-               JOIN active_doc a
-                 ON a.id = s.doc_id
-              WHERE s.path = '/Summary/SummaryMetaData/PDQBoard'
-                           + '/Board/@cdr:ref'
-                AND l.path = '/Summary/SummaryMetaData'
-                           + '/SummaryLanguage'
-                AND l.value = 'English'""")
-    cursor.execute("""\
-        INSERT INTO #spanish
-    SELECT DISTINCT s.doc_id summary, s.int_val as english
-               FROM query_term s
-               JOIN active_doc a
-                 ON a.id = s.doc_id
-               JOIN query_term l
-                 ON l.doc_id = s.doc_id
-              WHERE s.path = '/Summary/TranslationOf/@cdr:ref'
-                AND l.path = '/Summary/SummaryMetaData'
-                           + '/SummaryLanguage'
-                AND l.value = 'Spanish'""")
-    cursor.execute("""\
-        SELECT DISTINCT b.doc_id, b.title
-                   FROM #board b
-                   JOIN #english e
-                     ON e.board = b.doc_id""")
-    rows = cursor.fetchall()
-    html = ["""\
-    <fieldset>
-     <legend>English</legend>
-     &nbsp;
-     <input name='est' type='checkbox' checked='1' id='AllEnglish'
-            class='choice'
-            onclick='javascript:allEnglish(this, %d)'
-            value='all' /> All <br />
-""" % len(rows)]
-    i = 1
-    for docId, docTitle in rows:
-        if docTitle.startswith('PDQ '):
-            docTitle = docTitle[4:]
-        edBoard = docTitle.find(' Editorial Board;')
-        if edBoard != -1:
-            docTitle = docTitle[:edBoard]
-        html.append("""\
-     &nbsp;
-     <input name='est' type='checkbox' value='%d' class='choice'
-            onclick='javascript:someEnglish()' id='E%d' /> %s <br />
-""" % (docId, i, html_escape(docTitle)))
-        i += 1
-    cursor.execute("""\
-        SELECT DISTINCT b.doc_id, b.title
-                   FROM #spanish s
-                   JOIN #english e
-                     ON s.english = e.summary
-                   JOIN #board b
-                     ON e.board = b.doc_id""")
-    rows = cursor.fetchall()
-    html.append("""\
-    </fieldset>
-    <fieldset>
-     <legend>Spanish</legend>
-     &nbsp;
-     <input name='sst' type='checkbox' id='AllSpanish' class='choice'
-            onclick='javascript:allSpanish(this, %d)'
-            value='all' /> All <br />
-""" % len(rows))
-    i = 1
-    for docId, docTitle in rows:
-        if docTitle.startswith('PDQ '):
-            docTitle = docTitle[4:]
-        edBoard = docTitle.find(' Editorial Board;')
-        if edBoard != -1:
-            docTitle = docTitle[:edBoard]
-        html.append("""\
-     &nbsp;
-     <input name='sst' type='checkbox' value='%d' class='choice'
-            onclick='javascript:someSpanish()' id='S%d' /> %s <br />
-""" % (docId, i, html_escape(docTitle)))
-        i += 1
-    html.append("""\
-    </fieldset>
-""")
-    return "".join(html)
+        self.add_audience_fieldset(page)
+        boards = sorted([(name, id) for id, name in self.boards.items()])
+        for language in self.LANGUAGES:
+            field_name = f"{language[0].lower()}st"
+            classes = f"{field_name}-individual"
+            fieldset = page.fieldset(language)
+            opts = dict(value="all", checked=language=="English")
+            fieldset.append(page.checkbox(field_name, **opts))
+            for name, id in boards:
+                opts = dict(value=id, label=name, classes=classes)
+                fieldset.append(page.checkbox(field_name, **opts))
+            page.form.append(fieldset)
+        fieldset = page.fieldset("Include")
+        for value, label in self.OPTS:
+            fieldset.append(page.checkbox("opt", value=value, label=label))
+        page.form.append(fieldset)
+        end = date.today()
+        start = end - timedelta(6)
+        fieldset = page.fieldset("Report by Date Last Modified (User)")
+        opts = dict(value=start, label="Start Date")
+        fieldset.append(page.date_field("u-start", **opts))
+        opts = dict(value=end, label="End Date")
+        fieldset.append(page.date_field("u-end", **opts))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Report by Date Last Modified (System)")
+        fieldset.append(page.date_field("s-start", label="Start Date"))
+        fieldset.append(page.date_field("s-end", label="End Date"))
+        page.form.append(fieldset)
+        page.head.append(page.B.SCRIPT(src=self.SCRIPT))
 
-#----------------------------------------------------------------------
-# Put up the menu if we don't have selection criteria yet.
-#----------------------------------------------------------------------
-if not audience or not (est or sst) or ((not uStartDate or not uEndDate) and
-                                        (not sStartDate or not sEndDate)):
-    endDate = datetime.date.today()
-    startDate = endDate - datetime.timedelta(6)
-    form = """\
-   <input type='hidden' name='%s' value='%s' width='100%%' />
-   <fieldset>
-    <legend>Audience</legend>
-%s
-   </fieldset>
-%s
-   <fieldset>
-    <legend>Include</legend>
-    &nbsp;
-     <input name='also' type='checkbox' id='AlsoMod' class='choice'
-            value='modules' /> Modules <br />
-    &nbsp;
-     <input name='also' type='checkbox' id='AlsoBlocked' class='choice'
-            value='blocked' /> Blocked Documents <br />
-    &nbsp;
-     <input name='also' type='checkbox' id='AlsoUnpub' class='choice'
-            value='unpub' /> Other Unpublished Documents <br />
-   </fieldset>
-   <fieldset class='dates'>
-    <legend>Report by Date Last Modified (User)</legend>
-    <label for='ustart'>Start Date:</label>
-    <input name='UserStartDate' value='%s' class='CdrDateField'
-           id='ustart' onchange='javascript:clearSysDates()' /> &nbsp;
-    <label for='uend'>End Date:</label>
-    <input name='UserEndDate' value='%s' class='CdrDateField'
-           id='uend' onchange='javascript:clearSysDates()' />
-   </fieldset>
-   <fieldset class='dates'>
-    <legend>Report by Date Last Modified (System)</legend>
-    <label for='sstart'>Start Date:</label>
-    <input name='SysStartDate' class='CdrDateField'
-           id='sstart' onchange='javascript:clearUserDates()' /> &nbsp;
-    <label for='send'>End Date:</label>
-    <input name='SysEndDate' class='CdrDateField'
-           id='send' onchange='javascript:clearUserDates()' />
-   </fieldset>
-  </form>
-""" % (cdrcgi.SESSION, session, getAudienceChoices(cursor),
-       getSummaryTypeOptions(cursor), startDate, endDate)
-    cdrcgi.sendPage(header + form + """\
- </body>
-</html>
-""")
+    def show_report(self):
+        """Override base class version to get all tables on the same sheet."""
 
-#----------------------------------------------------------------------
-# Collection information we'll need for each summary document.
-#----------------------------------------------------------------------
-class Summary:
-    summaries = {}
-    def __init__(self, row, lang, reportType, cursor):
-        self.docId       = row[0]
-        self.title       = row[1]
-        self.board       = row[2]
-        self.audience    = row[3]
-        self.language    = row[4]
-        self.lastMod     = row[5]
-        self.summaryType = row[6]
-        self.lastSave    = row[7]
-        self.module      = row[8]
-        self.lastSaveUsr = Summary.__getSaveUsr(self.docId, cursor)
-        self.comment     = None
-        if self.board not in Summary.summaries:
-            Summary.summaries[self.board] = {}
-        board = Summary.summaries[self.board]
-        if self.language not in board:
-            board[self.language] = {}
-        language = board[self.language]
-        if self.audience not in language:
-            language[self.audience] = [self]
-        else:
-            language[self.audience].append(self)
-        if reportType == 'S':
-            self.comment = Summary.__getComment(self.docId, cursor)
-        lastVersions = cdr.lastVersions('guest', "CDR%010d" % self.docId)
-        if isinstance(lastVersions, (str, bytes)):
-            self.lastVFlag = lastVersions
-        else:
-            lastAny, lastPub, isChanged = lastVersions
-            if lastAny == -1:
-                self.lastVFlag = 'N/A'
-            elif lastAny == lastPub:
-                self.lastVFlag = 'Y'
+        if self.empty:
+            self.bail("No summaries match the report criteria")
+        row = 1
+        book = self.workbook
+        for col, width in enumerate(self.widths):
+            book.set_width(col+1, width)
+        for line in self.caption:
+            book.merge(row, 1, row, len(self.columns))
+            book.write(row, 1, line, self.main_caption_style)
+            row += 1
+        book.merge(row, 1, row, len(self.columns))
+        book.write(row, 1, f"Report Date: {date.today()}", self.date_style)
+        row += 2
+        for board in self.board:
+            row = board.add_tables(row)
+        book.send()
+
+    @property
+    def audience(self):
+        """Health professional or patient or both."""
+
+        if not hasattr(self, "_audience"):
+            audience = self.fields.getvalue("audience")
+            if not audience:
+                self._audience = self.AUDIENCES
+            elif audience not in self.AUDIENCES:
+                self.bail()
             else:
-                self.lastVFlag = 'N'
+                self._audience = [audience]
+        return self._audience
+
+    @property
+    def blocked(self):
+        """Include documents which are blocked."""
+        return "blocked" in self.opts
+
+    @property
+    def board(self):
+        """Board(s) selected for the report.
+
+        In a weird requirements twist, users need to be able to mix and
+        match languages and boards. So, for example, they can ask for a
+        report on English adult treatment summaries and Spanish child
+        treatment summaries.
+        """
+
+        if not hasattr(self, "_board"):
+            self._board = []
+            boards = {}
+            for language in self.LANGUAGES:
+                ids = self.fields.getlist(f"{language[0].lower()}st")
+                if "all" in ids:
+                    ids = list(self.boards)
+                for id in ids:
+                    try:
+                        id = int(id)
+                    except Exception:
+                        self.bail()
+                    if id not in self.boards:
+                        self.bail()
+                    if id not in boards:
+                        boards[id] = []
+                    boards[id].append(language)
+            if not boards:
+                self.bail("No summary types selected")
+            self._board = [Board(self, id, boards[id]) for id in boards]
+        return self._board
+
+    @property
+    def boards(self):
+        """Index of PDQ Editorial boards by CDR Organization document ID."""
+
+        if not hasattr(self, "_boards"):
+            self._boards = self.get_boards()
+        return self._boards
+
+    @property
+    def caption(self):
+        """Rows at the very top of the report."""
+        return self.report_title, self.date_range
+
+    @property
+    def caption_style(self):
+        """How we display the lines at the top of each table."""
+
+        if not hasattr(self, "_caption_style"):
+            self._caption_style = dict(
+                alignment=self.workbook.left,
+                font=self.workbook.bold,
+            )
+        return self._caption_style
+
+    @property
+    def center(self):
+        """Cell style for most data cells in the report."""
+
+        if not hasattr(self, "_center"):
+            opts = dict(
+                horizontal="center",
+                vertical="top",
+                wrap_text=True,
+            )
+            self._center = dict(
+                alignment=Alignment(**opts),
+                font=Font(size=10),
+            )
+        return self._center
+
+    @property
+    def columns(self):
+        """Column headers, depending on the report type."""
+
+        if not hasattr(self, "_columns"):
+            self._columns = [
+                "DocID",
+                "Summary Title",
+                "Date Last Modified",
+                "Last Modify Action Date (System)",
+                "LastV Publish?",
+                "User",
+            ]
+            if self.report_type == self.SYSTEM_REPORT:
+                self._columns[2:2] = ["Type", "Aud", "Last Comment"]
+        return self._columns
+
+    @property
+    def empty(self):
+        """Check to make sure we have something to report."""
+        return not any(self.board)
+
+    @property
+    def date_range(self):
+        """Second line of the report caption."""
+
+        if not hasattr(self, "_date_range"):
+            if self.report_type == self.USER_REPORT:
+                start, end = self.user_start, self.user_end
+            else:
+                start, end = self.system_start, self.system_end
+            if start:
+                if end:
+                    self._date_range = f"{start} - {end}"
+                else:
+                    self._date_range = f"Since {start}"
+            elif end:
+                self._date_range = f"Through {end}"
+            else:
+                self._date_range = "All dates"
+        return self._date_range
+
+    @property
+    def date_style(self):
+        """How we display the report date."""
+
+        if not hasattr(self, "_date_style"):
+            self._date_style = dict(
+                alignment=self.workbook.left,
+                font=Font(bold=True, size=10),
+            )
+        return self._date_style
+
+    @property
+    def header_style(self):
+        """How we display the column headers."""
+
+        if not hasattr(self, "_header_style"):
+            opts = dict(
+                horizontal="center",
+                vertical="bottom",
+                wrap_text=True,
+            )
+            self._header_style = dict(
+                alignment=Alignment(**opts),
+                font=self.workbook.bold,
+            )
+        return self._header_style
+
+    @property
+    def left(self):
+        """Cell style for comments and titles."""
+
+        if not hasattr(self, "_left"):
+            opts = dict(
+                horizontal="left",
+                vertical="top",
+                wrap_text=True,
+            )
+            self._left = dict(
+                alignment=Alignment(**opts),
+                font=Font(size=10),
+            )
+        return self._left
+
+    @property
+    def link_style(self):
+        """Cell style for hyperlinks."""
+
+        if not hasattr(self, "_link_style"):
+            opts = dict(
+                horizontal="center",
+                vertical="top",
+                wrap_text=True,
+            )
+            self._link_style = dict(
+                alignment=Alignment(**opts),
+                font=Font(size=10, color="000000FF", underline="single"),
+            )
+        return self._link_style
+
+    @property
+    def main_caption_style(self):
+        """How we display the lines at the top of the report sheet."""
+
+        if not hasattr(self, "_main_caption_style"):
+            self._main_caption_style = dict(
+                alignment=self.workbook.center,
+                font=Font(bold=True, size=12),
+            )
+        return self._main_caption_style
+
+    @property
+    def modules(self):
+        """Include summary modules."""
+        return "modules" in self.opts
+
+    @property
+    def opts(self):
+        """Additional options for refining the report criteria."""
+
+        if not hasattr(self, "_opts"):
+            self._opts = set(self.fields.getlist("opt"))
+        return self._opts
+
+    @property
+    def report_title(self):
+        """Top caption line."""
+
+        if self.report_type == self.USER_REPORT:
+            return "Summary Date Last Modified (User) Report"
+        else:
+            return "Summary Last Modified Date (System) Report"
+
+    @property
+    def report_type(self):
+        """Date fields determine whether this is a system or a user report."""
+
+        if not hasattr(self, "_report_type"):
+            if self.system_start or self.system_end:
+                self._report_type = self.SYSTEM_REPORT
+            else:
+                self._report_type = self.USER_REPORT
+        return self._report_type
+
+    @property
+    def system_end(self):
+        """End date for system version of the report."""
+
+        if not hasattr(self, "_system_end"):
+            value = self.fields.getvalue("s-end")
+            try:
+                self._system_end = self.parse_date(value)
+            except Exception:
+                self.bail("invalid date")
+        return self._system_end
+
+    @property
+    def system_start(self):
+        """Start date for system version of the report."""
+
+        if not hasattr(self, "_system_start"):
+            value = self.fields.getvalue("s-start")
+            try:
+                self._system_start = self.parse_date(value)
+            except Exception:
+                self.bail("invalid date")
+        return self._system_start
+
+    @property
+    def unpublished(self):
+        """Include documents if they haven't been sent to cancer.gov."""
+        return "unput" in self.opts
+
+    @property
+    def user_end(self):
+        """End date for user version of the report."""
+
+        if not hasattr(self, "_user_end"):
+            value = self.fields.getvalue("u-end")
+            try:
+                self._user_end = self.parse_date(value)
+            except Exception:
+                self.bail("invalid date")
+        return self._user_end
+
+    @property
+    def user_start(self):
+        """Start date for user version of the report."""
+
+        if not hasattr(self, "_user_start"):
+            value = self.fields.getvalue("u-start")
+            try:
+                self._user_start = self.parse_date(value)
+            except Exception:
+                self.bail("invalid date")
+        return self._user_start
+
+    @property
+    def widths(self):
+        """How wide should each column be?"""
+
+        if not hasattr(self, "_widths"):
+            self._widths = [12, 50, 15, 15, 10, 15]
+            if self.report_type == self.SYSTEM_REPORT:
+                self._widths[2:2] = [15, 7, 50]
+        return self._widths
+
+    @property
+    def workbook(self):
+        """Excel workbook for the report."""
+
+        if not hasattr(self, "_workbook"):
+            self._workbook = Excel(self.SUBTITLE, wrap=True, stamp=True)
+            sheet = self._workbook.add_sheet("DLM Report")
+        return self._workbook
+
+
+class Board:
+    """Collection of summaries for the report."""
+
+    AUDIENCE_PATH = "path = '/Summary/SummaryMetaData/SummaryAudience'"
+    AUDIT_URL = "https://{}/cgi-bin/cdr/AuditTrail.py?id="
+    VERSION_HISTORY_URL = "https://{}/cgi-bin/cdr/DocVersionHistory.py?DocId="
+    BOARD_PATH = "path = '/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref'"
+    LANGUAGE_PATH = "path = '/Summary/SummaryMetaData/SummaryLanguage'"
+    LAST_MOD_PATH = "path = '/Summary/DateLastModified'"
+    LAST_MOD_JOIN = "last_mod.doc_id = title.doc_id"
+    LAST_MOD_JOIN = LAST_MOD_JOIN, f"last_mod.{LAST_MOD_PATH}"
+    MODULE_PATH = "path = '/Summary/@AvailableAsModule'"
+    MODULE_JOIN = "modules.doc_id = title.doc_id", f"modules.{MODULE_PATH}"
+    TITLE_PATH = "path = '/Summary/SummaryTitle'"
+    TYPE_PATH = "path = '/Summary/SummaryMetaData/SummaryType'"
+    TRANSLATION_PATH = "path = '/Summary/TranslationOf/@cdr:ref'"
+    FIELDS = (
+        "title.doc_id AS doc_id",
+        "title.value AS summary_title",
+        "type.value AS summary_type",
+        "last_mod.value AS last_modified",
+        "saved.last_save_date AS last_saved",
+    )
+
+    def __init__(self, control, id, languages):
+        """Remember the caller's values.
+
+        Pass:
+            control - access to the report options and the database
+            id - CDR Organization document ID integer for the board
+            languages - English and/or Spanish
+        """
+
+        self.__control = control
+        self.__id = id
+        self.__languages = languages
+
+    def __len__(self):
+        """How many summaries did we find?"""
+
+        if not hasattr(self, "_count"):
+            self._count = 0
+            for key in self.summaries:
+                self._count += len(self.summaries[key])
+        return self._count
+
+    def add_tables(self, row):
+        book = self.__control.workbook
+        header_style = self.__control.header_style
+        caption_style = self.__control.caption_style
+        link_style = self.__control.link_style
+        left = self.__control.left
+        center = self.__control.center
+        full = f"PDQ {self.__control.boards[self.__id]} Editorial Board"
+        host = self.__control.session.tier.hosts["APPC"]
+        id_url = self.VERSION_HISTORY_URL.format(host)
+        audit_url = self.AUDIT_URL.format(host)
+        system_report = self.__control.report_type == Control.SYSTEM_REPORT
+        saved_style = link_style if system_report else center
+        for key in self.summaries:
+            subset = self.summaries[key]
+            if subset:
+                language, audience = key
+                aud = "HP" if audience[0] == "H" else "PAT"
+                subtitle = f"{audience.capitalize()}s ({language})"
+                book.merge(row, 1, row, len(self.__control.columns))
+                book.write(row, 1, full, caption_style)
+                row += 1
+                book.merge(row, 1, row, len(self.__control.columns))
+                book.write(row, 1, subtitle, caption_style)
+                row += 1
+                book.sheet.row_dimensions[row].height = 50
+                for col, header in enumerate(self.__control.columns):
+                    book.write(row, col+1, header, header_style)
+                row += 1
+                for summary in subset:
+                    id = summary.id
+                    summary_type = summary.type
+                    if "COMPLEMENTARY" in summary_type.upper():
+                        summary_type = "IACT"
+                    cdr_id = f"CDR{id}"
+                    doc_link = f'=HYPERLINK("{id_url}{id}", "{cdr_id}")'
+                    saved = str(summary.last_saved)[:10]
+                    if summary.last_version_publishable is None:
+                        lastv_pub = "N/A"
+                    elif summary.last_version_publishable:
+                        lastv_pub = "Y"
+                    else:
+                        lastv_pub = "N"
+                    col = 1
+                    book.write(row, 1, doc_link, link_style)
+                    book.write(row, 2, summary.title, left)
+                    if system_report:
+                        saved = f'=HYPERLINK("{audit_url}{id}", "{saved}")'
+                        book.write(row, 3, summary_type, center)
+                        book.write(row, 4, aud, center)
+                        book.write(row, 5, summary.comment, left)
+                        col = 6
+                    else:
+                        col = 3
+                    book.write(row, col, summary.last_modified, center)
+                    book.write(row, col+1, saved, saved_style)
+                    book.write(row, col+2, lastv_pub, center)
+                    book.write(row, col+3, summary.saver, center)
+                    row += 1
+                row += 1
+        return row
+
+    @property
+    def id(self):
+        """CDR Organization document ID integer for the board."""
+        return self.__id
+
+    @property
+    def summaries(self):
+        """Dictionary of summary sets, grouped by language and audience."""
+
+        if not hasattr(self, "_summaries"):
+            self._summaries = {}
+            for language in self.__languages:
+                for audience in self.__control.audience:
+                    key = language, audience
+                    self._summaries[key] = self.__select(language, audience)
+        return self._summaries
+
+    def __select(self, language, audience):
+        """Assemble the sequence of summaries for this language/audience combo.
+
+        Pass:
+            language - English or Spanish
+            audience - Patient or Health Professional
+        """
+
+        query = self.__control.Query("query_term title", *self.FIELDS)
+        query.join("query_term audience", "audience.doc_id = title.doc_id")
+        query.join("query_term language", "language.doc_id = title.doc_id")
+        query.join("query_term type", "type.doc_id = title.doc_id")
+        query.join("doc_last_save saved", "saved.doc_id = title.doc_id")
+        query.outer("query_term last_mod", *self.LAST_MOD_JOIN)
+        query.where(f"audience.{self.AUDIENCE_PATH}")
+        query.where(f"language.{self.LANGUAGE_PATH}")
+        query.where(f"title.{self.TITLE_PATH}")
+        query.where(f"type.{self.TYPE_PATH}")
+        query.where(query.Condition("audience.value", audience+"s"))
+        query.where(query.Condition("language.value", language))
+
+        # Board selection differs for English and Spanish.
+        if language == "English":
+            query.join("query_term board", "board.doc_id = title.doc_id")
+        else:
+            query.join("query_term english", "english.doc_id = title.doc_id")
+            query.where(f"english.{self.TRANSLATION_PATH}")
+            query.join("query_term board", "board.doc_id = english.int_val")
+        query.where(f"board.{self.BOARD_PATH}")
+        query.where(query.Condition("board.int_val", self.id))
+
+        # OCECDR-4285: add filtering of summary document states. By default,
+        # only summaries which have been published to Cancer.gov are included
+        # in the report (which would exclude all blocked documents, summaries
+        # which are marked 'available as module' and summaries which are new
+        # and in progress). Checkboxes are provided to lift some or all of
+        # those restrictions. It's complicated, but it works.
+        if self.__control.unpublished:
+            if not self.__control.blocked:
+                query.join("active_doc", "active_doc.id = title.doc_id")
+        else:
+            query.outer("pub_proc_cg", "pub_proc_cg.id = title.doc_id")
+            options = ["pub_proc_cg.id IS NOT NULL"]
+            if self.__control.blocked:
+                query.join("document", "document.id = title.doc_id")
+                options.append("document.active_status = 'I'")
+            if self.__control.modules:
+                query.outer("query_term modules", *self.MODULE_JOIN)
+                options.append("modules.doc_id IS NOT NULL")
+            query.where(query.Or(*options))
+        if not self.__control.modules:
+            query.outer("query_term modules", *self.MODULE_JOIN)
+            query.where("modules.doc_id IS NULL")
+
+        # Date filtering depends on which flavor of the report was requested.
+        if self.__control.report_type == Control.USER_REPORT:
+            start = self.__control.user_start
+            end = self.__control.user_end
+            if start or end:
+                if start:
+                    query.where(f"last_mod.value >= '{start}'")
+                if end:
+                    query.where(f"last_mod.value <= '{end} 23:59:59'")
+        else:
+            start = self.__control.system_start
+            end = self.__control.system_end
+            if start or end:
+                if start:
+                    query.where(f"saved.last_save_date >= '{start}'")
+                if end:
+                    query.where(f"saved.last_save_date <= '{end} 23:59:59'")
+
+        # Run the query.
+        if language == "Spanish":
+            self.__control.logger.info("summary query:\n%s", query)
+        rows = query.execute(self.__control.cursor).fetchall()
+        args = self.id, language, audience
+        self.__control.logger.info("board=%r language=%s audience=%s", *args)
+        self.__control.logger.info("found %d summaries", len(rows))
+        return sorted([Summary(self.__control, row) for row in rows])
+
+
+class Summary:
+    """Collection of information we need for the report."""
+
+    def __init__(self, control, row):
+        """Remember the caller's values."""
+        self.__control = control
+        self.__row = row
 
     def __lt__(self, other):
-        return (self.title, self.docId) < (other.title, other.docId)
+        """Support sorting the summaries by title."""
+        return self.key < other.key
 
-    @staticmethod
-    def __getComment(docId, cursor):
-        " Get the comment from the last version of the document."
-        cursor.execute("""\
-       SELECT comment
-         FROM doc_version
-        WHERE id = %s
-          AND num = (SELECT MAX(num)
-                       FROM doc_version
-                      WHERE id = %s)""" % (docId, docId))
-        rows = cursor.fetchall()
-        return rows and rows[0][0] or None
+    @property
+    def comment(self):
+        """Get the comment from the last version of the document."""
 
-    @staticmethod
-    def __getSaveUsr(docId, cursor):
-        "Get the user from the last version of the document."
-        cursor.execute("""\
-       SELECT fullname
-         FROM doc_last_save dls
-         JOIN doc_save_action dsa
-           ON dsa.doc_id = dls.doc_id
-          AND dls.last_save_date = dsa.save_date
-         JOIN usr u
-           ON u.id = dsa.save_user
-        WHERE dls.doc_id = %s""" % docId)
-        rows = cursor.fetchall()
-        return rows and rows[0][0] or None
+        if not hasattr(self, "_comment"):
+            query = self.__control.Query("doc_version", "comment")
+            query.where(query.Condition("id", self.id))
+            query.order("num DESC").limit(1)
+            rows = query.execute(self.__control.cursor).fetchall()
+            self._comment = rows[0].comment if rows else None
+        return self._comment
+
+    @property
+    def id(self):
+        """CDR document ID for this PDQ summary."""
+        return self.__row.doc_id
+
+    @property
+    def key(self):
+        """Sort ordering."""
+        return self.title, self.id
+
+    @property
+    def last_modified(self):
+        """String for the date the users say the summary was last changed."""
+        return self.__row.last_modified
+
+    @property
+    def last_saved(self):
+        """Date/time when the system says the document was last saved."""
+        return self.__row.last_saved
+
+    @property
+    def last_version_publishable(self):
+        """True if the most recent version is publishable."""
+
+        if not hasattr(self, "_last_version_publishable"):
+            doc = Doc(self.__control.session, id=self.id)
+            if doc.last_version is None:
+                self._last_version_publishable = None
+            else:
+                last_ver = doc.last_version
+                last_pub_ver = doc.last_publishable_version
+                self._last_version_publishable = last_ver == last_pub_ver
+        return self._last_version_publishable
+
+    @property
+    def saver(self):
+        "Who saved the document last?"""
+
+        if not hasattr(self, "_saver"):
+            query = self.__control.Query("doc_last_save s", "u.fullname")
+            query.join("doc_save_action a", "a.doc_id = s.doc_id",
+                       "s.last_save_date = a.save_date")
+            query.join("usr u", "u.id = a.save_user")
+            query.where(query.Condition("s.doc_id", self.id))
+            rows = query.execute(self.__control.cursor).fetchall()
+            self._saver = rows[0].fullname if rows else None
+        return self._saver
+
+    @property
+    def title(self):
+        """String for the title of the PDQ summary."""
+        return self.__row.summary_title
+
+    @property
+    def type(self):
+        """String for the type of the PDQ summary."""
+        return self.__row.summary_type
 
 
-#----------------------------------------------------------------------
-# Find the summaries that belong in the report.
-#----------------------------------------------------------------------
-sqlSelect = """\
-    SELECT DISTINCT su.doc_id         AS doc_id,
-                    su.value          AS summary_title,
-                    bn.value          AS board_name,
-                    au.value          AS audience,
-                    la.value          AS language,
-                    lm.value          AS last_mod_date,
-                    st.value          AS summary_type,
-                    ls.last_save_date AS last_save_date,
-                    mo.value          AS module
-"""
-sqlFrom = """\
-               FROM query_term su
-"""
-sqlJoin = """\
-               JOIN document d
-                 ON d.id = su.doc_id
-               JOIN query_term st
-                 ON st.doc_id = su.doc_id
-               JOIN query_term bn
-                 ON bn.doc_id = sb.int_val
-               JOIN query_term au
-                 ON au.doc_id = sb.doc_id
-               JOIN doc_last_save ls
-                 ON ls.doc_id = su.doc_id
-               JOIN query_term la
-                 ON la.doc_id = su.doc_id
-    LEFT OUTER JOIN pub_proc_cg cg
-                 ON cg.id = su.doc_id
-    LEFT OUTER JOIN query_term lm
-                 ON lm.doc_id = su.doc_id
-    LEFT OUTER JOIN query_term mo
-                 ON mo.doc_id = su.doc_id
-                AND mo.path = '/Summary/@AvailableAsModule'
-"""
-sqlWhere = """\
-              WHERE su.path = '/Summary/SummaryTitle'
-                AND st.path = '/Summary/SummaryMetaData/SummaryType'
-                AND sb.path = '/Summary/SummaryMetaData/PDQBoard'
-                            + '/Board/@cdr:ref'
-                AND au.path = '/Summary/SummaryMetaData/SummaryAudience'
-                AND lm.path = '/Summary/DateLastModified'
-                AND la.path = '/Summary/SummaryMetaData/SummaryLanguage'
-                AND bn.path = '/Organization/OrganizationNameInformation'
-                            + '/OfficialName/Name'
-"""
-
-#----------------------------------------------------------------------
-# OCECDR-4285: add filtering of summary document states. By default,
-# only summaries which have been published to Cancer.gov are included
-# in the report (which would exclude all blocked documents, summaries
-# which are marked 'available as module' and summaries which are new
-# and in progress). Checkboxes are provided to lift some or all of
-# those restrictions.
-#----------------------------------------------------------------------
-if "unpub" in also:
-    if "blocked" not in also:
-        sqlWhere += """\
-                AND d.active_status = 'A'
-"""
-else:
-    also_where = ["cg.id IS NOT NULL"]
-    if "blocked" in also:
-        also_where.append("d.active_status = 'I'")
-    if "modules" in also:
-        also_where.append("mo.doc_id IS NOT NULL")
-    sqlWhere += """\
-                AND (%s)
-""" % " OR ".join(also_where)
-if "modules" not in also:
-    sqlWhere += """\
-                AND mo.doc_id IS NULL
-"""
-
-#----------------------------------------------------------------------
-# Filter on dates, depending on which flavor of the report was requested.
-# We have to convert second date back to VARCHAR(40) using style 20
-# (YYYY-MM-DD ...) to avoid blowing up in the face of invalid date
-# strings in the documents.
-#----------------------------------------------------------------------
-if uStartDate and uEndDate:
-    bodyTitle  = "Summary Date Last Modified (User) Report"
-    subtitle   = "%s - %s" % (uStartDate, uEndDate)
-    reportType = 'U'
-    dateFilter = """\
-                AND lm.value BETWEEN '%s'
-                             AND CONVERT(VARCHAR(40),
-                                         DATEADD(s, -1,
-                                                 DATEADD(d, 1, '%s')), 20)
-""" % (uStartDate, uEndDate)
-else:
-    bodyTitle  = "Summary Last Modified Date (System) Report"
-    subtitle   = "%s - %s" % (sStartDate, sEndDate)
-    reportType = 'S'
-    dateFilter = """\
-                AND ls.last_save_date BETWEEN '%s' AND
-                                      DATEADD(s, -1, DATEADD(d, 1, '%s'))
-""" % (sStartDate, sEndDate)
-
-#----------------------------------------------------------------------
-# Filter on audience unless the user wants everything.
-#----------------------------------------------------------------------
-if audience and audience != 'all':
-    audienceFilter = """\
-                AND au.value = '%s'
-""" % audience
-else:
-    audienceFilter = ""
-
-#----------------------------------------------------------------------
-# Collect summaries which meet the criteria.
-#----------------------------------------------------------------------
-def collectSummaries(sqlSelect, sqlFrom, sqlJoin, sqlWhere,
-                     audienceFilter, dateFilter,
-                     cursor, language, boards, reportType):
-    if boards:
-        langFilter = """\
-                AND la.value = '%s'
-""" % language
-        if len(boards) == 1 and boards[0] == 'all':
-            boardFilter = """\
-                AND bn.value LIKE '%Editorial Board'
-"""
-        else:
-            boardFilter = """\
-                AND bn.doc_id IN (%s)
-""" % ", ".join(boards)
-        if language == 'English':
-            boardJoin = """\
-               JOIN query_term sb
-                 ON sb.doc_id = su.doc_id
-"""
-        else:
-            boardFilter += """\
-                AND en.path = '/Summary/TranslationOf/@cdr:ref'
-"""
-            boardJoin = """\
-               JOIN query_term en
-                 ON en.doc_id = su.doc_id
-               JOIN query_term sb
-                 ON sb.doc_id = en.int_val
-"""
-        try:
-            sql = (sqlSelect + sqlFrom + boardJoin + sqlJoin + sqlWhere +
-                   audienceFilter + boardFilter + langFilter + dateFilter)
-            cursor.execute(sql)
-            rows = cursor.fetchall()
-            for row in rows:
-                Summary(row, language, reportType, cursor)
-        except Exception as e:
-            cdrcgi.bail('Failure retrieving report information: %s' % e)
-        return sql
-
-collectSummaries(sqlSelect, sqlFrom, sqlJoin, sqlWhere,
-                 audienceFilter, dateFilter,
-                 cursor, 'English', est, reportType)
-collectSummaries(sqlSelect, sqlFrom, sqlJoin, sqlWhere,
-                 audienceFilter, dateFilter,
-                 cursor, 'Spanish', sst, reportType)
-if not Summary.summaries:
-    cdrcgi.bail("No summaries match report criteria")
-
-#----------------------------------------------------------------------
-# Map audience name to abbreviation.
-#----------------------------------------------------------------------
-def getAudienceAbbreviation(audience):
-    return 'PROFESSIONAL' in audience.upper() and 'HP' or 'PAT'
-
-#----------------------------------------------------------------------
-# Create the workbook.
-#----------------------------------------------------------------------
-styles = cdrcgi.ExcelStyles()
-styles.header = styles.style("align: wrap true, horz center; font: bold true")
-styles.url = styles.style(styles.HYPERLINK, styles.CENTER_TOP)
-styles.sect = styles.style(styles.LEFT, styles.bold_font(11))
-sheet = styles.add_sheet("DLM Report")
-report_date = "Report Date: %s" % today
-sheet.col(0).width = styles.chars_to_width(12)
-sheet.col(1).width = styles.chars_to_width(50)
-extraCols = 0
-if reportType == 'S':
-    sheet.col(2).width = styles.chars_to_width(15)
-    sheet.col(3).width = styles.chars_to_width(7)
-    sheet.col(4).width = styles.chars_to_width(50)
-    extraCols = 3
-sheet.col(extraCols + 2).width = styles.chars_to_width(15)
-sheet.col(extraCols + 3).width = styles.chars_to_width(15)
-sheet.col(extraCols + 4).width = styles.chars_to_width(10)
-sheet.col(extraCols + 5).width = styles.chars_to_width(15)
-sheet.write_merge(0, 0, 0, extraCols + 5, bodyTitle, styles.banner)
-sheet.write_merge(1, 1, 0, extraCols + 5, subtitle, styles.banner)
-sheet.write_merge(2, 2, 0, extraCols + 5, report_date, styles.bold)
-rowNum = 3
-
-#----------------------------------------------------------------------
-# Add rows for one section of the report.
-#----------------------------------------------------------------------
-def addSection(sheet, summaries, board, language, audience, reportType,
-               styles, row):
-    audienceAndLanguage = "%s (%s)" % (audience, language)
-    lastCol = reportType == 'S' and 8 or 5
-    sheet.write_merge(row, row, 0, lastCol, "")
-    row += 1
-    sheet.write_merge(row, row, 0, lastCol, board, styles.sect)
-    row += 1
-    sheet.write_merge(row, row, 0, lastCol, audienceAndLanguage, styles.sect)
-    row += 1
-    sheet.write(row, 0, "DocID", styles.header)
-    sheet.write(row, 1, "Summary Title", styles.header)
-    extraCols = 0
-    if reportType == 'S':
-        sheet.write(row, 2, "Board", styles.header)
-        sheet.write(row, 3, "Type", styles.header)
-        sheet.write(row, 4, "Last Comment", styles.header)
-        extraCols = 3
-        audienceAbbreviation = getAudienceAbbreviation(audience)
-    sheet.write(row, extraCols + 2, "Date Last Modified", styles.header)
-    sheet.write(row, extraCols + 3, "Last Modify Action Date (System)",
-                styles.header)
-    sheet.write(row, extraCols + 4, "LastV Publish?", styles.header)
-    sheet.write(row, extraCols + 5, "User", styles.header)
-    row += 1
-    for summary in sorted(summaries):
-        summaryType = summary.summaryType
-        if summaryType == 'Complementary and alternative medicine':
-            summaryType = 'CAM'
-        lastSave = ("%s" % summary.lastSave)[:10]
-        url = ("http://%s" % cdrcgi.WEBSERVER +
-               "/cgi-bin/cdr/DocVersionHistory.py?" +
-               "Session=guest&DocId=%s" % summary.docId)
-        link = styles.link(url, "CDR%d" % summary.docId)
-        sheet.write(row, 0, link, styles.url)
-        title = summary.title
-        if summary.module:
-            title += " [module]"
-        sheet.write(row, 1, title, styles.left)
-        if extraCols:
-            sheet.write(row, 2, summaryType, styles.left)
-            sheet.write(row, 3, audienceAbbreviation, styles.left)
-            sheet.write(row, 4, summary.comment, styles.left)
-        sheet.write(row, extraCols + 2, summary.lastMod, styles.center)
-        if reportType == 'S':
-            url = ("http://%s/cgi-bin/cdr/AuditTrail.py?id=%s" %
-                   (cdrcgi.WEBSERVER, summary.docId))
-            link = styles.link(url, lastSave)
-            sheet.write(row, extraCols + 3, link, styles.url)
-        else:
-            sheet.write(row, extraCols + 3, lastSave, styles.center)
-        sheet.write(row, extraCols + 4, summary.lastVFlag, styles.center)
-        sheet.write(row, extraCols + 5, summary.lastSaveUsr, styles.center)
-        row += 1
-    return row
-
-#----------------------------------------------------------------------
-# Walk through the sections.
-#----------------------------------------------------------------------
-for boardName in sorted(Summary.summaries):
-    board = Summary.summaries[boardName]
-    for languageName in sorted(board):
-        language = board[languageName]
-        for audienceName in sorted(language):
-            summaries = language[audienceName]
-            rowNum = addSection(sheet, summaries, boardName, languageName,
-                                audienceName, reportType, styles, rowNum)
-
-stamp = cdr.make_timestamp()
-sys.stdout.buffer.write(f"""\
-Content-type: application/vnd.ms-excel
-Content-Disposition: attachment; filename=sdlm-{stamp}.xls
-
-""".encode("utf-8"))
-styles.book.save(sys.stdout.buffer)
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+    Control().run()
