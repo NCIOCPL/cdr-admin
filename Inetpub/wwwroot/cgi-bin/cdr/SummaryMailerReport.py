@@ -1,475 +1,596 @@
-#----------------------------------------------------------------------
-#
-# BZIssue::4258
-# BZIssue::4250
-# BZIssue::4807 - Board Member not listed on Mailer Reports
-#
-# [Request 4258:]
-#
-# "We need to have a report to give us some information about the summary
-# mailers.  This report will be generated in an Excel Spreadsheet, and
-# contain columns for Mailer ID, Board Member Name, Summary Name, Mailer
-# Date Generated, Mailer Date Checked In, and Change Category.
-#
-# "To run the report, we would like to be able to select a Board (Editorial
-# or Editorial Advisory), select whether we want it sorted by Board Member
-# or by Summary Name, and select whether we want to show information for
-# the Last Mailer, or the Last Checked-In Mailer.  I will put a sample in
-# as an attachment.
-#
-# [Request 4259:]
-#
-# "We need a report that will give us the mailer history for all of the
-# summaries on a Board over a selected date range.  The report should be
-# generated in Excel, and have columns for Mailer ID, Board Member Name,
-# Summary Name, Mailer Date Generated, Mailer Date Checked In, and Change
-# Category.
-#
-# "To run the report, we would like to be able to select the Board
-# (Editorial or Advisory), enter a Date Range, and select whether to sort
-# by Board Member or by Summary.  I will put in a sample of the report.
-# Request form for generating RTF letters to board members."
-#
-#----------------------------------------------------------------------
-import sys
-import cgi, cdr, cdrcgi, time
-import lxml.etree as etree
-from cdrapi import db as cdrdb
-from html import escape as html_escape
+#!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-fields    = cgi.FieldStorage()
-session   = cdrcgi.getSession(fields)
-request   = cdrcgi.getRequest(fields)
-flavor    = fields.getvalue("flavor") or None
-board     = fields.getvalue("board") or None
-begin     = fields.getvalue("begin") or None
-end       = fields.getvalue("end") or None
-sortBy    = fields.getvalue("sortBy") or "member"
-selectBy  = fields.getvalue("selectBy") or "lastMailer"
+"""Show information about PDQ summary mailers.
 
-title     = "CDR Administration"
-section   = "Summary Mailer %sReport" % (flavor == "4259" and "History " or "")
-SUBMENU   = "Mailer Menu"
-buttons   = ["Submit", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-script    = 'SummaryMailerReport.py'
-header    = cdrcgi.header(title, title, section, script, buttons,
-                            stylesheet = """\
-   <link type='text/css' rel='stylesheet' href='/stylesheets/CdrCalendar.css'>
-   <script type='text/javascript' language='JavaScript'
-           src='/js/CdrCalendar.js'></script>
-   <style type='text/css'>
-    th, td, input { font-size: 10pt; }
-    body          { background-color: #DFDFDF;
-                    font-family: sans-serif;
-                    font-size: 12pt; }
-    legend        { font-weight: bold;
-                    color: teal;
-                    font-family: sans-serif; }
-    fieldset      { width: 500px;
-                    margin-left: auto;
-                    margin-right: auto;
-                    display: block; }
-    .CdrDateField { width: 100px; }
-   </style>
-""")
+Two flavors of the report are available, standard, and historical.
+"""
 
-#----------------------------------------------------------------------
-# Make sure we're logged in.
-#----------------------------------------------------------------------
-if not session: cdrcgi.bail('Unknown or expired CDR session.')
+from collections import UserDict
+from datetime import date
+from cdr import Board
+from cdrapi.docs import Doc
+from cdrcgi import Controller
 
-#----------------------------------------------------------------------
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if request == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif request == SUBMENU:
-    cdrcgi.navigateTo("Mailers.py", session)
 
-#----------------------------------------------------------------------
-# Handle request to log out.
-#----------------------------------------------------------------------
-if request == "Log Out":
-    cdrcgi.logout(session)
+class Control(Controller):
+    """Access to the database and report-building tools."""
 
-#----------------------------------------------------------------------
-# Make sure a report type was specified.
-#----------------------------------------------------------------------
-if flavor not in ("4258", "4259"):
-    cdrcgi.bail("Missing required flavor parameter")
+    LOGNAME = "SummaryMailerReport"
+    SUBMENU = "Mailer Menu"
+    MEMBER_SORT = "member"
+    SUMMARY_SORT = "summary"
+    CDR_REF = f"{{{Doc.NS}}}ref"
+    CREATE_TABLES = (
+        "CREATE TABLE #board_member (person_id INT, member_id INT)",
+        "CREATE TABLE #board_summary (doc_id INT)",
+    )
+    INFO_PATH = "/PDQBoardMemberInfo"
+    MEMBER_PATH = f"{INFO_PATH}/BoardMemberName/@cdr:ref"
+    BOARD_PATH = f"{INFO_PATH}/BoardMembershipDetails/BoardName/@cdr:ref"
+    SUMMARY_PATH = "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"
+    SORTS = (
+        (MEMBER_SORT, "Board Member", True),
+        (SUMMARY_SORT, "Summary Name", False),
+    )
+    LAST = "last"
+    LAST_CHECKED_IN = "last-checked-in"
+    SHOW = (
+        (LAST, "Last Mailer", True),
+        (LAST_CHECKED_IN, "Last Checked-In Mailer", False),
+    )
+    WIDTHS = 65, 185, 365, 70, 70, 250, 305
+    HEADERS = (
+        "Mailer ID",
+        "Board Member",
+        "Summary",
+        "Sent",
+        "Response",
+        "Changes",
+        "Comments",
+    )
+    assert(len(WIDTHS) == len(HEADERS))
 
-#----------------------------------------------------------------------
-# Connect to the CDR database.
-#----------------------------------------------------------------------
-try:
-    conn = cdrdb.connect(user='CdrGuest', timeout=300)
-except Exception as e:
-    cdrcgi.bail('Database connection failure: %s' % e)
+    def build_tables(self):
+        """Assemble the report's single table."""
 
-#----------------------------------------------------------------------
-# Build a CGI form picklist for the PDQ boards.
-#----------------------------------------------------------------------
-def makeBoardPicklist(cursor):
-    cursor.execute("""\
-  SELECT DISTINCT b.doc_id, b.value
-    FROM query_term b
-    JOIN query_term s
-      ON b.doc_id = s.int_val
-   WHERE s.path = '/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref'
-     AND b.path = '/Organization/OrganizationNameInformation'
-                + '/OfficialName/Name'
-ORDER BY b.value""")
-    html = ["""\
-<select name='board'>
-"""]
-    for docId, boardName in cursor.fetchall():
-        html.append("""\
-<option value='%d'>%s</option>
-""" % (docId, html_escape(boardName)))
-    html.append("""\
-</select>
-""")
-    return "".join(html)
+        if not self.board:
+            self.bail("No board selected")
+        opts = dict(
+            sheet_name=self.sheet_name,
+            columns=self.columns,
+            freeze_panes="A4",
+            caption=self.caption,
+        )
+        return self.Reporter.Table(self.rows, **opts)
 
-#----------------------------------------------------------------------
-# Add the title row and the column headers.
-#----------------------------------------------------------------------
-def addHeaderRows(sheet, styles, cursor, board, titleStart):
-    boardName = getBoardName(cursor, board)
-    now       = time.strftime("%Y-%m-%d")
-    title     = "%s - %s  %s" % (titleStart, boardName, now)
-    widths = (10, 30, 60, 10, 10, 40, 50)
-    headers = ("Mailer ID", "Board Member", "Summary", "Sent", "Response",
-               "Changes", "Comments")
-    for col, chars in enumerate(widths):
-        sheet.col(col).width = styles.chars_to_width(chars)
-    sheet.write_merge(0, 0, 0, len(widths) - 1, title, styles.banner)
-    for col, header in enumerate(headers):
-        sheet.write(2, col, header, styles.header)
+    def populate_form(self, page):
+        """Solicit options for the report.
 
-#----------------------------------------------------------------------
-# Generate the Summary Mailer Report.
-#----------------------------------------------------------------------
-def report4258(sheet, styles, cursor, board, selectBy):
-    if selectBy == "lastMailer":
-        dateField = "Sent"
-        title = "Summary Mailer Report (Last)"
-    else:
-        dateField = "Response/Received"
-        title = "Summary Mailer Report (Last Checked-In)"
-    addHeaderRows(sheet, styles, cursor, board, title)
-    dateField = selectBy == "lastMailer" and "Sent" or "Response/Received"
-    cursor.execute("""\
-        SELECT DISTINCT r.doc_id, r.int_val, s.int_val, d.value
-          FROM query_term r
-          JOIN query_term s
-            ON s.doc_id = r.doc_id
-          JOIN query_term d
-            ON d.doc_id = r.doc_id
-          JOIN #board_member m
-            ON m.person_id = r.int_val
-          JOIN #board_summary b
-            ON b.doc_id = s.int_val
-         WHERE r.path = '/Mailer/Recipient/@cdr:ref'
-           AND s.path = '/Mailer/Document/@cdr:ref'
-           AND d.path = '/Mailer/%s'""" % dateField)
-    mailers = {}
-    for m, r, s, d in cursor.fetchall():
-        if d and BoardMember.members[r].membershipActive(d):
-            key = (r, s)
-            if key not in mailers or mailers[key][1] < d:
-                mailers[key] = (m, d)
-    finishReport(sheet, styles, cursor, [v[0] for v in mailers.values()])
+        Pass:
+            page - HTMLPage object where the fields go
+        """
 
-#----------------------------------------------------------------------
-# Generate the Summary Mailer History Report.
-#----------------------------------------------------------------------
-def report4259(sheet, styles, cursor, board, begin, end):
-    if not begin or not end:
-        cdrcgi.bail("Both date range parameters are required for this report.")
-    end = cdr.calculateDateByOffset(1, end)
-    title = "Summary Mailer History Report (%s - %s)" % (begin, end)
-    addHeaderRows(sheet, styles, cursor, board, title)
-    cursor.execute("""\
-        SELECT DISTINCT mailer.doc_id, sent.value, member.person_id
-          FROM query_term mailer
-          JOIN query_term sent
-            ON sent.doc_id = mailer.doc_id
-          JOIN query_term recip
-            ON recip.doc_id = mailer.doc_id
-          JOIN #board_member member
-            ON member.person_id = recip.int_val
-          JOIN #board_summary summary
-            ON summary.doc_id = mailer.int_val
-         WHERE mailer.path = '/Mailer/Document/@cdr:ref'
-           AND sent.path = '/Mailer/Sent'
-           AND recip.path = '/Mailer/Recipient/@cdr:ref'
-           AND sent.value BETWEEN '%s' AND '%s'""" %
-                   (begin, end))
-    mailerIds = []
-    for mailerId, sent, personId in cursor.fetchall():
-        if BoardMember.members[personId].membershipActive(sent):
-            mailerIds.append(mailerId)
-    finishReport(sheet, styles, cursor, mailerIds)
+        page.form.append(page.hidden_field("flavor", self.flavor))
+        fieldset = page.fieldset("Select PDQ Board")
+        checked = True
+        for board in sorted(self.boards.values()):
+            opts = dict(value=board.id, label=board.name, checked=checked)
+            fieldset.append(page.radio_button("board", **opts))
+            checked = False
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Report Sorting")
+        for value, display, checked in self.SORTS:
+            label = f"Order by {display}"
+            opts = dict(value=value, label=label, checked=checked)
+            fieldset.append(page.radio_button("sort", **opts))
+        page.form.append(fieldset)
+        if self.historical:
+            fieldset = page.fieldset("Report Date Range")
+            fieldset.append(page.date_field("start", value=self.start))
+            fieldset.append(page.date_field("end", value=self.end))
+            page.form.append(fieldset)
+        else:
+            fieldset = page.fieldset("Select Mailers To Be Displayed")
+            for value, display, checked in self.SHOW:
+                label = f"Show {display}"
+                opts = dict(value=value, label=label, checked=checked)
+                fieldset.append(page.radio_button("show", **opts))
+            page.form.append(fieldset)
+        page.add_css("fieldset { width: 650px; }")
 
-#----------------------------------------------------------------------
-# Add the data rows to the report.
-#----------------------------------------------------------------------
-def finishReport(sheet, styles, cursor, mailerIds):
-    mailers = [Mailer(mailerId, cursor) for mailerId in mailerIds]
-    mailers.sort()
-    row = 3
-    for mailer in mailers:
-        row = mailer.addRow(sheet, styles, row)
+    @property
+    def board(self):
+        """Integer CDR document ID for the report's selected board."""
 
-#----------------------------------------------------------------------
-# Object that knows about all the spans of membership in a board for
-# a single board member.
-#----------------------------------------------------------------------
+        if not hasattr(self, "_board"):
+            try:
+                self._board = int(self.fields.getvalue("board"))
+                if self._board not in self.boards:
+                    self.bail()
+            except Exception:
+                self._board = None
+        return self._board
+
+    @property
+    def boards(self):
+        """Dictionary of PDQ boards for the form's radio buttons."""
+
+        if not hasattr(self, "_boards"):
+            self._boards = Board.get_boards(None, self.cursor)
+        return self._boards
+
+    @property
+    def board_members(self):
+        """Dictionary of `BoardMember` objects, indexed by Person doc ID."""
+
+        if not hasattr(self, "_board_members"):
+            for create_sql in self.CREATE_TABLES:
+                self.cursor.execute(create_sql)
+            query = self.Query("query_term m", "m.int_val", "m.doc_id")
+            query.join("query_term b", "b.doc_id = m.doc_id")
+            query.join("active_doc d", "d.id = m.doc_id")
+            query.where(f"m.path = '{self.MEMBER_PATH}'")
+            query.where(f"b.path = '{self.BOARD_PATH}'")
+            query.where(f"b.int_val = {self.board}")
+            query.unique()
+            self.cursor.execute(f"INSERT INTO #board_member {query}")
+            query = self.Query("query_term", "doc_id").unique()
+            query.where(f"path = '{self.SUMMARY_PATH}'")
+            query.where(f"int_val = {self.board}")
+            self.cursor.execute(f"INSERT INTO #board_summary {query}")
+            self.conn.commit()
+            query = self.Query("#board_member", "person_id", "member_id")
+            self._board_members = {}
+            for row in query.execute(self.cursor).fetchall():
+                self._board_members[row.person_id] = BoardMember(self, row)
+        return self._board_members
+
+    @property
+    def caption(self):
+        """What we display at the top of the report."""
+
+        if not hasattr(self, "_caption"):
+            if self.historical:
+                title = "Summary Mailer History Report ({} - {})"
+                title = title.format(self.start, self.end)
+            elif self.show == self.LAST:
+                title = "Summary Mailer Report (Last)"
+            else:
+                title = "Summary Mailer Report (Last Checked In)"
+            board_name = self.boards[self.board].name
+            self._caption = f"{title} - {board_name} - {date.today()}"
+        return self._caption
+
+    @property
+    def columns(self):
+        """Headers we display at the top of each report table column."""
+
+        if not hasattr(self, "_columns"):
+            self._columns = []
+            for i, header in enumerate(self.HEADERS):
+                opts = dict(width=f"{self.WIDTHS[i]:d}px")
+                self._columns.append(self.Reporter.Column(header, **opts))
+        return self._columns
+
+    @property
+    def end(self):
+        """End of the report's date range."""
+
+        if not hasattr(self, "_end"):
+            try:
+                value = self.fields.getvalue("end", str(date.today()))
+                self._end = self.parse_date(value)
+            except Exception:
+                self.bail("Invalid date")
+        return self._end
+
+    @property
+    def flavor(self):
+        """Is this the 'standard' or the 'historical' version of the report?"""
+
+        if not hasattr(self, "_flavor"):
+            self._flavor = self.fields.getvalue("flavor", "standard")
+        return self._flavor
+
+    @property
+    def format(self):
+        """This is an Excel report."""
+        return "excel"
+
+    @property
+    def historical(self):
+        """True if we're running the historical flavor of the report."""
+
+        if not hasattr(self, "_historical"):
+            self._historical = "histor" in self.flavor
+        return self._historical
+
+    @property
+    def mailers(self):
+        """The documents on which we're reporting.
+
+        Don't eliminate the check of self.board_members at the top.
+        It's necessary to populate the temporary tables before they're
+        used.
+        """
+
+        if not hasattr(self, "_mailers"):
+            if not self.board_members:
+                self.bail("Internal failure")
+            fields = (
+                "s.doc_id AS mailer_id",
+                "s.int_val AS summary_id",
+                "d.value AS date",
+                "r.int_val AS recipient_id",
+            )
+            date_path = "/Mailer/Sent"
+            if not self.historical and self.show == self.LAST_CHECKED_IN:
+                date_path = "/Mailer/Response/Received"
+            query = self.Query("query_term s", *fields)
+            query.where("s.path = '/Mailer/Document/@cdr:ref'")
+            query.join("query_term r", "r.doc_id = s.doc_id")
+            query.where("r.path = '/Mailer/Recipient/@cdr:ref'")
+            query.join("query_term d", "d.doc_id = s.doc_id")
+            query.where(f"d.path = '{date_path}'")
+            query.join("#board_member m", "m.person_id = r.int_val")
+            query.join("#board_summary b", "b.doc_id = s.int_val")
+            if self.historical:
+                start, end = self.start, f"{self.end} 23:59:59"
+                query.where(query.Condition("d.value", start, ">="))
+                query.where(query.Condition("d.value", end, "<="))
+            mailers = [] if self.historical else {}
+            for row in query.execute(self.cursor).fetchall():
+                member = self.board_members[row.recipient_id]
+                if row.date and member.was_active(row.date):
+                    if self.historical:
+                        mailers.append(Mailer(self, row.mailer_id))
+                    else:
+                        key = row.recipient_id, row.summary_id
+                        if key not in mailers or mailers[key][1] < row.date:
+                            mailers[key] = row.mailer_id, row.date
+            if self.historical:
+                self._mailers = mailers
+            else:
+                self._mailers = [Mailer(self, v[0]) for v in mailers.values()]
+        return self._mailers
+
+    @property
+    def order(self):
+        """How should we sort the report?"""
+
+        if not hasattr(self, "_order"):
+            self._order = self.fields.getvalue("sort", self.MEMBER_SORT)
+            if self._order not in [values[0] for values in self.SORTS]:
+                self.bail()
+        return self._order
+
+    @property
+    def recipients(self):
+        """Cached lookup of mailer recipient names by CDR Person ID."""
+
+        if not hasattr(self, "_recipients"):
+            class Recipients(UserDict):
+                def __init__(self, control):
+                    self.__control = control
+                    UserDict.__init__(self)
+                def __getitem__(self, key):
+                    if key not in self.data:
+                        query = self.__control.Query("document", "title")
+                        query.where(f"id = {key}")
+                        row = query.execute(self.__control.cursor).fetchone()
+                        title = row.title.strip() if row else ""
+                        pieces = [p.strip() for p in row.title.split(";")]
+                        name = pieces[0]
+                        if name.lower() == "inactive" and len(pieces) > 1:
+                            name = f"{pieces[1]} (inactive)"
+                        self.data[key] = name or None
+                    return self.data[key]
+            self._recipients = Recipients(self)
+        return self._recipients
+
+    @property
+    def rows(self):
+        """One for each mailer in the report."""
+
+        if not hasattr(self, "_rows"):
+            self._rows = []
+            for mailer in sorted(self.mailers):
+                self._rows.append([
+                    self.Reporter.Cell(mailer.id, center=True),
+                    mailer.recipient,
+                    mailer.summary,
+                    self.Reporter.Cell(mailer.sent, center=True),
+                    self.Reporter.Cell(mailer.response, center=True),
+                    "\n".join(mailer.changes),
+                    "\n".join(mailer.comments),
+                ])
+        return self._rows
+
+    @property
+    def sheet_name(self):
+        """String for the report's tab."""
+
+        if self.historical:
+            return "Summary Mailer History Report"
+        return "Summary Mailer Report"
+
+    @property
+    def show(self):
+        """Last mailer or last checked-in mailer?"""
+
+        if not hasattr(self, "_show"):
+            self._show = self.fields.getvalue("show", self.LAST)
+            if self._show not in [values[0] for values in self.SHOW]:
+                self.bail()
+        return self._show
+
+    @property
+    def start(self):
+        """Beginning of the report's date range."""
+
+        if not hasattr(self, "_start"):
+            value = self.fields.getvalue("start", "2000-01-01")
+            try:
+                self._start = self.parse_date(value)
+            except Exception:
+                self.bail("Invalid date")
+        return self._start
+
+    @property
+    def subtitle(self):
+        """What we display below the main banner."""
+
+        if not hasattr(self, "_subtitle"):
+            if self.historical:
+                self._subtitle = "Summary Mailer History Report"
+            else:
+                self._subtitle = "Summary Mailer Report"
+        return self._subtitle
+
+    @property
+    def summaries(self):
+        """Cached lookup of PDQ summary title by CDR document ID."""
+
+        if not hasattr(self, "_summaries"):
+            class Summaries(UserDict):
+                def __init__(self, control):
+                    self.__control = control
+                    UserDict.__init__(self)
+                def __getitem__(self, key):
+                    if key not in self.data:
+                        query = self.__control.Query("query_term", "value")
+                        query.where("path = '/Summary/SummaryTitle'")
+                        query.where(f"doc_id = {key}")
+                        row = query.execute(self.__control.cursor).fetchone()
+                        self.data[key] = row.value if row else None
+                    return self.data[key]
+            self._summaries = Summaries(self)
+        return self._summaries
+
+    @property
+    def title(self):
+        """Depends on whether we're showing the form or the report."""
+
+        if self.request == self.SUBMIT:
+            return self.subtitle
+        return self.TITLE
+
 class BoardMember:
-    members = {}
-    class Membership:
-        def __init__(self, node):
-            self.start = self.end = self.boardId = None
-            for e in node.findall('BoardName'):
-                a = e.get('{cips.nci.nih.gov/cdr}ref')
-                try:
-                    self.boardId = cdr.exNormalize(a)[1]
-                except:
-                    pass
-            for e in node.findall('TermStartDate'):
-                d = e.text
-                if d:
-                    self.start = d
-            for e in node.findall('TerminationDate'):
-            #for e in node.findall('TermEndDate'):
-                d = e.text
-                if d:
-                    self.end = d
-    def __init__(self, cursor, personId, memberId, boardId):
-        tomorrow      = str(cdr.calculateDateByOffset(1))
-        self.personId = personId
-        self.memberId = memberId
-        self.terms    = []
-        cursor.execute("SELECT xml FROM document WHERE id = ?", memberId)
-        docXml = cursor.fetchall()[0][0]
-        tree = etree.XML(docXml.encode('utf-8'))
-        for e in tree.findall('BoardMembershipDetails'):
-            membership = BoardMember.Membership(e)
-            #cdrcgi.bail("%s: %s: %s - %s" % (memberId, membership.boardId,
-            #                             membership.start, membership.end))
-            if membership.boardId == boardId and membership.start:
-                self.terms.append(membership)
-    def membershipActive(self, when):
+    """Information about one of the PDQ board's members."""
+
+    def __init__(self, control, row):
+        """Capture the caller's information.
+
+        Pass:
+            control - access to the database and the report settings
+            row - CDR document IDs for the board member
+        """
+
+        self.__control = control
+        self.__row = row
+
+    def was_active(self, when):
+        """True if the board member was an active member of the board.
+
+        Pass:
+            when - date string to check
+
+        Return:
+            True if the date falls in one of the member's membership terms
+        """
+
+        when = str(when)[:10]
         for term in self.terms:
             if term.start <= when:
                 if not term.end or term.end >= when:
                     return True
         return False
 
-#----------------------------------------------------------------------
-# Object in which we collect what we need for the mailers.
-#----------------------------------------------------------------------
+    @property
+    def member_id(self):
+        """Integer ID for the board member's CDR `PDQBoardMemberInfo` doc."""
+        return self.__row.member_id
+
+    @property
+    def person_id(self):
+        """Integer ID for the board member's CDR `Person` document."""
+        return self.__row.person_id
+
+    @property
+    def terms(self):
+        """Membership terms for the board member."""
+
+        if not hasattr(self, "_terms"):
+            self._terms = []
+            doc = Doc(self.__control.session, id=self.member_id)
+            for node in doc.root.findall("BoardMembershipDetails"):
+                term = self.MembershipTerm(node)
+                if term.board == self.__control.board and term.start:
+                    self._terms.append(term)
+        return self._terms
+
+    class MembershipTerm:
+        """Date range and board ID for a PDQ board membership term."""
+
+        def __init__(self, node):
+            """Remember the caller's value.
+
+            Pass:
+                node - XML doc node from which the properties can be pulled
+            """
+
+            self.__node = node
+
+        @property
+        def board(self):
+            """CDR Organization document integer ID for the PDQ board."""
+
+            if not hasattr(self, "_board"):
+                try:
+                    ref = self.__node.find("BoardName").get(Control.CDR_REF)
+                    self._board = Doc.extract_id(ref)
+                except Exception:
+                    self._board = None
+            return self._board
+
+        @property
+        def end(self):
+            """When this membership term ended, if applicable."""
+
+            if not hasattr(self, "_end"):
+                self._end = None
+                node = self.__node.find("TerminationDate")
+                if node is not None and node.text is not None:
+                    self._end = node.text
+            return self._end
+
+        @property
+        def start(self):
+            """When this membership term started."""
+
+            if not hasattr(self, "_start"):
+                self._start = None
+                node = self.__node.find("TermStartDate")
+                if node is not None and node.text is not None:
+                    self._start = node.text
+            return self._start
+
+
 class Mailer:
-    sortBy = "member"
-    recipients = {}
-    summaries = {}
-    def __init__(self, mailerId, cursor):
-        self.docId = mailerId
-        self.recipient = ""
-        self.summary = ""
-        self.sent = ""
-        self.response = ""
-        self.changes = []
-        self.comments = []
-        cursor.execute("SELECT xml FROM document WHERE id = ?", mailerId)
-        docXml = cursor.fetchall()[0][0]
-        tree = etree.XML(docXml.encode('utf-8'))
-        for e in tree.findall('Recipient'):
-            self.recipient = Mailer.getRecipient(e, cursor)
-        for e in tree.findall('Document'):
-            self.summary = Mailer.getSummary(e, cursor)
-        for e in tree.findall('Sent'):
-            self.sent = e.text[:10]
-        for r in tree.findall('Response'):
-            for e in r.findall('Received'):
-                self.response = e.text and e.text[:10] or ""
-            for e in r.findall('ChangesCategory'):
-                if e.text:
-                    change = e.text.strip()
-                    if change:
-                        self.changes.append(change)
-            for e in r.findall("Comment"):
-                if e.text is not None:
-                    comment = e.text.strip()
-                    if comment:
-                        self.comments.append(comment)
+    """Information need for a single row in the report."""
+
+    def __init__(self, control, id):
+        """Remember the caller's values.
+
+        Pass:
+            control - access to the database and the report settings
+            id - integer for the unique ID of the CDR `Mailer` document
+        """
+
+        self.__control = control
+        self.__id = id
+
     def __lt__(self, other):
-        if Mailer.sortBy == "member":
-            a = self.recipient, self.summary
-            b = other.recipient, other.summary
-        else:
-            a = self.summary, self.recipient
-            b = other.summary, other.recipient
-        return a < b
-    @classmethod
-    def getSummary(cls, e, cursor):
-        docId = e.get('{cips.nci.nih.gov/cdr}ref')
-        try:
-            docId = cdr.exNormalize(docId)[1]
-        except:
-            return ""
-        if docId in cls.summaries:
-            return cls.summaries[docId]
-        cursor.execute("""\
-            SELECT value
-              FROM query_term
-             WHERE path = '/Summary/SummaryTitle'
-               AND doc_id = ?""", docId)
-        rows = cursor.fetchall()
-        title = rows and rows[0][0] or ""
-        cls.summaries[docId] = title
-        return title
-    @classmethod
-    def getRecipient(cls, e, cursor):
-        docId = e.get('{cips.nci.nih.gov/cdr}ref')
-        try:
-            docId = cdr.exNormalize(docId)[1]
-        except:
-            return ""
-        if docId in cls.recipients:
-            return cls.recipients[docId]
-        cursor.execute("""\
-            SELECT title
-              FROM document
-             WHERE id = ?""", docId)
-        rows = cursor.fetchall()
-        title = rows and rows[0][0] or ""
-        cls.recipients[docId] = title.split(";")[0]
-        return cls.recipients[docId]
-    def addRow(self, sheet, styles, row):
-        sheet.write(row, 0, self.docId, styles.center)
-        sheet.write(row, 1, self.recipient, styles.left)
-        sheet.write(row, 2, self.summary, styles.left)
-        sheet.write(row, 3, self.sent, styles.center)
-        sheet.write(row, 4, self.response, styles.center)
-        sheet.write(row, 5, "\n".join(self.changes), styles.left)
-        sheet.write(row, 6, "\n".join(self.comments), styles.left)
-        return row + 1
+        """Sorting depends on the `key` property, determined by report type."""
+        return self.key < other.key
 
-#----------------------------------------------------------------------
-# Get the board name from the organization record.
-#----------------------------------------------------------------------
-def getBoardName(cursor, boardId):
-    cursor.execute("""\
-        SELECT value
-          FROM query_term
-         WHERE path = '/Organization/OrganizationNameInformation'
-                    + '/OfficialName/Name'
-           AND doc_id = ?""", boardId)
-    return cursor.fetchall()[0][0]
+    @property
+    def changes(self):
+        """Categories of changes reflected in the recipient's response."""
 
-#----------------------------------------------------------------------
-# Create the report if we have a request for one.
-#----------------------------------------------------------------------
-if board:
+        if not hasattr(self, "_changes"):
+            self._changes = []
+            for node in self.doc.root.findall("Response/ChangesCategory"):
+                change = node.text.strip() if node.text else ""
+                if change:
+                    self._changes.append(change)
+        return self._changes
 
-    cursor = conn.cursor()
-    cursor.execute("CREATE TABLE #board_member (person_id INT, member_id INT)")
-    cursor.execute("CREATE TABLE #board_summary (doc_id INT)")
-    cursor.execute("""\
-        INSERT INTO #board_member
-        SELECT DISTINCT m.int_val, m.doc_id
-          FROM query_term m
-          JOIN query_term b
-            ON m.doc_id = b.doc_id
-          JOIN active_doc d
-            ON d.id = m.doc_id
-         WHERE m.path = '/PDQBoardMemberInfo/BoardMemberName/@cdr:ref'
-           AND b.path = '/PDQBoardMemberInfo/BoardMembershipDetails'
-                      + '/BoardName/@cdr:ref'
-           AND b.int_val = ?""", board)
-    cursor.execute("""\
-        INSERT INTO #board_summary
-        SELECT DISTINCT doc_id
-          FROM query_term
-         WHERE path = '/Summary/SummaryMetaData/PDQBoard'
-                    + '/Board/@cdr:ref'
-           AND int_val = ?""", board)
-    conn.commit()
-    cursor.execute("SELECT person_id, member_id FROM #board_member")
-    for personId, memberId in cursor.fetchall():
-        BoardMember.members[personId] = BoardMember(cursor, personId, memberId,
-                                                    int(board))
-    styles = cdrcgi.ExcelStyles()
-    sheet = styles.add_sheet(section)
-    Mailer.sortBy = sortBy
+    @property
+    def comments(self):
+        """Additional notes supplied byu the mailer recipient."""
 
-    if flavor == "4258":
-        report4258(sheet, styles, cursor, board, selectBy)
-    else:
-        report4259(sheet, styles, cursor, board, begin, end)
-    stamp = time.strftime("%Y%m%d%H%M%S")
-    sys.stdout.buffer.write(f"""\
-Content-type: application/vnd.ms-excel
-Content-Disposition: attachment; filename=SummMailRep-{stamp}.xls
+        if not hasattr(self, "_comments"):
+            self._comments = []
+            for node in self.doc.root.findall("Response/Comment"):
+                comment = node.text.strip() if node.text else ""
+                if comment:
+                    self._comments.append(comment)
+        return self._comments
 
-""".encode("utf-8"))
-    styles.book.save(sys.stdout.buffer)
+    @property
+    def doc(self):
+        """`Doc` object for the mailer."""
 
-else:
-    boards = makeBoardPicklist(conn.cursor())
-    form = ["""\
-   <input type='hidden' name='flavor' value='%s' />
-   <input type='hidden' name='%s' value='%s' />
-   <table border='0'>
-    <tr>
-     <th align='right'>Board: </th>
-     <td>%s</td>
-    </tr>
-""" % (flavor, cdrcgi.SESSION, session, boards)]
-    if flavor == "4259":
-        form.append("""\
-    <tr>
-     <th align='right'>Start: </th>
-     <td><input class='CdrDateField' name='begin' id='begin' /></td>
-    </tr>
-    <tr>
-     <th align='right'>End: </th>
-     <td><input class='CdrDateField' name='end' id='end' /></td>
-    </tr>
-""")
-    form.append("""\
-    <tr>
-     <th align='right'>Sort By: </th>
-     <td>
-      <input type='radio' name='sortBy' value='member' checked='1' />
-      Board Member
-      <input type='radio' name='sortBy' value='summary' />
-      Summary Name
-     </td>
-    </tr>
-""")
-    if flavor == "4258":
-        form.append("""\
-    <tr>
-     <th align='right'>Show: </th>
-     <td>
-      <input type='radio' name='selectBy' value='lastMailer' checked='1' />
-      Last Mailer
-      <input type='radio' name='selectBy' value='lastCheckedInMailer' />
-      Last Checked-In Mailer
-     </td>
-    </tr>
-""")
-    form.append("""\
-   </table>
-  </form>
- </body>
-</html>
-""")
+        if not hasattr(self, "_doc"):
+            self._doc = Doc(self.__control.session, id=self.id)
+        return self._doc
 
-    cdrcgi.sendPage(header + "".join(form))
+    @property
+    def id(self):
+        """CDR document ID integer for the mailer."""
+        return self.__id
+
+    @property
+    def key(self):
+        """Sorting support, adjusted for the type of report."""
+
+        if not hasattr(self, "_key"):
+            if self.__control.order == Control.MEMBER_SORT:
+                self._key = self.recipient.lower(), self.summary.lower()
+            else:
+                self._key = self.summary.lower(), self.recipient.lower()
+        return self._key
+
+    @property
+    def recipient(self):
+        """Name of the person who got the mailer."""
+
+        if not hasattr(self, "_recipient"):
+            node = self.doc.root.find("Recipient")
+            try:
+                doc_id = Doc.extract_id(node.get(Control.CDR_REF))
+                self._recipient = self.__control.recipients[doc_id]
+            except Exception:
+                self._recipient = None
+        return self._recipient
+
+    @property
+    def response(self):
+        """When the recipient's response was received."""
+
+        if not hasattr(self, "_response"):
+            self._response = None
+            for node in self.doc.root.findall("Response/Received"):
+                if node.text:
+                    self._response = node.text.strip()[:10]
+        return self._response
+
+    @property
+    def sent(self):
+        """The date the summary mailer was mailed."""
+
+        if not hasattr(self, "_sent"):
+            self._sent = None
+            node = self.doc.root.find("Sent")
+            if node is not None and node.text is not None:
+                self._sent = node.text[:10]
+        return self._sent
+
+    @property
+    def summary(self):
+        """Document title of the PDQ summary behind this mailer."""
+
+        if not hasattr(self, "_summary"):
+            node = self.doc.root.find("Document")
+            try:
+                doc_id = Doc.extract_id(node.get(Control.CDR_REF))
+                self._summary = self.__control.summaries[doc_id]
+            except Exception:
+                self._summary = None
+        return self._summary
+
+
+if __name__ == "__main__":
+    """Don't execute script if loaded as a module."""
+    Control().run()
