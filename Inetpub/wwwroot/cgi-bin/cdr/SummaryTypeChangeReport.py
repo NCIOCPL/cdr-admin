@@ -1,120 +1,44 @@
-#----------------------------------------------------------------------
-# Report on the types of changes recorded in selected Summaries.
-#
-# BZIssue::None  (JIRA::OCECDR-3703)
-# OCECDR-3900: Modify the Summaries Type of Change report to display
-#              Spanish CAM summaries
-#
-#                                           Alan Meyer, March 2014
-#
-# JIRA::OCECDR-4217 - modify user interface for report
-# JIRA::OCECDR-4256 - fix date range filter bug
-#----------------------------------------------------------------------
+#!/usr/bin/env python
+
+"""Report on the types of changes recorded in selected Summaries.
+
+BZIssue::None  (JIRA::OCECDR-3703)
+OCECDR-3900: Modify the Summaries Type of Change report to display
+             Spanish CAM summaries
+
+                                           Alan Meyer, March 2014
+
+JIRA::OCECDR-4217 - modify user interface for report
+JIRA::OCECDR-4256 - fix date range filter bug
+"""
+
+from datetime import date
+from cdrapi.docs import Doc
+from cdrcgi import Controller
+from cdr import URDATE, getSchemaEnumVals
+
 import datetime
-import lxml.etree as etree
 import cdr
 import cdrcgi
 from cdrapi import db
 
-class Control(cdrcgi.Control):
+
+class Control(Controller):
     """
     Logic manager for report.
     """
 
+    SUBTITLE = "Summaries Type of Change"
     INCLUDE = "include"
     EXCLUDE = "exclude"
-    COMMENTS = (INCLUDE, EXCLUDE)
+    COMMENTS = INCLUDE, EXCLUDE
     CURRENT = "Current (most recent changes for each category of change)"
     HISTORICAL = "Historical (all changes for a given date range)"
-    REPORT_TYPES = (CURRENT, HISTORICAL)
+    REPORT_TYPES = CURRENT, HISTORICAL
     BY_SUMMARY = "One table for all summaries and changes"
     BY_CHANGE_TYPE = "One table for each type of change"
-    REPORT_ORGANIZATIONS = (BY_SUMMARY, BY_CHANGE_TYPE)
+    REPORT_ORGANIZATIONS = BY_SUMMARY, BY_CHANGE_TYPE
 
-    def __init__(self):
-        """
-        Collect and validate the report's request parameters.
-        """
-
-        cdrcgi.Control.__init__(self, "Summaries Type of Change")
-        self.debug = self.fields.getvalue("debug") and True or False
-        if self.debug:
-            self.logger.level = cdr.Logging.LEVELS["debug"]
-        self.today = str(datetime.date.today())
-        self.boards = self.get_boards()
-        self.all_types = self.get_change_types()
-        self.change_types = self.fields.getlist("change-type") or self.all_types
-        self.change_types = sorted(self.change_types)
-        self.report_type = self.fields.getvalue("report-type") or self.CURRENT
-        self.report_org = self.fields.getvalue("report-org") or self.BY_SUMMARY
-        self.comments = self.fields.getvalue("comments") != self.EXCLUDE
-        self.start = self.fields.getvalue("start") or cdr.URDATE
-        self.end = self.fields.getvalue("end") or self.today
-        self.selection_method = self.fields.getvalue("method", "board")
-        self.audience = self.fields.getvalue("audience", "Health Professional")
-        self.language = self.fields.getvalue("language", "English")
-        self.board = self.fields.getlist("board") or ["all"]
-        self.cdr_ids = self.fields.getvalue("cdr-id") or ""
-        self.fragment = self.fields.getvalue("title")
-        self.validate()
-
-    def populate_form(self, form, titles=None):
-        """
-        Put the fields on the form.
-
-        Pass:
-            form - cdrcgi.Page object
-            titles - if not None, show the followup page for selecting
-                     from multiple matches with the user's title fragment;
-                     otherwise, show the report's main request form
-        """
-
-        form.add_hidden_field("debug", self.debug)
-        fieldset = '<fieldset class="history">'
-        opts = { "titles": titles, "id-label": "CDR ID(s)" }
-        opts["id-tip"] = "separate multiple IDs with spaces"
-        self.add_summary_selection_fields(form, **opts)
-        form.add("<fieldset>")
-        form.add(form.B.LEGEND("Types of Change"))
-        for ct in self.all_types:
-            checked = ct in self.change_types
-            form.add_checkbox("change-type", ct, ct, checked=checked)
-        form.add("</fieldset>")
-        form.add("<fieldset>")
-        form.add(form.B.LEGEND("Comment Display"))
-        for value in self.COMMENTS:
-            label = "%s Comments" % value.capitalize()
-            if self.comments:
-                checked = value == self.INCLUDE
-            else:
-                checked = value == self.EXCLUDE
-            form.add_radio("comments", label, value, checked=checked)
-        form.add("</fieldset>")
-        form.add("<fieldset>")
-        form.add(form.B.LEGEND("Type of Report"))
-        for value in self.REPORT_TYPES:
-            checked = value == self.report_type
-            form.add_radio("report-type", value, value, checked=checked)
-        form.add("</fieldset>")
-        form.add(fieldset)
-        form.add(form.B.LEGEND("Date Range for Changes History"))
-        form.add_date_field("start", "Start Date", value=self.start)
-        form.add_date_field("end", "End Date", value=self.end)
-        form.add("</fieldset>")
-        form.add(fieldset)
-        form.add(form.B.LEGEND("Report Organization"))
-        for org in self.REPORT_ORGANIZATIONS:
-            checked = org == self.report_org
-            form.add_radio("report-org", org, org, checked=checked)
-        form.add("</fieldset>")
-        form.add_output_options(default=self.format)
-        script = self.toggle_display("check_report_type", self.HISTORICAL,
-                                     "history")
-        form.add_script(script)
-        form.add_script("""\
-jQuery(function() {
-    check_report_type(jQuery("input[name='report-type']:checked").val());
-});""")
     def build_tables(self):
         """
         Overrides the base class's version of this method to assemble
@@ -139,7 +63,7 @@ jQuery(function() {
             if not self.fragment:
                 cdrcgi.bail("Title fragment is required.")
             titles = self.summaries_for_title(self.fragment)
-            if not titles:
+            if not self.summary_titles:
                 cdrcgi.bail("No summaries match that title fragment")
             if len(titles) == 1:
                 summaries = [Summary(self, titles[0].id)]
@@ -150,9 +74,9 @@ jQuery(function() {
                     "subtitle": self.title,
                     "session": self.session
                 }
-                form = cdrcgi.Page(self.PAGE_TITLE, **opts)
+                page = cdrcgi.Page(self.PAGE_TITLE, **opts)
                 self.populate_form(form, titles)
-                form.send()
+                page.send()
         elif self.selection_method == "id":
             if not self.cdr_ids:
                 cdrcgi.bail("At least one CDR ID is required.")
@@ -183,16 +107,244 @@ jQuery(function() {
         """
 
         opts["page_opts"]["buttons"] = []
-        today = datetime.datetime.today()
-        subtitle = today.strftime("Report produced: %A %B %d, %Y %I:%M %p")
-        subtitle = "Report produced %s" % str(datetime.datetime.now())[:19]
-        subtitle = "Report produced %s" % datetime.date.today()
+        subtitle = f"Report produced {self.today}"
         opts["subtitle"] = subtitle
         if self.report_type == self.HISTORICAL:
             opts["subtitle"] += " -- %s" % self.format_date_range()
         report_type = self.report_type.split()[0]
         opts["banner"] = "Summary Type of Change Report - %s" % report_type
         return opts
+
+    def populate_form(self, page, titles=None):
+        """Put the fields on the form.
+
+        Pass:
+            page - `cdrcgi.HTMLPage` object
+            titles - if not None, show the followup page for selecting
+                     from multiple matches with the user's title fragment;
+                     otherwise, show the report's main request form
+        """
+
+        page.form.append(page.hidden_field("debug", self.debug))
+        opts = { "titles": titles, "id-label": "CDR ID(s)" }
+        opts["id-tip"] = "separate multiple IDs with spaces"
+        self.add_summary_selection_fields(page, **opts)
+        fieldset = page.fieldset("Types of Change")
+        for ct in self.all_types:
+            checked = ct in self.change_types
+            opts = dict(value=ct, checked=checked)
+            fieldset.append(page.checkbox("change-type", **opts))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Comment Display")
+        for value in self.COMMENTS:
+            label = "%s Comments" % value.capitalize()
+            if self.comments:
+                checked = value == self.INCLUDE
+            else:
+                checked = value == self.EXCLUDE
+            opts = dict(label=label, value=value, checked=checked)
+            fieldset.append(page.radio_button("comments", **opts))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Type of Report")
+        for value in self.REPORT_TYPES:
+            checked = value == self.type
+            opts = dict(value=value, checked=checked)
+            fieldset.append(page.radio_button("type", **opts))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Date Range for Changes History")
+        fieldset.set("class", "history")
+        opts = dict(value=self.start, label="Start Date")
+        fieldset.append(page.date_field("start", **opts))
+        opts = dict(value=self.start, label="End Date")
+        fieldset.append(page.date_field("end", **opts))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Report Organization")
+        for organization in self.REPORT_ORGANIZATIONS:
+            checked = organization == self.organization
+            opts = dict(value=organization, checked=checked)
+            fieldset.append(page.radio_button("organization", **opts))
+        page.form.append(fieldset)
+        page.add_output_options(default=self.format)
+        args = "check_report_type", self.HISTORICAL, "history"
+        page.add_script(self.toggle_display(*args))
+        page.add_script("""\
+jQuery(function() {
+    check_report_type(jQuery("input[name='report-type']:checked").val());
+});""")
+
+    @property
+    def all_types(self):
+        """Valid type of change values parsed from the summary schema."""
+
+        if not hasattr(self, "_all_types"):
+            args = "SummarySchema.xml", "SummaryChangeType"
+            self._all_types = sorted(cdr.getSchemaEnumVals(*args))
+        return self._all_types
+
+    @property
+    def audience(self):
+        """Selecting summaries for this audience."""
+
+        if not hasattr(self, "_audience"):
+            self._audience = self.fields.getvalue("audience")
+            if self._audience:
+                if self._audience not in self.AUDIENCES:
+                    self.bail()
+            else:
+                self._audience = self.AUDIENCES[0]
+        return self._audience
+
+    @property
+    def board(self):
+        """PDQ board ID(s) selected by the user for the report."""
+
+        if not hasattr(self, "_board"):
+            boards = self.fields.getlist("board")
+            if "all" in boards:
+                self._board = ["all"]
+            else:
+                self._board = set()
+                for id in boards:
+                    try:
+                        self._board.add(int(id))
+                    except:
+                        self.bail()
+                self._board = list(self._board)
+                if not self._board:
+                    self._board = ["all"]
+        return self._board
+
+    @property
+    def boards(self):
+        """Dictionary of board names indexed by CDR Organization ID."""
+
+        if not hasattr(self, "_boards"):
+            self._boards = self.get_boards()
+        return self._boards
+
+    @property
+    def cdr_ids(self):
+        """Set of unique CDR ID integers."""
+
+        if not hasattr(self, "_cdr_ids"):
+            self._cdr_ids = set()
+            for word in self.fields.getvalue("cdr-id", "").strip().split():
+                try:
+                    self._cdr_ids.add(Doc.extract_id(word))
+                except:
+                    self.bail("Invalid format for CDR ID")
+        return self._cdr_ids
+
+    @property
+    def change_types(self):
+        """Types of change selected by the user."""
+
+        if not hasattr(self, "_change_types"):
+            types = self.fields.getlist("change-type") or self.all_types
+            if set(types) - set(self.all_types):
+                self.bail()
+            self._change_types = sorted(types)
+        return self._change_types
+
+    @property
+    def comments(self):
+        """True if the report should include comments."""
+
+        if not hasattr(self, "_comments"):
+            comments = self.fields.getvalue("comments")
+            self._comments = comments != self.EXCLUDE
+        return self._comments
+
+    @property
+    def debug(self):
+        """True if we're running with increased logging."""
+
+        if not hasattr(self, "_debug"):
+            self._debug = True if self.fields.getvalue("debug") else False
+        return self._debug
+
+    @property
+    def end(self):
+        """End of date range for the historical version of the report."""
+
+        if not hasattr(self, "_end"):
+            end = self.fields.getvalue("end")
+            self._end = self.parse_date(end) or self.today
+        return self._end
+
+    @property
+    def fragment(self):
+        """Title fragment for selecting a summary by title."""
+
+        if not hasattr(self, "_fragment"):
+            self._fragment = self.fields.getvalue("title")
+        return self._fragment
+
+    @property
+    def language(self):
+        """Selecting summaries for this language."""
+
+        if not hasattr(self, "_language"):
+            self._language = self.fields.getvalue("language")
+            if self._language:
+                if self._language not in self.LANGUAGES:
+                    self.bail()
+            else:
+                self._language = self.LANGUAGES[0]
+        return self._language
+
+    @property
+    def loglevel(self):
+        """Override to support debug logging."""
+        return "DEBUG" if self.debug else self.LOGLEVEL
+
+    @property
+    def organization(self):
+        """Report organization (by summary or by change types)."""
+
+        if not hasattr(self, "_organization"):
+            organization = self.fields.getvalue("organization")
+            self._organization = organization or self.BY_SUMMARY
+            if self._organization not in self.REPORT_ORGANIZATIONS:
+                self.bail()
+        return self._organization
+
+    @property
+    def selection_method(self):
+        """How are we choosing summaries?"""
+
+        if not hasattr(self, "_selection_method"):
+            self._selection_method = self.fields.getvalue("method", "board")
+            if self._selection_method not in self.SUMMARY_SELECTION_METHODS:
+                self.bail()
+        return self._selection_method
+
+    @property
+    def start(self):
+        """Start of date range for the historical version of the report."""
+
+        if not hasattr(self, "_start"):
+            start = self.fields.getvalue("start", URDATE)
+            self._start = self.parse_date(start)
+        return self._start
+
+    @property
+    def today(self):
+        """Today's date object, used in several places."""
+
+        if not hasattr(self, "_today"):
+            self._today = date.today()
+        return self._today
+
+    @property
+    def type(self):
+        """Type of report (current or historical)."""
+
+        if not hasattr(self, "_type"):
+            self._type = self.fields.getvalue("type") or self.CURRENT
+            if self._type not in self.REPORT_TYPES:
+                self.bail()
+        return self._type
 
     def summaries_for_boards(self):
         """
@@ -302,58 +454,6 @@ jQuery(function() {
 
         return columns
 
-    def get_change_types(self):
-        """
-        Parse the summary schema to get the valid values for type of change.
-        """
-
-        schema_doc, element_tag = "SummarySchema.xml", "SummaryChangeType"
-        return sorted (cdr.getSchemaEnumVals(schema_doc, element_tag))
-
-    def validate(self):
-        """
-        Separate validation method, to make sure the CGI request's
-        parameters haven't been tampered with by an intruder.
-        """
-
-        msg = cdrcgi.TAMPERING
-        if self.audience not in self.AUDIENCES:
-            cdrcgi.bail(msg)
-        if self.language not in self.LANGUAGES:
-            cdrcgi.bail(msg)
-        if self.selection_method not in self.SUMMARY_SELECTION_METHODS:
-            cdrcgi.bail(msg)
-        if self.format not in self.FORMATS:
-            cdrcgi.bail(msg)
-        boards = []
-        for board in self.board:
-            if board == "all":
-                boards.append("all")
-            else:
-                try:
-                    board = int(board)
-                except:
-                    cdrcgi.bail(msg)
-                if board not in self.boards:
-                    cdrcgi.bail(msg)
-                boards.append(board)
-        self.board = boards
-        cdr_ids = set()
-        for word in self.cdr_ids.strip().split():
-            try:
-                cdr_ids.add(cdr.exNormalize(word)[1])
-            except:
-                cdrcgi.bail("Invalid format for CDR ID")
-        self.cdr_ids = cdr_ids
-        cdrcgi.valParmDate(self.start, msg=msg)
-        cdrcgi.valParmDate(self.end, msg=msg)
-        valid_value_checks = (
-            (self.change_types, self.all_types),
-            (self.report_type, self.REPORT_TYPES),
-            (self.report_org, self.REPORT_ORGANIZATIONS)
-        )
-        for user_values, valid_values in valid_value_checks:
-            cdrcgi.valParmVal(user_values, valList=valid_values, msg=msg)
 
 class Summary:
     """
