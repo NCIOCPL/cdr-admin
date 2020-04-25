@@ -55,9 +55,9 @@ class Control(Controller):
         for display, script, parms in (
             ("Miscellaneous Documents", "MiscSearch.py", {}),
             ("Summary Mailer History Report", "SummaryMailerReport.py",
-             dict(flavor="4259")),
+             dict(flavor="historical")),
             ("Summary Mailer Report", "SummaryMailerReport.py",
-             dict(flavor="4258")),
+             dict(flavor="standard")),
         ):
             ol.append(page.B.LI(page.menu_link(script, display, **parms)))
 
