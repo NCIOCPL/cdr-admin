@@ -1,4 +1,4 @@
-#!/usr/bin/env
+#!/usr/bin/env python
 
 """Simple demonstration of how to use the cdrcgi.Controller class.
 """

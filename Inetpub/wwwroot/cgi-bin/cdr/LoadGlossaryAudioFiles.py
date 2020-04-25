@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """Add and link to glossary pronunciation Media documents.
 
 Invoked from the CDR Admin web menu.

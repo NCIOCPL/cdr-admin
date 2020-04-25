@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 #----------------------------------------------------------------------
 # Report on summaries with citations to publications other than journal
 # articles.

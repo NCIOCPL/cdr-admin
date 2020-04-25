@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """Report on terms within StandardWording and/or GlossaryTerm elements.
 
 JIRA::OCECDR-4568

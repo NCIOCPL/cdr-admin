@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """
 Generate parameterized reports on the CDR media translation job queue.
 

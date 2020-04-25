@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """Replace working version of a document with an earlier version.
 
 Used when the most recent copy of a document has problems and

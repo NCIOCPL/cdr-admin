@@ -1,4 +1,4 @@
-#!/usr/bin/env
+#!/usr/bin/env python
 
 """Show the status of a publishing job.
 """

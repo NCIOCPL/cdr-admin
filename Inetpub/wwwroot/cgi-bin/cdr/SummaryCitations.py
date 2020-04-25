@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 #----------------------------------------------------------------------
 # Report listing all references cited in a selected version of a
 # cancer information summary.

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 """Show changes to DEV after DB refresh from PROD.
 """

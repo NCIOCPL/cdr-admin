@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 #----------------------------------------------------------------------
 # Sends the raw XML for a document to a browser.  Useful with IE5.x,
 # which by default shows a hierarchical tree display for the data.

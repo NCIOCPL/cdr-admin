@@ -1,4 +1,4 @@
-#!/usr/bin/env
+#!/usr/bin/env python
 
 """Report documents last modified during a specified time period.
 """

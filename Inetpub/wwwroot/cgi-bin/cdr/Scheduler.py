@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """Manage scheduler jobs.
 
 Replacement for the poorly maintained ndscheduler package.

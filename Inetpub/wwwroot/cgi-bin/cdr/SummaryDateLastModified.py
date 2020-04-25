@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """Report on the most recent changes made to PDQ summary documents.
 
 The users have insisted that we keep all the tables for the report

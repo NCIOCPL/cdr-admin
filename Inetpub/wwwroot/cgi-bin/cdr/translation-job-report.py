@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 #----------------------------------------------------------------------
 # Generate parameterized reports on the CDR summary translation job queue.
 # JIRA::OCECDR-4193

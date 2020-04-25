@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 #----------------------------------------------------------------------
 # Report listing summaries containing specified markup.
 #

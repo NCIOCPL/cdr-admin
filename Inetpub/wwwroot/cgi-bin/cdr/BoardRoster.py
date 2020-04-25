@@ -1,4 +1,4 @@
-#!/usr/bin/env
+#!/usr/bin/env python
 
 """Display the Board Roster with or without assistant information.
 """

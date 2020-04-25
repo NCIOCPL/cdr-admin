@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """
 Generate parameterized reports on the CDR glossary translation job queue.
 

@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """Edit a summary translation job.
 
 JIRA::OCECDR-4193 - create translation job editor

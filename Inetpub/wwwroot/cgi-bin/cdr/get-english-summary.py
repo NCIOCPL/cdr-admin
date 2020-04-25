@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """Fetch an English summary ready for translation
 """
 

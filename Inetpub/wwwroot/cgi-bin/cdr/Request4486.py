@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 #----------------------------------------------------------------------
 # "We need a new glossary term concept by type QC report to help us ensure
 # consistency in the wording of definitions."

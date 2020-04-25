@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """Report to list the Comprehensive Review Dates for PDQ summaries.
 """
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env /python
+#!/usr/bin/env python
 
 """Show Media documents, optionally filtered by category and/or diagnosis.
 """
