@@ -1,26 +1,12 @@
 #!/usr/bin/env python
 
 """Report on the types of changes recorded in selected Summaries.
-
-BZIssue::None  (JIRA::OCECDR-3703)
-OCECDR-3900: Modify the Summaries Type of Change report to display
-             Spanish CAM summaries
-
-                                           Alan Meyer, March 2014
-
-JIRA::OCECDR-4217 - modify user interface for report
-JIRA::OCECDR-4256 - fix date range filter bug
 """
 
 from datetime import date
 from cdrapi.docs import Doc
 from cdrcgi import Controller
 from cdr import URDATE, getSchemaEnumVals
-
-import datetime
-import cdr
-import cdrcgi
-from cdrapi import db
 
 
 class Control(Controller):
@@ -29,6 +15,7 @@ class Control(Controller):
     """
 
     SUBTITLE = "Summaries Type of Change"
+    LOGNAME = "SummaryTypeChangeReport"
     INCLUDE = "include"
     EXCLUDE = "exclude"
     COMMENTS = INCLUDE, EXCLUDE
@@ -38,15 +25,14 @@ class Control(Controller):
     BY_SUMMARY = "One table for all summaries and changes"
     BY_CHANGE_TYPE = "One table for each type of change"
     REPORT_ORGANIZATIONS = BY_SUMMARY, BY_CHANGE_TYPE
+    MODULES = (
+        ("both", "Summaries and Modules"),
+        ("summaries", "Summaries Only"),
+        ("modules", "Modules Only"),
+    )
 
     def build_tables(self):
-        """
-        Overrides the base class's version of this method to assemble
-        the tables to be displayed for this report. If the user
-        chooses the "by summary title" method for selecting which
-        summary to use for the report, and the fragment supplied
-        matches more than one summary document, display the form
-        a second time so the user can pick the summary.
+        """Assemble the table(s) for the report.
 
         If we're ready to display the report, we have three options:
           1. a single table showing the latest changes in each
@@ -59,61 +45,24 @@ class Control(Controller):
              date range for all selected summaries
         """
 
-        if self.selection_method == "title":
-            if not self.fragment:
-                cdrcgi.bail("Title fragment is required.")
-            titles = self.summaries_for_title(self.fragment)
-            if not self.summary_titles:
-                cdrcgi.bail("No summaries match that title fragment")
-            if len(titles) == 1:
-                summaries = [Summary(self, titles[0].id)]
-            else:
-                opts = {
-                    "buttons": self.buttons,
-                    "action": self.script,
-                    "subtitle": self.title,
-                    "session": self.session
-                }
-                page = cdrcgi.Page(self.PAGE_TITLE, **opts)
-                self.populate_form(form, titles)
-                page.send()
-        elif self.selection_method == "id":
-            if not self.cdr_ids:
-                cdrcgi.bail("At least one CDR ID is required.")
-            summaries = [Summary(self, id) for id in self.cdr_ids]
+        tables = None
+        if self.type == self.CURRENT:
+            caption = "Type of Change Report (Most Recent Change)"
+        elif self.organization == self.BY_SUMMARY:
+            caption = "Type of Change Report (All Changes by Summary)"
+            caption = caption, self.date_range
         else:
-            if not self.board:
-                cdrcgi.bail("At least one board is required.")
-            summaries = self.summaries_for_boards()
-
-        # We have the summaries; build the report table(s).
-        cols = self.get_cols()
-        opts = { "banner": self.PAGE_TITLE, "subtitle": self.title }
-        if self.report_type == self.CURRENT:
-            opts["caption"] = "Type of Change Report (Most Recent Change)"
-        elif self.report_org == self.BY_SUMMARY:
-            caption = ["Type of Change Report (All Changes by Summary)"]
-            caption.append(self.format_date_range())
-        else:
-            return self.get_change_type_tables(cols, summaries)
-        rows = []
-        for summary in sorted(summaries):
-            rows.extend(summary.get_rows())
-        return [cdrcgi.Report.Table(cols, rows, **opts)]
-
-    def set_report_options(self, opts):
-        """
-        Take off the buttons and add the banners/titles.
-        """
-
-        opts["page_opts"]["buttons"] = []
-        subtitle = f"Report produced {self.today}"
-        opts["subtitle"] = subtitle
-        if self.report_type == self.HISTORICAL:
-            opts["subtitle"] += " -- %s" % self.format_date_range()
-        report_type = self.report_type.split()[0]
-        opts["banner"] = "Summary Type of Change Report - %s" % report_type
-        return opts
+            tables = self.change_type_tables
+        if tables is None:
+            opts = dict(caption=caption, columns=self.columns)
+            rows = []
+            for summary in sorted(self.summaries):
+                rows.extend(summary.get_rows())
+            tables = [self.Reporter.Table(rows, **opts)]
+        self.subtitle = f"Report produced {self.today}"
+        if self.type == self.HISTORICAL:
+            self.subtitle += f" -- {self.date_range}"
+        return tables
 
     def populate_form(self, page, titles=None):
         """Put the fields on the form.
@@ -125,10 +74,17 @@ class Control(Controller):
                      otherwise, show the report's main request form
         """
 
-        page.form.append(page.hidden_field("debug", self.debug))
+        page.form.append(page.hidden_field("debug", self.debug or ""))
         opts = { "titles": titles, "id-label": "CDR ID(s)" }
         opts["id-tip"] = "separate multiple IDs with spaces"
         self.add_summary_selection_fields(page, **opts)
+        fieldset = page.fieldset("Include")
+        fieldset.set("class", "by-board-block")
+        for value, label in self.MODULES:
+            checked = value == self.modules
+            opts = dict(value=value, label=label, checked=checked)
+            fieldset.append(page.radio_button("modules", **opts))
+        page.form.append(fieldset)
         fieldset = page.fieldset("Types of Change")
         for ct in self.all_types:
             checked = ct in self.change_types
@@ -137,7 +93,7 @@ class Control(Controller):
         page.form.append(fieldset)
         fieldset = page.fieldset("Comment Display")
         for value in self.COMMENTS:
-            label = "%s Comments" % value.capitalize()
+            label = f"{value.capitalize()} Comments"
             if self.comments:
                 checked = value == self.INCLUDE
             else:
@@ -155,7 +111,7 @@ class Control(Controller):
         fieldset.set("class", "history")
         opts = dict(value=self.start, label="Start Date")
         fieldset.append(page.date_field("start", **opts))
-        opts = dict(value=self.start, label="End Date")
+        opts = dict(value=self.end, label="End Date")
         fieldset.append(page.date_field("end", **opts))
         page.form.append(fieldset)
         fieldset = page.fieldset("Report Organization")
@@ -165,11 +121,11 @@ class Control(Controller):
             fieldset.append(page.radio_button("organization", **opts))
         page.form.append(fieldset)
         page.add_output_options(default=self.format)
-        args = "check_report_type", self.HISTORICAL, "history"
+        args = "check_type", self.HISTORICAL, "history"
         page.add_script(self.toggle_display(*args))
         page.add_script("""\
-jQuery(function() {
-    check_report_type(jQuery("input[name='report-type']:checked").val());
+$(function() {
+    check_type($("input[name='type']:checked").val());
 });""")
 
     @property
@@ -178,7 +134,7 @@ jQuery(function() {
 
         if not hasattr(self, "_all_types"):
             args = "SummarySchema.xml", "SummaryChangeType"
-            self._all_types = sorted(cdr.getSchemaEnumVals(*args))
+            self._all_types = sorted(getSchemaEnumVals(*args))
         return self._all_types
 
     @property
@@ -236,6 +192,34 @@ jQuery(function() {
         return self._cdr_ids
 
     @property
+    def change_type_tables(self):
+        """Report each type of change in its own table."""
+
+        if not hasattr(self, "_change_type_tables"):
+            opts = { "html_callback_pre": Control.table_spacer }
+            tables = []
+            title = "Type of Change Report"
+            range = self.date_range
+            for change_type in self.change_types:
+                rows = []
+                for summary in self.summaries:
+                    rows.extend(summary.get_rows(change_type))
+                if not rows:
+                    continue
+                count = f"{len(rows):d} change"
+                if len(rows) > 1:
+                    count += "s"
+                opts = dict(
+                    caption=(title, change_type, f"{range} ({count})"),
+                    sheet_name=change_type.split()[0],
+                    columns=self.columns,
+                    classes="change_type_table",
+                )
+                tables.append(self.Reporter.Table(rows, **opts))
+            self._change_type_tables = tables
+        return self._change_type_tables
+
+    @property
     def change_types(self):
         """Types of change selected by the user."""
 
@@ -247,6 +231,41 @@ jQuery(function() {
         return self._change_types
 
     @property
+    def columns(self):
+        """Sequence of column definitions for the output report.
+
+        Number and types of columns depend on config parms.
+        """
+
+        if not hasattr(self, "_columns"):
+
+            # We'll use this a lot.
+            Column = self.Reporter.Column
+
+            # Leftmost column is always a doc title and ID.
+            self._columns = [Column("Summary", width="220px")]
+
+            # Basic reports need cols for types of change and comments.
+            if self.type == self.CURRENT:
+                if self.comments:
+                    comment_column = Column("Comment", width="150px")
+                for change_type in sorted(self.change_types):
+                    self._columns.append(Column(change_type, width="105px"))
+                    if self.comments:
+                        self._columns.append(comment_column)
+
+            # Historical reports.
+            else:
+                self._columns.append(Column("Date", width="80px"))
+                if self.organization == self.BY_SUMMARY:
+                    col = Column("Type of Change", width="150px")
+                    self._columns.append(col)
+                if self.comments:
+                    self._columns.append(Column("Comment", width="180px"))
+
+        return self._columns
+
+    @property
     def comments(self):
         """True if the report should include comments."""
 
@@ -254,6 +273,24 @@ jQuery(function() {
             comments = self.fields.getvalue("comments")
             self._comments = comments != self.EXCLUDE
         return self._comments
+
+    @property
+    def date_range(self):
+        """String describing the date coverage for the report."""
+
+        if not hasattr(self, "_date_range"):
+            start_is_urdate = str(self.start) <= URDATE
+            end_is_today = self.end >= self.today
+            if start_is_urdate:
+                if end_is_today:
+                    self._date_range = "Complete History"
+                else:
+                    self._date_range = f"Through {self.end}"
+            elif end_is_today:
+                self._date_range = f"From {self.start}"
+            else:
+                self._date_range = f"{self.start} - {self.end}"
+        return self._date_range
 
     @property
     def debug(self):
@@ -299,6 +336,16 @@ jQuery(function() {
         return "DEBUG" if self.debug else self.LOGLEVEL
 
     @property
+    def modules(self):
+        """How to handle modules in summary selection."""
+
+        if not hasattr(self, "_modules"):
+            self._modules = self.fields.getvalue("modules", "both")
+            if self._modules not in [m[0] for m in self.MODULES]:
+                self.bail()
+        return self._modules
+
+    @property
     def organization(self):
         """Report organization (by summary or by change types)."""
 
@@ -329,6 +376,81 @@ jQuery(function() {
         return self._start
 
     @property
+    def subtitle(self):
+        """What we display under the main banner."""
+
+        if not hasattr(self, "_subtitle"):
+            self._subtitle = self.SUBTITLE
+        return self._subtitle
+
+    @subtitle.setter
+    def subtitle(self, value):
+        """Allow the report page to override the subtitle."""
+        self._subtitle = value
+
+    @property
+    def summaries(self):
+        """PDQ summaries selected for the report.
+
+        If the user chooses the "by summary title" method for
+        selecting which summary to use for the report, and the
+        fragment supplied matches more than one summary document,
+        display the form a second time so the user can pick the
+        summary.
+        """
+
+        if not hasattr(self, "_summaries"):
+            if self.selection_method == "title":
+                if not self.fragment:
+                    self.bail("Title fragment is required.")
+                titles = self.summary_titles
+                if not titles:
+                    self.bail("No summaries match that title fragment")
+                if len(titles) == 1:
+                    self._summaries = [Summary(self, titles[0].id)]
+                else:
+                    self.populate_form(self.form_page, titles)
+                    self.form_page.send()
+            elif self.selection_method == "id":
+                if not self.cdr_ids:
+                    self.bail("At least one CDR ID is required.")
+                self._summaries = [Summary(self, id) for id in self.cdr_ids]
+            else:
+                if not self.board:
+                    self.bail("At least one board is required.")
+                a_path = "/Summary/SummaryMetaData/SummaryAudience"
+                b_path = "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"
+                l_path = "/Summary/SummaryMetaData/SummaryLanguage"
+                t_path = "/Summary/TranslationOf/@cdr:ref"
+                m_path = "/Summary/@AvailableAsModule"
+                query = self.Query("active_doc d", "d.id")
+                query.join("query_term_pub a", "a.doc_id = d.id")
+                query.where(query.Condition("a.path", a_path))
+                query.where(query.Condition("a.value", self.audience + "s"))
+                query.join("query_term_pub l", "l.doc_id = d.id")
+                query.where(query.Condition("l.path", l_path))
+                query.where(query.Condition("l.value", self.language))
+                if "all" not in self.board:
+                    if self.language == "English":
+                        query.join("query_term_pub b", "b.doc_id = d.id")
+                    else:
+                        query.join("query_term_pub t", "t.doc_id = d.id")
+                        query.where(query.Condition("t.path", t_path))
+                        query.join("query_term b", "b.doc_id = t.int_val")
+                    query.where(query.Condition("b.path", b_path))
+                    query.where(query.Condition("b.int_val", self.board, "IN"))
+                if self.modules == "modules":
+                    query.join("query_term_pub m", "m.doc_id = d.id")
+                    query.where(query.Condition("m.path", m_path))
+                elif self.modules == "summaries":
+                    query.outer("query_term_pub m", "m.doc_id = d.id",
+                                f"m.path = '{m_path}'")
+                    query.where("m.doc_id IS NULL")
+                rows = query.unique().execute(self.cursor).fetchall()
+                self._summaries = [Summary(self, row.id) for row in rows]
+        return self._summaries
+
+    @property
     def today(self):
         """Today's date object, used in several places."""
 
@@ -346,75 +468,6 @@ jQuery(function() {
                 self.bail()
         return self._type
 
-    def summaries_for_boards(self):
-        """
-        The user has asked for a report of multiple summaries for
-        one or more of the boards. Find the boards' summaries whose
-        language match the request parameters, and return a list of
-        Summary objects for them.
-        """
-
-        b_path = "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"
-        t_path = "/Summary/TranslationOf/@cdr:ref"
-        query = db.Query("active_doc d", "d.id")
-        #query.join("pub_proc_cg c", "c.id = d.id")
-        query.join("query_term_pub a", "a.doc_id = d.id")
-        query.where("a.path = '/Summary/SummaryMetaData/SummaryAudience'")
-        query.where(query.Condition("a.value", self.audience + "s"))
-        query.join("query_term_pub l", "l.doc_id = d.id")
-        query.where("l.path = '/Summary/SummaryMetaData/SummaryLanguage'")
-        query.where(query.Condition("l.value", self.language))
-        if "all" not in self.board:
-            if self.language == "English":
-                query.join("query_term_pub b", "b.doc_id = d.id")
-            else:
-                query.join("query_term_pub t", "t.doc_id = d.id")
-                query.where(query.Condition("t.path", t_path))
-                query.join("query_term b", "b.doc_id = t.int_val")
-            query.where(query.Condition("b.path", b_path))
-            query.where(query.Condition("b.int_val", self.board, "IN"))
-        rows = query.unique().execute(self.cursor).fetchall()
-        return [Summary(self, row[0]) for row in rows]
-
-    def format_date_range(self):
-        """
-        Construct a string describing the date coverage for the report.
-        """
-
-        start_is_urdate = self.start <= cdr.URDATE
-        end_is_today = self.end <= self.today
-        if start_is_urdate:
-            if end_is_today:
-                return "Complete History"
-            else:
-                return "Through %s" % self.end
-        elif end_is_today:
-            return "From %s" % self.start
-        return "%s - %s" % (self.start, self.end)
-
-    def get_change_type_tables(self, cols, summaries):
-        """
-        Report each type of change in its own table.
-        """
-
-        opts = { "html_callback_pre": Control.table_spacer }
-        tables = []
-        title = "Type of Change Report"
-        range = self.format_date_range()
-        for change_type in self.change_types:
-            rows = []
-            for summary in summaries:
-                rows.extend(summary.get_rows(change_type))
-            if not rows:
-                continue
-            count = "%d change" % len(rows)
-            if len(rows) > 1:
-                count += "s"
-            opts["caption"] = [title, change_type, "%s (%s)" % (range, count)]
-            opts["sheet_name"] = change_type.split()[0]
-            tables.append(cdrcgi.Report.Table(cols, rows, **opts))
-        return tables
-
     @staticmethod
     def table_spacer(table, page):
         """
@@ -422,37 +475,6 @@ jQuery(function() {
         """
 
         page.add_css("table { margin-top: 25px; }")
-
-    def get_cols(self):
-        """
-        Create a sequence of column definitions for the output report.
-        Number and types of columns depend on config parms.
-
-        Return:
-            Sequence of column definitions to add to object.
-        """
-
-        # Leftmost column is always a doc title and ID
-        columns = [cdrcgi.Report.Column("Summary", width="220px")]
-
-        # Basic reports need cols for types of change and comments
-        if self.report_type == self.CURRENT:
-            comment_column = cdrcgi.Report.Column("Comment", width="150px")
-            for ct in sorted(self.change_types):
-                columns.append(cdrcgi.Report.Column(ct, width="105px"))
-                if self.comments:
-                    columns.append(comment_column)
-
-        # Historical reports
-        else:
-            columns.append(cdrcgi.Report.Column("Date", width="80px"))
-            if self.report_org == self.BY_SUMMARY:
-                col = cdrcgi.Report.Column("Type of Change", width="150px")
-                columns.append(col)
-            if self.comments:
-                columns.append(cdrcgi.Report.Column("Comment", width="180px"))
-
-        return columns
 
 
 class Summary:
@@ -466,80 +488,109 @@ class Summary:
         changes  -  information about changes made to the summary over time
     """
 
-    Cell = cdrcgi.Report.Cell
-
     def __init__(self, control, doc_id):
-        """
-        Extract the title and change history from the CDR Summary document.
+        """Remember the caller's values.
+
+        Pass:
+            control - access to the database and the report options
+            doc_id - integer for the PDQ summary's unique CDR document ID
         """
 
-        self.doc_id = doc_id
-        self.control = control
-        self.changes = []
-        query = db.Query("document", "xml", "title")
-        query.where(query.Condition("id", doc_id))
-        xml, title = query.execute(control.cursor).fetchone()
-        title = title.split(";")[0]
-        root = etree.XML(xml.encode("utf-8"))
-        self.title = cdr.get_text(root.find("SummaryTitle")) or title
-        nodes = root.findall("TypeOfSummaryChange")
-        self.changes = sorted([self.Change(control, node) for node in nodes])
-        for change in self.changes:
-            control.logger.debug("CDR%d %s", doc_id, change)
-        self.key = (self.title.lower(), self.doc_id)
+        self.__control = control
+        self.__doc_id = doc_id
+
+    def __lt__(self, other):
+        """Support sorting the summaries by title."""
+        return self.key < other.key
+
     def get_rows(self, change_type=None):
-        if self.control.report_type == Control.CURRENT:
-            return self.get_single_row()
-        changes = self.get_changes(change_type)
+        """Get all or a subset of the report rows for the summary's changes.
+
+        Pass:
+            change_type - optional string identifying a subset of the changes
+
+        Return:
+            A sequence of report rows tuples
+        """
+
+        if self.control.type == Control.CURRENT:
+            return self.__get_single_row()
+        changes = self.__get_changes(change_type)
         nrows = len(changes)
         if nrows < 1:
             return []
-        rows = [
-            [
-                self.Cell(self.format_title(), rowspan=nrows),
-                changes[0].date
-            ]
+        row = [
+            self.control.Reporter.Cell(self.display_title, rowspan=nrows),
+            changes[0].date,
         ]
         if not change_type:
-            rows[0].append(changes[0].type)
+            row.append(changes[0].type)
         if self.control.comments:
-            rows[0].append(" / ".join(changes[0].comments))
+            row.append(" / ".join(changes[0].comments))
+        rows = [tuple(row)]
         for change in changes[1:]:
             row = [change.date]
             if not change_type:
                 row.append(change.type)
             if self.control.comments:
                 row.append(" / ".join(change.comments))
-            rows.append(row)
+            rows.append(tuple(row))
         return rows
-    def format_title(self):
-        return "%s (%d)" % (self.title, self.doc_id)
-    def get_single_row(self):
-        change_types = dict([(ct, None) for ct in self.control.change_types])
-        for change in self.changes:
-            self.control.logger.debug("CDR%d: get_single_row(%s)", self.doc_id,
-                                      change)
-            if change.type in change_types:
-                if change_types[change.type] is None:
-                    change_types[change.type] = change
-                elif self.control.comments:
-                    latest_change = change_types[change.type]
-                    if latest_change.date == change.date:
-                        latest_change.comments.extend(change.comments)
-        row = [self.format_title()]
-        nchanges = 0
-        for change_type in self.control.change_types:
-            change = change_types.get(change_type)
-            if change:
-                nchanges += 1
-            row.append(change and change.date or "")
-            if self.control.comments:
-                row.append(change and " / ".join(change.comments) or "")
-        if nchanges > 0:
-            return [row]
-        return []
 
-    def get_changes(self, change_type):
+    @property
+    def control(self):
+        """Access to the database and the report options."""
+        return self.__control
+
+    @property
+    def doc(self):
+        """`Doc` object for the summary's CDR document."""
+
+        if not hasattr(self, "_doc"):
+            self._doc = Doc(self.control.session, id=self.id)
+        return self._doc
+
+    @property
+    def changes(self):
+        """Record of modifications made throughout the life of the summary."""
+
+        if not hasattr(self, "_changes"):
+            changes = []
+            for node in self.doc.root.findall("TypeOfSummaryChange"):
+                change = self.Change(self.control, node)
+                self.control.logger.debug("CDR%d %s", self.id, change)
+                changes.append(change)
+            self._changes = sorted(changes)
+        return self._changes
+
+    @property
+    def display_title(self):
+        return f"{self.title} ({self.id:d})"
+
+    @property
+    def id(self):
+        """Integer for the PDQ summary's unique CDR document ID."""
+        return self.__doc_id
+
+    @property
+    def key(self):
+        """Control how the summaries are sorted."""
+
+        if not hasattr(self, "_key"):
+            self._key = self.title.lower(), self.id
+        return self._key
+
+    @property
+    def title(self):
+        """Official title of the PDQ summary."""
+
+        if not hasattr(self, "_title"):
+            self._title = Doc.get_text(self.doc.root.find("SummaryTitle"))
+            if not self._title:
+                self._title = self.doc.title.split(";")[0]
+        return self._title
+
+    def __get_changes(self, change_type):
         """
         If we're building a separate table for each type of change,
         filter to get only the changes matching a single change type.
@@ -549,6 +600,32 @@ class Summary:
         """
 
         return [c for c in self.changes if c.in_scope(change_type)]
+
+    def __get_single_row(self):
+        change_types = dict([(ct, None) for ct in self.control.change_types])
+        for change in self.changes:
+            args = self.id, change
+            self.control.logger.debug("CDR%d: get_single_row(%s)", *args)
+            if change.type in change_types:
+                if change_types[change.type] is None:
+                    change_types[change.type] = change
+                elif self.control.comments:
+                    latest_change = change_types[change.type]
+                    if latest_change.date == change.date:
+                        latest_change.comments.extend(change.comments)
+        row = [self.display_title]
+        nchanges = 0
+        for change_type in self.control.change_types:
+            change = change_types.get(change_type)
+            if change:
+                nchanges += 1
+            row.append(change and change.date or "")
+            if self.control.comments:
+                row.append(change and " / ".join(change.comments) or "")
+        if nchanges > 0:
+            return [tuple(row)]
+        return []
+
 
     class Change:
         """
@@ -566,12 +643,12 @@ class Summary:
             self.comments = []
             for child in node:
                 if child.tag == "TypeOfSummaryChangeValue":
-                    self.type = cdr.get_text(child)
+                    self.type = Doc.get_text(child)
                 elif child.tag == "Date":
-                    self.date = cdr.get_text(child)
+                    self.date = Doc.get_text(child)
                 elif child.tag == "Comment":
                     if control.comments:
-                        comment = cdr.get_text(child)
+                        comment = Doc.get_text(child)
                         if comment:
                             self.comments.append(comment)
 
@@ -588,10 +665,10 @@ class Summary:
             control = self.control
             if self.type not in control.change_types:
                 return False
-            if control.report_type == Control.HISTORICAL:
+            if control.type == Control.HISTORICAL:
                 if not self.date:
                     return False
-                if not (control.start <= self.date <= control.end):
+                if not (str(control.start) <= self.date <= str(control.end)):
                     return False
             return True
 
@@ -600,7 +677,7 @@ class Summary:
             Create a debugging string for the change.
             """
 
-            return "[%s %s]" % (self.type, self.date)
+            return f"[{self.type} {self.date}]"
 
         def __lt__(self, other):
             """
@@ -611,11 +688,7 @@ class Summary:
 
             return (other.date, self.type) < (self.date, other.type)
 
-    def __lt__(self, other):
-        """
-        Support sorting the summaries by title.
-        """
 
-        return self.key < other.key
-
-Control().run()
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+    Control().run()
