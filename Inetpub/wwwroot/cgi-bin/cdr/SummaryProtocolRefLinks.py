@@ -1,4 +1,4 @@
-#!/usr/bin/env
+#!/usr/bin/env python
 
 """Find ProtocolRef elements in Summary documents, showing the URLs.
 """

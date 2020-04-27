@@ -1,0 +1,20 @@
+.top-section {
+    font-weight: bold;
+}
+.mid-section {
+    font-weight: normal;
+}
+.low-section {
+    font-style: italic;
+}
+table.general {
+    width: 1024px;
+    margin-top: 40px;
+}
+table.general td:first-child {
+    width: 150px;
+    text-align: right;
+    vertical-align: middle;
+    padding-right: 10px;
+    font-weight: bold;
+}

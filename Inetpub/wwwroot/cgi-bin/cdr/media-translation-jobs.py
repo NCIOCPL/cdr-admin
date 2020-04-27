@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """
 Display CDR media translation job queue.
 

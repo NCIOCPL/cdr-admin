@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 """Demonstrate rendering of PDQ Summary documents.
 

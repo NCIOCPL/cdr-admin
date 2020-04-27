@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 #----------------------------------------------------------------------
 # Collect settings from this tier as JSON.
 # OCECDR-4101

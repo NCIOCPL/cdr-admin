@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 #----------------------------------------------------------------------
 # Show all of the top-level parameters used by CDR filters.  Useful
 # for XSL/T script writers who want to avoid conflicting uses of the

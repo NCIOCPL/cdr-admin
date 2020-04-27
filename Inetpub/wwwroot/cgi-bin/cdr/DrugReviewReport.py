@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 #----------------------------------------------------------------------
 # Produce an Excel spreadsheet showing problematic drug terms, divided
 # into three categories:

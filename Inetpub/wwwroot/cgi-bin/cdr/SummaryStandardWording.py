@@ -1,95 +1,66 @@
-"""
+#!/usr/bin/env python
 
-Report on terms within StandardWording and/or GlossaryTerm elements.
+"""Report on terms within StandardWording and/or GlossaryTerm elements.
 
 JIRA::OCECDR-4568
-
 """
 
-import datetime
+from datetime import date, datetime
 from io import BytesIO
-import re
-from sys import stdout
+from re import compile, UNICODE, IGNORECASE
+from sys import stdout, exit as sysexit
 from lxml import etree
-import lxml.html.builder as B
+from lxml.html import builder as B
 from xlsxwriter import Workbook
-from msvcrt import setmode
-import cdr
-import cdrcgi
+from cdrcgi import Controller, Reporter
 from cdrapi import db
+from cdrapi.docs import Doc
 
-class Control(cdrcgi.Control):
+
+class Control(Controller):
     """
     Logic manager for report.
     """
 
-    def __init__(self):
-        """
-        Collect and validate the report's request parameters.
+    SUBTITLE = "Summaries Standard Wording"
+    REGEX_FLAGS = UNICODE | IGNORECASE
 
-        We want the more capable, robust database cursor than the one
-        that comes by default with the base cdrcgi.Control class, but
-        we have to leave the old one in place alongside our new one,
-        at least until that base class is converted over to the newer
-        cdrapi.db library.
-        """
-
-        cdrcgi.Control.__init__(self, "Summaries Standard Wording")
-        self.db_cursor = db.connect(user="CdrGuest").cursor()
-        self.boards = self.get_boards()
-        self.debug = self.fields.getvalue("debug") and True or False
-        if self.debug:
-            self.logger.level = cdr.Logging.LEVELS["debug"]
-        self.today = datetime.date.today()
-        self.terms = self.fields.getlist("term")
-        self.blocked = self.fields.getvalue("blocked") and True or False
-        self.selection_method = self.fields.getvalue("method", "board")
-        self.audience = self.fields.getvalue("audience", "Patient")
-        self.language = self.fields.getvalue("language", "English")
-        self.board = self.fields.getlist("board") or ["all"]
-        self.cdr_ids = self.fields.getvalue("cdr-id") or ""
-        self.fragment = self.fields.getvalue("title")
-        self.validate()
-
-    def populate_form(self, form, titles=None):
-        """
-        Put the fields on the form.
+    def populate_form(self, page, titles=None):
+        """Put the fields on the form.
 
         Pass:
-            form - cdrcgi.Page object
+            page   - `cdrcgi.HTMLPage` object
             titles - if not None, show the followup page for selecting
                      from multiple matches with the user's title fragment;
                      otherwise, show the report's main request form
+                     (logic handled in add_summary_selection_fields())
         """
-
-        # Capture debugging setting.
-        form.add_hidden_field("debug", self.debug)
 
         # Default fieldsets for summaries.
         opts = { "titles": titles, "id-label": "CDR ID(s)" }
         opts["id-tip"] = "separate multiple IDs with spaces"
-        self.add_summary_selection_fields(form, **opts)
+        self.add_summary_selection_fields(page, **opts)
 
         # Add initial fields for search terms (one for each term).
-        form.add('<fieldset id="search-terms">')
-        form.add(form.B.LEGEND("Enter Search Terms"))
-        terms = self.terms or [""]
+        fieldset = page.fieldset("Enter Search Terms", id="search-terms")
+        terms = self.fields.getlist("term") or [""]
+        opts = dict(classes="term")
         for term in terms:
-            form.add_text_field("term", "Term", value=term, classes="term")
-        form.add("</fieldset>")
+            fieldset.append(page.text_field("term", value=term, **opts))
+        page.form.append(fieldset)
 
         # Flag for including blocked summaries.
-        form.add("<fieldset>")
-        form.add(form.B.LEGEND("Options"))
-        form.add_checkbox("blocked", "Include Blocked Documents", "N")
-        form.add("</fieldset>")
+        fieldset = page.fieldset("Options")
+        opts = dict(label="Include Blocked Documents", value="N")
+        fieldset.append(page.checkbox("blocked", **opts))
+        page.form.append(fieldset)
 
         # Section to select output format (HTML, Excel).
-        form.add_output_options(default=self.format)
+        page.add_output_options(default=self.format)
 
         # Button/script for adding new search term fields.
-        form.add_css(".term-button { padding-left: 10px; }")
-        form.add_script("""\
+        page.add_css(".term-button { padding-left: 10px; }")
+        page.add_script("""\
 function add_button() {
   green_button().insertAfter(jQuery(".term").first());
 }
@@ -111,95 +82,18 @@ function add_term_field() {
   field.append(jQuery("<input>", {class: "term", name: "term", id: id}));
   jQuery("#search-terms").append(field);
 }
-jQuery(add_button());
-""")
+jQuery(document).ready(function() {
+  add_button();
+});""")
 
-    def build_tables(self):
-        """
-        Overrides the base class's version of this method to assemble
-        the table to be displayed for this report. If the user
-        chooses the "by summary title" method for selecting which
-        summary to use for the report, and the fragment supplied
-        matches more than one summary document, display the form
-        a second time so the user can pick the summary.
+    def send_workbook(self):
+        """Create and send the Excel version of the report.
+
+        We're using the xlsxwriter package in order to support the
+        requirement of inline rich text.
         """
 
-        # See if we have more narrowing of the summary selection to do.
-        if self.selection_method == "title":
-            if not self.fragment:
-                cdrcgi.bail("Title fragment is required.")
-            titles = self.summaries_for_title(self.fragment)
-            if not titles:
-                cdrcgi.bail("No summaries match that title fragment")
-            if len(titles) == 1:
-                summaries = [Summary(self, titles[0].id)]
-            else:
-                opts = {
-                    "buttons": self.buttons,
-                    "action": self.script,
-                    "subtitle": self.title,
-                    "session": self.session
-                }
-                form = cdrcgi.Page(self.PAGE_TITLE, **opts)
-                self.populate_form(form, titles)
-                form.send()
-        elif self.selection_method == "id":
-            if not self.cdr_ids:
-                cdrcgi.bail("At least one CDR ID is required.")
-            summaries = [Summary(self, cdr_id) for cdr_id in self.cdr_ids]
-        else:
-            if not self.board:
-                cdrcgi.bail("At least one board is required.")
-            summaries = self.summaries_for_boards()
-
-        # Make sure we have something to report on.
-        if not summaries:
-            pattern = "No {} summaries available for selected board"
-            cdrcgi.bail(pattern.format(self.audience))
-        summaries = sorted(summaries, key=lambda x: x.title)
-
-        # Make sure we have something to search for.
-        terms = self.collect_terms()
-        if not terms:
-            cdrcgi.bail("No search terms specified")
-        regex = self.build_regex(*terms)
-        terms = "; ".join(sorted([term.lower() for term in terms]))
-        caption = "STANDARD WORDING REPORT", "Search Terms: {}".format(terms)
-
-        # If the user wants an Excel workbook, create it.
-        if self.format == "excel":
-            self.send_workbook(summaries, regex, *caption)
-
-        # Otherwise, assemble the options for an HTML report.
-        else:
-            cols = self.get_cols()
-            opts = dict(
-                banner=self.PAGE_TITLE,
-                subtitle=self.title,
-                caption=caption
-            )
-
-            # Build the report table.
-            rows = []
-            for summary in summaries:
-                doc_id, title = summary.cdr_id, summary.title
-                for match in summary.find_matches(regex):
-                    rows.append(match.html_row(doc_id, title))
-                    doc_id = title = ""
-            return [cdrcgi.Report.Table(cols, rows, **opts)]
-
-    def send_workbook(self, summaries, regex, title, subtitle):
-        """
-        Create and send the Excel version of the report
-
-        Pass:
-          summaries - sequence of `Summary` objects
-          regex - compiled regular expression for search terms
-          title - string for the report's title
-          subtitle - expanded list of search terms
-        """
-
-        stamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+        stamp = datetime.now().strftime("%Y%m%d%H%M%S")
         filename = "standard-wording-{}.xlsx".format(stamp)
         output = BytesIO()
         book = Workbook(output, {"in_memory": True})
@@ -212,6 +106,7 @@ jQuery(add_button());
             wrap=book.add_format(dict(text_wrap=True)),
             top=book.add_format(dict(valign="top"))
         )
+        title, subtitle = self.caption
         sheet.merge_range("A1:E1", title, formats["header"])
         sheet.merge_range("A2:E2", subtitle, formats["header"])
         widths = 10, 50, 30, 80, 18
@@ -220,9 +115,9 @@ jQuery(add_button());
             sheet.set_column(i, i, width)
             sheet.write(3, i, headers[i], formats["header"])
         row = 4
-        for summary in summaries:
+        for summary in self.summaries:
             doc_id, title = summary.cdr_id, summary.title
-            for match in summary.find_matches(regex):
+            for match in summary.matches:
                 row = match.excel_row(sheet, row, formats, doc_id, title)
                 doc_id = title = ""
         book.close()
@@ -235,112 +130,48 @@ Content-length: {len(book_bytes)}
 
 """.encode("utf-8"))
         stdout.buffer.write(book_bytes)
+        sysexit(0)
 
-    def collect_terms(self):
-        """
-        Assemble the search terms to be matched
+    @property
+    def audience(self):
+        """Select summaries written for patients or health professionals."""
 
-        Start with the list of terms supplied by the user on the report
-        request form, then expand the terms using the glossary term
-        documents and the external mapping table.
+        if not hasattr(self, "_audience"):
+            self._audience = self.fields.getvalue("audience", "Patient")
+            if self._audience not in self.AUDIENCES:
+                self.bail()
+        return self._audience
 
-        Return:
-          sequence of normalized search strings
-        """
+    @property
+    def board(self):
+        """Sequence of IDs for the selected board(s) (or "all")."""
 
-        # Set up the language-dependent values.
-        prefix = "Spanish " if self.language == "Spanish" else ""
-        name = "{}GlossaryTerm Phrases".format(prefix)
-        query = db.Query("external_map_usage", "id")
-        query.where(query.Condition("name", name))
-        usage = query.execute(self.db_cursor).fetchone().id
-        prefix = "Translated" if self.language == "Spanish" else "Term"
-        path = "/GlossaryTermName/{}Name/TermNameString".format(prefix)
-
-        # Loop through the user's phrases.
-        ids = set()
-        terms = dict()
-        for term in self.terms:
-            if term and term.strip():
-
-                # See if the term matches a glossary term name document.
-                term = Summary.normalize(term).strip()
-                query = db.Query("query_term", "doc_id")
-                query.where(query.Condition("path", path))
-                query.where(query.Condition("value", term))
-                row = query.execute(self.db_cursor).fetchone()
-                doc_id = row.doc_id if row else None
-
-                # If not, see if the term is in the variant mapping table.
-                if not doc_id:
-                    query = db.Query("external_map", "doc_id")
-                    query.where(query.Condition("usage", usage))
-                    query.where(query.Condition("value", term))
-                    row = query.execute(self.db_cursor).fetchone()
-                    doc_id = row.doc_id if row else None
-
-                # If we have a glossary term, pull in its names.
-                if doc_id:
-                    if doc_id not in ids:
-                        ids.add(doc_id)
-                        query = db.Query("query_term", "value")
-                        query.where(query.Condition("path", path))
-                        query.where(query.Condition("doc_id", doc_id))
-                        for row in query.execute(self.db_cursor).fetchall():
-                            if row.value and row.value.strip():
-                                value = Summary.normalize(row.value).strip()
-                                terms[value.lower()] = value
-                        query = db.Query("external_map", "value")
-                        query.where(query.Condition("usage", usage))
-                        query.where(query.Condition("doc_id", doc_id))
-                        for row in query.execute(self.db_cursor).fetchall():
-                            if row.value and row.value.strip():
-                                value = Summary.normalize(row.value).strip()
-                                terms[value.lower()] = value
-
-                # If we didn't find a matching glossary term, use the phrase.
+        if not hasattr(self, "_board"):
+            ids = self.fields.getlist("board")
+            self._board = []
+            if ids:
+                if "all" in ids:
+                    self._board = ["all"]
                 else:
-                    terms[term.lower()] = term
+                    boards = self.get_boards()
+                    for id in ids:
+                        try:
+                            id = int(id)
+                        except:
+                            self.bail()
+                        if id not in boards:
+                            self.bail()
+                        self._board.append(id)
+        return self._board
 
-        return sorted(terms.values())
+    @property
+    def blocked(self):
+        """Should we include blocked summaries?"""
+        return True if self.fields.getvalue("blocked") else False
 
-    def set_report_options(self, opts):
-        """
-        Take off the buttons and add the banners/titles.
-
-        Pass:
-          opts - dictionary of default options
-
-        Return:
-          modified dictionary
-        """
-
-        opts["page_opts"]["buttons"] = []
-        opts["subtitle"] = "Report produced {}".format(self.today)
-        opts["banner"] = "Standard Wording Report"
-        return opts
-
-    def add_audience_fieldset(self, form, include_any=False):
-        """
-        Overwrite the base class method to make Patient be the default
-
-        Pass:
-          form - reference to `cdrcgi.Page` object being populated
-          include_any - ignored
-        """
-        form.add("<fieldset id='audience-block' class='by-board-block'>")
-        form.add(form.B.LEGEND("Audience"))
-        form.add_radio("audience", "Health Professional", "Health Professional")
-        form.add_radio("audience", "Patient", "Patient", checked=True)
-        form.add("</fieldset>")
-
-    def summaries_for_boards(self):
-        """
-        The user has asked for a report of multiple summaries for
-        one or more of the boards. Find the boards' summaries whose
-        language matches the request parameters, and return a list of
-        Summary objects for them.
-        """
+    @property
+    def board_summaries(self):
+        """`Summary` objects for the selected board(s), language."""
 
         b_path = "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"
         t_path = "/Summary/TranslationOf/@cdr:ref"
@@ -361,10 +192,36 @@ Content-length: {len(book_bytes)}
                 query.join("query_term b", "b.doc_id = t.int_val")
             query.where(query.Condition("b.path", b_path))
             query.where(query.Condition("b.int_val", self.board, "IN"))
-        rows = query.unique().execute(self.db_cursor).fetchall()
-        return [Summary(self, row[0]) for row in rows]
+        rows = query.unique().execute(self.cursor).fetchall()
+        return [Summary(self, row.id) for row in rows]
 
-    def get_cols(self):
+    @property
+    def caption(self):
+        """Sequence of caption row strings for the report."""
+
+        if not hasattr(self, "_caption"):
+            top = "STANDARD WORDING REPORT"
+            if self.method == "board":
+                top = f"{top} ({self.audience.upper()})"
+            terms = "; ".join(sorted([term.lower() for term in self.terms]))
+            self._caption = top, f"Search Terms: {terms}"
+        return self._caption
+
+    @property
+    def cdr_id(self):
+        """Set of one or more CDR document ID integers."""
+
+        if not hasattr(self, "_cdr_id"):
+            self._cdr_id = set()
+            for word in self.fields.getvalue("cdr-id", "").strip().split():
+                try:
+                    self._cdr_id.add(Doc.extract_id(word))
+                except:
+                    self.bail("Invalid format for CDR ID")
+        return self._cdr_id
+
+    @property
+    def columns(self):
         """
         Create a sequence of column definitions for the output report.
 
@@ -375,110 +232,269 @@ Content-length: {len(book_bytes)}
         """
 
         return (
-            cdrcgi.Report.Column("Doc ID", width="70px"),
-            cdrcgi.Report.Column("Doc Title", width="200px"),
-            cdrcgi.Report.Column("Match", width="100px"),
-            cdrcgi.Report.Column("Context", width="200px"),
-            cdrcgi.Report.Column("Standard Wording?", width="50px")
+            Reporter.Column("Doc ID", width="70px"),
+            Reporter.Column("Doc Title", width="200px"),
+            Reporter.Column("Match", width="100px"),
+            Reporter.Column("Context", width="200px"),
+            Reporter.Column("Standard Wording?", width="50px")
         )
 
-    def validate(self):
-        """
-        Separate validation method, to make sure the CGI request's
-        parameters haven't been tampered with by an intruder.
-        """
+    @property
+    def default_audience(self):
+        """Override the default audience."""
+        return "Patient"
 
-        msg = cdrcgi.TAMPERING
-        if self.audience not in self.AUDIENCES:
-            cdrcgi.bail(msg)
-        if self.language not in self.LANGUAGES:
-            cdrcgi.bail(msg)
-        if self.selection_method not in self.SUMMARY_SELECTION_METHODS:
-            cdrcgi.bail(msg)
-        if self.format not in self.FORMATS:
-            cdrcgi.bail(msg)
-        boards = []
-        for board in self.board:
-            if board == "all":
-                boards.append("all")
-            else:
-                try:
-                    board = int(board)
-                except:
-                    cdrcgi.bail(msg)
-                if board not in self.boards:
-                    cdrcgi.bail(msg)
-                boards.append(board)
-        self.board = boards
-        cdr_ids = set()
-        for word in self.cdr_ids.strip().split():
-            try:
-                cdr_ids.add(cdr.exNormalize(word)[1])
-            except:
-                cdrcgi.bail("Invalid format for CDR ID")
-        self.cdr_ids = cdr_ids
+    @property
+    def fragment(self):
+        """String from the summary's title."""
+        return self.fields.getvalue("title")
 
-    @classmethod
-    def build_regex(cls, *phrases):
+    @property
+    def language(self):
+        """Select summaries in English or Spanish."""
+
+        if not hasattr(self, "_language"):
+            self._language = self.fields.getvalue("language", "English")
+            if self._language not in self.LANGUAGES:
+                self.bail()
+        return self._language
+
+    @property
+    def regex(self):
         """
-        Create a compiled regular expression for finding the caller's phrases
+        Create a compiled regular expression for finding the caller's phrases.
 
         The ugly wrapper surrounding the phrases ensures that we
         match on word boundaries, so that (for example) "breast"
         isn't matched in the phrase "they were walking abreast."
 
-        Pass:
-          phrases - one or more strings for which we need to find matches
-
-        Return:
-          compiled regular expression
-        """
-
-        phrases = [Summary.normalize(phrase) for phrase in phrases]
-        phrases = sorted(phrases, key=len, reverse=True)
-        phrases = "|".join([cls.to_regex(phrase) for phrase in phrases])
-        expression = "(?<!\\w)({})(?!\\w)".format(phrases)
-        flags = re.UNICODE | re.IGNORECASE
-        return re.compile(expression, flags)
-
-    @classmethod
-    def to_regex(cls, phrase):
-        """
-        Escape characters which have special meaning in a regular expression
+        Escape characters which have special meaning in a regular expression.
 
         We also make sure that Microsoft doesn't mess up the matching
         when it replaces apostrophes with "smart quotes" (as it frequently
         does).
-
-        Pass:
-          phrase - string for one of the phrases we look for
-
-        Return:
-          string with special characters escaped
         """
 
-        return (phrase
-            .replace("\\", r"\\")
-            .replace("+",  r"\+")
-            .replace(" ",  r"\s+")
-            .replace(".",  r"\.")
-            .replace("^",  r"\^")
-            .replace("$",  r"\$")
-            .replace("*",  r"\*")
-            .replace("?",  r"\?")
-            .replace("{",  r"\{")
-            .replace("}",  r"\}")
-            .replace("[",  r"\[")
-            .replace("]",  r"\]")
-            .replace("|",  r"\|")
-            .replace("(",  r"\(")
-            .replace(")",  r"\)")
-            .replace("'",  "['\u2019]"))
+        if not hasattr(self, "_regex"):
+            phrases = [Summary.normalize(phrase) for phrase in self.terms]
+            phrases = sorted(phrases, key=len, reverse=True)
+            expressions = []
+            for phrase in phrases:
+                expressions.append(phrase
+                                   .replace("\\", r"\\")
+                                   .replace("+",  r"\+")
+                                   .replace(" ",  r"\s+")
+                                   .replace(".",  r"\.")
+                                   .replace("^",  r"\^")
+                                   .replace("$",  r"\$")
+                                   .replace("*",  r"\*")
+                                   .replace("?",  r"\?")
+                                   .replace("{",  r"\{")
+                                   .replace("}",  r"\}")
+                                   .replace("[",  r"\[")
+                                   .replace("]",  r"\]")
+                                   .replace("|",  r"\|")
+                                   .replace("(",  r"\(")
+                                   .replace(")",  r"\)")
+                                   .replace("'",  "['\u2019]"))
+            expressions = "|".join(expressions)
+            expression = f"(?<!\\w)({expressions})(?!\\w)"
+            self._regex = compile(expression, self.REGEX_FLAGS)
+        return self._regex
+
+    @property
+    def report(self):
+        """This report is too specialized to use the base class version.
+
+        Take off the buttons and add the banners/titles.
+
+        If the user chooses the "by summary title" method for
+        selecting which summary to use for the report, and the
+        fragment supplied matches more than one summary document,
+        display the form a second time so the user can pick the
+        summary.
+        """
+
+        # Make sure we have something to look for.
+        if not self.terms:
+            self.bail("At least one search term is required")
+
+        # If the user wants an Excel workbook, create it.
+        if self.format == "excel":
+            return self.send_workbook()
+
+        # Otherwise, assemble the options for an HTML report.
+        if not hasattr(self, "_report"):
+            opts = {
+                "banner": "Standard Wording Report",
+                "footer": self.footer,
+                "subtitle": f"Report produced {date.today()}",
+                "no_results": self.no_results,
+                "page_opts": {
+                    "buttons": [],
+                    "session": self.session,
+                    "action": None,
+                }
+            }
+            self._report = Reporter(self.title, self.tables, **opts)
+        return self._report
+
+    @property
+    def rows(self):
+        """Assemble the rows for the HTML version of the report."""
+
+        if not hasattr(self, "_rows"):
+            self._rows = []
+            for summary in self.summaries:
+                doc_id, title = summary.cdr_id, summary.title
+                for match in summary.matches:
+                    self._rows.append(match.html_row(doc_id, title))
+                    doc_id = title = ""
+        return self._rows
+
+    @property
+    def selection_method(self):
+        """How does the user want to identify summaries for the report?"""
+
+        if not hasattr(self, "_selection_method"):
+            self._selection_method = self.fields.getvalue("method", "board")
+            if self._selection_method not in self.SUMMARY_SELECTION_METHODS:
+                self.bail()
+        return self._selection_method
+
+    @property
+    def summaries(self):
+        """PDQ Summaries included in the report."""
+
+        if not hasattr(self, "_summaries"):
+
+            # See if we have more narrowing of the summary selection to do.
+            if self.selection_method == "title":
+                if not self.fragment:
+                    self.bail("Title fragment is required.")
+                if not self.summary_titles:
+                    self.bail("No summaries match that title fragment")
+                if len(self.summary_titles) == 1:
+                    summaries = [Summary(self, self.summary_titles[0].id)]
+                else:
+                    buttons = [self.HTMLPage.button(b) for b in self.buttons]
+                    opts = dict(
+                        buttons=buttons,
+                        action=self.script,
+                        subtitle=self.subtitle,
+                        session=self.session,
+                        method=self.method,
+                    )
+                    page = self.HTMLPage(self.title, **opts)
+                    self.populate_form(page, self.summary_titles)
+                    page.send()
+            elif self.selection_method == "id":
+                if not self.cdr_id:
+                    self.bail("At least one CDR ID is required.")
+                summaries = [Summary(self, cdr_id) for cdr_id in self.cdr_id]
+            else:
+                if not self.board:
+                    self.bail("At least one board is required.")
+                summaries = self.board_summaries
+
+            # Make sure we have something to report on.
+            if not summaries:
+                pattern = "No {} summaries available for selected board"
+                self.bail(pattern.format(self.audience))
+            self._summaries = sorted(summaries)
+
+        return self._summaries
+
+    @property
+    def tables(self):
+        """List with a single table for the HTML report."""
+
+        if not hasattr(self, "_tables"):
+            opts = dict(
+                banner=self.PAGE_TITLE,
+                subtitle=self.subtitle,
+                caption=self.caption,
+                columns=self.columns,
+            )
+            self._tables = [Reporter.Table(self.rows, **opts)]
+        return self._tables
+
+    @property
+    def terms(self):
+        """Assemble the search terms to be matched.
+
+        Start with the list of terms supplied by the user on the report
+        request form, then expand the terms using the glossary term
+        documents and the external mapping table.
+
+        Return:
+          sequence of normalized search strings
+        """
+
+        # Use the cached value if we've already done this.
+        if hasattr(self, "_terms"):
+            return self._terms
+
+        # Set up the language-dependent values.
+        prefix = "Spanish " if self.language == "Spanish" else ""
+        name = f"{prefix}GlossaryTerm Phrases"
+        query = db.Query("external_map_usage", "id")
+        query.where(query.Condition("name", name))
+        usage = query.execute(self.cursor).fetchone().id
+        prefix = "Translated" if self.language == "Spanish" else "Term"
+        path = f"/GlossaryTermName/{prefix}Name/TermNameString"
+
+        # Loop through the user's phrases.
+        ids = set()
+        terms = dict()
+        for term in self.fields.getlist("term"):
+            if term and term.strip():
+
+                # See if the term matches a glossary term name document.
+                term = Summary.normalize(term).strip()
+                query = db.Query("query_term", "doc_id")
+                query.where(query.Condition("path", path))
+                query.where(query.Condition("value", term))
+                row = query.execute(self.cursor).fetchone()
+                doc_id = row.doc_id if row else None
+
+                # If not, see if the term is in the variant mapping table.
+                if not doc_id:
+                    query = db.Query("external_map", "doc_id")
+                    query.where(query.Condition("usage", usage))
+                    query.where(query.Condition("value", term))
+                    row = query.execute(self.cursor).fetchone()
+                    doc_id = row.doc_id if row else None
+
+                # If we have a glossary term, pull in its names.
+                if doc_id:
+                    if doc_id not in ids:
+                        ids.add(doc_id)
+                        query = db.Query("query_term", "value")
+                        query.where(query.Condition("path", path))
+                        query.where(query.Condition("doc_id", doc_id))
+                        for row in query.execute(self.cursor).fetchall():
+                            if row.value and row.value.strip():
+                                value = Summary.normalize(row.value).strip()
+                                terms[value.lower()] = value
+                        query = db.Query("external_map", "value")
+                        query.where(query.Condition("usage", usage))
+                        query.where(query.Condition("doc_id", doc_id))
+                        for row in query.execute(self.cursor).fetchall():
+                            if row.value and row.value.strip():
+                                value = Summary.normalize(row.value).strip()
+                                terms[value.lower()] = value
+
+                # If we didn't find a matching glossary term, use the phrase.
+                else:
+                    terms[term.lower()] = term
+
+        self._terms = sorted(terms.values())
+        return self._terms
 
 
 class Summary:
-    """
-    Information from a single PDQ summary for the report
+    """Information from a single PDQ summary for the report
 
     Properties:
       cdr_id - unique ID for the summary document
@@ -486,7 +502,7 @@ class Summary:
       root - parsed document object, streamlined for the report
     """
 
-    WHITESPACE = re.compile("\\s+")
+    WHITESPACE = compile(r"\s+")
     DROP = (
         "CitationLink",
         "Comment",
@@ -536,13 +552,17 @@ class Summary:
         self.cdr_id = cdr_id
         self.__control = control
 
+    def __lt__(self, other):
+        """Support sorting of the `Summary` objects."""
+        return self.title < other.title
+
     @property
     def root(self):
         """Fetch and parse xml and clean up unwanted elements/markup"""
         if not hasattr(self, "_root"):
             query = db.Query("document", "xml")
             query.where(query.Condition("id", self.cdr_id))
-            xml = query.execute(self.__control.db_cursor).fetchone().xml
+            xml = query.execute(self.__control.cursor).fetchone().xml
             self._root = etree.fromstring(xml.encode("utf-8"))
             etree.strip_elements(self._root, *self.DROP, with_tail=False)
             etree.strip_tags(self._root, *self.STRIP)
@@ -552,42 +572,37 @@ class Summary:
     def title(self):
         """Extract the summary title from the document"""
         if not hasattr(self, "_title"):
-            self._title = cdr.get_text(self.root.find("SummaryTitle"))
+            self._title = Doc.get_text(self.root.find("SummaryTitle"))
         return self._title
 
-    def find_matches(self, regex):
-        """
-        Assemble the sequence of matches for the caller's phrases
+    @property
+    def matches(self):
+        """Assemble the sequence of matches for the caller's phrases."""
 
-        Pass:
-          regex - compiled regular expression for matching the phrases
+        if not hasattr(self, "_matches"):
+            matches = []
+            regex = self.__control.regex
+            for section in self.root.findall("SummarySection"):
+                title = Doc.get_text(section.find("Title"))
+                for node in section.iter():
 
-        Return:
-          sequence of `Summary.Match` objects
-        """
+                    # Look for matches in the node's text property.
+                    if node.text is not None and node.text.strip():
+                        normalized = self.normalize(node.text)
+                        context = self.Context(node)
+                        if context.wrapper is not None:
+                            args = title, regex, normalized, context, matches
+                            self.scan_string(*args)
 
-        matches = []
-        for section in self.root.findall("SummarySection"):
-            title = cdr.get_text(section.find("Title"))
-            for node in section.iter():
-
-                # Look for matches in the node's text property.
-                if node.text is not None and node.text.strip():
-                    normalized = self.normalize(node.text)
-                    context = self.Context(node)
-                    if context.wrapper is not None:
-                        args = title, regex, normalized, context, matches
-                        self.scan_string(*args)
-
-                # Do a second pass looking for matches in the node's tail.
-                if node.tail is not None and node.tail.strip():
-                    normalized = self.normalize(node.tail)
-                    context = self.Context(node, using_tail=True)
-                    if context.wrapper is not None:
-                        args = title, regex, normalized, context, matches
-                        self.scan_string(*args)
-
-        return matches
+                    # Do a second pass looking for matches in the node's tail.
+                    if node.tail is not None and node.tail.strip():
+                        normalized = self.normalize(node.tail)
+                        context = self.Context(node, using_tail=True)
+                        if context.wrapper is not None:
+                            args = title, regex, normalized, context, matches
+                            self.scan_string(*args)
+            self._matches = matches
+        return self._matches
 
     @classmethod
     def scan_string(cls, section, regex, string, context, matches):
@@ -814,11 +829,6 @@ class Summary:
             self.__suffix = suffix
             self.standard_wording = opts.get("standard_wording") or False
 
-        @staticmethod
-        def make_td(cell, output_format):
-            """Cell callback for generating TD element"""
-            return cell.values().td
-
         def excel_row(self, sheet, row, formats, doc_id, title):
             """
             Add a rows to the Excel version of the report
@@ -863,8 +873,8 @@ class Summary:
                 summary_id,
                 summary_title,
                 self.text,
-                cdrcgi.Report.Cell(self, callback=Summary.Match.make_td),
-                cdrcgi.Report.Cell(standard_wording, classes="center")
+                Reporter.Cell(self.span),
+                Reporter.Cell(standard_wording, classes="center"),
             ]
 
         @property
@@ -914,13 +924,15 @@ class Summary:
             return self._suffix
 
         @property
-        def td(self):
+        def span(self):
             """Assemble the HTML cell object for the match"""
             section = B.B(self.section)
             section.tail = ' - "' + self.prefix.lstrip()
             term = B.B(self.text, B.CLASS("error"))
             term.tail = self.suffix.rstrip() + '"'
-            return B.TD(section, term)
+            return B.SPAN(section, term)
 
 
-Control().run()
+if __name__ == "__main__":
+    """Don't execute if loaded as a module."""
+    Control().run()

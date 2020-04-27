@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 """Smoke test following an upgrade of Python on a CDR Windows server.
 

@@ -16,6 +16,11 @@ class Control(Controller):
     CSS = "/stylesheets/ChangesToSummaries.css"
     NAME_PATH = "/Organization/OrganizationNameInformation/OfficialName/Name"
     TYPE_PATH = "/Organization/OrganizationType"
+    INCLUDE = (
+        ("a", "Summaries and modules", False),
+        ("s", "Summaries only", True),
+        ("m", "Modules only", False),
+    )
 
     def populate_form(self, page):
         """Add the fields for requesting the report.
@@ -36,6 +41,11 @@ class Control(Controller):
         for value in self.AUDIENCES:
             fieldset.append(page.radio_button("audience", value=value))
         page.form.append(fieldset)
+        fieldset = page.fieldset("Included Documents")
+        for value, label, checked in self.INCLUDE:
+            opts = dict(checked=checked, value=value, label=label)
+            fieldset.append(page.radio_button("include", **opts))
+        page.form.append(fieldset)
         fieldset = page.fieldset("Date Last Modified Range")
         fieldset.append(page.date_field("start", value=start))
         fieldset.append(page.date_field("end", value=end))
@@ -45,7 +55,12 @@ class Control(Controller):
         """Generate an HTML report that can be pasted into MS Word."""
 
         B = self.HTMLPage.B
-        title = f"Changes to Summaries Report - {datetime.date.today()}"
+        m = ""
+        if self.include == "m":
+            m = " (Modules Only)"
+        elif self.include == "s":
+            m = " (Excluding Modules)"
+        title = f"Changes to Summaries Report{m} - {datetime.date.today()}"
         head = B.HEAD(
             B.META(charset="utf-8"),
             B.TITLE(title),
@@ -53,7 +68,7 @@ class Control(Controller):
         )
         body = B.BODY(
             B.H1(
-                "Changes to Summaries Report",
+                f"Changes to Summaries Report{m}",
                 B.BR(),
                 f"From {self.start} to {self.end}"
             )
@@ -118,6 +133,16 @@ class Control(Controller):
         return self._end
 
     @property
+    def include(self):
+        """Should we include summaries (s), modules (m), or both (a)?"""
+
+        if not hasattr(self, "_include"):
+            self._include = self.fields.getvalue("include", "s")
+            if self._include not in [values[0] for values in self.INCLUDE]:
+                self.bail()
+        return self._include
+
+    @property
     def start(self):
         """Beginning of the report's date range."""
 
@@ -145,6 +170,14 @@ class Board:
         query.where(query.Condition("b.path", b_path))
         query.where(query.Condition("a.value", control.audience))
         query.where(query.Condition("b.int_val", doc_id))
+        if control.include == "m":
+            query.join("query_term m", "m.doc_id = a.doc_id",
+                       "m.path = '/Summary/@ModuleOnly'",
+                       "m.value = 'Yes'")
+        elif control.include == "s":
+            query.outer("query_term m", "m.doc_id = a.doc_id",
+                        "m.path = '/Summary/@ModuleOnly'")
+            query.where("(m.value IS NULL OR m.value <> 'Yes')")
         for row in query.execute(control.cursor).fetchall():
             summary = Summary(control, row[0])
             if summary.changes is not None:

@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 #----------------------------------------------------------------------
 # Release lock blocking future Hoover runs.
 # JIRA::OCECDR-4196

@@ -1,3 +1,8 @@
+#!/usr/bin/env python
+
+"""Show the users the available XMetaL icons.
+"""
+
 import glob
 import lxml.etree as etree
 import lxml.html.builder as B

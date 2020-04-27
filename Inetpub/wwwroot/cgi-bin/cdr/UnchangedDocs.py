@@ -103,6 +103,7 @@ class Control(Controller):
             query = self.Query("doc_type", "name").order("name")
             query.where("name IS NOT NULL")
             query.where("name <> ''")
+            query.where("active = 'Y'")
             self._doctypes = [row.name for row in query.execute(self.cursor)]
         return self._doctypes
 

@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 #----------------------------------------------------------------------
 # Determine whether an account is allowed to perform a CDR action.
 # JIRA::OCECDR-4107 - require authorization for viewing GP emailer list

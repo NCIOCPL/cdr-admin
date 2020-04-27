@@ -13,7 +13,7 @@ class Control(Controller):
     """Access to the database and report-generation tools."""
 
     SUBTITLE = "Media Doc Publishing Report"
-    AUDIENCES = "Patients", "Health Professionals"
+    AUDIENCES = "Patients", "Health_Professionals"
     PATHS = (
         "/Media/MediaContent/Captions/MediaCaption/@audience",
         "/Media/MediaContent/ContentDescriptions/ContentDescription/@audience",
@@ -110,9 +110,10 @@ class Control(Controller):
         query.where(query.Condition("d.id", subquery, "IN"))
         query.where(query.Condition("v.num", last_ver))
         if self.audience:
+            audience = self.audience.replace(" ", "_")
             query.join("query_term_pub a", "a.doc_id = d.id")
             query.where(query.Condition("a.path", self.PATHS, "IN"))
-            query.where(query.Condition("a.value", self.audience))
+            query.where(query.Condition("a.value", audience))
         rows = []
         for row in query.execute(self.cursor).fetchall():
             #for id, title, first, verDt, audDt, volFlag, ver, \

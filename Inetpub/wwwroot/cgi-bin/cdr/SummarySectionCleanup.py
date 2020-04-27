@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 #----------------------------------------------------------------------
 # Report on the types of changes recorded in selected Summaries.
 # JIRA::OCECDR-3703

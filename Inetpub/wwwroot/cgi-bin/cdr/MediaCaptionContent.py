@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 #----------------------------------------------------------------------
 # Produce an Excel spreadsheet showing significant fields from user
 # selected Media documents.

@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 #----------------------------------------------------------------------
 # Transform a CDR document using an XSL/T filter and send it back to
 # the browser.

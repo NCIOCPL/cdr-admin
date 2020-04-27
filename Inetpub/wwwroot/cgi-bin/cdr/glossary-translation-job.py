@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """
 Interface for creating/editing a glossary translation job
 

@@ -1,0 +1,53 @@
+ul.treeview {
+    margin-top: 2rem;
+}
+
+ul.treeview li {
+    font-family: courier,serif;
+    padding-left: 6px;
+    list-style-type: none;
+    font-weight: bold;
+}
+
+ul.treeview li span.sign {
+    margin-right: .5rem;
+}
+
+ul.treeview li.leaf {
+	color: Teal;
+	cursor: default;
+	list-style-type: none;
+    padding-left: 1.5rem;
+}
+
+ul.treeview li.leaf.selected {
+	font-style: italic;
+}
+
+ul.treeview li.parent{
+	color: Navy;
+	cursor: pointer;
+}
+
+ul.treeview li.show ul {
+	display: block;
+}
+
+ul.treeview li.hide ul {
+	display: none;
+}
+
+fieldset#clipboard textarea {
+    min-height: 300px;
+    min-width: 700px;
+}
+
+li.parent a {
+    font-size: 8pt;
+    color: rgb(200, 100, 100);
+    margin-left: 1rem;
+}
+
+footer p {
+    text-align: left;
+}

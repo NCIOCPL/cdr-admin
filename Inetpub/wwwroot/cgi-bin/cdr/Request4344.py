@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 #----------------------------------------------------------------------
 # The Glossary Term Concept by Spanish Definition Status Report will serve
 # as a QC report for Spanish and corresponding English Definitions by Status.

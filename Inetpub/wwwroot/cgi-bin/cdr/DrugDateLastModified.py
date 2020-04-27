@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """
 Report on the last modifications to Drug Information Summary documents
 

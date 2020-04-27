@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 #----------------------------------------------------------------------
 #
 # Web service for keeping CDR client files up to date.

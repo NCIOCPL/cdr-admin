@@ -1,549 +1,720 @@
-#----------------------------------------------------------------------
-#
-# Report on the metadata for one or more summaries.
-#
-# BZIssue::1724
-# BZIssue::2905
-# BZIssue::3716
-# BZIssue::4475
-# JIRA::OCECDR-3976
-# JIRA::OCECDR-4062
-#
-#----------------------------------------------------------------------
-import cdr
-import cdrcgi
-from cdrapi import db
-from lxml import etree
+#!/usr/bin/env python
 
-class Control(cdrcgi.Control):
-    """
-    Object used to determine how to respond to the client's request.
-    Collects parameters used to invoke the script and scrubs them.
-    """
+"""Report on the metadata for one or more summaries.
+"""
 
-    N_PATH = "/Organization/OrganizationNameInformation/OfficialName/Name"
-    T_PATH = "/Organization/OrganizationType"
-    ALL_ITEMS = ("CDR ID", "Summary Title", "Advisory Board", "Editorial Board",
-                 "Audience", "Language", "Description", "Pretty URL",
-                 "Topics", "Purpose Text", "Section Metadata",
-                 "Summary Abstract", "Summary Keywords", "PMID")
-    DEFAULT_ITEMS = set(["CDR ID", "Summary Title", "Advisory Board",
-                         "Editorial Board", "Topics"])
-    LANGUAGES = ("English", "Spanish")
-    AUDIENCES = ("Health Professional", "Patient")
-    SELECTIONS = ("id", "title", "group")
+from collections import UserDict
+from cdrcgi import Controller, Reporter
+from cdrapi.docs import Doc
 
-    def __init__(self):
-        """
-        Collect and validate the request's parameters.
-        """
-        cdrcgi.Control.__init__(self, "Summary Metadata Report")
-        self.items = set(self.fields.getlist("items")) or self.DEFAULT_ITEMS
-        self.selection = self.fields.getvalue("selection")
-        self.doc_id = self.fields.getvalue("doc-id")
-        self.doc_title = self.fields.getvalue("doc-title", "").strip()
-        self.language = self.fields.getvalue("language")
-        self.audience = self.fields.getvalue("audience")
-        self.board_id = self.fields.getvalue("board")
-        self.board_name = None
 
-        # Check for tampering.
-        if self.items - set(self.ALL_ITEMS):
-            cdrcgi.bail()
-        if self.doc_id:
-            try:
-                self.doc_id = cdr.exNormalize(self.doc_id)[1]
-            except:
-                cdrcgi.bail("Invalid document ID")
-        cdrcgi.valParmVal(self.language, valList=self.LANGUAGES, empty_ok=True,
-                          msg=cdrcgi.TAMPERING)
-        cdrcgi.valParmVal(self.audience, valList=self.AUDIENCES, empty_ok=True,
-                          msg=cdrcgi.TAMPERING)
-        cdrcgi.valParmVal(self.selection, valList=self.SELECTIONS,
-                          empty_ok=True, msg=cdrcgi.TAMPERING)
-        if self.board_id:
-            try:
-                self.board_name = self.get_board_name(self.board_id)
-            except:
-                cdrcgi.bail()
+class Control(Controller):
+    """Access to the database and report-generation tools."""
 
-    def populate_form(self, form):
-        """
-        Fill in the fields for requesting the report.
-        """
-        form.add("<fieldset>")
-        form.add(form.B.LEGEND("Summary Selection Method"))
-        form.add_radio("selection", "Single Summary By ID", "id", checked=True)
-        form.add_radio("selection", "Single Summary By Title", "title")
-        form.add_radio("selection", "Multiple Summaries By Group", "group")
-        form.add("</fieldset>")
-        form.add('<fieldset id="doc-id-box">')
-        form.add(form.B.LEGEND("Enter Document ID"))
-        form.add_text_field("doc-id", "Doc ID")
-        form.add("</fieldset>")
-        form.add('<fieldset id="doc-title-box" class="hidden">')
-        form.add(form.B.LEGEND("Enter Document Title"))
-        form.add_text_field("doc-title", "Doc Title")
-        form.add("</fieldset>")
-        form.add('<fieldset id="group-box" class="hidden">')
-        form.add(form.B.LEGEND("Summary Group"))
-        form.add_select("board", "Board", self.get_boards())
-        form.add_select("language", "Language", self.LANGUAGES)
-        form.add_select("audience", "Audience", self.AUDIENCES)
-        form.add("</fieldset>")
-        self.add_item_fields(form)
-        form.add_script("""\
-function check_selection(sel) {
-    switch (sel) {
-    case 'id':
-        jQuery('#doc-id-box').show();
-        jQuery('#doc-title-box').hide();
-        jQuery('#group-box').hide();
-        break;
-    case 'title':
-        jQuery('#doc-id-box').hide();
-        jQuery('#doc-title-box').show();
-        jQuery('#group-box').hide();
-        break;
-    case 'group':
-        jQuery('#doc-id-box').hide();
-        jQuery('#doc-title-box').hide();
-        jQuery('#group-box').show();
-        break;
+    SUBTITLE = "Summary Metadata Report"
+    LOGNAME = "SummaryMetadataReport"
+    METHODS = (
+        ("id", "Single Summary By ID", True),
+        ("title", "Single Summary By Title", False),
+        ("group", "Multiple Summaries By Group", False),
+    )
+    A_PATH = "a.path = '/Summary/SummaryMetaData/SummaryAudience'"
+    B_PATH = "b.path = '/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref'"
+    L_PATH = "l.path = '/Summary/SummaryMetaData/SummaryLanguage'"
+    M_PATH = "m.path = '/Summary/@AvailableAsModule'"
+    T_PATH = "t.path = '/Summary/TranslationOf/@cdr:ref'"
+    ITEMS = (
+        ("CDR ID", "id"),
+        ("Summary Title", "title"),
+        ("Advisory Board", "advisory_board"),
+        ("Editorial Board", "editorial_board"),
+        ("Audience", "audience"),
+        ("Language", "language"),
+        ("Description", "description"),
+        ("Pretty URL", "pretty_url"),
+        ("Topics", "topics"),
+        ("Purpose Text", "purpose"),
+        ("Section Metadata", None),
+        ("Summary Abstract", "abstract"),
+        ("Summary Keywords", "keywords"),
+        ("PMID", "pmid"),
+    )
+    LABELS = [item[0] for item in ITEMS]
+    DEFAULTS = {
+        "CDR ID",
+        "Summary Title",
+        "Advisory Board",
+        "Editorial Board",
+        "Topics"
     }
-}
-jQuery(function() {
-    var sel = jQuery('input[name="selection"]:checked').val();
-    check_selection(sel);
-});""")
+    MODULES = (
+        ("both", "Summaries and Modules"),
+        ("summaries", "Summaries Only"),
+        ("modules", "Modules Only"),
+    )
+    ORG_NAME_INFO = "/Organization/OrganizationNameInformation"
+    ORG_NAME_PATH = f"{ORG_NAME_INFO}/OfficialName/Name"
+    SCRIPT = "../../js/SummaryMetaData.js"
+    STYLESHEET = "../../stylesheets/SummaryMetaData.css"
+
+    def build_tables(self):
+        """Get each summary to assemble its table(s)."""
+
+        if not self.summaries:
+            cdrcgi.bail("No summaries found for report")
+        tables = []
+        for summary in self.summaries:
+            tables += summary.tables
+        return tables
+
+    def populate_form(self, page):
+        """Add the fields to the form.
+
+        Pass:
+            page - HTMLPage object containing the form
+        """
+
+        if self.titles:
+            page.form.append(page.hidden_field("method", "id"))
+            fieldset = page.fieldset("Choose Summary")
+            opts = dict(label="Summary", options=self.titles)
+            fieldset.append(page.select("doc-id", **opts))
+            page.form.append(fieldset)
+            page.form.append(self.item_fields)
+        else:
+            fieldset = page.fieldset("Summary Selection Method")
+            for value, label, checked in self.METHODS:
+                opts = dict(value=value, label=label, checked=checked)
+                fieldset.append(page.radio_button("method", **opts))
+            page.form.append(fieldset)
+            fieldset = page.fieldset("Enter Document ID", id="doc-id-box")
+            fieldset.append(page.text_field("doc-id", label="Doc ID"))
+            page.form.append(fieldset)
+            fieldset = page.fieldset("Enter Document Title", id="doc-title-box")
+            fieldset.set("class", "hidden")
+            fieldset.append(page.text_field("doc-title", label="Doc Title"))
+            page.form.append(fieldset)
+            fieldset = page.fieldset("Summary Group", id="group-box")
+            fieldset.set("class", "hidden")
+            fieldset.append(page.select("board", options=self.boards))
+            fieldset.append(page.select("language", options=self.LANGUAGES))
+            fieldset.append(page.select("audience", options=self.AUDIENCES))
+            fieldset.append(page.select("modules", options=self.MODULES))
+            page.form.append(fieldset)
+            page.form.append(self.item_fields)
+            page.head.append(page.B.SCRIPT(src=self.SCRIPT))
 
     def show_report(self):
-        """
-        Override the base class method since some of the tables are vertical.
-        """
-        summaries = self.get_summaries()
-        if not summaries:
-            cdrcgi.bail("No summaries found for report.")
-        if len(summaries) == 1:
-            subtitle = "%s (CDR%d)" % (summaries[0].title, summaries[0].doc_id)
-        else:
-            subtitle = "%s Language %s Summaries for the %s" % (self.language,
-                                                                self.audience,
-                                                                self.board_name)
-        page = cdrcgi.Page(self.title, subtitle=subtitle, body_classes="report")
-        for summary in summaries:
-            summary.report(page)
-        page.add_css("""\
-.top-section { font-weight: bold; }
-.mid-section { font-weight: normal; }
-.low-section { font-style: italic; }
-table.summary { width: 1024px; margin-top: 40px; }
-table.summary th { width: 150px; text-align: right; padding-right: 10px; }""")
-        page.send()
+        """Add some custom CSS styling."""
 
-    def add_item_fields(self, form):
-        """
-        Common code to create the check boxes for which data should be
-        displayed on the report. Hoisted out because it's used in two
-        places (the main report request form and the cascading form to
-        choose a summary when multiple matches are found for a partial
-        summary title string.
-        """
-        form.add("<fieldset>")
-        form.add(form.B.LEGEND("Include On Report"))
-        for item in self.ALL_ITEMS:
-            form.add_checkbox("items", item, item, checked=item in self.items)
-        form.add("</fieldset>")
+        page = self.report.page
+        elapsed = page.html.get_element_by_id("elapsed", None)
+        if elapsed is not None:
+            elapsed.text = str(self.elapsed)
+        page.head.append(page.B.LINK(href=self.STYLESHEET, rel="stylesheet"))
+        self.report.send(self.format)
 
-    def get_summaries(self):
-        """
-        Use the appropriate method for selection which summaries should
-        appear on the report.
-        """
-        if self.selection == "id":
-            return self.match_id()
-        elif self.selection == "title":
-            return self.match_title()
-        elif self.selection == "group":
-            return self.match_group()
+    @property
+    def audience(self):
+        """Selecting health-professional or patient summaries?"""
 
-    def match_id(self):
-        """
-        Find the summary which matches the document ID supplied by the user.
-        """
-        if not self.doc_id:
-            cdrcgi.bail("Missing document ID")
-        return [Summary(self, self.doc_id)]
+        if not hasattr(self, "_audience"):
+            self._audience = self.fields.getvalue("audience")
+            if self._audience and self._audience not in self.AUDIENCES:
+                self.bail()
+        return self._audience
 
-    def match_title(self):
-        """
-        Find the summaries which match the partial title string entered
-        by the user. If only a single summary matches, use it for the report.
-        Otherwise, put up a cascading form for the user to pick one.
-        """
-        if not self.doc_title:
-            cdrcgi.bail("No title specified")
-        pattern = f"%{self.doc_title}%"
-        query = db.Query("active_doc d", "d.id", "d.title")
-        query.join("doc_type t", "t.id = d.doc_type")
-        query.where(query.Condition("t.name", "Summary"))
-        query.where(query.Condition("d.title", pattern, "LIKE"))
-        query.order("d.title")
-        rows = query.execute(self.cursor).fetchall()
-        if not rows:
-            cdrcgi.bail("No matching summaries found")
-        if len(rows) == 1:
-            return [Summary(self, rows[0][0])]
-        opts = {
-            "buttons": self.buttons,
-            "action": self.script,
-            "subtitle": "Multiple Matching Summaries Found",
-            "session": self.session
-        }
-        form = cdrcgi.Page(self.PAGE_TITLE, **opts)
-        form.add_hidden_field("selection", "id")
-        form.add("<fieldset>")
-        form.add(form.B.LEGEND("Choose Summary"))
-        form.add_select("doc-id", "Summary", rows)
-        form.add("</fieldset>")
-        self.add_item_fields(form)
-        form.send()
+    @property
+    def board(self):
+        """CDR Organization document ID for the selected PDQ board."""
 
-    def match_group(self):
-        """
-        Find all the summaries for the user's selection for board,
-        language, and audience. If the user wants the Spanish summaries,
-        we first find the English language summaries for the selected
-        board and audience, and then find the documents which are marked
-        as translations of the English summaries we just found.
-        """
-        if not self.board_id:
-            cdrcgi.bail("Board not selected")
-        if not self.language:
-            cdrcgi.bail("Language not selected")
-        if not self.audience:
-            cdrcgi.bail("Audience not selected")
-        a_path = "/Summary/SummaryMetaData/SummaryAudience"
-        b_path = "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"
-        l_path = "/Summary/SummaryMetaData/SummaryLanguage"
-        t_path = "/Summary/TranslationOf/@cdr:ref"
-        query = db.Query("active_doc d", "d.id", "d.title").unique()
-        query.join("doc_version v", "v.id = d.id")
-        query.join("query_term b", "b.doc_id = d.id")
-        query.join("query_term a", "a.doc_id = d.id")
-        query.join("query_term l", "l.doc_id = d.id")
-        query.where(query.Condition("a.path", a_path))
-        query.where(query.Condition("b.path", b_path))
-        query.where(query.Condition("l.path", l_path))
-        query.where(query.Condition("a.value", self.audience + "s"))
-        query.where(query.Condition("b.int_val", self.board_id))
-        query.where(query.Condition("l.value", "English"))
-        query.where(query.Condition("v.publishable", "Y"))
-        query.order("d.title")
-        doc_ids = [row[0] for row in query.execute(self.cursor).fetchall()]
-        if self.language != "English":
-            query = db.Query("document d", "d.id", "d.title").unique()
-            query.join("query_term t", "t.doc_id = d.id")
-            query.where(query.Condition("t.path", t_path))
-            query.where(query.Condition("t.int_val", doc_ids, "IN"))
-            query.order("d.title")
+        if not hasattr(self, "_board"):
+            self._board = self.fields.getvalue("board")
+            if self._board:
+                try:
+                    self._board = int(self._board)
+                    if self._board not in self.boards:
+                        self.bail()
+                except Exception:
+                    self.bail()
+        return self._board
+
+    @property
+    def board_names(self):
+        """Dictionary of all board names (advisory and editorial)."""
+
+        if not hasattr(self, "_board_names"):
+            query = self.Query("query_term", "doc_id", "value")
+            query.where(query.Condition("path", Control.ORG_NAME_PATH))
             rows = query.execute(self.cursor).fetchall()
-            doc_ids = [row[0] for row in rows]
-        return [Summary(self, doc_id) for doc_id in doc_ids]
+            self._board_names = dict([tuple(row) for row in rows])
+        return self._board_names
 
-    def get_board_name(self, board_id):
-        """
-        Look up the board name given the CDR ID for the board's Organization
-        document. The caller will catch any exceptions raised (presumably
-        because the document ID has been tampered with by a hacker).
-        """
-        query = db.Query("query_term", "value")
-        query.where(query.Condition("path", self.N_PATH))
-        query.where(query.Condition("doc_id", board_id))
-        return query.execute(self.cursor).fetchone()[0]
+    @property
+    def boards(self):
+        """Dictionary of ID -> editorial board name (for the picklist)."""
 
-    def get_boards(self):
-        """
-        Fetch IDs and names of the PDQ editorial boards (for picklist).
-        """
-        query = db.Query("query_term n", "n.doc_id", "n.value")
-        query.join("query_term t", "t.doc_id = n.doc_id")
-        query.join("active_doc a", "a.id = n.doc_id")
-        query.where(query.Condition("n.path", self.N_PATH))
-        query.where(query.Condition("t.path", self.T_PATH))
-        query.where(query.Condition("t.value", "PDQ Editorial Board"))
-        query.order("n.value")
-        boards = []
-        prefix, suffix = ("PDQ ", " Editorial Board")
-        for id, name in query.execute(self.cursor).fetchall():
-            if name.startswith(prefix):
-                name = name[len(prefix):]
-            if name.endswith(suffix):
-                name = name[:-len(suffix)]
-            boards.append([id, name])
-        return boards
+        if not hasattr(self, "_boards"):
+            self._boards = self.get_boards()
+        return self._boards
+
+    @property
+    def diagnoses(self):
+        """Cached diagnosis term lookup."""
+
+        if not hasattr(self, "_diagnoses"):
+            class Diagnoses(UserDict):
+                def __init__(self, control):
+                    self.__control = control
+                    UserDict.__init__(self)
+                def __getitem__(self, key):
+                    if key not in self.data:
+                        query = self.__control.Query("query_term", "value")
+                        query.where("path = '/Term/PreferredName'")
+                        query.where(query.Condition("doc_id", key))
+                        rows = query.execute(self.__control.cursor).fetchall()
+                        self.data[key] = rows[0][0] if rows else ""
+                    return self.data[key]
+            self._diagnoses = Diagnoses(self)
+        return self._diagnoses
+
+    @property
+    def doc_id(self):
+        """CDR ID (integer) for document on which we are to report."""
+
+        if not hasattr(self, "_doc_id"):
+            self._doc_id = self.fields.getvalue("doc-id")
+            if self._doc_id:
+                try:
+                    self._doc_id = Doc.extract_id(self._doc_id)
+                except Exception:
+                    self.bail("Invalid document ID")
+        return self._doc_id
+
+    @property
+    def fragment(self):
+        """Document title fragment string."""
+
+        if not hasattr(self, "_fragment"):
+            self._fragment = self.fields.getvalue("doc-title", "").strip()
+        return self._fragment
+
+    @property
+    def item_fields(self):
+        """Factored out for use on the cascading title selection form."""
+
+        fieldset = self.HTMLPage.fieldset("Include On Report")
+        for item in self.LABELS:
+            opts = dict(value=item, label=item, checked=item in self.items)
+            fieldset.append(self.HTMLPage.checkbox("items", **opts))
+        return fieldset
+
+    @property
+    def items(self):
+        """What fields should be included on the report?"""
+
+        if not hasattr(self, "_items"):
+            self._items = set(self.fields.getlist("items"))
+            if not self._items:
+                self._items = self.DEFAULTS
+            if self._items - set(self.LABELS):
+                self.bail()
+        return self._items
+
+    @property
+    def language(self):
+        """Selecting English or Spanish summaries?"""
+
+        if not hasattr(self, "_language"):
+            self._language = self.fields.getvalue("language")
+            if self._language and self._language not in self.LANGUAGES:
+                self.bail()
+        return self._language
+
+    @property
+    def method(self):
+        """What method are we using to choose summaries?"""
+
+        if not hasattr(self, "_method"):
+            self._method = self.fields.getvalue("method") or "id"
+            if self._method not in [m[0] for m in self.METHODS]:
+                self.bail()
+        return self._method
+
+    @property
+    def modules(self):
+        """How to handle modules in summary selection."""
+
+        if not hasattr(self, "_modules"):
+            self._modules = self.fields.getvalue("modules", "both")
+            if self._modules not in [m[0] for m in self.MODULES]:
+                self.bail()
+        return self._modules
+
+    @property
+    def subtitle(self):
+        """What should we display underneath the main banner?"""
+
+        if not hasattr(self, "_subtitle"):
+            if self.request == self.SUBMIT:
+                if self.titles and len(self.titles) > 1:
+                    self._subtitle = "Multiple Matching Summaries Found"
+                elif self.summaries:
+                    if len(self.summaries) == 1:
+                        s = self.summaries[0]
+                        self._subtitle = f"{s.title} (CDR{s.id:d})"
+                    else:
+                        board_name = self.boards[self.board]
+                        args = self.language, self.audience, board_name
+                        self._subtitle = "{} {} Summaries for {}".format(*args)
+            else:
+                self._subtitle = self.SUBTITLE
+        return self._subtitle
+
+    @property
+    def summaries(self):
+        """Which summaries should be represented on the report?"""
+
+        if not hasattr(self, "_summaries"):
+            self._summaries = []
+            if self.method == "id":
+                if self.doc_id:
+                    self._summaries = [Summary(self, self.doc_id)]
+            elif self.method == "title":
+                if self.titles:
+                    if len(self.titles) == 1:
+                        id, title = self.titles[0]
+                        self._summaries = [Summary(self, id)]
+                    else:
+                        self.show_form()
+            elif self.method == "group":
+                if not self.board:
+                    self.bail("Board not selected")
+                if not self.language:
+                    self.bail("Language not selected")
+                if not self.audience:
+                    self.bail("Audience not selected")
+                query = self.Query("active_doc d", "d.id", "d.title").unique()
+                query.join("publishable_version v", "v.id = d.id")
+                query.join("query_term a", "a.doc_id = d.id")
+                query.join("query_term l", "l.doc_id = d.id")
+                if self.language == "English":
+                    query.join("query_term b", "b.doc_id = d.id")
+                else:
+                    query.join("query_term t", "t.doc_id = d.id")
+                    query.where(self.T_PATH)
+                    query.join("query_term b", "b.doc_id = t.int_val")
+                query.where(self.A_PATH)
+                query.where(self.L_PATH)
+                query.where(self.B_PATH)
+                query.where(query.Condition("a.value", f"{self.audience}s"))
+                query.where(query.Condition("b.int_val", self.board))
+                query.where(query.Condition("l.value", self.language))
+                if self.modules == "modules":
+                    query.join("query_term m", "m.doc_id = d.id")
+                    query.where(self.M_PATH)
+                elif self.modules == "summaries":
+                    query.outer("query_term m", "m.doc_id = d.id", self.M_PATH)
+                    query.where("m.doc_id IS NULL")
+                query.order("d.title")
+                rows = query.execute(self.cursor).fetchall()
+                self._summaries = [Summary(self, row.id) for row in rows]
+        return self._summaries
+
+    @property
+    def titles(self):
+        """Find summaries whose titles match the user's title fragment."""
+
+        if not hasattr(self, "_titles"):
+            self._titles = None
+            if self.method == "title" and self.fragment:
+                pattern = f"%{self.fragment}%"
+                query = self.Query("active_doc d", "d.id", "d.title")
+                query.join("doc_type t", "t.id = d.doc_type")
+                query.where(query.Condition("t.name", "Summary"))
+                query.where(query.Condition("d.title", pattern, "LIKE"))
+                query.order("d.title")
+                rows = query.execute(self.cursor).fetchall()
+                if rows:
+                    self._titles = [tuple(row) for row in rows]
+        return self._titles
+
 
 class Summary:
-    """
-    Object containing all of the information which can appear on the
-    report for a single PDQ summary.
-    """
+    """One of these for each PDQ summary on the report."""
 
-    NS = "cips.nci.nih.gov/cdr"
-    board_cache = {}
+    CDR_REF = f"{{{Doc.NS}}}ref"
+    COLUMNS = (
+        Reporter.Column("Section Title"),
+        Reporter.Column("Diagnoses"),
+        Reporter.Column("SS\N{NO-BREAK SPACE}No"),
+        Reporter.Column("Section Type"),
+    )
 
     def __init__(self, control, doc_id):
-        """
-        Parse the summary document, extracting data for the report.
-        """
-        self.control = control
-        self.doc_id = int(doc_id)
-        query = db.Query("document", "xml")
-        query.where(query.Condition("id", self.doc_id))
-        rows = query.execute(control.cursor).fetchall()
-        if not rows:
-            cdrcgi.bail("CDR%d not found" % self.doc_id)
-        try:
-            root = etree.XML(rows[0][0].encode("utf-8"))
-        except:
-            cdrcgi.bail("CDR%d malformed" % self.doc_id)
-        if root.tag != "Summary":
-            cdrcgi.bail("CDR%d is not a summary" % self.doc_id)
-        self.title = self.language = self.audience = self.description = ""
-        self.purpose = self.advisory_board = self.editorial_board = ""
-        self.topics = []
-        self.abstract = []
-        self.keywords = []
-        self.sections = []
-        self.type = self.link = self.pmid = None
-        for node in root.findall("SummaryTitle"):
-            self.title = self.get_text(node)
-        for node in root.findall("SummaryMetaData/*"):
-            if node.tag == "SummaryType":
-                self.type = node.text
-            elif node.tag == "SummaryAudience":
-                self.audience = node.text
-            elif node.tag == "SummaryLanguage":
-                self.language = node.text
-            elif node.tag == "SummaryDescription":
-                self.description = self.get_text(node)
-            elif node.tag == "SummaryURL":
-                self.link = self.Link(node)
-            elif node.tag == "PDQBoard":
-                for child in node.findall("Board"):
-                    try:
-                        name = self.get_board_name(child)
-                        if "advisory" in name.lower():
-                            self.advisory_board = name
-                        else:
-                            self.editorial_board = name
-                    except Exception as e:
-                        self.advisory_board = "oops! (%s)" % e
-            elif node.tag in ("MainTopics", "SecondaryTopics"):
-                self.topics.append(self.get_topic(node))
-            elif node.tag == "PurposeText":
-                self.purpose = self.get_text(node)
-            elif node.tag == "SummaryAbstract":
-                for child in node.findall("Para"):
-                    self.abstract.append(self.get_text(child))
-            elif node.tag == "SummaryKeyWords":
-                for child in node.findall("SummaryKeyWord"):
-                    self.keywords.append(child.text)
-            elif node.tag == "PMID":
-                self.pmid = self.get_text(node)
-        for node in root.iter("SummarySection"):
-            self.sections.append(self.Section(node, control.cursor))
+        """Remember the caller's values.
 
-    @staticmethod
-    def get_text(node):
+        Pass:
+            control - access to the login session and table-building tools
+            doc_id - integer for the unique CDR document ID for the summary
         """
-        Get all the text content for an element, stripping internal markup.
-        """
-        return "".join([t for t in node.itertext()]).strip()
 
-    def get_topic(self, node):
-        """
-        Pull out the name of the topic, and add a suffix indicating whether
-        it is a main topic (M) or a secondary topic (S).
-        """
-        for child in node.findall("Term"):
-            suffix = node.tag == "MainTopics" and "M" or "S"
-            return "%s (%s)" % (child.text, suffix)
+        self.__control = control
+        self.__doc_id = doc_id
 
-    def report(self, page):
-        """
-        Add at least one table (possibly two) describing this summary's
-        meta data.
-        """
-        self.B = page.B
-        if self.control.items - set(["Section Metadata"]):
-            self.add_general_table(page)
-        if "Section Metadata" in self.control.items:
-            self.add_section_metadata(page)
+    @property
+    def abstract(self):
+        """Sequence of strings (without markup) for abstract paragraphs."""
 
-    def add_section_metadata(self, page):
-        """
-        Add a table showing all of the summary's sections which have
-        reportable information.
-        """
-        table = self.B.TABLE(
-            self.B.TR(
-                self.B.TH("Section Title"),
-                self.B.TH("Diagnoses"),
-                self.B.TH("SS\u00a0No"),
-                self.B.TH("Section Type")
-            )
-        )
-        for section in self.sections:
-            if section.has_data():
-                section.report(table)
-        page.add(table)
+        if not hasattr(self, "_abstract"):
+            self._abstract = []
+            path = "SummaryMetaData/SummaryAbstract/Para"
+            for node in self.doc.root.findall(path):
+                self._abstract.append(Doc.get_text(node, "").strip())
+        return self._abstract
 
-    def add_general_table(self, page):
-        """
-        Create a vertical table for the data items to be displayed
-        for this summary (excluding information on the summary
-        sections).
-        """
-        table = self.B.TABLE(self.B.CLASS("summary"))
-        for label, value in (
-            ("CDR ID", self.doc_id),
-            ("Summary Title", self.title),
-            ("Advisory Board", self.advisory_board),
-            ("Editorial Board", self.editorial_board),
-            ("Audience", self.audience),
-            ("Language", self.language),
-            ("Description", self.description),
-            ("Pretty URL", self.link),
-            ("Topics", self.topics),
-            ("Purpose Text", self.purpose),
-            ("Summary Abstract", self.abstract),
-            ("Summary Keywords", self.keywords),
-            ("PMID", self.pmid),
-        ):
-            if label in self.control.items:
-                self.add_general_row(table, label, value)
-        page.add(table)
+    @property
+    def advisory_board(self):
+        """String for the name of the advisory board for this PDQ summary."""
 
-    def add_general_row(self, table, heading, value):
-        """
-        Append a row to the table for a single data item for this
-        summary. The table is vertical, so the headers go down
-        the first column instead of across the top row.
-        """
-        if value:
-            if heading == "Pretty URL":
-                link = self.B.A(value.url, href=value.url)
-                td = self.B.TD(value.display, self.B.BR(), link)
-            elif type(value) is list:
-                lines = list(value)
-                line = lines.pop(0)
-                td = self.B.TD(line)
-                while lines:
-                    line = lines.pop(0)
-                    br = self.B.BR()
-                    br.tail = str(line)
-                    td.append(br)
-            elif isinstance(value, (str, int, float)):
-                td = self.B.TD(str(value))
-            else:
-                cdrcgi.bail("type of value is %s" % type(value))
-        else:
-            td = self.B.TD()
-        table.append(self.B.TR(self.B.TH(heading), td))
+        if not hasattr(self, "_advisory_board"):
+            self._advisory_board = None
+            for name in self.boards:
+                if "advisory" in name.lower():
+                    self._advisory_board = name
+                    break
+        return self._advisory_board
 
-    def get_board_name(self, node):
-        """
-        Look up the name of a PDQ board using its CDR ID. Use a
-        cache to improve performance.
-        """
-        cdr_ref = node.get("{%s}ref" % self.NS)
-        if cdr_ref not in self.board_cache:
-            doc_id = cdr.exNormalize(cdr_ref)[1]
-            query = db.Query("query_term", "value")
-            query.where(query.Condition("path", Control.N_PATH))
-            query.where(query.Condition("doc_id", doc_id))
-            rows = query.execute(self.control.cursor).fetchall()
-            name = rows and rows[0][0] or ("no name for %s" % repr(cdr_ref))
-            self.board_cache[cdr_ref] = name
-        return self.board_cache[cdr_ref]
+    @property
+    def audience(self):
+        """Patients or Health professionals."""
+
+        if not hasattr(self, "_audience"):
+            node = self.doc.root.find("SummaryMetaData/SummaryAudience")
+            self._audience = Doc.get_text(node)
+        return self._audience
+
+    @property
+    def boards(self):
+        """Names of the boards which manage this PDQ summary."""
+
+        if not hasattr(self, "_boards"):
+            self._boards = []
+            path = "SummaryMetaData/PDQBoard/Board"
+            for node in self.doc.root.findall(path):
+                ref = node.get(self.CDR_REF)
+                try:
+                    name = self.control.board_names[Doc.extract_id(ref)]
+                    if name:
+                        self._boards.append(name)
+                except Exception:
+                    message = "%s: No board name for %r"
+                    args = self.doc.cdr_id, ref
+                    self.control.logger.exception(message, *args)
+        return self._boards
+
+    @property
+    def control(self):
+        """Access to the login session and table-building tools."""
+        return self.__control
+
+    @property
+    def description(self):
+        """String for the description of the summary (stripped of markup)."""
+
+        if not hasattr(self, "_description"):
+            node = self.doc.root.find("SummaryMetaData/SummaryDescription")
+            self._description = Doc.get_text(node)
+        return self._description
+
+    @property
+    def doc(self):
+        """`Doc` object for this PDQ summary document."""
+        if not hasattr(self, "_doc"):
+            self._doc = Doc(self.control.session, id=self.id)
+        return self._doc
+
+    @property
+    def editorial_board(self):
+        """String for the name of the editorial board for this PDQ summary."""
+
+        if not hasattr(self, "_editorial_board"):
+            self._editorial_board = None
+            for name in self.boards:
+                if "advisory" not in name.lower():
+                    self._editorial_board = name
+                    break
+        return self._editorial_board
+
+    @property
+    def general_table(self):
+        """Add the top-level metadata for the PDQ summary."""
+
+        if not hasattr(self, "_general_table"):
+            rows = []
+            for label, name in Control.ITEMS:
+                if name and label in self.control.items:
+                    rows.append((label, getattr(self, name)))
+            self._general_table = Reporter.Table(rows, classes="general")
+        return self._general_table
+
+    @property
+    def id(self):
+        """Integer for the unique CDR document ID for this PDQ summary."""
+        return self.__doc_id
+
+    @property
+    def keywords(self):
+        """Sequence of strings for keywords associated with this summary."""
+
+        if not hasattr(self, "_keywords"):
+            self._keywords = []
+            path = "SummaryMetaData/SummaryKeyWords/SummaryKeyWord"
+            for node in self.doc.root.findall(path):
+                self._keywords.append(Doc.get_text(node, "").strip())
+        return self._keywords
+
+    @property
+    def language(self):
+        """English or Spanish."""
+
+        if not hasattr(self, "_language"):
+            node = self.doc.root.find("SummaryMetaData/SummaryLanguage")
+            self._language = Doc.get_text(node)
+        return self._language
+
+    @property
+    def link(self):
+        """URL and accompanying label for this PDQ summary."""
+
+        if not hasattr(self, "_link"):
+            node = self.doc.root.find("SummaryMetaData/SummaryURL")
+            self._link = self.Link(node)
+        return self._link
+
+    @property
+    def pmid(self):
+        """PubMed ID for the PDQ summary on NLM's web site."""
+
+        if not hasattr(self, "_pmid"):
+            node = self.doc.root.find("SummaryMetaData/PMID")
+            self._pmid = Doc.get_text(node)
+        return self._pmid
+
+    @property
+    def pretty_url(self):
+        """Link to this PDQ summary."""
+        return self.link.span
+
+    @property
+    def purpose(self):
+        """String for the purpose of this PDQ summary (stripped of markup)."""
+
+        if not hasattr(self, "_purpose"):
+            node = self.doc.root.find("SummaryMetaData/PurposeText")
+            self._purpose = Doc.get_text(node)
+        return self._purpose
+
+    @property
+    def section_metadata_table(self):
+        """Table showing information about the sections of this PDQ summary."""
+
+        if not hasattr(self, "_section_metadata_table"):
+            if "Section Metadata" not in self.control.items:
+                self._section_meta_data = None
+                return None
+            rows = [section.row for section in self.sections if section.row]
+            opts = dict(columns=self.COLUMNS)
+            self._section_metadata_table = Reporter.Table(rows, **opts)
+        return self._section_metadata_table
+
+    @property
+    def sections(self):
+        """Find all the sections of the summary recursively."""
+
+        if not hasattr(self, "_sections"):
+            self._sections = []
+            for node in self.doc.root.iter("SummarySection"):
+                self._sections.append(self.Section(self.control, node))
+        return self._sections
+
+    @property
+    def tables(self):
+        """Table(s) for this PDQ summary on the report."""
+
+        if not hasattr(self, "_tables"):
+            tables = self.general_table, self.section_metadata_table
+            self._tables = [table for table in tables if table]
+        return self._tables
+
+    @property
+    def title(self):
+        """String for the title of the summary (stripped of markup)."""
+
+        if not hasattr(self, "_title"):
+            self._title = Doc.get_text(self.doc.root.find("SummaryTitle"))
+        return self._title
+
+    @property
+    def topics(self):
+        """Sequence of topics strings for this PDQ summary."""
+
+        if not hasattr(self, "_topics"):
+            self._topics = []
+            for tag in "MainTopics", "SecondaryTopics":
+                path = f"SummaryMetaData/{tag}/Term"
+                for node in self.doc.root.findall(path):
+                    topic = Doc.get_text(node, "").strip()
+                    if topic:
+                        self._topics.append(f"{topic} ({tag[0]})")
+        return self._topics
+
+    @property
+    def type(self):
+        """String for the type of this summary."""
+
+        if not hasattr(self, "_type"):
+            node = self.doc.root.find("SummaryMetaData/SummaryType")
+            self._type = Doc.get_text(node)
+        return self._type
+
 
     class Section:
-        """
-        Nested class for all the sections of the summary, fetched in
-        document order.
-        """
+        """Nested class for all the sections of the summary."""
 
-        diagnosis_cache = {}
+        CHECK_MARK = "\N{HEAVY CHECK MARK}"
 
-        def __init__(self, node, cursor):
-            """
-            Collect the information which can be display on the report
-            for this summary section.
-            """
-            self.depth = len(node.getroottree().getpath(node).split("/"))
-            self.cursor = cursor
-            self.title = ""
-            self.diagnoses = []
-            self.types = []
-            self.search_attr = node.get("TrialSearchString")
-            for child in node.findall("Title"):
-                self.title = Summary.get_text(child)
-            for child in node.findall("SectMetaData/Diagnosis"):
-                try:
-                    self.diagnoses.append(self.get_diagnosis_name(child))
-                except Exception as e:
-                    self.diagnoses.append("oops: %s" % e)
-            for child in node.findall("SectMetaData/SectionType"):
-                self.types.append(child.text)
+        def __init__(self, control, node):
+            """Remember the caller's values.
 
-        def get_diagnosis_name(self, node):
+            Pass:
+                control - provides cached diagnosis term name lookup
+                node - location of this summary section in the summary doc
             """
-            Look up a diagnosis name based on its CDR ID. Use a cache
-            to improve performance.
-            """
-            cdr_ref = node.get("{%s}ref" % Summary.NS)
-            if cdr_ref not in self.diagnosis_cache:
-                doc_id = cdr.exNormalize(cdr_ref)[1]
-                query = db.Query("query_term", "value")
-                query.where(query.Condition("path", "/Term/PreferredName"))
-                query.where(query.Condition("doc_id", doc_id))
-                rows = query.execute(self.cursor).fetchall()
-                name = rows and rows[0][0] or ("no name for %s" %
-                                               repr(cdr_ref))
-                self.diagnosis_cache[cdr_ref] = name
-            return self.diagnosis_cache[cdr_ref]
 
-        def has_data(self):
-            """
-            See if there's anything to report for this summary section.
-            """
-            if self.search_attr == "No":
-                return True
-            return self.diagnoses or self.types or self.title
+            self.__control = control
+            self.__node = node
 
-        def report(self, table):
-            """
-            Add the table row for this summary section's information.
-            """
-            B = cdrcgi.Page.B
-            check_mark = self.search_attr == "No" and "\u2714" or ""
-            level = { 3: "top", 4: "mid" }.get(self.depth, "low")
-            table.append(
-                B.TR(
-                    B.TD(self.title, B.CLASS("%s-section" % level)),
-                    B.TD("; ".join(self.diagnoses)),
-                    B.TD(check_mark, B.CLASS("center")),
-                    B.TD("; ".join(self.types))
-                )
-            )
+        @property
+        def depth(self):
+            """How deep is this section in the summary document?"""
+
+            if not hasattr(self, "_depth"):
+                self._depth = len(self.path.split("/"))
+            return self._depth
+
+        @property
+        def diagnoses(self):
+            """Sequence of diagnosis term strings applied to this section."""
+
+            if not hasattr(self, "_diagnoses"):
+                self._diagnoses = []
+                for node in self.__node.findall("SectMetaData/Diagnosis"):
+                    ref = node.get(Summary.CDR_REF)
+                    try:
+                        id = Doc.extract_id(ref)
+                        name = self.__control.diagnoses[id]
+                        if not name:
+                            name = f"diagnosis lookup failure for {ref!r}"
+                    except Exception:
+                        self.__control.logger.exception("%s lookup", ref)
+                        name = f"diagnosis lookup failure for {ref!r}"
+                    self._diagnoses.append(name)
+            return self._diagnoses
+
+        @property
+        def in_scope(self):
+            """Does this section have anything to contribute to the report?"""
+
+            if not hasattr(self, "_in_scope"):
+                self._in_scope = False
+                if self.needs_search_string:
+                    self._in_scope = True
+                elif self.diagnoses or self.types or self.title:
+                    self._in_scope = True
+            return self._in_scope
+
+        @property
+        def needs_search_string(self):
+            """True if the TrialSearchString attribute's value is 'No'."""
+
+            if not hasattr(self, "_needs_search_string"):
+                value = self.__node.get("TrialSearchString")
+                self._needs_search_string = value == "No"
+            return self._needs_search_string
+
+        @property
+        def path(self):
+            """String for where this section lives in the summary document."""
+
+            if not hasattr(self, "_path"):
+                self._path = self.__node.getroottree().getpath(self.__node)
+            return self._path
+
+        @property
+        def row(self):
+            """Optional sequence of values for this section."""
+
+            if not hasattr(self, "_row"):
+                self._row = None
+                if self.in_scope:
+                    check_mark = ""
+                    if self.needs_search_string:
+                        check_mark = self.CHECK_MARK
+                    level = {3: "top", 4: "mid"}.get(self.depth, "low")
+                    self._row = (
+                        Reporter.Cell(self.title, classes=f"{level}-section"),
+                        "; ".join(self.diagnoses),
+                        Reporter.Cell(check_mark, center=True),
+                        "; ".join(self.types),
+                    )
+            return self._row
+
+        @property
+        def title(self):
+            """String for this summary section's title."""
+
+            if not hasattr(self, "_title"):
+                self._title = Doc.get_text(self.__node.find("Title"))
+            return self._title
+
+        @property
+        def types(self):
+            """Sequence of strings for the section's types."""
+
+            if not hasattr(self, "_types"):
+                self._types = []
+                for node in self.__node.findall("SectMetaData/SectionType"):
+                    self._types.append(Doc.get_text(node))
+            return self._types
+
 
     class Link:
-        """
-        Holds the label and URL for the summary link.
-        """
-        def __init__(self, node):
-            self.display = node.text
-            self.url = node.get("{%s}xref" % Summary.NS)
+        """Holds the label and URL for the summary link."""
 
-Control().run()
+        def __init__(self, node):
+            """Save the node for this summary's URL.
+
+            Pass:
+                node - element from the XML summary document
+            """
+
+            self.__node = node
+
+        @property
+        def span(self):
+            """What to show in the table for this summary's URL."""
+
+            if not hasattr(self, "_span"):
+                self._span = None
+                if self.__node is not None and self.__node.text:
+                    B = Reporter.Cell.B
+                    url = self.__node.get(f"{{{Doc.NS}}}xref")
+                    link = B.A(url, href=url)
+                    self._span = B.SPAN(self.__node.text, B.BR(), link)
+            return self._span
+
+
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+    Control().run()
