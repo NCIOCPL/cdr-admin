@@ -68,7 +68,7 @@ class Control(Controller):
                     "Publication Reports", (
                         (
                             "New Published Glossary Terms",
-                            "Request4333.py",
+                            "NewlyPublishedGlossaryTerms.py",
                         ),
                         (
                             "Publish Preview",

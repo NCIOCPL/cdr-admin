@@ -49,7 +49,7 @@ class Control(Controller):
     def build_tables(self):
         """Create table(s) for the "summary" version of the report."""
 
-        if self.report_format == "full":
+        if self.format == "full":
             self.show_full_report()
         else:
             opts = dict(columns=self.headers)
@@ -205,7 +205,7 @@ jQuery(function() {
         return self._members
 
     @property
-    def report_format(self):
+    def format(self):
         """Selected flavor of the report ("full" or "summary")."""
         return self.fields.getvalue("format")
 
@@ -248,7 +248,7 @@ class Board:
     @property
     def fields(self):
         """Values which need to be fetched from the database for this board."""
-        return self.FIELDS[self.control.report_format]
+        return self.FIELDS[self.control.format]
 
     @property
     def id(self):
@@ -279,7 +279,7 @@ class Board:
             query.join("query_term p", "p.doc_id = m.doc_id")
             query.where(query.Condition("p.path", self.PERSON_PATH))
             query.join("active_doc d", "d.id = p.int_val")
-            if self.control.report_format == "summary":
+            if self.control.format == "summary":
                 query.join("query_term g", "g.doc_id = m.doc_id")
                 query.where(query.Condition("g.path", self.GOVT_EMPLOYEE_PATH))
                 query.outer("query_term t", "t.doc_id = m.doc_id",
@@ -382,7 +382,7 @@ class Board:
             """The final filter used on the member for this report."""
 
             if not hasattr(self, "_finishing_filter"):
-                name = self.FINISHING_FILTERS[self.control.report_format]
+                name = self.FINISHING_FILTERS[self.control.format]
                 self._finishing_filter = f"name:{name}"
             return self._finishing_filter
 
