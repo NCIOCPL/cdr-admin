@@ -44,6 +44,31 @@ class Control(Controller):
         opts = dict(label="End Date", value=end)
         fieldset.append(page.date_field("end", **opts))
         page.form.append(fieldset)
+        fieldset = page.fieldset("Audience")
+        for audience in self.AUDIENCES:
+            opts = dict(label=audience, value=audience)
+            fieldset.append(page.checkbox("audience", **opts))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Language")
+        for language in self.LANGUAGES:
+            opts = dict(label=language, value=language)
+            fieldset.append(page.checkbox("language", **opts))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Dictionary")
+        for dictionary in self.dictionaries:
+            opts = dict(label=dictionary, value=dictionary)
+            fieldset.append(page.checkbox("dictionary", **opts))
+        page.form.append(fieldset)
+
+    @property
+    def audiences(self):
+        """Which audiences have been selected for the report?"""
+
+        if not hasattr(self, "_audiences"):
+            self._audiences = self.fields.getlist("audience")
+            if set(self._audiences) - set(self.AUDIENCES):
+                self.bail()
+        return self._audiences
 
     @property
     def caption(self):
@@ -60,6 +85,42 @@ class Control(Controller):
         return cols
 
     @property
+    def definition_path(self):
+        """How we find concept filtering values depending on language."""
+
+        if not hasattr(self, "_definition_path"):
+            if len(self.languages) == 1:
+                if self.languages[0] == "English":
+                    tag = "TermDefinition"
+                else:
+                    tag = "TranslatedTermDefinition"
+            else:
+                tag = "%TermDefinition"
+            self._definition_path = f"/GlossaryTermConcept/{tag}"
+        return self._definition_path
+
+    @property
+    def dictionaries(self):
+        """Dictionary values for the checkboxes."""
+
+        if not hasattr(self, "_dictionaries"):
+            query = self.Query("query_term", "value").unique().order("value")
+            query.where("path LIKE '/GlossaryTermConcept/%nition/Dictionary'")
+            rows = query.execute(self.cursor).fetchall()
+            self._dictionaries = [row.value for row in rows]
+        return self._dictionaries
+
+    @property
+    def dictionary(self):
+        """Which dictionary(ies) has/have been selected for the report?"""
+
+        if not hasattr(self, "_dictionary"):
+            self._dictionary = self.fields.getlist("dictionary")
+            if set(self._dictionary) - set(self.dictionaries):
+                self.bail
+        return self._dictionary
+
+    @property
     def end(self):
         return self.fields.getvalue("end")
 
@@ -67,6 +128,16 @@ class Control(Controller):
     def format(self):
         """Override the default report format so we get an Excel workbook."""
         return "excel"
+
+    @property
+    def languages(self):
+        """Which languages have been selected for the report?"""
+
+        if not hasattr(self, "_languages"):
+            self._languages = self.fields.getlist("language")
+            if set(self._languages) - set(self.LANGUAGES):
+                self.bail()
+        return self._languages
 
     @property
     def rows(self):
@@ -85,8 +156,6 @@ class Control(Controller):
         """Values for the report table."""
 
         query = self.Query("document d", "d.id", "d.first_pub").order("d.id")
-        query.join("doc_type t", "t.id = d.doc_type")
-        query.where("t.name = 'GlossaryTermName'")
         query.where("d.first_pub IS NOT NULL")
         query.where("d.active_status = 'A'")
         if self.start:
@@ -94,6 +163,29 @@ class Control(Controller):
         if self.end:
             end = f"{self.end} 23:59:59"
             query.where(query.Condition("d.first_pub", end, "<="))
+        if self.audiences or self.dictionary or self.languages:
+            query.unique()
+            path = "/GlossaryTermName/GlossaryTermConcept/@cdr:ref"
+            query.join("query_term c", "c.doc_id = d.id")
+            query.where(f"c.path = '{path}'")
+            path_op = "LIKE" if "%" in self.definition_path else "="
+        else:
+            query.join("doc_type t", "t.id = d.doc_type")
+            query.where("t.name = 'GlossaryTermName'")
+        if self.audiences:
+            query.join("query_term a", "a.doc_id = c.int_val")
+            query.where(f"a.path {path_op} '{self.definition_path}/Audience'")
+            query.where(query.Condition("a.value", self.audiences, "IN"))
+        if self.dictionary:
+            path = f"{self.definition_path}/Dictionary"
+            query.join("query_term y", "y.doc_id = c.int_val")
+            query.where(f"y.path {path_op} '{path}'")
+            query.where(query.Condition("y.value", self.dictionary, "IN"))
+        if self.languages and not self.audiences and not self.dictionary:
+            path = f"{self.definition_path}/DefinitionText"
+            query.join("query_term l", "l.doc_id = c.int_val")
+            query.where(f"l.path {path_op} '{path}'")
+            query.where("l.value IS NOT NULL AND l.value <> ''")
         rows = query.execute(self.cursor).fetchall()
         return [TermName(self, row) for row in rows]
 
