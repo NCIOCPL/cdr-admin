@@ -229,8 +229,8 @@ class Summary:
 
     SCRIPT = "PublishPreview.py"
     TIER_SUFFIXES = dict(DEV="-blue-dev", PROD="")
-    IMAGE_PATH = "/images/cdr/live"
-    IMAGE_PATTERN = "images/cdr/live/(CDR[0-9-]+)\\.jpg"
+    IMAGE_PATH = "/pdq/media/images"
+    IMAGE_PATTERN = "pdq/media/images/([0-9-]+)\\.jpg"
     URL_PATHS = (
         "/Summary/SummaryMetaData/SummaryURL/@cdr:xref",
         "/DrugInformationSummary/DrugInfoMetaData/URL/@cdr:xref"
