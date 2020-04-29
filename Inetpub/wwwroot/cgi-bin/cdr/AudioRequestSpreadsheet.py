@@ -182,10 +182,13 @@ class TermNameDoc:
 
         @property
         def exclude(self):
-            """Boolean; True if no audio recording is wanted for this name."""
+            """Boolean; True if no audio recording is needed for this name."""
 
             if not hasattr(self, "_exclude"):
                 self._exclude = self.node.get("AudioRecording") == "No"
+                if not self._exclude:
+                    if self.node.find("MediaLink") is not None:
+                        self._exclude = True
             return self._exclude
 
         @property
