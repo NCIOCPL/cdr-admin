@@ -38,7 +38,7 @@ class Control(Controller):
         ("Contact Mode", "Contact Mode"),
         ("Assistant Name", "Assist Name"),
         ("Assistant E-mail", "Assist Email"),
-        ("Response Dates", "Resp. Dates"),
+        ("Response Date", "Resp. Date"),
     )
     DEFAULTS = "Phone", "E-mail"
     JS = (
@@ -305,7 +305,7 @@ class Control(Controller):
 
     @property
     def members(self):
-        """Current embers of the selected PDQ board."""
+        """Current members of the selected PDQ board."""
 
         if not hasattr(self, "_members"):
             self._members = []
@@ -385,7 +385,20 @@ class Control(Controller):
 
 
 class BoardMember:
-    """Member of the selected PDQ board."""
+    """Member of the selected PDQ board.
+
+    Note that there are some variations in the approaches to pulling
+    information out of the BoardMembershipDetails blocks. Some of the
+    code is parsing values from the document, and some is getting
+    values from the database query of the query_term table. Those
+    approaches will come up with consistent results, as long as the
+    documents only contain at most one BoardMembershipDetails block
+    for a given board. According to Robin J., that should always be
+    true. However, there is one document with two such blocks for
+    the same board (CDR769075 for Aimee Kriemer). Robin says that's
+    a data error, so the code should be OK as it is. See discussion
+    in https://tracker.nci.nih.gov/browse/OCECDR-4693.
+    """
 
     TODAY = str(datetime.date.today())
     FREQUENCY = {"Every year": 1, "Every two years": 2}
@@ -434,15 +447,12 @@ class BoardMember:
 
     @property
     def areas_of_expertise(self):
-        """Sequence of string showing professional strengths."""
+        """Sequence of strings showing professional strengths."""
 
-        areas = []
-        path = "BoardMembershipDetails/AreaOfExpertise"
-        for node in self.doc.root.findall(path):
-            area = Doc.get_text(node, "").strip()
-            if area:
-                areas.append(area)
-        return areas
+        areas = set()
+        for membership in self.memberships:
+            areas |= membership.areas_of_expertise
+        return sorted(areas)
 
     @property
     def assistant_email(self):
@@ -603,6 +613,18 @@ class BoardMember:
         return self._is_eic
 
     @property
+    def memberships(self):
+        """Membership(s) in the selected board."""
+
+        if not hasattr(self, "_memberships"):
+            self._memberships = []
+            for node in self.doc.root.findall("BoardMembershipDetails"):
+                membership = self.Membership(self.__control, node)
+                if membership.board_id == self.__control.board_id:
+                    self._memberships.append(membership)
+        return self._memberships
+
+    @property
     def name(self):
         """Member's name, as pulled from the Person document title."""
 
@@ -647,12 +669,10 @@ class BoardMember:
 
         if not hasattr(self, "_response_dates"):
             self._response_dates = []
-            path = "BoardMembershipDetails/ResponseDate"
-            for node in self.doc.root.findall(path):
-                response_date = Doc.get_text(node, "").strip()
-                if response_date:
-                    self._response_dates.append(response_date)
+            for membership in self.memberships:
+                self._response_dates += membership.response_dates
         return self._response_dates
+
     @property
     def row(self):
         """Values for the summary report's table."""
@@ -689,7 +709,7 @@ class BoardMember:
                 row.append(Cell(self.assistant_email, href=url))
             else:
                 row.append("")
-        if "Response Dates" in self.__control.columns:
+        if "Response Date" in self.__control.columns:
             row.append(self.response_dates)
         for col in range(len(self.__control.extra_columns)):
             row.append("")
@@ -729,13 +749,10 @@ class BoardMember:
     def subgroups(self):
         """Sequence of strings for the names of the member's subgroups."""
 
-        subgroups = []
-        path = "BoardMembershipDetails/MemberOfSubgroup"
-        for node in self.doc.root.findall(path):
-            name = Doc.get_text(node, "").strip()
-            if name:
-                subgroups.append(name)
-        return subgroups
+        subgroups = set()
+        for membership in self.memberships:
+            subgroups |= membership.subgroups
+        return sorted(subgroups)
 
     @property
     def term_end(self):
@@ -744,26 +761,24 @@ class BoardMember:
         if not hasattr(self, "_term_end"):
             self._term_end = None
             if self.term_start:
-                path = "BoardMembershipDetails/TermRenewalFrequency"
-                node = self.doc.root.find(path)
-                frequency = Doc.get_text(node, "").strip()
-                if frequency:
-                    years = self.FREQUENCY.get(frequency)
-                    if years is None:
-                        message = "Invalid frequency {!r} for {}"
-                        args = self.full_name, frequency
-                        self.__control.bail(message.format(*args))
-                    delta = self.YEAR * years
-                    try:
-                        args = self.term_start, "%Y-%m-%d"
-                        start = datetime.datetime.strptime(*args)
-                        end = start + delta
-                        self._term_end = end.strftime("%Y-%m-%d")
-                    except Exception:
-                        self.__control.logger.exception(self.full_name)
-                        args = self.full_name, self.term_start
-                        message = "Bad term date for {}: {}"
-                        self.__control.bail(message.format(*args))
+                for membership in self.memberships:
+                    if membership.frequency:
+                        years = self.FREQUENCY.get(membership.frequency)
+                        if years is None:
+                            message = "Invalid frequency {!r} for {}"
+                            args = self.full_name, membership.frequency
+                            self.__control.bail(message.format(*args))
+                        delta = self.YEAR * years
+                        try:
+                            args = self.term_start, "%Y-%m-%d"
+                            start = datetime.datetime.strptime(*args)
+                            end = start + delta
+                            self._term_end = end.strftime("%Y-%m-%d")
+                        except Exception:
+                            self.__control.logger.exception(self.full_name)
+                            args = self.full_name, self.term_start
+                            message = "Bad term date for {}: {}"
+                            self.__control.bail(message.format(*args))
         return self._term_end
 
     @property
@@ -771,6 +786,80 @@ class BoardMember:
         """String for the date the board member's term began."""
         return self.__row.term_start
 
+
+    class Membership:
+        """Membership of a particular board."""
+
+        def __init__(self, control, node):
+            """Remember the caller's values.
+
+            Pass:
+                control - access to logging
+                node - block of details for this membership
+            """
+
+            self.__node = node
+
+        @property
+        def areas_of_expertise(self):
+            """Member's expertise relevant to this board."""
+
+            if not hasattr(self, "_areas_of_expertise"):
+                self._areas_of_expertise = set()
+                for node in self.__node.findall("AreaOfExpertise"):
+                    area = Doc.get_text(node, "").strip()
+                    if area:
+                        self._areas_of_expertise.add(area)
+            return self._areas_of_expertise
+
+        @property
+        def board_id(self):
+            """Integer for the board's CDR Organization ID."""
+
+            if not hasattr(self, "_board_id"):
+                self._board_id = None
+                node = self.__node.find("BoardName")
+                if node is not None:
+                    ref = node.get(f"{{{Doc.NS}}}ref")
+                    if ref:
+                        try:
+                            self._board_id = Doc.extract_id(ref)
+                        except:
+                            self.__control.logger.exception("board ID")
+            return self._board_id
+
+        @property
+        def frequency(self):
+            """How long before term is up for renewal."""
+
+            if not hasattr(self, "_frequency"):
+                node = self.__node.find("TermRenewalFrequency")
+                self._frequency = Doc.get_text(node, "").strip()
+            return self._frequency
+
+        @property
+        def response_dates(self):
+            """When the user responded to invitations for this board."""
+
+            if not hasattr(self, "_response_dates"):
+                self._response_dates = []
+                for node in self.__node.findall("ResponseDate"):
+                    response_date = Doc.get_text(node, "").strip()
+                    if response_date:
+                        self._response_dates.append(response_date)
+            return self._response_dates
+
+        @property
+        def subgroups(self):
+            """Sequence of strings for the names of the member's subgroups."""
+
+            if not hasattr(self, "_subgroups"):
+                self._subgroups = set()
+                for node in self.__node.findall("MemberOfSubgroup"):
+                    name = Doc.get_text(node, "").strip()
+                    if name:
+                        self._subgroups.add(name)
+            return self._subgroups
 
 if __name__ == "__main__":
     "Let the script be loaded as a module."
