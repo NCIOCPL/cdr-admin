@@ -26,7 +26,7 @@ class Control(Controller):
                         ),
                         (
                             "Glossary Term Concept By Type Report",
-                            "Request4486.py",
+                            "GlossaryConceptByTypeReport.py",
                         ),
                         (
                             "Pronunciation by Glossary Term Stem Report",
