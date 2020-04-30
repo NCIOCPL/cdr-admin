@@ -14,7 +14,7 @@ class Control(Controller):
     SUBTITLE = "Glossary Term Concept By Type Report"
     LOGNAME = "GTCbyType"
     INSTRUCTIONS = (
-        "You must specify either a term name start, or text from the "
+        "You may specify either a term name start, and/or text from the "
         "definitions of the terms to be selected. All other selection "
         "criteria are required."
     )
