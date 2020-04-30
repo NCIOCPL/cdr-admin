@@ -450,7 +450,8 @@ if docType and re.search("\\W", docType):
     cdrcgi.bail("Invalid document type parameter")
 if repType and re.search("\\W", repType):
     cdrcgi.bail("Invalid report type parameter")
-if version and re.search("\\W", version) and int(version) != -1:
+# The version number -1 for the CWD is deprecated
+if version and re.search("\\W", version) and int(version) not in (-1, 0):
     cdrcgi.bail("Invalid document version parameter")
 
 # ---------------------------------------------------------------
@@ -705,6 +706,11 @@ elif docType:
 #----------------------------------------------------------------------
 # Let the user pick the version for most Summary or Glossary reports.
 # OCECDR-4190: let the user pick the version for drug information summaries.
+#
+# Note: The QC report "Glossary Term Name with Concept" called from
+#       within XMetaL is running Filter.py instead of QcReport.py!!!
+#       The CDR Admin interface is calling QcReport.py. This affects
+#       the reportType "GlossaryTermName:gtnwc"
 #----------------------------------------------------------------------
 letUserPickVersion = False
 if not version:
@@ -746,7 +752,7 @@ if letUserPickVersion:
   <div style="width: 100%; text-align: center;">
   <div style="margin: 0 auto;">
   <SELECT NAME='DocVersion'>
-   <OPTION VALUE='-1' SELECTED='1'>Current Working Version</OPTION>
+   <OPTION VALUE='0' SELECTED='1'>Current Working Version</OPTION>
 """
 
     # Limit display of version comment to 120 chars (if exists)
@@ -1152,7 +1158,7 @@ if not docType:
 
     #----------------------------------------------------------------------
     # Determine the report type if the document is a summary.
-    # The the resulting text output is given as a string similar to this:
+    # The resulting text output is given as a string similar to this:
     #      "Treatment Patients KeyPoint KeyPoint KeyPoint"
     # which will be used to set the propper report type for patient or HP
     #
@@ -1609,7 +1615,8 @@ if qd: docType += 'qd'
 if docType == 'Media':                 docType += ":img"
 if docType == 'MiscellaneousDocument': docType += ":rs"
 
-if version == "-1": version = None
+# -1 is deprecated but some scripts may still use it
+if version in ("-1", "0"): version = None
 
 # Display error message if no filter exist for current docType
 # ------------------------------------------------------------

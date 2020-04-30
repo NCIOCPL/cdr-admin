@@ -9,9 +9,9 @@ class Control(Controller):
 
     SUBTITLE = "Drug Information Reports"
     SUBMIT = None
-    QC_PARMS = dict(DocType="DrugInformationSummary", DocVersion="-1")
+    QC_PARMS = dict(DocType="DrugInformationSummary", DocVersion="0")
     PP_PARMS = dict(DocType="DrugInformationSummary", ReportType="pp")
-    PP_PARMS["DocVersion"] = "-1"
+    PP_PARMS["DocVersion"] = "0"
 
     def populate_form(self, page):
         page.body.set("class", "admin-menu")
