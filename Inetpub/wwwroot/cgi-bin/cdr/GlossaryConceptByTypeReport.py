@@ -1,136 +1,582 @@
 #!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# "We need a new glossary term concept by type QC report to help us ensure
-# consistency in the wording of definitions."
-#
-# BZIssue::4745 (eliminate empty pronunciation parens; ignore case mismatch)
-# JIRA::OCECDR-3800 - Address security vulnerabilities
-#----------------------------------------------------------------------
-import cgi
-import cdr
-import cdrcgi
-import datetime
-from lxml import etree
-from cdrapi import db
-from html import escape as html_escape
+"""Show glossary term concepts of a given type.
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-cursor    = db.connect(user="CdrGuest").cursor()
-fields    = cgi.FieldStorage()
-session   = cdrcgi.getSession(fields) or cdrcgi.bail("Please log in.")
-request   = cdrcgi.getRequest(fields)
-termType  = fields.getvalue("type")
-termName  = fields.getvalue("name")
-defText   = fields.getvalue("text")
-status    = fields.getvalue("stat")
-spanish   = fields.getvalue("span") == "Y"
-audience  = fields.getvalue("audi")
-logger    = cdr.Logging.get_logger("Request4486")
-title     = "CDR Administration"
-language  = spanish and "ENGLISH &amp; SPANISH" or "ENGLISH"
-section   = "Glossary Term Concept by Type Report"
-SUBMENU   = "Report Menu"
-buttons   = ["Submit", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-script    = 'Request4486.py'
-start     = datetime.datetime.now()
+"We need a new glossary term concept by type QC report to help us ensure
+consistency in the wording of definitions."
+"""
 
-#----------------------------------------------------------------------
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if request == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif request == SUBMENU:
-    cdrcgi.navigateTo("Reports.py", session)
-if request == "Log Out":
-    cdrcgi.logout(session)
+from cdrcgi import Controller
+from cdrapi.docs import Doc
 
-#----------------------------------------------------------------------
-# Get XML for CDR document with revision markup resolved.
-#----------------------------------------------------------------------
-def resolveRevisionMarkup(docId):
-    parms = (('useLevel', '1'),)
-    filt  = ['name:Revision Markup Filter']
-    response = cdr.filterDoc('guest', filt, docId, parm = parms)
-    if isinstance(response, (str, bytes)):
-        cdrcgi.bail("Unable to fetch CDR%d: %s" % (docId, response))
-    return response[0]
+class Control(Controller):
 
-#----------------------------------------------------------------------
-# Recursively break down a glossary definition into a chain of text
-# strings and placeholders.
-#----------------------------------------------------------------------
-def breakDownDefinition(node, with_tail=False):
-    pieces = []
-    if node.text is not None:
-        pieces = [node.text]
-    for child in node.findall("*"):
-        if child.tag == "PlaceHolder":
-            pieces.append(PlaceHolder(child.get("name")))
-            if child.tail is not None:
-                pieces.append(child.tail)
-        else:
-            pieces += breakDownDefinition(child, True)
-    if with_tail and node.tail is not None:
-        pieces.append(node.tail)
-    return pieces
+    SUBTITLE = "Glossary Term Concept By Type Report"
+    LOGNAME = "GTCbyType"
+    INSTRUCTIONS = (
+        "You must specify either a term name start, or text from the "
+        "definitions of the terms to be selected. All other selection "
+        "criteria are required."
+    )
+    STATUSES = "Approved", "New pending", "Revision pending", "Rejected"
+    AUDIENCES = "Patient", "Health Professional"
+    A_PATH = "/GlossaryTermConcept/TermDefinition/Audience"
+    S_PATH = "/GlossaryTermConcept/TermDefinition/DefinitionStatus"
+    D_PATH = "/GlossaryTermConcept/TermDefinition/DefinitionText"
+    T_PATH = "/GlossaryTermConcept/TermType"
+    C_PATH = "/GlossaryTermName/GlossaryTermConcept/@cdr:ref"
+    N_PATH = "/GlossaryTermName/TermName/TermNameString"
+    REVISION_LEVEL = Doc.REVISION_LEVEL_PUBLISHED_OR_APPROVED_OR_PROPOSED
 
-#----------------------------------------------------------------------
-# Object in which we collect what we need for a glossary term name.
-#----------------------------------------------------------------------
+    def build_tables(self):
+        """Assemble the table for the report."""
+
+        args = len(self.concepts), self.names
+        self.logger.info("%s concept objects loaded with %d names", *args)
+        opts = dict(columns=self.columns, caption=self.caption)
+        return self.Reporter.Table(self.rows, **opts)
+
+    def populate_form(self, page):
+        """Add the fields to the report request form.
+
+        Pass:
+            page - HTMLPage where the form is drawn
+        """
+
+        fieldset = page.fieldset("Instructions")
+        fieldset.append(page.B.P(self.INSTRUCTIONS))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Selection Options")
+        types = self.types
+        opts = dict(label="Term Type", options=types, default=types[0])
+        fieldset.append(page.select("type", **opts))
+        fieldset.append(page.text_field("name", label="Term Name"))
+        fieldset.append(page.text_field("text", label="Definition Text"))
+        opts = dict(
+            label="Definition Status",
+            options=self.STATUSES,
+            default=self.STATUSES[0],
+        )
+        fieldset.append(page.select("statuses", **opts))
+        opts = dict(
+            label="Audience",
+            options=self.AUDIENCES,
+            default=self.AUDIENCES[0],
+        )
+        fieldset.append(page.select("audience", **opts))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Display Options")
+        opts = dict(label="English Only", value="N", checked=True)
+        fieldset.append(page.radio_button("spanish", **opts))
+        opts = dict(label="Include Spanish", value="Y")
+        fieldset.append(page.radio_button("spanish", **opts))
+        page.form.append(fieldset)
+        page.add_css(".labeled-field label { width: 120px; }")
+
+    @property
+    def audience(self):
+        """Patient or Health professional."""
+
+        if not hasattr(self, "_audience"):
+            default = self.AUDIENCES[0]
+            self._audience = self.fields.getvalue("audience", default)
+            if self._audience not in self.AUDIENCES:
+                self.bail()
+        return self._audience
+
+    @property
+    def caption(self):
+        """What we display at the top of the report table."""
+
+        if not hasattr(self, "_caption"):
+            languages = "English & Spanish" if self.spanish else "English"
+            self._caption = (
+                f"{self.SUBTITLE} - {languages}",
+                self.type,
+                self.started.strftime("%Y-%m-%d %H:%M:%S"),
+            )
+        return self._caption
+
+    @property
+    def columns(self):
+        """Column headers for the report table."""
+
+        if not hasattr(self, "_columns"):
+            if self.spanish:
+                self._columns = (
+                    self.Reporter.Column("CDR ID of GTC"),
+                    self.Reporter.Column("Term Names (English)"),
+                    self.Reporter.Column("Term Names (Spanish)"),
+                    self.Reporter.Column("Definition (English)"),
+                    self.Reporter.Column("Definition (Spanish)"),
+                )
+            else:
+                self._columns = (
+                    self.Reporter.Column("CDR ID of GTC"),
+                    self.Reporter.Column("Term Names (Pronunciations)"),
+                    self.Reporter.Column("Definition (English)"),
+                )
+        return self._columns
+
+    @property
+    def concepts(self):
+        """GlossaryTermConcept documents selected for the report."""
+
+        if not hasattr(self, "_concepts"):
+            query = self.Query("query_term t", "t.doc_id").unique().order(1)
+            query.join("query_term s", "s.doc_id = t.doc_id")
+            query.join("query_term a", "a.doc_id = s.doc_id",
+                       "LEFT(a.node_loc, 4) = LEFT(s.node_loc, 4)")
+            query.where(f"t.path = '{self.T_PATH}'")
+            query.where(f"s.path = '{self.S_PATH}'")
+            query.where(f"a.path = '{self.A_PATH}'")
+            query.where(query.Condition("t.value", self.type))
+            query.where(query.Condition("s.value", self.status))
+            query.where(query.Condition("a.value", self.audience))
+            if self.name:
+                pattern = f"{self.name}%"
+                query.join("query_term c", "c.int_val = t.doc_id")
+                query.join("query_term n", "n.doc_id = c.doc_id")
+                query.where(f"c.path = '{self.C_PATH}'")
+                query.where(f"n.path = '{self.N_PATH}'")
+                query.where(query.Condition("n.value", pattern, "LIKE"))
+            if self.text:
+                pattern = f"%{self.text}%"
+                query.join("query_term d", "d.doc_id = a.doc_id",
+                           "LEFT(d.node_loc, 4) = LEFT(a.node_loc, 4)")
+                query.where(f"d.path = '{self.D_PATH}'")
+                query.where(query.Condition("d.value", pattern, "LIKE"))
+            # FOR DEBUGGING query.log(label="GTC-BY-TYPE QUERY")
+            # Use a fresh one-time connection for a longer timeout.
+            rows = query.execute(timeout=600).fetchall()
+            self.logger.info("found %d concept IDs", len(rows))
+            self._concepts = [Concept(self, row.doc_id) for row in rows]
+        return self._concepts
+
+    @property
+    def footer(self):
+        """Override to get in the count of concepts in the report."""
+
+        if not hasattr(self, "_footer"):
+            B = self.HTMLPage.B
+            user = self.session.User(self.session, id=self.session.user_id)
+            name = user.fullname or user.name
+            today = self.started.strftime("%Y-%m-%d")
+            generated = f"Report generated {today} by {name}"
+            args = len(self.concepts), self.elapsed
+            done = "Processed {:d} concepts in {}".format(*args)
+            self._footer = B.E("footer", B.P(generated, B.BR(), B.SPAN(done)))
+        return self._footer
+
+    @property
+    def name(self):
+        """For selecting concepts by term name start."""
+        return self.fields.getvalue("name")
+
+    @property
+    def names(self):
+        """Integer for total number of GlossaryConceptName documents found."""
+
+        if not hasattr(self, "_names"):
+            count = sum([len(concept.names) for concept in self.concepts])
+            self._names = count
+        return self._names
+
+    @property
+    def rows(self):
+        """Accumulate all of the table rows for the report."""
+
+        if not hasattr(self, "_rows"):
+            self._rows = []
+            for concept in self.concepts:
+                self._rows += concept.rows
+        return self._rows
+
+    @property
+    def spanish(self):
+        """True if we are to display Spanish info, not just English."""
+
+        if not hasattr(self, "_spanish"):
+            self._spanish = self.fields.getvalue("spanish") == "Y"
+        return self._spanish
+
+    @property
+    def status(self):
+        """Concept docs with this status will be in the report."""
+
+        if not hasattr(self, "_status"):
+            self._status = self.fields.getvalue("status", self.STATUSES[0])
+            if self._status not in self.STATUSES:
+                self.bail()
+        return self._status
+
+    @property
+    def text(self):
+        """For selecting concepts containing a definition phrase."""
+        return self.fields.getvalue("text")
+
+    @property
+    def type(self):
+        """Concept type selected for the report."""
+
+        if not hasattr(self, "_type"):
+            self._type = self.fields.getvalue("type", self.types[0])
+            if self._type not in self.types:
+                self.bail()
+        return self._type
+
+    @property
+    def types(self):
+        """Term types for the form picklist."""
+
+        if not hasattr(self, "_types"):
+            query = self.Query("query_term", "value").unique().order("value")
+            query.where("path = '/GlossaryTermConcept/TermType'")
+            query.where("value <> 'Other'")
+            rows = query.execute(self.cursor).fetchall()
+            self._types = [row.value for row in rows] + ["Other"]
+        return self._types
+
+
+class Concept:
+    """Information on a CDR GlossaryTermConcept document."""
+
+    def __init__(self, control, id):
+        """Remember the caller's values.
+
+        Pass:
+            control - access to the database and the report options
+            id - integer for the unique ID of this CDR concept document
+        docId, cursor, audience, spanish
+        """
+
+        self.__control = control
+        self.__id = id
+
+    @property
+    def audience(self):
+        """Audience for the report, normalized for testing."""
+
+        if not hasattr(self, "_audience"):
+            self._audience = self.control.audience.lower()
+        return self._audience
+
+    @property
+    def control(self):
+        """Access to the current login session and the report options."""
+        return self.__control
+
+    @property
+    def definition_rows(self):
+        """How many rows are needed for the concept's definitions?"""
+
+        if not hasattr(self, "_definition_rows"):
+            english = len(self.english_definitions)
+            spanish = len(self.spanish_definitions)
+            self._definition_rows = max(english, spanish)
+        return self._definition_rows
+
+    @property
+    def doc(self):
+        """`Doc` object for the GlossaryTermConcept document."""
+
+        if not hasattr(self, "_doc"):
+            opts = dict(id=self.__id, level=Control.REVISION_LEVEL)
+            self._doc = Doc(self.control.session, **opts)
+        return self._doc
+
+    @property
+    def english_definitions(self):
+        """English definitions for the concept needed for the report."""
+
+        if not hasattr(self, "_english_definitions"):
+            self._english_definitions = []
+            for node in self.root.findall("TermDefinition"):
+                definition = Definition(self, node)
+                if self.audience in definition.audiences:
+                    self._english_definitions.append(definition)
+        return self._english_definitions
+
+    @property
+    def name_rows(self):
+        """How many rows are needed for the concept's names?"""
+
+        if not hasattr(self, "_name_rows"):
+            self._name_rows = 0
+            for name in self.names:
+                if name.spanish:
+                    self._name_rows += len(name.spanish)
+                else:
+                    self._name_rows += 1
+        return self._name_rows
+
+    @property
+    def names(self):
+        """GlossaryTermName documents linked to this concept."""
+
+        if not hasattr(self, "_names"):
+            query = self.control.Query("query_term", "doc_id").unique()
+            query.where(f"path = '{Control.C_PATH}'")
+            query.where(query.Condition("int_val", self.__id))
+            rows = query.execute(self.control.cursor).fetchall()
+            self._names = [Name(self, row.doc_id) for row in rows]
+        return self._names
+
+    @property
+    def root(self):
+        """Root of the document after applying revision markup resolution."""
+
+        if not hasattr(self, "_root"):
+            self._root = self.doc.resolved
+        return self._root
+
+    @property
+    def rows(self):
+        """Rows to be added to the report for this concept."""
+
+        if not hasattr(self, "_rows"):
+
+            # Create the first row.
+            Cell = self.control.Reporter.Cell
+            row = [Cell(self.__id, rowspan=self.rowspan)]
+            if self.names:
+                row.append(self.names[0].english_cell)
+                if self.control.spanish:
+                    if self.names[0].spanish:
+                        row.append(self.names[0].spanish[0])
+                    else:
+                        row.append("")
+            else:
+                row.append("")
+                if self.control.spanish:
+                    row.append("")
+            if self.english_definitions:
+                definition = self.english_definitions[0].text
+            else:
+                definition = ""
+            row.append(Cell(definition, rowspan=self.name_rows))
+            if self.control.spanish:
+                if self.spanish_definitions:
+                    definition = self.spanish_definitions[0].text
+                else:
+                    definition = ""
+                row.append(Cell(definition, rowspan=self.name_rows))
+            self._rows = [row]
+
+            # Add rows for the rest of the names.
+            if self.names:
+                for name in self.names[0].spanish[1:]:
+                    self._rows.append([name])
+                for name in self.names[1:]:
+                    row = [name.english_cell]
+                    if self.control.spanish:
+                        row.append(name.spanish[0] if name.spanish else "")
+                    self._rows.append(row)
+                    for spanish in name.spanish[1:]:
+                        self._rows.append([spanish])
+
+            # Add rows for the extra definitions.
+            for i in range(1, self.definition_rows):
+                if i < len(self.english_definitions):
+                    row = [Cell(self.english_definitions[i].text)]
+                else:
+                    row = [""]
+                if self.control.spanish:
+                    if i < len(self.spanish_definitions):
+                        row.append(Cell(self.spanish_definitions[i].text))
+                    else:
+                        row.append("")
+                self._rows.append(row)
+
+        return self._rows
+
+    @property
+    def rowspan(self):
+        """How many rows in total will be generated for this concept doc?"""
+
+        if not hasattr(self, "_rowspan"):
+            self._rowspan = self.name_rows or 1
+            if self.definition_rows > 1:
+                self._rowspan += self.definition_rows - 1
+        return self._rowspan
+
+    @property
+    def spanish_definitions(self):
+        """Spanish definitions for the concept needed for the report."""
+
+        if not hasattr(self, "_spanish_definitions"):
+            self._spanish_definitions = []
+            for node in self.root.findall("TranslatedTermDefinition"):
+                definition = Definition(self, node)
+                if self.audience in definition.audiences:
+                    self._spanish_definitions.append(definition)
+        return self._spanish_definitions
+
+
 class Name:
-    COUNT = 0
-    def __init__(self, docId, spanish):
-        Name.COUNT += 1
-        self.docId         = docId
-        self.englishName   = ""
-        self.replacements  = {}
-        self.blocked       = False
-        self.pronunciation = ""
-        self.spanishNames  = []
+    """Information collected from one CDR GlossaryTermName document."""
 
-        docXml = resolveRevisionMarkup(docId)
-        root = etree.fromstring(docXml)
-        for node in root.findall("TermName/TermNameString"):
-            self.englishName = cdr.get_text(node, "")
-        if not spanish:
-            for node in root.findall("TermName/TermPronunciation"):
-                self.pronunciation = cdr.get_text(node, "")
-        for node in root.findall("ReplacementText"):
-            self.replacements[node.get("name")] = cdr.get_text(node, "")
-        if spanish:
-            for node in root.findall("TranslatedName/TermNameString"):
-                name = cdr.get_text(node)
-                if name:
-                    self.spanishNames.append(name)
-        query = db.Query("document", "active_status")
-        query.where(query.Condition("id", docId))
-        if query.execute(cursor).fetchall()[0][0] == "I":
-            self.blocked = True
+    def __init__(self, concept, id):
+        """Remember the caller's values.
 
-#----------------------------------------------------------------------
-# Object to represent a placeholder in a glossary definition.
-#----------------------------------------------------------------------
-class PlaceHolder:
-    def __init__(self, name):
-        self.name = name
+        Pass:
+            concept - access to the control object and the linked concept info
+            id - integer for the CDR document's unique ID
+        """
 
-#----------------------------------------------------------------------
-# Object for a glossary term definition (English or Spanish).
-#----------------------------------------------------------------------
+        self.__concept = concept
+        self.__id = id
+
+    @property
+    def blocked(self):
+        """Is this term marked as inactive?"""
+
+        if not hasattr(self, "_blocked"):
+            self._blocked = self.doc.active_status == Doc.BLOCKED
+        return self._blocked
+
+    @property
+    def concept(self):
+        """Access to the control object and the linked concept info."""
+        return self.__concept
+
+    @property
+    def control(self):
+        """Access to the current login session and the report options."""
+        return self.concept.control
+
+    @property
+    def doc(self):
+        """`Doc` object for the GlossaryTermName document."""
+
+        if not hasattr(self, "_doc"):
+            opts = dict(id=self.__id, level=Control.REVISION_LEVEL)
+            self._doc = Doc(self.control.session, **opts)
+        return self._doc
+
+    @property
+    def english(self):
+        """The term name we'll use for placeholders in English definitions.
+
+        Note that this property is a single string, whereas `spanish`
+        is a sequence.
+        """
+
+        if not hasattr(self, "_english"):
+            node = self.doc.root.find("TermName/TermNameString")
+            self._english = Doc.get_text(node, "").strip()
+        return self._english
+
+    @property
+    def english_cell(self):
+        """What goes in the cell for the doc's English name.
+
+        English and Spanish names are handled differently. For one
+        thing, a GlossaryTermName document can have only one English
+        name string, but an unlimited number of Spanish name strings,
+        so we'll need a 'rowspan' attribute to make the table cells
+        line up. For another thing, we add the pronunciation string
+        to the English name (if we're not also displaying Spanish
+        term name strings and definitions), whereas we don't do that
+        for Spanish term name strings (in fact, the schema doesn't
+        even provide for pronunciation strings of Spanish names,
+        presumably because Spanish pronunciation is easier to figure
+        out without assistance than English -- if you ignore the regional
+        variations). Finally, if a GlossaryTermName document is blocked,
+        we convey that information only in the cell for the English
+        name. So we need markup for the English name string's cell,
+        but plain strings are sufficient for the Spanish names. That's
+        why there is no spanish_cells property.
+        """
+
+        if not hasattr(self, "_english_cell"):
+            name = self.english
+            if self.pronunciation:
+                name = f"{name} ({self.pronunciation})"
+            if self.blocked:
+                B = self.control.HTMLPage.B
+                blocked = B.SPAN("[Blocked]", B.CLASS("error"))
+                name = B.SPAN(f"{name} ", blocked)
+            rowspan = len(self.spanish) or None
+            Cell = self.control.Reporter.Cell
+            self._english_cell = Cell(name, rowspan=rowspan)
+        return self._english_cell
+
+    @property
+    def pronunciation(self):
+        """Crude representation of the way the English name is spoken."""
+
+        if not hasattr(self, "_pronunciation"):
+            self._pronunciation = None
+            if not self.control.spanish:
+                path = "TermName/TermPronunciation"
+                value = Doc.get_text(self.doc.root.find(path), "").strip()
+                if value:
+                    self._pronunciation = value
+        return self._pronunciation
+
+    @property
+    def replacements(self):
+        """Dictionary of values for definition placeholders."""
+
+        if not hasattr(self, "_replacements"):
+            self._replacements = {}
+            for node in self.doc.root.findall("ReplacementText"):
+                self._replacements[node.get("name")] = Doc.get_text(node, "")
+        return self._replacements
+
+    @property
+    def spanish(self):
+        """Possibly empty sequence of Spanish term name strings."""
+
+        if not hasattr(self, "_spanish"):
+            self._spanish = []
+            if self.control.spanish:
+                path = "TranslatedName/TermNameString"
+                for node in self.doc.root.findall(path):
+                    name = Doc.get_text(node, "").strip()
+                    if name:
+                        self._spanish.append(name)
+        return self._spanish
+
+
 class Definition:
-    def __init__(self, node):
-        self.text = []
-        self.replacements = {}
-        self.audiences = set()
-        for child in node.findall("DefinitionText"):
-            self.text = breakDownDefinition(child)
-        for child in node.findall("ReplacementText"):
-            self.replacements[child.get("name")] = cdr.get_text(child, "")
-        for child in node.findall("Audience"):
-            self.audiences.add(cdr.get_text(child, "").upper())
+    """Object for a glossary term definition (English or Spanish)."""
+
+    def __init__(self, concept, node):
+        """Remember the caller's values.
+
+        Pass:
+            concept - access to the replacement values and report options
+            node - portion of the document where this definition was found
+        """
+
+        self.__concept = concept
+        self.__node = node
+
+    @property
+    def audiences(self):
+        """Set of strings ("patient" and/or "health professional")."""
+
+        if not hasattr(self, "_audiences"):
+            self._audiences = set()
+            for node in self.__node.findall("Audience"):
+                self._audiences.add(Doc.get_text(node, "").lower())
+        return self._audiences
+
+    @property
+    def replacements(self):
+        """Dictionary of substitutions for placeholders in the definition."""
+
+        if not hasattr(self, "_replacements"):
+            self._replacements = {}
+            for node in self.__node.findall("ReplacementText"):
+                self._replacements[node.get("name")] = Doc.get_text(node, "")
+            if self.__concept.names:
+                name = self.__concept.names[0]
+                self._replacements.update(name.replacements)
+        return self._replacements
+
     def resolve(self, replacementsFromNameDoc, termName):
         reps = self.replacements.copy()
         reps.update(replacementsFromNameDoc)
@@ -149,319 +595,79 @@ class Definition:
                 pieces.append(html_escape(piece))
         return "".join(pieces)
 
-#----------------------------------------------------------------------
-# Object for a glossary term concept's information.
-#----------------------------------------------------------------------
-class Concept:
-    COUNT = 0
-    def __init__(self, docId, cursor, audience, spanish):
-        Concept.COUNT += 1
-        self.docId = docId
-        self.htmlBlocked = "<span class='error'>[Blocked]</span>"
-        query = db.Query("query_term", "doc_id").unique()
-        query.where("path = '/GlossaryTermName/GlossaryTermConcept/@cdr:ref'")
-        query.where(query.Condition("int_val", docId))
-        rows = query.execute(cursor).fetchall()
-        self.names = [Name(row[0], spanish) for row in rows]
-        docXml = resolveRevisionMarkup(docId)
-        root = etree.fromstring(docXml)
-        self.definitions = []
-        for node in root.findall("TermDefinition"):
-            definition = Definition(node)
-            if audience.upper() in definition.audiences:
-                self.definitions.append(definition)
-        if spanish:
-            self.spanishDefinitions = []
-            for node in root.findall("TranslatedTermDefinition"):
-                definition = Definition(node)
-                if audience.upper() in definition.audiences:
-                    self.spanishDefinitions.append(definition)
+    @property
+    def term_name(self):
+        """Name to be used for definition placeholder substitutions."""
 
-    def toHtml(self, spanish):
-        termNameRows = 0
-        for name in self.names:
-            if spanish:
-                if name.spanishNames:
-                    termNameRows += len(name.spanishNames)
+        if not hasattr(self, "_term_name"):
+            self._term_name = None
+            if self.__concept.names:
+                name = self.__concept.names[0]
+                if self.__node.tag == "TermDefinition":
+                    self._term_name = name.english
+                elif name.spanish:
+                    self._term_name = name.spanish[0]
+        return self._term_name
+
+    @property
+    def text(self):
+        """Resolved definition ready to be plugged into the report."""
+
+        if not hasattr(self, "_text"):
+            B = self.__concept.control.HTMLPage.B
+            pieces = []
+            spans = 0
+            for chunk in self.__parse(self.__node.find("DefinitionText")):
+                if not isinstance(chunk, self.PlaceHolder):
+                    pieces.append(chunk)
                 else:
-                    termNameRows += 1
+                    default = f"[UNRESOLVED PLACEHOLDER {chunk.name}]"
+                    if chunk.name == "TERMNAME" and self.term_name:
+                        chunk = self.term_name
+                    elif chunk.name == "CAPPEDTERMNAME" and self.term_name:
+                        chunk = self.term_name.capitalize()
+                    else:
+                        chunk = self.replacements.get(chunk.name, default)
+                    pieces.append(B.SPAN(chunk, B.CLASS("replacement")))
+                    spans += 1
+            self._text = B.SPAN(*pieces) if spans else "".join(pieces)
+        return self._text
+
+    @classmethod
+    def __parse(cls, node, with_tail=False):
+        """Pull out the text and placeholders from a definition.
+
+        Pass:
+            node - portion of the document to be parsed (recursively)
+            with_tail - this is set to True when we recurse
+
+        Return:
+            sequence of alternating `str` and `PlaceHolder` objects
+        """
+
+        if node is None:
+            return []
+        pieces = []
+        if node.text is not None:
+            pieces = [node.text]
+        for child in node.findall("*"):
+            if child.tag == "PlaceHolder":
+                pieces.append(cls.PlaceHolder(child.get("name")))
+                if child.tail is not None:
+                    pieces.append(child.tail)
             else:
-                termNameRows += 1
-        rowspan = termNameRows or 1
-        definitionRows = len(self.definitions)
-        if spanish and len(self.spanishDefinitions) > definitionRows:
-            definitionRows = len(self.spanishDefinitions)
-        if definitionRows > 1:
-            rowspan += definitionRows - 1
-        html = ["""\
-   <tr>
-    <td rowspan='%d'>%d</td>
-""" % (rowspan, self.docId)]
-        rowspan = termNameRows or 1
-        name = self.names and self.names[0].englishName or ""
-        reps = self.names and self.names[0].replacements or {}
-        enDef = ""
-        firstEnglishName = name
-        if self.definitions:
-            enDef = self.definitions[0].resolve(reps, firstEnglishName)
+                pieces += cls.__parse(child, True)
+        if with_tail and node.tail is not None:
+            pieces.append(node.tail)
+        return pieces
 
-        # Processing the Terms if English and Spanish need to be displayed
-        # ----------------------------------------------------------------
-        if spanish:
-            spName = spDef = ""
-            termBlocked = ""
-            nameRowspan = 1
-            if self.names and self.names[0].spanishNames:
-                spName = self.names[0].spanishNames[0]
-                if len(self.names[0].spanishNames) > 1:
-                    nameRowspan = len(self.names[0].spanishNames)
 
-            firstSpanishName = spName
-            if self.spanishDefinitions:
-                spDef = self.spanishDefinitions[0].resolve(reps, spName)
+    class PlaceHolder:
+        """Object to represent a placeholder in a glossary definition."""
+        def __init__(self, name):
+            self.name = name
 
-            # Need to indicate if a term has been blocked
-            # -------------------------------------------
-            if self.names[0].blocked:
-                termBlocked = self.htmlBlocked
 
-            html.append("""\
-    <td rowspan='%d'>%s %s</td>
-    <td>%s</td>
-    <td rowspan='%d'>%s</td>
-    <td rowspan='%d'>%s</td>
-   </tr>
-""" % (nameRowspan, html_escape(name), termBlocked, html_escape(spName),
-       rowspan, enDef, rowspan, spDef))
-            if self.names:
-                for spName in self.names[0].spanishNames[1:]:
-                    html.append("""\
-   <tr>
-    <td>%s</td>
-   </tr>
-""" % html_escape(spName))
-                for name in self.names[1:]:
-                    nameRowspan = len(name.spanishNames) or 1
-                    spName = name.spanishNames and name.spanishNames[0] or ""
-                    if name.blocked:
-                        termBlocked = self.htmlBlocked
-
-                    html.append("""\
-   <tr>
-    <td rowspan='%d'>%s %s</td>
-    <td>%s</td>
-   </tr>
-""" % (nameRowspan, html_escape(name.englishName), termBlocked,
-                                                  html_escape(spName)))
-                    for spName in name.spanishNames[1:]:
-                        html.append("""\
-   <tr>
-    <td>%s</td>
-   </tr>
-""" % html_escape(spName))
-        # Processing the Terms if only English names are requested
-        # --------------------------------------------------------
-        else:
-            # Processing the first name
-            # -------------------------
-            termBlocked = ""
-            if self.names and self.names[0].pronunciation:
-                name += " (%s)" % self.names[0].pronunciation
-
-                # Need to indicate if a term has been blocked
-                # -------------------------------------------
-                if self.names[0].blocked:
-                    termBlocked = self.htmlBlocked
-
-            html.append("""\
-    <td>%s %s</td>
-    <td rowspan='%d'>%s</td>
-   </tr>
-""" % (html_escape(name), termBlocked, rowspan, enDef))
-
-            # Processing all other names (except the first)
-            # ---------------------------------------------
-            for name in self.names[1:]:
-                enName = name.englishName
-                if name.pronunciation:
-                    enName += (" (%s)" % name.pronunciation)
-                if name.blocked:
-                    termBlocked = self.htmlBlocked
-                html.append("""\
-   <tr>
-    <td>%s %s</td>
-   </tr>
-""" % (html_escape(enName), termBlocked))
-
-        i = 1
-        while i < definitionRows:
-            enDef = ""
-            if i < len(self.definitions):
-                enDef = self.definitions[i].resolve(reps, firstEnglishName)
-            html.append("""\
-   <tr>
-    <td>%s</td>
-""" % enDef)
-            if spanish:
-                spDef = ""
-                if i < len(self.spanishDefinitions):
-                    spName = firstSpanishName
-                    spDef = self.spanishDefinitions[i].resolve(reps, spName)
-                html.append("""\
-    <td>%s</td>
-""" % spDef)
-            html.append("""\
-   </tr>
-""")
-            i += 1
-        return "".join(html)
-
-#----------------------------------------------------------------------
-# Create the valid values lists.
-#----------------------------------------------------------------------
-query = db.Query("query_term", "value").unique().order(1)
-query.where("path = '/GlossaryTermConcept/TermType'")
-query.where("value <> 'Other'")
-term_types = [row[0] for row in query.execute(cursor).fetchall()]
-term_types.append("Other")
-statuses = ("Approved", "New pending", "Revision pending", "Rejected")
-audiences = ("Patient", "Health Professional")
-
-#----------------------------------------------------------------------
-# Validate the request parameters.
-#----------------------------------------------------------------------
-if termType and termType not in term_types:
-    cdrcgi.bail("Corrupt form data")
-if status and status not in statuses:
-    cdrcgi.bail("Corrupt form data")
-if audience and audience not in audiences:
-    cdrcgi.bail("Corrupt form data")
-
-#----------------------------------------------------------------------
-# Display the form for the report's parameters.
-#----------------------------------------------------------------------
-def createForm():
-    now = datetime.date.today()
-    then = now - datetime.timedelta(7)
-    page = cdrcgi.Page(title, subtitle=section, action=script,
-                       buttons=buttons, session=session)
-    instructions = """\
-You must specifiy either a term name start, or text from the definitions
-of the terms to be selected. All other selection criteria are required."""
-    page.add(page.B.FIELDSET(page.B.P(instructions)))
-    page.add("<fieldset>")
-    page.add(page.B.LEGEND("Selection Options"))
-    page.add_select("type", "Term Type", term_types, term_types[0])
-    page.add_text_field("name", "Term Name")
-    page.add_text_field("text", "Definition Text")
-    page.add_select("stat", "Definition Status", statuses, "Approved")
-    page.add_select("audi", "Audience", audiences, audiences[0])
-    page.add("</fieldset>")
-    page.add("<fieldset>")
-    page.add(page.B.LEGEND("Display Options"))
-    page.add_radio("span", "English Only", "N", checked=True)
-    page.add_radio("span", "Include Spanish", "Y")
-    page.add("</fieldset>")
-    page.add_css(".labeled-field label { width: 120px; }")
-    page.send()
-
-#----------------------------------------------------------------------
-# Generate the Mailer Tracking Report.
-#----------------------------------------------------------------------
-def createReport(cursor, conceptType, status, audience, name, text, spanish):
-    query = db.Query("query_term t", "t.doc_id").unique().order(1)
-    query.join("query_term s", "s.doc_id = t.doc_id")
-    query.join("query_term a", "a.doc_id = t.doc_id"
-               " AND LEFT(a.node_loc, 4) = LEFT(s.node_loc, 4)")
-    query.where("t.path = '/GlossaryTermConcept/TermType'")
-    query.where("s.path = '/GlossaryTermConcept/TermDefinition"
-                "/DefinitionStatus'")
-    query.where("a.path = '/GlossaryTermConcept/TermDefinition/Audience'")
-    query.where(query.Condition("t.value", conceptType))
-    query.where(query.Condition("s.value", status))
-    query.where(query.Condition("a.value", audience))
-    if name:
-        query.join("query_term c", "c.int_val = t.doc_id")
-        query.join("query_term n", "n.doc_id = c.doc_id")
-        query.where("c.path = '/GlossaryTermName/GlossaryTermConcept/@cdr:ref'")
-        query.where("n.path = '/GlossaryTermName/TermName/TermNameString'")
-        query.where(query.Condition("n.value", name + "%", "LIKE"))
-    if text:
-        query.join("query_term d", "d.doc_id = a.doc_id"
-                   " AND LEFT(d.node_loc, 4) = LEFT(a.node_loc, 4)")
-        query.where("d.path = '/GlossaryTermConcept/TermDefinition"
-                    "/DefinitionText'")
-        query.where(query.Condition("d.value", "%" + text + "%", "LIKE"))
-    # FOR DEBUGGING query.log(label="REQUEST4486 QUERY")
-    conceptIds = [row[0] for row in query.execute(cursor, 600).fetchall()]
-    logger.info("found %d concept IDs", len(conceptIds))
-    concepts = [Concept(cid, cursor, audience, spanish) for cid in conceptIds]
-    logger.info("concept objects loaded with %d names", Name.COUNT)
-    title = "%s - %s" % (section, language)
-    report = ["""\
-<!DOCTYPE html>
-<html>
- <head>
-  <meta charset="utf-8">
-  <title>%s</title>
-  <style type='text/css'>
-   body { font-family: Arial, sans-serif; }
-   table { border-collapse: collapse; }
-   th, td { border: 1px solid black; }
-   td { vertical-align: top; }
-   th { color: blue; }
-   .replacement  { background-color: yellow; font-weight: bold; }
-   h1 { font-size: 16pt; color: maroon; text-align: center; }
-   .error { color: red; font-weight: bold; }
-   .timer { color: green; font-size: 8pt; }
-  </style>
- </head>
- <body>
-  <h1>%s<br />%s<br />%s</h1>
-  <table>
-   <tr>
-    <th>CDR ID of GTC</th>
-""" % (title, title, conceptType,
-       datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))]
-    if spanish:
-        report.append("""\
-    <th>Term Names (English)</th>
-    <th>Term Names (Spanish)</th>
-    <th>Definition (English)</th>
-    <th>Definition (Spanish)</th>
-   </tr>
-""")
-    else:
-        report.append("""\
-    <th>Term Names (Pronunciations)</th>
-    <th>Definition (English)</th>
-   </tr>
-""")
-    report.append("""\
-   </tr>
-""")
-    for concept in concepts:
-        report.append(concept.toHtml(spanish))
-    elapsed = datetime.datetime.now() - start
-    args = len(conceptIds), elapsed.total_seconds()
-    timer = "Processed {:d} concepts in {:f} seconds".format(*args)
-    report.append("""\
-  </table>
-  <p class="timer">{}</p>
- </body>
-</html>
-""".format(timer))
-    cdrcgi.sendPage("".join(report))
-
-#----------------------------------------------------------------------
-# Create the report or as for the report parameters.
-#----------------------------------------------------------------------
-if termName or defText:
-    try:
-        createReport(cursor, termType, status, audience, termName, defText,
-                     spanish)
-    except Exception as e:
-        logger.exception("report failed")
-        cdrcgi.bail("report failed: {}".format(e))
-else:
-    createForm()
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+    Control().run()
