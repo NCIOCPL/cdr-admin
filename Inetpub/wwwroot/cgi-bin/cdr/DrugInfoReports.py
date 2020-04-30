@@ -32,6 +32,7 @@ class Control(Controller):
             ("Drug Description Report", "DrugDescriptionReport.py"),
             ("Drug Indications Report", "DrugIndicationsReport.py"),
             ("Drug Information Summaries Lists", "DISLists.py"),
+            ("Drug Processing Status Report", "DISProcessingStatusReport.py"),
             ("Drug Summaries with Markup Report", "DISWithMarkup.py"),
         ):
             ol.append(page.B.LI(page.menu_link(script, display)))
