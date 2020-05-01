@@ -558,7 +558,8 @@ jQuery("input[value='{self.SUBMIT}']").click(function(e) {{
             body.append(f"Spanish summary title: {job.spanish_title}")
         body.append(f"Summary audience: {job.english_audience}")
         body.append(f"Job status: {self.states.map.get(job.state_id)}")
-        body.append(f"Date of status transition: {job.state_date}")
+        state_date = str(job.state_date)[:10]
+        body.append(f"Date of status transition: {state_date}")
         body.append(f"Comments: {job.comments}")
         opts = dict(subject=subject, body="\n".join(body))
         if self.files:
