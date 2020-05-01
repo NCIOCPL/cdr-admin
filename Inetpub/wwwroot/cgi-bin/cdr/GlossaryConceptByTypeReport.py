@@ -462,7 +462,7 @@ class Name:
         """
 
         if not hasattr(self, "_english"):
-            node = self.doc.root.find("TermName/TermNameString")
+            node = self.root.find("TermName/TermNameString")
             self._english = Doc.get_text(node, "").strip()
         return self._english
 
@@ -509,7 +509,7 @@ class Name:
             self._pronunciation = None
             if not self.control.spanish:
                 path = "TermName/TermPronunciation"
-                value = Doc.get_text(self.doc.root.find(path), "").strip()
+                value = Doc.get_text(self.root.find(path), "").strip()
                 if value:
                     self._pronunciation = value
         return self._pronunciation
@@ -520,9 +520,17 @@ class Name:
 
         if not hasattr(self, "_replacements"):
             self._replacements = {}
-            for node in self.doc.root.findall("ReplacementText"):
+            for node in self.root.findall("ReplacementText"):
                 self._replacements[node.get("name")] = Doc.get_text(node, "")
         return self._replacements
+
+    @property
+    def root(self):
+        """Root of the document after applying revision markup resolution."""
+
+        if not hasattr(self, "_root"):
+            self._root = self.doc.resolved
+        return self._root
 
     @property
     def spanish(self):
@@ -532,7 +540,7 @@ class Name:
             self._spanish = []
             if self.control.spanish:
                 path = "TranslatedName/TermNameString"
-                for node in self.doc.root.findall(path):
+                for node in self.root.findall(path):
                     name = Doc.get_text(node, "").strip()
                     if name:
                         self._spanish.append(name)
