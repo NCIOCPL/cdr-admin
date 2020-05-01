@@ -172,3 +172,4 @@ footer p {
 footer p span { font-size: .8em; color: green; }
 .insertion { color: red; }
 .deletion { text-decoration: line-through; }
+.replacement { background-color: yellow; font-weight: bold; }

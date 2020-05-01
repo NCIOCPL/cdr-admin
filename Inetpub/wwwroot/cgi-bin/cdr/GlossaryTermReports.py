@@ -29,6 +29,10 @@ class Control(Controller):
                             "GlossaryConceptByTypeReport.py",
                         ),
                         (
+                            "Health Professional Glossary Terms Report",
+                            "HPGlossaryTermsReport.py",
+                        ),
+                        (
                             "Pronunciation by Glossary Term Stem Report",
                             "PronunciationByWordStem.py",
                         ),
