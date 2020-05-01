@@ -584,24 +584,6 @@ class Definition:
                 self._replacements.update(name.replacements)
         return self._replacements
 
-    def resolve(self, replacementsFromNameDoc, termName):
-        reps = self.replacements.copy()
-        reps.update(replacementsFromNameDoc)
-        pieces = []
-        for piece in self.text:
-            if isinstance(piece, PlaceHolder):
-                default = "[UNRESOLVED PLACEHOLDER %s]" % piece.name
-                if piece.name == 'TERMNAME' and termName:
-                    rep = html_escape(termName)
-                elif piece.name == 'CAPPEDTERMNAME' and termName:
-                    rep = html_escape(termName[0].upper() + termName[1:])
-                else:
-                    rep = html_escape(reps.get(piece.name, default))
-                pieces.append("<span class='replacement'>%s</span>" % rep)
-            else:
-                pieces.append(html_escape(piece))
-        return "".join(pieces)
-
     @property
     def term_name(self):
         """Name to be used for definition placeholder substitutions."""
