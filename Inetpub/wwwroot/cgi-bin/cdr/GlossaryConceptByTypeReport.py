@@ -247,7 +247,6 @@ class Concept:
         Pass:
             control - access to the database and the report options
             id - integer for the unique ID of this CDR concept document
-        docId, cursor, audience, spanish
         """
 
         self.__control = control
