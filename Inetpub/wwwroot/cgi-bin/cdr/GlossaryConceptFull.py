@@ -815,7 +815,7 @@ class Concept:
         @property
         def blocked(self):
             """True if the name document can't be published."""
-            self.doc.active_status != Doc.ACTIVE
+            return self.doc.active_status != Doc.ACTIVE
 
         @property
         def doc(self):
