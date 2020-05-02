@@ -480,32 +480,10 @@ class Document:
             Pass:
                 document - `Document` object for this CDR document
                 row - values for this version from the database query
-
-            num, comment, user, date, status, publishable
-            self.num = num
-            self.comment = comment
-            self.user = user
-            self.date = str(date)[:16]
-            self.status = status
-            self.publishable = publishable
-            self.pub_events = []
-            fields = (
-                "v.num",
-                "v.comment",
-                "u.fullname",
-                "u.name",
-                "v.dt",
-                "v.val_status",
-                "v.publishable",
-            )
            """
 
             self.__document = document
             self.__row = row
-
-        #def __lt__(self, other):
-        #    """Support sorting versions by version number."""
-        #    return self.num < other.num
 
         @property
         def num(self):
