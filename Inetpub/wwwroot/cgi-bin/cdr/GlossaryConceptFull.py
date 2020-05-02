@@ -530,16 +530,23 @@ class Concept:
                 markup = name.markup_for_name(langname)
                 if markup.tag == "p":
                     markup.tag = "span"
-                alt_names = ""
+                args = [markup, f" (CDR{name.id})"]
                 if self.langcode == "es":
                     if name.spanish_name is None:
-                        args = markup, " (en ingl\xe9s)", B.CLASS("special")
-                        markup = B.SPAN(*args)
+                        markup = B.SPAN(" (en ingl\xe9s)", B.CLASS("special"))
+                        args.append(markup)
                     elif name.alternate_spanish_names:
-                        alt_names = name.alternate_spanish_names
-                        alt_names = ", ".join(alt_names)
-                        alt_names = f" \xa0[{alt_names}]"
-                args = [markup, f" (CDR{name.id})", alt_names]
+                        separator = None
+                        args.append(" \xa0[alternate: ")
+                        for alt_name in name.alternate_spanish_names:
+                            if separator:
+                                args.append(separator)
+                            separator = ", "
+                            markup = name.markup_for_name(alt_name)
+                            if markup.tag == "p":
+                                markup.tag = "span"
+                            args.append(markup)
+                        args.append("]")
                 if name.blocked:
                     args = ["BLOCKED - "] + args + [B.CLASS("blocked")]
                 table.append(B.TR(B.TD("Name"), B.TD(*args), B.CLASS("name")))
@@ -849,12 +856,13 @@ class Concept:
             if not hasattr(self, "_spanish_name"):
                 self._spanish_name = None
                 alternates = []
-                path = "TranslatedName/TermNameString"
-                for node in self.doc.root.findall(path):
-                    if node.get("NameType") != "alternate":
-                        self._spanish_name = node
-                    else:
-                        alternates.append(node)
+                for node in self.doc.root.findall("TranslatedName"):
+                    child = node.find("TermNameString")
+                    if child is not None:
+                        if node.get("NameType") != "alternate":
+                            self._spanish_name = child
+                        else:
+                            alternates.append(child)
                 if not hasattr(self, "_alternate_spanish_names"):
                     self._alternate_spanish_names = alternates
             return self._spanish_name
