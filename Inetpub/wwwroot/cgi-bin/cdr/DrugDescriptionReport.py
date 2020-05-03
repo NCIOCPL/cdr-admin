@@ -1,22 +1,16 @@
 #!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# Report to display DrugInfoSummaries
-#
-# BZIssue::5264 - [DIS] Formatting Changes to Drug Description Report
-# Rewritten July 2015 as part of security sweep.
-# JIRA::OCECDR-4453 - Add options to view all single-agent drugs or all combos
-#----------------------------------------------------------------------
-import cdr
-import cdrcgi
-from cdrapi import db
-import cgi
-import datetime
-import json
-import lxml.etree as etree
-import re
+"""Display DrugInfoSummary document.
+"""
 
-class Control(cdrcgi.Control):
+from datetime import date, timedelta
+from json import dumps, loads
+from lxml import html
+from cdrcgi import Controller, DATETIMELEN
+from cdrapi.docs import Doc
+
+
+class Control(Controller):
     """
     If the user has asked for a report:
         collect the report options from the individual CGI parameters
@@ -26,360 +20,449 @@ class Control(cdrcgi.Control):
     Otherwise, put up the request form with the default choices.
     """
 
+    SUBTITLE = "Drug Description Report"
+    CSS = "../../stylesheets/DrugDescriptionReport.css"
+    SCRIPT = "../../js/DrugDescriptionReport.js"
+    REFTYPE_PATH = "/DrugInformationSummary/DrugReference/DrugReferenceType"
     METADATA = "/DrugInformationSummary/DrugInfoMetaData"
-    COMBO = METADATA + "/DrugInfoType/@Combination"
-    REFTYPES = ("NCI", "FDA", "NLM")
+    COMBO_PATH = METADATA + "/DrugInfoType/@Combination"
+    REFTYPES = "NCI", "FDA", "NLM"
     METHODS = (
         ("By Drug Name", "name"),
         ("By Date of Last Publishable Version", "date"),
-        ("By Drug Reference Type", "type")
+        ("By Drug Reference Type", "type"),
     )
-    def __init__(self):
-        cdrcgi.Control.__init__(self, "Drug Description Report")
-        if not self.session:
-            cdrcgi.bail("Not logged in")
-        self.drugs = self.load_drugs()
-        vals = self.fields.getvalue("vals")
-        if vals:
-            self.unpack_vals(vals)
-        else:
-            self.method = self.fields.getvalue("method")
-            self.start = self.fields.getvalue("start")
-            self.end = self.fields.getvalue("end")
-            self.selected_drugs = self.fields.getlist("drugs")
-            self.reftype = self.fields.getvalue("reftype")
-        self.validate_parms()
+    ALL_DRUGS = "all-drugs"
+    SINGLE_AGENT_DRUGS = "all-single-agent-drugs"
+    DRUG_COMBOS = "all-drug-combinations"
+    DRUG_GROUP_OPTIONS = ALL_DRUGS, SINGLE_AGENT_DRUGS, DRUG_COMBOS
+    DRUG_GROUP_LABELS = {
+        ALL_DRUGS: "All Drugs",
+        SINGLE_AGENT_DRUGS: "All Single-Agent Drugs",
+        DRUG_COMBOS: "All Drug Combinations",
+    }
 
-    def populate_form(self, form):
-        "Add the fields for a DIS report request to the page's form."
-        drugs = [
-            ("all-drugs", "All Drugs"),
-            ("all-single-agent-drugs", "All Single-Agent Drugs"),
-            ("all-drug-combinations", "All Drug Combinations")
-        ]
-        for drug in self.drugs:
-            title = drug.name or "[Unnamed Drug CDR%d]" % drug.id
-            drugs.append((str(drug.id), title))
-        form.add("<fieldset>")
-        form.add(form.B.LEGEND("Filter Method"))
+    def populate_form(self, page):
+        """Add the fields for a DIS report request to the page's form.
+
+        Pass:
+            page - HTMLPage object where the fields go
+        """
+
+        # How will the drugs be selected?
+        fieldset = page.fieldset("Filter Method")
         for label, value in self.METHODS:
-            checked = self.method == value
-            form.add_radio("method", label, value, checked=checked)
-        drug_help = "Control-click to select multiple\nShift-click for range."
-        form.add("</fieldset>")
-        class_string = self.method != "name" and ' class="hidden"' or ""
-        form.add('<fieldset id="name-block"%s>' % class_string)
-        form.add(form.B.LEGEND("Select Drugs For Report"))
-        form.add_select("drugs", "Drug(s)", drugs, multiple=True,
-                        default=self.selected_drugs, tooltip=drug_help)
-        form.add("</fieldset>")
-        class_string = self.method != "date" and ' class="hidden"' or ""
-        form.add('<fieldset id="date-block"%s>' % class_string)
-        form.add(form.B.LEGEND("Date Range of Last Published Version"))
-        form.add_date_field("start", "Start Date", value=self.start)
-        form.add_date_field("end", "End Date", value=self.end)
-        form.add("</fieldset>")
-        class_string = self.method != "type" and ' class="hidden"' or ""
-        form.add('<fieldset id="type-block"%s>' % class_string)
-        form.add(form.B.LEGEND("Select Drug Reference Type"))
-        form.add_radio("reftype", "NCI", "NCI", checked=True)
-        form.add_radio("reftype", "FDA", "FDA")
-        form.add_radio("reftype", "NLM", "NLM")
-        form.add("</fieldset>")
-        form.add_css("#drugs { height: 175px; }")
-        self.add_script(form)
+            checked = value == self.selection_method
+            opts = dict(value=value, label=label, checked=checked)
+            fieldset.append(page.radio_button("method", **opts))
+        page.form.append(fieldset)
+
+        # Picklist for selecting drugs by name or group.
+        fieldset = page.fieldset("Select Drugs For Report", id="name-block")
+        if self.selection_method != "name":
+            fieldset.set("class", "hidden")
+        opts = dict(
+            label="Drug(s)",
+            multiple=True,
+            default=self.selected_drugs,
+            options=self.drug_picklist_options,
+            tooltip="Control-click to select multiple\nShift-click for range.",
+        )
+        fieldset.append(page.select("drugs", **opts))
+        page.form.append(fieldset)
+
+        # Fields for selecting drugs by date range of last pub version.
+        fieldset = page.fieldset("Date Range of Last Published Version")
+        fieldset.set("id", "date-block")
+        if self.selection_method != "date":
+            fieldset.set("class", "hidden")
+        opts = dict(label="Start Date", value=self.start)
+        fieldset.append(page.date_field("start", **opts))
+        opts = dict(label="End Date", value=self.end)
+        fieldset.append(page.date_field("end", **opts))
+        page.form.append(fieldset)
+
+        # Radio buttons for selecting drugs by reference type.
+        fieldset = page.fieldset("Select Drug Reference Type", id="type-block")
+        if self.selection_method != "type":
+            fieldset.set("class", "hidden")
+        for value in self.REFTYPES:
+            checked = value == self.reftype
+            opts = dict(value=value, label=value, checked=checked)
+            fieldset.append(page.radio_button("reftype", **opts))
+        page.form.append(fieldset)
+
+        # Magic to make field sets appear and disappear, based on method.
+        page.head.append(page.B.SCRIPT(src=self.SCRIPT))
+        page.add_css("#drugs { height: 175px; }")
 
     def show_report(self):
-        """
-        Assemble a report with one table per drug information summary.
-        There are some string interpolations used here, partly because
-        of a bug in ADO/DB which doesn't allow placeholders in subqueries.
-        These are safe in this case because of the parameter validations
-        performed above.
-        """
-        query = db.Query("doc_version v", "v.id", "MAX(v.num)")
-        query.group("v.id")
-        criteria = ""
-        if self.method == "name":
-            if "all-drugs" in self.selected_drugs:
-                query.join("doc_type t", "t.id = v.doc_type")
-                query.join("document d", "d.id = v.id")
-                query.where("t.name = 'DrugInformationSummary'")
-            elif "all-drug-combinations" in self.selected_drugs:
-                criteria = " for drug combinations"
-                query.join("query_term c", "c.doc_id = v.id")
-                query.where("c.path = '%s'" % self.COMBO)
-                query.where("c.value = 'Yes'")
-            elif "all-single-agent-drugs" in self.selected_drugs:
-                criteria = " for single-agent drugs"
-                query.join("doc_type t", "t.id = v.doc_type")
-                query.join("document d", "d.id = v.id")
-                query.where("t.name = 'DrugInformationSummary'")
-                #query.where("d.active_status = 'A'")
-                subquery = db.Query("query_term", "doc_id")
-                subquery.where("path = '%s'" % self.COMBO)
-                subquery.where("value = 'Yes'")
-                query.where(query.Condition("v.id", subquery, "NOT IN"))
-            else:
-                selected = [int(d) for d in self.selected_drugs]
-                query.where(query.Condition("v.id", selected, "IN"))
-                criteria = " by name"
-        elif self.method == "type":
-            path = "/DrugInformationSummary/DrugReference/DrugReferenceType"
-            subquery = db.Query("query_term", "doc_id")
-            subquery.where("path = '%s'" % path)
-            subquery.where("value = '%s'" % self.reftype)
-            query.where(query.Condition("v.id", subquery, "IN"))
-            criteria = " with reference type %s" % self.reftype
-        elif self.method == "date":
-            # Different approach for date range.
-            start = self.start
-            end = "%s 23:59:59" % self.end
-            subquery = db.Query("publishable_version p",
-                                   "p.id", "MAX(p.num) AS num")
-            subquery.join("doc_type t", "t.id = p.doc_type")
-            subquery.join("document d", "d.id = p.id")
-            subquery.where("t.name = 'DrugInformationSummary'")
-            subquery.group("p.id")
-            subquery.alias("lastp")
-            query = db.Query("doc_version v", "v.id", "v.num")
-            query.join(subquery, "lastp.id = v.id", "lastp.num = v.num")
-            query.where("v.dt BETWEEN '%s' AND '%s'" % (start, end))
-            criteria = (" with last publishable versions "
-                        "created %s--%s (inclusive)" % (self.start, self.end))
-        else:
-            cdrcgi.bail("Internal error") # can't happen, given validation above
-        try:
-            rows = query.execute(self.cursor).fetchall()
-        except Exception as e:
-            raise Exception("Database failure: %s" % e)
-        summaries = [DrugInfoSummary(self, *row) for row in rows]
-        self.buttons[0] = "Back"
-        opts = {
-            "buttons": self.buttons,
-            "action": self.script,
-            "subtitle": self.title,
-            "session": self.session
-        }
-        now = str(datetime.datetime.now())[:cdrcgi.DATETIMELEN]
-        count = "%d documents found%s" % (len(summaries), criteria)
-        page = cdrcgi.Page(self.PAGE_TITLE, **opts)
-        page.add(page.B.H2(self.title, page.B.BR(),
-                           page.B.SPAN(now, page.B.CLASS("report-date")),
-                           page.B.BR(),
-                           page.B.SPAN(count, page.B.CLASS("report-count")),
-                           page.B.CLASS("center")))
-        page.add_hidden_field("vals", self.pack_vals())
-        for summary in sorted(summaries):
-            summary.show(page)
-        self.add_css(page)
+        """Override base table because this report doesn't fit the mold."""
+
+        buttons = (
+            self.HTMLPage.button("Back"),
+            self.HTMLPage.button(self.SUBMENU),
+            self.HTMLPage.button(self.ADMINMENU),
+            self.HTMLPage.button(self.LOG_OUT),
+        )
+        opts = dict(
+            buttons=buttons,
+            action=self.script,
+            subtitle=self.subtitle,
+            session=self.session,
+            body_classes="report",
+        )
+        page = self.HTMLPage(self.PAGE_TITLE, **opts)
+        page.form.append(page.hidden_field("vals", self.current_values))
+        now = str(self.started)[:DATETIMELEN]
+        count = f"{len(self.summaries):d} documents found"
+        if self.criteria:
+            count = f"{count} {self.criteria}"
+        title = page.B.H2(
+            self.subtitle,
+            page.B.BR(),
+            page.B.SPAN(now, page.B.CLASS("report-date")),
+            page.B.BR(),
+            page.B.SPAN(count, page.B.CLASS("report-count")),
+            page.B.CLASS("center"),
+        )
+        page.form.append(title)
+        for summary in sorted(self.summaries):
+            page.form.append(summary.table)
+            page.form.append(page.B.HR())
+        page.form.append(self.footer)
+        page.head.append(page.B.LINK(href=self.CSS, rel="stylesheet"))
         page.send()
 
-    def load_drugs(self):
+    @property
+    def criteria(self):
+        """String describing how the drug documents were selected."""
+
+        if not hasattr(self, "_criteria"):
+            self._criteria = None
+            if self.selection_method == "name":
+                if self.ALL_DRUGS not in self.selected_drugs:
+                    self._criteria = ""
+                if self.SINGLE_AGENT_DRUGS in self.selected_drugs:
+                    self._criteria = "for single-agent drugs"
+                elif self.DRUG_COMBOS in self.selected_drugs:
+                    self._criteria = "for drug combinations"
+                else:
+                    self._criteria = "by name"
+            elif self.selection_method == "type":
+                self._criteria = f"with reference type {self.reftype}"
+            elif self.selection_method == "date":
+                self._criteria = "with last publishable versions created "
+                self._criteria += f"{self.start}--{self.end} (inclusive)"
+        return self._criteria
+
+    @property
+    def current_values(self):
+        """Pack up the user's selections so she can return to them."""
+
+        vals = dict(
+            method=self.selection_method,
+            start=str(self.start),
+            end=str(self.end),
+            drugs=self.selected_drugs,
+            reftype=self.reftype,
+        )
+        return dumps(vals)
+
+    @property
+    def drug_picklist_options(self):
+        """The sequence presented in the picklist for selecting drugs."""
+
+        if not hasattr(self, "_drug_picklist_options"):
+            options = []
+            for option in self.DRUG_GROUP_OPTIONS:
+                options.append((option, self.DRUG_GROUP_LABELS[option]))
+            for drug in self.drugs:
+                options.append((drug.id, drug.name))
+            self._drug_picklist_options = options
+        return self._drug_picklist_options
+
+    @property
+    def drugs(self):
         "Find all of the DIS docs which have at least one version."
-        query = db.Query("document d", "d.id", "d.title").order(2, 1)
-        query.join("doc_type t", "t.id = d.doc_type")
-        query.join("doc_version v", "v.id = d.id")
-        query.where("t.name = 'DrugInformationSummary'")
-        query.unique()
-        return [Doc(*row) for row in query.execute(self.cursor).fetchall()]
 
-    def validate_parms(self):
-        "Make sure the CGI parameter are reasonable."
-        cdrcgi.BAILOUT_DEFAULT = True
-        msg = cdrcgi.TAMPERING
-        methods = [val for label, val in self.METHODS]
-        self.method = self.method or methods[0]
-        self.reftype = self.reftype or self.REFTYPES[0]
-        if not self.start or not self.end:
-            self.start = self.end = str(datetime.date.today())
-        if self.start > self.end:
-            raise Exception("Date range can't start before it ends! :-)")
-        if not self.selected_drugs or "all-drugs" in self.selected_drugs:
-            self.selected_drugs = ["all-drugs"]
-        elif "all-single-agent-drugs" in self.selected_drugs:
-            self.selected_drugs = ["all-single-agent-drugs"]
-        elif "all-drug-combinations" in self.selected_drugs:
-            self.selected_drugs = ["all-drug-combinations"]
-        elif set(self.selected_drugs) - set([str(d.id) for d in self.drugs]):
-            raise Exception(msg)
-        cdrcgi.valParmVal(self.reftype, val_list=self.REFTYPES, msg=msg)
-        cdrcgi.valParmVal(self.method, val_list=methods, msg=msg)
-        cdrcgi.valParmDate(self.start, msg=msg)
-        cdrcgi.valParmDate(self.end, msg=msg)
+        if not hasattr(self, "_drugs"):
+            query = self.Query("document d", "d.id", "d.title").order(2, 1)
+            query.join("doc_type t", "t.id = d.doc_type")
+            query.join("doc_version v", "v.id = d.id")
+            query.where("t.name = 'DrugInformationSummary'")
+            rows = query.unique().execute(self.cursor).fetchall()
+            class VersionedDrugDoc:
+                """Information needed for the drug picklist."""
+                def __init__(self, row):
+                    self.id = row.id
+                    self.name = row.title.split(";")[0].strip()
+                    if not self.name:
+                        self.name = f"[Unnamed drug CDR{row.id}]"
+            self._drugs = [VersionedDrugDoc(row) for row in rows]
+        return self._drugs
 
-    def pack_vals(self):
-        "Remember the user's choices so she can come back to them."
-        vals = {
-            "method": self.method,
-            "start": self.start,
-            "end": self.end,
-            "drugs": self.selected_drugs,
-            "reftype": self.reftype
-        }
-        return json.dumps(vals)
+    @property
+    def end(self):
+        """The `datetime.date` object for end of report's date range."""
 
-    def unpack_vals(self, packed):
-        """
-        The user wants to refine an existing report request. Get
-        the remembered options.
-        """
-        try:
-            vals = json.loads(packed)
-            self.method = vals.get("method")
-            self.start = vals.get("start")
-            self.end = vals.get("end")
-            self.selected_drugs = vals.get("drugs")
-            self.reftype = vals.get("reftype")
-        except:
-            raise
-            raise Exception(cdrcgi.TAMPERING)
+        if not hasattr(self, "_end"):
+            end = self.saved_values.get("end")
+            if not end:
+                end = self.fields.getvalue("end")
+            try:
+                self._end = self.parse_date(end)
+            except Exception:
+                self.bail("Invalid end date")
+            if not self._end:
+                self._end = date.today()
+        return self._end
 
-    @staticmethod
-    def add_css(page):
-        "Make the report look the way the users want it to."
-        page.add_css("""\
-.report-date { font-size: .8em; }
-.report-count { font-size: .7em; }
-.dis, hr { width: 80%; margin: 10px auto; }
-hr { margin: 0 auto 25px; }
-.dis, .dis tr * { border: none; background: transparent; }
-.dis > th { padding-right: 5px; }
-.dis th, .dis td { color: black; vertical-align: top; }
-.dis th { text-align: left; padding-right: 5px; }
-.dis p:first-child { padding-top: 0; margin-top: 0; }
-.dis table tbody { border: solid black 1px; }
-.dis table, .dis table * { margin: 0; }
-.dis table caption {
-    padding-left: 0; text-align: left; color: black; font-size: 14px;
-}
-.dis table td { padding: 3px 3px 0 0; }
-.dis table tr td:first-child { padding: 3px 3px 0 3px; }
-.dis table tr:last-child td { padding-bottom: 3px; }
-@media print {
-    .dis, hr { width: 100%; }
-    header { display: none; }
- }""")
+    @property
+    def selection_method(self):
+        """How should drugs be selected (see self.METHODS)?"""
 
-    @staticmethod
-    def add_script(form):
-        "Make the request form behave intelligently."
-        form.add_script("""\
-jQuery(document).ready(function($) {
-    $('#drugs option').click(function() {
-        switch ($(this).val()) {
-        case 'all-drugs':
-            $('#drugs option').prop('selected', false);
-            $('#drugs option[value="all-drugs"]').prop('selected', true);
-            break;
-        case 'all-single-agent-drugs':
-            $('#drugs option').prop('selected', false);
-            $('#drugs option[value="all-single-agent-drugs"]')
-                .prop('selected', true);
-            break;
-        case 'all-drug-combinations':
-            $('#drugs option').prop('selected', false);
-            $('#drugs option[value="all-drug-combinations"]')
-                .prop('selected', true);
-            break;
-        default:
-            $('#drugs option[value="all-drugs"]').prop('selected', false);
-            $('#drugs option[value="all-single-agent-drugs"]')
-                .prop('selected', false);
-            $('#drugs option[value="all-drug-combinations"]')
-                .prop('selected', false);
-            break;
-        }
-    });
-    check_method($('input[name=method]:checked').val());
-});
-function check_method(method) {
-    jQuery.each(['name', 'date', 'type'], function(i, block) {
-        if (block == method)
-            jQuery('#' + block + '-block').show();
-        else
-            jQuery('#' + block + '-block').hide();
-    });
-}""")
+        if not hasattr(self, "_selection_method"):
+            methods = [method[1] for method in self.METHODS]
+            method = self.saved_values.get("method")
+            if not method:
+                method = self.fields.getvalue("method", methods[0])
+            if method not in methods:
+                self.bail()
+            self._selection_method = method
+        return self._selection_method
 
-class Doc:
-    "One of these for each document potentially eligible for the report."
-    def __init__(self, id, title):
-        self.id = id
-        self.name = title.split(";")[0].strip()
+    @property
+    def reftype(self):
+        """Drug reference type (NCI, FDA, or NLM)."""
+
+        if not hasattr(self, "_reftype"):
+            self._reftype = self.saved_values.get("reftype")
+            if not self._reftype:
+                default = self.REFTYPES[0]
+                self._reftype = self.fields.getvalue("reftype", default)
+            if self._reftype not in self.REFTYPES:
+                self.bail()
+        return self._reftype
+
+    @property
+    def saved_values(self):
+        """User's selections from the last request."""
+
+        if not hasattr(self, "_saved_values"):
+            vals = self.fields.getvalue("vals", "{}")
+            try:
+                self._saved_values = loads(vals)
+            except Exception:
+                self.bail()
+        return self._saved_values
+
+    @property
+    def selected_drugs(self):
+        """Which drugs has the user chosen for the report?"""
+
+        if not hasattr(self, "_selected_drugs"):
+            drugs = self.saved_values.get("drugs")
+            if not drugs:
+                drugs = self.fields.getlist("drugs")
+            if not drugs or self.ALL_DRUGS in drugs:
+                self._selected_drugs = [self.ALL_DRUGS]
+            elif self.SINGLE_AGENT_DRUGS in drugs:
+                self._selected_drugs = [self.SINGLE_AGENT_DRUGS]
+            elif self.DRUG_COMBOS in drugs:
+                self._selected_drugs = [self.DRUG_COMBOS]
+            else:
+                try:
+                    self._selected_drugs = [int(d) for d in drugs]
+                except Exception:
+                    self.bail()
+                if set(self._selected_drugs) - {d.id for d in self.drugs}:
+                    self.bail()
+        return self._selected_drugs
+
+    @property
+    def start(self):
+        """The `datetime.date` object for start of report's date range."""
+
+        if not hasattr(self, "_start"):
+            start = self.saved_values.get("start")
+            if not start:
+                start = self.fields.getvalue("start")
+            try:
+                self._start = self.parse_date(start)
+            except Exception:
+                self.bail("Invalid start date")
+            if not self._start:
+                self._start = self.end - timedelta(30)
+            elif self._start > self.end:
+                self.bail("Invalid date range")
+        return self._start
+
+    @property
+    def summaries(self):
+        """Sequence of `DrugInformationSummary` docs selected for report."""
+
+        if not hasattr(self, "_summaries"):
+            if self.selection_method == "date":
+                end = f"{self.end} 23:59:59"
+                cols = "p.id", "MAX(p.num) AS num"
+                subquery = self.Query("publishable_version p", *cols)
+                subquery.join("doc_type t", "t.id = p.doc_type")
+                subquery.join("document d", "d.id = p.id")
+                subquery.where("t.name = 'DrugInformationSummary'")
+                subquery.group("p.id")
+                subquery.alias("lastp")
+                query = self.Query("doc_version v", "v.id", "v.num")
+                query.join(subquery, "lastp.id = v.id", "lastp.num = v.num")
+                query.where(query.Condition("v.dt", self.start, ">="))
+                query.where(query.Condition("v.dt", end, "<="))
+            else:
+                cols = "v.id", "MAX(v.num) AS num"
+                query = self.Query("doc_version v", *cols)
+                query.group("v.id")
+            if self.selection_method == "name":
+                self.logger.info("selected drugs: %s", self.selected_drugs)
+                if self.ALL_DRUGS in self.selected_drugs:
+                    query.join("doc_type t", "t.id = v.doc_type")
+                    query.join("document d", "d.id = v.id")
+                    query.where("t.name = 'DrugInformationSummary'")
+                elif self.SINGLE_AGENT_DRUGS in self.selected_drugs:
+                    query.join("doc_type t", "t.id = v.doc_type")
+                    query.join("document d", "d.id = v.id")
+                    query.where("t.name = 'DrugInformationSummary'")
+                    subquery = self.Query("query_term", "doc_id")
+                    subquery.where(f"path = '{self.COMBO_PATH}'")
+                    subquery.where("value = 'Yes'")
+                    query.where(query.Condition("v.id", subquery, "NOT IN"))
+                elif self.DRUG_COMBOS in self.selected_drugs:
+                    query.join("query_term c", "c.doc_id = v.id")
+                    query.where(f"c.path = '{self.COMBO_PATH}'")
+                    query.where("c.value = 'Yes'")
+                else:
+                    doc_ids = self.selected_drugs
+                    query.where(query.Condition("v.id", doc_ids, "IN"))
+            elif self.selection_method == "type":
+                subquery = self.Query("query_term", "doc_id")
+                subquery.where(query.Condition("path", self.REFTYPE_PATH))
+                subquery.where(query.Condition("value", self.reftype))
+                query.where(query.Condition("v.id", subquery, "IN"))
+            query.log(label="huh?")
+            try:
+                rows = query.execute(timeout=300).fetchall()
+            except Exception:
+                query.log(label="drug summaries")
+                self.logger.exception("drug summaries")
+                self.bail("database query failure finding drug summaries")
+            self._summaries = [DrugInfoSummary(self, row) for row in rows]
+        return self._summaries
+
 
 class DrugInfoSummary:
-    """
-    One of these for each DrugInfoSummary document selected (by
-    one of three possible filtering methods) to be included on
-    the report.
-    """
-    def __init__(self, control, doc_id, doc_version):
-        self.control = control
-        self.doc_id = doc_id
-        self.doc_version = doc_version
-        self.description = self.summary = None
+    """Drug document to be represented on the report."""
 
-        # XXX This report used to join on doc_version but take the
-        #     XML from the document table. Surely that was a mistake.
-        query = db.Query("doc_version", "title", "xml")
-        query.where(query.Condition("id", doc_id))
-        query.where(query.Condition("num", doc_version))
-        try:
-            title, xml = query.execute(control.cursor).fetchone()
-        except Exception as e:
-            raise Exception("Database failure fetching CDR%d version %d: %s" %
-                            (doc_id, doc_version, e))
-        xml = re.sub(r"<\?xml[^?]*\?>\s*", "", xml)
-        try:
-            root = etree.fromstring(xml)
-        except Exception as e:
-            raise Exception("Failure parsing CDR%d version %d: %s" %
-                            (doc_id, doc_version, e))
-        self.name = title.split(";")[0].strip()
-        for node in root.iter("Description"):
-            self.description = "".join(self.fetch_text(node))
-        filters = ["name:Format DIS SummarySection"]
-        parm = [("suppress-nbsp", "true")]
-        response = cdr.filterDoc("guest", filters, doc_id, parm=parm)
-        if isinstance(response, str):
-            cdrcgi.bail(response)
-            self.summary = '<span class="error">UNAVAILABLE</span>'
-        else:
-            self.summary = response[0]
+    FILTER = "name:Format DIS SummarySection"
+    PARMS = {"suppress-nbsp": "true"}
+    PARSER = html.HTMLParser()
+    URL = "QcReport.py?Session=guest&DocId={}&DocVersion=-1"
 
-    def show(self, page):
+    def __init__(self, control, row):
+        """Remember the caller's values.
+
+        Pass:
+            control - access to the current login session and report tools
         """
-        Add a table for this summary and a horizontal ruler to the report page.
-        """
-        parser = cdrcgi.lxml.html.HTMLParser() #encoding="utf-8")
-        url = f"QcReport.py?Session=guest&DocId={self.doc_id}&DocVersion=-1"
-        doc_id = page.B.TD(page.B.A(str(self.doc_id), href=url))
-        summary = cdrcgi.lxml.html.fromstring("<td>%s</td>" % self.summary,
-                                              parser=parser)
-        page.add('<table class="dis">')
-        for th, td in (
-            (page.B.TH("CDR ID"), doc_id),
-            (page.B.TH("Drug Name"), page.B.TD(self.name)),
-            (page.B.TH("Description"), page.B.TD(self.description)),
-            (page.B.TH("Summary"), summary)
-        ):
-            page.add("<tr>")
-            page.add(th)
-            page.add(td)
-            page.add("</tr>")
-        page.add("</table>")
-        page.add(page.B.HR())
+
+        self.__control = control
+        self.__row = row
 
     def __lt__(self, other):
-        return self.name.lower() < other.name.lower()
+        """Use lowercase names for sorting."""
+        return self.key < other.key
+
+    @property
+    def key(self):
+        """Use lowercase names for sorting."""
+
+        if not hasattr(self, "_key"):
+            self._key = self.name.lower()
+        return self._key
+
+    @property
+    def control(self):
+        """Access to the current login session and report creation tools."""
+        return self.__control
+
+    @property
+    def doc(self):
+        """`Doc` object for this version of the drug summary document."""
+
+        if not hasattr(self, "_doc"):
+            opts = dict(id=self.__row.id, version=self.__row.num)
+            self._doc = Doc(self.control.session, **opts)
+        return self._doc
+
+    @property
+    def description(self):
+        """String description of the drug summary page."""
+
+        if not hasattr(self, "_description"):
+            node = self.doc.root.find("Description")
+            self._description = "".join(self.fetch_text(node)).strip()
+        return self._description
+
+    @property
+    def link(self):
+        """Link to the document's QC report."""
+
+        if not hasattr(self, "_link"):
+            B = self.control.HTMLPage.B
+            url = self.URL.format(self.doc.id)
+            self._link = B.A(str(self.doc.id), href=url)
+        return self._link
+
+    @property
+    def name(self):
+        """Drug name, extracted from the document's title."""
+
+        if not hasattr(self, "_name"):
+            self._name = self.doc.title.split(";")[0].strip()
+        return self._name
+
+    @property
+    def summary(self):
+        """Body of document, filtered to extract content for table cell."""
+
+        if not hasattr(self, "_summary"):
+            try:
+                response = self.doc.filter(self.FILTER, parms=self.PARMS)
+                td = f"<td>{response.result_tree}</td>"
+            except Exception:
+                self.control.logger.exception("filtering %s", self.doc.cdr_id)
+                td = '<td><span class="error">UNAVAILABLE</span>'
+            self._summary = html.fromstring(td, parser=self.PARSER)
+        return self._summary
+
+    @property
+    def table(self):
+        """Assemble the report table for this drug summary."""
+
+        if not hasattr(self, "_table"):
+            B = self.control.HTMLPage.B
+            self._table = B.TABLE(
+                B.TR(B.TH("CDR ID"), B.TD(self.link)),
+                B.TR(B.TH("Drug Name"), B.TD(self.name)),
+                B.TR(B.TH("Description"), B.TD(self.description)),
+                B.TR(B.TH("Summary"), self.summary),
+                B.CLASS("dis"),
+            )
+        return self._table
 
     @staticmethod
     def fetch_text(node):
-        """
-        Recursively assemble a list of all the text content which is
-        not inside a Deletion element.
-        """
+        """Recurse through nodes to get text, skipping Deletion elements."""
+
+        if node is None:
+            return []
         text = []
         if node.text is not None:
             text.append(node.text)
@@ -389,6 +472,7 @@ class DrugInfoSummary:
         if node.tail is not None:
             text.append(node.tail)
         return text
+
 
 if __name__ == "__main__":
     "Allow documentation and lint tools to load script without side effects"
