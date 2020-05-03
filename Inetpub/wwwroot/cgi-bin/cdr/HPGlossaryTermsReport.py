@@ -138,7 +138,7 @@ class Control(Controller):
 
     @property
     def loe(self):
-        """True if the report should include loe terms."""
+        """True if the report should include level-of-evidence terms."""
         return self.LOE_TERMS in self.options
 
     @property
@@ -189,7 +189,6 @@ class Concept:
         Pass:
             control - access to the database and the report options
             id - integer for the unique ID of this CDR concept document
-        docId, cursor, audience, spanish
         """
 
         self.__control = control
