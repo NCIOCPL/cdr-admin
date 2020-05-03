@@ -527,7 +527,7 @@ class Document:
                 self.__row.fullname or self.__row.name,
                 Cell(self.__row.val_status, classes="center"),
                 Cell(self.__row.publishable, classes="center"),
-                self.publication_events,
+                Cell(self.publication_events, classes="nowrap"),
             ]
 
 
