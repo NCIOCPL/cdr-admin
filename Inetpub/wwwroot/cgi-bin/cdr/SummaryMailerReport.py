@@ -266,27 +266,12 @@ class Control(Controller):
 
     @property
     def recipients(self):
-        """Cached lookup of mailer recipient names by CDR Person ID."""
+        """Cached lookup of mailer recipient names by CDR Person ID.
 
-        if not hasattr(self, "_recipients"):
-            class Recipients(UserDict):
-                def __init__(self, control):
-                    self.__control = control
-                    UserDict.__init__(self)
-                def __getitem__(self, key):
-                    if key not in self.data:
-                        query = self.__control.Query("document", "title")
-                        query.where(f"id = {key}")
-                        row = query.execute(self.__control.cursor).fetchone()
-                        title = row.title.strip() if row else ""
-                        pieces = [p.strip() for p in row.title.split(";")]
-                        name = pieces[0]
-                        if name.lower() == "inactive" and len(pieces) > 1:
-                            name = f"{pieces[1]} (inactive)"
-                        self.data[key] = name or None
-                    return self.data[key]
-            self._recipients = Recipients(self)
-        return self._recipients
+        This is an alias for the base class method which does cached
+        lookup of document titles.
+        """
+        return self.doc_titles
 
     @property
     def rows(self):
