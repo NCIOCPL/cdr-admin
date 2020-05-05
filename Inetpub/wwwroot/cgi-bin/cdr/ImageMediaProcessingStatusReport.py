@@ -1,243 +1,405 @@
 #!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# Media (Images) Processing Status Report.
-#----------------------------------------------------------------------
-import datetime
-import re
-import cdr
-import cdrcgi
-from cdrapi import db
+"""Media (Images) Processing Status Report.
+"""
 
-class Control(cdrcgi.Control):
-    """
-    Logic for gathering request parameters from the user, and then
-    generating the requested report.
-    """
+from collections import defaultdict
+from cdrcgi import Controller, WEBSERVER, BASE
+from cdrapi.docs import Doc, Doctype
 
-    def __init__(self):
-        """
-        Collect and validate the user's request parameters.
-        """
 
-        cdrcgi.Control.__init__(self, "Media (Images) Processing Status Report")
-        self.begin = datetime.datetime.now()
-        self.statuses = self.get_statuses()
-        self.diagnoses = self.get_diagnoses()
-        self.status = self.get_status()
-        self.diagnosis = self.get_diagnosis()
-        self.start = self.get_date("start")
-        self.end = self.get_date("end")
-    def get_status(self):
-        status = self.fields.getvalue("status")
-        if status and status not in self.statuses:
-            cdrcgi.bail("bad status")
-            cdrcgi.bail()
-        return status
-    def get_diagnosis(self):
-        diagnosis = self.fields.getlist("diagnosis") or []
-        try:
-            diagnosis = [int(doc_id) for doc_id in diagnosis]
-        except:
-            cdrcgi.bail()
-        if set(diagnosis) - set([d[0] for d in self.diagnoses]):
-            cdrcgi.bail()
-        return diagnosis
-    def get_diagnoses(self):
-        diagnosis_path = "/Media/MediaContent/Diagnoses/Diagnosis/@cdr:ref"
-        query = db.Query("query_term t", "t.doc_id", "t.value")
-        query.unique().order(2)
-        query.join("query_term m", "m.int_val = t.doc_id")
-        query.where("t.path = '/Term/PreferredName'")
-        query.where("m.path = '%s'" % diagnosis_path)
-        return [tuple(row) for row in query.execute(self.cursor).fetchall()]
-    def get_statuses(self):
-        dt = cdr.getDoctype(self.session, "Media")
-        statuses = dict(dt.vvLists).get("ProcessingStatusValue")
-        if not statuses:
-            cdrcgi.bail("unable to load valid processing status values")
-        return [status for status in statuses if not status.startswith("Audio")]
-    def get_date(self, name):
-        value = self.fields.getvalue(name)
-        cdrcgi.valParmDate(value, empty_ok=True, msg=cdrcgi.TAMPERING)
-        return value
-    def populate_form(self, form):
-        """
-        Put the fields we need on the form. See documentation of the
-        cdrcgi.Page class for examples and other details. Read the
-        comment at the bottom of this script to see when and how this
-        callback method is invoked.
-        """
-        form.add("<fieldset>")
-        form.add(form.B.LEGEND("Request Parameters (only Status is required)"))
-        form.add_select("status", "Status", self.statuses)
-        form.add_date_field("start", "Start Date")
-        form.add_date_field("end", "End Date")
-        form.add_select("diagnosis", "Diagnosis", self.diagnoses,
-                        multiple=True)
-        form.add("</fieldset>")
-        form.add_output_options("html")
+class Control(Controller):
+    """Access to the database and report-building tools."""
+
+    SUBTITLE = "Media (Images) Processing Status Report"
 
     def build_tables(self):
+        """Assemble the table for this report."""
+
+        opts = dict(caption=self.caption, columns=self.columns)
+        return [self.Reporter.Table(self.rows, **opts)]
+
+    def populate_form(self, page):
+        """Put the fields we need on the form.
+
+        Pass:
+            page - HTMLPage instance where the fields go
         """
-        Callback to give the base class an array of Table objects
-        (only one in our case). See documentation of that class in
-        the cdrcgi module. Read the comment at the bottom of this
-        script to learn now and when this method is called.
-        """
-        if not self.status:
-            cdrcgi.bail("missing required status value")
-        query = db.Query("query_term i", "i.doc_id")
-        query.where("i.path = '/Media/PhysicalMedia/ImageData/ImageType'")
-        if self.diagnosis:
-            query.join("query_term d", "d.doc_id = i.doc_id")
-            query.where(query.Condition("d.int_val", self.diagnosis, "IN"))
-        ids = [row[0] for row in query.execute(self.cursor).fetchall()]
-        docs = [Doc(id, self) for id in ids]
-        rows = [doc.row() for doc in sorted(docs) if doc.in_scope()]
-        columns = (
-            cdrcgi.Report.Column("CDR ID"),
-            cdrcgi.Report.Column("Media Title", width="250px"),
-            cdrcgi.Report.Column("Diagnosis", width="150px"),
-            cdrcgi.Report.Column("Processing Status", width="150px"),
-            cdrcgi.Report.Column("Processing Status Date", width="100px"),
-            cdrcgi.Report.Column("Proposed Summaries", width="300px"),
-            cdrcgi.Report.Column("Proposed Glossary Terms", width="300px"),
-            cdrcgi.Report.Column("Comments", width="300px"),
-            cdrcgi.Report.Column("Last Version Publishable", width="125px"),
-            cdrcgi.Report.Column("Published", width="100px"),
+
+        fieldset = page.fieldset("Report Options (only Status is required)")
+        fieldset.append(page.select("status", options=self.statuses))
+        fieldset.append(page.date_field("start", label="Start Date"))
+        fieldset.append(page.date_field("end", label="End Date"))
+        opts = dict(options=self.diagnoses, multiple=True)
+        fieldset.append(page.select("diagnosis", **opts))
+        page.form.append(fieldset)
+        page.add_output_options("html")
+
+    @property
+    def caption(self):
+        """What we display above the table rows."""
+
+        if not hasattr(self, "_caption"):
+            self._caption = [self.subtitle]
+            if self.start:
+                if self.end:
+                    self._caption.append(f"From {self.start} - {self.end}")
+                else:
+                    self._caption.append(f"On or after {self.start}")
+            elif self.end:
+                self._caption.append(f"On or before {self.end}")
+            self._caption.append(f"Status: {self.status}")
+        return self._caption
+
+    @property
+    def columns(self):
+        return (
+            self.Reporter.Column("CDR ID"),
+            self.Reporter.Column("Media Title", width="250px"),
+            self.Reporter.Column("Diagnosis", width="150px"),
+            self.Reporter.Column("Processing Status", width="150px"),
+            self.Reporter.Column("Processing Status Date", width="100px"),
+            self.Reporter.Column("Proposed Summaries", width="300px"),
+            self.Reporter.Column("Proposed Glossary Terms", width="300px"),
+            self.Reporter.Column("Comments", width="300px"),
+            self.Reporter.Column("Last Version Publishable", width="125px"),
+            self.Reporter.Column("Published", width="100px"),
         )
-        caption = [self.title]
-        if self.start:
-            if self.end:
-                caption.append("From %s - %s" % (self.start, self.end))
-            else:
-                caption.append("On or after %s" % self.start)
-        elif self.end:
-            caption.append("On or before %s" % self.end)
-        caption.append(self.status)
-        return [cdrcgi.Report.Table(columns, rows, caption=caption)]
-    def set_report_options(self, opts):
-        opts["elapsed"] = datetime.datetime.now() - self.begin
-        opts["banner"] = self.PAGE_TITLE
-        opts["subtitle"] = "Media Reports"
-        self.PAGE_TITLE = "Media Processing Status Report"
-        return opts
-class Doc:
-    HOST = cdrcgi.WEBSERVER
-    BASE = cdrcgi.BASE
-    linked_titles = {}
-    def __init__(self, doc_id, control):
-        self.doc_id = doc_id
-        self.control = control
-        self.title = self.status = self.last_publishable_date = None
-        self.last_version_publishable = False
-        try:
-            self.root = self.control.get_parsed_doc_xml(doc_id)
-        except Exception as e:
-            cdrcgi.bail(e)
-        self.title = (self.root.find("MediaTitle").text or "").strip()
-        self.status = None
-        for node in self.root.findall("ProcessingStatuses/ProcessingStatus"):
-            self.status = self.Status(node)
-            break
-    def row(self):
-        diagnoses = []
-        summaries = []
-        glossary_terms = []
-        diagnosis_map = dict(self.control.diagnoses)
-        for node in self.root.findall("MediaContent/Diagnoses/Diagnosis"):
-            cdr_id = self.control.get_cdr_ref_int(node)
-            diagnosis = diagnosis_map.get(cdr_id)
-            if diagnosis:
-                diagnoses.append(diagnosis)
-        for node in self.root.findall("ProposedUse/*"):
-            title = self.get_linked_title(node)
-            if title:
-                if node.tag == "Summary":
-                    summaries.append(title.split(";")[0])
-                elif node.tag == "Glossary":
-                    glossary_terms.append(title.split(";")[0])
-        self.check_last_versions()
-        publishable = self.last_version_publishable and "Yes" or "No"
-        values = (self.HOST, self.BASE, self.control.session, self.doc_id)
-        url = "https://%s%s/QcReport.py?Session=%s&DocId=%d" % values
-        url += "&DocVersion=-1"
-        return [cdrcgi.Report.Cell(self.doc_id, href=url, target="_blank"),
-                self.title, "; ".join(diagnoses),
-                self.status.value, self.make_date_cell(self.status.date),
-                "; ".join(summaries), "; ".join(glossary_terms),
-                "; ".join(self.status.comments),
-                cdrcgi.Report.Cell(publishable, center=True),
-                self.make_date_cell(self.last_publishable_date)]
-    def make_date_cell(self, date):
-        if not date:
-            return ""
-        return cdrcgi.Report.Cell(str(date)[:10], classes="nowrap center")
-    def check_last_versions(self):
-        versions = cdr.lastVersions(self.control.session, self.doc_id)
-        if versions[1] > 0:
-            self.last_version_publishable = versions[0] == versions[1]
-            query = db.Query("doc_version", "dt")
-            query.where(query.Condition("id", self.doc_id))
-            query.where(query.Condition("num", versions[1]))
-            row = query.execute(self.control.cursor).fetchone()
-            if row:
-                self.last_publishable_date = row[0]
-    def get_linked_title(self, node):
-        cdr_id = self.control.get_cdr_ref_int(node)
-        if not cdr_id:
-            return None
-        if cdr_id not in Doc.linked_titles:
-            Doc.linked_titles[cdr_id] = self.control.get_doc_title(cdr_id)
-        return Doc.linked_titles[cdr_id]
+
+    @property
+    def diagnoses(self):
+        """Dictionary of diagnosis names indexed by CDR document ID."""
+
+        if not hasattr(self, "_diagnoses"):
+            path = "/Media/MediaContent/Diagnoses/Diagnosis/@cdr:ref"
+            query = self.Query("query_term t", "t.doc_id", "t.value")
+            query.unique().order(2)
+            query.join("query_term m", "m.int_val = t.doc_id")
+            query.where("t.path = '/Term/PreferredName'")
+            query.where(f"m.path = '{path}'")
+            rows = query.execute(self.cursor).fetchall()
+            self._diagnoses = dict([tuple(row) for row in rows])
+        return self._diagnoses
+
+    @property
+    def diagnosis(self):
+        """Diagnosis (or diagnoses) selected for the report."""
+
+        if not hasattr(self, "_diagnosis"):
+            diagnoses = self.fields.getlist("diagnosis")
+            try:
+                self._diagnosis = [int(doc_id) for doc_id in diagnoses]
+            except:
+                self.bail()
+            if set(self._diagnosis) - set(self.diagnoses):
+                self.bail()
+        return self._diagnosis
+
+    @property
+    def docs(self):
+        """Find the Media documents which are in scope for this report."""
+
+        if not hasattr(self, "_docs"):
+            if not self.status:
+                self.bail("missing required status value")
+            query = self.Query("query_term i", "i.doc_id")
+            query.where("i.path = '/Media/PhysicalMedia/ImageData/ImageType'")
+            if self.diagnosis:
+                query.join("query_term d", "d.doc_id = i.doc_id")
+                query.where(query.Condition("d.int_val", self.diagnosis, "IN"))
+            self._docs = []
+            for row in query.execute(self.cursor).fetchall():
+                doc = MediaDoc(self, row.doc_id)
+                if doc.in_scope:
+                    self._docs.append(doc)
+        return self._docs
+
+    @property
+    def end(self):
+        """Object for the end of the date range for the report."""
+
+        if not hasattr(self, "_end"):
+            self._end = self.parse_date(self.fields.getvalue("end"))
+        return self._end
+
+    @property
+    def end_string(self):
+        """Version of the date range end comparable with text from XML docs."""
+
+        if not hasattr(self, "_end_string"):
+            self._end_string = str(self.end or "")
+        return self._end_string
+
+    @property
+    def rows(self):
+        """Table rows for the report."""
+
+        if not hasattr(self, "_rows"):
+            self._rows = [doc.row for doc in sorted(self.docs)]
+        return self._rows
+
+    @property
+    def start(self):
+        """Object for the start of the date range for the report."""
+
+        if not hasattr(self, "_start"):
+            self._start = self.parse_date(self.fields.getvalue("start"))
+        return self._start
+
+    @property
+    def start_string(self):
+        """Date range start comparable with text from XML docs."""
+
+        if not hasattr(self, "_start_string"):
+            self._start_string = str(self.start or "")
+        return self._start_string
+
+    @property
+    def status(self):
+        """Status selected for the report."""
+
+        if not hasattr(self, "_status"):
+            self._status = self.fields.getvalue("status")
+            if self._status and self._status not in self.statuses:
+                self.bail()
+        return self._status
+
+    @property
+    def statuses(self):
+        """Valid values for the status picklist."""
+
+        if not hasattr(self, "_statuses"):
+            doctype = Doctype(self.session, name="Media")
+            statuses = doctype.vv_lists["ProcessingStatusValue"]
+            self._statuses = [s for s in statuses if not s.startswith("Audio")]
+        return self._statuses
+
+
+class MediaDoc:
+    """Media document to be considered for the report."""
+
+    URL = f"https://{WEBSERVER}{BASE}/QcReport.py?DocVersion=-1&DocId={{}}"
+
+    def __init__(self, control, id):
+        """Remember the caller's values.
+
+        Pass:
+            control - access to the database and report-creation tools
+            id - integer for the unique CDR ID for this Media document
+        """
+
+        self.__control = control
+        self.__id = id
+
+    def __lt__(self, other):
+        """Support sorting of the documents."""
+        return self.key < other.key
+
+    @property
+    def control(self):
+        """Access to the database and report-generation tools."""
+        return self.__control
+
+    @property
+    def diagnoses(self):
+        """List of diagnosis string link to this Media document."""
+
+        if not hasattr(self, "_diagnoses"):
+            self._diagnoses = []
+            path = "MediaContent/Diagnoses/Diagnosis"
+            for node in self.doc.root.findall(path):
+                ref = node.get(f"{{{Doc.NS}}}ref")
+                try:
+                    id = Doc.extract_id(ref)
+                    self._diagnoses.append(self.control.diagnoses[id])
+                except:
+                    self._diagnoses.append(f"INVALID DIAGNOSIS ID {ref}")
+        return self._diagnoses
+
+    @property
+    def doc(self):
+        """`Doc` object for the CDR media document."""
+
+        if not hasattr(self, "_doc"):
+            self._doc = Doc(self.control.session, id=self.__id)
+            if self._doc.root is None:
+                raise Exception(f"CDR{self.__id} is malformed")
+        return self._doc
+
+    @property
+    def glossary_terms(self):
+        """Sequence of strings for glossary docs to be used with this media."""
+        return self.proposed_uses.get("Glossary", [])
+
+    @property
     def in_scope(self):
+        """Should this Media document be part of the report?"""
+
         if not self.status:
             return False
         if self.status.value != self.control.status:
             return False
-        if self.control.start:
-            if not self.status.date or self.status.date < self.control.start:
+        if self.control.start or self.control.end:
+            if not self.status.date:
                 return False
-        if self.control.end:
-            if not self.status.date or self.status.date > self.control.end:
-                return False
+            if self.control.start:
+                if self.status.date < self.control.start_string:
+                    return False
+            if self.control.end:
+                if self.status.date > self.control.end_string:
+                    return False
         return True
-    def __lt__(self, other):
-        return (self.title or "").lower() < (other.title or "").lower()
-    class Status:
-        def __init__(self, node):
-            self.value = self.date = None
-            self.comments = []
-            for child in node:
-                if child.text is not None:
-                    if child.tag == "ProcessingStatusValue":
-                        self.value = child.text
-                    elif child.tag == "ProcessingStatusDate":
-                        self.date = child.text
-                    elif child.tag == "Comment":
-                        self.comments.append(child.text)
 
-#----------------------------------------------------------------------
-# Instantiate an instance of our class and invoke the inherited run()
-# method. This method acts as a switch statement, in effect, and checks
-# to see whether any of the action buttons have been clicked. If so,
-# and the button is not the "Submit" button, the user is taken to
-# whichever page is appropriate to that button (e.g., logging out,
-# the reports menu, or the top-level administrative menu page).
-# If the clicked button is the "Submit" button, the show_report()
-# method is invoked. The show_report() method in turn invokes the
-# build_tables() method, which we have overridden above. It also
-# invokes set_report_options() which we could override if we wanted
-# to modify how the report's page is displayed (for example, to
-# change which buttons are displayed); we're not overriding that
-# method in this simple example. Finally show_report() invokes
-# report.send() to display the report.
-#
-# If no button is clicked, the run() method invokes the show_form()
-# method, which in turn calls the set_form_options() method (which
-# we're not overriding here) as well as the populate_form() method
-# (see above) before calling form.send() to display the form.
-#----------------------------------------------------------------------
+    @property
+    def key(self):
+        """Make sorting case insensitive."""
+
+        if not hasattr(self, "_key"):
+            self._key = (self.title or "").lower()
+        return self._key
+
+    @property
+    def last_publishable_date(self):
+        """When was the most recent publishable version created?"""
+
+        if not hasattr(self, "_last_publishable_date"):
+            self._last_publishable_date = ""
+            if self.doc.last_publishable_version:
+                version = self.doc.last_publishable_version
+                query = self.control.Query("doc_version", "dt")
+                query.where(query.Condition("id", self.doc.id))
+                query.where(query.Condition("num", version))
+                row = query.execute(self.control.cursor).fetchone()
+                if row and row.dt:
+                    self._last_publishable_date = str(row.dt)[:10]
+        return self._last_publishable_date
+
+    @property
+    def last_ver_pub(self):
+        """True if the last version of the doc is marked as publishable."""
+
+        if not hasattr(self, "_last_ver_pub"):
+            self._last_ver_pub = False
+            if self.doc.last_version:
+                if self.doc.last_version == self.doc.last_publishable_version:
+                    self._last_ver_pub = True
+        return self._last_ver_pub
+
+    @property
+    def proposed_uses(self):
+        """Dictionary of documents (by type) to use this Media document."""
+
+        if not hasattr(self, "_proposed_uses"):
+            self._proposed_uses = defaultdict(list)
+            for node in self.doc.root.findall("ProposedUse/*"):
+                ref = node.get(f"{{{Doc.NS}}}ref")
+                try:
+                    title = self.control.doc_titles[Doc.extract_id(ref)]
+                    if title:
+                        self._proposed_uses[node.tag].append(title)
+                except Exception:
+                    self.control.logger.exception(ref)
+                    bogus = f"UNRESOLVEABLE DOCUMENT ID {ref}"
+                    self._proposed_uses[node.tag].append(bogus)
+        return self._proposed_uses
+
+    @property
+    def row(self):
+        """This document's contribution to the report table."""
+
+        if not hasattr(self, "_row"):
+            Cell = self.control.Reporter.Cell
+            self._row = (
+                Cell(self.doc.id, href=self.url, target="_blank"),
+                Cell(self.title),
+                Cell("; ".join(self.diagnoses)),
+                Cell(self.status.value),
+                Cell(self.status.date, classes="nowrap center"),
+                Cell("; ".join(self.summaries)),
+                Cell("; ".join(self.glossary_terms)),
+                Cell(self.status.comments),
+                Cell("Yes" if self.last_ver_pub else "No", center=True),
+                Cell(self.last_publishable_date, classes="nowrap center"),
+            )
+        return self._row
+
+    @property
+    def status(self):
+        """First processing status found in the document (if any)."""
+
+        if not hasattr(self, "_status"):
+            self._status = None
+            node = self.doc.root.find("ProcessingStatuses/ProcessingStatus")
+            if node is not None:
+                self._status = self.Status(node)
+        return self._status
+
+    @property
+    def summaries(self):
+        """Sequence of strings for summary docs to be used with this media."""
+        return self.proposed_uses.get("Summary", [])
+
+    @property
+    def title(self):
+        """Title of the Media document."""
+
+        if not hasattr(self, "_title"):
+            title = Doc.get_text(self.doc.root.find("MediaTitle", ""))
+            self._title = title.strip()
+        return self._title
+
+    @property
+    def url(self):
+        """Web address of the QC report for this document."""
+
+        if not hasattr(self, "_url"):
+            self._url = self.URL.format(self.doc.id)
+        return self._url
+
+
+    class Status:
+        """Parsed processing status values."""
+
+        def __init__(self, node):
+            """Remember the caller's value.
+
+            Pass:
+                node - element block containing the values (or None)
+            """
+
+            self.__node = node
+
+        @property
+        def comments(self):
+            """Sequence of comment strings for the status."""
+
+            if not hasattr(self, "_comments"):
+                self._comments = []
+                for child in self.__node.findall("Comment"):
+                    comment = Doc.get_text(child, "").strip()
+                    if comment:
+                        self._comments.append(comment)
+            return self._comments
+
+        @property
+        def date(self):
+            """String for the date the status was set (if available)."""
+
+            if not hasattr(self, "_date"):
+                child = self.__node.find("ProcessingStatusDate")
+                self._date = Doc.get_text(child, "").strip()[:10]
+            return self._date
+
+        @property
+        def value(self):
+            """String for the status value (if applicable)."""
+
+            if not hasattr(self, "_value"):
+                child = self.__node.find("ProcessingStatusValue")
+                self._value = Doc.get_text(child, "").strip()
+            return self._value
+
+
 if __name__ == "__main__":
+    """Don't run the script if loaded as a module."""
     Control().run()
