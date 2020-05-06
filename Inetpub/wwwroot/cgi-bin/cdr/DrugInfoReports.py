@@ -31,6 +31,8 @@ class Control(Controller):
             ("Drug Date Last Modified", "DrugDateLastModified.py"),
             ("Drug Description Report", "DrugDescriptionReport.py"),
             ("Drug Indications Report", "DrugIndicationsReport.py"),
+            ("Drug Information Comprehensive Review Date Report",
+             "DrugCRD.py"),
             ("Drug Information Summaries Lists", "DISLists.py"),
             ("Drug Processing Status Report", "DISProcessingStatusReport.py"),
             ("Drug Summaries with Markup Report", "DISWithMarkup.py"),
