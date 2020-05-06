@@ -335,7 +335,7 @@ class Summary:
                 elif src.startswith(self.IMAGE_PATH):
                     src = src.replace(self.IMAGE_PATH, replacement)
                     img.set("src", src)
-                elif not (src.startswith("http") or src.startswith("//"):
+                elif not (src.startswith("http") or src.startswith("//")):
                     img.set("src", f"{self.CANCER_GOV}{src}")
             script = self.__control.script
             for a in page.xpath("//a[@href]"):
