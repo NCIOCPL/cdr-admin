@@ -357,16 +357,6 @@ $(function() {
         return self._organization
 
     @property
-    def selection_method(self):
-        """How are we choosing summaries?"""
-
-        if not hasattr(self, "_selection_method"):
-            self._selection_method = self.fields.getvalue("method", "board")
-            if self._selection_method not in self.SUMMARY_SELECTION_METHODS:
-                self.bail()
-        return self._selection_method
-
-    @property
     def start(self):
         """Start of date range for the historical version of the report."""
 

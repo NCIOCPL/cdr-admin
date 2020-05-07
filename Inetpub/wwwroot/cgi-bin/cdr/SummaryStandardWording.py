@@ -201,7 +201,7 @@ Content-length: {len(book_bytes)}
 
         if not hasattr(self, "_caption"):
             top = "STANDARD WORDING REPORT"
-            if self.method == "board":
+            if self.selection_method == "board":
                 top = f"{top} ({self.audience.upper()})"
             terms = "; ".join(sorted([term.lower() for term in self.terms]))
             self._caption = top, f"Search Terms: {terms}"
@@ -351,16 +351,6 @@ Content-length: {len(book_bytes)}
                     self._rows.append(match.html_row(doc_id, title))
                     doc_id = title = ""
         return self._rows
-
-    @property
-    def selection_method(self):
-        """How does the user want to identify summaries for the report?"""
-
-        if not hasattr(self, "_selection_method"):
-            self._selection_method = self.fields.getvalue("method", "board")
-            if self._selection_method not in self.SUMMARY_SELECTION_METHODS:
-                self.bail()
-        return self._selection_method
 
     @property
     def summaries(self):
