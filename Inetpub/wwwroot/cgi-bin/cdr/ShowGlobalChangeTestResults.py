@@ -46,6 +46,8 @@ class Control(Controller):
     def run(self):
         """Override base class logic for some custom routing."""
 
+        if self.request in (self.ADMINMENU, self.REPORTS_MENU, self.LOG_OUT):
+            Controller.run(self)
         if self.request == self.TESTS:
             self.show_form()
         elif self.text:
