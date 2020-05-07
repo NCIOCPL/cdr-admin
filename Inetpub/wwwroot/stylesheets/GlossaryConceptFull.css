@@ -20,4 +20,4 @@ td:first-child { width: 20%; }
 .related-info-table td:first-child { font-weight: bold; }
 .term-normal { background-color: yellow; }
 .term-name { color: blue; font-weight: bold; }
-
+.lang-wrapper { float: left; width: 48%; margin: 0 5px; }
