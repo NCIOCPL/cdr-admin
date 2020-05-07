@@ -72,7 +72,7 @@ class Control(Controller):
             if self.dictionary == self.NONE:
                 self._caption.append("Without Dictionary")
             else:
-                self._caption.append("Glossary Dictionary")
+                self._caption.append("Genetics Dictionary")
             self._caption.append(self.started.strftime("%Y-%m-%d %H:%M:%S"))
         return self._caption
 
