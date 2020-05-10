@@ -1,271 +1,276 @@
 #!/usr/bin/env python
 
-#----------------------------------------------------------------------
-#
-# Reports on documents which link to a specified document.
-#
-# BZIssue::161
-# BZIssue::1532
-# BZIssue::3716
-# BZIssue::4672 - Changes to LinkedDoc Report
-# JIRA::OCECDR-3800 - Address security vulnerabilities
-#
-#----------------------------------------------------------------------
-import cdr
-import cdrcgi
-import cgi
-import datetime
-import urllib.parse
-from cdrapi import db
+"""Report on documents which link to a specified document.
+"""
 
-#----------------------------------------------------------------------
-# Set the form variables.
-#----------------------------------------------------------------------
-cursor       = db.connect(user="CdrGuest").cursor()
-fields       = cgi.FieldStorage()
-doc_id       = fields.getvalue("doc_id") or fields.getvalue("DocId")
-frag_id      = fields.getvalue("frag_id") or fields.getvalue("FragId") or ""
-doc_title    = fields.getvalue("doc_title", "")
-linked_type  = fields.getvalue("linked_type")
-linking_type = fields.getvalue("linking_type") or ""
-with_blocked = fields.getvalue("with_blocked") or "N"
-session      = cdrcgi.getSession(fields)
-request      = cdrcgi.getRequest(fields)
-title        = "Linked Documents Report"
-instr        = "Report on documents which link to a specified document"
-script       = "LinkedDocs.py"
-SUBMENU      = "Report Menu"
-buttons      = ("Submit", SUBMENU, cdrcgi.MAINMENU)
+from collections import defaultdict
+from cdrcgi import Controller
+from cdrapi.docs import Doc, Doctype
 
-#----------------------------------------------------------------------
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if request == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif request == SUBMENU:
-    cdrcgi.navigateTo("reports.py", session)
 
-#----------------------------------------------------------------------
-# Show a list of the matching documents so the user can pick one.
-#----------------------------------------------------------------------
-def put_up_selection(rows):
-    page = cdrcgi.Page(title, subtitle=instr, action=script,
-                       buttons=buttons, session=session)
-    page.add("<fieldset>")
-    page.add_css("fieldset { width: 1000px; }")
-    page.add(page.B.LEGEND("Select Linked Document For Report"))
-    for doc_id, name in rows:
-        id_string = cdr.normalize(doc_id)
-        label = "%s: %s" % (id_string, name)
-        page.add_radio("doc_id", label, id_string)
-    page.add("</fieldset>")
-    page.add(page.B.INPUT(name="frag_id", value=frag_id, type="hidden"))
-    page.add(page.B.INPUT(name="linking_type", value=linking_type,
-                          type="hidden"))
-    page.add(page.B.INPUT(name="with_blocked", value=with_blocked,
-                          type="hidden"))
-    page.send()
+class Control(Controller):
+    """Access to the database and report-building tools."""
 
-#----------------------------------------------------------------------
-# Search for linked document by title, if so requested.
-#----------------------------------------------------------------------
-if doc_title and not doc_id:
-    query = db.Query("document d", "d.id", "d.title")
-    if linked_type:
-        query.join("doc_type t", "t.id = d.doc_type")
-        query.where(query.Condition("t.name", linked_type))
-    query.where(query.Condition("d.title", doc_title + "%", "LIKE"))
-    rows = query.order("d.title").execute(cursor).fetchall()
-    if not rows:
-        cdrcgi.bail("No documents match %s" % repr(doc_title))
-    if len(rows) > 1:
-        put_up_selection(rows)
-    doc_id = rows[0][0]
-
-#----------------------------------------------------------------------
-# Describe the linked document.
-#----------------------------------------------------------------------
-def show_target_info(table, page):
-    target_info = table.user_data()
-    doc_id = target_info["doc_id"]
-    doc_title = target_info["doc_title"]
-    doc_type = target_info["doc_type"]
-    page.add_css("""\
-.target-info th { width: 130px; text-align: right; }
-.target-info td { width: 860px; }""")
-    page.add('<table class="report target-info">')
-    page.add(page.B.CAPTION("Target Document"))
-    page.add('<tr class="odd">')
-    page.add(page.B.TH("Document Type"))
-    page.add(page.B.TD(doc_type))
-    page.add("</tr>")
-    page.add('<tr class="odd">')
-    page.add(page.B.TH("Document Title"))
-    page.add(page.B.TD(doc_title))
-    page.add("</tr>")
-    page.add('<tr class="odd">')
-    page.add(page.B.TH("Document ID"))
-    page.add(page.B.TD(str(doc_id)))
-    page.add("</tr>")
-    page.add("</table>")
-
-#----------------------------------------------------------------------
-# Callback to show current date and user for whom report was run.
-#----------------------------------------------------------------------
-def show_footer(table, page):
-    try:
-        query = db.Query("usr u", "u.fullname")
-        query.join("session s", "u.id = s.usr")
-        query.where(query.Condition("s.name", session))
-        user = query.execute().fetchall()[0][0]
-    except:
-        user = "anonymous user"
-    today = datetime.date.today().strftime("%b %d, %Y")
-    page.add(page.B.P("Report generated %s for %s" % (today, user),
-                      page.B.CLASS("emphasis center")))
-
-#----------------------------------------------------------------------
-# Assemble and display the report.
-#----------------------------------------------------------------------
-def show_report(doc_id, frag_id):
-    id_pieces = cdr.exNormalize(doc_id)
-    doc_id = id_pieces[1]
-    if not frag_id:
-        frag_id = id_pieces[2]
-
-    # Get the target doc info.
-    query = db.Query("document d", "d.title", "t.name")
-    query.join("doc_type t", "t.id = d.doc_type")
-    query.where(query.Condition("d.id", doc_id))
-    rows = query.execute(cursor).fetchall()
-    target_info = {
-        "doc_id": doc_id,
-        "doc_title": rows[0][0],
-        "doc_type": rows[0][1]
-    }
-
-    # Find the links.
-    columns = ("d.id", "d.title", "t.name", "n.source_elem", "n.target_frag")
-    query = db.Query("document d", *columns)
-    query.join("doc_type t", "t.id = d.doc_type")
-    query.join("link_net n", "d.id = n.source_doc")
-    query.where(query.Condition("n.target_doc", doc_id))
-    if linking_type:
-        query.where(query.Condition("t.name", linking_type))
-    if frag_id:
-        query.where(query.Condition("n.target_frag", frag_id))
-    if with_blocked == "N":
-        query.where("d.active_status = 'A'")
-    results = query.order(3, 2, 4, 5).execute().fetchall()
-
-    # Build the report and show it.
-    args = {
-        "html_callback_pre": show_target_info,
-        "user_data": target_info
-    }
-    tables = []
-    if not results:
-        args["html_callback_post"] = show_footer
-        nada = "No link to this document found."
-        col = cdrcgi.Report.Column(nada, width="500px")
-        table = cdrcgi.Report.Table((col,), [], **args)
-        tables.append(table)
-    last_doc_type = ""
-    rows = []
-    columns = (
-        cdrcgi.Report.Column("Doc ID", width="80px"),
-        cdrcgi.Report.Column("Doc Title", width="550px"),
-        cdrcgi.Report.Column("Linking Element", width="200px"),
-        cdrcgi.Report.Column("Fragment ID", width="150px"),
+    SUBTITLE = "Linked Documents Report"
+    INSTRUCTIONS = (
+        "Enter the criteria for the report. "
+        "You can either enter the CDR ID for the linked document "
+        "or you can provide the title of that document (and optionally "
+        "a document type). "
+        "If you enter a title string which matches the start of more than "
+        "one document title (for that document type, if you have selected "
+        "a type), you will be asked to select the document from a list of "
+        "those which match. "
+        "You can also specify a fragment ID to further restrict the links "
+        "which are reported to those which link to one specific element of "
+        "the target document. "
+        "You can restrict the report to links from only a specified document "
+        "type, or you can include links from any document type. "
+        "Finally, you can exclude or include links from documents which "
+        "have been blocked."
     )
-    for doc_id, doc_title, doc_type, source_elem, target_frag in results:
-        if doc_type != last_doc_type:
-            if rows:
-                args["caption"] = "Links From %s Documents" % last_doc_type
-                tables.append(cdrcgi.Report.Table(columns, rows, **args))
-                rows = []
-                args = {}
-            last_doc_type = doc_type
-        doc_id_string = "CDR%d" % doc_id
-        params = { "DocId": doc_id_string, "Session": session or "guest" }
-        params["DocVersion"] = "-1"
-        url = "QcReport.py?%s" % urllib.parse.urlencode(params)
-        row = (
-            cdrcgi.Report.Cell(doc_id_string, href=url),
-            doc_title or "",
-            source_elem or "",
-            target_frag or "",
+
+    def build_tables(self):
+        """Assemble the tables for the report."""
+
+        if not self.target_id:
+            if self.titles or not self.fragment:
+                self.show_form()
+            else:
+                self.bail("no matching target documents found")
+        else:
+            return [self.target_table] + self.linking_tables
+
+
+    def populate_form(self, page):
+        """Put the fields for the report options on the form.
+
+        Pass:
+            page - HTMLPage object on which to place the field sets
+        """
+
+        if self.target_id:
+            return self.show_report()
+        elif self.titles:
+            fieldset = page.fieldset("Select Linked Document For Report")
+            for title in self.titles:
+                opts = dict(value=title.id, label=title.display)
+                if title.tooltip:
+                    opts["tooltip"] = title.tooltip
+                fieldset.append(page.radio_button("doc_id", **opts))
+            page.form.append(fieldset)
+            page.form.append(page.hidden_field("frag_id", self.fragment_id))
+            value = self.linking_type
+            page.form.append(page.hidden_field("linking_type", value))
+            value = "Y" if self.include_blocked_documents else "N"
+            page.form.append(page.hidden_field("with_blocked", value))
+            page.add_css("fieldset { width: 625px; }")
+        else:
+            fieldset = page.fieldset("Instructions")
+            fieldset.append(page.B.P(self.INSTRUCTIONS))
+            page.form.append(fieldset)
+            fieldset = page.fieldset("Linked Document")
+            fieldset.append(page.text_field("doc_id", label="Document ID"))
+            fieldset.append(page.text_field("frag_id", label="Fragment ID"))
+            fieldset.append(page.text_field("doc_title", label="Doc Title"))
+            opts = dict(label="Doc Type", options=[""]+self.doctypes)
+            fieldset.append(page.select("linked_type", **opts))
+            page.form.append(fieldset)
+            fieldset = page.fieldset("Linking Documents")
+            opts = dict(label="Doc Type", options=[("", "Any")]+self.doctypes)
+            fieldset.append(page.select("linking_type", **opts))
+            subset = page.fieldset("Links From Blocked Documents")
+            opts = dict(label="Include", value="Y")
+            subset.append(page.radio_button("with_blocked", **opts))
+            opts = dict(label="Exclude", value="N", checked=True)
+            subset.append(page.radio_button("with_blocked", **opts))
+            fieldset.append(subset)
+            page.form.append(fieldset)
+
+    @property
+    def columns(self):
+        """What we show at the top of the link table columns."""
+
+        if not hasattr(self, "_columns"):
+            self._columns = (
+                self.Reporter.Column("Doc ID", width="80px"),
+                self.Reporter.Column("Doc Title", width="550px"),
+                self.Reporter.Column("Linking Element", width="200px"),
+                self.Reporter.Column("Fragment ID", width="150px"),
+            )
+        return self._columns
+
+    @property
+    def doc_id(self):
+        """String for the CDR ID of the report's link target."""
+
+        if not hasattr(self, "_doc_id"):
+            self._doc_id = self.fields.getvalue("doc_id")
+            if not self._doc_id:
+                self._doc_id = self.fields.getvalue("DocId")
+        return self._doc_id
+
+    @property
+    def doctypes(self):
+        """Sequence of strings for the document type picklists."""
+
+        if not hasattr(self, "_doctypes"):
+            self._doctypes = Doctype.list_doc_types(self.session)
+        return self._doctypes
+
+    @property
+    def fragment(self):
+        """String for a summary title fragment."""
+        if not hasattr(self, "_fragment"):
+            self._fragment = self.fields.getvalue("doc_title")
+        return self._fragment
+
+    @property
+    def fragment_id(self):
+        """String for an optional ID identifying a portion of a document."""
+
+        if not hasattr(self, "_fragment_id"):
+            self._fragment_id = self.fields.getvalue("frag_id")
+            if not self._fragment_id:
+                self._fragment_id = self.fields.getvalue("FragId")
+            if not self._fragment_id:
+                if self.doc_id and "#" in self.doc_id:
+                    self._fragment_id = self.doc_id.split("#")[1]
+        return self._fragment_id
+
+    @property
+    def include_blocked_documents(self):
+        """True if the report should include blocked documents."""
+        return self.fields.getvalue("with_blocked") == "Y"
+
+    @property
+    def linked_type(self):
+        """String for the document type of the report's linked document."""
+
+        if not hasattr(self, "_linked_type"):
+            self._linked_type = self.fields.getvalue("linked_type")
+            if self._linked_type and self._linked_type not in self.doctypes:
+                self.bail()
+        return self._linked_type
+
+    @property
+    def linking_tables(self):
+        """Sequence of tables for each linking document type."""
+
+        if not self.links:
+            nada = "No link to this document found."
+            column = cdrcgi.Report.Column(nada, width="500px")
+            return [self.Reporter.Table([], columns=[column])]
+        tables = []
+        for doctype in sorted(self.links):
+            rows = []
+            for link in self.links[doctype]:
+                cdr_id = f"CDR{link.id:d}"
+                url = self.make_url("QcReport.py", DocId=cdr_id, DocVersion=-1)
+                row = (
+                    self.Reporter.Cell(cdr_id, href=url),
+                    link.title,
+                    link.source_elem,
+                    link.target_frag,
+                )
+                rows.append(row)
+            caption = f"Links From {doctype} Documents"
+            opts = dict(columns=self.columns, caption=caption)
+            tables.append(self.Reporter.Table(rows, **opts))
+        return tables
+
+    @property
+    def linking_type(self):
+        """String for the document type of the report's linking documents."""
+
+        if not hasattr(self, "_linking_type"):
+            self._linking_type = self.fields.getvalue("linking_type")
+            if self._linking_type and self._linking_type not in self.doctypes:
+                self.bail()
+        return self._linking_type
+
+    @property
+    def links(self):
+        """Links to be shown on the report."""
+
+        if not hasattr(self, "_links"):
+            columns = (
+                "t.name AS doc_type",
+                "d.title",
+                "n.source_elem",
+                "n.target_frag",
+                "d.id",
+            )
+            query = self.Query("document d", *columns).order(2, 3, 4)
+            query.join("doc_type t", "t.id = d.doc_type")
+            query.join("link_net n", "d.id = n.source_doc")
+            query.where(query.Condition("n.target_doc", self.target_id))
+            if self.linking_type:
+                query.where(query.Condition("t.name", self.linking_type))
+            if self.fragment_id:
+                query.where(query.Condition("n.target_frag", self.fragment_id))
+            if not self.include_blocked_documents:
+                query.where("d.active_status = 'A'")
+            self._links = defaultdict(list)
+            for row in query.execute(self.cursor).fetchall():
+                self._links[row.doc_type].append(row)
+        return self._links
+
+    @property
+    def target_id(self):
+        """Integer for the CDR ID of the report's link target."""
+
+        if not hasattr(self, "_target_id"):
+            self._target_id = None
+            if self.doc_id:
+                try:
+                    self._target_id = Doc.extract_id(self.doc_id)
+                except:
+                    self.bail("invalid document ID format")
+            elif len(self.titles) == 1:
+                self._target_id = self.titles[0].id
+        return self._target_id
+
+    @property
+    def target_table(self):
+        doc = Doc(self.session, id=self.target_id)
+        Cell = self.Reporter.Cell
+        rows = (
+            (Cell("Document Type", bold=True, right=True), doc.doctype.name),
+            (Cell("Document Title", bold=True, right=True), doc.title),
+            (Cell("Document ID", bold=True, right=True), doc.id),
         )
-        rows.append(row)
-    if last_doc_type:
-        args["caption"] = "Links From %s Documents" % last_doc_type
-        args["html_callback_post"] = show_footer
-        tables.append(cdrcgi.Report.Table(columns, rows, **args))
-    report = cdrcgi.Report(title, tables, banner=title, subtitle=instr)
-    report.send()
+        opts = dict(caption="Target Document", id="target-info")
+        return self.Reporter.Table(rows, **opts)
 
-#----------------------------------------------------------------------
-# If we have a document ID, produce a report.
-#----------------------------------------------------------------------
-if doc_id:
-    try:
-        show_report(doc_id, frag_id)
-    except Exception as e:
-        cdrcgi.bail("%s" % e)
+    @property
+    def titles(self):
+        """Sequence of `DocTitle` objects for titles matching user's string."""
 
-#----------------------------------------------------------------------
-# Retrieve the list of document type names.
-#----------------------------------------------------------------------
-def get_doc_types():
-    try:
-        cursor.execute("""\
-SELECT DISTINCT name
-           FROM doc_type
-          WHERE name IS NOT NULL and name <> '' AND active = 'Y'
-       ORDER BY name
-""")
-        return cursor.fetchall()
-    except Exception as e:
-        cdrcgi.bail('Database query failure: %s' % e)
+        if not hasattr(self, "_titles"):
+            self._titles = []
+            if self.fragment:
+                pattern = f"{self.fragment}%"
+                query = self.Query("document d", "d.id", "d.title").order(2)
+                if self.linked_type:
+                    query.join("doc_type t", "t.id = d.doc_type")
+                    query.where(query.Condition("t.name", self.linked_type))
+                query.where(query.Condition("d.title", pattern, "LIKE"))
+                class DocTitle:
+                    def __init__(self, row):
+                        self.id = row.id
+                        self.tooltip = None
+                        if len(row.title) > 60:
+                            title = row.title[:57] + "..."
+                            self.tooltip = row.title
+                        else:
+                            title = row.title
+                        self.display = f"{Doc.normalize_id(row.id)}: {title}"
+                for row in query.execute(self.cursor).fetchall():
+                    self._titles.append(DocTitle(row))
+        return self._titles
 
-#----------------------------------------------------------------------
-# Put up the main request form.
-#----------------------------------------------------------------------
-doc_types = [(row[0], row[0]) for row in get_doc_types()]
-page = cdrcgi.Page(title, subtitle=instr, action=script, session=session,
-                   buttons=buttons)
-instructions = (
-    "Enter the criteria for the report. "
-    "You can either enter the CDR ID for the linked document "
-    "or you can provide the title of that document (and optionally "
-    "a document type). "
-    "If you enter a title string which matches the start of more than "
-    "one document title (for that document type, if you have selected "
-    "a type), you will be asked to select the document from a list of "
-    "those which match. "
-    "You can also specify a fragment ID to further restrict the links "
-    "which are reported to those which link to one specific element of "
-    "the target document. "
-    "You can restrict the report to links from only a specified document "
-    "type, or you can include links from any document type. "
-    "Finally, you can exclude or include links from documents which "
-    "have been blocked."
-)
-page.add(page.B.FIELDSET(page.B.P(instructions)))
-page.add("<fieldset>")
-page.add(page.B.LEGEND("Linked Document"))
-page.add_text_field("doc_id", "Document ID")
-page.add_text_field("frag_id", "Fragment ID")
-page.add_text_field("doc_title", "Doc Title")
-page.add_select("linked_type", "Doc Type", [("", "")] + doc_types)
-page.add("</fieldset>")
-page.add("<fieldset>")
-page.add(page.B.LEGEND("Linking Documents"))
-page.add_select("linking_type", "Doc Type", [("", "Any")] + doc_types)
-page.add("<fieldset>")
-page.add(page.B.LEGEND("Links From Blocked Documents"))
-page.add_radio("with_blocked", "Include", "Y")
-page.add_radio("with_blocked", "Exclude", "N", checked=True)
-page.add("</fieldset>")
-page.add("</fieldset>")
-page.send()
+
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+    Control().run()
