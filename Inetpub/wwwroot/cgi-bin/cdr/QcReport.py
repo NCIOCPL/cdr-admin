@@ -138,6 +138,7 @@ header   = cdrcgi.header(title, title, getSectionTitle(repType),
     *.comgroup          { background: #C9C9C9;
                           margin-bottom: 8px; }
     *.radio-button    { margin-left: 40px; }
+    label:hover       { background-color: lightyellow; }
   </style>
 
   <script language = 'JavaScript'>
@@ -585,8 +586,10 @@ def showTitleChoices(choices):
 """
     for choice in choices:
         form += """\
-   <INPUT TYPE='radio' NAME='DocId' VALUE='CDR%010d'>[CDR%d] %s<BR>
-""" % (choice[0], choice[0], html_escape(choice[1]))
+   <INPUT TYPE="radio" id="%d" NAME="DocId" VALUE="CDR%010d">
+   <label for="%d">[CDR%06d] %s</label><BR>
+""" % (choice[0], choice[0], choice[0], choice[0], 
+       html_escape(choice[1]))
     cdrcgi.sendPage(header + form + """\
    <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
    <INPUT TYPE='hidden' NAME='DocType' VALUE='%s'>
@@ -707,7 +710,7 @@ elif docType:
 # Let the user pick the version for most Summary or Glossary reports.
 # OCECDR-4190: let the user pick the version for drug information summaries.
 #
-# Note: The QC report "Glossary Term Name with Concept" called from
+# Note: The QC report "Glossary Term Name with Concept" called from 
 #       within XMetaL is running Filter.py instead of QcReport.py!!!
 #       The CDR Admin interface is calling QcReport.py. This affects
 #       the reportType "GlossaryTermName:gtnwc"
