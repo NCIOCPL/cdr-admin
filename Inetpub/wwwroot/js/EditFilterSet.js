@@ -32,7 +32,7 @@ function save() {
         members.push({name: name, type: type});
     });
     jQuery("input[name='members']").val(JSON.stringify(members));
-    jQuery("input[name='Request']").val("Save Set");
+    document.forms[0]["Request"].value = "Save Set";
     jQuery("form").submit();
 }
 
@@ -44,7 +44,7 @@ jQuery(function() {
         over: function() { removeIntent = false; },
         out: function() { removeIntent = true; },
         beforeStop: function(event, ui) {
-            if(removeIntent === true) {
+            if (removeIntent === true) {
                 ui.item.remove();
                 check_members()
             }
