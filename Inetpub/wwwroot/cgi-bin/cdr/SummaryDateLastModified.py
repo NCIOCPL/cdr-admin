@@ -415,6 +415,7 @@ class Board:
         "type.value AS summary_type",
         "last_mod.value AS last_modified",
         "saved.last_save_date AS last_saved",
+        "modules.value as is_module",
     )
 
     def __init__(self, control, id, languages):
@@ -532,6 +533,7 @@ class Board:
         query.join("query_term type", "type.doc_id = title.doc_id")
         query.join("doc_last_save saved", "saved.doc_id = title.doc_id")
         query.outer("query_term last_mod", *self.LAST_MOD_JOIN)
+        query.outer("query_term modules", *self.MODULE_JOIN)
         query.where(f"audience.{self.AUDIENCE_PATH}")
         query.where(f"language.{self.LANGUAGE_PATH}")
         query.where(f"title.{self.TITLE_PATH}")
@@ -565,12 +567,10 @@ class Board:
                 query.join("document", "document.id = title.doc_id")
                 options.append("document.active_status = 'I'")
             if self.__control.modules:
-                query.outer("query_term modules", *self.MODULE_JOIN)
-                options.append("modules.doc_id IS NOT NULL")
+                options.append("modules.value = 'Yes'")
             query.where(query.Or(*options))
         if not self.__control.modules:
-            query.outer("query_term modules", *self.MODULE_JOIN)
-            query.where("modules.doc_id IS NULL")
+            query.where("modules.value IS NULL")
 
         # Date filtering depends on which flavor of the report was requested.
         if self.__control.report_type == Control.USER_REPORT:
@@ -659,6 +659,17 @@ class Summary:
         return self._last_version_publishable
 
     @property
+    def module(self):
+        """True if this summary can be used as a module."""
+
+        if not hasattr(self, "_module"):
+            self._module = False
+            if self.__row.is_module is not None:
+                if self.__row.is_module.capitalize() == "Yes":
+                    self._module = True
+        return self._module
+
+    @property
     def saver(self):
         "Who saved the document last?"""
 
@@ -675,7 +686,12 @@ class Summary:
     @property
     def title(self):
         """String for the title of the PDQ summary."""
-        return self.__row.summary_title
+
+        if not hasattr(self, "_title"):
+            self._title = self.__row.summary_title.strip()
+            if self.module:
+                self._title += " [Module]"
+        return self._title
 
     @property
     def type(self):
