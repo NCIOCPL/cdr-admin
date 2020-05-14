@@ -778,9 +778,8 @@ class AudioSet:
     def __install_set(self, name):
         """Add the rows for this set to the database.
 
-        Note that because the last column (for NCI Notes) has moved
-        over the years, we sometimes have to look beyond the seventh
-        column for that value.
+        Pass:
+            name - string identifying the zipfile for this set
 
         Return:
             integer for the new term_audio_zipfile row
@@ -822,14 +821,6 @@ class AudioSet:
                 continue
             for col in range(1, 7):
                 values.append(sheet.cell(row, col).value)
-            if not values[-1] and sheet.ncols > 7:
-                col = 7
-                while col < sheet.ncols:
-                    value = sheet.cell(row, col).value
-                    if value:
-                        values[-1] = value
-                        break
-                    col += 1
             if values[self.LANGUAGE_COL] not in self.LANGUAGES:
                 args = value[self.LANGUAGE_COL], row
                 self.cursor.bail("Invalid language %s in row %d", *args)
