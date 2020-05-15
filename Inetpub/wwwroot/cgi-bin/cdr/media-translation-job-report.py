@@ -319,7 +319,10 @@ class Job:
     @property
     def date(self):
         """When the current translation job's state was last modified."""
-        return self.__row.state_date
+
+        if not hasattr(self, "_date"):
+            self._date = str(self.__row.state_date)[:10]
+        return self._date
 
     @property
     def english_id(self):
@@ -344,7 +347,7 @@ class Job:
                 self.title,
                 self.spanish_id,
                 self.state,
-                Cell(str(self.date)[:10], classes="nowrap"),
+                Cell(self.date, classes="nowrap"),
                 self.user,
                 comments,
             )

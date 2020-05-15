@@ -286,7 +286,7 @@ class Job:
     Glossary document.
     """
 
-    FIELDS = "doc_id", "state", "user", "state_date", "comments"
+    FIELDS = "doc_id", "state", "user", "date", "comments"
 
     def __init__(self, control, row):
         """Remember the caller's values.
@@ -321,7 +321,7 @@ class Job:
         """String for the date portion of the date/time value."""
 
         if not hasattr(self, "_date"):
-            self._date = str(self.state_date)[:10]
+            self._date = str(self.__row.state_date)[:10]
         return self._date
 
     @property
@@ -388,11 +388,6 @@ class Job:
     def state(self):
         """Which phase of the translation job have we reached?"""
         return self.__row.value_name
-
-    @property
-    def state_date(self):
-        """When the current translation job's state was last modified."""
-        return self.__row.state_date
 
     @property
     def title(self):
