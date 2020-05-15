@@ -406,8 +406,8 @@ class DrugInfoSummary:
         """String description of the drug summary page."""
 
         if not hasattr(self, "_description"):
-            node = self.doc.root.find("Description")
-            self._description = "".join(self.fetch_text(node)).strip()
+            for node in self.doc.root.iter("Description"):
+                self._description = "".join(self.fetch_text(node)).strip()
         return self._description
 
     @property
