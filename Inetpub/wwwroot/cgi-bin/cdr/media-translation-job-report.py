@@ -41,7 +41,6 @@ class Control(Controller):
         current="media_translation_job j",
         history="media_translation_job_history j",
     )
-
     COMMENTS = (
         ("short", "Shortened", True),
         ("full", "Full", False),
@@ -49,7 +48,6 @@ class Control(Controller):
 
     def build_tables(self):
         """Assemble the report's table."""
-
         return self.Reporter.Table(self.rows, columns=self.columns)
 
     def populate_form(self, page):
@@ -96,7 +94,8 @@ class Control(Controller):
             self.redirect("glossary-translation-jobs.py")
         elif self.request == self.SUMMARY:
             self.redirect("translation-jobs.py")
-        Controller.run(self)
+        else:
+            Controller.run(self)
 
     def show_report(self):
         """Override the base class version so we can add extra buttons."""
@@ -291,7 +290,6 @@ class Job:
     CDR Media document.
     """
 
-    URL = "media-translation-job.py?Session=%s&english_id=%s"
     FIELDS = "english_id", "state", "user", "date", "comments"
 
     def __init__(self, control, row):
