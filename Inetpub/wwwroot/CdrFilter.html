@@ -8,8 +8,8 @@
     <meta charset="utf-8">
     <title>CDR Document Filtering</title>
     <link href="/favicon.ico" rel="icon">
-    <link href="/stylesheets/cdr.css?v=201701010000" rel="stylesheet">
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>
+    <link href="/stylesheets/cdr.css?v=202001010000" rel="stylesheet">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
     <script>
 function add_filter_field() {
     var id = jQuery(".filter").length + 1;
@@ -42,7 +42,7 @@ function filter_doc(extra) {
             if (jQuery("#" + name + ":checked").length)
                 url += "&" + name + "=true";
         });
-        jQuery.each(["DocVer", "port", "newdtd"], function(i, name) {
+        jQuery.each(["DocVer", "newdtd"], function(i, name) {
             var val = jQuery("#" + name).val();
             if (val)
                 url += "&" + name + "=" + encodeURIComponent(val);
@@ -54,8 +54,6 @@ function filter_doc(extra) {
         });
         if (!jQuery("#rsmarkup:checked").length)
             url += "&rsmarkup=false";
-        if (!jQuery("#use-cache:checked").length)
-            url += "&cache=refresh";
         if (extra)
             url += "&" + extra + "=Y";
         var opts = "standard=yes,scrollbars=yes,resizable=yes,status=yes,"
@@ -97,10 +95,6 @@ function filter_doc(extra) {
         <div class="labeled-field">
           <label for="newdtd">DTD</label>
           <input name="newdtd" id="newdtd" value="pdqCG.dtd">
-        </div>
-        <div class="labeled-field">
-          <label for="port">Port</label>
-          <input name="port" id="port">
         </div>
       </fieldset>
       <fieldset id="filters">
@@ -207,17 +201,6 @@ function filter_doc(extra) {
         <div>
           <input type="checkbox" name="isqc" value="true" id="isqc" checked>
           <label for="isqc" class="clickable">QC Report</label>
-        </div>
-      </fieldset>
-      <fieldset>
-        <legend>Filter Set Cache</legend>
-        <div>
-          <input type="radio" name="cache" value="use" id="use-cache" checked>
-          <label for="use-cache" class="clickable">Use cache</label>
-        </div>
-        <div>
-          <input type="radio" name="cache" value="refresh" id="refresh-cache">
-          <label for="refresh-cache" class="clickable">Refresh cache</label>
         </div>
       </fieldset>
     </form>

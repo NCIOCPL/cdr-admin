@@ -1,32 +1,15 @@
 #!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# Transform a CDR document using an XSL/T filter and send it back to
-# the browser.
-#
-# BZIssue::846 - Support insertion/deletion revision levels
-# BZIssue::846 - Allow display of glossary terms and standard wording
-# BZIssue::1683 - Allow display of editorial and advisory board markup
-# BZIssue::1883 - Support for choosing audience in GlossaryTerm RS reports
-# BZIssue::3923 - Replace pyXML with lxml for validation
-# BZIssue::2920 - Allow display of internal/external comments
-# BZIssue::3923 - Minor modifications to make HTML output valid
-# BZIssue::4123 - Added support for specifying a DTD file
-# BZIssue::4560 - Converted output to unicode to match sendPage requirements
-# BZIssue::4781 - Have certain links to unpublished docs ignored
-# BZIssue::4800 - Glossary Term Link error
-# Rewritten July 2015 as part of security sweep.
-#----------------------------------------------------------------------
-import cgi
-import cdr
-import cdrcgi
-import cdrpub
-import os
-import pickle
-import urllib.request, urllib.parse, urllib.error
-from cdrapi.settings import Tier
+"""Filter CDR documents.
+"""
 
-class Control(cdrcgi.Control):
+from lxml import etree
+from cdrapi.docs import Doc, FilterSet
+from cdrcgi import Controller, DOCID
+from cdr import DEFAULT_DTD, PDQDTDPATH, expandFilterSets
+
+
+class Control(Controller):
     """
     Encapsulates the logic for this script. The user has three choices:
      1. Run the document through one or more filters and show the result.
@@ -34,323 +17,484 @@ class Control(cdrcgi.Control):
      3. Show all of the filter sets which contain the specified filters.
     """
 
+    LOGNAME = "filter"
     FILTER = "Submit Filter Request"
     VALIDATE = "Filter and Validate"
     QCSETS = "QC Filter Sets"
     TITLE = "CDR Filtering"
-    CACHE = cdr.BASEDIR + "/reports/expanded-filter-sets"
-    USE_CACHE = "use"
-    REFRESH_CACHE = "refresh"
-    LOGNAME = "filter"
-    TIER = Tier()
+    CSS = ".action-buttons a { padding-left: 2px; padding-right: 2px; }"
 
-    def __init__(self):
-        """
-        Collect the CGI parameters and make sure they haven't been
-        tampered with.
-        """
-        cdrcgi.Control.__init__(self)
-        fields = self.fields
-        self.session = "guest"
-        self.cache = self.fields.getvalue("cache", self.USE_CACHE)
-        if self.cache not in (self.USE_CACHE, self.REFRESH_CACHE):
-            cdrcgi.bail()
-        self.dtd = fields.getvalue("newdtd", cdr.DEFAULT_DTD)
-        doc_id = fields.getvalue(cdrcgi.DOCID)
-        if not doc_id:
-            cdrcgi.bail("No Document", self.TITLE)
-        try:
-            self.cdr_id, self.doc_id, fragment = cdr.exNormalize(doc_id)
-        except:
-            cdrcgi.bail("Unrecognized document ID format")
-        version = fields.getvalue("DocVer", "0")
-        if version.isdigit():
-            self.version = int(version)
-        else:
-            versions = cdr.lastVersions("guest", self.cdr_id)
-            if not versions:
-                cdrcgi.bail("Document is not versioned")
-            if version == "last":
-                self.version = versions[0]
-            elif version == "lastp":
-                self.version = versions[1]
-            else:
-                cdrcgi.bail("Version can only be 'last', 'lastp', or an "
-                            "integer")
-        self.filters = fields.getlist("filter")
-
-        # Backward compatibility
-        for i in range(16):
-            name = cdrcgi.FILTER
-            if i:
-                name += str(i)
-            value = fields.getvalue(name)
-            if value:
-                self.filters.append(value)
-
-        # Make sure the filters are legitimate.
-        filters = cdr.getFilters("guest")
-        sets = cdr.getFilterSets("guest")
-        self.filter_sets = dict([(s.name.upper(), s.id) for s in sets])
-        self.all_filters = dict([(f.name.upper(), f.id) for f in filters])
-        self.all_filter_ids = set([f.id for f in filters])
-        for filter_spec in self.filters:
-            self.check_filter(filter_spec)
-        self.validate = fields.getvalue("validate") == "Y"
-        self.qc_sets = fields.getvalue("qcFilterSets") == "Y"
-        if not self.filters and not self.qc_sets:
-            cdrcgi.bail("No filter", self.TITLE)
-        self.ins_levels = []
-        for level in ("publish", "approved", "proposed", "rejected"):
-            if fields.getvalue(level) == "true":
-                self.ins_levels.append(level)# += "%s_" % level
-        self.ins_levels += fields.getvalue("insRevLevels", "")
-        self.del_levels = fields.getvalue("rsmarkup") == "false"
-        self.boards = []
-        for board in ("editorial", "advisory"):
-            if fields.getvalue(board) == "true":
-                self.boards.append("%s-board" % board)
-        self.audiences = []
-        for audience in ("patient", "hp"):
-            if fields.getvalue("gloss" + audience) == "true":
-                self.audiences.append(audience)
-        if fields.getvalue("QC") == "true":
-            self.vendor_or_qc = "QC"
-        else:
-            self.vendor_or_qc = fields.getvalue("vendorOrQC", "")
-        self.comments = "N"
-        if fields.getvalue("internal") == "true":
-            self.comments = "I"
-        if fields.getvalue("external") == "true":
-            self.comments = self.comments == "I" and "A" or "E"
-        self.glossary = fields.getvalue("glossary") == "true"
-        self.standard_wording = fields.getvalue("stdword") == "true"
-        self.is_pp = fields.getvalue("ispp") == "true"
-        self.is_qc = fields.getvalue("isqc") == "true"
-        self.loeref = fields.getvalue("loeref") == "true"
+    def build_tables(self):
+        """Return the single table used for this report."""
+        return self.table
 
     def run(self):
-        "Figure out what the user asked us to do and do it."
-        if self.qc_sets:
-            self.qc_filter_sets()
-        elif self.validate:
-            self.filter_and_validate()
-        else:
-            self.show_filtered_doc()
+        """Override the base class version: the form is static HTML."""
 
-    def qc_filter_sets(self):
-        """
+        if self.table:
+            self.show_report()
+        elif self.filter_specs:
+            self.send_page(self.filtered_xml, self.text_type)
+        else:
+            self.bail("No filters specified")
+
+    def show_report(self):
+        """Override the base class method to add custom styling."""
+
+        if self.filter_set_table:
+            self.report.page.add_css(self.CSS)
+        self.report.send(self.format)
+
+    @property
+    def all_filter_ids(self):
+        """Set of integers for the Filter documents in the system."""
+
+        if not hasattr(self, "_all_filter_ids"):
+            self._all_filter_ids = {id for id in self.all_filters.values()}
+        return self._all_filter_ids
+
+    @property
+    def all_filter_sets(self):
+        """Dictionary of filter set IDs indexed by normalized title."""
+
+        if not hasattr(self, "_all_filter_sets"):
+            self._all_filter_sets = {}
+            for id, name in FilterSet.get_filter_sets(self.session):
+                self._all_filter_sets[name.upper()] = id
+        return self._all_filter_sets
+
+    @property
+    def all_filters(self):
+        """Dictionary of filter IDs indexed by normalized title."""
+
+        if not hasattr(self, "_all_filters"):
+            self._all_filters = {}
+            for filter in FilterSet.get_filters(self.session):
+                self._all_filters[filter.title.upper()] = filter.id
+        return self._all_filters
+
+    @property
+    def audiences(self):
+        """Audience(s) selected for glossary definitions."""
+
+        if not hasattr(self, "_audiences"):
+            self._audiences = []
+            for audience in ("patient", "hp"):
+                if self.fields.getvalue(f"gloss{audience}") == "true":
+                    self._audiences.append(audience)
+        return self._audiences
+
+    @property
+    def boards(self):
+        """Editorial and/or advisory PDQ boards."""
+
+        if not hasattr(self, "_boards"):
+            self._boards = []
+            for board in ("editorial", "advisory"):
+                if self.fields.getvalue(board) == "true":
+                    self._boards.append(f"{board}-board")
+        return self._boards
+
+    @property
+    def comments(self):
+        """(I)nternal, (E)xternal, (A)ll, or (N)one."""
+
+        if not hasattr(self, "_comments"):
+            self._comments = "N"
+            if self.fields.getvalue("internal") == "true":
+                self._comments = "I"
+            if self.fields.getvalue("external") == "true":
+                self._comments = "A" if self.comments == "I" else "E"
+        return self._comments
+
+    @property
+    def doc(self):
+        """`Doc` object for the CDR document to be filtered."""
+
+        if not hasattr(self, "_doc"):
+            id = self.fields.getvalue(DOCID)
+            if not id:
+                self.bail("No Document", self.TITLE)
+            try:
+                id = Doc.extract_id(id)
+            except Exception:
+                self.bail("Unrecognized document ID format")
+            version = self.fields.getvalue("DocVer", "0")
+            if not version.isdigit() and version not in ("last", "lastp"):
+                self.bail(f"Invalid version {version!r}")
+            self._doc = Doc(self.session, id=id, version=version)
+        return self._doc
+
+    @property
+    def dtd(self):
+        """Object for validating the filtered CDR document."""
+
+        if not hasattr(self, "_dtd"):
+            path = self.fields.getvalue("newdtd", DEFAULT_DTD)
+            if "/" not in path and "\\" not in path:
+                path = f"{PDQDTDPATH}/{path}"
+            try:
+                with open(path) as fp:
+                    self._dtd = etree.DTD(fp)
+            except Exception as e:
+                self.logger.exception("Failure loading %s", path)
+                self.bail("Failure loading {path}: {e}")
+        return self._dtd
+
+    @property
+    def filter_ids(self):
+        """CDR document IDs for filters selected directly for this report."""
+
+        if not hasattr(self, "_filter_ids"):
+            specs = self.filter_specs
+            self._filter_ids = {s.filter_id for s in specs if s.filter_id}
+        return self._filter_ids
+
+    @property
+    def filter_result(self):
+        """Object with the result_tree, warning messages, and errors."""
+
+        if not hasattr(self, "_filter_result"):
+            specs = [spec.identifier for spec in self.filter_specs]
+            try:
+                self._filter_result = self.doc.filter(*specs, parms=self.parms)
+            except Exception as e:
+                self.logger.exception("filtering %s", self.doc.cdr_id)
+                self.bail(f"failure filtering {self.doc.cdr_id}: {e}")
+        return self._filter_result
+
+    @property
+    def filter_set_table(self):
+        """Table showing the filter sets relevant to this filtering job.
+
         Show the user the filter sets that contain the selected
         filter(s). Skip over named sets specified by the user.
         """
-        filter_ids = []
-        for f in self.filters:
-            if not f.startswith("set:"):
-                if f.startswith("name:"):
-                    name = f[5:]
-                    filter_id = self.all_filters.get(name.upper())
-                    if not filter_id:
-                        cdrcgi.bail("Unknown filter: %s" % name)
-                elif not f.startswith("set:"):
-                    filter_id = f
-                try:
-                    filter_ids.append(cdr.exNormalize(filter_id)[1])
-                except:
-                    cdrcgi.bail("Invalid filter %s" % repr(filter_id))
-        id_set = set(filter_ids)
-        columns = (
-            cdrcgi.Report.Column("Set Name"),
-            cdrcgi.Report.Column("Action"),
-            cdrcgi.Report.Column("Set Detail")
-        )
-        cache_warning = None
-        if self.cache == self.USE_CACHE:
-            fp = open(self.CACHE)
-            filter_sets = pickle.load(fp)
-            fp.close()
-        else:
-            filter_sets = cdr.expandFilterSets("guest")
-            try:
-                fp = open(self.CACHE, "w")
-                pickle.dump(filter_sets, fp)
-                fp.close()
-            except Exception as e:
-                cache_warning = "Failure refreshing filter set cache: %s" % e
-        opts = {
-            cdrcgi.DOCID: self.cdr_id,
-            "DocVer": str(self.version)
-        }
-        if self.vendor_or_qc:
-            opts["vendorOrQC"] = self.vendor_or_qc
-        rows = []
-        for set_name in sorted(filter_sets):
-            filter_set = filter_sets[set_name]
-            if self.set_wanted(filter_set, id_set):
-                opts["filter"] = [m.id for m in filter_set.members]
-                args = urllib.parse.urlencode(opts, True)
-                rows.append((
-                    set_name,
-                    ActionCell(self.script, args),
-                    ["%s:%s" % (m.id, m.name) for m in filter_set.members]
-                ))
-        opts = {
-            "html_callback_pre": self.show_cache_warning,
-            "user_data": cache_warning
-        }
-        table = cdrcgi.Report.Table(columns, rows, **opts)
-        title = "CDR XSL/T Filtering"
-        opts = {
-            "banner": title,
-            "subtitle": "QC Filter Sets",
-            "css": ".report a { padding-left: 2px; padding-right: 2px; }"
-        }
-        report = cdrcgi.Report(title, [table], **opts)
-        report.send()
 
-    def show_filtered_doc(self):
-        "Filter the document and display the results."
-        doc = self.filter_doc().replace("@@DOCID@@", self.cdr_id)
-        text_type = "<?xml" in doc and "xml" or "html"
-        cdrcgi.sendPage(doc, text_type)
+        if not hasattr(self, "_filter_set_table"):
+            table_requested = self.fields.getvalue("qcFilterSets") == "Y"
+            if table_requested or not self.filter_ids:
+                columns = "Set Name", "Action", "Set Detail"
+                rows = []
+                for filter_set in self.resolved_filter_sets:
+                    if filter_set.in_scope:
+                        rows.append(filter_set.row)
+                if not rows:
+                    columns = ["No filter sets include all selected filters"]
+                opts = dict(columns=columns)
+                self._filter_set_table = self.Reporter.Table(rows, **opts)
+            else:
+                self._filter_set_table = None
+        return self._filter_set_table
 
-    def filter_and_validate(self):
-        """
-        Run the document through all the selected filters and then
-        validate it against the specified DTD. Display a report
-        showing all the warnings and errors.
-        """
-        title = "Validation results for %s" % self.cdr_id
-        if "/" not in self.dtd and "\\" not in self.dtd:
-            self.dtd = "%s\\%s" % (cdr.PDQDTDPATH, self.dtd)
-        if not os.path.exists(self.dtd):
-            cdrcgi.bail("%s not found" % repr(self.dtd.replace("\\", "/")))
-        errors = cdrpub.Control.validate_doc(self.filter_doc(), self.dtd)
-        if not errors and not self.warnings:
-            title += " (passed)"
-        columns = (
-            cdrcgi.Report.Column("Type"),
-            cdrcgi.Report.Column("Document"),
-            cdrcgi.Report.Column("Line"),
-            cdrcgi.Report.Column("Message")
-        )
-        rows = []
-        if self.warnings:
-            rows.append(("Warning", self.cdr_id, "N/A", self.warnings))
-        for error in errors:
-            rows.append((error.level_name, self.cdr_id, error.line,
-                         error.message))
-        if not rows:
-            columns = [cdrcgi.Report.Column("Document is valid")]
-        table = cdrcgi.Report.Table(columns, rows)
-        report = cdrcgi.Report(title, [table])
-        report.send()
+    @property
+    def resolved_filter_sets(self):
+        """Sequence of `ResolvedFilterSet` objects."""
 
-    def filter_doc(self):
-        "Run the document through all of the selected filters."
-        parms = self.parms()
-        response = cdr.filterDoc(self.session, self.filters, self.cdr_id,
-                                 docVer=self.version, parm=self.parms())
-        try:
-            doc, self.warnings = response
-            return doc
-        except:
-            cdrcgi.bail(response)
+        if not hasattr(self, "_resolved_filter_sets"):
+            filter_sets = expandFilterSets(self.session)
+            self._resolved_filter_sets = []
+            for name in sorted(filter_sets):
+                filter_set = ResolvedFilterSet(self, filter_sets[name])
+                self._resolved_filter_sets.append(filter_set)
+        return self._resolved_filter_sets
 
+    @property
+    def filter_specs(self):
+        """Filters and filter sets chosen for filtering the CDR document."""
+
+        if not hasattr(self, "_filter_specs"):
+            values = self.fields.getlist("filter")
+            if not values:
+                values = self.fields.getlist("Filter")
+            self._filter_specs = []
+            for value in values:
+                spec = FilterSpec(self, value)
+                if spec.error:
+                    self.bail(spec.error)
+                self._filter_specs.append(spec)
+        return self._filter_specs
+
+    @property
+    def filtered_xml(self):
+        """String for the document's XML, ready to be returned to the user."""
+
+        if not hasattr(self, "_filtered_xml"):
+            xml = str(self.filter_result.result_tree)
+            self._filtered_xml = xml.replace("@@DOCID@@", self.doc.cdr_id)
+        return self._filtered_xml
+
+    @property
+    def glossary(self):
+        """True if glossary term print options are requested."""
+        return self.fields.getvalue("glossary") == "true"
+
+    @property
+    def is_pp(self):
+        """True if we're preparing a publish preview report."""
+        return self.fields.getvalue("ispp") == "true"
+
+    @property
+    def is_qc(self):
+        """True if we're preparing a QC report."""
+        return self.fields.getvalue("isqc") == "true"
+
+    @property
+    def loeref(self):
+        """True if level-of-evidence print options are requested."""
+        return self.fields.getvalue("loeref") == "true"
+
+    @property
+    def markup_levels(self):
+        """Level(s) of insertion/deletion markup which should be applied."""
+
+        if not hasattr(self, "_markup_levels"):
+            self._markup_levels = []
+            for level in  ("publish", "approved", "proposed", "rejected"):
+                if self.fields.getvalue(level) == "true":
+                    self._markup_levels.append(level)
+        return self._markup_levels
+
+    @property
     def parms(self):
-        "Pack up the parameters to be fed to the CDR filter module."
-        parms = [
-            ("insRevLevels",            "_".join(self.ins_levels)),
-            ("delRevLevels",            self.del_levels and "Y" or "N"),
-            ("DisplayComments",         self.comments),
-            ("DisplayGlossaryTermList", self.glossary and "Y" or "N"),
-            ("ShowStandardWording",     self.standard_wording and "Y" or "N"),
-            ("displayBoard",            "_".join(self.boards)),
-            ("displayAudience",         "_".join(self.audiences)),
-            ("isPP",                    self.is_pp and "Y" or "N"),
-            ("isQC",                    self.is_qc and "Y" or "N"),
-            ("displayLOETermList",      self.loeref and "Y" or "N")]
-        if self.vendor_or_qc:
-            parms.append(("vendorOrQC", 'QC'))
-        self.logger.info("Filter.py(parms=%r)", parms)
-        return parms
+        """Pack up the parameters to be fed to the CDR filter module."""
 
-    def check_filter(self, spec):
-        """
-        Verify that the filter spec is a real filter document or set
-        on this tier's CDR server.
-        """
-        if spec.startswith("name:"):
-            name = spec[5:]
-            if name.upper() not in self.all_filters:
-                cdrcgi.bail("%s is not a filter on the CDR %s server" %
-                            (repr(name), self.TIER.name))
-        elif spec.startswith("set:"):
-            name = spec[4:]
-            if name.upper() not in self.filter_sets:
-                cdrcgi.bail("%s is not a filter set on the CDR %s server" %
-                            (repr(name), self.TIER.name))
-        else:
-            digits = spec
-            if spec.upper().startswith("CDR"):
-                digits = spec[3:]
-            if not digits or not digits.isdigit():
-                cdrcgi.bail("%s is not a well-formed CDR ID" % repr(spec))
-            try:
-                cdr_id = cdr.normalize(spec)
-                if cdr_id not in self.all_filter_ids:
-                    cdrcgi.bail("%s is not a filter on the CDR %s server" %
-                                (cdr_id, self.TIER.name))
-            except Exception as e:
-                cdrcgi.bail("%s is not a well-formed CDR ID" % repr(spec))
+        if not hasattr(self, "_parms"):
+            self._parms = dict(
+                insRevLevels="_".join(self.markup_levels),
+                delRevLevels="N" if self.redline_strikeout else "Y",
+                DisplayComments=self.comments,
+                DisplayGlossaryTermList="Y" if self.glossary else "N",
+                ShowStandardWording="Y" if self.standard_wording else "N",
+                displayBoard="_".join(self.boards),
+                displayAudience="_".join(self.audiences),
+                isPP="Y" if self.is_pp else "N",
+                isQC="Y" if self.is_qc else "N",
+                displayLOETermList="Y" if self.loeref else "N",
+            )
+            if self.vendor_or_qc:
+                self._parms["vendorOrQC"] = "QC"
+            self.logger.info("Filter.py(parms=%r)", self._parms)
+        return self._parms
 
-    @staticmethod
-    def set_wanted(filter_set, filter_ids):
-        """
-        Determine whether we want to show this filter set.  If any filters
-        are explicitly listed in the filter data entry fields, then we
-        only want to show those filters which contain *all* of the filters
-        so listed. Otherwise, show all the sets.
+    @property
+    def redline_strikeout(self):
+        """Default is True, but turned off for a bold/underline report."""
+        return self.fields.getvalue("rsmarkup") != "false"
+
+    @property
+    def standard_wording(self):
+        """True if standard wording print options are requested."""
+        return self.fields.getvalue("stdword") == "true"
+
+    @property
+    def subtitle(self):
+        """What we display under the main banner."""
+
+        cdr_id = f"{self.doc.doctype} Document {self.doc.cdr_id}"
+        if self.filter_set_table:
+            return f"QC Filter Sets for CDR XSL/T Filtering of {cdr_id}"
+        return f"Validation Results for Filtered {cdr_id}"
+
+    @property
+    def table(self):
+        """Pick the table requested for this report."""
+        return self.validation_table or self.filter_set_table or None
+
+    @property
+    def text_type(self):
+        """String to let the browser know what type of text we're returning."""
+        return "xml" if "<?xml" in self.filtered_xml else "html"
+
+    @property
+    def validation_table(self):
+        """Assemble the table showing the validation results."""
+
+        if not hasattr(self, "_validation_table"):
+            if self.fields.getvalue("validate") == "Y":
+                self.dtd.validate(self.filter_result.result_tree)
+                errors = self.dtd.error_log.filter_from_errors()
+                rows = []
+                for message in self.filter_result.messages:
+                    rows.append(("Warning", self.doc.cdr_id, "N/A", message))
+                for error in errors:
+                    rows.append([
+                        error.level_name,
+                        self.doc.cdr_id,
+                        error.line,
+                        error.message,
+                    ])
+                columns = "Type", "Document", "Line", "Message"
+                if not rows:
+                    columns = ["Document is valid"]
+                opts = dict(columns=columns)
+                self._validation_table = self.Reporter.Table(rows, **opts)
+            else:
+                self._validation_table = None
+        return self._validation_table
+
+    @property
+    def vendor_or_qc(self):
+        """Are we filtering for export or for QC review?"""
+
+        if not hasattr(self, "_vendor_or_qc"):
+            if self.fields.getvalue("QC") == "true":
+                self._vendor_or_qc = "QC"
+            else:
+                self._vendor_or_qc = self.fields.getvalue("vendorOrQC", "")
+        return self._vendor_or_qc
+
+
+class FilterSpec:
+    """Identification of a filter or a set of filters."""
+
+    def __init__(self, control, identifier):
+        """Remember the caller's values.
+
+        Pass:
+            control - access to the report's options and report-creation tools
+            identifier - string identifying the filter or filter set
         """
 
-        if not filter_ids:
+        self.__control = control
+        self.__identifier = identifier
+
+    @property
+    def control(self):
+        """Access to the report's options and report-creation tools."""
+        return self.__control
+
+    @property
+    def error(self):
+        """Optional string explaining why this filter spec is unusable."""
+
+        if not hasattr(self, "_error"):
+            self._error = None
+            if self.set_name:
+                if self.set_name.upper() not in self.control.all_filter_sets:
+                    args = self.set_name, self.control.tier
+                    message = "{} not found on the CDR {} server"
+                    self._error = message.format(*args)
+            elif self.filter_name:
+                if self.filter_name.upper() not in self.control.all_filters:
+                    args = self.filter_name, self.control.tier
+                    message = "{} is not a filter on the CDR {} server"
+                    self._error = message.format(*args)
+            elif self.filter_id not in self.control.all_filter_ids:
+                args = self.identifier, self.control.tier
+                message = "{} is not a filter on the CDR {} server"
+                self._error = message.format(*args)
+        return self._error
+
+    @property
+    def filter_id(self):
+        """Integer for the ID of a CDR Filter document."""
+
+        if not hasattr(self, "_filter_id"):
+            self._filter_id = None
+            if self.filter_name:
+                key = self.filter_name.upper()
+                self._filter_id = self.control.all_filters[key]
+            elif not self.set_name:
+                try:
+                    self._filter_id = Doc.extract_id(self.identifier)
+                except Exception:
+                    id = self.identifier
+                    self.control.bail(f"{id!r} is not a well-formed CDR ID")
+        return self._filter_id
+
+    @property
+    def filter_name(self):
+        """String for the name of a CDR filter."""
+
+        if not hasattr(self, "_filter_name"):
+            self._filter_name = None
+            if self.identifier.startswith("name:"):
+                self._filter_name = self.identifier[5:]
+        return self._filter_name
+
+    @property
+    def identifier(self):
+        """String identifying the filter or filter set."""
+        return self.__identifier
+
+    @property
+    def set_name(self):
+        """String for the name of a CDR filter set."""
+
+        if not hasattr(self, "_set_name"):
+            self._set_name = None
+            if self.identifier.startswith("set:"):
+                self._set_name = self.identifier[4:]
+        return self._set_name
+
+
+class ResolvedFilterSet:
+    """Filter set with members in a single sequence.
+
+    Members of nested sets have been hoisted up into a single list.
+    Used for the QC Filter Sets option of the report.
+    """
+
+    def __init__(self, control, filter_set):
+        """Remember the caller's values.
+
+        Pass:
+            control - access to the report's options
+            filter_set - `cdr.FilterSet` object
+        """
+
+        self.__control = control
+        self.__set = filter_set
+
+    @property
+    def filter_ids(self):
+        """Sequence of filter ID integers for this set."""
+
+        if not hasattr(self, "_filter_ids"):
+            members = self.__set.members
+            self._filter_ids = [Doc.extract_id(m.id) for m in members]
+        return self._filter_ids
+
+    @property
+    def in_scope(self):
+        """True if this set should be included on the report.
+
+        If any filters are specified directly by the user, then we
+        only want to include sets which contain *all* of those filters.
+        Otherwise, we include all sets in the system.
+        """
+
+        user_ids = self.__control.filter_ids
+        if not user_ids:
             return True
-        ids_in_set = set([cdr.exNormalize(m.id)[1]
-                           for m in filter_set.members])
-        if filter_ids - ids_in_set:
-            return False
-        return True
+        return False if set(user_ids) - set(self.filter_ids) else True
 
-    @staticmethod
-    def show_cache_warning(table, page):
-        "If we're unable to refresh the filter set cache, let the user know."
-        warning = table.user_data()
-        if warning:
-            page.add(page.B.P(warning, page.B.CLASS("error center")))
+    @property
+    def row(self):
+        """Sequence of cell values for the report's table row for this set."""
 
-class ActionCell(cdrcgi.Report.Cell):
-    "Populate a cell in the table with two buttons linked to filter tasks."
-    def __init__(self, script, args):
-        cdrcgi.Report.Cell.__init__(self, "")
-        self.script = script
-        self.args = args
-    def to_td(self):
-        return cdrcgi.Page.B.TD(self.make_button(), self.make_button(True))
-    def make_button(self, validate=False):
-        args = self.args
-        if validate:
-            label = "Validate"
-            args += "&validate=Y"
-        else:
-            label = "Filter"
-        url = "%s?%s" % (self.script, args)
-        return cdrcgi.Page.B.A(cdrcgi.Page.B.BUTTON(label), href=url)
-        return cdrcgi.Page.B.A(label, cdrcgi.Page.B.CLASS("button"), href=url)
-        return cdrcgi.Page.B.BUTTON(label, type="submit",
-                                    formaction=url)
+        control = self.__control
+        B = control.HTMLPage.B
+        params = {
+            DOCID: control.doc.cdr_id,
+            "DocVer": control.doc.version,
+            "filter": self.filter_ids,
+        }
+        if control.vendor_or_qc:
+            params["vendorOrQC"] = control.vendor_or_qc
+        filter_url = control.make_url(control.script, **params)
+        params["validate"] = "Y"
+        validate_url = control.make_url(control.script, **params)
+        buttons = B.SPAN(
+            B.A(B.BUTTON("Filter"), href=filter_url),
+            B.A(B.BUTTON("Validate"), href=validate_url),
+            B.CLASS("action-buttons"),
+        )
+        members = [f"{m.id}:{m.name}" for m in self.__set.members]
+        return self.__set.name, buttons, members
+
 
 if __name__ == "__main__":
-    """
-    Allow documentation and code-checking tools to import this without
-    side effects.
-    """
+    """Don't execute the script if loaded as a module."""
     Control().run()
