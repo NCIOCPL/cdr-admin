@@ -114,7 +114,7 @@ class Control(Controller):
         if not hasattr(self, "_doc"):
             id = self.fields.getvalue(DOCID)
             if not id:
-                self.bail("No Document", self.TITLE)
+                self.bail("No document selected")
             try:
                 id = Doc.extract_id(id)
             except Exception:
