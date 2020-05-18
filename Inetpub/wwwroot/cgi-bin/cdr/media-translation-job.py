@@ -191,12 +191,12 @@ jQuery("input[value='{self.SUBMIT}']").click(function(e) {{
             id = self.fields.getvalue("english_id")
             if id:
                 try:
-                    self._english_doc = Doc(self.session, id=id)
+                    doc = self._english_doc = Doc(self.session, id=id)
                 except Exception:
                     self.logger.exception("id %r", id)
                     self.bail("Invalid document ID")
-                if self._english_doc.doctype.name != "Media":
-                    self.bail(f"CDR{doc.id} is not a Media document")
+                if doc.doctype.name != "Media":
+                    self.bail(f"CDR{doc.id} is a {doc.doctype} document")
         return self._english_doc
 
     @property
@@ -410,7 +410,7 @@ class Job:
             doc = self.__control.english_doc
             title = doc.title.split(";")[0].strip()
             if len(title) > 40:
-                title = f"{self._subtitle[:40]} ..."
+                title = f"{title[:40]} ..."
             self._subtitle = f"Translation job for {doc.cdr_id} ({title})"
         return self._subtitle
 
