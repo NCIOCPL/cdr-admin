@@ -1,219 +1,20 @@
 #!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# "The Processing Status Report will display the documents (GTC and GTN)
-# that correspond with the Processing Status selected by the user."
-#
-# Sheri says we are only to use the first processing status we find.
-#
-# BZIssue::4705
-# BZIssue::4777
-# JIRA::OCECDR-3800
-#----------------------------------------------------------------------
-import cdr
-import cdrcgi
-from cdrapi import db
-import cgi
-from lxml import etree
-from html import escape as html_escape
+"""Show glossary documents (concept and name) for a given processing status.
+"""
 
-#----------------------------------------------------------------------
-# Collect the CGI field data.
-#----------------------------------------------------------------------
-fields   = cgi.FieldStorage()
-session  = cdrcgi.getSession(fields)
-status   = fields.getvalue("status")
-show_all = fields.getvalue("all") == "yes"
-language = fields.getvalue("language")
-audience = fields.getvalue("audience")
-session  = cdrcgi.getSession(fields)
-request  = cdrcgi.getRequest(fields)
-title    = "Glossary Processing Status Report"
-script   = "GlossaryProcessingStatusReport.py"
-SUBMENU  = "Report Menu"
-buttons  = ("Submit Request", SUBMENU, cdrcgi.MAINMENU, "Log Out")
+from cdrcgi import Controller
+from cdrapi.docs import Doc, Doctype
 
-#----------------------------------------------------------------------
-# Make sure we're logged in.
-#----------------------------------------------------------------------
-if not session: cdrcgi.bail('Unknown or expired CDR session.')
 
-#----------------------------------------------------------------------
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if request == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif request == SUBMENU:
-    cdrcgi.navigateTo("Reports.py", session)
-if request == "Log Out":
-    cdrcgi.logout(session)
+class Control(Controller):
 
-#----------------------------------------------------------------------
-# Collect the list of status values.
-#----------------------------------------------------------------------
-def get_status_values():
-    values = set()
-    for name in ('GlossaryTermName', 'GlossaryTermConcept'):
-        doc_type = cdr.getDoctype('guest', name)
-        valid_vals = dict(doc_type.vvLists)
-        vv_list = valid_vals['ProcessingStatusValue']
-        values |= set(vv_list)
-    return values
-
-#----------------------------------------------------------------------
-# Extract text recursively from etree element.
-#----------------------------------------------------------------------
-def getText(e, pieces = None):
-    if pieces is None:
-        pieces = []
-        top = True
-    else:
-        top = False
-    if e.text is not None:
-        pieces.append(e.text)
-    for child in e:
-        getText(child, pieces)
-    if e.tail is not None:
-        pieces.append(e.tail)
-    if top:
-        return "".join(pieces)
-
-#----------------------------------------------------------------------
-# For Spanish names we need to know whether they're alternate names.
-#----------------------------------------------------------------------
-class SpanishName:
-    def __init__(self, node):
-        self.string = ""
-        self.alternate = node.get('NameType') == 'alternate'
-        for s in node.findall('TermNameString'):
-            self.string = getText(s)
-    def __str__(self):
-        # Can't call html_escape() if string = None
-        if self.string:
-            name = html_escape(self.string)
-        else:
-            name = ""
-        if self.alternate:
-            return "<span class='alt'>%s</span>" % name
-        return name
-
-#----------------------------------------------------------------------
-# Object representing a glossary term name.
-#----------------------------------------------------------------------
-class Name:
-    def __init__(self, docId, cursor, conceptId = None):
-        self.docId = docId
-        self.string = "[NO NAME]"
-        self.spanish = []
-        self.status = ""
-        self.comment = ""
-        self.conceptId = conceptId
-        cursor.execute("SELECT xml FROM document WHERE id = ?", docId)
-        docXml = cursor.fetchall()[0][0]
-        tree = etree.XML(docXml.encode("utf-8"))
-        for n in tree.findall('TermName'):
-            for s in n.findall('TermNameString'):
-                self.string = getText(s)
-        for n in tree.findall('TranslatedName'):
-            self.spanish.append(SpanishName(n))
-        eName = language == 'en' and 'TermName' or 'TranslatedName'
-        for n in tree.findall(eName):
-            comments = n.findall('Comment')
-            if comments:
-                self.comment = Comment(comments[0])
-                break
-        for statuses in tree.findall('ProcessingStatuses'):
-            for status in statuses.findall('ProcessingStatus'):
-                for statusValue in status.findall('ProcessingStatusValue'):
-                    v = getText(statusValue)
-                    if v:
-                        self.status = v
-                if self.status:
-                    break
-        if self.conceptId is None:
-            cursor.execute("""\
-        SELECT DISTINCT int_val
-          FROM query_term
-         WHERE path = '/GlossaryTermName/GlossaryTermConcept/@cdr:ref'
-           AND doc_id = ?""", docId)
-            rows = cursor.fetchall()
-            self.conceptId = rows and rows[0][0] or ""
-    def __str__(self):
-        if 'spanish' not in status.lower():
-            return "%s (CDR%d)" % (html_escape(self.string), self.docId)
-        return "%s (CDR%d)" % ("; ".join(["%s" % n for n in self.spanish]),
-                                self.docId)
-
-#----------------------------------------------------------------------
-# Object representing a glossary term concept.
-#----------------------------------------------------------------------
-class Concept:
-    def __init__(self, docId, cursor = None):
-        self.docId = cursor and docId or ''
-        self.status = ""
-        self.names = {}
-        self.comment = ""
-        if self.docId:
-            cursor.execute("SELECT xml FROM document WHERE id = ?", docId)
-            row = cursor.fetchone()
-            if not row:
-                return
-            tree = etree.XML(row[0].encode("utf-8"))
-            eName = 'TermDefinition'
-            if language != 'en':
-                eName = 'TranslatedTermDefinition'
-            for d in tree.findall(eName):
-                for a in d.findall('Audience'):
-                    if a.text == audience:
-                        comments = d.findall('Comment')
-                        if comments:
-                            self.comment = Comment(comments[0])
-                            break
-            for statuses in tree.findall('ProcessingStatuses'):
-                for status in statuses.findall('ProcessingStatus'):
-                    for statusValue in status.findall('ProcessingStatusValue'):
-                        v = getText(statusValue)
-                        if v:
-                            self.status = v
-                    if self.status:
-                        break
-
-#----------------------------------------------------------------------
-# Object which records what we need to know for a comment.
-#----------------------------------------------------------------------
-class Comment:
-    def __init__(self, node):
-        self.text = getText(node)
-        self.audience = node.get('audience') or ''
-        self.date = node.get('date') or ''
-        self.user = node.get('user') or ''
-    def __str__(self):
-        text = self.text
-        if not text:
-            text = "[NO TEXT ENTERED FOR COMMENT]"
-        return "[audience=%s; date=%s; user=%s] %s" % (self.audience,
-                                                        self.date,
-                                                        html_escape(self.user),
-                                                        html_escape(text))
-
-#----------------------------------------------------------------------
-# Scrub the values to make sure they haven't been tampered with.
-#----------------------------------------------------------------------
-status_values = get_status_values()
-if status not in status_values:
-    status = None
-if language not in ("en", "es"):
-    language = None
-if audience not in ("Patient", "Health Professional"):
-    audience = None
-
-#----------------------------------------------------------------------
-# If we don't have a report request, show the request form.
-#----------------------------------------------------------------------
-if not status or not language or not audience:
-    page = cdrcgi.Page("CDR Reports", subtitle=title, action=script,
-                       buttons=buttons, session=session)
-    instructions = (
+    SUBTITLE = "Glossary Processing Status Report"
+    AUDIENCES = "Patient", "Health professional"
+    STATUS_PATH = "ProcessingStatuses/ProcessingStatus/ProcessingStatusValue"
+    CONCEPT_STATUS_PATH = f"/GlossaryTermConcept/{STATUS_PATH}"
+    NAME_STATUS_PATH = f"/GlossaryTermName/{STATUS_PATH}"
+    INSTRUCTIONS = (
         "All fields are required. The option to include linked glossary "
         "documents causes the report to include glossary term concept "
         "documents which do not have the selected status but are linked "
@@ -222,157 +23,440 @@ if not status or not language or not audience:
         "documents which do not have the selected status but whose concept "
         "document has that status."
     )
-    page.add(page.B.FIELDSET(page.B.P(instructions)))
-    page.add("<fieldset>")
-    page.add(page.B.LEGEND("Select Processing Status"))
-    page.add_select("status", "Status", sorted(status_values))
-    page.add("</fieldset>")
-    page.add("<fieldset>")
-    page.add(page.B.LEGEND("Include Linked Glossary Documents?"))
-    page.add_radio("all", "Show only documents with selected status", "no",
-                   checked=True)
-    page.add_radio("all",
-                   "Also show linked glossary documents with other statuses",
-                   "yes")
-    page.add("</fieldset>")
-    page.add("<fieldset>")
-    page.add(page.B.LEGEND("Language"))
-    page.add_radio("language", "English", "en", checked=True)
-    page.add_radio("language", "Spanish", "es")
-    page.add("</fieldset>")
-    page.add("<fieldset>")
-    page.add(page.B.LEGEND("Audience"))
-    page.add_radio("audience", "Patient", "Patient", checked=True)
-    page.add_radio("audience", "Health Professional", "Health Professional")
-    page.add("</fieldset>")
-    page.send()
+    INCLUDE_LINKED_OPTS = (
+        (
+            "no",
+            "Show only documents with selected status",
+            True,
+        ),
+        (
+            "yes",
+            "Also show linked glossary documents with other statuses",
+            False,
+        ),
+    )
+    COLUMNS = (
+        "CDR ID",
+        "Processing Status",
+        "Last Comment",
+        "Term Names",
+        "Processing Status",
+        "Last Comment",
+    )
 
-#----------------------------------------------------------------------
-# Collect all the concepts with matching processing statuses.
-#----------------------------------------------------------------------
-concepts = {}
-cursor = db.connect(user='CdrGuest').cursor()
-cursor.execute("""\
-    SELECT DISTINCT doc_id
-               FROM query_term
-              WHERE path = '/GlossaryTermConcept/ProcessingStatuses'
-                         + '/ProcessingStatus/ProcessingStatusValue'
-                AND value = ?""", status)
-for row in cursor.fetchall():
-    docId = row[0]
-    concept = Concept(docId, cursor)
-    if concept.status == status:
-        concepts[docId] = concept
+    def build_tables(self):
+        """Assemble the table for the report."""
+        return self.Reporter.Table(self.rows, columns=self.COLUMNS)
 
-#----------------------------------------------------------------------
-# Collect all the names with matching processing statuses.
-#----------------------------------------------------------------------
-cursor.execute("""\
-    SELECT DISTINCT doc_id
-               FROM query_term
-              WHERE path = '/GlossaryTermName/ProcessingStatuses'
-                         + '/ProcessingStatus/ProcessingStatusValue'
-                AND value = ?""", status)
-for row in cursor.fetchall():
-    docId = row[0]
-    name = Name(docId, cursor)
-    if name.status == status and name.conceptId:
-        concept = concepts.get(name.conceptId)
-        if concept is None:
-            concept = Concept(name.conceptId, show_all and cursor or None)
-            concepts[name.conceptId] = concept
-        concept.names[docId] = name
+    def populate_form(self, page):
+        """Add the fields to the request form for the report.
 
-#----------------------------------------------------------------------
-# Fill in any names with the wrong statuses if we're showing everything.
-#----------------------------------------------------------------------
-if show_all:
-    for conceptId in concepts:
-        if not conceptId:
-            continue
-        concept = concepts[conceptId]
-        cursor.execute("""\
-   SELECT DISTINCT doc_id
-              FROM query_term
-             WHERE path = '/GlossaryTermName/GlossaryTermConcept/@cdr:ref'
-               AND int_val = ?""", conceptId)
-        for row in cursor.fetchall():
-            nameId = row[0]
-            if nameId not in concept.names:
-                concept.names[nameId] = Name(nameId, cursor, conceptId)
+        Pass:
+            page - HTMLPage object where we put the fields
+        """
 
-#----------------------------------------------------------------------
-# Assemble the report.
-#----------------------------------------------------------------------
-html = ["""\
-<!DOCTYPE html>
-<html>
- <head>
-  <title>%s</title>
-  <style type='text/css'>
-   body { font-family: Arial, sans-serif; }
-   h1 { font-size: 14pt; color: maroon; font-family: Arial, sans-serif; }
-   h1 { text-align: center; }
-   th { color: blue; }
-   .alt { color: red; }
-   table { border-collapse: collapse; empty-cells: show; border-spacing: 0; }
-   th, td { border: black solid 1px; padding: 3px; }
-   body { font-family: "Times New Roman", serif; }
-   h1 { font-size: 16pt; }
-   th, td { font-size: 11pt; }
-  </style>
- </head>
- <body>
-  <h1>%s</h1>
-  <table>
-   <tr>
-    <th colspan='3'>Glossary Term Concept</th>
-    <th colspan='3'>Glossary Term Name</th>
-   </tr>
-   <tr>
-    <th>CDR ID</th>
-    <th>Processing Status</th>
-    <th>Last Comment</th>
-    <th>Term Names</th>
-    <th>Processing Status</th>
-    <th>Last Comment</th>
-   </tr>
-""" % (title, title)]
-for conceptId in sorted(concepts):
-    concept = concepts[conceptId]
-    nameIds = sorted(concept.names)
-    rowspan = len(nameIds) or 1
-    gtcId = gtcStatus = gtcComment = gtn = gtnStatus = gtnComment = ""
-    if show_all or concept.status == status:
-        gtcId = concept.docId
-        gtcStatus = concept.status or ""
-        gtcComment = concept.comment or ""
-    if nameIds:
-        gtn = concept.names[nameIds[0]]
-        gtnStatus = gtn.status
-        gtnComment = gtn.comment
-    html.append("""\
-   <tr>
-    <td valign='top' rowspan='%d'>%s</td>
-    <td valign='top' rowspan='%d'>%s</td>
-    <td valign='top' rowspan='%d'>%s</td>
-    <td valign='top'>%s</td>
-    <td valign='top'>%s</td>
-    <td valign='top'>%s</td>
-   </tr>
-""" % (rowspan, gtcId, rowspan, gtcStatus, rowspan, gtcComment,
-       gtn, gtnStatus, gtnComment))
-    for nameId in nameIds[1:]:
-        name = concept.names[nameId]
-        html.append("""\
-   <tr>
-    <td valign='top'>%s</td>
-    <td valign='top'>%s</td>
-    <td valign='top'>%s</td>
-   </tr>
-""" % (name, name.status, name.comment))
-html.append("""\
-  </table>
- </body>
-</html>""")
-cdrcgi.sendPage("".join(html))
+        fieldset = page.fieldset("Instructions")
+        fieldset.append(page.B.P(self.INSTRUCTIONS))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Select Processing Status")
+        fieldset.append(page.select("status", options=self.statuses))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Include Linked Glossary Documents?")
+        for value, label, checked in self.INCLUDE_LINKED_OPTS:
+            opts = dict(value=value, label=label, checked=checked)
+            fieldset.append(page.radio_button("all", **opts))
+        page.form.append(fieldset)
+        self.add_language_fieldset(page)
+        self.add_audience_fieldset(page)
+
+    def show_report(self):
+        """Override base class to add second header row and custom CSS."""
+
+        page = self.report.page
+        page.add_css(".alt { color: red; } th { height: 32px; ")
+        thead = page.body.find("table/thead")
+        tr = page.B.TR(
+            page.B.TH("Glossary Term Concept", colspan="3"),
+            page.B.TH("Glossary Term Name", colspan="3"),
+        )
+        thead.insert(0, tr)
+        self.report.send()
+
+    @property
+    def audience(self):
+        """Audience selected for the report."""
+
+        if not hasattr(self, "_audience"):
+            self._audience = self.fields.getvalue("audience", "Patient")
+            if self._audience not in self.AUDIENCES:
+                self.bail()
+        return self._audience
+
+    @property
+    def concepts(self):
+        """Dictionary of glossary concepts to be included on the report."""
+
+        if not hasattr(self, "_concepts"):
+            self._concepts = {}
+            query = self.Query("query_term", "doc_id AS id").unique()
+            query.where(f"path = '{self.CONCEPT_STATUS_PATH}'")
+            query.where(query.Condition("value", self.status))
+            for row in query.execute(self.cursor).fetchall():
+                concept = Concept(self, row.id)
+                if concept.status == self.status:
+                    self._concepts[row.id] = concept
+            query = self.Query("query_term", "doc_id AS id").unique()
+            query.where(f"path = '{self.NAME_STATUS_PATH}'")
+            query.where(query.Condition("value", self.status))
+            for row in query.execute(self.cursor).fetchall():
+                name = Name(self, row.id)
+                if name.status == self.status and name.concept_id:
+                    concept = self._concepts.get(name.concept_id)
+                    if concept is None:
+                        concept_id = name.concept_id if self.show_all else None
+                        concept = Concept(self, concept_id)
+                        self._concepts[name.concept_id] = concept
+                    concept.names[row.id] = name
+            if self.show_all:
+                query = self.Query("query_term", "doc_id AS id").unique()
+                query.where(f"path = '{Name.CONCEPT_PATH}'")
+                query.where(query.Condition("int_val", 0))
+                query = str(query)
+                for id in self._concepts:
+                    concept = self._concepts[id]
+                    if concept.doc:
+                        for row in self.cursor.execute(query, id).fetchall():
+                            if row.id not in concept.names:
+                                concept.names[row.id] = Name(self, row.id, id)
+        return self._concepts
+
+    @property
+    def language(self):
+        """Language selected for the report."""
+
+        if not hasattr(self, "_language"):
+            self._language = self.fields.getvalue("language", "English")
+            if self._language not in self.LANGUAGES:
+                self.bail()
+        return self._language
+
+    @property
+    def rows(self):
+        """Collect the table rows for the report."""
+
+        if not hasattr(self, "_rows"):
+            self._rows = []
+            for id in sorted(self.concepts):
+                self._rows += self.concepts[id].rows
+        return self._rows
+
+    @property
+    def show_all(self):
+        """True means include docs linked from terms with the status."""
+        return self.fields.getvalue("all") == "yes"
+
+    @property
+    def spanish_names(self):
+        """True if we should show Spanish term names instead of English."""
+
+        if not hasattr(self, "_spanish_names"):
+            self._spanish_names = "spanish" in self.status.lower()
+        return self._spanish_names
+
+    @property
+    def status(self):
+        """Processing status selected for the report."""
+
+        if not hasattr(self, "_status"):
+            self._status = self.fields.getvalue("status")
+            if self._status and self._status not in self.statuses:
+                self.bail()
+        return self._status
+
+    @property
+    def statuses(self):
+        """Valid values for the processing status picklist."""
+
+        if not hasattr(self, "_statuses"):
+            values = set()
+            for name in ("GlossaryTermName", "GlossaryTermConcept"):
+                doctype = Doctype(self.session, name=name)
+                values |= set(doctype.vv_lists["ProcessingStatusValue"])
+            self._statuses = sorted(values, key=str.lower)
+        return self._statuses
+
+
+class GlossaryTermDocument:
+    """Base class for Concepts and Names."""
+
+    STATUS_PATH = "ProcessingStatuses/ProcessingStatus/ProcessingStatusValue"
+
+    @property
+    def doc(self):
+        """`Doc` object for this CDR GlossaryConceptName document."""
+
+        if not hasattr(self, "_doc"):
+            self._doc = None
+            if self.id:
+                self._doc = Doc(self.control, id=self.id)
+        return self._doc
+
+    @property
+    def status(self):
+        """First processing status found for the document."""
+
+        if not hasattr(self, "_status"):
+            self._status = None
+            if self.doc:
+                for node in self.doc.root.findall(self.STATUS_PATH):
+                    status = Doc.get_text(node, "").strip()
+                    if status:
+                        self._status = status
+                        return status
+        return self._status
+
+
+class Concept(GlossaryTermDocument):
+    """Glossary term concept document included on the report."""
+
+    def __init__(self, control, id):
+        """Remember the caller's values.
+
+        Pass:
+            control - access to the database and report-creation tools
+            id - integer for the concept document (None if the concept
+                 doesn't have the selected status but at least one of
+                 its linked names does)
+        """
+
+        self.__control = control
+        self.__id = id
+
+    @property
+    def comment(self):
+        """Comment for the definition for the selected language/audience."""
+
+        if not hasattr(self, "_comment"):
+            self._comment = None
+            if self.doc:
+                control = self.__control
+                tag = "TermDefinition"
+                if control.language != "English":
+                    tag = "TranslatedTermDefinition"
+                for definition in self.doc.root.findall(tag):
+                    audience = Doc.get_text(definition.find("Audience"))
+                    if audience == control.audience:
+                        comment_node = definition.find("Comment")
+                        if comment_node is not None:
+                            self._comment = Comment(comment_node)
+                            return self._comment
+        return self._comment
+
+    @property
+    def control(self):
+        """Access to the report's options and report-building tools."""
+        return self.__control
+
+    @property
+    def id(self):
+        """Integer for this document's CDR ID."""
+        return self.__id
+
+    @property
+    def names(self):
+        """Dictionary of linked glossary name documents.
+
+        Populated by the controller.
+        """
+
+        if not hasattr(self, "_names"):
+            self._names = {}
+        return self._names
+
+    @property
+    def rows(self):
+        """Assemble this concept's rows for the report."""
+
+        if not hasattr(self, "_rows"):
+            names = [self.names[id] for id in sorted(self.names)]
+            rowspan = max(len(names), 1)
+            Cell = self.__control.Reporter.Cell
+            self._rows = [(
+                Cell(self.doc.id if self.doc else None, rowspan=rowspan),
+                Cell(self.status, rowspan=rowspan),
+                Cell(self.comment, rowspan=rowspan),
+                names[0].names if names else None,
+                names[0].status if names else None,
+                names[0].comment if names else None,
+            )]
+            for name in names[1:]:
+                self._rows.append((
+                    name.names,
+                    name.status,
+                    name.comment,
+                ))
+        return self._rows
+
+
+class Name(GlossaryTermDocument):
+    """GlossaryTermName document to be included on the report."""
+
+    CONCEPT_PATH = "/GlossaryTermName/GlossaryTermConcept/@cdr:ref"
+
+    def __init__(self, control, name_id, concept_id=None):
+        """Remember the caller's values.
+
+        Pass:
+            control - access to the report options and report-building tools
+            id - integer for this document's unique CDR ID
+            concept_id - optional integer for the concept document
+        """
+
+        self.__control = control
+        self.__name_id = name_id
+        self.__concept_id = concept_id
+
+    @property
+    def comment(self):
+        """First comment found for the report's selected language."""
+
+        if not hasattr(self, "_comment"):
+            self._comment = None
+            path = "TermName/Comment"
+            if self.control.language != "English":
+                path = "TranslatedName/Comment"
+            node = self.doc.root.find(path)
+            if node is not None:
+                self._comment = Comment(node)
+        return self._comment
+
+    @property
+    def concept_id(self):
+        """Integer for the linked GlossaryTermConcept document.
+
+        If the call the the constructor already gave us this value,
+        use it. Otherwise find it using the query_term table.
+        """
+
+        if not hasattr(self, "_concept_id"):
+            self._concept_id = self.__concept_id
+            if self._concept_id is None:
+                query = self.control.Query("query_term", "int_val")
+                query.where(f"path = '{self.CONCEPT_PATH}'")
+                query.where(query.Condition("doc_id", self.doc.id))
+                rows = query.execute(self.control.cursor).fetchall()
+                if rows:
+                    self._concept_id = rows[0].int_val
+        return self._concept_id
+
+    @property
+    def control(self):
+        """Access to the report's options and report-building tools."""
+        return self.__control
+
+    @property
+    def id(self):
+        """Integer for this document's CDR ID."""
+        return self.__name_id
+
+    @property
+    def names(self):
+        """Show the appropriate names for the document."""
+
+        if not hasattr(self, "_names"):
+            if self.control.spanish_names and self.spanish_names:
+                B = self.control.HTMLPage.B
+                self._names = B.SPAN(self.spanish_names[0].span)
+                for name in self.spanish_names[1:]:
+                    self._names.append(B.SPAN("; "))
+                    self._names.append(name.span)
+                self._names.append(B.SPAN(f" (CDR{self.doc.id})"))
+            else:
+                self._names = f"{self.english_name} (CDR{self.doc.id})"
+        return self._names
+
+    @property
+    def english_name(self):
+        """String for the only English name in this document."""
+
+        if not hasattr(self, "_english_name"):
+            self._english_name = "[NO NAME]"
+            for node in self.doc.root.findall("TermName/TermNameString"):
+                self._english_name = Doc.get_text(node, "[NO NAME]")
+        return self._english_name
+
+    @property
+    def spanish_names(self):
+        """At most one primary and other optional alternate Spanish names."""
+
+        if not hasattr(self, "_spanish_names"):
+            self._spanish_names = []
+            for node in self.doc.root.findall("TranslatedName"):
+                spanish_name = SpanishNameString(self.control, node)
+                self._spanish_names.append(spanish_name)
+        return self._spanish_names
+
+
+class SpanishNameString:
+    """Special handling for Spanish names, to identify the alternates."""
+
+    def __init__(self, control, node):
+        """Save the caller's values.
+
+        Pass:
+            control - access to report-building tools
+            node - wrapper for the name string
+        """
+
+        self.__control = control
+        self.__node = node
+
+    @property
+    def span(self):
+        """HTML span element wrapping the display of this Spanish name."""
+
+        if not hasattr(self, "_span"):
+            text = Doc.get_text(self.__node.find("TermNameString"), "")
+            self._span = self.__control.HTMLPage.B.SPAN(text)
+            if self.__node.get("NameType") == "alternate":
+                self._span.set("class", "alt")
+        return self._span
+
+
+class Comment:
+    """Object which knows how to serialize a comment for the report."""
+
+    NO_TEXT = "[NO TEXT ENTERED FOR COMMENT]"
+
+    def __init__(self, node):
+        """Remember the node which holds the comment information."""
+        self.__node = node
+
+    def __str__(self):
+        """Roll up the information about the comment into one string."""
+        return f"[{self.audience}; {self.date}; {self.user}] {self.text}"
+
+    @property
+    def audience(self):
+        """Serialization of the audience for the comment."""
+        return f"audience={self.__node.get('audience', '')}"
+
+    @property
+    def date(self):
+        """Serialization of the date for the comment."""
+        return f"date={self.__node.get('date', '')}"
+
+    @property
+    def text(self):
+        """String carrying the payload for the comment."""
+        return Doc.get_text(self.__node) or self.NO_TEXT
+
+    @property
+    def user(self):
+        """Serialization of the user who entered the comment."""
+        return f"user={self.__node.get('user', '')}"
+
+
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+    Control().run()
