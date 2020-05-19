@@ -94,20 +94,24 @@ class Control(Controller):
 
         if self.job and not self.job.new:
             page.add_script(f"""\
-jQuery("input[value='{self.DELETE}']").click(function(e) {{
+jQuery(function() {{
+  jQuery("input[value='{self.DELETE}']").click(function(e) {{
     if (confirm("Are you sure?"))
-        return true;
+      return true;
     e.preventDefault();
+  }});
 }});""")
         else:
             page.add_script(f"""\
 var submitted = false;
-jQuery("input[value='{self.SUBMIT}']").click(function(e) {{
+jQuery(function() {{
+  jQuery("input[value='{self.SUBMIT}']").click(function(e) {{
     if (!submitted) {{
-        submitted = true;
-        return true;
+      submitted = true;
+      return true;
     }}
     e.preventDefault();
+  }});
 }});""")
         action = "Edit" if self.job and not self.job.new else "Create"
         legend = f"{action} Translation Job"
@@ -270,7 +274,7 @@ jQuery("input[value='{self.SUBMIT}']").click(function(e) {{
 
         if not hasattr(self, "_translators"):
             translators = self.load_group("Spanish Media Translators")
-            if self.assigned_to and self.assigned_to not in translators:
+            if self.assigned_to and self.assigned_to not in translators.map:
                 translators = translators.map
                 translators[self.assigned_to] = self.users[self.assigned_to]
                 key = lambda pair: pair[1].lower()

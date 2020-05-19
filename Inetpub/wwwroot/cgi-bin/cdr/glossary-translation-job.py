@@ -1,18 +1,15 @@
 #!/usr/bin/env python
 
-"""
-Interface for creating/editing a glossary translation job
+"""Interface for creating/editing a glossary translation job.
 
 JIRA::OCECDR-4489
 """
 
-import operator
-import cdr
-import cdrcgi
-from cdrapi import db
+from cdrcgi import Controller
+from cdrapi.docs import Doc
 
 
-class Control(cdrcgi.Control):
+class Control(Controller):
     """
     Logic for displaying an editing form for creating new translation
     jobs as well as modifying existing jobs.
@@ -25,92 +22,27 @@ class Control(cdrcgi.Control):
     MEDIA = "Media"
     REPORTS_MENU = SUBMENU = "Reports"
     ADMINMENU = "Admin"
-
-    def __init__(self):
-        """
-        Collect and validate the request parameters
-        """
-
-        cdrcgi.Control.__init__(self, "Translation Job")
-        self.conn = db.connect()
-        self.cursor = self.conn.cursor()
-        if not self.session:
-            cdrcgi.bail("not authorized")
-        if not cdr.canDo(self.session, "MANAGE TRANSLATION QUEUE"):
-            cdrcgi.bail("not authorized")
-        self.states = self.load_values("glossary_translation_state")
-        self.users = self.load_users()
-        self.translators = self.load_group("Spanish Glossary Translators")
-        self.lead_translators = self.load_group("Spanish Translation Leads")
-        self.state_id = self.get_id("state", self.states.map)
-        self.assigned_to = self.get_id("assigned_to", self.users)
-        self.comments = self.fields.getvalue("comments") or None
-        self.job = Job(self) if self.doc_id else None
-
-    @property
-    def doc_id(self):
-        if not hasattr(self, "_doc_id"):
-            self._doc_id = self.get_id("doc_id")
-        return self._doc_id
-
-    @property
-    def doc_type(self):
-        if not hasattr(self, "_doc_type"):
-            if self.doc_id:
-                query = db.Query("doc_type t", "t.name")
-                query.join("document d", "d.doc_type = t.id")
-                query.where(query.Condition("d.id", self.doc_id))
-                row = query.execute(self.cursor).fetchone()
-                self._doc_type = row.name if row else None
-            else:
-                self._doc_type = None
-        return self._doc_type
-
-    @property
-    def doc_title(self):
-        if not hasattr(self, "_doc_title"):
-            if not self.doc_type:
-                self._doc_title = None
-            else:
-                if self.doc_type.lower() == "glossarytermname":
-                    query = db.Query("document", "title")
-                    query.where(query.Condition("id", self.doc_id))
-                    row = query.execute(self.cursor).fetchone()
-                    if not row:
-                        cdrcgi.bail("No title for CDR{:d}".format(self.doc_id))
-                    self._doc_title = row.title.split(";")[0]
-                else:
-                    path = "/GlossaryTermName/GlossaryTermConcept/@cdr:ref"
-                    query = db.Query("document d", "d.title").limit(1)
-                    query.join("query_term q", "q.doc_id = d.id")
-                    query.where(query.Condition("q.path", path))
-                    query.where(query.Condition("q.int_val", self.doc_id))
-                    query.where("d.active_status = 'A'")
-                    query.order("d.title")
-                    row = query.execute(self.cursor).fetchone()
-                    if row:
-                        title = row.title.split(";")[0]
-                        pattern = "Concept document for {}"
-                        self._doc_title = pattern.format(title)
-                    else:
-                        pattern = "Concept document CDR{:d}"
-                        self._doc_title = pattern.format(self.doc_id)
-        return self._doc_title
+    SUBTITLE = "Glossary Translation Job"
+    ACTION = "MANAGE TRANSLATION QUEUE"
+    INSERT = "INSERT INTO {} ({}) VALUES ({})"
+    UPDATE = "UPDATE {} SET {} WHERE {} = ?"
 
     def run(self):
         """
         Override the base class method to handle additional buttons.
         """
 
+        if not self.session or not self.session.can_do(self.ACTION):
+            self.bail("not authorized")
         if self.request == self.JOBS:
-            cdrcgi.navigateTo("glossary-translation-jobs.py", self.session)
+            self.redirect("glossary-translation-jobs.py")
         elif self.request == self.DELETE:
             self.delete_job()
         elif self.request == self.MEDIA:
-            cdrcgi.navigateTo("media-translation-jobs.py", self.session)
+            self.redirect("media-translation-jobs.py")
         elif self.request == self.SUMMARY:
-            cdrcgi.navigateTo("translation-jobs.py", self.session)
-        cdrcgi.Control.run(self)
+            self.redirect("translation-jobs.py")
+        Controller.run(self)
 
     def show_report(self):
         """
@@ -119,104 +51,88 @@ class Control(cdrcgi.Control):
         table.
         """
 
-        if self.have_required_values():
-            if self.job.changed():
+        if self.have_required_values:
+            if self.job.changed:
                 params = [getattr(self, name) for name in Job.FIELDS]
                 params.append(self.started)
                 params.append(getattr(self, Job.KEY))
                 self.logger.info("storing translation job state %s", params)
                 placeholders = ", ".join(["?"] * len(params))
                 cols = ", ".join(Job.FIELDS + ("state_date", Job.KEY))
-                args = (Job.HISTORY, cols, placeholders)
-                query = "INSERT INTO {} ({}) VALUES ({})".format(*args)
-                self.cursor.execute(query, params)
+                strings = Job.HISTORY, cols, placeholders
+                self.cursor.execute(self.INSERT.format(*strings), params)
                 if self.job.new:
                     strings = Job.TABLE, cols, placeholders
-                    query = "INSERT INTO {} ({}) VALUES ({})".format(*strings)
+                    query = self.INSERT.format(*strings)
                 else:
-                    cols = [("{} = ?".format(name)) for name in Job.FIELDS]
+                    cols = [f"{name} = ?" for name in Job.FIELDS]
                     cols.append("state_date = ?")
-                    strings = (Job.TABLE, ", ".join(cols), Job.KEY)
-                    query = "UPDATE {} SET {} WHERE {} = ?".format(*strings)
+                    strings = Job.TABLE, ", ".join(cols), Job.KEY
+                    query = self.UPDATE.format(*strings)
                 try:
                     self.cursor.execute(query, params)
                     self.conn.commit()
                 except Exception as e:
                     if "duplicate key" in str(e).lower():
                         self.logger.error("duplicate translation job ID")
-                        cdrcgi.bail("attempt to create duplicate job")
+                        self.bail("attempt to create duplicate job")
                     else:
-                        self.logger.error("database failure: %s", e.message)
-                        cdrcgi.bail("database failure: {}".format(e.message))
+                        self.logger.error("database failure: %s", e)
+                        self.bail(f"database failure: {e}")
                 self.logger.info("translation job state stored successfully")
-            cdrcgi.navigateTo("glossary-translation-jobs.py", self.session)
+            self.redirect("glossary-translation-jobs.py")
         else:
             self.show_form()
 
-    def set_form_options(self, opts):
+    def populate_form(self, page):
         """
-        Add some extra buttons
-        """
+        Show the form for editing/creating a transation job.
 
-        opts["buttons"].insert(-3, self.JOBS)
-        if self.job:
-            if not self.job.new:
-                opts["buttons"].insert(-3, self.DELETE)
-            opts["banner"] = self.job.banner
-        opts["buttons"].insert(-3, self.SUMMARY)
-        opts["buttons"].insert(-3, self.MEDIA)
-        return opts
-
-    def populate_form(self, form):
-        """
-        Add the fields to the job form
+        Pass:
+            page - object used to collect the form fields
         """
 
         if self.job and not self.job.new:
-            form.add_script("""\
-jQuery("input[value='{}']").click(function(e) {{
+            page.add_script(f"""\
+jQuery(function() {{
+  jQuery("input[value='{self.DELETE}']").click(function(e) {{
     if (confirm("Are you sure?"))
-        return true;
+      return true;
     e.preventDefault();
-}});""".format(self.DELETE))
+  }});
+}});""")
         else:
-            form.add_script("""\
+            page.add_script(f"""\
 var submitted = false;
-jQuery("input[value='{}']").click(function(e) {{
+jQuery(function() {{
+  jQuery("input[value='{self.SUBMIT}']").click(function(e) {{
     if (!submitted) {{
-        submitted = true;
-        return true;
+      submitted = true;
+      return true;
     }}
     e.preventDefault();
-}});""".format(self.SUBMIT))
+  }});
+}});""")
         action = "Edit" if self.job and not self.job.new else "Create"
-        legend = "{} Translation Job".format(action)
+        legend = f"{action} Translation Job"
+        fieldset = page.fieldset(legend)
         if self.doc_id:
-            legend = "{} for CDR{}".format(legend, self.doc_id)
-            form.add_hidden_field("doc_id", self.doc_id)
-        form.add("<fieldset>")
-        form.add(form.B.LEGEND(legend))
-        user = self.job.assigned_to if self.job else None
-        users = self.translators
-        if user:
-            if user not in users:
-                users[user] = self.users[user]
-        elif self.lead_translators:
-            user = self.sort_dict(self.lead_translators)[0][0]
-        users = self.sort_dict(users)
+            page.form.append(page.hidden_field("doc_id", self.doc_id))
+        else:
+            fieldset.append(page.text_field("doc_id", label="Doc ID"))
+        user = self.job.assigned_to if self.job else self.lead_translator
+        opts = dict(options=self.translators, default=user)
+        fieldset.append(page.select("assigned_to", **opts))
         states = self.states.values
         state_id = self.job.state_id if self.job else None
         if not state_id:
             state_id = states[0][0]
+        opts = dict(options=states, default=state_id, label="Status")
+        fieldset.append(page.select("state", **opts))
         comments = self.job.comments if self.job else None
-        comments = comments or ""
-        comments = comments.replace("\r", "").replace("\n", cdrcgi.NEWLINE)
-        if not self.doc_id:
-            form.add_text_field("doc_id", "Doc ID")
-        form.add_select("assigned_to", "Assigned To", users, user)
-        form.add_select("state", "Status", states, state_id)
-        form.add_textarea_field("comments", "Comments", value=comments)
-        form.add("</fieldset>")
+        comments = (comments or "").replace("\r", "")
+        fieldset.append(page.textarea("comments", value=comments))
+        page.form.append(fieldset)
 
     def delete_job(self):
         """
@@ -224,80 +140,105 @@ jQuery("input[value='{}']").click(function(e) {{
         the user).
         """
 
-        query = "DELETE FROM {} WHERE doc_id = ?".format(Job.TABLE)
+        query = f"DELETE FROM {Job.TABLE} WHERE doc_id = ?"
         self.cursor.execute(query, self.doc_id)
         self.conn.commit()
         self.logger.info("removed translation job for CDR%d", self.doc_id)
-        cdrcgi.navigateTo("glossary-translation-jobs.py", self.session)
+        self.redirect("glossary-translation-jobs.py")
 
-    def load_values(self, table_name):
-        """
-        Factor out logic for collecting a valid values set.
+    @property
+    def assigned_to(self):
+        """Integer for the account ID of the user who is assigned this task."""
 
-        This works because our tables for valid values both
-        have the same structure.
+        if not hasattr(self, "_assigned_to"):
+            self._assigned_to = self.fields.getvalue("assigned_to")
+            if self._assigned_to:
+                if not self._assigned_to.isdigit():
+                    self.bail()
+                self._assigned_to = int(self._assigned_to)
+                if self._assigned_to not in self.users:
+                    self.bail()
+        return self._assigned_to
 
-        Returns a populated Values object.
-        """
+    @property
+    def buttons(self):
+        """Customize the action buttons."""
 
-        query = db.Query(table_name, "value_id", "value_name")
-        rows = query.order("value_pos").execute(self.cursor).fetchall()
-        class Values:
-            def __init__(self, rows):
-                self.map = {}
-                self.values = []
-                for value_id, value_name in rows:
-                    self.map[value_id] = value_name
-                    self.values.append((value_id, value_name))
-        return Values(rows)
+        if not hasattr(self, "_buttons"):
+            self._buttons = [self.SUBMIT, self.JOBS]
+            if self.job and not self.job.new:
+                self._buttons.append(self.DELETE)
+            self._buttons.append(self.SUMMARY)
+            self._buttons.append(self.MEDIA)
+            self._buttons.append(self.SUBMENU)
+            self._buttons.append(self.ADMINMENU)
+            self._buttons.append(self.LOG_OUT)
+        return self._buttons
 
-    def get_id(self, name, valid_values=None):
-        """
-        Fetch and validate a parameter for a primary key in one
-        of the valid values tables.
+    @property
+    def comments(self):
+        """Notes on the translation job."""
 
-        Pass:
-            name - name of the CGI parameter
-            valid_values - dictionary of valid values indexed by primary keys
-                           if None, verify that the value (if present)
-                           is the CDR ID for a Glossary document
+        if not hasattr(self, "_comments"):
+            self._comments = None
+            comments = self.fields.getvalue("comments", "").strip()
+            if comments:
+                self._comments = comments.replace("\r", "")
+        return self._comments
 
-        Return:
-            integer for a valid value primary key if parameter is present
-            otherwise None
+    @property
+    def doc(self):
+        """`Doc` object for the glossary document being translated."""
 
-        Script exits with an error message if the parameters have been
-        tampered with by a hacker.
-        """
+        if not hasattr(self, "_doc"):
+            self._doc = None
+            id = self.fields.getvalue("doc_id")
+            if id:
+                try:
+                    doc = self._doc = Doc(self.session, id=id)
+                except Exception:
+                    self.logger.exception("id %r", id)
+                    self.bail("Invalid document ID")
+                if not doc.doctype.name.lower().startswith("glossary"):
+                    self.bail(f"CDR{doc.id} is a {doc.doctype} document")
+        return self._doc
 
-        value = self.fields.getvalue(name)
-        if not value:
-            return None
-        if valid_values:
-            try:
-                int_id = int(value)
-            except:
-                cdrcgi.bail("invalid {} ({!r})".format(name, value))
-            if int_id not in valid_values:
-                cdrcgi.bail("invalid {} ({!r})".format(name, value))
-        else:
-            try:
-                int_id = cdr.exNormalize(value)[1]
-            except:
-                cdrcgi.bail("invalid {} ({!r})".format(name, value))
-            query = db.Query("doc_type t", "name")
-            query.join("document d", "d.doc_type = t.id")
-            query.where(query.Condition("d.id", int_id))
-            row = query.execute(self.cursor).fetchone()
-            if not row:
-                cdrcgi.bail("CDR{:d} not found".format(int_id))
-            self._doc_type = row.name
-            expected = "glossarytermname", "glossarytermconcept"
-            if row.name.lower() not in expected:
-                template = "CDR{:d} is not a Glossary document"
-                cdrcgi.bail(template.format(int_id))
-        return int_id
+    @property
+    def doc_id(self):
+        """Integer for the CDR ID of the glossary document being translated."""
+        return self.doc.id if self.doc else None
 
+    @property
+    def doc_type(self):
+        """String for the name of the glossary document's CDR doctype."""
+        return self.doc.doctype.name if self.doc else None
+
+    @property
+    def doc_title(self):
+        if not hasattr(self, "_doc_title"):
+            if not self.doc_type:
+                self._doc_title = None
+            else:
+                if self.doc_type.lower() == "glossarytermname":
+                    self._doc_title = self.doc.title.split(";")[0].strip()
+                else:
+                    path = "/GlossaryTermName/GlossaryTermConcept/@cdr:ref"
+                    query = self.Query("document d", "d.title").limit(1)
+                    query.join("query_term q", "q.doc_id = d.id")
+                    query.where(query.Condition("q.path", path))
+                    query.where(query.Condition("q.int_val", self.doc_id))
+                    query.where("d.active_status = 'A'")
+                    query.order("d.title")
+                    row = query.execute(self.cursor).fetchone()
+                    if row:
+                        title = row.title.split(";")[0].strip()
+                        self._doc_title = f"Concept document for {title}"
+                    else:
+                        pattern = "Concept document CDR{:d}"
+                        self._doc_title = pattern.format(self.doc_id)
+        return self._doc_title
+
+    @property
     def have_required_values(self):
         """
         Determine whether we have values for all of the required job fields.
@@ -308,9 +249,73 @@ jQuery("input[value='{}']").click(function(e) {{
                 return False
         return True
 
-    def load_users(self):
+    @property
+    def job(self):
+        """Translation job being displayed/edited."""
+
+        if not hasattr(self, "_job"):
+            self._job = Job(self) if self.doc_id else None
+        return self._job
+
+    @property
+    def lead_translator(self):
+        """Default assignee for a new translation job."""
+
+        if not hasattr(self, "_lead_translator"):
+            group_name = "Spanish Translation Leads"
+            leads = self.load_group(group_name).items
+            self._lead_translator = leads[0][0] if leads else None
+        return self._lead_translator
+
+    @property
+    def state_id(self):
+        """Primary key for the selected translation state."""
+
+        if not hasattr(self, "_state_id"):
+            self._state_id = self.fields.getvalue("state")
+            if self._state_id:
+                if not self._state_id.isdigit():
+                    self.bail()
+                self._state_id = int(self._state_id)
+                if self._state_id not in self.states.map:
+                    self.bail()
+        return self._state_id
+
+    @property
+    def states(self):
+        """Valid values for the translation job states."""
+
+        if not hasattr(self, "_states"):
+            self._states = self.load_valid_values("glossary_translation_state")
+        return self._states
+
+    @property
+    def subtitle(self):
+        """What we display under the main banner."""
+        return self.job.subtitle if self.job else self.SUBTITLE
+
+    @property
+    def translators(self):
+        """Users who are authorized to translate glossary documents.
+
+        Expand the list to include the translator of the current job,
+        in case he/she is no long in the translation group.
         """
-        Fetch a dictionary of all active users.
+
+        if not hasattr(self, "_translators"):
+            translators = self.load_group("Spanish Glossary Translators")
+            if self.assigned_to and self.assigned_to not in translators.map:
+                translators = translators.map
+                translators[self.assigned_to] = self.users[self.assigned_to]
+                key = lambda pair: pair[1].lower()
+                self._translators = sorted(translators.items(), key=key)
+            else:
+                self._translators = translators.items
+        return self._translators
+
+    @property
+    def users(self):
+        """Dictionary of all active users.
 
         We need this for validating the assigned_to parameter. The set
         of currently active translators won't work for that purpose,
@@ -319,45 +324,22 @@ jQuery("input[value='{}']").click(function(e) {{
         group.
         """
 
-        query = db.Query("usr", "id", "fullname")
-        query.where("fullname IS NOT NULL")
-        rows = query.execute(self.cursor).fetchall()
-        return dict([(row[0], row[1]) for row in rows])
-
-    def load_group(self, group):
-        """
-        Fetch the user ID and name for all members of a specified group.
-
-        Pass:
-            group - name of group to fetch
-
-        Return:
-            dictionary of user names indexed by user ID
-        """
-
-        query = db.Query("usr u", "u.id", "u.fullname")
-        query.join("grp_usr gu", "gu.usr = u.id")
-        query.join("grp g", "g.id = gu.grp")
-        query.where("u.expired IS NULL")
-        query.where(query.Condition("g.name", group))
-        rows = query.execute(self.cursor).fetchall()
-        return dict([(row[0], row[1]) for row in rows])
-
-    @staticmethod
-    def sort_dict(d):
-        """
-        Generate a sequence from a dictionary, with the elements in the
-        sequence ordered by the dictionary element's value. The sequence
-        contain tuples of (key, value) pairs pulled from the dictionary.
-        """
-
-        return sorted(d.items(), key=operator.itemgetter(1))
+        if not hasattr(self, "_users"):
+            query = self.Query("usr", "id", "fullname")
+            query.where("fullname IS NOT NULL")
+            rows = query.execute(self.cursor).fetchall()
+            self._users = dict([tuple(row) for row in rows])
+        return self._users
 
 
 class Job:
-    """
-    Represents a translation job for the currently selected CDR
-    Glossary document.
+    """Translation job for a CDR glossary document.
+
+    Collect the information about the CDR glossary document being
+    translated into Spanish. Also collect information about the
+    ongoing translation job if there exists a record for such a job
+    for this document. Otherwise populate the job attributes with
+    suitable defaults to be displayed in the editing form for the job.
     """
 
     TABLE = "glossary_translation_job"
@@ -367,54 +349,91 @@ class Job:
     REQUIRED = "doc_id", "state_id", "assigned_to"
 
     def __init__(self, control):
-        """
-        Collect the information about the CDR glossary document being
-        translated into Spanish. Also collect information about the
-        ongoing translation job if there exists a record for such a
-        job for this document. Otherwise populate the job attributes
-        with suitable defaults to be displayed in the editing form for
-        the job.
+        """Save a reference to the `Control` object.
+
+        Pass:
+          control - access to the form and to the database
         """
 
-        self.control = control
-        self.new = True
-        self.doc_id = control.doc_id
-        self.doc_type = control.doc_type
-        self.doc_title = control.doc_title
-        for name in self.FIELDS:
-            setattr(self, name, None)
-        query = db.Query(self.TABLE, *self.FIELDS)
-        query.where(query.Condition(self.KEY, self.doc_id))
-        row = query.execute(control.cursor).fetchone()
-        if row:
-            self.new = False
-            for name in self.FIELDS:
-                setattr(self, name, getattr(row, name))
-        self.banner = self.doc_title
-        if len(self.banner) > 40:
-            self.banner = self.banner[:40] + " ..."
+        self.__control = control
 
+    @property
+    def assigned_to(self):
+        """ID of user to whom the translation job has been assigned."""
+        return self.row.assigned_to if self.row else None
+
+    @property
     def changed(self):
-        """
-        Determine which fields on the editing form have been changed
+        """Determine whether any fields on the editing form have been changed.
 
         We do this to optimize away unnecessary writes to the database.
         """
 
-        fields = []
         for name in self.FIELDS:
-            if getattr(self, name) != getattr(self.control, name):
-                fields.append(name)
-        return fields
+            if getattr(self, name) != getattr(self.__control, name):
+                return True
+        return False
+
+    @property
+    def comments(self):
+        """Notes on the translation job."""
+        return self.row.comments if self.row else None
+
+    @property
+    def doc_id(self):
+        """CDR ID for the CDR glossary document being translated."""
+        return self.__control.doc_id
+
+    @property
+    def doc_title(self):
+        """String for the title of the glossary document."""
+        return self.__control.doc_title
+
+    @property
+    def doc_type(self):
+        """String for the name of the glossary document's CDR doctype."""
+        return self.__control.doc_type
+
+    @property
+    def new(self):
+        """True if we don't already have a job for this summary."""
+        return False if self.row else True
+
+    @property
+    def row(self):
+        """Current values for an existing job, if applicable."""
+
+        if not hasattr(self, "_row"):
+            query = self.__control.Query(self.TABLE, *self.FIELDS)
+            query.where(query.Condition(self.KEY, self.doc_id))
+            self._row = query.execute(self.__control.cursor).fetchone()
+        return self._row
+
+    @property
+    def state_id(self):
+        """Primary key for the job's state."""
+        return self.row.state_id if self.row else None
+
+    @property
+    def subtitle(self):
+        """Override for string below banner."""
+
+        if not hasattr(self, "_subtitle"):
+            title = self.doc_title.split(";")[0].strip()
+            cdr_id = self.__control.doc.cdr_id
+            if len(title) > 40:
+                title = f"{title[:40]} ..."
+            self._subtitle = f"Translation job for {cdr_id} ({title})"
+        return self._subtitle
+
+
 
 if __name__ == "__main__":
-    """
-    Make it possible to load this script as a module
-    """
+    """Don't execute the script if loaded as a module."""
 
     control = Control()
     try:
         control.run()
     except Exception as e:
         control.logger.exception("failure")
-        cdrcgi.bail("failure: {}".format(e.message))
+        control.bail(f"failure: {e}")
