@@ -25,7 +25,7 @@ class Control(Controller):
             ("Media (Images) Processing Status Report",
              "ImageMediaProcessingStatusReport.py"),
             ("Media Lists", "MediaLists.py"),
-            ("Media Permissions Report", "ocecdr-3704.py"),
+            ("Media Permissions Report", "MediaPermissionsReport.py"),
             ("Media Translation Job Workflow Report",
              "media-translation-job-report.py"),
         ):
