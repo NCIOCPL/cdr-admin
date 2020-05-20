@@ -1,528 +1,724 @@
 #!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# Media permissions report.
-#
-# JIRA::OCECDR-3704
-#----------------------------------------------------------------------
-import cdr
-import cdrcgi
-import cgi
-import datetime
-import lxml.html
-import lxml.html.builder
-import lxml.etree as etree
-from cdrapi import db
+"""Report on management of PDQ media permissions.
 
-def main():
-    request = Request()
-    if request.action == cdrcgi.MAINMENU:
-        cdrcgi.navigateTo("Admin.py", session)
-    elif request.action == "Report Menu":
-        cdrcgi.navigateTo("reports.py", session)
-    elif request.action == "Submit":
-        request.report()
-    form = Form()
-    form.send()
+JIRA::OCECDR-3704
+"""
 
-def extract_board_name(doc_title):
-    board_name = doc_title.split(";")[0].strip()
-    board_name = board_name.replace("PDQ ", "").strip()
-    board_name = board_name.replace(" Editorial Board", "").strip()
-    if board_name.startswith("Cancer Complementary"):
-        board_name = board_name.replace("Cancer ", "").strip()
-    return board_name
+from cdrcgi import Controller
+from cdrapi.docs import Doc
 
-class Request:
-    def __init__(self):
-        self.fields = cgi.FieldStorage()
-        self.action = cdrcgi.getRequest(self.fields)
-        self.session = cdrcgi.getSession(self.fields)
-    def report(self):
-        self.cursor = db.connect(user="CdrGuest").cursor()
-        self.option1 = self.fields.getlist("option1")
-        self.option2 = self.fields.getvalue("option2")
-        self.format = self.fields.getvalue("format") or "excel"
-        self.req = self.get_date_range("req")
-        self.exp = self.get_date_range("exp")
-        if self.option1:
-            if "denied" in self.option1:
-                rpt = self.report_denials()
+
+class Control(Controller):
+
+    SUBTITLE = "Media Permissions Report"
+    REQUESTS = "Requests"
+    APPROVALS = "Permissions"
+    DENIALS = "Denials"
+    SELECTION_METHODS = (
+        ("global", "Global version of the report", True),
+        ("specific", "Specific document selection", False),
+    )
+    GLOBAL_CHOICES = (
+        ("en", "Permission Requested (English)", True),
+        ("es", "Permission Requested (Spanish)", True),
+        (
+            "denied",
+            "Show All Denied Permission Requested (English and Spanish)",
+            False,
+        ),
+    )
+    SPECIFIC_CHOICES = (
+        ("doctype", "Choose Document Type"),
+        ("summary", "Select Summary Language and Board"),
+        ("docid", "Enter the CDR ID of a certain summary or glossary term"),
+    )
+    DOCTYPE_CHOICES = (
+        ("summary", "Summaries", False),
+        ("glossary", "Glossary Terms", False),
+        ("both", "Both Summaries and Glossary Terms", True),
+    )
+    REQUEST_LEGEND = "Optional Date Range for Permission Request"
+    EXPIRATION_LEGEND = "Optional Date Range for Permission Expiration"
+    SCRIPT = "../../js/MediaPermissionsReport.js"
+    COLUMNS = {
+        REQUESTS: (
+            ("Media DocTitle", 300),
+            ("Permission Request Date", 100),
+            ("Permission Response (Response Date)", 200),
+            ("Expiration", 100),
+            ("Spanish Permission Requested (Permission Response)", 200),
+            ("Approved Use", 300),
+            ("Comment", 150),
+        ),
+        APPROVALS: (
+            ("Approved Use", 300),
+            ("Media DocTitle", 300),
+            ("Permission Request Date", 100),
+            ("Permission Granted Date", 100),
+            ("Expiration", 100),
+            ("Spanish Permission Requested (Permission Response)", 150),
+            ("Comment", 150),
+        ),
+        DENIALS: (
+            ("Media DocTitle", 300),
+            ("Permission Request Date", 100),
+            ("Permission Response (Response Date)", 200),
+            ("Spanish Permission Requested (Permission Response)", 200),
+            ("Comment", 200),
+        ),
+    }
+    RESPONSE_PATHS = (
+        "/Media/PermissionInformation/PermissionResponse",
+        "/Media/PermissionInformation/SpanishTranslationPermissionResponse",
+    )
+    USAGE_PATHS = dict(
+        glossary="/Media/PermissionInformation/ApprovedUse/Glossary/@cdr:ref",
+        summary="/Media/PermissionInformation/ApprovedUse/Summary/@cdr:ref",
+    )
+
+    def build_tables(self):
+        """Assemble the report table which matches the user's selections."""
+
+        opts = dict(
+            caption=self.caption,
+            columns=self.columns,
+            sheet_name=self.report_type,
+        )
+        return self.Reporter.Table(self.rows, **opts)
+
+    def populate_form(self, page):
+        """Add the fields to the report request form.
+
+        Pass:
+            page - HTMLPage object on which to place the fields
+        """
+
+        fieldset = page.fieldset("Selection Method")
+        for value, label, checked in self.SELECTION_METHODS:
+            opts = dict(value=value, label=label, checked=checked)
+            fieldset.append(page.radio_button("selection_method", **opts))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Global Selections", id="global-block")
+        for value, label, checked in self.GLOBAL_CHOICES:
+            opts = dict(value=value, label=label, checked=checked)
+            fieldset.append(page.checkbox("global", **opts))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Specific Selections", id="specific-block")
+        for value, label in self.SPECIFIC_CHOICES:
+            opts = dict(value=value, label=label)
+            fieldset.append(page.radio_button("specific", **opts))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Document Type(s)", id="doctype-block")
+        for value, label, checked in self.DOCTYPE_CHOICES:
+            opts = dict(value=value, label=label, checked=checked)
+            fieldset.append(page.radio_button("doctype", **opts))
+        page.form.append(fieldset)
+        self.add_board_fieldset(page)
+        self.add_language_fieldset(page)
+        fieldset = page.fieldset("CDR Document ID", id="id-block")
+        fieldset.append(page.text_field("docid", label="CDR ID"))
+        page.form.append(fieldset)
+        fieldset = page.fieldset(self.REQUEST_LEGEND)
+        fieldset.append(page.date_field("req_start", label="Start Date"))
+        fieldset.append(page.date_field("req_end", label="End Date"))
+        page.form.append(fieldset)
+        fieldset = page.fieldset(self.EXPIRATION_LEGEND)
+        fieldset.append(page.date_field("exp_start", label="Start Date"))
+        fieldset.append(page.date_field("exp_end", label="End Date"))
+        page.form.append(fieldset)
+        page.add_output_options("html")
+        page.head.append(page.B.SCRIPT(src=self.SCRIPT))
+
+    @property
+    def board(self):
+        """PDQ board(s) selected for the report."""
+
+        if not hasattr(self, "_board"):
+            self._board = None
+            if self._specific_method == "summary":
+                self._board = []
+                boards = self.fields.getlist("board")
+                if "all" not in boards:
+                    for id in boards:
+                        if not id.isdigit():
+                            self.bail()
+                        id = int(id)
+                        if id not in self.boards:
+                            self.bail()
+                        self._board.append(id)
+        return self._board
+
+    @property
+    def boards(self):
+        """Dictionary of boards used for parameter validation."""
+
+        if not hasattr(self, "_boards"):
+            self._boards = self.get_boards()
+        return self._boards
+
+    @property
+    def caption(self):
+        """String to be displayed at the top of the report table."""
+
+        if not hasattr(self, "_caption"):
+            if self.report_type == self.DENIALS:
+                self._caption = "Media Permission Denials"
+            elif self.report_type == self.REQUESTS:
+                languages = dict(en="English", es="Spanish")
+                languages = [languages[key] for key in self.global_selections]
+                languages = " and ".join(languages)
+                self._caption = f"{languages} Permission Requests"
+            elif self.doc_id:
+                self._caption = f"Media Approved For Use With CDR{self.doc_id}"
+            elif self.doctype:
+                doctype = dict(
+                    both="Summaries and Glossary Terms",
+                    summary="Summaries",
+                    glossary="Glossary Terms",
+                )[self.doctype]
+                self._caption = f"Media Approved For Use With {doctype}"
             else:
-                rpt = self.report_requests()
-        elif self.option2:
-            rpt = self.report_approvals()
-        rpt.send(self.format)
-    def get_date_range(self, name):
-        start = self.fields.getvalue("%s_start" % name)
-        end = self.fields.getvalue("%s_end" % name)
-        if start or end:
-            return Request.DateRange(start, end)
-    def report_denials(self):
-        paths = (
-            "/Media/PermissionInformation/PermissionResponse",
-            "/Media/PermissionInformation/SpanishTranslationPermissionResponse"
-        )
-        query = db.Query("query_term", "doc_id").unique()
-        query.where(query.Condition("path", paths, "IN"))
-        query.where(query.Condition("value", "Permission Denied"))
-        query.execute(self.cursor)
-        columns = (
-            Report.Column("Media DocTitle", width="300px"),
-            Report.Column("Permission Request Date", width="100px"),
-            Report.Column("Permission Response (Response Date)", width="200px"),
-            Report.Column("Spanish Permission Requested (Permission Response)",
-                          width="200px"),
-            Report.Column("Comment", width="200px")
-        )
-        docs = [Media(row[0], self.cursor) for row in self.cursor.fetchall()]
-        rows = []
-        for doc in docs:
-            if not doc.in_range(self):
-                continue
-            col1 = "%s (CDR%d)" % (doc.title, doc.doc_id)
-            col2 = doc.request_date
-            col3 = doc.english_response or ""
-            col4 = doc.spanish_request or ""
-            col5 = doc.comments
-            if doc.response_date:
-                col3 += " (%s)" % doc.response_date
-            if doc.spanish_response:
-                col4 += " (%s)" % doc.spanish_response
-            rows.append((col1, col2, col3, col4, col5))
-        rows.sort(key=lambda row:row[0].lower())
-        caption = "Media Permission Denials"
-        opts = { "caption": caption, "sheet_name": "Denials" }
-        table = Report.Table(columns, rows, **opts)
-        return Report(table)
-    def report_requests(self):
-        columns = (
-            Report.Column("Media DocTitle", width="300px"),
-            Report.Column("Permission Request Date", width="100px"),
-            Report.Column("Permission Response (Response Date)", width="200px"),
-            Report.Column("Expiration", width="100px"),
-            Report.Column("Spanish Permission Requested (Permission Response)",
-                          width="200px"),
-            Report.Column("Approved Use", width="300px"),
-            Report.Column("Comment", width="150px")
-        )
-        tags = {
-            "en": "PermissionRequested",
-            "es": "SpanishTranslationPermissionRequested"
-        }
-        paths = []
-        for language in self.option1:
-            paths.append("/Media/PermissionInformation/%s" % tags[language])
-        query = db.Query("query_term", "doc_id").unique()
-        query.where(query.Condition("path", paths, "IN"))
-        query.where(query.Condition("value", "Yes"))
-        query.execute(self.cursor)
-        docs = [Media(row[0], self.cursor) for row in self.cursor.fetchall()]
-        rows = []
-        for doc in docs:
-            if not doc.in_range(self):
-                continue
-            approvals = []
-            for approval in doc.approved:
-                approvals.append("%s (CDR%d)" % (approval.title,
-                                                 approval.doc_id))
-            col1 = "%s (CDR%d)" % (doc.title, doc.doc_id)
-            col2 = doc.request_date
-            col3 = doc.english_response or ""
-            col4 = doc.expiration_date
-            col5 = doc.spanish_request or ""
-            col6 = approvals
-            col7 = doc.comments
-            if doc.response_date:
-                col3 += " (%s)" % doc.response_date
-            if doc.spanish_response:
-                col5 += " (%s)" % doc.spanish_response
-            rows.append((col1, col2, col3, col4, col5, col6, col7))
-        rows.sort(key=lambda row:row[0].lower())
-        langs = { "en": "English", "es": "Spanish" }
-        langs = " and ".join([langs[key] for key in self.option1])
-        caption = "%s Permission Requests" % langs
-        opts = { "caption": caption, "sheet_name": "Denials" }
-        table = Report.Table(columns, rows, **opts)
-        return Report(table)
-    def report_approvals(self):
-        results = {
-            "doctype": self.approvals_by_doctype,
-            "summary": self.summary_approvals,
-            "docid": self.approvals_by_docid
-        }.get(self.option2)()
-        docs = [Media(doc_id, self.cursor) for doc_id in results.doc_ids]
-        columns = (
-            Report.Column("Approved Use", width="300px"),
-            Report.Column("Media DocTitle", width="300px"),
-            Report.Column("Permission Request Date", width="100px"),
-            Report.Column("Permission Granted Date", width="100px"),
-            Report.Column("Expiration", width="100px"),
-            Report.Column("Spanish Permission Requested (Permission Response)",
-                          width="150px"),
-            Report.Column("Comment", width="150px")
-        )
-        rows = []
-        for doc in docs:
-            if not doc.in_range(self):
-                continue
-            col2 = "%s (CDR%d)" % (doc.title, doc.doc_id)
-            col3 = Report.Cell(doc.request_date, classes="nowrap")
-            col4 = Report.Cell(doc.response_date, classes="nowrap")
-            col5 = Report.Cell(doc.expiration_date, classes="nowrap")
-            col6 = doc.spanish_request
-            col7 = doc.comments
-            if doc.spanish_response:
-                col6 += " (%s)" % doc.spanish_response
-            for approval in doc.approved:
-                col1 = "%s (CDR%d)" % (approval.title, approval.doc_id)
-                rows.append((col1, col2, col3, col4, col5, col6, col7))
-        rows.sort(key=lambda row:row[0].lower())
-        opts = { "caption": results.caption, "sheet_name": "Permissions" }
-        table = Report.Table(columns, rows, **opts)
-        return Report(table)
-    def summary_approvals(self):
-        language = self.fields.getvalue("summary")
-        if not language:
-            cdrcgi.bail("Summary language not specified")
-        boards = self.fields.getlist(language.lower())
-        if not boards:
-            cdrcgi.bail("Summary boards(s) not specified")
-        args = [language]
-        caption = "Media Approved For Use With %s " % language
-        m_path = "/Media/PermissionInformation/ApprovedUse/Summary/@cdr:ref"
-        l_path = "/Summary/SummaryMetaData/SummaryLanguage"
-        b_path = "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"
-        t_path = "/Summary/TranslationOf/@cdr:ref"
-        query = db.Query("query_term m", "m.doc_id").unique()
-        query.where(query.Condition("m.path", m_path))
-        query.join("query_term l", "l.doc_id = m.int_val")
-        query.where(query.Condition("l.path", l_path))
-        query.where(query.Condition("l.value", language))
-        if "all" in boards:
-            caption += "Summaries"
-        else:
-            names = [self.get_board_name(b) for b in boards]
-            if len(boards) == 1:
-                caption += "%s Summaries" % names[0]
-            elif len(boards) == 2:
-                caption += "%s and %s Summaries" % (names[0], names[1])
-            else:
-                caption += ", ".join(names[:-1])
-                caption += ", and %s Summaries" % names[-1]
-            if language == "English":
-                query.join("query_term b", "b.doc_id = l.doc_id")
-            else:
-                query.join("query_term t", "t.doc_id = l.doc_id")
-                query.join("query_term b", "b.doc_id = t.int_val")
-                query.where(query.Condition("t.path", t_path))
-            query.where(query.Condition("b.path", b_path))
-            query.where(query.Condition("b.int_val", boards, "IN"))
-        query.execute(self.cursor)
-        return Results([row[0] for row in self.cursor.fetchall()], caption)
-    def approvals_by_doctype(self):
-        doctype = self.fields.getvalue("doctype")
-        if not doctype:
-            cdrcgi.bail("Document type(s) not specified")
-        caption = "Media Approved For Use With %s" % {
-            "both": "Summaries and Glossary Terms",
-            "summary": "Summaries",
-            "glossary": "Glossary Terms"
-        }[doctype]
-        query = db.Query("query_term", "doc_id").unique()
-        pattern = "/Media/PermissionInformation/ApprovedUse/%s/@cdr:ref"
-        doctypes = ("summary", "glossary")
-        if doctype in doctypes:
-            query.where(query.Condition("path", pattern % doctype.capitalize()))
-        else:
-            paths = [pattern % t.capitalize() for t in doctypes]
+                self._caption = f"Media Approved For Use With {self.language} "
+                if not self.board:
+                    self._caption = f"{self._caption} Summaries"
+                else:
+                    boards = [self.boards[id] for id in self.board]
+                    if len(boards) < 3:
+                        boards = " and ".join(boards)
+                    else:
+                        first = ", ".join(boards[:-1])
+                        boards = f"{first}, and {boards[-1]}"
+                    self._caption = f"{self._caption} {boards} Summaries"
+        return self._caption
+
+    @property
+    def columns(self):
+        """Strings for the top of the report's table columns."""
+
+        if not hasattr(self, "_columns"):
+            self._columns = []
+            for label, width in self.COLUMNS[self.report_type]:
+                column = self.Reporter.Column(label, width=f"{width:d}px")
+                self._columns.append(column)
+        return self._columns
+
+    @property
+    def denials(self):
+        """Rows for the report table on permission denials."""
+
+        if not hasattr(self, "_denials"):
+            query = self.Query("query_term", "doc_id").unique()
+            query.where(query.Condition("path", self.RESPONSE_PATHS, "IN"))
+            query.where(query.Condition("value", "Permission Denied"))
+            rows = query.execute(self.cursor).fetchall()
+            docs = [Media(self, row.doc_id) for row in rows]
+            self._denials = []
+            for doc in sorted(docs):
+                if doc.in_scope:
+                    self._denials.append((
+                        doc.title,
+                        doc.request_date,
+                        doc.english_response,
+                        doc.spanish_request,
+                        doc.comments,
+                    ))
+        return self._denials
+
+    @property
+    def doc_id(self):
+        """Integer for CDR document selected for the report."""
+
+        if not hasattr(self, "_doc_id"):
+            self._doc_id = None
+            if self.specific_method == "docid":
+                self._doc_id = self.fields.getvalue("docid")
+                if self._doc_id:
+                    if not self._doc_id.isdigit():
+                        self.bail()
+                    self._doc_id = int(self._doc_id)
+        return self._doc_id
+
+    @property
+    def doctype(self):
+        """One of summary, glossary, or both."""
+
+        if not hasattr(self, "_doctype"):
+            self._doctype = None
+            if self.specific_method == "doctype":
+                valid = [choice[0] for choice in self.DOCTYPE_CHOICES]
+                self._doctype = self.fields.getvalue("doctype", valid[0])
+                if self._doctype not in valid:
+                    self.bail()
+        return self._doctype
+
+    @property
+    def exp_end(self):
+        """End of the date range for restricting by permission expiration."""
+
+        if not hasattr(self, "_exp_end"):
+            value = self.fields.getvalue("exp_end")
+            try:
+                self._exp_end = self.parse_date(value)
+                if self._exp_end:
+                    self._exp_end = f"{self._exp_end} 23:59:59"
+            except Exception:
+                self.logger.exception("parsing exp_end")
+                self.bail("Invalid expiration end date")
+        return self._exp_end
+
+    @property
+    def exp_start(self):
+        """Start of the date range for restricting by permission expiration."""
+
+        if not hasattr(self, "_exp_start"):
+            value = self.fields.getvalue("exp_start")
+            try:
+                self._exp_start = self.parse_date(value)
+                if self._exp_start:
+                    self._exp_start = str(self._exp_start)
+            except Exception:
+                self.logger.exception("parsing exp_start")
+                self.bail("Invalid expiration start date")
+        return self._exp_start
+
+    @property
+    def global_selections(self):
+        """Selection(s) made for reporting on requests or denials."""
+
+        if not hasattr(self, "_global_selections"):
+            self._global_selections = None
+            name = self.selection_method
+            if name == "global":
+                valid = [choice[0] for choice in self.GLOBAL_CHOICES]
+                self._global_selections = self.fields.getlist(name) or valid[0]
+                if set(self._global_selections) - set(valid):
+                    self.bail()
+                elif "denied" in self._global_selections:
+                    if len(self._global_selections) > 1:
+                        self.bail("Can't combine 'denied' with other options")
+        return self._global_selections
+
+    @property
+    def language(self):
+        """English or Spanish (used when selecting summaries by PDQ board."""
+
+        if not hasattr(self, "_language"):
+            self._language = None
+            if self._specific_method == "summary":
+                self._language = self.fields.getvalue("language", "English")
+                if self._language not in self.LANGUAGES:
+                    self.bail()
+        return self._language
+
+    @property
+    def media_by_docid(self):
+        """Sequence of IDs for media used by a one summary or glossary term."""
+
+        if not hasattr(self, "_media_by_docid"):
+            paths = list(self.USAGE_PATHS.values())
+            query = self.Query("query_term", "doc_id").unique()
             query.where(query.Condition("path", paths, "IN"))
-        query.execute(self.cursor)
-        return Results([row[0] for row in self.cursor.fetchall()], caption)
-    def approvals_by_docid(self):
-        docid = self.fields.getvalue("docid")
-        if not docid:
-            cdrcgi.bail("Document ID not specified")
-        try:
-            doc_id = cdr.exNormalize(docid)[1]
-        except:
-            cdrcgi.bail("Invalid document ID %s" % repr(docid))
-        paths = ["/Media/PermissionInformation/ApprovedUse/Glossary/@cdr:ref",
-                 "/Media/PermissionInformation/ApprovedUse/Summary/@cdr:ref"]
-        query = db.Query("query_term", "doc_id").unique()
-        query.where(query.Condition("path", paths, "IN"))
-        query.where(query.Condition("int_val", doc_id))
-        query.execute(self.cursor)
-        return Results([row[0] for row in self.cursor.fetchall()],
-                       "Media Approved For Use With CDR%s" % doc_id)
-    def get_board_name(self, doc_id):
-        query = db.Query("document", "title")
-        query.where(db.Query.Condition("id", doc_id))
-        return extract_board_name(query.execute(self.cursor).fetchall()[0][0])
-    class DateRange:
-        def __init__(self, start, end):
-            self.start, self.end = start, end
-        def in_range(self, date):
-            if not date:
-                return False
-            if self.start and self.start > date:
-                return False
-            if self.end and self.end < date:
-                return False
-            return True
+            query.where(query.Condition("int_val", self.doc_id))
+            rows  = query.execute(self.cursor).fetchall()
+            self._media_by_docid = [row.doc_id for row in rows]
+        return self._media_by_docid
 
-class Form(cdrcgi.Page):
-    def __init__(self):
-        self.cursor = db.connect(user="CdrGuest").cursor()
-        self._fields = cgi.FieldStorage()
-        self._session = self._fields.getvalue("Session")
-        settings = {
-            "subtitle": "Media Permissions Report",
-            "action": "ocecdr-3704.py",
-            "buttons": ("Submit", "Report Menu", cdrcgi.MAINMENU),
-            "session": self._session
-        }
-        cdrcgi.Page.__init__(self, "CDR Administration", **settings)
-        self.add_script("CdrCalendar.setReadOnly = false;\n")
-        self.option1()
-        self.option2()
-        self.common()
-    def option1(self):
-        self.add("<fieldset>")
-        self.add(self.B.LEGEND("OPTION 1: Global Version"))
-        choices = (
-            ("Permission Requested (English)", "en"),
-            ("Permission Requested (Spanish)", "es"),
-            ("Show All Denied Permission Requested (English and Spanish)",
-             "denied")
-        )
-        for label, value in choices:
-            self.add_checkbox("option1", label, value)
-        self.add("</fieldset>")
-        self.add_script("""\
-function check_option1(id) {
-    switch (id) {
-    case 'denied':
-        jQuery('#option1-en').prop('checked', false);
-        jQuery('#option1-es').prop('checked', false);
-        break;
-    default:
-        jQuery('#option1-denied').prop('checked', false);
-    }
-    clear_option_2();
-}
-function clear_option_1() {
-    jQuery('#option1-en').prop('checked', false);
-    jQuery('#option1-es').prop('checked', false);
-    jQuery('#option1-denied').prop('checked', false);
-}
-""")
+    @property
+    def media_by_doctype(self):
+        """Sequence of IDs for media used by docs of the selected type(s)."""
 
-    def common(self):
-        self.add("<fieldset>")
-        self.add(self.B.LEGEND("Common Options"))
-        self.add("<fieldset>")
-        self.add(self.B.LEGEND("Optional Date Range for Permission Request"))
-        self.add_date_field("req_start", "Start Date")
-        self.add_date_field("req_end", "End Date")
-        self.add("</fieldset>")
-        self.add("<fieldset>")
-        self.add(self.B.LEGEND("Optional Date Range for Permission Expiration"))
-        self.add_date_field("exp_start", "Start Date")
-        self.add_date_field("exp_end", "End Date")
-        self.add("</fieldset>")
-        self.add_output_options("html")
-        self.add("</fieldset>")
-    def option2(self):
-        self.add("<fieldset>")
-        self.add(self.B.LEGEND("OPTION 2: Specific Version"))
-        choices = (
-            ("Choose Document Type", "doctype"),
-            ("Select Summary Language and Board", "summary"),
-            ("Enter the CDR ID of a certain summary or glossary term", "docid")
-        )
-        for label, value in choices:
-            self.add_radio("option2", label, value)
-        self.doctype_block()
-        self.summary_block()
-        self.docid_block()
-        self.add("</fieldset>")
-        self.add_script("""\
-function check_option2(id) {
-    var options = ['doctype', 'summary', 'docid'];
-    for (var i = 0; i < options.length; ++i) {
-        if (options[i] == id)
-            jQuery('#' + options[i] + '_block').show();
-        else
-            jQuery('#' + options[i] + '_block').hide();
-    }
-    clear_option_1();
-}
-function clear_option_2() {
-    var options = ['doctype', 'summary', 'docid'];
-    for (var i = 0; i < options.length; ++i) {
-        jQuery('#option2-' + options[i]).prop('checked', false);
-        jQuery('#' + options[i] + '_block').hide();
-    }
-}
-""")
-    def doctype_block(self):
-        self.add('<fieldset id="doctype_block" class="hidden">')
-        self.add(self.B.LEGEND("Document Type(s)"))
-        choices = (
-            ("Summaries", "summary"),
-            ("Glossary Terms", "glossary"),
-            ("Both Summaries and Glossary Terms", "both")
-        )
-        for label, value in choices:
-            self.add_radio("doctype", label, value)
-        self.add("</fieldset>")
-    def get_boards(self, query):
-        boards = []
-        for doc_id, doc_title in query.execute(self.cursor).fetchall():
-            boards.append((extract_board_name(doc_title), doc_id))
-        return sorted(boards)
-    def summary_block(self):
-        self.add('<fieldset id="summary_block" class="hidden">')
-        self.add(self.B.LEGEND("Select PDQ Summaries"))
-        for language in ("English", "Spanish"):
-            self.add_radio("summary", language, language, wrapper=None)
-        C = db.Query.Condition
-        self.add('<fieldset id="english_block" class="hidden">')
-        self.add(self.B.LEGEND("English Summary Board(s)"))
-        self.add_checkbox("english", "All English", "all")
-        query = db.Query("active_doc d", "d.id", "d.title").unique()
-        query.join("query_term b", "b.int_val = d.id")
-        query.join("query_term l", "b.doc_id = l.doc_id")
-        query.where(C("b.path",
-                      "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"))
-        query.where(C("l.path", "/Summary/SummaryMetaData/SummaryLanguage"))
-        query.where(C("l.value", "English"))
-        query.where(C("d.title", "%Editorial Advisory%", "NOT LIKE"))
-        for board_name, board_id in self.get_boards(query):
-            self.add_checkbox("english", board_name, str(board_id),
-                              widget_classes="summary-type")
-        self.add("</fieldset>")
+        if not hasattr(self, "_media_by_doctype"):
+            query = self.Query("query_term", "doc_id").unique()
+            if self.doctype == "both":
+                paths = list(self.USAGE_PATHS.values())
+                query.where(query.Condition("path", paths, "IN"))
+            else:
+                path = self.USAGE_PATHS[self.doctype]
+                query.where(query.Condition("path", path))
+            rows  = query.execute(self.cursor).fetchall()
+            self._media_by_doctype = [row.doc_id for row in rows]
+        return self._media_by_doctype
 
-        # Spanish summaries don't store their own boards, so they need a
-        # different query, unfortunately.
-        self.add('<fieldset id="spanish_block" class="hidden">')
-        self.add(self.B.LEGEND("Spanish Summary Board(s)"))
-        self.add_checkbox("spanish", "All Spanish", "all")
-        query = db.Query("active_doc d", "d.id", "d.title").unique()
-        query.join("query_term b", "b.int_val = d.id")
-        query.join("query_term t", "t.int_val = b.doc_id")
-        query.where(C("b.path",
-                      "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"))
-        query.where(C("t.path", "/Summary/TranslationOf/@cdr:ref"))
-        query.where(C("d.title", "%Editorial Advisory%", "NOT LIKE"))
-        for board_name, board_id in self.get_boards(query):
-            self.add_checkbox("spanish", board_name, str(board_id),
-                              widget_classes="summary-type")
-        self.add("</fieldset>")
-        self.add("</fieldset>")
-        self.add_script("""\
-function check_summary(id) {
-    var options = ['English', 'Spanish'];
-    for (var i = 0; i < options.length; ++i) {
-        if (options[i] == id)
-            jQuery('#' + options[i].toLowerCase() + '_block').show();
-        else
-            jQuery('#' + options[i].toLowerCase() + '_block').hide();
-    }
-}
-function check_english(id) { check_lang(id); }
-function check_spanish(id) { check_lang(id); }
-function check_lang(id) {
-    switch (id) {
-    case 'all':
-        jQuery('.summary-type').prop('checked', false);
-        break;
-    default:
-        jQuery('#english-all').prop('checked', false);
-        jQuery('#spanish-all').prop('checked', false);
-    }
-}
-""")
-    def docid_block(self):
-        self.add('<fieldset id="docid_block" class="hidden">')
-        self.add(self.B.LEGEND("CDR Document ID"))
-        self.add_text_field("docid", "CDR ID")
-        self.add("</fieldset>")
+    @property
+    def media_by_summary(self):
+        """Sequence of IDs for media used by selected PDQ summaries."""
 
-class Results:
-    def __init__(self, doc_ids, caption):
-        self.doc_ids = doc_ids
-        self.caption = caption
+        if not hasattr(self, "_media_by_summary"):
+            m_path = self.USAGE_PATHS["summary"]
+            l_path = "/Summary/SummaryMetaData/SummaryLanguage"
+            b_path = "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"
+            t_path = "/Summary/TranslationOf/@cdr:ref"
+            query = self.Query("query_term m", "m.doc_id").unique()
+            query.where(query.Condition("m.path", m_path))
+            query.join("query_term l", "l.doc_id = m.int_val")
+            query.where(query.Condition("l.path", l_path))
+            query.where(query.Condition("l.value", self.language))
+            if self.board:
+                if self.language == "English":
+                    query.join("query_term b", "b.doc_id = l.doc_id")
+                else:
+                    query.join("query_term t", "t.doc_id = l.doc_id")
+                    query.join("query_term b", "b.doc_id = t.int_val")
+                    query.where(query.Condition("t.path", t_path))
+                query.where(query.Condition("b.path", b_path))
+                query.where(query.Condition("b.int_val", self.board, "IN"))
+            rows  = query.execute(self.cursor).fetchall()
+            self._media_by_summary = [row.doc_id for row in rows]
+        return self._media_by_summary
 
-class Report(cdrcgi.Report):
-    def __init__(self, table):
-        title = "Media Permissions Report"
-        options = {
-            "banner": title,
-            "subtitle": "Report Generated %s" % datetime.date.today()
-        }
-        cdrcgi.Report.__init__(self, title, [table], **options)
+    @property
+    def permissions(self):
+        """Rows for the report table on granted permissions."""
 
-class Table(Report.Table):
-    def __init__(self, columns, rows, caption):
-        Raport.Table.__init__(self, columns, rows, caption=caption,
-                              sheet_name="Permissions")
+        if not hasattr(self, "_permissions"):
+            self._permissions = []
+            Cell = self.Reporter.Cell
+            ids = getattr(self, f"media_by_{self.specific_method}")
+            docs = [Media(self, id) for id in ids]
+            values = []
+            for doc in docs:
+                if doc.in_scope:
+                    title_key = doc.title.lower()
+                    media = [doc.title.lower(), doc]
+                    for approval in doc.approvals:
+                        approval = str(approval)
+                        key = approval.lower(), title_key, len(values)
+                        values.append((key, approval, doc))
+            for key, approval, doc in sorted(values):
+                self._permissions.append((
+                    approval,
+                    doc.title,
+                    Cell(doc.request_date, classes="nowrap"),
+                    Cell(doc.english_response, classes="nowrap"),
+                    Cell(doc.expiration_date, classes="nowrap"),
+                    doc.spanish_request,
+                    doc.comments,
+                ))
+        return self._permissions
+
+    @property
+    def report_type(self):
+        """Denials, Requests, or Permissions."""
+        if not hasattr(self, "_report_type"):
+            if self.selection_method == "global":
+                if "denied" in self.global_selections:
+                    self._report_type = self.DENIALS
+                else:
+                    self._report_type = self.REQUESTS
+            else:
+                self._report_type = self.APPROVALS
+        return self._report_type
+
+    @property
+    def req_end(self):
+        """End of the date range for restricting by permission request date."""
+
+        if not hasattr(self, "_req_end"):
+            value = self.fields.getvalue("req_end")
+            try:
+                self._req_end = self.parse_date(value)
+                if self._req_end:
+                    self._req_end = f"{self._req_end} 23:59:59"
+            except Exception:
+                self.logger.exception("parsing req_end")
+                self.bail("Invalid request end date")
+        return self._req_end
+
+    @property
+    def req_start(self):
+        """Start of date range for restricting by permission request date."""
+
+        if not hasattr(self, "_req_start"):
+            value = self.fields.getvalue("req_start")
+            try:
+                self._req_start = self.parse_date(value)
+                if self._req_start:
+                    self._req_start = str(self._req_start)
+            except Exception:
+                self.logger.exception("parsing req_start")
+                self.bail("Invalid request start date")
+        return self._req_start
+
+    @property
+    def requests(self):
+        """Rows for the report table on permission requests."""
+
+        if not hasattr(self, "_requests"):
+            tags = dict(
+                en="PermissionRequested",
+                es="SpanishTranslationPermissionRequested",
+            )
+            paths = []
+            for key in self.global_selections:
+                paths.append(f"/Media/PermissionInformation/{tags[key]}")
+            query = self.Query("query_term", "doc_id").unique()
+            query.where(query.Condition("path", paths, "IN"))
+            query.where(query.Condition("value", "Yes"))
+            rows = query.execute(self.cursor).fetchall()
+            docs = [Media(self, row.doc_id) for row in rows]
+            self._requests = []
+            for doc in sorted(docs):
+                if doc.in_scope:
+                    self._requests.append((
+                        doc.title,
+                        doc.request_date,
+                        doc.english_response,
+                        doc.expiration_date,
+                        doc.spanish_request,
+                        [str(approval) for approval in doc.approvals],
+                        doc.comments,
+                    ))
+        return self._requests
+
+    @property
+    def rows(self):
+        """Assemble the table rows for the report.
+
+        Will use one of the `denials`, `requests` or `permissions`
+        properties.
+        """
+
+        return getattr(self, self.report_type.lower())
+
+    @property
+    def selection_method(self):
+        """Valid values are global and specific."""
+
+        if not hasattr(self, "_selection_method"):
+            methods = [method[0] for method in self.SELECTION_METHODS]
+            name = "selection_method"
+            self._selection_method = self.fields.getvalue(name, methods[0])
+            if self._selection_method not in methods:
+                self.bail()
+        return self._selection_method
+
+    @property
+    def specific_method(self):
+        """Selecting by document type, document ID, or board/language."""
+
+        if not hasattr(self, "_specific_method"):
+            self._specific_method = None
+            name = self.selection_method
+            if name == "specific":
+                valid = [choice[0] for choice in self.SPECIFIC_CHOICES]
+                self._specific_method = self.fields.getvalue(name, valid[0])
+                if self._specific_method not in valid:
+                    self.bail()
+        return self._specific_method
+
 
 class Media:
-    def __init__(self, doc_id, cursor):
-        query = db.Query("document", "title", "xml")
-        query.where(query.Condition("id", doc_id))
-        rows = query.execute(cursor).fetchall()
-        if not rows:
-            cdrcgi.bail("Media document %s not found" % doc_id)
-        self.title = rows[0][0].split(";")[0]
-        self.doc_id = doc_id
-        self.approved = []
-        self.english_request = self.spanish_request = None
-        self.english_response = self.spanish_response = None
-        self.request_date = self.response_date = self.expiration_date = None
-        self.comments = []
-        tree = etree.XML(rows[0][1].encode("utf-8"))
-        for node in tree.findall("PermissionInformation/*"):
-            if node.tag == "PermissionRequested":
-                self.english_request = node.text
-            elif node.tag == "PermissionRequestDate":
-                self.request_date = node.text
-            elif node.tag == "PermissionResponse":
-                self.english_response = node.text
-            elif node.tag == "PermissionResponseDate":
-                self.response_date = node.text
-            elif node.tag == "PermissionExpirationDate":
-                self.expiration_date = node.text
-            elif node.tag == "SpanishTranslationPermissionRequested":
-                self.spanish_request = node.text
-            elif node.tag == "SpanishTranslationPermissionResponse":
-                self.spanish_response = node.text
-            elif node.tag == "Comment":
-                self.comments.append(node.text)
-            elif node.tag == "ApprovedUse":
+    """Media document proposed for inclusion on the report."""
+
+    def __init__(self, control, doc_id):
+        """Remember the caller's values.
+
+        Pass:
+            control - access to the database and the report options
+            doc_id - integer for this document's CDR ID
+        """
+
+        self.__control = control
+        self.__doc_id = doc_id
+
+    def __lt__(self, other):
+        """Sort by normalized title."""
+        return self.sort_key < other.sort_key
+
+    @property
+    def approvals(self):
+        """Sequence of information from ApprovedUse nodes."""
+
+        if not hasattr(self, "_approvals"):
+            self._approvals = []
+            path = "PermissionInformation/ApprovedUse"
+            for node in self.doc.root.findall(path):
                 for child in node:
-                    ref = child.get("{cips.nci.nih.gov/cdr}ref")
-                    try:
-                        doc_id = cdr.exNormalize(ref)[1]
-                        self.approved.append(Approval(doc_id, cursor))
-                    except:
-                        pass
-    def in_range(self, request):
-        if request.req:
-            if not request.req.in_range(self.request_date):
+                    ref = child.get(f"{{{Doc.NS}}}ref")
+                    if ref:
+                        try:
+                            approval = self.Approval(self, ref)
+                            if approval.title:
+                                self._approvals.append(approval)
+                        except Exception:
+                            self.control.exception("parsing %r", ref)
+        return self._approvals
+
+    @property
+    def comments(self):
+        """Sequence of comment strings for permission to use the media."""
+
+        if not hasattr(self, "_comments"):
+            self._comments = []
+            for node in self.doc.root.findall("PermissionInformation/Comment"):
+                comment = Doc.get_text(node, "").strip()
+                if comment:
+                    self._comments.append(comment)
+        return self._comments
+
+    @property
+    def control(self):
+        """Access to the database and to the report options."""
+        return self.__control
+
+    @property
+    def doc(self):
+        """`Doc` object for this CDR Media document."""
+
+        if not hasattr(self, "_doc"):
+            self._doc = Doc(self.control.session, id=self.__doc_id)
+        return self._doc
+
+    @property
+    def english_request(self):
+        """Request for use of English media content."""
+
+        if not hasattr(self, "_english_request"):
+            path = "PermissionInformation/PermissionRequested"
+            self._english_request = Doc.get_text(self.doc.root.find(path))
+        return self._english_request
+
+    @property
+    def english_response(self):
+        """Response to request to use English media content."""
+
+        if not hasattr(self, "_english_response"):
+            path = "PermissionInformation/PermissionResponse"
+            self._english_response = Doc.get_text(self.doc.root.find(path))
+            if self.response_date:
+                self._english_response += f" ({self.response_date})"
+        return self._english_response
+
+    @property
+    def expiration_date(self):
+        """Date on which the permission expires."""
+
+        if not hasattr(self, "_expiration_date"):
+            path = "PermissionInformation/PermissionExpirationDate"
+            self._expiration_date = Doc.get_text(self.doc.root.find(path))
+        return self._expiration_date
+
+    @property
+    def in_scope(self):
+        """True if the document should be included on the report."""
+
+        if self.control.exp_start or self.control.exp_end:
+            if not self.expiration_date:
                 return False
-        if request.exp:
-            if not request.exp.in_range(self.expiration_date):
+            if self.control.exp_start:
+                if self.control.exp_start > self.expiration_date:
+                    return False
+            if self.control.exp_end:
+                if self.control.exp_end < self.expiration_date:
+                    return False
+        if self.control.req_start or self.control.req_end:
+            if not self.request_date:
                 return False
+            if self.control.req_start:
+                if self.control.req_start > self.request_date:
+                    return False
+            if self.control.req_end:
+                if self.control.req_end < self.request_date:
+                    return False
         return True
 
-class Approval:
-    def __init__(self, doc_id, cursor):
-        query = db.Query("document", "title")
-        query.where(query.Condition("id", doc_id))
-        self.doc_id = doc_id
-        self.title = query.execute(cursor).fetchall()[0][0].split(";")[0]
+    @property
+    def request_date(self):
+        """Date the request was submitted."""
 
-main()
+        if not hasattr(self, "_request_date"):
+            path = "PermissionInformation/PermissionRequestDate"
+            self._request_date = Doc.get_text(self.doc.root.find(path))
+        return self._request_date
+
+    @property
+    def response_date(self):
+        """Date the response to the request was received."""
+
+        if not hasattr(self, "_response_date"):
+            path = "PermissionInformation/PermissionResponseDate"
+            self._response_date = Doc.get_text(self.doc.root.find(path))
+        return self._response_date
+
+    @property
+    def spanish_request(self):
+        """Request for use of Spanish media content."""
+
+        path = "PermissionInformation/SpanishTranslationPermissionRequested"
+        if not hasattr(self, "_spanish_request"):
+            self._spanish_request = Doc.get_text(self.doc.root.find(path))
+            if self.spanish_response:
+                self._spanish_request += f" ({self.spanish_response})"
+        return self._spanish_request
+
+    @property
+    def spanish_response(self):
+        """Response to request to use Spanish media content."""
+
+        path = "PermissionInformation/SpanishTranslationPermissionResponse"
+        if not hasattr(self, "_spanish_response"):
+            self._spanish_response = Doc.get_text(self.doc.root.find(path))
+        return self._spanish_response
+
+    @property
+    def title(self):
+        """Brief title for the Media document."""
+
+        if not hasattr(self, "_title"):
+            try:
+                title = self.doc.title.split(";")[0].strip()
+                self._title = f"{title} (CDR{self.doc.id})"
+            except Exception:
+                self.control.exception("parsing document %r", self.__doc_id)
+                self.control.bail(f"Cannot find document {self.__doc_id!r}")
+        return self._title
+
+    @property
+    def sort_key(self):
+        """Sort by normalized title."""
+
+        if not hasattr(self, "_sort_key"):
+            self._sort_key = self.title.lower()
+        return self._sort_key
+
+
+    class Approval:
+        """Identification of a document for which use is authorized."""
+
+        def __init__(self, media, ref):
+            """Remember the caller's values
+
+            Pass:
+                media - document for the media needing permissions
+                ref - ID of the using document
+            """
+
+            self.__media = media
+            self.__ref = ref
+
+        def __str__(self):
+            """Format the approval for display in the report's table."""
+            return f"{self.title} (CDR{self.doc_id:d})"
+
+        @property
+        def doc_id(self):
+            """Integer parsed from the cdr:ref attribute."""
+
+            if not hasattr(self, "_doc_id"):
+                self._doc_id = Doc.extract_id(self.__ref)
+            return self._doc_id
+
+        @property
+        def title(self):
+            """String for the using document's title."""
+
+            if not hasattr(self, "_title"):
+                doc = Doc(self.__media.control.session, id=self.doc_id)
+                self._title = doc.title.split(";")[0].strip()
+            return self._title
+
+
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+    Control().run()
