@@ -42,13 +42,13 @@ class Control(Controller):
                     "Processing Reports", (
                         (
                             STATUS_REPORT.format("English"),
-                            "Request4344.py",
-                            dict(report="4342"),
+                            "GlossaryConceptByDefinitionStatus.py",
+                            dict(report="English"),
                         ),
                         (
                             STATUS_REPORT.format("Spanish"),
-                            "Request4344.py",
-                            dict(report="4344"),
+                            "GlossaryConceptByDefinitionStatus.py",
+                            dict(report="Spanish"),
                         ),
                         (
                             "Glossary Term Concept Documents Modified Report",
