@@ -140,7 +140,7 @@ class Concept:
     AUDIENCES = "Patient", "Health professional"
     FILTER = "name:Glossary Term Definition Update"
     EN_INGLES = " (en ingl\xe9s)"
-    CSS = "/stylesheets/GlossaryConceptFull.css"
+    CSS = "../../stylesheets/GlossaryConceptFull.css"
 
     def __init__(self, control):
         """Save the control object, which has everything we need.

@@ -5,7 +5,7 @@ h1 span { font-size: 12pt; }
 h2 { font-size: 13pt; margin-top: 50px; }
 img { width: 300px; }
 table { width: 100%; }
-td { vertical-align: top; }
+td { vertical-align: top; word-break: break-word; }
 td:first-child { width: 20%; }
 .attribute { font-style: italic; }
 .blocked, .special { color: red; font-weight: bold; }
