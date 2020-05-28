@@ -395,6 +395,11 @@ class Summary:
         return self._audience
 
     @property
+    def available_as_module(self):
+        """Can this summary be used as a module?"""
+        return self.doc.root.get("AvailableAsModule") == "Yes"
+
+    @property
     def boards(self):
         """Names of the boards which manage this PDQ summary."""
 
@@ -553,6 +558,8 @@ class Summary:
 
         if not hasattr(self, "_title"):
             self._title = Doc.get_text(self.doc.root.find("SummaryTitle"))
+            if self.available_as_module:
+                self._title += " [module]"
         return self._title
 
     @property
