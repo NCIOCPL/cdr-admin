@@ -32,8 +32,6 @@ class Control(Controller):
     SUBTITLE = "Load Glossary Audio Files"
     LOGNAME = "LoadGlossaryAudioFiles"
     AUDIO = "Audio_from_CIPSFTP"
-    SKIPPING = "skipping CDR%d: already done"
-    SKIPPED = "Skipped (already processed)"
     INSTRUCTIONS = (
         "Press the Submit button to create Media documents for the MP3 files "
         "contained in the archive files listed below, and have those "
@@ -91,20 +89,6 @@ class Control(Controller):
         return f"{self.session.tier.basedir}/{self.AUDIO}"
 
     @property
-    def done(self):
-        """CDR document IDs for terms which already have MediaLink elements."""
-
-        if not hasattr(self, "_done"):
-            path = "/GlossaryTermName/%/MediaLink/MediaID/@cdr:ref"
-            query = self.Query("query_term", "doc_id")
-            query.where(f"path LIKE '{path}'")
-            rows = query.execute(self.cursor).fetchall()
-            self._done = {row.doc_id for row in rows}
-            count = len(self._done)
-            self.logger.info("%d documents already processed", count)
-        return self._done
-
-    @property
     def rows(self):
         """Table rows reporting what we did for each document."""
 
@@ -144,15 +128,6 @@ class Control(Controller):
                     # Skip over the column header row.
                     if isinstance(self.get_cell_value(row, 0), (int, float)):
                         mp3 = AudioFile(self, path, zipfile, row)
-
-                        # Log term name docs which already have media links.
-                        if mp3.term_id in self.done:
-                            if mp3.term_id not in skipped:
-                                self.logger.info(self.SKIPPING, mp3.term_id)
-                                row = f"CDR{mp3.term_id}", self.SKIPPED
-                                self.rows.append(row)
-                                skipped.add(mp3.term_id)
-                            continue
 
                         # Check for unexpected multiple occurrences.
                         key = mp3.filename.lower()
@@ -529,10 +504,13 @@ class AudioFile:
             """Get the name and position for this node."""
             self.node = node
             self.name = None
+            self.media_link = None
             self.position = 0
             for child in node:
                 if child.tag in self.BEFORE:
                     self.position += 1
+                    if child.tag == "MediaLink":
+                        self.media_link = child
                 if child.tag == 'TermNameString':
                     self.name = child.text
 
@@ -619,6 +597,9 @@ class Linker(Job):
             root = etree.fromstring(doc.xml)
             for mp3 in self.__control.term_docs[int_id].mp3s:
                 home = mp3.find_link_home(root)
+                if home.media_link is not None:
+                    message = f"{cdr_id} already has {mp3.language} media link"
+                    self.__control.bail(message)
                 home.node.insert(home.position, mp3.link_node)
                 message = self.MESSAGE.format(mp3.media_id)
                 self.__control.rows.append((cdr_id, message))
