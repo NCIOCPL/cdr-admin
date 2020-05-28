@@ -173,7 +173,7 @@ class Control(Controller):
 
         if not hasattr(self, "_filter_set_table"):
             table_requested = self.fields.getvalue("qcFilterSets") == "Y"
-            if table_requested or not self.filter_ids:
+            if table_requested or not self.filter_specs:
                 columns = "Set Name", "Action", "Set Detail"
                 rows = []
                 for filter_set in self.resolved_filter_sets:
@@ -186,18 +186,6 @@ class Control(Controller):
             else:
                 self._filter_set_table = None
         return self._filter_set_table
-
-    @property
-    def resolved_filter_sets(self):
-        """Sequence of `ResolvedFilterSet` objects."""
-
-        if not hasattr(self, "_resolved_filter_sets"):
-            filter_sets = expandFilterSets(self.session)
-            self._resolved_filter_sets = []
-            for name in sorted(filter_sets):
-                filter_set = ResolvedFilterSet(self, filter_sets[name])
-                self._resolved_filter_sets.append(filter_set)
-        return self._resolved_filter_sets
 
     @property
     def filter_specs(self):
@@ -281,6 +269,18 @@ class Control(Controller):
     def redline_strikeout(self):
         """Default is True, but turned off for a bold/underline report."""
         return self.fields.getvalue("rsmarkup") != "false"
+
+    @property
+    def resolved_filter_sets(self):
+        """Sequence of `ResolvedFilterSet` objects."""
+
+        if not hasattr(self, "_resolved_filter_sets"):
+            filter_sets = expandFilterSets(self.session)
+            self._resolved_filter_sets = []
+            for name in sorted(filter_sets):
+                filter_set = ResolvedFilterSet(self, filter_sets[name])
+                self._resolved_filter_sets.append(filter_set)
+        return self._resolved_filter_sets
 
     @property
     def standard_wording(self):
