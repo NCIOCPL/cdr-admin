@@ -34,7 +34,8 @@ class Control(Controller):
         if not self.session.can_do("MODIFY FILTER SET"):
             bail("You are not authorized to use this page")
         try:
-            if self.request == self.SAVE:
+            request = self.request or self.fields.getvalue("action")
+            if request == self.SAVE:
                 return self.save()
             elif self.request == self.DELETE:
                 return self.delete()
@@ -54,6 +55,7 @@ class Control(Controller):
 
         # Capture information in fields behind the scenes.
         page.form.append(page.hidden_field("members", ""))
+        page.form.append(page.hidden_field("action", ""))
         page.form.append(page.hidden_field("id", self.set.id))
 
         # Explain how to use the tool.
