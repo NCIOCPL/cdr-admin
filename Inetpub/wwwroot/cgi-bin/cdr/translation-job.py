@@ -665,7 +665,9 @@ class Job:
         if not hasattr(self, "_banner"):
             self._banner = self.english_title
             if len(self._banner) > 40:
-                self._banner = self._banner[:40] + " ..."
+                self._banner = f"{self._banner[:40]} ..."
+            if self.subtitle:
+                self._banner = f"{self._banner} ({self.subtitle})"
         return self._banner
 
     @property
@@ -840,10 +842,13 @@ class Job:
         """Override for string below banner if we have a Spanish summary."""
 
         if not hasattr(self, "_subtitle"):
-            if self.full_spanish_title is None:
+            if self.spanish_title is None:
                 self._subtitle = None
             else:
-                args = self.spanish_id, self.full_spanish_title
+                title = self.spanish_title
+                if len(title) > 40:
+                    title = f"{title[:40]} ..."
+                args = self.spanish_id, title
                 self._subtitle = "Spanish summary: CDR{} ({})".format(*args)
         return self._subtitle
 
