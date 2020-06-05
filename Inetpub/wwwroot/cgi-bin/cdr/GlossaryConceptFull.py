@@ -908,7 +908,7 @@ class Concept:
 
             doc = Doc(Concept.GUEST, xml=etree.tostring(name))
             result = doc.filter(Concept.FILTER)
-            return html.fromstring(str(result.result_tree))
+            return html.fromstring(str(result.result_tree).strip())
 
         @staticmethod
         def __make_capped_name(node):
