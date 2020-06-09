@@ -26,9 +26,9 @@ class Control(Controller):
 
         page.body.set("class", "admin-menu")
         links = []
-        for group, script, label in self.MENUS:
+        for group, filename, label in self.MENUS:
             if group in self.user.groups:
-                script = script
+                script = filename
                 links.append(page.B.LI(page.menu_link(script, label)))
         if not links:
             script = "GuestUsers.py"
