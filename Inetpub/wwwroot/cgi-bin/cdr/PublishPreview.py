@@ -471,7 +471,7 @@ class GTN:
         """`Doc` object for the GlossaryTermName document."""
 
         if not hasattr(self, "_doc"):
-            version = self.__control.version or "lastp"
+            version = self.__control.version or None
             if version == "cwd":
                 version = None
             opts = dict(id=self.__control.id, version=version)
