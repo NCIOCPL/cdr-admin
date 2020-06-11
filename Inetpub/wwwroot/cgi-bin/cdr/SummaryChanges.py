@@ -88,7 +88,7 @@ class Control(Controller):
             self.show_form()
         title = self.doc.title.split(";")[0]
         if self.all:
-            description = "Changes made over the life of the summary"
+            description = "Complete history of changes in the CDR"
         elif self.start:
             if self.end:
                 description = f"Changes made {self.start} through {self.end}"
@@ -97,7 +97,7 @@ class Control(Controller):
         elif self.end:
             description = f"Changes made through {self.end}"
         else:
-            description = "Changes made over the life of the summary"
+            description = "Complete history of changes in the CDR"
         span = B.SPAN(description)
         title = B.H2(title, B.BR(), span, id="summary-title")
         self.report.page.form.append(title)
