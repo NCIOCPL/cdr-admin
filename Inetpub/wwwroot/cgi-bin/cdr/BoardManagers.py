@@ -59,12 +59,12 @@ class Control(Controller):
             page.menu_link(
                 "SummaryMailerReport.py",
                 "Summary Mailer History Report",
-                flavor="4259"
+                flavor="history"
             ),
             page.menu_link(
                 "SummaryMailerReport.py",
                 "Summary Mailer Report",
-                flavor="4258"
+                flavor="standard"
             ),
         )
         items = [page.B.LI(link) for link in links]

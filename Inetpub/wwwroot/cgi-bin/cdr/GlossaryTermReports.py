@@ -26,7 +26,11 @@ class Control(Controller):
                         ),
                         (
                             "Glossary Term Concept By Type Report",
-                            "Request4486.py",
+                            "GlossaryConceptByTypeReport.py",
+                        ),
+                        (
+                            "Health Professional Glossary Terms Report",
+                            "HPGlossaryTermsReport.py",
                         ),
                         (
                             "Pronunciation by Glossary Term Stem Report",
@@ -38,13 +42,13 @@ class Control(Controller):
                     "Processing Reports", (
                         (
                             STATUS_REPORT.format("English"),
-                            "Request4344.py",
-                            dict(report="4342"),
+                            "GlossaryConceptByDefinitionStatus.py",
+                            dict(report="English"),
                         ),
                         (
                             STATUS_REPORT.format("Spanish"),
-                            "Request4344.py",
-                            dict(report="4344"),
+                            "GlossaryConceptByDefinitionStatus.py",
+                            dict(report="Spanish"),
                         ),
                         (
                             "Glossary Term Concept Documents Modified Report",
@@ -68,7 +72,7 @@ class Control(Controller):
                     "Publication Reports", (
                         (
                             "New Published Glossary Terms",
-                            "Request4333.py",
+                            "NewlyPublishedGlossaryTerms.py",
                         ),
                         (
                             "Publish Preview",
@@ -93,7 +97,7 @@ class Control(Controller):
                             dict(
                                 DocType="GlossaryTermName",
                                 ReportType="gtnwc",
-                                DocVersion="-1",
+                                DocVersion="0",
                             ),
                         ),
                     ),
@@ -112,7 +116,7 @@ class Control(Controller):
                         (
                             "Glossary Term Name QC Report",
                             "QcReport.py",
-                            dict(DocType="GlossaryTermName", DocVersion="-1"),
+                            dict(DocType="GlossaryTermName", DocVersion="0"),
                         ),
                     ),
                 ),

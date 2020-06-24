@@ -83,6 +83,7 @@ class Control(Controller):
         self.logger.debug("populate_form(): self.sql=%s", self.sql)
         rows = sql.count("\n") + 2
         textarea = page.textarea("sql", label="SQL", value=sql, rows=rows)
+        textarea.set("spellcheck", "false")
         fieldset.append(textarea)
         page.form.append(fieldset)
 

@@ -55,9 +55,9 @@ class Control(Controller):
         for display, script, parms in (
             ("Miscellaneous Documents", "MiscSearch.py", {}),
             ("Summary Mailer History Report", "SummaryMailerReport.py",
-             dict(flavor="4259")),
+             dict(flavor="historical")),
             ("Summary Mailer Report", "SummaryMailerReport.py",
-             dict(flavor="4258")),
+             dict(flavor="standard")),
         ):
             ol.append(page.B.LI(page.menu_link(script, display, **parms)))
 
@@ -67,7 +67,7 @@ class Control(Controller):
         ol = page.B.OL()
         page.form.append(ol)
         script = "QcReport.py"
-        parms = dict(DocType="Summary", DocVersion="-1")
+        parms = dict(DocType="Summary", DocVersion="0")
         for display, report_type in (
             ("HP Bold/Underline QC Report", "bu"),
             ("HP Redline/Strikeout QC Report", "rs"),

@@ -9,7 +9,7 @@ class Control(Controller):
 
     SUBTITLE = "Media Reports"
     SUBMIT = None
-    QC_PARMS = dict(DocType="Media", ReportType="img", DocVersion="-1")
+    QC_PARMS = dict(DocType="Media", ReportType="img", DocVersion="0")
 
     def populate_form(self, page):
         page.body.set("class", "admin-menu")
@@ -22,9 +22,10 @@ class Control(Controller):
             ("Linked Media Documents", "MediaLinks.py"),
             ("Media Caption and Content Report", "MediaCaptionContent.py"),
             ("Media Doc Publishing Report", "PublishedMediaDocuments.py"),
-            ("Media (Images) Processing Status Report", "ocecdr-4038.py"),
+            ("Media (Images) Processing Status Report",
+             "ImageMediaProcessingStatusReport.py"),
             ("Media Lists", "MediaLists.py"),
-            ("Media Permissions Report", "ocecdr-3704.py"),
+            ("Media Permissions Report", "MediaPermissionsReport.py"),
             ("Media Translation Job Workflow Report",
              "media-translation-job-report.py"),
         ):

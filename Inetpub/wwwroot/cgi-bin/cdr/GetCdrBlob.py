@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 #----------------------------------------------------------------------
 # Stream media blob over HTTP directly from the CDR database.  We do
 # this to avoid limitations imposed on memory usage within the CDR

@@ -26,7 +26,6 @@ class Control(Controller):
         page.form.append(ol)
         for display, script in (
             ("Citations Linked to Summaries", "CitationsInSummaries.py"),
-            ("Modified PubMed Documents", "ModifiedPubMedDocs.py"),
             ("New Citations Report", "NewCitations.py"),
         ):
             ol.append(page.B.LI(page.menu_link(script, display)))

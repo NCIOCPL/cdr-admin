@@ -13,7 +13,8 @@ class Control(Controller):
     """Access to the database and report-generation tools."""
 
     SUBTITLE = "Media Doc Publishing Report"
-    AUDIENCES = "Patients", "Health Professionals"
+    AUDIENCES = "Patients", "Health_Professionals"
+    LANGUAGES = "English", "Spanish"
     PATHS = (
         "/Media/MediaContent/Captions/MediaCaption/@audience",
         "/Media/MediaContent/ContentDescriptions/ContentDescription/@audience",
@@ -53,12 +54,23 @@ class Control(Controller):
 
         end = datetime.date.today()
         start = end - datetime.timedelta(7)
+
+        fieldset = page.fieldset("Language(s)")
+        for language in self.LANGUAGES:
+            if language == "English":
+                opts = dict(value=language, checked=True)
+            else:
+                opts = dict(value=language)
+            fieldset.append(page.checkbox("language", **opts))
+        page.form.append(fieldset)
+
         fieldset = page.fieldset("Date Range")
         fieldset.append(page.date_field("start", value=start))
         fieldset.append(page.date_field("end", value=end))
         page.form.append(fieldset)
         page.form.append(page.hidden_field("doctype", "Media"))
         page.form.append(page.hidden_field("VOL", "Y"))
+
         fieldset = page.fieldset("Audience(s)")
         for audience in self.AUDIENCES:
             opts = dict(value=audience, checked=True)
@@ -75,6 +87,17 @@ class Control(Controller):
             if len(audiences) == 1:
                 self._audience = audiences[0]
         return self._audience
+
+    @property
+    def language(self):
+        """Language selected from the form, if only one."""
+
+        if not hasattr(self, "_language"):
+            self._language = None
+            languages = self.fields.getlist("language")
+            if len(languages) == 1:
+                self._language = languages[0]
+        return self._language
 
     @property
     def end(self):
@@ -104,15 +127,32 @@ class Control(Controller):
         query.join("query_term c", "t.doc_id = c.doc_id")
         query.outer("query_term b", "t.doc_id = b.doc_id",
                     "b.path = '/Media/@BlockedFromVOL'")
+        # The l.value identifies the language (see below)
+        query.outer("query_term l", "t.doc_id = l.doc_id",
+                    "l.path = '/Media/TranslationOf/@cdr:ref'")
         query.where("t.path = '/Media/MediaTitle'")
         query.where("c.path = '/Media/MediaContent/Categories/Category'")
         query.where("c.value NOT IN ('pronunciation', 'meeting recording')")
         query.where(query.Condition("d.id", subquery, "IN"))
         query.where(query.Condition("v.num", last_ver))
+
+        # The language is determined indirectly.  If a TranslationOf
+        # element exists the document is a Spanish translation, 
+        # otherwise the document is English.  This where-clause 
+        # adjusts the query accordingly.  If either both or none of
+        # the languages are selected the report displays both
+        # languages.
+        # ---------------------------------------------------------
+        if self.language == 'English':
+            query.where("l.value IS NULL") # English
+        elif self.language == 'Spanish':
+            query.where("l.value IS NOT NULL") # Spanish
+
         if self.audience:
+            audience = self.audience.replace(" ", "_")
             query.join("query_term_pub a", "a.doc_id = d.id")
             query.where(query.Condition("a.path", self.PATHS, "IN"))
-            query.where(query.Condition("a.value", self.audience))
+            query.where(query.Condition("a.value", audience))
         rows = []
         for row in query.execute(self.cursor).fetchall():
             #for id, title, first, verDt, audDt, volFlag, ver, \

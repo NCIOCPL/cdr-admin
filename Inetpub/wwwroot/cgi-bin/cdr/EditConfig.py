@@ -27,7 +27,9 @@ class Control(Controller):
             options=self.files,
         )
         fieldset.append(page.select("filename", **opts))
-        fieldset.append(page.textarea("content", value=self.content))
+        textarea = page.textarea("content", value=self.content)
+        textarea.set("spellcheck", "false")
+        fieldset.append(textarea)
         page.form.append(fieldset)
         page.add_css("""\
 xbody { background: #fcfcfc; }

@@ -9,9 +9,9 @@ class Control(Controller):
 
     SUBTITLE = "Drug Information Reports"
     SUBMIT = None
-    QC_PARMS = dict(DocType="DrugInformationSummary", DocVersion="-1")
+    QC_PARMS = dict(DocType="DrugInformationSummary", DocVersion="0")
     PP_PARMS = dict(DocType="DrugInformationSummary", ReportType="pp")
-    PP_PARMS["DocVersion"] = "-1"
+    PP_PARMS["DocVersion"] = "0"
 
     def populate_form(self, page):
         page.body.set("class", "admin-menu")
@@ -31,7 +31,10 @@ class Control(Controller):
             ("Drug Date Last Modified", "DrugDateLastModified.py"),
             ("Drug Description Report", "DrugDescriptionReport.py"),
             ("Drug Indications Report", "DrugIndicationsReport.py"),
+            ("Drug Information Comprehensive Review Date Report",
+             "DrugCRD.py"),
             ("Drug Information Summaries Lists", "DISLists.py"),
+            ("Drug Processing Status Report", "DISProcessingStatusReport.py"),
             ("Drug Summaries with Markup Report", "DISWithMarkup.py"),
         ):
             ol.append(page.B.LI(page.menu_link(script, display)))

@@ -1,117 +1,207 @@
-#----------------------------------------------------------------------
-# CDR document XML viewer
-#----------------------------------------------------------------------
-import cdr
-import cdrcgi
-from cdrapi import db
+#!/usr/bin/env python
 
-class Control(cdrcgi.Control):
-    """
-    Override base class to generate specific report.
-    """
+"""Show the XML for CDR documents.
+"""
 
+from collections import OrderedDict
+from cdrcgi import Controller
+from cdrapi.docs import Doc, Doctype
+
+
+class Control(Controller):
+    """Access to the database and to report-creation tools."""
+
+    SUBTITLE = "CDR Document Viewer"
     LOGNAME = "cdr-document-viewer"
+    BY_ID = "id"
+    BY_TITLE = "title"
+    SELECTION_METHODS = (
+        (BY_ID, "By document ID", True),
+        (BY_TITLE, "By document title", False),
+    )
+    VHELP = (
+        "Integer (negative for recent versions: -1 is last version saved; "
+        "-2 is next-to-last version, etc.)"
+    )
+    VERSION_TYPES = OrderedDict([
+        ("cwd", "Current working document"),
+        ("latest", "Most recently created version"),
+        ("lastpub", "Most recently created publishable version"),
+        ("exported", "Filtered XML most recently sent to cancer.gov"),
+        ("num", "Version by number"),
+    ])
+    TITLE_HELP = (
+        "Use SQL wildcards (e.g., liver cancer%) unless you only want "
+        "documents whose document title is an exact match (ignoring case) "
+        "with the Title field. "
+        "You can also optionally select one or more document "
+        "types to narrow the selection."
+    )
+    CSS = "../../stylesheets/ShowCdrDocument.css"
+    SCRIPT = "../../js/ShowCdrDocument.js"
 
-    def __init__(self):
-        """
-        Gather form parameters, applying defaults as needed.
+    def populate_form(self, page):
+        """Let the user pick a document by ID or by title."""
 
-        Validation is done later.
-        """
-        cdrcgi.Control.__init__(self, "CDR Document Viewer")
-        self.method = self.fields.getvalue("method") or "id"
-        self.doc_id = self.fields.getvalue("doc-id") or ""
-        self.fragment = self.fields.getvalue("title") or ""
-        self.doctypes = self.fields.getlist("doctype")
-        self.vtype = self.fields.getvalue("vtype") or "cwd"
-        self.version = self.fields.getvalue("version") or ""
-
-    def run(self):
-        """
-        Override of the base class method to support immediately
-        display without the CGI form.
-        """
-
-        if self.doc_id:
+        if self.xml:
             self.show_report()
-        cdrcgi.Control.run(self)
+        elif self.titles:
+            self.logger.info("showing %d titles", len(self.titles))
+            version = self.fields.getvalue("version", "").strip()
+            page.form.append(page.hidden_field("selection_method", self.BY_ID))
+            page.form.append(page.hidden_field("version", version))
+            page.form.append(page.hidden_field("vtype", self.version_type))
+            fieldset = page.fieldset("Choose Document")
+            for title in self.titles:
+                opts = dict(value=title.value, label=title.label)
+                if title.tooltip:
+                    opts["tooltip"] = title.tooltip
+                fieldset.append(page.radio_button("doc-id", **opts))
+            page.form.append(fieldset)
+            page.add_css("fieldset { width: 1024px; }")
+            self.new_tab_on_submit(page)
+        else:
+            fieldset = page.fieldset("Selection Method")
+            for value, label, checked in self.SELECTION_METHODS:
+                opts = dict(value=value, label=label, checked=checked)
+                fieldset.append(page.radio_button("selection_method", **opts))
+            page.form.append(fieldset)
+            fieldset = page.fieldset("Document ID", id="by-id-block")
+            fieldset.append(page.text_field("doc-id", label="CDR ID"))
+            page.form.append(fieldset)
+            fieldset = page.fieldset("Title Or Title Pattern")
+            fieldset.set("id", "by-title-block")
+            fieldset.append(page.B.P(self.TITLE_HELP))
+            fieldset.append(page.text_field("title"))
+            opts = dict(label="Doc Type", options=self.doctypes, multiple=True)
+            fieldset.append(page.select("doctype", **opts))
+            page.form.append(fieldset)
+            fieldset = page.fieldset("Document Version")
+            checked = True
+            for value, label in self.VERSION_TYPES.items():
+                opts = dict(value=value, label=label, checked=checked)
+                #if value == "num":
+                #    opts["wrapper_id"] = "num-div"
+                fieldset.append(page.radio_button("vtype", **opts))
+                checked=False
+            page.form.append(fieldset)
+            fieldset = page.fieldset("Version Number")
+            fieldset.set("id", "version-number-block")
+            fieldset.append(page.text_field("version", tooltip=self.VHELP))
+            page.form.append(fieldset)
+            page.head.append(page.B.LINK(href=self.CSS, rel="stylesheet"))
+            page.head.append(page.B.SCRIPT(src=self.SCRIPT))
 
     def show_report(self):
-        """
-        Display the version of the CDR document requested by the user.
+        """Display the version of the CDR document requested by the user."""
 
-        If match_title() is called and finds more than one match,
-        it puts up a chained form for selecting one of the matched
-        documents, never returning to this method.
-        """
-
-        doc_id = self.method == "title" and self.match_title() or self.doc_id
-        if not doc_id:
-            cdrcgi.bail("Missing document ID")
-        try:
-            doc_id = cdr.exNormalize(doc_id)[1]
-        except Exception:
-            cdrcgi.bail("Invalid document ID")
-        if self.vtype == "exported":
-            query = db.Query("pub_proc_cg", "xml")
-            what = "exported XML"
+        if not self.xml:
+            if self.selection_method == self.BY_TITLE and self.fragment:
+                if not self.titles:
+                    self.bail("No matching documents found")
+            elif self.id:
+                if self.version_type == "exported":
+                    self.bail(f"CDR{self.id} not published")
+                elif self.version == 0:
+                    self.bail(f"CDR{self.id} not found")
+                elif self.version:
+                    self.bail(f"CDR{self.id} version {self.version} not found")
+            self.show_form()
         else:
-            version = self.get_version(doc_id)
-            if version:
-                query = db.Query("doc_version", "xml")
-                query.where(query.Condition("num", version))
-                what = "version %s" % version
+            self.send_page(self.xml, text_type="xml")
+
+    @property
+    def doctype(self):
+        """Document type string(s) selected by the user to narrow search."""
+
+        if not hasattr(self, "_doctype"):
+            self._doctype = self.fields.getlist("doctype")
+            if set(self._doctype) - set(self.doctypes):
+                self.bail()
+        return self._doctype
+
+    @property
+    def doctypes(self):
+        """Valid value strings for available CDR document types."""
+
+        if not hasattr(self, "_doctypes"):
+            self._doctypes = Doctype.list_doc_types(self.session)
+        return self._doctypes
+
+    @property
+    def fragment(self):
+        """String for matching CDR document by title substring."""
+
+        if not hasattr(self, "_fragment"):
+            self._fragment = self.fields.getvalue("title", "").strip()
+        return self._fragment
+
+    @property
+    def id(self):
+        """Integer for the document to be displayed."""
+
+        if not hasattr(self, "_id"):
+            self._id = self.fields.getvalue("doc-id")
+            if self._id:
+                try:
+                    self._id = Doc.extract_id(self._id)
+                except Exception:
+                    self.bail("invalid document ID format")
+            elif len(self.titles) == 1:
+                self._id = self.titles[0].value
+        return self._id
+
+    @property
+    def method(self):
+        """Carry the parameters in the URL."""
+        return "GET"
+
+    @property
+    def selection_method(self):
+        """How the user wants to select the document to show."""
+
+        if not hasattr(self, "_selection_method"):
+            methods = [method[0] for method in self.SELECTION_METHODS]
+            method = self.fields.getvalue("selection_method", "id")
+            if method not in methods:
+                self.bail()
             else:
-                what = "current working document"
-                query = db.Query("document", "xml")
-        query.where(query.Condition("id", doc_id))
-        rows = query.execute(self.cursor).fetchall()
-        if not rows:
-            cdrcgi.bail("document not currently exported")
-        self.logger.info("showing %s for CDR%d", what, doc_id)
-        cdrcgi.sendPage(rows[0][0], "xml")
+                self._selection_method = method
+        return self._selection_method
 
-    def populate_form(self, form, title=None):
-        """
-        Let the user pick a document by ID or by title.
-        """
+    @property
+    def titles(self):
+        """Find documents matching the specified title fragment."""
 
-        doctypes = self.get_doctypes()
-        form.add("<fieldset>")
-        form.add(form.B.LEGEND("Selection Method"))
-        form.add_radio("method", "By document ID", "id", checked=True)
-        form.add_radio("method", "By document title", "title")
-        form.add("</fieldset>")
-        form.add('<fieldset id="by-id-block">')
-        form.add(form.B.LEGEND("Document ID"))
-        form.add_text_field("doc-id", "CDR ID")
-        form.add("</fieldset>")
-        form.add('<fieldset id="by-title-block" class="xxhidden">')
-        form.add(form.B.LEGEND("Title Or Title Pattern"))
-        form.add(self.TITLE_HELP)
-        form.add_text_field("title", "Title")
-        form.add_select("doctype", "Doc Type", doctypes, multiple=True)
-        form.add("</fieldset>")
-        form.add("<fieldset>")
-        form.add(form.B.LEGEND("Document Version"))
-        checked = True
-        for vtype in self.VERSION_TYPES:
-            label = self.VERSION_TYPE_LABELS[vtype]
-            if vtype == "num":
-                form.add_radio("vtype", label, vtype, wrapper_id="num-div")
-            else:
-                form.add_radio("vtype", label, vtype, checked=checked)
-            checked=False
-        form.add("</fieldset>")
-        form.add('<fieldset id="version-number-block" class="xxhidden">')
-        form.add(form.B.LEGEND("Version Number"))
-        form.add_text_field("version", "Version", tooltip=self.VHELP)
-        form.add("</fieldset>")
-        form.add_script(self.SCRIPT)
+        if not hasattr(self, "_titles"):
+            self._titles = []
+            if self.fragment and self.selection_method == self.BY_TITLE:
+                fragment = self.fragment
+                query = self.Query("document d", "d.id", "d.title", "t.name")
+                query.join("doc_type t", "t.id = d.doc_type")
+                query.where(query.Condition("d.title", fragment, "LIKE"))
+                if self.doctype:
+                    query.where(query.Condition("t.name", self.doctype, "IN"))
+                    types = ", ".join(sorted(self.doctype))
+                    self.logger.info("matching %r in %s", fragment, types)
+                else:
+                    self.logger.info("matching title fragment %r", fragment)
+                rows = query.order("d.id").execute(self.cursor).fetchall()
+                class Doc:
+                    def __init__(self, row):
+                        self.value = row.id
+                        self.tooltip = None
+                        self.label = f"CDR{row.id:d} [{row.name}] {row.title}"
+                        if len(self.label) > 125:
+                            self.tooltip = self.label
+                            self.label = self.label[:125] + "..."
+                for row in rows:
+                    self._titles.append(Doc(row))
+        return self._titles
 
-    def get_version(self, doc_id):
-        """
-        Return the integer version number for the user's request.
+    @property
+    def version(self):
+        """Integer version number for the user's request.
 
         Most often the user will request a version generically
         (latest version created, latest publishable version, etc.)
@@ -122,161 +212,70 @@ class Control(cdrcgi.Control):
         unlikely to know the numbers of the versions).
         """
 
-        if self.vtype == "cwd":
-            query = db.Query("document", "id")
-            query.where(query.Condition("id", doc_id))
-            rows = query.execute(self.cursor).fetchall()
-            if not rows:
-                cdrcgi.bail("CDR%d not found" % doc_id)
-            return None
-        if self.vtype == "latest":
-            query = db.Query("doc_version", "MAX(num)")
-            query.where(query.Condition("id", doc_id))
-            rows = query.execute(self.cursor).fetchall()
-            if not rows:
-                cdrcgi.bail("no versions found for CDR%d" % doc_id)
-            return rows[0][0]
-        if self.vtype == "lastpub":
-            query = db.Query("publishable_version", "MAX(num)")
-            query.where(query.Condition("id", doc_id))
-            rows = query.execute(self.cursor).fetchall()
-            if not rows:
-                cdrcgi.bail("no publishable versions found for CDR%d" % doc_id)
-            return rows[0][0]
-        if self.version.startswith("-"): # -1 is latest, -2 next-to-last, etc.
-            version = self.version[1:]
-            if not version.isdigit():
-                cdrcgi.bail("invalid version")
-            back = int(version)
-            query = db.Query("doc_version", "num").limit(back)
-            query.where(query.Condition("id", doc_id))
-            rows = query.order("num DESC").execute(self.cursor).fetchall()
-            if not rows:
-                cdrcgi.bail("no versions found for CDR%d" % doc_id)
-            elif len(rows) < back:
-                cdrcgi.bail("only %d versions found for CDR%d" %
-                            (len(rows), doc_id))
-            return rows[-1][0]
-        if not self.version.isdigit():
-            cdrcgi.bail("invalid version")
-        query = db.Query("doc_version", "num")
-        query.where(query.Condition("id", doc_id))
-        query.where(query.Condition("num", self.version))
-        rows = query.execute(self.cursor).fetchall()
-        if not rows:
-            cdrcgi.bail("version %s not found for CDR%d" % (self.version,
-                                                            doc_id))
-        return rows[0][0]
+        if not hasattr(self, "_version"):
+            self._version = None
+            if self.id:
+                if self.version_type == "cwd":
+                    self._version = 0
+                else:
+                    doc = Doc(self.session, id=self.id)
+                if self.version_type == "latest":
+                    self._version = doc.last_version
+                elif self.version_type == "lastpub":
+                    self._version = doc.last_publishable_version
+                elif self.version_type == "num":
+                    version = self.fields.getvalue("version", "").strip()
+                    try:
+                        self._version = int(version)
+                    except Exception:
+                        self.bail("invalid version")
+                    if self._version < 0:
+                        back = abs(self._version)
+                        versions = doc.list_versions(limit=back)
+                        if len(versions) == back:
+                            self._version = versions[-1][0]
+        return self._version
 
-    def match_title(self):
-        """
-        Find documents matching the specified title fragment.
+    @property
+    def version_type(self):
+        """How the user wants to identify the selected version."""
 
-        If exactly one document is found, return its ID.
-        If more than one match is found, put up a picker form.
-        If no documents match, display an error message.
-        """
+        if not hasattr(self, "_version_type"):
+            self._version_type = self.fields.getvalue("vtype", "cwd")
+            if self._version_type not in self.VERSION_TYPES:
+                self.bail()
+        return self._version_type
 
-        fragment = self.fragment.strip()
-        if not fragment:
-            cdrcgi.bail("Missing title")
-        query = db.Query("document d", "d.id", "d.title", "t.name")
-        query.join("doc_type t", "t.id = d.doc_type")
-        query.where(query.Condition("d.title", fragment, "LIKE"))
-        if self.doctypes:
-            query.where(query.Condition("t.name", self.doctypes, "IN"))
-            types = ", ".join(sorted(self.doctypes))
-            self.logger.info("matching %r in %s", fragment, types)
-        else:
-            self.logger.info("matching title fragment %r", fragment)
-        rows = query.order("d.id").execute(self.cursor).fetchall()
-        if not rows:
-            cdrcgi.bail("No matching documents found")
-        if len(rows) == 1:
-            return rows[0][0]
-        opts = {
-            "buttons": self.buttons,
-            "action": self.script,
-            "subtitle": self.title,
-            "session": self.session
-        }
-        self.logger.info("putting up picker form for %d matches", len(rows))
-        form = cdrcgi.Page(self.PAGE_TITLE, **opts)
-        form.add_hidden_field("method", "by-id")
-        form.add_hidden_field("version", self.version)
-        form.add_hidden_field("vtype", self.vtype)
-        form.add('<fieldset style="width: 1024px">')
-        form.add(form.B.LEGEND("Choose Document"))
-        for doc_id, title, doctype in rows:
-            tooltip = None
-            display = "CDR%d [%s] %s" % (doc_id, doctype, title)
-            if len(display) > 125:
-                display, tooltip = display[:125] + "...", display
-            form.add_radio("doc-id", display, doc_id, tooltip=tooltip)
-        form.add("</fieldset>")
-        self.new_tab_on_submit(form)
-        form.send()
+    @property
+    def xml(self):
+        """What we came to display."""
 
-    def get_doctypes(self):
-        """
-        Get the names of the active document types for the form picklist.
-        """
+        if not hasattr(self, "_xml"):
+            self._xml = what = None
+            if self.id:
+                if self.version_type == "exported":
+                    query = self.Query("pub_proc_cg", "xml")
+                    query.where(query.Condition("id", self.id))
+                    row = query.execute(self.cursor).fetchone()
+                    if row:
+                        self._xml = row.xml
+                        what = "exported XML"
+                elif self.version is not None:
+                    doc = Doc(self.session, id=self.id, version=self.version)
+                    try:
+                        self._xml = doc.xml
+                        if doc.version:
+                            what = f"version {doc.version:d}"
+                        else:
+                            what = "current working document"
+                    except Exception:
+                        message = "fetching XML for CDR%dV%d"
+                        self.logger.exception(message, self.id, self.version)
+                if what:
+                    self.logger.info("showing %s for CDR%d", what, self.id)
+        return self._xml
 
-        query = db.Query("doc_type", "name")
-        query.where("active = 'Y'")
-        query.where("xml_schema IS NOT NULL")
-        rows = query.order("name").execute(self.cursor).fetchall()
-        return [row[0] for row in rows]
 
-    VHELP = (
-        "Integer (negative for recent versions: -1 is last version saved; "
-        "-2 is next-to-last version, etc.)"
-    )
-    VERSION_TYPE_LABELS = {
-        "cwd": "Current working document",
-        "latest": "Most recently created version",
-        "lastpub": "Most recently created publishable version",
-        "exported": "Filtered XML most recently sent to cancer.gov",
-        "num": "Version by number"
-    }
-    VERSION_TYPES = "cwd", "latest", "lastpub", "exported", "num"
-    TITLE_HELP = (
-        '<p style="color: green; font-style: italic; font; font-size: 11pt">'
-        "Use the wildcards (e.g., liver cancer%) unless you only want "
-        "documents whose document title is an exact match (ignoring case) "
-        "with the Title field. "
-        "You can also optionally select one or more document "
-        "types to narrow the selection.</p>"
-    )
-    SCRIPT = """\
-function check_method(method) {
-    switch (method) {
-        case "id":
-            jQuery("#by-id-block").show();
-            jQuery("#by-title-block").hide();
-            jQuery("#num-div").show();
-            break;
-        case "title":
-            jQuery("#by-id-block").hide();
-            jQuery("#by-title-block").show();
-            jQuery("#num-div").hide();
-            jQuery("#version-number-block").hide();
-            if (jQuery("#vtype-num").prop("checked")) {
-                jQuery("#vtype-num").prop("checked", false);
-                jQuery("#vtype-cwd").prop("checked", true);
-            }
-            break;
-    }
-}
-function check_vtype(vtype) {
-    if (vtype == "num")
-        jQuery("#version-number-block").show();
-    else
-        jQuery("#version-number-block").hide();
-}
-jQuery(function() {
-    check_vtype(jQuery("input[name='vtype']:checked").val());
-    check_method(jQuery("input[name='method']:checked").val());
-});"""
-
-Control().run()
+if __name__ == "__main__":
+    """Don't run the script if loaded as a module."""
+    Control().run()

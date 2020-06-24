@@ -36,7 +36,7 @@ class Control(Controller):
         """Override the base class version because this isn't a report."""
 
         if self.request:
-            Controller(self).run()
+            Controller.run(self)
         else:
             if not self.session.can_do(self.USE_PUBLISHING_SYSTEM):
                 self.bail("Permission denied.")

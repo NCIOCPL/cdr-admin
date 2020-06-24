@@ -1,4 +1,4 @@
-#!/usr/bin/env
+#!/usr/bin/env python
 
 """Show the status of a publishing job.
 """
@@ -27,7 +27,9 @@ class Control(Controller):
         """Override the base class method to customize routing."""
 
         try:
-            if self.request == self.DETAILS:
+            if self.request == self.SUBMIT and not (self.start and self.end):
+                self.show_form()
+            elif self.request == self.DETAILS:
                 self.show_report()
             elif not self.request and (self.id or self.start and self.end):
                 self.show_report()
@@ -64,20 +66,10 @@ class Control(Controller):
             opts = dict(columns=self.columns, caption=self.caption)
             return self.Reporter.Table(self.rows, **opts)
 
-    def show_report(self):
-        """Override base class version to customize the form."""
-
-        if self.request == self.SUBMIT and not (self.start and self.end):
-            self.show_form()
-        if self.job_details:
-            page = self.report.page
-            form = page.form
-            form.append(page.hidden_field("id", self.id))
-            if not self.job_details.show_details:
-                button = page.button(self.DETAILS)
-                buttons = form.find("header/h1/span")
-                buttons.insert(0, button)
-        self.report.send()
+    @property
+    def buttons(self):
+        """Customize buttons (see OCECDR-4753)."""
+        return self.SUBMIT, self.DEVMENU, self.LOG_OUT
 
     @property
     def caption(self):
@@ -161,11 +153,11 @@ class Control(Controller):
             query.where(query.Condition("pub_system", self.pub_system))
             query.where(query.Condition("started", self.start, ">="))
             query.where(query.Condition("started", end, "<="))
-            #query.where("status in ('Success', 'Verifying')")
             if self.job_type and self.job_type != "All":
                 push_type = f"Push_Documents_To_Cancer.Gov_{self.job_type}"
                 types = self.job_type, push_type
                 query.where(query.Condition("pub_subset", types, "IN"))
+            query.log()
             rows = query.execute(self.cursor).fetchall()
             self._jobs = [Job(self, row) for row in rows]
         return self._jobs
@@ -201,6 +193,35 @@ class Control(Controller):
             query.where("d.title = 'Primary'")
             self._pub_system = query.execute(self.cursor).fetchall()[0].id
         return self._pub_system
+
+    @property
+    def report(self):
+        """Customize the buttons for this report  (see OCECDR-4753)."""
+
+        if not hasattr(self, "_report"):
+            tables = self.build_tables()
+            buttons = []
+            if self.job_details and not self.job_details.show_details:
+                buttons = [self.HTMLPage.button(self.DETAILS)]
+            buttons += [
+                self.HTMLPage.button(self.DEVMENU),
+                self.HTMLPage.button(self.LOG_OUT),
+            ]
+            opts = {
+                "banner": self.title,
+                "footer": self.footer,
+                "subtitle": self.subtitle,
+                "no_results": self.no_results,
+                "page_opts": {
+                    "buttons": buttons,
+                    "session": self.session,
+                    "action": self.script,
+                }
+            }
+            self._report = self.Reporter(self.title, tables, **opts)
+            page = self._report.page
+            page.form.append(page.hidden_field("id", self.id))
+        return self._report
 
     @property
     def rows(self):

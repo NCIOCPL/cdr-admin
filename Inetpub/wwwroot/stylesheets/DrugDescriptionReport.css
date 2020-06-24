@@ -1,0 +1,61 @@
+.report-date {
+    font-size: .8em;
+}
+.report-count {
+    font-size: .7em;
+}
+.dis, hr {
+    width: 80%;
+    margin: 10px auto;
+}
+hr {
+    margin: 0 auto 25px;
+}
+.dis, .dis tr * {
+    border: none;
+    background: transparent;
+}
+.dis > th {
+    padding-right: 5px;
+}
+.dis th, .dis td {
+    color: black;
+    vertical-align: top;
+}
+.dis th {
+    text-align: left;
+    padding-right: 5px;
+}
+.dis p:first-child {
+    padding-top: 0;
+    margin-top: 0;
+}
+.dis table tbody {
+    border: solid black 1px;
+}
+.dis table, .dis table * {
+    margin: 0;
+}
+.dis table caption {
+    padding-left: 0;
+    text-align: left;
+    color: black;
+    font-size: 14px;
+}
+.dis table td {
+    padding: 3px 3px 0 0;
+}
+.dis table tr td:first-child {
+    padding: 3px 3px 0 3px;
+}
+.dis table tr:last-child td {
+    padding-bottom: 3px;
+}
+@media print {
+    .dis, hr {
+        width: 100%;
+    }
+    header {
+        display: none;
+    }
+}

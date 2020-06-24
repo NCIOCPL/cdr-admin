@@ -1,262 +1,365 @@
-#----------------------------------------------------------------------
-# Report on lists of summaries.
-#
-# BZIssue::1010 - Initial report
-# BZIssue::1011 - Initial report
-# BZIssue::3204 - Added count of summaries per board; display fix
-# BZIssue::3716 - Unicode encoding cleanup
-# BZIssue::5177 - Adding a Table Option to the Summaries Lists Report
-# BZIssue::5273 - Identifying Modules in Summary Reports
-# JIRA::OCECDR-3721 - Additional blank columns
-# OCECDR-3899: Modify Summaries Lists report to display Spanish CAM
-#              summaries
-# Rewritten July 2015 to eliminate security vulnerabilities
-# OCECDR-3991: Modify Summaries List Report to retrieve publishable summaries
-# OCECDR-4020: add option to include modules
-#----------------------------------------------------------------------------
-import cdr
-import cdrcgi
-from cdrapi import db
-import cgi
-import datetime
+#!/usr/bin/env python
 
-class Control:
-    TITLE = "CDR Administration"
-    SUBMENU = "Report Menu"
-    AUDIENCES = ("Health Professional", "Patient")
-    LANGUAGES = ("English", "Spanish")
-    def __init__(self):
-        "Collect options for the report"
-        fields = cgi.FieldStorage()
-        self.session = cdrcgi.getSession(fields)
-        self.request = cdrcgi.getRequest(fields)
-        self.audience = fields.getvalue("audience") or Control.AUDIENCES[0]
-        self.language = fields.getvalue("language") or Control.LANGUAGES[0]
-        self.show_id = fields.getvalue("show_id") == "Y"
-        self.show_all = fields.getvalue("show_all") or "N"
-        self.extra = fields.getvalue("extra") or "0"
-        self.included = fields.getvalue("included") or "s"
-        self.sets = fields.getlist("sets") or ["all"]
-        self.subtitle = "Summaries Lists"
-        self.script = "SummariesLists.py"
-        self.buttons = ("Submit", Control.SUBMENU, cdrcgi.MAINMENU)
-        self.boards = cdr.getBoardNames("editorial", "short")
-        self.cursor = db.connect(user="CdrGuest").cursor()
-        self.sanitize()
+"""Report on lists of summaries for selected PDQ boards.
+"""
 
-    def run(self):
-        if self.request == cdrcgi.MAINMENU:
-            cdrcgi.navigateTo("Admin.py", self.session)
-        elif self.request == Control.SUBMENU:
-            cdrcgi.navigateTo("reports.py", self.session)
-        elif self.request == "Submit":
-            self.show_report()
-        else:
-            self.show_form()
-    def show_report(self):
-        columns = []
-        if self.show_id:
-            columns.append(cdrcgi.Report.Column("CDR ID"))
-        columns.append(cdrcgi.Report.Column("Title"))
-        if self.extra:
-            extra = int(self.extra)
-            while extra > 0:
-                columns.append(cdrcgi.Report.Column("", width="50px"))
-                extra -= 1
-        sets = self.sets
-        doc_ids = (not sets or "all" in sets) and list(self.boards) or sets
-        title = "PDQ %s %s Summaries" % (self.language, self.audience)
-        if self.show_all == "Y":
-            title = title + " (all)"
-        now = datetime.date.today()
-        subtitle = "Report Date: %s" % now
-        boards = [Board(self, doc_id) for doc_id in doc_ids]
+from operator import itemgetter
+from cdrcgi import Controller
+
+
+class Control(Controller):
+
+    SUBTITLE = "Summaries Lists"
+    INCLUDED = (
+        ("a", "Summaries and modules", False),
+        ("s", "Summaries only", True),
+        ("m", "Modules only", False),
+    )
+    ID_DISPLAY = (
+        ("N", "Without CDR ID", True),
+        ("Y", "With CDR ID", False),
+    )
+    VERSION_DISPLAY = (
+        ("N", "Publishable only", True),
+        ("Y", "Publishable and non-publishable", False),
+    )
+    SCRIPT = """\
+function check_board(val) {
+  if (val == "all")
+    jQuery(".some").prop("checked", false);
+  else
+    jQuery("#board-all").prop("checked", false);
+}"""
+
+    def build_tables(self):
+        """Assemble the tables from each of the boards."""
+
         tables = []
-        for board in sorted(boards):
-            if self.included in "sa":
-                if board.summaries:
-                    tables.append(board.to_table(columns))
-            if self.included in "ma":
-                if board.modules:
-                    tables.append(board.to_table(columns, True))
-        #tables = [b.to_table(columns) for b in sorted(boards) if b.summaries]
-        report = cdrcgi.Report(title, tables, banner=title, subtitle=subtitle,
-                               css="table.report { width: 1024px; }")
-        report.send()
+        for board in sorted(self.board):
+            tables += board.tables
+        return tables
 
-    def show_form(self):
-        opts = {
-            "buttons": self.buttons,
-            "action": self.script,
-            "subtitle": self.subtitle,
-            "session": self.session
-        }
-        page = cdrcgi.Page(Control.TITLE, **opts)
-        page.add("<fieldset>")
-        page.add(page.B.LEGEND("Select Summary Audience"))
-        page.add_radio("audience", Control.AUDIENCES[0], Control.AUDIENCES[0],
-                       checked=True)
-        page.add_radio("audience", Control.AUDIENCES[1], Control.AUDIENCES[1])
-        page.add("</fieldset>")
-        page.add("<fieldset>")
-        page.add(page.B.LEGEND("Summary Language"))
-        page.add_radio("language", Control.LANGUAGES[0], Control.LANGUAGES[0],
-                       checked=True)
-        page.add_radio("language", Control.LANGUAGES[1], Control.LANGUAGES[1])
-        page.add("</fieldset>")
-        page.add("<fieldset>")
-        page.add(page.B.LEGEND("ID Display"))
-        page.add_radio("show_id", "Without CDR ID", "N", checked=True)
-        page.add_radio("show_id", "With CDR ID", "Y")
-        page.add("</fieldset>")
-        page.add("<fieldset>")
-        page.add(page.B.LEGEND("Version Display"))
-        page.add_radio("show_all", "Publishable only", "N", checked=True)
-        page.add_radio("show_all", "Publishable and non-publishable", "Y")
-        page.add("</fieldset>")
-        if False:
-            page.add("<fieldset>")
-            page.add(page.B.LEGEND("Table Options"))
-            page.add_radio("table-opts", "Single column, no gridlines",
-                           "simple", checked=True)
-            page.add_radio("table-opts", "Extra blank columns, show gridlines",
-                           "extra")
-            page.add_text_field("extra-cols", "Extra Cols", default="1")
-            page.add("</fieldset>")
-        else:
-            page.add('<fieldset id="extra-block">')
-            page.add(page.B.LEGEND("Extra Blank Columns"))
-            page.add_text_field("extra", "Extra Cols", value="0")
-            page.add("</fieldset>")
-        page.add("<fieldset>")
-        page.add(page.B.LEGEND("Select Summary Set(s)"))
-        page.add_checkbox("sets", "All", "all", checked=True)
-        for key in sorted(self.boards, key=lambda k: self.boards[k]):
-            name = self.boards[key].replace("Editorial Board", "").strip()
-            page.add_checkbox("sets", name, str(key), widget_classes="some")
-        page.add("</fieldset>")
-        page.add("<fieldset>")
-        page.add(page.B.LEGEND("Included Documents"))
-        page.add_radio("included", "Summaries and modules", "a")
-        page.add_radio("included", "Summaries only", "s", checked=True)
-        page.add_radio("included", "Modules only", "m")
-        page.add("</fieldset>")
-        page.add_script("""\
-function check_sets(val) {
-    if (val == 'all')
-        jQuery('.some').prop('checked', false);
-    else
-        jQuery('#sets-all').prop('checked', false);
-}""")
-        page.send()
+    def populate_form(self, page):
+        """Put the fields for the report options on the form.
 
-    def sanitize(self):
-        "Make sure the CGI form parameters haven't been tampered with"
-        if self.included not in "sam":
-            raise Exception("CGI parameter tampering detected")
-        if self.audience and self.audience not in Control.AUDIENCES:
-            raise Exception("CGI parameter tampering detected")
-        if self.language and self.language not in Control.LANGUAGES:
-            raise Exception("CGI parameter tampering detected")
-        if self.extra and not self.extra.isdigit():
-            raise Exception("Number of extra columns must an integer")
-        for value in self.sets:
-            if not self.sets_value_ok(value):
-                raise Exception("CGI parameter tampering detected")
+        Pass:
+            page - HTMLPage object on which to place the field sets
+        """
 
-    def sets_value_ok(self, value):
-        "Make sure a board parameter hasn't been tampered with"
-        if value == "all":
-            return True
-        if not value.isdigit() or int(value) not in self.boards:
-            return False
-        return True
+        self.add_audience_fieldset(page)
+        self.add_language_fieldset(page)
+        fieldset = page.fieldset("ID Display")
+        for value, label, checked in self.ID_DISPLAY:
+            opts = dict(label=label, value=value, checked=checked)
+            fieldset.append(page.radio_button("show_id", **opts))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Version Display")
+        for value, label, checked in self.VERSION_DISPLAY:
+            opts = dict(label=label, value=value, checked=checked)
+            fieldset.append(page.radio_button("show_all", **opts))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Extra Blank Columns", id="extra-block")
+        opts = dict(label="Extra Cols", value="0")
+        fieldset.append(page.text_field("extra", **opts))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Select Summary Set(s)")
+        fieldset.append(page.checkbox("board", value="all", checked=True))
+        for id, name in sorted(self.boards.items(), key=itemgetter(1)):
+            opts = dict(value=id, label=name, classes="some")
+            fieldset.append(page.checkbox("board", **opts))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Included Documents")
+        for value, label, checked in self.INCLUDED:
+            opts = dict(value=value, label=label, checked=checked)
+            fieldset.append(page.radio_button("included", **opts))
+        page.form.append(fieldset)
+        page.add_script(self.SCRIPT)
+
+    def show_report(self):
+        """Override base class version so we can set the table widhts."""
+
+        self.report.page.add_css(".report table { width: 1024px; }")
+        self.report.send()
+
+    @property
+    def audience(self):
+        """Patient or Health Professional."""
+
+        if not hasattr(self, "_audience"):
+            default = self.AUDIENCES[0]
+            self._audience = self.fields.getvalue("audience", default)
+            if self._audience not in self.AUDIENCES:
+                self.bail()
+        return self._audience
+
+    @property
+    def board(self):
+        """Board(s) selected for the report."""
+
+        if not hasattr(self, "_board"):
+            ids = self.fields.getlist("board")
+            if not ids or "all" in ids:
+                self._board = [Board(self, id) for id in self.boards]
+            else:
+                self._board = []
+                for id in ids:
+                    if not id.isdigit():
+                        self.bail()
+                    id = int(id)
+                    if id not in self.boards:
+                        self.bail()
+                    self._board.append(Board(self, id))
+        return self._board
+
+    @property
+    def boards(self):
+        """Boards available the report form's piclist."""
+
+        if not hasattr(self, "_boards"):
+            self._boards = self.get_boards()
+        return self._boards
+
+    @property
+    def columns(self):
+        """Column header(s) used by each table."""
+
+        if not hasattr(self, "_columns"):
+            self._columns = []
+            if self.show_id:
+                self._columns.append(self.Reporter.Column("CDR ID"))
+            self._columns.append(self.Reporter.Column("Title"))
+            for _ in range(self.extra):
+                self._columns.append(self.Reporter.Column("", width="50px"))
+        return self._columns
+
+    @property
+    def extra(self):
+        """How many extra blank columns should be included?"""
+
+        if not hasattr(self, "_extra"):
+            try:
+                self._extra = int(self.fields.getvalue("extra", "0"))
+            except Exception:
+                self._extra = 0
+        return self._extra
+
+    @property
+    def included(self):
+        """Summaries, modules, or both?"""
+
+        if not hasattr(self, "_included"):
+            self._included = self.fields.getvalue("included", "s")
+            if self._included not in {i[0] for i in self.INCLUDED}:
+                self.bail()
+        return self._included
+
+    @property
+    def language(self):
+        """English or Spanish."""
+
+        if not hasattr(self, "_language"):
+            default = self.LANGUAGES[0]
+            self._language = self.fields.getvalue("language", default)
+            if self._language not in self.LANGUAGES:
+                self.bail()
+        return self._language
+
+    @property
+    def show_all(self):
+        """True if we should include summaries which are not publishable."""
+        return self.fields.getvalue("show_all") == "Y"
+
+    @property
+    def show_id(self):
+        """True if a column for the CDR document IDs should be included."""
+        return self.fields.getvalue("show_id") == "Y"
+
+    @property
+    def subtitle(self):
+        """What to display underneath the main banner."""
+
+        if not hasattr(self, "_subtitle"):
+            if self.request == self.SUBMIT:
+                subtitle = f"PDQ {self.language} {self.audience} Summaries"
+                if self.show_all:
+                    subtitle += " (all)"
+                today = self.started.strftime("%Y-%m-%d")
+                self._subtitle = f"{subtitle} {today}"
+            else:
+                self._subtitle = self.SUBTITLE
+        return self._subtitle
+
 
 class Board:
-    "Metadata about a single PDQ board and its summaries for this report"
+    """PDQ board selected for the report."""
+
+    TABLES = (
+        ("sa", "summary", "summaries"),
+        ("ma", "module", "modules"),
+    )
+
     def __init__(self, control, doc_id):
-        self.control = control
-        self.doc_id = int(doc_id)
-        self.name = control.boards[self.doc_id]
-        self.audience = control.audience or Control.AUDIENCES[0]
-        self.language = control.language or Control.LANGUAGES[0]
-        self.show_all = control.show_all
-        b_path = "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"
-        cols = ["t.doc_id", "t.value", "m.value"]
-        if self.language != "English":
-            cols.append("o.value")
+        """Remeber the caller's values.
 
-        # Including only publishable versions or all versions in output
-        # -------------------------------------------------------------
-        if self.show_all == 'N':
-           pub = '_pub'
-        else:
-           pub = ''
+        Pass:
+            control - access to the report options and report-building tools
+            doc_id - integer for CDR Organization document ID for the board
+        """
 
-        query = db.Query("query_term%s t" % pub, *cols).unique()
-        query.join("query_term%s a" % pub, "a.doc_id = t.doc_id")
-        query.join("query_term%s l" % pub, "l.doc_id = t.doc_id")
-        query.join("active_doc d", "d.id = t.doc_id")
-        query.where("t.path = '/Summary/SummaryTitle'")
-        query.where("a.path = '/Summary/SummaryMetaData/SummaryAudience'")
-        query.where("l.path = '/Summary/SummaryMetaData/SummaryLanguage'")
-        query.where(query.Condition("a.value", self.audience + "s"))
-        query.where(query.Condition("l.value", self.language))
-        if self.language == "English":
-            query.join("query_term%s b" % pub, "b.doc_id = t.doc_id")
-        else:
-            query.join("query_term%s e" % pub, "e.doc_id = t.doc_id")
-            query.join("query_term%s b" % pub, "b.doc_id = e.int_val")
-            query.join("query_term%s o" % pub, "o.doc_id = e.int_val")
-            query.where("e.path = '/Summary/TranslationOf/@cdr:ref'")
-            query.where("o.path = '/Summary/SummaryTitle'")
-        query.where(query.Condition("b.path", b_path))
-        query.where(query.Condition("b.int_val", doc_id))
-        query.outer("query_term m", "m.doc_id = t.doc_id",
-                    "m.path = '/Summary/@ModuleOnly'")
-        rows = query.execute(control.cursor).fetchall()
-        summaries = [Summary(control, *row) for row in rows]
-        self.summaries = [s for s in summaries if not s.module]
-        self.modules = [s for s in summaries if s.module]
+        self.__control = control
+        self.__doc_id = doc_id
 
-    def to_table(self, columns, modules=False):
-        "Create a table showing the summaries for this board"
-        if modules:
-            docs = self.modules
-            what = (len(docs) == 1) and "module" or "modules"
-        else:
-            docs = self.summaries
-            what = (len(docs) == 1) and "summary" or "summaries"
-        opts = { "caption": "%s (%d %s)" % (self.name, len(docs), what) }
-        rows = []
-        for doc in sorted(docs):
-            row = []
-            if self.control.show_id:
-                row.append(cdrcgi.Report.Cell(doc.doc_id, classes="center"))
-            title = [doc.title]
-            if doc.original_title:
-                title.append("(%s)" % doc.original_title)
-            row.append(title)
-            while len(row) < len(columns):
-                row.append("")
-            rows.append(row)
-        return cdrcgi.Report.Table(columns, rows, **opts)
     def __lt__(self, other):
-        return self.name.lower() < other.name.lower()
+        """Sort by board name."""
+        return self.name < other.name
+
+    @property
+    def control(self):
+        """Access to the report options and report-building tools."""
+        return self.__control
+
+    @property
+    def docs(self):
+        """CDR Summary documents for this board."""
+
+        if not hasattr(self, "_docs"):
+            control = self.control
+            query_term = "query_term"
+            if not control.show_all:
+                query_term += "_pub"
+            cols = ["t.doc_id", "t.value AS title", "m.value AS module_only"]
+            if control.language != "English":
+                cols.append("o.value AS original_title")
+            query = control.Query(f"{query_term} t", *cols).unique()
+            query.join(f"{query_term} a", "a.doc_id = t.doc_id")
+            query.join(f"{query_term} l", "l.doc_id = t.doc_id")
+            query.join("active_doc d", "d.id = t.doc_id")
+            query.where("t.path = '/Summary/SummaryTitle'")
+            query.where("a.path = '/Summary/SummaryMetaData/SummaryAudience'")
+            query.where("l.path = '/Summary/SummaryMetaData/SummaryLanguage'")
+            query.where(query.Condition("a.value", f"{control.audience}s"))
+            query.where(query.Condition("l.value", control.language))
+            if control.language == "English":
+                query.join(f"{query_term} b", "b.doc_id = t.doc_id")
+            else:
+                query.join(f"{query_term} e", "e.doc_id = t.doc_id")
+                query.join(f"{query_term} b", "b.doc_id = e.int_val")
+                query.join(f"{query_term} o", "o.doc_id = e.int_val")
+                query.where("e.path = '/Summary/TranslationOf/@cdr:ref'")
+                query.where("o.path = '/Summary/SummaryTitle'")
+            b_path = "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"
+            query.where(query.Condition("b.path", b_path))
+            query.where(query.Condition("b.int_val", self.id))
+            query.outer(f"{query_term} m", "m.doc_id = t.doc_id",
+                        "m.path = '/Summary/@ModuleOnly'")
+            rows = query.execute(control.cursor).fetchall()
+            self._docs = [Summary(row) for row in rows]
+        return self._docs
+
+    @property
+    def id(self):
+        """Integer for CDR Organization document ID for the board."""
+        return self.__doc_id
+
+    @property
+    def modules(self):
+        """Summary documents which can only be used as modules."""
+
+        if not hasattr(self, "_modules"):
+            self._modules = [doc for doc in self.docs if doc.module]
+        return self._modules
+
+    @property
+    def name(self):
+        """String for the board's brief name."""
+
+        if not hasattr(self, "_name"):
+            self._name = f"{self.control.boards[self.id]} Editorial Board"
+        return self._name
+
+    @property
+    def summaries(self):
+        """Summary documents which can be published independently."""
+
+        if not hasattr(self, "_summaries"):
+            self._summaries = [doc for doc in self.docs if not doc.module]
+        return self._summaries
+
+    @property
+    def tables(self):
+        """Create the table(s) showing summaries for this board."""
+
+        if not hasattr(self, "_tables"):
+            Cell = self.control.Reporter.Cell
+            Table = self.control.Reporter.Table
+            columns = self.control.columns
+            self._tables = []
+            for included, singular, plural in self.TABLES:
+                if self.control.included in included:
+                    docs = getattr(self, plural)
+                    if docs:
+                        what = singular if len(docs) == 1 else plural
+                        caption = f"{self.name} ({len(docs)} {what})"
+                        rows = []
+                        for doc in sorted(docs):
+                            row = []
+                            if self.control.show_id:
+                                row = [Cell(doc.doc_id, classes="center")]
+                            title = [doc.title]
+                            if doc.original_title:
+                                title.append(f"({doc.original_title})")
+                            row.append(title)
+                            while len(row) < len(columns):
+                                row.append("")
+                            rows.append(row)
+                        opts = dict(caption=caption, columns=columns)
+                        self._tables.append(Table(rows, **opts))
+        return self._tables
+
 
 class Summary:
-    logged = False
-    "Summary document ID and title(s)"
-    def __init__(self, control, doc_id, title, module, original_title=None):
-        self.control = control
-        self.doc_id = doc_id
-        self.title = title
-        self.module = module == "Yes"
-        self.original_title = original_title
+    """PDQ summary managed by one of the boards selected for the report."""
+
+    def __init__(self, row):
+        """Save the values from the database query for this document."""
+        self.__row = row
 
     def __lt__(self, other):
-        return self.title.upper() < other.title.upper()
+        """Sort by title, case insensitive."""
+        return self.key < other.key
+
+    @property
+    def doc_id(self):
+        """Integer for the unique CDR document ID for this PDQ summary."""
+        return self.__row.doc_id
+
+    @property
+    def key(self):
+        """Sort by normalized title."""
+
+        if not hasattr(self, "_key"):
+            self._key = self.title.lower()
+        return self._key
+
+    @property
+    def module(self):
+        """True if this document can only be used as an included module."""
+        return self.__row.module_only == "Yes"
+
+    @property
+    def original_title(self):
+        """Title of the English document of which this is a translation."""
+        try:
+            return self.__row.original_title
+        except Exception:
+            return None
+
+    @property
+    def title(self):
+        """String for the title of this PDQ summary."""
+        return self.__row.title
+
 
 if __name__ == "__main__":
-    "Allow import (by doc or lint tools, for example) without side effects"
+    """Don't run the script if loaded as a module."""
     Control().run()

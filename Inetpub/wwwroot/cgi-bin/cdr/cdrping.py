@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 ############
 # CGI script invoked by the Big Brother system monitor to determine if
 # the CDR server is up and responding properly.

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 """Navigate term hierarchy.
 """
@@ -227,9 +227,9 @@ class Term:
     """
 
     FILTER = "Filter.py"
-    FILTER_PARAMS = dict(
-        Filter="name:Denormalization Filter (1/1): Terminology",
-        Filter1="name:Terminology QC Report Filter",
+    FILTERS = (
+        "name:Denormalization Filter (1/1): Terminology",
+        "name:Terminology QC Report Filter",
     )
 
     def __init__(self, tree, id, name, focus):
@@ -308,8 +308,7 @@ class Term:
     def qc_url(self):
         """Let the user see full information about the term."""
 
-        params = dict(self.FILTER_PARAMS)
-        params["DocId"] = str(self.id)
+        params = dict(filter=self.FILTERS, DocId=self.id)
         return self.control.make_url(self.FILTER, **params)
 
     def add_child(self, child):

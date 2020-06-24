@@ -1,279 +1,344 @@
-#----------------------------------------------------------------------
-# Report listing all references cited in a selected version of a
-# cancer information summary.
-#
-# BZIssue::4598 modify sort order to use local setting and ignore case
-# BZIssue::4651 add PMID link to citations
-# BZIssue::4786 fix non-Pubmed citations
-# JIRA::OCECDR-3456 switch NCBI url to use HTTPS protocol
-# JIRA::OCECDR-4179 include module refs by default (complete rewrite)
-# JIRA::OCECDR-4194 remove duplicate citations
-#----------------------------------------------------------------------
+#!/usr/bin/env python
 
-import datetime
-import locale
-import lxml.etree as etree
-import cdr
-import cdrcgi
-from cdrapi import db
+"""Show all references cited in a selected cancer information summary.
+"""
 
-class Control(cdrcgi.Control):
-    """
-    Report-specific behavior implemented in this derived class.
-    """
+from locale import LC_COLLATE, setlocale, strcoll
+from cdrcgi import Controller
+from cdrapi.docs import Doc
 
-    def __init__(self):
-        """
-        Collect and validate the request parameters.
+
+class Control(Controller):
+    """Access to the database and report-building tools."""
+
+    SUBTITLE = "Summary Citations Report"
+    INCLUDE_MODULES = "Include citations in linked modules"
+    EXCLUDE_MODULES = "Exclude citations in linked modules"
+
+    def populate_form(self, page):
+        """Show one of the cascading forms.
+
+        Pass:
+            page - HTMLPage object where the form is drawn
         """
 
-        cdrcgi.Control.__init__(self, "Summary Citations Report")
-        self.parsed = set()
-        self.summary_title = None
-        self.doc_id = self.fields.getvalue("DocId")
-        self.title_fragment = self.fields.getvalue("DocTitle", "").strip()
-        self.doc_version = self.fields.getvalue("DocVersion")
-        self.modules = self.fields.getvalue("modules") and True or False
-        if self.doc_id:
-            try:
-                self.doc_id = cdr.exNormalize(self.doc_id)[1]
-            except:
-                cdrcgi.bail("invalid CDR document id format")
-        if self.doc_version:
-            try:
-                self.doc_version = int(self.doc_version)
-            except:
-                cdrcgi.bail(cdrcgi.TAMPERING)
-
-    def populate_form(self, form):
-        """
-        Put up the initial report request form.
-        """
-
-        if self.doc_id:
-            self.show_versions(form)
-        elif self.title_fragment:
-            self.show_titles(form)
-        else:
-            self.show_first_form(form)
-
-    def show_first_form(self, form):
-        """
-        Gather the preliminary information for the request.
-
-        User must enter either a CDR ID or a title fragment. By
-        default we recurse into linked summary modules, but the
-        user can suppress that behavior.
-        """
-
-        form.add("<fieldset>")
-        form.add(form.B.LEGEND("Select a document"))
-        form.add_text_field("DocTitle", "Title")
-        form.add_text_field("DocId", "CDR ID")
-        form.add("</fieldset>")
-        form.add("<fieldset>")
-        form.add(form.B.LEGEND("Linked summary modules"))
-        form.add_radio("modules", "Include citations in linked modules",
-                       "1", checked=True)
-        form.add_radio("modules", "Exclude citations in linked modules", "")
-        form.add("</fieldset>")
-
-    def show_versions(self, form):
-        """
-        Let the user select the document version for the report.
-        """
-
-        query = db.Query("doc_version v", "v.num", "v.dt", "v.comment")
-        query.join("usr u", "u.id = v.usr")
-        query.where(query.Condition("v.id", self.doc_id))
-        rows = query.order("v.num DESC").execute(self.cursor).fetchall()
-        if not rows:
-            self.doc_version = -1
+        if self.summary:
             self.show_report()
+        elif self.id:
+            modules = "Y" if self.modules else "N"
+            page.form.append(page.hidden_field("modules", modules))
+            page.form.append(page.hidden_field("DocId", self.id))
+            fieldset = page.fieldset(f"Select version for CDR{self.id:d}")
+            opts = dict(label="Version", options=self.versions, default=0)
+            fieldset.append(page.select("DocVersion", **opts))
+            page.form.append(fieldset)
+        elif self.titles:
+            modules = "Y" if self.modules else "N"
+            page.form.append(page.hidden_field("modules", modules))
+            fieldset = page.fieldset("Select Summary")
+            for title in self.titles:
+                opts = dict(value=title.id, label=title.label)
+                fieldset.append(page.radio_button("DocId", **opts))
+            page.form.append(fieldset)
+            page.add_css("fieldset { width: 1000px; }")
         else:
-            query = db.Query("document", "title")
-            query.where("id = %d" % self.doc_id)
-            title = query.execute(self.cursor).fetchone()[0].split(";")[0]
-            form.add_hidden_field("modules", self.modules and "1" or "")
-            form.add_hidden_field("DocId", str(self.doc_id))
-            form.add("<fieldset>")
-            form.add(form.B.LEGEND("Select version for %s" % title))
-            versions = [(-1, "Current Working Version")]
-            for version, date, comment in rows:
-                comment = comment or "[No comment]"
-                label = "[V%d %s] %s" % (version, str(date)[:10], comment)
-                versions.append((version, label))
-            form.add_select("DocVersion", "Version", versions, -1)
-            form.add("</fieldset>")
-
-    def show_titles(self, form):
-        """
-        Let the user pick from a list of summaries matching the title fragment.
-
-        If no summaries match the title fragment, bail with an error message.
-        If only one summary matches, jump straight to the version selection.
-        """
-
-        docs = self.get_docs()
-        if not docs:
-            cdrcgi.bail("No matching documents found")
-        elif len(docs) == 1:
-            self.doc_id = docs[0].id
-            self.show_versions(form)
-        else:
-            form.add_hidden_field("modules", self.modules and "1" or "")
-            form.add("<fieldset style='width: 1024px'>")
-            form.add(form.B.LEGEND("Select Summary"))
-            for doc in docs:
-                display = "[CDR%010d] %s" % (doc.id, doc.title)
-                form.add_radio("DocId", display, str(doc.id))
-            form.add("</fieldset>")
+            fieldset = page.fieldset("Select a Document")
+            fieldset.append(page.text_field("DocTitle", label="Title"))
+            fieldset.append(page.text_field("DocId", label="CDR ID"))
+            page.form.append(fieldset)
+            fieldset = page.fieldset("Linked Summary Modules")
+            opts = dict(label=self.INCLUDE_MODULES, value="Y", checked=True)
+            fieldset.append(page.radio_button("modules", **opts))
+            opts = dict(label=self.EXCLUDE_MODULES, value="N")
+            fieldset.append(page.radio_button("modules", **opts))
+            page.form.append(fieldset)
 
     def show_report(self):
-        """
-        Override the base class method since we have a non-tablar report
-        with intermediary forms to refine the request.
-        """
+        """Override base class method to show non-tabular report."""
 
-        if not self.doc_id or not self.doc_version:
-            self.show_form()
-        self.parse_summary(self.doc_id, self.doc_version, self.modules)
-        locale.setlocale(locale.LC_COLLATE, "")
-        citations = sorted(Citation.citations.values())
-        page = cdrcgi.Page(self.title, banner=None)
-        page.add(page.B.H1(self.summary_title))
-        page.add(page.B.H2("References"))
-        if not citations:
-            page.add("<p>No references found</p>")
+        if not self.summary:
+            return self.show_form()
+        setlocale(LC_COLLATE, "")
+        page = self.report.page
+        page.form.append(page.B.H1(self.summary.title))
+        page.form.append(page.B.H2("References"))
+        if self.summary.citations:
+            ordered_list = page.B.OL()
+            for citation in sorted(self.summary.citations.values()):
+                ordered_list.append(citation.list_item)
+            page.form.append(ordered_list)
         else:
-            page.add("<ol>")
-            for citation in citations:
-                page.add(citation.li())
-            page.add("</ol>")
-        page.send()
+            page.form.append(page.B.P("No references found"))
+        self.report.send()
 
-    def parse_summary(self, doc_id, doc_version=-1, recurse=False):
+    @property
+    def id(self):
+        """Integer for the selected summary's CDR ID."""
+
+        if not hasattr(self, "_id"):
+            self._id = self.fields.getvalue("DocId")
+            if self._id:
+                self._id = Doc.extract_id(self._id)
+            elif len(self.titles) == 1:
+                self._id = self.titles[0].id
+        return self._id
+
+    @property
+    def modules(self):
+        """True if references from linked modules should be included."""
+        return self.fields.getvalue("modules") == "Y"
+
+    @property
+    def no_results(self):
+        """Suppress message about lack of tables."""
+        return None
+
+    @property
+    def parsed(self):
+        """Remember summaries we've already parsed."""
+
+        if not hasattr(self, "_parsed"):
+            self._parsed = set()
+        return self._parsed
+
+    @property
+    def summary(self):
+        """PDQ summary selected for the report."""
+
+        if not hasattr(self, "_summary"):
+            self._summary = None
+            if self.id and self.version is not None:
+                version = self.version if self.version > 0 else None
+                self._summary = Summary(self, self.id, version)
+        return self._summary
+
+    @property
+    def title_fragment(self):
+        """String for selecting summary by title fragment."""
+
+        if not hasattr(self, "_title_fragment"):
+            self._title_fragment = self.fields.getvalue("DocTitle", "").strip()
+        return self._title_fragment
+
+    @property
+    def titles(self):
+        """Find the summaries matching the user's title fragment."""
+
+        if not hasattr(self, "_titles"):
+            self._titles = []
+            if self.title_fragment:
+                fragment = f"{self.title_fragment}%"
+                query = self.Query("document d", "d.id", "d.title")
+                query.join("doc_type t", "t.id = d.doc_type")
+                query.where("t.name = 'Summary'")
+                query.where(query.Condition("d.title", fragment, "LIKE"))
+                rows = query.order("d.id").execute(self.cursor).fetchall()
+                class Doc:
+                    def __init__(self, row):
+                        self.id = row.id
+                        self.label = f"[CDR{row.id:010d}] {row.title}"
+                self._titles = [Doc(row) for row in rows]
+        return self._titles
+
+    @property
+    def version(self):
+        """Summary document's version selected for the report.
+
+        The value 0 (zero) indicates that the current working
+        (unnumbered) version of the document is to be parsed.
+        Do not confuse this value with None, which indicates that
+        a version is still to be selected.
         """
-        Collect the citations and the summary title from the document.
 
-        If the user has not suppressed recursion into linked summary
-        modules, parse them, too.
+        if not hasattr(self, "_version"):
+            if len(self.versions) == 1:
+                self._version = 0
+            else:
+                self._version = self.fields.getvalue("DocVersion")
+                if self._version:
+                    try:
+                        self._version = int(self._version)
+                    except Exception:
+                        self.bail()
+        return self._version
+
+    @property
+    def versions(self):
+        """Sequence of versions available for the selected summary."""
+
+        if not hasattr(self, "_versions"):
+            self._versions = []
+            query = self.Query("doc_version", "num", "dt", "comment")
+            query.where(query.Condition("id", self.id))
+            query.order("num DESC")
+            rows = query.execute(self.cursor).fetchall()
+            if rows:
+                self._versions = [(0, "Current Working Version")]
+                for row in rows:
+                    comment = row.comment or "[No comment]"
+                    date = str(row.dt)[:10]
+                    label = f"[V{row.num:d} {date}] {comment}"
+                    self._versions.append((row.num, label))
+        return self._versions
+
+
+class Summary:
+    """Summary and its citation references."""
+
+    FILTER = "set:Denormalization Summary Set"
+
+    def __init__(self, control, id, version=None):
+        """Remember the caller's values.
+
+        Pass:
+            control = access to the report's options and report-building tools
+            id - integer for the summary's CDR document ID
+            version - optional integer for the version of the summary to parse
         """
 
-        self.parsed.add(doc_id)
-        if doc_version == -1:
-            doc_version = None
-        filter_set = ['set:Denormalization Summary Set']
-        response = cdr.filterDoc("guest", filter_set, doc_id,
-                                 docVer=doc_version)
-        if isinstance(response, (str, bytes)):
-           cdrcgi.bail(response)
-        try:
-            root = etree.XML(response[0])
-        except:
-            cdrcgi.bail("Failure parsing filtered document")
-        for node in root.iter("ReferenceList"):
-            for child in node.findall("Citation"):
-                Citation(child)
-        if self.summary_title is None:
-            self.summary_title = ""
-            for node in root.findall("SummaryTitle"):
-                self.summary_title = node.text
-                break
-        if recurse:
-            for node in root.iter("SummaryModuleLink"):
-                cdr_id = self.extract_cdr_id(node)
-                if cdr_id and cdr_id not in self.parsed:
-                    self.parse_summary(cdr_id, recurse=recurse)
+        self.__control = control
+        self.__id = id
+        self.__version = version
 
-    def get_docs(self):
-        """
-        Find the summaries matching the user's title fragment.
+    @property
+    def citations(self):
+        """Dictionary of the citations used by the summary document.
+
+        The key is the citation text combined with the Pubmed ID,
+        so any variants in the citation text for the same article
+        will be reflected in the report.
         """
 
-        fragment = f"{self.title_fragment}%"
-        query = db.Query("document d", "d.id", "d.title")
-        query.join("doc_type t", "t.id = d.doc_type")
-        query.where("t.name = 'Summary'")
-        query.where(query.Condition("d.title", fragment, "LIKE"))
-        rows = query.order("d.id").execute(self.cursor).fetchall()
-        class Doc:
-            def __init__(self, doc_id, doc_title):
-                self.id = doc_id
-                self.title = doc_title
-        return [Doc(*row) for row in rows]
+        if not hasattr(self, "_citations"):
+            self._citations = {}
+            for node in self.root.iter("ReferenceList"):
+                for child in node.findall("Citation"):
+                    citation = Citation(self.control, child)
+                    if citation.key and citation.key not in self._citations:
+                        self._citations[citation.key] = citation
 
-    @staticmethod
-    def extract_cdr_id(node):
-        """
-        Pull out the CDR ID as an integer from a node's cdr:ref attribute.
-        """
+            # Recurse if appropriate, rolling citations from linked modules
+            # into this dictionary.
+            if self.control.modules:
+                for node in self.root.iter("SummaryModuleLink"):
+                    cdr_ref = node.get(f"{{{Doc.NS}}}ref")
+                    if cdr_ref:
+                        try:
+                            id = Doc.extract_id(cdr_ref)
+                        except Exception:
+                            self.control.bail("bad module link %s", cdr_ref)
+                        if id not in self.control.parsed:
+                            summary = Summary(self.control, id)
+                            for key in summary.citations:
+                                if key not in self._citations:
+                                    citation = summary.citations[key]
+                                    self._citations[key] = citation
+        return self._citations
 
-        cdr_id = None
-        cdr_ref = node.get("{cips.nci.nih.gov/cdr}ref")
-        if cdr_ref:
-            try:
-                cdr_id = cdr.exNormalize(cdr_ref)[1]
-            except:
-                pass
-        return cdr_id
+    @property
+    def control(self):
+        """Access to the report's options and report-building tools."""
+        return self.__control
+
+    @property
+    def doc(self):
+        """`Doc` object for the CDR summary document."""
+
+        if not hasattr(self, "_doc"):
+            opts = dict(id=self.__id, version=self.__version)
+            self._doc = Doc(self.control.session, **opts)
+            self.control.parsed.add(self.__id)
+        return self._doc
+
+    @property
+    def root(self):
+        """Denormalized summary document's DOM root."""
+
+        if not hasattr(self, "_root"):
+            self._root = self.doc.filter(self.FILTER).result_tree.getroot()
+        return self._root
+
+    @property
+    def title(self):
+        """String for the official title of the summary document."""
+
+        if not hasattr(self, "_title"):
+            self._title = Doc.get_text(self.root.find("SummaryTitle"))
+        return self._title
+
 
 class Citation:
-    """
-    Objects representing each of the unique citations found in the summaries.
+    """A citation reference found in a CDR PDQ summary document."""
 
-    Instance variables:
+    URL = "https://www.ncbi.nlm.nih.gov/pubmed"
+    URL = "https://pubmed.ncbi.nlm.nih.gov"
 
-        text  -  formatted text for the citation
-        pmid  -  optional Pubmed ID
+    def __init__(self, control, node):
+        """Remember the caller's values.
 
-    Class variables:
-
-        citations - dictionary of unique citations found
-        BASE      - front portion of the URL for viewing the Pubmed citation
-    """
-
-    citations = {}
-    BASE = "https://www.ncbi.nlm.nih.gov/pubmed"
-
-    def __init__(self, node):
-        """
-        Extract the formatted citation and Pubmed ID.
-
-        If the citation text is not empty, and we haven't seen this one
-        yet, add the citation to the dictionary of unique citations found.
+        Pass:
+            control - access to report-building tools
+            node - where the citation reference was found
         """
 
-        self.text = "".join(node.itertext()).strip()
-        self.pmid = node.get("PMID")
-        if self.text:
-            if not self.text.endswith("."):
-                self.text += "."
-            key = (self.pmid, self.text)
-            if key not in Citation.citations:
-                Citation.citations[key] = self
+        self.__control = control
+        self.__node = node
 
-    def li(self):
-        """
-        Return the object representing the list item for the citation.
+    def __lt__(self, other):
+        """Fold characters with different diacritics together."""
+        return strcoll(self.sort_key, other.sort_key) < 0
+
+    @property
+    def key(self):
+        """Unique tuple distinguishing this reference."""
+
+        if not hasattr(self, "_key"):
+            self._key = (self.pmid, self.text) if self.text else None
+        return self._key
+
+    @property
+    def list_item(self):
+        """Return an HTML LI object for this citation.
 
         If the citation has a Pubmed ID, also include a link to the
         citation on the Pubmed web site.
         """
 
+        B = self.__control.HTMLPage.B
         if self.pmid:
-            url = "%s/%s?dopt=Abstract" % (self.BASE, self.pmid)
-            a = cdrcgi.Page.B.A(self.pmid, href=url, target="_blank")
+            a = B.A(self.pmid, href=f"{self.URL}/{self.pmid}", target="_blank")
             a.tail = "]"
-            return cdrcgi.Page.B.LI(self.text + " [", a)
-        return cdrcgi.Page.B.LI(self.text)
+            return B.LI(f"{self.text} [", a)
+        else:
+            return B.LI(self.text)
 
-    def __lt__(self, other):
-        """
-        Use intelligent sorting for the citations, folding characters
-        with different diacritics together.
-        """
+    @property
+    def pmid(self):
+        """String for NLM's Pubmed ID for this citation."""
 
-        return locale.strcoll(self.text.lower(), other.text.lower()) < 0
+        if not hasattr(self, "_pmid"):
+            self._pmid = self.__node.get("PMID", "").strip()
+        return self._pmid
 
-Control().run()
+    @property
+    def sort_key(self):
+        """Ignore case for sorting."""
+
+        if not hasattr(self, "_sort_key"):
+            self._sort_key = self.text.lower()
+        return self._sort_key
+
+    @property
+    def text(self):
+        """String for the citation's reference text."""
+
+        if not hasattr(self, "_text"):
+            self._text = Doc.get_text(self.__node, "").strip()
+            if self._text and not self._text.endswith("."):
+                self._text += "."
+        return self._text
+
+
+if __name__ == "__main__":
+    """Don't execute the script if loaded as a module."""
+    Control().run()

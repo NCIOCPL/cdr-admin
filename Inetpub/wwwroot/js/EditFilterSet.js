@@ -6,13 +6,13 @@
 function check_members() {
 
     // If we have other members, remove the placeholder.
-    let count = jQuery("#members li").length;
+    var count = jQuery("#members li").length;
     if (count > 1)
         jQuery("#members .dummy").remove();
 
     // If the set of members is empty, add the placeholder.
     if (count < 1) {
-        let dummy = '<li class="dummy">Add some members, please!</li>';
+        var dummy = '<li class="dummy">Add some members, please!</li>';
         jQuery("#members").append(dummy);
     }
 
@@ -27,13 +27,13 @@ function check_members() {
 function save() {
     var members = [];
     jQuery("#members li").each(function(index) {
-        let name = jQuery(this).text();
-        let type = jQuery(this).attr("class");
+        var name = jQuery(this).text();
+        var type = jQuery(this).attr("class");
         members.push({name: name, type: type});
     });
     jQuery("input[name='members']").val(JSON.stringify(members));
-    jQuery("input[name='Request']").val("Save Set");
-    jQuery("form").submit();
+    jQuery("input[name='action']").val("Save Set");
+    jQuery("#primary-form").submit();
 }
 
 // Run the initialization when the page has loaded.
@@ -44,7 +44,7 @@ jQuery(function() {
         over: function() { removeIntent = false; },
         out: function() { removeIntent = true; },
         beforeStop: function(event, ui) {
-            if(removeIntent === true) {
+            if (removeIntent === true) {
                 ui.item.remove();
                 check_members()
             }

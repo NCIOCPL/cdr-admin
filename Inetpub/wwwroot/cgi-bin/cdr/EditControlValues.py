@@ -153,9 +153,11 @@ fieldset { width: 800px; }
     def inactivate(self):
         """Suppress a value which is no longer needed."""
 
-        if not (self.group and self.name):
+        group = self.fields.getvalue("group")
+        name = self.fields.getvalue("name")
+        if not (group and name):
             bail("Nothing to inactivate")
-        args = self.session, self.group.name, self.name
+        args = self.session, group, name
         try:
             self.session.tier.inactivate_control_value(*args)
         except Exception as e:

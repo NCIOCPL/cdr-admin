@@ -199,7 +199,6 @@ class Item:
         "mediatrackingreport.py",
         "messageloggedinusers.py",
         "miscsearch.py",
-        "modifiedpubmeddocs.py",
         "modwithoutpubversion.py",
         "newcitations.py",
         "newdocreport.py",

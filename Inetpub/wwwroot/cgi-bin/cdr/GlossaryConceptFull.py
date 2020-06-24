@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 """Show complete information about a glossary concept and its names.
 """
@@ -17,6 +17,9 @@ class Control(Controller):
     CONCEPT_PATH = "/GlossaryTermName/GlossaryTermConcept/@cdr:ref"
     NAME_PATH = "/GlossaryTermName/TermName/TermNameString"
     METHOD = "get"
+    SIDE_BY_SIDE = "English and Spanish Side-By-Side"
+    STACKED = "English and Spanish Stacked"
+    LAYOUTS = SIDE_BY_SIDE, STACKED
 
     def populate_form(self, page):
         """Ask for more information if we don't have everything we need."""
@@ -25,6 +28,7 @@ class Control(Controller):
             self.show_report()
             sys.exit(0)
         if self.names:
+            page.form.append(page.hidden_field("layout", self.layout))
             fieldset = page.fieldset("Select Glossary Concept Document")
             for concept_id, name in self.names:
                 opts = dict(label=name, value=concept_id)
@@ -38,6 +42,12 @@ class Control(Controller):
             fieldset.append(page.text_field("id", label="Concept ID"))
             fieldset.append(page.text_field("name_id", label="Name ID"))
             fieldset.append(page.text_field("name", **opts))
+            page.form.append(fieldset)
+            fieldset = page.fieldset("Choose Layout")
+            for layout in self.LAYOUTS:
+                checked = layout == self.layout
+                opts = dict(value=layout, label=layout, checked=checked)
+                fieldset.append(page.radio_button("layout", **opts))
         page.form.append(fieldset)
 
     def show_report(self):
@@ -80,6 +90,16 @@ class Control(Controller):
         return self._id
 
     @property
+    def layout(self):
+        """Should English and Spanish be stacked or side-by-side?"""
+
+        if not hasattr(self, "_layout"):
+            self._layout = self.fields.getvalue("layout", self.LAYOUTS[0])
+            if self._layout not in self.LAYOUTS:
+                self.bail()
+        return self._layout
+
+    @property
     def name_id(self):
         """CDR ID for a GlossaryTermName document."""
 
@@ -120,7 +140,7 @@ class Concept:
     AUDIENCES = "Patient", "Health professional"
     FILTER = "name:Glossary Term Definition Update"
     EN_INGLES = " (en ingl\xe9s)"
-    CSS = "/stylesheets/GlossaryConceptFull.css"
+    CSS = "../../stylesheets/GlossaryConceptFull.css"
 
     def __init__(self, control):
         """Save the control object, which has everything we need.
@@ -173,48 +193,6 @@ class Concept:
         return self._doc
 
     @property
-    def names(self):
-        """Objects for the concept's GlossaryTermName documents."""
-
-        if not hasattr(self, "_names"):
-            query = self.control.Query("query_term", "doc_id")
-            query.where(query.Condition("path", self.control.CONCEPT_PATH))
-            query.where(query.Condition("int_val", self.doc.id))
-            rows = query.execute(self.control.cursor).fetchall()
-            self._names = [self.Name(self, row.doc_id) for row in rows]
-        return self._names
-
-    @property
-    def report(self):
-        """`HTMLPage` object for the report."""
-
-        if not hasattr(self, "_report"):
-            B = builder
-            meta = B.META(charset="utf-8")
-            link = B.LINK(href=self.CSS, rel="stylesheet")
-            icon = B.LINK(href="/favicon.ico", rel="icon")
-            head = B.HEAD(meta, B.TITLE(self.TITLE), icon, link)
-            time = B.SPAN(self.control.started.ctime())
-            args = self.SUBTITLE, B.BR(), "QC Report", B.BR(), time
-            concept_id = B.P(f"CDR{self.doc.id}", id="concept-id")
-            body = B.BODY(B.E("header", B.H1(*args)), concept_id)
-            self._report = B.HTML(head, body)
-            for langcode in sorted(self.definitions):
-                language = self.LANGUAGES[langcode]
-                for definition in self.definitions[langcode]:
-                    section = f"{language} - {definition.audience}"
-                    body.append(B.H2(section))
-                    body.append(definition.term_table)
-                    body.append(definition.info_table)
-                if langcode == "en" and self.media_table is not None:
-                    body.append(self.media_table)
-            body.append(self.term_type_table)
-            if self.related_info_table is not None:
-                body.append(B.H2("Related Information"))
-                body.append(self.related_info_table)
-        return self._report
-
-    @property
     def drug_links(self):
         """Drug summary links for the concept."""
 
@@ -231,12 +209,23 @@ class Concept:
         return self._external_refs
 
     @property
-    def summary_refs(self):
-        """Links to Cancer Information Summary documents."""
+    def media_links(self):
+        """Links to images not associated with a specific definition."""
 
-        if not hasattr(self, "_summary_refs"):
-            self._summary_refs = self.Link.get_links(self, "sref")
-        return self._summary_refs
+        if not hasattr(self, "_media_links"):
+            nodes = self.doc.root.findall("MediaLink")
+            self._media_links = [self.MediaLink(node) for node in nodes]
+        return self._media_links
+
+    @property
+    def media_table(self):
+        """Table showing all the non-definition-specific images."""
+
+        if not hasattr(self, "_media_table"):
+            self._media_table = builder.TABLE()
+            for link in self.media_links:
+                self._media_table.append(link.row)
+        return self._media_table
 
     @property
     def name_links(self):
@@ -245,6 +234,18 @@ class Concept:
         if not hasattr(self, "_name_links"):
             self._name_links = self.Link.get_links(self, "term")
         return self._name_links
+
+    @property
+    def names(self):
+        """Objects for the concept's GlossaryTermName documents."""
+
+        if not hasattr(self, "_names"):
+            query = self.control.Query("query_term", "doc_id")
+            query.where(query.Condition("path", self.control.CONCEPT_PATH))
+            query.where(query.Condition("int_val", self.doc.id))
+            rows = query.execute(self.control.cursor).fetchall()
+            self._names = [self.Name(self, row.doc_id) for row in rows]
+        return self._names
 
     @property
     def pdq_terms(self):
@@ -277,33 +278,53 @@ class Concept:
         return self._related_info_table
 
     @property
-    def thesaurus_ids(self):
-        """Links to concepts in the NCI thesaurus."""
+    def report(self):
+        """`HTMLPage` object for the report."""
 
-        if not hasattr(self, "_thesaurus_ids"):
-            self._thesaurus_ids = []
-            for node in self.doc.root.findall("NCIThesaurusID"):
-                self._thesaurus_ids.append(Doc.get_text(node, "").strip())
-        return self._thesaurus_ids
+        if not hasattr(self, "_report"):
+            B = builder
+            meta = B.META(charset="utf-8")
+            link = B.LINK(href=self.CSS, rel="stylesheet")
+            icon = B.LINK(href="/favicon.ico", rel="icon")
+            head = B.HEAD(meta, B.TITLE(self.TITLE), icon, link)
+            time = B.SPAN(self.control.started.ctime())
+            args = self.SUBTITLE, B.BR(), "QC Report", B.BR(), time
+            concept_id = B.P(f"CDR{self.doc.id}", id="concept-id")
+            wrapper = body = B.BODY(B.E("header", B.H1(*args)), concept_id)
+            self._report = B.HTML(head, body)
+            for langcode in sorted(self.definitions):
+                language = self.LANGUAGES[langcode]
+                if self.parallel:
+                    wrapper = B.DIV(B.CLASS("lang-wrapper"))
+                    body.append(wrapper)
+                for definition in self.definitions[langcode]:
+                    section = f"{language} - {definition.audience}"
+                    wrapper.append(B.H2(section))
+                    wrapper.append(definition.term_table)
+                    wrapper.append(definition.info_table)
+            if self.media_table is not None:
+                body.append(self.media_table)
+            body.append(self.term_type_table)
+            if self.related_info_table is not None:
+                body.append(B.H2("Related Information"))
+                body.append(self.related_info_table)
+        return self._report
 
     @property
-    def media_links(self):
-        """Links to images not associated with a specific definition."""
+    def parallel(self):
+        """True if the English and Spanish should be side-by-side."""
 
-        if not hasattr(self, "_media_links"):
-            nodes = self.doc.root.findall("MediaLink")
-            self._media_links = [self.MediaLink(node) for node in nodes]
-        return self._media_links
+        if not hasattr(self, "_parallel"):
+            self._parallel = self.control.layout == Control.SIDE_BY_SIDE
+        return self._parallel
 
     @property
-    def media_table(self):
-        """Table showing all the non-definition-specific images."""
+    def summary_refs(self):
+        """Links to Cancer Information Summary documents."""
 
-        if not hasattr(self, "_media_table"):
-            self._media_table = builder.TABLE()
-            for link in self.media_links:
-                self._media_table.append(link.row)
-        return self._media_table
+        if not hasattr(self, "_summary_refs"):
+            self._summary_refs = self.Link.get_links(self, "sref")
+        return self._summary_refs
 
     @property
     def term_type_table(self):
@@ -326,6 +347,16 @@ class Concept:
             for node in self.doc.root.findall("TermType"):
                 self._term_types.append(Doc.get_text(node, "").strip())
         return self._term_types
+
+    @property
+    def thesaurus_ids(self):
+        """Links to concepts in the NCI thesaurus."""
+
+        if not hasattr(self, "_thesaurus_ids"):
+            self._thesaurus_ids = []
+            for node in self.doc.root.findall("NCIThesaurusID"):
+                self._thesaurus_ids.append(Doc.get_text(node, "").strip())
+        return self._thesaurus_ids
 
     @property
     def videos(self):
@@ -530,16 +561,23 @@ class Concept:
                 markup = name.markup_for_name(langname)
                 if markup.tag == "p":
                     markup.tag = "span"
-                alt_names = ""
+                args = [markup, f" (CDR{name.id})"]
                 if self.langcode == "es":
                     if name.spanish_name is None:
-                        args = markup, " (en ingl\xe9s)", B.CLASS("special")
-                        markup = B.SPAN(*args)
+                        markup = B.SPAN(" (en ingl\xe9s)", B.CLASS("special"))
+                        args.append(markup)
                     elif name.alternate_spanish_names:
-                        alt_names = name.alternate_spanish_names
-                        alt_names = ", ".join(alt_names)
-                        alt_names = f" \xa0[{alt_names}]"
-                args = [markup, f" (CDR{name.id})", alt_names]
+                        separator = None
+                        args.append(" \xa0[alternate: ")
+                        for alt_name in name.alternate_spanish_names:
+                            if separator:
+                                args.append(separator)
+                            separator = ", "
+                            markup = name.markup_for_name(alt_name)
+                            if markup.tag == "p":
+                                markup.tag = "span"
+                            args.append(markup)
+                        args.append("]")
                 if name.blocked:
                     args = ["BLOCKED - "] + args + [B.CLASS("blocked")]
                 table.append(B.TR(B.TD("Name"), B.TD(*args), B.CLASS("name")))
@@ -617,7 +655,7 @@ class Concept:
         TYPES = dict(
             drug=(DRUG_SUMMARY_LINK, "Rel Drug Summary Link", "ref", True),
             xref=(EXTERNAL_REF, "Rel External Ref", "xref", True),
-            sref=(SUMMARY_REF, "Rel Summary Ref", "href", True),
+            sref=(SUMMARY_REF, "Rel Summary Ref", "ref", True),
             term=(TERM_NAME_LINK, "Rel Glossary Term", "ref", True),
             pdqt=(PDQ_TERM, "PDQ Term", "ref", False),
         )
@@ -653,7 +691,6 @@ class Concept:
                     doc_id = Doc.extract_id(self.__value)
                     display = f"CDR{doc_id:d}"
                     url = f"QcReport.py?Session=guest&DocId={doc_id:d}"
-                    url += "&DocVersion=-1"
                 link = builder.A(display, href=url)
                 args = f"{self.__text} (", link, ")"
                 self._row = builder.TR(label, builder.TD(*args))
@@ -722,7 +759,7 @@ class Concept:
             if not hasattr(self, "_row"):
                 B = builder
                 img = B.IMG(src=self.URL.format(self.id))
-                args = self.text, B.BR(), img
+                args = f"{self.text} (CDR{self.id})", B.BR(), img
                 self._row = B.TR(B.TD("Media Link"), B.TD(*args))
             return self._row
 
@@ -809,7 +846,7 @@ class Concept:
         @property
         def blocked(self):
             """True if the name document can't be published."""
-            self.doc.active_status != Doc.ACTIVE
+            return self.doc.active_status != Doc.ACTIVE
 
         @property
         def doc(self):
@@ -850,12 +887,13 @@ class Concept:
             if not hasattr(self, "_spanish_name"):
                 self._spanish_name = None
                 alternates = []
-                path = "TranslatedName/TermNameString"
-                for node in self.doc.root.findall(path):
-                    if node.get("NameType") != "alternate":
-                        self._spanish_name = node
-                    else:
-                        alternates.append(node)
+                for node in self.doc.root.findall("TranslatedName"):
+                    child = node.find("TermNameString")
+                    if child is not None:
+                        if node.get("NameType") != "alternate":
+                            self._spanish_name = child
+                        else:
+                            alternates.append(child)
                 if not hasattr(self, "_alternate_spanish_names"):
                     self._alternate_spanish_names = alternates
             return self._spanish_name
@@ -870,7 +908,7 @@ class Concept:
 
             doc = Doc(Concept.GUEST, xml=etree.tostring(name))
             result = doc.filter(Concept.FILTER)
-            return html.fromstring(str(result.result_tree))
+            return html.fromstring(str(result.result_tree).strip())
 
         @staticmethod
         def __make_capped_name(node):

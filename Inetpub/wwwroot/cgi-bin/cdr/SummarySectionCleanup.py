@@ -1,183 +1,241 @@
-#----------------------------------------------------------------------
-# Report on the types of changes recorded in selected Summaries.
-# JIRA::OCECDR-3703
-# JIRA::OCECDR-4062
-#----------------------------------------------------------------------
-import cdr
-import cdrcgi
-from cdrapi import db
-import datetime
-import lxml.etree as etree
+#!/usr/bin/env python
 
-class Control(cdrcgi.Control):
-    """
-    Override class to generate specific report.
-    """
+"""Report on anomalous sections found in selected Summaries.
 
-    def __init__(self):
-        """
-        Collect and validate the form's parameters.
-        """
+See https://tracker.nci.nih.gov/browse/OCECDR-3804.
+"""
 
-        cdrcgi.Control.__init__(self, "Summary Section Cleanup Report")
-        self.boards = self.get_boards()
-        self.selection_method = self.fields.getvalue("method", "board")
-        self.audience = self.fields.getvalue("audience", "Health Professional")
-        self.language = self.fields.getvalue("language", "English")
-        self.board = self.fields.getlist("board") or ["all"]
-        self.cdr_id = self.fields.getvalue("cdr-id")
-        self.fragment = self.fields.getvalue("title")
-        self.validate()
+from cdrcgi import Controller
+from cdrapi.docs import Doc
 
-    def populate_form(self, form, titles=None):
-        """
-        Overridden version of the method to fill in the fields for
-        the CGI request's form. In addition to being invoked by the
-        base class's run() method when the page is first requested,
-        this method is invoked by our build_tables() method below,
-        when the user has selected the "by summary title" method
-        of choosing a summary, with a title fragment which matches
-        more than one summary, so that we can put the form up again,
-        letting the user pick which of the matching summaries should
-        be used for the report.
+
+class Control(Controller):
+    """Access to the database and report creation tools."""
+
+    SUBTITLE = "Summary Section Cleanup Report"
+    LOGNAME = "SectionCleanup"
+    B_PATH = "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"
+    T_PATH = "/Summary/TranslationOf/@cdr:ref"
+    A_PATH = "/Summary/SummaryMetaData/SummaryAudience"
+    L_PATH = "/Summary/SummaryMetaData/SummaryLanguage"
+
+    def populate_form(self, page, titles=None):
+        """Fill in the fields for the report request.
+
+        Pass:
+            page - HTMLPage object where the fields go
+            titles - optional sequence of title fragment object
+                     (if present, they will trigger a cascading
+                     form to select one of the summary titles)
         """
 
-        self.add_summary_selection_fields(form, titles=titles)
-        form.add_output_options(default=self.format)
+        self.add_summary_selection_fields(page, titles=titles)
+        page.add_output_options(default=self.format)
 
     def build_tables(self):
-        """
-        Overrides the base class's version of this method to assemble
-        the tables to be displayed for this report. If the user
-        chooses the "by summary title" method for selecting which
-        summary to use for the report, and the fragment supplied
-        matches more than one summary document, display the form
-        a second time so the user can pick the summary.
-        """
+        """Assemble the report's single table."""
 
-        if self.selection_method == "title":
-            if not self.fragment:
-                cdrcgi.bail("Title fragment is required.")
-            titles = self.summaries_for_title(self.fragment)
-            if not titles:
-                cdrcgi.bail("No summaries match that title fragment")
-            if len(titles) == 1:
-                summaries = [Summary(titles[0].id, self)]
+        opts = dict(columns=self.columns, caption=self.subtitle)
+        return self.Reporter.Table(self.rows, **opts)
+
+    @property
+    def audience(self):
+        """Patient or Health Professional."""
+
+        if not hasattr(self, "_audience"):
+            default = self.AUDIENCES[0]
+            self._audience = self.fields.getvalue("audience", default)
+            if self._audience not in self.AUDIENCES:
+                self.bail()
+        return self._audience
+
+    @property
+    def board(self):
+        """PDQ board(s) selected for the report."""
+
+        if not hasattr(self, "_board"):
+            boards = self.fields.getlist("board")
+            if not boards or "all" in boards:
+                self._board = ["all"]
             else:
-                opts = {
-                    "buttons": self.buttons,
-                    "action": self.script,
-                    "subtitle": self.title,
-                    "session": self.session
-                }
-                form = cdrcgi.Page(self.PAGE_TITLE, **opts)
-                self.populate_form(form, titles)
-                form.send()
-        elif self.selection_method == "id":
-            if not self.cdr_id:
-                cdrcgi.bail("CDR ID is required.")
-            summaries = [Summary(self.cdr_id, self)]
-        else:
-            if not self.board:
-                cdrcgi.bail("At least one board is required.")
-            summaries = self.summaries_for_boards()
+                self._board = []
+                for id in boards:
+                    try:
+                        board = int(id)
+                    except Exception:
+                        self.bail()
+                    if board not in self.boards:
+                        self.bail()
+                    self._board.append(int(id))
+        return self._board
 
-        # We have the summaries; build the report table.
-        cols = self.get_cols()
-        rows = [summary.get_row() for summary in summaries if summary.changes]
-        return [cdrcgi.Report.Table(cols, rows, caption=self.title)]
+    @property
+    def boards(self):
+        """For validation of the board selections."""
 
-    def get_cols(self):
-        "Return a sequence of column definitions for the report table."
+        if not hasattr(self, "_boards"):
+            self._boards = self.get_boards()
+        return self._boards
+
+    @property
+    def cdr_id(self):
+        """Integer for the summary document selected for the report."""
+
+        if not hasattr(self, "_cdr_id"):
+            self._cdr_id = self.fields.getvalue("cdr-id")
+            if self._cdr_id:
+                try:
+                    self._cdr_id = Doc.extract_id(self._cdr_id)
+                except Exception:
+                    self.bail("Invalid format for CDR ID")
+        return self._cdr_id
+
+    @property
+    def columns(self):
+        """Sequence of column definitions for the report table."""
 
         return (
-            cdrcgi.Report.Column("CDR ID", width="80px"),
-            cdrcgi.Report.Column("Title", width="400px"),
-            cdrcgi.Report.Column("Summary Sections", width="500px")
+            self.Reporter.Column("CDR ID", width="80px"),
+            self.Reporter.Column("Title", width="400px"),
+            self.Reporter.Column("Summary Sections", width="500px"),
         )
 
-    def summaries_for_boards(self):
-        """
-        The user has asked for a report of multiple summaries for
-        one or more of the boards. Find the boards' summaries whose
-        language match the request parameters, and return a sorted
-        list of Summary objects for them.
-        """
+    @property
+    def fragment(self):
+        """Title fragment provided for matching summaries."""
 
-        b_path = "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"
-        t_path = "/Summary/TranslationOf/@cdr:ref"
-        query = db.Query("active_doc d", "d.id")
-        query.join("query_term_pub a", "a.doc_id = d.id")
-        query.where("a.path = '/Summary/SummaryMetaData/SummaryAudience'")
-        query.where(query.Condition("a.value", self.audience + "s"))
-        query.join("query_term_pub l", "l.doc_id = d.id")
-        query.where("l.path = '/Summary/SummaryMetaData/SummaryLanguage'")
-        query.where(query.Condition("l.value", self.language))
-        if "all" not in self.board:
-            if self.language == "English":
-                query.join("query_term_pub b", "b.doc_id = d.id")
+        if not hasattr(self, "_fragment"):
+            self._fragment = self.fields.getvalue("title")
+        return self._fragment
+
+    @property
+    def language(self):
+        """English or Spanish."""
+
+        if not hasattr(self, "_language"):
+            default = self.LANGUAGES[0]
+            self._language = self.fields.getvalue("language", default)
+            if self._language not in self.LANGUAGES:
+                self.bail()
+        return self._language
+
+    @property
+    def rows(self):
+        """One row for each summary which has problem sections."""
+        return [summary.row for summary in self.summaries if summary.sections]
+
+    @property
+    def summaries(self):
+        """Summaries selected by ID, title, or board."""
+
+        if not hasattr(self, "_summaries"):
+            if self.selection_method == "title":
+                if not self.fragment:
+                    self.bail("Title fragment is required.")
+                if not self.summary_titles:
+                    self.bail("No summaries match that title fragment")
+                if len(self.summary_titles) == 1:
+                    summary = Summary(self, self.summary_titles[0].id)
+                    self._summaries = [summary]
+                else:
+                    self.populate_form(self.form_page, self.summary_titles)
+                    self.form_page.send()
+            elif self.selection_method == "id":
+                if not self.cdr_id:
+                    self.bail("CDR ID is required.")
+                self._summaries = [Summary(self, self.cdr_id)]
             else:
-                query.join("query_term_pub t", "t.doc_id = d.id")
-                query.where(query.Condition("t.path", t_path))
-                query.join("query_term b", "b.doc_id = t.int_val")
-            query.where(query.Condition("b.path", b_path))
-            query.where(query.Condition("b.int_val", self.board, "IN"))
-        rows = query.unique().execute(self.cursor).fetchall()
-        return sorted([Summary(row[0], self) for row in rows])
+                if not self.board:
+                    self.bail("At least one board is required.")
+                query = self.Query("active_doc d", "d.id")
+                query.join("query_term_pub a", "a.doc_id = d.id")
+                query.where(f"a.path = '{self.A_PATH}'")
+                query.where(query.Condition("a.value", f"{self.audience}s"))
+                query.join("query_term_pub l", "l.doc_id = d.id")
+                query.where(f"l.path = '{self.L_PATH}'")
+                query.where(query.Condition("l.value", self.language))
+                if "all" not in self.board:
+                    if self.language == "English":
+                        query.join("query_term_pub b", "b.doc_id = d.id")
+                    else:
+                        query.join("query_term_pub t", "t.doc_id = d.id")
+                        query.where(query.Condition("t.path", self.T_PATH))
+                        query.join("query_term b", "b.doc_id = t.int_val")
+                    query.where(query.Condition("b.path", self.B_PATH))
+                    query.where(query.Condition("b.int_val", self.board, "IN"))
+                query.log(label="SummarySectionCleanup")
+                rows = query.unique().execute(self.cursor).fetchall()
+                summaries = [Summary(self, row.id) for row in rows]
+                self._summaries = sorted(summaries)
+                self.logger.info("found %d summaries", len(self._summaries))
+        return self._summaries
 
-    def validate(self):
-        """
-        Separate validation method, to make sure the CGI request's
-        parameters haven't been tampered with by an intruder.
-        """
-
-        msg = cdrcgi.TAMPERING
-        if self.audience not in self.AUDIENCES:
-            cdrcgi.bail(msg)
-        if self.language not in self.LANGUAGES:
-            cdrcgi.bail(msg)
-        if self.selection_method not in self.SUMMARY_SELECTION_METHODS:
-            cdrcgi.bail(msg)
-        if self.format not in self.FORMATS:
-            cdrcgi.bail(msg)
-        boards = []
-        for board in self.board:
-            if board == "all":
-                boards.append("all")
-            else:
-                try:
-                    board = int(board)
-                except:
-                    cdrcgi.bail(msg)
-                if board not in self.boards:
-                    cdrcgi.bail(msg)
-                boards.append(board)
-        self.board = boards
-        if self.cdr_id:
-            try:
-                self.cdr_id = cdr.exNormalize(self.cdr_id)[1]
-            except:
-                cdrcgi.bail("Invalid format for CDR ID")
 
 class Summary:
-    """
-    Represents one CDR Summary document.
+    """One of the CDR PDQ summaries selected for the report.
 
     Attributes:
         id       -  CDR ID of summary document
         title    -  title of summary (from title column of all_docs table)
         control  -  object holding request parameters for report
-        changes  -  sequence of string descripts of changed sections
+        problems -  sequence of strings identifying sections with problems
     """
 
-    NORMAL_CONTENT = set(["Para", "SummarySection", "Table", "QandASet",
-                          "ItemizedList", "OrderedList"])
+    NORMAL_CONTENT = {"Para", "SummarySection", "Table", "QandASet",
+                      "ItemizedList", "OrderedList"}
 
-    def __init__(self, doc_id, control):
+    def __init__(self, control, doc_id):
+        """Remember the caller's values.
+
+        Pass:
+            control - access to the DB and report options and creation tools
+            doc_id - integer for the summary's CDR document ID
         """
-        Remember summary identification and recursively walk through
-        all of the Summary sections (depth first) looking for information
-        to be added to the report.
+
+        self.__control = control
+        self.__doc_id = doc_id
+
+    def __lt__(self, other):
+        """Support case-insensitive sorting of the summaries by title."""
+        return self.key < other.key
+
+    @property
+    def control(self):
+        """Access to the DB and report options and creation tools."""
+        return self.__control
+
+    @property
+    def doc(self):
+        """`Doc` object for the CDR Summary document."""
+
+        if not hasattr(self, "_doc"):
+            self._doc = Doc(self.control.session, id=self.id)
+        return self._doc
+
+    @property
+    def id(self):
+        """Integer for the summary's CDR document ID."""
+        return self.__doc_id
+
+    @property
+    def key(self):
+        """Composite values for sorting."""
+
+        if not hasattr(self, "_key"):
+            self._key = self.title.lower(), self.id
+        return self._key
+
+    @property
+    def row(self):
+        """Assemble the row for the report table."""
+        return self.id, self.title, self.sections
+
+    @property
+    def sections(self):
+        """Sequence of string identifying anomalous summary sections.
+
+        What we're looking for are sections which don't have any of
+        the elements in the class- level `NORMAL_CONTENT` set property.
 
         Here's the logic:
 
@@ -190,56 +248,41 @@ class Summary:
                 IF THERE IS NO INSERTION ANCESTOR OF THIS SECTION ELEMENT:
                   SHOW THE TITLE OF THIS SECTION
                   SHOW THE TAGS OF THE CHILDREN OF THIS SUMMARY SECTION ELEMENT
+
         """
 
-        self.id = doc_id
-        self.control = control
-        self.changes = []
-        query = db.Query("document", "title", "xml")
-        query.where(query.Condition("id", doc_id))
-        self.title, xml = query.execute(control.cursor).fetchone()
-        root = etree.XML(xml.encode("utf-8"))
-        prev_section_empty = False
-        for section in root.iter("SummarySection"):
+        if not hasattr(self, "_sections"):
+            self._sections = []
+            prev_section_empty = False
+            for section in self.doc.root.iter("SummarySection"):
+                children = [c for c in section if isinstance(c.tag, str)]
+                tags = [child.tag for child in children]
+                if not children:
+                    self._sections.append("*** Empty Section ***")
+                    prev_section_empty = True
+                elif tags[0] == "Title":
+                    title = children[0].text or None
+                    if title is None or not title.strip():
+                        title = "EMPTY TITLE"
+                    if prev_section_empty:
+                        self._sections.append("*** %s" % title)
+                    if not (set(tags) & Summary.NORMAL_CONTENT):
+                        ancestors = [a.tag for a in section.iterancestors()]
+                        if "Insertion" not in ancestors:
+                            if not prev_section_empty:
+                                self._sections.append(title)
+                            self._sections.append(tags)
+                    prev_section_empty = False
+            if prev_section_empty:
+                self._sections.append("*** Last Section")
+        return self._sections
 
-            # Get the element child nodes for the secion (skip PIs, etc.).
-            children = [c for c in list(section) if self.is_element(c)]
-            # Another possibility:
-            #children = [c for c in list(section) if type(c) is etree._Element]
+    @property
+    def title(self):
+        """String for the title of the summary document."""
+        return self.doc.title
 
-            tags = [child.tag for child in children]
-            if not children:
-                self.changes.append("*** Empty Section ***")
-                prev_section_empty = True
-            elif tags[0] == "Title":
-                title = children[0].text or None
-                if title is None or not title.strip():
-                    title = "EMPTY TITLE"
-                if prev_section_empty:
-                    self.changes.append("*** %s" % title)
-                if not (set(tags) & Summary.NORMAL_CONTENT):
-                    ancestors = [a.tag for a in section.iterancestors()]
-                    if "Insertion" not in ancestors:
-                        if not prev_section_empty: # title already shown?
-                            self.changes.append(title)
-                        self.changes.append(tags)
-                prev_section_empty = False
-        if prev_section_empty:
-            self.changes.append("*** Last Section")
-
-    def __lt__(self, other):
-        "Support sorting the summaries by title."
-        return (self.title, self.id) < (other.title, other.id)
-
-    def get_row(self):
-        "Assemble the row for the report table."
-        return [self.id, self.title, self.changes]
-
-    @staticmethod
-    def is_element(node):
-        "We need to skip over processing instructions and comments."
-        return isinstance(node.tag, str)
 
 if __name__ == "__main__":
-    "Protect this from being executed when loaded by lint-like tools."
+    """Protect this from being executed when loaded by lint-like tools."""
     Control().run()

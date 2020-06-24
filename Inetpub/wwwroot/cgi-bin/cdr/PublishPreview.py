@@ -228,9 +228,9 @@ class Summary:
     """Base class for PDQ summary documents (cancer and drug information)"""
 
     SCRIPT = "PublishPreview.py"
-    TIER_SUFFIXES = dict(DEV="-blue-dev", PROD="")
     IMAGE_PATH = "/pdq/media/images"
     IMAGE_PATTERN = "pdq/media/images/([0-9-]+)\\.jpg"
+    CANCER_GOV = "https://www.cancer.gov"
     URL_PATHS = (
         "/Summary/SummaryMetaData/SummaryURL/@cdr:xref",
         "/DrugInformationSummary/DrugInfoMetaData/URL/@cdr:xref"
@@ -310,21 +310,22 @@ class Summary:
             self.__control.show_progress("fixing links...")
             for script in page.iter("script"):
                 url = script.get("src", "")
-                if url and not url.startswith("https:"):
+                if url and not (url.startswith("https:") or
+                                url.startswith("//")):
+                    script.set("osrc", url)
                     if not url.startswith("http"):
                         url = f"{self.client.base}{url}"
                     src = f"proxy.py?url={url}"
                     script.set("src", src)
             for link in page.findall("head/link"):
                 url = link.get("href", "")
-                if not url.startswith("https://"):
+                if not (url.startswith("https://") or url.startswith("//")):
+                    link.set("ohref", url)
                     if not url.startswith("http"):
                         url = f"{self.client.base}{url}"
                     href = f"proxy.py?url={url}"
                     link.set("href", href)
-            suffix = self.TIER_SUFFIXES.get(self.doc.session.tier.name, "-qa")
-            image_host = f"www{suffix}.cancer.gov"
-            replacement = f"https://{image_host}{self.IMAGE_PATH}"
+            replacement = f"{self.CANCER_GOV}{self.IMAGE_PATH}"
             for img in page.iter("img"):
                 src = img.get("src", "")
                 img.set("osrc", src)
@@ -334,14 +335,12 @@ class Summary:
                 elif src.startswith(self.IMAGE_PATH):
                     src = src.replace(self.IMAGE_PATH, replacement)
                     img.set("src", src)
-                elif not src.startswith("http"):
-                    img.set("src", f"{self.client.base}{src}")
+                elif not (src.startswith("http") or src.startswith("//")):
+                    img.set("src", f"{self.CANCER_GOV}{src}")
             script = self.__control.script
             for a in page.xpath("//a[@href]"):
-                if "nav-item-xxtitle" in (a.getparent().get("class", "")):
-                    continue
                 link_type = "unknown"
-                fixed = href = (a.get("href", "")).strip()
+                fixed = href = a.get("href", "").strip()
                 if "Common/PopUps" in href:
                     continue
                 self.__control.logger.debug("@href=%r", href)
@@ -371,7 +370,7 @@ class Summary:
                                 fixed = f"{script}?{DOCID}={id:d}"
                                 link_type = "SummaryRef-external"
                         else:
-                            fixed = f"{self.client.base}{href}"
+                            fixed = f"{self.CANCER_GOV}{href}"
                             link_type = "Cancer.gov-link"
                     else:
                         link_type = "Dead-link"
@@ -472,7 +471,7 @@ class GTN:
         """`Doc` object for the GlossaryTermName document."""
 
         if not hasattr(self, "_doc"):
-            version = self.__control.version or "lastp"
+            version = self.__control.version or None
             if version == "cwd":
                 version = None
             opts = dict(id=self.__control.id, version=version)

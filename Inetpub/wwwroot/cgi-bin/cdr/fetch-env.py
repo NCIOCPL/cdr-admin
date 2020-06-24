@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 #----------------------------------------------------------------------
 # Dump the server environment variables as json. Requires permission.
 #----------------------------------------------------------------------

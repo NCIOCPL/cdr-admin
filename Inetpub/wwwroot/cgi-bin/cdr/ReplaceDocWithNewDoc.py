@@ -349,7 +349,7 @@ class Control(Controller):
             for name in ("ReferencedTableNumber", "ReferencedFigureNumber"):
                 xpath = f"//{name}[starts-with(@Target, '{target}')]"
                 for node in self.new.root.xpath(xpath):
-                    self._internal_links.append((node, name))
+                    self._internal_links.append((node, "Target"))
         return self._internal_links
 
     @property
