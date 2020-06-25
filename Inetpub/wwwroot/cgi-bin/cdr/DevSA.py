@@ -37,7 +37,6 @@ class Control(Controller):
             ("Manage Value Tables", "edit-value-table.py"),
             ("Publishing - Create Job", "Publishing.py"),
             ("Publishing - Fail Job", "FailBatchJob.py"),
-            ("Publishing - Reverify Push Job", "ReverifyJob.py"),
             ("Publishing - Set Next Job ID", self.SET_NEXT_JOB_ID),
             ("Re-Publishing", "Republish.py"),
             ("Replace CWD with Older Version", "ReplaceCWDwithVersion.py"),
