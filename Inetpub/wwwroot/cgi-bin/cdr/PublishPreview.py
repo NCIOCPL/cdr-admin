@@ -7,7 +7,7 @@ from argparse import ArgumentParser
 from datetime import datetime
 from re import search
 from sys import stderr
-from cdrcgi import Controller, DOCID# , sendPage
+from cdrcgi import Controller, DOCID
 from cdrapi.publishing import DrupalClient
 from cdrapi.docs import Doc
 import cdrpub
@@ -423,6 +423,8 @@ class DIS(Summary):
 
 
 class GTN:
+    """GlossaryTermName document."""
+
     MEDIA = "/PublishedContent/Media/CDR/media/"
     VENDOR_FILTERS = "set:Vendor GlossaryTerm Set"
     JSON_FILTER = "Glossary Term JSON"
@@ -476,10 +478,18 @@ class GTN:
 
 
     def __init__(self, control):
+        """Remember the caller's value.
+
+        Pass:
+            control - access to the report parameters and the database
+        """
+
         self.__control = control
 
     @property
     def body(self):
+        """DOM object for the HTML page's body."""
+
         if not hasattr(self, "_body"):
             self._body = self.B.BODY(
                 self.B.DIV(
@@ -509,10 +519,13 @@ class GTN:
 
     @property
     def control(self):
+        """Access to the report parameters and the database."""
         return self.__control
 
     @property
     def doc(self):
+        """`Doc` object for the version to be previewed."""
+
         if not hasattr(self, "_doc"):
             id = self.control.id
             version = self.control.version
@@ -521,6 +534,8 @@ class GTN:
 
     @property
     def head(self):
+        """DOM object for the HTML page's head."""
+
         if not hasattr(self, "_head"):
             self._head = self.B.HEAD(self.B.META(charset="utf-8"), id="header")
             compat = self.B.META(content="IE=edge")
@@ -549,6 +564,8 @@ class GTN:
 
     @property
     def left_nav(self):
+        """Dummy placeholder for the left navigation bar."""
+
         if not hasattr(self, "_left_nav"):
             self._left_nav = self.B.DIV(
                 self.B.DIV(
@@ -570,6 +587,8 @@ class GTN:
 
     @property
     def main(self):
+        """HTML div wrapper for the page's main payload."""
+
         if not hasattr(self, "_main"):
             self._main = self.B.DIV(
                 self.B.E(
@@ -594,6 +613,8 @@ class GTN:
 
     @property
     def page(self):
+        """DOM object for the preview HTML page."""
+
         if not hasattr(self, "_page"):
             attrs = dict(lang="en", id="htmlEl")
             self._page = self.B.HTML(self.head, self.body, **attrs)
@@ -601,6 +622,8 @@ class GTN:
 
     @property
     def results(self):
+        """Sequence of div blocks, one for each language."""
+
         if not hasattr(self, "_results"):
             self._results = []
             for language in self.control.LANGUAGES:
@@ -610,6 +633,8 @@ class GTN:
 
     @property
     def root(self):
+        """Top-level element for the document, prepared for export."""
+
         if not hasattr(self, "_root"):
             result = self.doc.filter(self.VENDOR_FILTERS)
             self._root = result.result_tree.getroot()
@@ -617,16 +642,28 @@ class GTN:
 
     @property
     def title(self):
+        """String for the head's title element."""
         return f"Publish Preview: CDR{self.doc.id}"
 
 
     class Result:
+        """Portion of the display specific to one language."""
+
         def __init__(self, term, language):
+            """Remember the caller's values
+
+            Pass:
+                term - the `GTN` object for this preview
+                language - the language for this block
+            """
+
             self.__term = term
             self.__language = language
 
         @property
         def audio(self):
+            """Media link for the term's pronunciation in this language."""
+
             if self.audio_url:
                 B = self.term.B
                 return B.A(
@@ -639,6 +676,8 @@ class GTN:
 
         @property
         def audio_url(self):
+            """String for the audio link's URL."""
+
             if not hasattr(self, "_audio_url"):
                 self._audio_url = id = None
                 for node in self.term.root.findall("MediaLink"):
@@ -655,13 +694,14 @@ class GTN:
 
         @property
         def definitions(self):
+            """Sequence of DD elements for this language."""
+
             if not hasattr(self, "_definitions"):
                 self._definitions = []
                 B = self.term.B
                 name = "TermDefinition"
                 if self.langcode == "es":
                     name = "SpanishTermDefinition"
-                #node = self.term.root.find(f"{name}/DefinitionText")
                 for node in self.term.root.findall(f"{name}/DefinitionText"):
                     text = Doc.get_text(node, "").strip()
                     if text:
@@ -674,6 +714,8 @@ class GTN:
 
         @property
         def divs(self):
+            """Sequence of top-level DIV elements for this language."""
+
             if not hasattr(self, "_divs"):
                 self._divs = []
                 if self.name:
@@ -691,6 +733,8 @@ class GTN:
 
         @property
         def drugs(self):
+            """Links to related drug summary documents."""
+
             if not hasattr(self, "_drugs"):
                 self._drugs = []
                 path = "RelatedInformation/RelatedDrugSummaryRef"
@@ -702,15 +746,18 @@ class GTN:
 
         @property
         def dt(self):
-            if self.name:
-                B = self.term.B
-                dfn = B.DFN(self.name)
-                dfn.set("data-cdr-id", str(self.term.doc.id))
-                return B.DT(dfn)
-            return None
+            """DT element for the term name."""
+
+            name = self.name or "[MISSING NAME]"
+            B = self.term.B
+            dfn = B.DFN(name)
+            dfn.set("data-cdr-id", str(self.term.doc.id))
+            return B.DT(dfn)
 
         @property
         def external(self):
+            """Links to external resources."""
+
             if not hasattr(self, "_external"):
                 self._external = []
                 path = "RelatedInformation/RelatedExternalRef"
@@ -722,6 +769,8 @@ class GTN:
 
         @property
         def images(self):
+            """Sequence of `Image` objects for this language."""
+
             if not hasattr(self, "_images"):
                 self._images = []
                 for node in self.term.root.findall("MediaLink"):
@@ -732,6 +781,8 @@ class GTN:
 
         @property
         def key(self):
+            """String for the term's pronunciation key (English only)."""
+
             if not hasattr(self, "_key"):
                 self._key = None
                 if self.langcode == "en":
@@ -741,12 +792,16 @@ class GTN:
 
         @property
         def langcode(self):
+            """String for the two-character ISO language code (en or es)."""
+
             if not hasattr(self, "_langcode"):
                 self._langcode = "en" if self.__language == "English" else "es"
             return self._langcode
 
         @property
         def name(self):
+            """String for the name of the term in this block's language."""
+
             if not hasattr(self, "_name"):
                 tag = "TermName"
                 if self.langcode == "es":
@@ -757,6 +812,8 @@ class GTN:
 
         @property
         def pronunciation(self):
+            """DD element for the term name's pronunciation (if present)."""
+
             audio = self.audio
             if not self.key and audio is None:
                 return None
@@ -770,6 +827,8 @@ class GTN:
 
         @property
         def related(self):
+            """DIV block for related resources (if any)."""
+
             terms = self.terms
             cis = self.summaries
             dis = self.drugs
@@ -811,6 +870,8 @@ class GTN:
 
         @property
         def summaries(self):
+            """Sequence of references to Cancer Information Summary docs."""
+
             if not hasattr(self, "_summaries"):
                 self._summaries = []
                 path = "RelatedInformation/RelatedSummaryRef"
@@ -822,10 +883,13 @@ class GTN:
 
         @property
         def term(self):
+            """Access to the glossary term being previewed."""
             return self.__term
 
         @property
         def terms(self):
+            """Sequence of links to related glossary terms."""
+
             if not hasattr(self, "_terms"):
                 self._terms = []
                 path = "RelatedInformation/RelatedGlossaryTermRef"
@@ -839,6 +903,8 @@ class GTN:
 
         @property
         def videos(self):
+            """Sequence of `Video` objects for this language block."""
+
             if not hasattr(self, "_videos"):
                 self._videos = []
                 for node in self.term.root.findall("EmbeddedVideo"):
@@ -849,19 +915,31 @@ class GTN:
 
 
         class Image:
+            """Images associated with this glossary term."""
 
             def __init__(self, result, node):
+                """Remember the caller's values.
+
+                Pass:
+                    result - block of the page for a specific language
+                    node - node in which the image information is stored
+                """
+
                 self.__node = node
                 self.__result = result
 
             @property
             def alt(self):
+                """String to be displayed if the image is unavailable."""
+
                 if not hasattr(self, "_alt"):
                     self._alt = self.__node.get("alt") or ""
                 return self._alt
 
             @property
             def caption(self):
+                """String to be displayed with the image."""
+
                 if not hasattr(self, "_caption"):
                     self._caption = ""
                     for node in self.__node.findall("Caption"):
@@ -872,6 +950,8 @@ class GTN:
 
             @property
             def enlarge(self):
+                """String for the button used to enlarge the image."""
+
                 if not hasattr(self, "_enlarge"):
                     self._enlarge = "Enlarge"
                     if self.__result.langcode == "es":
@@ -880,6 +960,8 @@ class GTN:
 
             @property
             def figure(self):
+                """HTML FIGURE element wrapping the image on the page."""
+
                 B = self.__result.term.B
                 href = f"GetCdrImage.py?id=CDR{self.id}-750.{self.suffix}"
                 src = f"GetCdrImage.py?id=CDR{self.id}-571.{self.suffix}"
@@ -904,6 +986,8 @@ class GTN:
 
             @property
             def id(self):
+                """Integer for the image's CDR Media document."""
+
                 if not hasattr(self, "_id"):
                     try:
                         self._id = Doc.extract_id(self.__node.get("ref"))
@@ -913,12 +997,19 @@ class GTN:
 
             @property
             def placement(self):
+                """String for the image placement instructions.
+
+                Ignored for now.
+                """
+
                 if not hasattr(self, "_placement"):
                     self._placement = self.__node.get("placement")
                 return self._placement
 
             @property
             def suffix(self):
+                """String for the image's file name suffix."""
+
                 if not hasattr(self, "_suffix"):
                     type = self.__node.get("type")
                     if "gif" in type:
@@ -931,13 +1022,23 @@ class GTN:
 
 
         class Ref:
+            """Link to a related resource."""
 
             def __init__(self, result, node):
+                """Remember the caller's values.
+
+                Pass:
+                    result - section for this language's portion of the page
+                    node - DOM node containing the link's information
+                """
+
                 self.__result = result
                 self.__node = node
 
             @property
             def item(self):
+                """HTML LI element wrapping this link."""
+
                 link = self.link
                 if self.link is None:
                     return None
@@ -945,6 +1046,8 @@ class GTN:
 
             @property
             def link(self):
+                """HTML A element for the link."""
+
                 if self.url:
                     B = self.__result.term.B
                     return B.A(self.text, href=self.url)
@@ -952,19 +1055,22 @@ class GTN:
 
             @property
             def text(self):
+                """String for the link's display text."""
+
                 if not hasattr(self, "_text"):
                     self._text = Doc.get_text(self.__node, "").strip()
                 return self._text
 
             @property
             def url(self):
+                """String for the link's URL."""
+
                 if not hasattr(self, "_url"):
                     if "External" in self.__node.tag:
                         self._url = self.__node.get("xref", "")
                     elif "Glossary" in self.__node.tag:
                         href = self.__node.get("href", "")
-                        # XXX TODO FIX ME
-                        self._url = f"GlossaryPublishPreview.py?id={href}"
+                        self._url = f"PublishPreview.py?{DOCID}={href}"
                     else:
                         url = self.__node.get("url", "")
                         self._url = f"https://cancer.gov{url}"
@@ -972,13 +1078,23 @@ class GTN:
 
 
         class Video:
+            """Embedded video for the glossary term."""
 
             def __init__(self, result, node):
+                """Remember the caller's values.
+
+                Pass:
+                    result - section for this language's portion of the page
+                    node - DOM node containing the link's information
+                """
+
                 self.__result = result
                 self.__node = node
 
             @property
             def caption(self):
+                """String to be displayed with the embedded video."""
+
                 if not hasattr(self, "_caption"):
                     node = self.__node.find("Caption")
                     self._caption = Doc.get_text(node, "").strip()
@@ -986,6 +1102,8 @@ class GTN:
 
             @property
             def classes(self):
+                """CSS classes to be used for this embedded video."""
+
                 if not hasattr(self, "_classes"):
                     size = 75
                     if "100" in self.template:
@@ -1000,6 +1118,8 @@ class GTN:
 
             @property
             def figure(self):
+                """HTML figure element wrapping the embedded video."""
+
                 B = self.__result.term.B
                 figure = B.E("figure", B.CLASS(self.classes))
                 if "NoTitle" not in self.template and self.title:
@@ -1030,6 +1150,8 @@ class GTN:
 
             @property
             def template(self):
+                """String used to indicate how the video should be shown."""
+
                 if not hasattr(self, "_template"):
                     default = "Video75NoTitle"
                     self._template = self.__node.get("template", default)
@@ -1037,6 +1159,8 @@ class GTN:
 
             @property
             def title(self):
+                """String for the embedded video's title."""
+
                 if not hasattr(self, "_title"):
                     node = self.__node.find("VideoTitle")
                     self._title = Doc.get_text(node, "").strip()
@@ -1044,12 +1168,16 @@ class GTN:
 
             @property
             def uid(self):
+                """YouTube ID for the video."""
+
                 if not hasattr(self, "_uid"):
                     self._uid = self.__node.get("unique_id", "")
                 return self._uid
 
             @property
             def url(self):
+                """String for the URL to display the video."""
+
                 if not hasattr(self, "_url"):
                     self._url = f"https://www.youtube.com/watch?v={self.uid}"
                 return self._url
