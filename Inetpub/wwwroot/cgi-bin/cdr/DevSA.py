@@ -9,7 +9,6 @@ from cdr import isProdHost
 class Control(Controller):
     SUBTITLE = "Developers/System Administrators"
     SUBMIT = None
-    SET_NEXT_JOB_ID = "SetNextJobId.py"
     ON_PROD = isProdHost()
     def populate_form(self, page):
         page.body.set("class", "admin-menu")
@@ -37,7 +36,6 @@ class Control(Controller):
             ("Manage Value Tables", "edit-value-table.py"),
             ("Publishing - Create Job", "Publishing.py"),
             ("Publishing - Fail Job", "FailBatchJob.py"),
-            ("Publishing - Set Next Job ID", self.SET_NEXT_JOB_ID),
             ("Re-Publishing", "Republish.py"),
             ("Replace CWD with Older Version", "ReplaceCWDwithVersion.py"),
             ("Reports", "Reports.py"),
@@ -49,7 +47,6 @@ class Control(Controller):
             ("Update ZIP Codes", "upload-zip-code-file.py"),
             ("View Logs", "log-tail.py"),
         ):
-            if not self.ON_PROD or script != self.SET_NEXT_JOB_ID:
-                ol.append(page.B.LI(page.menu_link(script, display)))
+            ol.append(page.B.LI(page.menu_link(script, display)))
         page.form.append(ol)
 Control().run()

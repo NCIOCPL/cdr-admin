@@ -236,7 +236,6 @@ class Item:
         "runicrdbstatreport.py",
         "runpcibstatreport.py",
         "semantictypereport.py",
-        "setnextjobid.py",
         "showcdrdocument.py",
         "showglobalchangetestresults.py",
         "showsummaryincludes.py",
