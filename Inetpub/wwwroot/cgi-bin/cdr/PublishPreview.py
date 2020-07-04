@@ -7,14 +7,15 @@ from argparse import ArgumentParser
 from datetime import datetime
 from re import search
 from sys import stderr
-from cdrcgi import Controller, DOCID, sendPage
+from cdrcgi import Controller, DOCID# , sendPage
 from cdrapi.publishing import DrupalClient
 from cdrapi.docs import Doc
-import cdr2gk
 import cdrpub
 from lxml import etree, html
+from lxml.html import builder
 import requests
 from cdr import TMP
+
 
 # TODO: Get Acquia to fix their broken certificates.
 from urllib3.exceptions import InsecureRequestWarning
@@ -38,7 +39,7 @@ class Control(Controller):
         args = len(page), self.elapsed
         self.show_progress("Complete!")
         self.logger.info("Assembled %d bytes; elapsed: %s", *args)
-        sendPage(page)
+        self.send_page(page)
 
     def show_progress(self, progress):
         """If enabled, write processing progress to the console."""
@@ -90,28 +91,6 @@ class Control(Controller):
         return self._drupal_host
 
     @property
-    def flavor(self):
-        """Override the default report flavor for glossary docs."""
-
-        if not hasattr(self, "_flavor"):
-            if self.opts is None:
-                self._flavor = self.fields.getvalue("Flavor", "GlossaryTerm")
-            else:
-                self._flavor = self.opts.flavor
-        return self._flavor
-
-    @property
-    def gk_host(self):
-        """Override the default GateKeeper host name."""
-
-        if not hasattr(self, "_gk_host"):
-            if self.opts is None:
-                self._gk_host = self.fields.getvalue("gkHost")
-            else:
-                self._gk_host = self.opts.gk_host
-        return self._gk_host
-
-    @property
     def id(self):
         """CDR ID for the doccument to process."""
 
@@ -153,8 +132,6 @@ class Control(Controller):
                 parser.add_argument("--debug", "-d", action="store_true")
                 parser.add_argument("--drupal_host")
                 parser.add_argument("--password", "-p")
-                parser.add_argument("--flavor", "-f", default="GlossaryTerm")
-                parser.add_argument("--gk_host", "-g")
                 parser.add_argument("--cached_html", "-c")
                 parser.add_argument("--session", "-s")
                 self._opts = parser.parse_args()
@@ -446,170 +423,636 @@ class DIS(Summary):
 
 
 class GTN:
-    """GlossaryTermName CDR document."""
-
+    MEDIA = "/PublishedContent/Media/CDR/media/"
     VENDOR_FILTERS = "set:Vendor GlossaryTerm Set"
-    CIS_URL = "/Summary/SummaryMetaData/SummaryURL/@cdr:xref"
-    DIS_URL = "/DrugInformationSummary/DrugInfoMetaData/URL/@cdr:xref"
-    GATEKEEPER_ERROR_MESSAGES = (
-        ("Validation Error",
-        "Top-level section _\d* is missing a required Title."),
-        ("DTD Error", "The element '\w*' has invalid child element"),
+    JSON_FILTER = "Glossary Term JSON"
+    IMAGE_LOCATION = "[__imagelocation]"
+    AUDIO_LOCATION = "[__audiolocation]"
+    B = builder
+    PRECONNECT = (
+        "https://cdnjs.cloudflare.com",
+        "https://ajax.googleapis.com",
+        "https://fonts.gstatic.com",
+        "https://static.cancer.gov",
     )
+    FONTS = "https://fonts.googleapis.com/css"
+    FONTS = f"{FONTS}?family=Noto+Sans:400,400i,700,700i"
+    META = (
+        ("content-language", "en"),
+        ("english-linking-policy",
+         "https://www.cancer.gov/global/web/policies/exit"),
+        ("espanol-linking-policy",
+         "https://www.cancer.gov/espanol/global/politicas/salda"),
+        ("publishpreview", "undefined"),
+        ("apple-mobile-web-app-title", "Cancer.gov"),
+        ("application-name", "Cancer.gov"),
+        ("theme-color", "#ffffff")
+    )
+    ADOBE = (
+        "//assets.adobedtm.com/f1bfa9f7170c81b1a9a9ecdcc6c5215ee0b03c84"
+        "/satelliteLib-5b3dcf1f2676c378b518a1583ef5355acd83cd3d.js"
+    )
+    SCRIPT = (
+        ("https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js",
+         False),
+        ("https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1"
+         "/jquery-ui.min.js",
+         True),
+        ("https://cdnjs.cloudflare.com/ajax/libs/jplayer/2.9.2"
+         "/jplayer/jquery.jplayer.min.js", False),
+        ("https://cancer.gov/PublishedContent/js/cdeConfig.js", False),
+        ("https://cancer.gov/PublishedContent/js/Common.js", True),
+        ("https://cancer.gov/PublishedContent/js/InnerPage.js", True),
+        ("https://cancer.gov/PublishedContent/js/DictionaryPage.js", True),
+    )
+    CSS = (
+        "https://cancer.gov/PublishedContent/Styles/Common.css",
+        "https://cancer.gov/PublishedContent/Styles/InnerPage.css",
+        "/stylesheets/fonts.css",
+    )
+    STYLE = "dl.dictionary-list figure.image-left-medium { float: none; }"
+    STYLE = "div.results { clear: both; }"
+    NAV = "LEFT NAV GOES HERE"
+
 
     def __init__(self, control):
-        """Save the caller's value.
-
-        Pass:
-            control - access to the database and the current login session
-        """
-
         self.__control = control
 
     @property
-    def doc(self):
-        """`Doc` object for the GlossaryTermName document."""
+    def body(self):
+        if not hasattr(self, "_body"):
+            self._body = self.B.BODY(
+                self.B.DIV(
+                    self.B.DIV(self.B.CLASS("fixedtotop")),
+                    self.B.DIV(id="headerzone"),
+                    self.B.DIV(
+                        self.B.DIV(
+                            self.B.DIV(
+                                self.left_nav,
+                                self.main,
+                                self.B.CLASS("row"),
+                            ),
+                            self.B.CLASS(
+                                "row general-page-body-container collapse"
+                            ),
+                        ),
+                        self.B.CLASS("main-content"),
+                        id="content",
+                        tabindex="0",
+                    ),
+                    id="page",
+                ),
+                self.B.CLASS("nciappmodulepage"),
+                id="Body1",
+            )
+        return self._body
 
+    @property
+    def control(self):
+        return self.__control
+
+    @property
+    def doc(self):
         if not hasattr(self, "_doc"):
-            version = self.__control.version or None
-            if version == "cwd":
-                version = None
-            opts = dict(id=self.__control.id, version=version)
-            self._doc = Doc(self.__control.session, **opts)
-            self.__control.show_progress("fetched document...")
+            id = self.control.id
+            version = self.control.version
+            self._doc = Doc(self.control.session, id=id, version=version)
         return self._doc
 
     @property
-    def filtered_doc(self):
-        """Parsed XML document prepared as we do for export."""
-
-        result = self.doc.filter(self.VENDOR_FILTERS, isPP="Y")
-        root = result.result_tree.getroot()
-        self.__control.show_progress("filtered document...")
-        return root
+    def head(self):
+        if not hasattr(self, "_head"):
+            self._head = self.B.HEAD(self.B.META(charset="utf-8"), id="header")
+            compat = self.B.META(content="IE=edge")
+            compat.set("http-equiv", "X-UA-Compatible")
+            self._head.append(compat)
+            self._head.append(self.B.TITLE(self.title))
+            for url in self.PRECONNECT:
+                link = self.B.LINK(rel="prevcocnnect", href=url)
+                if not url.endswith("cancer.gov"):
+                    link.set("crossorigin")
+                self._head.append(link)
+            self._head.append(self.B.SCRIPT(src=self.ADOBE))
+            fonts = self.B.LINK(id="gFonts", rel="stylesheet", href=self.FONTS)
+            self._head.append(fonts)
+            for name, content in self.META:
+                self._head.append(self.B.META(name=name, content=content))
+            for url in self.CSS:
+                self._head.append(self.B.LINK(href=url, rel="stylesheet"))
+            for url, defer in self.SCRIPT:
+                script = self.B.SCRIPT(src=url, type="text/javascript")
+                if defer:
+                    script.set("defer")
+                self._head.append(script)
+            self._head.append(self.B.STYLE(self.STYLE))
+        return self._head
 
     @property
-    def gatekeeper_doc(self):
-        """Document returned by the GateKeeper SOAP service."""
+    def left_nav(self):
+        if not hasattr(self, "_left_nav"):
+            self._left_nav = self.B.DIV(
+                self.B.DIV(
+                    self.B.DIV(
+                        self.B.UL(
+                            self.B.LI(
+                                self.B.DIV(self.B.A(self.NAV, href="#")),
+                                self.B.CLASS("level-0 has-children"),
+                            ),
+                        ),
+                        self.B.CLASS("section-nav"),
+                    ),
+                    self.B.CLASS("slot-item only-SI"),
+                ),
+                self.B.CLASS("medium-3 columns local-navigation"),
+                id="nvcgSlSectionNav",
+            )
+        return self._left_nav
 
-        if self.__control.cached_html:
-            root = html.parse(self.__control.cached_html).getroot()
-            self.__control.show_progress("loaded cached html")
-            return root
-        else:
-            xml = etree.tostring(self.filtered_doc, encoding="unicode")
-            cdr2gk.DEBUGLEVEL = 0
-            if self.__control.debugging:
-                cdr2gk.DEBUGLEVEL = 3
-                self.__control.show_progress("gatekeeper debugging enabled...")
-            self.__control.show_progress("submitting doc to GateKeeper...")
-            flavor = self.__control.flavor
-            host = self.__control.gk_host
-            try:
-                response = cdr2gk.pubPreview(xml, flavor, host=host)
-            except Exception as e:
-                self.__control.logger.exception("GateKeeper failure")
-                self.__show_gatekeeper_error(str(e))
-            self.__control.show_progress("received GateKeeper response...")
-            return html.fromstring(response.xmlResult)
+    @property
+    def main(self):
+        if not hasattr(self, "_main"):
+            self._main = self.B.DIV(
+                self.B.E(
+                    "article",
+                    self.B.DIV(
+                        self.B.DIV(
+                            self.B.DIV(
+                                *self.results,
+                                self.B.CLASS("slot-item last-SI"),
+                            ),
+                            id="cgvBody",
+                        ),
+                        self.B.CLASS("resize-content"),
+                    ),
+                ),
+                self.B.CLASS("medium-9 columns contentzone has-section-nav"),
+                id="main",
+                tabindex="0",
+                role="main",
+            )
+        return self._main
 
     @property
     def page(self):
-        """Publish preview page ready for delivery."""
+        if not hasattr(self, "_page"):
+            attrs = dict(lang="en", id="htmlEl")
+            self._page = self.B.HTML(self.head, self.body, **attrs)
+        return self._page
 
-        root = self.gatekeeper_doc
-        root.find("head/title").text = f"Publish Preview: CDR{self.doc.id}"
-        if self.__control.preserve_links:
-            self.__control.show_progress("preserving original links...")
-        else:
-            self.__transform_links(root)
-        return root
+    @property
+    def results(self):
+        if not hasattr(self, "_results"):
+            self._results = []
+            for language in self.control.LANGUAGES:
+                for div in self.Result(self, language).divs:
+                    self._results.append(div)
+        return self._results
 
-    def __lookup_url(self, url):
-        """Find the document a URL belongs to."""
+    @property
+    def root(self):
+        if not hasattr(self, "_root"):
+            result = self.doc.filter(self.VENDOR_FILTERS)
+            self._root = result.result_tree.getroot()
+        return self._root
 
-        url = url.split("#")[0].rstrip("/")
-        query = self.__control.Query("query_term u", "u.doc_id")
-        query.join("active_doc d", "d.id = u.doc_id")
-        query.where(f"u.path IN ('{self.CIS_URL}', '{self.DIS_URL}')")
-        query.where(query.Condition("u.value", url, "LIKE"))
-        rows = query.execute(self.__control.cursor).fetchall()
-        return rows[0].doc_id if rows else None
+    @property
+    def title(self):
+        return f"Publish Preview: CDR{self.doc.id}"
 
-    def __show_gatekeeper_error(self, error):
-        """Explain what went wrong with GateKeeper and exit.
 
-        Pass:
-            error - string from raised exception
-        """
+    class Result:
+        def __init__(self, term, language):
+            self.__term = term
+            self.__language = language
 
-        message = "Unspecified error"
-        for error_type, pattern in self.GATEKEEPER_ERROR_MESSAGES:
-            matches = search(pattern, error)
-            if matches:
-                message = f"{error_type}: {matches.group()}"
-                break
-        extra = message, "Complete Error message below:", error
-        cdrcgi.bail("Error in PubPreview:", extra=extra)
+        @property
+        def audio(self):
+            if self.audio_url:
+                B = self.term.B
+                return B.A(
+                    B.SPAN("listen", B.CLASS("hidden")),
+                    B.CLASS("CDR_audiofile"),
+                    href=self.audio_url,
+                    type="ExternalLink",
+                )
+            return None
 
-    def __transform_links(self, root):
-        """Modify the links so that they will work locally."""
-
-        self.__control.show_progress("fixing links...")
-        cgov = self.__control.session.tier.hosts["CG"]
-        for link in root.xpath("//a[@href]"):
-            url = link.get("href", "").strip()
-            id = self.__lookup_url(url)
-            classes = link.get("class", "")
-            if "CDR_audiofile" in classes:
-                id = Doc.extract_id(url.replace(".mp3", ""))
-                link.set("href", f"GetCdrBlob.py?id={id}")
-                link.set("type", "ExternalLink")
-            elif url.startswith("http"):
-                link.set("type", "ExternalLink")
-            elif "#cit" in url:
-                link.set("type", "CitationLink")
-            elif url.startswith("#") and id == self.doc.id:
-                link.set("href", f"#{url.split('#')[1]}")
-                link.set("type", "SummaryFragRef-internal-frag")
-            elif url.startswith("/"):
+        @property
+        def audio_url(self):
+            if not hasattr(self, "_audio_url"):
+                self._audio_url = id = None
+                for node in self.term.root.findall("MediaLink"):
+                    if node.get("type") == "audio/mpeg":
+                        if node.get("language") == self.langcode:
+                            try:
+                                id = Doc.extract_id(node.get("ref"))
+                                break
+                            except Exception:
+                                self.term.control.logger.exception("audio ID")
                 if id:
-                    if id == self.doc.id and "#" in url:
-                        link.set("href", f"#{url.split('#')[1]}")
-                        link.set("type", "SummaryFragRef-internal+url")
-                    elif "#" in url:
-                        fragment = url.split("#")[1]
-                        new_url = f"PublishPreview.py?DocId={id}#{fragment}"
-                        link.set("href", new_url)
-                        link.set("type", "SummaryFragRef-external")
+                    self._audio_url = f"GetCdrBlob.py?id={id:d}"
+            return self._audio_url
+
+        @property
+        def definitions(self):
+            if not hasattr(self, "_definitions"):
+                self._definitions = []
+                B = self.term.B
+                name = "TermDefinition"
+                if self.langcode == "es":
+                    name = "SpanishTermDefinition"
+                #node = self.term.root.find(f"{name}/DefinitionText")
+                for node in self.term.root.findall(f"{name}/DefinitionText"):
+                    text = Doc.get_text(node, "").strip()
+                    if text:
+                        dd = B.DD(text, B.BR(), B.CLASS("definition"))
+                        related = self.related
+                        if related is not None:
+                            dd.append(self.related)
+                        self._definitions.append(dd)
+            return self._definitions
+
+        @property
+        def divs(self):
+            if not hasattr(self, "_divs"):
+                self._divs = []
+                if self.name:
+                    B = self.term.B
+                    for definition in self.definitions:
+                        dl = B.DL(self.dt, B.CLASS("dictionary-list"))
+                        div = B.DIV(B.BR(), dl, B.CLASS("results"))
+                        div.set("data-dict-type", "term")
+                        pronunciation = self.pronunciation
+                        if pronunciation is not None:
+                            dl.append(self.pronunciation)
+                        dl.append(definition)
+                        self._divs.append(div)
+            return self._divs
+
+        @property
+        def drugs(self):
+            if not hasattr(self, "_drugs"):
+                self._drugs = []
+                path = "RelatedInformation/RelatedDrugSummaryRef"
+                for node in self.term.root.findall(path):
+                    language = node.get("UseWith")
+                    if not language or language == self.langcode:
+                        self._drugs.append(self.Ref(self, node))
+            return self._drugs
+
+        @property
+        def dt(self):
+            if self.name:
+                B = self.term.B
+                dfn = B.DFN(self.name)
+                dfn.set("data-cdr-id", str(self.term.doc.id))
+                return B.DT(dfn)
+            return None
+
+        @property
+        def external(self):
+            if not hasattr(self, "_external"):
+                self._external = []
+                path = "RelatedInformation/RelatedExternalRef"
+                for node in self.term.root.findall(path):
+                    language = node.get("UseWith")
+                    if not language or language == self.langcode:
+                        self._external.append(self.Ref(self, node))
+            return self._external
+
+        @property
+        def images(self):
+            if not hasattr(self, "_images"):
+                self._images = []
+                for node in self.term.root.findall("MediaLink"):
+                    if node.get("type", "").startswith("image"):
+                        if node.get("language") == self.langcode:
+                            self._images.append(self.Image(self, node))
+            return self._images
+
+        @property
+        def key(self):
+            if not hasattr(self, "_key"):
+                self._key = None
+                if self.langcode == "en":
+                    node = self.term.root.find("TermPronunciation")
+                    self._key = Doc.get_text(node, "").strip()
+            return self._key
+
+        @property
+        def langcode(self):
+            if not hasattr(self, "_langcode"):
+                self._langcode = "en" if self.__language == "English" else "es"
+            return self._langcode
+
+        @property
+        def name(self):
+            if not hasattr(self, "_name"):
+                tag = "TermName"
+                if self.langcode == "es":
+                    tag = "SpanishTermName"
+                node = self.term.root.find(tag)
+                self._name = Doc.get_text(node, "").strip()
+            return self._name
+
+        @property
+        def pronunciation(self):
+            audio = self.audio
+            if not self.key and audio is None:
+                return None
+            B = self.term.B
+            children = []
+            if audio is not None:
+                children = [audio]
+            if self.key:
+                children.append(f" {self.key}")
+            return B.DD(*children, B.CLASS("pronunciation"))
+
+        @property
+        def related(self):
+            terms = self.terms
+            cis = self.summaries
+            dis = self.drugs
+            external = self.external
+            images = self.images
+            videos = self.videos
+            if not (terms or cis or dis or external or images or videos):
+                return None
+            B = self.term.B
+            div = B.DIV(B.CLASS("related-resources"))
+            if terms or cis or dis or external:
+                h6 = "More Information"
+                if self.langcode == "es":
+                    h6 = "M\xe1s informaci\xf3n"
+                div.append(B.H6(h6))
+            for collection in (external, cis, dis):
+                items = []
+                for ref in collection:
+                    item = ref.item
+                    if item is not None:
+                        items.append(item)
+                if items:
+                    div.append(B.UL(*items, B.CLASS("no-bullets")))
+            if terms:
+                label = "Definition of: "
+                items = [B.SPAN(label, B.CLASS("related-definition-label"))]
+                separator = None
+                for term in terms:
+                    if separator:
+                        items.append(separator)
+                    items.append(term.link)
+                    separator = ", "
+                div.append(B.P(*items))
+            for image in images:
+                div.append(image.figure)
+            for video in videos:
+                div.append(video.figure)
+            return B.DIV(div, id="pnlRelatedInfo")
+
+        @property
+        def summaries(self):
+            if not hasattr(self, "_summaries"):
+                self._summaries = []
+                path = "RelatedInformation/RelatedSummaryRef"
+                for node in self.term.root.findall(path):
+                    language = node.get("UseWith")
+                    if not language or language == self.langcode:
+                        self._summaries.append(self.Ref(self, node))
+            return self._summaries
+
+        @property
+        def term(self):
+            return self.__term
+
+        @property
+        def terms(self):
+            if not hasattr(self, "_terms"):
+                self._terms = []
+                path = "RelatedInformation/RelatedGlossaryTermRef"
+                for node in self.term.root.findall(path):
+                    language = node.get("UseWith")
+                    if not language or language == self.langcode:
+                        ref = self.Ref(self, node)
+                        if ref.link is not None:
+                            self._terms.append(ref)
+            return self._terms
+
+        @property
+        def videos(self):
+            if not hasattr(self, "_videos"):
+                self._videos = []
+                for node in self.term.root.findall("EmbeddedVideo"):
+                    langcode = node.get("language")
+                    if not langcode or langcode == self.langcode:
+                        self._videos.append(self.Video(self, node))
+            return self._videos
+
+
+        class Image:
+
+            def __init__(self, result, node):
+                self.__node = node
+                self.__result = result
+
+            @property
+            def alt(self):
+                if not hasattr(self, "_alt"):
+                    self._alt = self.__node.get("alt") or ""
+                return self._alt
+
+            @property
+            def caption(self):
+                if not hasattr(self, "_caption"):
+                    self._caption = ""
+                    for node in self.__node.findall("Caption"):
+                        langcode = node.get("language")
+                        if not langcode or langcode == self.__result.langcode:
+                            self._caption = Doc.get_text(node, "").strip()
+                return self._caption
+
+            @property
+            def enlarge(self):
+                if not hasattr(self, "_enlarge"):
+                    self._enlarge = "Enlarge"
+                    if self.__result.langcode == "es":
+                        self._enlarge = "Ampliar"
+                return self._enlarge
+
+            @property
+            def figure(self):
+                B = self.__result.term.B
+                href = f"GetCdrImage.py?id=CDR{self.id}-750.{self.suffix}"
+                src = f"GetCdrImage.py?id=CDR{self.id}-571.{self.suffix}"
+                return B.E(
+                    "figure",
+                    B.A(
+                        self.enlarge,
+                        B.CLASS("article-image-enlarge no-resize"),
+                        target="_blank",
+                        href=href,
+                    ),
+                    B.IMG(src=src, alt=self.alt),
+                    B.E(
+                        "figcaption",
+                        B.DIV(
+                            B.P(self.caption),
+                            B.CLASS("caption-container no-resize"),
+                        ),
+                    ),
+                    B.CLASS("image-left-medium"),
+                )
+
+            @property
+            def id(self):
+                if not hasattr(self, "_id"):
+                    try:
+                        self._id = Doc.extract_id(self.__node.get("ref"))
+                    except:
+                        self._id = None
+                return self._id
+
+            @property
+            def placement(self):
+                if not hasattr(self, "_placement"):
+                    self._placement = self.__node.get("placement")
+                return self._placement
+
+            @property
+            def suffix(self):
+                if not hasattr(self, "_suffix"):
+                    type = self.__node.get("type")
+                    if "gif" in type:
+                        self._suffix = "gif"
+                    elif "png" in type:
+                        self._suffix = "png"
                     else:
-                        link.set("href", f"PublishPreview.py?DocId={id}")
-                        link.set("type", "SummaryRef-external")
-                else:
-                    link.set("href", f"http://{cgov}{url}")
-            elif "=" in url:
-                link.set("href", f"PublishPreview.py?DocId=url.split('=')[1]")
-                link.set("type", "related-link")
-            else:
-                continue
-            link.set("ohref", url)
-        for script in root.findall("head/script"):
-            src = script.get("src", "")
-            if src.startswith("http://"):
-                script.set("src", f"proxy.py?url={src}")
-        for link in root.findall("head/link"):
-            href = link.get("href", "")
-            if href.startswith("http://"):
-                href = href.replace("cancer.gov//", "cancer.gov/")
-                link.set(f"proxy.py?url={href}")
-        path = "//a[starts-with(@onclick, 'javascript:popWindow')]"
-        for link in root.xpath(path):
-            link.set("href", "")
-            link.set("onclick", "return false")
-        for link in root.xpath("//*[starts-with(@src, 'http')]"):
-            src = link.get("src")
-            if "://cdr" in src:
-                link.set("src", "/" + src.split("//")[1].split("/", 1)[1])
+                        self._suffix = "jpg"
+                return self._suffix
+
+
+        class Ref:
+
+            def __init__(self, result, node):
+                self.__result = result
+                self.__node = node
+
+            @property
+            def item(self):
+                link = self.link
+                if self.link is None:
+                    return None
+                return self.__result.term.B.LI(link)
+
+            @property
+            def link(self):
+                if self.url:
+                    B = self.__result.term.B
+                    return B.A(self.text, href=self.url)
+                return None
+
+            @property
+            def text(self):
+                if not hasattr(self, "_text"):
+                    self._text = Doc.get_text(self.__node, "").strip()
+                return self._text
+
+            @property
+            def url(self):
+                if not hasattr(self, "_url"):
+                    if "External" in self.__node.tag:
+                        self._url = self.__node.get("xref", "")
+                    elif "Glossary" in self.__node.tag:
+                        href = self.__node.get("href", "")
+                        # XXX TODO FIX ME
+                        self._url = f"GlossaryPublishPreview.py?id={href}"
+                    else:
+                        url = self.__node.get("url", "")
+                        self._url = f"https://cancer.gov{url}"
+                return self._url
+
+
+        class Video:
+
+            def __init__(self, result, node):
+                self.__result = result
+                self.__node = node
+
+            @property
+            def caption(self):
+                if not hasattr(self, "_caption"):
+                    node = self.__node.find("Caption")
+                    self._caption = Doc.get_text(node, "").strip()
+                return self._caption
+
+            @property
+            def classes(self):
+                if not hasattr(self, "_classes"):
+                    size = 75
+                    if "100" in self.template:
+                        size = 100
+                    elif "50" in self.template:
+                        self = 50
+                    position = "center"
+                    if "Right" in self.template:
+                        position = "right"
+                    self._classes = f"video {position} size{size}"
+                return self._classes
+
+            @property
+            def figure(self):
+                B = self.__result.term.B
+                figure = B.E("figure", B.CLASS(self.classes))
+                if "NoTitle" not in self.template and self.title:
+                    figure.append(B.H4(self.title))
+                div = B.DIV(
+                    B.NOSCRIPT(
+                        B.P(
+                            B.A(
+                                "View this video on YouTube.",
+                                href=self.url,
+                                target="_blank",
+                                title=self.title,
+                            )
+                        ),
+                    ),
+                    B.CLASS("flex-video widescreen"),
+                    id=f"ytplayer-{self.uid}",
+                )
+                div.set("data-video-id", self.uid)
+                if self.title:
+                    div.set("data-video-title", self.title)
+                figure.append(div)
+                if self.caption:
+                    classes = B.CLASS("caption-container no-resize")
+                    caption = B.E("figcaption", self.caption, classes)
+                    figure.append(caption)
+                return figure
+
+            @property
+            def template(self):
+                if not hasattr(self, "_template"):
+                    default = "Video75NoTitle"
+                    self._template = self.__node.get("template", default)
+                return self._template
+
+            @property
+            def title(self):
+                if not hasattr(self, "_title"):
+                    node = self.__node.find("VideoTitle")
+                    self._title = Doc.get_text(node, "").strip()
+                return self._title
+
+            @property
+            def uid(self):
+                if not hasattr(self, "_uid"):
+                    self._uid = self.__node.get("unique_id", "")
+                return self._uid
+
+            @property
+            def url(self):
+                if not hasattr(self, "_url"):
+                    self._url = f"https://www.youtube.com/watch?v={self.uid}"
+                return self._url
 
 
 if __name__ == "__main__":
