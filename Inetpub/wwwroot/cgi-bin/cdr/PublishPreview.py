@@ -780,7 +780,8 @@ class GTN:
                 for node in self.term.root.findall("MediaLink"):
                     if node.get("type", "").startswith("image"):
                         if node.get("language") == self.langcode:
-                            self._images.append(self.Image(self, node))
+                            if node.get("audience") == "Patients":
+                                self._images.append(self.Image(self, node))
             return self._images
 
         @property
@@ -914,7 +915,9 @@ class GTN:
                 for node in self.term.root.findall("EmbeddedVideo"):
                     langcode = node.get("language")
                     if not langcode or langcode == self.langcode:
-                        self._videos.append(self.Video(self, node))
+                        audience = node.get("audience")
+                        if not audience or audience == "Patients":
+                            self._videos.append(self.Video(self, node))
             return self._videos
 
 
