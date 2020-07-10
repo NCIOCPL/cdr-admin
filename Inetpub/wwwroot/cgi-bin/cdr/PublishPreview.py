@@ -105,6 +105,8 @@ class Control(Controller):
                 self._id = Doc.extract_id(id)
             except:
                 self.bail("Invalid ID")
+            if self._id <= 0:
+                self.bail("Invalid ID")
         return self._id
 
     @property
@@ -251,6 +253,8 @@ class Summary:
             self.__control.show_progress("logging on to Drupal CMS...")
             response = requests.post(url, json=data, verify=False)
             cookies = response.cookies
+            self.__control.show_progress("clearing old temp docs...")
+            self.client.remove(-self.doc.id)
             self.__control.show_progress("pushing summary values to Drupal...")
             nid = self.client.push(self.values)
             url = f"{self.client.base}{espanol}/node/{nid}"
