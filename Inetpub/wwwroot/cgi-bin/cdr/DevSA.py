@@ -47,7 +47,6 @@ class Control(Controller):
             ("Unblock Documents", "UnblockDoc.py"),
             ("Unlock Media", "UnlockMedia.py"),
             ("Update Mapping Table", "EditExternalMap.py"),
-            ("Update ZIP Codes", "upload-zip-code-file.py"),
             ("View Logs", "log-tail.py"),
         ):
             if not self.ON_PROD or script != self.SET_NEXT_JOB_ID:
