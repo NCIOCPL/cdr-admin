@@ -80,6 +80,7 @@ class Control(Controller):
             ("Changes to Summaries", "ChangesToSummaries.py"),
             ("History of Changes to Summary", "SummaryChanges.py"),
             ("PCIB Statistics Report", "RunPCIBStatReport.py"),
+            ("Standard Wording", "SummaryStandardWording.py"),
             ("Summaries Citations", "SummaryCitations.py"),
             ("Summaries Comments", "SummaryComments.py"),
             ("Summaries Comprehensive Review Date Report", "SummaryCRD.py"),
