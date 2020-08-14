@@ -35,7 +35,7 @@ class Control(Controller):
         fieldset.append(page.B.P(self.INSTRUCTIONS))
         prefix = "It is recommended that you run the "
         suffix = " to check for links to the documents you plan to delete."
-        opts = dict(href="LindedDocs.py", target="_blank")
+        opts = dict(href="LinkedDocs.py", target="_blank")
         link = page.B.A("linked-docs report", **opts)
         warning = page.B.P(prefix, link, suffix, page.B.CLASS("warning"))
         fieldset.append(warning)
