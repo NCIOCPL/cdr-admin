@@ -15,8 +15,8 @@ class Control(Controller):
     INSTRUCTIONS = (
         "This page can be used to request re-publishing of CDR documents "
         "which have already been sent to Cancer.gov, in a way which "
-        "bypasses the optimization which normally prevents sending of "
-        "an unchanged document to the Cancer.gov GateKeeper program.",
+        "bypasses the optimization which normally prevents pushing of "
+        "an unchanged document to the Cancer.gov web site.",
         "You may enter one or more CDR Document IDs, and/or one or "
         "more publishing Job IDs.  Separate multiple ID values with "
         "spaces.  You may also select a Document Type. "
@@ -36,15 +36,11 @@ class Control(Controller):
         "An export job will be created for generating the "
         "output suitable for publishing. This job, if successful, "
         "will in turn create a second job for pushing the "
-        "exported jobs to the GateKeeper at Cancer.gov.",
+        "exported jobs to Cancer.gov.",
         "You may optionally add an Email Address to which "
         "status notifications for the progress of the new publishing "
         "jobs will be sent, with links to pages with additional "
         "information about the status for the jobs.",
-        "Specify the fully qualified domain name or IP address for "
-        "the GateKeeper host to which the republishing job is to be "
-        "directed if it is not the default host for the CDR server "
-        "from which the request originates.",
     )
 
     def populate_form(self, page):
@@ -65,9 +61,6 @@ class Control(Controller):
         fieldset.append(page.select("doctype", **opts))
         opts = dict(label="Email", value=self.email)
         fieldset.append(page.text_field("email", **opts))
-        fieldset.append(page.text_field("host", label="GK Host"))
-        opts = dict(label="GK Target", value="Live")
-        fieldset.append(page.text_field("target", **opts))
         page.form.append(fieldset)
         fieldset = page.fieldset("Options")
         opts = dict(value="all", label="Include all documents for type")
@@ -141,16 +134,6 @@ class Control(Controller):
         return self._email
 
     @property
-    def gatekeeper_host(self):
-        """Optional GateKeeper host name entered on the form."""
-        return self.fields.getvalue("host")
-
-    @property
-    def gatekeeper_target(self):
-        """Optional GateKeeper target name entered on the form."""
-        return self.fields.getvalue("target")
-
-    @property
     def include_all_documents_for_type(self):
         """Boolean indicating whether to do a full doctype republish."""
         return True if "all" in self.options else False
@@ -205,8 +188,6 @@ class Control(Controller):
                         self.include_all_documents_for_type,
                         self.include_only_failed_documents,
                         self.email,
-                        self.gatekeeper_host,
-                        self.gatekeeper_target,
                     )
                     job_id = republisher.republish(*args)
                     subtitle = f"Export job {job_id:d} created successfully"
