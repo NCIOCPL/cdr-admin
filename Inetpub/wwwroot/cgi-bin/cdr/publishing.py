@@ -530,9 +530,7 @@ class PublishingSystem:
                 if not hasattr(self, "_default"):
                     self._default = Doc.get_text(self.__node.find("ParmValue"))
                     if not self._default:
-                        if self.name == "GKServer":
-                            self._default = self.hosts.get("GK")
-                        elif self.name == "DrupalServer":
+                        if self.name == "DrupalServer":
                             self._default = self.hosts.get("DRUPAL")
                 return self._default
 

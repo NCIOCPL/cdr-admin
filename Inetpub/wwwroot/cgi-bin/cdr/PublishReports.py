@@ -15,7 +15,6 @@ class Control(Controller):
         ol = page.B.OL()
         page.form.append(ol)
         for display, script in (
-            ("Gatekeeper Status Request", "GatekeeperStatus.py"),
             ("Published Document Count (Latest Weekly Export Job)",
              "CountByDoctype.py"),
             ("Publishing Job Activities", "PubStatus.py"),
